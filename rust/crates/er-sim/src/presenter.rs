@@ -3,9 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-use er_types::{PresentationEvent, PresentationEventId, PresentationOutcome, SeatId};
 use er_types::battle_ids::BattlePresentationEventId;
 use er_types::battle_ui::{BattlePresentationEvent, PresentationSettlementOutcome};
+use er_types::{PresentationEvent, PresentationEventId, PresentationOutcome, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -94,13 +94,9 @@ pub enum PresenterError {
     #[error("presentation event {event_id} is already settled")]
     AlreadySettled { event_id: PresentationEventId },
     #[error("battle presentation event {event_id:?} is unknown")]
-    UnknownBattleEvent {
-        event_id: BattlePresentationEventId,
-    },
+    UnknownBattleEvent { event_id: BattlePresentationEventId },
     #[error("battle presentation event {event_id:?} is already settled")]
-    BattleAlreadySettled {
-        event_id: BattlePresentationEventId,
-    },
+    BattleAlreadySettled { event_id: BattlePresentationEventId },
     #[error("battle presentation settlement outcome is invalid")]
     InvalidBattleOutcome,
     #[error("presenter state is invalid: {reason}")]
@@ -140,15 +136,9 @@ pub trait Presenter: fmt::Debug {
 
     fn settled_event_ids(&self, endpoint: SeatId) -> BTreeSet<PresentationEventId>;
 
-    fn pending_battle_event_ids(
-        &self,
-        endpoint: SeatId,
-    ) -> BTreeSet<BattlePresentationEventId>;
+    fn pending_battle_event_ids(&self, endpoint: SeatId) -> BTreeSet<BattlePresentationEventId>;
 
-    fn settled_battle_event_ids(
-        &self,
-        endpoint: SeatId,
-    ) -> BTreeSet<BattlePresentationEventId>;
+    fn settled_battle_event_ids(&self, endpoint: SeatId) -> BTreeSet<BattlePresentationEventId>;
 
     fn diagnostics_for(&self, endpoint: SeatId) -> PresenterDiagnostics {
         PresenterDiagnostics {
@@ -184,9 +174,11 @@ pub fn restore_presenter(state: PresenterState) -> Result<Box<dyn Presenter>, Pr
 
 impl PresenterState {
     pub fn validate(&self) -> Result<(), PresenterError> {
-        if has_duplicate_or_unsorted(self.pending.iter().map(|entry| {
-            (entry.endpoint, entry.event.event_id)
-        })) {
+        if has_duplicate_or_unsorted(
+            self.pending
+                .iter()
+                .map(|entry| (entry.endpoint, entry.event.event_id)),
+        ) {
             return Err(PresenterError::InvalidState {
                 reason: "legacy pending events must be strictly sorted and unique".to_owned(),
             });
@@ -200,16 +192,20 @@ impl PresenterState {
                 reason: "legacy outcomes must be strictly sorted and unique".to_owned(),
             });
         }
-        if has_duplicate_or_unsorted(self.battle_pending.iter().map(|entry| {
-            (entry.endpoint, entry.event.event_id.clone())
-        })) {
+        if has_duplicate_or_unsorted(
+            self.battle_pending
+                .iter()
+                .map(|entry| (entry.endpoint, entry.event.event_id.clone())),
+        ) {
             return Err(PresenterError::InvalidState {
                 reason: "battle pending events must be strictly sorted and unique".to_owned(),
             });
         }
-        if has_duplicate_or_unsorted(self.battle_outcomes.iter().map(|entry| {
-            (entry.endpoint, entry.event_id.clone())
-        })) {
+        if has_duplicate_or_unsorted(
+            self.battle_outcomes
+                .iter()
+                .map(|entry| (entry.endpoint, entry.event_id.clone())),
+        ) {
             return Err(PresenterError::InvalidState {
                 reason: "battle outcomes must be strictly sorted and unique".to_owned(),
             });
@@ -239,12 +235,15 @@ impl PresenterState {
             .iter()
             .map(|entry| (entry.endpoint, entry.event_id.clone()))
             .collect::<BTreeSet<_>>();
-        if pending.iter().any(|key| outcomes.contains(key) || tombstones.contains(key))
+        if pending
+            .iter()
+            .any(|key| outcomes.contains(key) || tombstones.contains(key))
             || outcomes != tombstones
         {
             return Err(PresenterError::InvalidState {
-                reason: "battle pending identities must be unsettled and outcomes must match tombstones"
-                    .to_owned(),
+                reason:
+                    "battle pending identities must be unsettled and outcomes must match tombstones"
+                        .to_owned(),
             });
         }
 
@@ -310,8 +309,7 @@ where
 #[derive(Debug, Default)]
 pub struct InstantPresenter {
     settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
-    battle_settled:
-        BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
+    battle_settled: BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
     disposed: bool,
 }
 
@@ -337,11 +335,13 @@ impl InstantPresenter {
             battle_outcomes: self
                 .battle_settled
                 .iter()
-                .map(|((endpoint, event_id), outcome)| PresenterBattleOutcomeState {
-                    endpoint: *endpoint,
-                    event_id: event_id.clone(),
-                    outcome: outcome.clone(),
-                })
+                .map(
+                    |((endpoint, event_id), outcome)| PresenterBattleOutcomeState {
+                        endpoint: *endpoint,
+                        event_id: event_id.clone(),
+                        outcome: outcome.clone(),
+                    },
+                )
                 .collect(),
             tombstones: self
                 .battle_settled
@@ -479,17 +479,11 @@ impl Presenter for InstantPresenter {
             .collect()
     }
 
-    fn pending_battle_event_ids(
-        &self,
-        _endpoint: SeatId,
-    ) -> BTreeSet<BattlePresentationEventId> {
+    fn pending_battle_event_ids(&self, _endpoint: SeatId) -> BTreeSet<BattlePresentationEventId> {
         BTreeSet::new()
     }
 
-    fn settled_battle_event_ids(
-        &self,
-        endpoint: SeatId,
-    ) -> BTreeSet<BattlePresentationEventId> {
+    fn settled_battle_event_ids(&self, endpoint: SeatId) -> BTreeSet<BattlePresentationEventId> {
         self.battle_settled
             .keys()
             .filter_map(|(key_endpoint, event_id)| {
@@ -526,8 +520,7 @@ pub struct FaultPresenter {
     pending: BTreeMap<(SeatId, PresentationEventId), PresentationEvent>,
     settled: BTreeMap<(SeatId, PresentationEventId), PresentationOutcome>,
     battle_pending: BTreeMap<(SeatId, BattlePresentationEventId), BattlePresentationEvent>,
-    battle_settled:
-        BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
+    battle_settled: BTreeMap<(SeatId, BattlePresentationEventId), PresentationSettlementOutcome>,
     battle_tombstones: BTreeSet<(SeatId, BattlePresentationEventId)>,
     disposed: bool,
 }
@@ -568,11 +561,13 @@ impl FaultPresenter {
             battle_outcomes: self
                 .battle_settled
                 .iter()
-                .map(|((endpoint, event_id), outcome)| PresenterBattleOutcomeState {
-                    endpoint: *endpoint,
-                    event_id: event_id.clone(),
-                    outcome: outcome.clone(),
-                })
+                .map(
+                    |((endpoint, event_id), outcome)| PresenterBattleOutcomeState {
+                        endpoint: *endpoint,
+                        event_id: event_id.clone(),
+                        outcome: outcome.clone(),
+                    },
+                )
                 .collect(),
             tombstones: self
                 .battle_tombstones
@@ -615,12 +610,22 @@ impl FaultPresenter {
             battle_pending: state
                 .battle_pending
                 .into_iter()
-                .map(|pending| ((pending.endpoint, pending.event.event_id.clone()), pending.event))
+                .map(|pending| {
+                    (
+                        (pending.endpoint, pending.event.event_id.clone()),
+                        pending.event,
+                    )
+                })
                 .collect(),
             battle_settled: state
                 .battle_outcomes
                 .into_iter()
-                .map(|outcome| ((outcome.endpoint, outcome.event_id.clone()), outcome.outcome))
+                .map(|outcome| {
+                    (
+                        (outcome.endpoint, outcome.event_id.clone()),
+                        outcome.outcome,
+                    )
+                })
                 .collect(),
             battle_tombstones: state
                 .tombstones
@@ -752,10 +757,7 @@ impl Presenter for FaultPresenter {
             .collect()
     }
 
-    fn pending_battle_event_ids(
-        &self,
-        endpoint: SeatId,
-    ) -> BTreeSet<BattlePresentationEventId> {
+    fn pending_battle_event_ids(&self, endpoint: SeatId) -> BTreeSet<BattlePresentationEventId> {
         self.battle_pending
             .iter()
             .filter_map(|((key_endpoint, event_id), _)| {
@@ -764,10 +766,7 @@ impl Presenter for FaultPresenter {
             .collect()
     }
 
-    fn settled_battle_event_ids(
-        &self,
-        endpoint: SeatId,
-    ) -> BTreeSet<BattlePresentationEventId> {
+    fn settled_battle_event_ids(&self, endpoint: SeatId) -> BTreeSet<BattlePresentationEventId> {
         self.battle_settled
             .keys()
             .filter_map(|(key_endpoint, event_id)| {

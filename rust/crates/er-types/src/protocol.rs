@@ -6,13 +6,13 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _, se
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::{
-    ConnectionGeneration, GameButton, MembershipRevision, OperationId, PresentationEventId,
-    RawInputEvent, Revision, RunId, SafeU53, SeatId, SessionId, TimerId, UiState, UiViewModel,
-};
 use crate::battle_ids::BattlePresentationEventId;
 use crate::battle_ui::{
     BattlePresentationEvent, BattleUiProjection, PresentationSettlementOutcome,
+};
+use crate::{
+    ConnectionGeneration, GameButton, MembershipRevision, OperationId, PresentationEventId,
+    RawInputEvent, Revision, RunId, SafeU53, SeatId, SessionId, TimerId, UiState, UiViewModel,
 };
 
 pub const PROTOCOL_VERSION: &str = "er-coop-47";

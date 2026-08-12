@@ -351,17 +351,17 @@ impl KernelScheduler {
                 registration: registration.clone(),
             })
             .collect::<Vec<_>>();
-        timers.sort_by_key(|timer| {
-            (timer.registration.endpoint, timer.registration.timer_id)
-        });
+        timers.sort_by_key(|timer| (timer.registration.endpoint, timer.registration.timer_id));
         let pauses = self
             .pause_reasons
             .iter()
-            .map(|((endpoint, time_class), reasons)| KernelSchedulerPauseState {
-                endpoint: *endpoint,
-                time_class: *time_class,
-                reasons: reasons.iter().cloned().collect(),
-            })
+            .map(
+                |((endpoint, time_class), reasons)| KernelSchedulerPauseState {
+                    endpoint: *endpoint,
+                    time_class: *time_class,
+                    reasons: reasons.iter().cloned().collect(),
+                },
+            )
             .collect();
         KernelSchedulerRestorableState {
             next_timer_id: self.next_timer_id,
@@ -481,12 +481,7 @@ fn validate_restorable_state(
     let timer_keys = state
         .timers
         .iter()
-        .map(|timer| {
-            (
-                timer.registration.endpoint,
-                timer.registration.timer_id,
-            )
-        })
+        .map(|timer| (timer.registration.endpoint, timer.registration.timer_id))
         .collect::<Vec<_>>();
     if timer_keys.windows(2).any(|pair| pair[0] >= pair[1]) {
         return Err(invalid(

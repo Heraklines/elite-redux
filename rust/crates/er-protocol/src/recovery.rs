@@ -1665,7 +1665,7 @@ impl RecoveryTransaction {
         actions
     }
 
-fn terminalize_with_actions(
+    fn terminalize_with_actions(
         &mut self,
         reason: String,
         scheduler: &mut KernelScheduler,
@@ -1808,7 +1808,9 @@ impl crate::snapshot::RecoveryTransactionSnapshotBridge for RecoveryTransaction 
                     "recovery timer metadata does not match its retained kind and configuration",
                 ));
             }
-            if scheduler.is_disposed() || scheduler.timer(retained.timer.timer_id) != Some(&retained.timer) {
+            if scheduler.is_disposed()
+                || scheduler.timer(retained.timer.timer_id) != Some(&retained.timer)
+            {
                 return Err(recovery_snapshot_invalid(
                     "recovery.timers",
                     "retained recovery timer is not the exact registration in the restored scheduler",
@@ -2057,8 +2059,12 @@ fn validate_recovery_snapshot_state(
                     "bundle presence does not match the active recovery phase",
                 ));
             }
-            if matches!(phase, RecoveryPhase::FenceAcquired | RecoveryPhase::FrontierCaptured | RecoveryPhase::Requested)
-                && bundle.is_some()
+            if matches!(
+                phase,
+                RecoveryPhase::FenceAcquired
+                    | RecoveryPhase::FrontierCaptured
+                    | RecoveryPhase::Requested
+            ) && bundle.is_some()
             {
                 return Err(recovery_snapshot_invalid(
                     "recovery.bundle",
@@ -2073,8 +2079,14 @@ fn validate_recovery_snapshot_state(
                     "frontier-installed recovery must allow its exact control projection",
                 ));
             }
-            if matches!(phase, RecoveryPhase::FenceAcquired | RecoveryPhase::FrontierCaptured | RecoveryPhase::Requested | RecoveryPhase::Validated | RecoveryPhase::MaterialApplied)
-                && snapshot.fence.control_projection_allowed
+            if matches!(
+                phase,
+                RecoveryPhase::FenceAcquired
+                    | RecoveryPhase::FrontierCaptured
+                    | RecoveryPhase::Requested
+                    | RecoveryPhase::Validated
+                    | RecoveryPhase::MaterialApplied
+            ) && snapshot.fence.control_projection_allowed
             {
                 return Err(recovery_snapshot_invalid(
                     "recovery.fence.control_projection_allowed",
@@ -2092,7 +2104,9 @@ fn validate_recovery_snapshot_state(
                 }
             }
             let timer_shape = match phase {
-                RecoveryPhase::Requested => request_timers == 1 && control_timers == 0 && pacing_timers == 0,
+                RecoveryPhase::Requested => {
+                    request_timers == 1 && control_timers == 0 && pacing_timers == 0
+                }
                 RecoveryPhase::FrontierInstalled => {
                     request_timers == 0 && control_timers == 1 && pacing_timers <= 1
                 }
@@ -2220,7 +2234,10 @@ fn decode_recovery_hex(
 ) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
     let raw = bytes.as_str().as_bytes();
     if raw.len() % 2 != 0 {
-        return Err(recovery_snapshot_canonical(path, "canonical payload has odd hex length"));
+        return Err(recovery_snapshot_canonical(
+            path,
+            "canonical payload has odd hex length",
+        ));
     }
     let mut decoded = Vec::with_capacity(raw.len() / 2);
     for pair in raw.chunks_exact(2) {
@@ -2233,7 +2250,10 @@ fn decode_recovery_hex(
         decoded.push((high << 4) | low);
     }
     if decoded.is_empty() {
-        return Err(recovery_snapshot_canonical(path, "canonical payload must not be empty"));
+        return Err(recovery_snapshot_canonical(
+            path,
+            "canonical payload must not be empty",
+        ));
     }
     Ok(decoded)
 }

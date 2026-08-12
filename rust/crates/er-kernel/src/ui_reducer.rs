@@ -1,15 +1,14 @@
 //! Logical menu reducer and immutable renderer projection.
 
+use er_types::battle_control::{BattleControl, BattleControlError};
+use er_types::battle_ids::MenuInstanceId;
+use er_types::battle_ui::{
+    BattleMenu, BattleMenuError, BattleUiProjection, BattleUiProjectionError, NavigationDirection,
+};
 use er_types::{
     ButtonEvent, CancelPolicy, GameButton, MenuGeneration, MenuOption, MenuOptionId,
     MenuOptionView, MenuState, SafeU53, SeatId, UiIntent, UiRejectReason, UiState, UiViewKind,
     UiViewModel,
-};
-use er_types::battle_control::{BattleControl, BattleControlError};
-use er_types::battle_ids::MenuInstanceId;
-use er_types::battle_ui::{
-    BattleMenu, BattleMenuError, BattleUiProjection, BattleUiProjectionError,
-    NavigationDirection,
 };
 use thiserror::Error;
 
@@ -650,10 +649,7 @@ impl BattleUiReducer {
         self.projection.actionable && self.current_menu().is_some()
     }
 
-    pub(crate) fn install(
-        &mut self,
-        projection: BattleUiProjection,
-    ) -> Result<(), BattleUiReject> {
+    pub(crate) fn install(&mut self, projection: BattleUiProjection) -> Result<(), BattleUiReject> {
         projection.validate()?;
         if let Some(menu) = menu_for_control(&projection.seat_control.control) {
             menu.validate()?;
@@ -703,9 +699,7 @@ impl BattleUiReducer {
             GameButton::Down => self.navigate(NavigationDirection::Down),
             GameButton::Left => self.navigate(NavigationDirection::Left),
             GameButton::Right => self.navigate(NavigationDirection::Right),
-            GameButton::Submit | GameButton::Action => {
-                self.activate(seat, expected_instance_id)
-            }
+            GameButton::Submit | GameButton::Action => self.activate(seat, expected_instance_id),
             GameButton::Cancel => self.cancel(seat, expected_instance_id),
             GameButton::Menu
             | GameButton::Stats
@@ -726,7 +720,9 @@ impl BattleUiReducer {
         direction: NavigationDirection,
     ) -> Result<BattleUiReduction, BattleUiReject> {
         let (current, edge_target) = {
-            let menu = self.current_menu().ok_or(BattleUiReject::UnsupportedButton)?;
+            let menu = self
+                .current_menu()
+                .ok_or(BattleUiReject::UnsupportedButton)?;
             menu.validate()?;
             let current = menu.selected_option_id.clone();
             let edge_target = menu
@@ -747,9 +743,13 @@ impl BattleUiReducer {
             .ok_or(BattleUiReject::UnsupportedButton)?
             .option(target.clone())
             .map(|option| option.visibility.is_visible())
-            .ok_or(BattleUiReject::Menu(BattleMenuError::UnknownNavigationEndpoint))?;
+            .ok_or(BattleUiReject::Menu(
+                BattleMenuError::UnknownNavigationEndpoint,
+            ))?;
         if !destination_visible {
-            return Err(BattleUiReject::Menu(BattleMenuError::HiddenNavigationEndpoint));
+            return Err(BattleUiReject::Menu(
+                BattleMenuError::HiddenNavigationEndpoint,
+            ));
         }
         if target == current {
             return Ok(BattleUiReduction {
@@ -769,7 +769,9 @@ impl BattleUiReducer {
         seat: SeatId,
         menu_instance_id: MenuInstanceId,
     ) -> Result<BattleUiReduction, BattleUiReject> {
-        let menu = self.current_menu().ok_or(BattleUiReject::UnsupportedButton)?;
+        let menu = self
+            .current_menu()
+            .ok_or(BattleUiReject::UnsupportedButton)?;
         let option = menu
             .option(menu.selected_option_id.clone())
             .ok_or(BattleUiReject::DisabledOption)?;
@@ -792,7 +794,9 @@ impl BattleUiReducer {
         seat: SeatId,
         menu_instance_id: MenuInstanceId,
     ) -> Result<BattleUiReduction, BattleUiReject> {
-        let menu = self.current_menu().ok_or(BattleUiReject::UnsupportedButton)?;
+        let menu = self
+            .current_menu()
+            .ok_or(BattleUiReject::UnsupportedButton)?;
         if !control_allows_cancel(&self.projection.seat_control.control) {
             return Err(BattleUiReject::UnsupportedButton);
         }
@@ -835,7 +839,9 @@ fn set_selected_option(
         }
     };
     if !menu.is_visible(&option_id) {
-        return Err(BattleUiReject::Menu(BattleMenuError::HiddenNavigationEndpoint));
+        return Err(BattleUiReject::Menu(
+            BattleMenuError::HiddenNavigationEndpoint,
+        ));
     }
     menu.selected_option_id = option_id;
     Ok(())

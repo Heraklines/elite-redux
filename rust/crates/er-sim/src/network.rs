@@ -427,7 +427,7 @@ impl FaultNetwork {
                 connection_generation,
                 payload,
                 deliver_at_ms,
-                },
+            },
             queue_order_id,
             enqueued_at_ms: effective_now_ms,
             source_generation,
@@ -581,10 +581,7 @@ impl FaultNetwork {
             .map(|queued| queued.kind)
     }
 
-    pub fn packet_disposition(
-        &self,
-        packet_id: SafeU53,
-    ) -> Option<FaultNetworkPacketDisposition> {
+    pub fn packet_disposition(&self, packet_id: SafeU53) -> Option<FaultNetworkPacketDisposition> {
         self.queue
             .iter()
             .find(|queued| queued.packet.packet_id == packet_id)
@@ -659,9 +656,7 @@ impl FaultNetwork {
         }
     }
 
-    fn peek_packet_and_queue_ids(
-        &self,
-    ) -> Result<(SafeU53, SafeU53, u64, u64), FaultNetworkError> {
+    fn peek_packet_and_queue_ids(&self) -> Result<(SafeU53, SafeU53, u64, u64), FaultNetworkError> {
         let (packet_id, next_packet_id) = self.peek_packet_id()?;
         let queue_order_id = SafeU53::new(self.next_queue_order_id)
             .map_err(|_| FaultNetworkError::QueueOrderExhausted)?;
@@ -815,7 +810,8 @@ impl FaultNetwork {
                 .filter(|queued| !seen.contains(&queued.packet.packet_id))
                 .cloned(),
         );
-        let next_queue_order_id = relabel_queue_order_ids(&mut reordered, self.next_queue_order_id)?;
+        let next_queue_order_id =
+            relabel_queue_order_ids(&mut reordered, self.next_queue_order_id)?;
         self.queue = reordered;
         self.next_queue_order_id = next_queue_order_id;
         self.reordered_packet_ids = seen;
@@ -889,10 +885,9 @@ impl FaultNetwork {
                 .map_err(|reason| FaultNetworkError::InvalidFault { reason })?;
         }
         let expected_kind = self.queue[index].kind;
-        self.queue[index].payload_corrupted = classify_payload_strict(
-            &self.queue[index].packet.payload,
-        )
-        .map_or(true, |actual_kind| actual_kind != expected_kind);
+        self.queue[index].payload_corrupted =
+            classify_payload_strict(&self.queue[index].packet.payload)
+                .map_or(true, |actual_kind| actual_kind != expected_kind);
         increment_diagnostic_counter(&mut self.corrupted_count);
         Ok(())
     }
@@ -935,14 +930,8 @@ impl FaultNetworkState {
             });
         }
 
-        if self
-            .disconnected
-            .windows(2)
-            .any(|pair| pair[0] >= pair[1])
-            || self
-                .suspended
-                .windows(2)
-                .any(|pair| pair[0] >= pair[1])
+        if self.disconnected.windows(2).any(|pair| pair[0] >= pair[1])
+            || self.suspended.windows(2).any(|pair| pair[0] >= pair[1])
             || self
                 .disconnected
                 .iter()
@@ -961,8 +950,7 @@ impl FaultNetworkState {
             .any(|pair| pair[0] >= pair[1])
         {
             return Err(FaultNetworkError::InvalidState {
-                reason: "reordered packet identities must be strictly sorted and unique"
-                    .to_owned(),
+                reason: "reordered packet identities must be strictly sorted and unique".to_owned(),
             });
         }
 
@@ -990,15 +978,10 @@ impl FaultNetworkState {
             }
             if !queue_order_ids.insert(queued.queue_order_id) {
                 return Err(FaultNetworkError::InvalidState {
-                    reason: format!(
-                        "queue-order ID {} is duplicated",
-                        queued.queue_order_id
-                    ),
+                    reason: format!("queue-order ID {} is duplicated", queued.queue_order_id),
                 });
             }
-            if previous_queue_order_id
-                .is_some_and(|previous| previous >= queued.queue_order_id)
-            {
+            if previous_queue_order_id.is_some_and(|previous| previous >= queued.queue_order_id) {
                 return Err(FaultNetworkError::InvalidState {
                     reason: "packets must be strictly sorted by queue-order ID".to_owned(),
                 });
@@ -1024,8 +1007,7 @@ impl FaultNetworkState {
 
             let expected_stale = self.disconnected.contains(&queued.packet.from)
                 || self.disconnected.contains(&queued.packet.to)
-                || generations.get(&queued.packet.from).copied()
-                    != Some(queued.source_generation)
+                || generations.get(&queued.packet.from).copied() != Some(queued.source_generation)
                 || generations.get(&queued.packet.to).copied()
                     != Some(queued.destination_generation)
                 || Some(queued.packet.connection_generation)
@@ -1041,8 +1023,7 @@ impl FaultNetworkState {
             let family_matches = matches!(
                 (&queued.kind, &queued.packet.payload),
                 (
-                    FaultNetworkPacketKind::AuthorityFrame
-                        | FaultNetworkPacketKind::ControlReceipt,
+                    FaultNetworkPacketKind::AuthorityFrame | FaultNetworkPacketKind::ControlReceipt,
                     NetworkPayload::Frame(_)
                 ) | (
                     FaultNetworkPacketKind::CommandProposal
@@ -1073,13 +1054,9 @@ impl FaultNetworkState {
 
             match (reordered.contains(&packet_id), queued.reorder_rank) {
                 (true, Some(rank)) => {
-                    if rank.get() != expected_reorder_rank
-                        || !seen_reorder_ids.insert(packet_id)
-                    {
+                    if rank.get() != expected_reorder_rank || !seen_reorder_ids.insert(packet_id) {
                         return Err(FaultNetworkError::InvalidState {
-                            reason: format!(
-                                "packet {packet_id} has an inconsistent reorder rank"
-                            ),
+                            reason: format!("packet {packet_id} has an inconsistent reorder rank"),
                         });
                     }
                     expected_reorder_rank = expected_reorder_rank.saturating_add(1);
@@ -1097,11 +1074,10 @@ impl FaultNetworkState {
                 reason: "reordered identities must refer to queued packets".to_owned(),
             });
         }
-        let reorder_len = u64::try_from(reordered.len()).map_err(|_| {
-            FaultNetworkError::InvalidState {
+        let reorder_len =
+            u64::try_from(reordered.len()).map_err(|_| FaultNetworkError::InvalidState {
                 reason: "reorder identity count exceeds u64".to_owned(),
-            }
-        })?;
+            })?;
         if expected_reorder_rank != reorder_len {
             return Err(FaultNetworkError::InvalidState {
                 reason: "reorder ranks must cover exactly the explicitly held packets".to_owned(),
@@ -1337,9 +1313,7 @@ fn classify_payload(payload: &NetworkPayload) -> (FaultNetworkPacketKind, bool) 
     }
 }
 
-fn classify_payload_strict(
-    payload: &NetworkPayload,
-) -> Result<FaultNetworkPacketKind, String> {
+fn classify_payload_strict(payload: &NetworkPayload) -> Result<FaultNetworkPacketKind, String> {
     match payload {
         NetworkPayload::Proposal(proposal) => {
             if proposal.fingerprint.starts_with("brp1-") {

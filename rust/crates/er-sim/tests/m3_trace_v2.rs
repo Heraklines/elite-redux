@@ -14,7 +14,11 @@ fn failure_evidence_validation_is_owner_scoped_and_line_safe() {
         expected: Some("accepted".to_owned()),
         actual: Some("rejected".to_owned()),
     };
-    assert!(evidence.validate(Some(TraceFailureOwnerV2::Endpoint)).is_ok());
+    assert!(
+        evidence
+            .validate(Some(TraceFailureOwnerV2::Endpoint))
+            .is_ok()
+    );
     assert!(evidence.validate(Some(TraceFailureOwnerV2::Guest)).is_err());
 
     let mut unsafe_evidence = evidence;
@@ -97,6 +101,9 @@ fn trace_api_surface_and_contract_stay_wired() {
         "pair failures require `Host`, `Guest`, or `Environment`",
         "A pair effect's origin must agree",
     ] {
-        assert!(contract.contains(marker), "missing contract marker: {marker}");
+        assert!(
+            contract.contains(marker),
+            "missing contract marker: {marker}"
+        );
     }
 }

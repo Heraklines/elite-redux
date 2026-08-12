@@ -37,9 +37,7 @@ pub enum PartyMenuError {
     #[error("party option ID is invalid: {0}")]
     OptionId(#[source] StringIdError),
     #[error("party option ID {value:?} is not in the canonical party/<pokemon>/slot/<slot> form")]
-    MalformedPartyOption {
-        value: String,
-    },
+    MalformedPartyOption { value: String },
     #[error("party menu option is invalid: {0}")]
     Option(#[source] BattleMenuOptionError),
     #[error("party menu contains more than six members")]
@@ -47,10 +45,15 @@ pub enum PartyMenuError {
     #[error("party menu contains duplicate Pokémon identity {pokemon:?}")]
     DuplicatePokemon { pokemon: PokemonId },
     #[error("party menu actor {actor:?} is not the occupant of player slot {field_slot:?}")]
-    ActorNotOnField { actor: PokemonId, field_slot: FieldSlot },
+    ActorNotOnField {
+        actor: PokemonId,
+        field_slot: FieldSlot,
+    },
     #[error("party menu actor {actor:?} is not a living Pokémon")]
     ActorNotLiving { actor: PokemonId },
-    #[error("party menu owner {actual:?} does not own player slot {field_slot:?}; expected {expected:?}")]
+    #[error(
+        "party menu owner {actual:?} does not own player slot {field_slot:?}; expected {expected:?}"
+    )]
     OwnerMismatch {
         actual: SeatId,
         expected: SeatId,
@@ -172,19 +175,18 @@ pub(crate) fn parse_party_option_id(
             value: value.to_owned(),
         });
     }
-    let pokemon = parse_canonical_decimal(pokemon).ok_or_else(|| {
-        PartyMenuError::MalformedPartyOption {
+    let pokemon =
+        parse_canonical_decimal(pokemon).ok_or_else(|| PartyMenuError::MalformedPartyOption {
             value: value.to_owned(),
-        }
-    })?;
-    let slot = parse_canonical_decimal(slot).ok_or_else(|| {
-        PartyMenuError::MalformedPartyOption {
+        })?;
+    let slot =
+        parse_canonical_decimal(slot).ok_or_else(|| PartyMenuError::MalformedPartyOption {
             value: value.to_owned(),
-        }
-    })?;
-    let pokemon = PokemonId::try_from(pokemon).map_err(|_| PartyMenuError::MalformedPartyOption {
-        value: value.to_owned(),
-    })?;
+        })?;
+    let pokemon =
+        PokemonId::try_from(pokemon).map_err(|_| PartyMenuError::MalformedPartyOption {
+            value: value.to_owned(),
+        })?;
     let slot = PartyIndex::try_from(slot).map_err(|_| PartyMenuError::MalformedPartyOption {
         value: value.to_owned(),
     })?;
@@ -219,9 +221,8 @@ pub(crate) fn build_party_graph_parts(
     let mut bench_option_ids = Vec::new();
 
     for (index, pokemon) in battle.player_party.iter().enumerate() {
-        let party_slot = PartyIndex::try_from(index as u64).map_err(|_| {
-            PartyMenuError::TooManyPartyMembers
-        })?;
+        let party_slot =
+            PartyIndex::try_from(index as u64).map_err(|_| PartyMenuError::TooManyPartyMembers)?;
         let option_id = party_option_id(pokemon.id, party_slot)?;
         let active = active_ids.contains(&pokemon.id);
         if active {
@@ -457,11 +458,10 @@ pub fn navigate_party_menu(
     direction: NavigationDirection,
 ) -> Result<PartySelectControl, PartyMenuError> {
     let parts = validate_party_control(battle, control, Some(expected_instance_id))?;
-    let Some(edge) = control
-        .menu
-        .navigation
-        .iter()
-        .find(|edge| edge.from == control.menu.selected_option_id && edge.direction == direction)
+    let Some(edge) =
+        control.menu.navigation.iter().find(|edge| {
+            edge.from == control.menu.selected_option_id && edge.direction == direction
+        })
     else {
         return Ok(control.clone());
     };
@@ -521,13 +521,15 @@ pub(crate) fn validate_party_control(
     if expected_instance_id.is_some_and(|expected| control.menu.instance_id != expected) {
         return Err(PartyMenuError::StaleMenuInstance);
     }
-    validate_party_context(battle, control.actor, control.field_slot, control.menu.owner_seat)?;
-
-    let expected_control_id = expected_party_control_id(
+    validate_party_context(
         battle,
+        control.actor,
         control.field_slot,
         control.menu.owner_seat,
-    );
+    )?;
+
+    let expected_control_id =
+        expected_party_control_id(battle, control.field_slot, control.menu.owner_seat);
     if control.menu.control_id != expected_control_id {
         return Err(PartyMenuError::ControlIdMismatch {
             expected: expected_control_id,
@@ -546,15 +548,9 @@ pub(crate) fn validate_party_control(
     {
         return Err(PartyMenuError::StaleMenuState);
     }
-    if !is_memory_option(
-        &control.last_left_option_id,
-        &parts.active_option_ids,
-        true,
-    ) || !is_memory_option(
-        &control.last_right_option_id,
-        &parts.bench_option_ids,
-        true,
-    ) {
+    if !is_memory_option(&control.last_left_option_id, &parts.active_option_ids, true)
+        || !is_memory_option(&control.last_right_option_id, &parts.bench_option_ids, true)
+    {
         return Err(PartyMenuError::StaleMenuState);
     }
     if !selected_matches_memory(
@@ -615,8 +611,7 @@ pub(crate) fn selected_matches_memory(
     if selected_option_id.as_str() == PARTY_CANCEL_OPTION_ID {
         return true;
     }
-    (active_option_ids.contains(selected_option_id)
-        && last_left_option_id == selected_option_id)
+    (active_option_ids.contains(selected_option_id) && last_left_option_id == selected_option_id)
         || (bench_option_ids.contains(selected_option_id)
             && last_right_option_id == selected_option_id)
 }
@@ -651,14 +646,18 @@ pub(crate) fn validate_party_inventory(battle: &BattleState) -> Result<(), Party
             .iter()
             .any(|candidate| candidate.id == pokemon.id)
         {
-            return Err(PartyMenuError::DuplicatePokemon { pokemon: pokemon.id });
+            return Err(PartyMenuError::DuplicatePokemon {
+                pokemon: pokemon.id,
+            });
         }
         if battle
             .enemy_party
             .iter()
             .any(|candidate| candidate.id == pokemon.id)
         {
-            return Err(PartyMenuError::DuplicatePokemon { pokemon: pokemon.id });
+            return Err(PartyMenuError::DuplicatePokemon {
+                pokemon: pokemon.id,
+            });
         }
     }
     for entry in &battle.field.slots {
@@ -690,9 +689,8 @@ pub(crate) fn validate_party_context(
     if field_slot.side != BattleSide::Player {
         return Err(PartyMenuError::NonPlayerField { field_slot });
     }
-    let expected = owner_seat_for(&battle.format, field_slot)?.ok_or(
-        PartyMenuError::NonPlayerField { field_slot },
-    )?;
+    let expected = owner_seat_for(&battle.format, field_slot)?
+        .ok_or(PartyMenuError::NonPlayerField { field_slot })?;
     if expected != owner_seat {
         return Err(PartyMenuError::OwnerMismatch {
             actual: owner_seat,
@@ -709,7 +707,11 @@ pub(crate) fn validate_party_context(
     if occupant != Some(actor) {
         return Err(PartyMenuError::ActorNotOnField { actor, field_slot });
     }
-    let Some(actor_state) = battle.player_party.iter().find(|pokemon| pokemon.id == actor) else {
+    let Some(actor_state) = battle
+        .player_party
+        .iter()
+        .find(|pokemon| pokemon.id == actor)
+    else {
         return Err(PartyMenuError::ActorNotOnField { actor, field_slot });
     };
     if actor_state.owner_seat != Some(owner_seat) {
@@ -754,11 +756,7 @@ fn validate_switch_cancel_parent(
     }
     let expected = format!(
         "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/command",
-        battle.battle_id,
-        battle.wave,
-        battle.turn,
-        field_slot.position,
-        owner_seat,
+        battle.battle_id, battle.wave, battle.turn, field_slot.position, owner_seat,
     );
     if root.menu.control_id != expected {
         return Err(PartyMenuError::InvalidCancelParent);

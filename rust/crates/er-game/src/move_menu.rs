@@ -5,13 +5,11 @@
 //! move cursor as either an implicit submission or a target-selector route.
 //! It never creates an operation ID or a command proposal.
 
-use er_types::battle_command::{
-    BattleCommandError, BattleTargetSelection, OfferedMoveCommand,
+use er_types::battle_command::{BattleCommandError, BattleTargetSelection, OfferedMoveCommand};
+use er_types::battle_control::{BattleControl, BattleControlError, MoveSelectControl};
+use er_types::battle_ids::{
+    BattleSide, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PokemonId,
 };
-use er_types::battle_control::{
-    BattleControl, BattleControlError, MoveSelectControl,
-};
-use er_types::battle_ids::{BattleSide, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PokemonId};
 use er_types::battle_ui::{
     BattleMenu, BattleMenuError, BattleMenuOption, MenuNavigationEdge, MenuOptionLayout,
     MenuOptionVisibility, NavigationDirection,
@@ -185,11 +183,7 @@ pub fn move_option_id(
     actor: PokemonId,
     move_slot: MoveSlotIndex,
 ) -> Result<MenuOptionId, StringIdError> {
-    MenuOptionId::new(format!(
-        "move/{}/slot/{}",
-        actor,
-        move_slot.get()
-    ))
+    MenuOptionId::new(format!("move/{}/slot/{}", actor, move_slot.get()))
 }
 
 /// The eight explicit edges in the four-cell move graph.
@@ -269,10 +263,8 @@ pub fn build_move_menu(
         ));
     }
 
-    let selected_option_id = move_option_id(
-        actor,
-        selected_slot(entries, remembered_slot, first_summon),
-    )?;
+    let selected_option_id =
+        move_option_id(actor, selected_slot(entries, remembered_slot, first_summon))?;
     Ok(BattleMenu::new(
         instance_id,
         owner_seat,

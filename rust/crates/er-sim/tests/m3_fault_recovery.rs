@@ -9,9 +9,9 @@ use std::error::Error;
 use er_sim::PairEndpoint;
 use er_sim::snapshot::{
     FaultNetworkSnapshotV2, FaultOperationV2, FaultScriptSnapshotV2, FrameCorruptionV2,
-    NetworkLinkSnapshotV2, PacketDispositionV2, PacketReorderStateV2,
-    QueuedPacketSnapshotV2, RestorablePacketKindV2, RestorableStorageRequestV2,
-    StorageRequestSnapshotV2, StorageSnapshotV2,
+    NetworkLinkSnapshotV2, PacketDispositionV2, PacketReorderStateV2, QueuedPacketSnapshotV2,
+    RestorablePacketKindV2, RestorableStorageRequestV2, StorageRequestSnapshotV2,
+    StorageSnapshotV2,
 };
 use er_types::battle_ids::CanonicalHexBytes;
 use er_types::{ConnectionGeneration, SafeU53};
@@ -148,10 +148,12 @@ fn fault_script_rejects_duplicate_reorder_ids_and_unknown_shapes() {
     };
     assert!(root_pointer.validate().is_err());
     assert!(serde_json::from_str::<FaultOperationV2>(r#"{"kind":"BIT_FLIP"}"#).is_err());
-    assert!(serde_json::from_str::<FrameCorruptionV2>(
-        r#"{"kind":"DELETE_FIELD","json_pointer":"/x","extra":true}"#,
-    )
-    .is_err());
+    assert!(
+        serde_json::from_str::<FrameCorruptionV2>(
+            r#"{"kind":"DELETE_FIELD","json_pointer":"/x","extra":true}"#,
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -205,19 +207,17 @@ mod live_replica_recovery {
 
     use std::collections::BTreeMap;
 
+    use er_content::pack::ContentPack;
+    use er_kernel::snapshot::{KernelDeterminismDigest, RestorableKernelSnapshotV2};
+    use er_protocol::snapshot::{
+        CorrelatedResponseSnapshotV2, PendingRecoverySnapshotV2, ProposalTimerKindV2,
+    };
     use er_sim::snapshot::{
-        QueuedPacketSnapshotV2, RestorablePairSnapshotV2, RestorablePacketKindV2,
+        QueuedPacketSnapshotV2, RestorablePacketKindV2, RestorablePairSnapshotV2,
     };
     use er_sim::{
         FaultOperation, FrameCorruption, PairEndpoint, PairOperation, SimulatedBattlePairConfig,
         SimulatedPair,
-    };
-    use er_content::pack::ContentPack;
-    use er_kernel::snapshot::{
-        KernelDeterminismDigest, RestorableKernelSnapshotV2,
-    };
-    use er_protocol::snapshot::{
-        CorrelatedResponseSnapshotV2, PendingRecoverySnapshotV2, ProposalTimerKindV2,
     };
     use er_types::battle_ids::{CanonicalHexBytes, ContentPackHash};
     use er_types::{LiveResourceSnapshot, RecoveryFenceState};
@@ -255,18 +255,47 @@ mod live_replica_recovery {
         right: &GameKernel,
         label: &str,
     ) -> TestResult {
-        assert_eq!(left.snapshot(), right.snapshot(), "legacy snapshot diverged after {label}");
-        assert_eq!(left.state_digest(), right.state_digest(), "legacy state digest diverged after {label}");
+        assert_eq!(
+            left.snapshot(),
+            right.snapshot(),
+            "legacy snapshot diverged after {label}"
+        );
+        assert_eq!(
+            left.state_digest(),
+            right.state_digest(),
+            "legacy state digest diverged after {label}"
+        );
         let left_v2 = left.snapshot_v2()?;
         let right_v2 = right.snapshot_v2()?;
         assert!(left_v2.prepared_transaction.is_none());
         assert!(right_v2.prepared_transaction.is_none());
-        assert_eq!(serde_json::to_vec(&left_v2)?, serde_json::to_vec(&right_v2)?, "V2 snapshot bytes diverged after {label}");
-        assert_eq!(left_v2.mechanical_digest, right_v2.mechanical_digest, "mechanical digest diverged after {label}");
-        assert_eq!(left_v2.kernel_determinism_digest, right_v2.kernel_determinism_digest, "V2 kernel digest diverged after {label}");
-        assert_eq!(left_v2.ui, right_v2.ui, "UI projection diverged after {label}");
-        assert_eq!(left.battle_ui_projection(), right.battle_ui_projection(), "live UI projection diverged after {label}");
-        assert_eq!(left.live_resources(), right.live_resources(), "live resources diverged after {label}");
+        assert_eq!(
+            serde_json::to_vec(&left_v2)?,
+            serde_json::to_vec(&right_v2)?,
+            "V2 snapshot bytes diverged after {label}"
+        );
+        assert_eq!(
+            left_v2.mechanical_digest, right_v2.mechanical_digest,
+            "mechanical digest diverged after {label}"
+        );
+        assert_eq!(
+            left_v2.kernel_determinism_digest, right_v2.kernel_determinism_digest,
+            "V2 kernel digest diverged after {label}"
+        );
+        assert_eq!(
+            left_v2.ui, right_v2.ui,
+            "UI projection diverged after {label}"
+        );
+        assert_eq!(
+            left.battle_ui_projection(),
+            right.battle_ui_projection(),
+            "live UI projection diverged after {label}"
+        );
+        assert_eq!(
+            left.live_resources(),
+            right.live_resources(),
+            "live resources diverged after {label}"
+        );
         Ok(())
     }
 
@@ -278,15 +307,16 @@ mod live_replica_recovery {
     ) -> TestResult<Vec<KernelEffect>> {
         let left_effects = left.step(input.clone())?;
         let right_effects = right.step(input)?;
-        assert_eq!(serde_json::to_vec(&left_effects)?, serde_json::to_vec(&right_effects)?, "ordered effect bytes diverged after {label}");
+        assert_eq!(
+            serde_json::to_vec(&left_effects)?,
+            serde_json::to_vec(&right_effects)?,
+            "ordered effect bytes diverged after {label}"
+        );
         assert_kernel_observation_equal(left, right, label)?;
         Ok(left_effects)
     }
 
-    fn restore_from_wire(
-        wire: &str,
-        content: Arc<ContentPack>,
-    ) -> TestResult<GameKernel> {
+    fn restore_from_wire(wire: &str, content: Arc<ContentPack>) -> TestResult<GameKernel> {
         let snapshot: RestorableKernelSnapshotV2 = serde_json::from_str(wire)?;
         Ok(GameKernel::from_snapshot(snapshot, content)?)
     }
@@ -491,9 +521,7 @@ mod live_replica_recovery {
         ))
     }
 
-    fn assert_guest_recovery_fence_held(
-        snapshot: &RestorablePairSnapshotV2,
-    ) -> TestResult {
+    fn assert_guest_recovery_fence_held(snapshot: &RestorablePairSnapshotV2) -> TestResult {
         let recovery = snapshot
             .guest
             .protocol
@@ -614,11 +642,13 @@ mod live_replica_recovery {
             .find(|target| matches!(target.kind, ProposalTimerKindV2::Retry))
             .map(|target| target.timer_id)
             .ok_or_else(|| invalid("replica snapshot omitted proposal retry timer"))?;
-        assert!(original_snapshot
-            .scheduler
-            .timers
-            .iter()
-            .any(|timer| timer.registration.timer_id == retry_timer_id));
+        assert!(
+            original_snapshot
+                .scheduler
+                .timers
+                .iter()
+                .any(|timer| timer.registration.timer_id == retry_timer_id)
+        );
         let (wire, decoded) = snapshot_wire(&original_snapshot)?;
         let content = content_pack()?;
         let (mut uninterrupted, mut restored) = {
@@ -652,8 +682,7 @@ mod live_replica_recovery {
         let baseline = serde_json::to_vec(&uninterrupted.snapshot_v2()?)?;
 
         let mut malformed_content_hash = decoded.clone();
-        malformed_content_hash.content_hash =
-            alternate_content_hash(&decoded.content_hash)?;
+        malformed_content_hash.content_hash = alternate_content_hash(&decoded.content_hash)?;
         assert_rejected_without_mutating_live_owner(
             &uninterrupted,
             &baseline,
@@ -717,12 +746,13 @@ mod live_replica_recovery {
         )?;
 
         let mut malformed_recovery = decoded.clone();
-        malformed_recovery.protocol.pending_recoveries.push(
-            PendingRecoverySnapshotV2 {
+        malformed_recovery
+            .protocol
+            .pending_recoveries
+            .push(PendingRecoverySnapshotV2 {
                 correlation_id: String::new(),
                 bundle: None,
-            },
-        );
+            });
         assert_rejected_without_mutating_live_owner(
             &uninterrupted,
             &baseline,
@@ -910,9 +940,11 @@ mod live_replica_recovery {
             &corrupted_receipt_body,
         );
         assert_eq!(queued_corrupted_delayed.len(), 2);
-        assert!(queued_corrupted_delayed
-            .iter()
-            .all(|packet| packet.disposition == PacketDispositionV2::Delayed));
+        assert!(
+            queued_corrupted_delayed
+                .iter()
+                .all(|packet| packet.disposition == PacketDispositionV2::Delayed)
+        );
 
         let wire = serde_json::to_string(&checkpoint)?;
         let decoded: RestorablePairSnapshotV2 = serde_json::from_str(&wire)?;

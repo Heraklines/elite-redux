@@ -9,9 +9,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use er_battle::legality::{
-    build_command_offer, build_scripted_enemy_offer,
-    validate_command_proposal, validate_replacement_proposal, validate_replacement_selection,
-    validate_state_content,
+    build_command_offer, build_scripted_enemy_offer, validate_command_proposal,
+    validate_replacement_proposal, validate_replacement_selection, validate_state_content,
 };
 use er_battle::{
     BattleNextDecision, BattleResolveError, resolve_replacement, resolve_turn,
@@ -21,9 +20,7 @@ use er_content::pack::{ContentPack, ContentPackError};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::RngError;
 use er_state::battle::BattleState;
-use er_state::conditions::{
-    GlobalAbilitySuppressionState, TerrainState, WeatherState,
-};
+use er_state::conditions::{GlobalAbilitySuppressionState, TerrainState, WeatherState};
 use er_state::digest::MechanicalStateDigest;
 use er_state::field::{FieldSlotState, FieldState, FieldStateError};
 use er_state::format::{
@@ -32,13 +29,14 @@ use er_state::format::{
 };
 use er_state::snapshot::GameState;
 use er_state::validation::StateValidationError;
+use er_types::battle_command::ScriptedEnemyPolicyV1;
 use er_types::battle_command::{
-    AcceptedBattleCommand, BattleCommand, BattleCommandError, BattleCommandProposalV1,
-    BattleCommandOffer, BattleReplacementProposalV1, BattleTargetSelection,
-    CommandAdmissionSource, CommandCollectionState, CommandFingerprintEntry,
-    CommandFrontierEntry, CommandFrontierStatus, ReplacementProposalFingerprintEntry,
-    ReplacementSelection, player_command_operation_id, replacement_operation_id,
-    scripted_enemy_command_operation_id, turn_result_operation_id,
+    AcceptedBattleCommand, BattleCommand, BattleCommandError, BattleCommandOffer,
+    BattleCommandProposalV1, BattleReplacementProposalV1, BattleTargetSelection,
+    CommandAdmissionSource, CommandCollectionState, CommandFingerprintEntry, CommandFrontierEntry,
+    CommandFrontierStatus, ReplacementProposalFingerprintEntry, ReplacementSelection,
+    player_command_operation_id, replacement_operation_id, scripted_enemy_command_operation_id,
+    turn_result_operation_id,
 };
 use er_types::battle_control::{
     BATTLE_CONTROL_PLAN_SCHEMA_VERSION, BattleControl, BattleControlError, BattleControlPlan,
@@ -49,18 +47,13 @@ use er_types::battle_ids::{
     AuthorityEpoch, BattleFormat, BattleId, BattleSide, FaintOccurrenceId, FieldSlot,
     MenuInstanceId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex,
 };
+use er_types::battle_model::BattleOutcome;
 use er_types::battle_model::ReplacementProgress;
 use er_types::battle_ui::NavigationDirection;
-use er_types::battle_model::BattleOutcome;
 use er_types::ids::{MenuOptionId, SafeU53, SeatId};
-use er_types::battle_command::ScriptedEnemyPolicyV1;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::internal_event::{
-    BattleResolvedPayload, CausalIdentity, GameIntent, InternalEvent, PreparedBattleResolution,
-    GameEventPayload, UiEventPayload,
-};
 use crate::authority_commands::{
     PreparedAuthorityAdmission, PreparedAuthorityMenuPath, PreparedAuthorityReplacement,
     PreparedAuthorityTurn, PreparedReplacementFingerprintEvidence,
@@ -69,24 +62,24 @@ use crate::command_menu::{
     CommandChoice, CommandMenuError, CommandRootSelection, build_command_root_control,
     select_command,
 };
+use crate::internal_event::{
+    BattleResolvedPayload, CausalIdentity, GameEventPayload, GameIntent, InternalEvent,
+    PreparedBattleResolution, UiEventPayload,
+};
 use crate::move_menu::{
     MoveActivation, MoveMenuEntry, MoveMenuError, MoveSelectionError, build_move_control,
     move_option_id, select_move,
 };
-use crate::party_menu::{
-    PartyMenuError, build_party_select, navigate_party_menu, party_option_id,
-};
+use crate::party_menu::{PartyMenuError, build_party_select, navigate_party_menu, party_option_id};
 use crate::party_option_menu::{
     PARTY_OPTION_CANCEL_ID, PARTY_OPTION_SEND_OUT_ID, PartyOptionMenuError,
     open_party_option_menu_from_control, restore_parent_menu,
 };
 use crate::replacement_menu::{
-    ReplacementMenuError, ReplacementMenuResult, build_replacement_menu,
-    navigate_replacement_menu,
+    ReplacementMenuError, ReplacementMenuResult, build_replacement_menu, navigate_replacement_menu,
 };
 use crate::snapshot::{
-    GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2, SeatControlHistorySnapshotV1,
-    SnapshotError,
+    GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2, SeatControlHistorySnapshotV1, SnapshotError,
 };
 
 /// The frozen game configuration schema version.
@@ -241,13 +234,9 @@ pub enum GameRuntimeError {
     #[error("the battle game config is invalid: {message}")]
     InvalidConfig { message: String },
     #[error("a command proposal conflicts with retained operation {operation_id}")]
-    CommandConflict {
-        operation_id: er_types::OperationId,
-    },
+    CommandConflict { operation_id: er_types::OperationId },
     #[error("a replacement proposal conflicts with retained operation {operation_id}")]
-    ReplacementConflict {
-        operation_id: er_types::OperationId,
-    },
+    ReplacementConflict { operation_id: er_types::OperationId },
     #[error("no active battle is available")]
     NoActiveBattle,
     #[error("the supplied runtime state does not match the prepared transition")]
@@ -323,7 +312,9 @@ impl GameRuntime {
         config.scripted_enemy_policy.validate()?;
         validate_state_content(&config.run_state, content.as_ref()).map_err(map_legality_error)?;
         if config.run_state.battle.is_some() {
-            return Err(invalid_config("run_state.battle must be None at battle start"));
+            return Err(invalid_config(
+                "run_state.battle must be None at battle start",
+            ));
         }
         if config.run_state.wave.get().get() == 0 {
             return Err(invalid_config("run_state.wave must be one-based"));
@@ -386,11 +377,8 @@ impl GameRuntime {
             Some(battle),
         )?;
 
-        let (frontier, scripted_enemy_policy) = build_command_frontier(
-            &state,
-            &config.scripted_enemy_policy,
-            content.as_ref(),
-        )?;
+        let (frontier, scripted_enemy_policy) =
+            build_command_frontier(&state, &config.scripted_enemy_policy, content.as_ref())?;
         state
             .battle
             .as_mut()
@@ -399,12 +387,8 @@ impl GameRuntime {
         validate_state_content(&state, content.as_ref()).map_err(map_legality_error)?;
 
         let allocators = initial_allocators(&human_seat_values)?;
-        let control = project_command_frontier(
-            &state,
-            &human_seat_values,
-            &allocators,
-            content.as_ref(),
-        )?;
+        let control =
+            project_command_frontier(&state, &human_seat_values, &allocators, content.as_ref())?;
         let runtime = Self {
             state,
             control,
@@ -566,14 +550,20 @@ impl GameRuntime {
         validate_state_content(&self.state, self.content.as_ref()).map_err(map_legality_error)?;
         self.scripted_enemy_policy.validate()?;
         self.control.validate()?;
-        let battle = self.state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(GameRuntimeError::NoActiveBattle)?;
         let decision = decision_for_state(&self.state)?;
         let expected_control_turn = expected_control_plan_turn(battle, decision)?;
         if self.control.battle_id != battle.battle_id
             || self.control.wave != battle.wave
             || self.control.turn != expected_control_turn
         {
-            return Err(invalid_config("control plan coordinates do not match its logical decision"));
+            return Err(invalid_config(
+                "control plan coordinates do not match its logical decision",
+            ));
         }
         let seats = human_seats(&battle.format)?;
         if seats.len() != self.control.seats.len()
@@ -582,7 +572,9 @@ impl GameRuntime {
                 .zip(&self.control.seats)
                 .any(|(expected, actual)| expected != &actual.seat)
         {
-            return Err(invalid_config("control plan does not cover the canonical human seats"));
+            return Err(invalid_config(
+                "control plan does not cover the canonical human seats",
+            ));
         }
         if !seats.contains(&self.local_seat) {
             return Err(invalid_config("local_seat is not a canonical human seat"));
@@ -718,11 +710,13 @@ impl GameRuntime {
                 .frontier
                 .iter_mut()
                 .find(|entry| entry.operation_id == proposal.operation_id)
-                .ok_or_else(|| GameRuntimeError::StateContent(
-                    er_battle::legality::CommandLegalityError::MissingCommandFrontier {
-                        operation_id: proposal.operation_id.clone(),
-                    },
-                ))?;
+                .ok_or_else(|| {
+                    GameRuntimeError::StateContent(
+                        er_battle::legality::CommandLegalityError::MissingCommandFrontier {
+                            operation_id: proposal.operation_id.clone(),
+                        },
+                    )
+                })?;
             match entry.status.clone() {
                 CommandFrontierStatus::Pending => {
                     entry.status = CommandFrontierStatus::Retained {
@@ -752,14 +746,10 @@ impl GameRuntime {
             proposal.operation_id.clone(),
             proposal.fingerprint(),
         )?);
-        self.command_fingerprints.sort_unstable_by(|left, right| {
-            left.operation_id.cmp(&right.operation_id)
-        });
-        let waiting = project_waiting_after_command(
-            &self.control,
-            proposal.owner_seat,
-            &command_state,
-        )?;
+        self.command_fingerprints
+            .sort_unstable_by(|left, right| left.operation_id.cmp(&right.operation_id));
+        let waiting =
+            project_waiting_after_command(&self.control, proposal.owner_seat, &command_state)?;
         self.remember_control(proposal.owner_seat, waiting.clone());
         self.control = waiting;
         Ok(CommandAdmission::Accepted {
@@ -819,15 +809,13 @@ impl GameRuntime {
             proposal.owner_seat,
             proposal.menu_instance_id,
         )?;
-        self.replacement_fingerprints.push(
-            ReplacementProposalFingerprintEntry::new(
+        self.replacement_fingerprints
+            .push(ReplacementProposalFingerprintEntry::new(
                 proposal.operation_id.clone(),
                 proposal.fingerprint(),
-            )?,
-        );
-        self.replacement_fingerprints.sort_unstable_by(|left, right| {
-            left.operation_id.cmp(&right.operation_id)
-        });
+            )?);
+        self.replacement_fingerprints
+            .sort_unstable_by(|left, right| left.operation_id.cmp(&right.operation_id));
         let waiting = project_waiting_after_replacement(
             &self.control,
             proposal.owner_seat,
@@ -1034,16 +1022,25 @@ impl GameRuntime {
         Ok(())
     }
 
-    fn install_control_inner(&mut self, control: BattleControlPlan) -> Result<(), GameRuntimeError> {
+    fn install_control_inner(
+        &mut self,
+        control: BattleControlPlan,
+    ) -> Result<(), GameRuntimeError> {
         control.validate()?;
-        let battle = self.state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(GameRuntimeError::NoActiveBattle)?;
         let decision = decision_for_state(&self.state)?;
         let expected_control_turn = expected_control_plan_turn(battle, decision)?;
         if control.battle_id != battle.battle_id
             || control.wave != battle.wave
             || control.turn != expected_control_turn
         {
-            return Err(invalid_config("installed control has stale logical coordinates"));
+            return Err(invalid_config(
+                "installed control has stale logical coordinates",
+            ));
         }
         let expected = project_battle_control_plan(
             &self.state,
@@ -1066,13 +1063,19 @@ impl GameRuntime {
         decision: BattleNextDecision,
     ) -> Result<(), GameRuntimeError> {
         if decision != BattleNextDecision::CommandFrontier {
-            let battle = after.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+            let battle = after
+                .battle
+                .as_ref()
+                .ok_or(GameRuntimeError::NoActiveBattle)?;
             if !battle.command_state.frontier.is_empty() {
                 return Err(GameRuntimeError::TransitionIdentityMismatch);
             }
             return Ok(());
         }
-        let battle = after.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+        let battle = after
+            .battle
+            .as_ref()
+            .ok_or(GameRuntimeError::NoActiveBattle)?;
         let (expected_frontier, next_policy) =
             build_command_frontier(after, &self.scripted_enemy_policy, self.content.as_ref())?;
         if battle.command_state.frontier != expected_frontier {
@@ -1091,7 +1094,10 @@ impl GameRuntime {
     /// `er-game`.  The kernel only dequeues the typed payload; it does not
     /// inspect private event fields or construct a campaign-facing action.
     #[doc(hidden)]
-    pub fn reduce_ui(&mut self, payload: UiEventPayload) -> Result<BattleUiResult, GameRuntimeError> {
+    pub fn reduce_ui(
+        &mut self,
+        payload: UiEventPayload,
+    ) -> Result<BattleUiResult, GameRuntimeError> {
         let (endpoint, menu_instance_id, action) = payload.into_parts();
         match action {
             crate::internal_event::BattleUiAction::Activate {
@@ -1124,7 +1130,10 @@ impl GameRuntime {
     /// causal identity remains kernel bookkeeping; only the typed GameIntent
     /// crosses into this reducer.
     #[doc(hidden)]
-    pub fn reduce_game(&mut self, payload: GameEventPayload) -> Result<GameReduction, GameRuntimeError> {
+    pub fn reduce_game(
+        &mut self,
+        payload: GameEventPayload,
+    ) -> Result<GameReduction, GameRuntimeError> {
         let (intent, _causal) = payload.into_parts();
         self.reduce(intent)
     }
@@ -1162,12 +1171,7 @@ impl GameRuntime {
                 option_id,
             } => (seat, menu_instance_id, control_id, option_id, true),
         };
-        let current = self.live_ui_control(
-            seat,
-            menu_instance_id,
-            &control_id,
-            &option_id,
-        )?;
+        let current = self.live_ui_control(seat, menu_instance_id, &control_id, &option_id)?;
         if is_cancel {
             self.cancel_ui_control(seat, current)
         } else {
@@ -1188,12 +1192,7 @@ impl GameRuntime {
         option_id: MenuOptionId,
     ) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
-        candidate.sync_battle_ui_selection_inner(
-            seat,
-            menu_instance_id,
-            control_id,
-            option_id,
-        )?;
+        candidate.sync_battle_ui_selection_inner(seat, menu_instance_id, control_id, option_id)?;
         candidate.validate()?;
         *self = candidate;
         Ok(())
@@ -1217,16 +1216,13 @@ impl GameRuntime {
         control_id: &str,
         option_id: MenuOptionId,
     ) -> Result<(), GameRuntimeError> {
-        let current = self.live_ui_control_for_sync(
-            seat,
-            menu_instance_id,
-            control_id,
-            &option_id,
-        )?;
+        let current =
+            self.live_ui_control_for_sync(seat, menu_instance_id, control_id, &option_id)?;
         let battle = self.active_battle()?.clone();
         let next = match current {
             BattleControl::CommandRoot(value) => {
-                let (field_slot, offer) = self.command_context(seat, value.actor, value.field_slot)?;
+                let (field_slot, offer) =
+                    self.command_context(seat, value.actor, value.field_slot)?;
                 let selected = command_root_selection(&option_id)?;
                 BattleControl::CommandRoot(build_command_root_control(
                     value.menu.instance_id,
@@ -1239,7 +1235,8 @@ impl GameRuntime {
                 )?)
             }
             BattleControl::MoveSelect(value) => {
-                let (_field_slot, offer) = self.command_context(seat, value.actor, value.field_slot)?;
+                let (_field_slot, offer) =
+                    self.command_context(seat, value.actor, value.field_slot)?;
                 let entries = self.move_entries(value.actor, &offer)?;
                 let selected_slot = parse_move_option_id(value.actor, &option_id)?;
                 BattleControl::MoveSelect(build_move_control(
@@ -1281,7 +1278,9 @@ impl GameRuntime {
                 if option_id != MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?
                     && option_id != MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?
                 {
-                    return Err(ui_rejected("party-option identity is not in the frozen graph"));
+                    return Err(ui_rejected(
+                        "party-option identity is not in the frozen graph",
+                    ));
                 }
                 let menu = BattleMenu::new(
                     value.menu.instance_id,
@@ -1307,7 +1306,9 @@ impl GameRuntime {
                 BattleControl::ReplacementSelect(next)
             }
             BattleControl::Waiting(_) | BattleControl::Complete(_) => {
-                return Err(ui_rejected("non-actionable control cannot synchronize selection"));
+                return Err(ui_rejected(
+                    "non-actionable control cannot synchronize selection",
+                ));
             }
         };
         self.install_seat_control(seat, next)
@@ -1322,10 +1323,12 @@ impl GameRuntime {
         match current {
             BattleControl::CommandRoot(value) => match select_command(&value.menu)? {
                 CommandChoice::Fight => {
-                    let (_field_slot, offer) = self.command_context(seat, value.actor, value.field_slot)?;
+                    let (_field_slot, offer) =
+                        self.command_context(seat, value.actor, value.field_slot)?;
                     let entries = self.move_entries(value.actor, &offer)?;
                     let menu_id = self.allocate_menu_instance(seat)?;
-                    let control_id = replace_control_leaf(&value.menu.control_id, "command", "move")?;
+                    let control_id =
+                        replace_control_leaf(&value.menu.control_id, "command", "move")?;
                     let next = BattleControl::MoveSelect(build_move_control(
                         menu_id,
                         seat,
@@ -1355,14 +1358,19 @@ impl GameRuntime {
                 }
             },
             BattleControl::MoveSelect(value) => {
-                let (_field_slot, offer) = self.command_context(seat, value.actor, value.field_slot)?;
+                let (_field_slot, offer) =
+                    self.command_context(seat, value.actor, value.field_slot)?;
                 let entries = self.move_entries(value.actor, &offer)?;
                 match select_move(&value.menu, value.actor, &entries)? {
                     MoveActivation::Immediate { move_slot, targets } => {
                         let command = BattleCommand::fight(value.actor, move_slot, targets)?;
-                        Ok(BattleUiResult::CommandProposal(
-                            self.command_proposal(seat, &value.menu, value.actor, value.field_slot, command)?,
-                        ))
+                        Ok(BattleUiResult::CommandProposal(self.command_proposal(
+                            seat,
+                            &value.menu,
+                            value.actor,
+                            value.field_slot,
+                            command,
+                        )?))
                     }
                     MoveActivation::TargetSelect {
                         move_slot,
@@ -1370,20 +1378,22 @@ impl GameRuntime {
                         candidate_targets,
                     } => {
                         let menu_id = self.allocate_menu_instance(seat)?;
-                        let control_id = replace_control_leaf(&value.menu.control_id, "move", "target")?;
-                        let next = BattleControl::TargetSelect(crate::target_menu::build_target_control(
-                            menu_id,
-                            seat,
-                            control_id,
-                            value.actor,
-                            value.field_slot,
-                            move_slot,
-                            multiple,
-                            &candidate_targets,
-                            None,
-                            None,
-                            BattleControl::MoveSelect(value),
-                        )?);
+                        let control_id =
+                            replace_control_leaf(&value.menu.control_id, "move", "target")?;
+                        let next =
+                            BattleControl::TargetSelect(crate::target_menu::build_target_control(
+                                menu_id,
+                                seat,
+                                control_id,
+                                value.actor,
+                                value.field_slot,
+                                move_slot,
+                                multiple,
+                                &candidate_targets,
+                                None,
+                                None,
+                                BattleControl::MoveSelect(value),
+                            )?);
                         self.install_seat_control(seat, next)?;
                         Ok(BattleUiResult::ControlChanged)
                     }
@@ -1392,12 +1402,18 @@ impl GameRuntime {
             BattleControl::TargetSelect(value) => {
                 let targets = crate::target_menu::select_target_control(&value)?;
                 let command = BattleCommand::fight(value.actor, value.move_slot, targets)?;
-                Ok(BattleUiResult::CommandProposal(
-                    self.command_proposal(seat, &value.menu, value.actor, value.field_slot, command)?,
-                ))
+                Ok(BattleUiResult::CommandProposal(self.command_proposal(
+                    seat,
+                    &value.menu,
+                    value.actor,
+                    value.field_slot,
+                    command,
+                )?))
             }
             BattleControl::PartySelect(value) => {
-                if value.menu.selected_option_id.as_str() == crate::party_menu::PARTY_CANCEL_OPTION_ID {
+                if value.menu.selected_option_id.as_str()
+                    == crate::party_menu::PARTY_CANCEL_OPTION_ID
+                {
                     let menu_id = self.allocate_menu_instance(seat)?;
                     let next = rebind_command_root(value.cancel_to.as_ref(), menu_id)?;
                     self.install_seat_control(seat, next)?;
@@ -1420,12 +1436,8 @@ impl GameRuntime {
                 let cancel = MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?;
                 if value.menu.selected_option_id == cancel {
                     let menu_id = self.allocate_menu_instance(seat)?;
-                    let restored = restore_parent_menu(
-                        &battle,
-                        &value,
-                        value.menu.instance_id,
-                        menu_id,
-                    )?;
+                    let restored =
+                        restore_parent_menu(&battle, &value, value.menu.instance_id, menu_id)?;
                     self.install_seat_control(seat, restored)?;
                     return Ok(BattleUiResult::ControlChanged);
                 }
@@ -1435,15 +1447,13 @@ impl GameRuntime {
                 match value.cancel_to.as_ref() {
                     BattleControl::PartySelect(_) => {
                         let command = BattleCommand::switch(value.actor, value.selected_party_slot);
-                        Ok(BattleUiResult::CommandProposal(
-                            self.command_proposal(
-                                seat,
-                                &value.menu,
-                                value.actor,
-                                value.field_slot,
-                                command,
-                            )?,
-                        ))
+                        Ok(BattleUiResult::CommandProposal(self.command_proposal(
+                            seat,
+                            &value.menu,
+                            value.actor,
+                            value.field_slot,
+                            command,
+                        )?))
                     }
                     BattleControl::ReplacementSelect(parent) => Ok(
                         BattleUiResult::ReplacementProposal(self.replacement_proposal(
@@ -1490,9 +1500,15 @@ impl GameRuntime {
             | BattleControl::Complete(_) => Err(ui_rejected("Cancel is disabled for this control")),
         }?;
         let next = match current {
-            BattleControl::MoveSelect(value) => rebind_command_root(value.cancel_to.as_ref(), new_id)?,
-            BattleControl::TargetSelect(value) => rebind_control_menu(value.cancel_to.as_ref(), new_id)?,
-            BattleControl::PartySelect(value) => rebind_command_root(value.cancel_to.as_ref(), new_id)?,
+            BattleControl::MoveSelect(value) => {
+                rebind_command_root(value.cancel_to.as_ref(), new_id)?
+            }
+            BattleControl::TargetSelect(value) => {
+                rebind_control_menu(value.cancel_to.as_ref(), new_id)?
+            }
+            BattleControl::PartySelect(value) => {
+                rebind_command_root(value.cancel_to.as_ref(), new_id)?
+            }
             BattleControl::PartyOptionSelect(value) => {
                 restore_parent_menu(&battle, &value, value.menu.instance_id, new_id)?
             }
@@ -1587,10 +1603,8 @@ impl GameRuntime {
             .find(|allocator| allocator.seat == seat)
             .ok_or_else(|| invalid_config("missing UI menu allocator"))?;
         let current = allocator.next_menu_instance_id;
-        allocator.next_menu_instance_id = menu_id(increment_safe(
-            current.get(),
-            "menu allocator exhausted",
-        )?);
+        allocator.next_menu_instance_id =
+            menu_id(increment_safe(current.get(), "menu allocator exhausted")?);
         Ok(current)
     }
 
@@ -1605,10 +1619,7 @@ impl GameRuntime {
             .iter_mut()
             .find(|allocator| allocator.seat == seat)
             .ok_or_else(|| invalid_config("missing UI menu allocator"))?;
-        let required = menu_id(increment_safe(
-            consumed.get(),
-            "menu allocator exhausted",
-        )?);
+        let required = menu_id(increment_safe(consumed.get(), "menu allocator exhausted")?);
         if required > allocator.next_menu_instance_id {
             allocator.next_menu_instance_id = required;
         }
@@ -1641,7 +1652,10 @@ impl GameRuntime {
     }
 
     fn active_battle(&self) -> Result<&er_state::battle::BattleState, GameRuntimeError> {
-        self.state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)
+        self.state
+            .battle
+            .as_ref()
+            .ok_or(GameRuntimeError::NoActiveBattle)
     }
 
     fn command_context(
@@ -1677,7 +1691,11 @@ impl GameRuntime {
         let mut entries = Vec::with_capacity(crate::move_menu::MOVE_SLOT_COUNT);
         for raw in 0_u8..4 {
             let slot = MoveSlotIndex::new(raw).map_err(|_| ui_rejected("move slot is invalid"))?;
-            let entry = if let Some(move_offer) = offer.fight.iter().find(|move_offer| move_offer.move_slot == slot) {
+            let entry = if let Some(move_offer) = offer
+                .fight
+                .iter()
+                .find(|move_offer| move_offer.move_slot == slot)
+            {
                 let move_state = pokemon.moves[usize::from(raw)]
                     .ok_or_else(|| ui_rejected("offered move is absent from the actor state"))?;
                 MoveMenuEntry::from_offer(move_state.move_id, move_offer)?
@@ -1710,7 +1728,12 @@ impl GameRuntime {
             .find(|edge| edge.from == control.menu.selected_option_id && edge.to == option_id)
             .map(|edge| edge.direction)
             .ok_or_else(|| ui_rejected("party selection is not an explicit live edge"))?;
-        Ok(navigate_party_menu(battle, control, control.menu.instance_id, direction)?)
+        Ok(navigate_party_menu(
+            battle,
+            control,
+            control.menu.instance_id,
+            direction,
+        )?)
     }
 
     fn sync_replacement_selection(
@@ -1734,7 +1757,12 @@ impl GameRuntime {
             .find(|edge| edge.from == control.menu.selected_option_id && edge.to == option_id)
             .map(|edge| edge.direction)
             .ok_or_else(|| ui_rejected("replacement selection is not an explicit live edge"))?;
-        Ok(navigate_replacement_menu(battle, control, control.menu.instance_id, direction)?)
+        Ok(navigate_replacement_menu(
+            battle,
+            control,
+            control.menu.instance_id,
+            direction,
+        )?)
     }
 
     fn command_proposal(
@@ -1817,11 +1845,8 @@ impl GameRuntime {
         if root.actor != proposal.actor || root.field_slot != proposal.field_slot {
             return Err(GameRuntimeError::ControlIdentityMismatch);
         }
-        let (_, offer) = self.command_context(
-            proposal.owner_seat,
-            proposal.actor,
-            proposal.field_slot,
-        )?;
+        let (_, offer) =
+            self.command_context(proposal.owner_seat, proposal.actor, proposal.field_slot)?;
         let root_selection = match &proposal.command {
             BattleCommand::Fight { .. } => CommandRootSelection::Fight,
             BattleCommand::Switch { .. } => CommandRootSelection::Switch,
@@ -1838,9 +1863,7 @@ impl GameRuntime {
 
         let leaf = match &proposal.command {
             BattleCommand::Fight {
-                move_slot,
-                targets,
-                ..
+                move_slot, targets, ..
             } => {
                 let entries = self.move_entries(proposal.actor, &offer)?;
                 let menu_ids = self.remote_menu_sequence(
@@ -1852,11 +1875,8 @@ impl GameRuntime {
                         2
                     },
                 )?;
-                let move_control_id = replace_control_leaf(
-                    &root.menu.control_id,
-                    "command",
-                    "move",
-                )?;
+                let move_control_id =
+                    replace_control_leaf(&root.menu.control_id, "command", "move")?;
                 let move_control = build_move_control(
                     menu_ids[0],
                     proposal.owner_seat,
@@ -1894,11 +1914,8 @@ impl GameRuntime {
                         {
                             return Err(GameRuntimeError::ControlIdentityMismatch);
                         }
-                        let target_control_id = replace_control_leaf(
-                            &root.menu.control_id,
-                            "command",
-                            "target",
-                        )?;
+                        let target_control_id =
+                            replace_control_leaf(&root.menu.control_id, "command", "target")?;
                         let default_target = selected_targets.first().copied();
                         let target_control = crate::target_menu::build_target_control(
                             menu_ids[1],
@@ -1932,11 +1949,8 @@ impl GameRuntime {
                 else {
                     return Err(GameRuntimeError::ControlIdentityMismatch);
                 };
-                let menu_ids = self.remote_menu_sequence(
-                    proposal.owner_seat,
-                    proposal.menu_instance_id,
-                    2,
-                )?;
+                let menu_ids =
+                    self.remote_menu_sequence(proposal.owner_seat, proposal.menu_instance_id, 2)?;
                 let party_control = build_party_select(
                     battle,
                     proposal.actor,
@@ -1947,11 +1961,8 @@ impl GameRuntime {
                 )?;
                 let selected_option = party_option_id(switch.pokemon, *party_slot)
                     .map_err(|_| ui_rejected("remote switch party option is malformed"))?;
-                let party_control = replay_party_selection(
-                    battle,
-                    party_control,
-                    &selected_option,
-                )?;
+                let party_control =
+                    replay_party_selection(battle, party_control, &selected_option)?;
                 let option_control = open_party_option_menu_from_control(
                     battle,
                     &BattleControl::PartySelect(party_control),
@@ -1992,11 +2003,8 @@ impl GameRuntime {
         {
             return Err(GameRuntimeError::ControlIdentityMismatch);
         }
-        let menu_id = self.remote_menu_sequence(
-            proposal.owner_seat,
-            proposal.menu_instance_id,
-            1,
-        )?[0];
+        let menu_id =
+            self.remote_menu_sequence(proposal.owner_seat, proposal.menu_instance_id, 1)?[0];
         crate::replacement_menu::validate_replacement_control(
             battle,
             current,
@@ -2095,11 +2103,13 @@ impl GameRuntime {
                 .frontier
                 .iter_mut()
                 .find(|entry| entry.operation_id == proposal.operation_id)
-                .ok_or_else(|| GameRuntimeError::StateContent(
-                    er_battle::legality::CommandLegalityError::MissingCommandFrontier {
-                        operation_id: proposal.operation_id.clone(),
-                    },
-                ))?;
+                .ok_or_else(|| {
+                    GameRuntimeError::StateContent(
+                        er_battle::legality::CommandLegalityError::MissingCommandFrontier {
+                            operation_id: proposal.operation_id.clone(),
+                        },
+                    )
+                })?;
             match entry.status.clone() {
                 CommandFrontierStatus::Pending => {
                     entry.status = CommandFrontierStatus::Retained {
@@ -2125,8 +2135,7 @@ impl GameRuntime {
             let complete = battle.command_state.frontier.iter().all(|entry| {
                 matches!(
                     &entry.status,
-                    CommandFrontierStatus::Retained { .. }
-                        | CommandFrontierStatus::Admitted { .. }
+                    CommandFrontierStatus::Retained { .. } | CommandFrontierStatus::Admitted { .. }
                 )
             });
             if complete {
@@ -2159,21 +2168,15 @@ impl GameRuntime {
             proposal.owner_seat,
             proposal.menu_instance_id,
         )?;
-        let fingerprint = CommandFingerprintEntry::new(
-            proposal.operation_id.clone(),
-            proposal.fingerprint(),
-        )?;
+        let fingerprint =
+            CommandFingerprintEntry::new(proposal.operation_id.clone(), proposal.fingerprint())?;
         self.command_fingerprints.push(fingerprint);
-        self.command_fingerprints.sort_unstable_by(|left, right| {
-            left.operation_id.cmp(&right.operation_id)
-        });
+        self.command_fingerprints
+            .sort_unstable_by(|left, right| left.operation_id.cmp(&right.operation_id));
         let operation_id = proposal.operation_id.clone();
         if !complete {
-            let waiting = project_waiting_after_command(
-                &self.control,
-                proposal.owner_seat,
-                &command_state,
-            )?;
+            let waiting =
+                project_waiting_after_command(&self.control, proposal.owner_seat, &command_state)?;
             self.remember_control(proposal.owner_seat, waiting.clone());
             self.control = waiting;
             self.validate()?
@@ -2188,7 +2191,8 @@ impl GameRuntime {
             });
         }
 
-        let commands = commands.ok_or_else(|| invalid_config("complete frontier did not produce a command set"))?;
+        let commands = commands
+            .ok_or_else(|| invalid_config("complete frontier did not produce a command set"))?;
         let material_operation_id = turn_result_operation_id(battle_id, wave, turn)?;
         let mut transition = resolve_turn(
             &self.state,
@@ -2198,8 +2202,8 @@ impl GameRuntime {
             self.content.as_ref(),
         )?;
         self.finalize_turn_frontier(&mut transition)?;
-        let (next_control, followup_events) =
-            self.project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
+        let (next_control, followup_events) = self
+            .project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
         let mut events = vec![InternalEvent::BattleResolved(BattleResolvedPayload {
             resolution: PreparedBattleResolution::Turn {
                 transition,
@@ -2265,15 +2269,13 @@ impl GameRuntime {
             proposal.owner_seat,
             proposal.menu_instance_id,
         )?;
-        self.replacement_fingerprints.push(
-            ReplacementProposalFingerprintEntry::new(
+        self.replacement_fingerprints
+            .push(ReplacementProposalFingerprintEntry::new(
                 proposal.operation_id.clone(),
                 proposal.fingerprint(),
-            )?,
-        );
-        self.replacement_fingerprints.sort_unstable_by(|left, right| {
-            left.operation_id.cmp(&right.operation_id)
-        });
+            )?);
+        self.replacement_fingerprints
+            .sort_unstable_by(|left, right| left.operation_id.cmp(&right.operation_id));
         let mut transition = resolve_replacement(
             &self.state,
             proposal.occurrence,
@@ -2282,8 +2284,8 @@ impl GameRuntime {
             self.content.as_ref(),
         )?;
         self.finalize_replacement_frontier(&mut transition)?;
-        let (next_control, followup_events) =
-            self.project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
+        let (next_control, followup_events) = self
+            .project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
         let mut events = vec![InternalEvent::BattleResolved(BattleResolvedPayload {
             resolution: PreparedBattleResolution::Replacement {
                 transition,
@@ -2323,8 +2325,14 @@ impl GameRuntime {
         let Some(battle) = self.state.battle.as_ref() else {
             return Err(GameRuntimeError::NoActiveBattle);
         };
-        let Some(faint) = battle.faint_queue.iter().find(|faint| faint.id == occurrence) else {
-            return Err(invalid_config("no-legal replacement occurrence is not stored"));
+        let Some(faint) = battle
+            .faint_queue
+            .iter()
+            .find(|faint| faint.id == occurrence)
+        else {
+            return Err(invalid_config(
+                "no-legal replacement occurrence is not stored",
+            ));
         };
         if faint.source.epoch != authority_epoch {
             return Err(GameRuntimeError::ReplacementEpochMismatch);
@@ -2336,7 +2344,9 @@ impl GameRuntime {
             faint.source.resolved_turn,
             faint.source.turn_occurrence,
             faint.slot,
-            faint.owner_seat.ok_or_else(|| invalid_config("enemy faint has no human replacement owner"))?,
+            faint
+                .owner_seat
+                .ok_or_else(|| invalid_config("enemy faint has no human replacement owner"))?,
         )?;
         let mut transition = resolve_replacement(
             &self.state,
@@ -2346,8 +2356,8 @@ impl GameRuntime {
             self.content.as_ref(),
         )?;
         self.finalize_replacement_frontier(&mut transition)?;
-        let (next_control, followup_events) =
-            self.project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
+        let (next_control, followup_events) = self
+            .project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
         let mut events = vec![InternalEvent::BattleResolved(BattleResolvedPayload {
             resolution: PreparedBattleResolution::Replacement {
                 transition,
@@ -2366,7 +2376,10 @@ impl GameRuntime {
         &mut self,
         transition: &mut er_battle::BattleTransition,
     ) -> Result<(), GameRuntimeError> {
-        if !matches!(transition.next_decision, BattleNextDecision::CommandFrontier) {
+        if !matches!(
+            transition.next_decision,
+            BattleNextDecision::CommandFrontier
+        ) {
             return Ok(());
         }
         self.finalize_command_frontier(
@@ -2389,7 +2402,10 @@ impl GameRuntime {
         &mut self,
         transition: &mut er_battle::BattleReplacementTransition,
     ) -> Result<(), GameRuntimeError> {
-        if !matches!(transition.next_decision, BattleNextDecision::CommandFrontier) {
+        if !matches!(
+            transition.next_decision,
+            BattleNextDecision::CommandFrontier
+        ) {
             return Ok(());
         }
         self.finalize_command_frontier(
@@ -2422,8 +2438,11 @@ impl GameRuntime {
         after_state: &mut GameState,
         mutations: &mut Vec<er_battle::BattleMutation>,
     ) -> Result<(), GameRuntimeError> {
-        let (frontier, _next_policy) =
-            build_command_frontier(after_state, &self.scripted_enemy_policy, self.content.as_ref())?;
+        let (frontier, _next_policy) = build_command_frontier(
+            after_state,
+            &self.scripted_enemy_policy,
+            self.content.as_ref(),
+        )?;
         let battle = after_state
             .battle
             .as_mut()
@@ -2432,10 +2451,7 @@ impl GameRuntime {
         let after = CommandCollectionState::new(frontier, before.tombstones.clone())?;
         if before != after {
             battle.command_state = after.clone();
-            mutations.push(er_battle::BattleMutation::CommandCollectionChanged {
-                before,
-                after,
-            });
+            mutations.push(er_battle::BattleMutation::CommandCollectionChanged { before, after });
         }
         validate_state_content(after_state, self.content.as_ref()).map_err(map_legality_error)?;
         Ok(())
@@ -2504,7 +2520,11 @@ impl GameRuntime {
         if self.control != pending.prepared_control {
             return Err(GameRuntimeError::ControlProjectionMismatch);
         }
-        let battle = self.state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(GameRuntimeError::NoActiveBattle)?;
         let faint = battle
             .faint_queue
             .iter()
@@ -2517,9 +2537,11 @@ impl GameRuntime {
         }
         let allocator = self
             .control
-            .allocator(faint.owner_seat.ok_or_else(|| {
-                invalid_config("pending no-legal replacement has no human owner")
-            })?)
+            .allocator(
+                faint.owner_seat.ok_or_else(|| {
+                    invalid_config("pending no-legal replacement has no human owner")
+                })?,
+            )
             .ok_or_else(|| invalid_config("pending no-legal replacement allocator is absent"))?;
         if !matches!(
             build_replacement_menu(&battle, pending.occurrence, allocator.next_menu_instance_id)?,
@@ -2544,7 +2566,10 @@ impl GameRuntime {
         let BattleNextDecision::Replacement { occurrence } = decision else {
             return Ok(None);
         };
-        let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+        let battle = state
+            .battle
+            .as_ref()
+            .ok_or(GameRuntimeError::NoActiveBattle)?;
         let faint = battle
             .faint_queue
             .iter()
@@ -2557,11 +2582,8 @@ impl GameRuntime {
             .control
             .allocator(owner)
             .ok_or_else(|| invalid_config("missing replacement owner allocator"))?;
-        let projection = build_replacement_menu(
-            battle,
-            *occurrence,
-            allocator.next_menu_instance_id,
-        )?;
+        let projection =
+            build_replacement_menu(battle, *occurrence, allocator.next_menu_instance_id)?;
         if !matches!(projection, ReplacementMenuResult::NoLegalReplacement { .. }) {
             return Ok(None);
         }
@@ -2624,10 +2646,8 @@ impl GameRuntimeSnapshotBridge for GameRuntime {
         public_candidate.menu_history = menu_history;
         ensure_public_quiescent_boundary(&public_candidate)?;
 
-        let rebuilt_paths = rebuild_authority_remote_paths(
-            &public_candidate,
-            &snapshot.control_history,
-        )?;
+        let rebuilt_paths =
+            rebuild_authority_remote_paths(&public_candidate, &snapshot.control_history)?;
         if rebuilt_paths != self.authority_remote_paths {
             return Err(snapshot_invalid(
                 "authority_remote_paths",
@@ -2685,10 +2705,8 @@ impl GameRuntimeSnapshotBridge for GameRuntime {
             .validate()
             .map_err(|error| snapshot_runtime_invalid("runtime", error))?;
         ensure_public_quiescent_boundary(&runtime)?;
-        runtime.authority_remote_paths = rebuild_authority_remote_paths(
-            &runtime,
-            &control_history,
-        )?;
+        runtime.authority_remote_paths =
+            rebuild_authority_remote_paths(&runtime, &control_history)?;
         runtime
             .validate()
             .map_err(|error| snapshot_runtime_invalid("runtime", error))?;
@@ -2732,11 +2750,9 @@ fn menu_history_from_snapshot(
 fn validate_snapshot_control_consistency(
     snapshot: &GameRuntimeSnapshotV2,
 ) -> Result<(), SnapshotError> {
-    let battle = snapshot
-        .state
-        .battle
-        .as_ref()
-        .ok_or_else(|| snapshot_invalid("state.battle", "M3 game snapshots require an active battle"))?;
+    let battle = snapshot.state.battle.as_ref().ok_or_else(|| {
+        snapshot_invalid("state.battle", "M3 game snapshots require an active battle")
+    })?;
     let completed_from_state = battle.outcome != BattleOutcome::Ongoing;
     if snapshot.completed != completed_from_state {
         return Err(snapshot_invalid(
@@ -2790,11 +2806,9 @@ fn rebuild_authority_remote_paths(
     runtime: &GameRuntime,
     histories: &[SeatControlHistorySnapshotV1],
 ) -> Result<BTreeMap<er_types::OperationId, RuntimeAuthorityMenuPath>, SnapshotError> {
-    let battle = runtime
-        .state
-        .battle
-        .as_ref()
-        .ok_or_else(|| snapshot_invalid("state.battle", "M3 game snapshots require an active battle"))?;
+    let battle = runtime.state.battle.as_ref().ok_or_else(|| {
+        snapshot_invalid("state.battle", "M3 game snapshots require an active battle")
+    })?;
     let authority_runtime = runtime.local_seat == battle.authority_seat;
     let mut paths = BTreeMap::new();
 
@@ -2875,7 +2889,12 @@ fn rebuild_authority_remote_paths(
                 faint.slot,
                 owner,
             )
-            .map_err(|error| snapshot_invalid("command_admission.replacement_tombstones", error.to_string()))?;
+            .map_err(|error| {
+                snapshot_invalid(
+                    "command_admission.replacement_tombstones",
+                    error.to_string(),
+                )
+            })?;
             if let Some(tombstone) = runtime
                 .replacement_fingerprints
                 .iter()
@@ -2940,7 +2959,10 @@ fn rebuild_remote_command_path(
             push_unique_replay_control(&mut prior_controls, control);
         }
     }
-    for history in histories.iter().filter(|history| history.seat == proposal.owner_seat) {
+    for history in histories
+        .iter()
+        .filter(|history| history.seat == proposal.owner_seat)
+    {
         for control in &history.controls {
             if !matches!(control, BattleControl::CommandRoot(_)) {
                 continue;
@@ -2974,10 +2996,12 @@ fn rebuild_remote_command_path(
         }
     }
     match paths.len() {
-        1 => paths
-            .into_iter()
-            .next()
-            .ok_or_else(|| snapshot_invalid("authority_remote_paths.command", "remote command proof disappeared")),
+        1 => paths.into_iter().next().ok_or_else(|| {
+            snapshot_invalid(
+                "authority_remote_paths.command",
+                "remote command proof disappeared",
+            )
+        }),
         0 => Err(snapshot_invalid(
             "authority_remote_paths.command",
             format!(
@@ -3002,10 +3026,12 @@ fn rebuild_remote_replacement_path(
     operation_id: &er_types::OperationId,
     tombstone: &ReplacementProposalFingerprintEntry,
 ) -> Result<RuntimeAuthorityMenuPath, SnapshotError> {
-    let allocator = runtime
-        .control
-        .allocator(owner)
-        .ok_or_else(|| snapshot_invalid("menu_allocators", "remote replacement owner allocator is absent"))?;
+    let allocator = runtime.control.allocator(owner).ok_or_else(|| {
+        snapshot_invalid(
+            "menu_allocators",
+            "remote replacement owner allocator is absent",
+        )
+    })?;
     let next_value = allocator.next_menu_instance_id.get().get();
     if next_value <= 1 {
         return Err(snapshot_invalid(
@@ -3017,26 +3043,25 @@ fn rebuild_remote_replacement_path(
         SafeU53::new(next_value - 1)
             .map_err(|error| snapshot_invalid("menu_allocators", error.to_string()))?,
     );
-    let battle = runtime
-        .state
-        .battle
-        .as_ref()
-        .ok_or_else(|| snapshot_invalid("state.battle", "M3 game snapshots require an active battle"))?;
+    let battle = runtime.state.battle.as_ref().ok_or_else(|| {
+        snapshot_invalid("state.battle", "M3 game snapshots require an active battle")
+    })?;
     let faint = battle
         .faint_queue
         .iter()
         .find(|candidate| candidate.id == occurrence)
         .copied()
-        .ok_or_else(|| snapshot_invalid("state.battle.faint_queue", "replacement occurrence is absent"))?;
+        .ok_or_else(|| {
+            snapshot_invalid(
+                "state.battle.faint_queue",
+                "replacement occurrence is absent",
+            )
+        })?;
     let mut prior_controls = Vec::new();
     // Replacement proofs use the same installed-parent rule as commands: the
     // current replacement control is a valid prior when admission is captured
     // before the common material boundary records a history transition.
-    if let Some(control) = runtime
-        .control
-        .seat(owner)
-        .map(|entry| &entry.control)
-    {
+    if let Some(control) = runtime.control.seat(owner).map(|entry| &entry.control) {
         if let BattleControl::ReplacementSelect(value) = control {
             if value.occurrence == occurrence
                 && value.owner_seat == owner
@@ -3105,19 +3130,16 @@ fn rebuild_remote_replacement_path(
             {
                 continue;
             }
-            let selected = match replay_replacement_selection(
-                battle,
-                current.clone(),
-                &selected_option,
-            ) {
-                Ok(selected) => selected,
-                Err(error) => {
-                    if first_failure.is_none() {
-                        first_failure = Some(error.to_string());
+            let selected =
+                match replay_replacement_selection(battle, current.clone(), &selected_option) {
+                    Ok(selected) => selected,
+                    Err(error) => {
+                        if first_failure.is_none() {
+                            first_failure = Some(error.to_string());
+                        }
+                        continue;
                     }
-                    continue;
-                }
-            };
+                };
             let option_control = match open_party_option_menu_from_control(
                 battle,
                 &BattleControl::ReplacementSelect(selected),
@@ -3156,7 +3178,10 @@ fn rebuild_remote_replacement_path(
             if proposal.fingerprint() != tombstone.fingerprint {
                 continue;
             }
-            if matched_proposals.iter().any(|previous| previous == &proposal) {
+            if matched_proposals
+                .iter()
+                .any(|previous| previous == &proposal)
+            {
                 continue;
             }
             matched_proposals.push(proposal.clone());
@@ -3171,10 +3196,12 @@ fn rebuild_remote_replacement_path(
         }
     }
     match matches.len() {
-        1 => matches
-            .into_iter()
-            .next()
-            .ok_or_else(|| snapshot_invalid("authority_remote_paths.replacement", "remote replacement proof disappeared")),
+        1 => matches.into_iter().next().ok_or_else(|| {
+            snapshot_invalid(
+                "authority_remote_paths.replacement",
+                "remote replacement proof disappeared",
+            )
+        }),
         0 => Err(snapshot_invalid(
             "authority_remote_paths.replacement",
             format!(
@@ -3205,16 +3232,22 @@ fn remote_menu_allocator_before_final(
     path: &str,
 ) -> Result<MenuInstanceId, SnapshotError> {
     if menu_count == 0 {
-        return Err(snapshot_invalid(path, "remote menu replay must consume at least one menu instance"));
+        return Err(snapshot_invalid(
+            path,
+            "remote menu replay must consume at least one menu instance",
+        ));
     }
     let allocator = runtime
         .control
         .allocator(seat)
         .ok_or_else(|| snapshot_invalid(path, "remote proposal owner allocator is absent"))?;
     let final_value = final_menu_instance_id.get().get();
-    let expected_next = final_value
-        .checked_add(1)
-        .ok_or_else(|| snapshot_invalid(path, "remote proposal menu instance exhausted its allocator"))?;
+    let expected_next = final_value.checked_add(1).ok_or_else(|| {
+        snapshot_invalid(
+            path,
+            "remote proposal menu instance exhausted its allocator",
+        )
+    })?;
     if allocator.next_menu_instance_id.get().get() != expected_next {
         return Err(snapshot_invalid(
             path,
@@ -3225,11 +3258,14 @@ fn remote_menu_allocator_before_final(
         .checked_sub((menu_count - 1) as u64)
         .ok_or_else(|| snapshot_invalid(path, "remote proposal menu sequence underflowed"))?;
     if first_value == 0 {
-        return Err(snapshot_invalid(path, "remote proposal menu sequence contains zero"));
+        return Err(snapshot_invalid(
+            path,
+            "remote proposal menu sequence contains zero",
+        ));
     }
-    Ok(MenuInstanceId::new(
-        SafeU53::new(first_value).map_err(|error| snapshot_invalid(path, error.to_string()))?,
-    ))
+    Ok(MenuInstanceId::new(SafeU53::new(first_value).map_err(
+        |error| snapshot_invalid(path, error.to_string()),
+    )?))
 }
 
 fn runtime_with_prior_control(
@@ -3239,7 +3275,10 @@ fn runtime_with_prior_control(
     operation_id: &er_types::OperationId,
     allocator_before: MenuInstanceId,
 ) -> Result<GameRuntime, SnapshotError> {
-    if prior_control.owner_seat().is_some_and(|owner| owner != seat) {
+    if prior_control
+        .owner_seat()
+        .is_some_and(|owner| owner != seat)
+    {
         return Err(snapshot_invalid(
             "control_history",
             "a replay prior control belongs to a different seat",
@@ -3255,7 +3294,10 @@ fn runtime_with_prior_control(
     seat_control.control = prior_control.clone();
     seat_control.decision_operation_id = Some(operation_id.clone());
     let mut allocators = runtime.control.menu_allocators.clone();
-    let Some(allocator) = allocators.iter_mut().find(|allocator| allocator.seat == seat) else {
+    let Some(allocator) = allocators
+        .iter_mut()
+        .find(|allocator| allocator.seat == seat)
+    else {
         return Err(snapshot_invalid(
             "menu_allocators",
             "a replay prior control has no seat allocator",
@@ -3309,7 +3351,9 @@ fn replay_party_selection(
             NavigationDirection::Down,
         )?;
     }
-    Err(ui_rejected("party replay could not reach the submitted option"))
+    Err(ui_rejected(
+        "party replay could not reach the submitted option",
+    ))
 }
 
 fn replay_replacement_selection(
@@ -3328,10 +3372,14 @@ fn replay_replacement_selection(
             NavigationDirection::Down,
         )?;
     }
-    Err(ui_rejected("replacement replay could not reach the submitted option"))
+    Err(ui_rejected(
+        "replacement replay could not reach the submitted option",
+    ))
 }
 
-fn command_root_selection(option_id: &MenuOptionId) -> Result<CommandRootSelection, GameRuntimeError> {
+fn command_root_selection(
+    option_id: &MenuOptionId,
+) -> Result<CommandRootSelection, GameRuntimeError> {
     match option_id.as_str() {
         crate::command_menu::COMMAND_FIGHT_OPTION_ID => Ok(CommandRootSelection::Fight),
         crate::command_menu::COMMAND_SWITCH_OPTION_ID => Ok(CommandRootSelection::Switch),
@@ -3347,7 +3395,10 @@ fn parse_move_option_id(
     let Some(raw) = option_id.as_str().strip_prefix(&prefix) else {
         return Err(ui_rejected("move option identity is stale"));
     };
-    if raw.is_empty() || (raw.len() > 1 && raw.starts_with('0')) || !raw.bytes().all(|byte| byte.is_ascii_digit()) {
+    if raw.is_empty()
+        || (raw.len() > 1 && raw.starts_with('0'))
+        || !raw.bytes().all(|byte| byte.is_ascii_digit())
+    {
         return Err(ui_rejected("move option number is not canonical"));
     }
     let raw = raw
@@ -3393,7 +3444,10 @@ fn replace_control_leaf(
     Ok(format!("{prefix}/{next_leaf}"))
 }
 
-fn rebind_menu(menu: &BattleMenu, new_instance_id: MenuInstanceId) -> Result<BattleMenu, GameRuntimeError> {
+fn rebind_menu(
+    menu: &BattleMenu,
+    new_instance_id: MenuInstanceId,
+) -> Result<BattleMenu, GameRuntimeError> {
     BattleMenu::new(
         new_instance_id,
         menu.owner_seat,
@@ -3496,7 +3550,10 @@ fn ui_rejected(message: &str) -> GameRuntimeError {
 }
 
 fn decision_for_state(state: &GameState) -> Result<BattleNextDecision, GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     if battle.outcome != BattleOutcome::Ongoing {
         return Ok(BattleNextDecision::Complete(battle.outcome));
     }
@@ -3531,8 +3588,14 @@ fn validate_state_coordinate_progression(
     before: &GameState,
     after: &GameState,
 ) -> Result<(), GameRuntimeError> {
-    let before_battle = before.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
-    let after_battle = after.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let before_battle = before
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
+    let after_battle = after
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     if before_battle.battle_id != after_battle.battle_id
         || before_battle.wave != after_battle.wave
         || before_battle.format != after_battle.format
@@ -3546,7 +3609,10 @@ fn validate_state_coordinate_progression(
 fn expected_material_operation_id(
     state: &GameState,
 ) -> Result<er_types::OperationId, GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     if !battle.command_state.frontier.is_empty() {
         return Ok(turn_result_operation_id(
             battle.battle_id,
@@ -3578,7 +3644,10 @@ fn validate_current_operation_binding(
     control: &BattleControlPlan,
     material_operation_id: &er_types::OperationId,
 ) -> Result<(), GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     if !battle.command_state.frontier.is_empty() {
         for entry in &control.seats {
             let Some(operation_id) = entry.decision_operation_id.as_ref() else {
@@ -3668,10 +3737,12 @@ fn validate_turn_transition_identity(
         .battle
         .as_ref()
         .ok_or(GameRuntimeError::NoActiveBattle)?;
-    if transition.before_digest != MechanicalStateDigest::compute(&transition.before_state)
-        .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
-        || transition.after_digest != MechanicalStateDigest::compute(&transition.after_state)
+    if transition.before_digest
+        != MechanicalStateDigest::compute(&transition.before_state)
             .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
+        || transition.after_digest
+            != MechanicalStateDigest::compute(&transition.after_state)
+                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
     {
         return Err(GameRuntimeError::TransitionDigestMismatch);
     }
@@ -3683,8 +3754,7 @@ fn validate_turn_transition_identity(
         .ok_or_else(|| invalid_config("turn allocator exhausted"))?;
     if before.battle_id != after.battle_id
         || before.wave != after.wave
-        || (after.outcome == BattleOutcome::Ongoing
-            && after.turn.get().get() != expected_next_turn)
+        || (after.outcome == BattleOutcome::Ongoing && after.turn.get().get() != expected_next_turn)
         || (after.outcome != BattleOutcome::Ongoing && after.turn != before.turn)
     {
         return Err(GameRuntimeError::TransitionIdentityMismatch);
@@ -3751,10 +3821,12 @@ fn validate_replacement_transition_identity(
         stored.slot,
         owner,
     )?;
-    if transition.before_digest != MechanicalStateDigest::compute(&transition.before_state)
-        .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
-        || transition.after_digest != MechanicalStateDigest::compute(&transition.after_state)
+    if transition.before_digest
+        != MechanicalStateDigest::compute(&transition.before_state)
             .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
+        || transition.after_digest
+            != MechanicalStateDigest::compute(&transition.after_state)
+                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
         || before.battle_id != after.battle_id
         || before.wave != after.wave
         || before.turn != after.turn
@@ -3786,7 +3858,10 @@ pub fn project_battle_control_plan(
     allocator_before: &[SeatMenuInstanceAllocator],
     content: &ContentPack,
 ) -> Result<BattleControlPlan, GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     let seats = human_seats(&battle.format)?;
     match decision {
         BattleNextDecision::CommandFrontier => {
@@ -3825,9 +3900,7 @@ fn invalid_config(message: &str) -> GameRuntimeError {
     }
 }
 
-fn map_legality_error(
-    source: er_battle::legality::CommandLegalityError,
-) -> GameRuntimeError {
+fn map_legality_error(source: er_battle::legality::CommandLegalityError) -> GameRuntimeError {
     match source {
         er_battle::legality::CommandLegalityError::Content(source) => {
             GameRuntimeError::Content(source)
@@ -3865,12 +3938,20 @@ fn menu_id(value: SafeU53) -> MenuInstanceId {
     MenuInstanceId::new(value)
 }
 
-fn initial_allocators(seats: &[SeatId]) -> Result<Vec<SeatMenuInstanceAllocator>, GameRuntimeError> {
+fn initial_allocators(
+    seats: &[SeatId],
+) -> Result<Vec<SeatMenuInstanceAllocator>, GameRuntimeError> {
     seats
         .iter()
         .map(|seat| {
-            SeatMenuInstanceAllocator::new(*seat, menu_id(SafeU53::new(1).map_err(|_| invalid_config("invalid initial menu allocator"))?))
-                .map_err(|error| GameRuntimeError::Control(BattleControlPlanError::Allocator(error)))
+            SeatMenuInstanceAllocator::new(
+                *seat,
+                menu_id(
+                    SafeU53::new(1)
+                        .map_err(|_| invalid_config("invalid initial menu allocator"))?,
+                ),
+            )
+            .map_err(|error| GameRuntimeError::Control(BattleControlPlanError::Allocator(error)))
         })
         .collect()
 }
@@ -3884,8 +3965,18 @@ fn validate_start_parties(
     {
         return Err(invalid_config("lead vectors must match battle capacities"));
     }
-    validate_leads(&start.player_party, &start.player_leads, Some(human_seats), BattleSide::Player)?;
-    validate_leads(&start.enemy_party, &start.enemy_leads, None, BattleSide::Enemy)?;
+    validate_leads(
+        &start.player_party,
+        &start.player_leads,
+        Some(human_seats),
+        BattleSide::Player,
+    )?;
+    validate_leads(
+        &start.enemy_party,
+        &start.enemy_leads,
+        None,
+        BattleSide::Enemy,
+    )?;
     Ok(())
 }
 
@@ -3898,7 +3989,9 @@ fn validate_leads(
     let mut seen = Vec::new();
     for (position, lead) in leads.iter().enumerate() {
         if !seen.iter().all(|previous| previous != lead) {
-            return Err(invalid_config("lead vectors must contain unique party slots"));
+            return Err(invalid_config(
+                "lead vectors must contain unique party slots",
+            ));
         }
         seen.push(*lead);
         let pokemon = party
@@ -3914,7 +4007,9 @@ fn validate_leads(
                     .copied()
                     .ok_or_else(|| invalid_config("player lead has no human owner"))?;
                 if pokemon.owner_seat != Some(expected) {
-                    return Err(invalid_config("player lead owner does not match canonical seat"));
+                    return Err(invalid_config(
+                        "player lead owner does not match canonical seat",
+                    ));
                 }
             }
             (BattleSide::Enemy, None) if pokemon.owner_seat.is_some() => {
@@ -3955,7 +4050,10 @@ fn build_command_frontier(
     policy: &ScriptedEnemyPolicyV1,
     content: &ContentPack,
 ) -> Result<(Vec<CommandFrontierEntry>, ScriptedEnemyPolicyV1), GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     let mut next_policy = policy.clone();
     let mut frontier = Vec::new();
     for slot in canonical_slots(&battle.format)? {
@@ -3964,23 +4062,37 @@ fn build_command_frontier(
         };
         let (owner_seat, operation_id, offer, status) = match slot.side {
             BattleSide::Player => {
-                let owner = owner_seat_for(&battle.format, slot)?.ok_or_else(|| invalid_config("player slot has no owner"))?;
-                let operation = player_command_operation_id(battle.battle_id, battle.wave, battle.turn, slot, owner)?;
-                let offer = build_command_offer(state, slot, content).map_err(map_legality_error)?;
-                (Some(owner), operation, offer, CommandFrontierStatus::Pending)
+                let owner = owner_seat_for(&battle.format, slot)?
+                    .ok_or_else(|| invalid_config("player slot has no owner"))?;
+                let operation = player_command_operation_id(
+                    battle.battle_id,
+                    battle.wave,
+                    battle.turn,
+                    slot,
+                    owner,
+                )?;
+                let offer =
+                    build_command_offer(state, slot, content).map_err(map_legality_error)?;
+                (
+                    Some(owner),
+                    operation,
+                    offer,
+                    CommandFrontierStatus::Pending,
+                )
             }
             BattleSide::Enemy => {
-                let scripted = next_policy
-                    .next_command()
-                    .cloned()
-                    .ok_or_else(|| invalid_config("scripted enemy policy has no command at cursor"))?;
+                let scripted = next_policy.next_command().cloned().ok_or_else(|| {
+                    invalid_config("scripted enemy policy has no command at cursor")
+                })?;
                 if scripted.battle_id != battle.battle_id
                     || scripted.wave != battle.wave
                     || scripted.turn != battle.turn
                     || scripted.field_slot != slot
                     || scripted.actor != actor
                 {
-                    return Err(invalid_config("scripted enemy command coordinates are stale"));
+                    return Err(invalid_config(
+                        "scripted enemy command coordinates are stale",
+                    ));
                 }
                 let operation = scripted_enemy_command_operation_id(
                     battle.battle_id,
@@ -3992,7 +4104,8 @@ fn build_command_frontier(
                 let offer = build_scripted_enemy_offer(state, slot, &scripted.command, content)
                     .map_err(map_legality_error)?;
                 let accepted = AcceptedBattleCommand::scripted_enemy(scripted);
-                next_policy.cursor = increment_safe(next_policy.cursor, "scripted enemy cursor exhausted")?;
+                next_policy.cursor =
+                    increment_safe(next_policy.cursor, "scripted enemy cursor exhausted")?;
                 (
                     None,
                     operation,
@@ -4022,7 +4135,10 @@ fn project_command_frontier(
     allocators: &[SeatMenuInstanceAllocator],
     _content: &ContentPack,
 ) -> Result<BattleControlPlan, GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     battle.command_state.validate()?;
     // Runtime and snapshot invariants keep every canonical human seat in the
     // plan.  The pending frontier controls actionability; seats excluded from
@@ -4082,7 +4198,10 @@ fn project_command_frontier(
             .find(|allocator| allocator.seat == *seat)
             .ok_or_else(|| invalid_config("missing human menu allocator"))?;
         let instance_id = allocator.next_menu_instance_id;
-        allocator.next_menu_instance_id = menu_id(increment_safe(instance_id.get(), "menu allocator exhausted")?);
+        allocator.next_menu_instance_id = menu_id(increment_safe(
+            instance_id.get(),
+            "menu allocator exhausted",
+        )?);
         let control_id = format!(
             "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/command",
             battle.battle_id, battle.wave, battle.turn, slot.position, seat,
@@ -4115,7 +4234,10 @@ fn project_replacement(
     seats: &[SeatId],
     allocators: &[SeatMenuInstanceAllocator],
 ) -> Result<BattleControlPlan, GameRuntimeError> {
-    let battle = state.battle.as_ref().ok_or(GameRuntimeError::NoActiveBattle)?;
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(GameRuntimeError::NoActiveBattle)?;
     let faint = battle
         .faint_queue
         .iter()
@@ -4142,20 +4264,16 @@ fn project_replacement(
         .iter()
         .find(|allocator| allocator.seat == owner)
         .ok_or_else(|| invalid_config("missing replacement owner allocator"))?;
-    let projection = build_replacement_menu(
-        battle,
-        occurrence,
-        owner_allocator.next_menu_instance_id,
-    )?;
+    let projection =
+        build_replacement_menu(battle, occurrence, owner_allocator.next_menu_instance_id)?;
     if matches!(projection, ReplacementMenuResult::NoLegalReplacement { .. }) {
         let entries = seats
             .iter()
             .map(|seat| {
-                WaitingControl::new(
-                    WaitingReason::ReplacementOwner,
-                    vec![operation_id.clone()],
-                )
-                .map(|waiting| SeatBattleControl::new(*seat, None, BattleControl::Waiting(waiting)))
+                WaitingControl::new(WaitingReason::ReplacementOwner, vec![operation_id.clone()])
+                    .map(|waiting| {
+                        SeatBattleControl::new(*seat, None, BattleControl::Waiting(waiting))
+                    })
             })
             .collect::<Result<Vec<_>, _>>()?;
         return BattleControlPlan::new(
@@ -4169,7 +4287,9 @@ fn project_replacement(
         .map_err(GameRuntimeError::Control);
     }
     let ReplacementMenuResult::Menu(replacement_control) = projection else {
-        return Err(invalid_config("replacement menu projection changed classification"));
+        return Err(invalid_config(
+            "replacement menu projection changed classification",
+        ));
     };
     let mut next_allocators = allocators.to_vec();
     let mut entries = Vec::with_capacity(seats.len());
@@ -4229,16 +4349,23 @@ fn control_accepts_command(
             && slot == proposal.field_slot
     };
     match (&seat.control, &proposal.command) {
-        (BattleControl::MoveSelect(value), BattleCommand::Fight { move_slot, targets, .. })
-            if menu_matches(&value.menu, value.actor, value.field_slot) =>
-        {
+        (
+            BattleControl::MoveSelect(value),
+            BattleCommand::Fight {
+                move_slot, targets, ..
+            },
+        ) if menu_matches(&value.menu, value.actor, value.field_slot) => {
             move_option_id(value.actor, *move_slot)
                 .is_ok_and(|option| value.menu.selected_option_id == option)
                 && matches!(targets, BattleTargetSelection::Implicit)
         }
-        (BattleControl::TargetSelect(value), BattleCommand::Fight { move_slot, targets, .. })
-            if menu_matches(&value.menu, value.actor, value.field_slot)
-                && value.move_slot == *move_slot =>
+        (
+            BattleControl::TargetSelect(value),
+            BattleCommand::Fight {
+                move_slot, targets, ..
+            },
+        ) if menu_matches(&value.menu, value.actor, value.field_slot)
+            && value.move_slot == *move_slot =>
         {
             crate::target_menu::select_target_control(value)
                 .is_ok_and(|selected| selected == *targets)
@@ -4246,12 +4373,10 @@ fn control_accepts_command(
         // A voluntary Switch is final only at the Send Out leaf reached from
         // the PartySelect path.  Accepting it from a root/PartySelect menu
         // would bypass the explicit option confirmation.
-        (
-            BattleControl::PartyOptionSelect(value),
-            BattleCommand::Switch { party_slot, .. },
-        ) if menu_matches(&value.menu, value.actor, value.field_slot)
-            && value.menu.selected_option_id.as_str() == PARTY_OPTION_SEND_OUT_ID
-            && value.selected_party_slot == *party_slot =>
+        (BattleControl::PartyOptionSelect(value), BattleCommand::Switch { party_slot, .. })
+            if menu_matches(&value.menu, value.actor, value.field_slot)
+                && value.menu.selected_option_id.as_str() == PARTY_OPTION_SEND_OUT_ID
+                && value.selected_party_slot == *party_slot =>
         {
             let BattleControl::PartySelect(parent) = value.cancel_to.as_ref() else {
                 return false;
@@ -4342,7 +4467,9 @@ fn project_waiting_after_command(
     )?);
     let mut seats = current.seats.clone();
     let Some(entry) = seats.iter_mut().find(|entry| entry.seat == accepted_seat) else {
-        return Err(invalid_config("accepted command seat is absent from control plan"));
+        return Err(invalid_config(
+            "accepted command seat is absent from control plan",
+        ));
     };
     entry.decision_operation_id = None;
     entry.control = waiting;
@@ -4368,7 +4495,9 @@ fn project_waiting_after_replacement(
     )?);
     let mut seats = current.seats.clone();
     let Some(entry) = seats.iter_mut().find(|entry| entry.seat == owner) else {
-        return Err(invalid_config("replacement owner is absent from control plan"));
+        return Err(invalid_config(
+            "replacement owner is absent from control plan",
+        ));
     };
     entry.decision_operation_id = None;
     entry.control = waiting;
@@ -4404,7 +4533,9 @@ fn validate_command_ledger(entries: &[CommandFingerprintEntry]) -> Result<(), Ga
     }
     for pair in entries.windows(2) {
         if pair[0].operation_id >= pair[1].operation_id {
-            return Err(invalid_config("command fingerprint ledger is not canonical"));
+            return Err(invalid_config(
+                "command fingerprint ledger is not canonical",
+            ));
         }
     }
     Ok(())
@@ -4418,7 +4549,9 @@ fn validate_replacement_ledger(
     }
     for pair in entries.windows(2) {
         if pair[0].operation_id >= pair[1].operation_id {
-            return Err(invalid_config("replacement fingerprint ledger is not canonical"));
+            return Err(invalid_config(
+                "replacement fingerprint ledger is not canonical",
+            ));
         }
     }
     Ok(())

@@ -3,8 +3,7 @@ use std::error::Error;
 use er_game::command_menu::{
     COMMAND_FIGHT_OPTION_ID, COMMAND_SWITCH_OPTION_ID, CommandChoice, CommandMenuAvailability,
     CommandMenuError, CommandRootSelection, build_command_menu,
-    build_command_menu_with_availability,
-    build_command_root_control, select_command,
+    build_command_menu_with_availability, build_command_root_control, select_command,
 };
 use er_game::move_menu::{
     MOVE_SLOT_COUNT, MoveActivation, MoveMenuEntry, MoveSelectionError, build_move_control,
@@ -18,7 +17,9 @@ use er_types::battle_command::{
     BattleTargetSelection, OfferedMoveCommand, OfferedSwitchCommand,
 };
 use er_types::battle_control::{BattleControl, BattleControlPlan};
-use er_types::battle_ids::{BattleSide, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PokemonId};
+use er_types::battle_ids::{
+    BattleSide, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PokemonId,
+};
 use er_types::battle_ui::{MenuNavigationEdge, NavigationDirection};
 use er_types::{MenuOptionId, SafeU53, SeatId};
 
@@ -71,11 +72,7 @@ fn one_move_offer(targets: Vec<BattleTargetSelection>) -> TestResult<OfferedMove
     Ok(OfferedMoveCommand::new(MoveSlotIndex::ZERO, targets)?)
 }
 
-fn edge(
-    from: &str,
-    direction: NavigationDirection,
-    to: &str,
-) -> TestResult<MenuNavigationEdge> {
+fn edge(from: &str, direction: NavigationDirection, to: &str) -> TestResult<MenuNavigationEdge> {
     Ok(MenuNavigationEdge::new(
         MenuOptionId::new(from)?,
         direction,
@@ -116,10 +113,19 @@ fn command_control_fixture_is_read_and_root_graph_is_complete() -> TestResult {
         BattleControl::CommandRoot(root) => root,
         other => return Err(format!("fixture control was {other:?}").into()),
     };
-    assert_eq!(root.menu.selected_option_id.as_str(), COMMAND_FIGHT_OPTION_ID);
+    assert_eq!(
+        root.menu.selected_option_id.as_str(),
+        COMMAND_FIGHT_OPTION_ID
+    );
     assert_eq!(root.menu.options.len(), 2);
-    assert!(root.menu.contains_option(&MenuOptionId::new(COMMAND_FIGHT_OPTION_ID)?));
-    assert!(root.menu.contains_option(&MenuOptionId::new(COMMAND_SWITCH_OPTION_ID)?));
+    assert!(
+        root.menu
+            .contains_option(&MenuOptionId::new(COMMAND_FIGHT_OPTION_ID)?)
+    );
+    assert!(
+        root.menu
+            .contains_option(&MenuOptionId::new(COMMAND_SWITCH_OPTION_ID)?)
+    );
 
     let menu = build_command_menu(
         menu_instance(1)?,
@@ -272,7 +278,10 @@ fn move_graph_has_every_explicit_edge_and_never_skips_placeholders() -> TestResu
         Some(MoveSlotIndex::new(3)?),
         false,
     )?;
-    assert_eq!(remembered_present.selected_option_id.as_str(), "move/7/slot/3");
+    assert_eq!(
+        remembered_present.selected_option_id.as_str(),
+        "move/7/slot/3"
+    );
     Ok(())
 }
 
@@ -299,7 +308,10 @@ fn move_activation_distinguishes_implicit_single_and_multiple_routes() -> TestRe
 
     entries[0] = MoveMenuEntry::enabled(
         move_id(1)?,
-        vec![target_selection(vec![enemy(0)])?, target_selection(vec![enemy(1)])?],
+        vec![
+            target_selection(vec![enemy(0)])?,
+            target_selection(vec![enemy(1)])?,
+        ],
     )?;
     let choices = build_move_menu(
         menu_instance(9)?,
@@ -394,13 +406,37 @@ fn target_binary_graph_covers_cross_side_and_horizontal_edges() -> TestResult {
 
     let mut expected = vec![
         edge("target/player/0", NavigationDirection::Up, "target/enemy/0")?,
-        edge("target/player/0", NavigationDirection::Right, "target/player/1")?,
+        edge(
+            "target/player/0",
+            NavigationDirection::Right,
+            "target/player/1",
+        )?,
         edge("target/player/1", NavigationDirection::Up, "target/enemy/0")?,
-        edge("target/player/1", NavigationDirection::Left, "target/player/0")?,
-        edge("target/enemy/0", NavigationDirection::Down, "target/player/0")?,
-        edge("target/enemy/0", NavigationDirection::Right, "target/enemy/1")?,
-        edge("target/enemy/1", NavigationDirection::Down, "target/player/0")?,
-        edge("target/enemy/1", NavigationDirection::Left, "target/enemy/0")?,
+        edge(
+            "target/player/1",
+            NavigationDirection::Left,
+            "target/player/0",
+        )?,
+        edge(
+            "target/enemy/0",
+            NavigationDirection::Down,
+            "target/player/0",
+        )?,
+        edge(
+            "target/enemy/0",
+            NavigationDirection::Right,
+            "target/enemy/1",
+        )?,
+        edge(
+            "target/enemy/1",
+            NavigationDirection::Down,
+            "target/player/0",
+        )?,
+        edge(
+            "target/enemy/1",
+            NavigationDirection::Left,
+            "target/enemy/0",
+        )?,
     ];
     expected.sort_unstable();
     assert_eq!(menu.navigation, expected);
@@ -494,8 +530,14 @@ fn cancel_history_restores_exact_root_then_move_selection() -> TestResult {
         true,
         BattleControl::CommandRoot(root.clone()),
     )?;
-    assert_eq!(move_control.cancel_to.as_ref(), &BattleControl::CommandRoot(root));
-    assert_eq!(move_control.menu.selected_option_id.as_str(), "move/7/slot/0");
+    assert_eq!(
+        move_control.cancel_to.as_ref(),
+        &BattleControl::CommandRoot(root)
+    );
+    assert_eq!(
+        move_control.menu.selected_option_id.as_str(),
+        "move/7/slot/0"
+    );
 
     let target_control = build_target_control(
         menu_instance(19)?,
@@ -514,7 +556,10 @@ fn cancel_history_restores_exact_root_then_move_selection() -> TestResult {
         target_control.cancel_to.as_ref(),
         &BattleControl::MoveSelect(move_control)
     );
-    assert_eq!(target_control.menu.selected_option_id.as_str(), "target/enemy/1");
+    assert_eq!(
+        target_control.menu.selected_option_id.as_str(),
+        "target/enemy/1"
+    );
     assert_ne!(target_control.menu.instance_id, menu_instance(18)?);
 
     let no_targets = build_target_menu(

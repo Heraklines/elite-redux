@@ -15,11 +15,11 @@ use er_canonical::{canonicalize_value, content_digest, fixture_digest};
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::internal_event::InternalEventKind;
 use er_game::runtime::BATTLE_START_SCHEMA_VERSION;
+use er_kernel::snapshot::{RestorableKernelSnapshotV2, RngDraw};
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput,
 };
-use er_kernel::snapshot::{RestorableKernelSnapshotV2, RngDraw};
 use er_protocol::{AuthorityLogConfig, BackoffPolicy};
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::format::BattleFormat;
@@ -36,8 +36,8 @@ use er_types::battle_ids::{
     WaveIndex,
 };
 use er_types::{
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 use serde_json::{Value, json};
 
@@ -150,7 +150,10 @@ impl fmt::Display for M3ParityError {
                 write!(formatter, "M3 snapshot {stage} failed: {reason}")
             }
             Self::Canonical { field, reason } => {
-                write!(formatter, "could not canonicalize M3 parity {field}: {reason}")
+                write!(
+                    formatter,
+                    "could not canonicalize M3 parity {field}: {reason}"
+                )
             }
         }
     }
@@ -178,10 +181,9 @@ fn single_party_pokemon(
     id: u64,
     owner_seat: Option<SeatId>,
 ) -> Result<PokemonState, M3ParityError> {
-    let species = content
-        .species
-        .first()
-        .ok_or_else(|| M3ParityError::Configuration("selected content has no species".to_owned()))?;
+    let species = content.species.first().ok_or_else(|| {
+        M3ParityError::Configuration("selected content has no species".to_owned())
+    })?;
     let move_id = content
         .moves
         .first()
@@ -242,10 +244,10 @@ fn single_party_pokemon(
 
 fn battle_config(seed: &str, content: &ContentPack) -> Result<BattleGameConfig, M3ParityError> {
     let battle_id = BattleId::new(safe(1));
-    let wave = WaveIndex::new(safe(1))
-        .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
-    let turn = TurnIndex::new(safe(1))
-        .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let wave =
+        WaveIndex::new(safe(1)).map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let turn =
+        TurnIndex::new(safe(1)).map_err(|error| M3ParityError::Configuration(error.to_string()))?;
     let enemy_slot = FieldSlot::new(BattleSide::Enemy, 0)
         .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
     let enemy_command = BattleCommand::fight(
@@ -254,14 +256,9 @@ fn battle_config(seed: &str, content: &ContentPack) -> Result<BattleGameConfig, 
         BattleTargetSelection::implicit(),
     )
     .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
-    let enemy_operation = scripted_enemy_command_operation_id(
-        battle_id,
-        wave,
-        turn,
-        enemy_slot,
-        safe(0),
-    )
-    .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let enemy_operation =
+        scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, safe(0))
+            .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
     let enemy_script = ScriptedEnemyBattleCommandV1::new(
         enemy_operation,
         battle_id,
@@ -437,8 +434,8 @@ fn observe(
         content_digest(&snapshot).map_err(|error| canonical_error("snapshot", error))?;
     let ui_projection_digest = content_digest(projection)
         .map_err(|error| canonical_error("battle_ui_projection", error))?;
-    let rng_audit_digest = content_digest(&rng_audit)
-        .map_err(|error| canonical_error("rng_audit", error))?;
+    let rng_audit_digest =
+        content_digest(&rng_audit).map_err(|error| canonical_error("rng_audit", error))?;
     let internal_events = internal_events
         .into_iter()
         .map(internal_event_kind_name)
@@ -574,8 +571,9 @@ pub fn final_evidence_trace_json() -> Result<String, M3ParityError> {
 
 /// Parse the exact serialized trace artifact before any kernel is constructed.
 pub fn parse_serialized_trace(input: &str) -> Result<M3ParityFixture, M3ParityError> {
-    let value: Value = serde_json::from_str(input)
-        .map_err(|error| M3ParityError::InvalidFixture(format!("trace JSON is invalid: {error}")))?;
+    let value: Value = serde_json::from_str(input).map_err(|error| {
+        M3ParityError::InvalidFixture(format!("trace JSON is invalid: {error}"))
+    })?;
     let object = value.as_object().ok_or_else(|| {
         M3ParityError::InvalidFixture("serialized trace root must be an object".to_owned())
     })?;
@@ -589,71 +587,52 @@ pub fn parse_serialized_trace(input: &str) -> Result<M3ParityFixture, M3ParityEr
     let trace_id = object
         .get("trace_id")
         .and_then(Value::as_str)
-        .ok_or_else(|| {
-            M3ParityError::InvalidFixture("trace trace_id must be a string".to_owned())
-        })?
+        .ok_or_else(|| M3ParityError::InvalidFixture("trace trace_id must be a string".to_owned()))?
         .to_owned();
     let seed = object
         .get("seed")
         .and_then(Value::as_str)
-        .ok_or_else(|| {
-            M3ParityError::InvalidFixture("trace seed must be a string".to_owned())
-        })?
+        .ok_or_else(|| M3ParityError::InvalidFixture("trace seed must be a string".to_owned()))?
         .to_owned();
-    let snapshot_boundary_after: SafeU53 = serde_json::from_value(
-        object
-            .get("snapshot_boundary_after")
-            .cloned()
-            .ok_or_else(|| {
-                M3ParityError::InvalidFixture(
-                    "trace snapshot_boundary_after is missing".to_owned(),
-                )
-            })?,
-    )
-    .map_err(|error| {
-        M3ParityError::InvalidFixture(format!(
-            "trace snapshot_boundary_after is invalid: {error}"
-        ))
-    })?;
+    let snapshot_boundary_after: SafeU53 =
+        serde_json::from_value(object.get("snapshot_boundary_after").cloned().ok_or_else(
+            || M3ParityError::InvalidFixture("trace snapshot_boundary_after is missing".to_owned()),
+        )?)
+        .map_err(|error| {
+            M3ParityError::InvalidFixture(format!(
+                "trace snapshot_boundary_after is invalid: {error}"
+            ))
+        })?;
     let events = object
         .get("events")
         .and_then(Value::as_array)
-        .ok_or_else(|| {
-            M3ParityError::InvalidFixture("trace events must be an array".to_owned())
-        })?
+        .ok_or_else(|| M3ParityError::InvalidFixture("trace events must be an array".to_owned()))?
         .iter()
         .enumerate()
         .map(|(index, value)| {
             let event = value.as_object().ok_or_else(|| {
                 M3ParityError::InvalidFixture(format!("trace event {index} must be an object"))
             })?;
-            let virtual_time_ms: SafeU53 = serde_json::from_value(
-                event
-                    .get("virtual_time_ms")
-                    .cloned()
-                    .ok_or_else(|| {
-                        M3ParityError::InvalidFixture(format!(
-                            "trace event {index} is missing virtual_time_ms"
-                        ))
-                    })?,
-            )
-            .map_err(|error| {
-                M3ParityError::InvalidFixture(format!(
-                    "trace event {index} virtual_time_ms is invalid: {error}"
-                ))
-            })?;
-            let input: KernelInput = serde_json::from_value(
-                event.get("input").cloned().ok_or_else(|| {
+            let virtual_time_ms: SafeU53 =
+                serde_json::from_value(event.get("virtual_time_ms").cloned().ok_or_else(|| {
                     M3ParityError::InvalidFixture(format!(
-                        "trace event {index} is missing input"
+                        "trace event {index} is missing virtual_time_ms"
                     ))
-                })?,
-            )
-            .map_err(|error| {
-                M3ParityError::InvalidFixture(format!(
-                    "trace event {index} input is invalid: {error}"
-                ))
-            })?;
+                })?)
+                .map_err(|error| {
+                    M3ParityError::InvalidFixture(format!(
+                        "trace event {index} virtual_time_ms is invalid: {error}"
+                    ))
+                })?;
+            let input: KernelInput =
+                serde_json::from_value(event.get("input").cloned().ok_or_else(|| {
+                    M3ParityError::InvalidFixture(format!("trace event {index} is missing input"))
+                })?)
+                .map_err(|error| {
+                    M3ParityError::InvalidFixture(format!(
+                        "trace event {index} input is invalid: {error}"
+                    ))
+                })?;
             Ok(M3ParityEvent {
                 virtual_time_ms,
                 input,
@@ -700,11 +679,12 @@ fn restore_from_v2_snapshot(
             "snapshot boundary did not retain a presentation continuation".to_owned(),
         ));
     }
-    let snapshot_digest = content_digest(&snapshot).map_err(|error| snapshot_error("digest", error))?;
+    let snapshot_digest =
+        content_digest(&snapshot).map_err(|error| snapshot_error("digest", error))?;
     let snapshot_bytes_digest =
         fixture_digest(&snapshot).map_err(|error| snapshot_error("bytes digest", error))?;
-    let snapshot_value = serde_json::to_value(&snapshot)
-        .map_err(|error| snapshot_error("serialize", error))?;
+    let snapshot_value =
+        serde_json::to_value(&snapshot).map_err(|error| snapshot_error("serialize", error))?;
     let snapshot_wire = canonicalize_value(&snapshot_value)
         .map_err(|error| snapshot_error("canonicalize", error))?;
     let decoded: RestorableKernelSnapshotV2 = serde_json::from_str(&snapshot_wire)
@@ -794,9 +774,7 @@ fn settle_pending_presentations(
 /// and an explicit V2 snapshot destroy/restore continuation boundary.  Native
 /// and wasm32/Node runs emit this same canonical report shape; CI compares the
 /// two independent target artifacts.
-pub fn replay_eventwise(
-    fixture: &M3ParityFixture,
-) -> Result<M3ParityReport, M3ParityError> {
+pub fn replay_eventwise(fixture: &M3ParityFixture) -> Result<M3ParityReport, M3ParityError> {
     validate_fixture(fixture)?;
     let content = selected_content()?;
     let mut kernel = new_battle_kernel_with_content(&fixture.seed, Arc::clone(&content))?;

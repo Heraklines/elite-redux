@@ -9,14 +9,14 @@ use std::sync::Arc;
 
 use er_content::pack::ContentPack;
 use er_state::snapshot::GameState;
+use er_types::SeatId;
 use er_types::battle_command::{
     CommandFingerprintEntry, ReplacementProposalFingerprintEntry, ScriptedEnemyPolicyV1,
 };
 use er_types::battle_control::{
-    BattleControl, BattleControlPlan, SeatMenuInstanceAllocator, MAX_CANCEL_HISTORY_DEPTH,
+    BattleControl, BattleControlPlan, MAX_CANCEL_HISTORY_DEPTH, SeatMenuInstanceAllocator,
 };
 use er_types::battle_model::BattleOutcome;
-use er_types::SeatId;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -138,9 +138,9 @@ impl CommandAdmissionLedgerSnapshotV1 {
             "command_admission.replacement_tombstones",
         )?;
         for entry in &self.command_tombstones {
-            entry
-                .validate()
-                .map_err(|error| invalid("command_admission.command_tombstones", error.to_string()))?;
+            entry.validate().map_err(|error| {
+                invalid("command_admission.command_tombstones", error.to_string())
+            })?;
         }
         for entry in &self.replacement_tombstones {
             entry.validate().map_err(|error| {
@@ -196,11 +196,10 @@ impl GameRuntimeSnapshotV2 {
         self.current_control
             .validate()
             .map_err(|error| invalid("current_control", error.to_string()))?;
-        let battle = self
-            .state
-            .battle
-            .as_ref()
-            .ok_or_else(|| invalid("state.battle", "M3 game snapshots require an active battle"))?;
+        let battle =
+            self.state.battle.as_ref().ok_or_else(|| {
+                invalid("state.battle", "M3 game snapshots require an active battle")
+            })?;
         if self.current_control.battle_id != battle.battle_id
             || self.current_control.wave != battle.wave
         {
@@ -378,8 +377,9 @@ impl GameRuntimeSnapshotV2 {
         }
         if !self.control_history.is_empty() {
             return Err(SnapshotError::Restoration {
-                reason: "GameRuntime::from_parts cannot restore control_history on this integration SHA"
-                    .to_owned(),
+                reason:
+                    "GameRuntime::from_parts cannot restore control_history on this integration SHA"
+                        .to_owned(),
             });
         }
         GameRuntime::from_parts(

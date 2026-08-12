@@ -7,8 +7,9 @@ use er_types::{
     AwaitSuccessorControl, CommandControlTarget, ConnectionGeneration, ControlAddress,
     ControlProjectionOutcome, FrameContext, InteractionControlAddress, InteractionSuccessor,
     Material, MaterialApplicationOutcome, NextControl, OperationId, RecoveredFrontierTerminal,
-    ReplacementControl, ReplacementControlAddress, Revision, SafeU53, SeatId, SharedInteractionControl,
-    TerminalControl, validate_authority_material_digest, validate_authority_operation_id,
+    ReplacementControl, ReplacementControlAddress, Revision, SafeU53, SeatId,
+    SharedInteractionControl, TerminalControl, validate_authority_material_digest,
+    validate_authority_operation_id,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -712,10 +713,13 @@ impl AuthorityReplica {
                 control: entry.revision,
             })
             && self.pending.is_none()
-            && self.installed_controls.get(&entry.revision).is_some_and(|installed| {
-                installed.identity.matches(&entry_identity)
-                    && installed.control_id == control_id_of(&entry.next_control)
-            })
+            && self
+                .installed_controls
+                .get(&entry.revision)
+                .is_some_and(|installed| {
+                    installed.identity.matches(&entry_identity)
+                        && installed.control_id == control_id_of(&entry.next_control)
+                })
         {
             return Ok(vec![ReplicaAction::ProjectControl {
                 entry: entry.clone(),
@@ -1150,7 +1154,9 @@ fn same_entry_identity(left: &AuthorityEntry, right: &AuthorityEntry) -> bool {
 }
 
 fn installed_matches_entry(installed: &InstalledControl, entry: &AuthorityEntry) -> bool {
-    installed.identity.matches(&EntryIdentity::from_entry(entry))
+    installed
+        .identity
+        .matches(&EntryIdentity::from_entry(entry))
 }
 
 fn is_valid_entry(entry: &AuthorityEntry) -> bool {
@@ -1196,7 +1202,10 @@ impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
             .as_ref()
             .map(|pending| {
                 Ok(crate::snapshot::PendingReplicaEntrySnapshotV2 {
-                    entry: opaque_authority_entry_snapshot(&pending.entry, "authority_replica.pending")?,
+                    entry: opaque_authority_entry_snapshot(
+                        &pending.entry,
+                        "authority_replica.pending",
+                    )?,
                     stage: match pending.stage {
                         PendingStage::Admitted => crate::snapshot::PendingReplicaStageV2::Admitted,
                         PendingStage::MaterialApplied => {
@@ -1211,7 +1220,9 @@ impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
             .iter()
             .map(|(revision, installed)| {
                 let identity = identity_snapshot_from_identity(&installed.identity);
-                if *revision != identity.revision || installed.control_id != identity.next_control_id {
+                if *revision != identity.revision
+                    || installed.control_id != identity.next_control_id
+                {
                     return Err(snapshot_invalid(
                         "authority_replica.installed_controls",
                         "installed control identity is internally inconsistent",
@@ -1286,7 +1297,9 @@ impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
                 &control.identity,
                 "authority_replica.installed_controls.identity",
             )?;
-            if control.revision != identity.revision || control.control_id != identity_snapshot_next_control_id(&identity) {
+            if control.revision != identity.revision
+                || control.control_id != identity_snapshot_next_control_id(&identity)
+            {
                 return Err(snapshot_invalid(
                     "authority_replica.installed_controls",
                     "installed control identity or control ID is contradictory",
@@ -1589,7 +1602,10 @@ fn decode_snapshot_hex(
 ) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
     let raw = bytes.as_str().as_bytes();
     if raw.len() % 2 != 0 {
-        return Err(snapshot_canonical(path, "canonical payload has odd hex length"));
+        return Err(snapshot_canonical(
+            path,
+            "canonical payload has odd hex length",
+        ));
     }
     let mut decoded = Vec::with_capacity(raw.len() / 2);
     for pair in raw.chunks_exact(2) {
@@ -1602,7 +1618,10 @@ fn decode_snapshot_hex(
         decoded.push((high << 4) | low);
     }
     if decoded.is_empty() {
-        return Err(snapshot_canonical(path, "canonical payload must not be empty"));
+        return Err(snapshot_canonical(
+            path,
+            "canonical payload must not be empty",
+        ));
     }
     Ok(decoded)
 }
@@ -1859,9 +1878,7 @@ fn parse_await_successor_control_id(value: &str) -> Option<NextControl> {
     }))
 }
 
-fn parse_interaction_addresses(
-    value: &str,
-) -> Option<Option<Vec<InteractionControlAddress>>> {
+fn parse_interaction_addresses(value: &str) -> Option<Option<Vec<InteractionControlAddress>>> {
     if value == "*" {
         return Some(None);
     }

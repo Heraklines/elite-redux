@@ -5,23 +5,21 @@ use std::sync::Arc;
 
 use er_canonical::{canonical_bytes, content_digest};
 use er_content::pack::ContentPack;
-use er_kernel::{BattleGameConfig, BattleProtocolConfig, GameKernel, KernelConfig};
 use er_kernel::snapshot::{
     GameKernelSnapshotBridge, KernelDeterminismDigest, PresentationOutcomeSnapshotV1,
     RestorableKernelSnapshotV2, RestorableTimerSnapshotV2, RngDraw,
 };
+use er_kernel::{BattleGameConfig, BattleProtocolConfig, GameKernel, KernelConfig};
 use er_protocol::{ScheduledTimer, SchedulerCommand, control_id_of};
-use er_testkit::{
-    DetachedKeyboardDriver, DetachedKeyboardDriverState, DriverHoldState,
-};
+use er_testkit::{DetachedKeyboardDriver, DetachedKeyboardDriverState, DriverHoldState};
+use er_types::battle_ids::{BattlePresentationEventId, CanonicalHexBytes};
+use er_types::battle_ui::PresentationSettlementOutcome;
 use er_types::{
     ConnectionGeneration, ControlProjectionOutcome, InputFocus, KernelEffect, KernelInput,
     KernelSnapshot, LiveResourceSnapshot, MaterialApplicationOutcome, MenuState, NetworkPayload,
     PhysicalKey, PresentationEventId, PresentationOutcome, RawFrame, RawInputEvent, SafeU53,
     SeatId, StorageResult, TerminalMenu, TerminalState, TimeClass, TransportState, UiViewModel,
 };
-use er_types::battle_ids::{BattlePresentationEventId, CanonicalHexBytes};
-use er_types::battle_ui::PresentationSettlementOutcome;
 use serde::{
     Deserialize, Deserializer, Serialize, Serializer, de::DeserializeOwned,
     de::Error as SerdeDeError, ser::Error as SerdeSerError,
@@ -29,6 +27,19 @@ use serde::{
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::snapshot::{
+    DetachedKeyboardDriverSnapshotV2, DriverHoldSnapshotV2, FaultNetworkSnapshotV2,
+    FaultOperationV2, FaultRngStateV2, FrameCorruptionV2, InternalEventKindV1, PacketDispositionV2,
+    PacketReorderStateV2, PairClockTimerSnapshotV2, PairOperationV2, PairPresenterEventSnapshotV2,
+    PairPresenterOutcomeSnapshotV2, PairPresenterTombstoneSnapshotV2, PairTraceObservationV2,
+    PresenterSnapshotV2, QueuedPacketSnapshotV2, RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
+    RestorableKernelEffectV2, RestorablePacketKindV2, RestorablePairSnapshotV2,
+    RestorableStorageRequestV2, RestorableStorageResultV2, SimulatedPairSnapshotBridge,
+    SnapshotError, StorageFaultSnapshotV2, StorageRequestSnapshotV2, StorageSnapshotV2,
+    StorageValueSnapshotV2, TraceFailureEvidenceV2, TraceFailureOwnerV2, VirtualClockSnapshotV2,
+    numbered_pair_effects, restore_simulated_pair, snapshot_simulated_pair,
+    validate_pair_operation,
+};
 use crate::{
     ClockCounterState, ClockEndpointState, ClockPauseState, ClockTimerSnapshot, ClockTimerState,
     FaultNetwork, FaultNetworkDiagnostics, FaultNetworkGenerationState,
@@ -38,21 +49,6 @@ use crate::{
     PresenterBattlePendingState, PresenterDiagnostics, PresenterMode, PresenterState,
     PresenterTombstoneState, StorageAdapter, StorageDiagnostics, StoragePendingRequestState,
     StorageValueState, VirtualClockState, restore_presenter,
-};
-use crate::snapshot::{
-    DetachedKeyboardDriverSnapshotV2, DriverHoldSnapshotV2, FaultNetworkSnapshotV2,
-    FaultOperationV2, FaultRngStateV2, FrameCorruptionV2, InternalEventKindV1,
-    PacketDispositionV2, PacketReorderStateV2, PairClockTimerSnapshotV2,
-    PairPresenterEventSnapshotV2, PairPresenterOutcomeSnapshotV2,
-    PairPresenterTombstoneSnapshotV2, PairTraceObservationV2, PairOperationV2,
-    PresenterSnapshotV2, QueuedPacketSnapshotV2, RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
-    RestorableKernelEffectV2, RestorablePacketKindV2, RestorablePairSnapshotV2,
-    RestorableStorageRequestV2, RestorableStorageResultV2,
-    SimulatedPairSnapshotBridge, SnapshotError, StorageFaultSnapshotV2,
-    StorageRequestSnapshotV2, StorageSnapshotV2, StorageValueSnapshotV2,
-    TraceFailureEvidenceV2, TraceFailureOwnerV2, VirtualClockSnapshotV2,
-    numbered_pair_effects, restore_simulated_pair, snapshot_simulated_pair,
-    validate_pair_operation,
 };
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -366,15 +362,12 @@ impl SimulatedPair {
         })
     }
 
-    pub fn new_battle(
-        config: SimulatedBattlePairConfig,
-    ) -> Result<Self, SimulatedPairError> {
+    pub fn new_battle(config: SimulatedBattlePairConfig) -> Result<Self, SimulatedPairError> {
         let host_seat = config.host_game.local_seat;
         let guest_seat = config.guest_game.local_seat;
         if host_seat == guest_seat {
             return Err(SimulatedPairError::InvalidConfig {
-                reason: "host and guest Battle endpoints must use distinct local seats"
-                    .to_owned(),
+                reason: "host and guest Battle endpoints must use distinct local seats".to_owned(),
             });
         }
         let host_kernel = GameKernel::new_battle(
@@ -393,22 +386,25 @@ impl SimulatedPair {
         .map_err(|error| SimulatedPairError::InvalidConfig {
             reason: format!("guest Battle kernel: {error}"),
         })?;
-        let host_snapshot = host_kernel
-            .snapshot_v2()
-            .map_err(|error| SimulatedPairError::InvalidConfig {
-                reason: format!("host Battle snapshot: {error}"),
-            })?;
-        let guest_snapshot = guest_kernel
-            .snapshot_v2()
-            .map_err(|error| SimulatedPairError::InvalidConfig {
-                reason: format!("guest Battle snapshot: {error}"),
-            })?;
+        let host_snapshot =
+            host_kernel
+                .snapshot_v2()
+                .map_err(|error| SimulatedPairError::InvalidConfig {
+                    reason: format!("host Battle snapshot: {error}"),
+                })?;
+        let guest_snapshot =
+            guest_kernel
+                .snapshot_v2()
+                .map_err(|error| SimulatedPairError::InvalidConfig {
+                    reason: format!("guest Battle snapshot: {error}"),
+                })?;
         if host_snapshot.game.state != guest_snapshot.game.state
             || host_snapshot.protocol.role == guest_snapshot.protocol.role
         {
             return Err(SimulatedPairError::InvalidConfig {
-                reason: "Battle endpoints must share one mechanical state and opposite protocol roles"
-                    .to_owned(),
+                reason:
+                    "Battle endpoints must share one mechanical state and opposite protocol roles"
+                        .to_owned(),
             });
         }
 
@@ -580,7 +576,10 @@ impl SimulatedPair {
         }
 
         let clock = freeze_clock(self.clock.export_state())?;
-        let mut host = self.host_kernel.snapshot_v2().map_err(map_kernel_snapshot_error)?;
+        let mut host = self
+            .host_kernel
+            .snapshot_v2()
+            .map_err(map_kernel_snapshot_error)?;
         let mut guest = self
             .guest_kernel
             .snapshot_v2()
@@ -639,15 +638,11 @@ impl SimulatedPair {
             host_driver: freeze_driver(self.host_keyboard.export_state()),
             guest_driver: freeze_driver(self.guest_keyboard.export_state()),
             clock,
-            network: freeze_network(
-                network_state,
-                self.host_seat,
-                self.guest_seat,
-            )?,
+            network: freeze_network(network_state, self.host_seat, self.guest_seat)?,
             presenter: freeze_presenter(
-                self.presenter.export_state().map_err(|error| {
-                    pair_snapshot_invalid("presenter", error.to_string())
-                })?,
+                self.presenter
+                    .export_state()
+                    .map_err(|error| pair_snapshot_invalid("presenter", error.to_string()))?,
                 self.host_seat,
                 self.guest_seat,
             )?,
@@ -934,11 +929,10 @@ impl SimulatedPair {
         let PairOperation::Fault { operation } = operation else {
             return Ok(None);
         };
-        let frozen = freeze_fault_operation(operation).map_err(|error| {
-            SimulatedPairError::Adapter {
+        let frozen =
+            freeze_fault_operation(operation).map_err(|error| SimulatedPairError::Adapter {
                 reason: format!("fault operation cannot enter the V2 script: {error}"),
-            }
-        })?;
+            })?;
         if self.fault_script.cursor == SafeU53::MAX {
             return Err(SimulatedPairError::Adapter {
                 reason: "fault script cursor exhausted".to_owned(),
@@ -1038,8 +1032,7 @@ impl SimulatedPair {
                 return pair.press(endpoint, code);
             }
             if pair.shared_terminal.is_some() {
-                let key_down =
-                    pair.key_down(endpoint, code.clone(), is_printable_key(&code))?;
+                let key_down = pair.key_down(endpoint, code.clone(), is_printable_key(&code))?;
                 let advance = pair.advance_time(duration_ms)?;
                 let key_up = pair.key_up(endpoint, code)?;
                 return Ok(vec![key_down, advance, key_up]);
@@ -1631,11 +1624,12 @@ impl SimulatedPair {
             *generated_events += 1;
         }
 
-        let effects = self.kernel_mut(endpoint).step(input).map_err(kernel_error)?;
+        let effects = self
+            .kernel_mut(endpoint)
+            .step(input)
+            .map_err(kernel_error)?;
         let (rng_audit, internal_events) = self.kernel(endpoint).m3_trace_audit();
-        let internal_events = internal_events
-            .into_iter()
-            .map(freeze_internal_event_kind);
+        let internal_events = internal_events.into_iter().map(freeze_internal_event_kind);
         match endpoint {
             PairEndpoint::Host => {
                 self.trace_audit.host_rng_audit.extend(rng_audit);
@@ -2278,12 +2272,10 @@ fn freeze_trace_effect(
             from: *from,
             bytes: canonical_value_bytes(frame, "trace.effects.send_frame")?,
         }),
-        KernelEffect::SendProposal { proposal } => {
-            Some(RestorableKernelEffectV2::SendProposal {
-                from: proposal.from,
-                bytes: canonical_value_bytes(proposal, "trace.effects.send_proposal")?,
-            })
-        }
+        KernelEffect::SendProposal { proposal } => Some(RestorableKernelEffectV2::SendProposal {
+            from: proposal.from,
+            bytes: canonical_value_bytes(proposal, "trace.effects.send_proposal")?,
+        }),
         KernelEffect::ScheduleTimer {
             endpoint,
             timer_id,
@@ -2603,9 +2595,7 @@ fn freeze_network(
             .iter()
             .find(|entry| entry.endpoint == seat)
             .map(|entry| entry.generation)
-            .ok_or_else(|| {
-                pair_snapshot_invalid("network.links", "endpoint generation is absent")
-            })
+            .ok_or_else(|| pair_snapshot_invalid("network.links", "endpoint generation is absent"))
     };
     let next_packet_id = state.next_packet_id.ok_or_else(|| {
         pair_snapshot_invalid(
@@ -2643,10 +2633,11 @@ fn freeze_network(
                 body: canonical_value_bytes(&packet.packet.payload, "network.packets.body")?,
                 enqueued_at_ms: packet.enqueued_at_ms,
                 delivery_deadline_ms: packet.packet.deliver_at_ms,
-                reorder_state: packet.reorder_rank.map_or(
-                    PacketReorderStateV2::Stable,
-                    |rank| PacketReorderStateV2::Held { rank },
-                ),
+                reorder_state: packet
+                    .reorder_rank
+                    .map_or(PacketReorderStateV2::Stable, |rank| {
+                        PacketReorderStateV2::Held { rank }
+                    }),
                 disposition: freeze_packet_disposition(packet.disposition),
             })
         })
@@ -2740,10 +2731,8 @@ fn thaw_network(
         }
         let from = seat_for_pair_endpoint(packet.source, host_seat, guest_seat);
         let to = seat_for_pair_endpoint(packet.destination, host_seat, guest_seat);
-        let payload = decode_canonical_value::<NetworkPayload>(
-            &packet.body,
-            "network.packets.body",
-        )?;
+        let payload =
+            decode_canonical_value::<NetworkPayload>(&packet.body, "network.packets.body")?;
         let kind = thaw_packet_kind(packet.kind);
         let stale = !is_link_connected(from, host_seat, guest_seat, host_link, guest_link)
             || !is_link_connected(to, host_seat, guest_seat, host_link, guest_link)
@@ -2818,9 +2807,7 @@ fn thaw_packet_kind(kind: RestorablePacketKindV2) -> FaultNetworkPacketKind {
     }
 }
 
-fn freeze_packet_disposition(
-    disposition: FaultNetworkPacketDisposition,
-) -> PacketDispositionV2 {
+fn freeze_packet_disposition(disposition: FaultNetworkPacketDisposition) -> PacketDispositionV2 {
     match disposition {
         FaultNetworkPacketDisposition::Queued => PacketDispositionV2::Queued,
         FaultNetworkPacketDisposition::Delayed => PacketDispositionV2::Delayed,
@@ -2897,11 +2884,7 @@ fn pair_endpoint_for_seat(
     }
 }
 
-fn seat_for_pair_endpoint(
-    endpoint: PairEndpoint,
-    host_seat: SeatId,
-    guest_seat: SeatId,
-) -> SeatId {
+fn seat_for_pair_endpoint(endpoint: PairEndpoint, host_seat: SeatId, guest_seat: SeatId) -> SeatId {
     match endpoint {
         PairEndpoint::Host => host_seat,
         PairEndpoint::Guest => guest_seat,
@@ -2970,9 +2953,7 @@ fn freeze_presenter(
             })
         })
         .collect::<Result<Vec<_>, SnapshotError>>()?;
-    tombstones.sort_by_key(|entry| {
-        (pair_endpoint_rank(entry.endpoint), entry.event_id.clone())
-    });
+    tombstones.sort_by_key(|entry| (pair_endpoint_rank(entry.endpoint), entry.event_id.clone()));
     let snapshot = PresenterSnapshotV2 {
         pending,
         outcomes,
@@ -3062,10 +3043,7 @@ fn freeze_storage(
                 Some(value) => RestorableStorageRequestV2::Persist {
                     request_id: entry.request.request_id,
                     key: entry.request.key,
-                    value: canonical_value_bytes(
-                        &value,
-                        "storage.pending_requests.value",
-                    )?,
+                    value: canonical_value_bytes(&value, "storage.pending_requests.value")?,
                 },
             };
             Ok(StorageRequestSnapshotV2 { endpoint, request })
@@ -3155,20 +3133,16 @@ fn freeze_fault_operation(
     operation: &FaultOperation,
 ) -> Result<crate::snapshot::FaultOperationV2, SnapshotError> {
     Ok(match operation {
-        FaultOperation::Deliver { packet_id } => {
-            crate::snapshot::FaultOperationV2::Deliver {
-                packet_id: *packet_id,
-            }
-        }
+        FaultOperation::Deliver { packet_id } => crate::snapshot::FaultOperationV2::Deliver {
+            packet_id: *packet_id,
+        },
         FaultOperation::DeliverNext => crate::snapshot::FaultOperationV2::DeliverNext,
         FaultOperation::Drop { packet_id } => crate::snapshot::FaultOperationV2::Drop {
             packet_id: *packet_id,
         },
-        FaultOperation::Duplicate { packet_id } => {
-            crate::snapshot::FaultOperationV2::Duplicate {
-                packet_id: *packet_id,
-            }
-        }
+        FaultOperation::Duplicate { packet_id } => crate::snapshot::FaultOperationV2::Duplicate {
+            packet_id: *packet_id,
+        },
         FaultOperation::Delay {
             packet_id,
             additional_ms,
@@ -3176,11 +3150,9 @@ fn freeze_fault_operation(
             packet_id: *packet_id,
             additional_ms: *additional_ms,
         },
-        FaultOperation::Reorder { packet_ids } => {
-            crate::snapshot::FaultOperationV2::Reorder {
-                packet_ids: packet_ids.clone(),
-            }
-        }
+        FaultOperation::Reorder { packet_ids } => crate::snapshot::FaultOperationV2::Reorder {
+            packet_ids: packet_ids.clone(),
+        },
         FaultOperation::Corrupt {
             packet_id,
             corruption,
@@ -3224,10 +3196,7 @@ fn canonical_value_bytes<T: Serialize>(
         .map_err(|error| pair_snapshot_canonical(path, error.to_string()))
 }
 
-fn decode_canonical_value<T>(
-    value: &CanonicalHexBytes,
-    path: &str,
-) -> Result<T, SnapshotError>
+fn decode_canonical_value<T>(value: &CanonicalHexBytes, path: &str) -> Result<T, SnapshotError>
 where
     T: DeserializeOwned + Serialize,
 {

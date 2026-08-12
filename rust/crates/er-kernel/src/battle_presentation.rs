@@ -312,9 +312,7 @@ impl BattlePresentationState {
                 }
             }
         }
-        candidate
-            .plans
-            .insert(operation_id.clone(), plan);
+        candidate.plans.insert(operation_id.clone(), plan);
         candidate.last_plan_operation_id = Some(operation_id);
         candidate.event_catalog = event_catalog;
         candidate.validate()?;
@@ -541,8 +539,10 @@ impl BattlePresentationState {
         if !self.pending.contains(&event_id) {
             return Err(BattlePresentationError::UnknownEvent { event_id });
         }
-        if matches!(&outcome, PresentationSettlementOutcome::IntentionallySkipped)
-            && !skip_allowed
+        if matches!(
+            &outcome,
+            PresentationSettlementOutcome::IntentionallySkipped
+        ) && !skip_allowed
         {
             return Err(BattlePresentationError::UnauthorizedSkip { event_id });
         }

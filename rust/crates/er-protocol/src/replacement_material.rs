@@ -8,9 +8,7 @@
 use std::collections::BTreeSet;
 
 use er_canonical::canonicalize_value;
-use er_types::battle_ids::{
-    AuthorityEpoch, BattleId, BattleSide, FieldSlot, TurnIndex, WaveIndex,
-};
+use er_types::battle_ids::{AuthorityEpoch, BattleId, BattleSide, FieldSlot, TurnIndex, WaveIndex};
 use er_types::{
     AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, FrameType, OperationId, RawFrame,
     SafeU53, SeatId, battle_command::validate_replacement_operation_id,
@@ -26,8 +24,7 @@ use crate::validation::{InboundFrameResult, ValidatedFrame, validate_inbound_fra
 pub const BATTLE_REPLACEMENT_MATERIAL_SCHEMA_VERSION: u32 = 1;
 
 /// Alias matching the contract's shorter material terminology.
-pub const REPLACEMENT_MATERIAL_SCHEMA_VERSION: u32 =
-    BATTLE_REPLACEMENT_MATERIAL_SCHEMA_VERSION;
+pub const REPLACEMENT_MATERIAL_SCHEMA_VERSION: u32 = BATTLE_REPLACEMENT_MATERIAL_SCHEMA_VERSION;
 
 const ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const FRAME_VERSION: u64 = 2;
@@ -45,7 +42,9 @@ pub enum ReplacementMaterialError {
     SchemaVersionMismatch { expected: u32, actual: u64 },
     #[error("REPLACEMENT material oracle identity is {actual}; expected {expected}")]
     OracleIdentityMismatch { expected: String, actual: String },
-    #[error("REPLACEMENT material operation identity mismatch: expected {expected}, actual {actual}")]
+    #[error(
+        "REPLACEMENT material operation identity mismatch: expected {expected}, actual {actual}"
+    )]
     OperationIdentityMismatch { expected: String, actual: String },
     #[error("malformed REPLACEMENT material digest {digest}")]
     MalformedDigest { digest: String },
@@ -70,9 +69,7 @@ pub fn compute_replacement_material_digest(
 }
 
 /// Short alias for callers that name the digest after its material.
-pub fn replacement_material_digest(
-    payload: &Value,
-) -> Result<String, ReplacementMaterialError> {
+pub fn replacement_material_digest(payload: &Value) -> Result<String, ReplacementMaterialError> {
     compute_replacement_material_digest(payload)
 }
 
@@ -87,11 +84,8 @@ pub fn validate_replacement_material(
             reason: error.to_string(),
         }
     })?;
-    validate_replacement_material_body_with_epoch(
-        &body,
-        Some(entry.context.session_epoch),
-    )
-    .map(|_| ())
+    validate_replacement_material_body_with_epoch(&body, Some(entry.context.session_epoch))
+        .map(|_| ())
 }
 
 /// Validate the exact Authority-entry body shape and its opaque REPLACEMENT
@@ -244,12 +238,7 @@ fn validate_replacement_material_body_with_epoch(
     let payload = material
         .get("payload")
         .ok_or_else(|| malformed("body.material.payload", "missing field"))?;
-    validate_replacement_payload(
-        payload,
-        digest,
-        &typed_body.operation_id,
-        session_epoch,
-    )?;
+    validate_replacement_payload(payload, digest, &typed_body.operation_id, session_epoch)?;
     Ok(typed_body)
 }
 
@@ -379,7 +368,14 @@ fn parse_replacement_identity(
     )?;
     exact_keys(
         occurrence,
-        &["id", "source", "slot", "pokemon", "owner_seat", "replacement"],
+        &[
+            "id",
+            "source",
+            "slot",
+            "pokemon",
+            "owner_seat",
+            "replacement",
+        ],
         "payload.occurrence",
     )?;
     let source = object_at(
@@ -417,12 +413,9 @@ fn parse_replacement_identity(
     )?)
     .map_err(|error| malformed("payload.occurrence.source.wave", error.to_string()))?;
     let source_turn = TurnIndex::new(safe_u53(
-        source.get("resolved_turn").ok_or_else(|| {
-            malformed(
-                "payload.occurrence.source.resolved_turn",
-                "missing field",
-            )
-        })?,
+        source
+            .get("resolved_turn")
+            .ok_or_else(|| malformed("payload.occurrence.source.resolved_turn", "missing field"))?,
         "payload.occurrence.source.resolved_turn",
         true,
     )?)
@@ -441,10 +434,7 @@ fn parse_replacement_identity(
     }
     let turn_occurrence_value = number_at(
         source.get("turn_occurrence").ok_or_else(|| {
-            malformed(
-                "payload.occurrence.source.turn_occurrence",
-                "missing field",
-            )
+            malformed("payload.occurrence.source.turn_occurrence", "missing field")
         })?,
         "payload.occurrence.source.turn_occurrence",
     )?;
@@ -469,8 +459,7 @@ fn parse_replacement_identity(
         ));
     }
     let position = number_at(
-        slot
-            .get("position")
+        slot.get("position")
             .ok_or_else(|| malformed("payload.occurrence.slot.position", "missing field"))?,
         "payload.occurrence.slot.position",
     )?;
@@ -532,9 +521,7 @@ fn validate_replacement_digest(
     if fields.next().is_some()
         || length_wire.is_empty()
         || hash_wire.len() != 8
-        || length_wire
-            .bytes()
-            .any(|byte| !matches!(byte, b'0'..=b'9'))
+        || length_wire.bytes().any(|byte| !matches!(byte, b'0'..=b'9'))
         || hash_wire
             .bytes()
             .any(|byte| !matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
@@ -543,11 +530,12 @@ fn validate_replacement_digest(
             digest: supplied.to_owned(),
         });
     }
-    let length = length_wire.parse::<usize>().map_err(|_| {
-        ReplacementMaterialError::MalformedDigest {
-            digest: supplied.to_owned(),
-        }
-    })?;
+    let length =
+        length_wire
+            .parse::<usize>()
+            .map_err(|_| ReplacementMaterialError::MalformedDigest {
+                digest: supplied.to_owned(),
+            })?;
     if length_wire != length.to_string() {
         return Err(ReplacementMaterialError::MalformedDigest {
             digest: supplied.to_owned(),
@@ -606,10 +594,7 @@ fn object_at<'a>(
         .ok_or_else(|| malformed(path, "must be an object"))
 }
 
-fn string_at<'a>(
-    value: &'a Value,
-    path: &str,
-) -> Result<&'a str, ReplacementMaterialError> {
+fn string_at<'a>(value: &'a Value, path: &str) -> Result<&'a str, ReplacementMaterialError> {
     value
         .as_str()
         .ok_or_else(|| malformed(path, "must be a string"))

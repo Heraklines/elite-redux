@@ -6,9 +6,7 @@
 //! graph.  It does not infer targets from a renderer rectangle and never wraps.
 
 use er_types::battle_command::{BattleCommandError, BattleTargetSelection};
-use er_types::battle_control::{
-    BattleControl, BattleControlError, TargetSelectControl,
-};
+use er_types::battle_control::{BattleControl, BattleControlError, TargetSelectControl};
 use er_types::battle_ids::{BattleSide, FieldSlot, MenuInstanceId, MoveSlotIndex, PokemonId};
 use er_types::battle_ui::{
     BattleMenu, BattleMenuError, BattleMenuOption, MenuNavigationEdge, MenuOptionLayout,

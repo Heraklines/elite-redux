@@ -7,6 +7,7 @@ use er_state::battle::BattleState;
 use er_state::digest::MechanicalStateDigest;
 use er_state::pokemon::PokemonState;
 use er_state::snapshot::GameState;
+use er_types::SafeU53;
 use er_types::battle_command::{CommandCollectionState, CommandSet, ReplacementSelection};
 use er_types::battle_ids::{
     FaintOccurrenceId, FieldSlot, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex,
@@ -19,15 +20,13 @@ use er_types::battle_ui::{
     BattlePresentationEvent, PRESENTATION_PLAN_DIGEST_PREFIX, PresentationPlanDigest,
     PresentationPlanDigestError,
 };
-use er_types::SafeU53;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::error::BattleInvariantError;
 
 /// Domain included in every M3 presentation-plan digest preimage.
-pub const PRESENTATION_PLAN_DIGEST_DOMAIN: &str =
-    "pokerogue-redux/m3/presentation-plan/v1";
+pub const PRESENTATION_PLAN_DIGEST_DOMAIN: &str = "pokerogue-redux/m3/presentation-plan/v1";
 
 /// Failure to canonicalize or construct a typed presentation-plan digest.
 #[derive(Debug, Error)]
@@ -202,12 +201,9 @@ fn causal_mutation_order_is_valid(
             before,
             after,
         } => {
-            let matching_unresolved = battle
-                .faint_queue
-                .iter()
-                .find(|stored| {
-                    stored.replacement != ReplacementProgress::Applied && stored.slot == *slot
-                });
+            let matching_unresolved = battle.faint_queue.iter().find(|stored| {
+                stored.replacement != ReplacementProgress::Applied && stored.slot == *slot
+            });
             let Some(stored) = matching_unresolved else {
                 return true;
             };
@@ -304,13 +300,9 @@ fn replacement_field_occupant(
         ReplacementProgress::Selected {
             party_slot,
             pokemon,
-        } if selected_replacement_is_bound(
-            battle,
-            occurrence,
-            party_slot,
-            pokemon,
-            false,
-        ) => Some(Some(pokemon)),
+        } if selected_replacement_is_bound(battle, occurrence, party_slot, pokemon, false) => {
+            Some(Some(pokemon))
+        }
         ReplacementProgress::NoLegalReplacement | ReplacementProgress::NotRequired => Some(None),
         ReplacementProgress::Pending | ReplacementProgress::Applied => None,
         ReplacementProgress::Selected { .. } => None,
@@ -507,10 +499,10 @@ fn apply_evidence_mutation(state: &mut GameState, mutation: &BattleMutation) -> 
             };
             if stored.id != *occurrence
                 || !matches!(
-                stored.replacement,
-                ReplacementProgress::NotRequired
-                    | ReplacementProgress::Selected { .. }
-                    | ReplacementProgress::NoLegalReplacement
+                    stored.replacement,
+                    ReplacementProgress::NotRequired
+                        | ReplacementProgress::Selected { .. }
+                        | ReplacementProgress::NoLegalReplacement
                 )
             {
                 return false;

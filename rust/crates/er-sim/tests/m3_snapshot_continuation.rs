@@ -8,18 +8,15 @@ use std::error::Error;
 use er_kernel::snapshot::{
     HeldLogicalButtonSnapshotV2, InputRepeatSnapshotV2, InputRouterSnapshotV2,
     KernelSchedulerSnapshotV2, PendingPresentationsSnapshotV1, PhysicalInputSourceV2,
-    PresentationPlanSnapshotV1,
-    PresentationOutcomeSnapshotV1, PressedPhysicalInputSnapshotV2, RestorableTimerSnapshotV2,
-    TimeClassPauseSnapshotV2,
+    PresentationOutcomeSnapshotV1, PresentationPlanSnapshotV1, PressedPhysicalInputSnapshotV2,
+    RestorableTimerSnapshotV2, TimeClassPauseSnapshotV2,
 };
-use er_protocol::snapshot::{
-    PendingRecoverySnapshotV2, StagedPeerRebindSnapshotV2,
-};
+use er_protocol::snapshot::{PendingRecoverySnapshotV2, StagedPeerRebindSnapshotV2};
+use er_sim::PairEndpoint;
 use er_sim::snapshot::{
     FaultNetworkSnapshotV2, NetworkLinkSnapshotV2, PacketDispositionV2, PacketReorderStateV2,
     QueuedPacketSnapshotV2,
 };
-use er_sim::PairEndpoint;
 use er_types::battle_ids::{BattlePresentationEventId, MenuInstanceId};
 use er_types::battle_ui::{
     BattlePresentationEvent, BattlePresentationKind, PresentationBlockingPolicy,
@@ -308,8 +305,7 @@ mod live_local_production {
             "mechanical digest diverged after {label}",
         );
         assert_eq!(
-            left_v2.kernel_determinism_digest,
-            right_v2.kernel_determinism_digest,
+            left_v2.kernel_determinism_digest, right_v2.kernel_determinism_digest,
             "V2 kernel digest diverged after {label}",
         );
         assert_eq!(
@@ -350,10 +346,7 @@ mod live_local_production {
         KernelInput::RawInput { seat, event }
     }
 
-    fn restore_from_wire(
-        wire: &str,
-        content: Arc<ContentPack>,
-    ) -> TestResult<GameKernel> {
+    fn restore_from_wire(wire: &str, content: Arc<ContentPack>) -> TestResult<GameKernel> {
         let snapshot: RestorableKernelSnapshotV2 = serde_json::from_str(wire)?;
         Ok(GameKernel::from_snapshot(snapshot, content)?)
     }
@@ -384,11 +377,13 @@ mod live_local_production {
             assert!(!snapshot.input_router.held_buttons.is_empty());
             assert!(!snapshot.input_router.locks.is_empty());
             assert!(!snapshot.input_router.repeats.is_empty());
-            assert!(snapshot
-                .scheduler
-                .timers
-                .iter()
-                .any(|timer| timer.registration.owner.owner_id == "input-router"));
+            assert!(
+                snapshot
+                    .scheduler
+                    .timers
+                    .iter()
+                    .any(|timer| timer.registration.owner.owner_id == "input-router")
+            );
             assert!(snapshot.prepared_transaction.is_none());
             let (wire, _) = snapshot_wire(&snapshot)?;
 
@@ -402,9 +397,12 @@ mod live_local_production {
         let seat = seat(1)?;
         let later_inputs = [
             (
-                raw_input(seat, RawInputEvent::KeyUp {
-                    code: PhysicalKey::Enter,
-                }),
+                raw_input(
+                    seat,
+                    RawInputEvent::KeyUp {
+                        code: PhysicalKey::Enter,
+                    },
+                ),
                 "held-enter-keyup",
             ),
             (
@@ -420,9 +418,12 @@ mod live_local_production {
                 "fresh-enter-fight",
             ),
             (
-                raw_input(seat, RawInputEvent::KeyUp {
-                    code: PhysicalKey::Enter,
-                }),
+                raw_input(
+                    seat,
+                    RawInputEvent::KeyUp {
+                        code: PhysicalKey::Enter,
+                    },
+                ),
                 "fresh-enter-keyup",
             ),
         ];
@@ -464,7 +465,12 @@ mod live_local_production {
 
             let snapshot = original.snapshot_v2()?;
             assert!(snapshot.game.completed || snapshot.terminal.is_some());
-            assert!(snapshot.pending_presentations.pending_barrier_ids.is_empty());
+            assert!(
+                snapshot
+                    .pending_presentations
+                    .pending_barrier_ids
+                    .is_empty()
+            );
             assert!(snapshot.prepared_transaction.is_none());
             let (wire, _) = snapshot_wire(&snapshot)?;
             (wire, original.clone())
@@ -513,24 +519,22 @@ mod live_coop_production {
 
     use er_canonical::{canonicalize, content_digest};
     use er_content::pack::ContentPack;
+    use er_kernel::snapshot::PhysicalInputSourceV2;
+    use er_kernel::snapshot::RestorableKernelSnapshotV2;
     use er_kernel::{
         BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1,
     };
-    use er_kernel::snapshot::PhysicalInputSourceV2;
     use er_protocol::{
         AckStage, AuthorityEntryBody, AuthorityEntryKind, AuthorityLogConfig, AuthorityReceiptBody,
         AuthorityReplicaConfig, BackoffPolicy, FrameType, NetworkFrame, PeerBinding,
         ProposalLeaseConfig, ProposalMessage, RecoveryTransactionConfig,
     };
     use er_sim::snapshot::{
-        FaultOperationV2, FrameCorruptionV2, PairDeterminismDigest, PairKernelTraceRecorder,
-        PairOperationV2, PacketDispositionV2, QueuedPacketSnapshotV2, RestorablePairSnapshotV2,
-        RestorablePacketKindV2, RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION,
+        FaultOperationV2, FrameCorruptionV2, PacketDispositionV2, PairDeterminismDigest,
+        PairKernelTraceRecorder, PairOperationV2, QueuedPacketSnapshotV2,
+        RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION, RestorablePacketKindV2, RestorablePairSnapshotV2,
     };
-    use er_kernel::snapshot::RestorableKernelSnapshotV2;
-    use er_sim::{
-        PairEndpoint, PairOperation, PairStep, SimulatedBattlePairConfig, SimulatedPair,
-    };
+    use er_sim::{PairEndpoint, PairOperation, PairStep, SimulatedBattlePairConfig, SimulatedPair};
     use er_types::battle_command::{
         AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandFrontierStatus,
         ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1, scripted_enemy_command_operation_id,
@@ -542,8 +546,8 @@ mod live_coop_production {
     };
     use er_types::battle_ui::PresentationSettlementOutcome;
     use er_types::{
-        ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision, PhysicalKey,
-        RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId, TimeClass,
+        ConnectionGeneration, FrameContext, GameButton, InputFocus, MembershipRevision,
+        PhysicalKey, RawInputEvent, RecoveryFenceState, SafeU53, SeatId, SessionId, TimeClass,
     };
     use serde::{Deserialize, Serialize, de::DeserializeOwned};
     use serde_json::Value;
@@ -552,8 +556,7 @@ mod live_coop_production {
 
     const M3_CONTINUATION_SUITE_SCHEMA_VERSION: u32 = 1;
     const M3_CONTINUATION_REPORT_SCHEMA_VERSION: u32 = 1;
-    const M3_CONTINUATION_SUITE_ID: &str =
-        "pokerogue-redux/m3/native-wasm-continuation/v1";
+    const M3_CONTINUATION_SUITE_ID: &str = "pokerogue-redux/m3/native-wasm-continuation/v1";
     const REQUIRED_CONTINUATION_BOUNDARIES: [&str; 10] = [
         "held-fight-before-keyup",
         "doubles-one-command-pending",
@@ -610,9 +613,8 @@ mod live_coop_production {
     }
 
     fn safe_len(length: usize, field: &str) -> TestResult<SafeU53> {
-        Ok(SafeU53::new(u64::try_from(length)?).map_err(|error| {
-            invalid(format!("{field} length is not JS-safe: {error}"))
-        })?)
+        Ok(SafeU53::new(u64::try_from(length)?)
+            .map_err(|error| invalid(format!("{field} length is not JS-safe: {error}")))?)
     }
 
     impl M3ContinuationSuiteV1 {
@@ -695,14 +697,12 @@ mod live_coop_production {
         let mut scenarios = Vec::with_capacity(suite.scenarios.len());
 
         for scenario in &suite.scenarios {
-            let replay = scenario
-                .trace
-                .replay_simulated_pair::<SimulatedPair, _>(
-                    Arc::clone(&content),
-                    |pair, operation, _virtual_time_ms| {
-                        pair.apply_trace_operation_v2(operation.clone())
-                    },
-                )?;
+            let replay = scenario.trace.replay_simulated_pair::<SimulatedPair, _>(
+                Arc::clone(&content),
+                |pair, operation, _virtual_time_ms| {
+                    pair.apply_trace_operation_v2(operation.clone())
+                },
+            )?;
             if let Some(divergence) = replay.first_divergence {
                 return Err(invalid(format!(
                     "M3 continuation diverged at {}, operation {}, time {} ms, path {}, code {}",
@@ -714,23 +714,38 @@ mod live_coop_production {
                 )));
             }
 
-            let final_entry = scenario
-                .trace
-                .entries
-                .last()
-                .ok_or_else(|| invalid(format!("boundary {:?} has no final entry", scenario.boundary_id)))?;
+            let final_entry = scenario.trace.entries.last().ok_or_else(|| {
+                invalid(format!(
+                    "boundary {:?} has no final entry",
+                    scenario.boundary_id
+                ))
+            })?;
             let host_rng_draw_count = scenario
                 .trace
                 .entries
                 .iter()
-                .try_fold(0usize, |total, entry| total.checked_add(entry.host.rng_audit.len()))
-                .ok_or_else(|| invalid(format!("boundary {:?} host RNG count overflowed", scenario.boundary_id)))?;
+                .try_fold(0usize, |total, entry| {
+                    total.checked_add(entry.host.rng_audit.len())
+                })
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "boundary {:?} host RNG count overflowed",
+                        scenario.boundary_id
+                    ))
+                })?;
             let guest_rng_draw_count = scenario
                 .trace
                 .entries
                 .iter()
-                .try_fold(0usize, |total, entry| total.checked_add(entry.guest.rng_audit.len()))
-                .ok_or_else(|| invalid(format!("boundary {:?} guest RNG count overflowed", scenario.boundary_id)))?;
+                .try_fold(0usize, |total, entry| {
+                    total.checked_add(entry.guest.rng_audit.len())
+                })
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "boundary {:?} guest RNG count overflowed",
+                        scenario.boundary_id
+                    ))
+                })?;
             scenarios.push(M3ContinuationScenarioReportV1 {
                 boundary_id: scenario.boundary_id.clone(),
                 trace_digest: content_digest(&scenario.trace)?,
@@ -893,7 +908,9 @@ mod live_coop_production {
                     .player_party
                     .iter()
                     .position(|pokemon| pokemon.id == pokemon_id)
-                    .ok_or_else(|| invalid(format!("player lead {pokemon_id} is not in the party")))?;
+                    .ok_or_else(|| {
+                        invalid(format!("player lead {pokemon_id} is not in the party"))
+                    })?;
                 Ok(PartyIndex::try_from(party_index as u64)?)
             })
             .collect::<TestResult<Vec<_>>>()?;
@@ -908,7 +925,9 @@ mod live_coop_production {
                     .enemy_party
                     .iter()
                     .position(|pokemon| pokemon.id == pokemon_id)
-                    .ok_or_else(|| invalid(format!("enemy lead {pokemon_id} is not in the party")))?;
+                    .ok_or_else(|| {
+                        invalid(format!("enemy lead {pokemon_id} is not in the party"))
+                    })?;
                 Ok(PartyIndex::try_from(party_index as u64)?)
             })
             .collect::<TestResult<Vec<_>>>()?;
@@ -1037,10 +1056,7 @@ mod live_coop_production {
         Ok(wire)
     }
 
-    fn restore_from_wire(
-        wire: &str,
-        content: Arc<ContentPack>,
-    ) -> TestResult<SimulatedPair> {
+    fn restore_from_wire(wire: &str, content: Arc<ContentPack>) -> TestResult<SimulatedPair> {
         let snapshot: RestorablePairSnapshotV2 = serde_json::from_str(wire)?;
         snapshot.validate()?;
         Ok(SimulatedPair::from_snapshot_v2(snapshot, content)?)
@@ -1083,23 +1099,19 @@ mod live_coop_production {
             "pair determinism digest diverged after {label}",
         );
         assert_eq!(
-            left_v2.host.mechanical_digest,
-            right_v2.host.mechanical_digest,
+            left_v2.host.mechanical_digest, right_v2.host.mechanical_digest,
             "host mechanical digest diverged after {label}",
         );
         assert_eq!(
-            left_v2.guest.mechanical_digest,
-            right_v2.guest.mechanical_digest,
+            left_v2.guest.mechanical_digest, right_v2.guest.mechanical_digest,
             "guest mechanical digest diverged after {label}",
         );
         assert_eq!(
-            left_v2.host.kernel_determinism_digest,
-            right_v2.host.kernel_determinism_digest,
+            left_v2.host.kernel_determinism_digest, right_v2.host.kernel_determinism_digest,
             "host kernel digest diverged after {label}",
         );
         assert_eq!(
-            left_v2.guest.kernel_determinism_digest,
-            right_v2.guest.kernel_determinism_digest,
+            left_v2.guest.kernel_determinism_digest, right_v2.guest.kernel_determinism_digest,
             "guest kernel digest diverged after {label}",
         );
         Ok(())
@@ -1196,11 +1208,15 @@ mod live_coop_production {
         key: PhysicalKey,
     ) -> bool {
         let endpoint_snapshot = endpoint_snapshot(snapshot, endpoint);
-        endpoint_snapshot.input_router.held_buttons.iter().any(|held| {
-            held.seat == endpoint_snapshot.runtime_identity.local_seat
-                && held.button == button
-                && held.source == PhysicalInputSourceV2::Keyboard(key.clone())
-        })
+        endpoint_snapshot
+            .input_router
+            .held_buttons
+            .iter()
+            .any(|held| {
+                held.seat == endpoint_snapshot.runtime_identity.local_seat
+                    && held.button == button
+                    && held.source == PhysicalInputSourceV2::Keyboard(key.clone())
+            })
     }
 
     fn driver_key_down(
@@ -1228,10 +1244,7 @@ mod live_coop_production {
         }
     }
 
-    fn endpoint_has_fight(
-        snapshot: &RestorablePairSnapshotV2,
-        endpoint: PairEndpoint,
-    ) -> bool {
+    fn endpoint_has_fight(snapshot: &RestorablePairSnapshotV2, endpoint: PairEndpoint) -> bool {
         let owner = endpoint_snapshot(snapshot, endpoint)
             .runtime_identity
             .local_seat;
@@ -1281,9 +1294,11 @@ mod live_coop_production {
         let Some(battle) = snapshot.host.game.state.battle.as_ref() else {
             return false;
         };
-        let host_done = battle.command_state.frontier.iter().any(|entry| {
-            entry.owner_seat == Some(seat(1)) && fight_status(&entry.status)
-        });
+        let host_done = battle
+            .command_state
+            .frontier
+            .iter()
+            .any(|entry| entry.owner_seat == Some(seat(1)) && fight_status(&entry.status));
         let guest_pending = battle.command_state.frontier.iter().any(|entry| {
             entry.owner_seat == Some(seat(2))
                 && matches!(entry.status, CommandFrontierStatus::Pending)
@@ -1330,11 +1345,9 @@ mod live_coop_production {
         if entry.kind != AuthorityEntryKind::TurnCommit {
             return false;
         }
-        let Ok(material) =
-            serde_json::from_value::<er_game::material::BattleTurnMaterialV1>(
-                entry.material.payload.clone(),
-            )
-        else {
+        let Ok(material) = serde_json::from_value::<er_game::material::BattleTurnMaterialV1>(
+            entry.material.payload.clone(),
+        ) else {
             return false;
         };
         if material.commands.validate().is_err() {
@@ -1436,9 +1449,7 @@ mod live_coop_production {
         Ok(result_packet_matches)
     }
 
-    fn host_admission_with_blocking_presentation(
-        snapshot: &RestorablePairSnapshotV2,
-    ) -> bool {
+    fn host_admission_with_blocking_presentation(snapshot: &RestorablePairSnapshotV2) -> bool {
         let admission_live = snapshot
             .host
             .protocol
@@ -1487,10 +1498,7 @@ mod live_coop_production {
         pending
     }
 
-    fn settle_all_presentations(
-        left: &mut SimulatedPair,
-        right: &mut SimulatedPair,
-    ) -> TestResult {
+    fn settle_all_presentations(left: &mut SimulatedPair, right: &mut SimulatedPair) -> TestResult {
         for _ in 0..64 {
             let snapshot = left.snapshot_v2()?;
             let pending = pending_battle_presentations(&snapshot);
@@ -1519,10 +1527,7 @@ mod live_coop_production {
         Ok(Arc::new(er_content::pack::selected_content_pack()?))
     }
 
-    fn apply_trace_operation(
-        pair: &mut SimulatedPair,
-        operation: PairOperationV2,
-    ) -> TestResult {
+    fn apply_trace_operation(pair: &mut SimulatedPair, operation: PairOperationV2) -> TestResult {
         let _observation = pair.apply_trace_operation_v2(operation)?;
         Ok(())
     }
@@ -1628,8 +1633,7 @@ mod live_coop_production {
             PairEndpoint::Host,
             generation(1),
         )?;
-        let proposal: ProposalMessage =
-            decode_canonical_packet(&proposal.body, "guest proposal")?;
+        let proposal: ProposalMessage = decode_canonical_packet(&proposal.body, "guest proposal")?;
         let proposal_identity = (proposal.operation_id.clone(), proposal.fingerprint.clone());
         apply_trace_operation(
             pair,
@@ -1748,9 +1752,7 @@ mod live_coop_production {
         Ok(decoded)
     }
 
-    fn is_guest_host_generation_one_control_receipt(
-        packet: &QueuedPacketSnapshotV2,
-    ) -> bool {
+    fn is_guest_host_generation_one_control_receipt(packet: &QueuedPacketSnapshotV2) -> bool {
         packet.kind == RestorablePacketKindV2::ControlReceipt
             && packet.source == PairEndpoint::Guest
             && packet.destination == PairEndpoint::Host
@@ -1969,13 +1971,11 @@ mod live_coop_production {
         let Some(recovery) = snapshot.guest.protocol.recovery.as_ref() else {
             return Ok(false);
         };
-        let frame: NetworkFrame = match decode_canonical_packet(
-            &receipt.body,
-            "delayed control receipt",
-        ) {
-            Ok(frame) => frame,
-            Err(_) => return Ok(false),
-        };
+        let frame: NetworkFrame =
+            match decode_canonical_packet(&receipt.body, "delayed control receipt") {
+                Ok(frame) => frame,
+                Err(_) => return Ok(false),
+            };
         if frame.version != 2
             || frame.frame_type != FrameType::AuthorityReceipt
             || frame.context != replica.receipt_context
@@ -2194,7 +2194,8 @@ mod live_coop_production {
     }
 
     #[test]
-    fn live_new_battle_snapshot_restores_doubles_proposal_admission_and_replacement() -> TestResult {
+    fn live_new_battle_snapshot_restores_doubles_proposal_admission_and_replacement() -> TestResult
+    {
         let content = content_pack()?;
         let game = forced_doubles_config()?;
         let mut uninterrupted = new_battle_pair(game.clone(), Arc::clone(&content), 12)?;
@@ -2245,11 +2246,7 @@ mod live_coop_production {
             "guest command did not leave a live proposal lease and queued proposal",
         );
         restored = destroy_and_restore(restored, Arc::clone(&content))?;
-        assert_pair_observation_equal(
-            &uninterrupted,
-            &restored,
-            "guest-proposal-pending-restore",
-        )?;
+        assert_pair_observation_equal(&uninterrupted, &restored, "guest-proposal-pending-restore")?;
 
         for tick in 0..128 {
             let snapshot = uninterrupted.snapshot_v2()?;
@@ -2297,11 +2294,7 @@ mod live_coop_production {
             "forced-replacement fixture never exposed its replacement menu",
         );
         restored = destroy_and_restore(restored, Arc::clone(&content))?;
-        assert_pair_observation_equal(
-            &uninterrupted,
-            &restored,
-            "replacement-menu-open-restore",
-        )?;
+        assert_pair_observation_equal(&uninterrupted, &restored, "replacement-menu-open-restore")?;
         press_same(
             &mut uninterrupted,
             &mut restored,
@@ -2394,11 +2387,7 @@ mod live_coop_production {
         let mut scenarios = Vec::with_capacity(REQUIRED_CONTINUATION_BOUNDARIES.len());
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1101,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1101)?;
             apply_trace_operation(
                 &mut pair,
                 PairOperationV2::Reconnect {
@@ -2434,11 +2423,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1102,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1102)?;
             apply_trace_operation(
                 &mut pair,
                 PairOperationV2::Reconnect {
@@ -2458,19 +2443,12 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1103,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1103)?;
             let (proposal_operation_id, proposal_fingerprint) =
                 reach_guest_proposal_admitted_with_delivery_pending(&mut pair)?;
             let pending_snapshot = pair.snapshot_v2()?;
-            let continuation = if let Some(packet) = pending_snapshot
-                .network
-                .packets
-                .iter()
-                .find(|packet| {
+            let continuation = if let Some(packet) =
+                pending_snapshot.network.packets.iter().find(|packet| {
                     packet.source == PairEndpoint::Host
                         && packet.destination == PairEndpoint::Guest
                         && packet.source_generation == generation(1)
@@ -2481,8 +2459,7 @@ mod live_coop_production {
                             &proposal_operation_id,
                             &proposal_fingerprint,
                         )
-                })
-            {
+                }) {
                 PairOperationV2::Fault {
                     operation: FaultOperationV2::Deliver {
                         packet_id: packet.packet_id,
@@ -2508,11 +2485,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1104,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1104)?;
             prime_trace_pair(&mut pair)?;
             let proposal = first_packet_v2(
                 &pair.snapshot_v2()?,
@@ -2566,11 +2539,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1105,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1105)?;
             prime_trace_pair(&mut pair)?;
             let proposal = first_packet_v2(
                 &pair.snapshot_v2()?,
@@ -2643,11 +2612,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1106,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1106)?;
             reach_replacement_menu_open(&mut pair)?;
             scenarios.push(trace_boundary(
                 "replacement-menu-open",
@@ -2661,11 +2626,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1107,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1107)?;
             prime_trace_pair(&mut pair)?;
             let proposal = first_packet_v2(
                 &pair.snapshot_v2()?,
@@ -2734,22 +2695,14 @@ mod live_coop_production {
                 "recovery-fence-held",
                 &mut pair,
                 move |snapshot| {
-                    recovery_fence_held(
-                        snapshot,
-                        stale_receipt_id,
-                        &stale_receipt_body,
-                    )
+                    recovery_fence_held(snapshot, stale_receipt_id, &stale_receipt_body)
                 },
                 vec![PairOperationV2::AdvanceTime { delta_ms: safe(1) }],
             )?);
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1108,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1108)?;
             reach_blocking_presentation_pending(&mut pair)?;
             let (endpoint, event_id) = pending_battle_presentations(&pair.snapshot_v2()?)
                 .into_iter()
@@ -2768,11 +2721,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_victory_config()?,
-                Arc::clone(&content),
-                1109,
-            )?;
+            let mut pair = new_battle_pair(forced_victory_config()?, Arc::clone(&content), 1109)?;
             apply_trace_operation(
                 &mut pair,
                 PairOperationV2::Reconnect {
@@ -2815,11 +2764,7 @@ mod live_coop_production {
         }
 
         {
-            let mut pair = new_battle_pair(
-                forced_doubles_config()?,
-                Arc::clone(&content),
-                1110,
-            )?;
+            let mut pair = new_battle_pair(forced_doubles_config()?, Arc::clone(&content), 1110)?;
             prime_trace_pair(&mut pair)?;
             let proposal = first_packet_v2(
                 &pair.snapshot_v2()?,
@@ -2900,11 +2845,15 @@ mod live_coop_production {
             let corrupted_frame: Value =
                 decode_canonical_packet(&corrupted.body, "corrupted control receipt")?;
             assert!(
-                original_frame.pointer("/ctx/connectionGeneration").is_some(),
+                original_frame
+                    .pointer("/ctx/connectionGeneration")
+                    .is_some(),
                 "original control receipt omitted its connection generation"
             );
             assert!(
-                corrupted_frame.pointer("/ctx/connectionGeneration").is_none(),
+                corrupted_frame
+                    .pointer("/ctx/connectionGeneration")
+                    .is_none(),
                 "corrupted control receipt retained connectionGeneration"
             );
             let mut expected_corrupted_frame = original_frame.clone();
@@ -2949,11 +2898,7 @@ mod live_coop_production {
                 "mixed-network-fault-queue",
                 &mut pair,
                 move |snapshot| {
-                    mixed_fault_queue(
-                        snapshot,
-                        stale_packet_ids,
-                        &corrupted_body_for_predicate,
-                    )
+                    mixed_fault_queue(snapshot, stale_packet_ids, &corrupted_body_for_predicate)
                 },
                 vec![PairOperationV2::AdvanceTime { delta_ms: safe(1) }],
             )?);
@@ -2969,10 +2914,7 @@ mod live_coop_production {
         Ok(suite)
     }
 
-    fn emit_hosted_continuation_artifacts(
-        suite_json: &str,
-        report_json: &str,
-    ) -> TestResult {
+    fn emit_hosted_continuation_artifacts(suite_json: &str, report_json: &str) -> TestResult {
         let Some(directory) = std::env::var_os("M3_CONTINUATION_ARTIFACT_DIR") else {
             return Ok(());
         };
@@ -2990,7 +2932,10 @@ mod live_coop_production {
     fn hosted_m3_native_wasm_continuation_suite_emits_artifacts() -> TestResult {
         let content = selected_content_pack_for_continuation()?;
         let suite = build_hosted_continuation_suite(Arc::clone(&content))?;
-        assert_eq!(suite.scenarios.len(), REQUIRED_CONTINUATION_BOUNDARIES.len());
+        assert_eq!(
+            suite.scenarios.len(),
+            REQUIRED_CONTINUATION_BOUNDARIES.len()
+        );
         assert_eq!(
             suite
                 .scenarios
@@ -2999,10 +2944,12 @@ mod live_coop_production {
                 .collect::<Vec<_>>(),
             REQUIRED_CONTINUATION_BOUNDARIES.to_vec(),
         );
-        assert!(suite
-            .scenarios
-            .iter()
-            .all(|scenario| !scenario.trace.entries.is_empty()));
+        assert!(
+            suite
+                .scenarios
+                .iter()
+                .all(|scenario| !scenario.trace.entries.is_empty())
+        );
 
         let suite_json = canonical_suite_json(&suite)?;
         let parsed_suite = parse_suite_json(&suite_json)?;
@@ -3034,7 +2981,10 @@ mod live_coop_production {
             .get("scenarios")
             .and_then(Value::as_array)
             .ok_or_else(|| invalid("native continuation report omitted scenarios"))?;
-        assert_eq!(report_scenarios.len(), REQUIRED_CONTINUATION_BOUNDARIES.len());
+        assert_eq!(
+            report_scenarios.len(),
+            REQUIRED_CONTINUATION_BOUNDARIES.len()
+        );
         for (index, (scenario, expected_id)) in report_scenarios
             .iter()
             .zip(REQUIRED_CONTINUATION_BOUNDARIES)
@@ -3048,7 +2998,9 @@ mod live_coop_production {
             let operation_count = scenario
                 .get("operation_count")
                 .and_then(Value::as_u64)
-                .ok_or_else(|| invalid(format!("report scenario {index} omitted operation_count")))?;
+                .ok_or_else(|| {
+                    invalid(format!("report scenario {index} omitted operation_count"))
+                })?;
             let replayed_operation_count = scenario
                 .get("replayed_operation_count")
                 .and_then(Value::as_u64)
@@ -3058,8 +3010,7 @@ mod live_coop_production {
                     ))
                 })?;
             assert_eq!(
-                operation_count,
-                replayed_operation_count,
+                operation_count, replayed_operation_count,
                 "replayed operation count diverged for report scenario {index}",
             );
             assert_eq!(

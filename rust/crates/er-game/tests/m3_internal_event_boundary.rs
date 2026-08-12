@@ -1,6 +1,6 @@
 use er_game::internal_event::{
-    ButtonEventPayload, InternalEvent, InternalEventKind, InternalEventQueue,
-    InternalEventQueueError, UiEventPayload, INTERNAL_EVENT_BUDGET,
+    ButtonEventPayload, INTERNAL_EVENT_BUDGET, InternalEvent, InternalEventKind,
+    InternalEventQueue, InternalEventQueueError, UiEventPayload,
 };
 use er_types::battle_ids::MenuInstanceId;
 use er_types::{ButtonEvent, GameButton, MenuOptionId, SafeU53, SeatId};
@@ -75,7 +75,10 @@ fn budget_records_exactly_4096_kinds_and_keeps_event_4097() {
     }
 
     assert_eq!(queue.processed(), INTERNAL_EVENT_BUDGET);
-    assert_eq!(queue.processed_kinds(), &expected_kinds[..INTERNAL_EVENT_BUDGET]);
+    assert_eq!(
+        queue.processed_kinds(),
+        &expected_kinds[..INTERNAL_EVENT_BUDGET]
+    );
 
     let error = queue
         .pop()
@@ -103,7 +106,11 @@ fn budget_records_exactly_4096_kinds_and_keeps_event_4097() {
         .pop()
         .expect_err("a non-empty queue remains over budget");
     assert_eq!(repeated_error, error);
-    assert_eq!(queue.len(), 1, "repeated rejection must not drop event 4097");
+    assert_eq!(
+        queue.len(),
+        1,
+        "repeated rejection must not drop event 4097"
+    );
 }
 
 #[test]

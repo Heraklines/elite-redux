@@ -12,12 +12,10 @@ use std::sync::Arc;
 
 use er_canonical::canonical_bytes;
 use er_content::pack::ContentPack;
-use er_kernel::{
-    BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1,
-};
+use er_kernel::{BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1};
 use er_protocol::{
-    AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding,
-    ProposalLeaseConfig, RecoveryTransactionConfig,
+    AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalLeaseConfig,
+    RecoveryTransactionConfig,
 };
 use er_sim::snapshot::{
     InternalEventKindV1, PairKernelTraceRecorder, PairKernelTraceV2, PairOperationV2,
@@ -30,8 +28,8 @@ use er_types::battle_command::{
 };
 use er_types::battle_ids::{BattleId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, WaveIndex};
 use er_types::{
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -101,10 +99,9 @@ fn enemy_actor(battle: &Value) -> TestResult<er_types::battle_ids::PokemonId> {
         .ok_or_else(|| invalid("battle field slots are not an array"))?;
     let actor = slots.iter().find_map(|entry| {
         let slot = entry.get("slot")?;
-        (slot.get("side")?.as_str() == Some("ENEMY")
-            && slot.get("position")?.as_u64() == Some(0))
-        .then(|| entry.get("occupant")?.as_u64())
-        .flatten()
+        (slot.get("side")?.as_str() == Some("ENEMY") && slot.get("position")?.as_u64() == Some(0))
+            .then(|| entry.get("occupant")?.as_u64())
+            .flatten()
     });
     let actor = actor.ok_or_else(|| invalid("single fixture has no enemy lead"))?;
     Ok(er_types::battle_ids::PokemonId::new(SafeU53::new(actor)?))
@@ -122,13 +119,8 @@ fn scripted_enemy_policy(battle: &Value) -> TestResult<ScriptedEnemyPolicyV1> {
         position: 0,
     };
     let turn = er_types::battle_ids::TurnIndex::new(SafeU53::new(turn_number)?)?;
-    let operation_id = scripted_enemy_command_operation_id(
-        battle_id,
-        wave,
-        turn,
-        enemy_slot,
-        SafeU53::ZERO,
-    )?;
+    let operation_id =
+        scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, SafeU53::ZERO)?;
     let command = BattleCommand::fight(
         actor,
         MoveSlotIndex::ZERO,

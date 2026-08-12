@@ -9,8 +9,8 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_kernel::{
-    BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1,
-    GameKernel, KernelEffect, KernelInput,
+    BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
+    KernelEffect, KernelInput,
 };
 use er_protocol::{AuthorityLogConfig, BackoffPolicy};
 use er_testkit::m3_fixture::load_m3_fixture_catalog;
@@ -25,8 +25,8 @@ use er_types::battle_ui::{
     BattlePresentationEvent, BattlePresentationKind, PresentationSettlementOutcome,
 };
 use er_types::{
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 use serde_json::{Value, json};
 
@@ -96,10 +96,9 @@ fn enemy_actor(battle: &Value) -> TestResult<er_types::battle_ids::PokemonId> {
         .ok_or_else(|| invalid_data("battle field slots are not an array"))?;
     let actor = slots.iter().find_map(|entry| {
         let slot = entry.get("slot")?;
-        (slot.get("side")?.as_str() == Some("ENEMY")
-            && slot.get("position")?.as_u64() == Some(0))
-        .then(|| entry.get("occupant")?.as_u64())
-        .flatten()
+        (slot.get("side")?.as_str() == Some("ENEMY") && slot.get("position")?.as_u64() == Some(0))
+            .then(|| entry.get("occupant")?.as_u64())
+            .flatten()
     });
     let actor = actor.ok_or_else(|| invalid_data("single fixture has no enemy lead"))?;
     Ok(er_types::battle_ids::PokemonId::new(SafeU53::new(actor)?))
@@ -123,13 +122,8 @@ fn scripted_enemy_policy(battle: &Value) -> TestResult<ScriptedEnemyPolicyV1> {
     for cursor_number in 0..=1_u64 {
         let cursor = SafeU53::new(cursor_number)?;
         let turn = TurnIndex::new(SafeU53::new(turn_number + cursor_number)?)?;
-        let operation_id = scripted_enemy_command_operation_id(
-            battle_id,
-            wave,
-            turn,
-            enemy_slot,
-            cursor,
-        )?;
+        let operation_id =
+            scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, cursor)?;
         let command = BattleCommand::fight(
             actor,
             MoveSlotIndex::ZERO,
@@ -578,7 +572,11 @@ fn raw_singles_walk_party_and_duplicate_keydown_cannot_bleed_into_new_menu() -> 
     let duplicate = raw_key_down(&mut kernel, PhysicalKey::Enter)?;
     assert!(duplicate.is_empty(), "held Enter leaked into the new menu");
     let release = raw_key_up(&mut kernel, PhysicalKey::Enter)?;
-    assert_eq!(release.len(), 1, "Enter release was not exact timer cleanup");
+    assert_eq!(
+        release.len(),
+        1,
+        "Enter release was not exact timer cleanup"
+    );
     assert!(matches!(&release[0], KernelEffect::CancelTimer { .. }));
     all_effects.extend(release);
     assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
@@ -609,10 +607,12 @@ fn raw_singles_complete_a_real_turn_and_settle_every_presentation() -> TestResul
     assert!(matches!(control(&kernel)?, BattleControl::MoveSelect(_)));
     effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
     assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
-    assert!(!kernel
-        .battle_ui_projection()
-        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
-        .actionable);
+    assert!(
+        !kernel
+            .battle_ui_projection()
+            .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+            .actionable
+    );
 
     let events = presentation_events(&effects);
     assert_eq!(events.len(), oracle_presentation_count(&fixture)?);
@@ -625,10 +625,12 @@ fn raw_singles_complete_a_real_turn_and_settle_every_presentation() -> TestResul
     assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before);
     assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
-    assert!(kernel
-        .battle_ui_projection()
-        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
-        .actionable);
+    assert!(
+        kernel
+            .battle_ui_projection()
+            .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+            .actionable
+    );
     assert!(kernel.live_resources().battle_presentations.is_empty());
     Ok(())
 }
@@ -660,18 +662,17 @@ fn raw_singles_target_path_reaches_fixture_exact_defeat() -> TestResult {
     assert_no_compatibility_effects(&effects);
     assert_eq!(battle_outcome(&kernel)?, "DEFEAT");
     assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
-    assert_eq!(
-        next_faint_occurrence(&kernel)?,
-        faint_allocator_before + 1,
-    );
+    assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(matches!(
         control(&kernel)?,
         BattleControl::Complete(BattleOutcome::Defeat)
     ));
-    assert!(!kernel
-        .battle_ui_projection()
-        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
-        .actionable);
+    assert!(
+        !kernel
+            .battle_ui_projection()
+            .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+            .actionable
+    );
     assert!(kernel.live_resources().battle_presentations.is_empty());
     Ok(())
 }
@@ -701,10 +702,7 @@ fn raw_singles_victory_path_reaches_terminal_control_after_settlement() -> TestR
     assert_no_compatibility_effects(&effects);
     assert_eq!(battle_outcome(&kernel)?, "VICTORY");
     assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
-    assert_eq!(
-        next_faint_occurrence(&kernel)?,
-        faint_allocator_before + 1,
-    );
+    assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(matches!(
         control(&kernel)?,
         BattleControl::Complete(BattleOutcome::Victory)
@@ -725,24 +723,31 @@ fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> Tes
     first_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
     assert!(matches!(control(&kernel)?, BattleControl::TargetSelect(_)));
     first_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
-    assert!(matches!(control(&kernel)?, BattleControl::ReplacementSelect(_)));
-    assert!(!kernel
-        .battle_ui_projection()
-        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
-        .actionable);
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::ReplacementSelect(_)
+    ));
+    assert!(
+        !kernel
+            .battle_ui_projection()
+            .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+            .actionable
+    );
     let first_events = presentation_events(&first_effects);
     assert!(has_fainted(&first_events));
     first_effects.extend(settle_presentations(&mut kernel, &first_events)?);
     assert_no_compatibility_effects(&first_effects);
-    assert!(matches!(control(&kernel)?, BattleControl::ReplacementSelect(_)));
-    assert!(kernel
-        .battle_ui_projection()
-        .ok_or_else(|| invalid_data("missing Battle UI projection"))?
-        .actionable);
-    assert_eq!(
-        next_faint_occurrence(&kernel)?,
-        faint_allocator_before + 1,
+    assert!(matches!(
+        control(&kernel)?,
+        BattleControl::ReplacementSelect(_)
+    ));
+    assert!(
+        kernel
+            .battle_ui_projection()
+            .ok_or_else(|| invalid_data("missing Battle UI projection"))?
+            .actionable
     );
+    assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     let state = game_state_json(&kernel)?;
     assert_eq!(
         state
@@ -776,10 +781,7 @@ fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> Tes
         Some(0)
     );
     assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
-    assert_eq!(
-        next_faint_occurrence(&kernel)?,
-        faint_allocator_before + 1,
-    );
+    assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(kernel.live_resources().battle_presentations.is_empty());
     Ok(())
 }

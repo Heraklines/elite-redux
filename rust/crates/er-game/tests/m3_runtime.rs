@@ -15,9 +15,7 @@ use er_state::conditions::{
 };
 use er_state::field::{FieldSlotState, FieldState};
 use er_state::format::BattleFormat;
-use er_state::pokemon::{
-    AbilityLoadout, BattleStats, PokemonState, StatStages, StatusState,
-};
+use er_state::pokemon::{AbilityLoadout, BattleStats, PokemonState, StatStages, StatusState};
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
     BattleCommand, BattleCommandProposalV1, ScriptedEnemyPolicyV1, player_command_operation_id,
@@ -27,12 +25,10 @@ use er_types::battle_control::{
     BattleMenuOption, CommandRootControl, SeatBattleControl, SeatMenuInstanceAllocator,
 };
 use er_types::battle_ids::{
-    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId,
-    MenuInstanceId, PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
+    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId, MenuInstanceId,
+    PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
 };
-use er_types::battle_ui::{
-    MenuOptionLayout, MenuOptionVisibility,
-};
+use er_types::battle_ui::{MenuOptionLayout, MenuOptionVisibility};
 use er_types::{ButtonEvent, GameButton, MenuOptionId, SafeU53, SeatId};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -81,7 +77,9 @@ fn internal_fifo_rejects_event_4097_without_dropping_the_remaining_queue() -> Te
     for _ in 0..4_096 {
         assert!(queue.pop()?.is_some());
     }
-    let error = queue.pop().expect_err("event 4097 must exceed the fixed budget");
+    let error = queue
+        .pop()
+        .expect_err("event 4097 must exceed the fixed budget");
     assert_eq!(
         error,
         InternalEventQueueError::InternalEventBudgetExceeded {
@@ -98,12 +96,7 @@ fn internal_fifo_rejects_event_4097_without_dropping_the_remaining_queue() -> Te
 fn fixture_runtime() -> TestResult<GameRuntime> {
     let content = selected_content_pack()?;
     let species = find_species(&content.species, SpeciesId::new(safe(19)?))?;
-    let player = pokemon(
-        &content,
-        1,
-        Some(SeatId::new(safe(1)?)),
-        species.id,
-    )?;
+    let player = pokemon(&content, 1, Some(SeatId::new(safe(1)?)), species.id)?;
     let enemy = pokemon(&content, 2, None, species.id)?;
     let format = BattleFormat::single();
     let player_slot = FieldSlot::new(BattleSide::Player, 0)?;
@@ -179,11 +172,8 @@ fn fixture_runtime() -> TestResult<GameRuntime> {
         vec![option],
         Vec::new(),
     )?;
-    let control = BattleControl::CommandRoot(CommandRootControl::new(
-        player.id,
-        player_slot,
-        menu,
-    )?);
+    let control =
+        BattleControl::CommandRoot(CommandRootControl::new(player.id, player_slot, menu)?);
     let control = BattleControlPlan::new(
         BATTLE_CONTROL_PLAN_SCHEMA_VERSION,
         BattleId::new(safe(1)?),
@@ -360,9 +350,7 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "special-hit-priority",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/special-hit-priority.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/special-hit-priority.json"),
         ),
         (
             "always-hit",
@@ -374,21 +362,15 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "poison-type-immunity",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/poison-type-immunity.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/poison-type-immunity.json"),
         ),
         (
             "grass-powder-immunity",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/grass-powder-immunity.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/grass-powder-immunity.json"),
         ),
         (
             "existing-status-rejected",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/existing-status-rejected.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/existing-status-rejected.json"),
         ),
         (
             "speed-tie",
@@ -400,15 +382,11 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "pp-unusable-rejected",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/pp-unusable-rejected.json"),
         ),
         (
             "poison-application",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/poison-application.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/poison-application.json"),
         ),
         (
             "poison-residual",
@@ -416,21 +394,15 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "paralysis-application",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/paralysis-application.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/paralysis-application.json"),
         ),
         (
             "paralysis-full-stop",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/paralysis-full-stop.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/paralysis-full-stop.json"),
         ),
         (
             "paralysis-speed-order",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/paralysis-speed-order.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/paralysis-speed-order.json"),
         ),
         (
             "burn-application",
@@ -442,15 +414,11 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "burn-physical-penalty",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/burn-physical-penalty.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/burn-physical-penalty.json"),
         ),
         (
             "spread-stage-down",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/spread-stage-down.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/spread-stage-down.json"),
         ),
         (
             "stage-floor-cap",
@@ -458,27 +426,19 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "none-ability-no-trigger",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/none-ability-no-trigger.json"),
         ),
         (
             "intimidate-switch-in",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/intimidate-switch-in.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/intimidate-switch-in.json"),
         ),
         (
             "intimidate-stage-floor",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/intimidate-stage-floor.json"),
         ),
         (
             "wonder-guard-block",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/wonder-guard-block.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/wonder-guard-block.json"),
         ),
         (
             "wonder-guard-super-effective-pass",
@@ -488,9 +448,7 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "wonder-guard-status-pass",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/wonder-guard-status-pass.json"),
         ),
         (
             "type-weakness",
@@ -502,9 +460,7 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "type-native-immunity",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/type-native-immunity.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/type-native-immunity.json"),
         ),
         (
             "voluntary-switch",
@@ -512,9 +468,7 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "doubles-single-target",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json"),
         ),
         (
             "same-side-simultaneous-faint",
@@ -530,15 +484,11 @@ mod m3_oracle_control_axis8 {
         ),
         (
             "forced-replacement",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/forced-replacement.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/forced-replacement.json"),
         ),
         (
             "no-legal-replacement",
-            include_str!(
-                "../../../fixtures/m3/oracle/battle-cases/no-legal-replacement.json"
-            ),
+            include_str!("../../../fixtures/m3/oracle/battle-cases/no-legal-replacement.json"),
         ),
         (
             "victory",
@@ -579,8 +529,11 @@ mod m3_oracle_control_axis8 {
     }
 
     fn parse_fixture(case: &str, source: &str) -> TestResult<Value> {
-        serde_json::from_str(source)
-            .map_err(|error| boxed(format!("{case}: could not parse frozen fixture JSON: {error}")))
+        serde_json::from_str(source).map_err(|error| {
+            boxed(format!(
+                "{case}: could not parse frozen fixture JSON: {error}"
+            ))
+        })
     }
 
     fn required<'a>(case: &str, value: &'a Value, path: &str) -> TestResult<&'a Value> {
@@ -596,11 +549,11 @@ mod m3_oracle_control_axis8 {
     }
 
     fn u64_field(case: &str, value: &Value, path: &str) -> TestResult<u64> {
-        required(case, value, path)?
-            .as_u64()
-            .ok_or_else(|| boxed(format!(
+        required(case, value, path)?.as_u64().ok_or_else(|| {
+            boxed(format!(
                 "{case}: fixture field {path} is not an unsigned integer"
-            )))
+            ))
+        })
     }
 
     fn array_field<'a>(case: &str, value: &'a Value, path: &str) -> TestResult<&'a [Value]> {
@@ -634,20 +587,12 @@ mod m3_oracle_control_axis8 {
             .get("format")
             .and_then(Value::as_object)
             .and_then(|format| format.get("slots"))
-            .ok_or_else(|| {
-                boxed(format!(
-                    "{case}: canonical.battle.format.slots is missing"
-                ))
-            })?;
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.format.slots is missing")))?;
         let field_slots = battle
             .get("field")
             .and_then(Value::as_object)
             .and_then(|field| field.get("slots"))
-            .ok_or_else(|| {
-                boxed(format!(
-                    "{case}: canonical.battle.field.slots is missing"
-                ))
-            })?;
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.field.slots is missing")))?;
         require(
             case,
             format_slots.is_array() && field_slots.is_array() && format_slots == field_slots,
@@ -678,14 +623,9 @@ mod m3_oracle_control_axis8 {
                         "{case}: {path}.{field_name} has an unsupported nested kind shape"
                     )));
                 }
-                let tag = nested
-                    .get("kind")
-                    .and_then(Value::as_str)
-                    .ok_or_else(|| {
-                        boxed(format!(
-                            "{case}: {path}.{field_name}.kind is not a string"
-                        ))
-                    })?;
+                let tag = nested.get("kind").and_then(Value::as_str).ok_or_else(|| {
+                    boxed(format!("{case}: {path}.{field_name}.kind is not a string"))
+                })?;
                 Value::String(tag.to_owned())
             }
             other => {
@@ -699,23 +639,23 @@ mod m3_oracle_control_axis8 {
     }
 
     fn legacy_replacement_queue_is_resolved(case: &str, queue: &Value) -> TestResult<bool> {
-        let queue = queue
-            .as_array()
-            .ok_or_else(|| boxed(format!("{case}: canonical.battle.faint_queue is not an array")))?;
+        let queue = queue.as_array().ok_or_else(|| {
+            boxed(format!(
+                "{case}: canonical.battle.faint_queue is not an array"
+            ))
+        })?;
         let mut all_applied = true;
         for (index, occurrence) in queue.iter().enumerate() {
             let occurrence_path = format!("canonical.battle.faint_queue[{index}]");
-            let occurrence = occurrence.as_object().ok_or_else(|| {
-                boxed(format!("{case}: {occurrence_path} is not an object"))
-            })?;
-            let occurrence_slot = occurrence.get("slot").ok_or_else(|| {
-                boxed(format!("{case}: {occurrence_path}.slot is missing"))
-            })?;
-            let occurrence_slot = occurrence_slot.as_object().ok_or_else(|| {
-                boxed(format!(
-                    "{case}: {occurrence_path}.slot is not an object"
-                ))
-            })?;
+            let occurrence = occurrence
+                .as_object()
+                .ok_or_else(|| boxed(format!("{case}: {occurrence_path} is not an object")))?;
+            let occurrence_slot = occurrence
+                .get("slot")
+                .ok_or_else(|| boxed(format!("{case}: {occurrence_path}.slot is missing")))?;
+            let occurrence_slot = occurrence_slot
+                .as_object()
+                .ok_or_else(|| boxed(format!("{case}: {occurrence_path}.slot is not an object")))?;
             let occurrence_side = occurrence_slot
                 .get("side")
                 .and_then(Value::as_str)
@@ -821,9 +761,9 @@ mod m3_oracle_control_axis8 {
             let entry = entry
                 .as_object()
                 .ok_or_else(|| boxed(format!("{case}: {entry_path} is not an object")))?;
-            let entry_slot = entry.get("field_slot").ok_or_else(|| {
-                boxed(format!("{case}: {entry_path}.field_slot is missing"))
-            })?;
+            let entry_slot = entry
+                .get("field_slot")
+                .ok_or_else(|| boxed(format!("{case}: {entry_path}.field_slot is missing")))?;
             let entry_slot_object = entry_slot.as_object().ok_or_else(|| {
                 boxed(format!("{case}: {entry_path}.field_slot is not an object"))
             })?;
@@ -852,12 +792,9 @@ mod m3_oracle_control_axis8 {
                 .get("status")
                 .and_then(Value::as_object)
                 .ok_or_else(|| boxed(format!("{case}: {entry_path}.status is invalid")))?;
-            let status_kind = status
-                .get("kind")
-                .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    boxed(format!("{case}: {entry_path}.status.kind is not a string"))
-                })?;
+            let status_kind = status.get("kind").and_then(Value::as_str).ok_or_else(|| {
+                boxed(format!("{case}: {entry_path}.status.kind is not a string"))
+            })?;
             if !matches!(status_kind, "PENDING" | "RETAINED" | "ADMITTED") {
                 return Err(boxed(format!(
                     "{case}: {entry_path}.status.kind has unsupported value {status_kind:?}"
@@ -871,9 +808,7 @@ mod m3_oracle_control_axis8 {
                     ))
                 })?),
                 None => {
-                    return Err(boxed(format!(
-                        "{case}: {entry_path}.owner_seat is missing"
-                    )));
+                    return Err(boxed(format!("{case}: {entry_path}.owner_seat is missing")));
                 }
             };
             if entry_owner == owner_seat {
@@ -904,21 +839,26 @@ mod m3_oracle_control_axis8 {
             .filter(|entry| entry.0 == case)
             .collect::<Vec<_>>();
         let mut normalized_count = 0;
-        let player_party = battle.get("player_party").cloned().ok_or_else(|| {
-            boxed(format!("{case}: canonical.battle.player_party is missing"))
-        })?;
-        let enemy_party = battle.get("enemy_party").cloned().ok_or_else(|| {
-            boxed(format!("{case}: canonical.battle.enemy_party is missing"))
-        })?;
-        let faint_queue = battle.get("faint_queue").cloned().ok_or_else(|| {
-            boxed(format!("{case}: canonical.battle.faint_queue is missing"))
-        })?;
-        let outcome = battle.get("outcome").cloned().ok_or_else(|| {
-            boxed(format!("{case}: canonical.battle.outcome is missing"))
-        })?;
-        let command_state = battle.get("command_state").cloned().ok_or_else(|| {
-            boxed(format!("{case}: canonical.battle.command_state is missing"))
-        })?;
+        let player_party = battle
+            .get("player_party")
+            .cloned()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.player_party is missing")))?;
+        let enemy_party = battle
+            .get("enemy_party")
+            .cloned()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.enemy_party is missing")))?;
+        let faint_queue = battle
+            .get("faint_queue")
+            .cloned()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.faint_queue is missing")))?;
+        let outcome = battle
+            .get("outcome")
+            .cloned()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.outcome is missing")))?;
+        let command_state = battle
+            .get("command_state")
+            .cloned()
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.command_state is missing")))?;
         let queue_is_resolved = legacy_replacement_queue_is_resolved(case, &faint_queue)?;
         let field = battle
             .get_mut("field")
@@ -992,14 +932,19 @@ mod m3_oracle_control_axis8 {
                 _ => unreachable!("field slot side was validated above"),
             };
             let party = party.as_array().ok_or_else(|| {
-                boxed(format!("{case}: canonical.battle.{side}_party is not an array"))
+                boxed(format!(
+                    "{case}: canonical.battle.{side}_party is not an array"
+                ))
             })?;
-            let matching_pokemon = party.iter().filter(|pokemon| {
-                pokemon
-                    .get("id")
-                    .and_then(Value::as_u64)
-                    .is_some_and(|id| id == occupant_id)
-            }).collect::<Vec<_>>();
+            let matching_pokemon = party
+                .iter()
+                .filter(|pokemon| {
+                    pokemon
+                        .get("id")
+                        .and_then(Value::as_u64)
+                        .is_some_and(|id| id == occupant_id)
+                })
+                .collect::<Vec<_>>();
             let pokemon = match matching_pokemon.as_slice() {
                 [] => {
                     if expected_slot.is_some() {
@@ -1016,14 +961,11 @@ mod m3_oracle_control_axis8 {
                     )));
                 }
             };
-            let hp = pokemon
-                .get("hp")
-                .and_then(Value::as_u64)
-                .ok_or_else(|| {
-                    boxed(format!(
-                        "{case}: {path}.occupant party record has no unsigned hp"
-                    ))
-                })?;
+            let hp = pokemon.get("hp").and_then(Value::as_u64).ok_or_else(|| {
+                boxed(format!(
+                    "{case}: {path}.occupant party record has no unsigned hp"
+                ))
+            })?;
             let fainted = pokemon
                 .get("fainted")
                 .and_then(Value::as_bool)
@@ -1101,9 +1043,7 @@ mod m3_oracle_control_axis8 {
                 .get_mut(party_name)
                 .and_then(Value::as_array_mut)
                 .ok_or_else(|| {
-                    boxed(format!(
-                        "{case}: canonical.battle.{party_name} is invalid"
-                    ))
+                    boxed(format!("{case}: canonical.battle.{party_name} is invalid"))
                 })?;
             for (index, pokemon) in party.iter_mut().enumerate() {
                 let status = pokemon.get_mut("status").ok_or_else(|| {
@@ -1239,14 +1179,12 @@ mod m3_oracle_control_axis8 {
         require(
             case,
             cursor == 0,
-            format!(
-                "allocator-before reconstruction requires frozen cursor 0, got {cursor}"
-            ),
+            format!("allocator-before reconstruction requires frozen cursor 0, got {cursor}"),
         )?;
-        let first = MenuInstanceId::new(
-            SafeU53::new(1)
-                .map_err(|error| boxed(format!("{case}: invalid initial menu allocator: {error}")))?,
-        );
+        let first =
+            MenuInstanceId::new(SafeU53::new(1).map_err(|error| {
+                boxed(format!("{case}: invalid initial menu allocator: {error}"))
+            })?);
         seats
             .iter()
             .map(|seat| {
@@ -1265,10 +1203,9 @@ mod m3_oracle_control_axis8 {
             .get()
             .checked_add(1)
             .ok_or_else(|| boxed(format!("{case}: menu allocator overflowed")))?;
-        Ok(MenuInstanceId::new(
-            SafeU53::new(next)
-                .map_err(|error| boxed(format!("{case}: menu allocator overflowed: {error}")))?,
-        ))
+        Ok(MenuInstanceId::new(SafeU53::new(next).map_err(
+            |error| boxed(format!("{case}: menu allocator overflowed: {error}")),
+        )?))
     }
 
     fn require_allocators(
@@ -1327,7 +1264,9 @@ mod m3_oracle_control_axis8 {
         for allocator in &plan.menu_allocators {
             require(
                 case,
-                before.iter().any(|previous| previous.seat == allocator.seat),
+                before
+                    .iter()
+                    .any(|previous| previous.seat == allocator.seat),
                 format!(
                     "projected plan introduced allocator for unknown seat {}",
                     allocator.seat
@@ -1359,7 +1298,10 @@ mod m3_oracle_control_axis8 {
             (false, true, false, false) | (false, true, true, false) => Ok("PartyReplacement"),
             (false, false, true, false) => Ok("Waiting"),
             (false, false, false, true) => Ok("Terminal"),
-            shape => mismatch(case, format!("projected plan has mixed control shape {shape:?}")),
+            shape => mismatch(
+                case,
+                format!("projected plan has mixed control shape {shape:?}"),
+            ),
         }
     }
 
@@ -1377,9 +1319,11 @@ mod m3_oracle_control_axis8 {
         array_field(case, control, "pending_command_owners")?
             .iter()
             .map(|owner| {
-                owner
-                    .as_u64()
-                    .ok_or_else(|| boxed(format!("{case}: pending command owner is not an unsigned seat")))
+                owner.as_u64().ok_or_else(|| {
+                    boxed(format!(
+                        "{case}: pending command owner is not an unsigned seat"
+                    ))
+                })
             })
             .collect()
     }
@@ -1409,7 +1353,9 @@ mod m3_oracle_control_axis8 {
                     let selected = root
                         .menu
                         .option(root.menu.selected_option_id.clone())
-                        .ok_or_else(|| boxed(format!("{case}: selected command option is absent")))?;
+                        .ok_or_else(|| {
+                            boxed(format!("{case}: selected command option is absent"))
+                        })?;
                     require(
                         case,
                         selected.layout.row == 0
@@ -1446,7 +1392,10 @@ mod m3_oracle_control_axis8 {
                 )?;
                 Ok(u64::from(selected.layout.row))
             }
-            other => mismatch(case, format!("cannot derive cursor for control kind {other}")),
+            other => mismatch(
+                case,
+                format!("cannot derive cursor for control kind {other}"),
+            ),
         }
     }
 
@@ -1487,12 +1436,18 @@ mod m3_oracle_control_axis8 {
         require(
             case,
             plan.wave.get().get() == expected_wave,
-            format!("projected plan wave differs: expected {expected_wave}, got {}", plan.wave),
+            format!(
+                "projected plan wave differs: expected {expected_wave}, got {}",
+                plan.wave
+            ),
         )?;
         require(
             case,
             plan.turn.get().get() == expected_turn,
-            format!("projected plan turn differs: expected {expected_turn}, got {}", plan.turn),
+            format!(
+                "projected plan turn differs: expected {expected_turn}, got {}",
+                plan.turn
+            ),
         )?;
 
         let expected_owners = expected_command_owners(case, control)?;
@@ -1544,7 +1499,10 @@ mod m3_oracle_control_axis8 {
                     BattleOutcome::Victory => "VictoryPhase",
                     BattleOutcome::Defeat => "GameOverPhase",
                     BattleOutcome::Ongoing => {
-                        return mismatch(case, "terminal control has an ongoing final-state outcome")
+                        return mismatch(
+                            case,
+                            "terminal control has an ongoing final-state outcome",
+                        );
                     }
                 };
                 require(
@@ -1672,8 +1630,11 @@ mod m3_oracle_control_axis8 {
                 other => {
                     return mismatch(
                         case,
-                        format!("seat {} projected non-command control {other:?}", seat_control.seat),
-                    )
+                        format!(
+                            "seat {} projected non-command control {other:?}",
+                            seat_control.seat
+                        ),
+                    );
                 }
             };
             require(
@@ -1732,7 +1693,10 @@ mod m3_oracle_control_axis8 {
             require(
                 case,
                 root.menu == expected_menu,
-                format!("seat {} command menu graph differs from canonical offer", seat_control.seat),
+                format!(
+                    "seat {} command menu graph differs from canonical offer",
+                    seat_control.seat
+                ),
             )?;
             let allocator = before
                 .iter()
@@ -1755,7 +1719,10 @@ mod m3_oracle_control_axis8 {
                 case,
                 seat_control.control.is_actionable()
                     && seat_control.decision_operation_id.is_some(),
-                format!("seat {} command control is not actionable/bound", seat_control.seat),
+                format!(
+                    "seat {} command control is not actionable/bound",
+                    seat_control.seat
+                ),
             )?;
             consumed.push(seat_control.seat);
         }
@@ -1777,25 +1744,35 @@ mod m3_oracle_control_axis8 {
             .faint_queue
             .iter()
             .find(|faint| faint.id == occurrence)
-            .ok_or_else(|| boxed(format!("{case}: replacement occurrence {occurrence} is absent")))?;
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: replacement occurrence {occurrence} is absent"
+                ))
+            })?;
         let owner = faint
             .owner_seat
             .ok_or_else(|| boxed(format!("{case}: replacement occurrence has no human owner")))?;
-        let operation_id = replacement_operation_id_for_occurrence(battle, occurrence).map_err(|error| {
-            boxed(format!(
-                "{case}: production replacement operation could not be derived: {error}"
-            ))
-        })?;
+        let operation_id =
+            replacement_operation_id_for_occurrence(battle, occurrence).map_err(|error| {
+                boxed(format!(
+                    "{case}: production replacement operation could not be derived: {error}"
+                ))
+            })?;
         let owner_allocator = before
             .iter()
             .find(|allocator| allocator.seat == owner)
-            .ok_or_else(|| boxed(format!("{case}: missing replacement owner allocator-before")))?;
-        let expected_projection = build_replacement_menu(
-            battle,
-            occurrence,
-            owner_allocator.next_menu_instance_id,
-        )
-        .map_err(|error| boxed(format!("{case}: production replacement menu failed: {error}")))?;
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: missing replacement owner allocator-before"
+                ))
+            })?;
+        let expected_projection =
+            build_replacement_menu(battle, occurrence, owner_allocator.next_menu_instance_id)
+                .map_err(|error| {
+                    boxed(format!(
+                        "{case}: production replacement menu failed: {error}"
+                    ))
+                })?;
 
         match expected_projection {
             ReplacementMenuResult::Menu(expected_control) => {
@@ -1807,8 +1784,10 @@ mod m3_oracle_control_axis8 {
                             other => {
                                 return mismatch(
                                     case,
-                                    format!("replacement owner projected {other:?}, not ReplacementSelect"),
-                                )
+                                    format!(
+                                        "replacement owner projected {other:?}, not ReplacementSelect"
+                                    ),
+                                );
                             }
                         };
                         require(
@@ -1837,7 +1816,7 @@ mod m3_oracle_control_axis8 {
                                 return mismatch(
                                     case,
                                     format!("non-owner seat projected {other:?}, not Waiting"),
-                                )
+                                );
                             }
                         };
                         require(
@@ -1853,7 +1832,10 @@ mod m3_oracle_control_axis8 {
                             case,
                             seat_control.decision_operation_id.is_none()
                                 && !seat_control.control.is_actionable(),
-                            format!("non-owner seat {} is incorrectly actionable", seat_control.seat),
+                            format!(
+                                "non-owner seat {} is incorrectly actionable",
+                                seat_control.seat
+                            ),
                         )?;
                     }
                 }
@@ -1882,20 +1864,26 @@ mod m3_oracle_control_axis8 {
                             return mismatch(
                                 case,
                                 format!("no-legal seat projected {other:?}, not Waiting"),
-                            )
+                            );
                         }
                     };
                     require(
                         case,
                         waiting.reason == WaitingReason::ReplacementOwner
                             && waiting.operation_ids == vec![operation_id.clone()],
-                        format!("no-legal waiting identity differs for seat {}", seat_control.seat),
+                        format!(
+                            "no-legal waiting identity differs for seat {}",
+                            seat_control.seat
+                        ),
                     )?;
                     require(
                         case,
                         seat_control.decision_operation_id.is_none()
                             && !seat_control.control.is_actionable(),
-                        format!("no-legal seat {} is incorrectly actionable", seat_control.seat),
+                        format!(
+                            "no-legal seat {} is incorrectly actionable",
+                            seat_control.seat
+                        ),
                     )?;
                 }
                 require_allocators(case, plan, before, &[])
@@ -1920,8 +1908,11 @@ mod m3_oracle_control_axis8 {
                 other => {
                     return mismatch(
                         case,
-                        format!("terminal seat {} projected {other:?}, not Complete", seat_control.seat),
-                    )
+                        format!(
+                            "terminal seat {} projected {other:?}, not Complete",
+                            seat_control.seat
+                        ),
+                    );
                 }
             };
             require(
@@ -1934,20 +1925,30 @@ mod m3_oracle_control_axis8 {
             )?;
             require(
                 case,
-                seat_control.decision_operation_id.is_none() && !seat_control.control.is_actionable(),
-                format!("terminal seat {} is incorrectly actionable", seat_control.seat),
+                seat_control.decision_operation_id.is_none()
+                    && !seat_control.control.is_actionable(),
+                format!(
+                    "terminal seat {} is incorrectly actionable",
+                    seat_control.seat
+                ),
             )?;
         }
         require_allocators(case, plan, before, &[])
     }
 
-    fn compare_case(case: &str, source: &str, content: &er_content::pack::ContentPack) -> TestResult {
+    fn compare_case(
+        case: &str,
+        source: &str,
+        content: &er_content::pack::ContentPack,
+    ) -> TestResult {
         let fixture = parse_fixture(case, source)?;
         let control = expected_control(case, &fixture)?;
         let state = parse_expected_final_state(case, &fixture)?;
-        state
-            .validate()
-            .map_err(|error| boxed(format!("{case}: expected final state failed validation: {error}")))?;
+        state.validate().map_err(|error| {
+            boxed(format!(
+                "{case}: expected final state failed validation: {error}"
+            ))
+        })?;
         require(
             case,
             state.content_hash == content.hash,
@@ -1964,13 +1965,17 @@ mod m3_oracle_control_axis8 {
             .map_err(|error| boxed(format!("{case}: could not derive human seats: {error}")))?;
         let before = allocator_before(case, control, &seats)?;
         let decision = decision_for_state(case, &state)?;
-        let plan = project_battle_control_plan(&state, decision, &before, content).map_err(|error| {
+        let plan =
+            project_battle_control_plan(&state, decision, &before, content).map_err(|error| {
+                boxed(format!(
+                    "{case}: production control projection failed for {decision:?}: {error}"
+                ))
+            })?;
+        plan.validate().map_err(|error| {
             boxed(format!(
-                "{case}: production control projection failed for {decision:?}: {error}"
+                "{case}: projected BattleControlPlan is invalid: {error}"
             ))
         })?;
-        plan.validate()
-            .map_err(|error| boxed(format!("{case}: projected BattleControlPlan is invalid: {error}")))?;
         let projected_seats = plan
             .seats
             .iter()
@@ -1995,8 +2000,16 @@ mod m3_oracle_control_axis8 {
         compare_legacy_control_fields(case, control, &plan, battle, kind)?;
         match decision {
             BattleNextDecision::CommandFrontier => {
-                require(case, kind == "Command", format!("decision projected as {kind}"))?;
-                require(case, battle.outcome == BattleOutcome::Ongoing, "command frontier is not ongoing")?;
+                require(
+                    case,
+                    kind == "Command",
+                    format!("decision projected as {kind}"),
+                )?;
+                require(
+                    case,
+                    battle.outcome == BattleOutcome::Ongoing,
+                    "command frontier is not ongoing",
+                )?;
                 compare_command_plan(case, &state, &plan, &before)?;
             }
             BattleNextDecision::Replacement { occurrence } => {
@@ -2005,11 +2018,19 @@ mod m3_oracle_control_axis8 {
                     kind == "PartyReplacement" || kind == "Waiting",
                     format!("replacement decision projected as {kind}"),
                 )?;
-                require(case, battle.outcome == BattleOutcome::Ongoing, "replacement decision is not ongoing")?;
+                require(
+                    case,
+                    battle.outcome == BattleOutcome::Ongoing,
+                    "replacement decision is not ongoing",
+                )?;
                 compare_replacement_plan(case, &state, occurrence, &plan, &before)?;
             }
             BattleNextDecision::Complete(outcome) => {
-                require(case, kind == "Terminal", format!("complete decision projected as {kind}"))?;
+                require(
+                    case,
+                    kind == "Terminal",
+                    format!("complete decision projected as {kind}"),
+                )?;
                 compare_complete_plan(case, &plan, &before, outcome)?;
             }
         }
@@ -2029,6 +2050,4 @@ mod m3_oracle_control_axis8 {
         }
         Ok(())
     }
-
-
 }

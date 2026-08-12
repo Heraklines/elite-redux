@@ -27,17 +27,17 @@ use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
 };
 use er_state::snapshot::GameState;
+use er_types::SafeU53;
+use er_types::SeatId;
 use er_types::battle_command::{
     BattleCommand, BattleCommandProposalV1, BattleTargetSelection, ScriptedEnemyBattleCommandV1,
     ScriptedEnemyPolicyV1, player_command_operation_id, scripted_enemy_command_operation_id,
 };
 use er_types::battle_control::BattleControl;
 use er_types::battle_ids::{
-    AbilityId, AuthorityEpoch, BattleId, BattleSide, FieldSlot, GameModeId,
-    MoveSlotIndex, PokemonId, PartyIndex, TurnIndex, WaveIndex,
+    AbilityId, AuthorityEpoch, BattleId, BattleSide, FieldSlot, GameModeId, MoveSlotIndex,
+    PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
-use er_types::SafeU53;
-use er_types::SeatId;
 
 use local_battle::{
     BATTLE_START_SCHEMA_VERSION, BattleGameConfig, BattleStartV1, LocalBattleError,
@@ -149,13 +149,8 @@ fn valid_config() -> TestResult<BattleGameConfig> {
         MoveSlotIndex::ZERO,
         BattleTargetSelection::implicit(),
     )?;
-    let enemy_operation = scripted_enemy_command_operation_id(
-        battle_id,
-        wave,
-        turn,
-        enemy_slot,
-        safe(0),
-    )?;
+    let enemy_operation =
+        scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, safe(0))?;
     let enemy_script = ScriptedEnemyBattleCommandV1::new(
         enemy_operation,
         battle_id,

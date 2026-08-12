@@ -521,9 +521,7 @@ impl GameKernel {
         Self::from_snapshot(snapshot, content)
     }
 
-    fn capture_restorable_snapshot_v2(
-        &self,
-    ) -> Result<RestorableKernelSnapshotV2, SnapshotError> {
+    fn capture_restorable_snapshot_v2(&self) -> Result<RestorableKernelSnapshotV2, SnapshotError> {
         let battle = self.battle.as_ref().ok_or_else(|| {
             m3_snapshot_invalid(
                 "battle",
@@ -634,8 +632,7 @@ impl GameKernel {
                 "restored runtime does not reproduce the captured mechanical digest",
             ));
         }
-        if restored_snapshot.presentation_plan_digest
-            != expected_snapshot.presentation_plan_digest
+        if restored_snapshot.presentation_plan_digest != expected_snapshot.presentation_plan_digest
         {
             return Err(m3_snapshot_invalid(
                 "presentation_plan_digest",

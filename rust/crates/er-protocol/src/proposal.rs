@@ -1590,12 +1590,12 @@ impl crate::snapshot::ProposalAdmissionSnapshotBridge for ProposalAdmissionLedge
             fingerprints: self
                 .fingerprints
                 .iter()
-                .map(|(operation_id, fingerprint)| {
-                    crate::snapshot::ProposalFingerprintSnapshotV2 {
+                .map(
+                    |(operation_id, fingerprint)| crate::snapshot::ProposalFingerprintSnapshotV2 {
                         operation_id: operation_id.clone(),
                         fingerprint: fingerprint.clone(),
-                    }
-                })
+                    },
+                )
                 .collect(),
             disposed: self.disposed,
         };
@@ -1658,18 +1658,22 @@ impl crate::snapshot::ProposalLeaseSnapshotBridge for ProposalLeaseManager {
         let timer_targets = self
             .timer_targets
             .iter()
-            .map(|(timer_id, target)| crate::snapshot::ProposalTimerTargetSnapshotV2 {
-                timer_id: *timer_id,
-                operation_id: target.operation_id.clone(),
-                kind: match target.kind {
-                    ProposalTimerKind::Retry => crate::snapshot::ProposalTimerKindV2::Retry,
-                    ProposalTimerKind::Absolute => crate::snapshot::ProposalTimerKindV2::Absolute,
+            .map(
+                |(timer_id, target)| crate::snapshot::ProposalTimerTargetSnapshotV2 {
+                    timer_id: *timer_id,
+                    operation_id: target.operation_id.clone(),
+                    kind: match target.kind {
+                        ProposalTimerKind::Retry => crate::snapshot::ProposalTimerKindV2::Retry,
+                        ProposalTimerKind::Absolute => {
+                            crate::snapshot::ProposalTimerKindV2::Absolute
+                        }
+                    },
+                    endpoint: target.endpoint,
+                    owner: target.owner.clone(),
+                    delay_ms: target.delay_ms,
+                    time_class: target.time_class,
                 },
-                endpoint: target.endpoint,
-                owner: target.owner.clone(),
-                delay_ms: target.delay_ms,
-                time_class: target.time_class,
-            })
+            )
             .collect();
         let snapshot = crate::snapshot::ProposalLeaseSnapshotV2 {
             config: self.config.clone(),
@@ -1776,7 +1780,9 @@ impl crate::snapshot::ProposalLeaseSnapshotBridge for ProposalLeaseManager {
                 },
             )?;
             let expected_delay = match kind {
-                ProposalTimerKind::Retry => proposal_retry_delay(&snapshot.config, lease.retry_attempt),
+                ProposalTimerKind::Retry => {
+                    proposal_retry_delay(&snapshot.config, lease.retry_attempt)
+                }
                 ProposalTimerKind::Absolute => lease.absolute_delay_ms,
             };
             if target.owner != expected_owner || target.delay_ms != expected_delay {
@@ -1828,7 +1834,8 @@ impl crate::snapshot::ProposalLeaseSnapshotBridge for ProposalLeaseManager {
                     "a committed proposal cannot retain an active lease",
                 ));
             }
-            if lease.retry_timer.is_some() && lease.absolute_timer.is_some()
+            if lease.retry_timer.is_some()
+                && lease.absolute_timer.is_some()
                 && lease.retry_timer == lease.absolute_timer
             {
                 return Err(proposal_snapshot_invalid(
@@ -1836,8 +1843,12 @@ impl crate::snapshot::ProposalLeaseSnapshotBridge for ProposalLeaseManager {
                     "proposal retry and absolute timers cannot share an identity",
                 ));
             }
-            if lease.retry_timer.is_some_and(|timer_id| !timer_targets.contains_key(&timer_id))
-                || lease.absolute_timer.is_some_and(|timer_id| !timer_targets.contains_key(&timer_id))
+            if lease
+                .retry_timer
+                .is_some_and(|timer_id| !timer_targets.contains_key(&timer_id))
+                || lease
+                    .absolute_timer
+                    .is_some_and(|timer_id| !timer_targets.contains_key(&timer_id))
             {
                 return Err(proposal_snapshot_invalid(
                     "proposal_leases.leases",
@@ -1901,7 +1912,9 @@ fn proposal_timer_owner(
         proposal.operation_id.as_str(),
         reason,
     )
-    .map_err(|error| proposal_snapshot_invalid("proposal_leases.timer_targets.owner", error.to_string()))
+    .map_err(|error| {
+        proposal_snapshot_invalid("proposal_leases.timer_targets.owner", error.to_string())
+    })
 }
 
 fn cross_check_proposal_timers(
@@ -1978,7 +1991,10 @@ fn decode_proposal_hex(
 ) -> Result<Vec<u8>, crate::snapshot::SnapshotError> {
     let raw = bytes.as_str().as_bytes();
     if raw.len() % 2 != 0 {
-        return Err(proposal_snapshot_canonical(path, "canonical payload has odd hex length"));
+        return Err(proposal_snapshot_canonical(
+            path,
+            "canonical payload has odd hex length",
+        ));
     }
     let mut decoded = Vec::with_capacity(raw.len() / 2);
     for pair in raw.chunks_exact(2) {
@@ -1991,7 +2007,10 @@ fn decode_proposal_hex(
         decoded.push((high << 4) | low);
     }
     if decoded.is_empty() {
-        return Err(proposal_snapshot_canonical(path, "canonical payload must not be empty"));
+        return Err(proposal_snapshot_canonical(
+            path,
+            "canonical payload must not be empty",
+        ));
     }
     Ok(decoded)
 }

@@ -122,10 +122,8 @@ impl VirtualClock {
                     timer: timer.timer.clone(),
                     remaining_active_ms: timer.remaining_active_ms,
                     deadline_ms: timer.deadline_ms,
-                    paused: self.is_endpoint_class_paused(
-                        timer.timer.endpoint,
-                        timer.timer.time_class,
-                    ),
+                    paused: self
+                        .is_endpoint_class_paused(timer.timer.endpoint, timer.timer.time_class),
                 })
                 .collect(),
             disposed: self.disposed,
@@ -536,7 +534,6 @@ impl EndpointClock {
     fn is_active(&self, time_class: TimeClass) -> bool {
         time_class == TimeClass::Absolute || !self.is_paused(time_class)
     }
-
 }
 
 impl VirtualClockState {
@@ -570,11 +567,7 @@ impl VirtualClockState {
                     ),
                 });
             }
-            for (counter, expected_class) in endpoint
-                .counters
-                .iter()
-                .zip(ALL_TIME_CLASSES)
-            {
+            for (counter, expected_class) in endpoint.counters.iter().zip(ALL_TIME_CLASSES) {
                 if counter.time_class != expected_class {
                     return Err(VirtualClockError::InvalidState {
                         reason: format!(

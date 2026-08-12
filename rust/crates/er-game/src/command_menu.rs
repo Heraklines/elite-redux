@@ -6,9 +6,7 @@
 //! menu instance and the already validated control identity.
 
 use er_types::battle_command::{BattleCommandError, BattleCommandOffer};
-use er_types::battle_control::{
-    BattleControl, BattleControlError, CommandRootControl,
-};
+use er_types::battle_control::{BattleControl, BattleControlError, CommandRootControl};
 use er_types::battle_ids::{BattleSide, FieldSlot, MenuInstanceId, PokemonId};
 use er_types::battle_ui::{
     BattleMenu, BattleMenuError, BattleMenuOption, MenuNavigationEdge, MenuOptionLayout,
@@ -158,16 +156,8 @@ pub fn build_command_menu_with_availability(
     // directions are intentional no-ops; do not derive more edges from the
     // row/column metadata.
     let navigation = vec![
-        MenuNavigationEdge::new(
-            fight.clone(),
-            NavigationDirection::Down,
-            switch.clone(),
-        ),
-        MenuNavigationEdge::new(
-            switch,
-            NavigationDirection::Up,
-            fight.clone(),
-        ),
+        MenuNavigationEdge::new(fight.clone(), NavigationDirection::Down, switch.clone()),
+        MenuNavigationEdge::new(switch, NavigationDirection::Up, fight.clone()),
     ];
 
     let selected_option_id = MenuOptionId::new(selected.option_id())?;

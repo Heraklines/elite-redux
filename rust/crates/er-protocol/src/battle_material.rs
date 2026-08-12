@@ -156,9 +156,7 @@ pub fn validate_turn_material_body(
 /// The generic M2 validator is still run first so JSON, context, body and
 /// successor semantics retain their established classification. M3 then
 /// tightens only the exact outer keys and TURN identity/digest requirements.
-pub fn validate_turn_material_frame(
-    raw: &RawFrame,
-) -> Result<ValidatedFrame, BattleMaterialError> {
+pub fn validate_turn_material_frame(raw: &RawFrame) -> Result<ValidatedFrame, BattleMaterialError> {
     let value = raw_frame_value(raw)?;
     let envelope = object_at(&value, "frame")?;
     exact_keys(envelope, &["v", "t", "ctx", "body"], "frame")?;
@@ -319,10 +317,7 @@ fn parse_turn_identity(
     Ok((canonical, operation_id, battle_id, wave, turn))
 }
 
-fn validate_turn_digest(
-    supplied: &str,
-    canonical: &str,
-) -> Result<(), BattleMaterialError> {
+fn validate_turn_digest(supplied: &str, canonical: &str) -> Result<(), BattleMaterialError> {
     if supplied.len() != 16
         || supplied
             .bytes()
@@ -359,11 +354,11 @@ fn canonical_payload(payload: &Value) -> Result<String, BattleMaterialError> {
 
 fn raw_frame_value(raw: &RawFrame) -> Result<Value, BattleMaterialError> {
     match raw {
-        RawFrame::JsonText(text) => serde_json::from_str(text).map_err(|error| {
-            BattleMaterialError::EnvelopeViolation {
+        RawFrame::JsonText(text) => {
+            serde_json::from_str(text).map_err(|error| BattleMaterialError::EnvelopeViolation {
                 reason: format!("malformed JSON: {error}"),
-            }
-        }),
+            })
+        }
         RawFrame::JsonValue(value) => Ok(value.clone()),
     }
 }
@@ -399,11 +394,7 @@ fn number_at(value: &Value, path: &str) -> Result<u64, BattleMaterialError> {
     Ok(value as u64)
 }
 
-fn safe_u53(
-    value: &Value,
-    path: &str,
-    positive: bool,
-) -> Result<SafeU53, BattleMaterialError> {
+fn safe_u53(value: &Value, path: &str, positive: bool) -> Result<SafeU53, BattleMaterialError> {
     let value = number_at(value, path)?;
     if positive && value == 0 {
         return Err(malformed(path, "must be greater than zero"));

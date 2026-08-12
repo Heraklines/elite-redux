@@ -17,18 +17,18 @@ use er_kernel::{
     KernelEffect, KernelInput,
 };
 use er_protocol::{
-    AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding,
-    ProposalLeaseConfig, RecoveryTransactionConfig,
+    AuthorityLogConfig, AuthorityReplicaConfig, BackoffPolicy, PeerBinding, ProposalLeaseConfig,
+    RecoveryTransactionConfig,
 };
 use er_sim::{PairEndpoint, PairOperation, PairStep, SimulatedBattlePairConfig, SimulatedPair};
 use er_state::battle::BattleState;
 use er_state::snapshot::GameState;
-use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleTargetSelection, CommandAdmissionSource,
     CommandFrontierStatus, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
     player_command_operation_id, scripted_enemy_command_operation_id,
 };
+use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_ids::{
     BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex,
 };
@@ -53,12 +53,10 @@ const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 const PHYSICAL_HIT_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/physical-hit.json");
-const VICTORY_FIXTURE: &str =
-    include_str!("../../../fixtures/m3/oracle/battle-cases/victory.json");
+const VICTORY_FIXTURE: &str = include_str!("../../../fixtures/m3/oracle/battle-cases/victory.json");
 const DOUBLES_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json");
-const CONTENT_PACK_FIXTURE: &str =
-    include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
+const CONTENT_PACK_FIXTURE: &str = include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
 
 #[derive(Clone, Debug, Default, Serialize)]
 struct Counts {
@@ -172,7 +170,9 @@ fn normalize_legacy_initial_state(state: &mut Value) -> TestResult {
             .get_mut(party_name)
             .and_then(Value::as_array_mut)
             .ok_or_else(|| {
-                invalid(format!("initial_state canonical battle {party_name} is invalid"))
+                invalid(format!(
+                    "initial_state canonical battle {party_name} is invalid"
+                ))
             })?;
         for (index, pokemon) in party.iter_mut().enumerate() {
             let status = pokemon.get_mut("status").ok_or_else(|| {
@@ -224,7 +224,11 @@ fn canonical_state(fixture: &Value) -> TestResult<GameState> {
     Ok(serde_json::from_value(canonical)?)
 }
 
-fn lead_indices(battle: &BattleState, side: BattleSide, capacity: u8) -> TestResult<Vec<PartyIndex>> {
+fn lead_indices(
+    battle: &BattleState,
+    side: BattleSide,
+    capacity: u8,
+) -> TestResult<Vec<PartyIndex>> {
     (0..capacity)
         .map(|position| {
             let slot = FieldSlot::new(side, position)?;
@@ -348,13 +352,7 @@ fn authority_protocol(
     Ok(BattleProtocolConfig {
         role: BattleProtocolRoleConfig::Authority {
             log: AuthorityLogConfig {
-                local_context: context(
-                    prefix,
-                    iteration,
-                    host,
-                    host,
-                    connection_generation,
-                )?,
+                local_context: context(prefix, iteration, host, host, connection_generation)?,
                 peer_bindings: guest
                     .into_iter()
                     .map(|seat_id| PeerBinding {
@@ -385,13 +383,7 @@ fn replica_protocol(
     guest: SeatId,
     connection_generation: ConnectionGeneration,
 ) -> TestResult<BattleProtocolConfig> {
-    let guest_context = context(
-        prefix,
-        iteration,
-        guest,
-        host,
-        connection_generation,
-    )?;
+    let guest_context = context(prefix, iteration, guest, host, connection_generation)?;
     Ok(BattleProtocolConfig {
         role: BattleProtocolRoleConfig::Replica {
             replica: AuthorityReplicaConfig {
@@ -430,7 +422,11 @@ fn new_local_kernel(
         None,
         ConnectionGeneration::ZERO,
     )?;
-    Ok(GameKernel::new_battle(config, protocol, Arc::clone(content))?)
+    Ok(GameKernel::new_battle(
+        config,
+        protocol,
+        Arc::clone(content),
+    )?)
 }
 
 fn new_pair(
@@ -452,13 +448,7 @@ fn new_pair(
             generation,
         )?,
         guest_game: battle_config(fixture, guest, force_short_victory)?,
-        guest_protocol: replica_protocol(
-            "m3-benchmark-pair",
-            iteration,
-            host,
-            guest,
-            generation,
-        )?,
+        guest_protocol: replica_protocol("m3-benchmark-pair", iteration, host, guest, generation)?,
         content: Arc::clone(content),
         replay_seed: 0x4c,
         initial_storage: BTreeMap::new(),
@@ -518,11 +508,7 @@ fn count_rng_draws(effects: &[KernelEffect]) -> u64 {
                 .body
                 .get("material")
                 .and_then(|material| material.get("payload"))
-                .and_then(|payload| {
-                    payload
-                        .get("rng_audit")
-                        .or_else(|| payload.get("rngAudit"))
-                })
+                .and_then(|payload| payload.get("rng_audit").or_else(|| payload.get("rngAudit")))
                 .and_then(Value::as_array)
                 .map(|draws| draws.len() as u64)
         })
@@ -598,11 +584,7 @@ fn settle_local_presentations(
     Ok(())
 }
 
-fn dispose_local_kernel(
-    kernel: &mut GameKernel,
-    checksum: &mut u64,
-    reason: &str,
-) -> TestResult {
+fn dispose_local_kernel(kernel: &mut GameKernel, checksum: &mut u64, reason: &str) -> TestResult {
     let effects = kernel.dispose(reason);
     assert_no_legacy_success_effects(&effects);
     absorb(checksum, &effects)?;
@@ -690,8 +672,7 @@ fn record_pair_turn_evidence(step: &PairStep, evidence: &mut TurnEvidence) -> Te
             continue;
         }
         if *from == seat(1) {
-            evidence.authority_turn_commits =
-                evidence.authority_turn_commits.saturating_add(1);
+            evidence.authority_turn_commits = evidence.authority_turn_commits.saturating_add(1);
         } else if *from == seat(2) {
             evidence.replica_turn_commits = evidence.replica_turn_commits.saturating_add(1);
         } else {
@@ -709,9 +690,7 @@ fn state_game<'a>(state: &'a Value, label: &str) -> TestResult<&'a Value> {
         .and_then(Value::as_str)
         .ok_or_else(|| invalid(format!("{label}.mode is not a string")))?;
     if mode != "BATTLE" {
-        return Err(invalid(format!(
-            "{label}.mode is {mode}, expected BATTLE"
-        )));
+        return Err(invalid(format!("{label}.mode is {mode}, expected BATTLE")));
     }
     let game = state
         .get("game")
@@ -858,11 +837,11 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
         actual_slots.push(entry.field_slot);
         match (entry.field_slot.side, entry.owner_seat, &entry.status) {
             (BattleSide::Player, Some(owner), CommandFrontierStatus::Pending) => {
-                let expected_owner = er_state::format::owner_seat_for(
-                    &battle.format,
-                    entry.field_slot,
-                )?
-                .ok_or_else(|| invalid(format!("{label}.frontier[{index}] has no human owner")))?;
+                let expected_owner =
+                    er_state::format::owner_seat_for(&battle.format, entry.field_slot)?
+                        .ok_or_else(|| {
+                            invalid(format!("{label}.frontier[{index}] has no human owner"))
+                        })?;
                 if owner != expected_owner {
                     return Err(invalid(format!(
                         "{label}.frontier[{index}] owner {owner} does not match {expected_owner}"
@@ -888,8 +867,7 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
                 CommandFrontierStatus::Admitted {
                     command:
                         AcceptedBattleCommand::ScriptedEnemy {
-                            command: scripted,
-                            ..
+                            command: scripted, ..
                         },
                     source: CommandAdmissionSource::ScriptedEnemy,
                 },
@@ -934,11 +912,7 @@ fn assert_frontier_at_turn(state: &Value, expected_turn: u64, label: &str) -> Te
     Ok(())
 }
 
-fn assert_supported_turn_transition(
-    before: &Value,
-    after: &Value,
-    label: &str,
-) -> TestResult {
+fn assert_supported_turn_transition(before: &Value, after: &Value, label: &str) -> TestResult {
     let before_turn = state_turn(before, &format!("{label} before"))?;
     let expected_turn = before_turn
         .checked_add(1)
@@ -1314,12 +1288,8 @@ fn m3_simple_turn_resolutions() -> TestResult {
     for iteration in 0..SIMPLE_TURN_RESOLUTIONS {
         let mut kernel = new_local_kernel(&fixture, &content, iteration)?;
         let before = kernel.snapshot().state;
-        let mut effects = raw_press_local(
-            &mut kernel,
-            &mut checksum,
-            &mut counts,
-            PhysicalKey::Enter,
-        )?;
+        let mut effects =
+            raw_press_local(&mut kernel, &mut checksum, &mut counts, PhysicalKey::Enter)?;
         effects.extend(raw_press_local(
             &mut kernel,
             &mut checksum,
@@ -1362,12 +1332,8 @@ fn m3_complete_short_battles() -> TestResult {
     let mut counts = Counts::default();
     for iteration in 0..COMPLETE_SHORT_BATTLES {
         let mut kernel = new_local_kernel(&fixture, &content, iteration)?;
-        let mut effects = raw_press_local(
-            &mut kernel,
-            &mut checksum,
-            &mut counts,
-            PhysicalKey::Enter,
-        )?;
+        let mut effects =
+            raw_press_local(&mut kernel, &mut checksum, &mut counts, PhysicalKey::Enter)?;
         effects.extend(raw_press_local(
             &mut kernel,
             &mut checksum,

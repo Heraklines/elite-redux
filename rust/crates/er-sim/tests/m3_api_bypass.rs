@@ -16,8 +16,7 @@ use er_types::{
     PresentationOutcome, Revision, SafeU53, SeatId,
 };
 
-const BATTLE_KERNEL_SOURCE: &str =
-    include_str!("../../er-kernel/src/battle_kernel.rs");
+const BATTLE_KERNEL_SOURCE: &str = include_str!("../../er-kernel/src/battle_kernel.rs");
 const KERNEL_SOURCE: &str = include_str!("../../er-kernel/src/kernel.rs");
 const KERNEL_INPUT_SOURCE: &str = include_str!("../../er-types/src/protocol.rs");
 const RUNTIME_SOURCE: &str = include_str!("../../er-game/src/runtime.rs");
@@ -107,9 +106,12 @@ fn battle_mode_has_no_fixture_plans_or_public_semantic_driver() {
         }
     }
 
-    let input_source =
-        between(KERNEL_INPUT_SOURCE, "pub enum KernelInput", "pub enum KernelEffect")
-            .unwrap_or_default();
+    let input_source = between(
+        KERNEL_INPUT_SOURCE,
+        "pub enum KernelInput",
+        "pub enum KernelEffect",
+    )
+    .unwrap_or_default();
     assert!(
         !input_source.contains("UiIntent")
             && !input_source.contains("select_")
@@ -158,11 +160,7 @@ fn battle_mode_emits_only_battle_owned_effects() {
 
 #[test]
 fn external_material_control_and_legacy_presentation_success_are_rejected() {
-    for boundary in [
-        "MaterialApplied",
-        "ControlProjected",
-        "PresentationSettled",
-    ] {
+    for boundary in ["MaterialApplied", "ControlProjected", "PresentationSettled"] {
         assert!(
             BATTLE_KERNEL_SOURCE.contains(&format!("boundary: \"{boundary}\"")),
             "BattleMode must reject compatibility boundary {boundary}"
@@ -216,13 +214,23 @@ fn battle_public_boundary_rejects_legacy_success_inputs_without_mutation()
 
     for (boundary, input) in inputs {
         let result = kernel.step(input);
-        assert!(result.is_err(), "Battle accepted legacy boundary {boundary}");
-        let error = result.err().map(|value| value.to_string()).unwrap_or_default();
+        assert!(
+            result.is_err(),
+            "Battle accepted legacy boundary {boundary}"
+        );
+        let error = result
+            .err()
+            .map(|value| value.to_string())
+            .unwrap_or_default();
         assert!(
             error.contains("legacy compatibility boundary"),
             "Battle rejected {boundary} for an unexpected reason: {error}"
         );
-        assert_eq!(kernel.snapshot(), before_snapshot, "{boundary} mutated state");
+        assert_eq!(
+            kernel.snapshot(),
+            before_snapshot,
+            "{boundary} mutated state"
+        );
         assert_eq!(
             kernel.live_resources(),
             before_resources,

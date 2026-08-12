@@ -8,18 +8,18 @@
 
 use std::collections::BTreeMap;
 
-use er_battle::{BattleReplacementTransition, BattleTransition};
 use er_battle::legality::{
     CommandLegalityError, validate_command_proposal, validate_preserved_offer,
     validate_replacement_proposal, validate_replacement_selection, validate_state_content,
 };
+use er_battle::{BattleReplacementTransition, BattleTransition};
 use er_content::pack::ContentPack;
 use er_state::battle::BattleState;
 use er_state::format::{FormatTopologyError, owner_seat_for};
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleCommandError, BattleCommandFingerprint,
-    BattleCommandProposalV1, BattleReplacementProposalV1, BattleReplacementProposalFingerprint,
+    BattleCommandProposalV1, BattleReplacementProposalFingerprint, BattleReplacementProposalV1,
     BattleTargetSelection, CommandAdmissionSource, CommandFrontierStatus, CommandSet,
     ReplacementProposalFingerprintEntry, ReplacementSelection, ScriptedEnemyPolicyV1,
 };
@@ -95,10 +95,7 @@ pub enum AuthorityCommandError {
     #[error(
         "script cursor {cursor} names slot {actual:?}, but the command frontier has no pending enemy slot"
     )]
-    ScriptCommandMismatch {
-        cursor: SafeU53,
-        actual: FieldSlot,
-    },
+    ScriptCommandMismatch { cursor: SafeU53, actual: FieldSlot },
     #[error("scripted enemy command coordinates do not match the active battle frontier")]
     ScriptCommandStale,
     #[error("the command frontier contains an invalid preserved offer: {0}")]
@@ -265,8 +262,13 @@ pub struct PreparedAuthorityReplacement {
 /// Result of checking whether the exact command frontier is ready to resolve.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CommandFrontierCompletion {
-    Incomplete { state: GameState },
-    Complete { state: GameState, commands: CommandSet },
+    Incomplete {
+        state: GameState,
+    },
+    Complete {
+        state: GameState,
+        commands: CommandSet,
+    },
 }
 
 impl CommandFrontierCompletion {
@@ -308,9 +310,11 @@ fn validate_replacement_fingerprint_evidence(
 ) -> Result<(), AuthorityCommandError> {
     for pair in evidence.windows(2) {
         if pair[0].operation_id >= pair[1].operation_id {
-            return Err(AuthorityCommandError::InvalidReplacementFingerprintEvidence {
-                reason: "entries must be unique and sorted by operation identity",
-            });
+            return Err(
+                AuthorityCommandError::InvalidReplacementFingerprintEvidence {
+                    reason: "entries must be unique and sorted by operation identity",
+                },
+            );
         }
     }
     for entry in evidence {
@@ -490,7 +494,9 @@ pub fn admit_scripted_enemy_frontier(
     policy: &ScriptedEnemyPolicyV1,
     content: &ContentPack,
 ) -> Result<ScriptedEnemyAdmission, AuthorityCommandError> {
-    policy.validate().map_err(|source| AuthorityCommandError::ScriptedPolicy(source))?;
+    policy
+        .validate()
+        .map_err(|source| AuthorityCommandError::ScriptedPolicy(source))?;
     validate_state_content(state, content).map_err(legality)?;
 
     let mut next_state = state.clone();
@@ -619,20 +625,18 @@ pub fn project_scripted_policy_for_material(
         let CommandFrontierStatus::Admitted {
             command:
                 AcceptedBattleCommand::ScriptedEnemy {
-                    command: admitted,
-                    ..
+                    command: admitted, ..
                 },
             source: CommandAdmissionSource::ScriptedEnemy,
         } = &entry.status
         else {
             return Err(AuthorityCommandError::ScriptedProjectionNotAdmitted);
         };
-        let scripted = expected_policy
-            .next_command()
-            .cloned()
-            .ok_or(AuthorityCommandError::ScriptCursorExhausted {
+        let scripted = expected_policy.next_command().cloned().ok_or(
+            AuthorityCommandError::ScriptCursorExhausted {
                 cursor: expected_policy.cursor,
-            })?;
+            },
+        )?;
         if scripted.field_slot != entry.field_slot
             || scripted.actor != entry.actor
             || scripted.operation_id != entry.operation_id
@@ -719,8 +723,7 @@ pub fn complete_command_frontier(
     // This is the game-owned last legality gate.  It proves exact living
     // actor coverage, current offers, target/switch legality, and duplicate
     // switch destinations before any resolver is called.
-    er_battle::legality::normalize_command_set(&next, &commands, content)
-        .map_err(legality)?;
+    er_battle::legality::normalize_command_set(&next, &commands, content).map_err(legality)?;
     validate_state_content(&next, content).map_err(legality)?;
     Ok(CommandFrontierCompletion::Complete {
         state: next,
@@ -739,14 +742,7 @@ pub fn admit_replacement_proposal(
     proposal: &BattleReplacementProposalV1,
     content: &ContentPack,
 ) -> Result<ReplacementAdmissionResult, AuthorityCommandError> {
-    admit_replacement_proposal_with_context(
-        state,
-        control,
-        None,
-        fingerprints,
-        proposal,
-        content,
-    )
+    admit_replacement_proposal_with_context(state, control, None, fingerprints, proposal, content)
 }
 
 /// Replacement admission counterpart with GameRuntime's typed remote menu
@@ -857,10 +853,7 @@ pub fn retain_command_tombstones(
             continue;
         }
         battle.command_state.tombstones.push(
-            er_types::battle_command::CommandFingerprintEntry::new(
-                operation_id,
-                fingerprint,
-            )?,
+            er_types::battle_command::CommandFingerprintEntry::new(operation_id, fingerprint)?,
         );
     }
     battle
@@ -957,9 +950,8 @@ fn validate_control_identity<'a>(
             validate_replayed_path(&seat.control, active, owner_seat)?;
         }
     }
-    let menu = current_menu(active).ok_or(AuthorityCommandError::ControlNotActionable {
-        seat: owner_seat,
-    })?;
+    let menu = current_menu(active)
+        .ok_or(AuthorityCommandError::ControlNotActionable { seat: owner_seat })?;
     if menu.instance_id != menu_instance_id {
         return Err(AuthorityCommandError::MenuInstanceMismatch {
             expected: menu.instance_id,
@@ -1085,10 +1077,7 @@ fn validate_command_control(
                     reason: "TargetSelect requires a selected Fight target set",
                 });
             };
-            if *actor != value.actor
-                || *actor != proposal.actor
-                || *move_slot != value.move_slot
-            {
+            if *actor != value.actor || *actor != proposal.actor || *move_slot != value.move_slot {
                 return Err(AuthorityCommandError::CommandControlMismatch {
                     reason: "actor or move slot differs from TargetSelect",
                 });
@@ -1177,7 +1166,8 @@ fn validate_replacement_control(
         proposal.menu_instance_id,
         &proposal.control_id,
     )?;
-    let (menu, occurrence, source, actor, field_slot, owner_seat, active_party_slot) = match active {
+    let (menu, occurrence, source, actor, field_slot, owner_seat, active_party_slot) = match active
+    {
         BattleControl::ReplacementSelect(value) => (
             &value.menu,
             value.occurrence,
@@ -1315,5 +1305,4 @@ mod compile_shape_tests {
     fn replacement_fingerprint_evidence_accepts_empty_snapshot() {
         assert!(validate_replacement_fingerprint_evidence(&[]).is_ok());
     }
-
 }

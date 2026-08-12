@@ -32,21 +32,18 @@ use er_state::snapshot::GameState;
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1, BattleReplacementProposalV1,
     BattleTargetSelection, CommandAdmissionSource, CommandFrontierEntry, CommandFrontierStatus,
-    CommandSet, ReplacementSelection, ScriptedEnemyBattleCommandV1,
-    player_command_operation_id, replacement_operation_id, turn_result_operation_id,
+    CommandSet, ReplacementSelection, ScriptedEnemyBattleCommandV1, player_command_operation_id,
+    replacement_operation_id, turn_result_operation_id,
 };
 use er_types::battle_ids::{
-    AbilityId, AuthorityEpoch, BattleId, BattlePresentationEventId, BattleSide,
-    FaintOccurrenceId, FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId,
-    TurnIndex, WaveIndex,
+    AbilityId, AuthorityEpoch, BattleId, BattlePresentationEventId, BattleSide, FaintOccurrenceId,
+    FieldSlot, MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
     BattleStat, FaintOccurrence, ReplacementProgress, ResolvedAction, ResolvedActionKind,
     StatusKind, StatusState,
 };
-use er_types::battle_ui::{
-    BattlePresentationEvent, BattlePresentationKind,
-};
+use er_types::battle_ui::{BattlePresentationEvent, BattlePresentationKind};
 use er_types::{OperationId, SafeU53, SeatId};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -635,9 +632,9 @@ fn assert_exact_keys(
     value: &Value,
     expected: &[&str],
 ) -> Result<(), FixtureError> {
-    let object = value.as_object().ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: {path} is not an object"))
-    })?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
     let actual: BTreeSet<String> = object.keys().cloned().collect();
     let expected: BTreeSet<String> = expected.iter().map(|key| (*key).to_owned()).collect();
     if actual != expected {
@@ -654,9 +651,9 @@ fn normalize_nested_kind(
     object: &mut Value,
     field_name: &str,
 ) -> Result<(), FixtureError> {
-    let object = object.as_object_mut().ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: {path} is not an object"))
-    })?;
+    let object = object
+        .as_object_mut()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
     let Some(kind) = object.get(field_name).cloned() else {
         return Err(FixtureError::new(format!(
             "{case_name}: {path}.{field_name} is missing"
@@ -670,14 +667,11 @@ fn normalize_nested_kind(
                     "{case_name}: {path}.{field_name} has an unsupported nested kind shape"
                 )));
             }
-            let tag = nested
-                .get("kind")
-                .and_then(Value::as_str)
-                .ok_or_else(|| {
-                    FixtureError::new(format!(
-                        "{case_name}: {path}.{field_name}.kind is not a string"
-                    ))
-                })?;
+            let tag = nested.get("kind").and_then(Value::as_str).ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path}.{field_name}.kind is not a string"
+                ))
+            })?;
             Value::String(tag.to_owned())
         }
         other => {
@@ -701,10 +695,7 @@ fn status_kind_wire(kind: StatusKind) -> &'static str {
     }
 }
 
-fn normalize_legacy_format_slots(
-    case_name: &str,
-    battle: &mut Value,
-) -> Result<(), FixtureError> {
+fn normalize_legacy_format_slots(case_name: &str, battle: &mut Value) -> Result<(), FixtureError> {
     let field_slots = battle
         .get("field")
         .and_then(|field| field.get("slots"))
@@ -718,9 +709,7 @@ fn normalize_legacy_format_slots(
         .get_mut("format")
         .and_then(Value::as_object_mut)
         .ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: canonical.battle.format is invalid"
-            ))
+            FixtureError::new(format!("{case_name}: canonical.battle.format is invalid"))
         })?;
     let format_slots = format.get("slots").cloned().ok_or_else(|| {
         FixtureError::new(format!(
@@ -774,33 +763,24 @@ fn normalize_legacy_final_statuses(
         {
             continue;
         }
-        let before: LegacyPokemonEvidence = serde_json::from_value(
-            object_field(mutation, case_name, &path, "before")?.clone(),
-        )
-        .map_err(|error| {
-            FixtureError::new(format!(
-                "{case_name}: {path}.before is not legacy faint evidence: {error}"
-            ))
-        })?;
+        let before: LegacyPokemonEvidence =
+            serde_json::from_value(object_field(mutation, case_name, &path, "before")?.clone())
+                .map_err(|error| {
+                    FixtureError::new(format!(
+                        "{case_name}: {path}.before is not legacy faint evidence: {error}"
+                    ))
+                })?;
         if before.status.effect == 7 {
             return Err(FixtureError::new(format!(
                 "{case_name}: {path} has legacy faint marker on both sides"
             )));
         }
-        let before_status = legacy_status_state(
-            case_name,
-            &format!("{path}.before.status"),
-            &before.status,
-        )
-        .map_err(|error| FixtureError::new(error.to_string()))?;
+        let before_status =
+            legacy_status_state(case_name, &format!("{path}.before.status"), &before.status)
+                .map_err(|error| FixtureError::new(error.to_string()))?;
         let target_id = identities
             .iter()
-            .find(|identity| {
-                identity
-                    .get("legacy_pid")
-                    .and_then(Value::as_u64)
-                    == Some(before.id)
-            })
+            .find(|identity| identity.get("legacy_pid").and_then(Value::as_u64) == Some(before.id))
             .and_then(|identity| identity.get("pokemon_id"))
             .cloned()
             .ok_or_else(|| {
@@ -870,7 +850,12 @@ fn validate_legacy_final_faint_context(
     pokemon: u64,
     side: BattleSide,
 ) -> Result<(), FixtureError> {
-    let queue = array_field(battle, case_name, "expected_final_state.canonical.battle", "faint_queue")?;
+    let queue = array_field(
+        battle,
+        case_name,
+        "expected_final_state.canonical.battle",
+        "faint_queue",
+    )?;
     if !queue.is_empty() {
         return Err(FixtureError::new(format!(
             "{case_name}: cannot normalize stale occupant {pokemon}; final faint queue is not empty"
@@ -936,8 +921,7 @@ fn validate_legacy_final_faint_context(
                 "occurrence",
             )
             .ok()
-        })
-        == Some(occurrence)
+        }) == Some(occurrence)
     });
     if !resolved {
         return Err(FixtureError::new(format!(
@@ -955,15 +939,15 @@ fn validate_legacy_final_faint_context(
         "VICTORY" | "DEFEAT" => Ok(()),
         "ONGOING" => {
             let commands = object_field(document, case_name, "$", "commands")?;
-            let proposals = array_field(
-                commands,
-                case_name,
-                "commands",
-                "replacement_proposals",
-            )?;
+            let proposals = array_field(commands, case_name, "commands", "replacement_proposals")?;
             let has_no_legal = proposals.iter().any(|proposal| {
-                u64_field(proposal, case_name, "commands.replacement_proposals", "occurrence")
-                    .ok()
+                u64_field(
+                    proposal,
+                    case_name,
+                    "commands.replacement_proposals",
+                    "occurrence",
+                )
+                .ok()
                     == Some(occurrence)
                     && proposal
                         .get("selection")
@@ -1009,7 +993,9 @@ fn normalize_legacy_final_occupants(
             let hp = u64_field(pokemon, case_name, &path, "hp")?;
             let fainted = required(pokemon, case_name, &path, "fainted")?
                 .as_bool()
-                .ok_or_else(|| FixtureError::new(format!("{case_name}: {path}.fainted is not boolean")))?;
+                .ok_or_else(|| {
+                    FixtureError::new(format!("{case_name}: {path}.fainted is not boolean"))
+                })?;
             if party.insert(id, (hp, fainted, side)).is_some() {
                 return Err(FixtureError::new(format!(
                     "{case_name}: canonical final party repeats Pokemon id {id}"
@@ -1049,7 +1035,13 @@ fn normalize_legacy_final_occupants(
         }
         if hp == 0 {
             let slot = serde_json::from_value::<FieldSlot>(
-                required(entry, case_name, &format!("canonical.battle.field.slots[{index}]"), "slot")?.clone(),
+                required(
+                    entry,
+                    case_name,
+                    &format!("canonical.battle.field.slots[{index}]"),
+                    "slot",
+                )?
+                .clone(),
             )
             .map_err(|error| {
                 FixtureError::new(format!(
@@ -1071,7 +1063,10 @@ fn normalize_legacy_final_occupants(
         .map(|entry| (entry.case_name, entry.slot, entry.pokemon))
         .collect::<Vec<_>>();
     catalogue_keys.sort_unstable();
-    if catalogue_keys.windows(2).any(|entries| entries[0] == entries[1]) {
+    if catalogue_keys
+        .windows(2)
+        .any(|entries| entries[0] == entries[1])
+    {
         return Err(FixtureError::new(format!(
             "{case_name}: internal stale-final-occupant catalogue contains a duplicate case/slot/Pokemon entry"
         )));
@@ -1106,24 +1101,22 @@ fn normalize_legacy_final_occupants(
                 "{case_name}: refusing to sanitize field occupant {occupant}; it is not a same-side hp=0 fainted party member"
             )));
         }
-        validate_legacy_final_faint_context(
-            case_name,
-            document,
-            battle,
-            raw_occupant,
-            slot.side,
-        )?;
+        validate_legacy_final_faint_context(case_name, document, battle, raw_occupant, slot.side)?;
         let slots = battle
             .get_mut("field")
             .and_then(|field| field.get_mut("slots"))
             .and_then(Value::as_array_mut)
             .ok_or_else(|| FixtureError::new(format!("{case_name}: field slots disappeared")))?;
         let entry = slots.get_mut(index).ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: stale field slot index {index} disappeared"))
+            FixtureError::new(format!(
+                "{case_name}: stale field slot index {index} disappeared"
+            ))
         })?;
         entry
             .as_object_mut()
-            .ok_or_else(|| FixtureError::new(format!("{case_name}: field slot {index} is not an object")))?
+            .ok_or_else(|| {
+                FixtureError::new(format!("{case_name}: field slot {index} is not an object"))
+            })?
             .insert("occupant".to_owned(), Value::Null);
     }
     Ok(())
@@ -1166,11 +1159,23 @@ fn normalize_legacy_final_slot_compaction(
             continue;
         };
         let current_slot: FieldSlot = serde_json::from_value(
-            required(entry, case_name, &format!("canonical.battle.field.slots[{index}]"), "slot")?.clone(),
+            required(
+                entry,
+                case_name,
+                &format!("canonical.battle.field.slots[{index}]"),
+                "slot",
+            )?
+            .clone(),
         )
-        .map_err(|error| FixtureError::new(format!("{case_name}: final field slot is invalid: {error}")))?;
-        let target_slot: FieldSlot = serde_json::from_value(target_value.clone())
-            .map_err(|error| FixtureError::new(format!("{case_name}: typed command field slot is invalid: {error}")))?;
+        .map_err(|error| {
+            FixtureError::new(format!("{case_name}: final field slot is invalid: {error}"))
+        })?;
+        let target_slot: FieldSlot =
+            serde_json::from_value(target_value.clone()).map_err(|error| {
+                FixtureError::new(format!(
+                    "{case_name}: typed command field slot is invalid: {error}"
+                ))
+            })?;
         if current_slot == target_slot {
             continue;
         }
@@ -1190,8 +1195,7 @@ fn normalize_legacy_final_slot_compaction(
                         .as_str()
                         .map(|value| {
                             committed.iter().any(|command| {
-                                u64_field(command, case_name, "commands.committed", "actor")
-                                    .ok()
+                                u64_field(command, case_name, "commands.committed", "actor").ok()
                                     == Some(occupant)
                                     && string_field(
                                         command,
@@ -1223,8 +1227,16 @@ fn normalize_legacy_final_slot_compaction(
         let target_index = field_values
             .iter()
             .position(|candidate| candidate.get("slot") == Some(target_value))
-            .ok_or_else(|| FixtureError::new(format!("{case_name}: final compaction target slot is absent")))?;
-        if field_values[target_index].get("occupant").and_then(Value::as_u64).is_some() {
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: final compaction target slot is absent"
+                ))
+            })?;
+        if field_values[target_index]
+            .get("occupant")
+            .and_then(Value::as_u64)
+            .is_some()
+        {
             return Err(FixtureError::new(format!(
                 "{case_name}: final compaction target {:?} is occupied before remapping {occupant}",
                 target_slot
@@ -1236,7 +1248,10 @@ fn normalize_legacy_final_slot_compaction(
     if remapped.is_empty() {
         return Ok(());
     }
-    let moves = remapped.values().map(|(from, to, _)| (*from, *to)).collect::<Vec<_>>();
+    let moves = remapped
+        .values()
+        .map(|(from, to, _)| (*from, *to))
+        .collect::<Vec<_>>();
     let slots = battle
         .get_mut("field")
         .and_then(|field| field.get_mut("slots"))
@@ -1244,15 +1259,21 @@ fn normalize_legacy_final_slot_compaction(
         .ok_or_else(|| FixtureError::new(format!("{case_name}: final field slots disappeared")))?;
     for (from, to) in moves {
         let occupant = slots[from].get("occupant").cloned().ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: final compaction source occupant disappeared"))
+            FixtureError::new(format!(
+                "{case_name}: final compaction source occupant disappeared"
+            ))
         })?;
         slots[from]
             .as_object_mut()
-            .ok_or_else(|| FixtureError::new(format!("{case_name}: final compaction source is invalid")))?
+            .ok_or_else(|| {
+                FixtureError::new(format!("{case_name}: final compaction source is invalid"))
+            })?
             .insert("occupant".to_owned(), Value::Null);
         slots[to]
             .as_object_mut()
-            .ok_or_else(|| FixtureError::new(format!("{case_name}: final compaction target is invalid")))?
+            .ok_or_else(|| {
+                FixtureError::new(format!("{case_name}: final compaction target is invalid"))
+            })?
             .insert("occupant".to_owned(), occupant);
     }
 
@@ -1263,9 +1284,16 @@ fn normalize_legacy_final_slot_compaction(
         .get_mut("command_state")
         .and_then(|state| state.get_mut("frontier"))
         .and_then(Value::as_array_mut)
-        .ok_or_else(|| FixtureError::new(format!("{case_name}: final command frontier is invalid")))?;
+        .ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: final command frontier is invalid"))
+        })?;
     for entry in frontier {
-        let actor = u64_field(entry, case_name, "canonical.battle.command_state.frontier", "actor")?;
+        let actor = u64_field(
+            entry,
+            case_name,
+            "canonical.battle.command_state.frontier",
+            "actor",
+        )?;
         let Some((_, _, target_slot)) = remapped.get(&actor) else {
             continue;
         };
@@ -1308,12 +1336,12 @@ fn normalize_legacy_state(
     field_name: &str,
     state: &mut Value,
 ) -> Result<(), FixtureError> {
-    let canonical = state.get_mut("canonical").ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: canonical is missing"))
-    })?;
-    let battle = canonical.get_mut("battle").ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: canonical.battle is missing"))
-    })?;
+    let canonical = state
+        .get_mut("canonical")
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical is missing")))?;
+    let battle = canonical
+        .get_mut("battle")
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: canonical.battle is missing")))?;
     if !battle.is_object() {
         return Err(FixtureError::new(format!(
             "{case_name}: canonical.battle is invalid"
@@ -1434,7 +1462,10 @@ fn legacy_identities(
             ))
             .into());
         }
-        if identities.insert(identity.legacy_pid, identity.pokemon_id).is_some() {
+        if identities
+            .insert(identity.legacy_pid, identity.pokemon_id)
+            .is_some()
+        {
             return Err(FixtureError::new(format!(
                 "{case_name}: duplicate legacy_pid {}",
                 identity.legacy_pid
@@ -1464,9 +1495,9 @@ fn fixture_source(
     case_name: &str,
     path: &str,
 ) -> Result<CommandAdmissionSource, Box<dyn Error>> {
-    let value = value.as_str().ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: {path} is not a source string"))
-    })?;
+    let value = value
+        .as_str()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not a source string")))?;
     match value {
         "AUTHORITY_LOCAL_INTERNAL" => Ok(CommandAdmissionSource::AuthorityLocalInternal),
         "AUTHORITY_REMOTE_PROPOSAL" => Ok(CommandAdmissionSource::AuthorityRemoteProposal),
@@ -1494,12 +1525,8 @@ fn fixture_command(
     let command = object_field(value, case_name, path, "command")?;
     let command_path = format!("{path}.command");
     let kind = string_field(command, case_name, &command_path, "kind")?;
-    let inner_actor = PokemonId::try_from_u64(u64_field(
-        command,
-        case_name,
-        &command_path,
-        "actor",
-    )?)?;
+    let inner_actor =
+        PokemonId::try_from_u64(u64_field(command, case_name, &command_path, "actor")?)?;
     match kind.as_str() {
         "FIGHT" => {
             assert_exact_keys(
@@ -1526,19 +1553,14 @@ fn fixture_command(
                 command,
                 &["actor", "kind", "party_slot", "pokemon"],
             )?;
-            let party_slot = PartyIndex::try_from(u64_field(
-                command,
-                case_name,
-                &command_path,
-                "party_slot",
-            )?)?;
-            let pokemon = PokemonId::try_from_u64(u64_field(
-                command,
-                case_name,
-                &command_path,
-                "pokemon",
-            )?)?;
-            Ok((BattleCommand::switch(inner_actor, party_slot), Some(pokemon)))
+            let party_slot =
+                PartyIndex::try_from(u64_field(command, case_name, &command_path, "party_slot")?)?;
+            let pokemon =
+                PokemonId::try_from_u64(u64_field(command, case_name, &command_path, "pokemon")?)?;
+            Ok((
+                BattleCommand::switch(inner_actor, party_slot),
+                Some(pokemon),
+            ))
         }
         _ => Err(FixtureError::new(format!(
             "{case_name}: {command_path} has unsupported kind {kind}"
@@ -1572,12 +1594,8 @@ fn fixture_command_records(
         let actor = PokemonId::try_from_u64(u64_field(value, case_name, &path, "actor")?)?;
         let field_slot: FieldSlot =
             serde_json::from_value(required(value, case_name, &path, "field_slot")?.clone())?;
-        let operation_id = OperationId::new(string_field(
-            value,
-            case_name,
-            &path,
-            "operation_id",
-        )?)?;
+        let operation_id =
+            OperationId::new(string_field(value, case_name, &path, "operation_id")?)?;
         let owner_seat = match required(value, case_name, &path, "owner_seat")? {
             Value::Null => None,
             value => Some(seat_id_from_u64(u64_field(
@@ -1805,10 +1823,8 @@ fn admit_fixture_commands(
     }
 
     let command_set = CommandSet::new(accepted)?;
-    let command_state = CommandCollectionState::new(
-        frontier,
-        battle.command_state.tombstones.clone(),
-    )?;
+    let command_state =
+        CommandCollectionState::new(frontier, battle.command_state.tombstones.clone())?;
     let mut state = initial.clone();
     state
         .battle
@@ -1841,10 +1857,7 @@ fn compare_admitted_commands(
         .zip(records)
         .map(|(accepted, record)| admitted_command_wire(accepted, record, case_name))
         .collect::<Result<Vec<_>, _>>()?;
-    if let Some(divergence) = first_divergence(
-        &Value::Array(expected),
-        &Value::Array(actual),
-    ) {
+    if let Some(divergence) = first_divergence(&Value::Array(expected), &Value::Array(actual)) {
         return Err(FixtureError::new(format!(
             "{case_name}: axis ADMITTED_COMMANDS mismatch: {divergence}"
         ))
@@ -1900,12 +1913,7 @@ fn fixture_replacement_proposals(
     case_name: &str,
 ) -> Result<Vec<FixtureReplacementProposal>, Box<dyn Error>> {
     let commands = object_field(document, case_name, "$", "commands")?;
-    let proposals = array_field(
-        commands,
-        case_name,
-        "commands",
-        "replacement_proposals",
-    )?;
+    let proposals = array_field(commands, case_name, "commands", "replacement_proposals")?;
     let mut result = Vec::with_capacity(proposals.len());
 
     for (index, value) in proposals.iter().enumerate() {
@@ -1934,12 +1942,7 @@ fn fixture_replacement_proposals(
             ))
             .into());
         }
-        let battle_id = BattleId::try_from_u64(u64_field(
-            value,
-            case_name,
-            &path,
-            "battle_id",
-        )?)?;
+        let battle_id = BattleId::try_from_u64(u64_field(value, case_name, &path, "battle_id")?)?;
         let field_slot: FieldSlot =
             serde_json::from_value(required(value, case_name, &path, "field_slot")?.clone())?;
         if field_slot.side != BattleSide::Player {
@@ -1948,39 +1951,17 @@ fn fixture_replacement_proposals(
             ))
             .into());
         }
-        let occurrence = FaintOccurrenceId::try_from_u64(u64_field(
-            value,
-            case_name,
-            &path,
-            "occurrence",
-        )?)?;
-        let raw_operation_id = OperationId::new(string_field(
-            value,
-            case_name,
-            &path,
-            "operation_id",
-        )?)?;
-        let owner_seat = seat_id_from_u64(u64_field(
-            value,
-            case_name,
-            &path,
-            "owner_seat",
-        )?)?;
-        let resolved_turn = TurnIndex::try_from_u64(u64_field(
-            value,
-            case_name,
-            &path,
-            "resolved_turn",
-        )?)?;
-        let selection: ReplacementSelection = serde_json::from_value(
-            required(value, case_name, &path, "selection")?.clone(),
-        )?;
-        let turn_occurrence = u32::try_from(u64_field(
-            value,
-            case_name,
-            &path,
-            "turn_occurrence",
-        )?)?;
+        let occurrence =
+            FaintOccurrenceId::try_from_u64(u64_field(value, case_name, &path, "occurrence")?)?;
+        let raw_operation_id =
+            OperationId::new(string_field(value, case_name, &path, "operation_id")?)?;
+        let owner_seat = seat_id_from_u64(u64_field(value, case_name, &path, "owner_seat")?)?;
+        let resolved_turn =
+            TurnIndex::try_from_u64(u64_field(value, case_name, &path, "resolved_turn")?)?;
+        let selection: ReplacementSelection =
+            serde_json::from_value(required(value, case_name, &path, "selection")?.clone())?;
+        let turn_occurrence =
+            u32::try_from(u64_field(value, case_name, &path, "turn_occurrence")?)?;
         let wave = WaveIndex::try_from_u64(u64_field(value, case_name, &path, "wave")?)?;
 
         let segments = raw_operation_id.as_str().split('/').collect::<Vec<_>>();
@@ -2002,12 +1983,8 @@ fn fixture_replacement_proposals(
             ))
             .into());
         }
-        let epoch = AuthorityEpoch::try_from_u64(operation_number(
-            case_name,
-            &path,
-            segments[1],
-            "e",
-        )?)?;
+        let epoch =
+            AuthorityEpoch::try_from_u64(operation_number(case_name, &path, segments[1], "e")?)?;
         let mut offset = 2;
         if expected_len == 8 {
             assert_operation_number(
@@ -2019,13 +1996,7 @@ fn fixture_replacement_proposals(
             )?;
             offset += 1;
         }
-        assert_operation_number(
-            case_name,
-            &path,
-            segments[offset],
-            "w",
-            u64::from(wave),
-        )?;
+        assert_operation_number(case_name, &path, segments[offset], "w", u64::from(wave))?;
         assert_operation_number(
             case_name,
             &path,
@@ -2070,17 +2041,14 @@ fn fixture_replacement_proposals(
     Ok(result)
 }
 
-fn fixture_rng_draws(
-    document: &Value,
-    case_name: &str,
-) -> Result<Vec<RngDraw>, Box<dyn Error>> {
+fn fixture_rng_draws(document: &Value, case_name: &str) -> Result<Vec<RngDraw>, Box<dyn Error>> {
     let values = array_field(document, case_name, "$", "expected_rng_draws")?;
     let mut draws = Vec::with_capacity(values.len());
     for (index, value) in values.iter().enumerate() {
         let path = format!("expected_rng_draws[{index}]");
-        let object = value.as_object().ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: {path} is not an object"))
-        })?;
+        let object = value
+            .as_object()
+            .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
         let allowed = [
             "after_fingerprint",
             "after_state",
@@ -2119,21 +2087,28 @@ fn fixture_rng_draws(
             let normalized_object = normalized.as_object().ok_or_else(|| {
                 FixtureError::new(format!("{case_name}: {path} is not an object"))
             })?;
-            let before_state = normalized_object
-                .get("before_state")
-                .ok_or_else(|| FixtureError::new(format!("{case_name}: {path}.before_state is missing")))?;
-            let after_state = normalized_object
-                .get("after_state")
-                .ok_or_else(|| FixtureError::new(format!("{case_name}: {path}.after_state is missing")))?;
-            let before_context = before_state
-                .get("seed_offset")
-                .ok_or_else(|| FixtureError::new(format!("{case_name}: {path}.before_state.seed_offset is missing")))?;
-            let after_context = after_state
-                .get("seed_offset")
-                .ok_or_else(|| FixtureError::new(format!("{case_name}: {path}.after_state.seed_offset is missing")))?;
-            let before_context: Option<SeedOffsetContext> = serde_json::from_value(before_context.clone())?;
-            let after_context: Option<SeedOffsetContext> = serde_json::from_value(after_context.clone())?;
-            if before_context.as_ref() != Some(&context) || after_context.as_ref() != Some(&context) {
+            let before_state = normalized_object.get("before_state").ok_or_else(|| {
+                FixtureError::new(format!("{case_name}: {path}.before_state is missing"))
+            })?;
+            let after_state = normalized_object.get("after_state").ok_or_else(|| {
+                FixtureError::new(format!("{case_name}: {path}.after_state is missing"))
+            })?;
+            let before_context = before_state.get("seed_offset").ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path}.before_state.seed_offset is missing"
+                ))
+            })?;
+            let after_context = after_state.get("seed_offset").ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: {path}.after_state.seed_offset is missing"
+                ))
+            })?;
+            let before_context: Option<SeedOffsetContext> =
+                serde_json::from_value(before_context.clone())?;
+            let after_context: Option<SeedOffsetContext> =
+                serde_json::from_value(after_context.clone())?;
+            if before_context.as_ref() != Some(&context) || after_context.as_ref() != Some(&context)
+            {
                 return Err(FixtureError::new(format!(
                     "{case_name}: {path}.seed_offset_context does not equal both typed audit-state contexts"
                 ))
@@ -2156,7 +2131,9 @@ fn fixture_rng_draws(
             .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?
             .insert("callsite_id".to_owned(), Value::String(callsite));
         let draw: RngDraw = serde_json::from_value(normalized).map_err(|error| {
-            FixtureError::new(format!("{case_name}: {path} is not a typed RngDraw: {error}"))
+            FixtureError::new(format!(
+                "{case_name}: {path} is not a typed RngDraw: {error}"
+            ))
         })?;
         draws.push(draw);
     }
@@ -2182,13 +2159,14 @@ fn fixture_action_order(
     Ok(actions)
 }
 
-fn initial_field_slot_for_pokemon(
-    state: &GameState,
-    pokemon: PokemonId,
-) -> Option<FieldSlot> {
-    state.battle.as_ref()?.field.slots.iter().find_map(|entry| {
-        (entry.occupant == Some(pokemon)).then_some(entry.slot)
-    })
+fn initial_field_slot_for_pokemon(state: &GameState, pokemon: PokemonId) -> Option<FieldSlot> {
+    state
+        .battle
+        .as_ref()?
+        .field
+        .slots
+        .iter()
+        .find_map(|entry| (entry.occupant == Some(pokemon)).then_some(entry.slot))
 }
 
 fn normalize_legacy_action_order(
@@ -2335,12 +2313,10 @@ fn legacy_pokemon_transition(
     identities: &BTreeMap<u64, PokemonId>,
     ignored_field: &str,
 ) -> Result<(LegacyPokemonEvidence, LegacyPokemonEvidence, PokemonId), Box<dyn Error>> {
-    let before: LegacyPokemonEvidence = serde_json::from_value(
-        object_field(value, case_name, path, "before")?.clone(),
-    )?;
-    let after: LegacyPokemonEvidence = serde_json::from_value(
-        object_field(value, case_name, path, "after")?.clone(),
-    )?;
+    let before: LegacyPokemonEvidence =
+        serde_json::from_value(object_field(value, case_name, path, "before")?.clone())?;
+    let after: LegacyPokemonEvidence =
+        serde_json::from_value(object_field(value, case_name, path, "after")?.clone())?;
     let before_id = legacy_pokemon_id(identities, case_name, &format!("{path}.before"), before.id)?;
     let after_id = legacy_pokemon_id(identities, case_name, &format!("{path}.after"), after.id)?;
     if before_id != after_id {
@@ -2349,8 +2325,10 @@ fn legacy_pokemon_transition(
         ))
         .into());
     }
-    let before_status = legacy_status_state(case_name, &format!("{path}.before.status"), &before.status)?;
-    let after_status = legacy_status_state(case_name, &format!("{path}.after.status"), &after.status)?;
+    let before_status =
+        legacy_status_state(case_name, &format!("{path}.before.status"), &before.status)?;
+    let after_status =
+        legacy_status_state(case_name, &format!("{path}.after.status"), &after.status)?;
     if ignored_field != "hp" && before.hp != after.hp {
         return Err(FixtureError::new(format!(
             "{case_name}: {path} changes hp outside its declared {ignored_field} mutation"
@@ -2392,12 +2370,10 @@ fn legacy_faint_marker(
     cause: Option<usize>,
     _sequence: u64,
 ) -> Result<Option<LegacyFaintMarker>, Box<dyn Error>> {
-    let before: LegacyPokemonEvidence = serde_json::from_value(
-        object_field(value, case_name, path, "before")?.clone(),
-    )?;
-    let after: LegacyPokemonEvidence = serde_json::from_value(
-        object_field(value, case_name, path, "after")?.clone(),
-    )?;
+    let before: LegacyPokemonEvidence =
+        serde_json::from_value(object_field(value, case_name, path, "before")?.clone())?;
+    let after: LegacyPokemonEvidence =
+        serde_json::from_value(object_field(value, case_name, path, "after")?.clone())?;
     if before.status.effect != 7 && after.status.effect != 7 {
         return Ok(None);
     }
@@ -2406,7 +2382,9 @@ fn legacy_faint_marker(
         case_name,
         path,
         "STATUS_SET",
-        &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+        &[
+            "after", "before", "cause", "kind", "path", "phase", "sequence",
+        ],
     )?;
     let mutation_path = string_field(value, case_name, path, "path")?;
     let segments = mutation_path.split('/').collect::<Vec<_>>();
@@ -2451,11 +2429,8 @@ fn legacy_faint_marker(
         ))
         .into());
     }
-    let before_status = legacy_status_state(
-        case_name,
-        &format!("{path}.before.status"),
-        &before.status,
-    )?;
+    let before_status =
+        legacy_status_state(case_name, &format!("{path}.before.status"), &before.status)?;
     let pokemon = legacy_pokemon_id(identities, case_name, path, legacy_pid)?;
     Ok(Some(LegacyFaintMarker {
         cause,
@@ -2615,13 +2590,25 @@ fn validate_legacy_mutation_metadata(
             | ("FAINT_QUEUED", "FaintPhase", Some(ResolvedActionKind::Faint))
             | ("FAINT_PROGRESS_CHANGED", "FaintPhase", Some(ResolvedActionKind::Faint))
             | ("FAINT_RESOLVED", "FaintPhase", Some(ResolvedActionKind::Faint))
-            | ("HP_DAMAGE", "PostTurnStatusEffectPhase", Some(ResolvedActionKind::ResidualStatus))
-            | ("FAINT_PROGRESS_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
+            | (
+                "HP_DAMAGE",
+                "PostTurnStatusEffectPhase",
+                Some(ResolvedActionKind::ResidualStatus),
+            )
+            | (
+                "FAINT_PROGRESS_CHANGED",
+                "SwitchSummonPhase",
+                Some(ResolvedActionKind::Replacement),
+            )
             | ("FAINT_RESOLVED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
             | ("FIELD_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Switch))
             | ("FIELD_CHANGED", "SwitchSummonPhase", Some(ResolvedActionKind::Replacement))
             | ("BATTLE_RNG_CHANGED", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
-            | ("BATTLE_RNG_CHANGED", "StatStageChangePhase", Some(ResolvedActionKind::Replacement))
+            | (
+                "BATTLE_RNG_CHANGED",
+                "StatStageChangePhase",
+                Some(ResolvedActionKind::Replacement),
+            )
             | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Move))
             | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Switch))
             | ("STAT_STAGE", "StatStageChangePhase", Some(ResolvedActionKind::Replacement))
@@ -2694,14 +2681,9 @@ fn fixture_mutations(
             cause: required(value, case_name, &path, "cause")?.clone(),
         };
 
-        if let Some(marker) = legacy_faint_marker(
-            value,
-            case_name,
-            &path,
-            identities,
-            cause,
-            sequence,
-        )? {
+        if let Some(marker) =
+            legacy_faint_marker(value, case_name, &path, identities, cause, sequence)?
+        {
             faint_markers.push(marker);
             metadata.push(legacy_metadata);
             continue;
@@ -2714,7 +2696,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "PP_CONSUMPTION",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 let mutation_path = string_field(value, case_name, &path, "path")?;
                 let segments = mutation_path.split('/').collect::<Vec<_>>();
@@ -2764,9 +2748,7 @@ fn fixture_mutations(
                 })?;
                 let (actor, move_slot) = match &record.command {
                     BattleCommand::Fight {
-                        actor,
-                        move_slot,
-                        ..
+                        actor, move_slot, ..
                     } => (*actor, *move_slot),
                     BattleCommand::Switch { .. } => {
                         return Err(FixtureError::new(format!(
@@ -2817,7 +2799,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "HP_DAMAGE",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 let mutation_path = string_field(value, case_name, &path, "path")?;
                 let segments = mutation_path.split('/').collect::<Vec<_>>();
@@ -2849,7 +2833,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "STATUS_SET",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 let mutation_path = string_field(value, case_name, &path, "path")?;
                 let segments = mutation_path.split('/').collect::<Vec<_>>();
@@ -2888,7 +2874,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "STAT_STAGE",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 let mutation_path = string_field(value, case_name, &path, "path")?;
                 let segments = mutation_path.split('/').collect::<Vec<_>>();
@@ -2938,7 +2926,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "BATTLE_RNG_CHANGED",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 let before: BattleRngState = serde_json::from_value(
                     object_field(value, case_name, &path, "before")?.clone(),
@@ -2954,7 +2944,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "FAINT_QUEUED",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 if !required(value, case_name, &path, "before")?.is_null() {
                     return Err(FixtureError::new(format!(
@@ -3040,12 +3032,10 @@ fn fixture_mutations(
                     ))
                     .into());
                 }
-                let before: ReplacementProgress = serde_json::from_value(
-                    required(value, case_name, &path, "before")?.clone(),
-                )?;
-                let after: ReplacementProgress = serde_json::from_value(
-                    required(value, case_name, &path, "after")?.clone(),
-                )?;
+                let before: ReplacementProgress =
+                    serde_json::from_value(required(value, case_name, &path, "before")?.clone())?;
+                let after: ReplacementProgress =
+                    serde_json::from_value(required(value, case_name, &path, "after")?.clone())?;
                 BattleMutation::FaintProgressChanged {
                     occurrence,
                     before,
@@ -3058,14 +3048,7 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "FAINT_RESOLVED",
-                    &[
-                        "cause",
-                        "kind",
-                        "occurrence",
-                        "path",
-                        "phase",
-                        "sequence",
-                    ],
+                    &["cause", "kind", "occurrence", "path", "phase", "sequence"],
                 )?;
                 let occurrence = FaintOccurrenceId::try_from_u64(u64_field(
                     value,
@@ -3094,19 +3077,11 @@ fn fixture_mutations(
                     &path,
                     "FIELD_CHANGED",
                     &[
-                        "after",
-                        "before",
-                        "cause",
-                        "kind",
-                        "path",
-                        "phase",
-                        "sequence",
-                        "slot",
+                        "after", "before", "cause", "kind", "path", "phase", "sequence", "slot",
                     ],
                 )?;
-                let slot: FieldSlot = serde_json::from_value(
-                    required(value, case_name, &path, "slot")?.clone(),
-                )?;
+                let slot: FieldSlot =
+                    serde_json::from_value(required(value, case_name, &path, "slot")?.clone())?;
                 let mutation_path = string_field(value, case_name, &path, "path")?;
                 let segments = mutation_path.split('/').collect::<Vec<_>>();
                 if segments.len() != 6
@@ -3137,13 +3112,15 @@ fn fixture_mutations(
                     ))
                     .into());
                 }
-                let before: Option<PokemonId> = serde_json::from_value(
-                    required(value, case_name, &path, "before")?.clone(),
-                )?;
-                let after: Option<PokemonId> = serde_json::from_value(
-                    required(value, case_name, &path, "after")?.clone(),
-                )?;
-                BattleMutation::FieldChanged { slot, before, after }
+                let before: Option<PokemonId> =
+                    serde_json::from_value(required(value, case_name, &path, "before")?.clone())?;
+                let after: Option<PokemonId> =
+                    serde_json::from_value(required(value, case_name, &path, "after")?.clone())?;
+                BattleMutation::FieldChanged {
+                    slot,
+                    before,
+                    after,
+                }
             }
             "TURN_ADVANCE" => {
                 mutation_metadata(
@@ -3151,7 +3128,9 @@ fn fixture_mutations(
                     case_name,
                     &path,
                     "TURN_ADVANCE",
-                    &["after", "before", "cause", "kind", "path", "phase", "sequence"],
+                    &[
+                        "after", "before", "cause", "kind", "path", "phase", "sequence",
+                    ],
                 )?;
                 let before: LegacyTurnBoundary = serde_json::from_value(
                     object_field(value, case_name, &path, "before")?.clone(),
@@ -3220,7 +3199,11 @@ fn replay_fixture_replacements(
             proposal.owner_seat,
         )?;
         if proposal.raw_operation_id.as_str() != operation_id.as_str() {
-            let raw_segments = proposal.raw_operation_id.as_str().split('/').collect::<Vec<_>>();
+            let raw_segments = proposal
+                .raw_operation_id
+                .as_str()
+                .split('/')
+                .collect::<Vec<_>>();
             let canonical_segments = operation_id.as_str().split('/').collect::<Vec<_>>();
             let legacy = [
                 raw_segments.first().copied(),
@@ -3359,13 +3342,8 @@ fn materialize_pending_command_frontier(
             ))
         })?;
         let offer = build_command_offer(state, entry.slot, content)?;
-        let operation_id = player_command_operation_id(
-            battle_id,
-            wave,
-            turn,
-            entry.slot,
-            owner_seat,
-        )?;
+        let operation_id =
+            player_command_operation_id(battle_id, wave, turn, entry.slot, owner_seat)?;
         frontier.push(CommandFrontierEntry::new(
             operation_id,
             Some(owner_seat),
@@ -3393,11 +3371,7 @@ fn legacy_field_slot_from_bi(
     legacy_field_slot(case_name, path, bi)
 }
 
-fn legacy_field_slot(
-    case_name: &str,
-    path: &str,
-    bi: u64,
-) -> Result<FieldSlot, Box<dyn Error>> {
+fn legacy_field_slot(case_name: &str, path: &str, bi: u64) -> Result<FieldSlot, Box<dyn Error>> {
     let (side, position) = match bi {
         0 => (BattleSide::Player, 0),
         1 => (BattleSide::Player, 1),
@@ -3624,7 +3598,12 @@ fn fixture_presentation(
 
     for (index, value) in values.iter().enumerate() {
         let path = format!("expected_presentation[{index}]");
-        assert_exact_keys(case_name, &path, value, &["authority_recorded", "event", "event_id"])?;
+        assert_exact_keys(
+            case_name,
+            &path,
+            value,
+            &["authority_recorded", "event", "event_id"],
+        )?;
         if required(value, case_name, &path, "authority_recorded")?.as_bool() != Some(true) {
             return Err(FixtureError::new(format!(
                 "{case_name}: {path}.authority_recorded must be true"
@@ -3632,7 +3611,12 @@ fn fixture_presentation(
             .into());
         }
         let event_id_value = object_field(value, case_name, &path, "event_id")?;
-        assert_exact_keys(case_name, &format!("{path}.event_id"), event_id_value, &["operation_id", "sequence"])?;
+        assert_exact_keys(
+            case_name,
+            &format!("{path}.event_id"),
+            event_id_value,
+            &["operation_id", "sequence"],
+        )?;
         let operation_id = OperationId::new(string_field(
             event_id_value,
             case_name,
@@ -3733,7 +3717,9 @@ fn fixture_presentation(
                     case_name,
                     &event_path,
                     event,
-                    &["actor", "bi", "critical", "hp", "k", "maxHp", "result", "sp"],
+                    &[
+                        "actor", "bi", "critical", "hp", "k", "maxHp", "result", "sp",
+                    ],
                 )?;
                 let actor_value = object_field(event, case_name, &event_path, "actor")?;
                 let actor = legacy_actor(
@@ -3748,11 +3734,17 @@ fn fixture_presentation(
                 let max_hp = u32::try_from(u64_field(event, case_name, &event_path, "maxHp")?)?;
                 let critical = required(event, case_name, &event_path, "critical")?
                     .as_bool()
-                    .ok_or_else(|| FixtureError::new(format!("{case_name}: {event_path}.critical is not boolean")))?;
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {event_path}.critical is not boolean"
+                        ))
+                    })?;
                 let result = u64_field(event, case_name, &event_path, "result")?;
                 let sp = u64_field(event, case_name, &event_path, "sp")?;
                 let pokemon = pokemon_state(initial, actor_id).ok_or_else(|| {
-                    FixtureError::new(format!("{case_name}: {event_path} actor {actor_id} is absent from initial state"))
+                    FixtureError::new(format!(
+                        "{case_name}: {event_path} actor {actor_id} is absent from initial state"
+                    ))
                 })?;
                 if pokemon.max_hp != max_hp {
                     return Err(FixtureError::new(format!(
@@ -3840,12 +3832,9 @@ fn fixture_presentation(
                     .into());
                 }
                 let stat = legacy_stat(stat_value - 1, case_name, &event_path)?;
-                let value: i8 = serde_json::from_value(required(
-                    event,
-                    case_name,
-                    &event_path,
-                    "value",
-                )?.clone())?;
+                let value: i8 = serde_json::from_value(
+                    required(event, case_name, &event_path, "value")?.clone(),
+                )?;
                 let (before, after) = take_stage_mutation(
                     case_name,
                     &event_path,
@@ -3880,7 +3869,11 @@ fn fixture_presentation(
                 let actor_id = validate_legacy_actor_slot(case_name, &event_path, actor, slot)?;
                 let narrate = required(event, case_name, &event_path, "narrate")?
                     .as_bool()
-                    .ok_or_else(|| FixtureError::new(format!("{case_name}: {event_path}.narrate is not boolean")))?;
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {event_path}.narrate is not boolean"
+                        ))
+                    })?;
                 let sp = u64_field(event, case_name, &event_path, "sp")?;
                 let occurrence = take_faint_occurrence(
                     case_name,
@@ -3932,15 +3925,15 @@ fn fixture_presentation(
                     ))
                     .into());
                 }
-                let party_slot = PartyIndex::try_from(u64_field(
-                    event,
-                    case_name,
-                    &event_path,
-                    "partySlot",
-                )?)?;
+                let party_slot =
+                    PartyIndex::try_from(u64_field(event, case_name, &event_path, "partySlot")?)?;
                 let passive = required(event, case_name, &event_path, "passive")?
                     .as_bool()
-                    .ok_or_else(|| FixtureError::new(format!("{case_name}: {event_path}.passive is not boolean")))?;
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {event_path}.passive is not boolean"
+                        ))
+                    })?;
                 let passive_slot = u64_field(event, case_name, &event_path, "passiveSlot")?;
                 let _legacy_ability_annotations = (party_slot, passive, passive_slot);
                 BattlePresentationKind::AbilityActivated {
@@ -3986,13 +3979,13 @@ fn fixture_presentation(
                 )?;
                 let do_return = required(event, case_name, &event_path, "doReturn")?
                     .as_bool()
-                    .ok_or_else(|| FixtureError::new(format!("{case_name}: {event_path}.doReturn is not boolean")))?;
-                let party_slot = PartyIndex::try_from(u64_field(
-                    event,
-                    case_name,
-                    &event_path,
-                    "partySlot",
-                )?)?;
+                    .ok_or_else(|| {
+                        FixtureError::new(format!(
+                            "{case_name}: {event_path}.doReturn is not boolean"
+                        ))
+                    })?;
+                let party_slot =
+                    PartyIndex::try_from(u64_field(event, case_name, &event_path, "partySlot")?)?;
                 let species_id = u64_field(event, case_name, &event_path, "speciesId")?;
                 let switch_type = u64_field(event, case_name, &event_path, "switchType")?;
                 let (outgoing, incoming) = take_field_mutation(
@@ -4068,18 +4061,16 @@ fn assert_keys_with_optional(
     required_keys: &[&str],
     optional_keys: &[&str],
 ) -> Result<(), FixtureError> {
-    let object = value.as_object().ok_or_else(|| {
-        FixtureError::new(format!("{case_name}: {path} is not an object"))
-    })?;
+    let object = value
+        .as_object()
+        .ok_or_else(|| FixtureError::new(format!("{case_name}: {path} is not an object")))?;
     let allowed = required_keys
         .iter()
         .chain(optional_keys)
         .copied()
         .collect::<BTreeSet<_>>();
     if object.keys().any(|key| !allowed.contains(key.as_str()))
-        || required_keys
-            .iter()
-            .any(|key| !object.contains_key(*key))
+        || required_keys.iter().any(|key| !object.contains_key(*key))
     {
         return Err(FixtureError::new(format!(
             "{case_name}: {path} has unsupported or missing command-boundary keys; actual={:?}, required={required_keys:?}, optional={optional_keys:?}",
@@ -4108,7 +4099,10 @@ fn legacy_target_bis(record: &FixtureCommandRecord) -> Vec<u64> {
         BattleCommand::Fight {
             targets: BattleTargetSelection::Selected(targets),
             ..
-        } => targets.iter().map(|slot| legacy_battle_index(*slot)).collect(),
+        } => targets
+            .iter()
+            .map(|slot| legacy_battle_index(*slot))
+            .collect(),
         BattleCommand::Fight {
             targets: BattleTargetSelection::Implicit,
             ..
@@ -4300,12 +4294,12 @@ fn validate_legacy_command_boundary(
             "TURN_ADVANCE.{}.pre_commands[{bi}]",
             if before { "before" } else { "after" }
         );
-        let command = commands.get(&bi).ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: {command_path} is missing"))
-        })?;
-        let pre_command = pre_commands.get(&bi).ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: {pre_path} is missing"))
-        })?;
+        let command = commands
+            .get(&bi)
+            .ok_or_else(|| FixtureError::new(format!("{case_name}: {command_path} is missing")))?;
+        let pre_command = pre_commands
+            .get(&bi)
+            .ok_or_else(|| FixtureError::new(format!("{case_name}: {pre_path} is missing")))?;
         if !before {
             if !command.is_null() || !pre_command.is_null() {
                 return Err(FixtureError::new(format!(
@@ -4322,7 +4316,12 @@ fn validate_legacy_command_boundary(
             (BattleCommand::Fight { .. }, BattleSide::Player)
         );
         if expected_pre {
-            assert_exact_keys(case_name, &pre_path, pre_command, &["command", "skip", "targets"])?;
+            assert_exact_keys(
+                case_name,
+                &pre_path,
+                pre_command,
+                &["command", "skip", "targets"],
+            )?;
             if u64_field(pre_command, case_name, &pre_path, "command")? != 0
                 || required(pre_command, case_name, &pre_path, "skip")?.as_bool() != Some(true)
             {
@@ -4370,11 +4369,8 @@ fn validate_legacy_turn_advances(
         ))
         .into());
     }
-    for (index, (legacy, (before, after))) in trace
-        .turn_advances
-        .iter()
-        .zip(actual_turns)
-        .enumerate()
+    for (index, (legacy, (before, after))) in
+        trace.turn_advances.iter().zip(actual_turns).enumerate()
     {
         if legacy.before.turn != before.get().get() || legacy.after.turn != after.get().get() {
             return Err(FixtureError::new(format!(
@@ -4386,20 +4382,8 @@ fn validate_legacy_turn_advances(
             ))
             .into());
         }
-        validate_legacy_command_boundary(
-            case_name,
-            &legacy.before,
-            records,
-            initial,
-            true,
-        )?;
-        validate_legacy_command_boundary(
-            case_name,
-            &legacy.after,
-            records,
-            initial,
-            false,
-        )?;
+        validate_legacy_command_boundary(case_name, &legacy.before, records, initial, true)?;
+        validate_legacy_command_boundary(case_name, &legacy.after, records, initial, false)?;
         if let Some(cause) = legacy.cause {
             let cause_sequence = SafeU53::new(u64::try_from(cause)?)?;
             let action = actions
@@ -4575,10 +4559,8 @@ fn compare_mutation_trace(
         .ok_or_else(|| FixtureError::new(format!("{case_name}: transition has no before battle")))?
         .command_state
         .clone();
-    let empty_command_state = CommandCollectionState::new(
-        Vec::new(),
-        before_command_state.tombstones.clone(),
-    )?;
+    let empty_command_state =
+        CommandCollectionState::new(Vec::new(), before_command_state.tombstones.clone())?;
     let final_outcome = final_state
         .battle
         .as_ref()
@@ -4660,17 +4642,11 @@ fn compare_mutation_trace(
             .iter()
             .any(|mutation| matches!(mutation, BattleMutation::TurnAdvanced { .. }))
     {
-        return Err(FixtureError::new(format!(
-            "{case_name}: outcome changed after TURN_ADVANCE"
-        ))
-        .into());
+        return Err(
+            FixtureError::new(format!("{case_name}: outcome changed after TURN_ADVANCE")).into(),
+        );
     }
-    compare_serialized_axis(
-        case_name,
-        "CAUSAL_MUTATIONS.TYPED",
-        expected,
-        &projected,
-    )?;
+    compare_serialized_axis(case_name, "CAUSAL_MUTATIONS.TYPED", expected, &projected)?;
     Ok(())
 }
 
@@ -4842,11 +4818,7 @@ fn project_typed_presentation(
             match (&replacement.selection, &event.kind) {
                 (
                     ReplacementSelection::Selected { pokemon, .. },
-                    BattlePresentationKind::Switched {
-                        slot,
-                        incoming,
-                        ..
-                    },
+                    BattlePresentationKind::Switched { slot, incoming, .. },
                 ) => {
                     selected_switches += 1;
                     if *slot != replacement.field_slot || incoming != pokemon {
@@ -4856,9 +4828,18 @@ fn project_typed_presentation(
                         .into());
                     }
                 }
-                (ReplacementSelection::Selected { .. }, BattlePresentationKind::AbilityActivated { .. }) => {}
-                (ReplacementSelection::NoLegalReplacement, BattlePresentationKind::Switched { .. })
-                | (ReplacementSelection::NoLegalReplacement, BattlePresentationKind::AbilityActivated { .. }) => {
+                (
+                    ReplacementSelection::Selected { .. },
+                    BattlePresentationKind::AbilityActivated { .. },
+                ) => {}
+                (
+                    ReplacementSelection::NoLegalReplacement,
+                    BattlePresentationKind::Switched { .. },
+                )
+                | (
+                    ReplacementSelection::NoLegalReplacement,
+                    BattlePresentationKind::AbilityActivated { .. },
+                ) => {
                     return Err(FixtureError::new(format!(
                         "{case_name}: no-legal replacement {replacement_index} emitted selected-only presentation evidence"
                     ))
@@ -4960,11 +4941,7 @@ fn assert_axis_shape(case_name: &str, document: &Value) -> Result<(), FixtureErr
             }
             let object_expected = matches!(
                 field_name,
-                "initial_state"
-                    | "initial_rng"
-                    | "commands"
-                    | "final_rng"
-                    | "expected_final_state"
+                "initial_state" | "initial_rng" | "commands" | "final_rng" | "expected_final_state"
             );
             let shape_is_valid = if object_expected {
                 field.is_object()
@@ -5057,13 +5034,10 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     let records = fixture_command_records(&document, case_name)?;
     let replacement_proposals = fixture_replacement_proposals(&document, case_name)?;
     let raw_expected_actions = fixture_action_order(&document, case_name)?;
-    let expected_actions = normalize_legacy_action_order(
-        case_name,
-        &initial,
-        &records,
-        &raw_expected_actions,
-    )?;
-    let (resolver_input, commands) = admit_fixture_commands(&initial, &records, case_name, &content)?;
+    let expected_actions =
+        normalize_legacy_action_order(case_name, &initial, &records, &raw_expected_actions)?;
+    let (resolver_input, commands) =
+        admit_fixture_commands(&initial, &records, case_name, &content)?;
     let authority_epoch = replacement_proposals
         .first()
         .map(|proposal| proposal.epoch)
@@ -5072,7 +5046,8 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         .battle
         .as_ref()
         .ok_or_else(|| FixtureError::new(format!("{case_name}: resolver input has no battle")))?;
-    let material_operation_id = turn_result_operation_id(battle.battle_id, battle.wave, battle.turn)?;
+    let material_operation_id =
+        turn_result_operation_id(battle.battle_id, battle.wave, battle.turn)?;
     let transition = resolve_turn(
         &resolver_input,
         &commands,
@@ -5192,7 +5167,9 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         .next_sequence
         .get()
         .checked_add(u64::try_from(expected_rng_draws.len())?)
-        .ok_or_else(|| FixtureError::new(format!("{case_name}: final RNG sequence overflows u53")))?;
+        .ok_or_else(|| {
+            FixtureError::new(format!("{case_name}: final RNG sequence overflows u53"))
+        })?;
     let actual_final_rng = state_rng_boundary(
         &replacement_replay.state,
         SafeU53::new(final_sequence)?,
@@ -5290,8 +5267,7 @@ fn first_divergence_diagnostic_is_deterministic() {
 }
 
 #[test]
-fn legacy_presentation_message_catalogue_and_inventory_are_exact()
--> Result<(), Box<dyn Error>> {
+fn legacy_presentation_message_catalogue_and_inventory_are_exact() -> Result<(), Box<dyn Error>> {
     let mut message_case_count = 0;
     let mut message_count = 0;
     let mut unique_messages = BTreeSet::new();
@@ -5301,7 +5277,12 @@ fn legacy_presentation_message_catalogue_and_inventory_are_exact()
         let mut case_message_count = 0;
         for (index, value) in values.iter().enumerate() {
             let path = format!("expected_presentation[{index}].event");
-            let event = object_field(value, case_name, &format!("expected_presentation[{index}]"), "event")?;
+            let event = object_field(
+                value,
+                case_name,
+                &format!("expected_presentation[{index}]"),
+                "event",
+            )?;
             if string_field(event, case_name, &path, "k")? != "message" {
                 continue;
             }
@@ -5329,7 +5310,8 @@ fn legacy_presentation_message_catalogue_and_inventory_are_exact()
 }
 
 #[test]
-fn every_published_gap_free_case_replays_all_er_battle_transition_axes() -> Result<(), Box<dyn Error>> {
+fn every_published_gap_free_case_replays_all_er_battle_transition_axes()
+-> Result<(), Box<dyn Error>> {
     let mut failures = Vec::new();
     for &(case_name, _) in FROZEN_CASES {
         if let Err(error) = replay_transition_case(case_name) {

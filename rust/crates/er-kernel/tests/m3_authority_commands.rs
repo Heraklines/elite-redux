@@ -7,10 +7,10 @@ use er_battle::legality::{
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_content::species::find_species;
 use er_game::authority_commands::{
-    AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion,
-    HumanAdmissionSource, ReplacementAdmissionResult,
-    admit_command_proposal, admit_replacement_proposal, admit_scripted_enemy_frontier,
-    complete_command_frontier, internal_no_legal_replacement, retain_command_tombstones,
+    AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion, HumanAdmissionSource,
+    ReplacementAdmissionResult, admit_command_proposal, admit_replacement_proposal,
+    admit_scripted_enemy_frontier, complete_command_frontier, internal_no_legal_replacement,
+    retain_command_tombstones,
 };
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
@@ -25,22 +25,20 @@ use er_state::pokemon::{
 };
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
-    AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1,
-    BattleReplacementProposalV1, BattleTargetSelection, CommandAdmissionSource,
-    CommandFrontierEntry, CommandFrontierStatus, ReplacementSelection,
-    ReplacementProposalFingerprintEntry, ScriptedEnemyBattleCommandV1,
-    ScriptedEnemyPolicyV1, player_command_operation_id,
-    replacement_operation_id, scripted_enemy_command_operation_id,
+    AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1, BattleReplacementProposalV1,
+    BattleTargetSelection, CommandAdmissionSource, CommandFrontierEntry, CommandFrontierStatus,
+    ReplacementProposalFingerprintEntry, ReplacementSelection, ScriptedEnemyBattleCommandV1,
+    ScriptedEnemyPolicyV1, player_command_operation_id, replacement_operation_id,
+    scripted_enemy_command_operation_id,
 };
 use er_types::battle_control::{
     BATTLE_CONTROL_PLAN_SCHEMA_VERSION, BattleControl, BattleControlPlan, BattleMenu,
     BattleMenuOption, CommandRootControl, MenuOptionLayout, MenuOptionVisibility,
-    MoveSelectControl, ReplacementSelectControl, SeatBattleControl,
-    SeatMenuInstanceAllocator,
+    MoveSelectControl, ReplacementSelectControl, SeatBattleControl, SeatMenuInstanceAllocator,
 };
 use er_types::battle_ids::{
-    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId,
-    MenuInstanceId, MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
+    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId, MenuInstanceId,
+    MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{FaintOccurrence, StatusKind};
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
@@ -363,7 +361,11 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
             owner,
             actor,
             field_slot,
-            BattleCommand::fight(actor, MoveSlotIndex::ZERO, BattleTargetSelection::implicit())?,
+            BattleCommand::fight(
+                actor,
+                MoveSlotIndex::ZERO,
+                BattleTargetSelection::implicit(),
+            )?,
             MenuInstanceId::new(safe(2 + u64::from(position) * 3)?),
             format!(
                 "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/move",
@@ -406,7 +408,11 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
             cursor,
             actor,
             field_slot,
-            BattleCommand::fight(actor, MoveSlotIndex::ZERO, BattleTargetSelection::implicit())?,
+            BattleCommand::fight(
+                actor,
+                MoveSlotIndex::ZERO,
+                BattleTargetSelection::implicit(),
+            )?,
         )?;
         let offer = build_scripted_enemy_offer(&state, field_slot, &command, content)?;
         frontier.push(CommandFrontierEntry::new(
@@ -438,23 +444,9 @@ fn pending_replacement_fixture(
     content: &ContentPack,
     with_reserve: bool,
 ) -> TestResult<(GameState, FaintOccurrence)> {
-    let mut player_party = vec![pokemon(
-        content,
-        1,
-        Some(seat(1)?),
-        &[351],
-        100,
-        100,
-    )?];
+    let mut player_party = vec![pokemon(content, 1, Some(seat(1)?), &[351], 100, 100)?];
     if with_reserve {
-        player_party.push(pokemon(
-            content,
-            2,
-            Some(seat(1)?),
-            &[351],
-            100,
-            90,
-        )?);
+        player_party.push(pokemon(content, 2, Some(seat(1)?), &[351], 100, 90)?);
     }
     let mut state = state_for(
         content,
@@ -559,15 +551,18 @@ fn replacement_proposal(
         occurrence.slot,
         ReplacementSelection::selected(party_slot, pokemon),
         MenuInstanceId::new(safe(2)?),
-        format!("{}/control/replacement", replacement_operation_id(
-            occurrence.source.epoch,
-            battle.battle_id,
-            occurrence.source.wave,
-            occurrence.source.resolved_turn,
-            occurrence.source.turn_occurrence,
-            occurrence.slot,
-            owner,
-        )?),
+        format!(
+            "{}/control/replacement",
+            replacement_operation_id(
+                occurrence.source.epoch,
+                battle.battle_id,
+                occurrence.source.wave,
+                occurrence.source.resolved_turn,
+                occurrence.source.turn_occurrence,
+                occurrence.slot,
+                owner,
+            )?
+        ),
     )?)
 }
 
@@ -592,28 +587,31 @@ fn exact_frontier_completion_waits_for_scripted_enemy_and_preserves_source() -> 
     assert_eq!(source, HumanAdmissionSource::AuthorityLocalInternal);
     assert_ne!(staged_state, before);
     let incomplete = complete_command_frontier(&staged_state, &content)?;
-    assert!(matches!(incomplete, CommandFrontierCompletion::Incomplete { .. }));
-    let enemy = admit_scripted_enemy_frontier(
-        incomplete.state(),
-        &fixture.enemy_policy,
-        &content,
-    )?;
+    assert!(matches!(
+        incomplete,
+        CommandFrontierCompletion::Incomplete { .. }
+    ));
+    let enemy = admit_scripted_enemy_frontier(incomplete.state(), &fixture.enemy_policy, &content)?;
     assert_eq!(enemy.admitted.len(), 1);
     let complete = complete_command_frontier(&enemy.state, &content)?;
-    let commands = match complete {
-        CommandFrontierCompletion::Complete { commands, state } => {
-            let battle = state.battle.as_ref().ok_or("missing completed battle")?;
-            assert!(battle.command_state.frontier.iter().all(|entry| {
-                matches!(&entry.status, CommandFrontierStatus::Admitted { .. })
-            }));
-            commands
-        }
-        CommandFrontierCompletion::Incomplete { .. } => {
-            return Err("frontier did not complete after enemy collection".into());
-        }
-    };
+    let commands =
+        match complete {
+            CommandFrontierCompletion::Complete { commands, state } => {
+                let battle = state.battle.as_ref().ok_or("missing completed battle")?;
+                assert!(battle.command_state.frontier.iter().all(|entry| {
+                    matches!(&entry.status, CommandFrontierStatus::Admitted { .. })
+                }));
+                commands
+            }
+            CommandFrontierCompletion::Incomplete { .. } => {
+                return Err("frontier did not complete after enemy collection".into());
+            }
+        };
     assert_eq!(commands.entries.len(), 2);
-    assert_eq!(commands.entries[0].field_slot(), slot(BattleSide::Player, 0));
+    assert_eq!(
+        commands.entries[0].field_slot(),
+        slot(BattleSide::Player, 0)
+    );
     assert_eq!(commands.entries[1].field_slot(), slot(BattleSide::Enemy, 0));
     Ok(())
 }
@@ -630,35 +628,24 @@ fn asymmetric_two_seat_arrival_is_canonical_and_marks_remote_source() -> TestRes
         .human_proposals
         .first()
         .ok_or("missing seat one proposal")?;
-    let seat_two_state = match admit_command_proposal(
-        &fixture.state,
-        &fixture.control,
-        second,
-        &content,
-    )? {
-        CommandAdmissionResult::Admitted { state, source, .. } => {
-            assert_eq!(source, HumanAdmissionSource::AuthorityRemoteProposal);
-            state
-        }
-        CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
-    };
-    let both_players_state = match admit_command_proposal(
-        &seat_two_state,
-        &fixture.control,
-        first,
-        &content,
-    )? {
-        CommandAdmissionResult::Admitted { state, source, .. } => {
-            assert_eq!(source, HumanAdmissionSource::AuthorityLocalInternal);
-            state
-        }
-        CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
-    };
-    let enemy = admit_scripted_enemy_frontier(
-        &both_players_state,
-        &fixture.enemy_policy,
-        &content,
-    )?;
+    let seat_two_state =
+        match admit_command_proposal(&fixture.state, &fixture.control, second, &content)? {
+            CommandAdmissionResult::Admitted { state, source, .. } => {
+                assert_eq!(source, HumanAdmissionSource::AuthorityRemoteProposal);
+                state
+            }
+            CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
+        };
+    let both_players_state =
+        match admit_command_proposal(&seat_two_state, &fixture.control, first, &content)? {
+            CommandAdmissionResult::Admitted { state, source, .. } => {
+                assert_eq!(source, HumanAdmissionSource::AuthorityLocalInternal);
+                state
+            }
+            CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
+        };
+    let enemy =
+        admit_scripted_enemy_frontier(&both_players_state, &fixture.enemy_policy, &content)?;
     let complete = complete_command_frontier(&enemy.state, &content)?;
     let commands = match complete {
         CommandFrontierCompletion::Complete { commands, .. } => commands,
@@ -691,13 +678,16 @@ fn command_identity_control_and_fingerprint_failures_are_idempotent_or_rejected(
         .first()
         .ok_or("missing human proposal")?
         .clone();
-    let staged = match admit_command_proposal(&fixture.state, &fixture.control, &proposal, &content)?
-    {
-        CommandAdmissionResult::Admitted { state, .. } => state,
-        CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
-    };
+    let staged =
+        match admit_command_proposal(&fixture.state, &fixture.control, &proposal, &content)? {
+            CommandAdmissionResult::Admitted { state, .. } => state,
+            CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
+        };
     let duplicate = admit_command_proposal(&staged, &fixture.control, &proposal, &content)?;
-    assert!(matches!(duplicate, CommandAdmissionResult::Duplicate { .. }));
+    assert!(matches!(
+        duplicate,
+        CommandAdmissionResult::Duplicate { .. }
+    ));
 
     let mut conflict = proposal.clone();
     conflict.command = BattleCommand::fight(
@@ -714,13 +704,9 @@ fn command_identity_control_and_fingerprint_failures_are_idempotent_or_rejected(
 
     let mut wrong_control = proposal.clone();
     wrong_control.control_id = "wrong/control".to_owned();
-    let wrong_control_error = admit_command_proposal(
-        &fixture.state,
-        &fixture.control,
-        &wrong_control,
-        &content,
-    )
-    .expect_err("wrong control identity must be rejected");
+    let wrong_control_error =
+        admit_command_proposal(&fixture.state, &fixture.control, &wrong_control, &content)
+            .expect_err("wrong control identity must be rejected");
     assert!(matches!(
         wrong_control_error,
         AuthorityCommandError::ControlIdMismatch { .. }
@@ -728,13 +714,9 @@ fn command_identity_control_and_fingerprint_failures_are_idempotent_or_rejected(
 
     let mut wrong_menu = proposal.clone();
     wrong_menu.menu_instance_id = MenuInstanceId::new(safe(99)?);
-    let wrong_menu_error = admit_command_proposal(
-        &fixture.state,
-        &fixture.control,
-        &wrong_menu,
-        &content,
-    )
-    .expect_err("stale menu identity must be rejected");
+    let wrong_menu_error =
+        admit_command_proposal(&fixture.state, &fixture.control, &wrong_menu, &content)
+            .expect_err("stale menu identity must be rejected");
     assert!(matches!(
         wrong_menu_error,
         AuthorityCommandError::MenuInstanceMismatch { .. }
@@ -742,26 +724,20 @@ fn command_identity_control_and_fingerprint_failures_are_idempotent_or_rejected(
 
     let mut wrong_owner = proposal.clone();
     wrong_owner.owner_seat = seat(2)?;
-    let wrong_owner_error = admit_command_proposal(
-        &fixture.state,
-        &fixture.control,
-        &wrong_owner,
-        &content,
-    )
-    .expect_err("wrong owner must be rejected by operation grammar");
-    assert!(matches!(wrong_owner_error, AuthorityCommandError::Command(_)));
+    let wrong_owner_error =
+        admit_command_proposal(&fixture.state, &fixture.control, &wrong_owner, &content)
+            .expect_err("wrong owner must be rejected by operation grammar");
+    assert!(matches!(
+        wrong_owner_error,
+        AuthorityCommandError::Command(_)
+    ));
 
     let mut wrong_operation = proposal.clone();
-    wrong_operation.operation_id = OperationId::new(
-        "battle/1/wave/1/turn/1/command/player/0/seat/99".to_owned(),
-    )?;
-    let wrong_operation_error = admit_command_proposal(
-        &fixture.state,
-        &fixture.control,
-        &wrong_operation,
-        &content,
-    )
-    .expect_err("wrong operation grammar must be rejected");
+    wrong_operation.operation_id =
+        OperationId::new("battle/1/wave/1/turn/1/command/player/0/seat/99".to_owned())?;
+    let wrong_operation_error =
+        admit_command_proposal(&fixture.state, &fixture.control, &wrong_operation, &content)
+            .expect_err("wrong operation grammar must be rejected");
     assert!(matches!(
         wrong_operation_error,
         AuthorityCommandError::Command(_)
@@ -782,10 +758,7 @@ fn command_identity_control_and_fingerprint_failures_are_idempotent_or_rejected(
     let mut wire = serde_json::to_value(&retained_command)?;
     wire.as_object_mut()
         .ok_or("accepted command did not serialize as an object")?
-        .insert(
-            "fingerprint".to_owned(),
-            json!("bc1-0-0000000000000000"),
-        );
+        .insert("fingerprint".to_owned(), json!("bc1-0-0000000000000000"));
     let forged_command: AcceptedBattleCommand = serde_json::from_value(wire)?;
     let forged_entry = forged_state
         .battle
@@ -802,7 +775,10 @@ fn command_identity_control_and_fingerprint_failures_are_idempotent_or_rejected(
     let forged_before = forged_state.clone();
     let fingerprint_error = complete_command_frontier(&forged_state, &content)
         .expect_err("forged retained fingerprint must fail before resolution");
-    assert!(matches!(fingerprint_error, AuthorityCommandError::Legality(_)));
+    assert!(matches!(
+        fingerprint_error,
+        AuthorityCommandError::Legality(_)
+    ));
     assert_eq!(forged_state, forged_before);
     Ok(())
 }
@@ -816,11 +792,11 @@ fn command_tombstones_preserve_duplicate_identity_after_frontier_clear() -> Test
         .first()
         .ok_or("missing human proposal")?
         .clone();
-    let staged = match admit_command_proposal(&fixture.state, &fixture.control, &proposal, &content)?
-    {
-        CommandAdmissionResult::Admitted { state, .. } => state,
-        CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
-    };
+    let staged =
+        match admit_command_proposal(&fixture.state, &fixture.control, &proposal, &content)? {
+            CommandAdmissionResult::Admitted { state, .. } => state,
+            CommandAdmissionResult::Duplicate { .. } => return Err("unexpected duplicate".into()),
+        };
     let enemy = admit_scripted_enemy_frontier(&staged, &fixture.enemy_policy, &content)?;
     let completed = complete_command_frontier(&enemy.state, &content)?;
     let (mut after, commands) = match completed {
@@ -838,7 +814,10 @@ fn command_tombstones_preserve_duplicate_identity_after_frontier_clear() -> Test
         .clear();
     let tombstoned = retain_command_tombstones(&after, &commands, &content)?;
     let duplicate = admit_command_proposal(&tombstoned, &fixture.control, &proposal, &content)?;
-    assert!(matches!(duplicate, CommandAdmissionResult::Duplicate { .. }));
+    assert!(matches!(
+        duplicate,
+        CommandAdmissionResult::Duplicate { .. }
+    ));
 
     let mut conflicting = proposal;
     conflicting.command = BattleCommand::fight(
@@ -848,7 +827,10 @@ fn command_tombstones_preserve_duplicate_identity_after_frontier_clear() -> Test
     )?;
     let error = admit_command_proposal(&tombstoned, &fixture.control, &conflicting, &content)
         .expect_err("tombstone conflict must remain fail-closed");
-    assert!(matches!(error, AuthorityCommandError::ProposalConflict { .. }));
+    assert!(matches!(
+        error,
+        AuthorityCommandError::ProposalConflict { .. }
+    ));
     Ok(())
 }
 
@@ -860,13 +842,7 @@ fn replacement_admission_pins_stored_occurrence_source_and_is_idempotent() -> Te
     let reserve_slot = PartyIndex::new(1)?;
     let control = replacement_control_plan(&state, occurrence, reserve, reserve_slot)?;
     let proposal = replacement_proposal(&state, occurrence, reserve, reserve_slot)?;
-    let admitted = admit_replacement_proposal(
-        &state,
-        &control,
-        &[],
-        &proposal,
-        &content,
-    )?;
+    let admitted = admit_replacement_proposal(&state, &control, &[], &proposal, &content)?;
     match admitted {
         ReplacementAdmissionResult::Admitted { proposal: admitted } => {
             assert_eq!(admitted.occurrence, occurrence.id);
@@ -879,13 +855,8 @@ fn replacement_admission_pins_stored_occurrence_source_and_is_idempotent() -> Te
         proposal.fingerprint(),
     )?];
     let evidence_before = fingerprints.clone();
-    let duplicate = admit_replacement_proposal(
-        &state,
-        &control,
-        &fingerprints,
-        &proposal,
-        &content,
-    )?;
+    let duplicate =
+        admit_replacement_proposal(&state, &control, &fingerprints, &proposal, &content)?;
     assert!(matches!(
         duplicate,
         ReplacementAdmissionResult::Duplicate { .. }
@@ -904,14 +875,9 @@ fn replacement_admission_pins_stored_occurrence_source_and_is_idempotent() -> Te
         proposal.menu_instance_id,
         proposal.control_id.clone(),
     )?;
-    let conflict_error = admit_replacement_proposal(
-        &state,
-        &control,
-        &fingerprints,
-        &conflicting,
-        &content,
-    )
-    .expect_err("same replacement operation with another selection must conflict");
+    let conflict_error =
+        admit_replacement_proposal(&state, &control, &fingerprints, &conflicting, &content)
+            .expect_err("same replacement operation with another selection must conflict");
     assert!(matches!(
         conflict_error,
         AuthorityCommandError::ProposalConflict { .. }
@@ -919,14 +885,9 @@ fn replacement_admission_pins_stored_occurrence_source_and_is_idempotent() -> Te
 
     let mut wrong_control = proposal.clone();
     wrong_control.control_id = "wrong/replacement/control".to_owned();
-    let wrong_control_error = admit_replacement_proposal(
-        &state,
-        &control,
-        &[],
-        &wrong_control,
-        &content,
-    )
-    .expect_err("wrong replacement control must fail closed");
+    let wrong_control_error =
+        admit_replacement_proposal(&state, &control, &[], &wrong_control, &content)
+            .expect_err("wrong replacement control must fail closed");
     assert!(matches!(
         wrong_control_error,
         AuthorityCommandError::ControlIdMismatch { .. }
@@ -934,14 +895,9 @@ fn replacement_admission_pins_stored_occurrence_source_and_is_idempotent() -> Te
 
     let mut wrong_occurrence = proposal.clone();
     wrong_occurrence.occurrence = FaintOccurrenceId::new(safe(99)?);
-    let wrong_occurrence_error = admit_replacement_proposal(
-        &state,
-        &control,
-        &[],
-        &wrong_occurrence,
-        &content,
-    )
-    .expect_err("global occurrence identity must remain pinned to the queue head");
+    let wrong_occurrence_error =
+        admit_replacement_proposal(&state, &control, &[], &wrong_occurrence, &content)
+            .expect_err("global occurrence identity must remain pinned to the queue head");
     assert!(matches!(
         wrong_occurrence_error,
         AuthorityCommandError::ReplacementHeadMismatch { .. }
@@ -970,14 +926,9 @@ fn replacement_admission_pins_stored_occurrence_source_and_is_idempotent() -> Te
         proposal.menu_instance_id,
         proposal.control_id.clone(),
     )?;
-    let wrong_source_error = admit_replacement_proposal(
-        &state,
-        &control,
-        &[],
-        &wrong_source,
-        &content,
-    )
-    .expect_err("replacement operation must use source.turn_occurrence");
+    let wrong_source_error =
+        admit_replacement_proposal(&state, &control, &[], &wrong_source, &content)
+            .expect_err("replacement operation must use source.turn_occurrence");
     assert!(matches!(
         wrong_source_error,
         AuthorityCommandError::DecisionOperationMismatch
@@ -1008,14 +959,8 @@ fn no_legal_replacement_is_internal_only_and_does_not_touch_fingerprint_evidence
             json!({"kind": "NO_LEGAL_REPLACEMENT"}),
         );
     let forged_external: BattleReplacementProposalV1 = serde_json::from_value(wire)?;
-    let error = admit_replacement_proposal(
-        &state,
-        &control,
-        &[],
-        &forged_external,
-        &content,
-    )
-    .expect_err("external NO_LEGAL_REPLACEMENT must be rejected");
+    let error = admit_replacement_proposal(&state, &control, &[], &forged_external, &content)
+        .expect_err("external NO_LEGAL_REPLACEMENT must be rejected");
     assert!(matches!(
         error,
         AuthorityCommandError::ExternalNoLegalReplacement

@@ -109,8 +109,7 @@ fn replacement_payload() -> Value {
 }
 
 fn replacement_body(payload: Value) -> Value {
-    let digest =
-        compute_replacement_material_digest(&payload).expect("REPLACEMENT digest");
+    let digest = compute_replacement_material_digest(&payload).expect("REPLACEMENT digest");
     let operation_id = payload
         .get("operation_id")
         .and_then(Value::as_str)
@@ -176,9 +175,11 @@ fn turn_digest_is_sorted_canonical_utf16_fnv1a64_and_lowercase_hex() {
         expected
     );
     assert_eq!(expected.len(), 16);
-    assert!(expected.bytes().all(|byte| {
-        matches!(byte, b'0'..=b'9' | b'a'..=b'f')
-    }));
+    assert!(
+        expected
+            .bytes()
+            .all(|byte| { matches!(byte, b'0'..=b'9' | b'a'..=b'f') })
+    );
 
     let mut reordered = serde_json::Map::new();
     reordered.insert("opaque_array".to_owned(), json!(["b", "a"]));
@@ -195,11 +196,14 @@ fn turn_digest_is_sorted_canonical_utf16_fnv1a64_and_lowercase_hex() {
         expected
     );
 
-    let scalar_hash = canonical.chars().fold(0xcbf2_9ce4_8422_2325_u64, |hash, character| {
-        (hash ^ u64::from(character as u32)).wrapping_mul(0x0000_0100_0000_01b3)
-    });
+    let scalar_hash = canonical
+        .chars()
+        .fold(0xcbf2_9ce4_8422_2325_u64, |hash, character| {
+            (hash ^ u64::from(character as u32)).wrapping_mul(0x0000_0100_0000_01b3)
+        });
     assert_ne!(
-        scalar_hash, fnv1a64_utf16(&canonical),
+        scalar_hash,
+        fnv1a64_utf16(&canonical),
         "astral vector must exercise UTF-16 surrogate units"
     );
 }
@@ -213,8 +217,7 @@ fn replacement_digest_has_utf16_length_and_fnv1a32_vector() {
         canonical.encode_utf16().count(),
         fnv1a32_utf16(&canonical)
     );
-    let digest =
-        compute_replacement_material_digest(&payload).expect("REPLACEMENT digest");
+    let digest = compute_replacement_material_digest(&payload).expect("REPLACEMENT digest");
     assert_eq!(digest, expected);
     assert!(digest.starts_with("rc1-"));
     let hash = format!("{:08x}", fnv1a32_utf16(&canonical));
@@ -316,8 +319,7 @@ fn replacement_operation_uses_source_turn_occurrence_not_global_occurrence_id() 
     );
 
     let mut operation_from_global_id = payload.clone();
-    operation_from_global_id["operation_id"] =
-        json!("RC/e1/b7/w2/t3/o99/f1/s0");
+    operation_from_global_id["operation_id"] = json!("RC/e1/b7/w2/t3/o99/f1/s0");
     let operation_from_global_body = replacement_body(operation_from_global_id);
     assert!(matches!(
         validate_replacement_material_body(&operation_from_global_body),
@@ -340,9 +342,7 @@ fn valid_replacement_frame_binds_context_epoch_and_rejects_extra_outer_fields() 
     let payload = replacement_payload();
     let mut body = replacement_body(payload);
     body["nextControl"] = replacement_control();
-    assert!(
-        validate_replacement_material_frame(&raw(replacement_frame(body.clone()))).is_ok()
-    );
+    assert!(validate_replacement_material_frame(&raw(replacement_frame(body.clone()))).is_ok());
 
     let mut frame = replacement_frame(body);
     frame["extra"] = json!(true);

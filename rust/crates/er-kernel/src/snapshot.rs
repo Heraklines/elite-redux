@@ -15,24 +15,24 @@ use er_content::pack::ContentPack;
 use er_game::snapshot::GameRuntimeSnapshotV2;
 use er_protocol::{
     AuthorityLogConfig, AuthorityReplicaConfig, KernelScheduler, KernelSchedulerPauseState,
-    KernelSchedulerRestorableState, KernelSchedulerTimerState, ProtocolRuntimeSnapshotV2,
-    ProposalLeaseConfig, RecoveryTransactionConfig, ScheduledTimer,
+    KernelSchedulerRestorableState, KernelSchedulerTimerState, ProposalLeaseConfig,
+    ProtocolRuntimeSnapshotV2, RecoveryTransactionConfig, ScheduledTimer,
 };
 pub use er_rng::audit::RngDraw;
 pub use er_state::digest::MechanicalStateDigest;
+pub use er_types::LiveResourceSnapshot;
+use er_types::OperationId;
 use er_types::battle_ids::{
     BattlePresentationEventId, CanonicalHexBytes, ContentPackHash, MenuInstanceId,
 };
 use er_types::battle_ui::{
-    BattlePresentationEvent, BattleUiProjection, PresentationSettlementOutcome,
-    PresentationPlanDigest,
+    BattlePresentationEvent, BattleUiProjection, PresentationPlanDigest,
+    PresentationSettlementOutcome,
 };
 use er_types::{
     GameButton, InputFocus, PhysicalKey, SafeU53, SeatId, TerminalState, TimeClass, TimerId,
     TransportState,
 };
-use er_types::OperationId;
-pub use er_types::LiveResourceSnapshot;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _, ser::Error as _};
 use thiserror::Error;
 
@@ -795,10 +795,9 @@ impl PendingPresentationsSnapshotV1 {
                 ));
             }
             for outcome in &self.outcomes {
-                outcome
-                    .outcome
-                    .validate()
-                    .map_err(|error| invalid("pending_presentations.outcomes", error.to_string()))?;
+                outcome.outcome.validate().map_err(|error| {
+                    invalid("pending_presentations.outcomes", error.to_string())
+                })?;
                 if !self
                     .event_catalog
                     .iter()
@@ -811,7 +810,10 @@ impl PendingPresentationsSnapshotV1 {
                 }
             }
             let has_failure = self.outcomes.iter().any(|outcome| {
-                matches!(outcome.outcome, PresentationSettlementOutcome::Failed { .. })
+                matches!(
+                    outcome.outcome,
+                    PresentationSettlementOutcome::Failed { .. }
+                )
             });
             if self.presentation_failed != has_failure {
                 return Err(invalid(
@@ -821,7 +823,11 @@ impl PendingPresentationsSnapshotV1 {
             }
             return Ok(());
         };
-        if !self.plans.iter().any(|plan| &plan.operation_id == last_plan) {
+        if !self
+            .plans
+            .iter()
+            .any(|plan| &plan.operation_id == last_plan)
+        {
             return Err(invalid(
                 "pending_presentations.last_plan_operation_id",
                 "last plan identity is not present in the plan map",
@@ -917,7 +923,10 @@ impl PendingPresentationsSnapshotV1 {
             ));
         }
         let has_failure = self.outcomes.iter().any(|outcome| {
-            matches!(outcome.outcome, PresentationSettlementOutcome::Failed { .. })
+            matches!(
+                outcome.outcome,
+                PresentationSettlementOutcome::Failed { .. }
+            )
         });
         if self.presentation_failed != has_failure {
             return Err(invalid(
@@ -1035,7 +1044,9 @@ impl RestorableKernelSnapshotV2 {
                 ));
             }
         }
-        self.protocol.validate().map_err(|error| invalid("protocol", error.to_string()))?;
+        self.protocol
+            .validate()
+            .map_err(|error| invalid("protocol", error.to_string()))?;
         let owner_quiesced = self.disposed || self.terminal.is_some();
         if self.input_router.disposed != self.disposed
             || self.scheduler.disposed != owner_quiesced
@@ -1114,9 +1125,7 @@ impl RestorableKernelSnapshotV2 {
                     .scheduler
                     .timers
                     .iter()
-                    .find(|scheduled| {
-                        scheduled.registration.timer_id == timer.timer.timer_id
-                    })
+                    .find(|scheduled| scheduled.registration.timer_id == timer.timer.timer_id)
                     .ok_or_else(|| {
                         invalid(
                             "protocol.recovery.timers",
@@ -1158,12 +1167,12 @@ impl RestorableKernelSnapshotV2 {
         self.ui
             .validate()
             .map_err(|error| invalid("ui", error.to_string()))?;
-        let battle = self
-            .game
-            .state
-            .battle
-            .as_ref()
-            .ok_or_else(|| invalid("game.state.battle", "M3 battle snapshot requires an active battle"))?;
+        let battle = self.game.state.battle.as_ref().ok_or_else(|| {
+            invalid(
+                "game.state.battle",
+                "M3 battle snapshot requires an active battle",
+            )
+        })?;
         let projected = self
             .game
             .current_control
@@ -1181,19 +1190,18 @@ impl RestorableKernelSnapshotV2 {
                 "projection is not the exact current local control projection",
             ));
         }
-        let suspended = self.scheduler.pauses.iter().any(|pause| {
-            pause.reasons.iter().any(|reason| reason == "suspended")
-        });
+        let suspended = self
+            .scheduler
+            .pauses
+            .iter()
+            .any(|pause| pause.reasons.iter().any(|reason| reason == "suspended"));
         let recovery_fenced = self
             .protocol
             .recovery
             .as_ref()
             .is_some_and(|recovery| recovery.fence.state != er_types::RecoveryFenceState::Open);
         let expected_actionable = projected.control.is_actionable()
-            && self
-                .pending_presentations
-                .blocking_barrier_ids
-                .is_empty()
+            && self.pending_presentations.blocking_barrier_ids.is_empty()
             && self.terminal.is_none()
             && !self.disposed
             && !suspended

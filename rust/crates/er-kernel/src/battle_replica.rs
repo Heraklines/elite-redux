@@ -5,9 +5,9 @@
 //! common `er-game` material applier.
 
 use er_game::material::{
-    BattleMaterialApplyContext, BattleMaterialApplyError, MaterialApplyResult,
-    ContentPack, apply_replacement_material, apply_turn_material,
-    decode_replacement_material, decode_turn_material,
+    BattleMaterialApplyContext, BattleMaterialApplyError, ContentPack, MaterialApplyResult,
+    apply_replacement_material, apply_turn_material, decode_replacement_material,
+    decode_turn_material,
 };
 use er_types::{AuthorityEntryKind, Material};
 use thiserror::Error;
@@ -70,8 +70,9 @@ fn apply_turn_material_bytes(
     bytes: &[u8],
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, ReplicaApplyError> {
-    let material = decode_turn_material(bytes)
-        .map_err(|_| ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial))?;
+    let material = decode_turn_material(bytes).map_err(|_| {
+        ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial)
+    })?;
     apply_turn_material(current, &material, content).map_err(map_material_apply_error)
 }
 
@@ -81,8 +82,9 @@ fn apply_replacement_material_bytes(
     bytes: &[u8],
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, ReplicaApplyError> {
-    let material = decode_replacement_material(bytes)
-        .map_err(|_| ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial))?;
+    let material = decode_replacement_material(bytes).map_err(|_| {
+        ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial)
+    })?;
     apply_replacement_material(current, &material, content).map_err(map_material_apply_error)
 }
 
@@ -93,8 +95,9 @@ pub(crate) fn apply_authority_material(
     material: &Material,
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, ReplicaApplyError> {
-    let bytes = serde_json::to_vec(&material.payload)
-        .map_err(|_| ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial))?;
+    let bytes = serde_json::to_vec(&material.payload).map_err(|_| {
+        ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial)
+    })?;
     match kind {
         AuthorityEntryKind::TurnCommit => {
             let typed = decode_turn_material(&bytes).map_err(|_| {
@@ -122,8 +125,7 @@ pub(crate) fn apply_authority_material(
                     ProtocolViolation::MalformedBattleMaterial,
                 ));
             }
-            apply_replacement_material(current, &typed, content)
-                .map_err(map_material_apply_error)
+            apply_replacement_material(current, &typed, content).map_err(map_material_apply_error)
         }
         AuthorityEntryKind::InteractionCommit
         | AuthorityEntryKind::ControlCommit
@@ -137,28 +139,24 @@ pub(crate) fn apply_authority_material(
 }
 
 /// Map the common applier's closed error set without broadening recovery.
-pub(crate) const fn map_material_apply_error(
-    error: BattleMaterialApplyError,
-) -> ReplicaApplyError {
+pub(crate) const fn map_material_apply_error(error: BattleMaterialApplyError) -> ReplicaApplyError {
     match error {
         BattleMaterialApplyError::LocalBeforeStateMismatch => {
             ReplicaApplyError::BeforeDigestMismatch
         }
-        BattleMaterialApplyError::ContentHashMismatch => ReplicaApplyError::ProtocolViolation(
-            ProtocolViolation::ContentHashMismatch,
-        ),
+        BattleMaterialApplyError::ContentHashMismatch => {
+            ReplicaApplyError::ProtocolViolation(ProtocolViolation::ContentHashMismatch)
+        }
         BattleMaterialApplyError::MalformedIdentity
         | BattleMaterialApplyError::SchemaVersionMismatch
-        | BattleMaterialApplyError::OracleIdentityMismatch => ReplicaApplyError::ProtocolViolation(
-            ProtocolViolation::MalformedBattleMaterial,
-        ),
+        | BattleMaterialApplyError::OracleIdentityMismatch => {
+            ReplicaApplyError::ProtocolViolation(ProtocolViolation::MalformedBattleMaterial)
+        }
         BattleMaterialApplyError::InvalidMaterialBeforeDigest
         | BattleMaterialApplyError::InvalidEvidence
         | BattleMaterialApplyError::InvalidAfterState
         | BattleMaterialApplyError::InvalidControlProjection
-        | BattleMaterialApplyError::MenuAllocatorMismatch => {
-            ReplicaApplyError::InvalidAfterState
-        }
+        | BattleMaterialApplyError::MenuAllocatorMismatch => ReplicaApplyError::InvalidAfterState,
         BattleMaterialApplyError::Invariant => ReplicaApplyError::Invariant,
     }
 }

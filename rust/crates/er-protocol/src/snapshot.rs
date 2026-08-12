@@ -498,12 +498,15 @@ where
     T: DeserializeOwned + Serialize,
 {
     let bytes = decode_hex(value, path)?;
-    let decoded = serde_json::from_slice::<T>(&bytes)
-        .map_err(|error| canonical(path, error.to_string()))?;
+    let decoded =
+        serde_json::from_slice::<T>(&bytes).map_err(|error| canonical(path, error.to_string()))?;
     let canonical_bytes = er_canonical::canonical_bytes(&decoded)
         .map_err(|error| canonical(path, error.to_string()))?;
     if canonical_bytes != bytes {
-        return Err(canonical(path, "payload is not the exact canonical JSON encoding"));
+        return Err(canonical(
+            path,
+            "payload is not the exact canonical JSON encoding",
+        ));
     }
     Ok(decoded)
 }
@@ -579,14 +582,25 @@ impl AuthorityLogSnapshotV2 {
             || self.delivery_backoff.factor_denominator == SafeU53::ZERO
             || self.delivery_backoff.factor_numerator < self.delivery_backoff.factor_denominator
         {
-            return Err(invalid("authority_log", "owner and retention capacity are invalid"));
+            return Err(invalid(
+                "authority_log",
+                "owner and retention capacity are invalid",
+            ));
         }
         validate_sorted_unique(
-            &self.peer_bindings.iter().map(|value| value.seat).collect::<Vec<_>>(),
+            &self
+                .peer_bindings
+                .iter()
+                .map(|value| value.seat)
+                .collect::<Vec<_>>(),
             "authority_log.peer_bindings",
         )?;
         validate_sorted_unique(
-            &self.retained.iter().map(|value| value.revision).collect::<Vec<_>>(),
+            &self
+                .retained
+                .iter()
+                .map(|value| value.revision)
+                .collect::<Vec<_>>(),
             "authority_log.retained",
         )?;
         if self.retained.len() as u64 > self.retain_capacity.get() {
@@ -797,7 +811,11 @@ impl ProposalAdmissionSnapshotV2 {
                 "fingerprint count exceeds admission capacity",
             ));
         }
-        if self.fingerprints.iter().any(|value| value.fingerprint.is_empty()) {
+        if self
+            .fingerprints
+            .iter()
+            .any(|value| value.fingerprint.is_empty())
+        {
             return Err(invalid(
                 "proposal_admission.fingerprints",
                 "fingerprints must not be empty",
@@ -883,7 +901,11 @@ impl ProposalLeaseSnapshotV2 {
                 ));
             }
             for (timer_id, kind, time_class) in [
-                (lease.retry_timer, ProposalTimerKindV2::Retry, TimeClass::Connected),
+                (
+                    lease.retry_timer,
+                    ProposalTimerKindV2::Retry,
+                    TimeClass::Connected,
+                ),
                 (
                     lease.absolute_timer,
                     ProposalTimerKindV2::Absolute,
@@ -1118,9 +1140,10 @@ impl ProtocolRuntimeSnapshotV2 {
                     .authority_log
                     .as_ref()
                     .ok_or_else(|| invalid("protocol.authority_log", "owner is required"))?;
-                let admission = self.proposal_admission.as_ref().ok_or_else(|| {
-                    invalid("protocol.proposal_admission", "owner is required")
-                })?;
+                let admission = self
+                    .proposal_admission
+                    .as_ref()
+                    .ok_or_else(|| invalid("protocol.proposal_admission", "owner is required"))?;
                 if log.local_context != self.frame_context.context {
                     return Err(invalid(
                         "protocol.authority_log.local_context",
@@ -1182,9 +1205,10 @@ impl ProtocolRuntimeSnapshotV2 {
                     .as_ref()
                     .ok_or_else(|| invalid("protocol.recovery", "owner is required"))?
                     .validate()?;
-                let replica = self.authority_replica.as_ref().ok_or_else(|| {
-                    invalid("protocol.authority_replica", "owner is required")
-                })?;
+                let replica = self
+                    .authority_replica
+                    .as_ref()
+                    .ok_or_else(|| invalid("protocol.authority_replica", "owner is required"))?;
                 let leases = self
                     .proposal_leases
                     .as_ref()

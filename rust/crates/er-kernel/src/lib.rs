@@ -10,9 +10,9 @@ pub mod kernel;
 pub mod snapshot;
 pub mod ui_reducer;
 
-pub use input_router::{InputRouteError, InputRouter};
-pub use er_game::runtime::{BattleGameConfig, BattleStartV1};
 pub use battle_kernel::BattleInitializationError;
+pub use er_game::runtime::{BattleGameConfig, BattleStartV1};
+pub use input_router::{InputRouteError, InputRouter};
 pub use kernel::{
     AuthorityResolutionPlan, BattleProtocolConfig, BattleProtocolRoleConfig, ControlMenuPlan,
     GameKernel, KernelConfig, KernelEffect, KernelError, KernelInput, KernelSnapshot,

@@ -18,9 +18,8 @@ use er_canonical::{canonical_bytes, canonicalize, content_digest};
 use er_content::pack::ContentPack;
 use er_game::authority_commands::{
     AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion,
-    PreparedAuthorityReplacement, PreparedAuthorityTurn,
-    ReplacementAdmissionResult, admit_command_proposal_with_context,
-    admit_replacement_proposal_with_context,
+    PreparedAuthorityReplacement, PreparedAuthorityTurn, ReplacementAdmissionResult,
+    admit_command_proposal_with_context, admit_replacement_proposal_with_context,
     admit_scripted_enemy_frontier, complete_command_frontier, internal_no_legal_replacement,
     project_scripted_policy_for_material,
 };
@@ -28,7 +27,9 @@ use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleReplacementMaterialV1,
     BattleTurnMaterialV1, MaterialApplyResult, apply_replacement_material, apply_turn_material,
 };
-use er_protocol::{AuthorityEntryDraft, AuthorityLog, CommitOutcome, KernelScheduler, PreparedCommit};
+use er_protocol::{
+    AuthorityEntryDraft, AuthorityLog, CommitOutcome, KernelScheduler, PreparedCommit,
+};
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
     BattleCommandProposalV1, BattleReplacementProposalV1, ReplacementSelection,
@@ -313,17 +314,20 @@ fn validate_published_authority_stage(
     // empty peer quorum as satisfied; do not manufacture a synthetic peer or
     // reject a valid peerless commit merely because the action list has no
     // Deliver entry.
-    let has_peer_delivery = published.commit.actions.iter().any(|action| {
-        matches!(action, er_protocol::AuthorityLogAction::Deliver { .. })
-    });
+    let has_peer_delivery = published
+        .commit
+        .actions
+        .iter()
+        .any(|action| matches!(action, er_protocol::AuthorityLogAction::Deliver { .. }));
     if !has_peer_delivery
         && !published
             .log
             .peer_stage_quorum(&published.operation_id, er_types::AckStage::Admitted)
     {
         return Err(AuthorityTransactionError::EnclosingValidation {
-            reason: "authority publication has no peer delivery but its local quorum is not satisfied"
-                .to_owned(),
+            reason:
+                "authority publication has no peer delivery but its local quorum is not satisfied"
+                    .to_owned(),
         });
     }
     Ok(())
@@ -382,11 +386,8 @@ pub(crate) fn prepare_authority_turn(
     // current frontier while producing `prepared`.  Only run the admission
     // reducer when a pending enemy entry remains; an already-retained or
     // already-admitted entry must not consume the policy cursor twice.
-    let (staged_state, staged_policy) = admit_scripted_if_pending(
-        &staged_state,
-        &scripted_policy,
-        content,
-    )?;
+    let (staged_state, staged_policy) =
+        admit_scripted_if_pending(&staged_state, &scripted_policy, content)?;
     let completion = complete_command_frontier(&staged_state, content)?;
     let CommandFrontierCompletion::Complete {
         state: complete_state,
@@ -407,12 +408,11 @@ pub(crate) fn prepare_authority_turn(
         .validate_canonical_order()
         .map_err(AuthorityCommandError::Command)
         .map_err(AuthorityTransactionError::Admission)?;
-    let completed_battle = complete_state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+    let completed_battle = complete_state.battle.as_ref().ok_or_else(|| {
+        AuthorityTransactionError::ControlProjection {
             reason: "completed command frontier has no active battle".to_owned(),
-        })?;
+        }
+    })?;
     completed_battle
         .command_state
         .validate()
@@ -563,11 +563,9 @@ pub(crate) fn prepare_authority_replacement(
                 content,
             )?;
             match admission {
-                ReplacementAdmissionResult::Admitted { proposal } => (
-                    proposal.selection,
-                    proposal.occurrence,
-                    vec![proposal],
-                ),
+                ReplacementAdmissionResult::Admitted { proposal } => {
+                    (proposal.selection, proposal.occurrence, vec![proposal])
+                }
                 ReplacementAdmissionResult::Duplicate { .. } => {
                     // GameRuntime is the sole mutable fingerprint owner and
                     // records the accepted replacement before emitting its
@@ -584,12 +582,13 @@ pub(crate) fn prepare_authority_replacement(
         }
     };
 
-    let battle = state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
-            reason: "REPLACEMENT preparation has no active battle".to_owned(),
-        })?;
+    let battle =
+        state
+            .battle
+            .as_ref()
+            .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+                reason: "REPLACEMENT preparation has no active battle".to_owned(),
+            })?;
     let stored = battle
         .faint_queue
         .iter()
@@ -604,9 +603,11 @@ pub(crate) fn prepare_authority_replacement(
         stored.source.resolved_turn,
         stored.source.turn_occurrence,
         stored.slot,
-        stored.owner_seat.ok_or_else(|| AuthorityTransactionError::ControlProjection {
-            reason: "REPLACEMENT occurrence has no player owner".to_owned(),
-        })?,
+        stored
+            .owner_seat
+            .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+                reason: "REPLACEMENT occurrence has no player owner".to_owned(),
+            })?,
     )
     .map_err(AuthorityCommandError::Command)
     .map_err(AuthorityTransactionError::Admission)?;
@@ -624,9 +625,7 @@ pub(crate) fn prepare_authority_replacement(
         });
     }
     if candidate.selection != selection {
-        return Err(AuthorityTransactionError::CandidateMismatch {
-            field: "selection",
-        });
+        return Err(AuthorityTransactionError::CandidateMismatch { field: "selection" });
     }
     let scripted_policy_after = validate_prepared_projection(
         &candidate.after_state,
@@ -726,12 +725,13 @@ fn admit_scripted_if_pending(
     // frontier already carrying admitted enemies takes the no-op branch, so
     // the common material-install policy projector cannot be double-consumed.
     // Neither return value is installed or published by this adapter.
-    let battle = state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
-            reason: "scripted command admission has no active battle".to_owned(),
-        })?;
+    let battle =
+        state
+            .battle
+            .as_ref()
+            .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+                reason: "scripted command admission has no active battle".to_owned(),
+            })?;
     let has_pending_enemy = battle.command_state.frontier.iter().any(|entry| {
         entry.field_slot.side == er_types::battle_ids::BattleSide::Enemy
             && matches!(
@@ -759,20 +759,17 @@ fn validate_prepared_projection(
     policy_before: &ScriptedEnemyPolicyV1,
     content: &ContentPack,
 ) -> Result<ScriptedEnemyPolicyV1, AuthorityTransactionError> {
-    policy_before
-        .validate()
-        .map_err(|source| {
-            AuthorityTransactionError::Admission(AuthorityCommandError::ScriptedPolicy(source))
-        })?;
-    control_plan
-        .validate()
-        .map_err(|source| AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source)))?;
-    let battle = after_state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+    policy_before.validate().map_err(|source| {
+        AuthorityTransactionError::Admission(AuthorityCommandError::ScriptedPolicy(source))
+    })?;
+    control_plan.validate().map_err(|source| {
+        AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source))
+    })?;
+    let battle = after_state.battle.as_ref().ok_or_else(|| {
+        AuthorityTransactionError::ControlProjection {
             reason: "prepared resolver candidate has no after battle".to_owned(),
-        })?;
+        }
+    })?;
     let expected_turn = match next_decision {
         BattleNextDecision::Replacement { occurrence } => battle
             .faint_queue
@@ -813,11 +810,12 @@ fn validate_prepared_projection(
                 .ok_or_else(|| AuthorityTransactionError::ControlProjection {
                     reason: "prepared replacement candidate lost its occurrence".to_owned(),
                 })?;
-            let owner = stored.owner_seat.ok_or_else(|| {
-                AuthorityTransactionError::ControlProjection {
-                    reason: "prepared replacement occurrence has no player owner".to_owned(),
-                }
-            })?;
+            let owner =
+                stored
+                    .owner_seat
+                    .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+                        reason: "prepared replacement occurrence has no player owner".to_owned(),
+                    })?;
             let operation_id = replacement_operation_id(
                 stored.source.epoch,
                 battle.battle_id,
@@ -838,7 +836,8 @@ fn validate_prepared_projection(
                     || seat.decision_operation_id.is_some()
             }) {
                 return Err(AuthorityTransactionError::ControlProjection {
-                    reason: "complete resolver candidate has a non-complete seat control".to_owned(),
+                    reason: "complete resolver candidate has a non-complete seat control"
+                        .to_owned(),
                 });
             }
             Ok(policy_before.clone())
@@ -878,7 +877,10 @@ fn validate_command_frontier_projection(
             });
         };
         if entry.operation_id != *operation_id
-            || !matches!(&entry.status, er_types::battle_command::CommandFrontierStatus::Pending)
+            || !matches!(
+                &entry.status,
+                er_types::battle_command::CommandFrontierStatus::Pending
+            )
         {
             return Err(AuthorityTransactionError::ControlProjection {
                 reason: "next command collection contains a stale or already-admitted human entry"
@@ -897,13 +899,13 @@ fn validate_command_frontier_projection(
             };
             !control_plan.seats.iter().any(|seat| {
                 seat.seat == owner
-                    && command_control_coordinates(&seat.control)
-                        .is_some_and(|(actor, field_slot)| {
+                    && command_control_coordinates(&seat.control).is_some_and(
+                        |(actor, field_slot)| {
                             actor == entry.actor
                                 && field_slot == entry.field_slot
-                                && seat.decision_operation_id.as_ref()
-                                    == Some(&entry.operation_id)
-                        })
+                                && seat.decision_operation_id.as_ref() == Some(&entry.operation_id)
+                        },
+                    )
             })
         })
     {
@@ -914,7 +916,9 @@ fn validate_command_frontier_projection(
     Ok(())
 }
 
-fn command_control_coordinates(control: &BattleControl) -> Option<(er_types::battle_ids::PokemonId, FieldSlot)> {
+fn command_control_coordinates(
+    control: &BattleControl,
+) -> Option<(er_types::battle_ids::PokemonId, FieldSlot)> {
     match control {
         BattleControl::CommandRoot(value) => Some((value.actor, value.field_slot)),
         BattleControl::MoveSelect(value) => Some((value.actor, value.field_slot)),
@@ -1011,29 +1015,29 @@ pub(crate) fn protocol_next_control_from_plan(
     control_plan: &BattleControlPlan,
     authority_epoch: AuthorityEpoch,
 ) -> Result<NextControl, AuthorityTransactionError> {
-    control_plan
-        .validate()
-        .map_err(|source| AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source)))?;
+    control_plan.validate().map_err(|source| {
+        AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source))
+    })?;
     match next_decision {
         BattleNextDecision::CommandFrontier => {
             let mut commands = control_plan
                 .seats
                 .iter()
                 .map(|seat| {
-                    let (actor, field_slot) = command_control_coordinates(&seat.control).ok_or_else(|| {
-                        AuthorityTransactionError::ControlProjection {
-                            reason: "cannot derive protocol command target from the exact control plan"
-                                .to_owned(),
-                        }
-                    })?;
+                    let (actor, field_slot) = command_control_coordinates(&seat.control)
+                        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+                            reason:
+                                "cannot derive protocol command target from the exact control plan"
+                                    .to_owned(),
+                        })?;
                     Ok(CommandControlTarget {
                         owner_seat_id: seat.seat,
                         pokemon_id: actor.get(),
-                        field_index: SafeU53::new(u64::from(field_slot.position)).map_err(|source| {
-                            AuthorityTransactionError::ControlProjection {
+                        field_index: SafeU53::new(u64::from(field_slot.position)).map_err(
+                            |source| AuthorityTransactionError::ControlProjection {
                                 reason: source.to_string(),
-                            }
-                        })?,
+                            },
+                        )?,
                     })
                 })
                 .collect::<Result<Vec<_>, AuthorityTransactionError>>()?;
@@ -1060,9 +1064,9 @@ pub(crate) fn protocol_next_control_from_plan(
                 .seats
                 .iter()
                 .filter_map(|seat| {
-                    replacement_control_coordinates(&seat.control).map(|(id, source, field_slot, owner)| {
-                        (seat, id, source, field_slot, owner)
-                    })
+                    replacement_control_coordinates(&seat.control).map(
+                        |(id, source, field_slot, owner)| (seat, id, source, field_slot, owner),
+                    )
                 })
                 .collect::<Vec<_>>();
             targets.sort_by(|left, right| {
@@ -1079,16 +1083,17 @@ pub(crate) fn protocol_next_control_from_plan(
                         .to_owned(),
                 });
             };
-            let operation_id = current
-                .decision_operation_id
-                .clone()
-                .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+            let operation_id = current.decision_operation_id.clone().ok_or_else(|| {
+                AuthorityTransactionError::ControlProjection {
                     reason: "replacement control plan has no decision operation".to_owned(),
-                })?;
+                }
+            })?;
             let remaining = targets
                 .iter()
                 .filter(|target| target.1 != *current_occurrence)
-                .map(|target| replacement_control_address(target.0, target.1, target.2, target.3, target.4))
+                .map(|target| {
+                    replacement_control_address(target.0, target.1, target.2, target.3, target.4)
+                })
                 .collect::<Result<Vec<_>, AuthorityTransactionError>>()?;
             Ok(NextControl::Replacement(ReplacementControl {
                 operation_id,
@@ -1160,12 +1165,11 @@ fn replacement_control_address(
     field_slot: &FieldSlot,
     owner: &SeatId,
 ) -> Result<ReplacementControlAddress, AuthorityTransactionError> {
-    let operation_id = seat
-        .decision_operation_id
-        .clone()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+    let operation_id = seat.decision_operation_id.clone().ok_or_else(|| {
+        AuthorityTransactionError::ControlProjection {
             reason: "replacement tail control has no decision operation".to_owned(),
-        })?;
+        }
+    })?;
     let field_index = SafeU53::new(u64::from(field_slot.position)).map_err(|source| {
         AuthorityTransactionError::ControlProjection {
             reason: source.to_string(),
@@ -1186,19 +1190,19 @@ fn encode_decode_material<T>(material: &T) -> Result<(T, Value), AuthorityTransa
 where
     T: Serialize + DeserializeOwned + Clone,
 {
-    let bytes = canonical_bytes(material).map_err(|source| AuthorityTransactionError::MaterialCodec {
-        reason: source.to_string(),
-    })?;
+    let bytes =
+        canonical_bytes(material).map_err(|source| AuthorityTransactionError::MaterialCodec {
+            reason: source.to_string(),
+        })?;
     let payload: Value = serde_json::from_slice(&bytes).map_err(|source| {
         AuthorityTransactionError::MaterialCodec {
             reason: source.to_string(),
         }
     })?;
-    let canonical_again = canonical_bytes(&payload).map_err(|source| {
-        AuthorityTransactionError::MaterialCodec {
+    let canonical_again =
+        canonical_bytes(&payload).map_err(|source| AuthorityTransactionError::MaterialCodec {
             reason: source.to_string(),
-        }
-    })?;
+        })?;
     if canonical_again != bytes {
         return Err(AuthorityTransactionError::MaterialCodec {
             reason: "material payload was not canonical after JSON round-trip".to_owned(),
@@ -1209,11 +1213,10 @@ where
             reason: source.to_string(),
         }
     })?;
-    let decoded_bytes = canonical_bytes(&decoded).map_err(|source| {
-        AuthorityTransactionError::MaterialCodec {
+    let decoded_bytes =
+        canonical_bytes(&decoded).map_err(|source| AuthorityTransactionError::MaterialCodec {
             reason: source.to_string(),
-        }
-    })?;
+        })?;
     if decoded_bytes != bytes {
         return Err(AuthorityTransactionError::MaterialCodec {
             reason: "typed material decoder changed canonical bytes".to_owned(),
@@ -1229,20 +1232,16 @@ fn build_turn_material(
     menu_allocators: &[SeatMenuInstanceAllocator],
     content: &ContentPack,
 ) -> Result<BattleTurnMaterialV1, AuthorityTransactionError> {
-    let before_battle = candidate
-        .before_state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+    let before_battle = candidate.before_state.battle.as_ref().ok_or_else(|| {
+        AuthorityTransactionError::ControlProjection {
             reason: "TURN candidate has no before battle".to_owned(),
-        })?;
-    let after_battle = candidate
-        .after_state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+        }
+    })?;
+    let after_battle = candidate.after_state.battle.as_ref().ok_or_else(|| {
+        AuthorityTransactionError::ControlProjection {
             reason: "TURN candidate has no after battle".to_owned(),
-        })?;
+        }
+    })?;
     let presentation_digest = presentation_plan_digest(&candidate.presentation)?;
     Ok(BattleTurnMaterialV1 {
         schema_version: TURN_MATERIAL_SCHEMA_VERSION,
@@ -1278,13 +1277,11 @@ fn build_replacement_material(
     menu_allocators: &[SeatMenuInstanceAllocator],
     content: &ContentPack,
 ) -> Result<BattleReplacementMaterialV1, AuthorityTransactionError> {
-    let before_battle = candidate
-        .before_state
-        .battle
-        .as_ref()
-        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
+    let before_battle = candidate.before_state.battle.as_ref().ok_or_else(|| {
+        AuthorityTransactionError::ControlProjection {
             reason: "REPLACEMENT candidate has no before battle".to_owned(),
-        })?;
+        }
+    })?;
     let presentation_digest = presentation_plan_digest(&candidate.presentation)?;
     Ok(BattleReplacementMaterialV1 {
         schema_version: REPLACEMENT_MATERIAL_SCHEMA_VERSION,
@@ -1320,7 +1317,9 @@ fn require_turn_equivalence(
             field: "after_state",
         });
     }
-    if candidate.after_digest != applied.after_digest || material.after_digest != applied.after_digest {
+    if candidate.after_digest != applied.after_digest
+        || material.after_digest != applied.after_digest
+    {
         return Err(AuthorityTransactionError::CandidateMismatch {
             field: "after_digest",
         });
@@ -1330,9 +1329,11 @@ fn require_turn_equivalence(
             field: "presentation",
         });
     }
-    let expected_presentation_digest = presentation_plan_digest(&candidate.presentation)
-        .map_err(|_| AuthorityTransactionError::CandidateMismatch {
-            field: "presentation_digest",
+    let expected_presentation_digest =
+        presentation_plan_digest(&candidate.presentation).map_err(|_| {
+            AuthorityTransactionError::CandidateMismatch {
+                field: "presentation_digest",
+            }
         })?;
     if expected_presentation_digest != material.presentation_digest
         || expected_presentation_digest != applied.presentation_digest
@@ -1342,9 +1343,7 @@ fn require_turn_equivalence(
         });
     }
     if candidate.outcome != applied.outcome {
-        return Err(AuthorityTransactionError::CandidateMismatch {
-            field: "outcome",
-        });
+        return Err(AuthorityTransactionError::CandidateMismatch { field: "outcome" });
     }
     if candidate.next_decision != applied.next_decision {
         return Err(AuthorityTransactionError::CandidateMismatch {
@@ -1369,7 +1368,9 @@ fn require_replacement_equivalence(
             field: "after_state",
         });
     }
-    if candidate.after_digest != applied.after_digest || material.after_digest != applied.after_digest {
+    if candidate.after_digest != applied.after_digest
+        || material.after_digest != applied.after_digest
+    {
         return Err(AuthorityTransactionError::CandidateMismatch {
             field: "after_digest",
         });
@@ -1379,9 +1380,11 @@ fn require_replacement_equivalence(
             field: "presentation",
         });
     }
-    let expected_presentation_digest = presentation_plan_digest(&candidate.presentation)
-        .map_err(|_| AuthorityTransactionError::CandidateMismatch {
-            field: "presentation_digest",
+    let expected_presentation_digest =
+        presentation_plan_digest(&candidate.presentation).map_err(|_| {
+            AuthorityTransactionError::CandidateMismatch {
+                field: "presentation_digest",
+            }
         })?;
     if expected_presentation_digest != material.presentation_digest
         || expected_presentation_digest != applied.presentation_digest
@@ -1391,9 +1394,7 @@ fn require_replacement_equivalence(
         });
     }
     if candidate.outcome != applied.outcome {
-        return Err(AuthorityTransactionError::CandidateMismatch {
-            field: "outcome",
-        });
+        return Err(AuthorityTransactionError::CandidateMismatch { field: "outcome" });
     }
     if candidate.next_decision != applied.next_decision {
         return Err(AuthorityTransactionError::CandidateMismatch {
@@ -1413,19 +1414,19 @@ fn validate_internal_replacement_control(
     stored: &er_types::battle_model::FaintOccurrence,
     operation_id: &OperationId,
 ) -> Result<(), AuthorityTransactionError> {
-    control
-        .validate()
-        .map_err(|source| AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source)))?;
-    let owner = stored.owner_seat.ok_or_else(|| {
-        AuthorityTransactionError::ControlProjection {
+    control.validate().map_err(|source| {
+        AuthorityTransactionError::Admission(AuthorityCommandError::ControlPlan(source))
+    })?;
+    let owner = stored
+        .owner_seat
+        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
             reason: "internal replacement occurrence has no player owner".to_owned(),
-        }
-    })?;
-    let seat = control.seat(owner).ok_or_else(|| {
-        AuthorityTransactionError::ControlProjection {
+        })?;
+    let seat = control
+        .seat(owner)
+        .ok_or_else(|| AuthorityTransactionError::ControlProjection {
             reason: "internal replacement owner has no control entry".to_owned(),
-        }
-    })?;
+        })?;
     if seat.decision_operation_id.as_ref() != Some(operation_id) {
         return Err(AuthorityTransactionError::ControlProjection {
             reason: "internal replacement control operation is stale".to_owned(),
@@ -1560,16 +1561,18 @@ fn advance_one_allocator(
 }
 
 fn turn_material_digest(payload: &Value) -> Result<String, AuthorityTransactionError> {
-    let canonical = canonicalize(payload).map_err(|source| AuthorityTransactionError::MaterialDigest {
-        reason: source.to_string(),
-    })?;
+    let canonical =
+        canonicalize(payload).map_err(|source| AuthorityTransactionError::MaterialDigest {
+            reason: source.to_string(),
+        })?;
     Ok(format!("{:016x}", fnv1a64_utf16(&canonical)))
 }
 
 fn replacement_material_digest(payload: &Value) -> Result<String, AuthorityTransactionError> {
-    let canonical = canonicalize(payload).map_err(|source| AuthorityTransactionError::MaterialDigest {
-        reason: source.to_string(),
-    })?;
+    let canonical =
+        canonicalize(payload).map_err(|source| AuthorityTransactionError::MaterialDigest {
+            reason: source.to_string(),
+        })?;
     Ok(format!(
         "rc1-{}-{:08x}",
         canonical.encode_utf16().count(),

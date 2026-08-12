@@ -49,7 +49,9 @@ pub enum PartyOptionMenuError {
     NotPartySelection,
     #[error("the selected party member is visible but disabled")]
     DisabledSelection,
-    #[error("the selected party slot {party_slot:?} does not contain {expected:?}; found {actual:?}")]
+    #[error(
+        "the selected party slot {party_slot:?} does not contain {expected:?}; found {actual:?}"
+    )]
     PartyIdentityMismatch {
         party_slot: PartyIndex,
         expected: PokemonId,
@@ -127,26 +129,10 @@ fn build_option_menu(
         )?,
     ];
     let navigation = vec![
-        MenuNavigationEdge::new(
-            send_out.clone(),
-            NavigationDirection::Up,
-            cancel.clone(),
-        ),
-        MenuNavigationEdge::new(
-            send_out.clone(),
-            NavigationDirection::Down,
-            cancel.clone(),
-        ),
-        MenuNavigationEdge::new(
-            cancel.clone(),
-            NavigationDirection::Up,
-            send_out.clone(),
-        ),
-        MenuNavigationEdge::new(
-            cancel.clone(),
-            NavigationDirection::Down,
-            send_out,
-        ),
+        MenuNavigationEdge::new(send_out.clone(), NavigationDirection::Up, cancel.clone()),
+        MenuNavigationEdge::new(send_out.clone(), NavigationDirection::Down, cancel.clone()),
+        MenuNavigationEdge::new(cancel.clone(), NavigationDirection::Up, send_out.clone()),
+        MenuNavigationEdge::new(cancel.clone(), NavigationDirection::Down, send_out),
     ];
     Ok(BattleMenu::new(
         instance_id,
@@ -241,12 +227,9 @@ pub fn open_party_option_menu_from_control(
     new_instance_id: MenuInstanceId,
 ) -> Result<PartyOptionSelectControl, PartyOptionMenuError> {
     match parent {
-        BattleControl::PartySelect(value) => open_party_option_menu(
-            battle,
-            value,
-            expected_parent_instance_id,
-            new_instance_id,
-        ),
+        BattleControl::PartySelect(value) => {
+            open_party_option_menu(battle, value, expected_parent_instance_id, new_instance_id)
+        }
         BattleControl::ReplacementSelect(value) => open_replacement_option_menu(
             battle,
             value,

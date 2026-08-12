@@ -1,16 +1,16 @@
 //! Battle-only raw-input and exact-menu-graph adapter.
 
 use er_protocol::KernelScheduler;
-use er_types::{ButtonEvent, InputMap, InputTimerCommand, RawInputEvent, SeatId, TimerId};
 use er_types::battle_ids::MenuInstanceId;
 use er_types::battle_ui::BattleUiProjection;
+use er_types::{ButtonEvent, InputMap, InputTimerCommand, RawInputEvent, SeatId, TimerId};
 use thiserror::Error;
 
 use crate::input_router::{
     BattleButtonEvent, BattleInputError, BattleInputOutput, BattleInputRouter, InputRouteError,
 };
 use crate::snapshot::{InputRouterSnapshotV2, SnapshotError};
-use crate::ui_reducer::{BattleUiIntent, BattleUiReducer, BattleUiReject, BattleUiReduction};
+use crate::ui_reducer::{BattleUiIntent, BattleUiReducer, BattleUiReduction, BattleUiReject};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct BattleUiOutput {
@@ -322,9 +322,7 @@ impl BattleUiAdapter {
             event,
             RawInputEvent::KeyDown { .. } | RawInputEvent::GamepadDown { .. }
         );
-        if is_press
-            && (self.reducer.owner_seat() != Some(seat) || !self.reducer.is_actionable())
-        {
+        if is_press && (self.reducer.owner_seat() != Some(seat) || !self.reducer.is_actionable()) {
             return Err(BattleUiAdapterError::Ui(BattleUiReject::NonActionable));
         }
         Ok(())
@@ -357,9 +355,7 @@ impl BattleUiAdapter {
         if scheduled.endpoint != endpoint || !self.input.owns_scheduled_timer(&scheduled) {
             return Err(InputRouteError::UnknownTimer { timer_id }.into());
         }
-        let fired = scheduler
-            .fired(timer_id)
-            .map_err(InputRouteError::from)?;
+        let fired = scheduler.fired(timer_id).map_err(InputRouteError::from)?;
         let routed = match self.input.timer_fired(fired, scheduler) {
             Ok(routed) => routed,
             Err(error) => {

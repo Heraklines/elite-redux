@@ -6,18 +6,18 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use er_battle::legality::{
-    build_command_offer, build_scripted_enemy_offer,
-    normalize_command_set, validate_replacement_selection, validate_state_content,
-};
 use er_battle::command::NormalizedBattleCommand;
+use er_battle::legality::{
+    build_command_offer, build_scripted_enemy_offer, normalize_command_set,
+    validate_replacement_selection, validate_state_content,
+};
 use er_battle::replacement::legal_replacement_candidates;
-use er_content::moves::find_move;
 use er_battle::{
-    BattleMutation, BattleNextDecision, validate_battle_mutation_evidence,
-    compute_presentation_plan_digest,
+    BattleMutation, BattleNextDecision, compute_presentation_plan_digest,
+    validate_battle_mutation_evidence,
 };
 use er_canonical::{CanonicalError, canonical_bytes, canonicalize};
+use er_content::moves::find_move;
 pub use er_content::pack::ContentPack;
 use er_content::pack::ORACLE_GAME_SHA;
 use er_rng::audit::RngDraw;
@@ -26,28 +26,25 @@ use er_state::digest::MechanicalStateDigest;
 use er_state::format::{canonical_slots, human_seats, owner_seat_for, validate_slot};
 use er_state::snapshot::GameState;
 use er_types::battle_command::{
-    AcceptedBattleCommand, CommandAdmissionSource, CommandCollectionState,
-    CommandFrontierEntry, CommandFrontierStatus, CommandSet, ReplacementSelection,
-    player_command_operation_id, replacement_operation_id, scripted_enemy_command_operation_id,
-    turn_result_operation_id,
+    AcceptedBattleCommand, CommandAdmissionSource, CommandCollectionState, CommandFrontierEntry,
+    CommandFrontierStatus, CommandSet, ReplacementSelection, player_command_operation_id,
+    replacement_operation_id, scripted_enemy_command_operation_id, turn_result_operation_id,
 };
 use er_types::battle_control::{
     BattleControl, BattleControlPlan, BattleControlPlanError, CommandRootControl,
     MoveSelectControl, PartyOptionSelectControl, PartySelectControl, ReplacementSelectControl,
     SeatMenuInstanceAllocator, TargetSelectControl, WaitingControl,
 };
+use er_types::battle_ids::ContentPackHash;
 use er_types::battle_ids::{
     BattleId, BattleSide, FieldSlot, MenuInstanceId, MoveId, PokemonId, SafeU53, TurnIndex,
     WaveIndex,
 };
-use er_types::battle_model::{
-    FaintOccurrence, ReplacementProgress, ResolvedAction,
-};
+use er_types::battle_model::{FaintOccurrence, ReplacementProgress, ResolvedAction};
 use er_types::battle_ui::{
-    BattlePresentationEvent, BattlePresentationKind,
-    PresentationBlockingPolicy, PresentationPlanDigest, PresentationSkipPolicy,
+    BattlePresentationEvent, BattlePresentationKind, PresentationBlockingPolicy,
+    PresentationPlanDigest, PresentationSkipPolicy,
 };
-use er_types::battle_ids::ContentPackHash;
 use er_types::{OperationId, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -293,22 +290,14 @@ pub fn apply_turn_material(
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     validate_turn_identity(material)?;
     validate_turn_commands(&material.before_state, &material.commands, content)?;
-    validate_after_state_and_digest(
-        &material.after_state,
-        &material.after_digest,
-        content,
-    )?;
+    validate_after_state_and_digest(&material.after_state, &material.after_digest, content)?;
     validate_turn_rng(material)?;
     validate_outcome_and_decision(
         &material.after_state,
         material.outcome,
         material.next_decision,
     )?;
-    validate_next_state_command_collection(
-        &material.after_state,
-        material.next_decision,
-        content,
-    )?;
+    validate_next_state_command_collection(&material.after_state, material.next_decision, content)?;
     validate_turn_evidence(material, content)?;
     let menu_allocators = validate_allocator_projection(
         &material.after_state,
@@ -368,22 +357,14 @@ pub fn apply_replacement_material(
         content,
     )
     .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
-    validate_after_state_and_digest(
-        &material.after_state,
-        &material.after_digest,
-        content,
-    )?;
+    validate_after_state_and_digest(&material.after_state, &material.after_digest, content)?;
     validate_replacement_rng(material)?;
     validate_outcome_and_decision(
         &material.after_state,
         material.outcome,
         material.next_decision,
     )?;
-    validate_next_state_command_collection(
-        &material.after_state,
-        material.next_decision,
-        content,
-    )?;
+    validate_next_state_command_collection(&material.after_state, material.next_decision, content)?;
     validate_replacement_evidence(material, content)?;
     let menu_allocators = validate_allocator_projection(
         &material.after_state,
@@ -443,9 +424,7 @@ fn validate_material_header(
     if schema_version != BATTLE_MATERIAL_SCHEMA_VERSION {
         return Err(BattleMaterialApplyError::SchemaVersionMismatch);
     }
-    if oracle_game_sha != ORACLE_GAME_SHA
-        || content.oracle_game_sha != ORACLE_GAME_SHA
-    {
+    if oracle_game_sha != ORACLE_GAME_SHA || content.oracle_game_sha != ORACLE_GAME_SHA {
         return Err(BattleMaterialApplyError::OracleIdentityMismatch);
     }
     if content.validate().is_err() {
@@ -460,9 +439,7 @@ fn validate_material_header(
     Ok(())
 }
 
-fn validate_turn_identity(
-    material: &BattleTurnMaterialV1,
-) -> Result<(), BattleMaterialApplyError> {
+fn validate_turn_identity(material: &BattleTurnMaterialV1) -> Result<(), BattleMaterialApplyError> {
     let before = material
         .before_state
         .battle
@@ -533,7 +510,9 @@ fn validate_replacement_identity(
         material.resolved_turn,
         occurrence.source.turn_occurrence,
         occurrence.slot,
-        occurrence.owner_seat.ok_or(BattleMaterialApplyError::MalformedIdentity)?,
+        occurrence
+            .owner_seat
+            .ok_or(BattleMaterialApplyError::MalformedIdentity)?,
     )
     .map_err(|_| BattleMaterialApplyError::MalformedIdentity)?;
     if material.operation_id != expected_operation {
@@ -657,10 +636,7 @@ fn state_without_command_collection(state: &GameState) -> GameState {
     value
 }
 
-fn same_frontier_window(
-    left: &CommandFrontierEntry,
-    right: &CommandFrontierEntry,
-) -> bool {
+fn same_frontier_window(left: &CommandFrontierEntry, right: &CommandFrontierEntry) -> bool {
     left.operation_id == right.operation_id
         && left.owner_seat == right.owner_seat
         && left.actor == right.actor
@@ -668,9 +644,7 @@ fn same_frontier_window(
         && left.offer == right.offer
 }
 
-fn retained_command(
-    status: &CommandFrontierStatus,
-) -> Option<&AcceptedBattleCommand> {
+fn retained_command(status: &CommandFrontierStatus) -> Option<&AcceptedBattleCommand> {
     match status {
         CommandFrontierStatus::Pending => None,
         CommandFrontierStatus::Retained { command, .. }
@@ -678,9 +652,7 @@ fn retained_command(
     }
 }
 
-fn admitted_command(
-    status: &CommandFrontierStatus,
-) -> Option<&AcceptedBattleCommand> {
+fn admitted_command(status: &CommandFrontierStatus) -> Option<&AcceptedBattleCommand> {
     match status {
         CommandFrontierStatus::Admitted { command, .. } => Some(command),
         CommandFrontierStatus::Pending | CommandFrontierStatus::Retained { .. } => None,
@@ -834,19 +806,31 @@ fn validate_action_order(
                     (
                         er_types::battle_model::ResolvedActionKind::Move,
                         AcceptedBattleCommand::Human { proposal, .. },
-                    ) => matches!(&proposal.command, er_types::battle_command::BattleCommand::Fight { .. }),
+                    ) => matches!(
+                        &proposal.command,
+                        er_types::battle_command::BattleCommand::Fight { .. }
+                    ),
                     (
                         er_types::battle_model::ResolvedActionKind::Move,
                         AcceptedBattleCommand::ScriptedEnemy { command, .. },
-                    ) => matches!(&command.command, er_types::battle_command::BattleCommand::Fight { .. }),
+                    ) => matches!(
+                        &command.command,
+                        er_types::battle_command::BattleCommand::Fight { .. }
+                    ),
                     (
                         er_types::battle_model::ResolvedActionKind::Switch,
                         AcceptedBattleCommand::Human { proposal, .. },
-                    ) => matches!(&proposal.command, er_types::battle_command::BattleCommand::Switch { .. }),
+                    ) => matches!(
+                        &proposal.command,
+                        er_types::battle_command::BattleCommand::Switch { .. }
+                    ),
                     (
                         er_types::battle_model::ResolvedActionKind::Switch,
                         AcceptedBattleCommand::ScriptedEnemy { command, .. },
-                    ) => matches!(&command.command, er_types::battle_command::BattleCommand::Switch { .. }),
+                    ) => matches!(
+                        &command.command,
+                        er_types::battle_command::BattleCommand::Switch { .. }
+                    ),
                     _ => false,
                 };
                 if !command_kind_matches {
@@ -902,8 +886,7 @@ fn validate_action_order(
                     _ => return Err(BattleMaterialApplyError::InvalidEvidence),
                 }
                 if action.kind == er_types::battle_model::ResolvedActionKind::Switch
-                    && action.disposition
-                        != er_types::battle_model::ActionDisposition::Executed
+                    && action.disposition != er_types::battle_model::ActionDisposition::Executed
                 {
                     return Err(BattleMaterialApplyError::InvalidEvidence);
                 }
@@ -912,7 +895,10 @@ fn validate_action_order(
                 action.kind,
                 er_types::battle_model::ResolvedActionKind::Move
                     | er_types::battle_model::ResolvedActionKind::Switch
-            ) => return Err(BattleMaterialApplyError::InvalidEvidence),
+            ) =>
+            {
+                return Err(BattleMaterialApplyError::InvalidEvidence);
+            }
             None => {
                 if action.disposition != er_types::battle_model::ActionDisposition::Executed
                     || action.timing_modifier != 0
@@ -950,13 +936,7 @@ fn validate_presentation(
         {
             return Err(BattleMaterialApplyError::InvalidEvidence);
         }
-        validate_presentation_kind(
-            &event.kind,
-            mutations,
-            before_state,
-            after_state,
-            content,
-        )?;
+        validate_presentation_kind(&event.kind, mutations, before_state, after_state, content)?;
     }
     let computed = compute_presentation_plan_digest(presentation)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
@@ -1165,9 +1145,7 @@ fn move_exists_in_command_or_content(
     })
 }
 
-fn validate_turn_rng(
-    material: &BattleTurnMaterialV1,
-) -> Result<(), BattleMaterialApplyError> {
+fn validate_turn_rng(material: &BattleTurnMaterialV1) -> Result<(), BattleMaterialApplyError> {
     let before_battle = material
         .before_state
         .battle
@@ -1344,8 +1322,8 @@ fn validate_fresh_command_frontier(
         .command_state
         .validate()
         .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-    let expected_slots = canonical_slots(&battle.format)
-        .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
+    let expected_slots =
+        canonical_slots(&battle.format).map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
     let mut living_active = Vec::new();
     for slot in expected_slots {
         let actor = battle
@@ -1355,15 +1333,13 @@ fn validate_fresh_command_frontier(
         let Some(actor) = actor else {
             continue;
         };
-        let pokemon = find_pokemon(battle, actor)
-            .ok_or(BattleMaterialApplyError::InvalidAfterState)?;
+        let pokemon =
+            find_pokemon(battle, actor).ok_or(BattleMaterialApplyError::InvalidAfterState)?;
         if !pokemon.fainted {
             living_active.push((slot, actor));
         }
     }
-    if living_active.is_empty()
-        || battle.command_state.frontier.len() != living_active.len()
-    {
+    if living_active.is_empty() || battle.command_state.frontier.len() != living_active.len() {
         return Err(BattleMaterialApplyError::InvalidAfterState);
     }
 
@@ -1413,13 +1389,9 @@ fn validate_fresh_command_frontier(
                     scripted.script_cursor,
                 )
                 .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-                let expected_offer = build_scripted_enemy_offer(
-                    after_state,
-                    slot,
-                    &scripted.command,
-                    content,
-                )
-                .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
+                let expected_offer =
+                    build_scripted_enemy_offer(after_state, slot, &scripted.command, content)
+                        .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
                 if entry.owner_seat.is_some()
                     || entry.operation_id != expected_operation
                     || scripted.operation_id != expected_operation
@@ -1438,9 +1410,7 @@ fn validate_fresh_command_frontier(
     Ok(())
 }
 
-fn material_command_menu_ids(
-    commands: &CommandSet,
-) -> BTreeMap<SeatId, Vec<MenuInstanceId>> {
+fn material_command_menu_ids(commands: &CommandSet) -> BTreeMap<SeatId, Vec<MenuInstanceId>> {
     let mut ids = BTreeMap::new();
     for command in &commands.entries {
         if let AcceptedBattleCommand::Human { proposal, .. } = command {
@@ -1462,8 +1432,8 @@ fn validate_allocator_projection(
         .battle
         .as_ref()
         .ok_or(BattleMaterialApplyError::MenuAllocatorMismatch)?;
-    let seats = human_seats(&battle.format)
-        .map_err(|_| BattleMaterialApplyError::MenuAllocatorMismatch)?;
+    let seats =
+        human_seats(&battle.format).map_err(|_| BattleMaterialApplyError::MenuAllocatorMismatch)?;
     validate_allocator_vector(before_allocators, &seats)?;
     validate_control_plan_allocator_shape(next_control, &seats)?;
     let before = allocator_map(before_allocators);
@@ -1500,10 +1470,7 @@ fn validate_allocator_projection(
         let mut ids = grouped.remove(seat).unwrap_or_default();
         ids.sort_unstable();
         ids.dedup();
-        if ids
-            .iter()
-            .any(|id| *id < before_id || *id >= after_id)
-        {
+        if ids.iter().any(|id| *id < before_id || *id >= after_id) {
             return Err(BattleMaterialApplyError::MenuAllocatorMismatch);
         }
         let fresh = ids;
@@ -1573,9 +1540,7 @@ fn validate_control_plan_allocator_shape(
     }
 }
 
-fn allocator_map(
-    allocators: &[SeatMenuInstanceAllocator],
-) -> BTreeMap<SeatId, MenuInstanceId> {
+fn allocator_map(allocators: &[SeatMenuInstanceAllocator]) -> BTreeMap<SeatId, MenuInstanceId> {
     allocators
         .iter()
         .map(|allocator| (allocator.seat, allocator.next_menu_instance_id))
@@ -1586,7 +1551,8 @@ fn menu_id_add(
     start: MenuInstanceId,
     offset: usize,
 ) -> Result<MenuInstanceId, BattleMaterialApplyError> {
-    let offset = u64::try_from(offset).map_err(|_| BattleMaterialApplyError::MenuAllocatorMismatch)?;
+    let offset =
+        u64::try_from(offset).map_err(|_| BattleMaterialApplyError::MenuAllocatorMismatch)?;
     let value = start
         .get()
         .get()
@@ -1691,13 +1657,9 @@ fn validate_control_projection(
     next_control: &BattleControlPlan,
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
-    let projected = project_battle_control_plan(
-        after_state,
-        next_decision,
-        allocator_before,
-        content,
-    )
-    .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
+    let projected =
+        project_battle_control_plan(after_state, next_decision, allocator_before, content)
+            .map_err(|_| BattleMaterialApplyError::InvalidControlProjection)?;
     if &projected != next_control {
         return Err(BattleMaterialApplyError::InvalidControlProjection);
     }
@@ -1708,11 +1670,7 @@ fn party_contains(battle: &BattleState, pokemon: PokemonId) -> bool {
     find_pokemon(battle, pokemon).is_some()
 }
 
-fn party_contains_on_side(
-    battle: &BattleState,
-    pokemon: PokemonId,
-    side: BattleSide,
-) -> bool {
+fn party_contains_on_side(battle: &BattleState, pokemon: PokemonId, side: BattleSide) -> bool {
     let party = match side {
         BattleSide::Player => battle.player_party.iter(),
         BattleSide::Enemy => battle.enemy_party.iter(),
@@ -1727,7 +1685,10 @@ fn party_contains_state(state: &GameState, pokemon: PokemonId) -> bool {
         .is_some_and(|battle| party_contains(battle, pokemon))
 }
 
-fn find_pokemon(battle: &BattleState, pokemon: PokemonId) -> Option<&er_state::pokemon::PokemonState> {
+fn find_pokemon(
+    battle: &BattleState,
+    pokemon: PokemonId,
+) -> Option<&er_state::pokemon::PokemonState> {
     battle
         .player_party
         .iter()

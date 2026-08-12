@@ -4,15 +4,14 @@ use er_kernel::KernelInput;
 
 use er_wasm::m3_parity;
 use er_wasm::m3_parity::{
-    M3_PARITY_FIXTURE_SCHEMA_VERSION, M3_PARITY_TRACE_ID, M3ParityError,
-    final_evidence_fixture, final_evidence_report_json, final_evidence_trace_json,
-    parse_serialized_trace, replay_eventwise, replay_serialized_trace_json,
+    M3_PARITY_FIXTURE_SCHEMA_VERSION, M3_PARITY_TRACE_ID, M3ParityError, final_evidence_fixture,
+    final_evidence_report_json, final_evidence_trace_json, parse_serialized_trace,
+    replay_eventwise, replay_serialized_trace_json,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const M3_COVERAGE_MAP: &str =
-    include_str!("../../../fixtures/m3/m3-coverage-map.json");
+const M3_COVERAGE_MAP: &str = include_str!("../../../fixtures/m3/m3-coverage-map.json");
 
 fn assert_eventwise_contract() -> TestResult {
     let fixture = final_evidence_fixture();
@@ -40,19 +39,30 @@ fn assert_eventwise_contract() -> TestResult {
     assert!(report.coverage.continuation_input_count.get().get() > 0);
     assert_eq!(report.snapshot_boundary.after_raw_event.get().get(), 3);
     assert_eq!(report.snapshot_boundary.snapshot_schema_version, 2);
-    assert!(report.snapshot_boundary.pending_presentation_count.get().get() > 0);
+    assert!(
+        report
+            .snapshot_boundary
+            .pending_presentation_count
+            .get()
+            .get()
+            > 0
+    );
     assert_eq!(
         report.snapshot_boundary.snapshot_digest,
         report.snapshot_boundary.restored_snapshot_digest
     );
-    assert!(report
-        .observations
-        .iter()
-        .any(|observation| observation.input_kind == "BATTLE_PRESENTATION_OUTCOME"));
-    assert!(report
-        .observations
-        .iter()
-        .any(|observation| observation.battle_turn.get().get() > 1));
+    assert!(
+        report
+            .observations
+            .iter()
+            .any(|observation| observation.input_kind == "BATTLE_PRESENTATION_OUTCOME")
+    );
+    assert!(
+        report
+            .observations
+            .iter()
+            .any(|observation| observation.battle_turn.get().get() > 1)
+    );
     for (index, observation) in report.observations.iter().enumerate() {
         assert_eq!(observation.sequence.get().get(), (index + 1) as u64);
         assert!(observation.virtual_time_ms <= fixture.events.last().unwrap().virtual_time_ms);
@@ -69,7 +79,10 @@ fn assert_eventwise_contract() -> TestResult {
         .iter()
         .flat_map(|observation| &observation.rng_audit)
         .collect::<Vec<_>>();
-    assert!(!rng_audit.is_empty(), "M3 parity trace emitted no RNG audit");
+    assert!(
+        !rng_audit.is_empty(),
+        "M3 parity trace emitted no RNG audit"
+    );
     for draw in &rng_audit {
         draw.validate()?;
     }
@@ -160,8 +173,8 @@ fn wasm32_node_replays_the_serialized_m3_production_trace() -> TestResult {
 
 #[cfg(target_arch = "wasm32")]
 #[wasm_bindgen_test::wasm_bindgen_test]
-fn wasm32_export_emits_the_shared_canonical_eventwise_report(
-) -> Result<(), wasm_bindgen::JsValue> {
+fn wasm32_export_emits_the_shared_canonical_eventwise_report() -> Result<(), wasm_bindgen::JsValue>
+{
     let trace = final_evidence_trace_json()
         .map_err(|error| wasm_bindgen::JsValue::from_str(&error.to_string()))?;
     let direct = replay_serialized_trace_json(&trace)

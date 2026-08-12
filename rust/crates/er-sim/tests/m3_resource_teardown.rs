@@ -31,8 +31,8 @@ use er_types::battle_ids::{
     WaveIndex,
 };
 use er_types::{
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -129,13 +129,8 @@ fn battle_kernel() -> TestResult<GameKernel> {
         MoveSlotIndex::ZERO,
         BattleTargetSelection::implicit(),
     )?;
-    let enemy_operation = scripted_enemy_command_operation_id(
-        battle_id,
-        wave,
-        turn,
-        enemy_slot,
-        safe(0),
-    )?;
+    let enemy_operation =
+        scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, safe(0))?;
     let enemy_script = ScriptedEnemyBattleCommandV1::new(
         enemy_operation,
         battle_id,

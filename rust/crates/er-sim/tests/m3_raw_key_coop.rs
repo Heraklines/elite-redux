@@ -30,8 +30,7 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const FORCED_REPLACEMENT_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/forced-replacement.json");
-const CONTENT_PACK_FIXTURE: &str =
-    include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
+const CONTENT_PACK_FIXTURE: &str = include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
 
 fn invalid(message: impl Into<String>) -> Box<dyn Error> {
     std::io::Error::new(std::io::ErrorKind::InvalidData, message.into()).into()
@@ -366,7 +365,9 @@ impl BattlePair {
         match effect {
             KernelEffect::SendFrame { from, frame } => {
                 if *from != source.seat() || frame.context.sender_seat_id != *from {
-                    return Err(invalid("SendFrame identity did not match its emitting endpoint"));
+                    return Err(invalid(
+                        "SendFrame identity did not match its emitting endpoint",
+                    ));
                 }
                 if frame.frame_type == FrameType::AuthorityEntry {
                     let body: AuthorityEntryBody = serde_json::from_value(frame.body.clone())?;
@@ -401,11 +402,12 @@ impl BattlePair {
             KernelEffect::BattleUiChanged { endpoint, .. }
             | KernelEffect::PresentBattle { endpoint, .. } => {
                 if *endpoint != source.seat() {
-                    return Err(invalid("battle presentation/UI effect named the wrong seat"));
+                    return Err(invalid(
+                        "battle presentation/UI effect named the wrong seat",
+                    ));
                 }
                 if let KernelEffect::PresentBattle { event, .. } = effect {
-                    self.presentations
-                        .push((source, event.event_id.clone()));
+                    self.presentations.push((source, event.event_id.clone()));
                 }
             }
             KernelEffect::ScheduleTimer { .. }
@@ -627,7 +629,10 @@ fn assert_material_matches_snapshots(
     for endpoint in [Endpoint::Host, Endpoint::Guest] {
         let (game, control) = pair.mechanical_control(endpoint)?;
         assert_eq!(after_state, game, "material/game diverged at {endpoint:?}");
-        assert_eq!(next_control, control, "material/control diverged at {endpoint:?}");
+        assert_eq!(
+            next_control, control,
+            "material/control diverged at {endpoint:?}"
+        );
     }
     Ok(())
 }
@@ -664,7 +669,10 @@ fn raw_key_forced_doubles_authority_replica_campaign() -> TestResult {
         pair.authority_entry_count(Endpoint::Guest, AuthorityEntryKind::TurnCommit),
         0
     );
-    assert_eq!(delayed_guest_state, pair.mechanical_control(Endpoint::Guest)?);
+    assert_eq!(
+        delayed_guest_state,
+        pair.mechanical_control(Endpoint::Guest)?
+    );
     assert_ne!(
         pair.mechanical_control(Endpoint::Host)?,
         pair.mechanical_control(Endpoint::Guest)?,
@@ -687,7 +695,10 @@ fn raw_key_forced_doubles_authority_replica_campaign() -> TestResult {
     let turn_entry = pair.authority_entry(AuthorityEntryKind::TurnCommit)?;
     assert_material_matches_snapshots(&pair, AuthorityEntryKind::TurnCommit, &turn_entry)?;
     let turn_presentations = pair.settle_all_presentations()?;
-    assert!(turn_presentations > 0, "TURN did not emit a presentation plan");
+    assert!(
+        turn_presentations > 0,
+        "TURN did not emit a presentation plan"
+    );
     assert_eq!(
         guest_after_turn,
         pair.mechanical_control(Endpoint::Guest)?,

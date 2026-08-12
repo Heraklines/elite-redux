@@ -9,18 +9,16 @@ use std::sync::Arc;
 
 use er_content::pack::ContentPack;
 use er_game::internal_event::{
-    AuthorityEntryReadyPayload, BattleResolvedPayload, ButtonEventPayload,
-    ControlInstalledPayload, InternalEvent, InternalEventKind, InternalEventQueue,
-    MaterialApplyResult as EventApplyResult, MaterialInstalledPayload, MaterialKind,
-    PresentationBarrier, PreparedAuthorityEntry, PreparedBattleResolution, UiEventPayload,
+    AuthorityEntryReadyPayload, BattleResolvedPayload, ButtonEventPayload, ControlInstalledPayload,
+    InternalEvent, InternalEventKind, InternalEventQueue, MaterialApplyResult as EventApplyResult,
+    MaterialInstalledPayload, MaterialKind, PreparedAuthorityEntry, PreparedBattleResolution,
+    PresentationBarrier, UiEventPayload,
 };
 use er_game::material::{
     BattleMaterialApplyContext, MaterialApplyResult, decode_replacement_material,
     decode_turn_material,
 };
-use er_game::runtime::{
-    BattleGameConfig, BattleUiResult, GameRuntime, GameRuntimeError,
-};
+use er_game::runtime::{BattleGameConfig, BattleUiResult, GameRuntime, GameRuntimeError};
 use er_game::snapshot::{GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2};
 use er_protocol::{
     AuthorityLog, AuthorityLogAction, AuthorityLogSnapshotBridge, AuthorityReplica,
@@ -28,12 +26,12 @@ use er_protocol::{
     EndpointRole, FrameContextSnapshotV2, FrameValidator, InboundFrameResult, KernelScheduler,
     PeerBinding, PeerIdentitySnapshotV2, PendingRecoverySnapshotV2, ProposalAdmission,
     ProposalAdmissionLedger, ProposalAdmissionSnapshotBridge, ProposalIdentity,
-    ProposalLeaseAction, ProposalLeaseManager, ProposalLeaseSpec, ProposalLeaseStart,
-    ProposalLeaseSnapshotBridge, ProtocolRuntimeSnapshotV2, RecoveryAction,
-    RecoveryBundleValidation, RecoveryFrontierStagingOutcome, RecoveryLiveState,
-    RecoveryMaterialOutcome, RecoveryPhase, RecoveryTransaction, RecoveryTransactionSnapshotBridge,
-    RecoveryValidationContext, ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage,
-    SchedulerCommand, StagedPeerRebindSnapshotV2, ValidatedFrame, ValidatedFrameBody, control_id_of,
+    ProposalLeaseAction, ProposalLeaseManager, ProposalLeaseSnapshotBridge, ProposalLeaseSpec,
+    ProposalLeaseStart, ProtocolRuntimeSnapshotV2, RecoveryAction, RecoveryBundleValidation,
+    RecoveryFrontierStagingOutcome, RecoveryLiveState, RecoveryMaterialOutcome, RecoveryPhase,
+    RecoveryTransaction, RecoveryTransactionSnapshotBridge, RecoveryValidationContext,
+    ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage, SchedulerCommand,
+    StagedPeerRebindSnapshotV2, ValidatedFrame, ValidatedFrameBody, control_id_of,
     frame_contexts_compatible, validate_recovery_bundle,
 };
 use er_state::digest::MechanicalStateDigest;
@@ -43,20 +41,18 @@ use er_types::battle_command::{
     ReplacementSelection,
 };
 use er_types::battle_control::{BattleControl, BattleControlPlan};
-use er_types::battle_ids::{
-    AuthorityEpoch, BattlePresentationEventId, CanonicalHexBytes,
-};
+use er_types::battle_ids::{AuthorityEpoch, BattlePresentationEventId, CanonicalHexBytes};
 use er_types::battle_ui::{
     BATTLE_UI_PROJECTION_SCHEMA_VERSION, BattlePresentationEvent, BattleUiProjection,
     PresentationSettlementOutcome,
 };
 use er_types::{
-    AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceipt,
-    AuthorityReceiptBody, ButtonEvent, ConnectionGeneration, ControlProjectionOutcome,
-    FRAME_PROTOCOL_VERSION, FrameContext, FrameType, InputTimerCommand, KernelEffect, KernelInput,
-    LiveResourceSnapshot, NetworkFrame, ProposalMessage, RawFrame, RecoveryAppliedProof,
-    RecoveryBundle, RecoveryBundleBody, RecoveryFenceState, RecoveryRequestBody, Revision, SeatId,
-    TailRequestBody, TerminalState, TimerId, TransportState,
+    AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceipt, AuthorityReceiptBody,
+    ButtonEvent, ConnectionGeneration, ControlProjectionOutcome, FRAME_PROTOCOL_VERSION,
+    FrameContext, FrameType, InputTimerCommand, KernelEffect, KernelInput, LiveResourceSnapshot,
+    NetworkFrame, ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle,
+    RecoveryBundleBody, RecoveryFenceState, RecoveryRequestBody, Revision, SeatId, TailRequestBody,
+    TerminalState, TimerId, TransportState,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
@@ -65,8 +61,8 @@ use thiserror::Error;
 use crate::battle_authority::{
     AuthorityPreparedTransaction, AuthorityPublishedTransaction, AuthorityReplacementDecision,
     AuthorityReplacementRequest, AuthorityTransactionError, AuthorityTransactionInput,
-    AuthorityTurnRequest, EnclosingKernelValidation, PreparedMaterial, prepare_authority_replacement,
-    prepare_authority_turn, protocol_next_control_from_plan,
+    AuthorityTurnRequest, EnclosingKernelValidation, PreparedMaterial,
+    prepare_authority_replacement, prepare_authority_turn, protocol_next_control_from_plan,
 };
 use crate::battle_presentation::{
     BattlePresentationError, BattlePresentationState, M3_PRESENTATION_FAILED,
@@ -76,8 +72,8 @@ use crate::battle_ui::{BattleUiAdapter, BattleUiAdapterError};
 use crate::input_router::{BattleButtonEvent, BattleInputOutput, InputRouteError};
 use crate::kernel::{BattleProtocolConfig, BattleProtocolRoleConfig};
 use crate::snapshot::{
-    BattleKernelRuntimeIdentitySnapshotV1, InputRouterSnapshotV2,
-    PendingPresentationsSnapshotV1, RngDraw, SnapshotError,
+    BattleKernelRuntimeIdentitySnapshotV1, InputRouterSnapshotV2, PendingPresentationsSnapshotV1,
+    RngDraw, SnapshotError,
 };
 use crate::ui_reducer::{BattleUiIntent, BattleUiReject};
 
@@ -172,7 +168,11 @@ enum BattleProtocolState {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "kind", content = "proposal", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(
+    tag = "kind",
+    content = "proposal",
+    rename_all = "SCREAMING_SNAKE_CASE"
+)]
 enum BattleProposalEnvelope {
     Command(BattleCommandProposalV1),
     Replacement(BattleReplacementProposalV1),
@@ -308,7 +308,8 @@ impl BattleMode {
             last_rng_audit: Vec::new(),
             last_internal_events: Vec::new(),
         };
-        mode.validate_quiescent().map_err(|error| protocol_init(&error.to_string()))?;
+        mode.validate_quiescent()
+            .map_err(|error| protocol_init(&error.to_string()))?;
         Ok(mode)
     }
 
@@ -318,7 +319,8 @@ impl BattleMode {
         terminal: &mut Option<TerminalState>,
         input: KernelInput,
     ) -> Result<Vec<KernelEffect>, BattleKernelError> {
-        let mut transaction = BattleTransaction::new(self.clone(), scheduler.clone(), terminal.clone());
+        let mut transaction =
+            BattleTransaction::new(self.clone(), scheduler.clone(), terminal.clone());
         let staged = transaction
             .translate(input)
             .and_then(|()| transaction.drain())
@@ -456,9 +458,7 @@ impl BattleMode {
                     .extend(pending_recoveries.keys().cloned());
             }
             BattleProtocolState::Replica {
-                leases,
-                recovery,
-                ..
+                leases, recovery, ..
             } => {
                 snapshot.proposal_leases = leases.diagnostics().live_operation_ids;
                 let recovery = recovery.diagnostics();
@@ -621,12 +621,8 @@ impl BattleMode {
             });
         }
         let ui = self.ui.dispose(scheduler);
-        let _ = map_input_timer_commands(
-            &mut effects,
-            &ui.timers,
-            scheduler,
-            self.game.local_seat(),
-        );
+        let _ =
+            map_input_timer_commands(&mut effects, &ui.timers, scheduler, self.game.local_seat());
         match &mut self.protocol {
             BattleProtocolState::Authority {
                 log,
@@ -710,7 +706,9 @@ impl BattleProtocolState {
                 if log.local_context.sender_seat_id != local_seat
                     || log.local_context.authority_seat_id != local_seat
                 {
-                    return Err(protocol_init("authority context does not name the local authority seat"));
+                    return Err(protocol_init(
+                        "authority context does not name the local authority seat",
+                    ));
                 }
                 let context = log.local_context.clone();
                 let authority_log = if log.peer_bindings.is_empty() {
@@ -746,7 +744,9 @@ impl BattleProtocolState {
                 if replica.receipt_context.sender_seat_id != local_seat
                     || replica.authority_seat_id == local_seat
                 {
-                    return Err(protocol_init("replica context does not name the local guest seat"));
+                    return Err(protocol_init(
+                        "replica context does not name the local guest seat",
+                    ));
                 }
                 let context = replica.receipt_context.clone();
                 if recovery.local_context != context {
@@ -1037,11 +1037,7 @@ impl BattleProtocolState {
                     .iter()
                     .min_by_key(|binding| binding.seat_id)
                     .map(|binding| {
-                        peer_frame_context(
-                            context,
-                            binding.seat_id,
-                            binding.connection_generation,
-                        )
+                        peer_frame_context(context, binding.seat_id, binding.connection_generation)
                     });
                 ProtocolRuntimeSnapshotV2 {
                     role: EndpointRole::Authority,
@@ -1079,12 +1075,9 @@ impl BattleProtocolState {
                 staged_local_rebind,
                 staged_authority_rebind,
             } => {
-                let authority_replica = replica
-                    .snapshot_v2()
-                    .map_err(map_protocol_snapshot_error)?;
-                let proposal_leases = leases
-                    .snapshot_v2()
-                    .map_err(map_protocol_snapshot_error)?;
+                let authority_replica =
+                    replica.snapshot_v2().map_err(map_protocol_snapshot_error)?;
+                let proposal_leases = leases.snapshot_v2().map_err(map_protocol_snapshot_error)?;
                 let recovery_snapshot = recovery
                     .snapshot_v2()
                     .map_err(map_protocol_snapshot_error)?;
@@ -1163,9 +1156,7 @@ impl BattleProtocolState {
                 }
             }
         };
-        snapshot
-            .validate()
-            .map_err(map_protocol_snapshot_error)?;
+        snapshot.validate().map_err(map_protocol_snapshot_error)?;
         Ok(snapshot)
     }
 
@@ -1173,9 +1164,7 @@ impl BattleProtocolState {
         snapshot: ProtocolRuntimeSnapshotV2,
         scheduler: &mut KernelScheduler,
     ) -> Result<Self, SnapshotError> {
-        snapshot
-            .validate()
-            .map_err(map_protocol_snapshot_error)?;
+        snapshot.validate().map_err(map_protocol_snapshot_error)?;
         if snapshot.pending_material.is_some() || snapshot.pending_control.is_some() {
             return Err(snapshot_invalid(
                 "protocol.pending_material",
@@ -1231,11 +1220,7 @@ fn restore_authority_protocol(
         .iter()
         .min_by_key(|binding| binding.seat_id)
         .map(|binding| {
-            peer_frame_context(
-                &context,
-                binding.seat_id,
-                binding.connection_generation,
-            )
+            peer_frame_context(&context, binding.seat_id, binding.connection_generation)
         });
     if peer_identity.local != context || peer_identity.peer != expected_peer {
         return Err(snapshot_invalid(
@@ -1281,25 +1266,26 @@ fn restore_authority_protocol(
                 "authority pending recovery cannot carry a replica-owned bundle",
             ));
         }
-        let bytes = correlations.remove(&pending.correlation_id).ok_or_else(|| {
-            snapshot_invalid(
-                "protocol.pending_correlations",
-                "authority pending recovery has no exact private causal record",
-            )
-        })?;
+        let bytes = correlations
+            .remove(&pending.correlation_id)
+            .ok_or_else(|| {
+                snapshot_invalid(
+                    "protocol.pending_correlations",
+                    "authority pending recovery has no exact private causal record",
+                )
+            })?;
         let recovery: BattlePendingRecovery = decode_canonical_snapshot_bytes(
             &bytes,
             "protocol.pending_correlations.authority_recovery",
         )?;
-        let response_body = serde_json::from_value::<RecoveryBundleBody>(
-            recovery.response_frame.body.clone(),
-        )
-        .map_err(|error| {
-            snapshot_invalid(
-                "protocol.pending_correlations.authority_recovery.response_frame",
-                error.to_string(),
-            )
-        })?;
+        let response_body =
+            serde_json::from_value::<RecoveryBundleBody>(recovery.response_frame.body.clone())
+                .map_err(|error| {
+                    snapshot_invalid(
+                        "protocol.pending_correlations.authority_recovery.response_frame",
+                        error.to_string(),
+                    )
+                })?;
         let canonical_response_body = serde_json::to_value(&response_body).map_err(|error| {
             snapshot_invalid(
                 "protocol.pending_correlations.authority_recovery.response_frame",
@@ -1399,17 +1385,19 @@ fn restore_authority_protocol(
             "authority local rebind marker differs from staged state",
         ));
     }
-    let log = <AuthorityLog as AuthorityLogSnapshotBridge>::from_snapshot_v2(
-        authority_log,
-        scheduler,
+    let log =
+        <AuthorityLog as AuthorityLogSnapshotBridge>::from_snapshot_v2(authority_log, scheduler)
+            .map_err(map_protocol_snapshot_error)?;
+    let proposals = <ProposalAdmissionLedger as ProposalAdmissionSnapshotBridge>::from_snapshot_v2(
+        proposal_admission,
     )
     .map_err(map_protocol_snapshot_error)?;
-    let proposals =
-        <ProposalAdmissionLedger as ProposalAdmissionSnapshotBridge>::from_snapshot_v2(
-            proposal_admission,
-        )
-        .map_err(map_protocol_snapshot_error)?;
-    if disposed != log.snapshot_v2().map_err(map_protocol_snapshot_error)?.disposed {
+    if disposed
+        != log
+            .snapshot_v2()
+            .map_err(map_protocol_snapshot_error)?
+            .disposed
+    {
         return Err(snapshot_invalid(
             "protocol.disposed",
             "restored authority owner differs from the protocol lifecycle",
@@ -1542,8 +1530,7 @@ fn restore_replica_protocol(
     )
     .map_err(map_protocol_snapshot_error)?;
     let recovery = <RecoveryTransaction as RecoveryTransactionSnapshotBridge>::from_snapshot_v2(
-        recovery,
-        scheduler,
+        recovery, scheduler,
     )
     .map_err(map_protocol_snapshot_error)?;
     if disposed
@@ -1717,7 +1704,10 @@ where
 {
     let raw = value.as_str().as_bytes();
     if raw.is_empty() {
-        return Err(snapshot_canonical(path, "canonical payload must not be empty"));
+        return Err(snapshot_canonical(
+            path,
+            "canonical payload must not be empty",
+        ));
     }
     let mut bytes = Vec::with_capacity(raw.len() / 2);
     for index in (0..raw.len()).step_by(2) {
@@ -1749,12 +1739,16 @@ fn snapshot_hex_value(value: u8) -> Option<u8> {
 }
 
 fn scheduler_has_reason(scheduler: &KernelScheduler, expected: &str) -> bool {
-    scheduler.export_restorable_state().pauses.iter().any(|pause| {
-        pause
-            .reasons
-            .iter()
-            .any(|reason| reason.as_str() == expected)
-    })
+    scheduler
+        .export_restorable_state()
+        .pauses
+        .iter()
+        .any(|pause| {
+            pause
+                .reasons
+                .iter()
+                .any(|reason| reason.as_str() == expected)
+        })
 }
 
 fn presentation_revisions_from_protocol(
@@ -2045,7 +2039,10 @@ impl BattleTransaction {
             BattleProtocolState::Replica { recovery, .. }
                 if recovery.phase().is_some_and(|phase| {
                     !matches!(phase, RecoveryPhase::Released | RecoveryPhase::Terminalized)
-                }) => Some(recovery.abort(reason.clone(), &mut self.scheduler)),
+                }) =>
+            {
+                Some(recovery.abort(reason.clone(), &mut self.scheduler))
+            }
             BattleProtocolState::Authority { .. } | BattleProtocolState::Replica { .. } => None,
         };
         let mut terminalized = false;
@@ -2111,8 +2108,8 @@ impl BattleTransaction {
             &self.scheduler,
             self.staged.game.local_seat(),
         )?;
-        self.queue.push_all_source_order(output.events.into_iter().map(|event| {
-            match event {
+        self.queue
+            .push_all_source_order(output.events.into_iter().map(|event| match event {
                 BattleButtonEvent::Pressed {
                     seat,
                     button,
@@ -2131,8 +2128,7 @@ impl BattleTransaction {
                     menu_instance_id,
                     event: ButtonEvent::Released(button),
                 }),
-            }
-        }));
+            }));
         Ok(())
     }
 
@@ -2140,11 +2136,14 @@ impl BattleTransaction {
         let ButtonEvent::Pressed(button) = payload.event else {
             return Ok(());
         };
-        let reduction = self.staged.ui.reduce_one_button(BattleButtonEvent::Pressed {
-            seat: payload.endpoint,
-            button,
-            menu_instance_id: payload.menu_instance_id,
-        })?;
+        let reduction = self
+            .staged
+            .ui
+            .reduce_one_button(BattleButtonEvent::Pressed {
+                seat: payload.endpoint,
+                button,
+                menu_instance_id: payload.menu_instance_id,
+            })?;
         if reduction.changed {
             let projection = self.staged.ui.projection();
             let (menu_instance_id, control_id, selected_option_id) = projection_menu(projection)
@@ -2192,10 +2191,8 @@ impl BattleTransaction {
                     if !self.admit_local_authority_proposal(&envelope)? {
                         return Ok(());
                     }
-                    self.pending_replacements.insert(
-                        proposal.operation_id.clone(),
-                        proposal.clone(),
-                    );
+                    self.pending_replacements
+                        .insert(proposal.operation_id.clone(), proposal.clone());
                     self.queue
                         .push(InternalEvent::replacement_proposal(proposal, epoch));
                     Ok(())
@@ -2275,9 +2272,7 @@ impl BattleTransaction {
         payload: BattleResolvedPayload,
     ) -> Result<(), BattleKernelError> {
         let (context, log) = match &self.staged.protocol {
-            BattleProtocolState::Authority { context, log, .. } => {
-                (context.clone(), log.clone())
-            }
+            BattleProtocolState::Authority { context, log, .. } => (context.clone(), log.clone()),
             BattleProtocolState::Replica { .. } => {
                 return Err(BattleKernelError::Invariant {
                     reason: "replica emitted BattleResolved".to_owned(),
@@ -2362,11 +2357,12 @@ impl BattleTransaction {
             }
         };
         let entry = prepared.prepared_entry().clone();
-        let material_bytes = serde_json::to_vec(&prepared.material_wire().payload).map_err(|error| {
-            BattleKernelError::Protocol {
-                reason: format!("prepared material serialization failed: {error}"),
-            }
-        })?;
+        let material_bytes =
+            serde_json::to_vec(&prepared.material_wire().payload).map_err(|error| {
+                BattleKernelError::Protocol {
+                    reason: format!("prepared material serialization failed: {error}"),
+                }
+            })?;
         self.pending_authority = Some(prepared);
         self.queue.push(InternalEvent::AuthorityEntryReady(
             AuthorityEntryReadyPayload {
@@ -2386,11 +2382,12 @@ impl BattleTransaction {
         &mut self,
         payload: AuthorityEntryReadyPayload,
     ) -> Result<(), BattleKernelError> {
-        let prepared = self.pending_authority.as_ref().ok_or_else(|| {
-            BattleKernelError::Invariant {
-                reason: "AuthorityEntryReady has no prepared transaction".to_owned(),
-            }
-        })?;
+        let prepared =
+            self.pending_authority
+                .as_ref()
+                .ok_or_else(|| BattleKernelError::Invariant {
+                    reason: "AuthorityEntryReady has no prepared transaction".to_owned(),
+                })?;
         let entry = prepared.prepared_entry();
         if entry.revision != payload.prepared.revision
             || entry.operation_id != payload.prepared.operation_id
@@ -2413,8 +2410,8 @@ impl BattleTransaction {
             allocator_before.to_vec(),
             prepared.control().clone(),
         )?;
-        self.queue.push(InternalEvent::MaterialInstalled(
-            MaterialInstalledPayload {
+        self.queue
+            .push(InternalEvent::MaterialInstalled(MaterialInstalledPayload {
                 revision: entry.revision,
                 result: EventApplyResult {
                     material_kind: kind,
@@ -2422,8 +2419,7 @@ impl BattleTransaction {
                     before_digest: before_digest.clone(),
                     after_digest: after_digest.clone(),
                 },
-            },
-        ));
+            }));
         Ok(())
     }
 
@@ -2439,8 +2435,8 @@ impl BattleTransaction {
                     reason: "authority MaterialInstalled identity mismatch".to_owned(),
                 });
             }
-            self.queue.push(InternalEvent::ControlInstalled(
-                ControlInstalledPayload {
+            self.queue
+                .push(InternalEvent::ControlInstalled(ControlInstalledPayload {
                     revision: payload.revision,
                     operation_id: payload.result.operation_id,
                     control: prepared.control().clone(),
@@ -2448,16 +2444,16 @@ impl BattleTransaction {
                         operation_id: prepared.operation_id().clone(),
                         pending_events: prepared.presentation().len(),
                     },
-                },
-            ));
+                }));
             return Ok(());
         }
 
-        let pending = self.pending_replica_material.as_ref().ok_or_else(|| {
-            BattleKernelError::Invariant {
-                reason: "replica MaterialInstalled has no applied material".to_owned(),
-            }
-        })?;
+        let pending =
+            self.pending_replica_material
+                .as_ref()
+                .ok_or_else(|| BattleKernelError::Invariant {
+                    reason: "replica MaterialInstalled has no applied material".to_owned(),
+                })?;
         if pending.entry.revision != payload.revision
             || pending.entry.operation_id != payload.result.operation_id
         {
@@ -2514,10 +2510,8 @@ impl BattleTransaction {
                     reason: "replica ControlInstalled identity mismatch".to_owned(),
                 });
             }
-            let committed_local_proposals = committed_local_proposal_ids(
-                &pending.entry,
-                self.staged.game.local_seat(),
-            )?;
+            let committed_local_proposals =
+                committed_local_proposal_ids(&pending.entry, self.staged.game.local_seat())?;
             let actions = match &mut self.staged.protocol {
                 BattleProtocolState::Replica { replica, .. } => replica
                     .record_replica_stage(
@@ -2646,8 +2640,10 @@ impl BattleTransaction {
             from: context.sender_seat_id,
             to: authority_seat,
             connection_generation: authority_generation,
-            payload: serde_json::to_value(envelope).map_err(|error| BattleKernelError::Protocol {
-                reason: format!("proposal encoding failed: {error}"),
+            payload: serde_json::to_value(envelope).map_err(|error| {
+                BattleKernelError::Protocol {
+                    reason: format!("proposal encoding failed: {error}"),
+                }
             })?,
         };
         let outcome = match &mut self.staged.protocol {
@@ -2718,9 +2714,11 @@ impl BattleTransaction {
             }
             BattleProtocolState::Replica { .. } => return Ok(()),
         };
-        let envelope: BattleProposalEnvelope = serde_json::from_value(proposal.payload)
-            .map_err(|error| BattleKernelError::Protocol {
-                reason: format!("typed proposal decode failed: {error}"),
+        let envelope: BattleProposalEnvelope =
+            serde_json::from_value(proposal.payload).map_err(|error| {
+                BattleKernelError::Protocol {
+                    reason: format!("typed proposal decode failed: {error}"),
+                }
             })?;
         if envelope.operation_id() != &proposal.operation_id
             || envelope.fingerprint() != proposal.fingerprint
@@ -2747,13 +2745,12 @@ impl BattleTransaction {
         let epoch = AuthorityEpoch::new(context.session_epoch);
         match envelope {
             BattleProposalEnvelope::Command(value) => {
-                self.queue.push(InternalEvent::command_proposal(value, epoch));
+                self.queue
+                    .push(InternalEvent::command_proposal(value, epoch));
             }
             BattleProposalEnvelope::Replacement(value) => {
-                self.pending_replacements.insert(
-                    value.operation_id.clone(),
-                    value.clone(),
-                );
+                self.pending_replacements
+                    .insert(value.operation_id.clone(), value.clone());
                 self.queue
                     .push(InternalEvent::replacement_proposal(value, epoch));
             }
@@ -2804,7 +2801,11 @@ impl BattleTransaction {
                 self.receive_recovery_applied(endpoint, context, proof)
             }
             ValidatedFrameBody::Terminal(body) => {
-                if self.staged.protocol.accepts_remote_frame(endpoint, &context) {
+                if self
+                    .staged
+                    .protocol
+                    .accepts_remote_frame(endpoint, &context)
+                {
                     self.enter_terminal_state(TerminalState {
                         terminal_id: body.terminal_id,
                         reason: body.reason,
@@ -2885,7 +2886,8 @@ impl BattleTransaction {
                     stage: body.stage,
                     control_id: body.control_id,
                 };
-                log.accept_receipt_detailed(receipt, &mut self.scheduler).actions
+                log.accept_receipt_detailed(receipt, &mut self.scheduler)
+                    .actions
             }
             BattleProtocolState::Replica { .. } => return Ok(()),
         };
@@ -2959,7 +2961,10 @@ impl BattleTransaction {
                         && expected.captured_frontier == body.captured_frontier
                         && expected.reason == body.reason;
                     if exact {
-                        Some((authority_context.sender_seat_id, expected.response_frame.clone()))
+                        Some((
+                            authority_context.sender_seat_id,
+                            expected.response_frame.clone(),
+                        ))
                     } else {
                         conflict = true;
                         None
@@ -3148,13 +3153,10 @@ impl BattleTransaction {
         }
 
         if bundle.frontier == Revision::ZERO {
-            if recovered_entry.is_some()
-                || !applied_tail.is_empty()
-                || !completed_without_frontier
+            if recovered_entry.is_some() || !applied_tail.is_empty() || !completed_without_frontier
             {
                 return Err(BattleKernelError::Invariant {
-                    reason: "zero-frontier recovery did not complete as an empty proof"
-                        .to_owned(),
+                    reason: "zero-frontier recovery did not complete as an empty proof".to_owned(),
                 });
             }
             return self.install_current_projection();
@@ -3167,15 +3169,15 @@ impl BattleTransaction {
         let recovered_entry = recovered_entry.ok_or_else(|| BattleKernelError::Invariant {
             reason: "positive recovery emitted no recovered frontier".to_owned(),
         })?;
-        let (final_entry, final_applied) = applied_tail.last().ok_or_else(|| {
-            BattleKernelError::Invariant {
-                reason: "positive recovery applied no battle material".to_owned(),
-            }
-        })?;
+        let (final_entry, final_applied) =
+            applied_tail
+                .last()
+                .ok_or_else(|| BattleKernelError::Invariant {
+                    reason: "positive recovery applied no battle material".to_owned(),
+                })?;
         if &recovered_entry != final_entry || recovered_entry.revision != bundle.frontier {
             return Err(BattleKernelError::Invariant {
-                reason: "recovery staged a frontier other than the applied final entry"
-                    .to_owned(),
+                reason: "recovery staged a frontier other than the applied final entry".to_owned(),
             });
         }
 
@@ -3199,8 +3201,7 @@ impl BattleTransaction {
             }]
         {
             return Err(BattleKernelError::Invariant {
-                reason: "replica did not retain the exact recovered entry for control"
-                    .to_owned(),
+                reason: "replica did not retain the exact recovered entry for control".to_owned(),
             });
         }
 
@@ -3327,11 +3328,7 @@ impl BattleTransaction {
                     }
                 };
                 recovery
-                    .control_result(
-                        outcome,
-                        live,
-                        &mut self.scheduler,
-                    )
+                    .control_result(outcome, live, &mut self.scheduler)
                     .map_err(protocol_error)?
             }
             BattleProtocolState::Authority { .. } => {
@@ -3372,8 +3369,7 @@ impl BattleTransaction {
         }
 
         for (entry, _) in &applied_tail {
-            let operation_ids =
-                committed_local_proposal_ids(entry, self.staged.game.local_seat())?;
+            let operation_ids = committed_local_proposal_ids(entry, self.staged.game.local_seat())?;
             self.retire_local_proposal_leases(&operation_ids)?;
         }
 
@@ -3464,11 +3460,12 @@ impl BattleTransaction {
                 applied_tail.push((entry.clone(), applied));
                 continue;
             }
-            let (before_digest, allocator_before) = replica_material_metadata(entry).map_err(|_| {
-                BattleKernelError::TerminalRequired {
-                    reason: crate::battle_replica::M3_MALFORMED_BATTLE_MATERIAL.to_owned(),
-                }
-            })?;
+            let (before_digest, allocator_before) =
+                replica_material_metadata(entry).map_err(|_| {
+                    BattleKernelError::TerminalRequired {
+                        reason: crate::battle_replica::M3_MALFORMED_BATTLE_MATERIAL.to_owned(),
+                    }
+                })?;
             self.staged
                 .game
                 .install_material(
@@ -3491,9 +3488,7 @@ impl BattleTransaction {
                     reason: "zero-frontier recovery retained a material tail".to_owned(),
                 });
             }
-        } else if applied_tail.last().map(|(entry, _)| &entry.material)
-            != Some(&bundle.material)
-        {
+        } else if applied_tail.last().map(|(entry, _)| &entry.material) != Some(&bundle.material) {
             return Err(BattleKernelError::Invariant {
                 reason: "recovery final material diverged from the validated bundle".to_owned(),
             });
@@ -3617,8 +3612,7 @@ impl BattleTransaction {
                         }
                     };
                     validate_replica_protocol_control(&entry, &applied)?;
-                    let (before_digest, allocator_before) =
-                        replica_material_metadata(&entry)?;
+                    let (before_digest, allocator_before) = replica_material_metadata(&entry)?;
                     self.staged
                         .game
                         .install_material(
@@ -3631,8 +3625,7 @@ impl BattleTransaction {
                             applied.next_control.clone(),
                         )
                         .map_err(|_| BattleKernelError::TerminalRequired {
-                            reason: crate::battle_replica::M3_INVALID_AUTHORITY_MATERIAL
-                                .to_owned(),
+                            reason: crate::battle_replica::M3_INVALID_AUTHORITY_MATERIAL.to_owned(),
                         })?;
                     let kind = match entry.kind {
                         AuthorityEntryKind::TurnCommit => MaterialKind::Turn,
@@ -3647,8 +3640,8 @@ impl BattleTransaction {
                         entry: entry.clone(),
                         applied: applied.clone(),
                     });
-                    self.queue.push(InternalEvent::MaterialInstalled(
-                        MaterialInstalledPayload {
+                    self.queue
+                        .push(InternalEvent::MaterialInstalled(MaterialInstalledPayload {
                             revision: entry.revision,
                             result: EventApplyResult {
                                 material_kind: kind,
@@ -3656,8 +3649,7 @@ impl BattleTransaction {
                                 before_digest,
                                 after_digest: applied.after_digest,
                             },
-                        },
-                    ));
+                        }));
                 }
                 ReplicaAction::ProjectControl {
                     entry,
@@ -3665,7 +3657,8 @@ impl BattleTransaction {
                 } => {
                     let pending = self.pending_replica_material.as_ref().ok_or_else(|| {
                         BattleKernelError::Invariant {
-                            reason: "ProjectControl arrived before material installation".to_owned(),
+                            reason: "ProjectControl arrived before material installation"
+                                .to_owned(),
                         }
                     })?;
                     if pending.entry != entry
@@ -3675,8 +3668,8 @@ impl BattleTransaction {
                             reason: "replica ProjectControl identity mismatch".to_owned(),
                         });
                     }
-                    self.queue.push(InternalEvent::ControlInstalled(
-                        ControlInstalledPayload {
+                    self.queue
+                        .push(InternalEvent::ControlInstalled(ControlInstalledPayload {
                             revision: entry.revision,
                             operation_id: entry.operation_id.clone(),
                             control: pending.applied.next_control.clone(),
@@ -3684,8 +3677,7 @@ impl BattleTransaction {
                                 operation_id: entry.operation_id,
                                 pending_events: pending.applied.presentation.len(),
                             },
-                        },
-                    ));
+                        }));
                 }
                 ReplicaAction::ProbePresentation { entry } => {
                     if let Some(existing) = self
@@ -3724,10 +3716,7 @@ impl BattleTransaction {
         outcome: PresentationSettlementOutcome,
     ) -> Result<(), BattleKernelError> {
         let operation_id = event_id.operation_id.clone();
-        let revision = self
-            .staged
-            .presentation_revisions
-            .remove(&event_id);
+        let revision = self.staged.presentation_revisions.remove(&event_id);
         let report = self
             .staged
             .presentations
@@ -3751,10 +3740,7 @@ impl BattleTransaction {
             && let BattleProtocolState::Replica { replica, .. } = &mut self.staged.protocol
         {
             let actions = replica
-                .presentation_result(
-                    revision,
-                    er_protocol::PresentationProbeOutcome::Settled,
-                )
+                .presentation_result(revision, er_protocol::PresentationProbeOutcome::Settled)
                 .map_err(protocol_error)?;
             self.map_replica_actions(actions)?;
         }
@@ -3965,8 +3951,8 @@ impl BattleTransaction {
                     && peer_bindings
                         .iter()
                         .all(|binding| staged_peer_rebinds.contains_key(&binding.seat_id));
-                let staged_local_connected = transports.get(&local)
-                    == Some(&TransportState::Connected);
+                let staged_local_connected =
+                    transports.get(&local) == Some(&TransportState::Connected);
                 let staged_peers_connected = peer_bindings.iter().all(|binding| {
                     transports.get(&binding.seat_id) == Some(&TransportState::Connected)
                 });
@@ -4037,12 +4023,12 @@ impl BattleTransaction {
                 if endpoint == *authority_seat && generation_changed {
                     *staged_authority_rebind = Some(generation);
                 }
-                let complete_generation_staged = staged_local_rebind.is_some()
-                    && staged_authority_rebind.is_some();
-                let staged_local_connected = transports.get(&local)
-                    == Some(&TransportState::Connected);
-                let staged_authority_connected = transports.get(&*authority_seat)
-                    == Some(&TransportState::Connected);
+                let complete_generation_staged =
+                    staged_local_rebind.is_some() && staged_authority_rebind.is_some();
+                let staged_local_connected =
+                    transports.get(&local) == Some(&TransportState::Connected);
+                let staged_authority_connected =
+                    transports.get(&*authority_seat) == Some(&TransportState::Connected);
                 if connected
                     && complete_generation_staged
                     && staged_local_connected
@@ -4091,10 +4077,7 @@ impl BattleTransaction {
                     *staged_local_rebind = None;
                     *staged_authority_rebind = None;
                     clear_presentations = true;
-                    replica_config_rebind = Some((
-                        next_context.clone(),
-                        next_authority_generation,
-                    ));
+                    replica_config_rebind = Some((next_context.clone(), next_authority_generation));
                     recovery_start = Some((next_context, actions));
                 }
             }
@@ -4112,9 +4095,7 @@ impl BattleTransaction {
         }
         if let Some((next_context, next_authority_generation)) = replica_config_rebind {
             let BattleProtocolRoleConfig::Replica {
-                replica,
-                recovery,
-                ..
+                replica, recovery, ..
             } = &mut self.staged.protocol_config.role
             else {
                 return Err(BattleKernelError::Invariant {
@@ -4172,10 +4153,7 @@ impl BattleTransaction {
         })
     }
 
-    fn enter_terminal_state(
-        &mut self,
-        terminal: TerminalState,
-    ) -> Result<(), BattleKernelError> {
+    fn enter_terminal_state(&mut self, terminal: TerminalState) -> Result<(), BattleKernelError> {
         if self.terminal.is_some() {
             return Ok(());
         }
@@ -4234,8 +4212,9 @@ impl BattleTransaction {
                         ProposalLeaseAction::Terminalize { .. } => {}
                         ProposalLeaseAction::Send { .. } => {
                             return Err(BattleKernelError::Invariant {
-                                reason: "proposal disposal emitted a fresh send during terminal cleanup"
-                                    .to_owned(),
+                                reason:
+                                    "proposal disposal emitted a fresh send during terminal cleanup"
+                                        .to_owned(),
                             });
                         }
                     }
@@ -4262,7 +4241,8 @@ impl BattleTransaction {
         self.staged.terminal_fenced = true;
         self.install_current_projection()?;
         self.terminal = Some(terminal.clone());
-        self.effects.push(KernelEffect::EnterSharedTerminal { terminal });
+        self.effects
+            .push(KernelEffect::EnterSharedTerminal { terminal });
         Ok(())
     }
 
@@ -4411,7 +4391,11 @@ fn projection_for(
 
 fn projection_menu(
     projection: &BattleUiProjection,
-) -> Option<(er_types::battle_ids::MenuInstanceId, &str, er_types::MenuOptionId)> {
+) -> Option<(
+    er_types::battle_ids::MenuInstanceId,
+    &str,
+    er_types::MenuOptionId,
+)> {
     let menu = match &projection.seat_control.control {
         BattleControl::CommandRoot(value) => &value.menu,
         BattleControl::MoveSelect(value) => &value.menu,
@@ -4445,11 +4429,7 @@ fn ui_intent_event(intent: BattleUiIntent) -> InternalEvent {
             seat,
             menu_instance_id,
             control_id,
-        } => InternalEvent::Ui(UiEventPayload::cancel(
-            seat,
-            menu_instance_id,
-            control_id,
-        )),
+        } => InternalEvent::Ui(UiEventPayload::cancel(seat, menu_instance_id, control_id)),
     }
 }
 
@@ -4617,13 +4597,14 @@ fn map_input_timer_commands(
     for command in commands {
         match command {
             InputTimerCommand::Schedule { timer_id, .. } => {
-                let timer = scheduler.timer(*timer_id).ok_or_else(|| {
-                    BattleKernelError::Invariant {
-                        reason: format!(
-                            "input router emitted schedule for unknown timer {timer_id}"
-                        ),
-                    }
-                })?;
+                let timer =
+                    scheduler
+                        .timer(*timer_id)
+                        .ok_or_else(|| BattleKernelError::Invariant {
+                            reason: format!(
+                                "input router emitted schedule for unknown timer {timer_id}"
+                            ),
+                        })?;
                 effects.push(KernelEffect::ScheduleTimer {
                     endpoint: timer.endpoint,
                     timer_id: timer.timer_id,
@@ -4663,10 +4644,7 @@ fn map_authority_actions(
     Ok(())
 }
 
-fn map_proposal_actions(
-    effects: &mut Vec<KernelEffect>,
-    actions: Vec<ProposalLeaseAction>,
-) {
+fn map_proposal_actions(effects: &mut Vec<KernelEffect>, actions: Vec<ProposalLeaseAction>) {
     for action in actions {
         match action {
             ProposalLeaseAction::Send { proposal } => {
@@ -4723,8 +4701,7 @@ fn map_recovery_rebind_cleanup(
             | RecoveryAction::ProjectControl { .. }
             | RecoveryAction::SendAppliedProof { .. } => {
                 return Err(BattleKernelError::Invariant {
-                    reason: "superseded recovery emitted non-cleanup work during rebind"
-                        .to_owned(),
+                    reason: "superseded recovery emitted non-cleanup work during rebind".to_owned(),
                 });
             }
         }

@@ -1,20 +1,19 @@
 #[path = "../src/battle_replica.rs"]
 mod battle_replica;
 
-use er_game::material::{
-    BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, ContentPack,
-    apply_turn_material, decode_replacement_material, decode_turn_material,
-};
 use battle_replica::{
     M3_CONTENT_HASH_MISMATCH, M3_INVALID_AUTHORITY_MATERIAL, M3_MALFORMED_BATTLE_MATERIAL,
     ProtocolViolation, ReplicaApplyError, map_material_apply_error,
+};
+use er_game::material::{
+    BattleMaterialApplyContext, BattleMaterialApplyError, BattleTurnMaterialV1, ContentPack,
+    apply_turn_material, decode_replacement_material, decode_turn_material,
 };
 use serde_json::json;
 
 const MATERIAL_SOURCE: &str = include_str!("../../er-game/src/material.rs");
 const REPLICA_SOURCE: &str = include_str!("../src/battle_replica.rs");
-const CONTENT_FIXTURE: &str =
-    include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
+const CONTENT_FIXTURE: &str = include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
 const VICTORY_CASE_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/victory.json");
 const CONTROL_FIXTURE: &str =
@@ -51,15 +50,12 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
         .expect("victory fixture has an initial canonical state")
         .clone();
     let state = serde_json::from_value(state_value.clone()).expect("initial state is typed");
-    let next_control = serde_json::from_str::<er_types::battle_control::BattleControlPlan>(
-        CONTROL_FIXTURE,
-    )
-    .expect("control fixture is typed");
+    let next_control =
+        serde_json::from_str::<er_types::battle_control::BattleControlPlan>(CONTROL_FIXTURE)
+            .expect("control fixture is typed");
     let wrong_digest = format!("blake3-v1:{}", "0".repeat(64));
-    let rng_before = serde_json::from_value(
-        state_value["battle"]["battle_rng"].clone(),
-    )
-    .expect("battle RNG is typed");
+    let rng_before = serde_json::from_value(state_value["battle"]["battle_rng"].clone())
+        .expect("battle RNG is typed");
     let material = BattleTurnMaterialV1 {
         schema_version: 1,
         oracle_game_sha: content.oracle_game_sha.clone(),
@@ -68,24 +64,19 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
             .expect("operation ID is typed"),
         battle_id: serde_json::from_value(state_value["battle"]["battle_id"].clone())
             .expect("battle ID is typed"),
-        wave: serde_json::from_value(state_value["battle"]["wave"].clone())
-            .expect("wave is typed"),
+        wave: serde_json::from_value(state_value["battle"]["wave"].clone()).expect("wave is typed"),
         resolved_turn: serde_json::from_value(state_value["battle"]["turn"].clone())
             .expect("turn is typed"),
         before_digest: serde_json::from_value(json!(wrong_digest.clone()))
             .expect("digest is typed"),
-        after_digest: serde_json::from_value(json!(wrong_digest))
-            .expect("digest is typed"),
+        after_digest: serde_json::from_value(json!(wrong_digest)).expect("digest is typed"),
         commands: serde_json::from_value(json!({"entries": []}))
             .expect("empty command set is typed"),
         action_order: Vec::new(),
         mutations: Vec::new(),
         presentation: Vec::new(),
-        presentation_digest: serde_json::from_value(json!(format!(
-            "blake3-v1:{}",
-            "0".repeat(64)
-        )))
-        .expect("presentation digest is typed"),
+        presentation_digest: serde_json::from_value(json!(format!("blake3-v1:{}", "0".repeat(64))))
+            .expect("presentation digest is typed"),
         rng_before: rng_before.clone(),
         rng_after: rng_before,
         rng_audit: Vec::new(),
@@ -174,7 +165,11 @@ fn replica_maps_every_common_error_to_the_frozen_class() {
             .expect("invalid material terminalizes")
     );
     assert!(ReplicaApplyError::BeforeDigestMismatch.is_recoverable());
-    assert!(ReplicaApplyError::BeforeDigestMismatch.terminal_reason().is_none());
+    assert!(
+        ReplicaApplyError::BeforeDigestMismatch
+            .terminal_reason()
+            .is_none()
+    );
 }
 
 #[test]
@@ -209,8 +204,10 @@ fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
     assert!(frontier < retained && frontier < admitted);
     assert!(replacement < frontier && frontier < next_frontier);
     assert!(MATERIAL_SOURCE.contains("same_frontier_window"));
-    assert!(MATERIAL_SOURCE.contains("current_command != remote_command")
-        || MATERIAL_SOURCE.contains("local_command != remote_command"));
+    assert!(
+        MATERIAL_SOURCE.contains("current_command != remote_command")
+            || MATERIAL_SOURCE.contains("local_command != remote_command")
+    );
     for required in [
         "CommandFrontierStatus::Pending",
         "CommandAdmissionSource::ScriptedEnemy",
@@ -218,7 +215,10 @@ fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
         "validate_next_state_command_collection",
         "project_battle_control_plan",
     ] {
-        assert!(MATERIAL_SOURCE.contains(required), "missing frontier guard {required}");
+        assert!(
+            MATERIAL_SOURCE.contains(required),
+            "missing frontier guard {required}"
+        );
     }
     assert!(!MATERIAL_SOURCE.contains("fn validate_command_root_menu"));
     assert!(!MATERIAL_SOURCE.contains("fn validate_replacement_menu"));
@@ -235,7 +235,10 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "validate_turn_rng",
         "validate_replacement_rng",
     ] {
-        assert!(MATERIAL_SOURCE.contains(required), "missing guard {required}");
+        assert!(
+            MATERIAL_SOURCE.contains(required),
+            "missing guard {required}"
+        );
     }
     assert!(
         MATERIAL_SOURCE.contains("BattlePresentationKind::BattleWon")
@@ -278,7 +281,10 @@ fn adapter_rejects_non_material_authority_entry_kinds_without_fallback() {
         "AuthorityEntryKind::WaveAdvance",
         "AuthorityEntryKind::TerminalCommit",
     ] {
-        assert!(REPLICA_SOURCE.contains(kind), "missing closed kind branch {kind}");
+        assert!(
+            REPLICA_SOURCE.contains(kind),
+            "missing closed kind branch {kind}"
+        );
     }
     assert!(REPLICA_SOURCE.contains("MalformedBattleMaterial"));
     assert!(!REPLICA_SOURCE.contains("fallback"));

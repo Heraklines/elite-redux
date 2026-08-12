@@ -422,7 +422,9 @@ impl InternalEvent {
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 #[doc(hidden)]
 pub enum InternalEventQueueError {
-    #[error("internal event budget exceeded after {processed} events; remaining queue has {remaining} events")]
+    #[error(
+        "internal event budget exceeded after {processed} events; remaining queue has {remaining} events"
+    )]
     InternalEventBudgetExceeded {
         processed: usize,
         remaining: usize,

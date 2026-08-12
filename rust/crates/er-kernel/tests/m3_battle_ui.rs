@@ -1,16 +1,15 @@
 #![allow(clippy::too_many_arguments)]
 
+#[path = "../src/battle_ui.rs"]
+mod battle_ui;
 #[path = "../src/input_router.rs"]
 mod input_router;
 #[path = "../src/ui_reducer.rs"]
 mod ui_reducer;
-#[path = "../src/battle_ui.rs"]
-mod battle_ui;
 
 use std::error::Error;
 
 use battle_ui::BattleUiAdapter;
-use input_router::BattleButtonEvent;
 use er_protocol::KernelScheduler;
 use er_types::battle_control::{
     BattleControl, CommandRootControl, MoveSelectControl, SeatBattleControl,
@@ -24,6 +23,7 @@ use er_types::{
     ButtonEvent, GameButton, InputFocus, InputMap, KeyBinding, MenuOptionId, OperationId,
     PhysicalKey, RawInputEvent, SafeU53, SeatId,
 };
+use input_router::BattleButtonEvent;
 use ui_reducer::{BattleUiIntent, BattleUiReducer, BattleUiReject};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -39,11 +39,7 @@ fn seat(value: u64) -> SeatId {
     SeatId::new(safe(value))
 }
 
-fn option(
-    id: &str,
-    row: u16,
-    enabled: bool,
-) -> Result<BattleMenuOption, Box<dyn Error>> {
+fn option(id: &str, row: u16, enabled: bool) -> Result<BattleMenuOption, Box<dyn Error>> {
     let option_id = MenuOptionId::new(id)?;
     Ok(BattleMenuOption::new(
         option_id.clone(),
@@ -183,11 +179,7 @@ fn battle_reducer_uses_only_explicit_edges_and_preserves_legacy_reducer_path() -
         "command/fight",
         true,
         vec![
-            MenuNavigationEdge::new(
-                fight.clone(),
-                NavigationDirection::Down,
-                switch.clone(),
-            ),
+            MenuNavigationEdge::new(fight.clone(), NavigationDirection::Down, switch.clone()),
             MenuNavigationEdge::new(switch.clone(), NavigationDirection::Up, fight.clone()),
         ],
     )?)?;
@@ -201,11 +193,7 @@ fn battle_reducer_uses_only_explicit_edges_and_preserves_legacy_reducer_path() -
             "command/fight",
             true,
             vec![
-                MenuNavigationEdge::new(
-                    fight.clone(),
-                    NavigationDirection::Down,
-                    switch.clone(),
-                ),
+                MenuNavigationEdge::new(fight.clone(), NavigationDirection::Down, switch.clone(),),
                 MenuNavigationEdge::new(switch.clone(), NavigationDirection::Up, fight.clone()),
             ],
         )?
@@ -218,17 +206,15 @@ fn battle_reducer_uses_only_explicit_edges_and_preserves_legacy_reducer_path() -
         return Err("root menu was not retained after navigation".into());
     };
     assert_eq!(current_menu.selected_option_id.clone(), switch);
-    assert!(!reducer
-        .reduce(seat(1), ButtonEvent::Pressed(GameButton::Right))?
-        .changed);
+    assert!(
+        !reducer
+            .reduce(seat(1), ButtonEvent::Pressed(GameButton::Right))?
+            .changed
+    );
 
     let mut legacy = input_router::InputRouter::new(battle_input_map());
     let mut scheduler = KernelScheduler::new();
-    let legacy_output = legacy.handle(
-        seat(1),
-        key_down(PhysicalKey::ArrowDown),
-        &mut scheduler,
-    )?;
+    let legacy_output = legacy.handle(seat(1), key_down(PhysicalKey::ArrowDown), &mut scheduler)?;
     assert_eq!(
         legacy_output.events,
         vec![ButtonEvent::Pressed(GameButton::Down)]
@@ -283,9 +269,11 @@ fn battle_disabled_options_remain_navigation_endpoints_but_reject_activation() -
             MenuOptionId::new("command/switch")?,
         )],
     )?)?;
-    assert!(reducer
-        .reduce(seat(1), ButtonEvent::Pressed(GameButton::Down))?
-        .changed);
+    assert!(
+        reducer
+            .reduce(seat(1), ButtonEvent::Pressed(GameButton::Down))?
+            .changed
+    );
     assert_eq!(
         reducer.reduce(seat(1), ButtonEvent::Pressed(GameButton::Action)),
         Err(BattleUiReject::DisabledOption)
@@ -308,14 +296,19 @@ fn battle_raw_repeat_duplicate_keyup_blur_and_stale_timer_are_deterministic() ->
     let mut adapter = BattleUiAdapter::new(seat(1), projection, battle_input_map())?;
     let mut scheduler = KernelScheduler::new();
 
-    let first = adapter.handle_raw_input(seat(1), key_down(PhysicalKey::ArrowDown), &mut scheduler)?;
+    let first =
+        adapter.handle_raw_input(seat(1), key_down(PhysicalKey::ArrowDown), &mut scheduler)?;
     assert!(first.projection_changed);
     assert_eq!(first.timers.len(), 1);
-    assert_eq!(first.timers[0], er_types::InputTimerCommand::Schedule {
-        timer_id: er_types::TimerId::new(safe(0)),
-        delay_ms: safe(250),
-    });
-    let duplicate = adapter.handle_raw_input(seat(1), key_down(PhysicalKey::ArrowDown), &mut scheduler)?;
+    assert_eq!(
+        first.timers[0],
+        er_types::InputTimerCommand::Schedule {
+            timer_id: er_types::TimerId::new(safe(0)),
+            delay_ms: safe(250),
+        }
+    );
+    let duplicate =
+        adapter.handle_raw_input(seat(1), key_down(PhysicalKey::ArrowDown), &mut scheduler)?;
     assert_eq!(duplicate, battle_ui::BattleUiOutput::default());
 
     let repeated = adapter.timer_fired(seat(1), er_types::TimerId::new(safe(0)), &mut scheduler)?;
@@ -335,11 +328,8 @@ fn battle_raw_repeat_duplicate_keyup_blur_and_stale_timer_are_deterministic() ->
 
     let held = adapter.handle_raw_input(seat(1), key_down(PhysicalKey::Space), &mut scheduler)?;
     assert_eq!(held.timers.len(), 1);
-    let blurred = adapter.handle_raw_input(
-        seat(1),
-        RawInputEvent::WindowBlurred,
-        &mut scheduler,
-    )?;
+    let blurred =
+        adapter.handle_raw_input(seat(1), RawInputEvent::WindowBlurred, &mut scheduler)?;
     assert_eq!(blurred.timers.len(), 1);
     assert_eq!(adapter.input().held_count(), 0);
     assert_eq!(adapter.input().lock_count(), 0);
@@ -380,11 +370,8 @@ fn battle_input_route_and_one_button_reduction_are_separate_stages() -> TestResu
     let mut adapter = BattleUiAdapter::new(seat(1), projection.clone(), battle_input_map())?;
     let mut scheduler = KernelScheduler::new();
 
-    let routed = adapter.route_raw_input(
-        seat(1),
-        key_down(PhysicalKey::ArrowDown),
-        &mut scheduler,
-    )?;
+    let routed =
+        adapter.route_raw_input(seat(1), key_down(PhysicalKey::ArrowDown), &mut scheduler)?;
     assert_eq!(routed.events.len(), 1);
     assert_eq!(routed.timers.len(), 1);
     assert_eq!(adapter.projection(), &projection);
@@ -403,11 +390,8 @@ fn battle_input_route_and_one_button_reduction_are_separate_stages() -> TestResu
     assert!(reduction.intents.is_empty());
     assert_ne!(adapter.projection(), &projection);
 
-    let repeated = adapter.route_timer_fired(
-        seat(1),
-        er_types::TimerId::new(safe(0)),
-        &mut scheduler,
-    )?;
+    let repeated =
+        adapter.route_timer_fired(seat(1), er_types::TimerId::new(safe(0)), &mut scheduler)?;
     assert_eq!(repeated.events.len(), 1);
     assert_eq!(repeated.timers.len(), 1);
     assert_eq!(
@@ -440,7 +424,8 @@ fn battle_input_route_and_one_button_reduction_are_separate_stages() -> TestResu
 }
 
 #[test]
-fn battle_action_and_cancel_emit_only_private_ui_intents_and_teardown_is_idempotent() -> TestResult {
+fn battle_action_and_cancel_emit_only_private_ui_intents_and_teardown_is_idempotent() -> TestResult
+{
     let projection = command_projection(1, "command/fight", true, Vec::new())?;
     let mut adapter = BattleUiAdapter::new(seat(1), projection, battle_input_map())?;
     let mut scheduler = KernelScheduler::new();
@@ -461,19 +446,28 @@ fn battle_action_and_cancel_emit_only_private_ui_intents_and_teardown_is_idempot
         },
         &mut scheduler,
     )?;
-    assert!(adapter
-        .handle_raw_input(seat(1), RawInputEvent::KeyDown {
-            code: PhysicalKey::Backspace,
-            printable: false,
-            browser_repeat: false,
-            focus: InputFocus::Game,
-        }, &mut scheduler)?
-        .rejection
-        .is_some());
+    assert!(
+        adapter
+            .handle_raw_input(
+                seat(1),
+                RawInputEvent::KeyDown {
+                    code: PhysicalKey::Backspace,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+                &mut scheduler
+            )?
+            .rejection
+            .is_some()
+    );
     let disposed = adapter.dispose(&mut scheduler);
     assert!(scheduler.live_timers().is_empty());
     assert_eq!(adapter.input().held_count(), 0);
-    assert_eq!(adapter.dispose(&mut scheduler), battle_ui::BattleUiOutput::default());
+    assert_eq!(
+        adapter.dispose(&mut scheduler),
+        battle_ui::BattleUiOutput::default()
+    );
     assert!(matches!(
         adapter.handle_raw_input(seat(1), RawInputEvent::WindowFocused, &mut scheduler),
         Err(battle_ui::BattleUiAdapterError::Disposed)

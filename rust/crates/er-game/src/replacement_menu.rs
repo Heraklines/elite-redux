@@ -12,9 +12,7 @@ use er_battle::replacement::{
 };
 use er_state::battle::BattleState;
 use er_types::battle_command::{BattleCommandError, replacement_operation_id};
-use er_types::battle_control::{
-    BattleControlError, ReplacementSelectControl,
-};
+use er_types::battle_control::{BattleControlError, ReplacementSelectControl};
 use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanceId, PokemonId};
 use er_types::battle_model::{FaintSource, ReplacementProgress};
 use er_types::battle_ui::{BattleMenu, BattleMenuError, BattleMenuOptionError};
@@ -203,11 +201,10 @@ pub fn navigate_replacement_menu(
 ) -> Result<ReplacementSelectControl, ReplacementMenuError> {
     let stored = validate_replacement_control(battle, control, Some(expected_instance_id))?;
     let parts = build_party_graph_parts(battle, control.owner_seat, false)?;
-    let Some(edge) = control
-        .menu
-        .navigation
-        .iter()
-        .find(|edge| edge.from == control.menu.selected_option_id && edge.direction == direction)
+    let Some(edge) =
+        control.menu.navigation.iter().find(|edge| {
+            edge.from == control.menu.selected_option_id && edge.direction == direction
+        })
     else {
         return Ok(control.clone());
     };
@@ -245,7 +242,9 @@ pub fn navigate_replacement_menu(
         stored.source,
         stored.actor,
         stored.field_slot,
-        stored.owner_seat.ok_or(ReplacementMenuError::NonPlayerReplacement)?,
+        stored
+            .owner_seat
+            .ok_or(ReplacementMenuError::NonPlayerReplacement)?,
         menu,
         last_left_option_id,
         last_right_option_id,
@@ -316,15 +315,9 @@ pub(crate) fn validate_replacement_control(
     {
         return Err(ReplacementMenuError::StaleMenuState);
     }
-    if !is_memory_option(
-        &control.last_left_option_id,
-        &parts.active_option_ids,
-        true,
-    ) || !is_memory_option(
-        &control.last_right_option_id,
-        &parts.bench_option_ids,
-        true,
-    ) {
+    if !is_memory_option(&control.last_left_option_id, &parts.active_option_ids, true)
+        || !is_memory_option(&control.last_right_option_id, &parts.bench_option_ids, true)
+    {
         return Err(ReplacementMenuError::StaleMenuState);
     }
     if !selected_matches_memory(

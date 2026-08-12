@@ -243,12 +243,12 @@ impl MemoryStorage {
         if self.disposed {
             return Err(StorageAdapterError::Disposed);
         }
-        let request = self
-            .pending_request(endpoint, request_id)
-            .ok_or(StorageAdapterError::UnknownRequest {
+        let request = self.pending_request(endpoint, request_id).ok_or(
+            StorageAdapterError::UnknownRequest {
                 endpoint,
                 request_id,
-            })?;
+            },
+        )?;
         match (&request.value, result) {
             (_, StorageResult::Failed { reason }) if reason.is_empty() => {
                 Err(StorageAdapterError::ResultMismatch {
@@ -265,13 +265,11 @@ impl MemoryStorage {
                 request_id,
                 reason: "a load request requires Loaded or Failed".to_owned(),
             }),
-            (Some(_), StorageResult::Loaded { .. }) => {
-                Err(StorageAdapterError::ResultMismatch {
-                    endpoint,
-                    request_id,
-                    reason: "a persist request requires Persisted or Failed".to_owned(),
-                })
-            }
+            (Some(_), StorageResult::Loaded { .. }) => Err(StorageAdapterError::ResultMismatch {
+                endpoint,
+                request_id,
+                reason: "a persist request requires Persisted or Failed".to_owned(),
+            }),
         }
     }
 
@@ -283,12 +281,12 @@ impl MemoryStorage {
         if self.disposed {
             return Err(StorageAdapterError::Disposed);
         }
-        self.pending_requests
-            .remove(&(endpoint, request_id))
-            .ok_or(StorageAdapterError::UnknownRequest {
+        self.pending_requests.remove(&(endpoint, request_id)).ok_or(
+            StorageAdapterError::UnknownRequest {
                 endpoint,
                 request_id,
-            })
+            },
+        )
     }
 
     /// Validate and settle one exact restored request. All validation and the
@@ -301,13 +299,12 @@ impl MemoryStorage {
         result: StorageResult,
     ) -> Result<(), StorageAdapterError> {
         self.validate_pending_result(endpoint, request_id, &result)?;
-        let request = self
-            .pending_request(endpoint, request_id)
-            .cloned()
-            .ok_or(StorageAdapterError::UnknownRequest {
+        let request = self.pending_request(endpoint, request_id).cloned().ok_or(
+            StorageAdapterError::UnknownRequest {
                 endpoint,
                 request_id,
-            })?;
+            },
+        )?;
         let mut values = self.values.clone();
         if let StorageResult::Persisted = result {
             let Some(value) = request.value.clone() else {
@@ -390,18 +387,14 @@ impl MemoryStorage {
             value,
         } = request;
         let duplicate = match endpoint {
-            Some(endpoint) => self
-                .pending_requests
-                .contains_key(&(endpoint, request_id)),
+            Some(endpoint) => self.pending_requests.contains_key(&(endpoint, request_id)),
             None => self
                 .pending_requests
                 .keys()
                 .any(|(_, pending_request_id)| *pending_request_id == request_id),
         };
         if duplicate {
-            return Err(StorageAdapterError::DuplicateRequest {
-                request_id,
-            });
+            return Err(StorageAdapterError::DuplicateRequest { request_id });
         }
 
         let mut staged = self.values.clone();
@@ -430,17 +423,14 @@ impl MemoryStorageState {
                 reason: "storage values must be strictly sorted and unique by key".to_owned(),
             });
         }
-        if self
-            .pending_requests
-            .windows(2)
-            .any(|pair| {
-                (pair[0].endpoint, pair[0].request.request_id)
-                    >= (pair[1].endpoint, pair[1].request.request_id)
-            })
-        {
+        if self.pending_requests.windows(2).any(|pair| {
+            (pair[0].endpoint, pair[0].request.request_id)
+                >= (pair[1].endpoint, pair[1].request.request_id)
+        }) {
             return Err(StorageAdapterError::InvalidState {
-                reason: "pending requests must be strictly sorted and unique by endpoint and request ID"
-                    .to_owned(),
+                reason:
+                    "pending requests must be strictly sorted and unique by endpoint and request ID"
+                        .to_owned(),
             });
         }
         if let Some(next_request_id) = self.next_request_id

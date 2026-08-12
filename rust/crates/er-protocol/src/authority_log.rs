@@ -2,24 +2,24 @@
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
+use er_types::battle_ids::{CanonicalHexBytes, CanonicalU64Decimal};
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AuthorityRecoverySlice,
     ConnectionGeneration, FrameContext, Material, NextControl, OperationId, Revision, SafeU53,
     SeatId, TimeClass, TimerId, TimerOwner, validate_authority_material_digest,
     validate_authority_operation_id,
 };
-use er_types::battle_ids::{CanonicalHexBytes, CanonicalU64Decimal};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::successor::{control_allows_successor_entry, control_id_of, is_valid_next_control};
-use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 use crate::snapshot::{
     AuthorityDeliveryLeaseSnapshotV2, AuthorityDeliveryPeerStageSnapshotV2,
     AuthorityDeliveryStageV2, AuthorityEntryIdentitySnapshotV2, AuthorityLogSnapshotBridge,
     AuthorityLogSnapshotV2, OpaqueAuthorityEntrySnapshotV2, PeerBindingSnapshotV2,
     RetiredOperationStageSnapshotV2, SnapshotError,
 };
+use crate::successor::{control_allows_successor_entry, control_id_of, is_valid_next_control};
+use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
 
 pub const DEFAULT_RETAIN_CAPACITY: u64 = 512;
 pub const DEFAULT_DELIVERY_INITIAL_MS: u64 = 250;
@@ -249,7 +249,6 @@ impl AuthorityLog {
     }
 
     fn from_validated_config(config: AuthorityLogConfig) -> Result<Self, AuthorityLogError> {
-
         let mut peer_bindings = BTreeMap::new();
         for peer in config.peer_bindings {
             peer_bindings.insert(peer.seat_id, peer.connection_generation);
@@ -1117,10 +1116,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             .map(|(revision, lease)| {
                 Ok(AuthorityDeliveryLeaseSnapshotV2 {
                     revision: *revision,
-                    entry: authority_entry_snapshot(
-                        &lease.entry,
-                        "authority_log.retained.entry",
-                    )?,
+                    entry: authority_entry_snapshot(&lease.entry, "authority_log.retained.entry")?,
                     owner: lease.owner.clone(),
                     peer_stages: lease
                         .peer_stages
@@ -1132,13 +1128,11 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
                         })
                         .collect(),
                     timer_id: lease.timer_id,
-                    attempts: CanonicalU64Decimal::new(lease.attempts.to_string())
-                        .map_err(|error| {
-                            snapshot_canonical(
-                                "authority_log.retained.attempts",
-                                error.to_string(),
-                            )
-                        })?,
+                    attempts: CanonicalU64Decimal::new(lease.attempts.to_string()).map_err(
+                        |error| {
+                            snapshot_canonical("authority_log.retained.attempts", error.to_string())
+                        },
+                    )?,
                     next_delay_ms: lease.next_delay_ms,
                     stopped: lease.stopped,
                     subsumption_done: lease.subsumption_done,
@@ -1219,9 +1213,8 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             delivery_time_class: snapshot.delivery_time_class,
             max_delivery_attempts: snapshot.max_delivery_attempts,
         };
-        validate_config(&config, !config.peer_bindings.is_empty()).map_err(|error| {
-            snapshot_invalid("authority_log", error.to_string())
-        })?;
+        validate_config(&config, !config.peer_bindings.is_empty())
+            .map_err(|error| snapshot_invalid("authority_log", error.to_string()))?;
 
         let AuthorityLogSnapshotV2 {
             local_context,
@@ -1256,9 +1249,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
         }
 
         let latest_committed = latest_committed
-            .map(|entry| {
-                authority_entry_from_snapshot(&entry, "authority_log.latest_committed")
-            })
+            .map(|entry| authority_entry_from_snapshot(&entry, "authority_log.latest_committed"))
             .transpose()?;
         if let Some(entry) = &latest_committed {
             if entry.revision != head_revision || entry.revision == Revision::ZERO {
@@ -1336,9 +1327,9 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
         };
 
         if let Some(entry) = restored.latest_committed.as_ref() {
-            restored
-                .validate_entry_shape(entry)
-                .map_err(|error| snapshot_invalid("authority_log.latest_committed", error.to_string()))?;
+            restored.validate_entry_shape(entry).map_err(|error| {
+                snapshot_invalid("authority_log.latest_committed", error.to_string())
+            })?;
         }
 
         let mut timer_ids = BTreeSet::new();
@@ -1360,9 +1351,9 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
                     "retained revision must equal the decoded entry revision",
                 ));
             }
-            restored
-                .validate_entry_shape(&entry)
-                .map_err(|error| snapshot_invalid("authority_log.retained.entry", error.to_string()))?;
+            restored.validate_entry_shape(&entry).map_err(|error| {
+                snapshot_invalid("authority_log.retained.entry", error.to_string())
+            })?;
 
             let expected_owner = delivery_timer_owner(&restored.owner_id, revision)?;
             if lease_snapshot.owner != expected_owner {
@@ -1511,12 +1502,10 @@ fn authority_entry_from_snapshot(
     }
     let mut bytes = Vec::with_capacity(encoded.len() / 2);
     for pair in encoded.chunks_exact(2) {
-        let high = snapshot_hex_value(pair[0]).ok_or_else(|| {
-            snapshot_canonical(path, "canonical entry bytes contain invalid hex")
-        })?;
-        let low = snapshot_hex_value(pair[1]).ok_or_else(|| {
-            snapshot_canonical(path, "canonical entry bytes contain invalid hex")
-        })?;
+        let high = snapshot_hex_value(pair[0])
+            .ok_or_else(|| snapshot_canonical(path, "canonical entry bytes contain invalid hex"))?;
+        let low = snapshot_hex_value(pair[1])
+            .ok_or_else(|| snapshot_canonical(path, "canonical entry bytes contain invalid hex"))?;
         bytes.push((high << 4) | low);
     }
     let entry = serde_json::from_slice::<AuthorityEntry>(&bytes)
@@ -1608,7 +1597,10 @@ fn cross_check_authority_timers(
                 format!("delivery timer {timer_id} does not match its restored lease"),
             ));
         }
-        if expected_owners.insert(lease.owner.clone(), timer_id).is_some() {
+        if expected_owners
+            .insert(lease.owner.clone(), timer_id)
+            .is_some()
+        {
             return Err(snapshot_invalid(
                 "authority_log.retained.owner",
                 "delivery timer owners must identify one retained lease each",

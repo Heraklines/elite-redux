@@ -7,8 +7,8 @@
 //! every such symbol is doc-hidden so it cannot be mistaken for a campaign
 //! transaction or semantic-apply API.
 
-use er_types::battle_control::BattleControlPlan;
 use er_state::digest::MechanicalStateDigest;
+use er_types::battle_control::BattleControlPlan;
 
 use crate::internal_event::{GameIntent, PreparedBattleResolution};
 use crate::runtime::{GameReduction, GameRuntime, GameRuntimeError};
@@ -70,7 +70,10 @@ impl GameTransaction {
     /// it is intentionally doc-hidden so campaign code has no casual
     /// semantic-apply surface.
     #[doc(hidden)]
-    pub fn apply_intent(&mut self, intent: GameIntent) -> Result<GameReduction, GameTransactionError> {
+    pub fn apply_intent(
+        &mut self,
+        intent: GameIntent,
+    ) -> Result<GameReduction, GameTransactionError> {
         self.reduce(intent)
     }
 

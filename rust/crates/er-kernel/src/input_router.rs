@@ -3,11 +3,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use er_protocol::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
+use er_types::battle_ids::MenuInstanceId;
 use er_types::{
     ButtonEvent, GameButton, InputFocus, InputMap, InputRouterOutput, InputTimerCommand,
     KeyBinding, PhysicalKey, RawInputEvent, SafeU53, SeatId, TimeClass, TimerId, TimerOwner,
 };
-use er_types::battle_ids::MenuInstanceId;
 use thiserror::Error;
 
 use crate::snapshot::{
@@ -681,9 +681,7 @@ impl BattleInputRouter {
             if let Some(held) = self.held.get_mut(&held_key) {
                 held.timer_id = None;
             }
-            if let Some(BattlePhysicalPress::Accepted(pressed)) =
-                self.pressed.get_mut(&held_key)
-            {
+            if let Some(BattlePhysicalPress::Accepted(pressed)) = self.pressed.get_mut(&held_key) {
                 pressed.timer_id = None;
             }
             return Err(InputRouteError::SchedulerInvariant);
@@ -833,14 +831,7 @@ impl BattleInputRouter {
                 .insert(key, BattlePhysicalPress::Blocked { printable: false });
             return Ok(BattleInputOutput::default());
         };
-        self.accept_physical(
-            endpoint,
-            menu_instance_id,
-            source,
-            button,
-            false,
-            scheduler,
-        )
+        self.accept_physical(endpoint, menu_instance_id, source, button, false, scheduler)
     }
 
     fn gamepad_up(
@@ -1246,7 +1237,11 @@ impl BattleInputRouter {
             })
             .collect::<Vec<_>>();
         held_buttons.sort_unstable_by_key(|held| {
-            (held.seat, held.button, BattlePhysicalSource::from_snapshot(held.source.clone()))
+            (
+                held.seat,
+                held.button,
+                BattlePhysicalSource::from_snapshot(held.source.clone()),
+            )
         });
 
         let mut locks = self
@@ -1516,7 +1511,10 @@ fn validate_scheduler_repeat_ownership(
         let Some(scheduled) = scheduler.timer(repeat.timer_id) else {
             return Err(input_snapshot_invalid(
                 "input_router.repeats",
-                format!("repeat timer {} is absent from KernelScheduler", repeat.timer_id),
+                format!(
+                    "repeat timer {} is absent from KernelScheduler",
+                    repeat.timer_id
+                ),
             ));
         };
         if scheduled.endpoint != repeat.seat

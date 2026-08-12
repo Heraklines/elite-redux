@@ -5,17 +5,15 @@ use er_game::party_menu::{
     party_cancel_option_id, party_option_id,
 };
 use er_game::party_option_menu::{
-    PARTY_OPTION_CANCEL_ID, PARTY_OPTION_SEND_OUT_ID, PartyOptionMenuError,
-    open_party_option_menu, open_replacement_option_menu, restore_parent_menu,
+    PARTY_OPTION_CANCEL_ID, PARTY_OPTION_SEND_OUT_ID, PartyOptionMenuError, open_party_option_menu,
+    open_replacement_option_menu, restore_parent_menu,
 };
 use er_game::replacement_menu::{
     ReplacementMenuResult, build_replacement_menu, navigate_replacement_menu,
 };
 use er_state::battle::BattleState;
 use er_types::SafeU53;
-use er_types::battle_control::{
-    BattleControl, CommandRootControl,
-};
+use er_types::battle_control::{BattleControl, CommandRootControl};
 use er_types::battle_ids::{
     AuthorityEpoch, BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanceId, PartyIndex,
     PokemonId, TurnIndex, WaveIndex,
@@ -102,21 +100,13 @@ fn command_root(
         )?,
     ];
     let navigation = vec![
-        MenuNavigationEdge::new(
-            fight.clone(),
-            NavigationDirection::Down,
-            switch.clone(),
-        ),
+        MenuNavigationEdge::new(fight.clone(), NavigationDirection::Down, switch.clone()),
         MenuNavigationEdge::new(switch, NavigationDirection::Up, fight),
     ];
     let owner_seat = seat(u64::from(field_slot.position) + 1)?;
     let control_id = format!(
         "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/command",
-        battle.battle_id,
-        battle.wave,
-        battle.turn,
-        field_slot.position,
-        owner_seat,
+        battle.battle_id, battle.wave, battle.turn, field_slot.position, owner_seat,
     );
     let menu = BattleMenu::new(
         menu_instance_id,
@@ -127,9 +117,7 @@ fn command_root(
         navigation,
     )?;
     Ok(BattleControl::CommandRoot(CommandRootControl::new(
-        actor,
-        field_slot,
-        menu,
+        actor, field_slot, menu,
     )?))
 }
 
@@ -215,37 +203,94 @@ fn voluntary_party_graph_contains_all_edges_and_noops() -> Result<(), Box<dyn Er
     let actor = pokemon(1)?;
     let field_slot = player_slot(0);
     let root = command_root(&battle, actor, field_slot, instance(1)?)?;
-    let control = build_party_select(
-        &battle,
-        actor,
-        field_slot,
-        seat(1)?,
-        instance(2)?,
-        root,
-    )?;
+    let control = build_party_select(&battle, actor, field_slot, seat(1)?, instance(2)?, root)?;
     let slot_zero = party_option_id(pokemon(1)?, PartyIndex::new(0)?)?;
     let slot_one = party_option_id(pokemon(2)?, PartyIndex::new(1)?)?;
     let slot_two = party_option_id(pokemon(3)?, PartyIndex::new(2)?)?;
     let cancel = party_cancel_option_id()?;
 
     assert_eq!(control.menu.options.len(), 4);
-    assert!(!control.menu.option(slot_zero.clone()).ok_or_else(|| invalid_data("slot zero missing"))?.enabled);
-    assert!(!control.menu.option(slot_one.clone()).ok_or_else(|| invalid_data("slot one missing"))?.enabled);
-    assert!(control.menu.option(slot_two.clone()).ok_or_else(|| invalid_data("slot two missing"))?.enabled);
-    assert!(control.menu.option(cancel.clone()).ok_or_else(|| invalid_data("cancel missing"))?.enabled);
+    assert!(
+        !control
+            .menu
+            .option(slot_zero.clone())
+            .ok_or_else(|| invalid_data("slot zero missing"))?
+            .enabled
+    );
+    assert!(
+        !control
+            .menu
+            .option(slot_one.clone())
+            .ok_or_else(|| invalid_data("slot one missing"))?
+            .enabled
+    );
+    assert!(
+        control
+            .menu
+            .option(slot_two.clone())
+            .ok_or_else(|| invalid_data("slot two missing"))?
+            .enabled
+    );
+    assert!(
+        control
+            .menu
+            .option(cancel.clone())
+            .ok_or_else(|| invalid_data("cancel missing"))?
+            .enabled
+    );
 
     assert_edge(&control.menu, &slot_zero, NavigationDirection::Up, &cancel);
-    assert_edge(&control.menu, &slot_zero, NavigationDirection::Down, &slot_one);
-    assert_edge(&control.menu, &slot_one, NavigationDirection::Up, &slot_zero);
-    assert_edge(&control.menu, &slot_one, NavigationDirection::Down, &slot_two);
+    assert_edge(
+        &control.menu,
+        &slot_zero,
+        NavigationDirection::Down,
+        &slot_one,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_one,
+        NavigationDirection::Up,
+        &slot_zero,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_one,
+        NavigationDirection::Down,
+        &slot_two,
+    );
     assert_edge(&control.menu, &slot_two, NavigationDirection::Up, &slot_one);
     assert_edge(&control.menu, &slot_two, NavigationDirection::Down, &cancel);
     assert_edge(&control.menu, &cancel, NavigationDirection::Up, &slot_two);
-    assert_edge(&control.menu, &cancel, NavigationDirection::Down, &slot_zero);
-    assert_edge(&control.menu, &slot_zero, NavigationDirection::Right, &slot_two);
-    assert_edge(&control.menu, &slot_one, NavigationDirection::Right, &slot_two);
-    assert_edge(&control.menu, &slot_two, NavigationDirection::Left, &slot_zero);
-    assert_edge(&control.menu, &cancel, NavigationDirection::Left, &slot_zero);
+    assert_edge(
+        &control.menu,
+        &cancel,
+        NavigationDirection::Down,
+        &slot_zero,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_zero,
+        NavigationDirection::Right,
+        &slot_two,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_one,
+        NavigationDirection::Right,
+        &slot_two,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_two,
+        NavigationDirection::Left,
+        &slot_zero,
+    );
+    assert_edge(
+        &control.menu,
+        &cancel,
+        NavigationDirection::Left,
+        &slot_zero,
+    );
 
     for option in [&slot_zero, &slot_one, &slot_two, &cancel] {
         for direction in [NavigationDirection::Up, NavigationDirection::Down] {
@@ -264,7 +309,8 @@ fn voluntary_party_graph_contains_all_edges_and_noops() -> Result<(), Box<dyn Er
 }
 
 #[test]
-fn party_navigation_updates_column_memory_without_changing_instance() -> Result<(), Box<dyn Error>> {
+fn party_navigation_updates_column_memory_without_changing_instance() -> Result<(), Box<dyn Error>>
+{
     let battle = fixture_battle("voluntary-switch")?;
     let root = command_root(&battle, pokemon(1)?, player_slot(0), instance(1)?)?;
     let control = build_party_select(
@@ -275,29 +321,14 @@ fn party_navigation_updates_column_memory_without_changing_instance() -> Result<
         instance(2)?,
         root,
     )?;
-    let control = navigate_party_menu(
-        &battle,
-        &control,
-        instance(2)?,
-        NavigationDirection::Down,
-    )?;
-    let control = navigate_party_menu(
-        &battle,
-        &control,
-        instance(2)?,
-        NavigationDirection::Down,
-    )?;
+    let control = navigate_party_menu(&battle, &control, instance(2)?, NavigationDirection::Down)?;
+    let control = navigate_party_menu(&battle, &control, instance(2)?, NavigationDirection::Down)?;
     let slot_zero = party_option_id(pokemon(1)?, PartyIndex::new(0)?)?;
     let slot_two = party_option_id(pokemon(3)?, PartyIndex::new(2)?)?;
     assert_eq!(control.menu.instance_id, instance(2)?);
     assert_eq!(control.menu.selected_option_id, slot_two);
     assert_eq!(control.last_right_option_id, slot_two);
-    let control = navigate_party_menu(
-        &battle,
-        &control,
-        instance(2)?,
-        NavigationDirection::Left,
-    )?;
+    let control = navigate_party_menu(&battle, &control, instance(2)?, NavigationDirection::Left)?;
     assert_eq!(control.menu.selected_option_id, slot_zero);
     assert_eq!(control.last_left_option_id, slot_zero);
     Ok(())
@@ -318,29 +349,52 @@ fn party_option_open_cancel_and_disabled_selection_are_fail_closed() -> Result<(
     let disabled = open_party_option_menu(&battle, &party, instance(2)?, instance(3)?);
     assert_eq!(disabled, Err(PartyOptionMenuError::DisabledSelection));
 
-    let party = navigate_party_menu(
-        &battle,
-        &party,
-        instance(2)?,
-        NavigationDirection::Down,
-    )?;
-    let party = navigate_party_menu(
-        &battle,
-        &party,
-        instance(2)?,
-        NavigationDirection::Down,
-    )?;
+    let party = navigate_party_menu(&battle, &party, instance(2)?, NavigationDirection::Down)?;
+    let party = navigate_party_menu(&battle, &party, instance(2)?, NavigationDirection::Down)?;
     let option = open_party_option_menu(&battle, &party, instance(2)?, instance(3)?)?;
-    assert_eq!(option.menu.selected_option_id.as_str(), PARTY_OPTION_SEND_OUT_ID);
+    assert_eq!(
+        option.menu.selected_option_id.as_str(),
+        PARTY_OPTION_SEND_OUT_ID
+    );
     assert_eq!(option.menu.options.len(), 2);
-    assert!(option.menu.option(MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?).is_some());
-    assert!(option.menu.option(MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?).is_some());
+    assert!(
+        option
+            .menu
+            .option(MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?)
+            .is_some()
+    );
+    assert!(
+        option
+            .menu
+            .option(MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?)
+            .is_some()
+    );
     let send_out = MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID)?;
     let option_cancel = MenuOptionId::new(PARTY_OPTION_CANCEL_ID)?;
-    assert_edge(&option.menu, &send_out, NavigationDirection::Up, &option_cancel);
-    assert_edge(&option.menu, &send_out, NavigationDirection::Down, &option_cancel);
-    assert_edge(&option.menu, &option_cancel, NavigationDirection::Up, &send_out);
-    assert_edge(&option.menu, &option_cancel, NavigationDirection::Down, &send_out);
+    assert_edge(
+        &option.menu,
+        &send_out,
+        NavigationDirection::Up,
+        &option_cancel,
+    );
+    assert_edge(
+        &option.menu,
+        &send_out,
+        NavigationDirection::Down,
+        &option_cancel,
+    );
+    assert_edge(
+        &option.menu,
+        &option_cancel,
+        NavigationDirection::Up,
+        &send_out,
+    );
+    assert_edge(
+        &option.menu,
+        &option_cancel,
+        NavigationDirection::Down,
+        &send_out,
+    );
     assert_no_edge(&option.menu, &send_out, NavigationDirection::Left);
     assert_no_edge(&option.menu, &send_out, NavigationDirection::Right);
 
@@ -349,11 +403,19 @@ fn party_option_open_cancel_and_disabled_selection_are_fail_closed() -> Result<(
         return Err(invalid_data("party-option Cancel did not restore PartySelect").into());
     };
     assert_eq!(restored.menu.instance_id, instance(4)?);
-    assert_eq!(restored.menu.selected_option_id, party.menu.selected_option_id);
+    assert_eq!(
+        restored.menu.selected_option_id,
+        party.menu.selected_option_id
+    );
     assert_eq!(restored.last_right_option_id, party.last_right_option_id);
 
     let stale = open_party_option_menu(&battle, &party, instance(3)?, instance(5)?);
-    assert_eq!(stale, Err(PartyOptionMenuError::Party(PartyMenuError::StaleMenuInstance)));
+    assert_eq!(
+        stale,
+        Err(PartyOptionMenuError::Party(
+            PartyMenuError::StaleMenuInstance
+        ))
+    );
     Ok(())
 }
 
@@ -395,35 +457,66 @@ fn replacement_graph_uses_stored_source_and_exact_legality() -> Result<(), Box<d
         control.menu.control_id,
         "RC/e1/b1/w1/t1/o2/f0/s1/control/replacement"
     );
-    assert!(!control.menu.option(MenuOptionId::new(PARTY_CANCEL_OPTION_ID)?).ok_or_else(|| invalid_data("replacement cancel missing"))?.enabled);
+    assert!(
+        !control
+            .menu
+            .option(MenuOptionId::new(PARTY_CANCEL_OPTION_ID)?)
+            .ok_or_else(|| invalid_data("replacement cancel missing"))?
+            .enabled
+    );
 
     let slot_zero = party_option_id(pokemon(1)?, PartyIndex::new(0)?)?;
     let slot_one = party_option_id(pokemon(2)?, PartyIndex::new(1)?)?;
     let slot_two = party_option_id(pokemon(3)?, PartyIndex::new(2)?)?;
     let cancel = party_cancel_option_id()?;
-    assert_edge(&control.menu, &slot_zero, NavigationDirection::Down, &slot_one);
-    assert_edge(&control.menu, &slot_one, NavigationDirection::Down, &slot_two);
+    assert_edge(
+        &control.menu,
+        &slot_zero,
+        NavigationDirection::Down,
+        &slot_one,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_one,
+        NavigationDirection::Down,
+        &slot_two,
+    );
     assert_edge(&control.menu, &slot_two, NavigationDirection::Down, &cancel);
     assert_edge(&control.menu, &cancel, NavigationDirection::Up, &slot_two);
-    assert_edge(&control.menu, &slot_zero, NavigationDirection::Right, &slot_two);
-    assert_edge(&control.menu, &slot_two, NavigationDirection::Left, &slot_zero);
+    assert_edge(
+        &control.menu,
+        &slot_zero,
+        NavigationDirection::Right,
+        &slot_two,
+    );
+    assert_edge(
+        &control.menu,
+        &slot_two,
+        NavigationDirection::Left,
+        &slot_zero,
+    );
     for option in [&slot_zero, &slot_one, &cancel] {
-        assert!(control.menu.option(option.clone()).ok_or_else(|| invalid_data("replacement option missing"))?.enabled == false);
+        assert!(
+            control
+                .menu
+                .option(option.clone())
+                .ok_or_else(|| invalid_data("replacement option missing"))?
+                .enabled
+                == false
+        );
     }
-    assert!(control.menu.option(slot_two.clone()).ok_or_else(|| invalid_data("legal replacement missing"))?.enabled);
+    assert!(
+        control
+            .menu
+            .option(slot_two.clone())
+            .ok_or_else(|| invalid_data("legal replacement missing"))?
+            .enabled
+    );
 
-    let control = navigate_replacement_menu(
-        &battle,
-        &control,
-        instance(2)?,
-        NavigationDirection::Down,
-    )?;
-    let control = navigate_replacement_menu(
-        &battle,
-        &control,
-        instance(2)?,
-        NavigationDirection::Down,
-    )?;
+    let control =
+        navigate_replacement_menu(&battle, &control, instance(2)?, NavigationDirection::Down)?;
+    let control =
+        navigate_replacement_menu(&battle, &control, instance(2)?, NavigationDirection::Down)?;
     let option = open_replacement_option_menu(&battle, &control, instance(2)?, instance(3)?)?;
     assert_eq!(option.selected_party_slot, PartyIndex::new(2)?);
     let BattleControl::ReplacementSelect(parent) = option.cancel_to.as_ref() else {
@@ -449,34 +542,34 @@ fn replacement_stale_occurrence_and_source_fail_closed() -> Result<(), Box<dyn E
     };
     let mut wrong_occurrence = control.clone();
     wrong_occurrence.occurrence = FaintOccurrenceId::new(safe(10)?);
-    assert!(navigate_replacement_menu(
-        &battle,
-        &wrong_occurrence,
-        instance(2)?,
-        NavigationDirection::Down,
-    )
-    .is_err());
+    assert!(
+        navigate_replacement_menu(
+            &battle,
+            &wrong_occurrence,
+            instance(2)?,
+            NavigationDirection::Down,
+        )
+        .is_err()
+    );
 
     let mut wrong_source = control;
     wrong_source.source.turn_occurrence = 3;
-    assert!(navigate_replacement_menu(
-        &battle,
-        &wrong_source,
-        instance(2)?,
-        NavigationDirection::Down,
-    )
-    .is_err());
+    assert!(
+        navigate_replacement_menu(
+            &battle,
+            &wrong_source,
+            instance(2)?,
+            NavigationDirection::Down,
+        )
+        .is_err()
+    );
     Ok(())
 }
 
 #[test]
 fn no_legal_replacement_is_an_internal_result_without_a_menu() -> Result<(), Box<dyn Error>> {
     let battle = no_legal_replacement(fixture_battle("no-legal-replacement")?)?;
-    let result = build_replacement_menu(
-        &battle,
-        FaintOccurrenceId::new(safe(11)?),
-        instance(2)?,
-    )?;
+    let result = build_replacement_menu(&battle, FaintOccurrenceId::new(safe(11)?), instance(2)?)?;
     let ReplacementMenuResult::NoLegalReplacement {
         occurrence,
         source,

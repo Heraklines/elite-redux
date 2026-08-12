@@ -19,14 +19,16 @@ use er_state::digest::{
 };
 use er_state::snapshot::GameState;
 use er_state::validation::StateValidationError;
+use er_types::OperationId;
 use er_types::battle_command::{
     BattleCommandProposalV1, BattleReplacementProposalV1, ReplacementSelection,
 };
-use er_types::battle_control::{BattleControlPlan, BattleControlPlanError, SeatMenuInstanceAllocator};
+use er_types::battle_control::{
+    BattleControlPlan, BattleControlPlanError, SeatMenuInstanceAllocator,
+};
 use er_types::battle_ids::{AuthorityEpoch, FaintOccurrenceId};
 use er_types::battle_model::{BattleOutcome, ReplacementProgress};
 use er_types::battle_ui::{BattlePresentationEvent, PresentationPlanDigest};
-use er_types::OperationId;
 use thiserror::Error;
 
 use crate::internal_event::{GameIntent, InternalEvent, PreparedBattleResolution};
@@ -40,7 +42,7 @@ use crate::runtime::{CommandAdmission, GameReduction, GameRuntime, GameRuntimeEr
 
 // The canonical configuration lives in `runtime`; these aliases are kept
 // crate-private so the local lane cannot grow a second config/start schema.
-pub(crate) use crate::runtime::{BattleGameConfig, BattleStartV1, BATTLE_START_SCHEMA_VERSION};
+pub(crate) use crate::runtime::{BATTLE_START_SCHEMA_VERSION, BattleGameConfig, BattleStartV1};
 
 /// The private phase visible to the local game reducer.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -193,12 +195,16 @@ pub(crate) enum LocalMaterialValidationError {
 /// Progress returned to the private game reducer after one local request.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum LocalBattleProgress {
-    Waiting { frontier: LocalBattleFrontier },
+    Waiting {
+        frontier: LocalBattleFrontier,
+    },
     MaterialInstalled(LocalBattleMaterialResult),
     /// The runtime's canonical admission ledger already contains this exact
     /// proposal. The runtime intentionally does not retain old material, so a
     /// duplicate is a no-op rather than a second resolver/material pass.
-    AlreadyCommitted { operation_id: OperationId },
+    AlreadyCommitted {
+        operation_id: OperationId,
+    },
 }
 
 /// Failures raised while reducing one private local-battle request.
@@ -208,12 +214,16 @@ pub(crate) enum LocalBattleError {
     Runtime(#[source] LocalBattleRuntimeError),
     #[error("a command request arrived outside the command frontier: {actual:?}")]
     CommandOutsideFrontier { actual: LocalBattleFrontier },
-    #[error("a replacement request arrived outside its stored occurrence frontier: expected {expected:?}, actual {actual:?}")]
+    #[error(
+        "a replacement request arrived outside its stored occurrence frontier: expected {expected:?}, actual {actual:?}"
+    )]
     ReplacementOutsideFrontier {
         expected: FaintOccurrenceId,
         actual: LocalBattleFrontier,
     },
-    #[error("a replacement request names occurrence {requested:?}, but the stored frontier is {frontier:?}")]
+    #[error(
+        "a replacement request names occurrence {requested:?}, but the stored frontier is {frontier:?}"
+    )]
     InternalReplacementOutsideFrontier {
         requested: FaintOccurrenceId,
         frontier: LocalBattleFrontier,
@@ -437,15 +447,10 @@ fn reduce_staged_request(
     }
 }
 
-fn command_admission(
-    reduction: &GameReduction,
-) -> Result<CommandAdmission, LocalBattleError> {
-    reduction
-        .admission
-        .clone()
-        .ok_or(LocalBattleError::Runtime(
-            LocalBattleRuntimeError::MissingAdmission,
-        ))
+fn command_admission(reduction: &GameReduction) -> Result<CommandAdmission, LocalBattleError> {
+    reduction.admission.clone().ok_or(LocalBattleError::Runtime(
+        LocalBattleRuntimeError::MissingAdmission,
+    ))
 }
 
 fn prepared_resolution(
@@ -467,9 +472,7 @@ fn prepared_resolution(
     ))
 }
 
-fn runtime_frontier(
-    runtime: &GameRuntime,
-) -> Result<LocalBattleFrontier, GameRuntimeError> {
+fn runtime_frontier(runtime: &GameRuntime) -> Result<LocalBattleFrontier, GameRuntimeError> {
     let battle = runtime
         .state()
         .battle
@@ -672,13 +675,14 @@ fn build_turn_material(
     next_control: &BattleControlPlan,
     allocator_before: &[SeatMenuInstanceAllocator],
 ) -> Result<BattleTurnMaterialV1, LocalBattleError> {
-    let before_battle = transition
-        .before_state
-        .battle
-        .as_ref()
-        .ok_or(LocalBattleError::Runtime(LocalBattleRuntimeError::Runtime(
-            GameRuntimeError::NoActiveBattle,
-        )))?;
+    let before_battle =
+        transition
+            .before_state
+            .battle
+            .as_ref()
+            .ok_or(LocalBattleError::Runtime(LocalBattleRuntimeError::Runtime(
+                GameRuntimeError::NoActiveBattle,
+            )))?;
     let after_battle = transition
         .after_state
         .battle
@@ -722,13 +726,14 @@ fn build_replacement_material(
     next_control: &BattleControlPlan,
     allocator_before: &[SeatMenuInstanceAllocator],
 ) -> Result<BattleReplacementMaterialV1, LocalBattleError> {
-    let before_battle = transition
-        .before_state
-        .battle
-        .as_ref()
-        .ok_or(LocalBattleError::Runtime(LocalBattleRuntimeError::Runtime(
-            GameRuntimeError::NoActiveBattle,
-        )))?;
+    let before_battle =
+        transition
+            .before_state
+            .battle
+            .as_ref()
+            .ok_or(LocalBattleError::Runtime(LocalBattleRuntimeError::Runtime(
+                GameRuntimeError::NoActiveBattle,
+            )))?;
     let presentation_digest = compute_presentation_plan_digest(&transition.presentation)
         .map_err(|error| LocalBattleError::Runtime(error.into()))?;
     Ok(BattleReplacementMaterialV1 {
