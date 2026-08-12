@@ -272,14 +272,9 @@ fn battle_config(seed: &str, content: &ContentPack) -> Result<BattleGameConfig, 
     .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
     let next_turn =
         TurnIndex::new(safe(2)).map_err(|error| M3ParityError::Configuration(error.to_string()))?;
-    let next_enemy_operation = scripted_enemy_command_operation_id(
-        battle_id,
-        wave,
-        next_turn,
-        enemy_slot,
-        safe(1),
-    )
-    .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
+    let next_enemy_operation =
+        scripted_enemy_command_operation_id(battle_id, wave, next_turn, enemy_slot, safe(1))
+            .map_err(|error| M3ParityError::Configuration(error.to_string()))?;
     let next_enemy_script = ScriptedEnemyBattleCommandV1::new(
         next_enemy_operation,
         battle_id,

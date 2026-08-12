@@ -57,9 +57,14 @@ fn assert_eventwise_contract() -> TestResult {
             .iter()
             .any(|observation| observation.battle_turn.get().get() > 1)
     );
+    let last_event_time = fixture
+        .events
+        .last()
+        .ok_or("M3 parity fixture has no final event")?
+        .virtual_time_ms;
     for (index, observation) in report.observations.iter().enumerate() {
         assert_eq!(observation.sequence.get(), (index + 1) as u64);
-        assert!(observation.virtual_time_ms <= fixture.events.last().unwrap().virtual_time_ms);
+        assert!(observation.virtual_time_ms <= last_event_time);
         assert!(!observation.effect_digest.is_empty());
         assert!(!observation.state_digest.is_empty());
         assert!(!observation.snapshot_digest.is_empty());
