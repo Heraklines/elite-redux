@@ -2367,17 +2367,6 @@ impl BattleTransaction {
                 });
             }
         };
-        let input = AuthorityTransactionInput {
-            state: self.staged.game.state().clone(),
-            control: self.staged.game.control().clone(),
-            menu_allocators: self.staged.game.control().menu_allocators.clone(),
-            scripted_policy: self.staged.game.scripted_enemy_policy().clone(),
-            authority_epoch: self.staged.protocol.authority_epoch(),
-            local_seat: self.staged.game.local_seat(),
-            authority_context: context,
-            authority_log: log,
-            scheduler: self.scheduler.clone(),
-        };
         let mut prepared = match payload.resolution {
             PreparedBattleResolution::Turn {
                 digest_evidence,
@@ -2402,6 +2391,17 @@ impl BattleTransaction {
                     &material_operation_id,
                     next_control,
                 )?;
+                let input = AuthorityTransactionInput {
+                    state: self.staged.game.state(),
+                    control: self.staged.game.control(),
+                    menu_allocators: &self.staged.game.control().menu_allocators,
+                    scripted_policy: self.staged.game.scripted_enemy_policy(),
+                    authority_epoch: self.staged.protocol.authority_epoch(),
+                    local_seat: self.staged.game.local_seat(),
+                    authority_context: context,
+                    authority_log: log,
+                    scheduler: self.scheduler.clone(),
+                };
                 prepare_authority_turn(
                     input,
                     AuthorityTurnRequest {
@@ -2443,6 +2443,17 @@ impl BattleTransaction {
                     &material_operation_id,
                     next_control,
                 )?;
+                let input = AuthorityTransactionInput {
+                    state: self.staged.game.state(),
+                    control: self.staged.game.control(),
+                    menu_allocators: &self.staged.game.control().menu_allocators,
+                    scripted_policy: self.staged.game.scripted_enemy_policy(),
+                    authority_epoch: self.staged.protocol.authority_epoch(),
+                    local_seat: self.staged.game.local_seat(),
+                    authority_context: context,
+                    authority_log: log,
+                    scheduler: self.scheduler.clone(),
+                };
                 prepare_authority_replacement(
                     input,
                     AuthorityReplacementRequest { decision, prepared },
