@@ -2940,7 +2940,7 @@ jobs:
           set -euo pipefail
           mkdir -p rust-ci-summary
           native_build_started_ns="$(date +%s%N)"
-          cargo test --manifest-path rust/Cargo.toml -p er-sim \
+          cargo test --manifest-path rust/Cargo.toml -p er-sim --release \
             --test m3_snapshot_continuation --no-run \
             2>&1 | tee rust-ci-summary/native-continuation-build.log
           native_build_finished_ns="$(date +%s%N)"
@@ -2956,7 +2956,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$M3_CONTINUATION_ARTIFACT_DIR" rust-ci-summary
           native_execution_started_ns="$(date +%s%N)"
-          cargo test --manifest-path rust/Cargo.toml -p er-sim --test m3_snapshot_continuation \
+          cargo test --manifest-path rust/Cargo.toml -p er-sim --release --test m3_snapshot_continuation \
             live_coop_production::hosted_m3_native_wasm_continuation_suite_emits_artifacts -- --exact --nocapture \
             2>&1 | tee rust-ci-summary/native-continuation-report.log
           native_execution_finished_ns="$(date +%s%N)"
