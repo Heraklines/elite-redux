@@ -177,8 +177,8 @@ where
     )
     .map_err(CommandLegalityError::Command)
     .map_err(BattleResolveError::from)?;
-    let before_digest = compute_mechanical_state_digest(before)
-        .map_err(BattleResolveError::from)?;
+    let before_digest =
+        compute_mechanical_state_digest(before).map_err(BattleResolveError::from)?;
     let normalized = normalize_command_set_trusted(before, commands, content)
         .map_err(BattleResolveError::from)?;
     let mut queue =
@@ -261,20 +261,14 @@ where
         let battle = active_battle(&after)?;
         next_decision(battle, battle.outcome)
     };
-    finalizer(
-        before,
-        &mut after,
-        &mut mutations,
-        finalizer_decision_hint,
-    )?;
+    finalizer(before, &mut after, &mut mutations, finalizer_decision_hint)?;
     validate_after_state_trusted(&after, content)?;
     let (outcome, next_decision) = {
         let battle = active_battle(&after)?;
         let outcome = battle.outcome;
         (outcome, next_decision(battle, outcome))
     };
-    let after_digest = compute_mechanical_state_digest(&after)
-        .map_err(BattleResolveError::from)?;
+    let after_digest = compute_mechanical_state_digest(&after).map_err(BattleResolveError::from)?;
     let presentation = build_turn_presentation_plan(TurnPresentationInput::new(
         material_operation_id,
         &action_order,

@@ -125,7 +125,7 @@ fn string_literal_end(source: &[u8], quote_start: usize) -> usize {
 }
 
 fn is_ascii_hex(byte: u8) -> bool {
-    matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F')
+    byte.is_ascii_hexdigit()
 }
 
 fn utf8_char_width(byte: u8) -> Option<usize> {
@@ -253,12 +253,12 @@ fn sanitize_rust_source(source: &str) -> String {
             continue;
         }
 
-        if let Some(quote_start) = char_literal_quote_start(source_bytes, index) {
-            if let Some(end) = char_literal_end(source_bytes, quote_start) {
-                blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
-                index = end;
-                continue;
-            }
+        if let Some(quote_start) = char_literal_quote_start(source_bytes, index)
+            && let Some(end) = char_literal_end(source_bytes, quote_start)
+        {
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
         }
 
         index += 1;
@@ -281,9 +281,14 @@ fn unique_function_offset(source: &str, signature: &str) -> usize {
 
     let line_anchor = format!("\n{signature}");
     let mut matches = source.match_indices(&line_anchor);
-    let (offset, _) = matches
-        .next()
-        .unwrap_or_else(|| panic!("missing line-anchored function signature {signature:?}"));
+    let first_match = matches.next();
+    assert!(
+        first_match.is_some(),
+        "missing line-anchored function signature {signature:?}"
+    );
+    let Some((offset, _)) = first_match else {
+        return 0;
+    };
     assert!(
         matches.next().is_none(),
         "expected exactly one line-anchored function signature {signature:?}",
@@ -1465,7 +1470,9 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     );
     assert!(source.contains("prepared_admission.allocator_before() != allocators.as_slice()"));
     assert!(source.contains("admit_scripted_if_pending"));
-    assert!(source.contains("CommandCollectionState"));
+    assert!(turn_source.contains(
+        "let (complete_state, completed_commands): (Cow<GameState>, _) = if let Some(validated) ="
+    ));
     assert!(source.contains("protocol_next_control_from_plan"));
     assert!(source.contains("admit_command_proposal_with_context"));
     assert!(source.contains("admit_replacement_proposal_with_context"));

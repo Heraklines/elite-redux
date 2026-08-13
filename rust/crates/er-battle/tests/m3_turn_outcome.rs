@@ -512,7 +512,10 @@ fn trusted_turn_finalizer_metadata_and_digest_use_finalized_state() -> TestResul
     )?;
 
     assert!(finalizer_called);
-    assert_eq!(battle(&transition.after_state)?.outcome, BattleOutcome::Victory);
+    assert_eq!(
+        battle(&transition.after_state)?.outcome,
+        BattleOutcome::Victory
+    );
     assert_eq!(transition.outcome, BattleOutcome::Victory);
     assert_eq!(
         transition.next_decision,
