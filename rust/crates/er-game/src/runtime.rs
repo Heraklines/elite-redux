@@ -462,6 +462,25 @@ impl GameRuntime {
         &self.replacement_fingerprints
     }
 
+    /// Return the exact menu anchors retained by live remote admissions.
+    /// Snapshot serialization uses these anchors when the public control
+    /// history is compacted; deriving them from the installed replay paths
+    /// keeps the snapshot boundary aligned with restoration rather than with
+    /// every historical menu transition.
+    pub(crate) fn restorable_remote_control_anchors(
+        &self,
+    ) -> BTreeMap<SeatId, Vec<BattleControl>> {
+        let mut anchors = BTreeMap::new();
+        for path in self.authority_remote_paths.values() {
+            let Some(seat) = path.control.owner_seat() else {
+                continue;
+            };
+            let retained = anchors.entry(seat).or_insert_with(Vec::new);
+            collect_remote_control_anchors(&path.control, retained);
+        }
+        anchors
+    }
+
     pub fn content(&self) -> &ContentPack {
         self.content.as_ref()
     }
@@ -2979,23 +2998,10 @@ fn rebuild_remote_command_path(
     histories: &[SeatControlHistorySnapshotV1],
     proposal: &BattleCommandProposalV1,
 ) -> Result<RuntimeAuthorityMenuPath, SnapshotError> {
-    let menu_count = match &proposal.command {
-        BattleCommand::Fight { targets, .. } => {
-            if matches!(targets, BattleTargetSelection::Implicit) {
-                1
-            } else {
-                2
-            }
-        }
-        BattleCommand::Switch { .. } => 2,
+    let menu_counts = match &proposal.command {
+        BattleCommand::Fight { .. } => vec![1, 2],
+        BattleCommand::Switch { .. } => vec![2],
     };
-    let first_menu_instance_id = remote_menu_allocator_before_final(
-        runtime,
-        proposal.owner_seat,
-        proposal.menu_instance_id,
-        menu_count,
-        "authority_remote_paths.command",
-    )?;
     let mut paths = Vec::new();
     let mut first_failure = None;
     let mut prior_controls = Vec::new();
@@ -3023,26 +3029,43 @@ fn rebuild_remote_command_path(
         }
     }
     for prior_control in prior_controls {
-        let candidate = match runtime_with_prior_control(
-            runtime,
-            proposal.owner_seat,
-            &prior_control,
-            &proposal.operation_id,
-            first_menu_instance_id,
-        ) {
-            Ok(candidate) => candidate,
-            Err(error) => {
-                if first_failure.is_none() {
-                    first_failure = Some(error.to_string());
+        for menu_count in &menu_counts {
+            let first_menu_instance_id = match remote_menu_allocator_before_final(
+                runtime,
+                proposal.owner_seat,
+                proposal.menu_instance_id,
+                *menu_count,
+                "authority_remote_paths.command",
+            ) {
+                Ok(first_menu_instance_id) => first_menu_instance_id,
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
+                    continue;
                 }
-                continue;
-            }
-        };
-        match candidate.prepare_remote_command_path(proposal) {
-            Ok(path) => paths.push(path),
-            Err(error) => {
-                if first_failure.is_none() {
-                    first_failure = Some(error.to_string());
+            };
+            let candidate = match runtime_with_prior_control(
+                runtime,
+                proposal.owner_seat,
+                &prior_control,
+                &proposal.operation_id,
+                first_menu_instance_id,
+            ) {
+                Ok(candidate) => candidate,
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
+                    continue;
+                }
+            };
+            match candidate.prepare_remote_command_path(proposal) {
+                Ok(path) => paths.push(path),
+                Err(error) => {
+                    if first_failure.is_none() {
+                        first_failure = Some(error.to_string());
+                    }
                 }
             }
         }
@@ -3271,6 +3294,27 @@ fn rebuild_remote_replacement_path(
 fn push_unique_replay_control(prior_controls: &mut Vec<BattleControl>, control: &BattleControl) {
     if !prior_controls.iter().any(|previous| previous == control) {
         prior_controls.push(control.clone());
+    }
+}
+
+fn collect_remote_control_anchors(control: &BattleControl, anchors: &mut Vec<BattleControl>) {
+    match control {
+        BattleControl::CommandRoot(_) | BattleControl::ReplacementSelect(_) => {
+            push_unique_replay_control(anchors, control);
+        }
+        BattleControl::MoveSelect(value) => {
+            collect_remote_control_anchors(value.cancel_to.as_ref(), anchors);
+        }
+        BattleControl::TargetSelect(value) => {
+            collect_remote_control_anchors(value.cancel_to.as_ref(), anchors);
+        }
+        BattleControl::PartySelect(value) => {
+            collect_remote_control_anchors(value.cancel_to.as_ref(), anchors);
+        }
+        BattleControl::PartyOptionSelect(value) => {
+            collect_remote_control_anchors(value.cancel_to.as_ref(), anchors);
+        }
+        BattleControl::Waiting(_) | BattleControl::Complete(_) => {}
     }
 }
 

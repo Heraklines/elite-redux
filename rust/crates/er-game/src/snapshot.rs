@@ -187,6 +187,86 @@ impl SeatControlHistorySnapshotV1 {
     }
 }
 
+fn bounded_control_history(
+    seat: SeatId,
+    historical: Vec<BattleControl>,
+    current: &BattleControl,
+    remote_anchors: &[BattleControl],
+) -> Result<Vec<BattleControl>, SnapshotError> {
+    if !historical.is_empty() && historical.last() != Some(current) {
+        return Err(invalid(
+            format!("control_history[{seat}].controls"),
+            "causal history does not end at the current control",
+        ));
+    }
+    for anchor in remote_anchors {
+        if anchor.owner_seat().is_some_and(|owner| owner != seat) {
+            return Err(invalid(
+                format!("control_history[{seat}].controls"),
+                "a remote replay anchor belongs to a different seat",
+            ));
+        }
+    }
+
+    let ancestry = cancel_restorable_ancestry(current)?;
+    let mut retained = Vec::new();
+    for control in &historical {
+        if remote_anchors.iter().any(|anchor| anchor == control)
+            && !ancestry.iter().any(|ancestor| ancestor == control)
+            && !retained.iter().any(|previous| previous == control)
+        {
+            retained.push(control.clone());
+        }
+    }
+    for anchor in remote_anchors {
+        if !ancestry.iter().any(|ancestor| ancestor == anchor)
+            && !retained.iter().any(|previous| previous == anchor)
+        {
+            retained.push(anchor.clone());
+        }
+    }
+    retained.extend(ancestry);
+    if retained.len() > MAX_CANCEL_HISTORY_DEPTH + 1 {
+        return Err(invalid(
+            format!("control_history[{seat}].controls"),
+            "the Cancel-restorable ancestry and live remote replay anchors exceed the bounded depth",
+        ));
+    }
+    Ok(retained)
+}
+
+fn cancel_restorable_ancestry(
+    current: &BattleControl,
+) -> Result<Vec<BattleControl>, SnapshotError> {
+    let mut reversed = vec![current.clone()];
+    let mut cursor = current;
+    while let Some(parent) = cancel_parent(cursor) {
+        reversed.push(parent.clone());
+        if reversed.len() > MAX_CANCEL_HISTORY_DEPTH + 1 {
+            return Err(invalid(
+                "control_history.controls",
+                "the current Cancel-restorable ancestry exceeds the bounded depth",
+            ));
+        }
+        cursor = parent;
+    }
+    reversed.reverse();
+    Ok(reversed)
+}
+
+fn cancel_parent(control: &BattleControl) -> Option<&BattleControl> {
+    match control {
+        BattleControl::MoveSelect(value) => Some(value.cancel_to.as_ref()),
+        BattleControl::TargetSelect(value) => Some(value.cancel_to.as_ref()),
+        BattleControl::PartySelect(value) => Some(value.cancel_to.as_ref()),
+        BattleControl::PartyOptionSelect(value) => Some(value.cancel_to.as_ref()),
+        BattleControl::CommandRoot(_)
+        | BattleControl::ReplacementSelect(_)
+        | BattleControl::Waiting(_)
+        | BattleControl::Complete(_) => None,
+    }
+}
+
 impl GameRuntimeSnapshotV2 {
     /// Validate every game-owned invariant without mutating a runtime.
     pub fn validate(&self) -> Result<(), SnapshotError> {
@@ -304,6 +384,8 @@ impl GameRuntimeSnapshotV2 {
     /// owner snapshot.  The existing runtime exposes transition history as
     /// `MenuHistoryEntry { from, to }`; contiguous transitions are folded into
     /// one causal control stack per seat without duplicating shared endpoints.
+    /// Only the current Cancel ancestry and live remote replay anchors cross
+    /// the snapshot boundary; older menu transitions are not restorable state.
     pub fn from_runtime(runtime: &GameRuntime) -> Result<Self, SnapshotError> {
         let mut history = BTreeMap::<SeatId, Vec<BattleControl>>::new();
         for entry in runtime.menu_history() {
@@ -320,6 +402,32 @@ impl GameRuntimeSnapshotV2 {
             }
             controls.push(entry.to.clone());
         }
+        let remote_anchors = runtime.restorable_remote_control_anchors();
+        for seat in remote_anchors.keys() {
+            history.entry(*seat).or_default();
+        }
+        let control_history = history
+            .into_iter()
+            .map(|(seat, historical)| {
+                let current = runtime.control().seat(seat).ok_or_else(|| {
+                    invalid(
+                        "control_history",
+                        "history seat has no current control entry",
+                    )
+                })?;
+                let anchors = remote_anchors
+                    .get(&seat)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                let controls = bounded_control_history(
+                    seat,
+                    historical,
+                    &current.control,
+                    anchors,
+                )?;
+                Ok(SeatControlHistorySnapshotV1 { seat, controls })
+            })
+            .collect::<Result<Vec<_>, SnapshotError>>()?;
         let mut command_tombstones = runtime.command_fingerprints().to_vec();
         command_tombstones.sort_by_key(|entry| entry.operation_id.clone());
         let mut replacement_tombstones = runtime.replacement_fingerprints().to_vec();
@@ -327,10 +435,7 @@ impl GameRuntimeSnapshotV2 {
         let snapshot = Self {
             state: runtime.state().clone(),
             current_control: runtime.control().clone(),
-            control_history: history
-                .into_iter()
-                .map(|(seat, controls)| SeatControlHistorySnapshotV1 { seat, controls })
-                .collect(),
+            control_history,
             command_admission: CommandAdmissionLedgerSnapshotV1 {
                 command_tombstones,
                 replacement_tombstones,

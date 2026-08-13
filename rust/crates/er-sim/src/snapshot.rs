@@ -15,7 +15,7 @@ use er_content::pack::ContentPack;
 use er_kernel::snapshot::{
     GameKernelSnapshotBridge, KernelDeterminismDigest, LiveResourceSnapshot, MechanicalStateDigest,
     PhysicalInputSourceV2, RestorableKernelSnapshotV2, RestorableTimerSnapshotV2, RngDraw,
-    restore_game_kernel, snapshot_game_kernel,
+    snapshot_game_kernel,
     validate_live_resources as validate_kernel_live_resources,
 };
 use er_types::battle_ids::{BattlePresentationEventId, CanonicalHexBytes};
@@ -1478,80 +1478,6 @@ impl EndpointKernelTraceV2 {
         None
     }
 
-    pub fn replay_with<B, Restore, Step>(
-        &self,
-        restore: Restore,
-        mut step: Step,
-    ) -> Result<TraceReplayReportV2, SnapshotError>
-    where
-        Restore: FnOnce(RestorableKernelSnapshotV2) -> Result<B, SnapshotError>,
-        Step: FnMut(
-            &mut B,
-            &RestorableKernelInputV2,
-            SafeU53,
-        ) -> Result<EndpointTraceObservationV2, SnapshotError>,
-    {
-        self.validate()?;
-        let mut runtime = restore(self.initial_snapshot.clone())?;
-        let mut recorder = EndpointKernelTraceRecorder::new(
-            self.replay_seed.clone(),
-            self.initial_snapshot.clone(),
-        )?;
-        for (index, expected) in self.entries.iter().enumerate() {
-            let observation = step(&mut runtime, &expected.input, expected.virtual_time_ms)?;
-            if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
-                return Ok(TraceReplayReportV2 {
-                    replayed_entries: one_based_sequence(index, "replayed_entries")?,
-                    first_divergence: Some(replay_error_divergence(
-                        expected.sequence,
-                        expected.virtual_time_ms,
-                        TraceFailureOwnerV2::Endpoint,
-                        error,
-                    )),
-                });
-            }
-            let actual = recorder
-                .trace()
-                .entries
-                .last()
-                .cloned()
-                .ok_or_else(|| invalid("replay", "recorder produced no entry"))?;
-            if let Some(divergence) = first_endpoint_entry_divergence(expected, &actual) {
-                return Ok(TraceReplayReportV2 {
-                    replayed_entries: one_based_sequence(index, "replayed_entries")?,
-                    first_divergence: Some(divergence),
-                });
-            }
-        }
-        Ok(TraceReplayReportV2 {
-            replayed_entries: safe_u53_from_usize(self.entries.len(), "replayed_entries")?,
-            first_divergence: None,
-        })
-    }
-
-    /// Restore through the owning kernel snapshot bridge, leaving the actual
-    /// public `GameKernel` adapter in the integration-owned crate.
-    pub fn replay_game_kernel<B, Step>(
-        &self,
-        content: Arc<ContentPack>,
-        step: Step,
-    ) -> Result<TraceReplayReportV2, SnapshotError>
-    where
-        B: GameKernelSnapshotBridge,
-        Step: FnMut(
-            &mut B,
-            &RestorableKernelInputV2,
-            SafeU53,
-        ) -> Result<EndpointTraceObservationV2, SnapshotError>,
-    {
-        self.replay_with(
-            |snapshot| {
-                restore_game_kernel::<B>(snapshot, content)
-                    .map_err(|error| invalid("restore", error.to_string()))
-            },
-            step,
-        )
-    }
 }
 
 impl PairKernelTraceV2 {
@@ -1795,24 +1721,18 @@ impl PairKernelTraceV2 {
         None
     }
 
-    pub fn replay_with<B, Restore, Step>(
+    pub fn replay_simulated_pair(
         &self,
-        restore: Restore,
-        mut step: Step,
-    ) -> Result<TraceReplayReportV2, SnapshotError>
-    where
-        Restore: FnOnce(RestorablePairSnapshotV2) -> Result<B, SnapshotError>,
-        Step: FnMut(
-            &mut B,
-            &PairOperationV2,
-            SafeU53,
-        ) -> Result<PairTraceObservationV2, SnapshotError>,
-    {
+        content: Arc<ContentPack>,
+    ) -> Result<TraceReplayReportV2, SnapshotError> {
         self.validate()?;
-        let mut runtime = restore(self.initial_snapshot.clone())?;
+        let mut runtime = crate::SimulatedPair::from_snapshot(
+            self.initial_snapshot.clone(),
+            content,
+        )?;
         let mut recorder = PairKernelTraceRecorder::new(self.initial_snapshot.clone())?;
         for (index, expected) in self.entries.iter().enumerate() {
-            let observation = step(&mut runtime, &expected.input, expected.virtual_time_ms)?;
+            let observation = runtime.apply_trace_operation_v2(expected.input.clone())?;
             if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
                 return Ok(TraceReplayReportV2 {
                     replayed_entries: one_based_sequence(index, "replayed_entries")?,
@@ -1841,27 +1761,6 @@ impl PairKernelTraceV2 {
             replayed_entries: safe_u53_from_usize(self.entries.len(), "replayed_entries")?,
             first_divergence: None,
         })
-    }
-
-    /// Restore through the owning pair snapshot bridge, leaving the concrete
-    /// `SimulatedPair` constructor in the integration-owned crate.
-    pub fn replay_simulated_pair<B, Step>(
-        &self,
-        content: Arc<ContentPack>,
-        step: Step,
-    ) -> Result<TraceReplayReportV2, SnapshotError>
-    where
-        B: SimulatedPairSnapshotBridge,
-        Step: FnMut(
-            &mut B,
-            &PairOperationV2,
-            SafeU53,
-        ) -> Result<PairTraceObservationV2, SnapshotError>,
-    {
-        self.replay_with(
-            |snapshot| restore_simulated_pair::<B>(snapshot, content),
-            step,
-        )
     }
 }
 

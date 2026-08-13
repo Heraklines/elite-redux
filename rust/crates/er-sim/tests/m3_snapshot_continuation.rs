@@ -545,8 +545,8 @@ mod live_coop_production {
     };
     use er_protocol::{
         AckStage, AuthorityEntryBody, AuthorityEntryKind, AuthorityLogConfig, AuthorityReceiptBody,
-        AuthorityReplicaConfig, BackoffPolicy, FrameType, NetworkFrame, PeerBinding,
-        ProposalLeaseConfig, ProposalMessage, RecoveryTransactionConfig,
+        AuthorityReplicaConfig, BackoffPolicy, FrameType, NetworkFrame, NetworkPayload,
+        PeerBinding, ProposalLeaseConfig, ProposalMessage, RecoveryTransactionConfig,
     };
     use er_sim::snapshot::{
         FaultOperationV2, FrameCorruptionV2, PacketDispositionV2, PairDeterminismDigest,
@@ -718,12 +718,7 @@ mod live_coop_production {
         let mut scenarios = Vec::with_capacity(suite.scenarios.len());
 
         for scenario in &suite.scenarios {
-            let replay = scenario.trace.replay_simulated_pair::<SimulatedPair, _>(
-                Arc::clone(&content),
-                |pair, operation, _virtual_time_ms| {
-                    pair.apply_trace_operation_v2(operation.clone())
-                },
-            )?;
+            let replay = scenario.trace.replay_simulated_pair(Arc::clone(&content))?;
             if let Some(divergence) = replay.first_divergence {
                 return Err(invalid(format!(
                     "M3 continuation diverged at {}, operation {}, time {} ms, path {}, code {}",
@@ -2020,8 +2015,7 @@ mod live_coop_production {
             PairEndpoint::Host,
             generation(1),
         )?;
-        let proposal: ProposalMessage =
-            decode_canonical_packet(&proposal_packet.body, "guest proposal")?;
+        let proposal = decode_canonical_proposal_packet(&proposal_packet.body, "guest proposal")?;
         let proposal_identity = (proposal.operation_id.clone(), proposal.fingerprint.clone());
         apply_trace_operation(
             pair,
@@ -2138,6 +2132,18 @@ mod live_coop_production {
             return Err(invalid(format!("{field} is not canonical JSON")));
         }
         Ok(decoded)
+    }
+
+    fn decode_canonical_proposal_packet(
+        body: &CanonicalHexBytes,
+        field: &str,
+    ) -> TestResult<ProposalMessage> {
+        match decode_canonical_packet::<NetworkPayload>(body, field)? {
+            NetworkPayload::Proposal(proposal) => Ok(proposal),
+            NetworkPayload::Frame(_) => Err(invalid(format!(
+                "{field} carried a frame payload instead of a proposal envelope"
+            ))),
+        }
     }
 
     fn is_guest_host_generation_one_control_receipt(packet: &QueuedPacketSnapshotV2) -> bool {
