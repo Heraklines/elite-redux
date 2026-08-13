@@ -25,6 +25,33 @@ const LEGACY_ORACLE_CONTENT_DIGEST: &str =
 const LEGACY_ORACLE_CONTENT_HASH: &str =
     "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
+fn extract_function_section<'a>(source: &'a str, signature: &str) -> &'a str {
+    let start = source
+        .find(signature)
+        .unwrap_or_else(|| panic!("missing function signature {signature}"));
+    let body_start = source[start..]
+        .find('{')
+        .map(|offset| start + offset)
+        .unwrap_or_else(|| panic!("missing function body for {signature}"));
+
+    let mut depth = 0usize;
+    for (offset, byte) in source[body_start..].bytes().enumerate() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' => {
+                depth = depth
+                    .checked_sub(1)
+                    .expect("function section has an unmatched closing brace");
+                if depth == 0 {
+                    return &source[start..body_start + offset + 1];
+                }
+            }
+            _ => {}
+        }
+    }
+    panic!("function section has an unmatched opening brace for {signature}");
+}
+
 fn is_status_kind_tag(tag: &str) -> bool {
     matches!(
         tag,
@@ -570,12 +597,68 @@ fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
 
 #[test]
 fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
+    let source = MATERIAL_SOURCE.replace("\r\n", "\n");
+    let public_turn = extract_function_section(&source, "pub fn apply_turn_material(");
+    let public_turn_trusted =
+        extract_function_section(&source, "pub fn apply_turn_material_trusted(");
+    let reducer_turn = extract_function_section(
+        &source,
+        "pub fn apply_reducer_issued_turn_material_trusted(",
+    );
+    let turn_inner = extract_function_section(&source, "fn apply_turn_material_inner(");
+
+    for (name, section, signature) in [
+        (
+            "apply_turn_material",
+            public_turn,
+            concat!(
+                "pub fn apply_turn_material(\n",
+                "    current: &BattleMaterialApplyContext,",
+            ),
+        ),
+        (
+            "apply_turn_material_trusted",
+            public_turn_trusted,
+            concat!(
+                "pub fn apply_turn_material_trusted(\n",
+                "    current: &BattleMaterialApplyContext,",
+            ),
+        ),
+    ] {
+        assert!(
+            section.starts_with(signature),
+            "{name} no longer accepts current: &BattleMaterialApplyContext",
+        );
+    }
+    assert!(
+        reducer_turn.starts_with(concat!(
+            "pub fn apply_reducer_issued_turn_material_trusted(\n",
+            "    current_state: &GameState,\n",
+            "    local_seat: SeatId,\n",
+            "    menu_allocators: &[SeatMenuInstanceAllocator],",
+        )),
+        "reducer-issued TURN entry point changed its borrowed state/seat/allocator views",
+    );
+    assert!(
+        turn_inner.starts_with(concat!(
+            "fn apply_turn_material_inner(\n",
+            "    current_state: &GameState,\n",
+            "    local_seat: SeatId,\n",
+            "    current_menu_allocators: &[SeatMenuInstanceAllocator],",
+        )),
+        "TURN inner path changed its borrowed endpoint views",
+    );
+    assert!(
+        turn_inner.contains(
+            "validate_endpoint_allocators(\n        current_menu_allocators,\n        local_seat,",
+        ),
+        "TURN inner path no longer forwards its borrowed allocator slice",
+    );
+
     for required in [
         "verify_material_before_digest",
         "validate_after_state_and_digest",
-        "apply_reducer_issued_turn_material_trusted",
         "DigestValidationMode::Independent",
-        "DigestValidationMode::ReducerIssued",
         "validate_battle_mutation_evidence",
         "compute_presentation_plan_digest",
         "event.event_id.sequence",
@@ -583,13 +666,17 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "validate_replacement_rng",
     ] {
         assert!(
-            MATERIAL_SOURCE.contains(required),
+            source.contains(required),
             "missing guard {required}"
         );
     }
     assert!(
-        MATERIAL_SOURCE.contains("BattlePresentationKind::BattleWon")
-            && MATERIAL_SOURCE.contains("BattlePresentationKind::BattleLost")
+        source.contains("BattlePresentationKind::BattleWon")
+            && source.contains("BattlePresentationKind::BattleLost")
+    );
+    assert!(
+        reducer_turn.contains("DigestValidationMode::ReducerIssued"),
+        "reducer-issued TURN path no longer selects reducer-issued digest validation",
     );
     for evidence_check in [
         "transition.before_state != material.before_state",
@@ -598,11 +685,12 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "transition.after_digest != material.after_digest",
     ] {
         assert!(
-            MATERIAL_SOURCE.contains(evidence_check),
+            reducer_turn.contains(evidence_check),
             "reducer-issued material path omitted {evidence_check}",
         );
     }
-    assert!(!MATERIAL_SOURCE.contains("pub skip_digest"));
+    assert!(!source.contains("pub skip_digest"));
+    assert!(!source.contains("pub fn skip_digest"));
 }
 
 #[test]
