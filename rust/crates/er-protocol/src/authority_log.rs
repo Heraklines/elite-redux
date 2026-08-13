@@ -1000,9 +1000,10 @@ impl AuthorityLog {
     }
 
     fn needs_delivery_timer(&self) -> bool {
-        !self
-            .max_delivery_attempts
-            .is_some_and(|maximum| maximum.get() == 0)
+        !self.peer_bindings.is_empty()
+            && !self
+                .max_delivery_attempts
+                .is_some_and(|maximum| maximum.get() == 0)
     }
 
     fn delivery_actions(&self, lease: &DeliveryLease) -> Vec<AuthorityLogAction> {
