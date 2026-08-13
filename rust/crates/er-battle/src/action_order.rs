@@ -2,10 +2,9 @@
 //!
 //! The oracle has two distinct ordering stages.  Command construction puts
 //! ordinary switches before fights, while the phase queues then reorder their
-//! own entries before popping.  The move queue is ordered once per turn and
-//! then drained.  This module keeps those stages separate so a later resolver
-//! can consume one [`PendingAction`] at a time without inventing an actor or
-//! field-slot tie-break.
+//! own entries immediately before every pop.  This module keeps those stages
+//! separate so a later resolver can consume one [`PendingAction`] at a time
+//! without inventing an actor or field-slot tie-break.
 
 use std::cmp::Reverse;
 
@@ -181,7 +180,6 @@ pub struct PendingActionQueue {
     moves: Vec<PendingAction>,
     stage: PendingStage,
     options: ActionOrderOptions,
-    moves_ordered: bool,
 }
 
 impl PendingActionQueue {
@@ -204,7 +202,6 @@ impl PendingActionQueue {
             moves,
             stage,
             options,
-            moves_ordered: false,
         }
     }
 
@@ -228,9 +225,9 @@ impl PendingActionQueue {
 
     /// Reorder the current dynamic queue and pop exactly one action.
     ///
-    /// Switches are reordered before each pop.  Effective speed for the move
-    /// queue is read from the supplied live state once, then that ordered
-    /// queue is drained without another seed-offset transaction.
+    /// Effective speed is read from the supplied live state before each pop.
+    /// The seed-offset Fisher-Yates transaction is therefore repeated for
+    /// every queue pop, matching the source priority-queue boundary.
     pub fn pop_next(
         &mut self,
         state: &GameState,
@@ -257,25 +254,13 @@ impl PendingActionQueue {
         }
 
         let is_move_queue = self.stage == PendingStage::Moves;
-        let should_order = !is_move_queue || !self.moves_ordered;
-        if should_order {
-            let actions = if is_move_queue {
-                &mut self.moves
-            } else {
-                &mut self.switches
-            };
-            reorder_actions(actions, is_move_queue, battle, rng)?;
-        }
-        if is_move_queue && should_order {
-            self.moves_ordered = true;
-        }
-
         let action = {
             let actions = if is_move_queue {
                 &mut self.moves
             } else {
                 &mut self.switches
             };
+            reorder_actions(actions, is_move_queue, battle, rng)?;
 
             if actions.is_empty() {
                 None
