@@ -1161,7 +1161,20 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(source.contains("ReplacementAdmissionResult::Duplicate { .. }"));
     assert!(source.contains("expected read-only"));
     assert!(!source.contains("return Err(AuthorityTransactionError::Duplicate"));
-    assert!(source.contains("commands: completed_commands"));
+    for required in [
+        "validate_admitted_command_frontier_trusted",
+        "(Cow::Borrowed(state), commands)",
+        "(Cow::Owned(state), commands)",
+        "complete_command_frontier(scripted_state.as_ref(), content)?",
+        "Cow::Borrowed(state), Cow::Borrowed(policy)",
+        "complete_state.as_ref()",
+        "&allocators,",
+    ] {
+        assert!(
+            source.contains(required),
+            "authority adapter is missing the required {required} seam"
+        );
+    }
     assert!(source.contains("candidate.accepted_commands != completed_state_commands"));
     assert!(source.contains("frontier and tombstones"));
     assert!(source.contains("scripted_policy_after"));
@@ -1203,11 +1216,57 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         "pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry"
     ));
     assert!(source.contains("material_bytes: std::mem::take(&mut self.material_bytes)"));
+    let input_start = source
+        .find("pub(crate) struct AuthorityTransactionInput")
+        .ok_or("authority transaction input type missing")?;
+    let input_end = source
+        .find("pub(crate) struct AuthorityTurnRequest")
+        .ok_or("authority turn request type missing")?;
+    let input_source = &source[input_start..input_end];
+    for required in [
+        "pub state: &'a GameState",
+        "pub control: &'a BattleControlPlan",
+        "pub menu_allocators: &'a [SeatMenuInstanceAllocator]",
+        "pub scripted_policy: &'a ScriptedEnemyPolicyV1",
+    ] {
+        assert!(
+            input_source.contains(required),
+            "authority transaction input is missing {required}"
+        );
+    }
     let kernel_source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/battle_kernel.rs"));
     assert!(kernel_source.contains("prepared.take_prepared_entry()"));
     assert!(!kernel_source.contains("PreparedAuthorityEntry {"));
     assert!(!kernel_source.contains("take_material_bytes"));
     assert!(!kernel_source.contains("material_bytes"));
+    let resolved_start = kernel_source
+        .find("fn reduce_battle_resolved(")
+        .ok_or("BattleKernel battle-resolved reducer missing")?;
+    let resolved_end = kernel_source
+        .find("fn reduce_authority_ready(")
+        .ok_or("BattleKernel authority-ready reducer missing")?;
+    let resolved_source = &kernel_source[resolved_start..resolved_end];
+    for forbidden in [
+        ".state().clone()",
+        ".control().clone()",
+        ".scripted_enemy_policy().clone()",
+        ".control().menu_allocators.clone()",
+    ] {
+        assert!(
+            !resolved_source.contains(forbidden),
+            "BattleKernel authority reducer must not clone {forbidden}"
+        );
+    }
+    for required in [
+        "state: self.staged.game.state()",
+        "control: self.staged.game.control()",
+        "scripted_policy: self.staged.game.scripted_enemy_policy()",
+    ] {
+        assert!(
+            resolved_source.contains(required),
+            "BattleKernel authority reducer is missing {required}"
+        );
+    }
     let ready_start = kernel_source
         .find("let prepared_entry = prepared.take_prepared_entry();")
         .ok_or("BattleKernel FIFO payload handoff missing")?;
