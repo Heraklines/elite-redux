@@ -49,6 +49,7 @@ pub enum PresentationCausalEvent {
         pokemon: PokemonId,
         ability_id: AbilityId,
     },
+    #[cfg_attr(test, allow(dead_code))]
     StatStageAttempted {
         pokemon: PokemonId,
         stat: BattleStat,
@@ -80,6 +81,7 @@ impl PresentationCausalEvent {
         }
     }
 
+    #[cfg_attr(test, allow(dead_code))]
     pub const fn stat_stage_attempted(
         pokemon: PokemonId,
         stat: BattleStat,
