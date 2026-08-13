@@ -27,7 +27,9 @@ use er_types::battle_command::{
     BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
     scripted_enemy_command_operation_id,
 };
-use er_types::battle_ids::{BattleId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, WaveIndex};
+use er_types::battle_ids::{
+    BattleFormat, BattleId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, WaveIndex,
+};
 use er_types::{
     ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
     RunId, SafeU53, SeatId, SessionId, TimeClass,
@@ -38,7 +40,7 @@ use serde_json::Value;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const LIVE_BATTLE_FIXTURE: &str =
-    include_str!("../../../fixtures/m3/oracle/battle-cases/physical-hit.json");
+    include_str!("../../../fixtures/m3/oracle/battle-cases/doubles-single-target.json");
 const LIVE_CONTENT_PACK_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/content-pack-v1.json");
 const LEGACY_ORACLE_CONTENT_DIGEST: &str =
@@ -362,50 +364,72 @@ fn adapt_party_status_kinds(party: &Value, party_name: &str) -> TestResult<Value
     Ok(adapted)
 }
 
-fn enemy_actor(battle: &Value) -> TestResult<er_types::battle_ids::PokemonId> {
+fn enemy_actor(battle: &Value, position: u8) -> TestResult<er_types::battle_ids::PokemonId> {
     let slots = field(field(battle, "field")?, "slots")?
         .as_array()
         .ok_or_else(|| invalid("battle field slots are not an array"))?;
     let actor = slots.iter().find_map(|entry| {
         let slot = entry.get("slot")?;
-        (slot.get("side")?.as_str() == Some("ENEMY") && slot.get("position")?.as_u64() == Some(0))
+        (slot.get("side")?.as_str() == Some("ENEMY")
+            && slot.get("position")?.as_u64() == Some(u64::from(position)))
             .then(|| entry.get("occupant")?.as_u64())
             .flatten()
     });
-    let actor = actor.ok_or_else(|| invalid("single fixture has no enemy lead"))?;
+    let actor = actor.ok_or_else(|| {
+        invalid(format!(
+            "doubles fixture has no enemy lead at position {position}"
+        ))
+    })?;
     Ok(er_types::battle_ids::PokemonId::new(SafeU53::new(actor)?))
 }
 
-fn scripted_enemy_policy(battle: &Value) -> TestResult<ScriptedEnemyPolicyV1> {
-    let actor = enemy_actor(battle)?;
+fn scripted_enemy_policy(
+    battle: &Value,
+    format: &BattleFormat,
+) -> TestResult<ScriptedEnemyPolicyV1> {
     let battle_id: BattleId = serde_json::from_value(field(battle, "battle_id")?.clone())?;
     let turn_number = field(battle, "turn")?
         .as_u64()
         .ok_or_else(|| invalid("battle turn is not an unsigned integer"))?;
     let wave: WaveIndex = serde_json::from_value(field(battle, "wave")?.clone())?;
-    let enemy_slot = FieldSlot {
-        side: BattleSide::Enemy,
-        position: 0,
-    };
     let turn = er_types::battle_ids::TurnIndex::new(SafeU53::new(turn_number)?)?;
-    let operation_id =
-        scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, SafeU53::ZERO)?;
-    let command = BattleCommand::fight(
-        actor,
-        MoveSlotIndex::ZERO,
-        BattleTargetSelection::implicit(),
-    )?;
-    let scripted = ScriptedEnemyBattleCommandV1::new(
-        operation_id,
-        battle_id,
-        wave,
-        turn,
-        SafeU53::ZERO,
-        actor,
-        enemy_slot,
-        command,
-    )?;
-    Ok(ScriptedEnemyPolicyV1::new(SafeU53::ZERO, vec![scripted])?)
+    let commands = (0..format.enemy_capacity)
+        .map(|position| -> TestResult<ScriptedEnemyBattleCommandV1> {
+            let actor = enemy_actor(battle, position)?;
+            let enemy_slot = FieldSlot {
+                side: BattleSide::Enemy,
+                position,
+            };
+            let target = FieldSlot {
+                side: BattleSide::Player,
+                position: position.min(format.player_capacity.saturating_sub(1)),
+            };
+            let script_cursor = safe(u64::from(position));
+            let operation_id = scripted_enemy_command_operation_id(
+                battle_id,
+                wave,
+                turn,
+                enemy_slot,
+                script_cursor,
+            )?;
+            let command = BattleCommand::fight(
+                actor,
+                MoveSlotIndex::ZERO,
+                BattleTargetSelection::selected(vec![target])?,
+            )?;
+            Ok(ScriptedEnemyBattleCommandV1::new(
+                operation_id,
+                battle_id,
+                wave,
+                turn,
+                script_cursor,
+                actor,
+                enemy_slot,
+                command,
+            )?)
+        })
+        .collect::<TestResult<Vec<_>>>()?;
+    Ok(ScriptedEnemyPolicyV1::new(SafeU53::ZERO, commands)?)
 }
 
 fn battle_config(
@@ -416,15 +440,11 @@ fn battle_config(
     let canonical =
         normalize_legacy_state_content_identity(fixture, canonical_state(fixture)?, content)?;
     let battle = initial_battle(fixture)?;
-    let format = kernel_format(battle)?;
-    let player_capacity = field(&format, "player_capacity")?
-        .as_u64()
-        .ok_or_else(|| invalid("player capacity is not an unsigned integer"))?;
-    let enemy_capacity = field(&format, "enemy_capacity")?
-        .as_u64()
-        .ok_or_else(|| invalid("enemy capacity is not an unsigned integer"))?;
-    if player_capacity != 1 || enemy_capacity != 1 {
-        return Err(invalid("live pair fixture must use a single battle format"));
+    let format: BattleFormat = serde_json::from_value(kernel_format(battle)?)?;
+    if format != BattleFormat::coop_double() {
+        return Err(invalid(
+            "live pair fixture must use the exact co-op doubles battle format",
+        ));
     }
 
     let mut run_state = canonical;
@@ -453,15 +473,19 @@ fn battle_config(
         run_state: serde_json::from_value(run_state)?,
         start: BattleStartV1 {
             schema_version: 1,
-            format: serde_json::from_value(format)?,
+            format: format.clone(),
             player_party: serde_json::from_value(player_party)?,
             enemy_party: serde_json::from_value(enemy_party)?,
-            player_leads: vec![PartyIndex::try_from(0_u64)?],
-            enemy_leads: vec![PartyIndex::try_from(0_u64)?],
+            player_leads: (0..format.player_capacity)
+                .map(|position| Ok(PartyIndex::try_from(u64::from(position))?))
+                .collect::<TestResult<Vec<_>>>()?,
+            enemy_leads: (0..format.enemy_capacity)
+                .map(|position| Ok(PartyIndex::try_from(u64::from(position))?))
+                .collect::<TestResult<Vec<_>>>()?,
         },
         local_seat,
         wave_seed,
-        scripted_enemy_policy: scripted_enemy_policy(battle)?,
+        scripted_enemy_policy: scripted_enemy_policy(battle, &format)?,
     })
 }
 
