@@ -364,7 +364,11 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
             BattleCommand::fight(
                 actor,
                 MoveSlotIndex::ZERO,
-                BattleTargetSelection::implicit(),
+                if battle.format == BattleFormat::single() {
+                    BattleTargetSelection::implicit()
+                } else {
+                    BattleTargetSelection::selected(vec![slot(BattleSide::Enemy, 0)])?
+                },
             )?,
             MenuInstanceId::new(safe(2 + u64::from(position) * 3)?),
             format!(

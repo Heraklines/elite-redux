@@ -427,7 +427,7 @@ fn material_self_digest_failure_precedes_local_state_and_other_tampering() {
         before_state: state.clone(),
         after_state: state.clone(),
         outcome: serde_json::from_value(json!("ONGOING")).expect("outcome is typed"),
-        next_decision: serde_json::from_value(json!("COMMAND_FRONTIER"))
+        next_decision: serde_json::from_value(json!({"kind": "COMMAND_FRONTIER"}))
             .expect("next decision is typed"),
         menu_allocators_before: next_control.menu_allocators.clone(),
         next_control,
@@ -611,7 +611,9 @@ fn no_legal_replacement_is_validated_as_explicit_material_evidence() {
     assert!(MATERIAL_SOURCE.contains("validate_replacement_selection("));
     assert!(MATERIAL_SOURCE.contains("legal_replacement_candidates"));
     assert!(MATERIAL_SOURCE.contains("candidates.is_empty()"));
-    assert!(MATERIAL_SOURCE.contains("WaitingReason::ReplacementOwner"));
+    assert!(
+        MATERIAL_SOURCE.contains("stored.replacement == ReplacementProgress::NoLegalReplacement")
+    );
     assert!(MATERIAL_SOURCE.contains("material.occurrence.id"));
     assert!(MATERIAL_SOURCE.contains("validate_replacement_identity"));
 }

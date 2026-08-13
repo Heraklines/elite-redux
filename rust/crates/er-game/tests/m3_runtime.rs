@@ -331,6 +331,7 @@ mod m3_oracle_control_axis8 {
         ("wonder-guard-super-effective-pass", "ENEMY", 0, 2),
     ];
     const LEGACY_STALE_OCCUPANT_COUNT: usize = 9;
+    const LEGACY_COMPACTED_PLAYER_SLOT_CASE: &str = "mixed-side-simultaneous-faint";
     const LEGACY_ORACLE_CONTENT_DIGEST: &str =
         "3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
     const LEGACY_ORACLE_CONTENT_HASH: &str =
@@ -1075,6 +1076,145 @@ mod m3_oracle_control_axis8 {
         Ok(())
     }
 
+    fn normalize_legacy_compacted_player_slot(
+        case: &str,
+        battle: &mut serde_json::Map<String, Value>,
+    ) -> TestResult {
+        if case != LEGACY_COMPACTED_PLAYER_SLOT_CASE {
+            return Ok(());
+        }
+
+        let player_party = battle
+            .get("player_party")
+            .and_then(Value::as_array)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.player_party is invalid")))?;
+        let survivor = player_party
+            .iter()
+            .find(|pokemon| pokemon.get("id").and_then(Value::as_u64) == Some(2))
+            .ok_or_else(|| boxed(format!("{case}: compacted survivor 2 is missing")))?;
+        require(
+            case,
+            survivor.get("owner_seat").and_then(Value::as_u64) == Some(2)
+                && survivor.get("hp").and_then(Value::as_u64).is_some_and(|hp| hp > 0)
+                && survivor.get("fainted").and_then(Value::as_bool) == Some(false),
+            "legacy compacted survivor no longer has the exact seat-2 live-party shape",
+        )?;
+
+        let field = battle
+            .get("field")
+            .and_then(Value::as_object)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.field is invalid")))?;
+        let slots = field
+            .get("slots")
+            .and_then(Value::as_array)
+            .ok_or_else(|| boxed(format!("{case}: canonical.battle.field.slots is invalid")))?;
+        let source_index = slots
+            .iter()
+            .position(|entry| {
+                entry
+                    .get("slot")
+                    .and_then(Value::as_object)
+                    .is_some_and(|slot| {
+                        slot.get("side").and_then(Value::as_str) == Some("PLAYER")
+                            && slot.get("position").and_then(Value::as_u64) == Some(0)
+                    })
+            })
+            .ok_or_else(|| boxed(format!("{case}: compacted source slot is missing")))?;
+        let target_index = slots
+            .iter()
+            .position(|entry| {
+                entry
+                    .get("slot")
+                    .and_then(Value::as_object)
+                    .is_some_and(|slot| {
+                        slot.get("side").and_then(Value::as_str) == Some("PLAYER")
+                            && slot.get("position").and_then(Value::as_u64) == Some(1)
+                    })
+            })
+            .ok_or_else(|| boxed(format!("{case}: canonical seat-2 slot is missing")))?;
+        require(
+            case,
+            slots[source_index].get("occupant").and_then(Value::as_u64) == Some(2)
+                && slots[target_index]
+                    .get("occupant")
+                    .is_some_and(Value::is_null),
+            "legacy compacted field no longer has survivor 2 in player slot 0 and an empty player slot 1",
+        )?;
+
+        let frontier = battle
+            .get("command_state")
+            .and_then(Value::as_object)
+            .and_then(|command_state| command_state.get("frontier"))
+            .and_then(Value::as_array)
+            .ok_or_else(|| {
+                boxed(format!(
+                    "{case}: canonical.battle.command_state.frontier is invalid"
+                ))
+            })?;
+        require(
+            case,
+            frontier.len() == 1,
+            "legacy compacted fixture no longer has exactly one pending command",
+        )?;
+        let entry = frontier[0]
+            .as_object()
+            .ok_or_else(|| boxed(format!("{case}: pending command entry is invalid")))?;
+        let entry_slot = entry
+            .get("field_slot")
+            .and_then(Value::as_object)
+            .ok_or_else(|| boxed(format!("{case}: pending command slot is invalid")))?;
+        require(
+            case,
+            entry.get("actor").and_then(Value::as_u64) == Some(2)
+                && entry.get("owner_seat").and_then(Value::as_u64) == Some(2)
+                && entry_slot.get("side").and_then(Value::as_str) == Some("PLAYER")
+                && entry_slot.get("position").and_then(Value::as_u64) == Some(0)
+                && entry.get("operation_id").and_then(Value::as_str)
+                    == Some("battle/1/wave/1/turn/2/command/player/0/seat/2")
+                && entry
+                    .get("status")
+                    .and_then(Value::as_object)
+                    .and_then(|status| status.get("kind"))
+                    .and_then(Value::as_str)
+                    == Some("PENDING"),
+            "legacy compacted command no longer has the exact actor/owner/slot/operation/status shape",
+        )?;
+
+        let slots = battle
+            .get_mut("field")
+            .and_then(Value::as_object_mut)
+            .and_then(|field| field.get_mut("slots"))
+            .and_then(Value::as_array_mut)
+            .expect("field slots were validated above");
+        slots[source_index]
+            .as_object_mut()
+            .expect("source field slot was validated above")
+            .insert("occupant".to_owned(), Value::Null);
+        slots[target_index]
+            .as_object_mut()
+            .expect("target field slot was validated above")
+            .insert("occupant".to_owned(), Value::from(2));
+
+        let entry = battle
+            .get_mut("command_state")
+            .and_then(Value::as_object_mut)
+            .and_then(|command_state| command_state.get_mut("frontier"))
+            .and_then(Value::as_array_mut)
+            .and_then(|frontier| frontier.first_mut())
+            .and_then(Value::as_object_mut)
+            .expect("pending command entry was validated above");
+        entry
+            .get_mut("field_slot")
+            .and_then(Value::as_object_mut)
+            .expect("pending command slot was validated above")
+            .insert("position".to_owned(), Value::from(1));
+        entry.insert(
+            "operation_id".to_owned(),
+            Value::String("battle/1/wave/1/turn/2/command/player/1/seat/2".to_owned()),
+        );
+        Ok(())
+    }
+
     fn normalize_legacy_content_identity(
         case: &str,
         fixture: &Value,
@@ -1183,7 +1323,8 @@ mod m3_oracle_control_axis8 {
                 "kind",
             )?;
         }
-        normalize_legacy_stale_occupants(case, battle)
+        normalize_legacy_stale_occupants(case, battle)?;
+        normalize_legacy_compacted_player_slot(case, battle)
     }
 
     fn parse_expected_final_state(
