@@ -711,10 +711,8 @@ pub struct PairTraceObservationV2 {
 pub trait PairTraceReplayDriver {
     type PairState;
 
-    fn restore(
-        &self,
-        snapshot: RestorablePairSnapshotV2,
-    ) -> Result<Self::PairState, SnapshotError>;
+    fn restore(&self, snapshot: RestorablePairSnapshotV2)
+    -> Result<Self::PairState, SnapshotError>;
 
     fn step(
         &mut self,
@@ -1760,10 +1758,7 @@ impl PairKernelTraceV2 {
         None
     }
 
-    pub fn replay_with<D>(
-        &self,
-        mut driver: D,
-    ) -> Result<TraceReplayReportV2, SnapshotError>
+    pub fn replay_with<D>(&self, mut driver: D) -> Result<TraceReplayReportV2, SnapshotError>
     where
         D: PairTraceReplayDriver,
     {
@@ -1771,11 +1766,8 @@ impl PairKernelTraceV2 {
         let mut pair_state = driver.restore(self.initial_snapshot.clone())?;
         let mut recorder = PairKernelTraceRecorder::new(self.initial_snapshot.clone())?;
         for (index, expected) in self.entries.iter().enumerate() {
-            let observation = driver.step(
-                &mut pair_state,
-                &expected.input,
-                expected.virtual_time_ms,
-            )?;
+            let observation =
+                driver.step(&mut pair_state, &expected.input, expected.virtual_time_ms)?;
             if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
                 return Ok(TraceReplayReportV2 {
                     replayed_entries: one_based_sequence(index, "replayed_entries")?,

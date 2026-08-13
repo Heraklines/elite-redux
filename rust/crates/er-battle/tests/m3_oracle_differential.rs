@@ -2433,7 +2433,10 @@ fn catalogued_legacy_compacted_target(
         projection.legacy_target_side,
         projection.legacy_target_position,
     )?;
-    let typed_target = FieldSlot::new(projection.typed_target_side, projection.typed_target_position)?;
+    let typed_target = FieldSlot::new(
+        projection.typed_target_side,
+        projection.typed_target_position,
+    )?;
     let compacted_actor = PokemonId::try_from_u64(projection.compacted_actor)?;
     let surviving_actor = PokemonId::try_from_u64(projection.surviving_actor)?;
     let expected_move_slot = MoveSlotIndex::try_from(u64::from(projection.move_slot))?;
@@ -7507,9 +7510,11 @@ fn normalize_catalogued_compacted_target_presentation(
             FixtureError::new(format!(
                 "{case_name}: compacted-target presentation has no exact target catalogue entry"
             ))
-    })?;
-    let typed_target =
-        FieldSlot::new(projection.typed_target_side, projection.typed_target_position)?;
+        })?;
+    let typed_target = FieldSlot::new(
+        projection.typed_target_side,
+        projection.typed_target_position,
+    )?;
     let expected_move_id = MoveId::try_from_u64(projection.move_id)?;
     if presentation.len() != 7 {
         return Err(FixtureError::new(format!(

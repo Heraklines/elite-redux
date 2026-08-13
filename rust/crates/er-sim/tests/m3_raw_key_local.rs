@@ -795,7 +795,10 @@ fn assert_defeat_fixture_state_with_authoritative_terminal_faint(
     // and the applied faint occurrence remains as typed audit state.  Refuse
     // to normalize anything unless both sides have the exact known shapes,
     // then compare every remaining canonical field byte-for-byte.
-    let expected = field(field(&fixture.fixture, "expected_final_state")?, "canonical")?;
+    let expected = field(
+        field(&fixture.fixture, "expected_final_state")?,
+        "canonical",
+    )?;
     let mut expected = comparable_game_state(expected)?;
     let actual = comparable_game_state(&game_state_json(kernel)?)?;
 
@@ -836,12 +839,9 @@ fn assert_defeat_fixture_state_with_authoritative_terminal_faint(
         || actual.pointer("/battle/battle_rng") != Some(&authoritative_battle_rng)
         || expected.pointer("/battle/turn") != Some(&Value::from(1))
         || actual.pointer("/battle/turn") != Some(&Value::from(2))
-        || expected.pointer("/battle/enemy_party/0/moves/0/pp_used")
-            != Some(&Value::from(0))
-        || actual.pointer("/battle/enemy_party/0/moves/0/pp_used")
-            != Some(&Value::from(1))
-        || expected.pointer("/battle/player_party/0/abilities/passives")
-            != Some(&legacy_passives)
+        || expected.pointer("/battle/enemy_party/0/moves/0/pp_used") != Some(&Value::from(0))
+        || actual.pointer("/battle/enemy_party/0/moves/0/pp_used") != Some(&Value::from(1))
+        || expected.pointer("/battle/player_party/0/abilities/passives") != Some(&legacy_passives)
         || actual.pointer("/battle/player_party/0/abilities/passives")
             != Some(&authoritative_passives)
         || expected.pointer("/battle/field/slots/0/slot") != Some(&player_slot)
@@ -892,7 +892,10 @@ fn assert_victory_fixture_state_with_authoritative_terminal_faint(
     // cleared, and the applied faint occurrence remains as typed audit state.
     // Refuse to normalize anything unless both sides have those exact known
     // shapes, then compare every remaining canonical field byte-for-byte.
-    let expected = field(field(&fixture.fixture, "expected_final_state")?, "canonical")?;
+    let expected = field(
+        field(&fixture.fixture, "expected_final_state")?,
+        "canonical",
+    )?;
     let mut expected = comparable_game_state(expected)?;
     let actual = comparable_game_state(&game_state_json(kernel)?)?;
 
