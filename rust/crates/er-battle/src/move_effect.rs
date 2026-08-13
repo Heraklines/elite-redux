@@ -27,7 +27,7 @@ use crate::stat_stage::{
     StagePolicy, StatStageError, StatStageMutation, apply_stage_delta, effective_battle_stat,
 };
 use crate::status::{
-    StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError,
+    StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError, StatusRejection,
     apply_status_with_chance, burn_damage_multiplier, powder_immunity,
 };
 use crate::type_effectiveness::{
@@ -441,7 +441,11 @@ fn resolve_status_target(
             critical: None,
             damage: None,
             hp_mutation: None,
-            status_effects: Vec::new(),
+            status_effects: vec![StatusApplicationOutcome::Rejected {
+                reason: StatusRejection::PowderImmunity {
+                    immune_type: PokemonType::Grass,
+                },
+            }],
             stat_stage_effects: Vec::new(),
             faint_request: None,
         });

@@ -17,7 +17,6 @@ use er_types::battle_model::MoveTarget;
 use thiserror::Error;
 
 use crate::command::NormalizedBattleCommand;
-use crate::legality::canonical_target_candidates;
 use crate::move_effect::{
     DefensiveAbilityGate, FaintRequest, MoveEffectError, MoveTargetResult, resolve_target_effect,
 };
@@ -396,7 +395,11 @@ fn validate_targets(
     if move_target == MoveTarget::AllNearEnemies && targets.is_empty() {
         return Err(TargetSelectionError::AllEnemiesCount);
     }
-    let expected = canonical_target_candidates(battle, source_slot, move_target);
+    // Admission already authenticated the command against the live offer. By
+    // the time a queued move starts, an earlier action may have fainted or
+    // vacated one of those targets. Preserve the structural target shape here
+    // and let the target loop emit its typed inactive-target no-op.
+    let expected = structural_target_candidates(battle, source_slot, move_target);
     for (index, target) in targets.iter().copied().enumerate() {
         if !slot_within_format_capacity(battle, target) {
             return Err(TargetSelectionError::SlotOutsideCapacity { slot: target });
@@ -438,6 +441,35 @@ fn slot_within_format_capacity(battle: &BattleState, slot: FieldSlot) -> bool {
         er_types::battle_ids::BattleSide::Enemy => battle.format.enemy_capacity,
     };
     slot.position < capacity
+}
+
+fn structural_target_candidates(
+    battle: &BattleState,
+    actor_slot: FieldSlot,
+    target_kind: MoveTarget,
+) -> Vec<FieldSlot> {
+    let mut candidates = battle
+        .field
+        .slots
+        .iter()
+        .filter_map(|entry| {
+            if entry.slot == actor_slot
+                || !slot_within_format_capacity(battle, entry.slot)
+                || !battle.format.adjacency.iter().any(|edge| {
+                    (edge.first == actor_slot && edge.second == entry.slot)
+                        || (edge.first == entry.slot && edge.second == actor_slot)
+                })
+            {
+                return None;
+            }
+            if target_kind == MoveTarget::AllNearEnemies && entry.slot.side == actor_slot.side {
+                return None;
+            }
+            Some(entry.slot)
+        })
+        .collect::<Vec<_>>();
+    candidates.sort_unstable();
+    candidates
 }
 
 fn deduct_pp(

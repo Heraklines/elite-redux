@@ -2,6 +2,7 @@
 
 use er_content::moves::MoveDefinitionError;
 use er_content::pack::ContentPack;
+use er_rng::audit::RngStream;
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::RngError;
 use er_state::battle::{
@@ -408,14 +409,13 @@ fn resolve_move_action(
     mutations: &mut Vec<BattleMutation>,
     causal_events: &mut Vec<PresentationCausalEvent>,
 ) -> Result<(), BattleResolveError> {
-    let rng_before = active_battle(state)?.battle_rng.clone();
+    let rng_audit_start = runtime.audit_entries().len();
     let result = {
         let battle = active_battle_mut(state)?;
         resolve_move(battle, &action.command, content, runtime, gate)
     }
     .map_err(|source| map_move_pipeline_error(source, state, action))?;
     sync_rng_state(state, runtime)?;
-    let rng_after = active_battle(state)?.battle_rng.clone();
 
     let action_sequence = push_pending_action(action_order, action, move_disposition(&result))?;
     if let Some(pp) = result.pp_mutation {
@@ -430,13 +430,31 @@ fn resolve_move_action(
             },
         );
     }
-    if rng_before != rng_after {
+    for draw in runtime
+        .audit_entries()
+        .iter()
+        .skip(rng_audit_start)
+        .filter(|draw| draw.stream == RngStream::Battle)
+    {
+        let before = draw
+            .before_state
+            .battle
+            .clone()
+            .ok_or(RngError::MissingBattleState)?;
+        let after = draw
+            .after_state
+            .battle
+            .clone()
+            .ok_or(RngError::MissingBattleState)?;
+        if before == after {
+            continue;
+        }
         record_mutation(
             mutations,
             causal_events,
             BattleMutation::BattleRngChanged {
-                before: rng_before,
-                after: rng_after,
+                before,
+                after,
             },
         );
     }

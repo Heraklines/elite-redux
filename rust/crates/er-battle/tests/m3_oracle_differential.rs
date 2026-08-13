@@ -311,14 +311,13 @@ struct LegacyCompactedTargetProjection {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-struct LegacyRemappedCommandAdmissionProjection {
+struct TypedSpeedQueueProbeProjection {
     case_name: &'static str,
-    actor: u64,
-    source_side: BattleSide,
-    source_position: u8,
-    operation_id: &'static str,
-    owner_seat: u64,
-    source: CommandAdmissionSource,
+    actual_index: usize,
+    wave_seed: &'static str,
+    offset: u64,
+    cardinality: u64,
+    result: u64,
 }
 
 const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
@@ -342,7 +341,7 @@ const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
         move_slot: 0,
         move_id: 589,
         effective_speed: 180,
-        tie_order: 1,
+        tie_order: 0,
     },
     TypedInactiveActionProjection {
         case_name: "no-legal-replacement",
@@ -353,7 +352,7 @@ const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
         move_slot: 0,
         move_id: 589,
         effective_speed: 180,
-        tie_order: 0,
+        tie_order: 1,
     },
     TypedInactiveActionProjection {
         case_name: "defeat",
@@ -466,16 +465,21 @@ const LEGACY_COMPACTED_TARGET_PROJECTIONS: &[LegacyCompactedTargetProjection] =
         effective_speed: 207,
     }];
 
-const LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS: &[LegacyRemappedCommandAdmissionProjection] =
-    &[LegacyRemappedCommandAdmissionProjection {
-        case_name: "mixed-side-simultaneous-faint",
-        actor: 2,
-        source_side: BattleSide::Player,
-        source_position: 1,
-        operation_id: "battle/1/wave/1/turn/1/command/player/1/seat/2",
-        owner_seat: 2,
-        source: CommandAdmissionSource::AuthorityRemoteProposal,
+const TYPED_SPEED_QUEUE_PROJECTIONS: &[TypedSpeedQueueProbeProjection] =
+    &[TypedSpeedQueueProbeProjection {
+        case_name: "voluntary-switch",
+        actual_index: 5,
+        wave_seed: "n4.wpmvoubsz.txjudi",
+        offset: 1002,
+        cardinality: 2,
+        result: 0,
     }];
+
+const LEGACY_POST_TURN_OUTCOME_CASES: &[&str] = &[
+    "same-side-simultaneous-faint",
+    "no-legal-replacement",
+    "defeat",
+];
 
 const LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE: &str =
     "src/data/elite-redux/init-elite-redux-ability-upgrades.ts:496";
@@ -2474,50 +2478,6 @@ fn catalogued_legacy_compacted_target(
     Ok(Some(typed_target))
 }
 
-fn catalogued_remapped_command_admission_source(
-    case_name: &str,
-    record: &FixtureCommandRecord,
-) -> Result<CommandAdmissionSource, Box<dyn Error>> {
-    let Some(projection) =
-        LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS
-            .iter()
-            .find(|projection| {
-                projection.case_name == case_name && projection.actor == u64::from(record.actor)
-            })
-    else {
-        return Ok(record.source);
-    };
-    let source_slot = FieldSlot::new(projection.source_side, projection.source_position)?;
-    let owner_seat = SeatId::new(SafeU53::new(projection.owner_seat)?);
-    let expected_move_slot = MoveSlotIndex::try_from(0_u64)?;
-    let enemy_zero = FieldSlot::new(BattleSide::Enemy, 0)?;
-    let enemy_one = FieldSlot::new(BattleSide::Enemy, 1)?;
-    let exact_record = record.field_slot == source_slot
-        && record.operation_id.as_str() == projection.operation_id
-        && record.owner_seat == Some(owner_seat)
-        && record.source == projection.source
-        && record.legacy_command == record.command
-        && matches!(
-            &record.command,
-            BattleCommand::Fight {
-                actor,
-                move_slot,
-                targets: BattleTargetSelection::Selected(targets),
-            } if *actor == record.actor
-                && *move_slot == expected_move_slot
-                && targets.len() == 2
-                && targets[0] == enemy_zero
-                && targets[1] == enemy_one
-        );
-    if !exact_record {
-        return Err(FixtureError::new(format!(
-            "{case_name}: catalogued remapped command admission source differs from its exact actor/slot/operation/owner/source/target fingerprint"
-        ))
-        .into());
-    }
-    Ok(projection.source)
-}
-
 fn normalize_legacy_command_records(
     case_name: &str,
     initial: &GameState,
@@ -2923,7 +2883,7 @@ fn admit_fixture_commands(
     let mut frontier = Vec::with_capacity(records.len());
 
     for (index, record) in records.iter().enumerate() {
-        let admission_source = catalogued_remapped_command_admission_source(case_name, record)?;
+        let admission_source = record.source;
         let offer = match record.field_slot.side {
             BattleSide::Player => build_command_offer(initial, record.field_slot, content)?,
             BattleSide::Enemy => {
@@ -3480,6 +3440,44 @@ fn is_legacy_speed_queue_probe(draw: &RngDraw) -> bool {
         && draw.callsite_id == RngCallsiteId::speed_tie()
 }
 
+fn project_catalogued_typed_speed_queue_probe(
+    case_name: &str,
+    actual_index: usize,
+    draw: &RngDraw,
+) -> Result<bool, Box<dyn Error>> {
+    let Some(projection) = TYPED_SPEED_QUEUE_PROJECTIONS
+        .iter()
+        .find(|projection| {
+            projection.case_name == case_name && projection.actual_index == actual_index
+        })
+    else {
+        return Ok(false);
+    };
+    let expected_context = SeedOffsetContext {
+        wave_seed: projection.wave_seed.to_owned(),
+        offset: SafeU53::new(projection.offset)?,
+    };
+    let exact = draw.stream == RngStream::SeedOffset
+        && draw.reason == RngReason::SpeedTie
+        && draw.public_api == RngPublicApi::FisherYatesSwap
+        && draw.callsite_id == RngCallsiteId::speed_tie()
+        && draw.minimum == SafeU53::ZERO
+        && draw.cardinality == SafeU53::new(projection.cardinality)?
+        && draw.result == SafeU53::new(projection.result)?
+        && draw.consumed
+        && draw.primitive_draw_count == 2
+        && draw.before_state.battle == draw.after_state.battle
+        && draw.before_state.seed_offset.as_ref() == Some(&expected_context)
+        && draw.after_state.seed_offset.as_ref() == Some(&expected_context);
+    if !exact {
+        return Err(FixtureError::new(format!(
+            "{case_name}: typed speed-queue probe {actual_index} differs from its exact catalogue"
+        ))
+        .into());
+    }
+    Ok(true)
+}
+
 fn project_legacy_rng_draws(
     case_name: &str,
     legacy: Vec<LegacyProjectedRngDraw>,
@@ -3497,6 +3495,18 @@ fn project_legacy_rng_draws(
                 actual_draw.sequence
             ))
             .into());
+        }
+
+        if project_catalogued_typed_speed_queue_probe(case_name, actual_index, actual_draw)? {
+            let mut projected_draw = actual_draw.clone();
+            projected_draw.sequence = sequence;
+            projected_draw.before_fingerprint =
+                rng_state_fingerprint(&projected_draw.before_state)?;
+            projected_draw.after_fingerprint =
+                rng_state_fingerprint(&projected_draw.after_state)?;
+            projected_draw.validate()?;
+            projected.push(projected_draw);
+            continue;
         }
 
         let mut matched = None;
@@ -4444,28 +4454,28 @@ fn project_catalogued_forced_replacement_action_order(
     let actual_pair = exact_forced_replacement_action(
         &actual[3],
         3,
-        2,
-        player_one,
-        actor_two_operation,
-        ActionDisposition::Executed,
-        0,
-    )? && exact_forced_replacement_action(
-        &actual[4],
-        4,
         1,
         player_zero,
         actor_one_operation,
         ActionDisposition::SkippedActorInactive,
+        0,
+    )? && exact_forced_replacement_action(
+        &actual[4],
+        4,
+        2,
+        player_one,
+        actor_two_operation,
+        ActionDisposition::Executed,
         1,
     )?;
     if !expected_pair || !actual_pair {
         return Err(FixtureError::new(
-            "forced-replacement: action-order projection differs from its exact reverted-queue pair catalogue",
+            "forced-replacement: action-order projection differs from its exact dynamic-queue pair catalogue",
         )
         .into());
     }
     let mut projected = actual.to_vec();
-    projected.swap(3, 4);
+    projected[4].tie_order = SafeU53::ZERO;
     Ok(projected)
 }
 
@@ -7278,76 +7288,28 @@ fn voluntary_switch_rebased_hp_mutation(
     actual_index: usize,
 ) -> Option<(usize, u64, u32, u32, u32)> {
     match actual_index {
-        5 => Some((7, 2, 201, 157, 159)),
-        8 => Some((12, 3, 251, 216, 217)),
-        11 => Some((17, 4, 198, 113, 124)),
+        7 => Some((7, 2, 201, 157, 159)),
+        12 => Some((12, 3, 251, 216, 217)),
+        17 => Some((17, 4, 198, 113, 124)),
         _ => None,
     }
 }
 
-fn validate_voluntary_switch_aggregate_rng_mutation(
-    case_name: &str,
-    actual_index: usize,
-    mutation: &BattleMutation,
-    battle_draws: &[&RngDraw],
-) -> Result<(), Box<dyn Error>> {
-    let BattleMutation::BattleRngChanged { before, after } = mutation else {
-        return Err(FixtureError::new(format!(
-            "{case_name}: production mutation {actual_index} is not the catalogued aggregate BattleRngChanged"
-        ))
-        .into());
-    };
-    if let Some(group) = match actual_index {
-        4 => Some(0),
-        7 => Some(1),
-        10 => Some(2),
-        _ => None,
-    } {
-        let first = battle_draws.get(group * 3).ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: aggregate RNG mutation {actual_index} has no first draw"
-            ))
-        })?;
-        let last = battle_draws.get(group * 3 + 2).ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: aggregate RNG mutation {actual_index} has no final draw"
-            ))
-        })?;
-        if first.before_state.battle.as_ref() != Some(before)
-            || last.after_state.battle.as_ref() != Some(after)
-        {
-            return Err(FixtureError::new(format!(
-                "{case_name}: aggregate RNG mutation {actual_index} is not bounded by its exact three-draw group"
-            ))
-            .into());
-        }
-        return Ok(());
-    }
-    if actual_index != 12 {
-        return Err(FixtureError::new(format!(
-            "{case_name}: aggregate RNG mutation index {actual_index} is outside the exact catalogue"
-        ))
-        .into());
-    }
-    let final_draw = battle_draws
-        .last()
-        .and_then(|draw| draw.after_state.battle.as_ref())
-        .ok_or_else(|| {
-            FixtureError::new(format!(
-                "{case_name}: turn-boundary RNG mutation has no final battle draw"
-            ))
-        })?;
-    if before != final_draw
-        || before.battle_seed != after.battle_seed
-        || before.turn.get().get().checked_add(1) != Some(after.turn.get().get())
-        || after.saved_substream.is_some()
-    {
-        return Err(FixtureError::new(format!(
-            "{case_name}: turn-boundary RNG mutation is outside the exact post-draw increment shape"
-        ))
-        .into());
-    }
-    Ok(())
+fn is_catalogued_turn_boundary_rng_seam(mutations: &[BattleMutation], index: usize) -> bool {
+    matches!(
+        (mutations.get(index), mutations.get(index + 1)),
+        (
+            Some(BattleMutation::BattleRngChanged { before, after }),
+            Some(BattleMutation::TurnAdvanced {
+                before: turn_before,
+                after: turn_after,
+            }),
+        ) if before.battle_seed == after.battle_seed
+            && before.turn.get().get().checked_add(1) == Some(after.turn.get().get())
+            && after.saved_substream.is_none()
+            && before.turn == *turn_before
+            && after.turn == *turn_after
+    )
 }
 
 fn project_catalogued_voluntary_switch_stat_stage_order(
@@ -7399,18 +7361,19 @@ fn normalize_catalogued_deterministic_intimidate_mutations(
     }
     let mut projected = actual
         .iter()
-        .filter(|mutation| {
+        .enumerate()
+        .filter(|(index, mutation)| {
             !matches!(
                 mutation,
                 BattleMutation::CommandCollectionChanged { .. }
                     | BattleMutation::OutcomeChanged { .. }
-            )
+            ) && !is_catalogued_turn_boundary_rng_seam(actual, *index)
         })
-        .cloned()
+        .map(|(_, mutation)| mutation.clone())
         .collect::<Vec<_>>();
-    if trace.typed.len() != 19 || projected.len() != 14 {
+    if trace.typed.len() != 19 || projected.len() != 19 {
         return Err(FixtureError::new(format!(
-            "{case_name}: deterministic-Intimidate mutation projection has legacy/typed lengths {}/{}, expected exact 19/14",
+            "{case_name}: deterministic-Intimidate mutation projection has legacy/typed lengths {}/{}, expected exact 19/19",
             trace.typed.len(),
             projected.len()
         ))
@@ -7441,14 +7404,29 @@ fn normalize_catalogued_deterministic_intimidate_mutations(
         .into());
     }
 
+    let mut battle_draw_index = 0;
     for (actual_index, mutation) in projected.iter().enumerate() {
-        if matches!(actual_index, 4 | 7 | 10 | 12) {
-            validate_voluntary_switch_aggregate_rng_mutation(
-                case_name,
-                actual_index,
-                mutation,
-                &battle_draws,
-            )?;
+        if matches!(actual_index, 4 | 5 | 6 | 9 | 10 | 11 | 14 | 15 | 16) {
+            let draw = battle_draws.get(battle_draw_index).ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: production BattleRngChanged mutation {actual_index} has no exact audit draw"
+                ))
+            })?;
+            let BattleMutation::BattleRngChanged { before, after } = mutation else {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: production mutation {actual_index} is not an exact per-draw BattleRngChanged entry"
+                ))
+                .into());
+            };
+            if draw.before_state.battle.as_ref() != Some(before)
+                || draw.after_state.battle.as_ref() != Some(after)
+            {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: production BattleRngChanged mutation {actual_index} is not bounded by its exact audit draw"
+                ))
+                .into());
+            }
+            battle_draw_index += 1;
             continue;
         }
         if let Some((legacy_index, pokemon, before, legacy_after, typed_after)) =
@@ -7492,10 +7470,7 @@ fn normalize_catalogued_deterministic_intimidate_mutations(
             continue;
         }
         let legacy_index = match actual_index {
-            0..=3 => actual_index,
-            6 => 8,
-            9 => 13,
-            13 => 18,
+            0..=3 | 7..=8 | 12..=13 | 17..=18 => actual_index,
             _ => {
                 return Err(FixtureError::new(format!(
                     "{case_name}: production mutation {actual_index} is outside the exact deterministic-Intimidate projection"
@@ -7509,6 +7484,13 @@ fn normalize_catalogued_deterministic_intimidate_mutations(
             ))
             .into());
         }
+    }
+    if battle_draw_index != battle_draws.len() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: projected BattleRngChanged mutations consumed {battle_draw_index} of {} exact audit draws",
+            battle_draws.len()
+        ))
+        .into());
     }
     trace.typed = projected;
     Ok(())
@@ -7540,6 +7522,9 @@ fn compare_mutation_trace(
     let mut outcome_changes = 0;
     let mut outcome_change_index = None;
     for (index, mutation) in actual.iter().enumerate() {
+        if is_catalogued_turn_boundary_rng_seam(actual, index) {
+            continue;
+        }
         match mutation {
             BattleMutation::CommandCollectionChanged { before, after } => {
                 command_changes += 1;
@@ -7604,14 +7589,17 @@ fn compare_mutation_trace(
         ))
         .into());
     }
-    if let Some(outcome_index) = outcome_change_index
-        && actual[..outcome_index]
+    if let Some(outcome_index) = outcome_change_index {
+        let post_turn = actual[..outcome_index]
             .iter()
-            .any(|mutation| matches!(mutation, BattleMutation::TurnAdvanced { .. }))
-    {
-        return Err(
-            FixtureError::new(format!("{case_name}: outcome changed after TURN_ADVANCE")).into(),
-        );
+            .any(|mutation| matches!(mutation, BattleMutation::TurnAdvanced { .. }));
+        let catalogued = LEGACY_POST_TURN_OUTCOME_CASES.contains(&case_name);
+        if post_turn != catalogued {
+            return Err(FixtureError::new(format!(
+                "{case_name}: outcome-after-TURN_ADVANCE shape is outside its exact catalogue"
+            ))
+            .into());
+        }
     }
     compare_serialized_axis(case_name, "CAUSAL_MUTATIONS.TYPED", expected, &projected)?;
     Ok(())
