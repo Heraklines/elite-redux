@@ -2546,7 +2546,7 @@ impl BattleTransaction {
         } else if let Some(pending_terminal) = self.pending_replica_terminal.take() {
             if pending_terminal.entry.revision != payload.revision
                 || pending_terminal.entry.operation_id != payload.operation_id
-                || pending_terminal.entry.next_control != payload.control
+                || payload.control != *self.staged.game.control()
             {
                 return Err(BattleKernelError::Invariant {
                     reason: "replica terminal ControlInstalled identity mismatch".to_owned(),
@@ -2780,7 +2780,12 @@ impl BattleTransaction {
         let commit = match &mut self.staged.protocol {
             BattleProtocolState::Authority { log, .. } => log
                 .commit(draft, &mut self.scheduler)
-                .map_err(AuthorityTransactionError::from)?,
+                .map_err(|error| match error {
+                    er_protocol::authority_log::AuthorityLogError::Scheduler(error) => {
+                        AuthorityTransactionError::Scheduler(error)
+                    }
+                    other => AuthorityTransactionError::AuthorityLog(other),
+                })?,
             BattleProtocolState::Replica { .. } => {
                 return Err(BattleKernelError::Invariant {
                     reason: "replica attempted to publish terminal material".to_owned(),
@@ -4133,7 +4138,7 @@ impl BattleTransaction {
                             .push(InternalEvent::ControlInstalled(ControlInstalledPayload {
                                 revision: entry.revision,
                                 operation_id: entry.operation_id,
-                                control: entry.next_control,
+                                control: self.staged.game.control().clone(),
                                 presentation_barrier: PresentationBarrier {
                                     operation_id: pending.entry.operation_id.clone(),
                                     pending_events: 0,
