@@ -482,8 +482,10 @@ export class FunModeSelectUiHandler extends UiHandler {
       this.cursorObject.setVisible(false);
       this.startCursor.setVisible(true);
       if (this.startRegionOption === 1) {
-        this.startText.setText("Reuse Last Setup  (L/R: switch)").setAlpha(1);
-        this.setDescription("Restore the modifier choices used for your previous Fun Mode run.");
+        this.startText.setText("LAST SETUP").setAlpha(1);
+        this.setDescription(
+          "Restore the modifier choices used for your previous Fun Mode run. Press Left or Right to switch back to Start.",
+        );
       } else {
         this.startText.setText("START").setAlpha(anyEnabled ? 1 : 0.45);
         this.setDescription(

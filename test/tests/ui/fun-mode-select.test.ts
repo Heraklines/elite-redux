@@ -58,11 +58,23 @@ describe("UI - Fun Mode select", () => {
   it("still focuses literal START when a saved setup exists", () => {
     saveLastFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, randomizePokemon: true });
     const handler = game.scene.ui.getHandler<FunModeSelectUiHandler>();
-    const state = handler as unknown as { startRegionOption: number };
+    const state = handler as unknown as { startRegionOption: number; startText: Phaser.GameObjects.Text };
 
     expect(handler.processInput(Button.SUBMIT)).toBe(true);
     expect(handler.getCursor()).toBe(13);
     expect(state.startRegionOption).toBe(0);
+    expect(state.startText.text).toBe("START");
+  });
+
+  it("uses a compact caption when switching to Last Setup", () => {
+    saveLastFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, randomizePokemon: true });
+    const handler = game.scene.ui.getHandler<FunModeSelectUiHandler>();
+    const state = handler as unknown as { startRegionOption: number; startText: Phaser.GameObjects.Text };
+
+    expect(handler.processInput(Button.SUBMIT)).toBe(true);
+    expect(handler.processInput(Button.RIGHT)).toBe(true);
+    expect(state.startRegionOption).toBe(1);
+    expect(state.startText.text).toBe("LAST SETUP");
   });
 
   it("keeps the action button assigned to changing rules", () => {
