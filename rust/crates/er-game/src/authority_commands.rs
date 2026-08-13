@@ -349,6 +349,7 @@ impl CommandFrontierCompletion {
 /// Opaque proof that an admitted command frontier passed the trusted legality
 /// boundary without requiring a cloned game state.
 #[doc(hidden)]
+#[derive(Debug)]
 pub struct ValidatedAdmittedCommandFrontier<'a> {
     state: &'a GameState,
     commands: CommandSet,

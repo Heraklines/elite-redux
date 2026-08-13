@@ -1128,6 +1128,23 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("pub(crate) fn prepare_authority_replacement(")
         .ok_or("authority REPLACEMENT preparation function missing")?;
     let turn_source = &source[turn_start..replacement_start];
+    assert_eq!(
+        turn_source
+            .matches("validate_admitted_command_frontier_trusted(")
+            .count(),
+        1,
+        "TURN hot path must call trusted frontier validation exactly once"
+    );
+    assert!(turn_source.contains(
+        "validate_admitted_command_frontier_trusted(scripted_state.as_ref(), content)?"
+    ));
+    assert_eq!(
+        turn_source
+            .matches("complete_command_frontier(scripted_state.as_ref(), content)?")
+            .count(),
+        1,
+        "TURN hot path must complete the scripted frontier exactly once"
+    );
     let applier_start = turn_source
         .find("let applied = apply_turn_material(")
         .ok_or("TURN material applier call missing")?;
@@ -1137,6 +1154,16 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .ok_or("TURN material applier call end missing")?;
     let applier_source = &turn_source[applier_start..applier_end];
     assert!(applier_source.contains("&prepared,"));
+    assert_eq!(
+        applier_source.matches("complete_state.as_ref(),").count(),
+        1,
+        "TURN material applier must receive the completed state"
+    );
+    assert_eq!(
+        applier_source.matches("&allocators,").count(),
+        1,
+        "TURN material applier must receive the advanced allocators"
+    );
     assert!(turn_source.contains(
         "validate_control_allocator_projection(next_control, &allocators)?"
     ));
@@ -1161,18 +1188,29 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(source.contains("ReplacementAdmissionResult::Duplicate { .. }"));
     assert!(source.contains("expected read-only"));
     assert!(!source.contains("return Err(AuthorityTransactionError::Duplicate"));
+    let scripted_start = source
+        .find("fn admit_scripted_if_pending<'a>(")
+        .ok_or("scripted admission helper missing")?;
+    let scripted_end = source[scripted_start..]
+        .find("\n/// Validate the already-projected resolver candidate")
+        .map(|offset| scripted_start + offset)
+        .ok_or("scripted admission helper end missing")?;
+    let scripted_source = &source[scripted_start..scripted_end];
+    assert_eq!(
+        scripted_source
+            .matches("Cow::Borrowed(state), Cow::Borrowed(policy)")
+            .count(),
+        1,
+        "scripted admission helper must preserve its borrowed no-op path"
+    );
     for required in [
-        "validate_admitted_command_frontier_trusted",
         "(Cow::Borrowed(state), commands)",
         "(Cow::Owned(state), commands)",
-        "complete_command_frontier(scripted_state.as_ref(), content)?",
-        "Cow::Borrowed(state), Cow::Borrowed(policy)",
-        "complete_state.as_ref()",
-        "&allocators,",
     ] {
-        assert!(
-            source.contains(required),
-            "authority adapter is missing the required {required} seam"
+        assert_eq!(
+            turn_source.matches(required).count(),
+            1,
+            "TURN authority adapter is missing the required {required} seam"
         );
     }
     assert!(source.contains("candidate.accepted_commands != completed_state_commands"));
@@ -1246,6 +1284,53 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("fn reduce_authority_ready(")
         .ok_or("BattleKernel authority-ready reducer missing")?;
     let resolved_source = &kernel_source[resolved_start..resolved_end];
+    let turn_branch_start = resolved_source
+        .find("PreparedBattleResolution::Turn {")
+        .ok_or("TURN battle-resolution branch missing")?;
+    let replacement_branch_start = resolved_source
+        .find("PreparedBattleResolution::Replacement {")
+        .ok_or("REPLACEMENT battle-resolution branch missing")?;
+    assert!(turn_branch_start < replacement_branch_start);
+    let resolved_turn_source = &resolved_source[turn_branch_start..replacement_branch_start];
+    let resolved_replacement_source = &resolved_source[replacement_branch_start..];
+    assert_eq!(
+        resolved_source
+            .matches("let input = AuthorityTransactionInput {")
+            .count(),
+        2,
+        "BattleKernel resolved reducer must prepare both TURN and REPLACEMENT inputs"
+    );
+    assert_eq!(
+        resolved_turn_source
+            .matches("let input = AuthorityTransactionInput {")
+            .count(),
+        1,
+        "TURN battle-resolution branch must prepare one borrowed input"
+    );
+    assert_eq!(
+        resolved_replacement_source
+            .matches("let input = AuthorityTransactionInput {")
+            .count(),
+        1,
+        "REPLACEMENT battle-resolution branch must prepare one borrowed input"
+    );
+    let turn_input_start = resolved_turn_source
+        .find("let input = AuthorityTransactionInput {")
+        .ok_or("TURN authority transaction input initializer missing")?;
+    let turn_input_end = resolved_turn_source[turn_input_start..]
+        .find("\n                };")
+        .map(|offset| turn_input_start + offset)
+        .ok_or("TURN authority transaction input initializer end missing")?;
+    let replacement_input_start = resolved_replacement_source
+        .find("let input = AuthorityTransactionInput {")
+        .ok_or("REPLACEMENT authority transaction input initializer missing")?;
+    let replacement_input_end = resolved_replacement_source[replacement_input_start..]
+        .find("\n                };")
+        .map(|offset| replacement_input_start + offset)
+        .ok_or("REPLACEMENT authority transaction input initializer end missing")?;
+    let turn_input_source = &resolved_turn_source[turn_input_start..turn_input_end];
+    let replacement_input_source =
+        &resolved_replacement_source[replacement_input_start..replacement_input_end];
     for forbidden in [
         ".state().clone()",
         ".control().clone()",
@@ -1258,13 +1343,25 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         );
     }
     for required in [
-        "state: self.staged.game.state()",
-        "control: self.staged.game.control()",
-        "scripted_policy: self.staged.game.scripted_enemy_policy()",
+        "state: self.staged.game.state(),",
+        "control: self.staged.game.control(),",
+        "menu_allocators: &self.staged.game.control().menu_allocators,",
+        "scripted_policy: self.staged.game.scripted_enemy_policy(),",
     ] {
-        assert!(
-            resolved_source.contains(required),
-            "BattleKernel authority reducer is missing {required}"
+        assert_eq!(
+            resolved_source.matches(required).count(),
+            2,
+            "BattleKernel authority reducer must borrow {required} for TURN and REPLACEMENT"
+        );
+        assert_eq!(
+            turn_input_source.matches(required).count(),
+            1,
+            "TURN authority reducer input is missing {required}"
+        );
+        assert_eq!(
+            replacement_input_source.matches(required).count(),
+            1,
+            "REPLACEMENT authority reducer input is missing {required}"
         );
     }
     let ready_start = kernel_source
