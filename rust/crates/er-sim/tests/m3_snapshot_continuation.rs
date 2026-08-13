@@ -2746,11 +2746,39 @@ mod live_coop_production {
         let mut restored = new_battle_pair(game, Arc::clone(&content), 13)?;
         assert_pair_observation_equal(&uninterrupted, &restored, "terminal-initial")?;
 
+        let mut guest_target_redirected = false;
         for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
             for attempt in 0..8 {
                 let snapshot = uninterrupted.snapshot_v2()?;
                 if endpoint_commands_complete(&snapshot, endpoint) {
                     break;
+                }
+                if endpoint == PairEndpoint::Guest
+                    && !guest_target_redirected
+                    && matches!(
+                        &endpoint_snapshot(&snapshot, endpoint).ui.seat_control.control,
+                        BattleControl::TargetSelect(control)
+                            if control.menu.selected_option_id.as_str() == "target/enemy/0"
+                    )
+                {
+                    press_same(
+                        &mut uninterrupted,
+                        &mut restored,
+                        endpoint,
+                        PhysicalKey::ArrowRight,
+                        "terminal-guest-target-enemy-one",
+                    )?;
+                    let redirected = uninterrupted.snapshot_v2()?;
+                    assert!(
+                        matches!(
+                            &endpoint_snapshot(&redirected, endpoint).ui.seat_control.control,
+                            BattleControl::TargetSelect(control)
+                                if control.menu.selected_option_id.as_str() == "target/enemy/1"
+                        ),
+                        "forced-victory guest target did not move to the second enemy"
+                    );
+                    guest_target_redirected = true;
+                    continue;
                 }
                 press_same(
                     &mut uninterrupted,
@@ -2761,6 +2789,10 @@ mod live_coop_production {
                 )?;
             }
         }
+        assert!(
+            guest_target_redirected,
+            "forced-victory fixture never exposed the guest's exact enemy-zero target default"
+        );
 
         for tick in 0..512 {
             let snapshot = uninterrupted.snapshot_v2()?;
