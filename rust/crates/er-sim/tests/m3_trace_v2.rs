@@ -81,6 +81,10 @@ fn pair_digest_constructor_keeps_the_checked_wire_format() {
 fn trace_api_surface_and_contract_stay_wired() {
     let source = include_str!("../src/snapshot.rs");
     let contract = include_str!("../../../contracts/m3-snapshot-trace.md");
+    let compact_source: String = source
+        .chars()
+        .filter(|character| !character.is_whitespace())
+        .collect();
 
     for marker in [
         "pub struct EndpointKernelTraceRecorder",
@@ -88,11 +92,36 @@ fn trace_api_surface_and_contract_stay_wired() {
         "pub fn validate(&self)",
         "pub fn first_divergence(&self, actual: &Self)",
         "pub fn replay_with<B, Restore, Step>(",
+        "Restore: FnOnce(RestorablePairSnapshotV2) -> Result<B, SnapshotError>",
+        "Step: FnMut(&mut B, &PairOperationV2, SafeU53",
+        "Result<PairTraceObservationV2, SnapshotError>",
         "pub fn compute_components(",
         "pub host_live_resources: LiveResourceSnapshot",
         "pub environment_after: PairEnvironmentResourceSnapshotV2",
     ] {
-        assert!(source.contains(marker), "missing source marker: {marker}");
+        let compact_marker: String = marker
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect();
+        assert!(
+            compact_source.contains(&compact_marker),
+            "missing source marker: {marker}"
+        );
+    }
+    for marker in [
+        "pub fn replay_simulated_pair(",
+        "self.replay_with(",
+        "crate::SimulatedPair::from_snapshot",
+        "runtime.apply_trace_operation_v2",
+    ] {
+        let compact_marker: String = marker
+            .chars()
+            .filter(|character| !character.is_whitespace())
+            .collect();
+        assert!(
+            compact_source.contains(&compact_marker),
+            "missing replay delegation marker: {marker}"
+        );
     }
     for marker in [
         "Endpoint `sequence`",

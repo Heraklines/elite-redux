@@ -1719,16 +1719,24 @@ impl PairKernelTraceV2 {
         None
     }
 
-    pub fn replay_simulated_pair(
+    pub fn replay_with<B, Restore, Step>(
         &self,
-        content: Arc<ContentPack>,
-    ) -> Result<TraceReplayReportV2, SnapshotError> {
+        restore: Restore,
+        mut step: Step,
+    ) -> Result<TraceReplayReportV2, SnapshotError>
+    where
+        Restore: FnOnce(RestorablePairSnapshotV2) -> Result<B, SnapshotError>,
+        Step: FnMut(
+            &mut B,
+            &PairOperationV2,
+            SafeU53,
+        ) -> Result<PairTraceObservationV2, SnapshotError>,
+    {
         self.validate()?;
-        let mut runtime =
-            crate::SimulatedPair::from_snapshot(self.initial_snapshot.clone(), content)?;
+        let mut runtime = restore(self.initial_snapshot.clone())?;
         let mut recorder = PairKernelTraceRecorder::new(self.initial_snapshot.clone())?;
         for (index, expected) in self.entries.iter().enumerate() {
-            let observation = runtime.apply_trace_operation_v2(expected.input.clone())?;
+            let observation = step(&mut runtime, &expected.input, expected.virtual_time_ms)?;
             if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
                 return Ok(TraceReplayReportV2 {
                     replayed_entries: one_based_sequence(index, "replayed_entries")?,
@@ -1757,6 +1765,18 @@ impl PairKernelTraceV2 {
             replayed_entries: safe_u53_from_usize(self.entries.len(), "replayed_entries")?,
             first_divergence: None,
         })
+    }
+
+    pub fn replay_simulated_pair(
+        &self,
+        content: Arc<ContentPack>,
+    ) -> Result<TraceReplayReportV2, SnapshotError> {
+        self.replay_with(
+            |snapshot| crate::SimulatedPair::from_snapshot(snapshot, content),
+            |runtime, operation, _virtual_time_ms| {
+                runtime.apply_trace_operation_v2(operation.clone())
+            },
+        )
     }
 }
 
