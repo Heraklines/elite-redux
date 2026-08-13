@@ -179,10 +179,7 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
     assert!(INTERNAL_EVENT_SOURCE.contains("pub(crate) fn from_finalized_transition"));
     assert!(!INTERNAL_EVENT_SOURCE.contains("fn into_transition"));
 
-    let prepared_fields = struct_body(
-        AUTHORITY_COMMAND_SOURCE,
-        "pub struct PreparedAuthorityTurn",
-    );
+    let prepared_fields = struct_body(AUTHORITY_COMMAND_SOURCE, "pub struct PreparedAuthorityTurn");
     assert_doc_hidden_before(AUTHORITY_COMMAND_SOURCE, "pub struct PreparedAuthorityTurn");
     assert!(prepared_fields.contains("digest_evidence: TurnDigestEvidence"));
     assert!(!prepared_fields.contains("pub digest_evidence"));
