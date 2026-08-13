@@ -395,10 +395,10 @@ fn validate_targets(
     if move_target == MoveTarget::AllNearEnemies && targets.is_empty() {
         return Err(TargetSelectionError::AllEnemiesCount);
     }
-    // Admission already authenticated the command against the live offer. By
-    // the time a queued move starts, an earlier action may have fainted or
-    // vacated one of those targets. Preserve the structural target shape here
-    // and let the target loop emit its typed inactive-target no-op.
+    // Revalidate the live structural candidates before PP, paralysis, or any
+    // target effect work. A queued target may have been vacated or malformed
+    // since admission, while a properly fainted target remains an admissible
+    // typed no-op for the later target loop.
     let expected = structural_target_candidates(battle, source_slot, move_target);
     for (index, target) in targets.iter().copied().enumerate() {
         if !slot_within_format_capacity(battle, target) {
@@ -465,7 +465,11 @@ fn structural_target_candidates(
             if target_kind == MoveTarget::AllNearEnemies && entry.slot.side == actor_slot.side {
                 return None;
             }
-            Some(entry.slot)
+            let occupant = entry.occupant?;
+            let pokemon = find_pokemon(battle, entry.slot, occupant)?;
+            let valid_state = (pokemon.hp > 0 && !pokemon.fainted)
+                || (pokemon.hp == 0 && pokemon.fainted);
+            valid_state.then_some(entry.slot)
         })
         .collect::<Vec<_>>();
     candidates.sort_unstable();
