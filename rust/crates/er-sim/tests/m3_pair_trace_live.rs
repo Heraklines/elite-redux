@@ -644,23 +644,20 @@ fn replay(
     content: Arc<ContentPack>,
     mutate_observation: bool,
 ) -> TestResult<TraceReplayReportV2> {
-    let mut mutated = false;
-    Ok(trace.replay_simulated_pair::<SimulatedPair, _>(
-        content,
-        |pair, input, _virtual_time_ms| {
-            let mut observation = live_pair_trace_step(pair, input)?;
-            if mutate_observation && !mutated {
-                // This changes exactly one live observation field while
-                // retaining a valid frozen shape, so replay's first mismatch
-                // is reported by the trace comparator rather than validation.
-                observation
-                    .host_internal_events
-                    .push(InternalEventKindV1::Button);
-                mutated = true;
-            }
-            Ok(observation)
-        },
-    )?)
+    let mut expected = trace.clone();
+    if mutate_observation {
+        // This changes exactly one expected live observation field while
+        // retaining a valid frozen shape, so replay's first mismatch is
+        // reported by the trace comparator rather than validation.
+        expected
+            .entries
+            .first_mut()
+            .expect("live trace must contain an entry")
+            .host
+            .internal_events
+            .push(InternalEventKindV1::Button);
+    }
+    Ok(expected.replay_simulated_pair(content)?)
 }
 
 fn divergence_coordinates(
