@@ -750,8 +750,8 @@ fn assert_fixture_state_with_authoritative_enemy_pp(
     fixture_field: &str,
     expected_enemy_move_pp_used: u64,
 ) -> TestResult {
-    // The published physical-hit and defeat oracles predate scripted-enemy PP
-    // accounting.  Correct only that explicit enemy move-slot-0 expectation;
+    // The published physical-hit oracle predates scripted-enemy PP accounting.
+    // Correct only that explicit enemy move-slot-0 expectation;
     // every other canonical state field remains an exact fixture comparison.
     let expected = field(field(&fixture.fixture, fixture_field)?, "canonical")?;
     let mut expected = comparable_game_state(expected)?;
@@ -782,6 +782,104 @@ fn assert_fixture_state_with_authoritative_enemy_pp(
     }
     *pp_used = Value::from(expected_enemy_move_pp_used);
     assert_eq!(comparable_game_state(&game_state_json(kernel)?)?, expected,);
+    Ok(())
+}
+
+fn assert_defeat_fixture_state_with_authoritative_terminal_faint(
+    kernel: &GameKernel,
+    fixture: &BattleFixture,
+) -> TestResult {
+    // The published defeat oracle predates the authoritative terminal-faint
+    // state: the battle advances to turn two, its consumed RNG substream is
+    // cleared, fixture passives stay unset, the fainted field slot is cleared,
+    // and the applied faint occurrence remains as typed audit state.  Refuse
+    // to normalize anything unless both sides have the exact known shapes,
+    // then compare every remaining canonical field byte-for-byte.
+    let expected = field(field(&fixture.fixture, "expected_final_state")?, "canonical")?;
+    let mut expected = comparable_game_state(expected)?;
+    let actual = comparable_game_state(&game_state_json(kernel)?)?;
+
+    let legacy_battle_rng = json!({
+        "battle_seed": "fqJuSWpNWxXTocLw",
+        "saved_substream": {
+            "carry": 939700,
+            "s0_bits": "3fe588bad3000000",
+            "s1_bits": "3fd8ed71cf400000",
+            "s2_bits": "3fedfaebf1a00000",
+            "state_string": "!rnd,939700,0.6729406472295523,0.38949246634729207,0.9368800849188119"
+        },
+        "turn": 1
+    });
+    let authoritative_battle_rng = json!({
+        "battle_seed": "fqJuSWpNWxXTocLw",
+        "saved_substream": null,
+        "turn": 2
+    });
+    let legacy_passives = json!([62, 95, 50]);
+    let authoritative_passives = json!([null, null, null]);
+    let player_slot = json!({ "position": 0, "side": "PLAYER" });
+    let authoritative_faint_queue = json!([{
+        "id": 0,
+        "owner_seat": 1,
+        "pokemon": 1,
+        "replacement": { "kind": "APPLIED" },
+        "slot": { "position": 0, "side": "PLAYER" },
+        "source": {
+            "epoch": 1,
+            "resolved_turn": 1,
+            "turn_occurrence": 0,
+            "wave": 1
+        }
+    }]);
+
+    if expected.pointer("/battle/battle_rng") != Some(&legacy_battle_rng)
+        || actual.pointer("/battle/battle_rng") != Some(&authoritative_battle_rng)
+        || expected.pointer("/battle/turn") != Some(&Value::from(1))
+        || actual.pointer("/battle/turn") != Some(&Value::from(2))
+        || expected.pointer("/battle/enemy_party/0/moves/0/pp_used")
+            != Some(&Value::from(0))
+        || actual.pointer("/battle/enemy_party/0/moves/0/pp_used")
+            != Some(&Value::from(1))
+        || expected.pointer("/battle/player_party/0/abilities/passives")
+            != Some(&legacy_passives)
+        || actual.pointer("/battle/player_party/0/abilities/passives")
+            != Some(&authoritative_passives)
+        || expected.pointer("/battle/field/slots/0/slot") != Some(&player_slot)
+        || actual.pointer("/battle/field/slots/0/slot") != Some(&player_slot)
+        || expected.pointer("/battle/field/slots/0/occupant") != Some(&Value::from(1))
+        || actual.pointer("/battle/field/slots/0/occupant") != Some(&Value::Null)
+        || expected.pointer("/battle/faint_queue") != Some(&json!([]))
+        || actual.pointer("/battle/faint_queue") != Some(&authoritative_faint_queue)
+    {
+        return Err(invalid_data(
+            "defeat fixture terminal-faint state is outside its exact legacy normalization catalogue",
+        )
+        .into());
+    }
+
+    *expected
+        .pointer_mut("/battle/battle_rng")
+        .ok_or_else(|| invalid_data("defeat fixture has no battle RNG state"))? =
+        authoritative_battle_rng;
+    *expected
+        .pointer_mut("/battle/turn")
+        .ok_or_else(|| invalid_data("defeat fixture has no battle turn"))? = Value::from(2);
+    *expected
+        .pointer_mut("/battle/enemy_party/0/moves/0/pp_used")
+        .ok_or_else(|| invalid_data("defeat fixture has no enemy move PP state"))? = Value::from(1);
+    *expected
+        .pointer_mut("/battle/player_party/0/abilities/passives")
+        .ok_or_else(|| invalid_data("defeat fixture has no player passive list"))? =
+        authoritative_passives;
+    *expected
+        .pointer_mut("/battle/field/slots/0/occupant")
+        .ok_or_else(|| invalid_data("defeat fixture has no player field occupant"))? = Value::Null;
+    *expected
+        .pointer_mut("/battle/faint_queue")
+        .ok_or_else(|| invalid_data("defeat fixture has no faint queue"))? =
+        authoritative_faint_queue;
+
+    assert_eq!(actual, expected);
     Ok(())
 }
 
@@ -1141,7 +1239,7 @@ fn raw_singles_target_path_reaches_fixture_exact_defeat() -> TestResult {
     effects.extend(settle_presentations(&mut kernel, &events)?);
     assert_no_compatibility_effects(&effects);
     assert_eq!(battle_outcome(&kernel)?, "DEFEAT");
-    assert_fixture_state_with_authoritative_enemy_pp(&kernel, &fixture, "expected_final_state", 1)?;
+    assert_defeat_fixture_state_with_authoritative_terminal_faint(&kernel, &fixture)?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(matches!(
         control(&kernel)?,
@@ -1228,15 +1326,21 @@ fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> Tes
             .actionable
     );
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
+    let applied_faint_queue = json!([{
+        "id": 0,
+        "owner_seat": 1,
+        "pokemon": 1,
+        "replacement": { "kind": "APPLIED" },
+        "slot": { "position": 0, "side": "PLAYER" },
+        "source": {
+            "epoch": 1,
+            "resolved_turn": 1,
+            "turn_occurrence": 0,
+            "wave": 1
+        }
+    }]);
     let state = game_state_json(&kernel)?;
-    assert_eq!(
-        state
-            .get("battle")
-            .and_then(|battle| battle.get("faint_queue"))
-            .and_then(Value::as_array)
-            .map(Vec::len),
-        Some(1)
-    );
+    assert_eq!(field(field(&state, "battle")?, "faint_queue")?, &applied_faint_queue);
 
     let mut replacement_effects = Vec::new();
     replacement_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
@@ -1253,12 +1357,8 @@ fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> Tes
     let final_state = game_state_json(&kernel)?;
     assert_eq!(field_occupant(&final_state, "PLAYER", 0), Some(3));
     assert_eq!(
-        final_state
-            .get("battle")
-            .and_then(|battle| battle.get("faint_queue"))
-            .and_then(Value::as_array)
-            .map(Vec::len),
-        Some(0)
+        field(field(&final_state, "battle")?, "faint_queue")?,
+        &applied_faint_queue
     );
     assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
