@@ -499,10 +499,17 @@ fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicy
             .ok_or_else(|| invalid(format!("enemy lead slot {position} is empty")))?;
         let target_position = position.min(battle.format.player_capacity.saturating_sub(1));
         let target = FieldSlot::new(BattleSide::Player, target_position)?;
+        let target_selection = if battle.format.player_capacity == 1
+            && battle.format.enemy_capacity == 1
+        {
+            BattleTargetSelection::implicit()
+        } else {
+            BattleTargetSelection::selected(vec![target])?
+        };
         let command = BattleCommand::fight(
             actor,
             MoveSlotIndex::ZERO,
-            BattleTargetSelection::selected(vec![target])?,
+            target_selection,
         )?;
         let operation_id = scripted_enemy_command_operation_id(
             battle.battle_id,
