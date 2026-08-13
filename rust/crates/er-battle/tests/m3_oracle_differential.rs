@@ -254,6 +254,131 @@ struct LegacyDeterministicIntimidateProbe {
     stat_path: &'static str,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct TypedInactiveActionProjection {
+    case_name: &'static str,
+    actor: u64,
+    source_side: BattleSide,
+    source_position: u8,
+    operation_id: &'static str,
+    move_slot: u8,
+    move_id: u64,
+    effective_speed: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyReplacementActionProjection {
+    case_name: &'static str,
+    actor: u64,
+    source_side: BattleSide,
+    source_position: u8,
+    sequence: u64,
+    effective_speed: u32,
+    raw_operation_id: &'static str,
+    occurrence: u64,
+    party_slot: u8,
+    incoming: u64,
+    outcome: BattleOutcome,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyCompactedTargetProjection {
+    case_name: &'static str,
+    actor: u64,
+    source_side: BattleSide,
+    source_position: u8,
+    operation_id: &'static str,
+    move_slot: u8,
+    move_id: u64,
+    legacy_target_side: BattleSide,
+    legacy_target_position: u8,
+    typed_target_side: BattleSide,
+    typed_target_position: u8,
+    compacted_actor: u64,
+    surviving_actor: u64,
+    action_count: usize,
+    action_index: usize,
+    effective_speed: u32,
+}
+
+const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
+    TypedInactiveActionProjection {
+        case_name: "same-side-simultaneous-faint",
+        actor: 2,
+        source_side: BattleSide::Player,
+        source_position: 1,
+        operation_id: "battle/1/wave/1/turn/1/command/player/1/seat/2",
+        move_slot: 0,
+        move_id: 589,
+        effective_speed: 122,
+    },
+    TypedInactiveActionProjection {
+        case_name: "no-legal-replacement",
+        actor: 1,
+        source_side: BattleSide::Player,
+        source_position: 0,
+        operation_id: "battle/1/wave/1/turn/1/command/player/0/seat/1",
+        move_slot: 0,
+        move_id: 589,
+        effective_speed: 180,
+    },
+    TypedInactiveActionProjection {
+        case_name: "no-legal-replacement",
+        actor: 2,
+        source_side: BattleSide::Player,
+        source_position: 1,
+        operation_id: "battle/1/wave/1/turn/1/command/player/1/seat/2",
+        move_slot: 0,
+        move_id: 589,
+        effective_speed: 180,
+    },
+    TypedInactiveActionProjection {
+        case_name: "defeat",
+        actor: 1,
+        source_side: BattleSide::Player,
+        source_position: 0,
+        operation_id: "battle/1/wave/1/turn/1/command/player/0/seat/1",
+        move_slot: 0,
+        move_id: 589,
+        effective_speed: 180,
+    },
+];
+
+const LEGACY_REPLACEMENT_ACTION_PROJECTIONS: &[LegacyReplacementActionProjection] =
+    &[LegacyReplacementActionProjection {
+        case_name: "forced-replacement",
+        actor: 1,
+        source_side: BattleSide::Player,
+        source_position: 0,
+        sequence: 5,
+        effective_speed: 180,
+        raw_operation_id: "RC/e1/w1/t1/o2/f0/s1",
+        occurrence: 1,
+        party_slot: 2,
+        incoming: 3,
+        outcome: BattleOutcome::Ongoing,
+    }];
+
+const LEGACY_COMPACTED_TARGET_PROJECTIONS: &[LegacyCompactedTargetProjection] =
+    &[LegacyCompactedTargetProjection {
+        case_name: "mixed-side-simultaneous-faint",
+        actor: 4,
+        source_side: BattleSide::Enemy,
+        source_position: 1,
+        operation_id: "battle/1/wave/1/turn/1/command/enemy/1/script/0",
+        move_slot: 0,
+        move_id: 1,
+        legacy_target_side: BattleSide::Player,
+        legacy_target_position: 1,
+        typed_target_side: BattleSide::Player,
+        typed_target_position: 0,
+        compacted_actor: 1,
+        surviving_actor: 2,
+        action_count: 5,
+        action_index: 2,
+        effective_speed: 207,
+    }];
+
 const LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE: &str =
     "src/data/elite-redux/init-elite-redux-ability-upgrades.ts:496";
 
@@ -2103,14 +2228,168 @@ fn canonical_single_near_other_target(
     }
 }
 
+fn catalogued_legacy_compacted_target(
+    case_name: &str,
+    initial: &GameState,
+    record: &FixtureCommandRecord,
+    actions: &[ResolvedAction],
+) -> Result<Option<FieldSlot>, Box<dyn Error>> {
+    let Some(projection) = LEGACY_COMPACTED_TARGET_PROJECTIONS
+        .iter()
+        .find(|projection| {
+            projection.case_name == case_name && projection.actor == u64::from(record.actor)
+        })
+    else {
+        return Ok(None);
+    };
+    let source_slot = FieldSlot::new(projection.source_side, projection.source_position)?;
+    let legacy_target = FieldSlot::new(
+        projection.legacy_target_side,
+        projection.legacy_target_position,
+    )?;
+    let typed_target = FieldSlot::new(
+        projection.typed_target_side,
+        projection.typed_target_position,
+    )?;
+    let compacted_actor = PokemonId::try_from_u64(projection.compacted_actor)?;
+    let surviving_actor = PokemonId::try_from_u64(projection.surviving_actor)?;
+    let expected_move_slot = MoveSlotIndex::try_from(u64::from(projection.move_slot))?;
+    let exact_record = record.field_slot == source_slot
+        && record.operation_id.as_str() == projection.operation_id
+        && record.owner_seat.is_none()
+        && record.source == CommandAdmissionSource::ScriptedEnemy
+        && record.legacy_command == record.command
+        && matches!(
+            &record.command,
+            BattleCommand::Fight {
+                actor,
+                move_slot,
+                targets: BattleTargetSelection::Selected(targets),
+            } if *actor == record.actor
+                && *move_slot == expected_move_slot
+                && targets.len() == 1
+                && targets[0] == legacy_target
+        );
+    if !exact_record {
+        return Err(FixtureError::new(format!(
+            "{case_name}: catalogued compacted-target command differs from its exact actor/slot/operation/target fingerprint"
+        ))
+        .into());
+    }
+
+    let battle = initial.battle.as_ref().ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: catalogued compacted-target command has no initial battle"
+        ))
+    })?;
+    let occupant = |slot| {
+        battle
+            .field
+            .slots
+            .iter()
+            .find(|entry| entry.slot == slot)
+            .and_then(|entry| entry.occupant)
+    };
+    if occupant(source_slot) != Some(record.actor)
+        || occupant(typed_target) != Some(compacted_actor)
+        || occupant(legacy_target) != Some(surviving_actor)
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: catalogued compacted-target field occupancy differs from the frozen actor mapping"
+        ))
+        .into());
+    }
+    for actor in [record.actor, compacted_actor, surviving_actor] {
+        let pokemon = pokemon_state(initial, actor).ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: catalogued compacted-target actor {actor} is absent from initial state"
+            ))
+        })?;
+        if pokemon.fainted || pokemon.hp == 0 {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued compacted-target actor {actor} is not initially live"
+            ))
+            .into());
+        }
+    }
+    let move_state = pokemon_state(initial, record.actor)
+        .and_then(|pokemon| pokemon.moves.get(usize::from(expected_move_slot.get())))
+        .and_then(Option::as_ref)
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: catalogued compacted-target actor {} has no move in slot {}",
+                record.actor,
+                expected_move_slot.get()
+            ))
+        })?;
+    if u64::from(move_state.move_id) != projection.move_id {
+        return Err(FixtureError::new(format!(
+            "{case_name}: catalogued compacted-target move {} differs from frozen move {}",
+            move_state.move_id, projection.move_id
+        ))
+        .into());
+    }
+
+    let action = actions.get(projection.action_index).ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: catalogued compacted-target action {} is absent",
+            projection.action_index
+        ))
+    })?;
+    let preceding_faint = projection
+        .action_index
+        .checked_sub(1)
+        .and_then(|index| actions.get(index));
+    let exact_action_context = actions.len() == projection.action_count
+        && action.sequence.get() == u64::try_from(projection.action_index)?
+        && action.kind == ResolvedActionKind::Move
+        && action.actor == record.actor
+        && action.source_slot == source_slot
+        && action
+            .command_operation_id
+            .as_ref()
+            .is_some_and(|operation| operation.as_str() == projection.operation_id)
+        && action.effective_speed == projection.effective_speed
+        && action.timing_modifier == 1
+        && action.move_priority == 0
+        && action.bracket_modifier == 1
+        && action.tie_order == SafeU53::ZERO
+        && action.disposition == ActionDisposition::NoEffect
+        && preceding_faint.is_some_and(|faint| {
+            faint.kind == ResolvedActionKind::Faint
+                && faint.actor == compacted_actor
+                && faint.source_slot == typed_target
+                && faint.command_operation_id.is_none()
+                && faint.effective_speed == 180
+                && faint.timing_modifier == 0
+                && faint.move_priority == 0
+                && faint.bracket_modifier == 0
+                && faint.tie_order == SafeU53::ZERO
+                && faint.disposition == ActionDisposition::Executed
+        });
+    if !exact_action_context {
+        return Err(FixtureError::new(format!(
+            "{case_name}: catalogued compacted-target command lacks its exact frozen actor-4 NO_EFFECT/prior-faint context"
+        ))
+        .into());
+    }
+    Ok(Some(typed_target))
+}
+
 fn normalize_legacy_command_records(
     case_name: &str,
     initial: &GameState,
     records: &mut [FixtureCommandRecord],
+    actions: &[ResolvedAction],
     content: &ContentPack,
 ) -> Result<(), Box<dyn Error>> {
     // Keep the raw command for legacy wire assertions; only typed admission gets the
     // selected-pack singleton-target spelling, and only after exact target verification.
+    let expected_compacted_targets = LEGACY_COMPACTED_TARGET_PROJECTIONS
+        .iter()
+        .filter(|projection| projection.case_name == case_name)
+        .count();
+    let mut projected_compacted_targets = 0;
     for record in records {
         let command = match &record.command {
             BattleCommand::Fight {
@@ -2123,6 +2402,17 @@ fn normalize_legacy_command_records(
         let Some((actor, move_slot, legacy_target)) = command else {
             continue;
         };
+        if let Some(typed_target) =
+            catalogued_legacy_compacted_target(case_name, initial, record, actions)?
+        {
+            record.command = BattleCommand::fight(
+                actor,
+                move_slot,
+                BattleTargetSelection::Selected(vec![typed_target]),
+            )?;
+            projected_compacted_targets += 1;
+            continue;
+        }
         let Some(canonical_target) = canonical_single_near_other_target(
             case_name,
             initial,
@@ -2138,6 +2428,12 @@ fn normalize_legacy_command_records(
             continue;
         }
         record.command = BattleCommand::fight(actor, move_slot, BattleTargetSelection::Implicit)?;
+    }
+    if projected_compacted_targets != expected_compacted_targets {
+        return Err(FixtureError::new(format!(
+            "{case_name}: projected {projected_compacted_targets} compacted legacy targets, expected exact catalogue count {expected_compacted_targets}"
+        ))
+        .into());
     }
     Ok(())
 }
@@ -3521,6 +3817,454 @@ fn normalize_legacy_action_order(
         normalized[0].disposition = ActionDisposition::Executed;
     }
     Ok(normalized)
+}
+
+fn validate_action_sequences(
+    case_name: &str,
+    label: &str,
+    actions: &[ResolvedAction],
+) -> Result<(), Box<dyn Error>> {
+    for (index, action) in actions.iter().enumerate() {
+        if action.sequence.get() != u64::try_from(index)? {
+            return Err(FixtureError::new(format!(
+                "{case_name}: {label}[{index}] sequence is {}, expected {index}",
+                action.sequence
+            ))
+            .into());
+        }
+    }
+    Ok(())
+}
+
+fn resequence_projected_actions(actions: &mut [ResolvedAction]) -> Result<(), Box<dyn Error>> {
+    for (index, action) in actions.iter_mut().enumerate() {
+        action.sequence = SafeU53::new(u64::try_from(index)?)?;
+    }
+    Ok(())
+}
+
+fn project_catalogued_legacy_replacement_actions(
+    case_name: &str,
+    initial: &GameState,
+    turn_after: &GameState,
+    proposals: &[FixtureReplacementProposal],
+    replacements: &[ReplacementPresentationTrace],
+    expected: &[ResolvedAction],
+    actual: &[ResolvedAction],
+) -> Result<Vec<ResolvedAction>, Box<dyn Error>> {
+    let catalogue = LEGACY_REPLACEMENT_ACTION_PROJECTIONS
+        .iter()
+        .filter(|projection| projection.case_name == case_name)
+        .collect::<Vec<_>>();
+    if catalogue.is_empty() {
+        return Ok(expected.to_vec());
+    }
+    if proposals.len() != catalogue.len() || replacements.len() != catalogue.len() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: replacement action projection has proposal/replay counts {}/{}, expected exact catalogue count {}",
+            proposals.len(),
+            replacements.len(),
+            catalogue.len()
+        ))
+        .into());
+    }
+    if expected.len() != actual.len() + catalogue.len() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy replacement action projection saw legacy/typed lengths {}/{}, expected exactly {} catalogued legacy-only actions",
+            expected.len(),
+            actual.len(),
+            catalogue.len()
+        ))
+        .into());
+    }
+    if actual
+        .iter()
+        .any(|action| action.kind == ResolvedActionKind::Replacement)
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: typed turn action order contains a replacement owned by the separate replacement transition"
+        ))
+        .into());
+    }
+
+    let turn_battle = turn_after.battle.as_ref().ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: replacement action projection has no post-turn battle"
+        ))
+    })?;
+    let mut projected = expected.to_vec();
+    let mut remove = Vec::with_capacity(catalogue.len());
+    for projection in catalogue {
+        let actor = PokemonId::try_from_u64(projection.actor)?;
+        let source_slot = FieldSlot::new(projection.source_side, projection.source_position)?;
+        let index = expected
+            .iter()
+            .position(|action| {
+                action.kind == ResolvedActionKind::Replacement && action.actor == actor
+            })
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued legacy replacement action for actor {actor} is absent"
+                ))
+            })?;
+        let action = &expected[index];
+        let exact_action = index + 1 == expected.len()
+            && action.sequence.get() == projection.sequence
+            && action.source_slot == source_slot
+            && action.command_operation_id.is_none()
+            && action.effective_speed == projection.effective_speed
+            && action.timing_modifier == 0
+            && action.move_priority == 0
+            && action.bracket_modifier == 0
+            && action.tie_order == SafeU53::ZERO
+            && action.disposition == ActionDisposition::Executed;
+        if !exact_action {
+            return Err(FixtureError::new(format!(
+                "{case_name}: legacy replacement action for actor {actor} differs from its exact tail-action catalogue entry"
+            ))
+            .into());
+        }
+        if initial_field_slot_for_pokemon(initial, actor) != Some(source_slot) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued legacy replacement actor {actor} does not start in {source_slot:?}"
+            ))
+            .into());
+        }
+
+        let occurrence_id = FaintOccurrenceId::try_from_u64(projection.occurrence)?;
+        let proposal_index = proposals
+            .iter()
+            .position(|proposal| proposal.occurrence == occurrence_id)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued legacy replacement occurrence {occurrence_id} has no proposal"
+                ))
+            })?;
+        let proposal = &proposals[proposal_index];
+        let expected_party_slot = PartyIndex::try_from(u64::from(projection.party_slot))?;
+        let expected_incoming = PokemonId::try_from_u64(projection.incoming)?;
+        let exact_selection = matches!(
+            proposal.selection,
+            ReplacementSelection::Selected {
+                party_slot,
+                pokemon,
+            } if party_slot == expected_party_slot && pokemon == expected_incoming
+        );
+        if proposal.raw_operation_id.as_str() != projection.raw_operation_id
+            || proposal.field_slot != source_slot
+            || !exact_selection
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued legacy replacement proposal differs from its exact operation/slot/selection fingerprint"
+            ))
+            .into());
+        }
+        let stored = turn_battle
+            .faint_queue
+            .iter()
+            .find(|occurrence| occurrence.id == occurrence_id)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued legacy replacement occurrence {occurrence_id} is absent after the turn"
+                ))
+            })?;
+        if stored.pokemon != actor
+            || stored.slot != source_slot
+            || stored.replacement != ReplacementProgress::Pending
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued legacy replacement occurrence does not identify the exact pending fainted actor"
+            ))
+            .into());
+        }
+        let replacement = &replacements[proposal_index];
+        let operation_id = replacement_operation_id(
+            stored.source.epoch,
+            proposal.battle_id,
+            stored.source.wave,
+            stored.source.resolved_turn,
+            stored.source.turn_occurrence,
+            stored.slot,
+            proposal.owner_seat,
+        )?;
+        if replacement.operation_id != operation_id
+            || replacement.selection != proposal.selection
+            || replacement.field_slot != source_slot
+            || replacement.outcome != projection.outcome
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: separate replacement replay does not exactly own the catalogued legacy replacement action"
+            ))
+            .into());
+        }
+        remove.push(index);
+    }
+    remove.sort_unstable();
+    remove.dedup();
+    if remove.len() != LEGACY_REPLACEMENT_ACTION_PROJECTIONS
+        .iter()
+        .filter(|projection| projection.case_name == case_name)
+        .count()
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy replacement action projection matched duplicate catalogue entries"
+        ))
+        .into());
+    }
+    for index in remove.into_iter().rev() {
+        projected.remove(index);
+    }
+    Ok(projected)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn project_catalogued_typed_inactive_actions(
+    case_name: &str,
+    initial: &GameState,
+    turn_after: &GameState,
+    records: &[FixtureCommandRecord],
+    expected: &[ResolvedAction],
+    actual: &[ResolvedAction],
+    mutations: &[BattleMutation],
+    presentation: &[BattlePresentationEvent],
+) -> Result<Vec<ResolvedAction>, Box<dyn Error>> {
+    let catalogue = TYPED_INACTIVE_ACTION_PROJECTIONS
+        .iter()
+        .filter(|projection| projection.case_name == case_name)
+        .collect::<Vec<_>>();
+    if catalogue.is_empty() {
+        return Ok(actual.to_vec());
+    }
+    if actual.len() != expected.len() + catalogue.len() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: typed inactive-action projection saw legacy/typed lengths {}/{}, expected exactly {} catalogued typed-only actions",
+            expected.len(),
+            actual.len(),
+            catalogue.len()
+        ))
+        .into());
+    }
+    let tail_start = actual.len() - catalogue.len();
+    let mut projected = actual.to_vec();
+    let mut remove = Vec::with_capacity(catalogue.len());
+    for projection in catalogue {
+        let actor = PokemonId::try_from_u64(projection.actor)?;
+        let source_slot = FieldSlot::new(projection.source_side, projection.source_position)?;
+        let action_index = actual
+            .iter()
+            .enumerate()
+            .skip(tail_start)
+            .find_map(|(index, action)| (action.actor == actor).then_some(index))
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued typed-only inactive action for actor {actor} is absent from the exact tail window"
+                ))
+            })?;
+        let action = &actual[action_index];
+        let exact_action = action.sequence.get() == u64::try_from(action_index)?
+            && action.kind == ResolvedActionKind::Move
+            && action.source_slot == source_slot
+            && action
+                .command_operation_id
+                .as_ref()
+                .is_some_and(|operation| operation.as_str() == projection.operation_id)
+            && action.effective_speed == projection.effective_speed
+            && action.timing_modifier == 1
+            && action.move_priority == 0
+            && action.bracket_modifier == 1
+            && action.tie_order == SafeU53::ZERO
+            && action.disposition == ActionDisposition::SkippedActorInactive;
+        if !exact_action {
+            return Err(FixtureError::new(format!(
+                "{case_name}: typed-only inactive action for actor {actor} differs from its exact move/slot/operation/speed/disposition fingerprint"
+            ))
+            .into());
+        }
+        if expected.iter().any(|legacy| {
+            legacy.command_operation_id.as_ref().is_some_and(|operation| {
+                operation.as_str() == projection.operation_id
+                    && legacy.kind == ResolvedActionKind::Move
+                    && legacy.disposition == ActionDisposition::SkippedActorInactive
+            })
+        }) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued typed-only inactive action for actor {actor} is also represented by the legacy trace"
+            ))
+            .into());
+        }
+        let record = records
+            .iter()
+            .find(|record| record.actor == actor)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued typed-only inactive actor {actor} has no admitted command record"
+                ))
+            })?;
+        let expected_move_slot = MoveSlotIndex::try_from(u64::from(projection.move_slot))?;
+        if record.field_slot != source_slot
+            || record.operation_id.as_str() != projection.operation_id
+            || !matches!(
+                &record.command,
+                BattleCommand::Fight {
+                    actor: command_actor,
+                    move_slot,
+                    ..
+                } if *command_actor == actor && *move_slot == expected_move_slot
+            )
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued typed-only inactive action for actor {actor} does not match its admitted fight command"
+            ))
+            .into());
+        }
+        if initial_field_slot_for_pokemon(initial, actor) != Some(source_slot) {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued typed-only inactive actor {actor} is not initially bound to {source_slot:?}"
+            ))
+            .into());
+        }
+        let prior_faint = actual[..action_index].iter().any(|prior| {
+            prior.kind == ResolvedActionKind::Faint
+                && prior.actor == actor
+                && prior.source_slot == source_slot
+                && prior.command_operation_id.is_none()
+                && prior.effective_speed == projection.effective_speed
+                && prior.timing_modifier == 0
+                && prior.move_priority == 0
+                && prior.bracket_modifier == 0
+                && prior.tie_order == SafeU53::ZERO
+                && prior.disposition == ActionDisposition::Executed
+        });
+        let after_pokemon = pokemon_state(turn_after, actor).ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: catalogued typed-only inactive actor {actor} is absent after the turn"
+            ))
+        })?;
+        let after_occupant = turn_after
+            .battle
+            .as_ref()
+            .and_then(|battle| {
+                battle
+                    .field
+                    .slots
+                    .iter()
+                    .find(|entry| entry.slot == source_slot)
+            })
+            .and_then(|entry| entry.occupant);
+        if !prior_faint
+            || !after_pokemon.fainted
+            || after_pokemon.hp != 0
+            || after_occupant != Some(actor)
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued typed-only inactive actor {actor} is not proven fainted in its stable field slot"
+            ))
+            .into());
+        }
+
+        let initial_move = pokemon_state(initial, actor)
+            .and_then(|pokemon| pokemon.moves.get(usize::from(expected_move_slot.get())))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued typed-only inactive actor {actor} has no initial move in slot {}",
+                    expected_move_slot.get()
+                ))
+            })?;
+        let after_move = after_pokemon
+            .moves
+            .get(usize::from(expected_move_slot.get()))
+            .and_then(Option::as_ref)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued typed-only inactive actor {actor} loses move slot {}",
+                    expected_move_slot.get()
+                ))
+            })?;
+        if u64::from(initial_move.move_id) != projection.move_id
+            || initial_move != after_move
+            || mutations.iter().any(|mutation| {
+                matches!(
+                    mutation,
+                    BattleMutation::PpChanged {
+                        pokemon,
+                        move_slot,
+                        ..
+                    } if *pokemon == actor && *move_slot == expected_move_slot
+                )
+            })
+            || presentation.iter().any(|event| {
+                matches!(
+                    &event.kind,
+                    BattlePresentationKind::MoveUsed {
+                        actor: presented_actor,
+                        ..
+                    } if *presented_actor == actor
+                )
+            })
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: catalogued typed-only inactive action for actor {actor} has move-state, PP-mutation, or move-presentation evidence"
+            ))
+            .into());
+        }
+        remove.push(action_index);
+    }
+    remove.sort_unstable();
+    remove.dedup();
+    if remove.len() != TYPED_INACTIVE_ACTION_PROJECTIONS
+        .iter()
+        .filter(|projection| projection.case_name == case_name)
+        .count()
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: typed inactive-action projection matched duplicate catalogue entries"
+        ))
+        .into());
+    }
+    for index in remove.into_iter().rev() {
+        projected.remove(index);
+    }
+    Ok(projected)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn compare_projected_action_order(
+    case_name: &str,
+    initial: &GameState,
+    turn_after: &GameState,
+    records: &[FixtureCommandRecord],
+    proposals: &[FixtureReplacementProposal],
+    replacements: &[ReplacementPresentationTrace],
+    expected: &[ResolvedAction],
+    actual: &[ResolvedAction],
+    mutations: &[BattleMutation],
+    presentation: &[BattlePresentationEvent],
+) -> Result<(), Box<dyn Error>> {
+    validate_action_sequences(case_name, "legacy action order", expected)?;
+    validate_action_sequences(case_name, "typed action order", actual)?;
+    let mut expected = project_catalogued_legacy_replacement_actions(
+        case_name,
+        initial,
+        turn_after,
+        proposals,
+        replacements,
+        expected,
+        actual,
+    )?;
+    let mut actual = project_catalogued_typed_inactive_actions(
+        case_name,
+        initial,
+        turn_after,
+        records,
+        &expected,
+        actual,
+        mutations,
+        presentation,
+    )?;
+    resequence_projected_actions(&mut expected)?;
+    resequence_projected_actions(&mut actual)?;
+    compare_serialized_axis(case_name, "DYNAMIC_ACTION_ORDER", &expected, &actual)
 }
 
 fn pokemon_state(state: &GameState, pokemon: PokemonId) -> Option<&PokemonState> {
@@ -7038,11 +7782,17 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     let legacy_content_identity =
         is_exact_legacy_content_identity(&document, case_name, "initial_state", &content)?;
     let mut records = fixture_command_records(&document, case_name)?;
+    let raw_expected_actions = fixture_action_order(&document, case_name)?;
     if legacy_content_identity {
-        normalize_legacy_command_records(case_name, &initial, &mut records, &content)?;
+        normalize_legacy_command_records(
+            case_name,
+            &initial,
+            &mut records,
+            &raw_expected_actions,
+            &content,
+        )?;
     }
     let replacement_proposals = fixture_replacement_proposals(&document, case_name)?;
-    let raw_expected_actions = fixture_action_order(&document, case_name)?;
     let expected_actions =
         normalize_legacy_action_order(case_name, &initial, &records, &raw_expected_actions)?;
     let (resolver_input, commands) =
@@ -7085,11 +7835,17 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &content,
     )?;
     materialize_pending_command_frontier(case_name, &mut replacement_replay.state, &content)?;
-    compare_serialized_axis(
+    compare_projected_action_order(
         case_name,
-        "DYNAMIC_ACTION_ORDER",
+        &initial,
+        &transition.after_state,
+        &records,
+        &replacement_proposals,
+        &replacement_replay.transitions,
         &expected_actions,
         &transition.action_order,
+        &transition.mutations,
+        &transition.presentation,
     )?;
 
     let expected_rng_draws = fixture_rng_draws(&document, case_name, &transition.rng_audit)?;
