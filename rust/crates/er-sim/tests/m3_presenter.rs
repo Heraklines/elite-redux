@@ -8,7 +8,7 @@ use er_types::battle_ui::{
 };
 use er_types::{OperationId, SafeU53, SeatId};
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn seat() -> Result<SeatId, er_types::SafeU53Error> {
     Ok(SeatId::new(SafeU53::new(1)?))

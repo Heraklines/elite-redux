@@ -217,8 +217,9 @@ fn normalize_legacy_type_chart(
         .ok_or_else(|| invalid_data("published type chart entries are not an array"))?;
     let legacy_entries = entries.clone();
     if legacy_entries.len() != expected_entries.len() {
-        return Err(invalid_data("published type chart entry count differs from selected content")
-            .into());
+        return Err(
+            invalid_data("published type chart entry count differs from selected content").into(),
+        );
     }
     for (index, expected) in expected_entries.iter().enumerate() {
         if legacy_entries

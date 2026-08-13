@@ -26,8 +26,8 @@ use er_canonical::fixture_digest;
 use er_content::moves::find_move;
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_rng::audit::{
-    RngAuditState, RngCallsiteId, RngDraw, RngPublicApi, RngReason, RngStream,
-    SeedOffsetContext, rng_state_fingerprint,
+    RngAuditState, RngCallsiteId, RngDraw, RngPublicApi, RngReason, RngStream, SeedOffsetContext,
+    rng_state_fingerprint,
 };
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::RunRngState;
@@ -1712,12 +1712,7 @@ fn normalize_legacy_final_abilities(
     }
 
     let initial_state = object_field(document, case_name, "$", "initial_state")?;
-    let initial_canonical = object_field(
-        initial_state,
-        case_name,
-        "initial_state",
-        "canonical",
-    )?;
+    let initial_canonical = object_field(initial_state, case_name, "initial_state", "canonical")?;
     let initial_battle = object_field(
         initial_canonical,
         case_name,
@@ -1828,9 +1823,7 @@ fn normalize_legacy_final_abilities(
             pokemon
                 .as_object_mut()
                 .ok_or_else(|| {
-                    FixtureError::new(format!(
-                        "{case_name}: final Pokemon {id} is not an object"
-                    ))
+                    FixtureError::new(format!("{case_name}: final Pokemon {id} is not an object"))
                 })?
                 .insert("abilities".to_owned(), initial_abilities.clone());
             observed.push(snapshot);
@@ -2812,12 +2805,7 @@ fn normalize_legacy_rng_audit_state(
         value,
         &["battle", "next_sequence", "run", "seed_offset"],
     )?;
-    let legacy_sequence = SafeU53::new(u64_field(
-        value,
-        case_name,
-        path,
-        "next_sequence",
-    )?)?;
+    let legacy_sequence = SafeU53::new(u64_field(value, case_name, path, "next_sequence")?)?;
     if legacy_sequence != sequence {
         return Err(FixtureError::new(format!(
             "{case_name}: {path}.next_sequence is {legacy_sequence}, expected draw sequence {sequence}"
@@ -2938,10 +2926,7 @@ fn same_rebased_battle_draw_schedule(expected: &RngDraw, actual: &RngDraw) -> bo
         && expected.primitive_draw_count == actual.primitive_draw_count
 }
 
-fn voluntary_switch_rebased_rng_source_ordinal(
-    case_name: &str,
-    raw_index: usize,
-) -> Option<usize> {
+fn voluntary_switch_rebased_rng_source_ordinal(case_name: &str, raw_index: usize) -> Option<usize> {
     if case_name != "voluntary-switch" {
         return None;
     }
@@ -3225,8 +3210,8 @@ fn fixture_rng_draws(
             before_state.seed_offset.as_ref(),
             after_state.seed_offset.as_ref(),
         ) {
-            (Some(context), Some(before), Some(after))
-                if context == before && context == after => {}
+            (Some(context), Some(before), Some(after)) if context == before && context == after => {
+            }
             (None, None, None) => {}
             _ => {
                 return Err(FixtureError::new(format!(
@@ -3297,22 +3282,18 @@ fn fixture_rng_draws(
                 .into());
             }
         };
-        let public_api =
-            match string_field(value, case_name, &path, "public_api")?.as_str() {
-                "RAND_SEED_INT" => RngPublicApi::RandSeedInt,
-                "FISHER_YATES_SWAP" => RngPublicApi::FisherYatesSwap,
-                legacy => {
-                    return Err(FixtureError::new(format!(
-                        "{case_name}: {path}.public_api has unsupported legacy spelling {legacy:?}"
-                    ))
-                    .into());
-                }
-            };
+        let public_api = match string_field(value, case_name, &path, "public_api")?.as_str() {
+            "RAND_SEED_INT" => RngPublicApi::RandSeedInt,
+            "FISHER_YATES_SWAP" => RngPublicApi::FisherYatesSwap,
+            legacy => {
+                return Err(FixtureError::new(format!(
+                    "{case_name}: {path}.public_api has unsupported legacy spelling {legacy:?}"
+                ))
+                .into());
+            }
+        };
         normalized_object.insert("stream".to_owned(), serde_json::to_value(stream)?);
-        normalized_object.insert(
-            "public_api".to_owned(),
-            serde_json::to_value(public_api)?,
-        );
+        normalized_object.insert("public_api".to_owned(), serde_json::to_value(public_api)?);
 
         let callsite = string_field(&normalized, case_name, &path, "callsite_id")?;
         let callsite = if callsite.starts_with("src/") {
@@ -3587,7 +3568,8 @@ fn validate_legacy_pokemon_snapshot(
         .collect::<Option<Vec<_>>>();
     if actual.hp != legacy.hp
         || actual.fainted != legacy.fainted
-        || actual.status != legacy_status_state(case_name, &format!("{path}.status"), &legacy.status)?
+        || actual.status
+            != legacy_status_state(case_name, &format!("{path}.status"), &legacy.status)?
         || stages != legacy.stages
         || moves.as_deref() != Some(legacy.moves.as_slice())
     {
@@ -3611,8 +3593,13 @@ fn apply_catalogued_turn_resolution_setup(
         .iter()
         .enumerate()
         .filter(|(index, value)| {
-            required(value, case_name, &format!("expected_mutations[{index}]"), "cause")
-                .is_ok_and(|cause| cause.as_str() == Some("TURN_RESOLUTION"))
+            required(
+                value,
+                case_name,
+                &format!("expected_mutations[{index}]"),
+                "cause",
+            )
+            .is_ok_and(|cause| cause.as_str() == Some("TURN_RESOLUTION"))
         })
         .collect::<Vec<_>>();
     let expected_count = usize::from(matches!(
@@ -4303,9 +4290,7 @@ fn fixture_mutations(
             cause: required(value, case_name, &path, "cause")?.clone(),
         };
 
-        if validate_catalogued_legacy_intimidate_rng_mutation(
-            document, case_name, index, value,
-        )? {
+        if validate_catalogued_legacy_intimidate_rng_mutation(document, case_name, index, value)? {
             observed_intimidate_rng_mutations += 1;
             continue;
         }
@@ -4890,10 +4875,8 @@ fn replay_fixture_replacements(
             proposal.owner_seat,
         )?;
         if proposal.raw_operation_id.as_str() != operation_id.as_str() {
-            let catalogued = catalogued_legacy_faint_turn_occurrence(
-                case_name,
-                proposal.occurrence,
-            );
+            let catalogued =
+                catalogued_legacy_faint_turn_occurrence(case_name, proposal.occurrence);
             if catalogued != Some((proposal.turn_occurrence, stored.source.turn_occurrence))
                 || usize::try_from(stored.source.turn_occurrence)? != index
             {
@@ -5170,9 +5153,7 @@ fn take_hp_mutation(
             else {
                 continue;
             };
-            if *candidate_pokemon != pokemon
-                || *before != expected_before
-                || *after != typed_after
+            if *candidate_pokemon != pokemon || *before != expected_before || *after != typed_after
             {
                 continue;
             }

@@ -965,7 +965,7 @@ fn no_legal_replacement_is_internal_only_and_does_not_touch_fingerprint_evidence
         error,
         AuthorityCommandError::ExternalNoLegalReplacement
     ));
-    assert!(matches!(
+    assert!(
         BattleReplacementProposalV1::new(
             selected.operation_id,
             selected.battle_id,
@@ -978,9 +978,9 @@ fn no_legal_replacement_is_internal_only_and_does_not_touch_fingerprint_evidence
             ReplacementSelection::NoLegalReplacement,
             selected.menu_instance_id,
             selected.control_id,
-        ),
-        Err(_)
-    ));
+        )
+        .is_err()
+    );
     Ok(())
 }
 

@@ -1,4 +1,5 @@
 #[path = "../src/battle_replica.rs"]
+#[allow(dead_code)]
 mod battle_replica;
 
 use battle_replica::{
