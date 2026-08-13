@@ -372,8 +372,8 @@ fn enemy_actor(battle: &Value, position: u8) -> TestResult<er_types::battle_ids:
         let slot = entry.get("slot")?;
         (slot.get("side")?.as_str() == Some("ENEMY")
             && slot.get("position")?.as_u64() == Some(u64::from(position)))
-            .then(|| entry.get("occupant")?.as_u64())
-            .flatten()
+        .then(|| entry.get("occupant")?.as_u64())
+        .flatten()
     });
     let actor = actor.ok_or_else(|| {
         invalid(format!(

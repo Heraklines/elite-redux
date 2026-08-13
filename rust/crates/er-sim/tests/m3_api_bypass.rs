@@ -8,6 +8,8 @@
 
 use std::error::Error;
 
+// This source-negative audit exercises only one constructor from the full parity adapter.
+#[allow(dead_code)]
 #[path = "../../er-wasm/src/m3_parity.rs"]
 mod m3_parity;
 

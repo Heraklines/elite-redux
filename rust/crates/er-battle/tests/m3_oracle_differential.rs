@@ -466,8 +466,7 @@ const LEGACY_COMPACTED_TARGET_PROJECTIONS: &[LegacyCompactedTargetProjection] =
         effective_speed: 207,
     }];
 
-const LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS:
-    &[LegacyRemappedCommandAdmissionProjection] =
+const LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS: &[LegacyRemappedCommandAdmissionProjection] =
     &[LegacyRemappedCommandAdmissionProjection {
         case_name: "mixed-side-simultaneous-faint",
         actor: 2,
@@ -2479,11 +2478,12 @@ fn catalogued_remapped_command_admission_source(
     case_name: &str,
     record: &FixtureCommandRecord,
 ) -> Result<CommandAdmissionSource, Box<dyn Error>> {
-    let Some(projection) = LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS
-        .iter()
-        .find(|projection| {
-            projection.case_name == case_name && projection.actor == u64::from(record.actor)
-        })
+    let Some(projection) =
+        LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS
+            .iter()
+            .find(|projection| {
+                projection.case_name == case_name && projection.actor == u64::from(record.actor)
+            })
     else {
         return Ok(record.source);
     };
@@ -7372,9 +7372,7 @@ fn project_catalogued_voluntary_switch_stat_stage_order(
         before: 0,
         after: -1,
     };
-    if trace.typed.get(1) != Some(&legacy_first)
-        || trace.typed.get(2) != Some(&legacy_second)
-    {
+    if trace.typed.get(1) != Some(&legacy_first) || trace.typed.get(2) != Some(&legacy_second) {
         return Err(FixtureError::new(
             "voluntary-switch: retained legacy Intimidate stage order is outside its exact catalogue",
         )

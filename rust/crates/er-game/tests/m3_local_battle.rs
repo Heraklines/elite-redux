@@ -180,10 +180,8 @@ fn valid_config() -> TestResult<BattleGameConfig> {
 
 fn runtime_with_live_command() -> TestResult<er_game::runtime::GameRuntime> {
     let content = selected_content_pack()?;
-    let mut runtime = er_game::runtime::GameRuntime::new_battle(
-        valid_config()?,
-        Arc::new(content),
-    )?;
+    let mut runtime =
+        er_game::runtime::GameRuntime::new_battle(valid_config()?, Arc::new(content))?;
     let payload = {
         let seat = runtime.local_seat();
         let control = runtime

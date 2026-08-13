@@ -1242,7 +1242,10 @@ fn waiting_replacement_operation(
             });
         }
         let current = waiting.operation_ids[0].clone();
-        if operation_id.as_ref().is_some_and(|expected| expected != &current) {
+        if operation_id
+            .as_ref()
+            .is_some_and(|expected| expected != &current)
+        {
             return Err(AuthorityTransactionError::ControlProjection {
                 reason: "replacement waiting controls disagree on operation identity".to_owned(),
             });
