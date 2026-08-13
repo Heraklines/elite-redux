@@ -149,16 +149,17 @@ pub(crate) struct BattleModeSnapshotParts {
 }
 
 #[derive(Clone, Debug)]
-// The authority and replica variants own live protocol graphs whose inline
-// ownership is part of the state machine's mutation and snapshot paths.
-// Boxing either branch would ripple through those ownership paths, so allow
-// this enum's large-variant layout specifically.
+// The authority and replica variants own live protocol graphs. The retained
+// authority log is copy-on-write so presentation-only transactions do not
+// clone full material payloads; every mutating path uses `Arc::make_mut`.
+// Boxing either branch would ripple through snapshot ownership, so allow this
+// enum's large-variant layout specifically.
 #[allow(clippy::large_enum_variant)]
 enum BattleProtocolState {
     Authority {
         context: FrameContext,
         peer_bindings: Vec<PeerBinding>,
-        log: AuthorityLog,
+        log: Arc<AuthorityLog>,
         proposals: ProposalAdmissionLedger,
         pending_recoveries: BTreeMap<String, BattlePendingRecovery>,
         transports: BTreeMap<SeatId, TransportState>,
@@ -688,7 +689,7 @@ impl BattleMode {
                 staged_peer_rebinds,
                 ..
             } => {
-                let actions = log.dispose(reason, scheduler);
+                let actions = Arc::make_mut(log).dispose(reason, scheduler);
                 proposals.dispose();
                 pending_recoveries.clear();
                 for state in transports.values_mut() {
@@ -787,7 +788,7 @@ impl BattleProtocolState {
                 Ok(Self::Authority {
                     context,
                     peer_bindings: log.peer_bindings.clone(),
-                    log: authority_log,
+                    log: Arc::new(authority_log),
                     proposals,
                     pending_recoveries: BTreeMap::new(),
                     transports: std::iter::once((local_seat, TransportState::Connected))
@@ -1471,7 +1472,7 @@ fn restore_authority_protocol(
     Ok(BattleProtocolState::Authority {
         context,
         peer_bindings,
-        log,
+        log: Arc::new(log),
         proposals,
         pending_recoveries: restored_pending,
         transports,
@@ -2357,7 +2358,9 @@ impl BattleTransaction {
         payload: BattleResolvedPayload,
     ) -> Result<(), BattleKernelError> {
         let (context, log) = match &self.staged.protocol {
-            BattleProtocolState::Authority { context, log, .. } => (context.clone(), log.clone()),
+            BattleProtocolState::Authority { context, log, .. } => {
+                (context.clone(), log.as_ref().clone())
+            }
             BattleProtocolState::Replica { .. } => {
                 return Err(BattleKernelError::Invariant {
                     reason: "replica emitted BattleResolved".to_owned(),
@@ -2377,10 +2380,11 @@ impl BattleTransaction {
         };
         let prepared = match payload.resolution {
             PreparedBattleResolution::Turn {
-                transition,
+                digest_evidence,
                 material_operation_id,
                 next_control,
             } => {
+                let transition = digest_evidence.transition();
                 self.staged
                     .last_rng_audit
                     .extend(transition.rng_audit.iter().cloned());
@@ -2394,7 +2398,7 @@ impl BattleTransaction {
                     })
                     .collect();
                 let prepared = self.staged.game.prepare_authority_turn(
-                    transition,
+                    digest_evidence,
                     &material_operation_id,
                     next_control,
                 )?;
@@ -2447,12 +2451,7 @@ impl BattleTransaction {
             }
         };
         let entry = prepared.prepared_entry().clone();
-        let material_bytes =
-            serde_json::to_vec(&prepared.material_wire().payload).map_err(|error| {
-                BattleKernelError::Protocol {
-                    reason: format!("prepared material serialization failed: {error}"),
-                }
-            })?;
+        let material_bytes = prepared.material_bytes().to_vec();
         self.pending_authority = Some(prepared);
         self.queue.push(InternalEvent::AuthorityEntryReady(
             AuthorityEntryReadyPayload {
@@ -2827,7 +2826,7 @@ impl BattleTransaction {
             reason: format!("terminal material draft failed: {error}"),
         })?;
         let commit = match &mut self.staged.protocol {
-            BattleProtocolState::Authority { log, .. } => log
+            BattleProtocolState::Authority { log, .. } => Arc::make_mut(log)
                 .commit(draft, &mut self.scheduler)
                 .map_err(|error| match error {
                     er_protocol::authority_log::AuthorityLogError::Scheduler(error) => {
@@ -2877,7 +2876,7 @@ impl BattleTransaction {
         let presentation = published.presentation.clone();
         self.scheduler = published.scheduler;
         match &mut self.staged.protocol {
-            BattleProtocolState::Authority { log, .. } => *log = published.log,
+            BattleProtocolState::Authority { log, .. } => *log = Arc::new(published.log),
             BattleProtocolState::Replica { .. } => {
                 return Err(BattleKernelError::Invariant {
                     reason: "published authority transaction installed on replica".to_owned(),
@@ -3200,7 +3199,7 @@ impl BattleTransaction {
                     stage: body.stage,
                     control_id: body.control_id,
                 };
-                log.accept_receipt_detailed(receipt, &mut self.scheduler)
+                Arc::make_mut(log).accept_receipt_detailed(receipt, &mut self.scheduler)
                     .actions
             }
             BattleProtocolState::Replica { .. } => return Ok(()),
@@ -4303,7 +4302,7 @@ impl BattleTransaction {
         let report = self
             .staged
             .presentations
-            .settle(endpoint, event_id, outcome)?;
+            .settle_in_kernel_transaction(endpoint, event_id, outcome)?;
         let presentation_failed = report.terminal_reason() == Some(M3_PRESENTATION_FAILED);
         if presentation_failed {
             self.enter_terminal(M3_PRESENTATION_FAILED.to_owned())?;
@@ -4388,7 +4387,7 @@ impl BattleTransaction {
         let mut recovery_actions = None;
         match &mut self.staged.protocol {
             BattleProtocolState::Authority { log, .. } => {
-                let actions = log
+                let actions = Arc::make_mut(log)
                     .timer_fired(fired, &mut self.scheduler)
                     .map_err(protocol_error)?;
                 map_authority_actions(&mut self.effects, actions)?;
@@ -4557,7 +4556,7 @@ impl BattleTransaction {
                             binding.connection_generation = *staged;
                         }
                     }
-                    authority_actions = log
+                    authority_actions = Arc::make_mut(log)
                         .rebind_connection(next_context.clone(), next_peer_bindings.clone())
                         .map_err(protocol_error)?
                         .actions;
@@ -4768,7 +4767,8 @@ impl BattleTransaction {
                 staged_peer_rebinds,
                 ..
             } => {
-                let actions = log.dispose(&terminal.reason, &mut self.scheduler);
+                let actions =
+                    Arc::make_mut(log).dispose(&terminal.reason, &mut self.scheduler);
                 proposals.dispose();
                 pending_recoveries.clear();
                 for state in transports.values_mut() {

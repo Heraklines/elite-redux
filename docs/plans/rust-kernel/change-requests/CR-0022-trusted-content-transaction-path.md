@@ -59,6 +59,32 @@ implementation first encoded and discarded a standalone canonical snapshot,
 then encoded the same state again inside the digest preimage. Removing that
 discarded encoding does not change the digest bytes or validation result.
 
+After final frontier projection, the game reducer wraps the exact finalized
+transition and its resolver/finalizer digests in an opaque, non-serialized
+`TurnDigestEvidence` carried by private `PreparedBattleResolution`. Other
+crates receive read-only access only; authority preparation must consume the
+wrapper before it may reuse those digests instead of canonicalizing the same
+two states again. State equality, operation, content, mutation, command, and
+control checks remain mandatory, and the common material applier still
+independently verifies both material digests. When the authority's
+current state exactly equals material `before_state`, frontier reconciliation
+also returns before cloning and hashing an identical staged state. Partial
+replica frontiers retain the complete reconciliation path.
+
+Authority material encoding retains the exact canonical bytes after proving
+both the typed decode and canonical `Value` round trip. The frozen material
+digest is computed from those bytes, and the internal prepared-entry event
+carries those same bytes instead of serializing the payload again. The wire
+`Material { digest, payload }` shape is unchanged.
+
+The outer Battle clone/validate/swap transaction also permits two ordinary
+copy-on-write corrections. Settling a presentation mutates the already-cloned
+presentation owner after all fallible checks and relies on the enclosing
+quiescent validation; standalone settlement keeps its own clone/validate/swap.
+The retained authority log is `Arc` backed, so presentation-only transactions
+do not deep-copy the committed full-state material payload. Every log mutation
+uses `Arc::make_mut`, preserving rollback and snapshot ownership exactly.
+
 ## Compatibility and ownership
 
 This correction adds no dependency, wire message, serialized field, schema

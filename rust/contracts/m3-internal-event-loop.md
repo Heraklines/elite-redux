@@ -61,7 +61,7 @@ The private prepared payload is closed as:
 ```rust
 enum PreparedBattleResolution {
     Turn {
-        transition: BattleTransition,
+        digest_evidence: TurnDigestEvidence,
         material_operation_id: OperationId,
         next_control: BattleControlPlan,
     },
@@ -72,6 +72,13 @@ enum PreparedBattleResolution {
     },
 }
 ```
+
+`TurnDigestEvidence` owns the exact finalized transition, is opaque outside
+`er-game`, is created only after final frontier projection, and is never
+serialized. Other crates receive immutable transition access only. Consuming
+the wrapper lets the authority transaction reuse reducer-owned before/after
+digest work while the common material applier retains independent material
+digest validation.
 
 The `Game` reducer derives and validates the exact material operation ID,
 invokes the pure `er-battle` resolver with that ID, then uses the one `er-game`

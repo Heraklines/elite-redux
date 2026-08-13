@@ -1569,6 +1569,10 @@ domain/version prefix included in the preimage:
 The Authority material digest is a fourth compatibility value and is never
 interchanged with these three.
 
+Pair-trace clock and live-resource projections identify a timer by
+`(endpoint, timer_id)`. Numeric timer IDs are scheduler-local, so independent
+host and guest schedulers may retain the same numeric value concurrently.
+
 ## Typed Battle-mode external boundary
 
 M3 extends the existing integration-owned enums without changing M2 variants:
@@ -1740,6 +1744,26 @@ The validated core shared by `resolve_turn` and `resolve_turn_trusted` may use
 crate-private action-queue, move-pipeline, and target-effect helpers after the
 selected public or trusted entry point has completed its state/content guard;
 these helpers are not callable cross-crate and add no trusted function name.
+
+The game reducer creates an opaque, non-serialized `TurnDigestEvidence` only
+after resolver output and final command-frontier projection have fixed the
+transition's before/after digests. The wrapper owns that exact transition;
+other crates receive only immutable access, and
+`GameRuntime::prepare_authority_turn` must consume it before reusing the
+reducer-owned digests instead of canonicalizing the same states again. All
+state equality, identity, content, mutation, command, and control checks
+remain; the common material applier independently recomputes both material
+digests. Exact-state authority reconciliation may return before rebuilding
+and hashing an identical frontier, while partial replica frontiers retain the
+complete reconciliation path.
+
+Authority preparation retains one canonical material byte vector after typed
+decode and canonical-`Value` round-trip proof. The material digest and internal
+prepared-entry bytes derive from that vector without changing the frozen
+`Material { digest, payload }` wire shape. Presentation-only Battle
+transactions copy the retained authority log by `Arc` and use copy-on-write
+for every mutation; the enclosing clone/validate/swap remains the rollback
+owner.
 
 `new_battle` requires `run_state.battle = None`, a positive one-based run wave,
 an exact non-empty production `BattleScene.waveSeed`, and a valid unconsumed

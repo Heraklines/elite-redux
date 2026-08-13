@@ -17,7 +17,7 @@ use er_battle::{
     BattleNextDecision, BattleReplacementTransition, BattleTransition,
     compute_presentation_plan_digest,
 };
-use er_canonical::{canonical_bytes, canonicalize};
+use er_canonical::canonical_bytes;
 use er_content::pack::ContentPack;
 use er_game::authority_commands::{
     AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion,
@@ -158,7 +158,7 @@ pub(crate) struct AuthorityPreparedTransaction {
     menu_allocators: Vec<SeatMenuInstanceAllocator>,
     presentation: Vec<BattlePresentationEvent>,
     material: PreparedMaterial,
-    material_wire: Material,
+    material_bytes: Vec<u8>,
     operation_id: OperationId,
     kind: AuthorityEntryKind,
     scripted_policy_after: ScriptedEnemyPolicyV1,
@@ -188,8 +188,8 @@ impl AuthorityPreparedTransaction {
         &self.menu_allocators
     }
 
-    pub(crate) fn material_wire(&self) -> &Material {
-        &self.material_wire
+    pub(crate) fn material_bytes(&self) -> &[u8] {
+        &self.material_bytes
     }
 
     pub(crate) fn operation_id(&self) -> &OperationId {
@@ -242,7 +242,7 @@ impl AuthorityPreparedTransaction {
             menu_allocators,
             presentation,
             material,
-            material_wire: _,
+            material_bytes: _,
             operation_id,
             kind,
             scripted_policy_after,
@@ -491,9 +491,9 @@ pub(crate) fn prepare_authority_turn(
         &allocators,
         content,
     )?;
-    let (decoded, payload) = encode_decode_material(&material)?;
+    let (decoded, payload, material_bytes) = encode_decode_material(&material)?;
     let material_wire = Material {
-        digest: turn_material_digest(&payload)?,
+        digest: turn_material_digest(&material_bytes)?,
         payload,
     };
     let applied = apply_turn_material(
@@ -525,7 +525,7 @@ pub(crate) fn prepare_authority_turn(
             context: authority_context,
             operation_id: operation_id.clone(),
             kind: AuthorityEntryKind::TurnCommit,
-            material: material_wire.clone(),
+            material: material_wire,
             next_control: protocol_next_control,
             subsumes: Vec::new(),
         })
@@ -537,7 +537,7 @@ pub(crate) fn prepare_authority_turn(
         menu_allocators: applied.menu_allocators.clone(),
         presentation: applied.presentation.clone(),
         material: PreparedMaterial::Turn(decoded),
-        material_wire,
+        material_bytes,
         operation_id,
         kind: AuthorityEntryKind::TurnCommit,
         scripted_policy_after,
@@ -673,9 +673,9 @@ pub(crate) fn prepare_authority_replacement(
         &allocators,
         content,
     )?;
-    let (decoded, payload) = encode_decode_material(&material)?;
+    let (decoded, payload, material_bytes) = encode_decode_material(&material)?;
     let material_wire = Material {
-        digest: replacement_material_digest(&payload)?,
+        digest: replacement_material_digest(&material_bytes)?,
         payload,
     };
     let applied = apply_replacement_material(
@@ -707,7 +707,7 @@ pub(crate) fn prepare_authority_replacement(
             context: authority_context,
             operation_id: operation_id.clone(),
             kind: AuthorityEntryKind::ReplacementCommit,
-            material: material_wire.clone(),
+            material: material_wire,
             next_control: protocol_next_control,
             subsumes: Vec::new(),
         })
@@ -719,7 +719,7 @@ pub(crate) fn prepare_authority_replacement(
         menu_allocators: applied.menu_allocators.clone(),
         presentation: applied.presentation.clone(),
         material: PreparedMaterial::Replacement(decoded),
-        material_wire,
+        material_bytes,
         operation_id,
         kind: AuthorityEntryKind::ReplacementCommit,
         scripted_policy_after,
@@ -1284,9 +1284,11 @@ fn waiting_replacement_operation(
     })
 }
 
-fn encode_decode_material<T>(material: &T) -> Result<(T, Value), AuthorityTransactionError>
+fn encode_decode_material<T>(
+    material: &T,
+) -> Result<(T, Value, Vec<u8>), AuthorityTransactionError>
 where
-    T: Serialize + DeserializeOwned + Clone,
+    T: Serialize + DeserializeOwned + PartialEq,
 {
     let bytes =
         canonical_bytes(material).map_err(|source| AuthorityTransactionError::MaterialCodec {
@@ -1297,11 +1299,11 @@ where
             reason: source.to_string(),
         }
     })?;
-    let canonical_again =
+    let payload_bytes =
         canonical_bytes(&payload).map_err(|source| AuthorityTransactionError::MaterialCodec {
             reason: source.to_string(),
         })?;
-    if canonical_again != bytes {
+    if payload_bytes != bytes {
         return Err(AuthorityTransactionError::MaterialCodec {
             reason: "material payload was not canonical after JSON round-trip".to_owned(),
         });
@@ -1311,16 +1313,12 @@ where
             reason: source.to_string(),
         }
     })?;
-    let decoded_bytes =
-        canonical_bytes(&decoded).map_err(|source| AuthorityTransactionError::MaterialCodec {
-            reason: source.to_string(),
-        })?;
-    if decoded_bytes != bytes {
+    if &decoded != material {
         return Err(AuthorityTransactionError::MaterialCodec {
-            reason: "typed material decoder changed canonical bytes".to_owned(),
+            reason: "typed material decoder changed the constructed value".to_owned(),
         });
     }
-    Ok((decoded, payload))
+    Ok((decoded, payload, payload_bytes))
 }
 
 fn build_turn_material(
@@ -1655,23 +1653,25 @@ fn advance_one_allocator(
     Ok(())
 }
 
-fn turn_material_digest(payload: &Value) -> Result<String, AuthorityTransactionError> {
-    let canonical =
-        canonicalize(payload).map_err(|source| AuthorityTransactionError::MaterialDigest {
+fn turn_material_digest(canonical_bytes: &[u8]) -> Result<String, AuthorityTransactionError> {
+    let canonical = std::str::from_utf8(canonical_bytes).map_err(|source| {
+        AuthorityTransactionError::MaterialDigest {
             reason: source.to_string(),
-        })?;
-    Ok(format!("{:016x}", fnv1a64_utf16(&canonical)))
+        }
+    })?;
+    Ok(format!("{:016x}", fnv1a64_utf16(canonical)))
 }
 
-fn replacement_material_digest(payload: &Value) -> Result<String, AuthorityTransactionError> {
-    let canonical =
-        canonicalize(payload).map_err(|source| AuthorityTransactionError::MaterialDigest {
+fn replacement_material_digest(canonical_bytes: &[u8]) -> Result<String, AuthorityTransactionError> {
+    let canonical = std::str::from_utf8(canonical_bytes).map_err(|source| {
+        AuthorityTransactionError::MaterialDigest {
             reason: source.to_string(),
-        })?;
+        }
+    })?;
     Ok(format!(
         "rc1-{}-{:08x}",
         canonical.encode_utf16().count(),
-        fnv1a32_utf16(&canonical)
+        fnv1a32_utf16(canonical)
     ))
 }
 

@@ -203,11 +203,35 @@ pub struct ProtocolEventPayload {
     pub action: ProtocolAction,
 }
 
+/// Opaque proof that the game reducer retained the resolver/finalizer digests
+/// before handing a TURN to the private kernel queue. It is transaction-local
+/// and is never serialized into material, protocol frames, or snapshots.
+#[doc(hidden)]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TurnDigestEvidence {
+    transition: BattleTransition,
+}
+
+impl TurnDigestEvidence {
+    pub(crate) fn from_finalized_transition(transition: BattleTransition) -> Self {
+        Self { transition }
+    }
+
+    #[doc(hidden)]
+    pub fn transition(&self) -> &BattleTransition {
+        &self.transition
+    }
+
+    pub(crate) fn into_transition(self) -> BattleTransition {
+        self.transition
+    }
+}
+
 /// The only prepared game-resolution payload accepted by the private queue.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PreparedBattleResolution {
     Turn {
-        transition: BattleTransition,
+        digest_evidence: TurnDigestEvidence,
         material_operation_id: OperationId,
         next_control: BattleControlPlan,
     },
@@ -242,14 +266,18 @@ impl PreparedBattleResolution {
 
     pub fn before_digest(&self) -> &MechanicalStateDigest {
         match self {
-            Self::Turn { transition, .. } => &transition.before_digest,
+            Self::Turn {
+                digest_evidence, ..
+            } => &digest_evidence.transition().before_digest,
             Self::Replacement { transition, .. } => &transition.before_digest,
         }
     }
 
     pub fn after_digest(&self) -> &MechanicalStateDigest {
         match self {
-            Self::Turn { transition, .. } => &transition.after_digest,
+            Self::Turn {
+                digest_evidence, ..
+            } => &digest_evidence.transition().after_digest,
             Self::Replacement { transition, .. } => &transition.after_digest,
         }
     }

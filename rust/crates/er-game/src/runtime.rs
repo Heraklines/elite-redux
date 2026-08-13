@@ -66,7 +66,7 @@ use crate::command_menu::{
 };
 use crate::internal_event::{
     BattleResolvedPayload, CausalIdentity, GameEventPayload, GameIntent, InternalEvent,
-    PreparedBattleResolution, UiEventPayload,
+    PreparedBattleResolution, TurnDigestEvidence, UiEventPayload,
 };
 use crate::move_menu::{
     MoveActivation, MoveMenuEntry, MoveMenuError, MoveSelectionError, build_move_control,
@@ -519,11 +519,16 @@ impl GameRuntime {
     #[doc(hidden)]
     pub fn prepare_authority_turn(
         &self,
-        transition: er_battle::BattleTransition,
+        digest_evidence: TurnDigestEvidence,
         material_operation_id: &er_types::OperationId,
         control_plan: BattleControlPlan,
     ) -> Result<PreparedAuthorityTurn, GameRuntimeError> {
-        validate_turn_transition_identity(self, &transition, material_operation_id)?;
+        let transition = digest_evidence.into_transition();
+        validate_reducer_issued_turn_transition_identity(
+            self,
+            &transition,
+            material_operation_id,
+        )?;
         let expected = project_battle_control_plan(
             &transition.after_state,
             transition.next_decision,
@@ -915,10 +920,11 @@ impl GameRuntime {
     ) -> Result<(), GameRuntimeError> {
         match resolution {
             PreparedBattleResolution::Turn {
-                transition,
+                digest_evidence,
                 material_operation_id,
                 next_control,
             } => {
+                let transition = digest_evidence.transition();
                 validate_turn_transition_identity(self, transition, material_operation_id)?;
                 let allocator_before = self.control.menu_allocators.clone();
                 self.install_material_inner(
@@ -2378,9 +2384,10 @@ impl GameRuntime {
         self.finalize_turn_frontier(&mut transition)?;
         let (next_control, followup_events) = self
             .project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
+        let digest_evidence = TurnDigestEvidence::from_finalized_transition(transition);
         let mut events = vec![InternalEvent::BattleResolved(BattleResolvedPayload {
             resolution: PreparedBattleResolution::Turn {
-                transition,
+                digest_evidence,
                 material_operation_id,
                 next_control,
             },
@@ -4017,6 +4024,39 @@ fn validate_turn_transition_identity(
     transition: &er_battle::BattleTransition,
     material_operation_id: &er_types::OperationId,
 ) -> Result<(), GameRuntimeError> {
+    validate_turn_transition_identity_inner(
+        runtime,
+        transition,
+        TurnTransitionDigestValidation::Full,
+        material_operation_id,
+    )
+}
+
+fn validate_reducer_issued_turn_transition_identity(
+    runtime: &GameRuntime,
+    transition: &er_battle::BattleTransition,
+    material_operation_id: &er_types::OperationId,
+) -> Result<(), GameRuntimeError> {
+    validate_turn_transition_identity_inner(
+        runtime,
+        transition,
+        TurnTransitionDigestValidation::ReducerIssued,
+        material_operation_id,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum TurnTransitionDigestValidation {
+    Full,
+    ReducerIssued,
+}
+
+fn validate_turn_transition_identity_inner(
+    runtime: &GameRuntime,
+    transition: &er_battle::BattleTransition,
+    digest_validation: TurnTransitionDigestValidation,
+    material_operation_id: &er_types::OperationId,
+) -> Result<(), GameRuntimeError> {
     if runtime.state != transition.before_state {
         return Err(GameRuntimeError::TransitionBeforeMismatch);
     }
@@ -4030,12 +4070,13 @@ fn validate_turn_transition_identity(
         .battle
         .as_ref()
         .ok_or(GameRuntimeError::NoActiveBattle)?;
-    if transition.before_digest
+    if matches!(digest_validation, TurnTransitionDigestValidation::Full)
+        && (transition.before_digest
         != MechanicalStateDigest::compute(&transition.before_state)
             .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
         || transition.after_digest
             != MechanicalStateDigest::compute(&transition.after_state)
-                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
+                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?)
     {
         return Err(GameRuntimeError::TransitionDigestMismatch);
     }

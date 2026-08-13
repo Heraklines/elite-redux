@@ -162,14 +162,7 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
     runtime: &mut RngRuntime,
     defensive_gate: &G,
 ) -> Result<MovePipelineResult, MovePipelineError> {
-    resolve_move_with_content_validation(
-        battle,
-        command,
-        content,
-        runtime,
-        defensive_gate,
-        true,
-    )
+    resolve_move_with_content_validation(battle, command, content, runtime, defensive_gate, true)
 }
 
 /// Resolve one normalized move after the enclosing turn boundary has already
@@ -181,14 +174,7 @@ pub(crate) fn resolve_move_validated<G: DefensiveAbilityGate>(
     runtime: &mut RngRuntime,
     defensive_gate: &G,
 ) -> Result<MovePipelineResult, MovePipelineError> {
-    resolve_move_with_content_validation(
-        battle,
-        command,
-        content,
-        runtime,
-        defensive_gate,
-        false,
-    )
+    resolve_move_with_content_validation(battle, command, content, runtime, defensive_gate, false)
 }
 
 fn resolve_move_with_content_validation<G: DefensiveAbilityGate>(

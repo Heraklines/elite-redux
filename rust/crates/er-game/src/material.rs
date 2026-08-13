@@ -17,7 +17,7 @@ use er_battle::{
     BattleMutation, BattleNextDecision, compute_presentation_plan_digest,
     validate_battle_mutation_evidence,
 };
-use er_canonical::{CanonicalError, canonical_bytes, canonicalize};
+use er_canonical::{CanonicalError, canonical_bytes};
 use er_content::moves::find_move;
 pub use er_content::pack::ContentPack;
 use er_content::pack::ORACLE_GAME_SHA;
@@ -160,19 +160,33 @@ pub fn decode_replacement_material(
 pub fn turn_material_digest(
     material: &BattleTurnMaterialV1,
 ) -> Result<String, BattleMaterialCodecError> {
-    let canonical = canonicalize(material)?;
-    Ok(format!("{:016x}", fnv1a64_utf16(&canonical)))
+    turn_material_digest_from_canonical_bytes(&canonical_bytes(material)?)
 }
 
 /// Canonical REPLACEMENT material digest used by the Authority adapter.
 pub fn replacement_material_digest(
     material: &BattleReplacementMaterialV1,
 ) -> Result<String, BattleMaterialCodecError> {
-    let canonical = canonicalize(material)?;
+    replacement_material_digest_from_canonical_bytes(&canonical_bytes(material)?)
+}
+
+fn turn_material_digest_from_canonical_bytes(
+    bytes: &[u8],
+) -> Result<String, BattleMaterialCodecError> {
+    let canonical =
+        std::str::from_utf8(bytes).map_err(|_| BattleMaterialCodecError::NonCanonicalEncoding)?;
+    Ok(format!("{:016x}", fnv1a64_utf16(canonical)))
+}
+
+fn replacement_material_digest_from_canonical_bytes(
+    bytes: &[u8],
+) -> Result<String, BattleMaterialCodecError> {
+    let canonical =
+        std::str::from_utf8(bytes).map_err(|_| BattleMaterialCodecError::NonCanonicalEncoding)?;
     Ok(format!(
         "rc1-{}-{:08x}",
         canonical.encode_utf16().count(),
-        fnv1a32_utf16(&canonical)
+        fnv1a32_utf16(canonical)
     ))
 }
 
@@ -610,6 +624,9 @@ fn reconcile_turn_frontier(
 ) -> Result<(), BattleMaterialApplyError> {
     validate_state_content_trusted(&current.current_state, content)
         .map_err(|_| BattleMaterialApplyError::Invariant)?;
+    if current.current_state == material.before_state {
+        return Ok(());
+    }
     if state_without_command_collection(&current.current_state)
         != state_without_command_collection(&material.before_state)
     {

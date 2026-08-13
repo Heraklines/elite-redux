@@ -531,6 +531,22 @@ impl BattlePresentationState {
         event_id: BattlePresentationEventId,
         outcome: PresentationSettlementOutcome,
     ) -> Result<BattlePresentationSettlementReport, BattlePresentationError> {
+        let mut candidate = self.clone();
+        let report = candidate.settle_in_kernel_transaction(endpoint, event_id, outcome)?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(report)
+    }
+
+    /// Settle one event inside the enclosing Battle clone/validate/swap
+    /// transaction. Every fallible input check precedes mutation, and the
+    /// transaction validates the complete presentation owner before commit.
+    pub(crate) fn settle_in_kernel_transaction(
+        &mut self,
+        endpoint: SeatId,
+        event_id: BattlePresentationEventId,
+        outcome: PresentationSettlementOutcome,
+    ) -> Result<BattlePresentationSettlementReport, BattlePresentationError> {
         if endpoint != self.local_endpoint {
             return Err(BattlePresentationError::WrongEndpoint {
                 expected: self.local_endpoint,
@@ -571,27 +587,23 @@ impl BattlePresentationState {
         }
 
         let was_blocked = self.is_blocked();
-        let mut candidate = self.clone();
-        candidate.pending.remove(&event_id);
+        self.pending.remove(&event_id);
         match &outcome {
             PresentationSettlementOutcome::Settled
             | PresentationSettlementOutcome::IntentionallySkipped => {
-                candidate.blocking.remove(&event_id);
+                self.blocking.remove(&event_id);
             }
             PresentationSettlementOutcome::Failed { .. } => {
-                candidate.presentation_failed = true;
+                self.presentation_failed = true;
             }
         }
-        candidate.outcomes.insert(event_id, outcome);
-        candidate.validate()?;
+        self.outcomes.insert(event_id, outcome);
 
-        let report = BattlePresentationSettlementReport {
-            barrier_cleared: was_blocked && candidate.blocking.is_empty(),
-            terminal_reason: candidate.terminal_reason(),
+        Ok(BattlePresentationSettlementReport {
+            barrier_cleared: was_blocked && self.blocking.is_empty(),
+            terminal_reason: self.terminal_reason(),
             idempotent: false,
-        };
-        *self = candidate;
-        Ok(report)
+        })
     }
 
     #[allow(dead_code)] // Retained for staged presentation-contract consumers.

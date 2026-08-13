@@ -1097,7 +1097,7 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("PreparedAuthorityTurn {")
         .ok_or("GameRuntime prepared TURN seam missing")?;
     let codec = source
-        .find("let (decoded, payload) = encode_decode_material(&material)?")
+        .find("let (decoded, payload, material_bytes) = encode_decode_material(&material)?")
         .ok_or("authority material codec seam missing")?;
     let apply = source
         .find("let applied = apply_turn_material(")

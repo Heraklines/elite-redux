@@ -517,10 +517,11 @@ fn prepare_material(
     }
     match resolution {
         PreparedBattleResolution::Turn {
-            transition,
+            digest_evidence,
             material_operation_id,
             next_control,
         } => {
+            let transition = digest_evidence.transition();
             let material = build_turn_material(
                 runtime,
                 transition,
@@ -615,7 +616,9 @@ fn prepare_material(
 
 fn transition_before_state(resolution: &PreparedBattleResolution) -> &GameState {
     match resolution {
-        PreparedBattleResolution::Turn { transition, .. } => &transition.before_state,
+        PreparedBattleResolution::Turn {
+            digest_evidence, ..
+        } => &digest_evidence.transition().before_state,
         PreparedBattleResolution::Replacement { transition, .. } => &transition.before_state,
     }
 }

@@ -2792,21 +2792,32 @@ fn validate_pair_environment_projection(
     host_resources: &LiveResourceSnapshot,
     guest_resources: &LiveResourceSnapshot,
 ) -> Result<(), SnapshotError> {
-    let mut timer_ids = BTreeSet::new();
+    let mut timer_keys = BTreeSet::new();
     for timer in &environment.clock.timers {
-        if !timer_ids.insert(timer.timer_id) {
+        if !timer_keys.insert((timer.endpoint, timer.timer_id)) {
             return Err(invalid(
                 "environment_after.clock.timers",
-                "timer IDs must be unique across both endpoint schedulers",
+                "timer endpoint/ID identities must be unique",
             ));
         }
     }
-    let mut expected_timer_ids = host_resources.timers.clone();
-    expected_timer_ids.extend(guest_resources.timers.iter().copied());
-    if timer_ids != expected_timer_ids {
+    let mut expected_timer_keys = host_resources
+        .timers
+        .iter()
+        .copied()
+        .map(|timer_id| (environment.host_driver.seat, timer_id))
+        .collect::<BTreeSet<_>>();
+    expected_timer_keys.extend(
+        guest_resources
+            .timers
+            .iter()
+            .copied()
+            .map(|timer_id| (environment.guest_driver.seat, timer_id)),
+    );
+    if timer_keys != expected_timer_keys {
         return Err(invalid(
             "environment_after.clock.timers",
-            "clock timer IDs must equal the host/guest live-resource timer projection",
+            "clock timer identities must equal the host/guest live-resource projection",
         ));
     }
 
@@ -3301,11 +3312,11 @@ impl PresenterSnapshotV2 {
         if pending_keys
             .iter()
             .any(|key| outcome_keys.contains(key) || tombstone_keys.contains(key))
-            || outcome_keys.iter().any(|key| !tombstone_keys.contains(key))
+            || outcome_keys != tombstone_keys
         {
             return Err(invalid(
                 "presenter",
-                "pending identities must be unsettled and every retained outcome must have a tombstone",
+                "pending identities must be unsettled and outcomes must exactly match tombstones",
             ));
         }
         if self.disposed && !self.pending.is_empty() {

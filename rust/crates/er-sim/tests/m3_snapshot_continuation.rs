@@ -15,6 +15,7 @@ use er_protocol::snapshot::{PendingRecoverySnapshotV2, StagedPeerRebindSnapshotV
 use er_sim::PairEndpoint;
 use er_sim::snapshot::{
     FaultNetworkSnapshotV2, NetworkLinkSnapshotV2, PacketDispositionV2, PacketReorderStateV2,
+    PairPresenterOutcomeSnapshotV2, PairPresenterTombstoneSnapshotV2, PresenterSnapshotV2,
     QueuedPacketSnapshotV2,
 };
 use er_types::battle_ids::{BattlePresentationEventId, MenuInstanceId};
@@ -197,6 +198,30 @@ fn pending_presentation_snapshot_keeps_blocking_barrier_until_outcome() -> TestR
         disposed: false,
     };
     settled.validate()?;
+    Ok(())
+}
+
+#[test]
+fn presenter_snapshot_rejects_an_orphan_terminal_tombstone() -> TestResult {
+    let event = battle_event()?;
+    let mut snapshot = PresenterSnapshotV2 {
+        pending: Vec::new(),
+        outcomes: vec![PairPresenterOutcomeSnapshotV2 {
+            endpoint: PairEndpoint::Host,
+            outcome: PresentationOutcomeSnapshotV1 {
+                event_id: event.event_id.clone(),
+                outcome: PresentationSettlementOutcome::Settled,
+            },
+        }],
+        tombstones: vec![PairPresenterTombstoneSnapshotV2 {
+            endpoint: PairEndpoint::Host,
+            event_id: event.event_id,
+        }],
+        disposed: true,
+    };
+    snapshot.validate()?;
+    snapshot.outcomes.clear();
+    assert!(snapshot.validate().is_err());
     Ok(())
 }
 
@@ -2464,15 +2489,11 @@ mod live_coop_production {
         let Some(receipt_control_id) = receipt_body.control_id.as_deref() else {
             return Ok(false);
         };
-        let Some(installed) = replica
-            .installed_controls
-            .iter()
-            .find(|control| {
-                control.revision == receipt_body.revision
-                    && control.identity.operation_id == receipt_body.operation_id
-                    && control.control_id.as_str() == receipt_control_id
-            })
-        else {
+        let Some(installed) = replica.installed_controls.iter().find(|control| {
+            control.revision == receipt_body.revision
+                && control.identity.operation_id == receipt_body.operation_id
+                && control.control_id.as_str() == receipt_control_id
+        }) else {
             return Ok(false);
         };
         if installed.identity.revision != installed.revision
