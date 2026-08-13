@@ -983,6 +983,7 @@ impl GameRuntime {
         self.state = after;
         self.control = next_control;
         self.authority_remote_paths.clear();
+        self.schedule_no_legal_replacement_followup(&next_decision)?;
         Ok(())
     }
 
@@ -1054,6 +1055,7 @@ impl GameRuntime {
         self.remember_control_plan(&control);
         self.control = control;
         self.authority_remote_paths.clear();
+        self.schedule_no_legal_replacement_followup(&decision)?;
         Ok(())
     }
 
@@ -2487,28 +2489,42 @@ impl GameRuntime {
     }
 
     fn project_next_control_and_events(
-        &mut self,
+        &self,
         state: &GameState,
         decision: &BattleNextDecision,
     ) -> Result<(BattleControlPlan, Vec<InternalEvent>), GameRuntimeError> {
         let control = self.project_next_control(state, decision)?;
+        // Keep the operation/occurrence derivation as a preflight check, but
+        // defer the marker write until the transition's after-state and control
+        // have been installed.  The reducer validates its pre-material clone;
+        // recording the marker here would name an occurrence that is not yet in
+        // that clone's state.
+        let _ = self.no_legal_replacement_followup(state, decision)?;
+        Ok((control, Vec::new()))
+    }
+
+    fn schedule_no_legal_replacement_followup(
+        &mut self,
+        decision: &BattleNextDecision,
+    ) -> Result<(), GameRuntimeError> {
         let Some((occurrence, epoch, operation_id)) =
-            self.no_legal_replacement_followup(state, decision)?
+            self.no_legal_replacement_followup(&self.state, decision)?
         else {
-            return Ok((control, Vec::new()));
+            return Ok(());
         };
         // Do not return a Game event beside BattleResolved.  The kernel FIFO
         // appends reducer output behind AuthorityEntryReady/MaterialInstalled
         // work emitted by BattleResolved, so such an event would resolve the
-        // faint against the pre-material state.  The typed marker is consumed
-        // only by `take_pending_no_legal_replacement` after ControlInstalled.
+        // faint against the pre-material state.  Store the typed marker only
+        // after the matching state/control pair is live; it is consumed by
+        // `take_pending_no_legal_replacement` after ControlInstalled.
         self.pending_no_legal_replacement = Some(PendingNoLegalReplacementFollowup {
             occurrence,
             authority_epoch: epoch,
             operation_id,
-            prepared_control: control.clone(),
+            prepared_control: self.control.clone(),
         });
-        Ok((control, Vec::new()))
+        Ok(())
     }
 
     /// Enqueue the deterministic no-legal replacement work after the common
