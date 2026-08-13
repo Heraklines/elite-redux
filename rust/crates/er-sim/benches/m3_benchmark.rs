@@ -792,6 +792,18 @@ fn run_kernel_input(
     Ok(effects)
 }
 
+fn run_kernel_workload_input(
+    kernel: &mut GameKernel,
+    input: KernelInput,
+    counts: &mut Counts,
+) -> TestResult<Vec<KernelEffect>> {
+    counts.inputs = counts.inputs.saturating_add(1);
+    let effects = kernel.step(input)?;
+    assert_no_legacy_success_effects(&effects);
+    counts.rng_draws = counts.rng_draws.saturating_add(count_rng_draws(&effects));
+    Ok(effects)
+}
+
 fn run_raw_menu_input(
     kernel: &mut GameKernel,
     input: KernelInput,
@@ -837,6 +849,25 @@ fn raw_press_local(
     Ok(effects)
 }
 
+fn raw_press_local_workload(
+    kernel: &mut GameKernel,
+    counts: &mut Counts,
+    code: PhysicalKey,
+) -> TestResult<Vec<KernelEffect>> {
+    let local_seat = seat(1);
+    let mut effects = run_kernel_workload_input(
+        kernel,
+        raw_input(local_seat, key_down(code.clone())),
+        counts,
+    )?;
+    effects.extend(run_kernel_workload_input(
+        kernel,
+        raw_input(local_seat, key_up(code)),
+        counts,
+    )?);
+    Ok(effects)
+}
+
 fn settle_local_presentations(
     kernel: &mut GameKernel,
     checksum: &mut u64,
@@ -864,6 +895,34 @@ fn settle_local_presentations(
         )?;
     }
     Ok(())
+}
+
+fn settle_local_presentations_workload(
+    kernel: &mut GameKernel,
+    counts: &mut Counts,
+    effects: &[KernelEffect],
+) -> TestResult<Vec<KernelEffect>> {
+    let mut events = Vec::<BattlePresentationEventId>::new();
+    for effect in effects {
+        if let KernelEffect::PresentBattle { event, .. } = effect
+            && !events.contains(&event.event_id)
+        {
+            events.push(event.event_id.clone());
+        }
+    }
+    let mut settlement_effects = Vec::new();
+    for event_id in events {
+        settlement_effects.extend(run_kernel_workload_input(
+            kernel,
+            KernelInput::BattlePresentationOutcome {
+                endpoint: seat(1),
+                event_id,
+                outcome: PresentationSettlementOutcome::Settled,
+            },
+            counts,
+        )?);
+    }
+    Ok(settlement_effects)
 }
 
 fn dispose_local_kernel(kernel: &mut GameKernel, checksum: &mut u64, reason: &str) -> TestResult {
@@ -1572,30 +1631,34 @@ fn m3_simple_turn_resolutions() -> TestResult {
     // owned Clone gives each iteration an independent fresh battle/protocol
     // state, so the hot loop avoids repeating new_battle validation.
     let mut kernel_template = new_local_kernel(&fixture, &content, 0)?;
-    let execution_started = Instant::now();
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
+    let before = kernel_template.snapshot().state;
+    let mut execution_elapsed_ns = 0_u64;
     for _ in 0..SIMPLE_TURN_RESOLUTIONS {
         let mut kernel = kernel_template.clone();
-        let before = kernel.snapshot().state;
+        let execution_started = Instant::now();
         let mut effects =
-            raw_press_local(&mut kernel, &mut checksum, &mut counts, PhysicalKey::Enter)?;
-        effects.extend(raw_press_local(
+            raw_press_local_workload(&mut kernel, &mut counts, PhysicalKey::Enter)?;
+        effects.extend(raw_press_local_workload(
             &mut kernel,
-            &mut checksum,
             &mut counts,
             PhysicalKey::Enter,
         )?);
-        settle_local_presentations(&mut kernel, &mut checksum, &mut counts, &effects)?;
+        let settlement_effects =
+            settle_local_presentations_workload(&mut kernel, &mut counts, &effects)?;
+        execution_elapsed_ns = execution_elapsed_ns.saturating_add(elapsed_ns(execution_started));
+        effects.extend(settlement_effects);
         let after = kernel.snapshot().state;
         assert_supported_turn_transition(&before, &after, "simple local")?;
+        absorb(&mut checksum, &effects)?;
+        absorb_kernel_observation(&kernel, &mut checksum)?;
         counts.turns = counts.turns.saturating_add(1);
         counts.battles = counts.battles.saturating_add(1);
         dispose_local_kernel(&mut kernel, &mut checksum, "m3 simple turn teardown")?;
     }
     assert_eq!(counts.turns, SIMPLE_TURN_RESOLUTIONS);
     assert_eq!(counts.battles, SIMPLE_TURN_RESOLUTIONS);
-    let execution_elapsed_ns = elapsed_ns(execution_started);
     dispose_local_kernel(
         &mut kernel_template,
         &mut checksum,
@@ -1614,6 +1677,9 @@ fn m3_simple_turn_resolutions() -> TestResult {
             "input_architecture": "raw physical keydown/keyUp plus presentation settlement",
             "fixture": "physical-hit",
             "kernel_initialization_excluded": true,
+            "kernel_clone_excluded": true,
+            "validation_checksum_teardown_excluded": true,
+            "execution_scope": "four raw input transitions plus all hosted presentation settlement transitions",
         }),
     )
 }

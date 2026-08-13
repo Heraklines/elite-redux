@@ -5222,14 +5222,12 @@ fn map_recovery_dispose_actions(
             er_protocol::RecoveryAction::Scheduler { command } => {
                 map_scheduler_command(effects, command)
             }
-            er_protocol::RecoveryAction::Terminalize { reason } => {
-                effects.push(KernelEffect::EnterSharedTerminal {
-                    terminal: TerminalState {
-                        terminal_id: "m3-recovery".to_owned(),
-                        reason,
-                    },
-                });
-            }
+            // Explicit endpoint disposal uses the recovery transaction's
+            // terminal fence only to release its internal owner. Publishing
+            // that cleanup-only fence after GameKernel has become disposed
+            // would incorrectly create a fresh pair-level semantic terminal.
+            // Scheduler cancellation actions above remain observable.
+            er_protocol::RecoveryAction::Terminalize { .. } => {}
             _ => {}
         }
     }

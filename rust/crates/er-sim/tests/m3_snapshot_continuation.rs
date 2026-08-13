@@ -1550,8 +1550,14 @@ mod live_coop_production {
         operation: PairOperation,
         label: &str,
     ) -> TestResult<PairStep> {
-        let left_step = left.apply(operation.clone())?;
-        let right_step = right.apply(operation)?;
+        let left_step = left.apply(operation.clone()).map_err(|error| {
+            invalid(format!(
+                "{label}: uninterrupted pair operation failed: {error}"
+            ))
+        })?;
+        let right_step = right
+            .apply(operation)
+            .map_err(|error| invalid(format!("{label}: restored pair operation failed: {error}")))?;
         assert_eq!(
             serde_json::to_vec(&left_step.generated_effects)?,
             serde_json::to_vec(&right_step.generated_effects)?,
@@ -1759,10 +1765,9 @@ mod live_coop_production {
         if packet.kind != RestorablePacketKindV2::AuthorityFrame {
             return false;
         }
-        let Ok(frame) = decode_canonical_network_frame_packet(
-            &packet.body,
-            "proposal result authority frame",
-        ) else {
+        let Ok(frame) =
+            decode_canonical_network_frame_packet(&packet.body, "proposal result authority frame")
+        else {
             return false;
         };
         if frame.frame_type != FrameType::AuthorityEntry
@@ -2427,13 +2432,11 @@ mod live_coop_production {
         let Some(recovery) = snapshot.guest.protocol.recovery.as_ref() else {
             return Ok(false);
         };
-        let frame: NetworkFrame = match decode_canonical_network_frame_packet(
-            &receipt.body,
-            "delayed control receipt",
-        ) {
-            Ok(frame) => frame,
-            Err(_) => return Ok(false),
-        };
+        let frame: NetworkFrame =
+            match decode_canonical_network_frame_packet(&receipt.body, "delayed control receipt") {
+                Ok(frame) => frame,
+                Err(_) => return Ok(false),
+            };
         if frame.version != 2
             || frame.frame_type != FrameType::AuthorityReceipt
             || frame.context != replica.receipt_context
@@ -3062,15 +3065,7 @@ mod live_coop_production {
                     },
                 },
             )?;
-            if !pair
-                .snapshot_v2()?
-                .network
-                .packets
-                .iter()
-                .any(is_guest_host_generation_one_control_receipt)
-            {
-                settle_all_presentations_v2(&mut pair)?;
-            }
+            settle_all_presentations_v2(&mut pair)?;
             let receipt = last_packet_v2(
                 &pair.snapshot_v2()?,
                 RestorablePacketKindV2::ControlReceipt,
@@ -3213,10 +3208,33 @@ mod live_coop_production {
 
         {
             let mut pair = new_battle_pair(forced_victory_config()?, Arc::clone(&content), 1109)?;
+            let mut guest_target_redirected = false;
             for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
                 for _ in 0..8 {
-                    if endpoint_commands_complete(&pair.snapshot_v2()?, endpoint) {
+                    let snapshot = pair.snapshot_v2()?;
+                    if endpoint_commands_complete(&snapshot, endpoint) {
                         break;
+                    }
+                    if endpoint == PairEndpoint::Guest
+                        && !guest_target_redirected
+                        && matches!(
+                            &endpoint_snapshot(&snapshot, endpoint).ui.seat_control.control,
+                            BattleControl::TargetSelect(control)
+                                if control.menu.selected_option_id.as_str() == "target/enemy/0"
+                        )
+                    {
+                        raw_press_v2(&mut pair, endpoint, PhysicalKey::ArrowRight)?;
+                        let redirected = pair.snapshot_v2()?;
+                        assert!(
+                            matches!(
+                                &endpoint_snapshot(&redirected, endpoint).ui.seat_control.control,
+                                BattleControl::TargetSelect(control)
+                                    if control.menu.selected_option_id.as_str() == "target/enemy/1"
+                            ),
+                            "hosted forced-victory guest target did not move to the second enemy"
+                        );
+                        guest_target_redirected = true;
+                        continue;
                     }
                     raw_press_v2(&mut pair, endpoint, PhysicalKey::Enter)?;
                 }
@@ -3225,6 +3243,10 @@ mod live_coop_production {
                     "terminal fixture did not complete {endpoint:?} command selection"
                 );
             }
+            assert!(
+                guest_target_redirected,
+                "hosted forced-victory fixture never exposed the guest's exact enemy-zero target default"
+            );
             for tick in 0..512 {
                 let snapshot = pair.snapshot_v2()?;
                 if terminal_reached(&snapshot) {
@@ -3336,10 +3358,8 @@ mod live_coop_production {
             )?;
             let original_frame =
                 decode_canonical_frame_packet_value(&original_body, "original control receipt")?;
-            let corrupted_frame = decode_canonical_frame_packet_value(
-                &corrupted.body,
-                "corrupted control receipt",
-            )?;
+            let corrupted_frame =
+                decode_canonical_frame_packet_value(&corrupted.body, "corrupted control receipt")?;
             assert!(
                 original_frame
                     .pointer("/ctx/connectionGeneration")
