@@ -1316,9 +1316,7 @@ fn mechanical_address_of(
     Some(MechanicalAddress { epoch, wave, turn })
 }
 
-fn replacement_address_of(
-    payload: &Map<String, Value>,
-) -> Option<(SafeU53, SafeU53, SafeU53)> {
+fn replacement_address_of(payload: &Map<String, Value>) -> Option<(SafeU53, SafeU53, SafeU53)> {
     if let Some(source) = payload.get("sourceAddress") {
         let source = source.as_object()?;
         let epoch = safe_positive_value(source.get("epoch")?)?;

@@ -335,11 +335,7 @@ fn command_control_plan(state: &GameState) -> TestResult<BattleControlPlan> {
                 move_control,
             )?)
         };
-        seats.push(SeatBattleControl::new(
-            owner,
-            Some(operation_id),
-            control,
-        ));
+        seats.push(SeatBattleControl::new(owner, Some(operation_id), control));
         allocators.push(SeatMenuInstanceAllocator::new(
             owner,
             MenuInstanceId::new(safe(
@@ -416,12 +412,7 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
             MenuInstanceId::new(safe(proposal_menu_instance)?),
             format!(
                 "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/{}",
-                battle.battle_id,
-                battle.wave,
-                battle.turn,
-                position,
-                owner,
-                proposal_control_kind,
+                battle.battle_id, battle.wave, battle.turn, position, owner, proposal_control_kind,
             ),
         )?;
         let offer = build_command_offer(&state, field_slot, content)?;

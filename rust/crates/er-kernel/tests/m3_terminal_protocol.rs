@@ -119,9 +119,11 @@ fn recovery_accepts_battle_then_terminal_and_predecessor_frontier_terminal_only_
     assert!(tail.contains("RecoveredMaterial::Battle"));
     assert!(tail.contains("RecoveredMaterial::Terminal"));
     assert!(source.contains("terminal_final"));
-    assert!(source.contains(
-        "let terminal_final = final_entry.kind == AuthorityEntryKind::TerminalCommit;"
-    ));
+    assert!(
+        source.contains(
+            "let terminal_final = final_entry.kind == AuthorityEntryKind::TerminalCommit;"
+        )
+    );
     assert!(source.contains("previous_battle_is_present"));
     assert!(source.contains("!previous_battle_is_present && !terminal_predecessor_frontier_ready"));
 }
