@@ -698,8 +698,7 @@ impl GameRuntime {
         proposal: BattleCommandProposalV1,
     ) -> Result<CommandAdmission, GameRuntimeError> {
         let mut candidate = self.clone();
-        let admission =
-            candidate.retain_replica_command_in_kernel_transaction(proposal)?;
+        let admission = candidate.retain_replica_command_in_kernel_transaction(proposal)?;
         candidate.validate_transactional()?;
         *self = candidate;
         Ok(admission)

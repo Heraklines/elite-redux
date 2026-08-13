@@ -735,10 +735,7 @@ impl BattleMode {
         self.validate_quiescent_transaction(true)
     }
 
-    fn validate_quiescent_transaction(
-        &self,
-        validate_game: bool,
-    ) -> Result<(), BattleKernelError> {
+    fn validate_quiescent_transaction(&self, validate_game: bool) -> Result<(), BattleKernelError> {
         // `GameRuntime` construction, restore, and public snapshot validation
         // fully validate the immutable ContentPack.  A staged transaction
         // retains that same Arc and uses the live-state check here so every
@@ -2224,12 +2221,14 @@ impl BattleTransaction {
                     reason: "changed Battle UI projection has no menu".to_owned(),
                 })?;
             let control_id = control_id.to_owned();
-            self.staged.game_mut().sync_battle_ui_selection_in_kernel_transaction(
-                payload.endpoint,
-                menu_instance_id,
-                &control_id,
-                selected_option_id,
-            )?;
+            self.staged
+                .game_mut()
+                .sync_battle_ui_selection_in_kernel_transaction(
+                    payload.endpoint,
+                    menu_instance_id,
+                    &control_id,
+                    selected_option_id,
+                )?;
             self.install_current_projection()?;
         }
         let events = reduction.intents.into_iter().map(ui_intent_event);
@@ -2492,15 +2491,17 @@ impl BattleTransaction {
         }
         let (kind, before_digest, after_digest, next_decision, allocator_before) =
             prepared_material_metadata(prepared.material());
-        self.staged.game_mut().install_material_in_kernel_transaction(
-            before_digest,
-            prepared.state().clone(),
-            after_digest,
-            prepared.operation_id(),
-            next_decision,
-            allocator_before.to_vec(),
-            prepared.control().clone(),
-        )?;
+        self.staged
+            .game_mut()
+            .install_material_in_kernel_transaction(
+                before_digest,
+                prepared.state().clone(),
+                after_digest,
+                prepared.operation_id(),
+                next_decision,
+                allocator_before.to_vec(),
+                prepared.control().clone(),
+            )?;
         self.queue
             .push(InternalEvent::MaterialInstalled(MaterialInstalledPayload {
                 revision: entry.revision,
@@ -4907,9 +4908,8 @@ impl BattleTransaction {
                 reason: "Battle mode staged a forbidden compatibility effect".to_owned(),
             });
         }
-        self.staged.validate_quiescent_transaction(
-            self.staged.game_changed_in_transaction,
-        )
+        self.staged
+            .validate_quiescent_transaction(self.staged.game_changed_in_transaction)
     }
 }
 
