@@ -307,7 +307,9 @@ pub fn apply_turn_material(
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
     apply_turn_material_inner(
-        current,
+        &current.current_state,
+        current.local_seat,
+        &current.menu_allocators,
         material,
         content,
         ContentValidationMode::Full,
@@ -324,7 +326,9 @@ pub fn apply_turn_material_trusted(
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
     apply_turn_material_inner(
-        current,
+        &current.current_state,
+        current.local_seat,
+        &current.menu_allocators,
         material,
         content,
         ContentValidationMode::Trusted,
@@ -338,7 +342,9 @@ pub fn apply_turn_material_trusted(
 /// this capability and continue to recompute both digests.
 #[doc(hidden)]
 pub fn apply_reducer_issued_turn_material_trusted(
-    current: &BattleMaterialApplyContext,
+    current_state: &GameState,
+    local_seat: SeatId,
+    menu_allocators: &[SeatMenuInstanceAllocator],
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
     prepared: &PreparedAuthorityTurn,
@@ -352,7 +358,9 @@ pub fn apply_reducer_issued_turn_material_trusted(
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
     apply_turn_material_inner(
-        current,
+        current_state,
+        local_seat,
+        menu_allocators,
         material,
         content,
         ContentValidationMode::Trusted,
@@ -361,7 +369,9 @@ pub fn apply_reducer_issued_turn_material_trusted(
 }
 
 fn apply_turn_material_inner(
-    current: &BattleMaterialApplyContext,
+    current_state: &GameState,
+    local_seat: SeatId,
+    menu_allocators: &[SeatMenuInstanceAllocator],
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
     validation: ContentValidationMode,
@@ -410,10 +420,10 @@ fn apply_turn_material_inner(
         &material.next_control,
         content,
     )?;
-    reconcile_turn_frontier(current, material, content)?;
+    reconcile_turn_frontier(current_state, material, content)?;
     validate_endpoint_allocators(
-        &current.menu_allocators,
-        current.local_seat,
+        menu_allocators,
+        local_seat,
         &material.menu_allocators_before,
         &material.after_state,
     )?;
@@ -678,22 +688,21 @@ fn increment_turn(turn: TurnIndex) -> Result<TurnIndex, BattleMaterialApplyError
 }
 
 fn reconcile_turn_frontier(
-    current: &BattleMaterialApplyContext,
+    current_state: &GameState,
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
-    validate_state_content_trusted(&current.current_state, content)
+    validate_state_content_trusted(current_state, content)
         .map_err(|_| BattleMaterialApplyError::Invariant)?;
-    if current.current_state == material.before_state {
+    if current_state == &material.before_state {
         return Ok(());
     }
-    if state_without_command_collection(&current.current_state)
+    if state_without_command_collection(current_state)
         != state_without_command_collection(&material.before_state)
     {
         return Err(BattleMaterialApplyError::LocalBeforeStateMismatch);
     }
-    let current_battle = current
-        .current_state
+    let current_battle = current_state
         .battle
         .as_ref()
         .ok_or(BattleMaterialApplyError::LocalBeforeStateMismatch)?;
@@ -735,7 +744,7 @@ fn reconcile_turn_frontier(
     // the partial-frontier exception narrow: every non-command field came
     // from the endpoint, while the installed command collection is exactly
     // the material's canonical collection before its digest is recomputed.
-    let mut staged = current.current_state.clone();
+    let mut staged = current_state.clone();
     {
         let staged_battle = staged
             .battle
