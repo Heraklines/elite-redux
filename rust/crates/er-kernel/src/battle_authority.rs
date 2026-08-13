@@ -17,7 +17,7 @@ use er_battle::{
     BattleNextDecision, BattleReplacementTransition, BattleTransition,
     compute_presentation_plan_digest,
 };
-use er_canonical::canonical_bytes;
+use er_canonical::{canonical_bytes, canonicalize_value};
 use er_content::pack::ContentPack;
 use er_game::authority_commands::{
     AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion,
@@ -32,7 +32,7 @@ use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleReplacementMaterialV1,
     BattleTurnMaterialV1, MaterialApplyResult,
     apply_replacement_material_trusted as apply_replacement_material,
-    apply_turn_material_trusted as apply_turn_material,
+    apply_reducer_issued_turn_material_trusted as apply_turn_material,
 };
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLog, CommitOutcome, KernelScheduler, PreparedCommit,
@@ -188,8 +188,8 @@ impl AuthorityPreparedTransaction {
         &self.menu_allocators
     }
 
-    pub(crate) fn material_bytes(&self) -> &[u8] {
-        &self.material_bytes
+    pub(crate) fn take_material_bytes(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.material_bytes)
     }
 
     pub(crate) fn operation_id(&self) -> &OperationId {
@@ -375,13 +375,11 @@ pub(crate) fn prepare_authority_turn(
     } = input;
     let AuthorityTurnRequest {
         human_proposals,
-        prepared:
-            PreparedAuthorityTurn {
-                transition: candidate,
-                control_plan: next_control,
-                admission: prepared_admission,
-            },
+        prepared,
     } = request;
+    let candidate = prepared.transition();
+    let next_control = prepared.control_plan();
+    let prepared_admission = prepared.admission();
     // Stage all human owners in canonical operation order.  Authority-local
     // proposals deliberately use the same game admission reducer as relayed
     // proposals; only the transport path differs outside this module.
@@ -393,7 +391,7 @@ pub(crate) fn prepare_authority_turn(
         match admit_command_proposal_with_context(
             &staged_state,
             &control,
-            Some(&prepared_admission),
+            Some(prepared_admission),
             proposal,
             content,
         )? {
@@ -472,7 +470,7 @@ pub(crate) fn prepare_authority_turn(
     let scripted_policy_after = validate_prepared_projection(
         &candidate.after_state,
         candidate.next_decision,
-        &next_control,
+        next_control,
         &staged_policy,
         content,
     )?;
@@ -483,11 +481,11 @@ pub(crate) fn prepare_authority_turn(
             AuthorityCommandError::AdmissionAllocatorMismatch,
         ));
     }
-    validate_control_allocator_projection(&next_control, &allocators)?;
+    validate_control_allocator_projection(next_control, &allocators)?;
     let material = build_turn_material(
-        &candidate,
+        candidate,
         &operation_id,
-        &next_control,
+        next_control,
         &allocators,
         content,
     )?;
@@ -504,14 +502,15 @@ pub(crate) fn prepare_authority_turn(
         },
         &decoded,
         content,
+        &prepared,
     )
     .map_err(AuthorityTransactionError::MaterialApply)?;
-    if next_control != applied.next_control {
+    if next_control != &applied.next_control {
         return Err(AuthorityTransactionError::CandidateMismatch {
             field: "next_control",
         });
     }
-    require_turn_equivalence(&candidate, &decoded, &applied)?;
+    require_turn_equivalence(candidate, &decoded, &applied)?;
     let protocol_next_control = protocol_next_control_from_plan(
         &operation_id,
         candidate.next_decision,
@@ -532,10 +531,10 @@ pub(crate) fn prepare_authority_turn(
         .map_err(map_authority_log_error)?;
 
     Ok(AuthorityPreparedTransaction {
-        state: applied.after_state.clone(),
-        control: applied.next_control.clone(),
-        menu_allocators: applied.menu_allocators.clone(),
-        presentation: applied.presentation.clone(),
+        state: applied.after_state,
+        control: applied.next_control,
+        menu_allocators: applied.menu_allocators,
+        presentation: applied.presentation,
         material: PreparedMaterial::Turn(decoded),
         material_bytes,
         operation_id,
@@ -714,10 +713,10 @@ pub(crate) fn prepare_authority_replacement(
         .map_err(map_authority_log_error)?;
 
     Ok(AuthorityPreparedTransaction {
-        state: applied.after_state.clone(),
-        control: applied.next_control.clone(),
-        menu_allocators: applied.menu_allocators.clone(),
-        presentation: applied.presentation.clone(),
+        state: applied.after_state,
+        control: applied.next_control,
+        menu_allocators: applied.menu_allocators,
+        presentation: applied.presentation,
         material: PreparedMaterial::Replacement(decoded),
         material_bytes,
         operation_id,
@@ -1284,9 +1283,7 @@ fn waiting_replacement_operation(
     })
 }
 
-fn encode_decode_material<T>(
-    material: &T,
-) -> Result<(T, Value, Vec<u8>), AuthorityTransactionError>
+fn encode_decode_material<T>(material: &T) -> Result<(T, Value, Vec<u8>), AuthorityTransactionError>
 where
     T: Serialize + DeserializeOwned + PartialEq,
 {
@@ -1299,11 +1296,12 @@ where
             reason: source.to_string(),
         }
     })?;
-    let payload_bytes =
-        canonical_bytes(&payload).map_err(|source| AuthorityTransactionError::MaterialCodec {
+    let canonical_payload = canonicalize_value(&payload).map_err(|source| {
+        AuthorityTransactionError::MaterialCodec {
             reason: source.to_string(),
-        })?;
-    if payload_bytes != bytes {
+        }
+    })?;
+    if canonical_payload.as_bytes() != bytes.as_slice() {
         return Err(AuthorityTransactionError::MaterialCodec {
             reason: "material payload was not canonical after JSON round-trip".to_owned(),
         });
@@ -1318,7 +1316,7 @@ where
             reason: "typed material decoder changed the constructed value".to_owned(),
         });
     }
-    Ok((decoded, payload, payload_bytes))
+    Ok((decoded, payload, bytes))
 }
 
 fn build_turn_material(
@@ -1662,7 +1660,9 @@ fn turn_material_digest(canonical_bytes: &[u8]) -> Result<String, AuthorityTrans
     Ok(format!("{:016x}", fnv1a64_utf16(canonical)))
 }
 
-fn replacement_material_digest(canonical_bytes: &[u8]) -> Result<String, AuthorityTransactionError> {
+fn replacement_material_digest(
+    canonical_bytes: &[u8],
+) -> Result<String, AuthorityTransactionError> {
     let canonical = std::str::from_utf8(canonical_bytes).map_err(|source| {
         AuthorityTransactionError::MaterialDigest {
             reason: source.to_string(),

@@ -905,6 +905,7 @@ fn rebind_preserves_live_timer_and_replays_each_retained_entry_to_each_peer() ->
         receipt(&committed.entry, 1, 1, AckStage::Admitted)?,
         &mut scheduler,
     );
+    let before_rebind_log = log.clone();
 
     let outcome = log.rebind_connection(
         context(2)?,
@@ -928,6 +929,32 @@ fn rebind_preserves_live_timer_and_replays_each_retained_entry_to_each_peer() ->
         log.retained_entry(committed.entry.revision)
             .ok_or("retained entry missing")?
             .context,
+        context(2)?,
+    );
+    assert_eq!(
+        before_rebind_log
+            .retained_entry(committed.entry.revision)
+            .ok_or("cloned retained entry missing")?
+            .context,
+        context(1)?,
+        "rebind mutated a copy-on-write predecessor log",
+    );
+    assert_eq!(
+        before_rebind_log
+            .recovery_slice(committed.entry.revision)
+            .ok_or("cloned recovery frontier missing")?
+            .required_tail[0]
+            .context
+            .clone(),
+        context(1)?,
+        "rebind mutated a copy-on-write latest-commit proof",
+    );
+    assert_eq!(
+        log.recovery_slice(committed.entry.revision)
+            .ok_or("rebound recovery frontier missing")?
+            .required_tail[0]
+            .context
+            .clone(),
         context(2)?,
     );
 

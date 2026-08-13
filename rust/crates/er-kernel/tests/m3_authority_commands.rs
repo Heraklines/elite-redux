@@ -1094,7 +1094,7 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         "/src/battle_authority.rs"
     ));
     let prepared = source
-        .find("PreparedAuthorityTurn {")
+        .find("let candidate = prepared.transition();")
         .ok_or("GameRuntime prepared TURN seam missing")?;
     let codec = source
         .find("let (decoded, payload, material_bytes) = encode_decode_material(&material)?")
@@ -1120,6 +1120,10 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(validate < publish);
     assert!(publish < post_validate);
     assert!(source.contains("PreparedAuthorityReplacement {"));
+    assert!(source.contains(
+        "apply_reducer_issued_turn_material_trusted as apply_turn_material"
+    ));
+    assert!(source.contains("&prepared,"));
     assert!(source.contains("validate_control_allocator_projection(&next_control, &allocators)?"));
     assert!(source.contains("prepared_admission.allocator_before() != allocators.as_slice()"));
     assert!(source.contains("admit_scripted_if_pending"));
@@ -1160,7 +1164,7 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("/// Prepare a complete authority TURN")
         .ok_or("authority preparation function missing")?;
     assert!(source[published_start..published_end].contains("scripted_policy_after"));
-    assert!(source.contains("require_turn_equivalence(&candidate, &decoded, &applied)?"));
+    assert!(source.contains("require_turn_equivalence(candidate, &decoded, &applied)?"));
     assert!(source.contains("require_replacement_equivalence(&candidate, &decoded, &applied)?"));
     assert!(source.contains("stored.source.turn_occurrence"));
     Ok(())

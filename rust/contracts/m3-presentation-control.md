@@ -123,6 +123,13 @@ pending event identities, policies, outcomes/tombstones needed for idempotence,
 and the control actionability barrier. Restoration during a pending barrier
 must continue identically.
 
+A transport disconnect, reconnect, or authenticated generation rebind does not
+cancel or replace the local presentation epoch. Its exact plans, pending event
+identities, settled outcomes, presenter requests, and protocol revision
+correlation survive the rebind. The recovery fence controls actionability until
+the new generation is reconciled; only typed settlement or terminal teardown
+retires presentation work.
+
 Teardown cancels every live presentation and clears every barrier while
 retaining no live event. Settled tombstones are diagnostic history and are not
 counted as live resources.

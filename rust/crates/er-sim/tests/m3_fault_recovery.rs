@@ -528,30 +528,6 @@ mod live_replica_recovery {
         ))
     }
 
-    fn settle_guest_pending_battle_presentations(pair: &mut SimulatedPair) -> TestResult {
-        for _ in 0..64 {
-            let snapshot = pair.snapshot_v2()?;
-            let pending = snapshot
-                .guest
-                .pending_presentations
-                .pending_barrier_ids
-                .clone();
-            if pending.is_empty() {
-                return Ok(());
-            }
-            for event_id in pending {
-                pair.apply(PairOperation::BattlePresentationOutcome {
-                    endpoint: PairEndpoint::Guest,
-                    event_id,
-                    outcome: PresentationSettlementOutcome::Settled,
-                })?;
-            }
-        }
-        Err(invalid(
-            "guest Battle presentation barriers did not settle within the fixture bound",
-        ))
-    }
-
     fn assert_guest_recovery_fence_held(snapshot: &RestorablePairSnapshotV2) -> TestResult {
         let recovery = snapshot
             .guest
@@ -937,12 +913,26 @@ mod live_replica_recovery {
         );
         assert_eq!(duplicated.len(), 2);
 
-        // Guest reconnect clears live presentation barriers while retaining
-        // their typed plan. Settle the exact guest boundary first so every
-        // retained plan event still has one pending/outcome state at the
-        // reconnect snapshot; the selected receipt and its duplicate remain
-        // untouched in the fault queue.
-        settle_guest_pending_battle_presentations(&mut pair)?;
+        // Transport generation is not presentation ownership. Recovery fences
+        // input while the exact local plan, pending identities, outcomes, and
+        // presenter requests survive the rebind for deterministic continuation.
+        let before_reconnect = pair.snapshot_v2()?;
+        let guest_presentations_before = before_reconnect.guest.pending_presentations.clone();
+        let guest_presenter_pending_before = before_reconnect
+            .presenter
+            .pending
+            .iter()
+            .filter(|entry| entry.endpoint == PairEndpoint::Guest)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert!(
+            !guest_presentations_before.pending_barrier_ids.is_empty(),
+            "mixed-fault fixture omitted the guest presentation rebind boundary",
+        );
+        assert!(
+            !guest_presenter_pending_before.is_empty(),
+            "mixed-fault fixture omitted the guest presenter request",
+        );
 
         // A new generation fences the delayed/corrupted receipt copies while
         // the replica recovery transaction is visibly held.
@@ -950,6 +940,22 @@ mod live_replica_recovery {
             endpoint: PairEndpoint::Guest,
         })?;
         let checkpoint = pair.snapshot_v2()?;
+        assert_eq!(
+            checkpoint.guest.pending_presentations,
+            guest_presentations_before,
+            "guest reconnect changed the local presentation epoch",
+        );
+        let guest_presenter_pending_after = checkpoint
+            .presenter
+            .pending
+            .iter()
+            .filter(|entry| entry.endpoint == PairEndpoint::Guest)
+            .cloned()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            guest_presenter_pending_after, guest_presenter_pending_before,
+            "guest reconnect changed presenter-owned pending requests",
+        );
         assert_guest_recovery_fence_held(&checkpoint)?;
         let current_generation = checkpoint
             .network

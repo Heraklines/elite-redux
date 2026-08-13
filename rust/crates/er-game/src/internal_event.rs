@@ -221,10 +221,6 @@ impl TurnDigestEvidence {
     pub fn transition(&self) -> &BattleTransition {
         &self.transition
     }
-
-    pub(crate) fn into_transition(self) -> BattleTransition {
-        self.transition
-    }
 }
 
 /// The only prepared game-resolution payload accepted by the private queue.

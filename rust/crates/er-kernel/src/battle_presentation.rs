@@ -616,15 +616,10 @@ impl BattlePresentationState {
         self.settle(endpoint, event_id, outcome)
     }
 
-    /// Drops every live presentation request and barrier without erasing tombstones.
-    pub(crate) fn clear(&mut self) {
-        self.pending.clear();
-        self.blocking.clear();
-    }
-
     /// Teardown is terminal, repeatable, and retains only diagnostic tombstones.
     pub(crate) fn dispose(&mut self) {
-        self.clear();
+        self.pending.clear();
+        self.blocking.clear();
         self.plans.clear();
         self.last_plan_operation_id = None;
         self.disposed = true;
@@ -701,9 +696,9 @@ impl BattlePresentationState {
                         "plan event differs from its catalog identity",
                     ));
                 }
-                if self.pending.contains(event_id) && self.outcomes.contains_key(event_id) {
+                if self.pending.contains(event_id) == self.outcomes.contains_key(event_id) {
                     return Err(BattlePresentationError::InvalidState(
-                        "pending event also has an outcome tombstone",
+                        "every retained plan event must have exactly one pending/outcome state",
                     ));
                 }
 

@@ -1,6 +1,7 @@
 //! Authority-side global revision, retention, receipt, and delivery state.
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::sync::Arc;
 
 use er_types::battle_ids::{CanonicalHexBytes, CanonicalU64Decimal};
 use er_types::{
@@ -194,7 +195,7 @@ struct PeerStage {
 
 #[derive(Clone, Debug)]
 struct DeliveryLease {
-    entry: AuthorityEntry,
+    entry: Arc<AuthorityEntry>,
     owner: TimerOwner,
     peer_stages: BTreeMap<SeatId, PeerStage>,
     timer_id: Option<TimerId>,
@@ -216,7 +217,7 @@ pub struct AuthorityLog {
     retained: BTreeMap<Revision, DeliveryLease>,
     prepared: BTreeMap<SafeU53, PreparedCommit>,
     next_token: Option<SafeU53>,
-    latest_committed: Option<AuthorityEntry>,
+    latest_committed: Option<Arc<AuthorityEntry>>,
     head_revision: Revision,
     retired_operation_stages: BTreeMap<OperationId, i8>,
     retired_operation_order: VecDeque<OperationId>,
@@ -370,8 +371,9 @@ impl AuthorityLog {
                 )
             })
             .collect();
+        let entry = Arc::new(prepared.entry.clone());
         let mut lease = DeliveryLease {
-            entry: prepared.entry.clone(),
+            entry: Arc::clone(&entry),
             owner,
             peer_stages,
             timer_id: None,
@@ -399,7 +401,7 @@ impl AuthorityLog {
         // registration already in flight, or the later Schedule action would orphan it.
         actions.extend(self.delivery_actions(&lease));
         self.head_revision = revision;
-        self.latest_committed = Some(prepared.entry.clone());
+        self.latest_committed = Some(entry);
         self.retained.insert(revision, lease);
 
         Ok(CommitOutcome {
@@ -739,7 +741,7 @@ impl AuthorityLog {
                 frontier: self.head_revision,
                 frontier_operation_id: Some(latest.operation_id.clone()),
                 next_control: Some(latest.next_control.clone()),
-                required_tail: vec![latest.clone()],
+                required_tail: vec![latest.as_ref().clone()],
             });
         }
 
@@ -749,7 +751,13 @@ impl AuthorityLog {
         let mut revision = start;
         while revision <= end {
             let revision_id = Revision::new(SafeU53::new(revision).ok()?);
-            required_tail.push(self.retained.get(&revision_id)?.entry.clone());
+            required_tail.push(
+                self.retained
+                    .get(&revision_id)?
+                    .entry
+                    .as_ref()
+                    .clone(),
+            );
             revision = revision.checked_add(1)?;
         }
         let last = required_tail.last()?;
@@ -836,7 +844,7 @@ impl AuthorityLog {
         self.local_context = local_context.clone();
         self.peer_bindings = next_peers;
         for lease in self.retained.values_mut() {
-            lease.entry.context = local_context.clone();
+            Arc::make_mut(&mut lease.entry).context = local_context.clone();
             for (seat_id, peer) in &mut lease.peer_stages {
                 if let Some(generation) = self.peer_bindings.get(seat_id) {
                     peer.connection_generation = *generation;
@@ -844,7 +852,7 @@ impl AuthorityLog {
             }
         }
         if let Some(latest) = self.latest_committed.as_mut() {
-            latest.context = local_context;
+            Arc::make_mut(latest).context = local_context;
         }
 
         let mut actions = Vec::new();
@@ -858,13 +866,15 @@ impl AuthorityLog {
     }
 
     pub fn retained_entry(&self, revision: Revision) -> Option<&AuthorityEntry> {
-        self.retained.get(&revision).map(|lease| &lease.entry)
+        self.retained
+            .get(&revision)
+            .map(|lease| lease.entry.as_ref())
     }
 
     pub fn retained(&self) -> Vec<AuthorityEntry> {
         self.retained
             .values()
-            .map(|lease| lease.entry.clone())
+            .map(|lease| lease.entry.as_ref().clone())
             .collect()
     }
 
@@ -1013,7 +1023,7 @@ impl AuthorityLog {
             .keys()
             .map(|seat_id| AuthorityLogAction::Deliver {
                 to: *seat_id,
-                entry: Box::new(lease.entry.clone()),
+                entry: Box::new(lease.entry.as_ref().clone()),
             })
             .collect()
     }
@@ -1158,7 +1168,10 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             .map(|(revision, lease)| {
                 Ok(AuthorityDeliveryLeaseSnapshotV2 {
                     revision: *revision,
-                    entry: authority_entry_snapshot(&lease.entry, "authority_log.retained.entry")?,
+                    entry: authority_entry_snapshot(
+                        lease.entry.as_ref(),
+                        "authority_log.retained.entry",
+                    )?,
                     owner: lease.owner.clone(),
                     peer_stages: lease
                         .peer_stages
@@ -1209,7 +1222,9 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             latest_committed: self
                 .latest_committed
                 .as_ref()
-                .map(|entry| authority_entry_snapshot(entry, "authority_log.latest_committed"))
+                .map(|entry| {
+                    authority_entry_snapshot(entry.as_ref(), "authority_log.latest_committed")
+                })
                 .transpose()?,
             head_revision: self.head_revision,
             retired_operation_stages,
@@ -1292,7 +1307,8 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
 
         let latest_committed = latest_committed
             .map(|entry| authority_entry_from_snapshot(&entry, "authority_log.latest_committed"))
-            .transpose()?;
+            .transpose()?
+            .map(Arc::new);
         if let Some(entry) = &latest_committed {
             if entry.revision != head_revision || entry.revision == Revision::ZERO {
                 return Err(snapshot_invalid(
@@ -1369,7 +1385,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
         };
 
         if let Some(entry) = restored.latest_committed.as_ref() {
-            restored.validate_entry_shape(entry).map_err(|error| {
+            restored.validate_entry_shape(entry.as_ref()).map_err(|error| {
                 snapshot_invalid("authority_log.latest_committed", error.to_string())
             })?;
         }
@@ -1478,7 +1494,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             restored.retained.insert(
                 revision,
                 DeliveryLease {
-                    entry,
+                    entry: Arc::new(entry),
                     owner: lease_snapshot.owner,
                     peer_stages,
                     timer_id: lease_snapshot.timer_id,

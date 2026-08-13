@@ -51,6 +51,7 @@ use er_types::{OperationId, SeatId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::authority_commands::PreparedAuthorityTurn;
 use crate::runtime::project_battle_control_plan;
 
 /// The schema version of both typed M3 material DTOs.
@@ -253,6 +254,12 @@ enum ContentValidationMode {
     Trusted,
 }
 
+#[derive(Clone, Copy)]
+enum DigestValidationMode {
+    Independent,
+    ReducerIssued,
+}
+
 /// The closed common material-application failure categories.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Error)]
 pub enum BattleMaterialApplyError {
@@ -299,7 +306,13 @@ pub fn apply_turn_material(
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
-    apply_turn_material_inner(current, material, content, ContentValidationMode::Full)
+    apply_turn_material_inner(
+        current,
+        material,
+        content,
+        ContentValidationMode::Full,
+        DigestValidationMode::Independent,
+    )
 }
 
 /// Apply TURN material inside a kernel whose immutable content pack was
@@ -310,7 +323,41 @@ pub fn apply_turn_material_trusted(
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
-    apply_turn_material_inner(current, material, content, ContentValidationMode::Trusted)
+    apply_turn_material_inner(
+        current,
+        material,
+        content,
+        ContentValidationMode::Trusted,
+        DigestValidationMode::Independent,
+    )
+}
+
+/// Apply reducer-issued TURN material inside the authority kernel transaction.
+/// The sealed prepared bundle proves the exact finalized state/digest pairs;
+/// decoded replica and independently callable material paths cannot construct
+/// this capability and continue to recompute both digests.
+#[doc(hidden)]
+pub fn apply_reducer_issued_turn_material_trusted(
+    current: &BattleMaterialApplyContext,
+    material: &BattleTurnMaterialV1,
+    content: &ContentPack,
+    prepared: &PreparedAuthorityTurn,
+) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
+    let transition = prepared.digest_evidence().transition();
+    if transition.before_state != material.before_state
+        || transition.before_digest != material.before_digest
+        || transition.after_state != material.after_state
+        || transition.after_digest != material.after_digest
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    apply_turn_material_inner(
+        current,
+        material,
+        content,
+        ContentValidationMode::Trusted,
+        DigestValidationMode::ReducerIssued,
+    )
 }
 
 fn apply_turn_material_inner(
@@ -318,8 +365,11 @@ fn apply_turn_material_inner(
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
     validation: ContentValidationMode,
+    digest_validation: DigestValidationMode,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
-    verify_material_before_digest(&material.before_state, &material.before_digest)?;
+    if matches!(digest_validation, DigestValidationMode::Independent) {
+        verify_material_before_digest(&material.before_state, &material.before_digest)?;
+    }
     validate_material_header(
         material.schema_version,
         &material.oracle_game_sha,
@@ -333,7 +383,12 @@ fn apply_turn_material_inner(
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     validate_turn_identity(material)?;
     validate_turn_commands(&material.before_state, &material.commands, content)?;
-    validate_after_state_and_digest(&material.after_state, &material.after_digest, content)?;
+    validate_after_state_and_digest(
+        &material.after_state,
+        &material.after_digest,
+        content,
+        digest_validation,
+    )?;
     validate_turn_rng(material)?;
     validate_outcome_and_decision(
         &material.after_state,
@@ -421,7 +476,12 @@ fn apply_replacement_material_inner(
         content,
     )
     .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
-    validate_after_state_and_digest(&material.after_state, &material.after_digest, content)?;
+    validate_after_state_and_digest(
+        &material.after_state,
+        &material.after_digest,
+        content,
+        DigestValidationMode::Independent,
+    )?;
     validate_replacement_rng(material)?;
     validate_outcome_and_decision(
         &material.after_state,
@@ -1461,13 +1521,16 @@ fn validate_after_state_and_digest(
     after_state: &GameState,
     stated: &MechanicalStateDigest,
     content: &ContentPack,
+    digest_validation: DigestValidationMode,
 ) -> Result<(), BattleMaterialApplyError> {
     validate_state_content_trusted(after_state, content)
         .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-    let computed = MechanicalStateDigest::compute(after_state)
-        .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-    if &computed != stated {
-        return Err(BattleMaterialApplyError::InvalidAfterState);
+    if matches!(digest_validation, DigestValidationMode::Independent) {
+        let computed = MechanicalStateDigest::compute(after_state)
+            .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
+        if &computed != stated {
+            return Err(BattleMaterialApplyError::InvalidAfterState);
+        }
     }
     Ok(())
 }

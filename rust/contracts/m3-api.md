@@ -1727,11 +1727,14 @@ admit_scripted_enemy_frontier_trusted
 project_scripted_policy_for_material_trusted
 complete_command_frontier_trusted
 apply_turn_material_trusted
+apply_reducer_issued_turn_material_trusted
 apply_replacement_material_trusted
 ```
 
-These functions skip only repeated `ContentPack::validate()` and canonical
-content-hash recomputation. Complete state/content membership, capability,
+Trusted-content status by itself skips only repeated `ContentPack::validate()`
+and canonical content-hash recomputation; the separately sealed reducer-issued
+TURN capability below may also reuse its exact retained digest evidence.
+Complete state/content membership, capability,
 command, evidence, material-digest, control-projection, allocator, endpoint,
 and final transactional validation remain mandatory. Public counterparts
 still perform full content validation. The staged common-applier installation
@@ -1747,23 +1750,37 @@ these helpers are not callable cross-crate and add no trusted function name.
 
 The game reducer creates an opaque, non-serialized `TurnDigestEvidence` only
 after resolver output and final command-frontier projection have fixed the
-transition's before/after digests. The wrapper owns that exact transition;
-other crates receive only immutable access, and
-`GameRuntime::prepare_authority_turn` must consume it before reusing the
-reducer-owned digests instead of canonicalizing the same states again. All
-state equality, identity, content, mutation, command, and control checks
-remain; the common material applier independently recomputes both material
-digests. Exact-state authority reconciliation may return before rebuilding
-and hashing an identical frontier, while partial replica frontiers retain the
+transition's before/after digests. `GameRuntime::prepare_authority_turn` keeps
+that wrapper attached to a sealed `PreparedAuthorityTurn`; other crates receive
+immutable transition/control/admission access but no constructor, mutable
+field, raw transition handoff, or skip flag. The authority-only
+`apply_reducer_issued_turn_material_trusted` entry point first requires the
+decoded material's exact before state, before digest, after state, and after
+digest to equal that retained evidence, then reuses the reducer-owned digest
+work. All identity, content, mutation, command, RNG, presentation, frontier,
+allocator, endpoint, and control checks remain. Public, local, replica, recovery,
+and ordinary trusted material paths independently recompute both material
+digests. Exact-state authority reconciliation may return before rebuilding and
+hashing an identical frontier, while partial replica frontiers retain the
 complete reconciliation path.
 
 Authority preparation retains one canonical material byte vector after typed
 decode and canonical-`Value` round-trip proof. The material digest and internal
-prepared-entry bytes derive from that vector without changing the frozen
+prepared-entry bytes derive from that vector, which is moved rather than
+deep-copied at the private event boundary, without changing the frozen
 `Material { digest, payload }` wire shape. Presentation-only Battle
-transactions copy the retained authority log by `Arc` and use copy-on-write
-for every mutation; the enclosing clone/validate/swap remains the rollback
-owner.
+transactions copy the retained authority log by `Arc`; its immutable retained
+`AuthorityEntry` payloads are also `Arc` shared, and generation rebind detaches
+an entry with `Arc::make_mut` before changing its context. Synchronous authority
+publication validation borrows the already-installed game/control/policy
+instead of cloning them. The enclosing clone/validate/swap remains the rollback
+owner, while all public log actions, recovery slices, and snapshots continue to
+carry owned entries.
+
+The canonical-`Value` proof operates directly on the already-parsed `Value` and
+compares its frozen canonical string bytes with the original typed canonical
+bytes. It does not serialize through ordinary JSON ordering, remove the typed
+decode/equality check, or allocate a second deep `Value` clone.
 
 `new_battle` requires `run_state.battle = None`, a positive one-based run wave,
 an exact non-empty production `BattleScene.waveSeed`, and a valid unconsumed

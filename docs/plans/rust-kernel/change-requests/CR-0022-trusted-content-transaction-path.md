@@ -62,20 +62,26 @@ discarded encoding does not change the digest bytes or validation result.
 After final frontier projection, the game reducer wraps the exact finalized
 transition and its resolver/finalizer digests in an opaque, non-serialized
 `TurnDigestEvidence` carried by private `PreparedBattleResolution`. Other
-crates receive read-only access only; authority preparation must consume the
-wrapper before it may reuse those digests instead of canonicalizing the same
-two states again. State equality, operation, content, mutation, command, and
-control checks remain mandatory, and the common material applier still
-independently verifies both material digests. When the authority's
-current state exactly equals material `before_state`, frontier reconciliation
-also returns before cloning and hashing an identical staged state. Partial
-replica frontiers retain the complete reconciliation path.
+crates receive read-only access only; authority preparation retains the wrapper
+inside a sealed `PreparedAuthorityTurn`. Under CR-0025, the authority-only
+common-applier entry may reuse those digests only after the decoded material's
+before/after states and both stated digests exactly equal the retained evidence.
+State equality, operation, content, mutation, command, RNG, presentation,
+frontier, allocator, endpoint, and control checks remain mandatory. Public,
+local, replica, recovery, and ordinary trusted material paths still
+independently verify both material digests. When the authority's current state
+exactly equals material `before_state`, frontier reconciliation also returns
+before cloning and hashing an identical staged state. Partial replica frontiers
+retain the complete reconciliation path.
 
 Authority material encoding retains the exact canonical bytes after proving
 both the typed decode and canonical `Value` round trip. The frozen material
 digest is computed from those bytes, and the internal prepared-entry event
 carries those same bytes instead of serializing the payload again. The wire
-`Material { digest, payload }` shape is unchanged.
+`Material { digest, payload }` shape is unchanged. CR-0025 permits that proof to
+canonicalize the already-parsed `Value` by reference and compare its string
+bytes directly, avoiding a second deep `Value` clone without changing ordering,
+number checks, typed equality, or retained bytes.
 
 The outer Battle clone/validate/swap transaction also permits two ordinary
 copy-on-write corrections. Settling a presentation mutates the already-cloned

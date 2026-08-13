@@ -504,7 +504,7 @@ fn failed_blocking_event_retains_the_barrier_and_reports_terminal_reason() -> Te
 }
 
 #[test]
-fn clear_and_dispose_are_idempotent_and_drop_live_events() -> TestResult {
+fn dispose_is_idempotent_and_drops_live_events() -> TestResult {
     let endpoint = seat(1)?;
     let operation_id = operation("battle/1/turn/7/result")?;
     let blocking = event(
@@ -529,16 +529,6 @@ fn clear_and_dispose_are_idempotent_and_drop_live_events() -> TestResult {
         PresentationSettlementOutcome::Settled,
     )?;
     assert_eq!(state.live_count(), 1);
-
-    state.clear();
-    state.clear();
-    assert_eq!(state.live_count(), 0);
-    assert!(!state.is_blocked());
-    assert_eq!(
-        state.outcome(&blocking_id),
-        Some(&PresentationSettlementOutcome::Settled)
-    );
-    state.validate()?;
 
     state.dispose();
     state.dispose();

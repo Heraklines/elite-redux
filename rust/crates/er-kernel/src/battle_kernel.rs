@@ -2378,7 +2378,7 @@ impl BattleTransaction {
             authority_log: log,
             scheduler: self.scheduler.clone(),
         };
-        let prepared = match payload.resolution {
+        let mut prepared = match payload.resolution {
             PreparedBattleResolution::Turn {
                 digest_evidence,
                 material_operation_id,
@@ -2450,17 +2450,25 @@ impl BattleTransaction {
                 )?
             }
         };
-        let entry = prepared.prepared_entry().clone();
-        let material_bytes = prepared.material_bytes().to_vec();
+        let (revision, operation_id, kind, material_digest) = {
+            let entry = prepared.prepared_entry();
+            (
+                entry.revision,
+                entry.operation_id.clone(),
+                entry.kind,
+                entry.material.digest.clone(),
+            )
+        };
+        let material_bytes = prepared.take_material_bytes();
         self.pending_authority = Some(prepared);
         self.queue.push(InternalEvent::AuthorityEntryReady(
             AuthorityEntryReadyPayload {
                 prepared: PreparedAuthorityEntry {
-                    revision: entry.revision,
-                    operation_id: entry.operation_id,
-                    kind: entry.kind,
+                    revision,
+                    operation_id,
+                    kind,
                     material_bytes,
-                    material_digest: entry.material.digest,
+                    material_digest,
                 },
             },
         ));
@@ -2581,9 +2589,9 @@ impl BattleTransaction {
                 });
             }
             let validator = AuthorityStageValidator {
-                state: self.staged.game.state().clone(),
-                control: self.staged.game.control().clone(),
-                scripted_policy: self.staged.game.scripted_enemy_policy().clone(),
+                state: self.staged.game.state(),
+                control: self.staged.game.control(),
+                scripted_policy: self.staged.game.scripted_enemy_policy(),
             };
             let published = prepared.publish_after_validation(&validator)?;
             self.install_published_authority(published, payload)?;
@@ -2872,8 +2880,8 @@ impl BattleTransaction {
             });
         }
         let revision = published.commit.entry.revision;
-        let operation_id = published.operation_id.clone();
-        let presentation = published.presentation.clone();
+        let operation_id = published.operation_id;
+        let presentation = published.presentation;
         self.scheduler = published.scheduler;
         match &mut self.staged.protocol {
             BattleProtocolState::Authority { log, .. } => *log = Arc::new(published.log),
@@ -3199,7 +3207,8 @@ impl BattleTransaction {
                     stage: body.stage,
                     control_id: body.control_id,
                 };
-                Arc::make_mut(log).accept_receipt_detailed(receipt, &mut self.scheduler)
+                Arc::make_mut(log)
+                    .accept_receipt_detailed(receipt, &mut self.scheduler)
                     .actions
             }
             BattleProtocolState::Replica { .. } => return Ok(()),
@@ -4486,7 +4495,6 @@ impl BattleTransaction {
         let mut proposal_actions = Vec::new();
         let mut recovery_cleanup_actions = Vec::new();
         let mut recovery_start = None;
-        let mut clear_presentations = false;
         let mut authority_config_rebind = None;
         let mut replica_config_rebind = None;
         match &mut self.staged.protocol {
@@ -4661,7 +4669,6 @@ impl BattleTransaction {
                     *recovery_config = next_recovery_config;
                     *staged_local_rebind = None;
                     *staged_authority_rebind = None;
-                    clear_presentations = true;
                     replica_config_rebind = Some((next_context.clone(), next_authority_generation));
                     recovery_start = Some((next_context, actions));
                 }
@@ -4697,10 +4704,6 @@ impl BattleTransaction {
         map_authority_actions(&mut self.effects, authority_actions)?;
         map_recovery_rebind_cleanup(&mut self.effects, recovery_cleanup_actions)?;
         self.apply_proposal_actions(proposal_actions)?;
-        if clear_presentations {
-            self.staged.presentations.clear();
-            self.staged.presentation_revisions.clear();
-        }
         if let Some((context, actions)) = recovery_start {
             self.apply_recovery_start_actions(&context, actions)?;
         }
@@ -4767,8 +4770,7 @@ impl BattleTransaction {
                 staged_peer_rebinds,
                 ..
             } => {
-                let actions =
-                    Arc::make_mut(log).dispose(&terminal.reason, &mut self.scheduler);
+                let actions = Arc::make_mut(log).dispose(&terminal.reason, &mut self.scheduler);
                 proposals.dispose();
                 pending_recoveries.clear();
                 for state in transports.values_mut() {
@@ -4913,22 +4915,22 @@ impl BattleTransaction {
     }
 }
 
-#[derive(Clone)]
-struct AuthorityStageValidator {
-    state: er_state::snapshot::GameState,
-    control: BattleControlPlan,
-    scripted_policy: er_types::battle_command::ScriptedEnemyPolicyV1,
+#[derive(Clone, Copy)]
+struct AuthorityStageValidator<'a> {
+    state: &'a er_state::snapshot::GameState,
+    control: &'a BattleControlPlan,
+    scripted_policy: &'a er_types::battle_command::ScriptedEnemyPolicyV1,
 }
 
-impl EnclosingKernelValidation for AuthorityStageValidator {
+impl EnclosingKernelValidation for AuthorityStageValidator<'_> {
     fn validate_authority_stage(
         &self,
         staged: &AuthorityPreparedTransaction,
     ) -> Result<(), AuthorityTransactionError> {
-        if staged.state() != &self.state
-            || staged.control() != &self.control
+        if staged.state() != self.state
+            || staged.control() != self.control
             || staged.menu_allocators() != self.control.menu_allocators.as_slice()
-            || staged.scripted_policy_after() != &self.scripted_policy
+            || staged.scripted_policy_after() != self.scripted_policy
         {
             return Err(AuthorityTransactionError::EnclosingValidation {
                 reason: "game/control/allocator stage diverged before log publication".to_owned(),
@@ -4941,10 +4943,10 @@ impl EnclosingKernelValidation for AuthorityStageValidator {
         &self,
         published: &AuthorityPublishedTransaction,
     ) -> Result<(), AuthorityTransactionError> {
-        if published.state != self.state
-            || published.control != self.control
-            || published.menu_allocators != self.control.menu_allocators
-            || published.scripted_policy_after != self.scripted_policy
+        if &published.state != self.state
+            || &published.control != self.control
+            || published.menu_allocators.as_slice() != self.control.menu_allocators.as_slice()
+            || &published.scripted_policy_after != self.scripted_policy
         {
             return Err(AuthorityTransactionError::EnclosingValidation {
                 reason: "post-publication authority stage diverged from the validated game state"

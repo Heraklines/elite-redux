@@ -31,6 +31,8 @@ use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanc
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
 use thiserror::Error;
 
+use crate::internal_event::TurnDigestEvidence;
+
 #[derive(Clone, Copy)]
 enum ContentValidationMode {
     Full,
@@ -255,11 +257,45 @@ impl PreparedReplacementFingerprintEvidence {
 /// The projected transition therefore carries the next command collection in
 /// `after_state` when its decision is `CommandFrontier`; the kernel adapter
 /// never accepts a loose control plan or a protocol `NextControl` value.
+#[doc(hidden)]
 #[derive(Clone, Debug)]
 pub struct PreparedAuthorityTurn {
-    pub transition: BattleTransition,
-    pub control_plan: BattleControlPlan,
-    pub admission: PreparedAuthorityAdmission,
+    digest_evidence: TurnDigestEvidence,
+    control_plan: BattleControlPlan,
+    admission: PreparedAuthorityAdmission,
+}
+
+impl PreparedAuthorityTurn {
+    pub(crate) fn from_game_runtime(
+        digest_evidence: TurnDigestEvidence,
+        control_plan: BattleControlPlan,
+        admission: PreparedAuthorityAdmission,
+    ) -> Self {
+        Self {
+            digest_evidence,
+            control_plan,
+            admission,
+        }
+    }
+
+    #[doc(hidden)]
+    pub fn transition(&self) -> &BattleTransition {
+        self.digest_evidence.transition()
+    }
+
+    #[doc(hidden)]
+    pub fn control_plan(&self) -> &BattleControlPlan {
+        &self.control_plan
+    }
+
+    #[doc(hidden)]
+    pub fn admission(&self) -> &PreparedAuthorityAdmission {
+        &self.admission
+    }
+
+    pub(crate) fn digest_evidence(&self) -> &TurnDigestEvidence {
+        &self.digest_evidence
+    }
 }
 
 /// The replacement counterpart to [`PreparedAuthorityTurn`].

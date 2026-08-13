@@ -6,6 +6,7 @@ use er_types::battle_ids::MenuInstanceId;
 use er_types::{ButtonEvent, GameButton, MenuOptionId, SafeU53, SeatId};
 
 const INTERNAL_EVENT_SOURCE: &str = include_str!("../src/internal_event.rs");
+const AUTHORITY_COMMAND_SOURCE: &str = include_str!("../src/authority_commands.rs");
 const TRANSACTION_SOURCE: &str = include_str!("../src/transaction.rs");
 
 fn safe(value: u64) -> SafeU53 {
@@ -120,6 +121,7 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
         "pub enum GameIntent",
         "pub struct UiEventPayload",
         "pub struct GameEventPayload",
+        "pub struct TurnDigestEvidence",
         "pub enum InternalEvent",
         "pub enum InternalEventKind",
         "pub struct InternalEventQueue",
@@ -171,6 +173,24 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
     let game_fields = struct_body(INTERNAL_EVENT_SOURCE, "pub struct GameEventPayload");
     assert!(!game_fields.contains("pub intent"));
     assert!(!game_fields.contains("pub causal"));
+
+    let digest_fields = struct_body(INTERNAL_EVENT_SOURCE, "pub struct TurnDigestEvidence");
+    assert!(!digest_fields.contains("pub transition"));
+    assert!(INTERNAL_EVENT_SOURCE.contains("pub(crate) fn from_finalized_transition"));
+    assert!(!INTERNAL_EVENT_SOURCE.contains("fn into_transition"));
+
+    let prepared_fields = struct_body(
+        AUTHORITY_COMMAND_SOURCE,
+        "pub struct PreparedAuthorityTurn",
+    );
+    assert_doc_hidden_before(AUTHORITY_COMMAND_SOURCE, "pub struct PreparedAuthorityTurn");
+    assert!(prepared_fields.contains("digest_evidence: TurnDigestEvidence"));
+    assert!(!prepared_fields.contains("pub digest_evidence"));
+    assert!(!prepared_fields.contains("pub transition"));
+    assert!(!prepared_fields.contains("pub control_plan"));
+    assert!(!prepared_fields.contains("pub admission"));
+    assert!(AUTHORITY_COMMAND_SOURCE.contains("pub(crate) fn from_game_runtime"));
+    assert!(AUTHORITY_COMMAND_SOURCE.contains("pub(crate) fn digest_evidence"));
 
     for method in [
         "pub fn reduce",

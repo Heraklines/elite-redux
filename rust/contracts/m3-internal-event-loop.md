@@ -75,10 +75,12 @@ enum PreparedBattleResolution {
 
 `TurnDigestEvidence` owns the exact finalized transition, is opaque outside
 `er-game`, is created only after final frontier projection, and is never
-serialized. Other crates receive immutable transition access only. Consuming
-the wrapper lets the authority transaction reuse reducer-owned before/after
-digest work while the common material applier retains independent material
-digest validation.
+serialized. `GameRuntime` retains it inside a sealed `PreparedAuthorityTurn`;
+other crates receive immutable transition/control/admission access only. The
+authority material path may reuse reducer-owned before/after digest work only
+after decoded material exactly equals both evidenced state/digest pairs. Every
+wire-decoded replica, recovery, local, public, and ordinary trusted material
+path retains independent material digest validation.
 
 The `Game` reducer derives and validates the exact material operation ID,
 invokes the pure `er-battle` resolver with that ID, then uses the one `er-game`

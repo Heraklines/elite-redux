@@ -573,6 +573,9 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
     for required in [
         "verify_material_before_digest",
         "validate_after_state_and_digest",
+        "apply_reducer_issued_turn_material_trusted",
+        "DigestValidationMode::Independent",
+        "DigestValidationMode::ReducerIssued",
         "validate_battle_mutation_evidence",
         "compute_presentation_plan_digest",
         "event.event_id.sequence",
@@ -588,6 +591,18 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         MATERIAL_SOURCE.contains("BattlePresentationKind::BattleWon")
             && MATERIAL_SOURCE.contains("BattlePresentationKind::BattleLost")
     );
+    for evidence_check in [
+        "transition.before_state != material.before_state",
+        "transition.before_digest != material.before_digest",
+        "transition.after_state != material.after_state",
+        "transition.after_digest != material.after_digest",
+    ] {
+        assert!(
+            MATERIAL_SOURCE.contains(evidence_check),
+            "reducer-issued material path omitted {evidence_check}",
+        );
+    }
+    assert!(!MATERIAL_SOURCE.contains("pub skip_digest"));
 }
 
 #[test]

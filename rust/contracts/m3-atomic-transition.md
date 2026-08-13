@@ -46,7 +46,10 @@ The exact production order is:
    V2 compatible material digest.
 6. Deserialize those bytes through the production material decoder.
 7. Apply the decoded material to the authority's staged game through the
-   common production material applier.
+   common production material implementation. The authority-only entry may
+   reuse the reducer's sealed digest evidence only after exact equality of the
+   decoded before/after states and both stated digests; wire-decoded paths
+   independently recompute them.
 8. Require resolver candidate state and digest to equal the material-applied
    authority state and digest.
 9. Prepare the AuthorityLog commit on the staged protocol state.
@@ -125,10 +128,12 @@ duplicate, future gap, malformed material, or digest mismatch follows
 
 ## One material applier
 
-There is exactly one production entry point for TURN material application and
-one for REPLACEMENT material application. Each accepts typed current state,
-typed decoded material, and immutable content, and returns a fully validated
-new state/evidence result without mutating its input.
+There is exactly one production implementation for TURN material application
+and one for REPLACEMENT material application. Public/replica TURN calls and the
+sealed reducer-issued authority call enter the same implementation with typed
+current state, typed decoded material, and immutable content, and return a fully
+validated new state/evidence result without mutating their input. Only the
+sealed authority call may reuse already-proved state digests.
 
 Both public appliers are owned by `er-game`. They invoke `er-battle`'s pure
 mechanical material/evidence validator, then invoke the one `er-game`
@@ -145,8 +150,9 @@ resolver candidate
 == replica deserialize -> apply result
 ```
 
-The authority may retain the candidate transition for diagnostics, but may not
-adopt it directly. Test code may not provide an alternate applier.
+The authority retains the candidate transition inside opaque digest evidence,
+but may not adopt it directly. Test code may not provide an alternate applier
+or construct a digest-skip capability.
 
 ## Fail-closed recovery and terminal transitions
 

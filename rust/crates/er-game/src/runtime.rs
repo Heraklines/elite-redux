@@ -523,12 +523,8 @@ impl GameRuntime {
         material_operation_id: &er_types::OperationId,
         control_plan: BattleControlPlan,
     ) -> Result<PreparedAuthorityTurn, GameRuntimeError> {
-        let transition = digest_evidence.into_transition();
-        validate_reducer_issued_turn_transition_identity(
-            self,
-            &transition,
-            material_operation_id,
-        )?;
+        let transition = digest_evidence.transition();
+        validate_reducer_issued_turn_transition_identity(self, transition, material_operation_id)?;
         let expected = project_battle_control_plan(
             &transition.after_state,
             transition.next_decision,
@@ -538,11 +534,11 @@ impl GameRuntime {
         if expected != control_plan {
             return Err(GameRuntimeError::ControlProjectionMismatch);
         }
-        Ok(PreparedAuthorityTurn {
-            transition,
+        Ok(PreparedAuthorityTurn::from_game_runtime(
+            digest_evidence,
             control_plan,
-            admission: self.prepared_authority_admission(),
-        })
+            self.prepared_authority_admission(),
+        ))
     }
 
     /// Replacement counterpart to [`Self::prepare_authority_turn`]. The
@@ -4072,11 +4068,11 @@ fn validate_turn_transition_identity_inner(
         .ok_or(GameRuntimeError::NoActiveBattle)?;
     if matches!(digest_validation, TurnTransitionDigestValidation::Full)
         && (transition.before_digest
-        != MechanicalStateDigest::compute(&transition.before_state)
-            .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
-        || transition.after_digest
-            != MechanicalStateDigest::compute(&transition.after_state)
-                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?)
+            != MechanicalStateDigest::compute(&transition.before_state)
+                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
+            || transition.after_digest
+                != MechanicalStateDigest::compute(&transition.after_state)
+                    .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?)
     {
         return Err(GameRuntimeError::TransitionDigestMismatch);
     }
