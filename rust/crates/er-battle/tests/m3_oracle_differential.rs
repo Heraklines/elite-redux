@@ -9221,6 +9221,7 @@ fn normalize_catalogued_final_player_party_order(
     let (legacy_order, typed_order) = match case_name {
         "mixed-side-simultaneous-faint" => (vec![2_u64, 1], vec![1_u64, 2]),
         "forced-replacement" => (vec![3_u64, 2, 1], vec![1_u64, 2, 3]),
+        "voluntary-switch" => (vec![3_u64, 2, 1], vec![1_u64, 2, 3]),
         _ => return Ok(()),
     };
     let expected_battle = expected.battle.as_mut().ok_or_else(|| {
@@ -9266,6 +9267,64 @@ fn normalize_catalogued_final_player_party_order(
         normalized.push(expected_battle.player_party[index].clone());
     }
     expected_battle.player_party = normalized;
+
+    if case_name == "voluntary-switch" {
+        let expected_frontier = &mut expected_battle.command_state.frontier;
+        let actual_frontier = &actual_battle.command_state.frontier;
+        if expected_frontier.len() != 2 || actual_frontier.len() != 2 {
+            return Err(FixtureError::new(format!(
+                "{case_name}: final command frontier shape is outside the exact catalogue"
+            ))
+            .into());
+        }
+        let actor = PokemonId::try_from_u64(3)?;
+        let switched_pokemon = PokemonId::try_from_u64(1)?;
+        let field_slot = FieldSlot::new(BattleSide::Player, 0)?;
+        let legacy_party_slot = PartyIndex::new(2)?;
+        let expected_entry = expected_frontier.first_mut().ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: catalogued final command frontier entry is missing"
+            ))
+        })?;
+        let actual_entry = actual_frontier.first().ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: typed final command frontier entry is missing"
+            ))
+        })?;
+        if expected_entry.actor != actor
+            || expected_entry.field_slot != field_slot
+            || expected_entry.offer.switches.len() != 1
+            || actual_entry.actor != actor
+            || actual_entry.field_slot != field_slot
+            || actual_entry.offer.switches.len() != 1
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: final command frontier entry is outside the exact party-order rebase catalogue"
+            ))
+            .into());
+        }
+        let expected_switch = expected_entry.offer.switches.first_mut().ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: catalogued final command offer switch is missing"
+            ))
+        })?;
+        let actual_switch = actual_entry.offer.switches.first().ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: typed final command offer switch is missing"
+            ))
+        })?;
+        if expected_switch.party_slot != legacy_party_slot
+            || expected_switch.pokemon != switched_pokemon
+            || actual_switch.party_slot != PartyIndex::ZERO
+            || actual_switch.pokemon != switched_pokemon
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: final command offer switch is outside the exact party-order rebase catalogue"
+            ))
+            .into());
+        }
+        expected_switch.party_slot = PartyIndex::ZERO;
+    }
     Ok(())
 }
 
