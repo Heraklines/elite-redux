@@ -12,11 +12,11 @@ use er_battle::legality::{
     validate_replacement_selection, validate_state_content,
 };
 use er_battle::replacement::legal_replacement_candidates;
+use er_battle::stat_stage::MIN_STAT_STAGE;
 use er_battle::{
     BattleMutation, BattleNextDecision, compute_presentation_plan_digest,
     validate_battle_mutation_evidence,
 };
-use er_battle::stat_stage::MIN_STAT_STAGE;
 use er_canonical::{CanonicalError, canonical_bytes, canonicalize};
 use er_content::moves::find_move;
 pub use er_content::pack::ContentPack;

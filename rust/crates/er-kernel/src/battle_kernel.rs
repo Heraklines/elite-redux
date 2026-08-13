@@ -214,7 +214,7 @@ struct PendingReplicaTerminal {
 enum RecoveredMaterial {
     Battle {
         entry: AuthorityEntry,
-        applied: MaterialApplyResult,
+        applied: Box<MaterialApplyResult>,
     },
     Terminal {
         entry: AuthorityEntry,
@@ -3814,7 +3814,7 @@ impl BattleTransaction {
                 }
                 applied_tail.push(RecoveredMaterial::Battle {
                     entry: entry.clone(),
-                    applied,
+                    applied: Box::new(applied),
                 });
                 continue;
             }
@@ -3840,7 +3840,7 @@ impl BattleTransaction {
                 })?;
             applied_tail.push(RecoveredMaterial::Battle {
                 entry: entry.clone(),
-                applied,
+                applied: Box::new(applied),
             });
         }
         if bundle.frontier == Revision::ZERO {

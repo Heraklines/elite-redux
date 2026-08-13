@@ -338,11 +338,13 @@ fn presentation_kind_from_mutation(mutation: &BattleMutation) -> Option<BattlePr
             pokemon,
             before,
             after,
-        } if before != after && before.kind != after.kind => Some(BattlePresentationKind::StatusApplied {
-            pokemon: *pokemon,
-            before: *before,
-            after: *after,
-        }),
+        } if before != after && before.kind != after.kind => {
+            Some(BattlePresentationKind::StatusApplied {
+                pokemon: *pokemon,
+                before: *before,
+                after: *after,
+            })
+        }
         BattleMutation::StatStageChanged {
             pokemon,
             stat,

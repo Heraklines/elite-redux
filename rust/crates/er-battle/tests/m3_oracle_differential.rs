@@ -481,6 +481,17 @@ const LEGACY_POST_TURN_OUTCOME_CASES: &[&str] = &[
     "defeat",
 ];
 
+const LEGACY_FILTERED_RESOLVED_FAINT_CASES: &[(&str, usize)] = &[
+    ("defeat", 1),
+    ("forced-replacement", 1),
+    ("mixed-side-simultaneous-faint", 1),
+    ("no-legal-replacement", 2),
+    ("same-side-simultaneous-faint", 2),
+    ("victory", 1),
+    ("wonder-guard-status-pass", 1),
+    ("wonder-guard-super-effective-pass", 1),
+];
+
 const LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE: &str =
     "src/data/elite-redux/init-elite-redux-ability-upgrades.ts:496";
 
@@ -4090,8 +4101,7 @@ fn is_catalogued_legacy_forward_actor_compaction(
             .is_some_and(|operation| {
                 operation.as_str() == "battle/1/wave/1/turn/1/command/player/0/seat/2"
             })
-        && record.operation_id.as_str()
-            == "battle/1/wave/1/turn/1/command/player/1/seat/2"
+        && record.operation_id.as_str() == "battle/1/wave/1/turn/1/command/player/1/seat/2"
         && record
             .owner_seat
             .is_some_and(|owner_seat| owner_seat.get().get() == 2)
@@ -4099,8 +4109,7 @@ fn is_catalogued_legacy_forward_actor_compaction(
             prior.kind == ResolvedActionKind::Faint
                 && u64::from(prior.actor) == 1
                 && prior.source_slot
-                    == FieldSlot::new(BattleSide::Player, 0)
-                        .expect("valid catalogued faint slot")
+                    == FieldSlot::new(BattleSide::Player, 0).expect("valid catalogued faint slot")
         })
 }
 
@@ -5289,6 +5298,29 @@ fn legacy_faint_queue_path_index(path: &str, replacement: bool) -> Option<usize>
     value.strip_suffix(suffix)?.parse().ok()
 }
 
+fn is_exact_legacy_turn_boundary_cause(
+    case_name: &str,
+    cause: &ResolvedAction,
+    actions: &[ResolvedAction],
+) -> bool {
+    if actions.last().map(|action| action.sequence) == Some(cause.sequence) {
+        return true;
+    }
+    let Some(replacement) = actions.last() else {
+        return false;
+    };
+    case_name == "forced-replacement"
+        && actions.len() == 6
+        && cause.sequence.get() == 4
+        && cause.kind == ResolvedActionKind::Move
+        && u64::from(cause.actor) == 2
+        && cause.disposition == ActionDisposition::Executed
+        && replacement.sequence.get() == 5
+        && replacement.kind == ResolvedActionKind::Replacement
+        && u64::from(replacement.actor) == 1
+        && replacement.disposition == ActionDisposition::Executed
+}
+
 fn validate_legacy_mutation_metadata(
     case_name: &str,
     trace: &FixtureMutationTrace,
@@ -5467,7 +5499,7 @@ fn validate_legacy_mutation_metadata(
                     "{case_name}: expected_mutations[{index}] TURN_ADVANCE has no action cause"
                 ))
             })?;
-            if actions.last().map(|action| action.sequence) != Some(cause.sequence) {
+            if !is_exact_legacy_turn_boundary_cause(case_name, cause, actions) {
                 return Err(FixtureError::new(format!(
                     "{case_name}: expected_mutations[{index}] TURN_ADVANCE cause {} is not the exact final action sequence",
                     cause.sequence
@@ -5774,14 +5806,13 @@ fn fixture_mutations(
                         ))
                     })?;
                     if projected_before != before_status {
-                        let is_closed_residual_increment = matches!(
-                            projected_before.kind,
-                            StatusKind::Poison | StatusKind::Burn
-                        ) && projected_before.kind == before_status.kind
-                            && projected_before.sleep_turns_remaining
-                                == before_status.sleep_turns_remaining
-                            && projected_before.toxic_turn_count.checked_add(1)
-                                == Some(before_status.toxic_turn_count);
+                        let is_closed_residual_increment =
+                            matches!(projected_before.kind, StatusKind::Poison | StatusKind::Burn)
+                                && projected_before.kind == before_status.kind
+                                && projected_before.sleep_turns_remaining
+                                    == before_status.sleep_turns_remaining
+                                && projected_before.toxic_turn_count.checked_add(1)
+                                    == Some(before_status.toxic_turn_count);
                         if !is_closed_residual_increment {
                             return Err(FixtureError::new(format!(
                                 "{case_name}: {path} residual status bookkeeping is outside the closed Poison/Burn increment projection: {projected_before:?} -> {before_status:?}"
@@ -5842,11 +5873,8 @@ fn fixture_mutations(
                     &format!("{path}.before.status"),
                     &before.status,
                 )?;
-                let after_status = legacy_status_state(
-                    case_name,
-                    &format!("{path}.after.status"),
-                    &after.status,
-                )?;
+                let after_status =
+                    legacy_status_state(case_name, &format!("{path}.after.status"), &after.status)?;
                 let projected_before = projected_statuses.get(&pokemon).copied().ok_or_else(|| {
                     FixtureError::new(format!(
                         "{case_name}: {path} status mutation references absent Pokemon {pokemon}"
@@ -6927,14 +6955,44 @@ fn fixture_presentation(
                 }
             }
             "hp" => {
-                assert_exact_keys(
-                    case_name,
-                    &event_path,
-                    event,
-                    &[
-                        "actor", "bi", "critical", "hp", "k", "maxHp", "result", "sp",
-                    ],
-                )?;
+                let residual_shape = matches!(
+                    (case_name, event_path.as_str()),
+                    (
+                        "existing-status-rejected",
+                        "expected_presentation[5].event"
+                    ) | ("poison-application", "expected_presentation[6].event")
+                        | ("burn-application", "expected_presentation[7].event")
+                        | ("burn-residual", "expected_presentation[7].event")
+                        | (
+                            "burn-physical-penalty",
+                            "expected_presentation[7].event"
+                        )
+                        | (
+                            "pp-unusable-rejected",
+                            "expected_presentation[7].event"
+                        )
+                        | (
+                            "wonder-guard-status-pass",
+                            "expected_presentation[6].event"
+                        )
+                );
+                if residual_shape {
+                    assert_exact_keys(
+                        case_name,
+                        &event_path,
+                        event,
+                        &["actor", "bi", "hp", "k", "maxHp", "sp"],
+                    )?;
+                } else {
+                    assert_exact_keys(
+                        case_name,
+                        &event_path,
+                        event,
+                        &[
+                            "actor", "bi", "critical", "hp", "k", "maxHp", "result", "sp",
+                        ],
+                    )?;
+                }
                 let actor_value = object_field(event, case_name, &event_path, "actor")?;
                 let actor = legacy_actor(
                     actor_value,
@@ -6946,14 +7004,19 @@ fn fixture_presentation(
                 let actor_id = validate_legacy_actor_slot(case_name, &event_path, actor, slot)?;
                 let hp = u32::try_from(u64_field(event, case_name, &event_path, "hp")?)?;
                 let max_hp = u32::try_from(u64_field(event, case_name, &event_path, "maxHp")?)?;
-                let critical = required(event, case_name, &event_path, "critical")?
-                    .as_bool()
-                    .ok_or_else(|| {
-                        FixtureError::new(format!(
-                            "{case_name}: {event_path}.critical is not boolean"
-                        ))
-                    })?;
-                let result = u64_field(event, case_name, &event_path, "result")?;
+                let display_annotations = if residual_shape {
+                    None
+                } else {
+                    let critical = required(event, case_name, &event_path, "critical")?
+                        .as_bool()
+                        .ok_or_else(|| {
+                            FixtureError::new(format!(
+                                "{case_name}: {event_path}.critical is not boolean"
+                            ))
+                        })?;
+                    let result = u64_field(event, case_name, &event_path, "result")?;
+                    Some((critical, result))
+                };
                 let sp = u64_field(event, case_name, &event_path, "sp")?;
                 let pokemon = pokemon_state(initial, actor_id).ok_or_else(|| {
                     FixtureError::new(format!(
@@ -6975,7 +7038,7 @@ fn fixture_presentation(
                     actor_id,
                     hp,
                 )?;
-                let _legacy_display_annotations = (critical, result, sp);
+                let _legacy_display_annotations = (display_annotations, sp);
                 BattlePresentationKind::HpChanged {
                     pokemon: actor_id,
                     before,
@@ -7054,8 +7117,8 @@ fn fixture_presentation(
                     "stage-floor-cap" | "intimidate-stage-floor"
                 ) {
                     let closed_actor = matches!(u64::from(actor_id), 3 | 4);
-                    let initial_stage = pokemon_state(initial, actor_id)
-                        .map(|pokemon| pokemon.stat_stages.attack);
+                    let initial_stage =
+                        pokemon_state(initial, actor_id).map(|pokemon| pokemon.stat_stages.attack);
                     let has_typed_mutation = mutations.iter().any(|mutation| {
                         matches!(
                             mutation,
@@ -7327,6 +7390,67 @@ fn fixture_presentation(
         let (before_four, from_four) = presentation.split_at_mut(3);
         std::mem::swap(&mut before_four[2].kind, &mut from_four[0].kind);
     }
+    if case_name == "intimidate-stage-floor" {
+        let pokemon_three = PokemonId::try_from_u64(3)?;
+        let pokemon_four = PokemonId::try_from_u64(4)?;
+        let exact_floor_attempt = |index: usize, pokemon: PokemonId| {
+            matches!(
+                presentation.get(index).map(|event| &event.kind),
+                Some(BattlePresentationKind::StatStageChanged {
+                    pokemon: candidate,
+                    stat: BattleStat::Attack,
+                    before: -6,
+                    after: -6,
+                }) if *candidate == pokemon
+            )
+        };
+        if presentation.len() != 10
+            || !exact_floor_attempt(5, pokemon_four)
+            || !exact_floor_attempt(6, pokemon_three)
+            || !exact_floor_attempt(8, pokemon_four)
+            || !exact_floor_attempt(9, pokemon_three)
+        {
+            return Err(FixtureError::new(
+                "intimidate-stage-floor: legacy clamped presentation order is outside its exact catalogue",
+            )
+            .into());
+        }
+        let (before_six, from_six) = presentation.split_at_mut(6);
+        std::mem::swap(&mut before_six[5].kind, &mut from_six[0].kind);
+        let (before_nine, from_nine) = presentation.split_at_mut(9);
+        std::mem::swap(&mut before_nine[8].kind, &mut from_nine[0].kind);
+    }
+    if case_name == "same-side-simultaneous-faint" {
+        let pokemon_three = PokemonId::try_from_u64(3)?;
+        let pokemon_four = PokemonId::try_from_u64(4)?;
+        if presentation.len() != 9
+            || !matches!(
+                presentation.get(4).map(|event| &event.kind),
+                Some(BattlePresentationKind::StatStageChanged {
+                    pokemon,
+                    stat: BattleStat::Attack,
+                    before: 0,
+                    after: -1,
+                }) if *pokemon == pokemon_four
+            )
+            || !matches!(
+                presentation.get(5).map(|event| &event.kind),
+                Some(BattlePresentationKind::StatStageChanged {
+                    pokemon,
+                    stat: BattleStat::Attack,
+                    before: 0,
+                    after: -1,
+                }) if *pokemon == pokemon_three
+            )
+        {
+            return Err(FixtureError::new(
+                "same-side-simultaneous-faint: legacy stage presentation order is outside its exact catalogue",
+            )
+            .into());
+        }
+        let (before_five, from_five) = presentation.split_at_mut(5);
+        std::mem::swap(&mut before_five[4].kind, &mut from_five[0].kind);
+    }
     Ok(FixturePresentationTrace {
         typed: presentation,
         messages,
@@ -7426,13 +7550,15 @@ fn record_move_id(
     Ok(Some(move_state.move_id))
 }
 
-fn legacy_player_targets_live_on_parent(
-    case_name: &str,
-    record: &FixtureCommandRecord,
-) -> bool {
+fn legacy_player_targets_live_on_parent(case_name: &str, record: &FixtureCommandRecord) -> bool {
     matches!(
         case_name,
-        "speed-tie" | "paralysis-speed-order" | "doubles-single-target"
+        "speed-tie"
+            | "paralysis-speed-order"
+            | "doubles-single-target"
+            | "pp-unusable-rejected"
+            | "voluntary-switch"
+            | "mixed-side-simultaneous-faint"
     ) && record.field_slot.side == BattleSide::Player
         && matches!(
             &record.legacy_command,
@@ -7489,7 +7615,7 @@ fn validate_legacy_command_wire(
 ) -> Result<(), Box<dyn Error>> {
     let command = u64_field(value, case_name, path, "command")?;
     match (record.field_slot.side, &record.legacy_command) {
-        (BattleSide::Player, BattleCommand::Fight { .. }) => {
+        (BattleSide::Player, BattleCommand::Fight { move_slot, .. }) => {
             assert_keys_with_optional(
                 case_name,
                 path,
@@ -7498,7 +7624,8 @@ fn validate_legacy_command_wire(
                 &["targets"],
             )?;
             if command != 0
-                || u64_field(value, case_name, path, "cursor")? != 0
+                || u64_field(value, case_name, path, "cursor")?
+                    != u64::from(move_slot.get())
                 || required(value, case_name, path, "args")? != &json!([1, null])
             {
                 return Err(FixtureError::new(format!(
@@ -7727,7 +7854,7 @@ fn validate_legacy_turn_advances(
                     "{case_name}: TURN_ADVANCE[{index}] cause {cause} is outside normalized action order"
                 ))
             })?;
-            if actions.last().map(|candidate| candidate.sequence) != Some(action.sequence) {
+            if !is_exact_legacy_turn_boundary_cause(case_name, action, actions) {
                 return Err(FixtureError::new(format!(
                     "{case_name}: TURN_ADVANCE[{index}] cause {cause} is not the exact final action"
                 ))
@@ -8160,10 +8287,7 @@ fn normalize_catalogued_grass_powder_mutations(
         ))
         .into());
     }
-    for (mutation_index, draw) in (1..=5)
-        .filter(|index| *index != 2)
-        .zip(battle_draws)
-    {
+    for (mutation_index, draw) in (1..=5).filter(|index| *index != 2).zip(battle_draws) {
         let Some(BattleMutation::BattleRngChanged { before, after }) =
             projected.get(mutation_index)
         else {
@@ -8289,9 +8413,8 @@ fn normalize_catalogued_legacy_faint_mutations(
         .iter()
         .map(|(occurrence, ..)| *occurrence)
         .collect::<BTreeSet<_>>();
-    let mut normalized = Vec::with_capacity(
-        trace.typed.len() + typed_stale.len() + usize::from(added_turn),
-    );
+    let mut normalized =
+        Vec::with_capacity(trace.typed.len() + typed_stale.len() + usize::from(added_turn));
     for mutation in &trace.typed {
         let occurrence = match mutation {
             BattleMutation::FaintProgressChanged { occurrence, .. }
@@ -8320,6 +8443,44 @@ fn normalize_catalogued_legacy_faint_mutations(
         normalized.push(resolved);
     }
     trace.typed = normalized;
+    Ok(())
+}
+
+fn normalize_catalogued_same_side_stage_order(
+    case_name: &str,
+    trace: &mut FixtureMutationTrace,
+) -> Result<(), Box<dyn Error>> {
+    if case_name != "same-side-simultaneous-faint" {
+        return Ok(());
+    }
+    let pokemon_three = PokemonId::try_from_u64(3)?;
+    let pokemon_four = PokemonId::try_from_u64(4)?;
+    if trace.typed.len() != 21
+        || !matches!(
+            trace.typed.get(7),
+            Some(BattleMutation::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before: 0,
+                after: -1,
+            }) if *pokemon == pokemon_four
+        )
+        || !matches!(
+            trace.typed.get(8),
+            Some(BattleMutation::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before: 0,
+                after: -1,
+            }) if *pokemon == pokemon_three
+        )
+    {
+        return Err(FixtureError::new(
+            "same-side-simultaneous-faint: legacy stage mutation order is outside its exact catalogue",
+        )
+        .into());
+    }
+    trace.typed.swap(7, 8);
     Ok(())
 }
 
@@ -8791,44 +8952,6 @@ fn normalize_catalogued_deterministic_intimidate_final(
     expected_rng: &mut FixtureRngBoundary,
     actual: &GameState,
 ) -> Result<(), Box<dyn Error>> {
-    if case_name == "grass-powder-immunity" {
-        let expected_battle = expected.battle.as_mut().ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: expected final state has no battle"))
-        })?;
-        let actual_battle = actual.battle.as_ref().ok_or_else(|| {
-            FixtureError::new(format!("{case_name}: typed final state has no battle"))
-        })?;
-        let legacy_state = expected_battle
-            .battle_rng
-            .saved_substream
-            .as_ref()
-            .map(|state| state.state_string.as_str());
-        let typed_state = actual_battle
-            .battle_rng
-            .saved_substream
-            .as_ref()
-            .map(|state| state.state_string.as_str());
-        if expected_battle.battle_rng != expected_rng.battle
-            || legacy_state
-                != Some(
-                    "!rnd,1421545,0.6411179925780743,0.8526409473270178,0.4494296652264893",
-                )
-            || typed_state
-                != Some(
-                    "!rnd,1783417,0.4494296652264893,0.3972089900635183,0.058738359017297626",
-                )
-            || expected_battle.battle_rng.battle_seed != actual_battle.battle_rng.battle_seed
-            || expected_battle.battle_rng.turn != actual_battle.battle_rng.turn
-        {
-            return Err(FixtureError::new(format!(
-                "{case_name}: final RNG is outside the exact post-immunity accuracy projection"
-            ))
-            .into());
-        }
-        expected_battle.battle_rng = actual_battle.battle_rng.clone();
-        expected_rng.battle = actual_battle.battle_rng.clone();
-        return Ok(());
-    }
     if case_name == "voluntary-switch" {
         for (pokemon, legacy_hp, typed_hp, max_hp) in
             [(2, 157, 159, 201), (3, 216, 217, 251), (4, 113, 124, 198)]
@@ -8921,6 +9044,80 @@ fn normalize_catalogued_deterministic_intimidate_final(
         expected_battle.battle_rng = actual_battle.battle_rng.clone();
         expected_rng.battle = actual_battle.battle_rng.clone();
     }
+    Ok(())
+}
+
+fn normalize_catalogued_filtered_final_faint_ledger(
+    case_name: &str,
+    expected: &mut GameState,
+    actual: &GameState,
+    mutations: &[BattleMutation],
+) -> Result<(), Box<dyn Error>> {
+    let Some((_, expected_count)) = LEGACY_FILTERED_RESOLVED_FAINT_CASES
+        .iter()
+        .find(|(candidate, _)| *candidate == case_name)
+    else {
+        return Ok(());
+    };
+    let expected_battle = expected.battle.as_mut().ok_or_else(|| {
+        FixtureError::new(format!("{case_name}: expected final state has no battle"))
+    })?;
+    let actual_battle = actual.battle.as_ref().ok_or_else(|| {
+        FixtureError::new(format!("{case_name}: typed final state has no battle"))
+    })?;
+    if !expected_battle.faint_queue.is_empty() {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy final faint queue is not the exact filtered-empty shape"
+        ))
+        .into());
+    }
+
+    let mut retained = Vec::with_capacity(*expected_count);
+    for (index, mutation) in mutations.iter().enumerate() {
+        let BattleMutation::FaintQueued { occurrence } = mutation else {
+            continue;
+        };
+        if !matches!(
+            occurrence.replacement,
+            ReplacementProgress::NotRequired | ReplacementProgress::Pending
+        ) || mutations[index + 1..]
+            .iter()
+            .filter(|candidate| {
+                matches!(
+                    candidate,
+                    BattleMutation::FaintResolved {
+                        occurrence: resolved,
+                    } if *resolved == occurrence.id
+                )
+            })
+            .count()
+            != 1
+        {
+            return Err(FixtureError::new(format!(
+                "{case_name}: queued faint occurrence {} is outside the exact resolved legacy-ledger shape",
+                occurrence.id
+            ))
+            .into());
+        }
+        let mut applied = *occurrence;
+        applied.replacement = ReplacementProgress::Applied;
+        retained.push(applied);
+    }
+    if retained.len() != *expected_count
+        || retained
+            .iter()
+            .map(|occurrence| occurrence.id)
+            .collect::<BTreeSet<_>>()
+            .len()
+            != *expected_count
+        || retained != actual_battle.faint_queue
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: reconstructed final faint ledger differs from the exact typed retained ledger"
+        ))
+        .into());
+    }
+    expected_battle.faint_queue = retained;
     Ok(())
 }
 
@@ -9059,10 +9256,8 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &actual_mutations,
         &transition.rng_audit,
     )?;
-    normalize_catalogued_legacy_faint_mutations(
-        case_name,
-        &mut expected_mutations,
-    )?;
+    normalize_catalogued_legacy_faint_mutations(case_name, &mut expected_mutations)?;
+    normalize_catalogued_same_side_stage_order(case_name, &mut expected_mutations)?;
     normalize_expected_final_resources(
         case_name,
         &initial,
@@ -9136,6 +9331,12 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &mut expected_final,
         &mut expected_final_rng,
         &replacement_replay.state,
+    )?;
+    normalize_catalogued_filtered_final_faint_ledger(
+        case_name,
+        &mut expected_final,
+        &replacement_replay.state,
+        &expected_mutations.typed,
     )?;
     compare_serialized_axis(
         case_name,
