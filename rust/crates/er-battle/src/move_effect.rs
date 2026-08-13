@@ -434,7 +434,7 @@ fn resolve_status_target(
         return Ok(MoveTargetResult {
             slot: target_slot,
             pokemon: Some(target.id),
-            disposition: TargetEffectDisposition::NativeTypeImmune,
+            disposition: TargetEffectDisposition::Executed,
             effectiveness: None,
             defensive_gate: None,
             accuracy: None,
