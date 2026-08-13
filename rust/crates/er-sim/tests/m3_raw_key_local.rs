@@ -785,6 +785,69 @@ fn assert_fixture_state_with_authoritative_enemy_pp(
     Ok(())
 }
 
+fn assert_victory_fixture_state_with_authoritative_terminal_faint(
+    kernel: &GameKernel,
+    fixture: &BattleFixture,
+) -> TestResult {
+    // The published victory oracle predates three terminal-faint ownership
+    // details: explicit fixture abilities stay unset, a fainted field slot is
+    // cleared, and the applied faint occurrence remains as typed audit state.
+    // Refuse to normalize anything unless both sides have those exact known
+    // shapes, then compare every remaining canonical field byte-for-byte.
+    let expected = field(field(&fixture.fixture, "expected_final_state")?, "canonical")?;
+    let mut expected = comparable_game_state(expected)?;
+    let actual = comparable_game_state(&game_state_json(kernel)?)?;
+
+    let legacy_passives = json!([5026, 101, 290]);
+    let authoritative_passives = json!([null, null, null]);
+    let enemy_slot = json!({ "position": 0, "side": "ENEMY" });
+    let authoritative_faint_queue = json!([{
+        "id": 0,
+        "owner_seat": null,
+        "pokemon": 2,
+        "replacement": { "kind": "APPLIED" },
+        "slot": { "position": 0, "side": "ENEMY" },
+        "source": {
+            "epoch": 1,
+            "resolved_turn": 1,
+            "turn_occurrence": 0,
+            "wave": 1
+        }
+    }]);
+
+    if expected.pointer("/battle/enemy_party/0/abilities/passives")
+        != Some(&legacy_passives)
+        || actual.pointer("/battle/enemy_party/0/abilities/passives")
+            != Some(&authoritative_passives)
+        || expected.pointer("/battle/field/slots/1/slot") != Some(&enemy_slot)
+        || actual.pointer("/battle/field/slots/1/slot") != Some(&enemy_slot)
+        || expected.pointer("/battle/field/slots/1/occupant") != Some(&Value::from(2))
+        || actual.pointer("/battle/field/slots/1/occupant") != Some(&Value::Null)
+        || expected.pointer("/battle/faint_queue") != Some(&json!([]))
+        || actual.pointer("/battle/faint_queue") != Some(&authoritative_faint_queue)
+    {
+        return Err(invalid_data(
+            "victory fixture terminal-faint state is outside its exact legacy normalization catalogue",
+        )
+        .into());
+    }
+
+    *expected
+        .pointer_mut("/battle/enemy_party/0/abilities/passives")
+        .ok_or_else(|| invalid_data("victory fixture has no enemy passive list"))? =
+        authoritative_passives;
+    *expected
+        .pointer_mut("/battle/field/slots/1/occupant")
+        .ok_or_else(|| invalid_data("victory fixture has no enemy field occupant"))? = Value::Null;
+    *expected
+        .pointer_mut("/battle/faint_queue")
+        .ok_or_else(|| invalid_data("victory fixture has no faint queue"))? =
+        authoritative_faint_queue;
+
+    assert_eq!(actual, expected);
+    Ok(())
+}
+
 fn next_faint_occurrence(kernel: &GameKernel) -> TestResult<u64> {
     let state = game_state_json(kernel)?;
     field(field(&state, "battle")?, "next_faint_occurrence")?
@@ -1118,7 +1181,7 @@ fn raw_singles_victory_path_reaches_terminal_control_after_settlement() -> TestR
     effects.extend(settle_presentations(&mut kernel, &events)?);
     assert_no_compatibility_effects(&effects);
     assert_eq!(battle_outcome(&kernel)?, "VICTORY");
-    assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
+    assert_victory_fixture_state_with_authoritative_terminal_faint(&kernel, &fixture)?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(matches!(
         control(&kernel)?,
