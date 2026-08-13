@@ -28,7 +28,7 @@ use crate::stat_stage::{
 };
 use crate::status::{
     StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError,
-    apply_status_with_chance, burn_damage_multiplier,
+    apply_status_with_chance, burn_damage_multiplier, powder_immunity,
 };
 use crate::type_effectiveness::{
     EffectivenessMultiplier, TypeEffectiveness, TypeEffectivenessError, resolve_type_effectiveness,
@@ -426,6 +426,27 @@ fn resolve_status_target(
     target: &mut PokemonState,
     move_definition: &MoveDefinition,
 ) -> Result<MoveTargetResult, MoveEffectError> {
+    // Powder immunity is a move-level no-effect gate in the legacy engine: it
+    // is resolved before accuracy, so an immune Grass target must not consume
+    // a battle RNG draw. Keep the later status admission path intact for all
+    // other status rejections (including existing and type-immune statuses).
+    if move_definition.flags.contains(&MoveFlag::Powder) && powder_immunity(target.types) {
+        return Ok(MoveTargetResult {
+            slot: target_slot,
+            pokemon: Some(target.id),
+            disposition: TargetEffectDisposition::NativeTypeImmune,
+            effectiveness: None,
+            defensive_gate: None,
+            accuracy: None,
+            critical: None,
+            damage: None,
+            hp_mutation: None,
+            status_effects: Vec::new(),
+            stat_stage_effects: Vec::new(),
+            faint_request: None,
+        });
+    }
+
     let accuracy = resolve_accuracy_for_target(runtime, actor, target, move_definition)?;
     if !accuracy.is_hit() {
         return Ok(MoveTargetResult {
