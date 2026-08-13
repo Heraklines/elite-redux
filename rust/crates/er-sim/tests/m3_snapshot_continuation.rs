@@ -1759,20 +1759,10 @@ mod live_coop_production {
         if packet.kind != RestorablePacketKindV2::AuthorityFrame {
             return false;
         }
-        let Ok(payload) = decode_canonical_packet::<NetworkPayload>(
+        let Ok(frame) = decode_canonical_network_frame_packet(
             &packet.body,
             "proposal result authority frame",
         ) else {
-            return false;
-        };
-        let NetworkPayload::Frame(raw) = payload else {
-            return false;
-        };
-        let frame = match raw {
-            RawFrame::JsonText(text) => serde_json::from_str::<NetworkFrame>(&text),
-            RawFrame::JsonValue(value) => serde_json::from_value::<NetworkFrame>(value),
-        };
-        let Ok(frame) = frame else {
             return false;
         };
         if frame.frame_type != FrameType::AuthorityEntry
@@ -2197,6 +2187,27 @@ mod live_coop_production {
         }
     }
 
+    fn decode_canonical_frame_packet_value(
+        body: &CanonicalHexBytes,
+        field: &str,
+    ) -> TestResult<Value> {
+        match decode_canonical_packet::<NetworkPayload>(body, field)? {
+            NetworkPayload::Frame(RawFrame::JsonValue(value)) => Ok(value),
+            NetworkPayload::Frame(RawFrame::JsonText(text)) => Ok(serde_json::from_str(&text)?),
+            NetworkPayload::Proposal(_) => Err(invalid(format!(
+                "{field} carried a proposal payload instead of a raw frame"
+            ))),
+        }
+    }
+
+    fn decode_canonical_network_frame_packet(
+        body: &CanonicalHexBytes,
+        field: &str,
+    ) -> TestResult<NetworkFrame> {
+        let value = decode_canonical_frame_packet_value(body, field)?;
+        Ok(serde_json::from_value(value)?)
+    }
+
     fn is_guest_host_generation_one_control_receipt(packet: &QueuedPacketSnapshotV2) -> bool {
         packet.kind == RestorablePacketKindV2::ControlReceipt
             && packet.source == PairEndpoint::Guest
@@ -2416,11 +2427,13 @@ mod live_coop_production {
         let Some(recovery) = snapshot.guest.protocol.recovery.as_ref() else {
             return Ok(false);
         };
-        let frame: NetworkFrame =
-            match decode_canonical_packet(&receipt.body, "delayed control receipt") {
-                Ok(frame) => frame,
-                Err(_) => return Ok(false),
-            };
+        let frame: NetworkFrame = match decode_canonical_network_frame_packet(
+            &receipt.body,
+            "delayed control receipt",
+        ) {
+            Ok(frame) => frame,
+            Err(_) => return Ok(false),
+        };
         if frame.version != 2
             || frame.frame_type != FrameType::AuthorityReceipt
             || frame.context != replica.receipt_context
@@ -3321,10 +3334,12 @@ mod live_coop_production {
                 PairEndpoint::Host,
                 generation(1),
             )?;
-            let original_frame: Value =
-                decode_canonical_packet(&original_body, "original control receipt")?;
-            let corrupted_frame: Value =
-                decode_canonical_packet(&corrupted.body, "corrupted control receipt")?;
+            let original_frame =
+                decode_canonical_frame_packet_value(&original_body, "original control receipt")?;
+            let corrupted_frame = decode_canonical_frame_packet_value(
+                &corrupted.body,
+                "corrupted control receipt",
+            )?;
             assert!(
                 original_frame
                     .pointer("/ctx/connectionGeneration")
