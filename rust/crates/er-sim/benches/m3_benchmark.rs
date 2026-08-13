@@ -222,47 +222,29 @@ fn normalize_legacy_type_chart(content: &mut Value, selected: &ContentPack) -> T
         .get_mut("entries")
         .and_then(Value::as_array_mut)
         .ok_or_else(|| invalid("content_pack.type_chart.entries is not an array"))?;
-    let expected_pairs = selected
-        .type_chart
-        .entries
-        .iter()
-        .map(|entry| {
-            let value = serde_json::to_value(entry)?;
-            let attack = value
-                .get("attack")
-                .and_then(Value::as_str)
-                .ok_or_else(|| invalid("selected type-chart attack is not a string"))?
-                .to_owned();
-            let defense = value
-                .get("defense")
-                .and_then(Value::as_str)
-                .ok_or_else(|| invalid("selected type-chart defense is not a string"))?
-                .to_owned();
-            Ok((attack, defense))
-        })
-        .collect::<TestResult<Vec<_>>>()?;
-
-    let mut normalized = Vec::with_capacity(entries.len());
-    for (expected_index, (attack, defense)) in expected_pairs.iter().enumerate() {
-        let position = entries.iter().position(|entry| {
-            entry.as_object().is_some_and(|entry| {
-                entry.get("attack").and_then(Value::as_str) == Some(attack.as_str())
-                    && entry.get("defense").and_then(Value::as_str) == Some(defense.as_str())
-            })
-        });
-        let position = position.ok_or_else(|| {
-            invalid(format!(
-                "content_pack.type_chart.entries is missing canonical pair at index {expected_index}"
-            ))
-        })?;
-        normalized.push(entries.remove(position));
-    }
-    if !entries.is_empty() {
+    let expected_entries = serde_json::to_value(&selected.type_chart.entries)?
+        .as_array()
+        .cloned()
+        .ok_or_else(|| invalid("selected type-chart entries are not an array"))?;
+    let legacy_entries = entries.clone();
+    if legacy_entries.len() != expected_entries.len() {
         return Err(invalid(
-            "content_pack.type_chart.entries contains unexpected pairs",
+            "content_pack.type_chart.entries count differs from selected content",
         ));
     }
-    *entries = normalized;
+    for (index, expected) in expected_entries.iter().enumerate() {
+        if legacy_entries
+            .iter()
+            .filter(|entry| *entry == expected)
+            .count()
+            != 1
+        {
+            return Err(invalid(format!(
+                "content_pack.type_chart.entries does not contain selected entry at index {index}"
+            )));
+        }
+    }
+    *entries = expected_entries;
     Ok(())
 }
 

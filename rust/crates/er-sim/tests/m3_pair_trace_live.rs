@@ -22,7 +22,7 @@ use er_sim::snapshot::{
     InternalEventKindV1, PairKernelTraceRecorder, PairKernelTraceV2, PairOperationV2,
     PairTraceObservationV2, SnapshotError, TraceFailureOwnerV2, TraceReplayReportV2,
 };
-use er_sim::{PairEndpoint, SimulatedBattlePairConfig, SimulatedPair};
+use er_sim::{PairEndpoint, PairOperation, SimulatedBattlePairConfig, SimulatedPair};
 use er_types::battle_command::{
     BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
     scripted_enemy_command_operation_id,
@@ -163,6 +163,40 @@ fn adapt_legacy_content_conditions(content: &mut Value) -> TestResult<()> {
     Ok(())
 }
 
+fn normalize_legacy_type_chart(content: &mut Value, selected: &ContentPack) -> TestResult<()> {
+    let expected_entries = serde_json::to_value(&selected.type_chart.entries)?
+        .as_array()
+        .cloned()
+        .ok_or_else(|| invalid("selected type chart entries are not an array"))?;
+    let type_chart = content
+        .get_mut("type_chart")
+        .ok_or_else(|| invalid("published content pack type_chart is missing"))?;
+    let entries = type_chart
+        .get_mut("entries")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| invalid("published type chart entries are not an array"))?;
+    let legacy_entries = entries.clone();
+    if legacy_entries.len() != expected_entries.len() {
+        return Err(invalid(
+            "published type chart entry count differs from selected content",
+        ));
+    }
+    for (index, expected) in expected_entries.iter().enumerate() {
+        if legacy_entries
+            .iter()
+            .filter(|entry| *entry == expected)
+            .count()
+            != 1
+        {
+            return Err(invalid(format!(
+                "published type chart does not contain selected entry at index {index}"
+            )));
+        }
+    }
+    *entries = expected_entries;
+    Ok(())
+}
+
 fn normalize_legacy_content_pack(artifact: &mut Value, selected: &ContentPack) -> TestResult<()> {
     selected.validate()?;
     let (provenance_hash, provenance_oracle_sha) = {
@@ -204,6 +238,7 @@ fn normalize_legacy_content_pack(artifact: &mut Value, selected: &ContentPack) -
     let pack = artifact
         .get_mut("content_pack")
         .ok_or_else(|| invalid("published content artifact content_pack is missing"))?;
+    normalize_legacy_type_chart(pack, selected)?;
     adapt_legacy_content_conditions(pack)?;
     pack.as_object_mut()
         .ok_or_else(|| invalid("published content pack is not an object"))?
@@ -512,7 +547,7 @@ fn new_live_pair() -> TestResult<(SimulatedPair, Arc<ContentPack>)> {
     let host = seat(1);
     let guest = seat(2);
     let connection_generation = generation(1);
-    let pair = SimulatedPair::new_battle(SimulatedBattlePairConfig {
+    let mut pair = SimulatedPair::new_battle(SimulatedBattlePairConfig {
         host_game: battle_config(&fixture, &content, host)?,
         host_protocol: authority_protocol(host, guest, connection_generation)?,
         guest_game: battle_config(&fixture, &content, guest)?,
@@ -520,6 +555,12 @@ fn new_live_pair() -> TestResult<(SimulatedPair, Arc<ContentPack>)> {
         content: Arc::clone(&content),
         replay_seed: 0x4c_u64,
         initial_storage: BTreeMap::new(),
+    })?;
+    // Battle protocol construction starts at generation one, while simulated
+    // transport starts at zero. Establish the connected generation before the
+    // trace captures its initial snapshot.
+    pair.apply(PairOperation::Reconnect {
+        endpoint: PairEndpoint::Host,
     })?;
     Ok((pair, content))
 }
