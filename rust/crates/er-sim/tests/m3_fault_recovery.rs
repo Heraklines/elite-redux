@@ -528,6 +528,30 @@ mod live_replica_recovery {
         ))
     }
 
+    fn settle_guest_pending_battle_presentations(pair: &mut SimulatedPair) -> TestResult {
+        for _ in 0..64 {
+            let snapshot = pair.snapshot_v2()?;
+            let pending = snapshot
+                .guest
+                .pending_presentations
+                .pending_barrier_ids
+                .clone();
+            if pending.is_empty() {
+                return Ok(());
+            }
+            for event_id in pending {
+                pair.apply(PairOperation::BattlePresentationOutcome {
+                    endpoint: PairEndpoint::Guest,
+                    event_id,
+                    outcome: PresentationSettlementOutcome::Settled,
+                })?;
+            }
+        }
+        Err(invalid(
+            "guest Battle presentation barriers did not settle within the fixture bound",
+        ))
+    }
+
     fn assert_guest_recovery_fence_held(snapshot: &RestorablePairSnapshotV2) -> TestResult {
         let recovery = snapshot
             .guest
@@ -912,6 +936,13 @@ mod live_replica_recovery {
             &corrupted_receipt_body,
         );
         assert_eq!(duplicated.len(), 2);
+
+        // Guest reconnect clears live presentation barriers while retaining
+        // their typed plan. Settle the exact guest boundary first so every
+        // retained plan event still has one pending/outcome state at the
+        // reconnect snapshot; the selected receipt and its duplicate remain
+        // untouched in the fault queue.
+        settle_guest_pending_battle_presentations(&mut pair)?;
 
         // A new generation fences the delayed/corrupted receipt copies while
         // the replica recovery transaction is visibly held.
