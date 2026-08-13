@@ -175,6 +175,45 @@ describe("SelectModifierPhase", () => {
     expect(modifierSelectHandler.options[4].modifierTypeOption.type.id).toEqual("GOLDEN_PUNCH");
   });
 
+  it("ER: rearms Sprint rewards after taking an Upgraded Map as the first free pick", async () => {
+    await game.classicMode.startBattle(SpeciesId.ABRA);
+    scene.shopCursorTarget = 1;
+    const phase = new SelectModifierPhase(
+      0,
+      undefined,
+      {
+        guaranteedModifierTypeFuncs: [modifierTypes.ER_UPGRADED_MAP, modifierTypes.POKEBALL],
+        fillRemaining: false,
+      },
+      false,
+      { kind: "ambient" },
+      undefined,
+      0,
+      2,
+      2,
+    );
+    scene.phaseManager.unshiftPhase(phase);
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const firstHandler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
+    const mapCursor = firstHandler.options.findIndex(option => option.modifierTypeOption.type.id === "ER_UPGRADED_MAP");
+    expect(mapCursor).toBeGreaterThanOrEqual(0);
+    await vi.waitFor(() => expect(firstHandler.getCoopMirrorCursorState()).not.toBeNull(), { timeout: 5_000 });
+    firstHandler.setRowCursor(1);
+    firstHandler.setCursor(mapCursor);
+    expect(firstHandler.processInput(Button.ACTION)).toBe(true);
+
+    await vi.waitFor(
+      () => {
+        expect(scene.ui.getMode()).toBe(UiMode.MODIFIER_SELECT);
+        expect(firstHandler.options).toHaveLength(1);
+        expect(firstHandler.getCoopMirrorCursorState()).not.toBeNull();
+      },
+      { timeout: 5_000 },
+    );
+  });
+
   it("should generate custom modifier tiers that can upgrade from luck", async () => {
     await game.classicMode.startBattle(SpeciesId.ABRA, SpeciesId.VOLCARONA);
     scene.money = 1000000;

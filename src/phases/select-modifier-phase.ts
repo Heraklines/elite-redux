@@ -1920,6 +1920,13 @@ export class SelectModifierPhase extends BattlePhase {
   // Function that resets the reward selection screen,
   // e.g. after pressing cancel in the party ui or while learning a move
   protected resetModifierSelect(modifierSelectCallback: ModifierSelectCallback) {
+    // Sprint rewards can grant multiple free picks on one SelectModifierPhase. After
+    // pick one the UI is still in MODIFIER_SELECT, but its one-shot action callback
+    // has already been consumed. Clear that active handler so setMode's same-mode
+    // path rebuilds the remaining offers and rearms input instead of soft-locking.
+    if (globalScene.ui.getMode() === UiMode.MODIFIER_SELECT) {
+      globalScene.ui.getHandler().clear();
+    }
     void globalScene.ui
       .setMode(
         UiMode.MODIFIER_SELECT,
