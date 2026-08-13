@@ -2271,6 +2271,7 @@ impl BattleTransaction {
             }
         }
         self.queue.push_all_source_order(reduction.events);
+        self.install_current_projection()?;
         Ok(())
     }
 
