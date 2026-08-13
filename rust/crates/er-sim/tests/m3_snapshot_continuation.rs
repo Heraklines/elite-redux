@@ -370,13 +370,6 @@ mod live_local_production {
         Ok(GameKernel::from_snapshot(snapshot, content)?)
     }
 
-    pub(super) fn battle_config_for_scenario(
-        scenario_id: &str,
-    ) -> TestResult<er_kernel::BattleGameConfig> {
-        let fixture = published_case(scenario_id)?;
-        battle_config(&fixture)
-    }
-
     pub(super) fn content_pack_for_pair() -> TestResult<Arc<ContentPack>> {
         content_pack()
     }
@@ -388,7 +381,7 @@ mod live_local_production {
         let (wire, mut uninterrupted) = {
             let mut original = new_kernel(&fixture)?;
             let held_effects = raw_key_down(&mut original, PhysicalKey::Enter)?;
-            assert!(held_effects.len() >= 1);
+            assert!(!held_effects.is_empty());
             assert!(matches!(control(&original)?, BattleControl::MoveSelect(_)));
 
             let snapshot = original.snapshot_v2()?;
@@ -634,8 +627,8 @@ mod live_coop_production {
     }
 
     fn safe_len(length: usize, field: &str) -> TestResult<SafeU53> {
-        Ok(SafeU53::new(u64::try_from(length)?)
-            .map_err(|error| invalid(format!("{field} length is not JS-safe: {error}")))?)
+        SafeU53::new(u64::try_from(length)?)
+            .map_err(|error| invalid(format!("{field} length is not JS-safe: {error}")))
     }
 
     impl M3ContinuationSuiteV1 {
