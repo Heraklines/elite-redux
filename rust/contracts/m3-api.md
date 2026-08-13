@@ -1775,11 +1775,11 @@ an entry with `Arc::make_mut` before changing its context. Synchronous authority
 publication validation borrows the already-installed game/control/policy
 instead of cloning them. The enclosing clone/validate/swap remains the rollback
 owner, while all public log actions, recovery slices, and snapshots continue to
-carry owned entries. The private FIFO `PreparedAuthorityEntry.material_bytes`
-is construction-correlated diagnostic evidence produced by one sealed
-prepared-transaction seam; it is not a second canonicalization or publication
-payload. The prepared AuthorityLog `Material { digest, payload }` remains the
-publication input.
+carry owned entries. The public cross-crate `PreparedAuthorityEntry` DTO has one
+crate-private production authority-preparation construction seam. Its
+`material_bytes` field is construction-correlated diagnostic evidence; it is not
+a second canonicalization or publication payload. The prepared AuthorityLog
+`Material { digest, payload }` remains the publication input.
 
 The canonical-`Value` proof operates directly on the already-parsed `Value` and
 compares its frozen canonical string bytes with the original typed canonical

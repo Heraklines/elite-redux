@@ -1123,7 +1123,6 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(source.contains(
         "apply_reducer_issued_turn_material_trusted as apply_turn_material"
     ));
-    assert!(source.contains("&prepared,"));
     let turn_start = source
         .find("pub(crate) fn prepare_authority_turn(")
         .ok_or("authority TURN preparation function missing")?;
@@ -1131,7 +1130,18 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("pub(crate) fn prepare_authority_replacement(")
         .ok_or("authority REPLACEMENT preparation function missing")?;
     let turn_source = &source[turn_start..replacement_start];
-    assert!(turn_source.contains("validate_control_allocator_projection(next_control, &allocators)?"));
+    let applier_start = turn_source
+        .find("let applied = apply_turn_material(")
+        .ok_or("TURN material applier call missing")?;
+    let applier_end = turn_source[applier_start..]
+        .find("\n    .map_err(AuthorityTransactionError::MaterialApply)?;")
+        .map(|offset| applier_start + offset)
+        .ok_or("TURN material applier call end missing")?;
+    let applier_source = &turn_source[applier_start..applier_end];
+    assert!(applier_source.contains("&prepared,"));
+    assert!(turn_source.contains(
+        "validate_control_allocator_projection(next_control, &allocators)?"
+    ));
     assert_eq!(
         turn_source.matches("validate_control_allocator_projection(").count(),
         1,
@@ -1171,10 +1181,21 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("pub(crate) enum PreparedMaterial")
         .ok_or("prepared material type missing")?;
     assert!(source[prepared_start..prepared_end].contains("scripted_policy_after"));
+    let take_entry_start = source
+        .find("pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry {")
+        .ok_or("prepared entry constructor method missing")?;
+    let take_entry_end = source[take_entry_start..]
+        .find("\n    }\n")
+        .map(|offset| take_entry_start + offset)
+        .ok_or("prepared entry constructor method end missing")?;
+    let take_entry_source = &source[take_entry_start..take_entry_end];
     assert_eq!(
-        source.matches("PreparedAuthorityEntry {").count(),
+        take_entry_source
+            .lines()
+            .filter(|line| *line == "        PreparedAuthorityEntry {")
+            .count(),
         1,
-        "authority adapter must have one sealed FIFO payload construction seam"
+        "authority adapter must have one crate-private production authority-preparation construction seam"
     );
     assert!(source.contains(
         "pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry"

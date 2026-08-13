@@ -44,11 +44,12 @@ publication validation.
   the latest-commit proof. Log transaction clones share those payloads;
   generation rebind uses `Arc::make_mut` before changing entry context so a
   failed or discarded transaction cannot mutate its predecessor.
-- Move the one canonical material byte vector into the private prepared-entry
-  event after preparation through one crate-private
-  `AuthorityPreparedTransaction::take_prepared_entry` construction
-  seam, and borrow the already-installed game, control, and scripted policy
-  during synchronous pre/post-publication comparison. The FIFO bytes are
+- Move the one canonical material byte vector into the public cross-crate
+  `PreparedAuthorityEntry` DTO after preparation through one crate-private
+  production authority-preparation
+  `AuthorityPreparedTransaction::take_prepared_entry` construction seam, and
+  borrow the already-installed game, control, and scripted policy during
+  synchronous pre/post-publication comparison. The DTO bytes are
   construction-correlated diagnostic evidence; the prepared AuthorityLog
   `Material { digest, payload }` remains the publication input.
 
@@ -67,8 +68,10 @@ the resolving loop.
 
 ## Acceptance evidence
 
-- source audits prove the prepared fields and constructor are sealed and no
-  raw transition or skip flag exists;
+- source audits prove `PreparedAuthorityTurn` retains sealed reducer evidence,
+  the public cross-crate `PreparedAuthorityEntry` DTO has one crate-private
+  production authority-preparation construction seam, and no raw transition or
+  skip flag exists;
 - material audits prove all four reducer evidence equalities and independent
   digest mode for ordinary paths;
 - a cloned authority log remains unchanged when its successor is rebound while
