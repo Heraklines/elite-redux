@@ -1157,9 +1157,23 @@ fn raw_key_forced_doubles_authority_replica_campaign() -> TestResult {
         BattleControl::ReplacementSelect(_)
     ));
 
-    for _ in 0..2 {
-        pair.raw_press(Endpoint::Host, PhysicalKey::ArrowDown)?;
-    }
+    let replacement_control = match &projection.seat_control.control {
+        BattleControl::ReplacementSelect(control) => control,
+        _ => unreachable!("replacement projection was checked above"),
+    };
+    let selected_option = replacement_control
+        .menu
+        .option(replacement_control.menu.selected_option_id.clone())
+        .ok_or_else(|| invalid("replacement projection selected option is absent"))?;
+    assert!(
+        selected_option.visibility.is_visible() && selected_option.enabled,
+        "replacement projection did not select an enabled visible party option"
+    );
+
+    // The runtime has already normalized the typed replacement graph to its
+    // first enabled visible party option.  Two raw Enter presses then follow
+    // ReplacementSelect -> PartyOptionSelect -> Send Out; walking Down would
+    // intentionally land on disabled active/cancel nodes.
     for _ in 0..2 {
         pair.raw_press(Endpoint::Host, PhysicalKey::Enter)?;
     }
