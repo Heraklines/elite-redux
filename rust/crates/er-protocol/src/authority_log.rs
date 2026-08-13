@@ -843,15 +843,26 @@ impl AuthorityLog {
         // delays, stages, and lease owners remain live exactly as they were.
         self.local_context = local_context.clone();
         self.peer_bindings = next_peers;
-        for lease in self.retained.values_mut() {
-            Arc::make_mut(&mut lease.entry).context = local_context.clone();
+        let rebound_head = self
+            .retained
+            .get_mut(&self.head_revision)
+            .map(|lease| {
+                Arc::make_mut(&mut lease.entry).context = local_context.clone();
+                Arc::clone(&lease.entry)
+            });
+        for (revision, lease) in &mut self.retained {
+            if *revision != self.head_revision {
+                Arc::make_mut(&mut lease.entry).context = local_context.clone();
+            }
             for (seat_id, peer) in &mut lease.peer_stages {
                 if let Some(generation) = self.peer_bindings.get(seat_id) {
                     peer.connection_generation = *generation;
                 }
             }
         }
-        if let Some(latest) = self.latest_committed.as_mut() {
+        if let Some(rebound_head) = rebound_head {
+            self.latest_committed = Some(rebound_head);
+        } else if let Some(latest) = self.latest_committed.as_mut() {
             Arc::make_mut(latest).context = local_context;
         }
 
@@ -1420,7 +1431,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
                         "retained head entry requires latest_committed",
                     ));
                 };
-                if entry != latest_committed.as_ref() {
+                if &entry != latest_committed.as_ref() {
                     return Err(snapshot_invalid(
                         "authority_log.retained.entry",
                         "retained head entry must equal latest_committed as a complete AuthorityEntry",
