@@ -13,8 +13,11 @@
 
 use std::collections::BTreeSet;
 
-use er_battle::{BattleNextDecision, BattleReplacementTransition, BattleTransition};
-use er_canonical::{canonical_bytes, canonicalize, content_digest};
+use er_battle::{
+    BattleNextDecision, BattleReplacementTransition, BattleTransition,
+    compute_presentation_plan_digest,
+};
+use er_canonical::{canonical_bytes, canonicalize};
 use er_content::pack::ContentPack;
 use er_game::authority_commands::{
     AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion,
@@ -1560,29 +1563,13 @@ fn matches_stored_replacement_control(
         && owner_seat == owner
 }
 
-/// Compute the frozen presentation-plan digest at the adapter boundary.  The
-/// typed event already carries blocking/skip policy, so the ordered event
-/// vector is the complete plan evidence.  Keeping this helper here avoids a
-/// second renderer-facing digest implementation while the game material
-/// codec/applier remains the integration seam.
+/// Compute the frozen presentation-plan digest at the adapter boundary through
+/// the same shared implementation used by local material production and strict
+/// material validation.
 fn presentation_plan_digest(
     presentation: &[BattlePresentationEvent],
 ) -> Result<PresentationPlanDigest, AuthorityTransactionError> {
-    #[derive(Serialize)]
-    struct PresentationDigestPreimage<'a> {
-        domain: &'static str,
-        events: &'a [BattlePresentationEvent],
-    }
-
-    const DOMAIN: &str = "pokerogue-redux/m3/presentation-plan/v1";
-    let raw = content_digest(&PresentationDigestPreimage {
-        domain: DOMAIN,
-        events: presentation,
-    })
-    .map_err(|source| AuthorityTransactionError::MaterialCodec {
-        reason: source.to_string(),
-    })?;
-    PresentationPlanDigest::new(format!("blake3-v1:{raw}")).map_err(|source| {
+    compute_presentation_plan_digest(presentation).map_err(|source| {
         AuthorityTransactionError::MaterialCodec {
             reason: source.to_string(),
         }
