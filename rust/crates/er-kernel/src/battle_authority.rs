@@ -11,6 +11,7 @@
 //! appliers remain the one production application path for authority and
 //! replica, while this module only composes them with the authority log.
 
+use std::borrow::Cow;
 use std::collections::BTreeSet;
 
 use er_battle::{
@@ -27,6 +28,7 @@ use er_game::authority_commands::{
     admit_scripted_enemy_frontier_trusted as admit_scripted_enemy_frontier,
     complete_command_frontier_trusted as complete_command_frontier, internal_no_legal_replacement,
     project_scripted_policy_for_material_trusted as project_scripted_policy_for_material,
+    validate_admitted_command_frontier_trusted,
 };
 use er_game::internal_event::PreparedAuthorityEntry;
 use er_game::material::{
@@ -71,11 +73,11 @@ const REPLACEMENT_MATERIAL_SCHEMA_VERSION: u32 = 1;
 /// material-install method must validate the fresh admitted scripted frontier
 /// and commit that cursor once for both authority and replica.
 #[derive(Clone)]
-pub(crate) struct AuthorityTransactionInput {
-    pub state: GameState,
-    pub control: BattleControlPlan,
-    pub menu_allocators: Vec<SeatMenuInstanceAllocator>,
-    pub scripted_policy: ScriptedEnemyPolicyV1,
+pub(crate) struct AuthorityTransactionInput<'a> {
+    pub state: &'a GameState,
+    pub control: &'a BattleControlPlan,
+    pub menu_allocators: &'a [SeatMenuInstanceAllocator],
+    pub scripted_policy: &'a ScriptedEnemyPolicyV1,
     pub authority_epoch: AuthorityEpoch,
     pub local_seat: SeatId,
     pub authority_context: FrameContext,
@@ -368,7 +370,7 @@ fn validate_published_authority_stage(
 
 /// Prepare a complete authority TURN on the already-cloned transaction.
 pub(crate) fn prepare_authority_turn(
-    input: AuthorityTransactionInput,
+    input: AuthorityTransactionInput<'_>,
     request: AuthorityTurnRequest,
     content: &ContentPack,
 ) -> Result<AuthorityPreparedTransaction, AuthorityTransactionError> {
@@ -395,18 +397,18 @@ pub(crate) fn prepare_authority_turn(
     // proposals; only the transport path differs outside this module.
     let mut proposals = human_proposals;
     proposals.sort_by(|left, right| left.operation_id.cmp(&right.operation_id));
-    let mut staged_state = state;
+    let mut staged_state = Cow::Borrowed(state);
     let mut admitted_proposals = Vec::new();
     for proposal in &proposals {
         match admit_command_proposal_with_context(
-            &staged_state,
-            &control,
+            staged_state.as_ref(),
+            control,
             Some(prepared_admission),
             proposal,
             content,
         )? {
             CommandAdmissionResult::Admitted { state, .. } => {
-                staged_state = state;
+                staged_state = Cow::Owned(state);
                 admitted_proposals.push(proposal.clone());
             }
             CommandAdmissionResult::Duplicate { .. } => {}
@@ -417,19 +419,24 @@ pub(crate) fn prepare_authority_turn(
     // current frontier while producing `prepared`.  Only run the admission
     // reducer when a pending enemy entry remains; an already-retained or
     // already-admitted entry must not consume the policy cursor twice.
-    let (staged_state, staged_policy) =
-        admit_scripted_if_pending(&staged_state, &scripted_policy, content)?;
-    let completion = complete_command_frontier(&staged_state, content)?;
-    let CommandFrontierCompletion::Complete {
-        state: complete_state,
-        commands: completed_commands,
-    } = completion
-    else {
-        return Err(AuthorityTransactionError::ControlProjection {
-            reason: "authority resolution requested before exact command frontier completion"
-                .to_owned(),
-        });
-    };
+    let (scripted_state, staged_policy) =
+        admit_scripted_if_pending(staged_state.as_ref(), scripted_policy, content)?;
+    let (complete_state, completed_commands): (Cow<GameState>, _) =
+        if let Some(validated) =
+            validate_admitted_command_frontier_trusted(scripted_state.as_ref(), content)?
+        {
+            let (state, commands) = validated.into_parts();
+            (Cow::Borrowed(state), commands)
+        } else {
+            let completion = complete_command_frontier(scripted_state.as_ref(), content)?;
+            let CommandFrontierCompletion::Complete { state, commands } = completion else {
+                return Err(AuthorityTransactionError::ControlProjection {
+                    reason: "authority resolution requested before exact command frontier completion"
+                        .to_owned(),
+                });
+            };
+            (Cow::Owned(state), commands)
+        };
 
     // Keep the resolver's command evidence tied to the exact completed
     // frontier.  The completion helper returns a canonical set, while the
@@ -439,7 +446,7 @@ pub(crate) fn prepare_authority_turn(
         .validate_canonical_order()
         .map_err(AuthorityCommandError::Command)
         .map_err(AuthorityTransactionError::Admission)?;
-    let completed_battle = complete_state.battle.as_ref().ok_or_else(|| {
+    let completed_battle = complete_state.as_ref().battle.as_ref().ok_or_else(|| {
         AuthorityTransactionError::ControlProjection {
             reason: "completed command frontier has no active battle".to_owned(),
         }
@@ -464,7 +471,7 @@ pub(crate) fn prepare_authority_turn(
 
     // The full before-state equality below includes the canonical frontier
     // and tombstones, not only the mechanical digest.
-    if candidate.before_state != complete_state {
+    if candidate.before_state != *complete_state.as_ref() {
         return Err(AuthorityTransactionError::CandidateMismatch {
             field: "before_state",
         });
@@ -481,11 +488,11 @@ pub(crate) fn prepare_authority_turn(
         &candidate.after_state,
         candidate.next_decision,
         next_control,
-        &staged_policy,
+        staged_policy.as_ref(),
         content,
     )?;
 
-    let allocators = advance_allocators_for_proposals(&menu_allocators, &admitted_proposals)?;
+    let allocators = advance_allocators_for_proposals(menu_allocators, &admitted_proposals)?;
     if prepared_admission.allocator_before() != allocators.as_slice() {
         return Err(AuthorityTransactionError::Admission(
             AuthorityCommandError::AdmissionAllocatorMismatch,
@@ -500,11 +507,9 @@ pub(crate) fn prepare_authority_turn(
         payload,
     };
     let applied = apply_turn_material(
-        &BattleMaterialApplyContext {
-            current_state: complete_state.clone(),
-            local_seat,
-            menu_allocators: allocators.clone(),
-        },
+        complete_state.as_ref(),
+        local_seat,
+        &allocators,
         &decoded,
         content,
         &prepared,
@@ -555,7 +560,7 @@ pub(crate) fn prepare_authority_turn(
 /// the one authority resolver candidate and game-owned projection bundle;
 /// replicas use the common material applier and never call this function.
 pub(crate) fn prepare_authority_replacement(
-    input: AuthorityTransactionInput,
+    input: AuthorityTransactionInput<'_>,
     request: AuthorityReplacementRequest,
     content: &ContentPack,
 ) -> Result<AuthorityPreparedTransaction, AuthorityTransactionError> {
@@ -583,8 +588,8 @@ pub(crate) fn prepare_authority_replacement(
     let (selection, occurrence, proposals) = match decision {
         AuthorityReplacementDecision::Proposal(proposal) => {
             let admission = admit_replacement_proposal_with_context(
-                &state,
-                &control,
+                state,
+                control,
                 Some(&prepared_admission),
                 replacement_fingerprints.entries(),
                 &proposal,
@@ -605,7 +610,7 @@ pub(crate) fn prepare_authority_replacement(
             }
         }
         AuthorityReplacementDecision::NoLegalReplacement { occurrence } => {
-            let internal = internal_no_legal_replacement(&state, occurrence, content)?;
+            let internal = internal_no_legal_replacement(state, occurrence, content)?;
             (internal.selection, occurrence, Vec::new())
         }
     };
@@ -640,9 +645,9 @@ pub(crate) fn prepare_authority_replacement(
     .map_err(AuthorityCommandError::Command)
     .map_err(AuthorityTransactionError::Admission)?;
     if proposals.is_empty() {
-        validate_internal_replacement_control(&control, stored, &operation_id)?;
+        validate_internal_replacement_control(control, stored, &operation_id)?;
     }
-    if candidate.before_state != state {
+    if candidate.before_state != *state {
         return Err(AuthorityTransactionError::CandidateMismatch {
             field: "before_state",
         });
@@ -659,11 +664,11 @@ pub(crate) fn prepare_authority_replacement(
         &candidate.after_state,
         candidate.next_decision,
         &next_control,
-        &scripted_policy,
+        scripted_policy,
         content,
     )?;
 
-    let allocators = advance_allocators_for_replacement_proposals(&menu_allocators, &proposals)?;
+    let allocators = advance_allocators_for_replacement_proposals(menu_allocators, &proposals)?;
     if prepared_admission.allocator_before() != allocators.as_slice() {
         return Err(AuthorityTransactionError::Admission(
             AuthorityCommandError::AdmissionAllocatorMismatch,
@@ -684,7 +689,7 @@ pub(crate) fn prepare_authority_replacement(
     };
     let applied = apply_replacement_material(
         &BattleMaterialApplyContext {
-            current_state: state.clone(),
+            current_state: (*state).clone(),
             local_seat,
             menu_allocators: allocators.clone(),
         },
@@ -744,11 +749,17 @@ fn map_authority_log_error(
     }
 }
 
-fn admit_scripted_if_pending(
-    state: &GameState,
-    policy: &ScriptedEnemyPolicyV1,
+fn admit_scripted_if_pending<'a>(
+    state: &'a GameState,
+    policy: &'a ScriptedEnemyPolicyV1,
     content: &ContentPack,
-) -> Result<(GameState, ScriptedEnemyPolicyV1), AuthorityTransactionError> {
+) -> Result<
+    (
+        Cow<'a, GameState>,
+        Cow<'a, ScriptedEnemyPolicyV1>,
+    ),
+    AuthorityTransactionError,
+> {
     // This is a temporary admission view needed only when the transaction's
     // input frontier still has pending enemy entries.  A prepared GameRuntime
     // frontier already carrying admitted enemies takes the no-op branch, so
@@ -769,10 +780,10 @@ fn admit_scripted_if_pending(
             )
     });
     if !has_pending_enemy {
-        return Ok((state.clone(), policy.clone()));
+        return Ok((Cow::Borrowed(state), Cow::Borrowed(policy)));
     }
     let admitted = admit_scripted_enemy_frontier(state, policy, content)?;
-    Ok((admitted.state, admitted.policy))
+    Ok((Cow::Owned(admitted.state), Cow::Owned(admitted.policy)))
 }
 
 /// Validate the already-projected resolver candidate before it becomes
