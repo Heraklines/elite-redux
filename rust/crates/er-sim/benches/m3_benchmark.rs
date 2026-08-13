@@ -1576,8 +1576,7 @@ fn m3_simple_turn_resolutions() -> TestResult {
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
     for iteration in 0..SIMPLE_TURN_RESOLUTIONS {
-        let mut kernel =
-            new_local_kernel_with_config(local_config.clone(), &content, iteration)?;
+        let mut kernel = new_local_kernel_with_config(local_config.clone(), &content, iteration)?;
         let before = kernel.snapshot().state;
         let mut effects =
             raw_press_local(&mut kernel, &mut checksum, &mut counts, PhysicalKey::Enter)?;

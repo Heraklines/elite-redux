@@ -554,8 +554,8 @@ mod live_coop_production {
     };
     use er_types::battle_control::BattleControl;
     use er_types::battle_ids::{
-        BattlePresentationEventId, BattleSide, CanonicalHexBytes, FieldSlot, MoveSlotIndex,
-        MoveId, PartyIndex, TurnIndex,
+        BattlePresentationEventId, BattleSide, CanonicalHexBytes, FieldSlot, MoveId, MoveSlotIndex,
+        PartyIndex, TurnIndex,
     };
     use er_types::battle_ui::PresentationSettlementOutcome;
     use er_types::{
@@ -1384,12 +1384,7 @@ mod live_coop_production {
             ));
         }
         if player_leads.len() != player_capacity
-            || player_leads
-                .iter()
-                .copied()
-                .collect::<BTreeSet<_>>()
-                .len()
-                != player_capacity
+            || player_leads.iter().copied().collect::<BTreeSet<_>>().len() != player_capacity
         {
             return Err(invalid(
                 "forced-victory fixture must have one distinct player lead per active slot",
