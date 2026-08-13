@@ -25,31 +25,37 @@ const LEGACY_ORACLE_CONTENT_DIGEST: &str =
 const LEGACY_ORACLE_CONTENT_HASH: &str =
     "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
-fn extract_function_section<'a>(source: &'a str, signature: &str) -> &'a str {
-    let start = source
-        .find(signature)
-        .unwrap_or_else(|| panic!("missing function signature {signature}"));
-    let body_start = source[start..]
-        .find('{')
-        .map(|offset| start + offset)
-        .unwrap_or_else(|| panic!("missing function body for {signature}"));
+fn unique_function_offset(source: &str, signature: &str) -> usize {
+    assert_eq!(
+        source.matches(signature).count(),
+        1,
+        "expected exactly one function signature {signature:?}",
+    );
 
-    let mut depth = 0usize;
-    for (offset, byte) in source[body_start..].bytes().enumerate() {
-        match byte {
-            b'{' => depth += 1,
-            b'}' => {
-                depth = depth
-                    .checked_sub(1)
-                    .expect("function section has an unmatched closing brace");
-                if depth == 0 {
-                    return &source[start..body_start + offset + 1];
-                }
-            }
-            _ => {}
-        }
-    }
-    panic!("function section has an unmatched opening brace for {signature}");
+    let line_anchor = format!("\n{signature}");
+    let mut matches = source.match_indices(&line_anchor);
+    let (offset, _) = matches
+        .next()
+        .unwrap_or_else(|| panic!("missing line-anchored function signature {signature:?}"));
+    assert!(
+        matches.next().is_none(),
+        "expected exactly one line-anchored function signature {signature:?}",
+    );
+    offset + 1
+}
+
+fn extract_function_section<'a>(
+    source: &'a str,
+    signature: &str,
+    next_signature: &str,
+) -> &'a str {
+    let start = unique_function_offset(source, signature);
+    let end = unique_function_offset(source, next_signature);
+    assert!(
+        start < end,
+        "function signature {signature:?} must precede {next_signature:?}",
+    );
+    &source[start..end]
 }
 
 fn is_status_kind_tag(tag: &str) -> bool {
@@ -598,14 +604,26 @@ fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
 #[test]
 fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
     let source = MATERIAL_SOURCE.replace("\r\n", "\n");
-    let public_turn = extract_function_section(&source, "pub fn apply_turn_material(");
-    let public_turn_trusted =
-        extract_function_section(&source, "pub fn apply_turn_material_trusted(");
+    let public_turn = extract_function_section(
+        &source,
+        "pub fn apply_turn_material(",
+        "pub fn apply_turn_material_trusted(",
+    );
+    let public_turn_trusted = extract_function_section(
+        &source,
+        "pub fn apply_turn_material_trusted(",
+        "pub fn apply_reducer_issued_turn_material_trusted(",
+    );
     let reducer_turn = extract_function_section(
         &source,
         "pub fn apply_reducer_issued_turn_material_trusted(",
+        "fn apply_turn_material_inner(",
     );
-    let turn_inner = extract_function_section(&source, "fn apply_turn_material_inner(");
+    let turn_inner = extract_function_section(
+        &source,
+        "fn apply_turn_material_inner(",
+        "pub fn apply_replacement_material(",
+    );
 
     for (name, section, signature) in [
         (
@@ -630,14 +648,46 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
             "{name} no longer accepts current: &BattleMaterialApplyContext",
         );
     }
+    let turn_inner_forwarding = concat!(
+        "apply_turn_material_inner(\n",
+        "        &current.current_state,\n",
+        "        current.local_seat,\n",
+        "        &current.menu_allocators,",
+    );
+    assert!(
+        public_turn.contains(turn_inner_forwarding),
+        "public TURN wrapper no longer forwards the current state, local seat, and menu allocators",
+    );
+    assert!(
+        public_turn_trusted.contains(turn_inner_forwarding),
+        "trusted TURN wrapper no longer forwards the current state, local seat, and menu allocators",
+    );
     assert!(
         reducer_turn.starts_with(concat!(
             "pub fn apply_reducer_issued_turn_material_trusted(\n",
             "    current_state: &GameState,\n",
             "    local_seat: SeatId,\n",
             "    menu_allocators: &[SeatMenuInstanceAllocator],",
+            "\n    material: &BattleTurnMaterialV1,\n",
+            "    content: &ContentPack,\n",
+            "    prepared: &PreparedAuthorityTurn,\n",
         )),
-        "reducer-issued TURN entry point changed its borrowed state/seat/allocator views",
+        "reducer-issued TURN entry point changed its borrowed state/seat/allocator/prepared views",
+    );
+    assert!(
+        reducer_turn.contains(
+            "let transition = prepared.digest_evidence().transition();"
+        ),
+        "reducer-issued TURN path no longer obtains transition evidence from prepared",
+    );
+    assert!(
+        reducer_turn.contains(concat!(
+            "apply_turn_material_inner(\n",
+            "        current_state,\n",
+            "        local_seat,\n",
+            "        menu_allocators,",
+        )),
+        "reducer-issued TURN path no longer forwards current state, local seat, and menu allocators",
     );
     assert!(
         turn_inner.starts_with(concat!(
@@ -689,8 +739,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
             "reducer-issued material path omitted {evidence_check}",
         );
     }
-    assert!(!source.contains("pub skip_digest"));
-    assert!(!source.contains("pub fn skip_digest"));
+    assert!(!source.contains("skip_digest"));
 }
 
 #[test]
