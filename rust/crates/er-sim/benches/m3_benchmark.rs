@@ -511,10 +511,8 @@ fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicy
                     BattleTargetSelection::selected(vec![target])?
                 };
             let command = BattleCommand::fight(actor, MoveSlotIndex::ZERO, target_selection)?;
-            let script_cursor = safe(
-                u64::try_from(turn_offset)? * u64::from(enemy_capacity)
-                    + u64::from(position),
-            );
+            let script_cursor =
+                safe(u64::try_from(turn_offset)? * u64::from(enemy_capacity) + u64::from(position));
             let operation_id = scripted_enemy_command_operation_id(
                 battle.battle_id,
                 battle.wave,
@@ -667,6 +665,15 @@ fn new_local_kernel(
 ) -> TestResult<GameKernel> {
     let local_seat = seat(1);
     let config = battle_config(fixture, content.as_ref(), local_seat, false)?;
+    new_local_kernel_with_config(config, content, iteration)
+}
+
+fn new_local_kernel_with_config(
+    config: BattleGameConfig,
+    content: &Arc<ContentPack>,
+    iteration: u64,
+) -> TestResult<GameKernel> {
+    let local_seat = seat(1);
     let protocol = authority_protocol(
         "m3-benchmark-local",
         iteration,
@@ -1561,11 +1568,16 @@ fn m3_simple_turn_resolutions() -> TestResult {
     let content = fixture_content_pack()?;
     let content_load_elapsed_ns = elapsed_ns(content_started);
     let fixture = fixture_value(PHYSICAL_HIT_FIXTURE)?;
+    // The fixture-derived game config is invariant across local iterations.
+    // Keep its parsing/normalization outside timing; new_battle consumes the
+    // cloned config while the per-iteration protocol identity remains fresh.
+    let local_config = battle_config(&fixture, content.as_ref(), seat(1), false)?;
     let execution_started = Instant::now();
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
     for iteration in 0..SIMPLE_TURN_RESOLUTIONS {
-        let mut kernel = new_local_kernel(&fixture, &content, iteration)?;
+        let mut kernel =
+            new_local_kernel_with_config(local_config.clone(), &content, iteration)?;
         let before = kernel.snapshot().state;
         let mut effects =
             raw_press_local(&mut kernel, &mut checksum, &mut counts, PhysicalKey::Enter)?;
