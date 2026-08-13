@@ -941,8 +941,7 @@ mod live_replica_recovery {
         })?;
         let checkpoint = pair.snapshot_v2()?;
         assert_eq!(
-            checkpoint.guest.pending_presentations,
-            guest_presentations_before,
+            checkpoint.guest.pending_presentations, guest_presentations_before,
             "guest reconnect changed the local presentation epoch",
         );
         let guest_presenter_pending_after = checkpoint
