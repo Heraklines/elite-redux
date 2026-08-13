@@ -1333,6 +1333,15 @@ presentation IDs; neither function reads protocol runtime state. Neither
 function owns a menu, UI, timer, or environment state. `er-game` maps the typed
 `BattleNextDecision` to the exact `BattleControlPlan` carried by material.
 
+The integration-only doc-hidden `er-battle` TURN seam accepts a typed `FnOnce`
+finalizer for the cloned after-state and mutation evidence. `GameRuntime` uses
+it to insert the exact next command frontier before the resolver's one final
+state/content validation, after-state digest, and mutation-evidence replay.
+The seam returns only the fully proved `BattleTransition`; it does not expose
+an unvalidated transition or a mutable digest proof. Public `resolve_turn` and
+`resolve_turn_trusted` continue to use a no-op finalizer and retain the public
+signatures and behavior described above.
+
 Before-state validation, including the state error returned by command
 legality, maps to `InvalidBeforeState`. A reachable capability classified as
 unsupported maps to `UnsupportedEffectReached`. Candidate-state validation,

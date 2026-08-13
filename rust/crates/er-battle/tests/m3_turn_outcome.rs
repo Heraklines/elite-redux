@@ -15,6 +15,7 @@ use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState, Repla
 use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
 };
+use er_state::digest::MechanicalStateDigest;
 use er_state::field::{FieldSlotState, FieldState};
 use er_state::format::BattleFormat;
 use er_state::pokemon::{
@@ -392,6 +393,10 @@ fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_in
     assert_eq!(after_battle.turn, turn(2)?);
     assert_eq!(after_battle.turn, after_battle.battle_rng.turn);
     assert!(after_battle.command_state.frontier.is_empty());
+    assert_eq!(
+        transition.after_digest,
+        MechanicalStateDigest::compute(&transition.after_state)?
+    );
     assert_eq!(transition.rng_audit.len(), 1);
     assert_eq!(
         transition
@@ -419,6 +424,108 @@ fn successful_ongoing_turn_advances_once_clears_frontier_and_preserves_before_in
         assert_eq!(event.event_id.operation_id, operation);
         assert_eq!(event.event_id.sequence, safe(u64::try_from(index)?)?);
     }
+    Ok(())
+}
+
+#[test]
+fn trusted_turn_finalizer_metadata_and_digest_use_finalized_state() -> TestResult {
+    let content = selected_content_pack()?;
+    let mut state = state_with_parties(
+        &content,
+        vec![pokemon(
+            &content,
+            1,
+            Some(seat(1)?),
+            &[589],
+            100,
+            StatusKind::None,
+            200,
+        )?],
+        vec![pokemon(
+            &content,
+            2,
+            None,
+            &[589],
+            100,
+            StatusKind::None,
+            100,
+        )?],
+    )?;
+    let commands = admit_single_fights(&mut state, &content, 589, 589)?;
+    let before = state.clone();
+    let mut finalizer_called = false;
+    let transition = er_battle::resolve_turn_trusted_with_finalizer(
+        &before,
+        &commands,
+        AuthorityEpoch::new(safe(5)?),
+        &turn_operation(&before)?,
+        &content,
+        |before_seen, after, mutations, decision_hint| {
+            finalizer_called = true;
+            assert_eq!(before_seen, &before);
+            assert_eq!(decision_hint, BattleNextDecision::CommandFrontier);
+            let battle = after
+                .battle
+                .as_mut()
+                .expect("resolved candidate must retain its battle");
+            assert!(battle.command_state.frontier.is_empty());
+            let (enemy, hp_before) = {
+                let enemy = battle
+                    .enemy_party
+                    .first_mut()
+                    .expect("resolved candidate must retain its enemy");
+                let enemy_id = enemy.id;
+                let hp_before = enemy.hp;
+                assert!(hp_before > 0);
+                enemy.hp = 0;
+                enemy.fainted = true;
+                (enemy_id, hp_before)
+            };
+            mutations.push(BattleMutation::HpChanged {
+                pokemon: enemy,
+                before: hp_before,
+                after: 0,
+            });
+            let field_slot = {
+                let entry = battle
+                    .field
+                    .slots
+                    .iter_mut()
+                    .find(|entry| entry.occupant == Some(enemy))
+                    .expect("resolved candidate must retain the enemy field occupant");
+                entry.occupant = None;
+                entry.slot
+            };
+            mutations.push(BattleMutation::FieldChanged {
+                slot: field_slot,
+                before: Some(enemy),
+                after: None,
+            });
+            let outcome_before = battle.outcome;
+            battle.outcome = BattleOutcome::Victory;
+            mutations.push(BattleMutation::OutcomeChanged {
+                before: outcome_before,
+                after: BattleOutcome::Victory,
+            });
+            Ok::<(), er_battle::error::BattleResolveError>(())
+        },
+    )?;
+
+    assert!(finalizer_called);
+    assert_eq!(battle(&transition.after_state)?.outcome, BattleOutcome::Victory);
+    assert_eq!(transition.outcome, BattleOutcome::Victory);
+    assert_eq!(
+        transition.next_decision,
+        BattleNextDecision::Complete(BattleOutcome::Victory)
+    );
+    assert_eq!(
+        transition.after_digest,
+        MechanicalStateDigest::compute(&transition.after_state)?
+    );
+    assert!(matches!(
+        transition.presentation.last().map(|event| &event.kind),
+        Some(&BattlePresentationKind::BattleWon)
+    ));
     Ok(())
 }
 

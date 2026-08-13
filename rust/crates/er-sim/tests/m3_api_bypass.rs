@@ -111,6 +111,17 @@ fn battle_mode_has_no_fixture_plans_or_public_semantic_driver() {
             "{label} must not call a doc-hidden trusted-content transaction seam"
         );
     }
+    assert!(RUNTIME_SOURCE.contains("resolve_turn_trusted_with_finalizer"));
+    for (label, source) in [
+        ("parity adapter", PARITY_SOURCE),
+        ("teardown test", TEARDOWN_SOURCE),
+        ("benchmark", BENCHMARK_SOURCE),
+    ] {
+        assert!(
+            !source.contains("resolve_turn_trusted_with_finalizer"),
+            "{label} must not call the doc-hidden resolver finalizer seam"
+        );
+    }
 
     let input_source = between(
         KERNEL_INPUT_SOURCE,

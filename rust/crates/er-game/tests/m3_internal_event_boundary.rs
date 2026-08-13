@@ -8,6 +8,8 @@ use er_types::{ButtonEvent, GameButton, MenuOptionId, SafeU53, SeatId};
 const INTERNAL_EVENT_SOURCE: &str = include_str!("../src/internal_event.rs");
 const AUTHORITY_COMMAND_SOURCE: &str = include_str!("../src/authority_commands.rs");
 const TRANSACTION_SOURCE: &str = include_str!("../src/transaction.rs");
+const BATTLE_TURN_SOURCE: &str = include_str!("../../er-battle/src/turn.rs");
+const RUNTIME_SOURCE: &str = include_str!("../src/runtime.rs");
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test value must fit in a safe integer")
@@ -125,8 +127,14 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
         "pub enum InternalEvent",
         "pub enum InternalEventKind",
         "pub struct InternalEventQueue",
+        "pub fn resolve_turn_trusted_with_finalizer",
     ] {
-        assert_doc_hidden_before(INTERNAL_EVENT_SOURCE, item);
+        let source = if item.contains("resolve_turn") {
+            BATTLE_TURN_SOURCE
+        } else {
+            INTERNAL_EVENT_SOURCE
+        };
+        assert_doc_hidden_before(source, item);
     }
     for constructor in [
         "pub fn activate(",
@@ -178,6 +186,40 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
     assert!(!digest_fields.contains("pub transition"));
     assert!(INTERNAL_EVENT_SOURCE.contains("pub(crate) fn from_finalized_transition"));
     assert!(!INTERNAL_EVENT_SOURCE.contains("fn into_transition"));
+
+    assert!(BATTLE_TURN_SOURCE.contains("FinalizerError: From<BattleResolveError>"));
+    let finalizer_call = BATTLE_TURN_SOURCE
+        .split_once("let finalizer_decision_hint = {")
+        .and_then(|(_, source)| source.split_once("validate_after_state_trusted(&after, content)?"))
+        .map(|(source, _)| source)
+        .expect("TURN finalizer must receive only a pre-validation decision hint");
+    assert!(finalizer_call.contains("finalizer("));
+    assert!(finalizer_call.contains("finalizer_decision_hint"));
+    assert!(BATTLE_TURN_SOURCE.contains("validate_after_state_trusted(&after, content)?"));
+    let finalized_metadata = BATTLE_TURN_SOURCE
+        .split_once("validate_after_state_trusted(&after, content)?")
+        .and_then(|(_, source)| source.split_once("let after_digest"))
+        .map(|(source, _)| source)
+        .expect("finalized TURN metadata must be derived after final validation");
+    assert!(finalized_metadata.contains("let (outcome, next_decision)"));
+    assert!(finalized_metadata.contains("let battle = active_battle(&after)?"));
+    assert!(BATTLE_TURN_SOURCE.contains("validate_battle_mutation_evidence(before, &after"));
+    assert!(BATTLE_TURN_SOURCE.contains("|_, _, _, _| Ok::<(), BattleResolveError>(())"));
+
+    let reducer_identity = RUNTIME_SOURCE
+        .split_once("fn validate_reducer_issued_turn_transition_identity(")
+        .and_then(|(_, source)| source.split_once("fn validate_turn_transition_identity_inner("))
+        .map(|(source, _)| source)
+        .expect("reducer-issued transition identity seam must remain explicit");
+    assert!(!reducer_identity.contains("validate_state_content_trusted"));
+    assert!(!reducer_identity.contains("validate_battle_mutation_evidence"));
+    assert!(!reducer_identity.contains("MechanicalStateDigest::compute"));
+    let identity_inner = RUNTIME_SOURCE
+        .split_once("fn validate_turn_transition_identity_inner(")
+        .and_then(|(_, source)| source.split_once("fn validate_replacement_transition_identity("))
+        .map(|(source, _)| source)
+        .expect("turn transition identity implementation must remain explicit");
+    assert!(identity_inner.contains("TurnTransitionDigestValidation::ReducerIssued"));
 
     let prepared_fields = struct_body(AUTHORITY_COMMAND_SOURCE, "pub struct PreparedAuthorityTurn");
     assert_doc_hidden_before(AUTHORITY_COMMAND_SOURCE, "pub struct PreparedAuthorityTurn");

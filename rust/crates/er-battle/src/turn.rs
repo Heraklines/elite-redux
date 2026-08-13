@@ -86,6 +86,7 @@ pub fn resolve_turn(
         authority_epoch,
         material_operation_id,
         content,
+        |_, _, _, _| Ok::<(), BattleResolveError>(()),
     )
 }
 
@@ -99,25 +100,73 @@ pub fn resolve_turn_trusted(
     material_operation_id: &OperationId,
     content: &ContentPack,
 ) -> Result<BattleTransition, BattleResolveError> {
-    validate_state_content_trusted(before, content)?;
+    resolve_turn_trusted_with_finalizer(
+        before,
+        commands,
+        authority_epoch,
+        material_operation_id,
+        content,
+        |_, _, _, _| Ok::<(), BattleResolveError>(()),
+    )
+}
+
+/// Resolve a trusted turn and run one game-owned finalizer before the
+/// resolver's final after-state validation, digest, and mutation-evidence
+/// proof. The returned transition is never exposed before that combined
+/// proof succeeds. The finalizer's decision argument is a pre-finalization
+/// hint; authoritative outcome and decision metadata are derived afterward.
+#[doc(hidden)]
+pub fn resolve_turn_trusted_with_finalizer<Finalizer, FinalizerError>(
+    before: &GameState,
+    commands: &CommandSet,
+    authority_epoch: AuthorityEpoch,
+    material_operation_id: &OperationId,
+    content: &ContentPack,
+    finalizer: Finalizer,
+) -> Result<BattleTransition, FinalizerError>
+where
+    Finalizer: FnOnce(
+        &GameState,
+        &mut GameState,
+        &mut Vec<BattleMutation>,
+        BattleNextDecision,
+    ) -> Result<(), FinalizerError>,
+    FinalizerError: From<BattleResolveError>,
+{
+    validate_state_content_trusted(before, content)
+        .map_err(BattleResolveError::from)
+        .map_err(FinalizerError::from)?;
     resolve_turn_validated(
         before,
         commands,
         authority_epoch,
         material_operation_id,
         content,
+        finalizer,
     )
 }
 
-fn resolve_turn_validated(
+fn resolve_turn_validated<Finalizer, FinalizerError>(
     before: &GameState,
     commands: &CommandSet,
     authority_epoch: AuthorityEpoch,
     material_operation_id: &OperationId,
     content: &ContentPack,
-) -> Result<BattleTransition, BattleResolveError> {
+    finalizer: Finalizer,
+) -> Result<BattleTransition, FinalizerError>
+where
+    Finalizer: FnOnce(
+        &GameState,
+        &mut GameState,
+        &mut Vec<BattleMutation>,
+        BattleNextDecision,
+    ) -> Result<(), FinalizerError>,
+    FinalizerError: From<BattleResolveError>,
+{
     if authority_epoch == AuthorityEpoch::ZERO {
-        return Err(map_faint_input_error(FaintQueueError::ZeroAuthorityEpoch));
+        return Err(FinalizerError::from(map_faint_input_error(
+            FaintQueueError::ZeroAuthorityEpoch,
+        )));
     }
     let before_battle = active_battle(before)?;
     validate_turn_result_operation_id(
@@ -126,9 +175,12 @@ fn resolve_turn_validated(
         before_battle.wave,
         before_battle.turn,
     )
-    .map_err(CommandLegalityError::Command)?;
-    let before_digest = compute_mechanical_state_digest(before)?;
-    let normalized = normalize_command_set_trusted(before, commands, content)?;
+    .map_err(CommandLegalityError::Command)
+    .map_err(BattleResolveError::from)?;
+    let before_digest = compute_mechanical_state_digest(before)
+        .map_err(BattleResolveError::from)?;
+    let normalized = normalize_command_set_trusted(before, commands, content)
+        .map_err(BattleResolveError::from)?;
     let mut queue =
         build_pending_action_queue_from_commands_validated(before, normalized.entries(), content)
             .map_err(|source| map_action_order_error(source, before, false))?;
@@ -136,7 +188,8 @@ fn resolve_turn_validated(
     let mut runtime = RngRuntime::from_states(
         before.run_rng.clone(),
         Some(before_battle.battle_rng.clone()),
-    )?;
+    )
+    .map_err(BattleResolveError::from)?;
     let gate = ContentDefensiveAbilityGate { content };
     let mut action_order = Vec::new();
     let mut mutations = Vec::new();
@@ -204,18 +257,33 @@ fn resolve_turn_validated(
         sync_rng_state(&mut after, &runtime)?;
     }
 
+    let finalizer_decision_hint = {
+        let battle = active_battle(&after)?;
+        next_decision(battle, battle.outcome)
+    };
+    finalizer(
+        before,
+        &mut after,
+        &mut mutations,
+        finalizer_decision_hint,
+    )?;
     validate_after_state_trusted(&after, content)?;
-    let after_digest = compute_mechanical_state_digest(&after)?;
-    let battle = active_battle(&after)?;
-    let outcome = battle.outcome;
-    let next_decision = next_decision(battle, outcome);
+    let (outcome, next_decision) = {
+        let battle = active_battle(&after)?;
+        let outcome = battle.outcome;
+        (outcome, next_decision(battle, outcome))
+    };
+    let after_digest = compute_mechanical_state_digest(&after)
+        .map_err(BattleResolveError::from)?;
     let presentation = build_turn_presentation_plan(TurnPresentationInput::new(
         material_operation_id,
         &action_order,
         &causal_events,
         outcome,
-    ))?;
-    validate_battle_mutation_evidence(before, &after, &mutations)?;
+    ))
+    .map_err(BattleResolveError::from)?;
+    validate_battle_mutation_evidence(before, &after, &mutations)
+        .map_err(BattleResolveError::from)?;
 
     Ok(BattleTransition {
         before_state: before.clone(),

@@ -24,6 +24,7 @@ use std::sync::Arc;
 use er_content::pack::selected_content_pack;
 use er_game::internal_event::UiEventPayload;
 use er_rng::phaser::{PhaserRdg, RunRngState};
+use er_state::digest::MechanicalStateDigest;
 use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
 };
@@ -31,8 +32,9 @@ use er_state::snapshot::GameState;
 use er_types::SafeU53;
 use er_types::SeatId;
 use er_types::battle_command::{
-    BattleCommand, BattleCommandProposalV1, BattleTargetSelection, ScriptedEnemyBattleCommandV1,
-    ScriptedEnemyPolicyV1, player_command_operation_id, scripted_enemy_command_operation_id,
+    BattleCommand, BattleCommandProposalV1, BattleTargetSelection, CommandAdmissionSource,
+    CommandFrontierStatus, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
+    player_command_operation_id, scripted_enemy_command_operation_id,
 };
 use er_types::battle_control::BattleControl;
 use er_types::battle_ids::{
@@ -295,6 +297,8 @@ fn local_lane_has_one_canonical_runtime_boundary() {
     assert!(!LOCAL_SOURCE.contains("trait LocalBattleRuntime"));
     assert!(!LOCAL_SOURCE.contains("resolve_turn("));
     assert!(!LOCAL_SOURCE.contains("resolve_replacement("));
+    assert!(RUNTIME_SOURCE.contains("resolve_turn_trusted_with_finalizer"));
+    assert!(!RUNTIME_SOURCE.contains("finalize_turn_frontier"));
     assert!(!LOCAL_SOURCE.contains("serde_json"));
     assert!(MATERIAL_SOURCE.contains("pub fn encode_turn_material"));
     assert!(MATERIAL_SOURCE.contains("pub fn decode_turn_material"));
@@ -344,6 +348,63 @@ fn real_local_command_crosses_runtime_resolution_and_material_boundary() -> Test
     assert_eq!(material.kind, local_battle::LocalMaterialKind::Turn);
     assert_eq!(runtime.state(), &material.applied_after_state);
     assert_eq!(runtime.control(), &material.applied_control);
+    assert_eq!(
+        material.candidate_next_decision,
+        er_battle::BattleNextDecision::CommandFrontier
+    );
+    assert_eq!(
+        material.candidate_after_digest,
+        MechanicalStateDigest::compute(&material.candidate_after_state)?
+    );
+    let after_battle = material
+        .candidate_after_state
+        .battle
+        .as_ref()
+        .ok_or("candidate after-state has no battle")?;
+    assert_eq!(after_battle.command_state.frontier.len(), 2);
+    let player_entry = after_battle
+        .command_state
+        .frontier
+        .iter()
+        .find(|entry| entry.owner_seat == Some(seat(1)))
+        .ok_or("finalized frontier is missing the player entry")?;
+    assert!(matches!(
+        &player_entry.status,
+        CommandFrontierStatus::Pending
+    ));
+    assert_eq!(
+        player_entry.operation_id,
+        player_command_operation_id(
+            after_battle.battle_id,
+            after_battle.wave,
+            after_battle.turn,
+            player_entry.field_slot,
+            seat(1),
+        )?
+    );
+    let enemy_entry = after_battle
+        .command_state
+        .frontier
+        .iter()
+        .find(|entry| entry.owner_seat.is_none())
+        .ok_or("finalized frontier is missing the scripted enemy entry")?;
+    assert!(matches!(
+        &enemy_entry.status,
+        CommandFrontierStatus::Admitted {
+            source: CommandAdmissionSource::ScriptedEnemy,
+            ..
+        }
+    ));
+    assert_eq!(
+        enemy_entry.operation_id,
+        scripted_enemy_command_operation_id(
+            after_battle.battle_id,
+            after_battle.wave,
+            after_battle.turn,
+            enemy_entry.field_slot,
+            safe(1),
+        )?
+    );
     Ok(())
 }
 

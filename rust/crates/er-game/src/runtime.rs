@@ -15,7 +15,7 @@ use er_battle::legality::{
     validate_replacement_selection_trusted, validate_state_content_trusted,
 };
 use er_battle::{
-    BattleNextDecision, resolve_replacement_trusted, resolve_turn_trusted,
+    BattleNextDecision, resolve_replacement_trusted, resolve_turn_trusted_with_finalizer,
     validate_battle_mutation_evidence,
 };
 use er_content::pack::{ContentPack, ContentPackError};
@@ -2370,14 +2370,16 @@ impl GameRuntime {
         let commands = commands
             .ok_or_else(|| invalid_config("complete frontier did not produce a command set"))?;
         let material_operation_id = turn_result_operation_id(battle_id, wave, turn)?;
-        let mut transition = resolve_turn_trusted(
+        let transition = resolve_turn_trusted_with_finalizer(
             &self.state,
             &commands,
             authority_epoch,
             &material_operation_id,
             self.content.as_ref(),
+            |_, after_state, mutations, next_decision| {
+                self.finalize_command_frontier(after_state, mutations, next_decision)
+            },
         )?;
-        self.finalize_turn_frontier(&mut transition)?;
         let (next_control, followup_events) = self
             .project_next_control_and_events(&transition.after_state, &transition.next_decision)?;
         let digest_evidence = TurnDigestEvidence::from_finalized_transition(transition);
@@ -2549,32 +2551,6 @@ impl GameRuntime {
         })
     }
 
-    fn finalize_turn_frontier(
-        &mut self,
-        transition: &mut er_battle::BattleTransition,
-    ) -> Result<(), GameRuntimeError> {
-        if !matches!(
-            transition.next_decision,
-            BattleNextDecision::CommandFrontier
-        ) {
-            return Ok(());
-        }
-        self.finalize_command_frontier(
-            &transition.before_state,
-            &mut transition.after_state,
-            &mut transition.mutations,
-        )?;
-        transition.after_digest = MechanicalStateDigest::compute(&transition.after_state)
-            .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?;
-        validate_battle_mutation_evidence(
-            &transition.before_state,
-            &transition.after_state,
-            &transition.mutations,
-        )
-        .map_err(|error| GameRuntimeError::Resolve(BattleResolveError::Invariant(error)))?;
-        Ok(())
-    }
-
     fn finalize_replacement_frontier(
         &mut self,
         transition: &mut er_battle::BattleReplacementTransition,
@@ -2586,10 +2562,12 @@ impl GameRuntime {
             return Ok(());
         }
         self.finalize_command_frontier(
-            &transition.before_state,
             &mut transition.after_state,
             &mut transition.mutations,
+            transition.next_decision,
         )?;
+        validate_state_content_trusted(&transition.after_state, self.content.as_ref())
+            .map_err(map_legality_error)?;
         transition.after_digest = MechanicalStateDigest::compute(&transition.after_state)
             .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?;
         validate_battle_mutation_evidence(
@@ -2610,11 +2588,14 @@ impl GameRuntime {
     /// cursor is committed later by the role-neutral material installer after
     /// the serialized after-state has passed the common material boundary.
     fn finalize_command_frontier(
-        &mut self,
-        _before_state: &GameState,
+        &self,
         after_state: &mut GameState,
         mutations: &mut Vec<er_battle::BattleMutation>,
+        next_decision: BattleNextDecision,
     ) -> Result<(), GameRuntimeError> {
+        if !matches!(next_decision, BattleNextDecision::CommandFrontier) {
+            return Ok(());
+        }
         let (frontier, _next_policy) = build_command_frontier(
             after_state,
             &self.scripted_enemy_policy,
@@ -2630,8 +2611,6 @@ impl GameRuntime {
             battle.command_state = after.clone();
             mutations.push(er_battle::BattleMutation::CommandCollectionChanged { before, after });
         }
-        validate_state_content_trusted(after_state, self.content.as_ref())
-            .map_err(map_legality_error)?;
         Ok(())
     }
 
@@ -4066,15 +4045,19 @@ fn validate_turn_transition_identity_inner(
         .battle
         .as_ref()
         .ok_or(GameRuntimeError::NoActiveBattle)?;
-    if matches!(digest_validation, TurnTransitionDigestValidation::Full)
-        && (transition.before_digest
-            != MechanicalStateDigest::compute(&transition.before_state)
-                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
-            || transition.after_digest
-                != MechanicalStateDigest::compute(&transition.after_state)
-                    .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?)
-    {
-        return Err(GameRuntimeError::TransitionDigestMismatch);
+    match digest_validation {
+        TurnTransitionDigestValidation::Full => {
+            if transition.before_digest
+                != MechanicalStateDigest::compute(&transition.before_state)
+                    .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
+                || transition.after_digest
+                    != MechanicalStateDigest::compute(&transition.after_state)
+                        .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?
+            {
+                return Err(GameRuntimeError::TransitionDigestMismatch);
+            }
+        }
+        TurnTransitionDigestValidation::ReducerIssued => {}
     }
     let expected_next_turn = before
         .turn
@@ -4105,14 +4088,19 @@ fn validate_turn_transition_identity_inner(
     {
         return Err(GameRuntimeError::CurrentOperationMismatch);
     }
-    validate_state_content_trusted(&transition.after_state, runtime.content.as_ref())
-        .map_err(map_legality_error)?;
-    validate_battle_mutation_evidence(
-        &transition.before_state,
-        &transition.after_state,
-        &transition.mutations,
-    )
-    .map_err(|error| GameRuntimeError::Resolve(BattleResolveError::Invariant(error)))?;
+    match digest_validation {
+        TurnTransitionDigestValidation::Full => {
+            validate_state_content_trusted(&transition.after_state, runtime.content.as_ref())
+                .map_err(map_legality_error)?;
+            validate_battle_mutation_evidence(
+                &transition.before_state,
+                &transition.after_state,
+                &transition.mutations,
+            )
+            .map_err(|error| GameRuntimeError::Resolve(BattleResolveError::Invariant(error)))?;
+        }
+        TurnTransitionDigestValidation::ReducerIssued => {}
+    }
     Ok(())
 }
 

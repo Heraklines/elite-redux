@@ -42,8 +42,9 @@ through one implementation.
 Within `er-battle`, the already-validated turn core likewise calls
 crate-private validated action-queue, move-pipeline, and target-effect helpers.
 Those helpers are not additional cross-crate trusted seams: their public
-counterparts still validate the full pack, and only `resolve_turn_trusted` can
-reach them without first performing that public validation.
+counterparts still validate the full pack, and only `resolve_turn_trusted` or
+the doc-hidden `resolve_turn_trusted_with_finalizer` can reach them without
+first performing that public validation.
 
 The staged `install_material_in_kernel_transaction` path may omit after-state
 digest and control-projection recomputation only after the common material
@@ -73,6 +74,16 @@ independently verify both material digests. When the authority's current state
 exactly equals material `before_state`, frontier reconciliation also returns
 before cloning and hashing an identical staged state. Partial replica frontiers
 retain the complete reconciliation path.
+
+The game-owned TURN path reaches that boundary through the doc-hidden typed
+`resolve_turn_trusted_with_finalizer` seam. Its `FnOnce` finalizer may insert the
+exact next command frontier into the cloned candidate, but the seam returns no
+transition until the resolver has performed the single combined final
+state/content validation, after-state digest, and mutation-evidence replay.
+Public `resolve_turn` and `resolve_turn_trusted` retain their existing
+signatures and pass a no-op finalizer. The finalizer cannot receive or mint a
+digest proof, and its errors map through the existing typed resolver error
+boundary without string conversion.
 
 Authority material encoding retains the exact canonical bytes after proving
 both the typed decode and canonical `Value` round trip. The frozen material
