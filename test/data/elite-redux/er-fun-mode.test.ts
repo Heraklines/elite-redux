@@ -60,6 +60,25 @@ afterEach(() => {
 });
 
 describe("Fun Mode configuration", () => {
+  it("starts fresh runs with every modifier disabled", () => {
+    expect(DEFAULT_FUN_MODE_CONFIG).toMatchObject({
+      difficulty: "youngster",
+      randomizePokemon: false,
+      randomizeTypes: false,
+      randomizeAbilities: false,
+      randomizeLevelUpMoves: false,
+      megaMode: false,
+      megaMixMode: false,
+      shuffleStats: false,
+      shuffleEvolutions: false,
+      itemChaos: false,
+      weatherRoulette: false,
+      scrambleMoves: false,
+      abilityAvalanche: false,
+      moodyMode: false,
+    });
+  });
+
   it("is a 200-wave classic-style run with no leaderboard determinism", () => {
     const mode = getGameMode(GameModes.FUN);
     expect(mode.isFun).toBe(true);
@@ -187,6 +206,7 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
   });
 
   it("selects only implemented abilities", () => {
+    setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, randomizeAbilities: true });
     const ids = new Set();
     for (let slot = 0; slot < 6; slot++) {
       const id = getFunRandomAbilityId(12345, slot);
@@ -220,6 +240,7 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
   });
 
   it("rerolls the whole party seed without destabilizing the selected result", () => {
+    setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, randomizeAbilities: true });
     const slots = [0, 1, 2, 3, 4, 5];
     const before = slots.map(slot => getFunRandomAbilityId(12345, slot));
     rerollFunAbilities();

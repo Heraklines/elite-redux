@@ -304,7 +304,14 @@ export class FunModeSelectUiHandler extends UiHandler {
       }
       return this.setCurrentOption(button === Button.RIGHT);
     }
-    if (button === Button.ACTION || button === Button.SUBMIT) {
+    if (button === Button.SUBMIT) {
+      if (this.cursor < OPTIONS.length) {
+        this.startRegionOption = 0;
+        return this.setCursor(OPTIONS.length);
+      }
+      return this.confirmCurrentSelection();
+    }
+    if (button === Button.ACTION) {
       return this.confirmCurrentSelection();
     }
     return button === Button.CYCLE_SHINY && this.applyLastSetup();
@@ -469,9 +476,7 @@ export class FunModeSelectUiHandler extends UiHandler {
     } else {
       const anyEnabled = hasEnabledMode(this.config);
       const canReuse = loadLastFunModeConfig() != null;
-      if (!anyEnabled && canReuse) {
-        this.startRegionOption = 1;
-      } else if (!canReuse) {
+      if (!canReuse) {
         this.startRegionOption = 0;
       }
       this.cursorObject.setVisible(false);

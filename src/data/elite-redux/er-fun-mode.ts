@@ -38,10 +38,10 @@ export interface FunModeConfig {
 
 export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   difficulty: "youngster",
-  randomizePokemon: true,
-  randomizeTypes: true,
-  randomizeAbilities: true,
-  randomizeLevelUpMoves: true,
+  randomizePokemon: false,
+  randomizeTypes: false,
+  randomizeAbilities: false,
+  randomizeLevelUpMoves: false,
   megaMode: false,
   megaMixMode: false,
   shuffleStats: false,
