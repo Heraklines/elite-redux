@@ -33,23 +33,59 @@ fn authority_terminal_publish_is_gated_by_local_and_peer_presentation() {
 
 #[test]
 fn replica_terminal_path_is_typed_and_never_uses_battle_material_apply() {
-    let terminal_branch = KERNEL_SOURCE
+    let mapper = KERNEL_SOURCE
+        .find("fn map_replica_actions(")
+        .expect("replica action mapper is present");
+    let mapper = &KERNEL_SOURCE[mapper..];
+    let apply_arm = mapper
         .find("ReplicaAction::ApplyMaterial { entry } => {")
-        .expect("terminal replica branch is present");
-    let branch = &KERNEL_SOURCE[terminal_branch..];
-    assert!(branch.contains("validate_battle_terminal_commit"));
-    assert!(branch.contains("ReplicaMechanicalStage::MaterialApplied"));
-    assert!(branch.contains("ReplicaMechanicalStage::ControlInstalled"));
-    assert!(branch.contains("PresentationProbeOutcome::Settled"));
+        .expect("replica material arm is present");
+    let terminal_start = apply_arm
+        + mapper[apply_arm..]
+            .find("if entry.kind == AuthorityEntryKind::TerminalCommit {")
+            .expect("terminal material branch is present");
+    let terminal_end = terminal_start
+        + mapper[terminal_start..]
+            .find("let current = BattleMaterialApplyContext {")
+            .expect("battle material branch follows terminal material branch");
+    let terminal_branch = &mapper[terminal_start..terminal_end];
+    assert!(terminal_branch.contains("validate_battle_terminal_commit"));
+    assert!(terminal_branch.contains("ReplicaMechanicalStage::MaterialApplied"));
+    assert!(!terminal_branch.contains("apply_authority_material"));
+    let battle_apply = mapper
+        .find("apply_authority_material")
+        .expect("battle applier remains in the non-terminal replica arm");
+    assert!(terminal_end < battle_apply);
+
+    let control_reducer = KERNEL_SOURCE
+        .find("fn reduce_control_installed(")
+        .expect("control reducer is present");
+    let terminal_control_start = control_reducer
+        + KERNEL_SOURCE[control_reducer..]
+            .find("else if let Some(pending_terminal) = self.pending_replica_terminal.take() {")
+            .expect("terminal control branch is present");
+    let regular_control_start = terminal_control_start
+        + KERNEL_SOURCE[terminal_control_start..]
+            .find("let pending = self.pending_replica_material.take().ok_or_else")
+            .expect("regular replica control branch follows terminal control branch");
+    let terminal_control = &KERNEL_SOURCE[terminal_control_start..regular_control_start];
+    assert!(terminal_control.contains("ReplicaMechanicalStage::ControlInstalled"));
+
+    let probe_arm = mapper
+        .find("ReplicaAction::ProbePresentation { entry } => {")
+        .expect("replica presentation probe arm is present");
+    let terminal_probe_start = probe_arm
+        + mapper[probe_arm..]
+            .find("if entry.kind == AuthorityEntryKind::TerminalCommit {")
+            .expect("terminal presentation probe branch is present");
+    let terminal_probe_end = terminal_probe_start
+        + mapper[terminal_probe_start..]
+            .find("let terminal = TerminalState {")
+            .expect("terminal presentation transition follows its probe");
+    let terminal_probe = &mapper[terminal_probe_start..terminal_probe_end];
+    assert!(terminal_probe.contains("PresentationProbeOutcome::Settled"));
     assert!(KERNEL_SOURCE.contains("ReplicaAction::EmitReceipt { receipt }"));
     assert!(KERNEL_SOURCE.contains("AckStage::PresentationSettled"));
-    let terminal_apply = branch
-        .find("apply_authority_material")
-        .expect("battle applier remains in the surrounding replica reducer");
-    let terminal_validation = branch
-        .find("validate_battle_terminal_commit")
-        .expect("terminal validation precedes battle applier");
-    assert!(terminal_validation < terminal_apply);
 }
 
 #[test]
@@ -69,13 +105,23 @@ fn terminal_cleanup_preserves_protocol_proofs_and_recovery_applies_battle_first(
 
 #[test]
 fn recovery_accepts_battle_then_terminal_and_predecessor_frontier_terminal_only_tails() {
-    let recovery = KERNEL_SOURCE
-        .find("fn apply_recovery_tail")
+    let recovery_start = KERNEL_SOURCE
+        .find("fn receive_recovery_bundle(")
+        .expect("recovery bundle applier is present");
+    let recovery_tail = KERNEL_SOURCE
+        .find("fn apply_recovery_tail(")
         .expect("recovery tail applier is present");
-    let source = &KERNEL_SOURCE[recovery..];
-    assert!(source.contains("RecoveredMaterial::Battle"));
-    assert!(source.contains("RecoveredMaterial::Terminal"));
+    let tail_end = KERNEL_SOURCE
+        .find("fn map_replica_actions(")
+        .expect("replica action mapper follows recovery tail");
+    let tail = &KERNEL_SOURCE[recovery_tail..tail_end];
+    let source = &KERNEL_SOURCE[recovery_start..recovery_tail];
+    assert!(tail.contains("RecoveredMaterial::Battle"));
+    assert!(tail.contains("RecoveredMaterial::Terminal"));
     assert!(source.contains("terminal_final"));
+    assert!(source.contains(
+        "let terminal_final = final_entry.kind == AuthorityEntryKind::TerminalCommit;"
+    ));
     assert!(source.contains("previous_battle_is_present"));
     assert!(source.contains("!previous_battle_is_present && !terminal_predecessor_frontier_ready"));
 }
