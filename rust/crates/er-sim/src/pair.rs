@@ -474,8 +474,16 @@ impl SimulatedPair {
         let live_operation = thaw_pair_operation_v2(&operation)?;
         let failure_owner = pair_operation_failure_owner(&operation);
         let before_snapshot = self.snapshot_v2()?;
-        let before_host_live_resources = self.host_kernel.live_resources();
-        let before_guest_live_resources = self.guest_kernel.live_resources();
+        let before_host_live_resources = project_trace_live_resources(
+            &before_snapshot,
+            PairEndpoint::Host,
+            self.host_kernel.live_resources(),
+        );
+        let before_guest_live_resources = project_trace_live_resources(
+            &before_snapshot,
+            PairEndpoint::Guest,
+            self.guest_kernel.live_resources(),
+        );
         let rollback = self
             .capture_rollback_state()
             .map_err(|error| pair_snapshot_invalid("trace.rollback", error.to_string()))?;
@@ -503,15 +511,25 @@ impl SimulatedPair {
                         .collect::<Result<Vec<_>, SnapshotError>>()?;
                     let effects = numbered_pair_effects(effects)?;
                     let after_snapshot = self.snapshot_v2()?;
+                    let host_live_resources = project_trace_live_resources(
+                        &after_snapshot,
+                        PairEndpoint::Host,
+                        self.host_kernel.live_resources(),
+                    );
+                    let guest_live_resources = project_trace_live_resources(
+                        &after_snapshot,
+                        PairEndpoint::Guest,
+                        self.guest_kernel.live_resources(),
+                    );
                     Ok(PairTraceObservationV2 {
                         effects,
                         after_snapshot,
                         host_rng_audit: self.trace_audit.host_rng_audit.clone(),
                         host_internal_events: self.trace_audit.host_internal_events.clone(),
-                        host_live_resources: self.host_kernel.live_resources(),
+                        host_live_resources,
                         guest_rng_audit: self.trace_audit.guest_rng_audit.clone(),
                         guest_internal_events: self.trace_audit.guest_internal_events.clone(),
-                        guest_live_resources: self.guest_kernel.live_resources(),
+                        guest_live_resources,
                         failure: None,
                     })
                 })();
@@ -2131,6 +2149,21 @@ impl SimulatedPairSnapshotBridge for SimulatedPair {
     ) -> Result<Self, SnapshotError> {
         Self::restore_restorable_pair_snapshot_v2(snapshot, content)
     }
+}
+
+fn project_trace_live_resources(
+    snapshot: &RestorablePairSnapshotV2,
+    endpoint: PairEndpoint,
+    mut resources: LiveResourceSnapshot,
+) -> LiveResourceSnapshot {
+    resources.network_packets = snapshot
+        .network
+        .packets
+        .iter()
+        .filter(|packet| packet.source == endpoint)
+        .map(|packet| packet.packet_id)
+        .collect();
+    resources
 }
 
 fn pair_snapshot_invalid(path: impl Into<String>, reason: impl Into<String>) -> SnapshotError {
