@@ -539,7 +539,7 @@ mod live_coop_production {
     use er_protocol::{
         AckStage, AuthorityEntryBody, AuthorityEntryKind, AuthorityLogConfig, AuthorityReceiptBody,
         AuthorityReplicaConfig, BackoffPolicy, FrameType, NetworkFrame, NetworkPayload,
-        PeerBinding, ProposalLeaseConfig, ProposalMessage, RecoveryTransactionConfig,
+        PeerBinding, ProposalLeaseConfig, ProposalMessage, RawFrame, RecoveryTransactionConfig,
     };
     use er_sim::snapshot::{
         FaultOperationV2, FrameCorruptionV2, PacketDispositionV2, PairDeterminismDigest,
@@ -555,7 +555,7 @@ mod live_coop_production {
     use er_types::battle_control::BattleControl;
     use er_types::battle_ids::{
         BattlePresentationEventId, BattleSide, CanonicalHexBytes, FieldSlot, MoveSlotIndex,
-        PartyIndex, TurnIndex,
+        MoveId, PartyIndex, TurnIndex,
     };
     use er_types::battle_ui::PresentationSettlementOutcome;
     use er_types::{
@@ -1373,6 +1373,53 @@ mod live_coop_production {
 
     fn forced_victory_config_with_content(content: &ContentPack) -> TestResult<BattleGameConfig> {
         let mut config = forced_doubles_config_with_content(content)?;
+        let player_capacity = usize::from(config.start.format.player_capacity);
+        let enemy_capacity = usize::from(config.start.format.enemy_capacity);
+        let player_leads = config.start.player_leads.clone();
+        if config.start.enemy_party.len() != enemy_capacity
+            || config.start.enemy_leads.len() != enemy_capacity
+        {
+            return Err(invalid(
+                "forced-victory fixture must have exactly the active enemy leads and no reserves",
+            ));
+        }
+        if player_leads.len() != player_capacity
+            || player_leads
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len()
+                != player_capacity
+        {
+            return Err(invalid(
+                "forced-victory fixture must have one distinct player lead per active slot",
+            ));
+        }
+
+        let status_move = MoveId::try_from_u64(589)?;
+        let damaging_move = MoveId::try_from_u64(1)?;
+        for lead in player_leads {
+            let party_index = usize::from(lead.get());
+            let pokemon = config
+                .start
+                .player_party
+                .get_mut(party_index)
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "forced-victory player lead {} is outside the party",
+                        lead.get()
+                    ))
+                })?;
+            let first_move = pokemon.moves[0].map(|slot| slot.move_id);
+            let second_move = pokemon.moves[1].map(|slot| slot.move_id);
+            if first_move != Some(status_move) || second_move != Some(damaging_move) {
+                return Err(invalid(format!(
+                    "forced-victory player lead {} must retain fixture moves 589 then 1",
+                    lead.get()
+                )));
+            }
+            pokemon.moves.swap(0, 1);
+        }
         for pokemon in &mut config.start.enemy_party {
             pokemon.hp = 1;
             pokemon.fainted = false;
@@ -1717,10 +1764,20 @@ mod live_coop_production {
         if packet.kind != RestorablePacketKindV2::AuthorityFrame {
             return false;
         }
-        let Ok(frame) = decode_canonical_packet::<NetworkFrame>(
+        let Ok(payload) = decode_canonical_packet::<NetworkPayload>(
             &packet.body,
             "proposal result authority frame",
         ) else {
+            return false;
+        };
+        let NetworkPayload::Frame(raw) = payload else {
+            return false;
+        };
+        let frame = match raw {
+            RawFrame::JsonText(text) => serde_json::from_str::<NetworkFrame>(&text),
+            RawFrame::JsonValue(value) => serde_json::from_value::<NetworkFrame>(value),
+        };
+        let Ok(frame) = frame else {
             return false;
         };
         if frame.frame_type != FrameType::AuthorityEntry
