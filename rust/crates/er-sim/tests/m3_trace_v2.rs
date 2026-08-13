@@ -91,9 +91,12 @@ fn trace_api_surface_and_contract_stay_wired() {
         "pub struct PairKernelTraceRecorder",
         "pub fn validate(&self)",
         "pub fn first_divergence(&self, actual: &Self)",
-        "pub fn replay_with<B, Restore, Step>(",
-        "Restore: FnOnce(RestorablePairSnapshotV2) -> Result<B, SnapshotError>",
-        "Step: FnMut(&mut B, &PairOperationV2, SafeU53",
+        "pub trait PairTraceReplayDriver",
+        "type PairState;",
+        "fn restore(&self, snapshot: RestorablePairSnapshotV2,",
+        "fn step(&mut self, state: &mut Self::PairState, operation: &PairOperationV2, virtual_time_ms: SafeU53,",
+        "pub fn replay_with<D>(",
+        "D: PairTraceReplayDriver",
         "Result<PairTraceObservationV2, SnapshotError>",
         "pub fn compute_components(",
         "pub host_live_resources: LiveResourceSnapshot",
@@ -111,8 +114,9 @@ fn trace_api_surface_and_contract_stay_wired() {
     for marker in [
         "pub fn replay_simulated_pair(",
         "self.replay_with(",
+        "SimulatedPairTraceReplayDriver",
         "crate::SimulatedPair::from_snapshot",
-        "runtime.apply_trace_operation_v2",
+        "state.apply_trace_operation_v2",
     ] {
         let compact_marker: String = marker
             .chars()

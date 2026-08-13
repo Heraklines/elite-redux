@@ -707,6 +707,47 @@ pub struct PairTraceObservationV2 {
     pub failure: Option<TraceFailureEvidenceV2>,
 }
 
+/// Typed replay adapter for restoring and advancing a pair trace.
+pub trait PairTraceReplayDriver {
+    type PairState;
+
+    fn restore(
+        &self,
+        snapshot: RestorablePairSnapshotV2,
+    ) -> Result<Self::PairState, SnapshotError>;
+
+    fn step(
+        &mut self,
+        state: &mut Self::PairState,
+        operation: &PairOperationV2,
+        virtual_time_ms: SafeU53,
+    ) -> Result<PairTraceObservationV2, SnapshotError>;
+}
+
+struct SimulatedPairTraceReplayDriver {
+    content: Arc<ContentPack>,
+}
+
+impl PairTraceReplayDriver for SimulatedPairTraceReplayDriver {
+    type PairState = crate::SimulatedPair;
+
+    fn restore(
+        &self,
+        snapshot: RestorablePairSnapshotV2,
+    ) -> Result<Self::PairState, SnapshotError> {
+        crate::SimulatedPair::from_snapshot(snapshot, Arc::clone(&self.content))
+    }
+
+    fn step(
+        &mut self,
+        state: &mut Self::PairState,
+        operation: &PairOperationV2,
+        _virtual_time_ms: SafeU53,
+    ) -> Result<PairTraceObservationV2, SnapshotError> {
+        state.apply_trace_operation_v2(operation.clone())
+    }
+}
+
 /// A fail-atomic endpoint trace builder.
 ///
 /// `record` derives all before/after digest-chain fields from the snapshots it
@@ -1719,24 +1760,22 @@ impl PairKernelTraceV2 {
         None
     }
 
-    pub fn replay_with<B, Restore, Step>(
+    pub fn replay_with<D>(
         &self,
-        restore: Restore,
-        mut step: Step,
+        mut driver: D,
     ) -> Result<TraceReplayReportV2, SnapshotError>
     where
-        Restore: FnOnce(RestorablePairSnapshotV2) -> Result<B, SnapshotError>,
-        Step: FnMut(
-            &mut B,
-            &PairOperationV2,
-            SafeU53,
-        ) -> Result<PairTraceObservationV2, SnapshotError>,
+        D: PairTraceReplayDriver,
     {
         self.validate()?;
-        let mut runtime = restore(self.initial_snapshot.clone())?;
+        let mut pair_state = driver.restore(self.initial_snapshot.clone())?;
         let mut recorder = PairKernelTraceRecorder::new(self.initial_snapshot.clone())?;
         for (index, expected) in self.entries.iter().enumerate() {
-            let observation = step(&mut runtime, &expected.input, expected.virtual_time_ms)?;
+            let observation = driver.step(
+                &mut pair_state,
+                &expected.input,
+                expected.virtual_time_ms,
+            )?;
             if let Err(error) = recorder.record_observation(expected.input.clone(), observation) {
                 return Ok(TraceReplayReportV2 {
                     replayed_entries: one_based_sequence(index, "replayed_entries")?,
@@ -1771,12 +1810,7 @@ impl PairKernelTraceV2 {
         &self,
         content: Arc<ContentPack>,
     ) -> Result<TraceReplayReportV2, SnapshotError> {
-        self.replay_with(
-            |snapshot| crate::SimulatedPair::from_snapshot(snapshot, content),
-            |runtime, operation, _virtual_time_ms| {
-                runtime.apply_trace_operation_v2(operation.clone())
-            },
-        )
+        self.replay_with(SimulatedPairTraceReplayDriver { content })
     }
 }
 
