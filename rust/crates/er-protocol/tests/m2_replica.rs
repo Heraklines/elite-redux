@@ -659,6 +659,22 @@ fn staged_pipeline_keeps_frontiers_independent_and_resumes_exactly() -> TestResu
             .and_then(|receipt| receipt.control_id.as_deref()),
         Some(control_id.as_str())
     );
+    assert!(matches!(
+        duplicate_complete.actions.as_slice(),
+        [
+            ReplicaAction::EmitReceipt { receipt }
+                if receipt.stage == AckStage::ControlInstalled
+                    && receipt.control_id.as_deref() == Some(control_id.as_str()),
+            ReplicaAction::ProbePresentation { entry: probe_entry }
+                if probe_entry == &first,
+        ]
+    ));
+    assert!(!duplicate_complete.actions.iter().any(|action| matches!(
+        action,
+        ReplicaAction::EmitReceipt {
+            receipt: settled,
+        } if settled.stage == AckStage::PresentationSettled
+    )));
     assert_eq!(replica.diagnostics(), before_duplicate);
     assert_eq!(replica.pending_entry(), pending_before_duplicate.as_ref());
 

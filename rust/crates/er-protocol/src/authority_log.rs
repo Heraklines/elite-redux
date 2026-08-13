@@ -526,7 +526,13 @@ impl AuthorityLog {
 
         let revision = receipt.revision;
         let sender = receipt.context.sender_seat_id;
-        let (subsumes, should_retire_subsumed, should_retire_current, waiting_for) = {
+        let (
+            subsumes,
+            should_retire_subsumed,
+            should_retire_current,
+            waiting_for,
+            should_redeliver_after_control,
+        ) = {
             let Some(lease) = self.retained.get_mut(&revision) else {
                 return rejected_receipt(ReceiptRejectReason::RevisionMismatch);
             };
@@ -555,11 +561,14 @@ impl AuthorityLog {
                 .iter()
                 .filter_map(|(seat_id, peer)| (peer.stage < waiting_stage).then_some(*seat_id))
                 .collect::<Vec<_>>();
+            let should_redeliver_after_control = receipt.stage == AckStage::ControlInstalled
+                && waiting_stage > STAGE_CONTROL_INSTALLED;
             (
                 lease.entry.subsumes.clone(),
                 should_retire_subsumed,
                 should_retire_current,
                 waiting_for,
+                should_redeliver_after_control,
             )
         };
 
@@ -570,6 +579,12 @@ impl AuthorityLog {
                     self.retire(subsumed, &mut actions, scheduler);
                 }
             }
+        }
+        // Stage monotonicity above makes this a one-shot redelivery per peer. It intentionally does
+        // not inspect or replace the lease timer: stopped leases still need this exact post-control
+        // probe.
+        if should_redeliver_after_control {
+            self.redeliver_immediate_peer(revision, sender, &mut actions);
         }
         if should_retire_current {
             let retired = self.retire(revision, &mut actions, scheduler);
@@ -1109,6 +1124,21 @@ impl AuthorityLog {
             return;
         }
         actions.extend(self.delivery_actions(successor));
+    }
+
+    fn redeliver_immediate_peer(
+        &self,
+        revision: Revision,
+        to: SeatId,
+        actions: &mut Vec<AuthorityLogAction>,
+    ) {
+        let Some(lease) = self.retained.get(&revision) else {
+            return;
+        };
+        actions.push(AuthorityLogAction::Deliver {
+            to,
+            entry: Box::new(lease.entry.as_ref().clone()),
+        });
     }
 
     fn record_retired_stage(&mut self, operation_id: OperationId, stage: i8) {

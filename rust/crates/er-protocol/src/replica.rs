@@ -364,11 +364,14 @@ impl AuthorityReplica {
                     admission: ReplicaAdmission::Duplicate {
                         resume: ReplicaResume::ControlInstalled,
                     },
-                    actions: vec![self.receipt_action(
-                        &entry,
-                        AckStage::ControlInstalled,
-                        Some(control_id_of(&entry.next_control)),
-                    )],
+                    actions: vec![
+                        self.receipt_action(
+                            &entry,
+                            AckStage::ControlInstalled,
+                            Some(control_id_of(&entry.next_control)),
+                        ),
+                        ReplicaAction::ProbePresentation { entry },
+                    ],
                 }
             }
             ReplicaClassification::DuplicatePendingMaterial => {

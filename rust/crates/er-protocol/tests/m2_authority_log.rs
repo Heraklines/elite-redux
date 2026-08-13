@@ -9,7 +9,7 @@ use er_protocol::{
 use er_types::battle_ids::CanonicalHexBytes;
 use er_types::{
     CommandControlTarget, CommandFrontierControl, ConnectionGeneration, OperationId, Revision,
-    RunId, SafeU53, SeatId, SessionId, TimerId, TimerOwner,
+    RunId, SafeU53, SeatId, SessionId, TerminalControl, TimerId, TimerOwner,
 };
 use serde_json::json;
 
@@ -125,7 +125,8 @@ fn receipt(
         revision: entry.revision,
         operation_id: entry.operation_id.clone(),
         stage,
-        control_id: (stage == AckStage::ControlInstalled).then(|| control_id().to_owned()),
+        control_id: (stage == AckStage::ControlInstalled)
+            .then(|| control_id_of(&entry.next_control)),
     })
 }
 
@@ -464,6 +465,63 @@ fn maximum_attempt_exhaustion_is_a_stopped_final_delivery_without_new_timer() ->
         log.timer_fired(first_fired, &mut scheduler),
         Err(AuthorityLogError::InvalidEntry { .. })
     ));
+    Ok(())
+}
+
+#[test]
+fn stopped_presentation_lease_redelivers_once_after_control() -> TestResult {
+    let mut scheduler = KernelScheduler::new();
+    let mut log = AuthorityLog::new(config_with_owner_and_attempts(
+        8,
+        &[(1, 1)],
+        "authority-test",
+        Some(1),
+    )?)?;
+    let mut terminal_draft = draft("stopped-presentation")?;
+    terminal_draft.kind = AuthorityEntryKind::TerminalCommit;
+    terminal_draft.next_control = NextControl::Terminal(TerminalControl {
+        terminal_id: "terminal/stopped-presentation".to_owned(),
+    });
+    let committed = log.commit(terminal_draft, &mut scheduler)?;
+    let timer_id = scheduled_timer_id(&committed.actions).ok_or("missing timer")?;
+    let exhausted = log.timer_fired(scheduler.fired(timer_id)?, &mut scheduler)?;
+    assert_eq!(deliver_count(&exhausted), 1);
+    assert!(scheduler.live_timers().is_empty());
+
+    let control = log.accept_receipt_detailed(
+        receipt(&committed.entry, 1, 1, AckStage::ControlInstalled)?,
+        &mut scheduler,
+    );
+    assert!(matches!(
+        control.verdict,
+        AuthorityReceiptVerdict::Advanced {
+            retired: false,
+            ref waiting_for_seat_ids,
+        } if waiting_for_seat_ids.as_slice() == [seat(1)?]
+    ));
+    assert_eq!(
+        control.actions,
+        vec![AuthorityLogAction::Deliver {
+            to: seat(1)?,
+            entry: Box::new(committed.entry.clone()),
+        }]
+    );
+
+    let duplicate = log.accept_receipt_detailed(
+        receipt(&committed.entry, 1, 1, AckStage::ControlInstalled)?,
+        &mut scheduler,
+    );
+    assert!(matches!(
+        duplicate.verdict,
+        AuthorityReceiptVerdict::Duplicate {
+            highest_stage: AckStage::ControlInstalled
+        }
+    ));
+    assert!(duplicate.actions.is_empty());
+    assert_eq!(
+        log.retained_entry(committed.entry.revision),
+        Some(&committed.entry)
+    );
     Ok(())
 }
 
