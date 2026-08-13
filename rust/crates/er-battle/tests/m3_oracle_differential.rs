@@ -7551,15 +7551,20 @@ fn record_move_id(
 }
 
 fn legacy_player_targets_live_on_parent(case_name: &str, record: &FixtureCommandRecord) -> bool {
-    matches!(
+    let catalogued_record = matches!(
         case_name,
         "speed-tie"
             | "paralysis-speed-order"
             | "doubles-single-target"
-            | "pp-unusable-rejected"
             | "voluntary-switch"
-            | "mixed-side-simultaneous-faint"
-    ) && record.field_slot.side == BattleSide::Player
+    ) || (case_name == "mixed-side-simultaneous-faint"
+        && record.field_slot
+            == FieldSlot::new(BattleSide::Player, 0)
+                .expect("valid parent-target catalogue slot")
+        && record.operation_id.as_str()
+            == "battle/1/wave/1/turn/1/command/player/0/seat/1");
+    catalogued_record
+        && record.field_slot.side == BattleSide::Player
         && matches!(
             &record.legacy_command,
             BattleCommand::Fight {
@@ -8455,7 +8460,7 @@ fn normalize_catalogued_same_side_stage_order(
     }
     let pokemon_three = PokemonId::try_from_u64(3)?;
     let pokemon_four = PokemonId::try_from_u64(4)?;
-    if trace.typed.len() != 21
+    if trace.typed.len() != 22
         || !matches!(
             trace.typed.get(7),
             Some(BattleMutation::StatStageChanged {
