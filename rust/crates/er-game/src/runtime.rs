@@ -1879,19 +1879,22 @@ impl GameRuntime {
                 move_slot, targets, ..
             } => {
                 let entries = self.move_entries(proposal.actor, &offer)?;
-                let menu_ids = self.remote_menu_sequence(
-                    proposal.owner_seat,
-                    proposal.menu_instance_id,
-                    if matches!(targets, BattleTargetSelection::Implicit) {
-                        1
-                    } else {
-                        2
-                    },
-                )?;
+                // The command's serialized target selection is not the menu
+                // path.  In particular, a spread-target move may carry a
+                // concrete Selected target set while the canonical move
+                // activation is still immediate.  Build the move control at
+                // the allocator cursor first, classify that exact control,
+                // then validate the guest's final menu against the resulting
+                // path length.
+                let move_menu_id = self
+                    .control
+                    .allocator(proposal.owner_seat)
+                    .ok_or_else(|| invalid_config("remote command seat allocator is absent"))?
+                    .next_menu_instance_id;
                 let move_control_id =
                     replace_control_leaf(&root.menu.control_id, "command", "move")?;
                 let move_control = build_move_control(
-                    menu_ids[0],
+                    move_menu_id,
                     proposal.owner_seat,
                     move_control_id.clone(),
                     proposal.actor,
@@ -1906,7 +1909,14 @@ impl GameRuntime {
                         move_slot: selected_slot,
                         targets: selected_targets,
                     } if selected_slot == *move_slot && selected_targets == targets.clone() => {
-                        if proposal.control_id != move_control.menu.control_id {
+                        let menu_ids = self.remote_menu_sequence(
+                            proposal.owner_seat,
+                            proposal.menu_instance_id,
+                            1,
+                        )?;
+                        if menu_ids[0] != move_control.menu.instance_id
+                            || proposal.control_id != move_control.menu.control_id
+                        {
                             return Err(GameRuntimeError::ControlIdentityMismatch);
                         }
                         BattleControl::MoveSelect(move_control)
@@ -1916,6 +1926,14 @@ impl GameRuntime {
                         multiple,
                         candidate_targets,
                     } => {
+                        let menu_ids = self.remote_menu_sequence(
+                            proposal.owner_seat,
+                            proposal.menu_instance_id,
+                            2,
+                        )?;
+                        if menu_ids[0] != move_control.menu.instance_id {
+                            return Err(GameRuntimeError::ControlIdentityMismatch);
+                        }
                         let BattleTargetSelection::Selected(selected_targets) = targets else {
                             return Err(GameRuntimeError::ControlIdentityMismatch);
                         };
@@ -2581,7 +2599,10 @@ impl GameRuntime {
         ) {
             return Err(GameRuntimeError::ControlProjectionMismatch);
         }
-        self.pending_no_legal_replacement = None;
+        // Keep the marker live until the returned typed event is reduced.  The
+        // event is only a causal view of this pending identity; clearing it
+        // here would make the immediately-following GameIntent appear
+        // unscheduled to the reducer.
         Ok(Some(InternalEvent::no_legal_replacement(
             pending.occurrence,
             pending.authority_epoch,
@@ -4256,6 +4277,41 @@ fn project_command_frontier(
     .map_err(GameRuntimeError::Control)
 }
 
+fn normalize_replacement_selection(
+    battle: &BattleState,
+    mut control: er_types::battle_control::ReplacementSelectControl,
+) -> Result<er_types::battle_control::ReplacementSelectControl, GameRuntimeError> {
+    // The canonical replacement builder preserves party order for stable
+    // identity, so its first option may be the fainted active.  A projected
+    // actionable control must nevertheless start on an enabled visible
+    // option.  Replay the canonical Down edges rather than editing the menu
+    // cursor directly; this preserves menu instance, control ID, and memory.
+    let max_steps = control.menu.options.len().saturating_add(1);
+    for _ in 0..max_steps {
+        let selected = control
+            .menu
+            .option(control.menu.selected_option_id.clone())
+            .ok_or_else(|| invalid_config("replacement menu selection is absent"))?;
+        if selected.enabled && selected.visibility.is_visible() {
+            return Ok(control);
+        }
+        let previous = control.menu.selected_option_id.clone();
+        let next = navigate_replacement_menu(
+            battle,
+            &control,
+            control.menu.instance_id,
+            NavigationDirection::Down,
+        )?;
+        if next.menu.selected_option_id == previous {
+            break;
+        }
+        control = next;
+    }
+    Err(invalid_config(
+        "replacement menu has no enabled visible selection",
+    ))
+}
+
 fn project_replacement(
     state: &GameState,
     occurrence: FaintOccurrenceId,
@@ -4319,6 +4375,7 @@ fn project_replacement(
             "replacement menu projection changed classification",
         ));
     };
+    let replacement_control = normalize_replacement_selection(battle, replacement_control)?;
     let mut next_allocators = allocators.to_vec();
     let mut entries = Vec::with_capacity(seats.len());
     for seat in seats {

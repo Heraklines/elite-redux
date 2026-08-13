@@ -744,6 +744,50 @@ fn assert_fixture_state(
     Ok(())
 }
 
+fn assert_fixture_state_with_authoritative_enemy_pp(
+    kernel: &GameKernel,
+    fixture: &BattleFixture,
+    fixture_field: &str,
+    expected_enemy_move_pp_used: u64,
+) -> TestResult {
+    // The published physical-hit and defeat oracles predate scripted-enemy PP
+    // accounting.  Correct only that explicit enemy move-slot-0 expectation;
+    // every other canonical state field remains an exact fixture comparison.
+    let expected = field(field(&fixture.fixture, fixture_field)?, "canonical")?;
+    let mut expected = comparable_game_state(expected)?;
+    let battle = expected
+        .get_mut("battle")
+        .and_then(Value::as_object_mut)
+        .ok_or_else(|| invalid_data("expected canonical state has no battle object"))?;
+    let enemy_party = battle
+        .get_mut("enemy_party")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| invalid_data("expected canonical state has no enemy party"))?;
+    let enemy = enemy_party
+        .first_mut()
+        .ok_or_else(|| invalid_data("expected canonical state has no enemy lead"))?;
+    let enemy_move = enemy
+        .get_mut("moves")
+        .and_then(Value::as_array_mut)
+        .and_then(|moves| moves.first_mut())
+        .ok_or_else(|| invalid_data("expected canonical state has no enemy move slot 0"))?;
+    let pp_used = enemy_move
+        .get_mut("pp_used")
+        .ok_or_else(|| invalid_data("expected enemy move slot 0 has no pp_used"))?;
+    if pp_used.as_u64() != Some(0) {
+        return Err(invalid_data(
+            "authoritative enemy PP correction expected the published stale value 0",
+        )
+        .into());
+    }
+    *pp_used = Value::from(expected_enemy_move_pp_used);
+    assert_eq!(
+        comparable_game_state(&game_state_json(kernel)?)?,
+        expected,
+    );
+    Ok(())
+}
+
 fn next_faint_occurrence(kernel: &GameKernel) -> TestResult<u64> {
     let state = game_state_json(kernel)?;
     field(field(&state, "battle")?, "next_faint_occurrence")?
@@ -998,7 +1042,12 @@ fn raw_singles_complete_a_real_turn_and_settle_every_presentation() -> TestResul
 
     effects.extend(settle_presentations(&mut kernel, &events)?);
     assert_no_compatibility_effects(&effects);
-    assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
+    assert_fixture_state_with_authoritative_enemy_pp(
+        &kernel,
+        &fixture,
+        "expected_final_state",
+        1,
+    )?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before);
     assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
     assert!(
@@ -1037,7 +1086,12 @@ fn raw_singles_target_path_reaches_fixture_exact_defeat() -> TestResult {
     effects.extend(settle_presentations(&mut kernel, &events)?);
     assert_no_compatibility_effects(&effects);
     assert_eq!(battle_outcome(&kernel)?, "DEFEAT");
-    assert_fixture_state(&kernel, &fixture, "expected_final_state")?;
+    assert_fixture_state_with_authoritative_enemy_pp(
+        &kernel,
+        &fixture,
+        "expected_final_state",
+        1,
+    )?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(matches!(
         control(&kernel)?,

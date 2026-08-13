@@ -162,6 +162,23 @@ fn valid_config() -> TestResult<BattleGameConfig> {
         enemy_slot,
         enemy_command,
     )?;
+    let next_turn = TurnIndex::new(safe(2))?;
+    let next_operation =
+        scripted_enemy_command_operation_id(battle_id, wave, next_turn, enemy_slot, safe(1))?;
+    let next_enemy_script = ScriptedEnemyBattleCommandV1::new(
+        next_operation,
+        battle_id,
+        wave,
+        next_turn,
+        safe(1),
+        pokemon_id(2),
+        enemy_slot,
+        BattleCommand::fight(
+            pokemon_id(2),
+            MoveSlotIndex::ZERO,
+            BattleTargetSelection::implicit(),
+        )?,
+    )?;
     Ok(BattleGameConfig {
         run_state: run_state()?,
         start: BattleStartV1 {
@@ -174,7 +191,10 @@ fn valid_config() -> TestResult<BattleGameConfig> {
         },
         local_seat: seat(1),
         wave_seed: "m3-local-lifecycle-wave".to_owned(),
-        scripted_enemy_policy: ScriptedEnemyPolicyV1::new(safe(0), vec![enemy_script])?,
+        scripted_enemy_policy: ScriptedEnemyPolicyV1::new(
+            safe(0),
+            vec![enemy_script, next_enemy_script],
+        )?,
     })
 }
 
