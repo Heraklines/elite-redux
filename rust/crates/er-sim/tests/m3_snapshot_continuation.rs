@@ -2502,15 +2502,13 @@ mod live_coop_production {
         let Some(projected_control_id) = battle_control_id(&projected.control) else {
             return Ok(false);
         };
-        if installed.control_id.as_str() != projected_control_id {
-            return Ok(false);
-        }
+        let projected_control_id = projected_control_id.to_owned();
         let live = pair.snapshot()?;
         Ok(live
             .guest
             .live_resources
             .controls
-            .contains(&installed.control_id)
+            .contains(&projected_control_id)
             && live.network.queued_packet_ids.contains(&receipt_id))
     }
 

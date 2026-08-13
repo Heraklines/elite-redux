@@ -70,6 +70,32 @@ fn draft() -> Result<AuthorityEntryDraft, Box<dyn Error>> {
     })
 }
 
+fn second_m3_turn_draft() -> Result<AuthorityEntryDraft, Box<dyn Error>> {
+    Ok(AuthorityEntryDraft {
+        context: context()?,
+        operation_id: OperationId::new("battle/1/wave/1/turn/2/result")?,
+        kind: AuthorityEntryKind::TurnCommit,
+        material: Material {
+            digest: "1111111111111111".to_owned(),
+            payload: json!({
+                "wave": 1,
+                "resolved_turn": 2,
+            }),
+        },
+        next_control: NextControl::CommandFrontier(CommandFrontierControl {
+            epoch: safe(1)?,
+            wave: safe(1)?,
+            turn: safe(3)?,
+            commands: vec![CommandControlTarget {
+                owner_seat_id: SeatId::new(safe(1)?),
+                pokemon_id: safe(7)?,
+                field_index: safe(0)?,
+            }],
+        }),
+        subsumes: Vec::new(),
+    })
+}
+
 #[test]
 fn local_authority_uses_the_same_log_without_a_synthetic_peer_or_delivery_lease() -> TestResult {
     assert!(AuthorityLog::new(config()?).is_err());
@@ -83,5 +109,26 @@ fn local_authority_uses_the_same_log_without_a_synthetic_peer_or_delivery_lease(
     assert!(outcome.actions.is_empty());
     assert!(scheduler.live_timers().is_empty());
     assert_eq!(log.retained(), vec![outcome.entry]);
+    Ok(())
+}
+
+#[test]
+fn local_authority_accepts_the_frozen_m3_resolved_turn_successor_coordinate() -> TestResult {
+    let mut log = AuthorityLog::new_local(config()?)?;
+    let mut scheduler = KernelScheduler::new();
+    let first = log.commit(draft()?, &mut scheduler)?;
+    let mut ambiguous = second_m3_turn_draft()?;
+    ambiguous
+        .material
+        .payload
+        .as_object_mut()
+        .ok_or("M3 TURN fixture payload must be an object")?
+        .insert("turn".to_owned(), json!(2));
+    assert!(log.commit(ambiguous, &mut scheduler).is_err());
+    let second = log.commit(second_m3_turn_draft()?, &mut scheduler)?;
+
+    assert_eq!(first.entry.revision.get().get(), 1);
+    assert_eq!(second.entry.revision.get().get(), 2);
+    assert_eq!(log.head_revision(), second.entry.revision);
     Ok(())
 }

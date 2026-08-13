@@ -1285,9 +1285,17 @@ fn mechanical_address_of(
             {
                 epoch = safe_positive_value(payload_epoch)?;
             }
+            // Legacy Authority TURN payloads name this coordinate `turn`;
+            // the frozen M3 battle material names the same coordinate
+            // `resolved_turn`. Accept exactly one spelling so a payload can
+            // never smuggle two divergent successor addresses.
+            let turn = match (payload.get("turn"), payload.get("resolved_turn")) {
+                (Some(turn), None) | (None, Some(turn)) => turn,
+                (Some(_), Some(_)) | (None, None) => return None,
+            };
             (
                 safe_nonnegative_value(payload.get("wave")?)?,
-                safe_nonnegative_value(payload.get("turn")?)?,
+                safe_nonnegative_value(turn)?,
             )
         }
         AuthorityEntryKind::ReplacementCommit => {
