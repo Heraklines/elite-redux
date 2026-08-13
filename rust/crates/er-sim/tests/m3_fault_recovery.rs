@@ -866,7 +866,7 @@ mod live_replica_recovery {
                 additional_ms: safe(100),
             },
         })?;
-        let delayed_receipt = first_packet(
+        let delayed_receipt = last_packet(
             &pair.snapshot_v2()?,
             RestorablePacketKindV2::ControlReceipt,
             PairEndpoint::Guest,
@@ -883,7 +883,7 @@ mod live_replica_recovery {
                 },
             },
         })?;
-        let corrupted_receipt = first_packet(
+        let corrupted_receipt = last_packet(
             &pair.snapshot_v2()?,
             RestorablePacketKindV2::ControlReceipt,
             PairEndpoint::Guest,
