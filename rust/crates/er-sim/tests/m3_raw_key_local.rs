@@ -781,10 +781,7 @@ fn assert_fixture_state_with_authoritative_enemy_pp(
         .into());
     }
     *pp_used = Value::from(expected_enemy_move_pp_used);
-    assert_eq!(
-        comparable_game_state(&game_state_json(kernel)?)?,
-        expected,
-    );
+    assert_eq!(comparable_game_state(&game_state_json(kernel)?)?, expected,);
     Ok(())
 }
 
@@ -1042,12 +1039,7 @@ fn raw_singles_complete_a_real_turn_and_settle_every_presentation() -> TestResul
 
     effects.extend(settle_presentations(&mut kernel, &events)?);
     assert_no_compatibility_effects(&effects);
-    assert_fixture_state_with_authoritative_enemy_pp(
-        &kernel,
-        &fixture,
-        "expected_final_state",
-        1,
-    )?;
+    assert_fixture_state_with_authoritative_enemy_pp(&kernel, &fixture, "expected_final_state", 1)?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before);
     assert!(matches!(control(&kernel)?, BattleControl::CommandRoot(_)));
     assert!(
@@ -1086,12 +1078,7 @@ fn raw_singles_target_path_reaches_fixture_exact_defeat() -> TestResult {
     effects.extend(settle_presentations(&mut kernel, &events)?);
     assert_no_compatibility_effects(&effects);
     assert_eq!(battle_outcome(&kernel)?, "DEFEAT");
-    assert_fixture_state_with_authoritative_enemy_pp(
-        &kernel,
-        &fixture,
-        "expected_final_state",
-        1,
-    )?;
+    assert_fixture_state_with_authoritative_enemy_pp(&kernel, &fixture, "expected_final_state", 1)?;
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
     assert!(matches!(
         control(&kernel)?,

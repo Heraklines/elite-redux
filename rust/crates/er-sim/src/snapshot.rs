@@ -15,8 +15,7 @@ use er_content::pack::ContentPack;
 use er_kernel::snapshot::{
     GameKernelSnapshotBridge, KernelDeterminismDigest, LiveResourceSnapshot, MechanicalStateDigest,
     PhysicalInputSourceV2, RestorableKernelSnapshotV2, RestorableTimerSnapshotV2, RngDraw,
-    snapshot_game_kernel,
-    validate_live_resources as validate_kernel_live_resources,
+    snapshot_game_kernel, validate_live_resources as validate_kernel_live_resources,
 };
 use er_types::battle_ids::{BattlePresentationEventId, CanonicalHexBytes};
 use er_types::battle_ui::{BattlePresentationEvent, PresentationSettlementOutcome};
@@ -1477,7 +1476,6 @@ impl EndpointKernelTraceV2 {
         }
         None
     }
-
 }
 
 impl PairKernelTraceV2 {
@@ -1726,10 +1724,8 @@ impl PairKernelTraceV2 {
         content: Arc<ContentPack>,
     ) -> Result<TraceReplayReportV2, SnapshotError> {
         self.validate()?;
-        let mut runtime = crate::SimulatedPair::from_snapshot(
-            self.initial_snapshot.clone(),
-            content,
-        )?;
+        let mut runtime =
+            crate::SimulatedPair::from_snapshot(self.initial_snapshot.clone(), content)?;
         let mut recorder = PairKernelTraceRecorder::new(self.initial_snapshot.clone())?;
         for (index, expected) in self.entries.iter().enumerate() {
             let observation = runtime.apply_trace_operation_v2(expected.input.clone())?;

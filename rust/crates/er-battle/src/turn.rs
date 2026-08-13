@@ -452,10 +452,7 @@ fn resolve_move_action(
         record_mutation(
             mutations,
             causal_events,
-            BattleMutation::BattleRngChanged {
-                before,
-                after,
-            },
+            BattleMutation::BattleRngChanged { before, after },
         );
     }
     causal_events.push(PresentationCausalEvent::move_used(

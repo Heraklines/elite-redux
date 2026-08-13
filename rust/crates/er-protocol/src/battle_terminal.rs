@@ -7,9 +7,8 @@
 
 use er_canonical::canonicalize_value;
 use er_types::{
-    AuthorityEntry, AuthorityEntryKind, FrameContext, Material, NextControl, OperationId,
-    Revision, SafeU53, TerminalControl, validate_authority_material_digest,
-    validate_authority_operation_id,
+    AuthorityEntry, AuthorityEntryKind, FrameContext, Material, NextControl, OperationId, Revision,
+    SafeU53, TerminalControl, validate_authority_material_digest, validate_authority_operation_id,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use thiserror::Error;
@@ -197,7 +196,7 @@ pub fn validate_battle_terminal_commit(
     validate_context(&entry.context)?;
     validate_operation_id(&entry.operation_id)?;
 
-    if entry.subsumes.iter().any(|revision| *revision == Revision::ZERO) {
+    if entry.subsumes.contains(&Revision::ZERO) {
         return Err(BattleTerminalMaterialError::InvalidSubsumes {
             reason: "subsumed revisions must be positive".to_owned(),
         });
@@ -221,12 +220,10 @@ pub fn validate_battle_terminal_commit(
     validate_terminal_id(&control.terminal_id)?;
 
     validate_digest_shape(&entry.material.digest)?;
-    let material: BattleTerminalMaterialV1 =
-        serde_json::from_value(entry.material.payload.clone()).map_err(|error| {
-            BattleTerminalMaterialError::Malformed {
-                path: "material.payload".to_owned(),
-                reason: error.to_string(),
-            }
+    let material: BattleTerminalMaterialV1 = serde_json::from_value(entry.material.payload.clone())
+        .map_err(|error| BattleTerminalMaterialError::Malformed {
+            path: "material.payload".to_owned(),
+            reason: error.to_string(),
         })?;
     validate_terminal_material(&material)?;
 
@@ -301,10 +298,8 @@ fn validate_context(context: &FrameContext) -> Result<(), BattleTerminalMaterial
     }
 }
 
-fn normalize_subsumes(
-    subsumes: &mut Vec<Revision>,
-) -> Result<(), BattleTerminalMaterialError> {
-    if subsumes.iter().any(|revision| *revision == Revision::ZERO) {
+fn normalize_subsumes(subsumes: &mut Vec<Revision>) -> Result<(), BattleTerminalMaterialError> {
+    if subsumes.contains(&Revision::ZERO) {
         return Err(BattleTerminalMaterialError::InvalidSubsumes {
             reason: "subsumed revisions must be positive".to_owned(),
         });

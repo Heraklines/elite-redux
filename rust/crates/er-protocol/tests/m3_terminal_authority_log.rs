@@ -215,14 +215,8 @@ fn ordinary_entries_still_retire_at_full_control_quorum() -> TestResult {
     assert!(log.retained().is_empty());
     assert_eq!(scheduler.timer(timer_id), None);
     assert_eq!(cancel_count(&second.actions, timer_id), 1);
-    assert!(log.peer_stage_quorum(
-        &committed.entry.operation_id,
-        AckStage::ControlInstalled
-    ));
-    assert!(!log.peer_stage_quorum(
-        &committed.entry.operation_id,
-        AckStage::PresentationSettled
-    ));
+    assert!(log.peer_stage_quorum(&committed.entry.operation_id, AckStage::ControlInstalled));
+    assert!(!log.peer_stage_quorum(&committed.entry.operation_id, AckStage::PresentationSettled));
     Ok(())
 }
 
@@ -289,10 +283,7 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
             } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
         ));
     }
-    assert!(log.peer_stage_quorum(
-        &predecessor.entry.operation_id,
-        AckStage::ControlInstalled
-    ));
+    assert!(log.peer_stage_quorum(&predecessor.entry.operation_id, AckStage::ControlInstalled));
     assert!(!log.peer_stage_quorum(
         &predecessor.entry.operation_id,
         AckStage::PresentationSettled
@@ -352,7 +343,10 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
             ref waiting_for_seat_ids,
         } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
     ));
-    assert_eq!(cancel_count(&terminal_admitted_two.actions, predecessor_timer), 1);
+    assert_eq!(
+        cancel_count(&terminal_admitted_two.actions, predecessor_timer),
+        1
+    );
     assert_eq!(scheduler.timer(predecessor_timer), None);
     assert!(log.retained_entry(predecessor.entry.revision).is_none());
     assert!(log.retained_entry(terminal.entry.revision).is_some());
@@ -360,10 +354,7 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
         &predecessor.entry.operation_id,
         AckStage::PresentationSettled
     ));
-    assert!(log.peer_stage_quorum(
-        &terminal.entry.operation_id,
-        AckStage::Admitted
-    ));
+    assert!(log.peer_stage_quorum(&terminal.entry.operation_id, AckStage::Admitted));
     Ok(())
 }
 
@@ -418,14 +409,8 @@ fn terminal_waits_for_presentation_and_receipts_are_fail_closed_or_idempotent() 
             ref waiting_for_seat_ids,
         } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
     ));
-    assert!(log.peer_stage_quorum(
-        &terminal.entry.operation_id,
-        AckStage::ControlInstalled
-    ));
-    assert!(!log.peer_stage_quorum(
-        &terminal.entry.operation_id,
-        AckStage::PresentationSettled
-    ));
+    assert!(log.peer_stage_quorum(&terminal.entry.operation_id, AckStage::ControlInstalled));
+    assert!(!log.peer_stage_quorum(&terminal.entry.operation_id, AckStage::PresentationSettled));
 
     let settled_one = log.accept_receipt_detailed(
         receipt(&terminal.entry, 1, AckStage::PresentationSettled)?,
@@ -451,10 +436,7 @@ fn terminal_waits_for_presentation_and_receipts_are_fail_closed_or_idempotent() 
     ));
     assert_eq!(cancel_count(&settled_two.actions, timer_id), 1);
     assert_eq!(scheduler.timer(timer_id), None);
-    assert!(log.peer_stage_quorum(
-        &terminal.entry.operation_id,
-        AckStage::PresentationSettled
-    ));
+    assert!(log.peer_stage_quorum(&terminal.entry.operation_id, AckStage::PresentationSettled));
 
     let stale_after_retirement = log.accept_receipt_detailed(
         receipt(&terminal.entry, 2, AckStage::PresentationSettled)?,

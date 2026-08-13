@@ -2,10 +2,8 @@ const AUTHORITY_SOURCE: &str = include_str!(concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/src/battle_authority.rs"
 ));
-const KERNEL_SOURCE: &str = include_str!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/src/battle_kernel.rs"
-));
+const KERNEL_SOURCE: &str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/battle_kernel.rs"));
 
 #[test]
 fn complete_battle_authorizes_one_terminal_successor() {
@@ -79,7 +77,5 @@ fn recovery_accepts_battle_then_terminal_and_predecessor_frontier_terminal_only_
     assert!(source.contains("RecoveredMaterial::Terminal"));
     assert!(source.contains("terminal_final"));
     assert!(source.contains("previous_battle_is_present"));
-    assert!(source.contains(
-        "!previous_battle_is_present && !terminal_predecessor_frontier_ready"
-    ));
+    assert!(source.contains("!previous_battle_is_present && !terminal_predecessor_frontier_ready"));
 }

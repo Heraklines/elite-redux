@@ -467,9 +467,7 @@ impl GameRuntime {
     /// history is compacted; deriving them from the installed replay paths
     /// keeps the snapshot boundary aligned with restoration rather than with
     /// every historical menu transition.
-    pub(crate) fn restorable_remote_control_anchors(
-        &self,
-    ) -> BTreeMap<SeatId, Vec<BattleControl>> {
+    pub(crate) fn restorable_remote_control_anchors(&self) -> BTreeMap<SeatId, Vec<BattleControl>> {
         let mut anchors = BTreeMap::new();
         for path in self.authority_remote_paths.values() {
             let Some(seat) = path.control.owner_seat() else {

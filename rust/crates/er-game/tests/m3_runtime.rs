@@ -1095,7 +1095,10 @@ mod m3_oracle_control_axis8 {
         require(
             case,
             survivor.get("owner_seat").and_then(Value::as_u64) == Some(2)
-                && survivor.get("hp").and_then(Value::as_u64).is_some_and(|hp| hp > 0)
+                && survivor
+                    .get("hp")
+                    .and_then(Value::as_u64)
+                    .is_some_and(|hp| hp > 0)
                 && survivor.get("fainted").and_then(Value::as_bool) == Some(false),
             "legacy compacted survivor no longer has the exact seat-2 live-party shape",
         )?;

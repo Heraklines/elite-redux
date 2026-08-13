@@ -3445,12 +3445,9 @@ fn project_catalogued_typed_speed_queue_probe(
     actual_index: usize,
     draw: &RngDraw,
 ) -> Result<bool, Box<dyn Error>> {
-    let Some(projection) = TYPED_SPEED_QUEUE_PROJECTIONS
-        .iter()
-        .find(|projection| {
-            projection.case_name == case_name && projection.actual_index == actual_index
-        })
-    else {
+    let Some(projection) = TYPED_SPEED_QUEUE_PROJECTIONS.iter().find(|projection| {
+        projection.case_name == case_name && projection.actual_index == actual_index
+    }) else {
         return Ok(false);
     };
     let expected_context = SeedOffsetContext {
@@ -3502,8 +3499,7 @@ fn project_legacy_rng_draws(
             projected_draw.sequence = sequence;
             projected_draw.before_fingerprint =
                 rng_state_fingerprint(&projected_draw.before_state)?;
-            projected_draw.after_fingerprint =
-                rng_state_fingerprint(&projected_draw.after_state)?;
+            projected_draw.after_fingerprint = rng_state_fingerprint(&projected_draw.after_state)?;
             projected_draw.validate()?;
             projected.push(projected_draw);
             continue;

@@ -415,16 +415,9 @@ impl GameRuntimeSnapshotV2 {
                         "history seat has no current control entry",
                     )
                 })?;
-                let anchors = remote_anchors
-                    .get(&seat)
-                    .map(Vec::as_slice)
-                    .unwrap_or(&[]);
-                let controls = bounded_control_history(
-                    seat,
-                    historical,
-                    &current.control,
-                    anchors,
-                )?;
+                let anchors = remote_anchors.get(&seat).map(Vec::as_slice).unwrap_or(&[]);
+                let controls =
+                    bounded_control_history(seat, historical, &current.control, anchors)?;
                 Ok(SeatControlHistorySnapshotV1 { seat, controls })
             })
             .collect::<Result<Vec<_>, SnapshotError>>()?;

@@ -48,17 +48,9 @@ fn terminal() -> BattleTerminalMaterialV1 {
     .expect("terminal material")
 }
 
-fn entry_with(
-    revision_value: u64,
-    subsumes: Vec<Revision>,
-) -> AuthorityEntry {
-    let draft = build_battle_terminal_commit_draft(
-        context(),
-        operation_id(),
-        terminal(),
-        subsumes,
-    )
-    .expect("terminal draft");
+fn entry_with(revision_value: u64, subsumes: Vec<Revision>) -> AuthorityEntry {
+    let draft = build_battle_terminal_commit_draft(context(), operation_id(), terminal(), subsumes)
+        .expect("terminal draft");
     AuthorityEntry {
         context: draft.context,
         revision: revision(revision_value),
@@ -118,9 +110,11 @@ fn material_has_exact_wire_shape_and_deterministic_utf16_digest_vector() {
         expected
     );
     assert_eq!(expected.len(), "terminal:".len() + 8);
-    assert!(expected["terminal:".len()..]
-        .bytes()
-        .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')));
+    assert!(
+        expected["terminal:".len()..]
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    );
 }
 
 #[test]
@@ -143,19 +137,18 @@ fn digest_is_independent_of_wire_object_key_order() {
 #[test]
 fn builder_emits_typed_identities_and_sorted_deduplicated_subsumes() {
     let supplied = vec![revision(5), revision(2), revision(5), revision(3)];
-    let draft = build_battle_terminal_commit_draft(
-        context(),
-        operation_id(),
-        terminal(),
-        supplied.clone(),
-    )
-    .expect("terminal draft");
+    let draft =
+        build_battle_terminal_commit_draft(context(), operation_id(), terminal(), supplied.clone())
+            .expect("terminal draft");
 
     assert_eq!(draft.context, context());
     assert_eq!(draft.operation_id, operation_id());
     assert_eq!(draft.kind, AuthorityEntryKind::TerminalCommit);
     assert_eq!(draft.subsumes, vec![revision(2), revision(3), revision(5)]);
-    assert_eq!(supplied, vec![revision(5), revision(2), revision(5), revision(3)]);
+    assert_eq!(
+        supplied,
+        vec![revision(5), revision(2), revision(5), revision(3)]
+    );
     assert_eq!(
         draft.material.payload,
         serde_json::to_value(terminal()).expect("typed terminal payload")
@@ -187,44 +180,56 @@ fn validator_admits_builder_entry_and_redelivery_is_equal() {
 #[test]
 fn constructor_and_builder_reject_malformed_identities_and_zero_subsumes() {
     assert!(BattleTerminalMaterialV1::new("", BattleTerminalReasonV1::GameOver, 1, 2).is_err());
-    assert!(BattleTerminalMaterialV1::new("terminal", BattleTerminalReasonV1::GameOver, -1_i64, 2).is_err());
+    assert!(
+        BattleTerminalMaterialV1::new("terminal", BattleTerminalReasonV1::GameOver, -1_i64, 2)
+            .is_err()
+    );
 
     let mut bad_context = context();
     bad_context.seat_map_id.clear();
-    assert!(build_battle_terminal_commit_draft(
-        bad_context,
-        operation_id(),
-        terminal(),
-        Vec::<Revision>::new(),
-    )
-    .is_err());
+    assert!(
+        build_battle_terminal_commit_draft(
+            bad_context,
+            operation_id(),
+            terminal(),
+            Vec::<Revision>::new(),
+        )
+        .is_err()
+    );
 
-    let bad_operation = OperationId::new("bad\noperation").expect("construct malformed operation ID");
-    assert!(build_battle_terminal_commit_draft(
-        context(),
-        bad_operation,
-        terminal(),
-        Vec::<Revision>::new(),
-    )
-    .is_err());
+    let bad_operation =
+        OperationId::new("bad\noperation").expect("construct malformed operation ID");
+    assert!(
+        build_battle_terminal_commit_draft(
+            context(),
+            bad_operation,
+            terminal(),
+            Vec::<Revision>::new(),
+        )
+        .is_err()
+    );
 
     let mut bad_terminal = terminal();
     bad_terminal.terminal_id.clear();
-    assert!(build_battle_terminal_commit_draft(
-        context(),
-        operation_id(),
-        bad_terminal,
-        Vec::<Revision>::new(),
-    )
-    .is_err());
+    assert!(
+        build_battle_terminal_commit_draft(
+            context(),
+            operation_id(),
+            bad_terminal,
+            Vec::<Revision>::new(),
+        )
+        .is_err()
+    );
 
-    assert!(build_battle_terminal_commit_draft(
-        context(),
-        operation_id(),
-        terminal(),
-        vec![Revision::ZERO],
-    )
-    .is_err());
+    assert!(
+        build_battle_terminal_commit_draft(
+            context(),
+            operation_id(),
+            terminal(),
+            vec![Revision::ZERO],
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -306,8 +311,8 @@ fn validator_rejects_invalid_context_and_operation_identity() {
     assert!(validate_battle_terminal_commit(&bad_context).is_err());
 
     let mut bad_operation = valid;
-    bad_operation.operation_id = OperationId::new("bad\u{0000}operation")
-        .expect("construct malformed operation ID");
+    bad_operation.operation_id =
+        OperationId::new("bad\u{0000}operation").expect("construct malformed operation ID");
     assert!(validate_battle_terminal_commit(&bad_operation).is_err());
 }
 

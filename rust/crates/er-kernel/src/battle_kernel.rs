@@ -22,19 +22,18 @@ use er_game::runtime::{BattleGameConfig, BattleUiResult, GameRuntime, GameRuntim
 use er_game::snapshot::{GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2};
 use er_protocol::{
     AuthorityLog, AuthorityLogAction, AuthorityLogSnapshotBridge, AuthorityReplica,
-    AuthorityReplicaSnapshotBridge, ConnectionSnapshotV2, CorrelatedResponseSnapshotV2,
-    EndpointRole, FrameContextSnapshotV2, FrameValidator, InboundFrameResult, KernelScheduler,
-    PeerBinding, PeerIdentitySnapshotV2, PendingRecoverySnapshotV2, ProposalAdmission,
-    ProposalAdmissionLedger, ProposalAdmissionSnapshotBridge, ProposalIdentity,
-    ProposalLeaseAction, ProposalLeaseManager, ProposalLeaseSnapshotBridge, ProposalLeaseSpec,
-    ProposalLeaseStart, ProtocolRuntimeSnapshotV2, RecoveryAction, RecoveryBundleValidation,
-    RecoveryFrontierStagingOutcome, RecoveryLiveState, RecoveryMaterialOutcome, RecoveryPhase,
-    RecoveryTransaction, RecoveryTransactionSnapshotBridge, RecoveryValidationContext,
-    ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage, SchedulerCommand,
-    BattleTerminalMaterialV1, BattleTerminalReasonV1, build_battle_terminal_commit_draft,
-    validate_battle_terminal_commit,
-    StagedPeerRebindSnapshotV2, ValidatedFrame, ValidatedFrameBody, control_id_of,
-    frame_contexts_compatible, validate_recovery_bundle,
+    AuthorityReplicaSnapshotBridge, BattleTerminalMaterialV1, BattleTerminalReasonV1,
+    ConnectionSnapshotV2, CorrelatedResponseSnapshotV2, EndpointRole, FrameContextSnapshotV2,
+    FrameValidator, InboundFrameResult, KernelScheduler, PeerBinding, PeerIdentitySnapshotV2,
+    PendingRecoverySnapshotV2, ProposalAdmission, ProposalAdmissionLedger,
+    ProposalAdmissionSnapshotBridge, ProposalIdentity, ProposalLeaseAction, ProposalLeaseManager,
+    ProposalLeaseSnapshotBridge, ProposalLeaseSpec, ProposalLeaseStart, ProtocolRuntimeSnapshotV2,
+    RecoveryAction, RecoveryBundleValidation, RecoveryFrontierStagingOutcome, RecoveryLiveState,
+    RecoveryMaterialOutcome, RecoveryPhase, RecoveryTransaction, RecoveryTransactionSnapshotBridge,
+    RecoveryValidationContext, ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage,
+    SchedulerCommand, StagedPeerRebindSnapshotV2, ValidatedFrame, ValidatedFrameBody,
+    build_battle_terminal_commit_draft, control_id_of, frame_contexts_compatible,
+    validate_battle_terminal_commit, validate_recovery_bundle,
 };
 use er_state::digest::MechanicalStateDigest;
 use er_state::format::human_seats;
@@ -50,12 +49,11 @@ use er_types::battle_ui::{
 };
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryBody, AuthorityEntryKind, AuthorityReceipt,
-    AuthorityReceiptBody,
-    ButtonEvent, ConnectionGeneration, ControlProjectionOutcome, FRAME_PROTOCOL_VERSION,
-    FrameContext, FrameType, InputTimerCommand, KernelEffect, KernelInput, LiveResourceSnapshot,
-    NetworkFrame, ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle,
-    RecoveryBundleBody, RecoveryFenceState, RecoveryRequestBody, Revision, SeatId, TailRequestBody,
-    TerminalState, TimerId, TransportState,
+    AuthorityReceiptBody, ButtonEvent, ConnectionGeneration, ControlProjectionOutcome,
+    FRAME_PROTOCOL_VERSION, FrameContext, FrameType, InputTimerCommand, KernelEffect, KernelInput,
+    LiveResourceSnapshot, NetworkFrame, ProposalMessage, RawFrame, RecoveryAppliedProof,
+    RecoveryBundle, RecoveryBundleBody, RecoveryFenceState, RecoveryRequestBody, Revision, SeatId,
+    TailRequestBody, TerminalState, TimerId, TransportState,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
@@ -2675,8 +2673,7 @@ impl BattleTransaction {
                     .filter(|entry| {
                         matches!(
                             entry.kind,
-                            AuthorityEntryKind::TurnCommit
-                                | AuthorityEntryKind::ReplacementCommit
+                            AuthorityEntryKind::TurnCommit | AuthorityEntryKind::ReplacementCommit
                         )
                     })
                     .map(|entry| entry.operation_id.clone()),
@@ -2686,43 +2683,38 @@ impl BattleTransaction {
             return Ok(());
         };
 
-        let (
-            context,
-            terminal_published,
-            terminal_quorum,
-            battle_quorum,
-            latest_entry,
-            subsumes,
-        ) = match &self.staged.protocol {
-            BattleProtocolState::Authority { context, log, .. } => {
-                let retained = log.retained();
-                let terminal_published = retained.iter().any(|entry| {
-                    entry.operation_id == terminal_operation_id
-                        && entry.kind == AuthorityEntryKind::TerminalCommit
-                }) || log.peer_stage_quorum(&terminal_operation_id, AckStage::Admitted);
-                let terminal_quorum =
-                    log.peer_stage_quorum(&terminal_operation_id, AckStage::PresentationSettled);
-                let battle_quorum =
-                    log.peer_stage_quorum(&battle_operation_id, AckStage::PresentationSettled);
-                let latest_entry = log.retained_entry(log.head_revision()).cloned();
-                let mut subsumes = retained
-                    .into_iter()
-                    .filter(|entry| entry.kind != AuthorityEntryKind::TerminalCommit)
-                    .map(|entry| entry.revision)
-                    .collect::<Vec<_>>();
-                subsumes.sort_unstable();
-                subsumes.dedup();
-                (
-                    context.clone(),
-                    terminal_published,
-                    terminal_quorum,
-                    battle_quorum,
-                    latest_entry,
-                    subsumes,
-                )
-            }
-            BattleProtocolState::Replica { .. } => return Ok(()),
-        };
+        let (context, terminal_published, terminal_quorum, battle_quorum, latest_entry, subsumes) =
+            match &self.staged.protocol {
+                BattleProtocolState::Authority { context, log, .. } => {
+                    let retained = log.retained();
+                    let terminal_published = retained.iter().any(|entry| {
+                        entry.operation_id == terminal_operation_id
+                            && entry.kind == AuthorityEntryKind::TerminalCommit
+                    }) || log
+                        .peer_stage_quorum(&terminal_operation_id, AckStage::Admitted);
+                    let terminal_quorum = log
+                        .peer_stage_quorum(&terminal_operation_id, AckStage::PresentationSettled);
+                    let battle_quorum =
+                        log.peer_stage_quorum(&battle_operation_id, AckStage::PresentationSettled);
+                    let latest_entry = log.retained_entry(log.head_revision()).cloned();
+                    let mut subsumes = retained
+                        .into_iter()
+                        .filter(|entry| entry.kind != AuthorityEntryKind::TerminalCommit)
+                        .map(|entry| entry.revision)
+                        .collect::<Vec<_>>();
+                    subsumes.sort_unstable();
+                    subsumes.dedup();
+                    (
+                        context.clone(),
+                        terminal_published,
+                        terminal_quorum,
+                        battle_quorum,
+                        latest_entry,
+                        subsumes,
+                    )
+                }
+                BattleProtocolState::Replica { .. } => return Ok(()),
+            };
 
         if terminal_published {
             if terminal_quorum {
@@ -3439,17 +3431,19 @@ impl BattleTransaction {
         let recovered_entry = recovered_entry.ok_or_else(|| BattleKernelError::Invariant {
             reason: "positive recovery emitted no recovered frontier".to_owned(),
         })?;
-        let final_material = applied_tail.last().ok_or_else(|| BattleKernelError::Invariant {
-            reason: "positive recovery applied no material entry".to_owned(),
-        })?;
+        let final_material = applied_tail
+            .last()
+            .ok_or_else(|| BattleKernelError::Invariant {
+                reason: "positive recovery applied no material entry".to_owned(),
+            })?;
         if let RecoveredMaterial::Terminal { entry, material } = final_material {
             self.validate_terminal_entry_identity(entry, material)?;
         }
         let final_entry = final_material.entry().clone();
         let terminal_final = final_entry.kind == AuthorityEntryKind::TerminalCommit;
         let final_battle_applied = final_material.battle_apply().cloned();
-        let terminal_predecessor_frontier_ready = terminal_final
-            && self.replica_has_terminal_predecessor_frontier(&final_entry);
+        let terminal_predecessor_frontier_ready =
+            terminal_final && self.replica_has_terminal_predecessor_frontier(&final_entry);
         if recovered_entry != final_entry || recovered_entry.revision != bundle.frontier {
             return Err(BattleKernelError::Invariant {
                 reason: "recovery staged a frontier other than the applied final entry".to_owned(),
@@ -3457,14 +3451,13 @@ impl BattleTransaction {
         }
         if terminal_final {
             if !already_installed {
-                let previous_battle_is_present = applied_tail.iter().rev().nth(1).is_some_and(
-                    |previous| {
+                let previous_battle_is_present =
+                    applied_tail.iter().rev().nth(1).is_some_and(|previous| {
                         previous.entry().kind != AuthorityEntryKind::TerminalCommit
                             && previous.battle_apply().is_some_and(|applied| {
                                 applied.next_control == *self.staged.game.control()
                             })
-                    },
-                );
+                    });
                 if !previous_battle_is_present && !terminal_predecessor_frontier_ready {
                     return Err(BattleKernelError::TerminalRequired {
                         reason: "terminal recovery has neither a preceding battle entry nor an admitted complete predecessor frontier".to_owned(),
@@ -3755,8 +3748,9 @@ impl BattleTransaction {
                     && !predecessor_frontier_ready
                 {
                     return Err(BattleKernelError::TerminalRequired {
-                        reason: "terminal recovery must apply a battle entry before the terminal entry"
-                            .to_owned(),
+                        reason:
+                            "terminal recovery must apply a battle entry before the terminal entry"
+                                .to_owned(),
                     });
                 }
                 applied_tail.push(RecoveredMaterial::Terminal {
@@ -3850,9 +3844,7 @@ impl BattleTransaction {
                     reason: "zero-frontier recovery retained a material tail".to_owned(),
                 });
             }
-        } else if applied_tail.last().map(|item| &item.entry().material)
-            != Some(&bundle.material)
-        {
+        } else if applied_tail.last().map(|item| &item.entry().material) != Some(&bundle.material) {
             return Err(BattleKernelError::Invariant {
                 reason: "recovery final material diverged from the validated bundle".to_owned(),
             });
@@ -3955,15 +3947,17 @@ impl BattleTransaction {
         for seat in &self.staged.game.control().seats {
             let BattleControl::Complete(seat_outcome) = &seat.control else {
                 return Err(BattleKernelError::TerminalRequired {
-                    reason: "terminal material arrived before the complete battle control was installed"
-                        .to_owned(),
+                    reason:
+                        "terminal material arrived before the complete battle control was installed"
+                            .to_owned(),
                 });
             };
             let seat_outcome = *seat_outcome;
             if let Some(previous) = outcome {
                 if previous != seat_outcome {
                     return Err(BattleKernelError::TerminalRequired {
-                        reason: "terminal material found divergent complete battle outcomes".to_owned(),
+                        reason: "terminal material found divergent complete battle outcomes"
+                            .to_owned(),
                     });
                 }
             } else {
@@ -3975,7 +3969,8 @@ impl BattleTransaction {
                 reason: "terminal material arrived for an empty battle control plan".to_owned(),
             });
         };
-        let expected_operation_id = battle_terminal_operation_id(self.staged.game.control(), outcome)?;
+        let expected_operation_id =
+            battle_terminal_operation_id(self.staged.game.control(), outcome)?;
         if entry.kind != AuthorityEntryKind::TerminalCommit
             || entry.operation_id != expected_operation_id
             || material.terminal_id != expected_operation_id.to_string()
@@ -3984,8 +3979,7 @@ impl BattleTransaction {
             || !matches!(&material.reason, BattleTerminalReasonV1::GameOver)
         {
             return Err(BattleKernelError::TerminalRequired {
-                reason: "terminal material identity does not match the complete battle"
-                    .to_owned(),
+                reason: "terminal material identity does not match the complete battle".to_owned(),
             });
         }
         Ok(())
@@ -4007,11 +4001,12 @@ impl BattleTransaction {
                 }
                 ReplicaAction::ApplyMaterial { entry } => {
                     if entry.kind == AuthorityEntryKind::TerminalCommit {
-                        let terminal = validate_battle_terminal_commit(&entry).map_err(|error| {
-                            BattleKernelError::TerminalRequired {
-                                reason: format!("malformed terminal material: {error}"),
-                            }
-                        })?;
+                        let terminal =
+                            validate_battle_terminal_commit(&entry).map_err(|error| {
+                                BattleKernelError::TerminalRequired {
+                                    reason: format!("malformed terminal material: {error}"),
+                                }
+                            })?;
                         self.validate_terminal_entry_identity(&entry, &terminal)?;
                         let actions = match &mut self.staged.protocol {
                             BattleProtocolState::Replica { replica, .. } => replica
@@ -4172,11 +4167,12 @@ impl BattleTransaction {
                 }
                 ReplicaAction::ProbePresentation { entry } => {
                     if entry.kind == AuthorityEntryKind::TerminalCommit {
-                        let terminal = validate_battle_terminal_commit(&entry).map_err(|error| {
-                            BattleKernelError::TerminalRequired {
-                                reason: format!("malformed terminal material: {error}"),
-                            }
-                        })?;
+                        let terminal =
+                            validate_battle_terminal_commit(&entry).map_err(|error| {
+                                BattleKernelError::TerminalRequired {
+                                    reason: format!("malformed terminal material: {error}"),
+                                }
+                            })?;
                         self.validate_terminal_entry_identity(&entry, &terminal)?;
                         let actions = match &mut self.staged.protocol {
                             BattleProtocolState::Replica { replica, .. } => replica
@@ -4187,8 +4183,9 @@ impl BattleTransaction {
                                 .map_err(protocol_error)?,
                             BattleProtocolState::Authority { .. } => {
                                 return Err(BattleKernelError::Invariant {
-                                    reason: "authority received a replica terminal presentation probe"
-                                        .to_owned(),
+                                    reason:
+                                        "authority received a replica terminal presentation probe"
+                                            .to_owned(),
                                 });
                             }
                         };
