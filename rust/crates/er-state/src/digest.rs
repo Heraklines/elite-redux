@@ -6,7 +6,7 @@ use er_canonical::content_digest;
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use crate::snapshot::{GameState, SnapshotError, canonical_game_state_bytes};
+use crate::snapshot::{GameState, SnapshotError};
 
 pub const MECHANICAL_DIGEST_DOMAIN: &str = "pokerogue-redux/m3/mechanical/v1";
 pub const MECHANICAL_DIGEST_PREFIX: &str = "blake3-v1:";
@@ -105,12 +105,12 @@ struct MechanicalDigestPreimage<'a> {
 }
 
 /// Hash the exact complete GameState as canonical JSON of exactly
-/// `{ "domain": <frozen-domain>, "state": <complete-state> }`. The snapshot
-/// call ensures validation precedes hashing.
+/// `{ "domain": <frozen-domain>, "state": <complete-state> }`. State
+/// validation precedes hashing; the canonical preimage is encoded only once.
 pub fn compute_mechanical_state_digest(
     state: &GameState,
 ) -> Result<MechanicalStateDigest, MechanicalDigestError> {
-    let _ = canonical_game_state_bytes(state)?;
+    state.validate().map_err(SnapshotError::from)?;
     let raw = content_digest(&MechanicalDigestPreimage {
         domain: MECHANICAL_DIGEST_DOMAIN,
         state,

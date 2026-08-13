@@ -8,8 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use er_battle::command::NormalizedBattleCommand;
 use er_battle::legality::{
-    build_command_offer, build_scripted_enemy_offer, normalize_command_set,
-    validate_replacement_selection, validate_state_content,
+    build_command_offer_trusted, build_scripted_enemy_offer_trusted,
+    normalize_command_set_trusted, validate_replacement_selection_trusted,
+    validate_state_content_trusted,
 };
 use er_battle::replacement::legal_replacement_candidates;
 use er_battle::stat_stage::MIN_STAT_STAGE;
@@ -233,6 +234,12 @@ pub struct BattleMaterialApplyContext {
     pub menu_allocators: Vec<SeatMenuInstanceAllocator>,
 }
 
+#[derive(Clone, Copy)]
+enum ContentValidationMode {
+    Full,
+    Trusted,
+}
+
 /// The closed common material-application failure categories.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Error)]
 pub enum BattleMaterialApplyError {
@@ -279,6 +286,26 @@ pub fn apply_turn_material(
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
+    apply_turn_material_inner(current, material, content, ContentValidationMode::Full)
+}
+
+/// Apply TURN material inside a kernel whose immutable content pack was
+/// validated at construction or restore.
+#[doc(hidden)]
+pub fn apply_turn_material_trusted(
+    current: &BattleMaterialApplyContext,
+    material: &BattleTurnMaterialV1,
+    content: &ContentPack,
+) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
+    apply_turn_material_inner(current, material, content, ContentValidationMode::Trusted)
+}
+
+fn apply_turn_material_inner(
+    current: &BattleMaterialApplyContext,
+    material: &BattleTurnMaterialV1,
+    content: &ContentPack,
+    validation: ContentValidationMode,
+) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
     verify_material_before_digest(&material.before_state, &material.before_digest)?;
     validate_material_header(
         material.schema_version,
@@ -287,8 +314,9 @@ pub fn apply_turn_material(
         &material.before_state,
         &material.after_state,
         content,
+        validation,
     )?;
-    validate_state_content(&material.before_state, content)
+    validate_state_content_trusted(&material.before_state, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     validate_turn_identity(material)?;
     validate_turn_commands(&material.before_state, &material.commands, content)?;
@@ -340,6 +368,26 @@ pub fn apply_replacement_material(
     material: &BattleReplacementMaterialV1,
     content: &ContentPack,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
+    apply_replacement_material_inner(current, material, content, ContentValidationMode::Full)
+}
+
+/// Apply REPLACEMENT material inside a kernel whose immutable content pack
+/// was validated at construction or restore.
+#[doc(hidden)]
+pub fn apply_replacement_material_trusted(
+    current: &BattleMaterialApplyContext,
+    material: &BattleReplacementMaterialV1,
+    content: &ContentPack,
+) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
+    apply_replacement_material_inner(current, material, content, ContentValidationMode::Trusted)
+}
+
+fn apply_replacement_material_inner(
+    current: &BattleMaterialApplyContext,
+    material: &BattleReplacementMaterialV1,
+    content: &ContentPack,
+    validation: ContentValidationMode,
+) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
     verify_material_before_digest(&material.before_state, &material.before_digest)?;
     validate_material_header(
         material.schema_version,
@@ -348,8 +396,9 @@ pub fn apply_replacement_material(
         &material.before_state,
         &material.after_state,
         content,
+        validation,
     )?;
-    validate_state_content(&material.before_state, content)
+    validate_state_content_trusted(&material.before_state, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     validate_replacement_identity(material)?;
     validate_material_replacement_selection(
@@ -422,6 +471,7 @@ fn validate_material_header(
     before_state: &GameState,
     after_state: &GameState,
     content: &ContentPack,
+    validation: ContentValidationMode,
 ) -> Result<(), BattleMaterialApplyError> {
     if schema_version != BATTLE_MATERIAL_SCHEMA_VERSION {
         return Err(BattleMaterialApplyError::SchemaVersionMismatch);
@@ -429,7 +479,7 @@ fn validate_material_header(
     if oracle_game_sha != ORACLE_GAME_SHA || content.oracle_game_sha != ORACLE_GAME_SHA {
         return Err(BattleMaterialApplyError::OracleIdentityMismatch);
     }
-    if content.validate().is_err() {
+    if matches!(validation, ContentValidationMode::Full) && content.validate().is_err() {
         return Err(BattleMaterialApplyError::Invariant);
     }
     if content_hash != &content.hash
@@ -559,7 +609,7 @@ fn reconcile_turn_frontier(
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
-    validate_state_content(&current.current_state, content)
+    validate_state_content_trusted(&current.current_state, content)
         .map_err(|_| BattleMaterialApplyError::Invariant)?;
     if state_without_command_collection(&current.current_state)
         != state_without_command_collection(&material.before_state)
@@ -617,7 +667,7 @@ fn reconcile_turn_frontier(
             .ok_or(BattleMaterialApplyError::LocalBeforeStateMismatch)?;
         staged_battle.command_state = material_battle.command_state.clone();
     }
-    validate_state_content(&staged, content)
+    validate_state_content_trusted(&staged, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     let staged_digest = MechanicalStateDigest::compute(&staged)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
@@ -669,7 +719,7 @@ fn validate_turn_commands(
     commands
         .validate()
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
-    normalize_command_set(before, commands, content)
+    normalize_command_set_trusted(before, commands, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     Ok(())
 }
@@ -699,7 +749,7 @@ fn validate_material_replacement_selection(
         }
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
-    validate_replacement_selection(before, occurrence, selection, content)
+    validate_replacement_selection_trusted(before, occurrence, selection, content)
         .map_err(|_| BattleMaterialApplyError::InvalidEvidence)
 }
 
@@ -1158,7 +1208,7 @@ fn move_exists_in_command_or_content(
     let Ok(commands) = battle.command_state.admitted_command_set() else {
         return false;
     };
-    let Ok(normalized) = normalize_command_set(state, &commands, content) else {
+    let Ok(normalized) = normalize_command_set_trusted(state, &commands, content) else {
         return false;
     };
     normalized.entries().iter().any(|command| {
@@ -1396,7 +1446,7 @@ fn validate_after_state_and_digest(
     stated: &MechanicalStateDigest,
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
-    validate_state_content(after_state, content)
+    validate_state_content_trusted(after_state, content)
         .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
     let computed = MechanicalStateDigest::compute(after_state)
         .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
@@ -1515,7 +1565,7 @@ fn validate_fresh_command_frontier(
                     owner,
                 )
                 .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-                let expected_offer = build_command_offer(after_state, slot, content)
+                let expected_offer = build_command_offer_trusted(after_state, slot, content)
                     .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
                 if entry.owner_seat != Some(owner)
                     || entry.operation_id != expected_operation
@@ -1541,9 +1591,13 @@ fn validate_fresh_command_frontier(
                     scripted.script_cursor,
                 )
                 .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
-                let expected_offer =
-                    build_scripted_enemy_offer(after_state, slot, &scripted.command, content)
-                        .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
+                let expected_offer = build_scripted_enemy_offer_trusted(
+                    after_state,
+                    slot,
+                    &scripted.command,
+                    content,
+                )
+                .map_err(|_| BattleMaterialApplyError::InvalidAfterState)?;
                 if entry.owner_seat.is_some()
                     || entry.operation_id != expected_operation
                     || scripted.operation_id != expected_operation

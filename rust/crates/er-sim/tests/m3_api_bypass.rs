@@ -106,6 +106,10 @@ fn battle_mode_has_no_fixture_plans_or_public_semantic_driver() {
                 "{label} must not reach an internal mutable owner through {forbidden}"
             );
         }
+        assert!(
+            !source.contains("_trusted("),
+            "{label} must not call a doc-hidden trusted-content transaction seam"
+        );
     }
 
     let input_source = between(

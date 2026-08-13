@@ -7,7 +7,7 @@
 use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, ContentPack, MaterialApplyResult,
     apply_replacement_material, apply_turn_material, decode_replacement_material,
-    decode_turn_material,
+    decode_turn_material, apply_replacement_material_trusted, apply_turn_material_trusted,
 };
 use er_types::{AuthorityEntryKind, Material};
 use thiserror::Error;
@@ -121,7 +121,7 @@ pub(crate) fn apply_authority_material(
                     ProtocolViolation::MalformedBattleMaterial,
                 ));
             }
-            apply_turn_material(current, &typed, content).map_err(map_material_apply_error)
+            apply_turn_material_trusted(current, &typed, content).map_err(map_material_apply_error)
         }
         AuthorityEntryKind::ReplacementCommit => {
             let typed = decode_replacement_material(&bytes).map_err(|_| {
@@ -135,7 +135,8 @@ pub(crate) fn apply_authority_material(
                     ProtocolViolation::MalformedBattleMaterial,
                 ));
             }
-            apply_replacement_material(current, &typed, content).map_err(map_material_apply_error)
+            apply_replacement_material_trusted(current, &typed, content)
+                .map_err(map_material_apply_error)
         }
         AuthorityEntryKind::InteractionCommit
         | AuthorityEntryKind::ControlCommit

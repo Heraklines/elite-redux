@@ -167,6 +167,26 @@ pub fn build_command_offer(
     content: &ContentPack,
 ) -> Result<BattleCommandOffer, CommandLegalityError> {
     validate_state_content(state, content)?;
+    build_command_offer_validated(state, field_slot, content)
+}
+
+/// Build a command offer after the enclosing immutable-content owner has
+/// already validated the retained content pack.
+#[doc(hidden)]
+pub fn build_command_offer_trusted(
+    state: &GameState,
+    field_slot: FieldSlot,
+    content: &ContentPack,
+) -> Result<BattleCommandOffer, CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    build_command_offer_validated(state, field_slot, content)
+}
+
+fn build_command_offer_validated(
+    state: &GameState,
+    field_slot: FieldSlot,
+    content: &ContentPack,
+) -> Result<BattleCommandOffer, CommandLegalityError> {
     let battle = active_ongoing_battle(state)?;
     if field_slot.side != BattleSide::Player {
         return Err(CommandLegalityError::HumanCommandRequired { slot: field_slot });
@@ -183,6 +203,28 @@ pub fn build_scripted_enemy_offer(
     content: &ContentPack,
 ) -> Result<BattleCommandOffer, CommandLegalityError> {
     validate_state_content(state, content)?;
+    build_scripted_enemy_offer_validated(state, field_slot, command, content)
+}
+
+/// Build a scripted offer after the enclosing immutable-content owner has
+/// already validated the retained content pack.
+#[doc(hidden)]
+pub fn build_scripted_enemy_offer_trusted(
+    state: &GameState,
+    field_slot: FieldSlot,
+    command: &BattleCommand,
+    content: &ContentPack,
+) -> Result<BattleCommandOffer, CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    build_scripted_enemy_offer_validated(state, field_slot, command, content)
+}
+
+fn build_scripted_enemy_offer_validated(
+    state: &GameState,
+    field_slot: FieldSlot,
+    command: &BattleCommand,
+    content: &ContentPack,
+) -> Result<BattleCommandOffer, CommandLegalityError> {
     let battle = active_ongoing_battle(state)?;
     if field_slot.side != BattleSide::Enemy {
         return Err(CommandLegalityError::EnemyCommandRequired { slot: field_slot });
@@ -201,6 +243,26 @@ pub fn validate_preserved_offer(
     content: &ContentPack,
 ) -> Result<(), CommandLegalityError> {
     validate_state_content(state, content)?;
+    validate_preserved_offer_validated(state, entry, content)
+}
+
+/// Validate a preserved offer after the enclosing immutable-content owner has
+/// already validated the retained content pack.
+#[doc(hidden)]
+pub fn validate_preserved_offer_trusted(
+    state: &GameState,
+    entry: &CommandFrontierEntry,
+    content: &ContentPack,
+) -> Result<(), CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    validate_preserved_offer_validated(state, entry, content)
+}
+
+fn validate_preserved_offer_validated(
+    state: &GameState,
+    entry: &CommandFrontierEntry,
+    content: &ContentPack,
+) -> Result<(), CommandLegalityError> {
     let battle = active_ongoing_battle(state)?;
     let current = battle
         .command_state
@@ -224,6 +286,26 @@ pub fn validate_command_proposal(
     content: &ContentPack,
 ) -> Result<NormalizedBattleCommand, CommandLegalityError> {
     validate_state_content(state, content)?;
+    validate_command_proposal_validated(state, proposal, content)
+}
+
+/// Validate a proposal after the enclosing immutable-content owner has
+/// already validated the retained content pack.
+#[doc(hidden)]
+pub fn validate_command_proposal_trusted(
+    state: &GameState,
+    proposal: &BattleCommandProposalV1,
+    content: &ContentPack,
+) -> Result<NormalizedBattleCommand, CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    validate_command_proposal_validated(state, proposal, content)
+}
+
+fn validate_command_proposal_validated(
+    state: &GameState,
+    proposal: &BattleCommandProposalV1,
+    content: &ContentPack,
+) -> Result<NormalizedBattleCommand, CommandLegalityError> {
     proposal.validate()?;
     let battle = active_ongoing_battle(state)?;
     let entry = battle
@@ -272,6 +354,26 @@ pub fn normalize_command_set(
     content: &ContentPack,
 ) -> Result<NormalizedCommandSet, CommandLegalityError> {
     validate_state_content(state, content)?;
+    normalize_command_set_validated(state, commands, content)
+}
+
+/// Normalize an admitted command set after the enclosing immutable-content
+/// owner has already validated the retained content pack.
+#[doc(hidden)]
+pub fn normalize_command_set_trusted(
+    state: &GameState,
+    commands: &CommandSet,
+    content: &ContentPack,
+) -> Result<NormalizedCommandSet, CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    normalize_command_set_validated(state, commands, content)
+}
+
+fn normalize_command_set_validated(
+    state: &GameState,
+    commands: &CommandSet,
+    content: &ContentPack,
+) -> Result<NormalizedCommandSet, CommandLegalityError> {
     commands.validate()?;
     let battle = active_ongoing_battle(state)?;
 
@@ -343,6 +445,27 @@ pub fn validate_replacement_selection(
     content: &ContentPack,
 ) -> Result<(), CommandLegalityError> {
     validate_state_content(state, content)?;
+    validate_replacement_selection_validated(state, occurrence, selection)
+}
+
+/// Validate a replacement selection after the enclosing immutable-content
+/// owner has already validated the retained content pack.
+#[doc(hidden)]
+pub fn validate_replacement_selection_trusted(
+    state: &GameState,
+    occurrence: FaintOccurrenceId,
+    selection: &ReplacementSelection,
+    content: &ContentPack,
+) -> Result<(), CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    validate_replacement_selection_validated(state, occurrence, selection)
+}
+
+fn validate_replacement_selection_validated(
+    state: &GameState,
+    occurrence: FaintOccurrenceId,
+    selection: &ReplacementSelection,
+) -> Result<(), CommandLegalityError> {
     selection.validate_internal()?;
     let battle = active_battle(state)?;
     let faint = current_replacement(battle, occurrence)?;
@@ -357,6 +480,25 @@ pub fn validate_replacement_proposal(
     content: &ContentPack,
 ) -> Result<(), CommandLegalityError> {
     validate_state_content(state, content)?;
+    validate_replacement_proposal_validated(state, proposal)
+}
+
+/// Validate a replacement proposal after the enclosing immutable-content
+/// owner has already validated the retained content pack.
+#[doc(hidden)]
+pub fn validate_replacement_proposal_trusted(
+    state: &GameState,
+    proposal: &BattleReplacementProposalV1,
+    content: &ContentPack,
+) -> Result<(), CommandLegalityError> {
+    validate_state_content_trusted(state, content)?;
+    validate_replacement_proposal_validated(state, proposal)
+}
+
+fn validate_replacement_proposal_validated(
+    state: &GameState,
+    proposal: &BattleReplacementProposalV1,
+) -> Result<(), CommandLegalityError> {
     let battle = active_battle(state)?;
     let faint = current_replacement(battle, proposal.occurrence)?;
     proposal.validate_with_epoch(faint.source.epoch)?;

@@ -1635,17 +1635,29 @@ fn m3_simple_turn_resolutions() -> TestResult {
     let mut counts = Counts::default();
     let before = kernel_template.snapshot().state;
     let mut execution_elapsed_ns = 0_u64;
+    let mut first_press_elapsed_ns = 0_u64;
+    let mut resolving_press_elapsed_ns = 0_u64;
+    let mut settlement_elapsed_ns = 0_u64;
     for _ in 0..SIMPLE_TURN_RESOLUTIONS {
         let mut kernel = kernel_template.clone();
         let execution_started = Instant::now();
+        let first_press_started = Instant::now();
         let mut effects = raw_press_local_workload(&mut kernel, &mut counts, PhysicalKey::Enter)?;
+        first_press_elapsed_ns =
+            first_press_elapsed_ns.saturating_add(elapsed_ns(first_press_started));
+        let resolving_press_started = Instant::now();
         effects.extend(raw_press_local_workload(
             &mut kernel,
             &mut counts,
             PhysicalKey::Enter,
         )?);
+        resolving_press_elapsed_ns =
+            resolving_press_elapsed_ns.saturating_add(elapsed_ns(resolving_press_started));
+        let settlement_started = Instant::now();
         let settlement_effects =
             settle_local_presentations_workload(&mut kernel, &mut counts, &effects)?;
+        settlement_elapsed_ns =
+            settlement_elapsed_ns.saturating_add(elapsed_ns(settlement_started));
         execution_elapsed_ns = execution_elapsed_ns.saturating_add(elapsed_ns(execution_started));
         effects.extend(settlement_effects);
         let after = kernel.snapshot().state;
@@ -1679,6 +1691,16 @@ fn m3_simple_turn_resolutions() -> TestResult {
             "kernel_clone_excluded": true,
             "validation_checksum_teardown_excluded": true,
             "execution_scope": "four raw input transitions plus all hosted presentation settlement transitions",
+            "phase_elapsed_ns": {
+                "first_press": first_press_elapsed_ns,
+                "resolving_press": resolving_press_elapsed_ns,
+                "presentation_settlement": settlement_elapsed_ns,
+                "unattributed": execution_elapsed_ns.saturating_sub(
+                    first_press_elapsed_ns
+                        .saturating_add(resolving_press_elapsed_ns)
+                        .saturating_add(settlement_elapsed_ns),
+                ),
+            },
         }),
     )
 }

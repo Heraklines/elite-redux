@@ -29,4 +29,6 @@ pub use resolver::{
     PRESENTATION_PLAN_DIGEST_DOMAIN, PresentationPlanDigestComputationError,
     compute_presentation_plan_digest, validate_battle_mutation_evidence,
 };
-pub use turn::{resolve_replacement, resolve_turn};
+pub use turn::{
+    resolve_replacement, resolve_replacement_trusted, resolve_turn, resolve_turn_trusted,
+};

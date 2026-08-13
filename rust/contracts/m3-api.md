@@ -1696,6 +1696,40 @@ outside that enclosing transaction. The process-local `Arc` and dirty flag are
 not serialized and cannot change snapshot, trace, digest, material, or wire
 identity.
 
+CR-0022 freezes a second doc-hidden integration optimization. The production
+kernel may use the following exact trusted-content function names only with
+the immutable `ContentPack` retained by a `GameRuntime` that validated it at
+construction or snapshot restore:
+
+```text
+build_command_offer_trusted
+build_scripted_enemy_offer_trusted
+validate_preserved_offer_trusted
+validate_command_proposal_trusted
+normalize_command_set_trusted
+validate_replacement_selection_trusted
+validate_replacement_proposal_trusted
+resolve_turn_trusted
+resolve_replacement_trusted
+admit_command_proposal_with_context_trusted
+admit_scripted_enemy_frontier_trusted
+project_scripted_policy_for_material_trusted
+complete_command_frontier_trusted
+apply_turn_material_trusted
+apply_replacement_material_trusted
+```
+
+These functions skip only repeated `ContentPack::validate()` and canonical
+content-hash recomputation. Complete state/content membership, capability,
+command, evidence, material-digest, control-projection, allocator, endpoint,
+and final transactional validation remain mandatory. Public counterparts
+still perform full content validation. The staged common-applier installation
+may reuse the exact after digest and projected control already proved by that
+applier in the same private kernel transaction; independently callable
+installation recomputes them. Mechanical-state digest computation validates
+the state and encodes its frozen domain-separated canonical preimage once;
+discarding a second standalone state encoding cannot change digest bytes.
+
 `new_battle` requires `run_state.battle = None`, a positive one-based run wave,
 an exact non-empty production `BattleScene.waveSeed`, and a valid unconsumed
 `next_battle_id`. The wave seed is supplied explicitly because CR-0017 proves

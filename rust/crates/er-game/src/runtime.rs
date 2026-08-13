@@ -10,11 +10,13 @@ use std::sync::Arc;
 
 use er_battle::error::BattleResolveError;
 use er_battle::legality::{
-    build_command_offer, build_scripted_enemy_offer, validate_command_proposal,
-    validate_replacement_proposal, validate_replacement_selection, validate_state_content_trusted,
+    build_command_offer_trusted, build_scripted_enemy_offer_trusted,
+    validate_command_proposal_trusted, validate_replacement_proposal_trusted,
+    validate_replacement_selection_trusted, validate_state_content_trusted,
 };
 use er_battle::{
-    BattleNextDecision, resolve_replacement, resolve_turn, validate_battle_mutation_evidence,
+    BattleNextDecision, resolve_replacement_trusted, resolve_turn_trusted,
+    validate_battle_mutation_evidence,
 };
 use er_content::pack::{ContentPack, ContentPackError};
 use er_rng::battle::RngRuntime;
@@ -280,6 +282,12 @@ pub struct GameRuntime {
     authority_remote_paths: BTreeMap<er_types::OperationId, RuntimeAuthorityMenuPath>,
     pending_no_legal_replacement: Option<PendingNoLegalReplacementFollowup>,
     pub(crate) content: Arc<ContentPack>,
+}
+
+#[derive(Clone, Copy)]
+enum MaterialInstallValidation {
+    Full,
+    CommonApplierVerified,
 }
 
 impl GameRuntime {
@@ -737,7 +745,7 @@ impl GameRuntime {
                 operation_id: proposal.operation_id,
             });
         }
-        validate_command_proposal(&self.state, &proposal, self.content.as_ref())
+        validate_command_proposal_trusted(&self.state, &proposal, self.content.as_ref())
             .map_err(map_legality_error)?;
         if !control_accepts_command(&self.state, &self.control, &proposal) {
             return Err(GameRuntimeError::ControlIdentityMismatch);
@@ -854,7 +862,7 @@ impl GameRuntime {
                 operation_id: proposal.operation_id,
             });
         }
-        validate_replacement_proposal(&self.state, &proposal, self.content.as_ref())
+        validate_replacement_proposal_trusted(&self.state, &proposal, self.content.as_ref())
             .map_err(map_legality_error)?;
         if !control_accepts_replacement(&self.state, &self.control, &proposal) {
             return Err(GameRuntimeError::ControlIdentityMismatch);
@@ -921,6 +929,7 @@ impl GameRuntime {
                     transition.next_decision,
                     allocator_before,
                     next_control.clone(),
+                    MaterialInstallValidation::Full,
                 )
             }
             PreparedBattleResolution::Replacement {
@@ -938,6 +947,7 @@ impl GameRuntime {
                     transition.next_decision,
                     allocator_before,
                     next_control.clone(),
+                    MaterialInstallValidation::Full,
                 )
             }
         }
@@ -971,7 +981,7 @@ impl GameRuntime {
         next_control: BattleControlPlan,
     ) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
-        candidate.install_material_in_kernel_transaction(
+        candidate.install_material_inner(
             _before_digest,
             after,
             after_digest,
@@ -979,6 +989,7 @@ impl GameRuntime {
             next_decision,
             allocator_before,
             next_control,
+            MaterialInstallValidation::Full,
         )?;
         candidate.validate_transactional()?;
         *self = candidate;
@@ -1008,6 +1019,7 @@ impl GameRuntime {
             next_decision,
             allocator_before,
             next_control,
+            MaterialInstallValidation::CommonApplierVerified,
         )
     }
 
@@ -1021,20 +1033,25 @@ impl GameRuntime {
         next_decision: BattleNextDecision,
         allocator_before: Vec<SeatMenuInstanceAllocator>,
         next_control: BattleControlPlan,
+        validation: MaterialInstallValidation,
     ) -> Result<(), GameRuntimeError> {
         // The common material applier has already authenticated/reconciled
         // `before_digest`.  A replica may intentionally retain a compatible
         // partial TURN frontier, so comparing that complete digest with this
         // local snapshot would reject a valid material result.  Keep the
-        // role-neutral checks below on coordinates, operation binding,
-        // after-state digest, and exact projected control instead.
+        // role-neutral checks below on coordinates and operation binding.
+        // Independently callable installation also recomputes the after
+        // digest and exact projected control; the staged kernel path reuses
+        // those proofs from the common applier in this same transaction.
         validate_state_coordinate_progression(&self.state, &after)?;
-        validate_state_content_trusted(&after, self.content.as_ref())
-            .map_err(map_legality_error)?;
-        let actual_after = MechanicalStateDigest::compute(&after)
-            .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?;
-        if &actual_after != after_digest {
-            return Err(GameRuntimeError::TransitionDigestMismatch);
+        if matches!(validation, MaterialInstallValidation::Full) {
+            validate_state_content_trusted(&after, self.content.as_ref())
+                .map_err(map_legality_error)?;
+            let actual_after = MechanicalStateDigest::compute(&after)
+                .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?;
+            if &actual_after != after_digest {
+                return Err(GameRuntimeError::TransitionDigestMismatch);
+            }
         }
         if expected_material_operation_id(&self.state)? != *material_operation_id {
             return Err(GameRuntimeError::MaterialOperationMismatch);
@@ -1043,21 +1060,23 @@ impl GameRuntime {
         if decision_for_state(&after)? != next_decision {
             return Err(GameRuntimeError::TransitionIdentityMismatch);
         }
-        let expected_control = project_battle_control_plan(
-            &after,
-            next_decision,
-            &allocator_before,
-            self.content.as_ref(),
-        )?;
-        if expected_control != next_control {
-            return Err(GameRuntimeError::ControlProjectionMismatch);
+        if matches!(validation, MaterialInstallValidation::Full) {
+            let expected_control = project_battle_control_plan(
+                &after,
+                next_decision,
+                &allocator_before,
+                self.content.as_ref(),
+            )?;
+            if expected_control != next_control {
+                return Err(GameRuntimeError::ControlProjectionMismatch);
+            }
+            validate_allocator_installation(
+                &self.control.menu_allocators,
+                &allocator_before,
+                &next_control.menu_allocators,
+            )?;
+            next_control.validate()?;
         }
-        validate_allocator_installation(
-            &self.control.menu_allocators,
-            &allocator_before,
-            &next_control.menu_allocators,
-        )?;
-        next_control.validate()?;
 
         // This is deliberately after every material/equality check.  A
         // rejected or partially decoded material cannot consume a scripted
@@ -2224,7 +2243,7 @@ impl GameRuntime {
                 operation_id: proposal.operation_id,
             });
         }
-        validate_command_proposal(&self.state, &proposal, self.content.as_ref())
+        validate_command_proposal_trusted(&self.state, &proposal, self.content.as_ref())
             .map_err(map_legality_error)?;
         let authority_seat = self
             .state
@@ -2349,7 +2368,7 @@ impl GameRuntime {
         let commands = commands
             .ok_or_else(|| invalid_config("complete frontier did not produce a command set"))?;
         let material_operation_id = turn_result_operation_id(battle_id, wave, turn)?;
-        let mut transition = resolve_turn(
+        let mut transition = resolve_turn_trusted(
             &self.state,
             &commands,
             authority_epoch,
@@ -2399,7 +2418,7 @@ impl GameRuntime {
                 operation_id: proposal.operation_id,
             });
         }
-        validate_replacement_proposal(&self.state, &proposal, self.content.as_ref())
+        validate_replacement_proposal_trusted(&self.state, &proposal, self.content.as_ref())
             .map_err(map_legality_error)?;
         let authority_seat = self
             .state
@@ -2431,7 +2450,7 @@ impl GameRuntime {
             )?);
         self.replacement_fingerprints
             .sort_unstable_by(|left, right| left.operation_id.cmp(&right.operation_id));
-        let mut transition = resolve_replacement(
+        let mut transition = resolve_replacement_trusted(
             &self.state,
             proposal.occurrence,
             &proposal.selection,
@@ -2470,7 +2489,7 @@ impl GameRuntime {
             return Err(GameRuntimeError::UnscheduledNoLegalReplacement);
         }
         self.pending_no_legal_replacement = None;
-        validate_replacement_selection(
+        validate_replacement_selection_trusted(
             &self.state,
             occurrence,
             &ReplacementSelection::NoLegalReplacement,
@@ -2503,7 +2522,7 @@ impl GameRuntime {
                 .owner_seat
                 .ok_or_else(|| invalid_config("enemy faint has no human replacement owner"))?,
         )?;
-        let mut transition = resolve_replacement(
+        let mut transition = resolve_replacement_trusted(
             &self.state,
             occurrence,
             &ReplacementSelection::NoLegalReplacement,
@@ -4346,7 +4365,8 @@ fn build_command_frontier(
                     owner,
                 )?;
                 let offer =
-                    build_command_offer(state, slot, content).map_err(map_legality_error)?;
+                    build_command_offer_trusted(state, slot, content)
+                        .map_err(map_legality_error)?;
                 (
                     Some(owner),
                     operation,
@@ -4375,8 +4395,9 @@ fn build_command_frontier(
                     slot,
                     scripted.script_cursor,
                 )?;
-                let offer = build_scripted_enemy_offer(state, slot, &scripted.command, content)
-                    .map_err(map_legality_error)?;
+                let offer =
+                    build_scripted_enemy_offer_trusted(state, slot, &scripted.command, content)
+                        .map_err(map_legality_error)?;
                 let accepted = AcceptedBattleCommand::scripted_enemy(scripted);
                 next_policy.cursor =
                     increment_safe(next_policy.cursor, "scripted enemy cursor exhausted")?;

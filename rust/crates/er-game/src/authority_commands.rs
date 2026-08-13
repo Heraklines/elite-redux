@@ -9,8 +9,9 @@
 use std::collections::BTreeMap;
 
 use er_battle::legality::{
-    CommandLegalityError, validate_command_proposal, validate_preserved_offer,
-    validate_replacement_proposal, validate_replacement_selection, validate_state_content,
+    CommandLegalityError, normalize_command_set_trusted, validate_command_proposal_trusted,
+    validate_preserved_offer_trusted, validate_replacement_proposal_trusted,
+    validate_replacement_selection_trusted, validate_state_content, validate_state_content_trusted,
 };
 use er_battle::{BattleReplacementTransition, BattleTransition};
 use er_content::pack::ContentPack;
@@ -29,6 +30,24 @@ use er_types::battle_control::{
 use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanceId, PokemonId};
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
 use thiserror::Error;
+
+#[derive(Clone, Copy)]
+enum ContentValidationMode {
+    Full,
+    Trusted,
+}
+
+fn validate_transaction_content(
+    state: &GameState,
+    content: &ContentPack,
+    mode: ContentValidationMode,
+) -> Result<(), AuthorityCommandError> {
+    match mode {
+        ContentValidationMode::Full => validate_state_content(state, content),
+        ContentValidationMode::Trusted => validate_state_content_trusted(state, content),
+    }
+    .map_err(legality)
+}
 
 /// The source of a human proposal is derived from the authority-relative
 /// owner seat.  The authority's own proposal still enters this same reducer;
@@ -356,6 +375,44 @@ pub fn admit_command_proposal_with_context(
     proposal: &BattleCommandProposalV1,
     content: &ContentPack,
 ) -> Result<CommandAdmissionResult, AuthorityCommandError> {
+    admit_command_proposal_with_context_inner(
+        state,
+        control,
+        prepared,
+        proposal,
+        content,
+        ContentValidationMode::Full,
+    )
+}
+
+/// Admit a command inside an enclosing transaction whose immutable content
+/// pack was validated at construction or restore.
+#[doc(hidden)]
+pub fn admit_command_proposal_with_context_trusted(
+    state: &GameState,
+    control: &BattleControlPlan,
+    prepared: Option<&PreparedAuthorityAdmission>,
+    proposal: &BattleCommandProposalV1,
+    content: &ContentPack,
+) -> Result<CommandAdmissionResult, AuthorityCommandError> {
+    admit_command_proposal_with_context_inner(
+        state,
+        control,
+        prepared,
+        proposal,
+        content,
+        ContentValidationMode::Trusted,
+    )
+}
+
+fn admit_command_proposal_with_context_inner(
+    state: &GameState,
+    control: &BattleControlPlan,
+    prepared: Option<&PreparedAuthorityAdmission>,
+    proposal: &BattleCommandProposalV1,
+    content: &ContentPack,
+    validation: ContentValidationMode,
+) -> Result<CommandAdmissionResult, AuthorityCommandError> {
     proposal.validate()?;
     let accepted = AcceptedBattleCommand::human(proposal.clone());
     let fingerprint = proposal.fingerprint();
@@ -379,6 +436,7 @@ pub fn admit_command_proposal_with_context(
                 accepted,
                 content,
                 battle.authority_seat,
+                validation,
             ),
             CommandFrontierStatus::Retained { command, .. }
             | CommandFrontierStatus::Admitted { command, .. } => {
@@ -426,8 +484,9 @@ fn admit_new_command(
     accepted: AcceptedBattleCommand,
     content: &ContentPack,
     authority_seat: SeatId,
+    validation: ContentValidationMode,
 ) -> Result<CommandAdmissionResult, AuthorityCommandError> {
-    validate_state_content(state, content).map_err(legality)?;
+    validate_transaction_content(state, content, validation)?;
     let battle = active_battle(state)?;
     validate_command_control_plan(control, battle)?;
 
@@ -449,7 +508,7 @@ fn admit_new_command(
         HumanAdmissionSource::AuthorityRemoteProposal
     };
     validate_command_control(control, prepared, authority_seat, proposal)?;
-    validate_command_proposal(state, proposal, content).map_err(legality)?;
+    validate_command_proposal_trusted(state, proposal, content).map_err(legality)?;
 
     let mut next = state.clone();
     let next_battle = next
@@ -476,7 +535,7 @@ fn admit_new_command(
         source: source.as_command_source(),
     };
     next_battle.command_state.validate()?;
-    validate_state_content(&next, content).map_err(legality)?;
+    validate_state_content_trusted(&next, content).map_err(legality)?;
 
     Ok(CommandAdmissionResult::Admitted {
         state: next,
@@ -495,10 +554,30 @@ pub fn admit_scripted_enemy_frontier(
     policy: &ScriptedEnemyPolicyV1,
     content: &ContentPack,
 ) -> Result<ScriptedEnemyAdmission, AuthorityCommandError> {
+    admit_scripted_enemy_frontier_inner(state, policy, content, ContentValidationMode::Full)
+}
+
+/// Admit scripted commands inside an enclosing transaction whose immutable
+/// content pack was validated at construction or restore.
+#[doc(hidden)]
+pub fn admit_scripted_enemy_frontier_trusted(
+    state: &GameState,
+    policy: &ScriptedEnemyPolicyV1,
+    content: &ContentPack,
+) -> Result<ScriptedEnemyAdmission, AuthorityCommandError> {
+    admit_scripted_enemy_frontier_inner(state, policy, content, ContentValidationMode::Trusted)
+}
+
+fn admit_scripted_enemy_frontier_inner(
+    state: &GameState,
+    policy: &ScriptedEnemyPolicyV1,
+    content: &ContentPack,
+    validation: ContentValidationMode,
+) -> Result<ScriptedEnemyAdmission, AuthorityCommandError> {
     policy
         .validate()
         .map_err(AuthorityCommandError::ScriptedPolicy)?;
-    validate_state_content(state, content).map_err(legality)?;
+    validate_transaction_content(state, content, validation)?;
 
     let mut next_state = state.clone();
     let mut next_policy = policy.clone();
@@ -550,7 +629,7 @@ pub fn admit_scripted_enemy_frontier(
         if entry.actor != scripted.actor || entry.operation_id != scripted.operation_id {
             return Err(AuthorityCommandError::ScriptCommandStale);
         }
-        validate_preserved_offer(&next_state, entry, content)
+        validate_preserved_offer_trusted(&next_state, entry, content)
             .map_err(AuthorityCommandError::PreservedOffer)?;
 
         let accepted = AcceptedBattleCommand::scripted_enemy(scripted.clone());
@@ -583,7 +662,7 @@ pub fn admit_scripted_enemy_frontier(
     next_policy
         .validate()
         .map_err(AuthorityCommandError::ScriptedPolicy)?;
-    validate_state_content(&next_state, content).map_err(legality)?;
+    validate_state_content_trusted(&next_state, content).map_err(legality)?;
     Ok(ScriptedEnemyAdmission {
         state: next_state,
         policy: next_policy,
@@ -612,10 +691,40 @@ pub fn project_scripted_policy_for_material(
     policy_before: &ScriptedEnemyPolicyV1,
     content: &ContentPack,
 ) -> Result<ScriptedEnemyPolicyV1, AuthorityCommandError> {
+    project_scripted_policy_for_material_inner(
+        state,
+        policy_before,
+        content,
+        ContentValidationMode::Full,
+    )
+}
+
+/// Project the scripted cursor inside an enclosing transaction whose
+/// immutable content pack was validated at construction or restore.
+#[doc(hidden)]
+pub fn project_scripted_policy_for_material_trusted(
+    state: &GameState,
+    policy_before: &ScriptedEnemyPolicyV1,
+    content: &ContentPack,
+) -> Result<ScriptedEnemyPolicyV1, AuthorityCommandError> {
+    project_scripted_policy_for_material_inner(
+        state,
+        policy_before,
+        content,
+        ContentValidationMode::Trusted,
+    )
+}
+
+fn project_scripted_policy_for_material_inner(
+    state: &GameState,
+    policy_before: &ScriptedEnemyPolicyV1,
+    content: &ContentPack,
+    validation: ContentValidationMode,
+) -> Result<ScriptedEnemyPolicyV1, AuthorityCommandError> {
     policy_before
         .validate()
         .map_err(AuthorityCommandError::ScriptedPolicy)?;
-    validate_state_content(state, content).map_err(legality)?;
+    validate_transaction_content(state, content, validation)?;
 
     let battle = active_battle(state)?;
     let mut expected_policy = policy_before.clone();
@@ -645,7 +754,7 @@ pub fn project_scripted_policy_for_material(
         {
             return Err(AuthorityCommandError::ScriptCommandStale);
         }
-        validate_preserved_offer(state, entry, content)
+        validate_preserved_offer_trusted(state, entry, content)
             .map_err(AuthorityCommandError::PreservedOffer)?;
         let next_cursor = expected_policy
             .cursor
@@ -685,13 +794,31 @@ pub fn complete_command_frontier(
     state: &GameState,
     content: &ContentPack,
 ) -> Result<CommandFrontierCompletion, AuthorityCommandError> {
-    validate_state_content(state, content).map_err(legality)?;
+    complete_command_frontier_inner(state, content, ContentValidationMode::Full)
+}
+
+/// Complete a command frontier inside an enclosing transaction whose
+/// immutable content pack was validated at construction or restore.
+#[doc(hidden)]
+pub fn complete_command_frontier_trusted(
+    state: &GameState,
+    content: &ContentPack,
+) -> Result<CommandFrontierCompletion, AuthorityCommandError> {
+    complete_command_frontier_inner(state, content, ContentValidationMode::Trusted)
+}
+
+fn complete_command_frontier_inner(
+    state: &GameState,
+    content: &ContentPack,
+    validation: ContentValidationMode,
+) -> Result<CommandFrontierCompletion, AuthorityCommandError> {
+    validate_transaction_content(state, content, validation)?;
     let battle = active_battle(state)?;
     if battle.command_state.frontier.is_empty() {
         return Err(AuthorityCommandError::EmptyOrInvalidFrontier);
     }
     for entry in &battle.command_state.frontier {
-        validate_preserved_offer(state, entry, content)
+        validate_preserved_offer_trusted(state, entry, content)
             .map_err(AuthorityCommandError::PreservedOffer)?;
     }
     if battle
@@ -724,8 +851,8 @@ pub fn complete_command_frontier(
     // This is the game-owned last legality gate.  It proves exact living
     // actor coverage, current offers, target/switch legality, and duplicate
     // switch destinations before any resolver is called.
-    er_battle::legality::normalize_command_set(&next, &commands, content).map_err(legality)?;
-    validate_state_content(&next, content).map_err(legality)?;
+    normalize_command_set_trusted(&next, &commands, content).map_err(legality)?;
+    validate_state_content_trusted(&next, content).map_err(legality)?;
     Ok(CommandFrontierCompletion::Complete {
         state: next,
         commands,
@@ -789,7 +916,7 @@ pub fn admit_replacement_proposal_with_context(
     let battle = active_battle(state)?;
     validate_replacement_control_plan(control, battle, proposal.occurrence)?;
     validate_replacement_control(control, prepared, battle.authority_seat, proposal, battle)?;
-    validate_replacement_proposal(state, proposal, content).map_err(legality)?;
+    validate_replacement_proposal_trusted(state, proposal, content).map_err(legality)?;
 
     Ok(ReplacementAdmissionResult::Admitted {
         proposal: proposal.clone(),
@@ -808,7 +935,8 @@ pub fn internal_no_legal_replacement(
 ) -> Result<InternalNoLegalReplacement, AuthorityCommandError> {
     validate_state_content(state, content).map_err(legality)?;
     let selection = ReplacementSelection::NoLegalReplacement;
-    validate_replacement_selection(state, occurrence, &selection, content).map_err(legality)?;
+    validate_replacement_selection_trusted(state, occurrence, &selection, content)
+        .map_err(legality)?;
     Ok(InternalNoLegalReplacement {
         occurrence,
         selection,
@@ -862,7 +990,7 @@ pub fn retain_command_tombstones(
         .tombstones
         .sort_by(|left, right| left.operation_id.cmp(&right.operation_id));
     battle.command_state.validate()?;
-    validate_state_content(&next, content).map_err(legality)?;
+    validate_state_content_trusted(&next, content).map_err(legality)?;
     Ok(next)
 }
 

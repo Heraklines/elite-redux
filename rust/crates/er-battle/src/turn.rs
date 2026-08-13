@@ -36,7 +36,10 @@ use crate::action_order::{
 use crate::command::NormalizedBattleCommand;
 use crate::error::{BattleInvariantError, BattleResolveError};
 use crate::faint::{FaintCandidate, FaintQueueError, queue_faint};
-use crate::legality::{CommandLegalityError, normalize_command_set, validate_state_content};
+use crate::legality::{
+    CommandLegalityError, normalize_command_set_trusted, validate_state_content,
+    validate_state_content_trusted,
+};
 use crate::move_effect::{
     DefensiveAbilityBlockReason, DefensiveAbilityGate, DefensiveAbilityGateError,
     DefensiveAbilityGateInput, DefensiveAbilityGateResult, DefensiveAbilityGateUnsupportedReason,
@@ -77,6 +80,42 @@ pub fn resolve_turn(
     content: &ContentPack,
 ) -> Result<BattleTransition, BattleResolveError> {
     validate_state_content(before, content)?;
+    resolve_turn_validated(
+        before,
+        commands,
+        authority_epoch,
+        material_operation_id,
+        content,
+    )
+}
+
+/// Resolve a turn after the enclosing immutable-content owner has already
+/// validated the retained content pack.
+#[doc(hidden)]
+pub fn resolve_turn_trusted(
+    before: &GameState,
+    commands: &CommandSet,
+    authority_epoch: AuthorityEpoch,
+    material_operation_id: &OperationId,
+    content: &ContentPack,
+) -> Result<BattleTransition, BattleResolveError> {
+    validate_state_content_trusted(before, content)?;
+    resolve_turn_validated(
+        before,
+        commands,
+        authority_epoch,
+        material_operation_id,
+        content,
+    )
+}
+
+fn resolve_turn_validated(
+    before: &GameState,
+    commands: &CommandSet,
+    authority_epoch: AuthorityEpoch,
+    material_operation_id: &OperationId,
+    content: &ContentPack,
+) -> Result<BattleTransition, BattleResolveError> {
     if authority_epoch == AuthorityEpoch::ZERO {
         return Err(map_faint_input_error(FaintQueueError::ZeroAuthorityEpoch));
     }
@@ -89,7 +128,7 @@ pub fn resolve_turn(
     )
     .map_err(CommandLegalityError::Command)?;
     let before_digest = compute_mechanical_state_digest(before)?;
-    let normalized = normalize_command_set(before, commands, content)?;
+    let normalized = normalize_command_set_trusted(before, commands, content)?;
     let mut queue = build_pending_action_queue_from_commands(before, normalized.entries(), content)
         .map_err(|source| map_action_order_error(source, before, false))?;
     let mut after = before.clone();
@@ -164,7 +203,7 @@ pub fn resolve_turn(
         sync_rng_state(&mut after, &runtime)?;
     }
 
-    validate_after_state(&after, content)?;
+    validate_after_state_trusted(&after, content)?;
     let after_digest = compute_mechanical_state_digest(&after)?;
     let battle = active_battle(&after)?;
     let outcome = battle.outcome;
@@ -202,6 +241,42 @@ pub fn resolve_replacement(
     content: &ContentPack,
 ) -> Result<BattleReplacementTransition, BattleResolveError> {
     validate_state_content(before, content)?;
+    resolve_replacement_validated(
+        before,
+        occurrence,
+        selection,
+        material_operation_id,
+        content,
+    )
+}
+
+/// Resolve a replacement after the enclosing immutable-content owner has
+/// already validated the retained content pack.
+#[doc(hidden)]
+pub fn resolve_replacement_trusted(
+    before: &GameState,
+    occurrence: FaintOccurrenceId,
+    selection: &ReplacementSelection,
+    material_operation_id: &OperationId,
+    content: &ContentPack,
+) -> Result<BattleReplacementTransition, BattleResolveError> {
+    validate_state_content_trusted(before, content)?;
+    resolve_replacement_validated(
+        before,
+        occurrence,
+        selection,
+        material_operation_id,
+        content,
+    )
+}
+
+fn resolve_replacement_validated(
+    before: &GameState,
+    occurrence: FaintOccurrenceId,
+    selection: &ReplacementSelection,
+    material_operation_id: &OperationId,
+    content: &ContentPack,
+) -> Result<BattleReplacementTransition, BattleResolveError> {
     let before_digest = compute_mechanical_state_digest(before)?;
     let mut after = before.clone();
 
@@ -250,7 +325,7 @@ pub fn resolve_replacement(
         update_outcome(battle, &mut mutations, &mut causal_events);
     }
 
-    validate_after_state(&after, content)?;
+    validate_after_state_trusted(&after, content)?;
     let after_digest = compute_mechanical_state_digest(&after)?;
     let battle = active_battle(&after)?;
     let outcome = battle.outcome;
@@ -898,11 +973,11 @@ fn active_battle_mut(state: &mut GameState) -> Result<&mut BattleState, BattleRe
         .ok_or_else(|| CommandLegalityError::MissingBattle.into())
 }
 
-fn validate_after_state(
+fn validate_after_state_trusted(
     state: &GameState,
     content: &ContentPack,
 ) -> Result<(), BattleResolveError> {
-    match validate_state_content(state, content) {
+    match validate_state_content_trusted(state, content) {
         Ok(()) => Ok(()),
         Err(CommandLegalityError::State(source)) => {
             Err(BattleInvariantError::invalid_after_state(source).into())

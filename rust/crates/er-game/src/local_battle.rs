@@ -35,7 +35,8 @@ use crate::internal_event::{GameIntent, InternalEvent, PreparedBattleResolution}
 use crate::material::{
     BATTLE_MATERIAL_SCHEMA_VERSION, BattleMaterialApplyContext, BattleMaterialApplyError,
     BattleMaterialCodecError, BattleReplacementMaterialV1, BattleTurnMaterialV1,
-    apply_replacement_material, apply_turn_material, decode_replacement_material,
+    apply_replacement_material_trusted as apply_replacement_material,
+    apply_turn_material_trusted as apply_turn_material, decode_replacement_material,
     decode_turn_material, encode_replacement_material, encode_turn_material,
 };
 use crate::runtime::{CommandAdmission, GameReduction, GameRuntime, GameRuntimeError};

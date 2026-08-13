@@ -22,13 +22,17 @@ use er_content::pack::ContentPack;
 use er_game::authority_commands::{
     AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion,
     PreparedAuthorityReplacement, PreparedAuthorityTurn, ReplacementAdmissionResult,
-    admit_command_proposal_with_context, admit_replacement_proposal_with_context,
-    admit_scripted_enemy_frontier, complete_command_frontier, internal_no_legal_replacement,
-    project_scripted_policy_for_material,
+    admit_command_proposal_with_context_trusted as admit_command_proposal_with_context,
+    admit_replacement_proposal_with_context,
+    admit_scripted_enemy_frontier_trusted as admit_scripted_enemy_frontier,
+    complete_command_frontier_trusted as complete_command_frontier, internal_no_legal_replacement,
+    project_scripted_policy_for_material_trusted as project_scripted_policy_for_material,
 };
 use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleReplacementMaterialV1,
-    BattleTurnMaterialV1, MaterialApplyResult, apply_replacement_material, apply_turn_material,
+    BattleTurnMaterialV1, MaterialApplyResult,
+    apply_replacement_material_trusted as apply_replacement_material,
+    apply_turn_material_trusted as apply_turn_material,
 };
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLog, CommitOutcome, KernelScheduler, PreparedCommit,
