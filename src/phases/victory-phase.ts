@@ -29,7 +29,7 @@ import {
   getErStorySourceWave,
   isErCheckpointWave,
   isErMajorCheckpointWave,
-  isErSprintRun,
+  isErSprintMode,
 } from "#data/elite-redux/er-run-pacing";
 import { isMoodyAutomaticBiomeHealingEnabled } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { isMoodyBoonRewardWave } from "#data/elite-redux/moody/moody-state";
@@ -233,7 +233,7 @@ export class VictoryPhase extends PokemonPhase {
         let waveModifierRewardSettings: CustomModifierSettings | undefined;
         if (tailControl.eggLapse) {
           globalScene.phaseManager.pushNew("EggLapsePhase");
-          if (gameMode.modeId === GameModes.CLASSIC && isErSprintRun()) {
+          if (isErSprintMode(gameMode.modeId)) {
             globalScene.phaseManager.pushNew("EggLapsePhase");
           }
         }
@@ -252,7 +252,7 @@ export class VictoryPhase extends PokemonPhase {
               break;
           }
         }
-        const sprintClassic = gameMode.modeId === GameModes.CLASSIC && isErSprintRun();
+        const sprintClassic = isErSprintMode(gameMode.modeId);
         const checkpointWave = sprintClassic ? isErCheckpointWave(currentWaveIndex) : !(currentWaveIndex % 10);
         const progressionWave = sprintClassic ? getErProgressionWave(currentWaveIndex) : currentWaveIndex;
         if (!checkpointWave) {

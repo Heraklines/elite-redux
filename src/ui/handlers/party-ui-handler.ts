@@ -45,7 +45,11 @@ import { StatusEffect } from "#enums/status-effect";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
-import type { PokemonFormChangeItemModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import {
+  isPlayerManagedHeldItemTransferable,
+  type PokemonFormChangeItemModifier,
+  type PokemonHeldItemModifier,
+} from "#modifiers/modifier";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
@@ -1229,7 +1233,7 @@ export class PartyUiHandler extends MessageUiHandler {
 
   private getTransferrableItemsFromPokemon(pokemon: PlayerPokemon) {
     return globalScene.findModifiers(
-      m => m.is("PokemonHeldItemModifier") && m.isTransferable && m.pokemonId === pokemon.id,
+      m => m.is("PokemonHeldItemModifier") && isPlayerManagedHeldItemTransferable(m) && m.pokemonId === pokemon.id,
     ) as PokemonHeldItemModifier[];
   }
 
@@ -1650,7 +1654,7 @@ export class PartyUiHandler extends MessageUiHandler {
         const itemModifiers = globalScene.findModifiers(
           m =>
             m.is("PokemonHeldItemModifier")
-            && m.isTransferable
+            && isPlayerManagedHeldItemTransferable(m)
             && m.pokemonId === globalScene.getPlayerParty()[this.cursor].id,
         ) as PokemonHeldItemModifier[];
         this.transferQuantities = itemModifiers.map(item => item.getStackCount());
@@ -2051,7 +2055,7 @@ export class PartyUiHandler extends MessageUiHandler {
   private getItemModifiers(pokemon: Pokemon): PokemonHeldItemModifier[] {
     return (
       (globalScene.findModifiers(
-        m => m.is("PokemonHeldItemModifier") && m.isTransferable && m.pokemonId === pokemon.id,
+        m => m.is("PokemonHeldItemModifier") && isPlayerManagedHeldItemTransferable(m) && m.pokemonId === pokemon.id,
       ) as PokemonHeldItemModifier[]) ?? []
     );
   }

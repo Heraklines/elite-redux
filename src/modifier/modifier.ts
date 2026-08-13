@@ -3547,6 +3547,10 @@ export class PokemonFormChangeItemModifier extends PokemonHeldItemModifier {
           void pokemon.updateInfo();
           return true;
         }
+      } else {
+        // An already-disabled Fun Mega stone is only being held. Removing or
+        // transferring it must not invoke the ordinary form-change registry.
+        return true;
       }
     }
 
@@ -3568,6 +3572,14 @@ export class PokemonFormChangeItemModifier extends PokemonHeldItemModifier {
   getMaxHeldItemCount(_pokemon: Pokemon): number {
     return 1;
   }
+}
+
+/** Form stones are movable inventory in Fun Mega Mode without becoming stealable in battle. */
+export function isPlayerManagedHeldItemTransferable(modifier: PokemonHeldItemModifier): boolean {
+  return (
+    modifier.isTransferable
+    || (modifier instanceof PokemonFormChangeItemModifier && globalScene.gameMode.isFun && getFunModeConfig().megaMode)
+  );
 }
 
 export class MoneyRewardModifier extends ConsumableModifier {

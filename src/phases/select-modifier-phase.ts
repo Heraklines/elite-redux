@@ -99,6 +99,7 @@ import {
   EvolutionItemModifier,
   ExtraModifierModifier,
   HealShopCostModifier,
+  isPlayerManagedHeldItemTransferable,
   PokemonFormChangeItemModifier,
   PokemonHeldItemModifier,
   TempExtraModifierModifier,
@@ -1092,6 +1093,9 @@ export class SelectModifierPhase extends BattlePhase {
       false,
       { kind: "inherited", address: this.coopSourceAddress },
       this.coopRewardSurface,
+      0,
+      this.baseOptionCount,
+      this.freePicksRemaining,
     );
     globalScene.ui.clearText();
     if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
@@ -1279,7 +1283,10 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     const itemModifiers = globalScene.findModifiers(
-      m => m instanceof PokemonHeldItemModifier && m.isTransferable && m.pokemonId === party[fromSlotIndex].id,
+      m =>
+        m instanceof PokemonHeldItemModifier
+        && isPlayerManagedHeldItemTransferable(m)
+        && m.pokemonId === party[fromSlotIndex].id,
     ) as PokemonHeldItemModifier[];
     const itemModifier = itemModifiers[itemIndex];
     if (itemModifier == null) {
@@ -3322,6 +3329,9 @@ export class SelectModifierPhase extends BattlePhase {
           false,
           { kind: "inherited", address: this.coopSourceAddress },
           this.coopRewardSurface,
+          0,
+          this.baseOptionCount,
+          this.freePicksRemaining,
         );
         globalScene.ui.clearText();
         const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);

@@ -66,7 +66,7 @@ import {
   hasErRelic,
 } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
@@ -1160,7 +1160,10 @@ export class EncounterPhase extends BattlePhase {
     globalScene.eventTarget.dispatchEvent(new EncounterPhaseEvent());
 
     // Failsafe if players somehow skip floor 200 in classic mode
-    if (globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex > (isErSprintRun() ? 100 : 200)) {
+    if (
+      globalScene.gameMode.isClassic
+      && globalScene.currentBattle.waveIndex > (isErSprintMode(globalScene.gameMode.modeId) ? 100 : 200)
+    ) {
       globalScene.phaseManager.unshiftNew("GameOverPhase");
     }
 

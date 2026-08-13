@@ -30,6 +30,7 @@ import {
   getErProgressionWave,
   isErChapterStartWave,
   isErCheckpointWave,
+  isErSprintMode,
   isErSprintRun,
 } from "#data/elite-redux/er-run-pacing";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -246,7 +247,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.DAILY:
         return waveIndex + 30 + (ignoreCurveChanges ? 0 : Math.floor(waveIndex / 5));
       default:
-        return this.modeId === GameModes.CLASSIC ? getErProgressionWave(waveIndex) : waveIndex;
+        return isErSprintMode(this.modeId) ? getErProgressionWave(waveIndex) : waveIndex;
     }
   }
 
@@ -257,7 +258,7 @@ export class GameMode implements GameModeConfig {
    */
   public isWaveTrainer(waveIndex: number): boolean {
     const { arena, offsetGym } = globalScene;
-    const sprint = this.modeId === GameModes.CLASSIC && isErSprintRun();
+    const sprint = isErSprintMode(this.modeId);
     const gymInterval = sprint ? getErGymInterval() : 30;
     const gymOffset = sprint ? 10 : offsetGym ? 0 : 20;
 
@@ -410,7 +411,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.DAILY:
         return waveIndex > 10 && waveIndex < 50 && !(waveIndex % 10);
       default: {
-        const sprint = this.modeId === GameModes.CLASSIC && isErSprintRun();
+        const sprint = isErSprintMode(this.modeId);
         const gymInterval = sprint ? getErGymInterval() : 30;
         return (
           waveIndex % gymInterval === (sprint ? 10 : offsetGym ? 0 : 20)
@@ -450,8 +451,8 @@ export class GameMode implements GameModeConfig {
   isWaveFinal(waveIndex: number, modeId: GameModes = this.modeId): boolean {
     switch (modeId) {
       case GameModes.CLASSIC:
-        return waveIndex === (isErSprintRun() ? 100 : 200);
       case GameModes.CHALLENGE:
+        return waveIndex === (isErSprintRun() ? 100 : 200);
       case GameModes.LLM_DIRECTOR:
       case GameModes.COOP:
       case GameModes.FUN:
@@ -474,7 +475,7 @@ export class GameMode implements GameModeConfig {
    * @returns true if waveIndex is a multiple of 10
    */
   isBoss(waveIndex: number): boolean {
-    return this.modeId === GameModes.CLASSIC && isErSprintRun() ? isErCheckpointWave(waveIndex) : waveIndex % 10 === 0;
+    return isErSprintMode(this.modeId) ? isErCheckpointWave(waveIndex) : waveIndex % 10 === 0;
   }
 
   /**
@@ -545,7 +546,7 @@ export class GameMode implements GameModeConfig {
   }
 
   private getActiveBattleConfig(): FixedBattleConfigs {
-    return this.modeId === GameModes.CLASSIC && isErSprintRun() ? sprintFixedBattles : this.battleConfig;
+    return isErSprintMode(this.modeId) ? sprintFixedBattles : this.battleConfig;
   }
 
   /**
@@ -619,15 +620,16 @@ export class GameMode implements GameModeConfig {
   getMysteryEncounterLegalWaves(): [minWave: number, maxWave: number] {
     switch (this.modeId) {
       case GameModes.CLASSIC:
+      case GameModes.CHALLENGE:
         if (isErSprintRun()) {
           return getErMysteryEncounterLegalWaves();
         }
-        return CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;
+        return this.modeId === GameModes.CHALLENGE
+          ? CHALLENGE_MODE_MYSTERY_ENCOUNTER_WAVES
+          : CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;
       case GameModes.COOP:
       case GameModes.FUN:
         return CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES;
-      case GameModes.CHALLENGE:
-        return CHALLENGE_MODE_MYSTERY_ENCOUNTER_WAVES;
       default:
         return [0, 0];
     }

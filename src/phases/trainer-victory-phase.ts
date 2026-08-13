@@ -27,9 +27,8 @@ import {
 } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import { erRecordAchievementTrainerVictory } from "#data/elite-redux/er-achievement-tracker";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { addErSprintTrainerVoucherCredit, isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { addErSprintTrainerVoucherCredit, isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { BiomeId } from "#enums/biome-id";
-import { GameModes } from "#enums/game-modes";
 import { TrainerType } from "#enums/trainer-type";
 import { BattlePhase } from "#phases/battle-phase";
 import { achvs } from "#system/achv";
@@ -149,10 +148,9 @@ function queueTrainerVictoryRewards(victory: CoopTrainerVictoryBoundary): void {
 
   // Per-account ER trainer vouchers: Youngster 0, Ace 1, Elite 2, Hell 3.
   const difficulty = getErDifficulty();
-  const erVoucherCount =
-    globalScene.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()
-      ? addErSprintTrainerVoucherCredit(difficulty)
-      : { youngster: 0, ace: 1, elite: 2, hell: 3 }[difficulty];
+  const erVoucherCount = isErSprintMode(globalScene.gameMode.modeId)
+    ? addErSprintTrainerVoucherCredit(difficulty)
+    : { youngster: 0, ace: 1, elite: 2, hell: 3 }[difficulty];
   for (let i = 0; i < erVoucherCount; i++) {
     globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.VOUCHER);
   }

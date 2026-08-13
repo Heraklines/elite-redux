@@ -214,6 +214,33 @@ describe("SelectModifierPhase", () => {
     );
   });
 
+  it("ER: Sprint rerolls preserve both free reward picks", async () => {
+    await game.classicMode.startBattle(SpeciesId.ABRA);
+    scene.money = 1_000_000;
+    const phase = new SelectModifierPhase(0, undefined, undefined, false, { kind: "ambient" }, undefined, 0, 5, 2);
+    scene.phaseManager.unshiftPhase(phase);
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const handler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
+    await vi.waitFor(() => expect(handler.options).toHaveLength(5), { timeout: 5_000 });
+    const queueSpy = vi.spyOn(scene.phaseManager, "unshiftNew");
+    const reroll = (phase as unknown as { rerollModifiers: () => boolean }).rerollModifiers.bind(phase);
+    expect(reroll()).toBe(true);
+    expect(queueSpy).toHaveBeenCalledWith(
+      "SelectModifierPhase",
+      1,
+      expect.any(Array),
+      undefined,
+      false,
+      expect.objectContaining({ kind: "inherited" }),
+      undefined,
+      0,
+      5,
+      2,
+    );
+  });
+
   it("should generate custom modifier tiers that can upgrade from luck", async () => {
     await game.classicMode.startBattle(SpeciesId.ABRA, SpeciesId.VOLCARONA);
     scene.money = 1000000;

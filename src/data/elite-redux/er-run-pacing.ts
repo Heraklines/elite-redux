@@ -1,3 +1,5 @@
+import { GameModes } from "#enums/game-modes";
+
 export type ErRunPacing = "normal" | "sprint";
 
 export interface ErRunPacingProfile {
@@ -71,6 +73,15 @@ export function addErSprintTrainerVoucherCredit(
 
 export function isErSprintRun(): boolean {
   return currentPacing === "sprint";
+}
+
+/** Modes that share Classic's full run structure and may opt into Sprint pacing. */
+export function supportsErSprintPacing(modeId: GameModes): boolean {
+  return modeId === GameModes.CLASSIC || modeId === GameModes.CHALLENGE;
+}
+
+export function isErSprintMode(modeId: GameModes): boolean {
+  return supportsErSprintPacing(modeId) && isErSprintRun();
 }
 
 export function getErRunPacingProfile(pacing: ErRunPacing = currentPacing): ErRunPacingProfile {

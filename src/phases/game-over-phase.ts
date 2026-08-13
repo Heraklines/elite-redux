@@ -25,7 +25,7 @@ import {
 } from "#data/elite-redux/er-community-run-state";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
-import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -85,7 +85,10 @@ export class GameOverPhase extends BattlePhase {
     globalScene.phaseManager.hideAbilityBar();
 
     // Failsafe if players somehow skip floor 200 in classic mode
-    if (globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex > (isErSprintRun() ? 100 : 200)) {
+    if (
+      globalScene.gameMode.isClassic
+      && globalScene.currentBattle.waveIndex > (isErSprintMode(globalScene.gameMode.modeId) ? 100 : 200)
+    ) {
       this.isVictory = true;
     }
 

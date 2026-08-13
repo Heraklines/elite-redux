@@ -2,11 +2,10 @@ import { globalScene } from "#app/global-scene";
 import { getCapturedBattleMoneyGainMultiplier } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import { erGamblersCoinPayoutMultiplier } from "#data/elite-redux/er-relics";
-import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { getMoodyBossMoneyGainMultiplier } from "#data/elite-redux/moody/moody-scene-adapter";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
-import { GameModes } from "#enums/game-modes";
 import { MoneyMultiplierModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 import { NumberHolder } from "#utils/common";
@@ -25,7 +24,7 @@ export class MoneyRewardPhase extends BattlePhase {
   start() {
     const moneyAmount = new NumberHolder(globalScene.getWaveMoneyAmount(this.moneyMultiplier));
 
-    if (globalScene.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()) {
+    if (isErSprintMode(globalScene.gameMode.modeId)) {
       moneyAmount.value *= 2;
     }
 

@@ -6427,7 +6427,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         modifier =>
           modifier instanceof PokemonFormChangeItemModifier
           && modifier.pokemonId === this.id
-          && modifier.formChangeItem === recordedStone,
+          && modifier.formChangeItem === recordedStone
+          && modifier.active,
         this.isPlayer(),
       ) != null;
     return isFunPseudoMegaActive(this.customPokemonData.erFunPseudoMega === true, recordedStone, hasHeldStone);

@@ -101,7 +101,7 @@ import {
   getErMysteryEncounterTarget,
   getErProgressionWave,
   isErChapterStartWave,
-  isErSprintRun,
+  isErSprintMode,
 } from "#data/elite-redux/er-run-pacing";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
@@ -1924,7 +1924,7 @@ export class BattleScene extends SceneBase {
     // scheduled ghost-gauntlet wave), so normal runs are untouched.
     if (
       waveIndex === ClassicFixedBossWaves.TOWN_YOUNGSTER
-      || (this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun() && waveIndex === 3)
+      || (isErSprintMode(this.gameMode.modeId) && waveIndex === 3)
     ) {
       const ghost = takeGhostForWave(waveIndex, true);
       if (ghost !== null) {
@@ -4020,7 +4020,7 @@ export class BattleScene extends SceneBase {
         // held item, so the ER biome market - the first place held items are
         // BOUGHT rather than handed out free - never took the player's money.
         success = true;
-        if (modifier instanceof PokemonFormChangeItemModifier) {
+        if (modifier instanceof PokemonFormChangeItemModifier && modifier.active) {
           const pokemon = this.getPokemonById(modifier.pokemonId);
           if (pokemon) {
             success = modifier.apply(pokemon, true);
@@ -4107,7 +4107,7 @@ export class BattleScene extends SceneBase {
     return new Promise(resolve => {
       const modifiersToRemove: PersistentModifier[] = [];
       if ((modifier as PersistentModifier).add(this.enemyModifiers, false)) {
-        if (modifier instanceof PokemonFormChangeItemModifier) {
+        if (modifier instanceof PokemonFormChangeItemModifier && modifier.active) {
           const pokemon = this.getPokemonById(modifier.pokemonId);
           if (pokemon) {
             modifier.apply(pokemon, true);
@@ -4160,6 +4160,16 @@ export class BattleScene extends SceneBase {
 
     const newItemModifier = itemModifier.clone() as PokemonHeldItemModifier;
     newItemModifier.pokemonId = target.id;
+    // Form stones move as held inventory, not as an implicit transformation.
+    // Removing the source modifier deactivates its form; the recipient can then
+    // explicitly activate the transferred stone from the party screen.
+    if (
+      newItemModifier instanceof PokemonFormChangeItemModifier
+      && this.gameMode.isFun
+      && getFunModeConfig().megaMode
+    ) {
+      newItemModifier.active = false;
+    }
     // ER Ward Stones (#358): a stone stolen ONTO a player's mon arrives EMPTY
     // and must recharge over won waves (10 Minor / 15 Greater per the spec).
     if (newItemModifier instanceof ErWardStoneModifier && target.isPlayer() && source?.isEnemy()) {
@@ -5006,10 +5016,10 @@ export class BattleScene extends SceneBase {
     // EXP value calculation is based off Pokemon.getExpValue
     if (useWaveIndexMultiplier) {
       const runWave = this.currentBattle.waveIndex;
-      const expWave = this.gameMode.modeId === GameModes.CLASSIC ? getErProgressionWave(runWave) : runWave;
+      const expWave = isErSprintMode(this.gameMode.modeId) ? getErProgressionWave(runWave) : runWave;
       expValue = Math.floor((expValue * expWave) / 5 + 1);
     }
-    if (this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()) {
+    if (isErSprintMode(this.gameMode.modeId)) {
       expValue *= 2;
     }
 
@@ -5026,7 +5036,7 @@ export class BattleScene extends SceneBase {
         const pId = partyMember.id;
         const participated = participantIds.has(pId);
         if (participated && pokemonDefeated) {
-          const friendshipMultiplier = this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun() ? 2 : 1;
+          const friendshipMultiplier = isErSprintMode(this.gameMode.modeId) ? 2 : 1;
           partyMember.addFriendship(FRIENDSHIP_GAIN_FROM_BATTLE * friendshipMultiplier);
           const machoBraceModifier = partyMember.getHeldItems().find(m => m instanceof PokemonIncrementingStatModifier);
           if (machoBraceModifier && machoBraceModifier.stackCount < machoBraceModifier.getMaxStackCount()) {
@@ -5128,8 +5138,7 @@ export class BattleScene extends SceneBase {
     const encounteredEvents = this.mysteryEncounterSaveData.encounteredEvents;
 
     if (
-      this.gameMode.modeId === GameModes.CLASSIC
-      && isErSprintRun()
+      isErSprintMode(this.gameMode.modeId)
       && encounteredEvents.some(event => Math.floor((event.waveIndex - 1) / 5) === Math.floor((waveIndex - 1) / 5))
     ) {
       return false;
@@ -5151,10 +5160,9 @@ export class BattleScene extends SceneBase {
     // flat per-wave weight, which the anti-variance would just cancel out), so the
     // whole run targets more MEs - ~every 5 waves at 1 charm - and every tier scales
     // up commensurately.
-    const baseTarget =
-      this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()
-        ? getErMysteryEncounterTarget()
-        : AVERAGE_ENCOUNTERS_PER_RUN_TARGET;
+    const baseTarget = isErSprintMode(this.gameMode.modeId)
+      ? getErMysteryEncounterTarget()
+      : AVERAGE_ENCOUNTERS_PER_RUN_TARGET;
     const effectiveTarget = baseTarget + erMysteryCharmTargetBonus();
     const expectedEncountersByFloor =
       (effectiveTarget / (highestMysteryEncounterWave - lowestMysteryEncounterWave))
@@ -5198,9 +5206,7 @@ export class BattleScene extends SceneBase {
       this.gameMode.hasMysteryEncounters
       && battleType === BattleType.WILD
       && !this.gameMode.isBoss(waveIndex)
-      && !(this.gameMode.modeId === GameModes.CLASSIC && isErSprintRun()
-        ? isErChapterStartWave(waveIndex)
-        : waveIndex % 10 === 1)
+      && !(isErSprintMode(this.gameMode.modeId) ? isErChapterStartWave(waveIndex) : waveIndex % 10 === 1)
       && hasOwnedCoopContinuation
       && isBetween(waveIndex, lowestMysteryEncounterWave, highestMysteryEncounterWave)
     );

@@ -20,6 +20,7 @@ import {
   getErStorySourceWave,
   isErChapterStartWave,
   isErCheckpointWave,
+  isErSprintMode,
   resetErRunPacing,
   resetErSprintVoucherCredit,
   setErRunPacing,
@@ -44,6 +45,16 @@ describe("Classic Sprint pacing", () => {
     expect(getErProgressionWave(100)).toBe(200);
     expect(mode.isWaveFinal(99)).toBe(false);
     expect(mode.isWaveFinal(100)).toBe(true);
+  });
+
+  it("applies the same Sprint profile to Challenge runs", () => {
+    setErRunPacing("sprint");
+    const mode = getGameMode(GameModes.CHALLENGE);
+    expect(isErSprintMode(GameModes.CHALLENGE)).toBe(true);
+    expect(mode.getWaveForDifficulty(50)).toBe(100);
+    expect(mode.isBoss(5)).toBe(true);
+    expect(mode.isWaveFinal(100)).toBe(true);
+    expect(mode.getMysteryEncounterLegalWaves()).toEqual([1, 90]);
   });
 
   it("leaves Normal Classic pacing unchanged", () => {

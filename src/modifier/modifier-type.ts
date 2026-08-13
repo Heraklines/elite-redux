@@ -29,7 +29,7 @@ import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } fr
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
-import { getErProgressionWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { getErProgressionWave, isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { hasErAilment } from "#data/elite-redux/er-status-cure";
 import { erTacticalItemType } from "#data/elite-redux/er-tactical-items";
 import { erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
@@ -42,7 +42,6 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
 import { ChallengeType } from "#enums/challenge-type";
 import { FormChangeItem } from "#enums/form-change-item";
-import { GameModes } from "#enums/game-modes";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
@@ -3329,7 +3328,9 @@ export function getPlayerShopModifierTypeOptionsForWave(
   forBiomeShop = false,
 ): ModifierTypeOption[] {
   const progressionWave =
-    globalScene.gameMode?.modeId === GameModes.CLASSIC && isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
+    globalScene.gameMode != null && isErSprintMode(globalScene.gameMode.modeId)
+      ? getErProgressionWave(waveIndex)
+      : waveIndex;
   // ER Biome Market (#440 / #504): the dedicated BiomeShopPhase ALWAYS shows the
   // per-biome stock (rollErBiomeShopStock excludes heals by design) and NEVER the
   // vanilla healing row. DECOUPLED from the %10 gate: with variable biome length
