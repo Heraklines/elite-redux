@@ -21,7 +21,7 @@ use er_content::moves::find_move;
 pub use er_content::pack::ContentPack;
 use er_content::pack::ORACLE_GAME_SHA;
 use er_rng::audit::{RngDraw, RngPublicApi, RngReason, RngStream};
-use er_rng::phaser::{PhaserRdg, shift_char_codes};
+use er_rng::battle::RngRuntime;
 use er_state::battle::{BattleOutcome, BattleRngState, BattleState};
 use er_state::digest::MechanicalStateDigest;
 use er_state::format::{canonical_slots, human_seats, owner_seat_for, validate_slot};
@@ -1176,12 +1176,17 @@ fn validate_turn_rng(material: &BattleTurnMaterialV1) -> Result<(), BattleMateri
     {
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
-    let final_offset_cardinality =
-        SafeU53::new(2).map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
-    let mut persisted_run = material.before_state.run_rng.rdg.clone();
-    let mut persisted_battle = Some(material.rng_before.clone());
-    let mut previous_offset: Option<&RngDraw> = None;
-    for (index, draw) in material.rng_audit.iter().enumerate() {
+    if material.before_state.run_rng != material.after_state.run_rng {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+
+    let mut replay = RngRuntime::from_states(
+        material.before_state.run_rng.clone(),
+        Some(material.rng_before.clone()),
+    )
+    .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+    let mut index = 0;
+    while let Some(draw) = material.rng_audit.get(index) {
         draw.validate()
             .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
         let expected_sequence = SafeU53::new(
@@ -1192,109 +1197,161 @@ fn validate_turn_rng(material: &BattleTurnMaterialV1) -> Result<(), BattleMateri
             return Err(BattleMaterialApplyError::InvalidEvidence);
         }
 
-        match draw.stream {
-            RngStream::SeedOffset => {
-                // Speed ordering temporarily replaces the run generator with
-                // a wave/turn-derived stream, then restores the persisted
-                // run state. Its scoped snapshots therefore chain only
-                // inside one Fisher-Yates transaction.
-                if draw.reason != RngReason::SpeedTie
-                    || draw.public_api != RngPublicApi::FisherYatesSwap
-                    || draw.minimum != SafeU53::ZERO
-                    || draw.before_state.battle.as_ref() != persisted_battle.as_ref()
-                    || draw.after_state.battle.as_ref() != persisted_battle.as_ref()
-                {
-                    return Err(BattleMaterialApplyError::InvalidEvidence);
-                }
-                let context = draw
-                    .before_state
-                    .seed_offset
-                    .as_ref()
-                    .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
-                if draw.after_state.seed_offset.as_ref() != Some(context) {
-                    return Err(BattleMaterialApplyError::InvalidEvidence);
-                }
-
-                let continues_scope = previous_offset
-                    .is_some_and(|previous| previous.after_state == draw.before_state);
-                if continues_scope {
-                    let previous =
-                        previous_offset.ok_or(BattleMaterialApplyError::InvalidEvidence)?;
-                    if previous.cardinality.get().checked_sub(1) != Some(draw.cardinality.get()) {
-                        return Err(BattleMaterialApplyError::InvalidEvidence);
-                    }
-                } else {
-                    if previous_offset
-                        .is_some_and(|previous| previous.cardinality != final_offset_cardinality)
-                    {
-                        return Err(BattleMaterialApplyError::InvalidEvidence);
-                    }
-                    let expected_offset = material
-                        .resolved_turn
-                        .get()
-                        .get()
-                        .checked_mul(1_000)
-                        .and_then(|value| value.checked_add(draw.cardinality.get()))
-                        .and_then(|value| SafeU53::new(value).ok())
-                        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
-                    if context.wave_seed != before_battle.wave_seed
-                        || context.offset != expected_offset
-                    {
-                        return Err(BattleMaterialApplyError::InvalidEvidence);
-                    }
-                    let shift = i64::try_from(expected_offset.get())
-                        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
-                    let shifted_seed = shift_char_codes(&context.wave_seed, shift)
-                        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
-                    if draw.before_state.run != PhaserRdg::from_seed(&shifted_seed).state() {
-                        return Err(BattleMaterialApplyError::InvalidEvidence);
-                    }
-                }
-                previous_offset = Some(draw);
-            }
-            RngStream::Run | RngStream::Battle => {
-                // Ordinary draws remain on the exact persisted stream. This
-                // also proves that an offset scope restored its ambient state
-                // before any subsequent draw became observable.
-                if previous_offset
-                    .take()
-                    .is_some_and(|previous| previous.cardinality != final_offset_cardinality)
-                    || draw.before_state.run != persisted_run
-                    || draw.before_state.battle.as_ref() != persisted_battle.as_ref()
-                    || draw.before_state.seed_offset.is_some()
-                {
-                    return Err(BattleMaterialApplyError::InvalidEvidence);
-                }
-                persisted_run = draw.after_state.run.clone();
-                persisted_battle = draw.after_state.battle.clone();
-            }
+        if draw.stream == RngStream::SeedOffset {
+            index = replay_speed_order_scope(material, &mut replay, index)?;
+        } else {
+            replay_ordinary_draw(&mut replay, draw)?;
+            index += 1;
         }
     }
-    if previous_offset.is_some_and(|previous| previous.cardinality != final_offset_cardinality)
-        || persisted_run != material.after_state.run_rng.rdg
-    {
+
+    if replay.run_state() != material.after_state.run_rng {
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
-    let persisted_battle = persisted_battle.ok_or(BattleMaterialApplyError::InvalidEvidence)?;
-    if persisted_battle.battle_seed != material.rng_before.battle_seed
-        || persisted_battle.turn != material.rng_before.turn
-        || (material.outcome != BattleOutcome::Ongoing && persisted_battle != material.rng_after)
-    {
-        return Err(BattleMaterialApplyError::InvalidEvidence);
-    }
-    if material.before_state.run_rng != material.after_state.run_rng {
-        return Err(BattleMaterialApplyError::InvalidEvidence);
-    }
-    let mut expected_after_battle = material.rng_before.clone();
     if material.outcome == BattleOutcome::Ongoing {
-        expected_after_battle
+        replay
             .increment_turn()
             .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
     }
-    if material.rng_after != expected_after_battle {
+    if replay.battle_state() != Some(&material.rng_after) {
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
     Ok(())
+}
+
+fn replay_speed_order_scope(
+    material: &BattleTurnMaterialV1,
+    replay: &mut RngRuntime,
+    start: usize,
+) -> Result<usize, BattleMaterialApplyError> {
+    let first = material
+        .rng_audit
+        .get(start)
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    if first.stream != RngStream::SeedOffset
+        || first.reason != RngReason::SpeedTie
+        || first.public_api != RngPublicApi::FisherYatesSwap
+        || first.minimum != SafeU53::ZERO
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    let length = usize::try_from(first.cardinality.get())
+        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+    if length < 2 || length > material.commands.entries.len() {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    let draw_count = length
+        .checked_sub(1)
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let end = start
+        .checked_add(draw_count)
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let stated = material
+        .rng_audit
+        .get(start..end)
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let replay_start = replay.audit_entries().len();
+    let mut positions = vec![(); length];
+    replay
+        .speed_order_shuffle(
+            &mut positions,
+            &material
+                .before_state
+                .battle
+                .as_ref()
+                .ok_or(BattleMaterialApplyError::InvalidEvidence)?
+                .wave_seed,
+            material.resolved_turn,
+        )
+        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+    if replay.audit_entries().get(replay_start..) != Some(stated) {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    Ok(end)
+}
+
+fn replay_ordinary_draw(
+    replay: &mut RngRuntime,
+    stated: &RngDraw,
+) -> Result<(), BattleMaterialApplyError> {
+    let replay_start = replay.audit_entries().len();
+    match (stated.stream, stated.public_api) {
+        (RngStream::Run, RngPublicApi::RandSeedInt) => {
+            replay
+                .run_rand_seed_int(
+                    stated.cardinality,
+                    stated.minimum,
+                    stated.reason,
+                    stated.callsite_id.clone(),
+                )
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
+        (RngStream::Run, RngPublicApi::IntegerInRange) => {
+            let maximum = audited_range_maximum(stated)?;
+            replay
+                .run_integer_in_range(
+                    stated.minimum,
+                    maximum,
+                    stated.reason,
+                    stated.callsite_id.clone(),
+                )
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
+        (RngStream::Run, RngPublicApi::Pick) => {
+            let length = usize::try_from(stated.cardinality.get())
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+            replay
+                .run_pick_index(length, stated.reason, stated.callsite_id.clone())
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
+        (RngStream::Battle, RngPublicApi::RandSeedInt) => {
+            replay
+                .battle_rand_seed_int(
+                    stated.cardinality,
+                    stated.minimum,
+                    stated.reason,
+                    stated.callsite_id.clone(),
+                )
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
+        (RngStream::Battle, RngPublicApi::IntegerInRange) => {
+            let maximum = audited_range_maximum(stated)?;
+            replay
+                .battle_integer_in_range(
+                    stated.minimum,
+                    maximum,
+                    stated.reason,
+                    stated.callsite_id.clone(),
+                )
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
+        (RngStream::Battle, RngPublicApi::Pick) => {
+            let length = usize::try_from(stated.cardinality.get())
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+            replay
+                .battle_pick_index(length, stated.reason, stated.callsite_id.clone())
+                .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+        }
+        (RngStream::SeedOffset, _) | (_, RngPublicApi::FisherYatesSwap) => {
+            return Err(BattleMaterialApplyError::InvalidEvidence);
+        }
+    }
+    if replay.audit_entries().get(replay_start) != Some(stated)
+        || replay.audit_entries().len() != replay_start + 1
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    Ok(())
+}
+
+fn audited_range_maximum(stated: &RngDraw) -> Result<SafeU53, BattleMaterialApplyError> {
+    stated
+        .cardinality
+        .get()
+        .checked_sub(1)
+        .and_then(|width| stated.minimum.get().checked_add(width))
+        .and_then(|value| SafeU53::new(value).ok())
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)
 }
 
 fn validate_replacement_rng(
