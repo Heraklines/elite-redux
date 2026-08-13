@@ -47,6 +47,292 @@ use serde_json::json;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
+fn blank_non_newline_bytes(source: &[u8], sanitized: &mut [u8], start: usize, end: usize) {
+    for index in start..end {
+        if !matches!(source[index], b'\r' | b'\n') {
+            sanitized[index] = b' ';
+        }
+    }
+}
+
+fn raw_string_start(source: &[u8], start: usize) -> Option<(usize, usize)> {
+    let prefix_len = if source.get(start) == Some(&b'r') {
+        1
+    } else if matches!(source.get(start), Some(&b'b') | Some(&b'c'))
+        && source.get(start + 1) == Some(&b'r')
+    {
+        2
+    } else {
+        return None;
+    };
+
+    let mut quote = start + prefix_len;
+    let mut hash_count = 0;
+    while source.get(quote) == Some(&b'#') {
+        hash_count += 1;
+        quote += 1;
+    }
+    (source.get(quote) == Some(&b'"')).then_some((quote + 1, hash_count))
+}
+
+fn raw_string_end(source: &[u8], start: usize) -> Option<usize> {
+    let (content_start, hash_count) = raw_string_start(source, start)?;
+    let mut index = content_start;
+    while index < source.len() {
+        if source[index] == b'"' {
+            let mut closing = index + 1;
+            let mut matched_hashes = 0;
+            while matched_hashes < hash_count && source.get(closing) == Some(&b'#') {
+                matched_hashes += 1;
+                closing += 1;
+            }
+            if matched_hashes == hash_count {
+                return Some(closing);
+            }
+        }
+        index += 1;
+    }
+    Some(source.len())
+}
+
+fn string_quote_start(source: &[u8], start: usize) -> Option<usize> {
+    if source.get(start) == Some(&b'"') {
+        Some(start)
+    } else if matches!(source.get(start), Some(&b'b') | Some(&b'c'))
+        && source.get(start + 1) == Some(&b'"')
+    {
+        Some(start + 1)
+    } else {
+        None
+    }
+}
+
+fn string_literal_end(source: &[u8], quote_start: usize) -> usize {
+    let mut index = quote_start + 1;
+    while index < source.len() {
+        match source[index] {
+            b'\\' => {
+                index += 1;
+                if index < source.len() {
+                    index += 1;
+                }
+            }
+            b'"' => return index + 1,
+            _ => index += 1,
+        }
+    }
+    source.len()
+}
+
+fn is_ascii_hex(byte: u8) -> bool {
+    matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F')
+}
+
+fn utf8_char_width(byte: u8) -> Option<usize> {
+    match byte {
+        0x00..=0x7f => Some(1),
+        0xc2..=0xdf => Some(2),
+        0xe0..=0xef => Some(3),
+        0xf0..=0xf4 => Some(4),
+        _ => None,
+    }
+}
+
+fn char_literal_end(source: &[u8], quote_start: usize) -> Option<usize> {
+    let mut index = quote_start + 1;
+    let first = *source.get(index)?;
+    if first == b'\\' {
+        index += 1;
+        match source.get(index) {
+            Some(&b'u') if source.get(index + 1) == Some(&b'{') => {
+                index += 2;
+                let mut digits = 0;
+                let mut closed = false;
+                while let Some(&byte) = source.get(index) {
+                    if byte == b'}' {
+                        closed = (1..=6).contains(&digits);
+                        index += 1;
+                        break;
+                    }
+                    if !is_ascii_hex(byte) || digits == 6 {
+                        return None;
+                    }
+                    digits += 1;
+                    index += 1;
+                }
+                if !closed {
+                    return None;
+                }
+            }
+            Some(&b'x') => {
+                index += 1;
+                for _ in 0..2 {
+                    match source.get(index) {
+                        Some(&byte) if is_ascii_hex(byte) => index += 1,
+                        _ => return None,
+                    }
+                }
+            }
+            Some(&byte) if !matches!(byte, b'\r' | b'\n') => index += 1,
+            _ => return None,
+        }
+    } else {
+        if matches!(first, b'\r' | b'\n') {
+            return None;
+        }
+        let width = utf8_char_width(first)?;
+        let end = index + width;
+        if end > source.len()
+            || !source[index + 1..end]
+                .iter()
+                .all(|byte| (byte & 0xc0) == 0x80)
+        {
+            return None;
+        }
+        index = end;
+    }
+
+    (source.get(index) == Some(&b'\'')).then_some(index + 1)
+}
+
+fn char_literal_quote_start(source: &[u8], start: usize) -> Option<usize> {
+    if source.get(start) == Some(&b'\'') {
+        Some(start)
+    } else if source.get(start) == Some(&b'b') && source.get(start + 1) == Some(&b'\'') {
+        Some(start + 1)
+    } else {
+        None
+    }
+}
+
+fn sanitize_rust_source(source: &str) -> String {
+    let source_bytes = source.as_bytes();
+    let mut sanitized = source_bytes.to_vec();
+    let mut index = 0;
+
+    while index < source_bytes.len() {
+        if source_bytes[index] == b'/' && source_bytes.get(index + 1) == Some(&b'/') {
+            let mut end = index + 2;
+            while end < source_bytes.len() && source_bytes[end] != b'\n' {
+                end += 1;
+            }
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if source_bytes[index] == b'/' && source_bytes.get(index + 1) == Some(&b'*') {
+            let mut end = index + 2;
+            let mut depth = 1;
+            while end < source_bytes.len() && depth != 0 {
+                if source_bytes[end] == b'/' && source_bytes.get(end + 1) == Some(&b'*') {
+                    depth += 1;
+                    end += 2;
+                } else if source_bytes[end] == b'*'
+                    && source_bytes.get(end + 1) == Some(&b'/')
+                {
+                    depth -= 1;
+                    end += 2;
+                } else {
+                    end += 1;
+                }
+            }
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if let Some(end) = raw_string_end(source_bytes, index) {
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if let Some(quote_start) = string_quote_start(source_bytes, index) {
+            let end = string_literal_end(source_bytes, quote_start);
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if let Some(quote_start) = char_literal_quote_start(source_bytes, index) {
+            if let Some(end) = char_literal_end(source_bytes, quote_start) {
+                blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+                index = end;
+                continue;
+            }
+        }
+
+        index += 1;
+    }
+
+    String::from_utf8(sanitized).expect("source is valid UTF-8")
+}
+
+fn normalized_sanitized_source(source: &str) -> String {
+    sanitize_rust_source(&source.replace("\r\n", "\n"))
+}
+
+fn unique_function_offset(source: &str, signature: &str) -> usize {
+    let source = normalized_sanitized_source(source);
+    assert_eq!(
+        source.matches(signature).count(),
+        1,
+        "expected exactly one function signature {signature:?}",
+    );
+
+    let line_anchor = format!("\n{signature}");
+    let mut matches = source.match_indices(&line_anchor);
+    let (offset, _) = matches
+        .next()
+        .unwrap_or_else(|| panic!("missing line-anchored function signature {signature:?}"));
+    assert!(
+        matches.next().is_none(),
+        "expected exactly one line-anchored function signature {signature:?}",
+    );
+    offset + 1
+}
+
+fn extract_function_section(source: &str, signature: &str, next_signature: &str) -> String {
+    let source = normalized_sanitized_source(source);
+    let start = unique_function_offset(&source, signature);
+    let end = unique_function_offset(&source, next_signature);
+    assert!(
+        start < end,
+        "function signature {signature:?} must precede {next_signature:?}",
+    );
+    source[start..end].to_owned()
+}
+
+#[test]
+fn rust_source_sanitizer_masks_fake_signatures_and_preserves_code() {
+    let source = concat!(
+        "fn real() {\n",
+        "// fn fake_line() {}\n",
+        "/* fn fake_outer() { /* fn fake_nested() {} */ } */\n",
+        "let raw = r###\"fn fake_raw() {}\"###;\n",
+        "let normal = \"fn fake_normal() {}\";\n",
+        "}\n",
+    );
+    let sanitized = sanitize_rust_source(source);
+
+    assert_eq!(sanitized.len(), source.len());
+    assert_eq!(
+        sanitized.bytes().filter(|byte| *byte == b'\n').count(),
+        source.bytes().filter(|byte| *byte == b'\n').count()
+    );
+    assert!(sanitized.contains("fn real()"));
+    for fake in [
+        "fn fake_line",
+        "fn fake_outer",
+        "fn fake_nested",
+        "fn fake_raw",
+        "fn fake_normal",
+    ] {
+        assert!(!sanitized.contains(fake), "sanitizer leaked {fake}");
+    }
+}
+
 fn safe(value: u64) -> TestResult<SafeU53> {
     Ok(SafeU53::new(value)?)
 }
@@ -1048,10 +1334,10 @@ fn authority_admission_errors_are_fail_atomic_and_public_semantic_bypasses_are_a
         .expect_err("invalid control should reject");
     assert_eq!(fixture.state, before);
 
-    let authority_source = include_str!(concat!(
+    let authority_source = normalized_sanitized_source(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../er-game/src/authority_commands.rs"
-    ));
+    )));
     for forbidden in [
         "resolve_turn(",
         "resolve_replacement(",
@@ -1089,10 +1375,10 @@ fn authority_admission_errors_are_fail_atomic_and_public_semantic_bypasses_are_a
 
 #[test]
 fn authority_adapter_stages_material_and_log_before_publication() -> TestResult {
-    let source = include_str!(concat!(
+    let source = normalized_sanitized_source(include_str!(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/src/battle_authority.rs"
-    ));
+    )));
     let prepared = source
         .find("let candidate = prepared.transition();")
         .ok_or("GameRuntime prepared TURN seam missing")?;
@@ -1121,13 +1407,15 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(publish < post_validate);
     assert!(source.contains("PreparedAuthorityReplacement {"));
     assert!(source.contains("apply_reducer_issued_turn_material_trusted as apply_turn_material"));
-    let turn_start = source
-        .find("pub(crate) fn prepare_authority_turn(")
-        .ok_or("authority TURN preparation function missing")?;
-    let replacement_start = source
-        .find("pub(crate) fn prepare_authority_replacement(")
-        .ok_or("authority REPLACEMENT preparation function missing")?;
-    let turn_source = &source[turn_start..replacement_start];
+    let replacement_start = unique_function_offset(
+        &source,
+        "pub(crate) fn prepare_authority_replacement(",
+    );
+    let turn_source = extract_function_section(
+        &source,
+        "pub(crate) fn prepare_authority_turn(",
+        "pub(crate) fn prepare_authority_replacement(",
+    );
     assert_eq!(
         turn_source
             .matches("validate_admitted_command_frontier_trusted(")
@@ -1145,13 +1433,14 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         1,
         "TURN hot path must complete the scripted frontier exactly once"
     );
-    let applier_start = turn_source
-        .find("let applied = apply_turn_material(")
-        .ok_or("TURN material applier call missing")?;
-    let applier_end = turn_source[applier_start..]
-        .find("\n    .map_err(AuthorityTransactionError::MaterialApply)?;")
-        .map(|offset| applier_start + offset)
-        .ok_or("TURN material applier call end missing")?;
+    let applier_start = unique_function_offset(
+        &turn_source,
+        "    let applied = apply_turn_material(",
+    );
+    let applier_end = unique_function_offset(
+        &turn_source,
+        "    .map_err(AuthorityTransactionError::MaterialApply)?;",
+    );
     let applier_source = &turn_source[applier_start..applier_end];
     assert!(applier_source.contains("&prepared,"));
     assert_eq!(
@@ -1186,16 +1475,12 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(source.contains("admit_replacement_proposal_with_context"));
     assert!(source.contains("replacement_fingerprints.entries()"));
     assert!(source.contains("ReplacementAdmissionResult::Duplicate { .. }"));
-    assert!(source.contains("expected read-only"));
     assert!(!source.contains("return Err(AuthorityTransactionError::Duplicate"));
-    let scripted_start = source
-        .find("fn admit_scripted_if_pending<'a>(")
-        .ok_or("scripted admission helper missing")?;
-    let scripted_end = source[scripted_start..]
-        .find("\n/// Validate the already-projected resolver candidate")
-        .map(|offset| scripted_start + offset)
-        .ok_or("scripted admission helper end missing")?;
-    let scripted_source = &source[scripted_start..scripted_end];
+    let scripted_source = extract_function_section(
+        &source,
+        "fn admit_scripted_if_pending<'a>(",
+        "fn validate_prepared_projection(",
+    );
     assert_eq!(
         scripted_source
             .matches("Cow::Borrowed(state), Cow::Borrowed(policy)")
@@ -1214,7 +1499,7 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         );
     }
     assert!(source.contains("candidate.accepted_commands != completed_state_commands"));
-    assert!(source.contains("frontier and tombstones"));
+    assert!(source.contains("if candidate.before_state != *complete_state.as_ref()"));
     assert!(source.contains("scripted_policy_after"));
     assert!(source.contains("validate_published_authority_stage(&published)?"));
     assert!(source.contains("peer_stage_quorum"));
@@ -1227,20 +1512,20 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(!source.contains("request.protocol_next_control"));
     assert!(!source.contains("ReplacementAdmissionLedger"));
     assert!(!source.contains("replacement_ledger"));
-    let prepared_start = source
-        .find("pub(crate) struct AuthorityPreparedTransaction")
-        .ok_or("prepared transaction type missing")?;
-    let prepared_end = source
-        .find("pub(crate) enum PreparedMaterial")
-        .ok_or("prepared material type missing")?;
+    let prepared_start = unique_function_offset(
+        &source,
+        "pub(crate) struct AuthorityPreparedTransaction {",
+    );
+    let prepared_end = unique_function_offset(&source, "pub(crate) enum PreparedMaterial {");
     assert!(source[prepared_start..prepared_end].contains("scripted_policy_after"));
-    let take_entry_start = source
-        .find("pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry {")
-        .ok_or("prepared entry constructor method missing")?;
-    let take_entry_end = source[take_entry_start..]
-        .find("\n    }\n")
-        .map(|offset| take_entry_start + offset)
-        .ok_or("prepared entry constructor method end missing")?;
+    let take_entry_start = unique_function_offset(
+        &source,
+        "    pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry {",
+    );
+    let take_entry_end = unique_function_offset(
+        &source,
+        "    pub(crate) fn operation_id(&self) -> &OperationId {",
+    );
     let take_entry_source = &source[take_entry_start..take_entry_end];
     assert_eq!(
         take_entry_source
@@ -1254,12 +1539,11 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         "pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry"
     ));
     assert!(source.contains("material_bytes: std::mem::take(&mut self.material_bytes)"));
-    let input_start = source
-        .find("pub(crate) struct AuthorityTransactionInput")
-        .ok_or("authority transaction input type missing")?;
-    let input_end = source
-        .find("pub(crate) struct AuthorityTurnRequest")
-        .ok_or("authority turn request type missing")?;
+    let input_start = unique_function_offset(
+        &source,
+        "pub(crate) struct AuthorityTransactionInput<'a> {",
+    );
+    let input_end = unique_function_offset(&source, "pub(crate) struct AuthorityTurnRequest {");
     let input_source = &source[input_start..input_end];
     for required in [
         "pub state: &'a GameState",
@@ -1272,7 +1556,10 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
             "authority transaction input is missing {required}"
         );
     }
-    let kernel_source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/battle_kernel.rs"));
+    let kernel_source = normalized_sanitized_source(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/battle_kernel.rs"
+    )));
     assert!(kernel_source.contains("prepared.take_prepared_entry()"));
     assert!(!kernel_source.contains("PreparedAuthorityEntry {"));
     assert!(!kernel_source.contains("take_material_bytes"));
@@ -1373,12 +1660,11 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     let ready_source = &kernel_source[ready_start..ready_end];
     assert!(!ready_source.contains("canonical_bytes"));
     assert!(!ready_source.contains("fnv1a"));
-    let published_start = source
-        .find("pub(crate) struct AuthorityPublishedTransaction")
-        .ok_or("published transaction type missing")?;
-    let published_end = source
-        .find("/// Prepare a complete authority TURN")
-        .ok_or("authority preparation function missing")?;
+    let published_start = unique_function_offset(
+        &source,
+        "pub(crate) struct AuthorityPublishedTransaction {",
+    );
+    let published_end = unique_function_offset(&source, "pub(crate) fn prepare_authority_turn(");
     assert!(source[published_start..published_end].contains("scripted_policy_after"));
     assert!(source.contains("require_turn_equivalence(candidate, &decoded, &applied)?"));
     assert!(source.contains("require_replacement_equivalence(&candidate, &decoded, &applied)?"));
