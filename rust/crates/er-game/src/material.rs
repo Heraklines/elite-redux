@@ -259,19 +259,6 @@ pub enum BattleMaterialApplyError {
     Invariant,
 }
 
-fn trace_material_validation<T>(
-    stage: &'static str,
-    result: Result<T, BattleMaterialApplyError>,
-) -> Result<T, BattleMaterialApplyError> {
-    #[cfg(debug_assertions)]
-    if let Err(error) = &result {
-        eprintln!("M3 material validation failed at {stage}: {error}");
-    }
-    #[cfg(not(debug_assertions))]
-    let _ = stage;
-    result
-}
-
 /// Fully validated material output ready for atomic game/control installation.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MaterialApplyResult {
@@ -300,38 +287,19 @@ pub fn apply_turn_material(
         &material.after_state,
         content,
     )?;
-    trace_material_validation(
-        "turn.before_state_content",
-        validate_state_content(&material.before_state, content)
-            .map_err(|_| BattleMaterialApplyError::InvalidEvidence),
+    validate_state_content(&material.before_state, content)
+        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+    validate_turn_identity(material)?;
+    validate_turn_commands(&material.before_state, &material.commands, content)?;
+    validate_after_state_and_digest(&material.after_state, &material.after_digest, content)?;
+    validate_turn_rng(material)?;
+    validate_outcome_and_decision(
+        &material.after_state,
+        material.outcome,
+        material.next_decision,
     )?;
-    trace_material_validation("turn.identity", validate_turn_identity(material))?;
-    trace_material_validation(
-        "turn.commands",
-        validate_turn_commands(&material.before_state, &material.commands, content),
-    )?;
-    trace_material_validation(
-        "turn.after_state_and_digest",
-        validate_after_state_and_digest(&material.after_state, &material.after_digest, content),
-    )?;
-    trace_material_validation("turn.rng", validate_turn_rng(material))?;
-    trace_material_validation(
-        "turn.outcome_and_decision",
-        validate_outcome_and_decision(
-            &material.after_state,
-            material.outcome,
-            material.next_decision,
-        ),
-    )?;
-    trace_material_validation(
-        "turn.next_state_command_collection",
-        validate_next_state_command_collection(
-            &material.after_state,
-            material.next_decision,
-            content,
-        ),
-    )?;
-    trace_material_validation("turn.evidence", validate_turn_evidence(material, content))?;
+    validate_next_state_command_collection(&material.after_state, material.next_decision, content)?;
+    validate_turn_evidence(material, content)?;
     let menu_allocators = validate_allocator_projection(
         &material.after_state,
         &material.menu_allocators_before,
@@ -345,10 +313,7 @@ pub fn apply_turn_material(
         &material.next_control,
         content,
     )?;
-    trace_material_validation(
-        "turn.frontier_reconciliation",
-        reconcile_turn_frontier(current, material, content),
-    )?;
+    reconcile_turn_frontier(current, material, content)?;
     validate_endpoint_allocators(
         &current.menu_allocators,
         current.local_seat,
@@ -741,38 +706,29 @@ fn validate_turn_evidence(
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
 ) -> Result<(), BattleMaterialApplyError> {
-    trace_material_validation(
-        "turn.evidence.action_order",
-        validate_action_order(
-            &material.before_state,
-            &material.commands,
-            &material.action_order,
+    validate_action_order(
+        &material.before_state,
+        &material.commands,
+        &material.action_order,
+        content,
+    )?;
+    validate_battle_mutation_evidence(
+        &material.before_state,
+        &material.after_state,
+        &material.mutations,
+    )
+    .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+    validate_presentation(
+        &material.presentation,
+        &material.presentation_digest,
+        &material.operation_id,
+        material.outcome,
+        PresentationValidationContext {
+            mutations: &material.mutations,
+            before_state: &material.before_state,
+            after_state: &material.after_state,
             content,
-        ),
-    )?;
-    trace_material_validation(
-        "turn.evidence.mutations",
-        validate_battle_mutation_evidence(
-            &material.before_state,
-            &material.after_state,
-            &material.mutations,
-        )
-        .map_err(|_| BattleMaterialApplyError::InvalidEvidence),
-    )?;
-    trace_material_validation(
-        "turn.evidence.presentation",
-        validate_presentation(
-            &material.presentation,
-            &material.presentation_digest,
-            &material.operation_id,
-            material.outcome,
-            PresentationValidationContext {
-                mutations: &material.mutations,
-                before_state: &material.before_state,
-                after_state: &material.after_state,
-                content,
-            },
-        ),
+        },
     )?;
     Ok(())
 }
