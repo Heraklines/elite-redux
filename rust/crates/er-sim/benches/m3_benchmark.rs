@@ -30,7 +30,7 @@ use er_types::battle_command::{
 };
 use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_ids::{
-    BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex,
+    BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, TurnIndex,
 };
 use er_types::battle_model::BattleOutcome;
 use er_types::battle_ui::{BattleUiProjection, PresentationSettlementOutcome};
@@ -486,40 +486,53 @@ fn lead_indices(
 }
 
 fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicyV1> {
+    let next_turn_value = battle
+        .turn
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or_else(|| invalid("scripted enemy next turn overflowed"))?;
+    let next_turn = TurnIndex::new(safe(next_turn_value))?;
     let mut commands = Vec::new();
     let enemy_capacity = battle.format.enemy_capacity;
-    for position in 0..enemy_capacity {
-        let field_slot = FieldSlot::new(BattleSide::Enemy, position)?;
-        let actor = battle
-            .field
-            .occupant(&battle.format, field_slot)?
-            .ok_or_else(|| invalid(format!("enemy lead slot {position} is empty")))?;
-        let target_position = position.min(battle.format.player_capacity.saturating_sub(1));
-        let target = FieldSlot::new(BattleSide::Player, target_position)?;
-        let target_selection =
-            if battle.format.player_capacity == 1 && battle.format.enemy_capacity == 1 {
-                BattleTargetSelection::implicit()
-            } else {
-                BattleTargetSelection::selected(vec![target])?
-            };
-        let command = BattleCommand::fight(actor, MoveSlotIndex::ZERO, target_selection)?;
-        let operation_id = scripted_enemy_command_operation_id(
-            battle.battle_id,
-            battle.wave,
-            battle.turn,
-            field_slot,
-            safe(u64::from(position)),
-        )?;
-        commands.push(ScriptedEnemyBattleCommandV1::new(
-            operation_id,
-            battle.battle_id,
-            battle.wave,
-            battle.turn,
-            safe(u64::from(position)),
-            actor,
-            field_slot,
-            command,
-        )?);
+    for (turn_offset, turn) in [battle.turn, next_turn].into_iter().enumerate() {
+        for position in 0..enemy_capacity {
+            let field_slot = FieldSlot::new(BattleSide::Enemy, position)?;
+            let actor = battle
+                .field
+                .occupant(&battle.format, field_slot)?
+                .ok_or_else(|| invalid(format!("enemy lead slot {position} is empty")))?;
+            let target_position = position.min(battle.format.player_capacity.saturating_sub(1));
+            let target = FieldSlot::new(BattleSide::Player, target_position)?;
+            let target_selection =
+                if battle.format.player_capacity == 1 && battle.format.enemy_capacity == 1 {
+                    BattleTargetSelection::implicit()
+                } else {
+                    BattleTargetSelection::selected(vec![target])?
+                };
+            let command = BattleCommand::fight(actor, MoveSlotIndex::ZERO, target_selection)?;
+            let script_cursor = safe(
+                u64::try_from(turn_offset)? * u64::from(enemy_capacity)
+                    + u64::from(position),
+            );
+            let operation_id = scripted_enemy_command_operation_id(
+                battle.battle_id,
+                battle.wave,
+                turn,
+                field_slot,
+                script_cursor,
+            )?;
+            commands.push(ScriptedEnemyBattleCommandV1::new(
+                operation_id,
+                battle.battle_id,
+                battle.wave,
+                turn,
+                script_cursor,
+                actor,
+                field_slot,
+                command,
+            )?);
+        }
     }
     Ok(ScriptedEnemyPolicyV1::new(safe(0), commands)?)
 }
