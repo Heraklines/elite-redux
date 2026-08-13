@@ -411,7 +411,11 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
             BattleCommand::fight(
                 actor,
                 MoveSlotIndex::ZERO,
-                BattleTargetSelection::implicit(),
+                if battle.format == BattleFormat::single() {
+                    BattleTargetSelection::implicit()
+                } else {
+                    BattleTargetSelection::selected(vec![slot(BattleSide::Player, 0)])?
+                },
             )?,
         )?;
         let offer = build_scripted_enemy_offer(&state, field_slot, &command.command, content)?;
