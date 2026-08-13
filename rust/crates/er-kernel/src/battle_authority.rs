@@ -32,8 +32,8 @@ use er_game::internal_event::PreparedAuthorityEntry;
 use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleReplacementMaterialV1,
     BattleTurnMaterialV1, MaterialApplyResult,
-    apply_replacement_material_trusted as apply_replacement_material,
     apply_reducer_issued_turn_material_trusted as apply_turn_material,
+    apply_replacement_material_trusted as apply_replacement_material,
 };
 use er_protocol::{
     AuthorityEntryDraft, AuthorityLog, CommitOutcome, KernelScheduler, PreparedCommit,
@@ -492,13 +492,8 @@ pub(crate) fn prepare_authority_turn(
         ));
     }
     validate_control_allocator_projection(next_control, &allocators)?;
-    let material = build_turn_material(
-        candidate,
-        &operation_id,
-        next_control,
-        &allocators,
-        content,
-    )?;
+    let material =
+        build_turn_material(candidate, &operation_id, next_control, &allocators, content)?;
     let (decoded, payload, material_bytes) = encode_decode_material(&material)?;
     let material_wire = Material {
         digest: turn_material_digest(&material_bytes)?,

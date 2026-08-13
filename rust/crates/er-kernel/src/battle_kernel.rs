@@ -11,8 +11,8 @@ use er_content::pack::ContentPack;
 use er_game::internal_event::{
     AuthorityEntryReadyPayload, BattleResolvedPayload, ButtonEventPayload, ControlInstalledPayload,
     InternalEvent, InternalEventKind, InternalEventQueue, MaterialApplyResult as EventApplyResult,
-    MaterialInstalledPayload, MaterialKind, PreparedBattleResolution,
-    PresentationBarrier, UiEventPayload,
+    MaterialInstalledPayload, MaterialKind, PreparedBattleResolution, PresentationBarrier,
+    UiEventPayload,
 };
 use er_game::material::{
     BattleMaterialApplyContext, MaterialApplyResult, decode_replacement_material,
@@ -3158,6 +3158,9 @@ impl BattleTransaction {
                 self.enter_terminal(format!("authority entry rejected: {reason:?}"))?;
                 Ok(())
             }
+            ReplicaAdmission::Duplicate {
+                resume: er_protocol::ReplicaResume::ControlInstalled,
+            } => self.map_replica_actions_with_probe_mode(step.actions, true),
             ReplicaAdmission::Admitted { .. }
             | ReplicaAdmission::Duplicate { .. }
             | ReplicaAdmission::Gap { .. } => self.map_replica_actions(step.actions),
@@ -4044,6 +4047,14 @@ impl BattleTransaction {
         &mut self,
         actions: Vec<ReplicaAction>,
     ) -> Result<(), BattleKernelError> {
+        self.map_replica_actions_with_probe_mode(actions, false)
+    }
+
+    fn map_replica_actions_with_probe_mode(
+        &mut self,
+        actions: Vec<ReplicaAction>,
+        duplicate_complete_probe: bool,
+    ) -> Result<(), BattleKernelError> {
         for action in actions {
             match action {
                 ReplicaAction::EmitReceipt { receipt } => {
@@ -4253,6 +4264,37 @@ impl BattleTransaction {
                             self.deferred_terminal = Some(terminal);
                         } else {
                             self.enter_terminal_state(terminal)?;
+                        }
+                        continue;
+                    }
+                    if duplicate_complete_probe
+                        && self.pending_replica_material.is_none()
+                        && !self
+                            .pending_presentation_probes
+                            .contains_key(&entry.revision)
+                    {
+                        let has_live_events = self
+                            .staged
+                            .presentations
+                            .pending_ids()
+                            .iter()
+                            .any(|event_id| event_id.operation_id == entry.operation_id);
+                        if !has_live_events {
+                            let actions = match &mut self.staged.protocol {
+                                BattleProtocolState::Replica { replica, .. } => replica
+                                    .presentation_result(
+                                        entry.revision,
+                                        er_protocol::PresentationProbeOutcome::Settled,
+                                    )
+                                    .map_err(protocol_error)?,
+                                BattleProtocolState::Authority { .. } => {
+                                    return Err(BattleKernelError::Invariant {
+                                        reason: "authority received a duplicate replica presentation probe"
+                                            .to_owned(),
+                                    });
+                                }
+                            };
+                            self.map_replica_actions(actions)?;
                         }
                         continue;
                     }

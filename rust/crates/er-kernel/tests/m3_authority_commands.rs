@@ -1120,9 +1120,7 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(validate < publish);
     assert!(publish < post_validate);
     assert!(source.contains("PreparedAuthorityReplacement {"));
-    assert!(source.contains(
-        "apply_reducer_issued_turn_material_trusted as apply_turn_material"
-    ));
+    assert!(source.contains("apply_reducer_issued_turn_material_trusted as apply_turn_material"));
     let turn_start = source
         .find("pub(crate) fn prepare_authority_turn(")
         .ok_or("authority TURN preparation function missing")?;
@@ -1143,12 +1141,16 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         "validate_control_allocator_projection(next_control, &allocators)?"
     ));
     assert_eq!(
-        turn_source.matches("validate_control_allocator_projection(").count(),
+        turn_source
+            .matches("validate_control_allocator_projection(")
+            .count(),
         1,
         "TURN audit must bind allocator projection inside prepare_authority_turn"
     );
-    assert!(source[replacement_start..]
-        .contains("validate_control_allocator_projection(&next_control, &allocators)?"));
+    assert!(
+        source[replacement_start..]
+            .contains("validate_control_allocator_projection(&next_control, &allocators)?")
+    );
     assert!(source.contains("prepared_admission.allocator_before() != allocators.as_slice()"));
     assert!(source.contains("admit_scripted_if_pending"));
     assert!(source.contains("CommandCollectionState"));
@@ -1201,10 +1203,7 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         "pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry"
     ));
     assert!(source.contains("material_bytes: std::mem::take(&mut self.material_bytes)"));
-    let kernel_source = include_str!(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/src/battle_kernel.rs"
-    ));
+    let kernel_source = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/battle_kernel.rs"));
     assert!(kernel_source.contains("prepared.take_prepared_entry()"));
     assert!(!kernel_source.contains("PreparedAuthorityEntry {"));
     assert!(!kernel_source.contains("take_material_bytes"));

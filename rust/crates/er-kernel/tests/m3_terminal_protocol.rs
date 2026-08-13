@@ -89,6 +89,35 @@ fn replica_terminal_path_is_typed_and_never_uses_battle_material_apply() {
 }
 
 #[test]
+fn duplicate_complete_probe_replays_settled_only_without_live_presentation() {
+    let mapper = KERNEL_SOURCE
+        .find("fn map_replica_actions_with_probe_mode(")
+        .expect("probe-mode replica mapper is present");
+    let probe_start = mapper
+        + KERNEL_SOURCE[mapper..]
+            .find("ReplicaAction::ProbePresentation { entry } => {")
+            .expect("replica presentation probe arm is present");
+    let probe_end = probe_start
+        + KERNEL_SOURCE[probe_start..]
+            .find("ReplicaAction::RequestTail {")
+            .expect("probe arm is followed by tail handling");
+    let probe = &KERNEL_SOURCE[probe_start..probe_end];
+    assert!(probe.contains("duplicate_complete_probe"));
+    assert!(probe.contains("pending_replica_material.is_none()"));
+    assert!(probe.contains("pending_presentation_probes"));
+    assert!(probe.contains("pending_ids()"));
+    assert!(probe.contains("event_id.operation_id == entry.operation_id"));
+    assert!(probe.contains("PresentationProbeOutcome::Settled"));
+    assert!(probe.contains("if let Some(existing) = self"));
+    assert!(KERNEL_SOURCE.contains(
+        "ReplicaAdmission::Duplicate {\n                resume: er_protocol::ReplicaResume::ControlInstalled,\n            } => self.map_replica_actions_with_probe_mode(step.actions, true),"
+    ));
+    assert!(KERNEL_SOURCE.contains(
+        "ReplicaAdmission::Admitted { .. }\n            | ReplicaAdmission::Duplicate { .. }\n            | ReplicaAdmission::Gap { .. } => self.map_replica_actions(step.actions),"
+    ));
+}
+
+#[test]
 fn terminal_cleanup_preserves_protocol_proofs_and_recovery_applies_battle_first() {
     assert!(KERNEL_SOURCE.contains("fn is_terminal_cleanup_effect"));
     assert!(KERNEL_SOURCE.contains("FrameType::AuthorityReceipt | FrameType::RecoveryApplied"));
