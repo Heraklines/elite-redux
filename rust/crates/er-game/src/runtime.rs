@@ -4628,41 +4628,83 @@ fn control_accepts_replacement(
     if seat.decision_operation_id.as_ref() != Some(&proposal.operation_id) {
         return false;
     }
-    match &seat.control {
-        BattleControl::ReplacementSelect(value) => {
-            let BattleControl::ReplacementSelect(_) = &seat.control else {
+    let (parent, leaf) = match &seat.control {
+        BattleControl::ReplacementSelect(value) => (value, None),
+        BattleControl::PartyOptionSelect(value) => {
+            let BattleControl::ReplacementSelect(parent) = value.cancel_to.as_ref() else {
                 return false;
             };
-            let ReplacementSelection::Selected {
-                party_slot,
-                pokemon,
-            } = proposal.selection
-            else {
+            (parent, Some(value))
+        }
+        _ => return false,
+    };
+    let ReplacementSelection::Selected {
+        party_slot,
+        pokemon,
+    } = proposal.selection
+    else {
+        return false;
+    };
+    let Ok(expected_parent_option) = party_option_id(pokemon, party_slot) else {
+        return false;
+    };
+    let Some(battle) = state.battle.as_ref() else {
+        return false;
+    };
+    let Some(member) = battle.player_party.get(usize::from(party_slot.get())) else {
+        return false;
+    };
+    if member.id != pokemon {
+        return false;
+    }
+    if !replacement_operation_id(
+        parent.source.epoch,
+        battle.battle_id,
+        parent.source.wave,
+        parent.source.resolved_turn,
+        parent.source.turn_occurrence,
+        parent.field_slot,
+        parent.owner_seat,
+    )
+    .is_ok_and(|operation_id| operation_id == proposal.operation_id)
+        || crate::replacement_menu::validate_replacement_control(
+            battle,
+            parent,
+            Some(parent.menu.instance_id),
+        )
+        .is_err()
+        || parent.owner_seat != proposal.owner_seat
+        || parent.occurrence != proposal.occurrence
+        || parent.field_slot != proposal.field_slot
+        || parent.menu.selected_option_id != expected_parent_option
+        || !parent
+            .menu
+            .option(parent.menu.selected_option_id.clone())
+            .is_some_and(|option| option.enabled && option.visibility.is_visible())
+    {
+        return false;
+    }
+
+    match leaf {
+        None => {
+            parent.menu.instance_id == proposal.menu_instance_id
+                && parent.menu.control_id.as_str() == proposal.control_id.as_str()
+        }
+        Some(value) => {
+            let Ok(send_out) = MenuOptionId::new(PARTY_OPTION_SEND_OUT_ID) else {
                 return false;
             };
-            let Ok(expected_option) = party_option_id(pokemon, party_slot) else {
-                return false;
-            };
-            let Some(battle) = state.battle.as_ref() else {
-                return false;
-            };
-            crate::replacement_menu::validate_replacement_control(
-                battle,
-                value,
-                Some(value.menu.instance_id),
-            )
-            .is_ok()
-                && value.occurrence == proposal.occurrence
-                && value.field_slot == proposal.field_slot
+            value.actor == parent.actor
+                && value.field_slot == parent.field_slot
+                && value.selected_party_slot == party_slot
                 && value.menu.instance_id == proposal.menu_instance_id
                 && value.menu.control_id.as_str() == proposal.control_id.as_str()
-                && value.menu.selected_option_id == expected_option
+                && value.menu.selected_option_id == send_out
                 && value
                     .menu
                     .option(value.menu.selected_option_id.clone())
-                    .is_some_and(|option| option.enabled)
+                    .is_some_and(|option| option.enabled && option.visibility.is_visible())
         }
-        _ => false,
     }
 }
 
