@@ -246,8 +246,31 @@ fn battle_public_boundary_rejects_legacy_success_inputs_without_mutation()
 fn battle_kernel_owns_the_quiescent_fifo_and_runtime_reducer_boundary() {
     assert!(BATTLE_KERNEL_SOURCE.contains("fn drain(&mut self)"));
     assert!(BATTLE_KERNEL_SOURCE.contains("fn reduce_event(&mut self"));
-    assert!(BATTLE_KERNEL_SOURCE.contains("self.staged.game.reduce_ui"));
-    assert!(BATTLE_KERNEL_SOURCE.contains("self.staged.game.reduce_game"));
+    assert!(BATTLE_KERNEL_SOURCE.contains("game: Arc<GameRuntime>"));
+    assert!(BATTLE_KERNEL_SOURCE.contains("Arc::make_mut(&mut self.game)"));
+    assert!(BATTLE_KERNEL_SOURCE.contains("game_changed_in_transaction: bool"));
+    assert!(BATTLE_KERNEL_SOURCE.contains("self.game_changed_in_transaction = true"));
+    assert!(BATTLE_KERNEL_SOURCE.contains("self.staged.game_changed_in_transaction"));
+    for staged_boundary in [
+        "sync_battle_ui_selection_in_kernel_transaction",
+        "reduce_ui_in_kernel_transaction",
+        "retain_replica_command_in_kernel_transaction",
+        "retain_replica_replacement_in_kernel_transaction",
+        "reduce_game_in_kernel_transaction",
+        "install_material_in_kernel_transaction",
+        "take_pending_no_legal_replacement_in_kernel_transaction",
+    ] {
+        assert!(
+            BATTLE_KERNEL_SOURCE.contains(staged_boundary),
+            "BattleMode must use the explicit staged game boundary {staged_boundary}"
+        );
+        assert!(
+            RUNTIME_SOURCE.contains(&format!("pub fn {staged_boundary}")),
+            "GameRuntime must own staged boundary {staged_boundary}"
+        );
+    }
+    assert!(!BATTLE_KERNEL_SOURCE.contains("self.staged.game.reduce_ui"));
+    assert!(!BATTLE_KERNEL_SOURCE.contains("self.staged.game.reduce_game"));
     assert!(BATTLE_KERNEL_SOURCE.contains("self.queue.push_all_source_order"));
     assert!(BATTLE_KERNEL_SOURCE.contains("validate_quiescent"));
     assert!(RUNTIME_SOURCE.contains("pub fn reduce_ui"));

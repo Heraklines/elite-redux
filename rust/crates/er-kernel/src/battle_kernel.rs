@@ -122,7 +122,12 @@ pub(crate) enum BattleKernelError {
 
 #[derive(Clone, Debug)]
 pub(crate) struct BattleMode {
-    game: GameRuntime,
+    // External inputs clone BattleMode into a private transaction. Sharing the
+    // already-validated game owner keeps protocol-only and key-release inputs
+    // O(1); the first semantic mutation uses Arc::make_mut to preserve the
+    // exact clone-and-swap rollback boundary.
+    game: Arc<GameRuntime>,
+    game_changed_in_transaction: bool,
     ui: BattleUiAdapter,
     protocol_config: BattleProtocolConfig,
     protocol: BattleProtocolState,
@@ -266,6 +271,11 @@ struct BattleTransaction {
 }
 
 impl BattleMode {
+    fn game_mut(&mut self) -> &mut GameRuntime {
+        self.game_changed_in_transaction = true;
+        Arc::make_mut(&mut self.game)
+    }
+
     pub(crate) fn new(
         config: BattleGameConfig,
         protocol_config: BattleProtocolConfig,
@@ -338,7 +348,8 @@ impl BattleMode {
             }
         })?;
         let mode = Self {
-            game,
+            game: Arc::new(game),
+            game_changed_in_transaction: false,
             ui,
             protocol_config,
             protocol,
@@ -629,7 +640,8 @@ impl BattleMode {
         )?;
         let protocol = BattleProtocolState::from_snapshot_v2(protocol, scheduler)?;
         let mode = Self {
-            game,
+            game: Arc::new(game),
+            game_changed_in_transaction: false,
             ui,
             protocol_config: runtime_identity.protocol_config,
             protocol,
@@ -720,11 +732,20 @@ impl BattleMode {
     }
 
     fn validate_quiescent(&self) -> Result<(), BattleKernelError> {
+        self.validate_quiescent_transaction(true)
+    }
+
+    fn validate_quiescent_transaction(
+        &self,
+        validate_game: bool,
+    ) -> Result<(), BattleKernelError> {
         // `GameRuntime` construction, restore, and public snapshot validation
         // fully validate the immutable ContentPack.  A staged transaction
         // retains that same Arc and uses the live-state check here so every
         // raw input does not canonicalize and rehash the whole pack.
-        self.game.validate_transactional()?;
+        if validate_game {
+            self.game.validate_transactional()?;
+        }
         self.presentations.validate()?;
         let expected = projection_for(
             &self.game,
@@ -1897,6 +1918,7 @@ impl BattleTransaction {
     ) -> Self {
         staged.last_rng_audit.clear();
         staged.last_internal_events.clear();
+        staged.game_changed_in_transaction = false;
         Self {
             staged,
             scheduler,
@@ -1915,6 +1937,7 @@ impl BattleTransaction {
 
     fn capture_trace_audit(&mut self) {
         self.staged.last_internal_events = self.queue.processed_kinds().to_vec();
+        self.staged.game_changed_in_transaction = false;
     }
 
     fn translate(&mut self, input: KernelInput) -> Result<(), BattleKernelError> {
@@ -2200,10 +2223,11 @@ impl BattleTransaction {
                 .ok_or_else(|| BattleKernelError::Invariant {
                     reason: "changed Battle UI projection has no menu".to_owned(),
                 })?;
-            self.staged.game.sync_battle_ui_selection(
+            let control_id = control_id.to_owned();
+            self.staged.game_mut().sync_battle_ui_selection_in_kernel_transaction(
                 payload.endpoint,
                 menu_instance_id,
-                control_id,
+                &control_id,
                 selected_option_id,
             )?;
             self.install_current_projection()?;
@@ -2214,7 +2238,10 @@ impl BattleTransaction {
     }
 
     fn reduce_ui(&mut self, payload: UiEventPayload) -> Result<(), BattleKernelError> {
-        let result = self.staged.game.reduce_ui(payload)?;
+        let result = self
+            .staged
+            .game_mut()
+            .reduce_ui_in_kernel_transaction(payload)?;
         match result {
             BattleUiResult::ControlChanged => self.install_current_projection(),
             BattleUiResult::CommandProposal(proposal) => {
@@ -2229,7 +2256,9 @@ impl BattleTransaction {
                     ));
                     Ok(())
                 } else {
-                    self.staged.game.retain_replica_command(proposal.clone())?;
+                    self.staged
+                        .game_mut()
+                        .retain_replica_command_in_kernel_transaction(proposal.clone())?;
                     self.arm_replica_proposal(BattleProposalEnvelope::Command(proposal))?;
                     self.install_current_projection()
                 }
@@ -2248,8 +2277,11 @@ impl BattleTransaction {
                     Ok(())
                 } else {
                     self.staged
-                        .game
-                        .retain_replica_replacement(proposal.clone(), epoch)?;
+                        .game_mut()
+                        .retain_replica_replacement_in_kernel_transaction(
+                            proposal.clone(),
+                            epoch,
+                        )?;
                     self.arm_replica_proposal(BattleProposalEnvelope::Replacement(proposal))?;
                     self.install_current_projection()
                 }
@@ -2301,7 +2333,10 @@ impl BattleTransaction {
                 reason: "replica reached the authority game reducer".to_owned(),
             });
         }
-        let reduction = self.staged.game.reduce_game(payload)?;
+        let reduction = self
+            .staged
+            .game_mut()
+            .reduce_game_in_kernel_transaction(payload)?;
         if let Some(admission) = &reduction.admission {
             let operation_id = match admission {
                 er_game::runtime::CommandAdmission::Accepted { operation_id, .. }
@@ -2371,7 +2406,12 @@ impl BattleTransaction {
                         prepared,
                     },
                     self.staged.game.content(),
-                )?
+                )
+                .map_err(|error| BattleKernelError::Protocol {
+                    reason: format!(
+                        "authority TURN_COMMIT preparation for {material_operation_id} failed: {error}"
+                    ),
+                })?
             }
             PreparedBattleResolution::Replacement {
                 transition,
@@ -2452,7 +2492,7 @@ impl BattleTransaction {
         }
         let (kind, before_digest, after_digest, next_decision, allocator_before) =
             prepared_material_metadata(prepared.material());
-        self.staged.game.install_material(
+        self.staged.game_mut().install_material_in_kernel_transaction(
             before_digest,
             prepared.state().clone(),
             after_digest,
@@ -2619,7 +2659,11 @@ impl BattleTransaction {
             self.resolve_pending_presentation_probe(revision, &operation_id)?;
         }
 
-        if let Some(event) = self.staged.game.take_pending_no_legal_replacement()? {
+        if let Some(event) = self
+            .staged
+            .game_mut()
+            .take_pending_no_legal_replacement_in_kernel_transaction()?
+        {
             self.queue.push(event);
         }
         Ok(())
@@ -2786,9 +2830,13 @@ impl BattleTransaction {
                 .commit(draft, &mut self.scheduler)
                 .map_err(|error| match error {
                     er_protocol::authority_log::AuthorityLogError::Scheduler(error) => {
-                        AuthorityTransactionError::Scheduler(error)
+                        BattleKernelError::Authority(AuthorityTransactionError::Scheduler(error))
                     }
-                    other => AuthorityTransactionError::AuthorityLog(other),
+                    other => BattleKernelError::Protocol {
+                        reason: format!(
+                            "terminal authority commit for {terminal_operation_id} failed: {other}"
+                        ),
+                    },
                 })?,
             BattleProtocolState::Replica { .. } => {
                 return Err(BattleKernelError::Invariant {
@@ -3716,7 +3764,11 @@ impl BattleTransaction {
                     .to_owned(),
             });
         }
-        if let Some(event) = self.staged.game.take_pending_no_legal_replacement()? {
+        if let Some(event) = self
+            .staged
+            .game_mut()
+            .take_pending_no_legal_replacement_in_kernel_transaction()?
+        {
             self.queue.push(event);
         }
         self.install_current_projection()
@@ -3829,8 +3881,8 @@ impl BattleTransaction {
                     }
                 })?;
             self.staged
-                .game
-                .install_material(
+                .game_mut()
+                .install_material_in_kernel_transaction(
                     &before_digest,
                     applied.after_state.clone(),
                     &applied.after_digest,
@@ -4082,8 +4134,8 @@ impl BattleTransaction {
                     validate_replica_protocol_control(&entry, &applied)?;
                     let (before_digest, allocator_before) = replica_material_metadata(&entry)?;
                     self.staged
-                        .game
-                        .install_material(
+                        .game_mut()
+                        .install_material_in_kernel_transaction(
                             &before_digest,
                             applied.after_state.clone(),
                             &applied.after_digest,
@@ -4855,7 +4907,9 @@ impl BattleTransaction {
                 reason: "Battle mode staged a forbidden compatibility effect".to_owned(),
             });
         }
-        self.staged.validate_quiescent()
+        self.staged.validate_quiescent_transaction(
+            self.staged.game_changed_in_transaction,
+        )
     }
 }
 

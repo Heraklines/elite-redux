@@ -698,10 +698,22 @@ impl GameRuntime {
         proposal: BattleCommandProposalV1,
     ) -> Result<CommandAdmission, GameRuntimeError> {
         let mut candidate = self.clone();
-        let admission = candidate.retain_replica_command_inner(proposal)?;
+        let admission =
+            candidate.retain_replica_command_in_kernel_transaction(proposal)?;
         candidate.validate_transactional()?;
         *self = candidate;
         Ok(admission)
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    pub fn retain_replica_command_in_kernel_transaction(
+        &mut self,
+        proposal: BattleCommandProposalV1,
+    ) -> Result<CommandAdmission, GameRuntimeError> {
+        self.retain_replica_command_inner(proposal)
     }
 
     fn retain_replica_command_inner(
@@ -801,10 +813,23 @@ impl GameRuntime {
         authority_epoch: AuthorityEpoch,
     ) -> Result<CommandAdmission, GameRuntimeError> {
         let mut candidate = self.clone();
-        let admission = candidate.retain_replica_replacement_inner(proposal, authority_epoch)?;
+        let admission = candidate
+            .retain_replica_replacement_in_kernel_transaction(proposal, authority_epoch)?;
         candidate.validate_transactional()?;
         *self = candidate;
         Ok(admission)
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    pub fn retain_replica_replacement_in_kernel_transaction(
+        &mut self,
+        proposal: BattleReplacementProposalV1,
+        authority_epoch: AuthorityEpoch,
+    ) -> Result<CommandAdmission, GameRuntimeError> {
+        self.retain_replica_replacement_inner(proposal, authority_epoch)
     }
 
     fn retain_replica_replacement_inner(
@@ -947,7 +972,7 @@ impl GameRuntime {
         next_control: BattleControlPlan,
     ) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
-        candidate.install_material_inner(
+        candidate.install_material_in_kernel_transaction(
             _before_digest,
             after,
             after_digest,
@@ -959,6 +984,32 @@ impl GameRuntime {
         candidate.validate_transactional()?;
         *self = candidate;
         Ok(())
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    #[allow(clippy::too_many_arguments)]
+    pub fn install_material_in_kernel_transaction(
+        &mut self,
+        _before_digest: &MechanicalStateDigest,
+        after: GameState,
+        after_digest: &MechanicalStateDigest,
+        material_operation_id: &er_types::OperationId,
+        next_decision: BattleNextDecision,
+        allocator_before: Vec<SeatMenuInstanceAllocator>,
+        next_control: BattleControlPlan,
+    ) -> Result<(), GameRuntimeError> {
+        self.install_material_inner(
+            _before_digest,
+            after,
+            after_digest,
+            material_operation_id,
+            next_decision,
+            allocator_before,
+            next_control,
+        )
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -1135,12 +1186,27 @@ impl GameRuntime {
         &mut self,
         payload: UiEventPayload,
     ) -> Result<BattleUiResult, GameRuntimeError> {
+        let mut candidate = self.clone();
+        let result = candidate.reduce_ui_in_kernel_transaction(payload)?;
+        candidate.validate_transactional()?;
+        *self = candidate;
+        Ok(result)
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    pub fn reduce_ui_in_kernel_transaction(
+        &mut self,
+        payload: UiEventPayload,
+    ) -> Result<BattleUiResult, GameRuntimeError> {
         let (endpoint, menu_instance_id, action) = payload.into_parts();
         match action {
             crate::internal_event::BattleUiAction::Activate {
                 control_id,
                 option_id,
-            } => self.handle_ui_action(RuntimeUiAction::Activate {
+            } => self.handle_ui_action_inner(RuntimeUiAction::Activate {
                 seat: endpoint,
                 menu_instance_id,
                 control_id,
@@ -1153,7 +1219,7 @@ impl GameRuntime {
                     .and_then(|entry| control_menu(&entry.control))
                     .map(|menu| menu.selected_option_id.clone())
                     .ok_or_else(|| ui_rejected("Cancel has no live actionable menu"))?;
-                self.handle_ui_action(RuntimeUiAction::Cancel {
+                self.handle_ui_action_inner(RuntimeUiAction::Cancel {
                     seat: endpoint,
                     menu_instance_id,
                     control_id,
@@ -1171,23 +1237,23 @@ impl GameRuntime {
         &mut self,
         payload: GameEventPayload,
     ) -> Result<GameReduction, GameRuntimeError> {
-        let (intent, _causal) = payload.into_parts();
-        self.reduce(intent)
-    }
-
-    /// Validate and apply one stable menu action atomically.  Every logical
-    /// submenu/rebind consumes exactly one owner-seat allocator value; cursor
-    /// synchronization itself never allocates.  A proposal is returned only
-    /// from the final Send Out/target/move confirmation leaf.
-    fn handle_ui_action(
-        &mut self,
-        action: RuntimeUiAction,
-    ) -> Result<BattleUiResult, GameRuntimeError> {
         let mut candidate = self.clone();
-        let result = candidate.handle_ui_action_inner(action)?;
+        let reduction = candidate.reduce_game_in_kernel_transaction(payload)?;
         candidate.validate_transactional()?;
         *self = candidate;
-        Ok(result)
+        Ok(reduction)
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    pub fn reduce_game_in_kernel_transaction(
+        &mut self,
+        payload: GameEventPayload,
+    ) -> Result<GameReduction, GameRuntimeError> {
+        let (intent, _causal) = payload.into_parts();
+        self.reduce_inner(intent)
     }
 
     fn handle_ui_action_inner(
@@ -1229,10 +1295,29 @@ impl GameRuntime {
         option_id: MenuOptionId,
     ) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
-        candidate.sync_battle_ui_selection_inner(seat, menu_instance_id, control_id, option_id)?;
+        candidate.sync_battle_ui_selection_in_kernel_transaction(
+            seat,
+            menu_instance_id,
+            control_id,
+            option_id,
+        )?;
         candidate.validate_transactional()?;
         *self = candidate;
         Ok(())
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    pub fn sync_battle_ui_selection_in_kernel_transaction(
+        &mut self,
+        seat: SeatId,
+        menu_instance_id: MenuInstanceId,
+        control_id: &str,
+        option_id: MenuOptionId,
+    ) -> Result<(), GameRuntimeError> {
+        self.sync_battle_ui_selection_inner(seat, menu_instance_id, control_id, option_id)
     }
 
     #[doc(hidden)]
@@ -2591,10 +2676,20 @@ impl GameRuntime {
         &mut self,
     ) -> Result<Option<InternalEvent>, GameRuntimeError> {
         let mut candidate = self.clone();
-        let event = candidate.take_pending_no_legal_replacement_inner()?;
+        let event = candidate.take_pending_no_legal_replacement_in_kernel_transaction()?;
         candidate.validate_transactional()?;
         *self = candidate;
         Ok(event)
+    }
+
+    /// Mutate the private candidate already owned by the enclosing battle
+    /// transaction. The caller must discard the whole candidate on error and
+    /// validate it once after the internal FIFO reaches quiescence.
+    #[doc(hidden)]
+    pub fn take_pending_no_legal_replacement_in_kernel_transaction(
+        &mut self,
+    ) -> Result<Option<InternalEvent>, GameRuntimeError> {
+        self.take_pending_no_legal_replacement_inner()
     }
 
     fn take_pending_no_legal_replacement_inner(

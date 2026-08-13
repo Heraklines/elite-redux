@@ -1638,8 +1638,7 @@ fn m3_simple_turn_resolutions() -> TestResult {
     for _ in 0..SIMPLE_TURN_RESOLUTIONS {
         let mut kernel = kernel_template.clone();
         let execution_started = Instant::now();
-        let mut effects =
-            raw_press_local_workload(&mut kernel, &mut counts, PhysicalKey::Enter)?;
+        let mut effects = raw_press_local_workload(&mut kernel, &mut counts, PhysicalKey::Enter)?;
         effects.extend(raw_press_local_workload(
             &mut kernel,
             &mut counts,

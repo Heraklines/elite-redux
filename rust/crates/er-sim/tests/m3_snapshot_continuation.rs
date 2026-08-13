@@ -1555,9 +1555,9 @@ mod live_coop_production {
                 "{label}: uninterrupted pair operation failed: {error}"
             ))
         })?;
-        let right_step = right
-            .apply(operation)
-            .map_err(|error| invalid(format!("{label}: restored pair operation failed: {error}")))?;
+        let right_step = right.apply(operation).map_err(|error| {
+            invalid(format!("{label}: restored pair operation failed: {error}"))
+        })?;
         assert_eq!(
             serde_json::to_vec(&left_step.generated_effects)?,
             serde_json::to_vec(&right_step.generated_effects)?,
@@ -2219,6 +2219,26 @@ mod live_coop_production {
             && packet.destination == PairEndpoint::Host
             && packet.source_generation == generation(1)
             && packet.destination_generation == generation(1)
+    }
+
+    fn is_guest_host_generation_one_control_installed_receipt(
+        packet: &QueuedPacketSnapshotV2,
+    ) -> bool {
+        if !is_guest_host_generation_one_control_receipt(packet) {
+            return false;
+        }
+        let Ok(frame) =
+            decode_canonical_network_frame_packet(&packet.body, "control-installed receipt")
+        else {
+            return false;
+        };
+        if frame.frame_type != FrameType::AuthorityReceipt {
+            return false;
+        }
+        match serde_json::from_value::<AuthorityReceiptBody>(frame.body) {
+            Ok(receipt) => receipt.stage == AckStage::ControlInstalled,
+            Err(_) => false,
+        }
     }
 
     fn first_packet_v2(
@@ -3066,13 +3086,21 @@ mod live_coop_production {
                 },
             )?;
             settle_all_presentations_v2(&mut pair)?;
-            let receipt = last_packet_v2(
-                &pair.snapshot_v2()?,
-                RestorablePacketKindV2::ControlReceipt,
-                PairEndpoint::Guest,
-                PairEndpoint::Host,
-                generation(1),
-            )?;
+            let receipt = pair
+                .snapshot_v2()?
+                .network
+                .packets
+                .iter()
+                .rev()
+                .find(|packet| {
+                    is_guest_host_generation_one_control_installed_receipt(packet)
+                })
+                .cloned()
+                .ok_or_else(|| {
+                    invalid(
+                        "settled authority frame emitted no generation-one ControlInstalled receipt",
+                    )
+                })?;
             apply_trace_operation(
                 &mut pair,
                 PairOperationV2::Fault {
