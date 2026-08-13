@@ -775,6 +775,29 @@ fn run_kernel_input(
     Ok(effects)
 }
 
+fn run_raw_menu_input(
+    kernel: &mut GameKernel,
+    input: KernelInput,
+    checksum: &mut u64,
+    counts: &mut Counts,
+) -> TestResult {
+    counts.inputs = counts.inputs.saturating_add(1);
+    absorb(checksum, &input)?;
+    let effects = kernel.step(input)?;
+    assert_no_legacy_success_effects(&effects);
+    counts.rng_draws = counts.rng_draws.saturating_add(count_rng_draws(&effects));
+    absorb(checksum, &effects)?;
+    Ok(())
+}
+
+fn absorb_kernel_observation(kernel: &GameKernel, checksum: &mut u64) -> TestResult {
+    absorb(checksum, &kernel.snapshot())?;
+    absorb(checksum, &kernel.state_digest())?;
+    absorb(checksum, &kernel.battle_ui_projection())?;
+    absorb(checksum, &kernel.live_resources())?;
+    Ok(())
+}
+
 fn raw_press_local(
     kernel: &mut GameKernel,
     checksum: &mut u64,
@@ -1494,13 +1517,14 @@ fn m3_raw_menu_events() -> TestResult {
         } else {
             key_up(code)
         };
-        run_kernel_input(
+        run_raw_menu_input(
             &mut kernel,
             raw_input(seat(1), event),
             &mut checksum,
             &mut counts,
         )?;
     }
+    absorb_kernel_observation(&kernel, &mut checksum)?;
     dispose_local_kernel(&mut kernel, &mut checksum, "m3 raw menu events teardown")?;
     report(
         "raw-menu-events",
