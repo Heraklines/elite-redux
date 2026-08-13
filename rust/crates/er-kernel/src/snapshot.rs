@@ -1170,17 +1170,19 @@ impl RestorableKernelSnapshotV2 {
                 "M3 battle snapshot requires an active battle",
             )
         })?;
-        let projected = self
-            .game
-            .current_control
+        let current_control = &self.game.current_control;
+        // UI control identities use the logical decision coordinate. During a
+        // forced replacement that is `source.resolved_turn`, which may lag the
+        // already-advanced mechanical battle turn.
+        let projected = current_control
             .seats
             .iter()
             .find(|entry| entry.seat == self.runtime_identity.local_seat)
             .ok_or_else(|| invalid("runtime_identity.local_seat", "seat has no current control"))?;
         if self.ui.seat_control != *projected
-            || self.ui.battle_id != battle.battle_id
-            || self.ui.wave != battle.wave
-            || self.ui.turn != battle.turn
+            || self.ui.battle_id != current_control.battle_id
+            || self.ui.wave != current_control.wave
+            || self.ui.turn != current_control.turn
         {
             return Err(invalid(
                 "ui",
