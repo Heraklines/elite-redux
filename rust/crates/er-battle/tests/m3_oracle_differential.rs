@@ -3839,6 +3839,9 @@ fn legacy_faint_marker(
     cause: Option<usize>,
     _sequence: u64,
 ) -> Result<Option<LegacyFaintMarker>, Box<dyn Error>> {
+    if string_field(value, case_name, path, "kind")? != "STATUS_SET" {
+        return Ok(None);
+    }
     let before: LegacyPokemonEvidence =
         serde_json::from_value(object_field(value, case_name, path, "before")?.clone())?;
     let after: LegacyPokemonEvidence =
@@ -3863,10 +3866,12 @@ fn legacy_faint_marker(
         ))
         .into());
     }
-    let legacy_pid = segments[1].parse::<u64>()?;
-    if before.id != legacy_pid || after.id != legacy_pid {
+    let path_pokemon = PokemonId::try_from_u64(segments[1].parse::<u64>()?)?;
+    let before_pokemon = legacy_pokemon_id(identities, case_name, path, before.id)?;
+    let after_pokemon = legacy_pokemon_id(identities, case_name, path, after.id)?;
+    if before_pokemon != after_pokemon || path_pokemon != before_pokemon {
         return Err(FixtureError::new(format!(
-            "{case_name}: {path}.path legacy_pid does not match faint-marker snapshots"
+            "{case_name}: {path}.path PokemonId does not match faint-marker snapshots"
         ))
         .into());
     }
@@ -3900,10 +3905,9 @@ fn legacy_faint_marker(
     }
     let before_status =
         legacy_status_state(case_name, &format!("{path}.before.status"), &before.status)?;
-    let pokemon = legacy_pokemon_id(identities, case_name, path, legacy_pid)?;
     Ok(Some(LegacyFaintMarker {
         cause,
-        pokemon,
+        pokemon: before_pokemon,
         before,
         after,
         before_status,
@@ -4426,12 +4430,12 @@ fn fixture_mutations(
                     ))
                     .into());
                 }
-                let legacy_pid = segments[1].parse::<u64>()?;
                 let (before, after, pokemon) =
                     legacy_pokemon_transition(value, case_name, &path, identities, "hp")?;
-                if before.id != legacy_pid || after.id != legacy_pid {
+                let path_pokemon = PokemonId::try_from_u64(segments[1].parse::<u64>()?)?;
+                if path_pokemon != pokemon {
                     return Err(FixtureError::new(format!(
-                        "{case_name}: {path}.path legacy_pid does not match its snapshots"
+                        "{case_name}: {path}.path PokemonId does not match its snapshots"
                     ))
                     .into());
                 }
@@ -4460,12 +4464,12 @@ fn fixture_mutations(
                     ))
                     .into());
                 }
-                let legacy_pid = segments[1].parse::<u64>()?;
                 let (before, after, pokemon) =
                     legacy_pokemon_transition(value, case_name, &path, identities, "status")?;
-                if before.id != legacy_pid || after.id != legacy_pid {
+                let path_pokemon = PokemonId::try_from_u64(segments[1].parse::<u64>()?)?;
+                if path_pokemon != pokemon {
                     return Err(FixtureError::new(format!(
-                        "{case_name}: {path}.path legacy_pid does not match its snapshots"
+                        "{case_name}: {path}.path PokemonId does not match its snapshots"
                     ))
                     .into());
                 }
@@ -4501,12 +4505,12 @@ fn fixture_mutations(
                     ))
                     .into());
                 }
-                let legacy_pid = segments[1].parse::<u64>()?;
                 let (before, after, pokemon) =
                     legacy_pokemon_transition(value, case_name, &path, identities, "stages")?;
-                if before.id != legacy_pid || after.id != legacy_pid {
+                let path_pokemon = PokemonId::try_from_u64(segments[1].parse::<u64>()?)?;
+                if path_pokemon != pokemon {
                     return Err(FixtureError::new(format!(
-                        "{case_name}: {path}.path legacy_pid does not match its snapshots"
+                        "{case_name}: {path}.path PokemonId does not match its snapshots"
                     ))
                     .into());
                 }
