@@ -7451,10 +7451,200 @@ fn fixture_presentation(
         let (before_five, from_five) = presentation.split_at_mut(5);
         std::mem::swap(&mut before_five[4].kind, &mut from_five[0].kind);
     }
+    normalize_catalogued_voluntary_message_anchor(case_name, &presentation, &mut messages)?;
+    normalize_catalogued_compacted_target_presentation(case_name, &mut presentation)?;
+    normalize_catalogued_forced_replacement_presentation(
+        case_name,
+        &mut presentation,
+        mutations,
+    )?;
     Ok(FixturePresentationTrace {
         typed: presentation,
         messages,
     })
+}
+
+fn normalize_catalogued_voluntary_message_anchor(
+    case_name: &str,
+    presentation: &[BattlePresentationEvent],
+    messages: &mut [LegacyPresentationMessage],
+) -> Result<(), Box<dyn Error>> {
+    if case_name != "voluntary-switch" {
+        return Ok(());
+    }
+    let pokemon_four = PokemonId::try_from_u64(4)?;
+    let pokemon_five = PokemonId::try_from_u64(5)?;
+    let attack_fell = LEGACY_MESSAGE_CATALOGUE[4];
+    if presentation.len() != 10
+        || messages.len() != 2
+        || messages[0].sequence != 2
+        || messages[0].typed_before != 2
+        || messages[0].text != attack_fell
+        || messages[1].sequence != 4
+        || messages[1].typed_before != 3
+        || messages[1].text != attack_fell
+        || !matches!(
+            presentation.get(2).map(|event| &event.kind),
+            Some(BattlePresentationKind::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before: 0,
+                after: -1,
+            }) if *pokemon == pokemon_four
+        )
+        || !matches!(
+            presentation.get(3).map(|event| &event.kind),
+            Some(BattlePresentationKind::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before: 0,
+                after: -1,
+            }) if *pokemon == pokemon_five
+        )
+    {
+        return Err(FixtureError::new(
+            "voluntary-switch: legacy message anchor is outside the exact normalized Intimidate catalogue",
+        )
+        .into());
+    }
+    messages[0].typed_before = 3;
+    Ok(())
+}
+
+fn normalize_catalogued_compacted_target_presentation(
+    case_name: &str,
+    presentation: &mut [BattlePresentationEvent],
+) -> Result<(), Box<dyn Error>> {
+    if case_name != "mixed-side-simultaneous-faint" {
+        return Ok(());
+    }
+    let projection = LEGACY_COMPACTED_TARGET_PROJECTIONS
+        .iter()
+        .find(|projection| projection.case_name == case_name)
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: compacted-target presentation has no exact target catalogue entry"
+            ))
+    })?;
+    let typed_target =
+        FieldSlot::new(projection.typed_target_side, projection.typed_target_position)?;
+    let expected_move_id = MoveId::try_from_u64(projection.move_id)?;
+    if presentation.len() != 7 {
+        return Err(FixtureError::new(format!(
+            "{case_name}: compacted-target presentation has typed length {}, expected exact 7",
+            presentation.len()
+        ))
+        .into());
+    }
+    let event = presentation.get_mut(3).ok_or_else(|| {
+        FixtureError::new(format!(
+            "{case_name}: compacted-target presentation event 3 is absent"
+        ))
+    })?;
+    let BattlePresentationKind::MoveUsed {
+        actor,
+        move_id,
+        targets,
+    } = &mut event.kind
+    else {
+        return Err(FixtureError::new(format!(
+            "{case_name}: compacted-target presentation event 3 is not the exact NO_EFFECT move"
+        ))
+        .into());
+    };
+    if u64::from(*actor) != projection.actor
+        || *move_id != expected_move_id
+        || !targets.is_empty()
+    {
+        return Err(FixtureError::new(format!(
+            "{case_name}: compacted-target presentation event 3 is outside the exact empty legacy target shape"
+        ))
+        .into());
+    }
+    targets.push(typed_target);
+    Ok(())
+}
+
+fn normalize_catalogued_forced_replacement_presentation(
+    case_name: &str,
+    presentation: &mut Vec<BattlePresentationEvent>,
+    mutations: &[BattleMutation],
+) -> Result<(), Box<dyn Error>> {
+    if case_name != "forced-replacement" {
+        return Ok(());
+    }
+    let pokemon_four = PokemonId::try_from_u64(4)?;
+    let pokemon_five = PokemonId::try_from_u64(5)?;
+    let expected_stages = vec![
+        (pokemon_four, BattleStat::Attack, 0_i8, -1_i8),
+        (pokemon_five, BattleStat::Attack, 0_i8, -1_i8),
+        (pokemon_four, BattleStat::Attack, -1_i8, -2_i8),
+        (pokemon_five, BattleStat::Attack, -1_i8, -2_i8),
+    ];
+    let observed_stages = mutations
+        .iter()
+        .filter_map(|mutation| match mutation {
+            BattleMutation::StatStageChanged {
+                pokemon,
+                stat,
+                before,
+                after,
+            } => Some((*pokemon, *stat, *before, *after)),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if presentation.len() != 8
+        || observed_stages != expected_stages
+        || !matches!(
+            presentation.get(6).map(|event| &event.kind),
+            Some(BattlePresentationKind::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before: 0,
+                after: -1,
+            }) if *pokemon == pokemon_four
+        )
+        || !matches!(
+            presentation.get(7).map(|event| &event.kind),
+            Some(BattlePresentationKind::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before: 0,
+                after: -1,
+            }) if *pokemon == pokemon_five
+        )
+    {
+        return Err(FixtureError::new(
+            "forced-replacement: typed presentation is outside the exact turn/replacement Intimidate catalogue",
+        )
+        .into());
+    }
+    let operation_id = presentation
+        .first()
+        .map(|event| event.event_id.operation_id.clone())
+        .ok_or_else(|| {
+            FixtureError::new(format!(
+                "{case_name}: forced-replacement presentation has no operation identity"
+            ))
+        })?;
+    for (pokemon, before, after) in [
+        (pokemon_four, -1_i8, -2_i8),
+        (pokemon_five, -1_i8, -2_i8),
+    ] {
+        let sequence = SafeU53::new(u64::try_from(presentation.len())?)?;
+        presentation.push(BattlePresentationEvent::new(
+            BattlePresentationEventId::new(operation_id.clone(), sequence),
+            PRESENTATION_BLOCKING_POLICY,
+            PRESENTATION_SKIP_POLICY,
+            BattlePresentationKind::StatStageChanged {
+                pokemon,
+                stat: BattleStat::Attack,
+                before,
+                after,
+            },
+        ));
+    }
+    Ok(())
 }
 
 fn legacy_battle_index(slot: FieldSlot) -> u64 {
