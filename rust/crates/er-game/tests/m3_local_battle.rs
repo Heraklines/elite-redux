@@ -22,6 +22,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use er_content::pack::selected_content_pack;
+use er_game::internal_event::UiEventPayload;
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
@@ -179,10 +180,33 @@ fn valid_config() -> TestResult<BattleGameConfig> {
 
 fn runtime_with_live_command() -> TestResult<er_game::runtime::GameRuntime> {
     let content = selected_content_pack()?;
-    Ok(er_game::runtime::GameRuntime::new_battle(
+    let mut runtime = er_game::runtime::GameRuntime::new_battle(
         valid_config()?,
         Arc::new(content),
-    )?)
+    )?;
+    let payload = {
+        let seat = runtime.local_seat();
+        let control = runtime
+            .control()
+            .seat(seat)
+            .ok_or("local seat has no command-root control")?;
+        let BattleControl::CommandRoot(root) = &control.control else {
+            return Err("fresh runtime did not expose a command-root control".into());
+        };
+        UiEventPayload::activate(
+            seat,
+            root.menu.instance_id,
+            root.menu.control_id.clone(),
+            root.menu.selected_option_id.clone(),
+        )
+    };
+    if !matches!(
+        runtime.reduce_ui(payload)?,
+        er_game::runtime::BattleUiResult::ControlChanged
+    ) {
+        return Err("Fight activation did not open the live move control".into());
+    }
+    Ok(runtime)
 }
 
 fn live_command_request(
@@ -193,8 +217,8 @@ fn live_command_request(
         .control()
         .seat(seat)
         .ok_or("local seat has no control")?;
-    let BattleControl::CommandRoot(command_root) = &control.control else {
-        return Err("fresh runtime did not expose a command-root control".into());
+    let BattleControl::MoveSelect(move_control) = &control.control else {
+        return Err("runtime did not expose the activated move control".into());
     };
     let battle = runtime
         .state()
@@ -205,7 +229,7 @@ fn live_command_request(
         battle.battle_id,
         battle.wave,
         battle.turn,
-        command_root.field_slot,
+        move_control.field_slot,
         seat,
     )?;
     Ok(BattleCommandProposalV1::new(
@@ -214,15 +238,15 @@ fn live_command_request(
         battle.wave,
         battle.turn,
         seat,
-        command_root.actor,
-        command_root.field_slot,
+        move_control.actor,
+        move_control.field_slot,
         BattleCommand::fight(
-            command_root.actor,
+            move_control.actor,
             MoveSlotIndex::ZERO,
             BattleTargetSelection::implicit(),
         )?,
-        command_root.menu.instance_id,
-        command_root.menu.control_id.clone(),
+        move_control.menu.instance_id,
+        move_control.menu.control_id.clone(),
     )?)
 }
 
