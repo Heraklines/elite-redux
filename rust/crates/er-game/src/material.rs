@@ -371,7 +371,7 @@ pub fn apply_reducer_issued_turn_material_trusted(
 fn apply_turn_material_inner(
     current_state: &GameState,
     local_seat: SeatId,
-    menu_allocators: &[SeatMenuInstanceAllocator],
+    current_menu_allocators: &[SeatMenuInstanceAllocator],
     material: &BattleTurnMaterialV1,
     content: &ContentPack,
     validation: ContentValidationMode,
@@ -422,7 +422,7 @@ fn apply_turn_material_inner(
     )?;
     reconcile_turn_frontier(current_state, material, content)?;
     validate_endpoint_allocators(
-        menu_allocators,
+        current_menu_allocators,
         local_seat,
         &material.menu_allocators_before,
         &material.after_state,
