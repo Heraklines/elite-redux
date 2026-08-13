@@ -4144,10 +4144,11 @@ fn project_catalogued_legacy_replacement_actions(
     }
     remove.sort_unstable();
     remove.dedup();
-    if remove.len() != LEGACY_REPLACEMENT_ACTION_PROJECTIONS
-        .iter()
-        .filter(|projection| projection.case_name == case_name)
-        .count()
+    if remove.len()
+        != LEGACY_REPLACEMENT_ACTION_PROJECTIONS
+            .iter()
+            .filter(|projection| projection.case_name == case_name)
+            .count()
     {
         return Err(FixtureError::new(format!(
             "{case_name}: legacy replacement action projection matched duplicate catalogue entries"
@@ -4202,7 +4203,7 @@ fn project_catalogued_typed_inactive_actions(
                 FixtureError::new(format!(
                     "{case_name}: catalogued typed-only inactive action for actor {actor} is absent from the exact tail window"
                 ))
-        })?;
+            })?;
         let action = &actual[action_index];
         let expected_tie_order = SafeU53::new(u64::from(projection.tie_order))?;
         let exact_action = action.sequence.get() == u64::try_from(action_index)?
@@ -4225,11 +4226,14 @@ fn project_catalogued_typed_inactive_actions(
             .into());
         }
         if expected.iter().any(|legacy| {
-            legacy.command_operation_id.as_ref().is_some_and(|operation| {
-                operation.as_str() == projection.operation_id
-                    && legacy.kind == ResolvedActionKind::Move
-                    && legacy.disposition == ActionDisposition::SkippedActorInactive
-            })
+            legacy
+                .command_operation_id
+                .as_ref()
+                .is_some_and(|operation| {
+                    operation.as_str() == projection.operation_id
+                        && legacy.kind == ResolvedActionKind::Move
+                        && legacy.disposition == ActionDisposition::SkippedActorInactive
+                })
         }) {
             return Err(FixtureError::new(format!(
                 "{case_name}: catalogued typed-only inactive action for actor {actor} is also represented by the legacy trace"
@@ -4356,10 +4360,11 @@ fn project_catalogued_typed_inactive_actions(
     }
     remove.sort_unstable();
     remove.dedup();
-    if remove.len() != TYPED_INACTIVE_ACTION_PROJECTIONS
-        .iter()
-        .filter(|projection| projection.case_name == case_name)
-        .count()
+    if remove.len()
+        != TYPED_INACTIVE_ACTION_PROJECTIONS
+            .iter()
+            .filter(|projection| projection.case_name == case_name)
+            .count()
     {
         return Err(FixtureError::new(format!(
             "{case_name}: typed inactive-action projection matched duplicate catalogue entries"
