@@ -2996,9 +2996,9 @@ fn rebuild_remote_command_path(
     histories: &[SeatControlHistorySnapshotV1],
     proposal: &BattleCommandProposalV1,
 ) -> Result<RuntimeAuthorityMenuPath, SnapshotError> {
-    let menu_counts = match &proposal.command {
-        BattleCommand::Fight { .. } => vec![1, 2],
-        BattleCommand::Switch { .. } => vec![2],
+    let menu_counts: &[usize] = match &proposal.command {
+        BattleCommand::Fight { .. } => &[1, 2],
+        BattleCommand::Switch { .. } => &[2],
     };
     let mut paths = Vec::new();
     let mut first_failure = None;
