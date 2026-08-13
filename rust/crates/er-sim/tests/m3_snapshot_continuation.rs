@@ -2419,18 +2419,6 @@ mod live_coop_production {
         packets.len() == 2 && actual_ids == expected_ids
     }
 
-    fn battle_control_id(control: &BattleControl) -> Option<&str> {
-        match control {
-            BattleControl::CommandRoot(value) => Some(value.menu.control_id.as_str()),
-            BattleControl::MoveSelect(value) => Some(value.menu.control_id.as_str()),
-            BattleControl::TargetSelect(value) => Some(value.menu.control_id.as_str()),
-            BattleControl::PartySelect(value) => Some(value.menu.control_id.as_str()),
-            BattleControl::PartyOptionSelect(value) => Some(value.menu.control_id.as_str()),
-            BattleControl::ReplacementSelect(value) => Some(value.menu.control_id.as_str()),
-            BattleControl::Waiting(_) | BattleControl::Complete(_) => None,
-        }
-    }
-
     fn control_receipt_delayed_with_installed_control(
         pair: &SimulatedPair,
         snapshot: &RestorablePairSnapshotV2,
@@ -2470,46 +2458,31 @@ mod live_coop_production {
             Ok(body) => body,
             Err(_) => return Ok(false),
         };
+        if receipt_body.stage != AckStage::ControlInstalled {
+            return Ok(false);
+        }
+        let Some(receipt_control_id) = receipt_body.control_id.as_deref() else {
+            return Ok(false);
+        };
         let Some(installed) = replica
             .installed_controls
             .iter()
-            .find(|control| control.revision == replica.frontier.control)
+            .find(|control| {
+                control.revision == receipt_body.revision
+                    && control.identity.operation_id == receipt_body.operation_id
+                    && control.control_id.as_str() == receipt_control_id
+            })
         else {
             return Ok(false);
         };
         if installed.identity.revision != installed.revision
             || installed.identity.next_control_id.as_str() != installed.control_id.as_str()
+            || installed.revision > replica.frontier.control
         {
             return Ok(false);
         }
-        if receipt_body.revision != installed.revision
-            || receipt_body.operation_id != installed.identity.operation_id
-            || receipt_body.stage != AckStage::ControlInstalled
-            || receipt_body.control_id.as_deref() != Some(installed.control_id.as_str())
-        {
-            return Ok(false);
-        }
-        let Some(projected) = snapshot
-            .guest
-            .game
-            .current_control
-            .seats
-            .iter()
-            .find(|entry| entry.seat == snapshot.guest.runtime_identity.local_seat)
-        else {
-            return Ok(false);
-        };
-        let Some(projected_control_id) = battle_control_id(&projected.control) else {
-            return Ok(false);
-        };
-        let projected_control_id = projected_control_id.to_owned();
         let live = pair.snapshot()?;
-        Ok(live
-            .guest
-            .live_resources
-            .controls
-            .contains(&projected_control_id)
-            && live.network.queued_packet_ids.contains(&receipt_id))
+        Ok(live.network.queued_packet_ids.contains(&receipt_id))
     }
 
     fn trace_boundary_with_live_predicate(
@@ -2864,6 +2837,16 @@ mod live_coop_production {
             "terminal was not reached before explicit pair teardown",
         );
         assert!(terminal_snapshot.clock.timers.is_empty());
+        assert!(terminal_snapshot.presenter.disposed);
+        assert!(
+            !terminal_snapshot.presenter.outcomes.is_empty(),
+            "terminal snapshot erased settled presentation evidence",
+        );
+        assert_eq!(
+            terminal_snapshot.presenter.outcomes.len(),
+            terminal_snapshot.presenter.tombstones.len(),
+            "terminal presenter outcomes and tombstones diverged",
+        );
         let _terminal_wire = snapshot_wire(&uninterrupted)?;
         let before_teardown = uninterrupted.snapshot()?;
         assert_zero_resource_teardown(&before_teardown);

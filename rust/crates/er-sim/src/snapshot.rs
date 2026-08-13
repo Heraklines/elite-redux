@@ -3308,14 +3308,10 @@ impl PresenterSnapshotV2 {
                 "pending identities must be unsettled and every retained outcome must have a tombstone",
             ));
         }
-        if self.disposed
-            && (!self.pending.is_empty()
-                || !self.outcomes.is_empty()
-                || !self.tombstones.is_empty())
-        {
+        if self.disposed && !self.pending.is_empty() {
             return Err(invalid(
                 "presenter",
-                "disposed presenter cannot retain pending/outcome state",
+                "disposed presenter cannot retain pending state",
             ));
         }
         Ok(())

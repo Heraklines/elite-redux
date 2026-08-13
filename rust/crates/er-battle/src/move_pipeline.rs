@@ -18,7 +18,8 @@ use thiserror::Error;
 
 use crate::command::NormalizedBattleCommand;
 use crate::move_effect::{
-    DefensiveAbilityGate, FaintRequest, MoveEffectError, MoveTargetResult, resolve_target_effect,
+    DefensiveAbilityGate, FaintRequest, MoveEffectError, MoveTargetResult,
+    resolve_target_effect_validated,
 };
 use crate::status::{ParalysisActivationOutcome, StatusError, check_paralysis};
 
@@ -161,6 +162,43 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
     runtime: &mut RngRuntime,
     defensive_gate: &G,
 ) -> Result<MovePipelineResult, MovePipelineError> {
+    resolve_move_with_content_validation(
+        battle,
+        command,
+        content,
+        runtime,
+        defensive_gate,
+        true,
+    )
+}
+
+/// Resolve one normalized move after the enclosing turn boundary has already
+/// validated the immutable content pack and complete state/content binding.
+pub(crate) fn resolve_move_validated<G: DefensiveAbilityGate>(
+    battle: &mut BattleState,
+    command: &NormalizedBattleCommand,
+    content: &ContentPack,
+    runtime: &mut RngRuntime,
+    defensive_gate: &G,
+) -> Result<MovePipelineResult, MovePipelineError> {
+    resolve_move_with_content_validation(
+        battle,
+        command,
+        content,
+        runtime,
+        defensive_gate,
+        false,
+    )
+}
+
+fn resolve_move_with_content_validation<G: DefensiveAbilityGate>(
+    battle: &mut BattleState,
+    command: &NormalizedBattleCommand,
+    content: &ContentPack,
+    runtime: &mut RngRuntime,
+    defensive_gate: &G,
+    validate_content: bool,
+) -> Result<MovePipelineResult, MovePipelineError> {
     let (actor_id, source_slot, move_slot, command_move_id, targets) = match command {
         NormalizedBattleCommand::Fight {
             actor,
@@ -219,7 +257,9 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
 
     // Content validation is intentionally fail-closed.  In particular, an
     // unsupported reachable move is never coerced into a no-op definition.
-    content.validate().map_err(MovePipelineError::Content)?;
+    if validate_content {
+        content.validate().map_err(MovePipelineError::Content)?;
+    }
     let actor_snapshot = actor.clone();
     let move_slot_index = usize::from(move_slot.get());
     let selected_move_slot =
@@ -325,7 +365,7 @@ pub fn resolve_move<G: DefensiveAbilityGate>(
                 slot: target_slot,
             },
         )?;
-        let target_result = resolve_target_effect(
+        let target_result = resolve_target_effect_validated(
             &mut staged_runtime,
             &actor_snapshot,
             target_slot,

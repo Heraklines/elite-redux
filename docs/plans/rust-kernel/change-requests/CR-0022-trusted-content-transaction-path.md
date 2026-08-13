@@ -39,6 +39,12 @@ kernel adapters alias the trusted variants to the existing role-neutral
 applier names; both roles still decode and apply the same canonical material
 through one implementation.
 
+Within `er-battle`, the already-validated turn core likewise calls
+crate-private validated action-queue, move-pipeline, and target-effect helpers.
+Those helpers are not additional cross-crate trusted seams: their public
+counterparts still validate the full pack, and only `resolve_turn_trusted` can
+reach them without first performing that public validation.
+
 The staged `install_material_in_kernel_transaction` path may omit after-state
 digest and control-projection recomputation only after the common material
 applier has already proved those exact values in the same private transaction.

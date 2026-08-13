@@ -30,8 +30,8 @@ use crate::ability_pipeline::{
     evaluate_defensive_ability, evaluate_switch_in_ability,
 };
 use crate::action_order::{
-    ActionOrderError, PendingAction, UnsupportedOrdering, build_pending_action_queue_from_commands,
-    effective_speed,
+    ActionOrderError, PendingAction, UnsupportedOrdering,
+    build_pending_action_queue_from_commands_validated, effective_speed,
 };
 use crate::command::NormalizedBattleCommand;
 use crate::error::{BattleInvariantError, BattleResolveError};
@@ -47,7 +47,7 @@ use crate::move_effect::{
 };
 use crate::move_pipeline::{
     MovePipelineDisposition, MovePipelineError, MovePipelineResult, TargetSelectionError,
-    resolve_move,
+    resolve_move_validated,
 };
 use crate::outcome::derive_battle_outcome;
 use crate::presentation::{
@@ -129,8 +129,9 @@ fn resolve_turn_validated(
     .map_err(CommandLegalityError::Command)?;
     let before_digest = compute_mechanical_state_digest(before)?;
     let normalized = normalize_command_set_trusted(before, commands, content)?;
-    let mut queue = build_pending_action_queue_from_commands(before, normalized.entries(), content)
-        .map_err(|source| map_action_order_error(source, before, false))?;
+    let mut queue =
+        build_pending_action_queue_from_commands_validated(before, normalized.entries(), content)
+            .map_err(|source| map_action_order_error(source, before, false))?;
     let mut after = before.clone();
     let mut runtime = RngRuntime::from_states(
         before.run_rng.clone(),
@@ -496,7 +497,7 @@ fn resolve_move_action(
     let rng_audit_start = runtime.audit_entries().len();
     let result = {
         let battle = active_battle_mut(state)?;
-        resolve_move(battle, &action.command, content, runtime, gate)
+        resolve_move_validated(battle, &action.command, content, runtime, gate)
     }
     .map_err(|source| map_move_pipeline_error(source, state, action))?;
     sync_rng_state(state, runtime)?;

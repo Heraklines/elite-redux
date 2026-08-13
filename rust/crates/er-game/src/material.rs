@@ -8,9 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use er_battle::command::NormalizedBattleCommand;
 use er_battle::legality::{
-    build_command_offer_trusted, build_scripted_enemy_offer_trusted,
-    normalize_command_set_trusted, validate_replacement_selection_trusted,
-    validate_state_content_trusted,
+    build_command_offer_trusted, build_scripted_enemy_offer_trusted, normalize_command_set_trusted,
+    validate_replacement_selection_trusted, validate_state_content_trusted,
 };
 use er_battle::replacement::legal_replacement_candidates;
 use er_battle::stat_stage::MIN_STAT_STAGE;

@@ -608,7 +608,7 @@ fn allocator_internal_validation_precedes_endpoint_recovery_classification() {
 #[test]
 fn no_legal_replacement_is_validated_as_explicit_material_evidence() {
     assert!(MATERIAL_SOURCE.contains("pub selection: ReplacementSelection"));
-    assert!(MATERIAL_SOURCE.contains("validate_replacement_selection("));
+    assert!(MATERIAL_SOURCE.contains("validate_replacement_selection_trusted("));
     assert!(MATERIAL_SOURCE.contains("legal_replacement_candidates"));
     assert!(MATERIAL_SOURCE.contains("candidates.is_empty()"));
     assert!(

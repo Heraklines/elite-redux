@@ -6,8 +6,8 @@
 
 use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, ContentPack, MaterialApplyResult,
-    apply_replacement_material, apply_turn_material, decode_replacement_material,
-    decode_turn_material, apply_replacement_material_trusted, apply_turn_material_trusted,
+    apply_replacement_material, apply_replacement_material_trusted, apply_turn_material,
+    apply_turn_material_trusted, decode_replacement_material, decode_turn_material,
 };
 use er_types::{AuthorityEntryKind, Material};
 use thiserror::Error;

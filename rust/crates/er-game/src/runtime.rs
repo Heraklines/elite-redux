@@ -4364,9 +4364,8 @@ fn build_command_frontier(
                     slot,
                     owner,
                 )?;
-                let offer =
-                    build_command_offer_trusted(state, slot, content)
-                        .map_err(map_legality_error)?;
+                let offer = build_command_offer_trusted(state, slot, content)
+                    .map_err(map_legality_error)?;
                 (
                     Some(owner),
                     operation,

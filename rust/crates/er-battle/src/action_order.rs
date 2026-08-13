@@ -375,6 +375,22 @@ pub fn build_pending_action_queue_from_commands(
     )
 }
 
+/// Build the default queue after the enclosing turn resolver has already
+/// validated the immutable content pack and complete state/content binding.
+pub(crate) fn build_pending_action_queue_from_commands_validated(
+    state: &GameState,
+    commands: &[NormalizedBattleCommand],
+    content: &ContentPack,
+) -> Result<PendingActionQueue, ActionOrderError> {
+    let battle = state
+        .battle
+        .as_ref()
+        .ok_or(ActionOrderError::MissingBattle)?;
+    let options = ActionOrderOptions::default();
+    validate_supported_ordering(battle, &options)?;
+    build_pending_action_queue_validated(battle, commands, content, &options)
+}
+
 /// Build a staged queue while explicitly classifying unsupported oracle modes.
 pub fn build_pending_action_queue_with_options(
     state: &GameState,
@@ -390,6 +406,15 @@ pub fn build_pending_action_queue_with_options(
     content.validate().map_err(ActionOrderError::Content)?;
     state.validate().map_err(ActionOrderError::State)?;
 
+    build_pending_action_queue_validated(battle, commands, content, options)
+}
+
+fn build_pending_action_queue_validated(
+    battle: &BattleState,
+    commands: &[NormalizedBattleCommand],
+    content: &ContentPack,
+    options: &ActionOrderOptions,
+) -> Result<PendingActionQueue, ActionOrderError> {
     let active_slots: Vec<FieldSlot> = battle
         .field
         .slots

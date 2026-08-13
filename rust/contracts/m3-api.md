@@ -1615,6 +1615,13 @@ carry the exact composite battle event ID. Existing raw-input, network, timer,
 transport, storage, suspend, and resume variants remain the other closed
 external inputs.
 
+CR-0023 freezes terminal presenter disposal: pending Battle events and every
+legacy presenter value are released, while settled typed Battle outcomes and
+their exact tombstones remain as inert diagnostic evidence. They own no live
+resource and cannot emit another completion. A restorable pair requires those
+presenter outcomes to equal each endpoint kernel's retained settled outcomes
+exactly, including after shared-terminal disposal and reconstruction.
+
 ## Game runtime and kernel composition
 
 `GameRuntime` owns canonical `GameState`, current logical `BattleControlPlan`,
@@ -1729,6 +1736,10 @@ applier in the same private kernel transaction; independently callable
 installation recomputes them. Mechanical-state digest computation validates
 the state and encodes its frozen domain-separated canonical preimage once;
 discarding a second standalone state encoding cannot change digest bytes.
+The validated core shared by `resolve_turn` and `resolve_turn_trusted` may use
+crate-private action-queue, move-pipeline, and target-effect helpers after the
+selected public or trusted entry point has completed its state/content guard;
+these helpers are not callable cross-crate and add no trusted function name.
 
 `new_battle` requires `run_state.battle = None`, a positive one-based run wave,
 an exact non-empty production `BattleScene.waveSeed`, and a valid unconsumed

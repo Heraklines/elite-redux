@@ -284,12 +284,10 @@ impl PresenterState {
         if self.disposed
             && (!self.pending.is_empty()
                 || !self.outcomes.is_empty()
-                || !self.battle_pending.is_empty()
-                || !self.battle_outcomes.is_empty()
-                || !self.tombstones.is_empty())
+                || !self.battle_pending.is_empty())
         {
             return Err(PresenterError::InvalidState {
-                reason: "disposed presenter cannot retain pending, outcome, or tombstone state"
+                reason: "disposed presenter cannot retain pending or legacy outcome state"
                     .to_owned(),
             });
         }
@@ -511,7 +509,8 @@ impl Presenter for InstantPresenter {
     fn dispose(&mut self) {
         self.disposed = true;
         self.settled.clear();
-        self.battle_settled.clear();
+        // Settled battle outcomes are retained as diagnostic tombstones; only
+        // legacy outcomes are live adapter state on this presenter surface.
     }
 }
 
@@ -796,7 +795,8 @@ impl Presenter for FaultPresenter {
         self.pending.clear();
         self.settled.clear();
         self.battle_pending.clear();
-        self.battle_settled.clear();
-        self.battle_tombstones.clear();
+        // Match the disposed Battle kernel owner: settled battle outcomes are
+        // diagnostic tombstones, not live presentation resources. Retaining
+        // them keeps the restorable pair owner graph exact at shared terminal.
     }
 }

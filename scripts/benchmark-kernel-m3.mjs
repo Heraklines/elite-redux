@@ -676,9 +676,13 @@ function runWorkload(executable, required) {
   assertSafeInteger(peakRssBytes, `${required.id}.peak_rss_bytes`);
   const marker = parseBenchmarkMarker(result.stdout ?? "", required);
   if (marker.execution_elapsed_ns >= required.target.max_exclusive_ns) {
+    const phaseEvidence = marker.details?.phase_elapsed_ns;
+    const phaseSuffix = phaseEvidence && typeof phaseEvidence === "object"
+      ? `; phase_elapsed_ns=${JSON.stringify(phaseEvidence)}`
+      : "";
     fail(
       `${required.id} execution elapsed ${marker.execution_elapsed_ns}ns `
-        + `did not meet the exclusive target ${required.target.max_exclusive_ns}ns`,
+        + `did not meet the exclusive target ${required.target.max_exclusive_ns}ns${phaseSuffix}`,
     );
   }
   return {

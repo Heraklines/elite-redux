@@ -251,6 +251,33 @@ pub fn resolve_target_effect<G: DefensiveAbilityGate>(
     defensive_gate: &G,
 ) -> Result<MoveTargetResult, MoveEffectError> {
     content.validate().map_err(MoveEffectError::Content)?;
+    resolve_target_effect_validated(
+        runtime,
+        actor,
+        target_slot,
+        target,
+        move_definition,
+        content,
+        target_count,
+        abilities_ignored,
+        defensive_gate,
+    )
+}
+
+/// Resolve one active target after the enclosing move/turn boundary has
+/// already validated the immutable content pack.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn resolve_target_effect_validated<G: DefensiveAbilityGate>(
+    runtime: &mut RngRuntime,
+    actor: &PokemonState,
+    target_slot: FieldSlot,
+    target: &mut PokemonState,
+    move_definition: &MoveDefinition,
+    content: &ContentPack,
+    target_count: usize,
+    abilities_ignored: bool,
+    defensive_gate: &G,
+) -> Result<MoveTargetResult, MoveEffectError> {
     if target_count == 0 {
         return Err(MoveEffectError::EmptyTargetSet);
     }

@@ -476,6 +476,7 @@ fn admit_command_proposal_with_context_inner(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn admit_new_command(
     state: &GameState,
     control: &BattleControlPlan,

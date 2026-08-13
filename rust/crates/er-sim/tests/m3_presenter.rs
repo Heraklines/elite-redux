@@ -43,8 +43,14 @@ fn instant_presenter_returns_the_exact_typed_battle_identity() -> TestResult {
     assert!(presenter.pending_battle_event_ids(seat()?).is_empty());
     assert_eq!(
         presenter.settled_battle_event_ids(seat()?),
+        [event_id.clone()].into_iter().collect()
+    );
+    presenter.dispose();
+    assert_eq!(
+        presenter.settled_battle_event_ids(seat()?),
         [event_id].into_iter().collect()
     );
+    assert!(presenter.export_state()?.disposed);
     Ok(())
 }
 
@@ -73,7 +79,16 @@ fn fault_presenter_requires_explicit_typed_battle_settlement() -> TestResult {
             event_id.clone(),
             PresentationSettlementOutcome::Settled,
         ),
-        Err(PresenterError::BattleAlreadySettled { event_id })
+        Err(PresenterError::BattleAlreadySettled {
+            event_id: event_id.clone(),
+        })
     );
+    presenter.dispose();
+    assert!(presenter.pending_battle_event_ids(seat()?).is_empty());
+    assert_eq!(
+        presenter.settled_battle_event_ids(seat()?),
+        [event_id].into_iter().collect()
+    );
+    assert!(presenter.export_state()?.disposed);
     Ok(())
 }
