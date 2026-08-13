@@ -40,9 +40,9 @@ use er_types::battle_ids::{AuthorityEpoch, FaintOccurrenceId, FieldSlot, MenuIns
 use er_types::battle_model::{BattleOutcome, FaintSource};
 use er_types::battle_ui::{BattlePresentationEvent, PresentationPlanDigest};
 use er_types::{
-    AuthorityEntryKind, CommandControlTarget, CommandFrontierControl, FrameContext, Material,
-    NextControl, OperationId, ReplacementControl, ReplacementControlAddress, SafeU53, SeatId,
-    TerminalControl,
+    AuthorityEntryKind, AwaitSuccessorControl, CommandControlTarget, CommandFrontierControl,
+    FrameContext, Material, NextControl, OperationId, ReplacementControl,
+    ReplacementControlAddress, SafeU53, SeatId, TerminalControl,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -506,6 +506,7 @@ pub(crate) fn prepare_authority_turn(
     }
     require_turn_equivalence(&candidate, &decoded, &applied)?;
     let protocol_next_control = protocol_next_control_from_plan(
+        &operation_id,
         candidate.next_decision,
         &applied.next_control,
         authority_epoch,
@@ -687,6 +688,7 @@ pub(crate) fn prepare_authority_replacement(
     }
     require_replacement_equivalence(&candidate, &decoded, &applied)?;
     let protocol_next_control = protocol_next_control_from_plan(
+        &operation_id,
         candidate.next_decision,
         &applied.next_control,
         stored.source.epoch,
@@ -1027,6 +1029,7 @@ fn collect_control_menu_instances(
 }
 
 pub(crate) fn protocol_next_control_from_plan(
+    predecessor_operation_id: &OperationId,
     next_decision: BattleNextDecision,
     control_plan: &BattleControlPlan,
     authority_epoch: AuthorityEpoch,
@@ -1085,6 +1088,20 @@ pub(crate) fn protocol_next_control_from_plan(
                     )
                 })
                 .collect::<Vec<_>>();
+            if targets.is_empty() {
+                let operation_id = waiting_replacement_operation(control_plan)?;
+                return Ok(NextControl::AwaitSuccessor(AwaitSuccessorControl {
+                    after_operation_id: predecessor_operation_id.clone(),
+                    epoch: authority_epoch.get(),
+                    wave: control_plan.wave.get(),
+                    turn: control_plan.turn.get(),
+                    allowed_kinds: vec![AuthorityEntryKind::ReplacementCommit],
+                    allowed_interaction_addresses: None,
+                    allowed_control_addresses: None,
+                    allow_next_wave_start: false,
+                    expected_operation_id: Some(operation_id),
+                }));
+            }
             targets.sort_by(|left, right| {
                 left.1
                     .cmp(&right.1)
@@ -1201,6 +1218,36 @@ fn replacement_control_address(
         turn: source.resolved_turn.get(),
         occurrence: (*occurrence).into(),
         field_index,
+    })
+}
+
+fn waiting_replacement_operation(
+    control_plan: &BattleControlPlan,
+) -> Result<OperationId, AuthorityTransactionError> {
+    let mut operation_id = None;
+    for seat in &control_plan.seats {
+        let BattleControl::Waiting(waiting) = &seat.control else {
+            return Err(AuthorityTransactionError::ControlProjection {
+                reason: "replacement waiting control contains an actionable seat".to_owned(),
+            });
+        };
+        if waiting.reason != er_types::battle_control::WaitingReason::ReplacementOwner
+            || waiting.operation_ids.len() != 1
+        {
+            return Err(AuthorityTransactionError::ControlProjection {
+                reason: "replacement waiting control has invalid operation identity".to_owned(),
+            });
+        }
+        let current = waiting.operation_ids[0].clone();
+        if operation_id.as_ref().is_some_and(|expected| expected != &current) {
+            return Err(AuthorityTransactionError::ControlProjection {
+                reason: "replacement waiting controls disagree on operation identity".to_owned(),
+            });
+        }
+        operation_id = Some(current);
+    }
+    operation_id.ok_or_else(|| AuthorityTransactionError::ControlProjection {
+        reason: "replacement waiting control has no operation identity".to_owned(),
     })
 }
 
@@ -1445,6 +1492,19 @@ fn validate_internal_replacement_control(
         .ok_or_else(|| AuthorityTransactionError::ControlProjection {
             reason: "internal replacement owner has no control entry".to_owned(),
         })?;
+    if matches!(&seat.control, BattleControl::Waiting(_)) {
+        let waiting_operation = waiting_replacement_operation(control).map_err(|_| {
+            AuthorityTransactionError::ControlProjection {
+                reason: "internal replacement control operation is stale".to_owned(),
+            }
+        })?;
+        if waiting_operation != *operation_id {
+            return Err(AuthorityTransactionError::ControlProjection {
+                reason: "internal replacement control operation is stale".to_owned(),
+            });
+        }
+        return Ok(());
+    }
     if seat.decision_operation_id.as_ref() != Some(operation_id) {
         return Err(AuthorityTransactionError::ControlProjection {
             reason: "internal replacement control operation is stale".to_owned(),

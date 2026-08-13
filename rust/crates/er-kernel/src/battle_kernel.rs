@@ -4569,6 +4569,7 @@ fn validate_replica_protocol_control(
     applied: &MaterialApplyResult,
 ) -> Result<(), BattleKernelError> {
     let projected = protocol_next_control_from_plan(
+        &entry.operation_id,
         applied.next_decision,
         &applied.next_control,
         AuthorityEpoch::new(entry.context.session_epoch),
