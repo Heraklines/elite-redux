@@ -1861,10 +1861,11 @@ mod live_coop_production {
     }
 
     fn replacement_menu_open(snapshot: &RestorablePairSnapshotV2) -> bool {
-        matches!(
-            &snapshot.host.ui.seat_control.control,
-            BattleControl::ReplacementSelect(_)
-        )
+        snapshot.host.ui.actionable
+            && matches!(
+                &snapshot.host.ui.seat_control.control,
+                BattleControl::ReplacementSelect(_)
+            )
     }
 
     fn terminal_reached(snapshot: &RestorablePairSnapshotV2) -> bool {
@@ -2026,14 +2027,19 @@ mod live_coop_production {
             },
         )?;
         for tick in 0..128 {
+            let snapshot = pair.snapshot_v2()?;
             if guest_proposal_admitted_with_delivery_pending(
-                &pair.snapshot_v2()?,
+                &snapshot,
                 &proposal_identity.0,
                 &proposal_identity.1,
             )? {
                 return Ok(proposal_identity);
             }
-            advance_time_v2(pair, 1)?;
+            if pending_battle_presentations(&snapshot).is_empty() {
+                advance_time_v2(pair, 1)?;
+            } else {
+                settle_all_presentations_v2(pair)?;
+            }
             if tick == 127 {
                 break;
             }
@@ -2681,8 +2687,8 @@ mod live_coop_production {
             &mut uninterrupted,
             &mut restored,
             PairEndpoint::Host,
-            PhysicalKey::ArrowDown,
-            "replacement-menu-later-continuation",
+            PhysicalKey::Enter,
+            "replacement-menu-submit-continuation",
         )?;
         Ok(())
     }
@@ -2711,20 +2717,34 @@ mod live_coop_production {
             }
         }
 
-        for tick in 0..256 {
+        for tick in 0..512 {
             let snapshot = uninterrupted.snapshot_v2()?;
             if terminal_reached(&snapshot) {
                 break;
             }
-            if pending_battle_presentations(&snapshot).is_empty() {
+            if !pending_battle_presentations(&snapshot).is_empty() {
+                settle_all_presentations(&mut uninterrupted, &mut restored)?;
+            } else if let Some(endpoint) = [PairEndpoint::Host, PairEndpoint::Guest]
+                .into_iter()
+                .find(|endpoint| {
+                    endpoint_snapshot(&snapshot, *endpoint).ui.actionable
+                        && !endpoint_commands_complete(&snapshot, *endpoint)
+                })
+            {
+                press_same(
+                    &mut uninterrupted,
+                    &mut restored,
+                    endpoint,
+                    PhysicalKey::Enter,
+                    &format!("terminal-progress-{endpoint:?}-command-{tick}"),
+                )?;
+            } else {
                 advance_same(
                     &mut uninterrupted,
                     &mut restored,
                     1,
                     &format!("terminal-progress-tick-{tick}"),
                 )?;
-            } else {
-                settle_all_presentations(&mut uninterrupted, &mut restored)?;
             }
         }
         let terminal_snapshot = uninterrupted.snapshot_v2()?;
@@ -3115,16 +3135,25 @@ mod live_coop_production {
                     "terminal fixture did not complete {endpoint:?} command selection"
                 );
             }
-            for tick in 0..256 {
-                if terminal_reached(&pair.snapshot_v2()?) {
+            for tick in 0..512 {
+                let snapshot = pair.snapshot_v2()?;
+                if terminal_reached(&snapshot) {
                     break;
                 }
-                if pending_battle_presentations(&pair.snapshot_v2()?).is_empty() {
-                    advance_time_v2(&mut pair, 1)?;
-                } else {
+                if !pending_battle_presentations(&snapshot).is_empty() {
                     settle_all_presentations_v2(&mut pair)?;
+                } else if let Some(endpoint) = [PairEndpoint::Host, PairEndpoint::Guest]
+                    .into_iter()
+                    .find(|endpoint| {
+                        endpoint_snapshot(&snapshot, *endpoint).ui.actionable
+                            && !endpoint_commands_complete(&snapshot, *endpoint)
+                    })
+                {
+                    raw_press_v2(&mut pair, endpoint, PhysicalKey::Enter)?;
+                } else {
+                    advance_time_v2(&mut pair, 1)?;
                 }
-                if tick == 255 {
+                if tick == 511 {
                     break;
                 }
             }
