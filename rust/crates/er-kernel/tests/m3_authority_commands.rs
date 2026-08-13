@@ -12,6 +12,7 @@ use er_game::authority_commands::{
     admit_scripted_enemy_frontier, complete_command_frontier, internal_no_legal_replacement,
     retain_command_tombstones,
 };
+use er_game::target_menu::build_target_control;
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState};
@@ -278,7 +279,12 @@ fn command_control_plan(state: &GameState) -> TestResult<BattleControlPlan> {
             "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/move",
             battle.battle_id, battle.wave, battle.turn, position, owner,
         );
-        let root_instance = 1 + u64::from(position) * 3;
+        let menu_span = if battle.format == BattleFormat::single() {
+            3
+        } else {
+            4
+        };
+        let root_instance = 1 + u64::from(position) * menu_span;
         let root = BattleControl::CommandRoot(CommandRootControl::new(
             actor,
             slot(BattleSide::Player, position),
@@ -305,14 +311,45 @@ fn command_control_plan(state: &GameState) -> TestResult<BattleControlPlan> {
             )?,
             Box::new(root),
         )?);
+        let control = if battle.format == BattleFormat::single() {
+            move_control
+        } else {
+            let target_control_id = format!(
+                "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/target",
+                battle.battle_id, battle.wave, battle.turn, position, owner,
+            );
+            let candidate_targets = (0..battle.format.enemy_capacity)
+                .map(|enemy_position| slot(BattleSide::Enemy, enemy_position))
+                .collect::<Vec<_>>();
+            BattleControl::TargetSelect(build_target_control(
+                MenuInstanceId::new(safe(root_instance + 2)?),
+                owner,
+                target_control_id,
+                actor,
+                slot(BattleSide::Player, position),
+                MoveSlotIndex::ZERO,
+                false,
+                &candidate_targets,
+                Some(slot(BattleSide::Enemy, 0)),
+                None,
+                move_control,
+            )?)
+        };
         seats.push(SeatBattleControl::new(
             owner,
             Some(operation_id),
-            move_control,
+            control,
         ));
         allocators.push(SeatMenuInstanceAllocator::new(
             owner,
-            MenuInstanceId::new(safe(root_instance + 2)?),
+            MenuInstanceId::new(safe(
+                root_instance
+                    + if battle.format == BattleFormat::single() {
+                        2
+                    } else {
+                        3
+                    },
+            )?),
         )?);
     }
     Ok(BattleControlPlan::new(
@@ -346,6 +383,12 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
             .ok_or("missing player actor")?
             .id;
         let owner = seat(1 + u64::from(position))?;
+        let (proposal_menu_instance, proposal_control_kind) =
+            if battle.format == BattleFormat::single() {
+                (2 + u64::from(position) * 3, "move")
+            } else {
+                (3 + u64::from(position) * 4, "target")
+            };
         let operation_id = player_command_operation_id(
             battle.battle_id,
             battle.wave,
@@ -370,10 +413,15 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
                     BattleTargetSelection::selected(vec![slot(BattleSide::Enemy, 0)])?
                 },
             )?,
-            MenuInstanceId::new(safe(2 + u64::from(position) * 3)?),
+            MenuInstanceId::new(safe(proposal_menu_instance)?),
             format!(
-                "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/move",
-                battle.battle_id, battle.wave, battle.turn, position, owner,
+                "battle/{}/wave/{}/turn/{}/control/player/{}/seat/{}/{}",
+                battle.battle_id,
+                battle.wave,
+                battle.turn,
+                position,
+                owner,
+                proposal_control_kind,
             ),
         )?;
         let offer = build_command_offer(&state, field_slot, content)?;
