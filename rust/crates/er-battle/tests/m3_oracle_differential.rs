@@ -9225,6 +9225,62 @@ fn normalize_catalogued_deterministic_intimidate_final(
     Ok(())
 }
 
+fn normalize_catalogued_final_player_party_order(
+    case_name: &str,
+    expected: &mut GameState,
+    actual: &GameState,
+) -> Result<(), Box<dyn Error>> {
+    let (legacy_order, typed_order) = match case_name {
+        "mixed-side-simultaneous-faint" => (vec![2_u64, 1], vec![1_u64, 2]),
+        "forced-replacement" => (vec![3_u64, 2, 1], vec![1_u64, 2, 3]),
+        _ => return Ok(()),
+    };
+    let expected_battle = expected.battle.as_mut().ok_or_else(|| {
+        FixtureError::new(format!("{case_name}: expected final state has no battle"))
+    })?;
+    let actual_battle = actual.battle.as_ref().ok_or_else(|| {
+        FixtureError::new(format!("{case_name}: typed final state has no battle"))
+    })?;
+    let expected_ids = expected_battle
+        .player_party
+        .iter()
+        .map(|pokemon| u64::from(pokemon.id))
+        .collect::<Vec<_>>();
+    let actual_ids = actual_battle
+        .player_party
+        .iter()
+        .map(|pokemon| u64::from(pokemon.id))
+        .collect::<Vec<_>>();
+    if expected_ids != legacy_order {
+        return Err(FixtureError::new(format!(
+            "{case_name}: legacy final player_party identity/order is outside the exact catalogue: expected {legacy_order:?}, actual {expected_ids:?}"
+        ))
+        .into());
+    }
+    if actual_ids != typed_order {
+        return Err(FixtureError::new(format!(
+            "{case_name}: typed final player_party identity/order is outside the exact catalogue: expected {typed_order:?}, actual {actual_ids:?}"
+        ))
+        .into());
+    }
+
+    let mut normalized = Vec::with_capacity(expected_battle.player_party.len());
+    for pokemon_id in typed_order {
+        let index = expected_battle
+            .player_party
+            .iter()
+            .position(|pokemon| u64::from(pokemon.id) == pokemon_id)
+            .ok_or_else(|| {
+                FixtureError::new(format!(
+                    "{case_name}: catalogued final player_party Pokemon {pokemon_id} disappeared"
+                ))
+            })?;
+        normalized.push(expected_battle.player_party[index].clone());
+    }
+    expected_battle.player_party = normalized;
+    Ok(())
+}
+
 fn normalize_catalogued_filtered_final_faint_ledger(
     case_name: &str,
     expected: &mut GameState,
@@ -9436,6 +9492,14 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
     )?;
     normalize_catalogued_legacy_faint_mutations(case_name, &mut expected_mutations)?;
     normalize_catalogued_same_side_stage_order(case_name, &mut expected_mutations)?;
+    // Validate legacy final-state projections before replaying typed resources;
+    // voluntary-switch's closed HP catalogue is intentionally legacy -> typed.
+    normalize_catalogued_deterministic_intimidate_final(
+        case_name,
+        &mut expected_final,
+        &mut expected_final_rng,
+        &replacement_replay.state,
+    )?;
     normalize_expected_final_resources(
         case_name,
         &initial,
@@ -9504,10 +9568,9 @@ fn replay_transition_case(case_name: &str) -> Result<(), Box<dyn Error>> {
         &expected_presentation.typed,
         &actual_presentation,
     )?;
-    normalize_catalogued_deterministic_intimidate_final(
+    normalize_catalogued_final_player_party_order(
         case_name,
         &mut expected_final,
-        &mut expected_final_rng,
         &replacement_replay.state,
     )?;
     normalize_catalogued_filtered_final_faint_ledger(
