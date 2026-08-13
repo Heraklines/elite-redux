@@ -843,6 +843,79 @@ fn first_divergence_at(path: &str, expected: &Value, actual: &Value) -> Option<S
     }
 }
 
+const MAX_REPORTED_AXIS_DIVERGENCES: usize = 24;
+
+fn axis_divergence_report(expected: &Value, actual: &Value) -> Option<String> {
+    if expected == actual {
+        return None;
+    }
+    let mut divergences = Vec::new();
+    collect_axis_divergences("$", expected, actual, &mut divergences);
+    Some(divergences.join("; "))
+}
+
+fn collect_axis_divergences(
+    path: &str,
+    expected: &Value,
+    actual: &Value,
+    divergences: &mut Vec<String>,
+) {
+    if expected == actual || divergences.len() >= MAX_REPORTED_AXIS_DIVERGENCES {
+        return;
+    }
+    match (expected, actual) {
+        (Value::Object(expected_object), Value::Object(actual_object)) => {
+            let mut keys = BTreeSet::new();
+            keys.extend(expected_object.keys().cloned());
+            keys.extend(actual_object.keys().cloned());
+            for key in keys {
+                if divergences.len() >= MAX_REPORTED_AXIS_DIVERGENCES {
+                    return;
+                }
+                let child_path = format!("{path}.{key}");
+                match (expected_object.get(&key), actual_object.get(&key)) {
+                    (Some(expected_value), Some(actual_value)) => collect_axis_divergences(
+                        &child_path,
+                        expected_value,
+                        actual_value,
+                        divergences,
+                    ),
+                    (Some(expected_value), None) => divergences.push(format!(
+                        "at {child_path}: expected {expected_value}, actual <missing>"
+                    )),
+                    (None, Some(actual_value)) => divergences.push(format!(
+                        "at {child_path}: expected <missing>, actual {actual_value}"
+                    )),
+                    (None, None) => {}
+                }
+            }
+        }
+        (Value::Array(expected_array), Value::Array(actual_array)) => {
+            for index in 0..expected_array.len().min(actual_array.len()) {
+                if divergences.len() >= MAX_REPORTED_AXIS_DIVERGENCES {
+                    return;
+                }
+                collect_axis_divergences(
+                    &format!("{path}[{index}]"),
+                    &expected_array[index],
+                    &actual_array[index],
+                    divergences,
+                );
+            }
+            if expected_array.len() != actual_array.len()
+                && divergences.len() < MAX_REPORTED_AXIS_DIVERGENCES
+            {
+                divergences.push(format!(
+                    "at {path}: expected array length {}, actual {}",
+                    expected_array.len(),
+                    actual_array.len()
+                ));
+            }
+        }
+        _ => divergences.push(format!("at {path}: expected {expected}, actual {actual}")),
+    }
+}
+
 fn compare_serialized_axis<T: Serialize + ?Sized>(
     case_name: &str,
     axis_name: &str,
@@ -851,7 +924,7 @@ fn compare_serialized_axis<T: Serialize + ?Sized>(
 ) -> Result<(), Box<dyn Error>> {
     let expected = serde_json::to_value(expected)?;
     let actual = serde_json::to_value(actual)?;
-    if let Some(divergence) = first_divergence(&expected, &actual) {
+    if let Some(divergence) = axis_divergence_report(&expected, &actual) {
         return Err(FixtureError::new(format!(
             "{case_name}: axis {axis_name} mismatch: {divergence}"
         ))
