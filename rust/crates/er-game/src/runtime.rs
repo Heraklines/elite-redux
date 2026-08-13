@@ -11,8 +11,7 @@ use std::sync::Arc;
 use er_battle::error::BattleResolveError;
 use er_battle::legality::{
     build_command_offer, build_scripted_enemy_offer, validate_command_proposal,
-    validate_replacement_proposal, validate_replacement_selection,
-    validate_state_content_trusted,
+    validate_replacement_proposal, validate_replacement_selection, validate_state_content_trusted,
 };
 use er_battle::{
     BattleNextDecision, resolve_replacement, resolve_turn, validate_battle_mutation_evidence,
@@ -80,8 +79,8 @@ use crate::replacement_menu::{
     ReplacementMenuError, ReplacementMenuResult, build_replacement_menu, navigate_replacement_menu,
 };
 use crate::snapshot::{
-    bounded_control_history, GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2,
-    SeatControlHistorySnapshotV1, SnapshotError,
+    GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2, SeatControlHistorySnapshotV1, SnapshotError,
+    bounded_control_history,
 };
 
 /// The frozen game configuration schema version.
@@ -2759,15 +2758,12 @@ impl GameRuntime {
                 .seat(seat)
                 .ok_or_else(|| invalid_config("live menu history seat is absent from control"))?;
             let anchors = remote_anchors.get(&seat).map(Vec::as_slice).unwrap_or(&[]);
-            let controls = bounded_control_history(
-                seat,
-                history,
-                &current_control.control,
-                anchors,
-            )
-            .map_err(|error| GameRuntimeError::InvalidConfig {
-                message: format!("live menu history is not snapshot-restorable: {error}"),
-            })?;
+            let controls =
+                bounded_control_history(seat, history, &current_control.control, anchors).map_err(
+                    |error| GameRuntimeError::InvalidConfig {
+                        message: format!("live menu history is not snapshot-restorable: {error}"),
+                    },
+                )?;
             compacted.extend(controls.windows(2).map(|pair| MenuHistoryEntry {
                 seat,
                 from: pair[0].clone(),

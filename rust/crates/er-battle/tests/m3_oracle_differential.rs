@@ -6957,24 +6957,13 @@ fn fixture_presentation(
             "hp" => {
                 let residual_shape = matches!(
                     (case_name, event_path.as_str()),
-                    (
-                        "existing-status-rejected",
-                        "expected_presentation[5].event"
-                    ) | ("poison-application", "expected_presentation[6].event")
+                    ("existing-status-rejected", "expected_presentation[5].event")
+                        | ("poison-application", "expected_presentation[6].event")
                         | ("burn-application", "expected_presentation[7].event")
                         | ("burn-residual", "expected_presentation[7].event")
-                        | (
-                            "burn-physical-penalty",
-                            "expected_presentation[7].event"
-                        )
-                        | (
-                            "pp-unusable-rejected",
-                            "expected_presentation[7].event"
-                        )
-                        | (
-                            "wonder-guard-status-pass",
-                            "expected_presentation[6].event"
-                        )
+                        | ("burn-physical-penalty", "expected_presentation[7].event")
+                        | ("pp-unusable-rejected", "expected_presentation[7].event")
+                        | ("wonder-guard-status-pass", "expected_presentation[6].event")
                 );
                 if residual_shape {
                     assert_exact_keys(
@@ -7743,16 +7732,11 @@ fn record_move_id(
 fn legacy_player_targets_live_on_parent(case_name: &str, record: &FixtureCommandRecord) -> bool {
     let catalogued_record = matches!(
         case_name,
-        "speed-tie"
-            | "paralysis-speed-order"
-            | "doubles-single-target"
-            | "voluntary-switch"
+        "speed-tie" | "paralysis-speed-order" | "doubles-single-target" | "voluntary-switch"
     ) || (case_name == "mixed-side-simultaneous-faint"
         && record.field_slot
-            == FieldSlot::new(BattleSide::Player, 0)
-                .expect("valid parent-target catalogue slot")
-        && record.operation_id.as_str()
-            == "battle/1/wave/1/turn/1/command/player/0/seat/1");
+            == FieldSlot::new(BattleSide::Player, 0).expect("valid parent-target catalogue slot")
+        && record.operation_id.as_str() == "battle/1/wave/1/turn/1/command/player/0/seat/1");
     catalogued_record
         && record.field_slot.side == BattleSide::Player
         && matches!(
@@ -7819,8 +7803,7 @@ fn validate_legacy_command_wire(
                 &["targets"],
             )?;
             if command != 0
-                || u64_field(value, case_name, path, "cursor")?
-                    != u64::from(move_slot.get())
+                || u64_field(value, case_name, path, "cursor")? != u64::from(move_slot.get())
                 || required(value, case_name, path, "args")? != &json!([1, null])
             {
                 return Err(FixtureError::new(format!(
