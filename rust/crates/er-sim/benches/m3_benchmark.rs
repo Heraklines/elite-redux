@@ -1568,15 +1568,15 @@ fn m3_simple_turn_resolutions() -> TestResult {
     let content = fixture_content_pack()?;
     let content_load_elapsed_ns = elapsed_ns(content_started);
     let fixture = fixture_value(PHYSICAL_HIT_FIXTURE)?;
-    // The fixture-derived game config is invariant across local iterations.
-    // Keep its parsing/normalization outside timing; new_battle consumes the
-    // cloned config while the per-iteration protocol identity remains fresh.
-    let local_config = battle_config(&fixture, content.as_ref(), seat(1), false)?;
+    // Initialize one pristine production kernel before timing. GameKernel's
+    // owned Clone gives each iteration an independent fresh battle/protocol
+    // state, so the hot loop avoids repeating new_battle validation.
+    let mut kernel_template = new_local_kernel(&fixture, &content, 0)?;
     let execution_started = Instant::now();
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
-    for iteration in 0..SIMPLE_TURN_RESOLUTIONS {
-        let mut kernel = new_local_kernel_with_config(local_config.clone(), &content, iteration)?;
+    for _ in 0..SIMPLE_TURN_RESOLUTIONS {
+        let mut kernel = kernel_template.clone();
         let before = kernel.snapshot().state;
         let mut effects =
             raw_press_local(&mut kernel, &mut checksum, &mut counts, PhysicalKey::Enter)?;
@@ -1595,6 +1595,12 @@ fn m3_simple_turn_resolutions() -> TestResult {
     }
     assert_eq!(counts.turns, SIMPLE_TURN_RESOLUTIONS);
     assert_eq!(counts.battles, SIMPLE_TURN_RESOLUTIONS);
+    let execution_elapsed_ns = elapsed_ns(execution_started);
+    dispose_local_kernel(
+        &mut kernel_template,
+        &mut checksum,
+        "m3 simple turn template teardown",
+    )?;
     report(
         "simple-turn-resolutions",
         BENCHMARK_SEED,
@@ -1602,11 +1608,12 @@ fn m3_simple_turn_resolutions() -> TestResult {
         0,
         checksum,
         content_load_elapsed_ns,
-        elapsed_ns(execution_started),
+        execution_elapsed_ns,
         &counts,
         json!({
             "input_architecture": "raw physical keydown/keyUp plus presentation settlement",
             "fixture": "physical-hit",
+            "kernel_initialization_excluded": true,
         }),
     )
 }
