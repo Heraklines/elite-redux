@@ -1291,12 +1291,9 @@ fn mechanical_address_of(
             )
         }
         AuthorityEntryKind::ReplacementCommit => {
-            let source = payload.get("sourceAddress")?.as_object()?;
-            epoch = safe_positive_value(source.get("epoch")?)?;
-            (
-                safe_nonnegative_value(source.get("wave")?)?,
-                safe_nonnegative_value(source.get("turn")?)?,
-            )
+            let (source_epoch, wave, turn) = replacement_address_of(payload)?;
+            epoch = source_epoch;
+            (wave, turn)
         }
         AuthorityEntryKind::InteractionCommit => {
             let envelope = payload.get("envelope")?.as_object()?;
@@ -1317,6 +1314,26 @@ fn mechanical_address_of(
         return None;
     }
     Some(MechanicalAddress { epoch, wave, turn })
+}
+
+fn replacement_address_of(
+    payload: &Map<String, Value>,
+) -> Option<(SafeU53, SafeU53, SafeU53)> {
+    if let Some(source) = payload.get("sourceAddress") {
+        let source = source.as_object()?;
+        let epoch = safe_positive_value(source.get("epoch")?)?;
+        let wave = safe_nonnegative_value(source.get("wave")?)?;
+        let turn = safe_nonnegative_value(source.get("turn")?)?;
+        return Some((epoch, wave, turn));
+    }
+
+    let occurrence = payload.get("occurrence")?.as_object()?;
+    let source = occurrence.get("source")?.as_object()?;
+    let epoch = safe_positive_value(source.get("epoch")?)?;
+    let wave = safe_nonnegative_value(source.get("wave")?)?;
+    let turn = safe_nonnegative_value(source.get("resolved_turn")?)?;
+    safe_nonnegative_value(source.get("turn_occurrence")?)?;
+    Some((epoch, wave, turn))
 }
 
 fn safe_positive_value(value: &Value) -> Option<SafeU53> {
