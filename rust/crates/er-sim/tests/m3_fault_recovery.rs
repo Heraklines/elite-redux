@@ -1049,6 +1049,20 @@ mod live_replica_recovery {
             "recovery bundle",
         )?;
 
+        // The recovery bundle may leave a Battle presentation barrier active.
+        // Settle it while both endpoint kernels are live; explicit teardown
+        // must be the final lifecycle action because recovery cleanup can
+        // otherwise publish a shared terminal after disposal.
+        settle_pending_battle_presentations(&mut uninterrupted)?;
+        settle_pending_battle_presentations(&mut restored)?;
+        let uninterrupted_settled = uninterrupted.snapshot_v2()?;
+        let restored_settled = restored.snapshot_v2()?;
+        assert_pair_snapshot_equal(
+            &uninterrupted_settled,
+            &restored_settled,
+            "post-recovery presentation settlement",
+        )?;
+
         let uninterrupted_cleanup = uninterrupted.teardown("live Battle fault recovery test")?;
         let restored_cleanup = restored.teardown("live Battle fault recovery test")?;
         assert_zero_pair_resources(&uninterrupted_cleanup);
