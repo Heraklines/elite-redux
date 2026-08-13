@@ -321,6 +321,18 @@ enum PairWork {
     Effect(KernelEffect),
 }
 
+enum PairCompositeOperation {
+    Press {
+        endpoint: PairEndpoint,
+        code: PhysicalKey,
+    },
+    Hold {
+        endpoint: PairEndpoint,
+        code: PhysicalKey,
+        duration_ms: SafeU53,
+    },
+}
+
 impl SimulatedPair {
     pub fn new(config: SimulatedPairConfig) -> Result<Self, SimulatedPairError> {
         if config.event_budget == SafeU53::ZERO {
@@ -1014,11 +1026,7 @@ impl SimulatedPair {
         endpoint: PairEndpoint,
         code: PhysicalKey,
     ) -> Result<Vec<PairStep>, SimulatedPairError> {
-        self.run_atomic_composite(|pair| {
-            let key_down = pair.key_down(endpoint, code.clone(), is_printable_key(&code))?;
-            let key_up = pair.key_up(endpoint, code)?;
-            Ok(vec![key_down, key_up])
-        })
+        self.run_atomic_composite(PairCompositeOperation::Press { endpoint, code })
     }
 
     pub fn hold_for(
@@ -1027,38 +1035,55 @@ impl SimulatedPair {
         code: PhysicalKey,
         duration_ms: SafeU53,
     ) -> Result<Vec<PairStep>, SimulatedPairError> {
-        self.run_atomic_composite(|pair| {
-            if duration_ms == SafeU53::ZERO {
-                return pair.press(endpoint, code);
-            }
-            if pair.shared_terminal.is_some() {
-                let key_down = pair.key_down(endpoint, code.clone(), is_printable_key(&code))?;
-                let advance = pair.advance_time(duration_ms)?;
-                let key_up = pair.key_up(endpoint, code)?;
-                return Ok(vec![key_down, advance, key_up]);
-            }
-            let key_down_event = pair
-                .keyboard(endpoint)
-                .key_down(code.clone(), is_printable_key(&code));
-            pair.keyboard(endpoint)
-                .set_active_hold(code.clone(), duration_ms)
-                .map_err(adapter_error)?;
-            let key_down = pair.apply(PairOperation::RawInput {
-                endpoint,
-                event: key_down_event,
-            })?;
-            let advance = pair.advance_time(duration_ms)?;
-            let key_up = pair.key_up(endpoint, code)?;
-            Ok(vec![key_down, advance, key_up])
+        self.run_atomic_composite(PairCompositeOperation::Hold {
+            endpoint,
+            code,
+            duration_ms,
         })
     }
 
-    fn run_atomic_composite<T>(
+    fn run_atomic_composite(
         &mut self,
-        operation: impl FnOnce(&mut Self) -> Result<T, SimulatedPairError>,
-    ) -> Result<T, SimulatedPairError> {
+        operation: PairCompositeOperation,
+    ) -> Result<Vec<PairStep>, SimulatedPairError> {
         let rollback = self.capture_rollback_state()?;
-        match operation(self) {
+        let result = match operation {
+            PairCompositeOperation::Press { endpoint, code } => {
+                let key_down = self.key_down(endpoint, code.clone(), is_printable_key(&code))?;
+                let key_up = self.key_up(endpoint, code)?;
+                Ok(vec![key_down, key_up])
+            }
+            PairCompositeOperation::Hold {
+                endpoint,
+                code,
+                duration_ms,
+            } => {
+                if duration_ms == SafeU53::ZERO {
+                    self.press(endpoint, code)
+                } else if self.shared_terminal.is_some() {
+                    let key_down =
+                        self.key_down(endpoint, code.clone(), is_printable_key(&code))?;
+                    let advance = self.advance_time(duration_ms)?;
+                    let key_up = self.key_up(endpoint, code)?;
+                    Ok(vec![key_down, advance, key_up])
+                } else {
+                    let key_down_event = self
+                        .keyboard(endpoint)
+                        .key_down(code.clone(), is_printable_key(&code));
+                    self.keyboard(endpoint)
+                        .set_active_hold(code.clone(), duration_ms)
+                        .map_err(adapter_error)?;
+                    let key_down = self.apply(PairOperation::RawInput {
+                        endpoint,
+                        event: key_down_event,
+                    })?;
+                    let advance = self.advance_time(duration_ms)?;
+                    let key_up = self.key_up(endpoint, code)?;
+                    Ok(vec![key_down, advance, key_up])
+                }
+            }
+        };
+        match result {
             Ok(value) => Ok(value),
             Err(error) => {
                 if let Err(rollback_error) = self.restore_rollback_state(rollback) {

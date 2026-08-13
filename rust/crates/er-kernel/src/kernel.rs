@@ -768,7 +768,10 @@ impl GameKernel {
                     effects.extend(self.map_proposal_actions(actions));
                 }
                 ProtocolActionBatch::Recovery(actions) => {
-                    if let Ok(mapped) = self.apply_recovery_actions(actions) {
+                    // Endpoint teardown only releases recovery owners. A
+                    // cleanup-time terminal fence must not publish a new
+                    // shared terminal after this endpoint is disposed.
+                    if let Ok(mapped) = Self::map_rebind_recovery_cleanup(actions) {
                         effects.extend(mapped);
                     }
                 }
