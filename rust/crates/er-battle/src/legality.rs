@@ -124,6 +124,20 @@ pub fn validate_state_content(
     content: &ContentPack,
 ) -> Result<(), CommandLegalityError> {
     content.validate()?;
+    validate_state_content_trusted(state, content)
+}
+
+/// Validate state-local content membership after the immutable pack has
+/// already been validated by its owning construction or restore boundary.
+///
+/// This deliberately skips [`ContentPack::validate`] and its canonical hash
+/// recomputation.  Runtime transactions may use this narrower check because
+/// they retain the same immutable `Arc<ContentPack>`; public/configuration and
+/// snapshot boundaries must call [`validate_state_content`] instead.
+pub fn validate_state_content_trusted(
+    state: &GameState,
+    content: &ContentPack,
+) -> Result<(), CommandLegalityError> {
     validate_game_state_for_content(state, &content.hash)?;
 
     let Some(battle) = &state.battle else {

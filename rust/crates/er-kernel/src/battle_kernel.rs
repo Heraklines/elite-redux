@@ -720,7 +720,11 @@ impl BattleMode {
     }
 
     fn validate_quiescent(&self) -> Result<(), BattleKernelError> {
-        self.game.validate()?;
+        // `GameRuntime` construction, restore, and public snapshot validation
+        // fully validate the immutable ContentPack.  A staged transaction
+        // retains that same Arc and uses the live-state check here so every
+        // raw input does not canonicalize and rehash the whole pack.
+        self.game.validate_transactional()?;
         self.presentations.validate()?;
         let expected = projection_for(
             &self.game,

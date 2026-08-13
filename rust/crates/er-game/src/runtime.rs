@@ -11,7 +11,8 @@ use std::sync::Arc;
 use er_battle::error::BattleResolveError;
 use er_battle::legality::{
     build_command_offer, build_scripted_enemy_offer, validate_command_proposal,
-    validate_replacement_proposal, validate_replacement_selection, validate_state_content,
+    validate_replacement_proposal, validate_replacement_selection,
+    validate_state_content_trusted,
 };
 use er_battle::{
     BattleNextDecision, resolve_replacement, resolve_turn, validate_battle_mutation_evidence,
@@ -79,7 +80,8 @@ use crate::replacement_menu::{
     ReplacementMenuError, ReplacementMenuResult, build_replacement_menu, navigate_replacement_menu,
 };
 use crate::snapshot::{
-    GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2, SeatControlHistorySnapshotV1, SnapshotError,
+    bounded_control_history, GameRuntimeSnapshotBridge, GameRuntimeSnapshotV2,
+    SeatControlHistorySnapshotV1, SnapshotError,
 };
 
 /// The frozen game configuration schema version.
@@ -310,7 +312,8 @@ impl GameRuntime {
         }
         content.validate()?;
         config.scripted_enemy_policy.validate()?;
-        validate_state_content(&config.run_state, content.as_ref()).map_err(map_legality_error)?;
+        validate_state_content_trusted(&config.run_state, content.as_ref())
+            .map_err(map_legality_error)?;
         if config.run_state.battle.is_some() {
             return Err(invalid_config(
                 "run_state.battle must be None at battle start",
@@ -384,7 +387,7 @@ impl GameRuntime {
             .as_mut()
             .ok_or(GameRuntimeError::NoActiveBattle)?
             .command_state = CommandCollectionState::new(frontier, Vec::new())?;
-        validate_state_content(&state, content.as_ref()).map_err(map_legality_error)?;
+        validate_state_content_trusted(&state, content.as_ref()).map_err(map_legality_error)?;
 
         let allocators = initial_allocators(&human_seat_values)?;
         let control =
@@ -564,7 +567,20 @@ impl GameRuntime {
 
     pub fn validate(&self) -> Result<(), GameRuntimeError> {
         self.content.validate()?;
-        validate_state_content(&self.state, self.content.as_ref()).map_err(map_legality_error)?;
+        self.validate_transactional()
+    }
+
+    /// Validate a staged runtime after its immutable content pack has already
+    /// passed a construction or restore boundary.
+    ///
+    /// This preserves state/content membership, policy, control, ledger, and
+    /// pending-work checks, but intentionally skips `ContentPack::validate()`
+    /// and its canonical hash recomputation.  The battle kernel uses this only
+    /// inside its clone-and-swap transaction; public and snapshot boundaries
+    /// must call [`Self::validate`] instead.
+    pub fn validate_transactional(&self) -> Result<(), GameRuntimeError> {
+        validate_state_content_trusted(&self.state, self.content.as_ref())
+            .map_err(map_legality_error)?;
         self.scripted_enemy_policy.validate()?;
         self.control.validate()?;
         let battle = self
@@ -635,7 +651,7 @@ impl GameRuntime {
     pub fn reduce(&mut self, intent: GameIntent) -> Result<GameReduction, GameRuntimeError> {
         let mut candidate = self.clone();
         let reduction = candidate.reduce_inner(intent)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(reduction)
     }
@@ -683,7 +699,7 @@ impl GameRuntime {
     ) -> Result<CommandAdmission, GameRuntimeError> {
         let mut candidate = self.clone();
         let admission = candidate.retain_replica_command_inner(proposal)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(admission)
     }
@@ -767,7 +783,7 @@ impl GameRuntime {
             .sort_unstable_by(|left, right| left.operation_id.cmp(&right.operation_id));
         let waiting =
             project_waiting_after_command(&self.control, proposal.owner_seat, &command_state)?;
-        self.remember_control(proposal.owner_seat, waiting.clone());
+        self.remember_control(proposal.owner_seat, waiting.clone())?;
         self.control = waiting;
         Ok(CommandAdmission::Accepted {
             operation_id: proposal.operation_id,
@@ -786,7 +802,7 @@ impl GameRuntime {
     ) -> Result<CommandAdmission, GameRuntimeError> {
         let mut candidate = self.clone();
         let admission = candidate.retain_replica_replacement_inner(proposal, authority_epoch)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(admission)
     }
@@ -838,7 +854,7 @@ impl GameRuntime {
             proposal.owner_seat,
             &proposal.operation_id,
         )?;
-        self.remember_control(proposal.owner_seat, waiting.clone());
+        self.remember_control(proposal.owner_seat, waiting.clone())?;
         self.control = waiting;
         Ok(CommandAdmission::Accepted {
             operation_id: proposal.operation_id,
@@ -856,7 +872,7 @@ impl GameRuntime {
     ) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
         candidate.install_resolution_inner(resolution)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(())
     }
@@ -940,7 +956,7 @@ impl GameRuntime {
             allocator_before,
             next_control,
         )?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(())
     }
@@ -963,7 +979,8 @@ impl GameRuntime {
         // role-neutral checks below on coordinates, operation binding,
         // after-state digest, and exact projected control instead.
         validate_state_coordinate_progression(&self.state, &after)?;
-        validate_state_content(&after, self.content.as_ref()).map_err(map_legality_error)?;
+        validate_state_content_trusted(&after, self.content.as_ref())
+            .map_err(map_legality_error)?;
         let actual_after = MechanicalStateDigest::compute(&after)
             .map_err(|_| GameRuntimeError::TransitionDigestMismatch)?;
         if &actual_after != after_digest {
@@ -996,7 +1013,7 @@ impl GameRuntime {
         // rejected or partially decoded material cannot consume a scripted
         // cursor, and both endpoint roles execute this same operation.
         self.advance_scripted_policy_for_material(&after, next_decision)?;
-        self.remember_control_plan(&next_control);
+        self.remember_control_plan(&next_control)?;
         self.state = after;
         self.control = next_control;
         self.authority_remote_paths.clear();
@@ -1021,7 +1038,8 @@ impl GameRuntime {
         if &actual_before != before_digest {
             return Err(GameRuntimeError::TransitionDigestMismatch);
         }
-        validate_state_content(&after, candidate.content.as_ref()).map_err(map_legality_error)?;
+        validate_state_content_trusted(&after, candidate.content.as_ref())
+            .map_err(map_legality_error)?;
         validate_state_coordinate_progression(&candidate.state, &after)?;
         let decision = decision_for_state(&after)?;
         candidate.advance_scripted_policy_for_material(&after, decision)?;
@@ -1035,7 +1053,7 @@ impl GameRuntime {
     pub fn install_control(&mut self, control: BattleControlPlan) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
         candidate.install_control_inner(control)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(())
     }
@@ -1069,7 +1087,7 @@ impl GameRuntime {
         if expected != control {
             return Err(GameRuntimeError::ControlProjectionMismatch);
         }
-        self.remember_control_plan(&control);
+        self.remember_control_plan(&control)?;
         self.control = control;
         self.authority_remote_paths.clear();
         self.schedule_no_legal_replacement_followup(&decision)?;
@@ -1167,7 +1185,7 @@ impl GameRuntime {
     ) -> Result<BattleUiResult, GameRuntimeError> {
         let mut candidate = self.clone();
         let result = candidate.handle_ui_action_inner(action)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(result)
     }
@@ -1212,7 +1230,7 @@ impl GameRuntime {
     ) -> Result<(), GameRuntimeError> {
         let mut candidate = self.clone();
         candidate.sync_battle_ui_selection_inner(seat, menu_instance_id, control_id, option_id)?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(())
     }
@@ -1619,7 +1637,7 @@ impl GameRuntime {
             entries,
             self.control.menu_allocators.clone(),
         )?;
-        self.remember_control_plan(&next);
+        self.remember_control_plan(&next)?;
         self.control = next;
         Ok(())
     }
@@ -2230,9 +2248,9 @@ impl GameRuntime {
         if !complete {
             let waiting =
                 project_waiting_after_command(&self.control, proposal.owner_seat, &command_state)?;
-            self.remember_control(proposal.owner_seat, waiting.clone());
+            self.remember_control(proposal.owner_seat, waiting.clone())?;
             self.control = waiting;
-            self.validate()?
+            self.validate_transactional()?
         }
         if !complete {
             return Ok(GameReduction {
@@ -2506,7 +2524,8 @@ impl GameRuntime {
             battle.command_state = after.clone();
             mutations.push(er_battle::BattleMutation::CommandCollectionChanged { before, after });
         }
-        validate_state_content(after_state, self.content.as_ref()).map_err(map_legality_error)?;
+        validate_state_content_trusted(after_state, self.content.as_ref())
+            .map_err(map_legality_error)?;
         Ok(())
     }
 
@@ -2573,7 +2592,7 @@ impl GameRuntime {
     ) -> Result<Option<InternalEvent>, GameRuntimeError> {
         let mut candidate = self.clone();
         let event = candidate.take_pending_no_legal_replacement_inner()?;
-        candidate.validate()?;
+        candidate.validate_transactional()?;
         *self = candidate;
         Ok(event)
     }
@@ -2669,7 +2688,11 @@ impl GameRuntime {
         Ok(Some((*occurrence, faint.source.epoch, operation_id)))
     }
 
-    fn remember_control(&mut self, seat: SeatId, next: BattleControlPlan) {
+    fn remember_control(
+        &mut self,
+        seat: SeatId,
+        next: BattleControlPlan,
+    ) -> Result<(), GameRuntimeError> {
         if let Some(previous) = self.control.seat(seat).map(|entry| entry.control.clone())
             && let Some(next_entry) = next.seat(seat)
         {
@@ -2679,9 +2702,10 @@ impl GameRuntime {
                 to: next_entry.control.clone(),
             });
         }
+        self.compact_menu_history(&next)
     }
 
-    fn remember_control_plan(&mut self, next: &BattleControlPlan) {
+    fn remember_control_plan(&mut self, next: &BattleControlPlan) -> Result<(), GameRuntimeError> {
         let current = self.control.clone();
         for current_entry in current.seats {
             let Some(next_entry) = next.seat(current_entry.seat) else {
@@ -2695,6 +2719,62 @@ impl GameRuntime {
                 });
             }
         }
+        self.compact_menu_history(next)
+    }
+
+    /// Retain only the control graph that the snapshot bridge can restore:
+    /// the current Cancel ancestry plus live remote replay anchors.  The
+    /// complete transition log is diagnostic history, not live game state;
+    /// keeping it unbounded makes every outer and inner transactional clone
+    /// copy an ever-growing vector.
+    fn compact_menu_history(
+        &mut self,
+        current: &BattleControlPlan,
+    ) -> Result<(), GameRuntimeError> {
+        let mut historical = BTreeMap::<SeatId, Vec<BattleControl>>::new();
+        for entry in &self.menu_history {
+            let controls = historical.entry(entry.seat).or_default();
+            if let Some(previous) = controls.last()
+                && previous != &entry.from
+            {
+                return Err(invalid_config(
+                    "live menu transition history is not contiguous",
+                ));
+            }
+            if controls.is_empty() {
+                controls.push(entry.from.clone());
+            }
+            controls.push(entry.to.clone());
+        }
+
+        let remote_anchors = self.restorable_remote_control_anchors();
+        for seat in remote_anchors.keys() {
+            historical.entry(*seat).or_default();
+        }
+
+        let mut compacted = Vec::new();
+        for (seat, history) in historical {
+            let current_control = current
+                .seat(seat)
+                .ok_or_else(|| invalid_config("live menu history seat is absent from control"))?;
+            let anchors = remote_anchors.get(&seat).map(Vec::as_slice).unwrap_or(&[]);
+            let controls = bounded_control_history(
+                seat,
+                history,
+                &current_control.control,
+                anchors,
+            )
+            .map_err(|error| GameRuntimeError::InvalidConfig {
+                message: format!("live menu history is not snapshot-restorable: {error}"),
+            })?;
+            compacted.extend(controls.windows(2).map(|pair| MenuHistoryEntry {
+                seat,
+                from: pair[0].clone(),
+                to: pair[1].clone(),
+            }));
+        }
+        self.menu_history = compacted;
+        Ok(())
     }
 }
 
@@ -3866,7 +3946,7 @@ fn validate_turn_transition_identity(
     {
         return Err(GameRuntimeError::CurrentOperationMismatch);
     }
-    validate_state_content(&transition.after_state, runtime.content.as_ref())
+    validate_state_content_trusted(&transition.after_state, runtime.content.as_ref())
         .map_err(map_legality_error)?;
     validate_battle_mutation_evidence(
         &transition.before_state,
@@ -3927,7 +4007,7 @@ fn validate_replacement_transition_identity(
     {
         return Err(GameRuntimeError::TransitionIdentityMismatch);
     }
-    validate_state_content(&transition.after_state, runtime.content.as_ref())
+    validate_state_content_trusted(&transition.after_state, runtime.content.as_ref())
         .map_err(map_legality_error)?;
     validate_battle_mutation_evidence(
         &transition.before_state,

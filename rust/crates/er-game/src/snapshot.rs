@@ -187,7 +187,9 @@ impl SeatControlHistorySnapshotV1 {
     }
 }
 
-fn bounded_control_history(
+/// Keep exactly the bounded control evidence that both live runtime history
+/// and public snapshots are allowed to retain.
+pub(crate) fn bounded_control_history(
     seat: SeatId,
     historical: Vec<BattleControl>,
     current: &BattleControl,
