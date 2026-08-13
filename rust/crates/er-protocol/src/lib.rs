@@ -2,6 +2,7 @@
 
 pub mod authority_log;
 pub mod battle_material;
+pub mod battle_terminal;
 pub mod proposal;
 pub mod recovery;
 pub mod replacement_material;
@@ -13,6 +14,7 @@ pub mod validation;
 
 pub use authority_log::*;
 pub use battle_material::*;
+pub use battle_terminal::*;
 pub use proposal::*;
 pub use recovery::*;
 pub use replacement_material::*;
