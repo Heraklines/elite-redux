@@ -906,27 +906,19 @@ mod live_coop_production {
         }
 
         let legacy_entries = entries.clone();
-        let mut normalized = Vec::with_capacity(expected_entries.len());
         for (index, expected) in expected_entries.iter().enumerate() {
-            let actual = legacy_entries
+            if legacy_entries
                 .iter()
-                .find(|entry| {
-                    entry.get("attack") == expected.get("attack")
-                        && entry.get("defense") == expected.get("defense")
-                })
-                .ok_or_else(|| {
-                    invalid(format!(
-                        "published content type-chart entry {index} is missing the selected attack/defense pair"
-                    ))
-                })?;
-            if actual != expected {
+                .filter(|entry| *entry == expected)
+                .count()
+                != 1
+            {
                 return Err(invalid(format!(
-                    "published content type-chart entry {index} differs from the selected definition"
+                    "published content type-chart does not contain selected entry at index {index}"
                 )));
             }
-            normalized.push(actual.clone());
         }
-        *entries = normalized;
+        *entries = expected_entries;
         Ok(())
     }
 
