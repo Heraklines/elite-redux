@@ -2433,10 +2433,7 @@ fn catalogued_legacy_compacted_target(
         projection.legacy_target_side,
         projection.legacy_target_position,
     )?;
-    let typed_target = FieldSlot::new(
-        projection.typed_target_side,
-        projection.typed_target_position,
-    )?;
+    let typed_target = FieldSlot::new(projection.typed_target_side, projection.typed_target_position)?;
     let compacted_actor = PokemonId::try_from_u64(projection.compacted_actor)?;
     let surviving_actor = PokemonId::try_from_u64(projection.surviving_actor)?;
     let expected_move_slot = MoveSlotIndex::try_from(u64::from(projection.move_slot))?;
@@ -7442,11 +7439,7 @@ fn fixture_presentation(
     }
     normalize_catalogued_voluntary_message_anchor(case_name, &presentation, &mut messages)?;
     normalize_catalogued_compacted_target_presentation(case_name, &mut presentation)?;
-    normalize_catalogued_forced_replacement_presentation(
-        case_name,
-        &mut presentation,
-        mutations,
-    )?;
+    normalize_catalogued_forced_replacement_presentation(case_name, &mut presentation, mutations)?;
     Ok(FixturePresentationTrace {
         typed: presentation,
         messages,
@@ -7541,9 +7534,7 @@ fn normalize_catalogued_compacted_target_presentation(
         ))
         .into());
     };
-    if u64::from(*actor) != projection.actor
-        || *move_id != expected_move_id
-        || !targets.is_empty()
+    if u64::from(*actor) != projection.actor || *move_id != expected_move_id || !targets.is_empty()
     {
         return Err(FixtureError::new(format!(
             "{case_name}: compacted-target presentation event 3 is outside the exact empty legacy target shape"
@@ -7616,10 +7607,7 @@ fn normalize_catalogued_forced_replacement_presentation(
                 "{case_name}: forced-replacement presentation has no operation identity"
             ))
         })?;
-    for (pokemon, before, after) in [
-        (pokemon_four, -1_i8, -2_i8),
-        (pokemon_five, -1_i8, -2_i8),
-    ] {
+    for (pokemon, before, after) in [(pokemon_four, -1_i8, -2_i8), (pokemon_five, -1_i8, -2_i8)] {
         let sequence = SafeU53::new(u64::try_from(presentation.len())?)?;
         presentation.push(BattlePresentationEvent::new(
             BattlePresentationEventId::new(operation_id.clone(), sequence),

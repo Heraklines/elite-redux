@@ -913,8 +913,7 @@ fn assert_victory_fixture_state_with_authoritative_terminal_faint(
         }
     }]);
 
-    if expected.pointer("/battle/enemy_party/0/abilities/passives")
-        != Some(&legacy_passives)
+    if expected.pointer("/battle/enemy_party/0/abilities/passives") != Some(&legacy_passives)
         || actual.pointer("/battle/enemy_party/0/abilities/passives")
             != Some(&authoritative_passives)
         || expected.pointer("/battle/field/slots/1/slot") != Some(&enemy_slot)
