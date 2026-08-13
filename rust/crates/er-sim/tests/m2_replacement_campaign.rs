@@ -18,9 +18,9 @@ use er_sim::{
 use er_types::{
     AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, GameButton, InputFocus, InputMap,
     KeyBinding, LiveResourceSnapshot, MembershipRevision, MenuGeneration, MenuOption, MenuOptionId,
-    MenuState, NextControl, OperationId, PhysicalKey, ProposalMessage, RawInputEvent,
-    ReplacementControl, ReplacementControlAddress, ReplacementMenu, Revision, SafeU53, SeatId,
-    SessionId, TimeClass, TimerOwner, UiIntent, UiState, UiViewKind,
+    MenuState, NextControl, OperationId, PhysicalKey, PresentationEventId, ProposalMessage,
+    RawInputEvent, ReplacementControl, ReplacementControlAddress, ReplacementMenu, Revision,
+    SafeU53, SeatId, SessionId, TimeClass, TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
 
@@ -921,9 +921,24 @@ fn assert_authority_chain(
     };
     assert_eq!(control_id_of(control), expected_control_id);
 
+    let presentation_locations = effect_locations(steps, |effect| {
+        matches!(
+            effect,
+            KernelEffect::Present { endpoint, event }
+                if *endpoint == replica_seat
+                    && event.event_id == PresentationEventId::new(revision.get())
+        )
+    });
+    assert_eq!(
+        presentation_locations.len(),
+        1,
+        "replacement presentation identity was requested exactly once"
+    );
+    let presentation_location = presentation_locations[0];
+
     let receipts = receipt_events(steps, revision, operation_id)?;
     assert!(
-        receipts.len() >= 3,
+        receipts.len() >= 4,
         "replacement receipt chain is missing one or more mechanical receipts"
     );
     for receipt in &receipts {
@@ -938,22 +953,28 @@ fn assert_authority_chain(
         .iter()
         .map(|receipt| receipt.body.stage)
         .collect::<Vec<_>>();
-    assert!(
-        stages
-            == vec![
-                AckStage::Admitted,
-                AckStage::MaterialApplied,
-                AckStage::ControlInstalled,
-            ]
-            || stages
-                == vec![
-                    AckStage::Admitted,
-                    AckStage::MaterialApplied,
+    assert_eq!(
+        &stages[..4],
+        &[
+            AckStage::Admitted,
+            AckStage::MaterialApplied,
+            AckStage::ControlInstalled,
+            AckStage::PresentationSettled,
+        ],
+        "replacement receipt chain did not settle its first presentation: {stages:?}"
+    );
+    if !stages[4..].is_empty() {
+        assert_eq!(stages[4..].len() % 2, 0);
+        for replay in stages[4..].chunks(2) {
+            assert_eq!(
+                replay,
+                &[
                     AckStage::ControlInstalled,
                     AckStage::PresentationSettled,
-                ],
-        "replacement receipt stages were not an exact admitted/materialApplied/controlInstalled chain: {stages:?}"
-    );
+                ]
+            );
+        }
+    }
     let expected_receipts = [
         AuthorityReceiptBody {
             revision,
@@ -988,15 +1009,38 @@ fn assert_authority_chain(
             }
         );
     }
+    for replay in receipts[4..].chunks(2) {
+        assert_eq!(
+            replay[0].body,
+            AuthorityReceiptBody {
+                revision,
+                operation_id: operation_id.clone(),
+                stage: AckStage::ControlInstalled,
+                control_id: Some(expected_control_id.to_owned()),
+            }
+        );
+        assert_eq!(
+            replay[1].body,
+            AuthorityReceiptBody {
+                revision,
+                operation_id: operation_id.clone(),
+                stage: AckStage::PresentationSettled,
+                control_id: None,
+            }
+        );
+    }
 
     let admitted_location = (receipts[0].step_index, receipts[0].effect_index);
     let material_receipt_location = (receipts[1].step_index, receipts[1].effect_index);
     let control_receipt_location = (receipts[2].step_index, receipts[2].effect_index);
+    let presentation_receipt_location = (receipts[3].step_index, receipts[3].effect_index);
     assert!(entry_location < admitted_location);
     assert!(admitted_location < material_location);
     assert!(material_location < material_receipt_location);
     assert!(material_receipt_location < control_location);
     assert!(control_location < control_receipt_location);
+    assert!(control_receipt_location < presentation_location);
+    assert!(presentation_location < presentation_receipt_location);
 
     for (boundary, location) in [
         ("admitted", admitted_location),

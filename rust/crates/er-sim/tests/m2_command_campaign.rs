@@ -18,9 +18,9 @@ use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CancelPolicy, CommandControlTarget,
     CommandFrontierControl, ConnectionGeneration, FRAME_PROTOCOL_VERSION, FrameContext, FrameType,
     GameButton, InputMap, KeyBinding, Material, MembershipRevision, MenuGeneration, MenuOption,
-    MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey, ProposalMessage, Revision,
-    RunId, SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId, TimerOwner, UiIntent, UiState,
-    UiViewKind,
+    MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey, PresentationEventId,
+    ProposalMessage, Revision, RunId, SafeI53, SafeU53, SeatId, SessionId, TimeClass, TimerId,
+    TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
 
@@ -729,6 +729,57 @@ fn has_control_effect(step: &PairStep, operation_id: &str) -> bool {
     })
 }
 
+fn material_effect_count(steps: &[PairStep], endpoint: SeatId, operation_id: &str) -> usize {
+    steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter(|effect| {
+            matches!(
+                effect,
+                KernelEffect::ApplyAuthorityMaterial {
+                    endpoint: effect_endpoint,
+                    operation_id: effect_operation,
+                    ..
+                } if *effect_endpoint == endpoint && effect_operation.as_str() == operation_id
+            )
+        })
+        .count()
+}
+
+fn control_effect_count(steps: &[PairStep], endpoint: SeatId, operation_id: &str) -> usize {
+    steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter(|effect| {
+            matches!(
+                effect,
+                KernelEffect::ProjectAuthorityControl {
+                    endpoint: effect_endpoint,
+                    operation_id: effect_operation,
+                    ..
+                } if *effect_endpoint == endpoint && effect_operation.as_str() == operation_id
+            )
+        })
+        .count()
+}
+
+fn presentation_effect_count(steps: &[PairStep], endpoint: SeatId, revision: u64) -> usize {
+    steps
+        .iter()
+        .flat_map(|step| step.generated_effects.iter())
+        .filter(|effect| {
+            matches!(
+                effect,
+                KernelEffect::Present {
+                    endpoint: effect_endpoint,
+                    event,
+                } if *effect_endpoint == endpoint
+                    && event.event_id == PresentationEventId::new(safe(revision))
+            )
+        })
+        .count()
+}
+
 fn assert_control_effect(
     step: &PairStep,
     endpoint: SeatId,
@@ -811,7 +862,6 @@ fn expected_receipt(
 }
 
 fn expected_progress_receipts(
-    step: &PairStep,
     revision: u64,
     operation_id: &str,
     control_id: &str,
@@ -826,25 +876,20 @@ fn expected_progress_receipts(
             AckStage::ControlInstalled,
             Some(control_id),
         ),
+        expected_receipt(revision, operation_id, AckStage::PresentationSettled, None),
     ];
-    if step
-        .generated_effects
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::Present { .. }))
-    {
-        expected.push(expected_receipt(
-            revision,
-            operation_id,
-            AckStage::PresentationSettled,
-            None,
-        ));
-    }
     if let Some(replay_control_id) = replay_control_id {
         expected.push(expected_receipt(
             revision,
             operation_id,
             AckStage::ControlInstalled,
             Some(replay_control_id),
+        ));
+        expected.push(expected_receipt(
+            revision,
+            operation_id,
+            AckStage::PresentationSettled,
+            None,
         ));
     }
     expected
@@ -853,7 +898,7 @@ fn expected_progress_receipts(
 fn assert_exact_receipts(step: &PairStep, revision: u64, operation_id: &str, control_id: &str) {
     assert_eq!(
         authority_receipts(step),
-        expected_progress_receipts(step, revision, operation_id, control_id, None)
+        expected_progress_receipts(revision, operation_id, control_id, None)
     );
 }
 
@@ -866,7 +911,7 @@ fn assert_exact_entry_receipts(
 ) {
     assert_eq!(
         authority_receipts_for(step, revision, operation_id),
-        expected_progress_receipts(step, revision, operation_id, control_id, replay_control_id,)
+        expected_progress_receipts(revision, operation_id, control_id, replay_control_id)
     );
 }
 
@@ -1217,12 +1262,15 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     let duplicate_receipts = authority_receipts_for(&stale_repeat, 1, GUEST_OPERATION);
     assert_eq!(
         duplicate_receipts,
-        vec![expected_receipt(
-            1,
-            GUEST_OPERATION,
-            AckStage::ControlInstalled,
-            Some(&control_id_of(&remaining_control())),
-        )]
+        vec![
+            expected_receipt(
+                1,
+                GUEST_OPERATION,
+                AckStage::ControlInstalled,
+                Some(&control_id_of(&remaining_control())),
+            ),
+            expected_receipt(1, GUEST_OPERATION, AckStage::PresentationSettled, None),
+        ]
     );
     let revision_two_receipts = authority_receipts_for(&stale_repeat, 2, HOST_OPERATION);
     assert_eq!(
@@ -1231,6 +1279,16 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert!(!has_material_effect(&stale_repeat, GUEST_OPERATION));
     assert!(!has_control_effect(&stale_repeat, GUEST_OPERATION));
+    assert!(!stale_repeat
+        .generated_effects
+        .iter()
+        .any(|effect| matches!(effect, KernelEffect::Present { .. })));
+    assert!(stale_repeat
+        .snapshot
+        .guest
+        .live_resources
+        .presentations
+        .is_empty());
     let replay_revisions = authority_entry_revisions(&stale_repeat);
     assert_eq!(
         replay_revisions,
@@ -1509,5 +1567,22 @@ fn raw_key_command_campaign_covers_projection_progression_and_determinism() -> T
         proposals,
         vec![expected_guest_proposal.clone(), expected_guest_proposal]
     );
+    for (revision, operation_id) in [(1, GUEST_OPERATION), (2, HOST_OPERATION)] {
+        assert_eq!(
+            material_effect_count(&first_steps, seat(1), operation_id),
+            1,
+            "guest material application for {operation_id} was not exactly once"
+        );
+        assert_eq!(
+            control_effect_count(&first_steps, seat(1), operation_id),
+            1,
+            "guest control projection for {operation_id} was not exactly once"
+        );
+        assert_eq!(
+            presentation_effect_count(&first_steps, seat(1), revision),
+            1,
+            "guest visual presentation for {operation_id} was not exactly once"
+        );
+    }
     Ok(())
 }

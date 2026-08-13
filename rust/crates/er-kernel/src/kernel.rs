@@ -13,8 +13,8 @@ use er_protocol::{
     ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager, ProposalLeaseSpec,
     ProposalLeaseStart, RecoveryAction, RecoveryFrontierStagingOutcome, RecoveryLiveState,
     RecoveryMaterialOutcome, RecoveryTransaction, RecoveryTransactionConfig, ReplicaAction,
-    ReplicaAdmission, ScheduledTimer, SchedulerCommand, ValidatedFrame, ValidatedFrameBody,
-    control_id_of, frame_contexts_compatible,
+    ReplicaAdmission, ReplicaResume, ScheduledTimer, SchedulerCommand, ValidatedFrame,
+    ValidatedFrameBody, control_id_of, frame_contexts_compatible,
 };
 use er_state::digest::MechanicalStateDigest;
 use er_types::{
@@ -148,7 +148,9 @@ pub struct GameKernel {
     ui_reducer: UiReducer,
     scheduler: KernelScheduler,
     repeat_timers: BTreeMap<TimerId, RepeatContext>,
-    pending_presentations: BTreeMap<PresentationEventId, Revision>,
+    pending_presentations: BTreeMap<PresentationEventId, LegacyPresentationEvidence>,
+    completed_presentations:
+        BTreeMap<PresentationEventId, LegacyPresentationCompletionEvidence>,
     live_resources: LiveResourceSnapshot,
     protocol_config: Option<ProtocolKernelConfig>,
     protocol: Option<ProtocolState>,
@@ -272,6 +274,41 @@ struct RepeatContext {
     button: GameButton,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+struct LegacyPresentationEvidence {
+    revision: Revision,
+    operation_id: OperationId,
+    event: PresentationEvent,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct LegacyPresentationCompletionEvidence {
+    presentation: LegacyPresentationEvidence,
+    outcome: PresentationProbeOutcome,
+}
+
+impl LegacyPresentationEvidence {
+    fn from_entry(entry: &AuthorityEntry) -> Self {
+        let event_id = PresentationEventId::new(entry.revision.get());
+        Self {
+            revision: entry.revision,
+            operation_id: entry.operation_id.clone(),
+            event: PresentationEvent {
+                event_id,
+                event_kind: "authority-entry".to_owned(),
+                payload: entry.material.payload.clone(),
+            },
+        }
+    }
+
+    fn matches_entry(&self, entry: &AuthorityEntry) -> bool {
+        self.revision == entry.revision
+            && self.operation_id == entry.operation_id
+            && self.event.event_id == PresentationEventId::new(entry.revision.get())
+            && self.event.event_kind == "authority-entry"
+    }
+}
+
 impl GameKernel {
     pub fn new(config: KernelConfig) -> Self {
         let protocol_config = config.protocol;
@@ -289,6 +326,7 @@ impl GameKernel {
             scheduler: KernelScheduler::new(),
             repeat_timers: BTreeMap::new(),
             pending_presentations: BTreeMap::new(),
+            completed_presentations: BTreeMap::new(),
             live_resources: LiveResourceSnapshot::default(),
             protocol_config,
             protocol,
@@ -792,6 +830,7 @@ impl GameKernel {
 
         self.protocol = None;
         self.pending_presentations.clear();
+        self.completed_presentations.clear();
         self.disposed = true;
         self.live_resources = LiveResourceSnapshot::default();
         effects
@@ -1193,7 +1232,18 @@ impl GameKernel {
         effects
     }
 
-    fn map_replica_actions(&mut self, actions: Vec<ReplicaAction>) -> Vec<KernelEffect> {
+    fn map_replica_actions(
+        &mut self,
+        actions: Vec<ReplicaAction>,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        self.map_replica_actions_with_probe_mode(actions, false)
+    }
+
+    fn map_replica_actions_with_probe_mode(
+        &mut self,
+        actions: Vec<ReplicaAction>,
+        duplicate_complete_probe: bool,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
         let mut effects = Vec::new();
         for action in actions {
             match action {
@@ -1231,15 +1281,50 @@ impl GameKernel {
                     });
                 }
                 ReplicaAction::ProbePresentation { entry } => {
-                    let event_id = PresentationEventId::new(entry.revision.get());
-                    self.pending_presentations.insert(event_id, entry.revision);
+                    let evidence = LegacyPresentationEvidence::from_entry(&entry);
+                    let event_id = evidence.event.event_id;
+                    let has_duplicate_evidence = duplicate_complete_probe
+                        || self.pending_presentations.contains_key(&event_id)
+                        || self.completed_presentations.contains_key(&event_id);
+                    if has_duplicate_evidence {
+                        if let Some(pending) = self.pending_presentations.get(&event_id) {
+                            if !pending.matches_entry(&entry) {
+                                return Err(kernel_protocol_error(format!(
+                                    "pending presentation evidence conflicts for event {event_id:?}"
+                                )));
+                            }
+                            continue;
+                        }
+                        if let Some(completed) = self.completed_presentations.get(&event_id) {
+                            if !completed.presentation.matches_entry(&entry) {
+                                return Err(kernel_protocol_error(format!(
+                                    "completed presentation evidence conflicts for event {event_id:?}"
+                                )));
+                            }
+                            let completed_outcome = completed.outcome;
+                            let completion_actions = {
+                                let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut()
+                                else {
+                                    return Err(kernel_protocol_error(
+                                        "duplicate presentation probe has no replica owner",
+                                    ));
+                                };
+                                replica
+                                    .replica
+                                    .presentation_result(
+                                        entry.revision,
+                                        completed_outcome,
+                                    )
+                                    .map_err(kernel_protocol_error)?
+                            };
+                            effects.extend(self.map_replica_actions(completion_actions)?);
+                            continue;
+                        }
+                    }
+                    self.pending_presentations.insert(event_id, evidence.clone());
                     effects.push(KernelEffect::Present {
                         endpoint: self.local_endpoint(),
-                        event: PresentationEvent {
-                            event_id,
-                            event_kind: "authority-entry".to_owned(),
-                            payload: entry.material.payload,
-                        },
+                        event: evidence.event,
                     });
                 }
                 ReplicaAction::RequestTail {
@@ -1258,7 +1343,7 @@ impl GameKernel {
             }
         }
         self.sync_live_resources();
-        effects
+        Ok(effects)
     }
 
     fn route_ui_intent(&mut self, intent: UiIntent) -> Vec<KernelEffect> {
@@ -1622,6 +1707,12 @@ impl GameKernel {
         let operation_id = entry.operation_id.clone();
         let kind = entry.kind;
         let step = replica.replica.admit(entry);
+        let duplicate_complete_probe = matches!(
+            &step.admission,
+            ReplicaAdmission::Duplicate {
+                resume: ReplicaResume::ControlInstalled,
+            }
+        );
         let proposal_actions = if matches!(
             &step.admission,
             ReplicaAdmission::Admitted { .. } | ReplicaAdmission::Duplicate { .. }
@@ -1643,7 +1734,9 @@ impl GameKernel {
             | ReplicaAdmission::Gap { .. } => Vec::new(),
         };
         effects.extend(self.map_proposal_actions(proposal_actions));
-        effects.extend(self.map_replica_actions(step.actions));
+        effects.extend(
+            self.map_replica_actions_with_probe_mode(step.actions, duplicate_complete_probe)?,
+        );
         Ok(effects)
     }
 
@@ -2141,7 +2234,7 @@ impl GameKernel {
                 .material_result(revision, outcome.clone())
                 .map_err(kernel_protocol_error)?
         };
-        let effects = self.map_replica_actions(actions);
+        let effects = self.map_replica_actions(actions)?;
         if !matches!(outcome, MaterialApplicationOutcome::Deferred)
             && let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut()
         {
@@ -2246,7 +2339,7 @@ impl GameKernel {
             // correlated recoveryApplied proof. Recovery actions retain their
             // own proof-before-fence-release order, and the menu is exposed
             // only after both batches have been mapped.
-            let mut effects = self.map_replica_actions(replica_actions);
+            let mut effects = self.map_replica_actions(replica_actions)?;
             if self.terminal.is_some() {
                 return Ok(effects);
             }
@@ -2274,7 +2367,7 @@ impl GameKernel {
                 .control_result(revision, outcome.clone())
                 .map_err(kernel_protocol_error)?
         };
-        let mut effects = self.map_replica_actions(actions);
+        let mut effects = self.map_replica_actions(actions)?;
         if self.terminal.is_some() {
             return Ok(effects);
         }
@@ -2298,10 +2391,10 @@ impl GameKernel {
         if endpoint != self.local_endpoint() {
             return Ok(Vec::new());
         }
-        let Some(revision) = self.pending_presentations.remove(&event_id) else {
+        let Some(evidence) = self.pending_presentations.remove(&event_id) else {
             return Ok(Vec::new());
         };
-        let probe = match outcome {
+        let probe = match &outcome {
             PresentationOutcome::Settled => PresentationProbeOutcome::Settled,
             PresentationOutcome::Cancelled | PresentationOutcome::Failed { .. } => {
                 PresentationProbeOutcome::Failed
@@ -2313,10 +2406,17 @@ impl GameKernel {
             };
             replica
                 .replica
-                .presentation_result(revision, probe)
+                .presentation_result(evidence.revision, probe)
                 .map_err(kernel_protocol_error)?
         };
-        Ok(self.map_replica_actions(actions))
+        self.completed_presentations.insert(
+            event_id,
+            LegacyPresentationCompletionEvidence {
+                presentation: evidence,
+                outcome: probe,
+            },
+        );
+        self.map_replica_actions(actions)
     }
 
     fn dispatch_suspend(
@@ -2932,6 +3032,7 @@ impl GameKernel {
             }
         }
         self.pending_presentations.clear();
+        self.completed_presentations.clear();
         self.live_resources = LiveResourceSnapshot::default();
         self.ui_reducer.replace_menu(
             None,
