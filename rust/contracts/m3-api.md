@@ -21,6 +21,8 @@ their owned paths. They may not change a public item, serialization tag,
 operation grammar, digest domain, content selection, crate dependency, or
 failure outcome. A missing capability is a contract request to the integration
 owner. Workers never create private wire messages or semantic campaign helpers.
+CR-0020 is the integration-owner-approved exception for the doc-hidden staged
+game mutation seam described below; it changes no external schema or outcome.
 
 Production TypeScript and `rust/source-lock.toml` are read-only. Production
 core contains no callback, async runtime, thread, wall-clock read, sleep,
@@ -1662,6 +1664,30 @@ deterministic subsystem, processes the private FIFO to quiescence, validates,
 then swaps and emits effects. The exact queue/budget is
 `m3-internal-event-loop.md`; publication/application/control/timer atomicity is
 `m3-atomic-transition.md`; typed outcomes are `m3-error-policy.md`.
+
+CR-0020 freezes one doc-hidden cross-crate optimization boundary. `BattleMode`
+stores the already-validated game owner as `Arc<GameRuntime>` and the first
+semantic mutation in an external input uses `Arc::make_mut`. The seven staged
+method names are exactly:
+
+```text
+sync_battle_ui_selection_in_kernel_transaction
+reduce_ui_in_kernel_transaction
+retain_replica_command_in_kernel_transaction
+retain_replica_replacement_in_kernel_transaction
+reduce_game_in_kernel_transaction
+install_material_in_kernel_transaction
+take_pending_no_legal_replacement_in_kernel_transaction
+```
+
+They are callable only on the private candidate owned by `BattleTransaction`.
+They do not clone, validate, publish, or recover independently; an error causes
+the whole candidate to be discarded. The enclosing kernel drains the typed
+FIFO and performs one complete game validation before swap. The original
+public atomic reducers retain clone/validate/swap behavior for every caller
+outside that enclosing transaction. The process-local `Arc` and dirty flag are
+not serialized and cannot change snapshot, trace, digest, material, or wire
+identity.
 
 `new_battle` requires `run_state.battle = None`, a positive one-based run wave,
 an exact non-empty production `BattleScene.waveSeed`, and a valid unconsumed
