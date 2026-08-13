@@ -134,6 +134,7 @@ pub fn validate_state_content(
 /// recomputation.  Runtime transactions may use this narrower check because
 /// they retain the same immutable `Arc<ContentPack>`; public/configuration and
 /// snapshot boundaries must call [`validate_state_content`] instead.
+#[doc(hidden)]
 pub fn validate_state_content_trusted(
     state: &GameState,
     content: &ContentPack,

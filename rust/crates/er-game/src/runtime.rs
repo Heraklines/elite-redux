@@ -578,7 +578,8 @@ impl GameRuntime {
     /// and its canonical hash recomputation.  The battle kernel uses this only
     /// inside its clone-and-swap transaction; public and snapshot boundaries
     /// must call [`Self::validate`] instead.
-    pub(crate) fn validate_transactional(&self) -> Result<(), GameRuntimeError> {
+    #[doc(hidden)]
+    pub fn validate_transactional(&self) -> Result<(), GameRuntimeError> {
         validate_state_content_trusted(&self.state, self.content.as_ref())
             .map_err(map_legality_error)?;
         self.scripted_enemy_policy.validate()?;
