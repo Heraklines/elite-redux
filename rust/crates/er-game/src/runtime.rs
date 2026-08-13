@@ -578,7 +578,7 @@ impl GameRuntime {
     /// and its canonical hash recomputation.  The battle kernel uses this only
     /// inside its clone-and-swap transaction; public and snapshot boundaries
     /// must call [`Self::validate`] instead.
-    pub fn validate_transactional(&self) -> Result<(), GameRuntimeError> {
+    pub(crate) fn validate_transactional(&self) -> Result<(), GameRuntimeError> {
         validate_state_content_trusted(&self.state, self.content.as_ref())
             .map_err(map_legality_error)?;
         self.scripted_enemy_policy.validate()?;
@@ -2880,6 +2880,18 @@ fn menu_history_from_snapshot(
 ) -> Result<Vec<MenuHistoryEntry>, SnapshotError> {
     let mut menu_history = Vec::new();
     for (history_index, history) in histories.iter().enumerate() {
+        if let [control] = history.controls.as_slice() {
+            // A singleton is retained seat-local snapshot evidence rather
+            // than a control transition. Preserve it as a private no-op
+            // marker so an immediate capture after restore remains exact;
+            // the next real control transition compacts the marker away.
+            menu_history.push(MenuHistoryEntry {
+                seat: history.seat,
+                from: control.clone(),
+                to: control.clone(),
+            });
+            continue;
+        }
         for pair in history.controls.windows(2) {
             if pair[0] == pair[1] {
                 return Err(snapshot_invalid(
