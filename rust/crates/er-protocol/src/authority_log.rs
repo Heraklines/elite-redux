@@ -540,16 +540,18 @@ impl AuthorityLog {
             if should_retire_subsumed {
                 lease.subsumption_done = true;
             }
-            let should_retire_current = lease
-                .peer_stages
-                .values()
-                .all(|peer| peer.stage >= STAGE_CONTROL_INSTALLED);
+            let required_stage = retirement_stage(&lease.entry);
+            let waiting_stage = waiting_stage(&lease.entry);
+            let should_retire_current = required_stage.is_some_and(|required_stage| {
+                lease
+                    .peer_stages
+                    .values()
+                    .all(|peer| peer.stage >= required_stage)
+            });
             let waiting_for = lease
                 .peer_stages
                 .iter()
-                .filter_map(|(seat_id, peer)| {
-                    (peer.stage < STAGE_CONTROL_INSTALLED).then_some(*seat_id)
-                })
+                .filter_map(|(seat_id, peer)| (peer.stage < waiting_stage).then_some(*seat_id))
                 .collect::<Vec<_>>();
             (
                 lease.entry.subsumes.clone(),
@@ -1099,6 +1101,31 @@ impl AuthorityLog {
             };
             self.retired_operation_stages.remove(&oldest);
         }
+    }
+}
+
+/// Return the peer stage at which an entry may retire itself.  An
+/// `AwaitSuccessor` control that admits a terminal successor is the final
+/// battle predecessor: it remains retained until that successor's admitted
+/// quorum subsumes it.
+fn retirement_stage(entry: &AuthorityEntry) -> Option<i8> {
+    match &entry.next_control {
+        NextControl::AwaitSuccessor(control)
+            if control
+                .allowed_kinds
+                .contains(&AuthorityEntryKind::TerminalCommit) => None,
+        NextControl::Terminal(_) => Some(STAGE_PRESENTATION_SETTLED),
+        _ => Some(STAGE_CONTROL_INSTALLED),
+    }
+}
+
+/// Return the peer stage represented by `waiting_for_seat_ids`.  The final
+/// predecessor has no self-retirement stage, but it still has a meaningful
+/// presentation frontier before the terminal successor can complete it.
+fn waiting_stage(entry: &AuthorityEntry) -> i8 {
+    match retirement_stage(entry) {
+        Some(stage) => stage,
+        None => STAGE_PRESENTATION_SETTLED,
     }
 }
 
