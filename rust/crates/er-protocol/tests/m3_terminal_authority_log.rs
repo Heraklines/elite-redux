@@ -198,7 +198,7 @@ fn ordinary_entries_still_retire_at_full_control_quorum() -> TestResult {
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(2)?]
     ));
 
     let second = log.accept_receipt_detailed(
@@ -244,7 +244,7 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
             AuthorityReceiptVerdict::Advanced {
                 retired: false,
                 ref waiting_for_seat_ids,
-            } if waiting_for_seat_ids == &vec![seat(1)?, seat(2)?]
+            } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
         ));
     }
     assert!(log.peer_stage_quorum(
@@ -265,7 +265,7 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(2)?]
     ));
     let settled_two = log.accept_receipt_detailed(
         receipt(&predecessor.entry, 2, AckStage::PresentationSettled)?,
@@ -297,7 +297,7 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(1)?, seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
     ));
     let terminal_admitted_two = log.accept_receipt_detailed(
         receipt(&terminal.entry, 2, AckStage::Admitted)?,
@@ -308,7 +308,7 @@ fn final_predecessor_survives_presentation_until_terminal_subsumption() -> TestR
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(1)?, seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
     ));
     assert_eq!(cancel_count(&terminal_admitted_two.actions, predecessor_timer), 1);
     assert_eq!(scheduler.timer(predecessor_timer), None);
@@ -352,7 +352,7 @@ fn terminal_waits_for_presentation_and_receipts_are_fail_closed_or_idempotent() 
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(1)?, seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
     ));
     let duplicate_control = log.accept_receipt_detailed(
         receipt(&terminal.entry, 1, AckStage::ControlInstalled)?,
@@ -374,7 +374,7 @@ fn terminal_waits_for_presentation_and_receipts_are_fail_closed_or_idempotent() 
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(1)?, seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(1)?, seat(2)?]
     ));
     assert!(log.peer_stage_quorum(
         &terminal.entry.operation_id,
@@ -394,7 +394,7 @@ fn terminal_waits_for_presentation_and_receipts_are_fail_closed_or_idempotent() 
         AuthorityReceiptVerdict::Advanced {
             retired: false,
             ref waiting_for_seat_ids,
-        } if waiting_for_seat_ids == &vec![seat(2)?]
+        } if waiting_for_seat_ids.as_slice() == [seat(2)?]
     ));
     let settled_two = log.accept_receipt_detailed(
         receipt(&terminal.entry, 2, AckStage::PresentationSettled)?,

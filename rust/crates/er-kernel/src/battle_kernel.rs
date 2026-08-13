@@ -3979,8 +3979,8 @@ impl BattleTransaction {
         if entry.kind != AuthorityEntryKind::TerminalCommit
             || entry.operation_id != expected_operation_id
             || material.terminal_id != expected_operation_id.to_string()
-            || material.wave != self.staged.game.control().wave
-            || material.turn != self.staged.game.control().turn
+            || material.wave != self.staged.game.control().wave.get()
+            || material.turn != self.staged.game.control().turn.get()
             || !matches!(&material.reason, BattleTerminalReasonV1::GameOver)
         {
             return Err(BattleKernelError::TerminalRequired {
