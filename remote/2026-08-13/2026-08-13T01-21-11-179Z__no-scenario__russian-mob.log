@@ -1,0 +1,604 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:6979eaddc8ff41adc92e7a4c2a4e06eebbb1dbff:run-31655738126.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1.5x  devmem:4 GB
+boot:     boot-start@0ms -> loading-complete@8180ms -> title-shown@11525ms
+lastSess: ok (reached title)
+mode:     8  wave:4
+seed:     tTwrUPqFQqA88lrwrhM6Uu9X
+party:    Magnemite(L5 19hp f0), Eevee(L5 22hp f0), Dratini(L5 20hp f0), Shroomish(L5 22hp f0), Riolu(L5 20hp f0), Mareanie(L5 22hp f0)
+enemy:    Rattata Redux(L3)
+
+----- COMMENT -----
+Had a battle start where my pokemon did not get put back in its pokeball to reset stats.
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:6979eaddc8ff41adc92e7a4c2a4e06eebbb1dbff:run-31655738126.1","source":"github","sha":"6979eaddc8ff41adc92e7a4c2a4e06eebbb1dbff","workflow":{"provider":"github-actions","runId":"31655738126","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[00:53:31.411] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:53:31.668] LOG: [ER] build {"version":1,"id":"github:6979eaddc8ff41adc92e7a4c2a4e06eebbb1dbff:run-31655738126.1","source":"github","sha":"6979eaddc8ff41adc92e7a4c2a4e06eebbb1dbff","workflow":{"provider":"github-actions","runId":"31655738126","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[00:53:31.674] LOG: [dev-tools] loaded — 766 scenarios + Send Logs button
+[00:53:38.874] DEBUG: Destroying loading scene
+[00:53:38.874] DEBUG: Destroyed loading scene
+[00:53:38.898] LOG: Seed: tTwrUPqFQqA88lrwrhM6Uu9X
+[00:53:38.899] LOG: Wave Seed: tTwrUPqFQqA88lrwrhM6Uu9X 0
+[00:53:39.944] LOG: %cStart Phase LoginPhase color:green;
+[00:53:40.249] LOG: Client Session: DGQ9tftZBwqwo7ajEcS89q0Nwkd3dRfL
+[00:53:40.789] LOG: System data successfully migrated to v1.11.19!
+[00:53:40.803] LOG: [er-gift] granted 2 free Legendary eggs (one-time)
+[00:53:42.209] LOG: %cStart Phase TitlePhase color:green;
+[00:53:42.214] LOG: use seasonal splash messages true
+[00:53:47.382] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:53:47.520] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.520] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.554] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.554] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.580] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.604] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.604] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.624] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.624] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.643] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.643] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.662] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.662] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.680] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.680] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.698] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.698] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.716] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.716] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.733] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.733] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.749] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.750] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.767] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.767] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.785] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.785] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.804] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.804] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.822] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.822] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.838] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.838] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.855] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.855] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.874] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.874] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.891] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.891] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:53:47.908] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:53:47.908] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:54:15.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:54:15.610] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:54:23.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:54:23.154] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:54:24.002] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:54:24.002] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:54:54.725] LOG: %cStart Phase TitlePhase color:green;
+[00:54:54.729] LOG: use seasonal splash messages true
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items brick
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items old_amber
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items bright_powder
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items protective_pads
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items eject_button
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items trick_room
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items eject_button
+[00:54:56.106] WARN: Texture "%s" has no frame "%s" items brick
+[00:56:45.861] LOG: %cStart Phase SelectFunModePhase color:green;
+[00:57:04.668] LOG: %cStart Phase TitlePhase color:green;
+[00:57:04.671] LOG: use seasonal splash messages true
+[00:57:07.677] LOG: [coop:lobby] start announce name=RussianmobTest protocol=p33
+[00:57:10.090] LOG: [coop:lobby] poll players=0
+[00:57:12.247] LOG: [coop:lobby] poll players=0
+[00:57:13.621] LOG: [coop:lobby] cancel (id=p33_D92mOrT1jT1Nt3uulzj-jAEw9_fGxaTn connecting=false)
+[00:57:13.621] LOG: %cStart Phase TitlePhase color:green;
+[00:57:13.624] LOG: use seasonal splash messages true
+[00:57:21.725] LOG: %cStart Phase TitlePhase color:green;
+[00:57:21.730] LOG: use seasonal splash messages true
+[00:57:24.253] LOG: %cStart Phase SelectChallengePhase color:green;
+[00:57:27.404] LOG: %cStart Phase TitlePhase color:green;
+[00:57:27.407] LOG: use seasonal splash messages true
+[00:57:31.749] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:57:31.885] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:31.885] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:31.910] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:31.910] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:31.933] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:31.933] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:31.955] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:31.955] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:31.974] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:31.974] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:31.993] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:31.993] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.016] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.016] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.040] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.040] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.063] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.088] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.088] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.120] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.138] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.155] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.173] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.173] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.190] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.190] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.209] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.209] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.223] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.223] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.238] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.238] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.255] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.255] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.271] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.271] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:32.287] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[00:57:32.287] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[00:57:33.621] LOG: %cStart Phase TitlePhase color:green;
+[00:57:33.623] LOG: use seasonal splash messages true
+[00:57:36.541] LOG: %cStart Phase SelectFunModePhase color:green;
+[01:00:46.756] LOG: %cStart Phase TitlePhase color:green;
+[01:00:46.759] LOG: use seasonal splash messages true
+[01:00:49.187] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:00:49.323] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.323] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.344] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.344] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.364] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.364] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.383] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.383] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.400] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.400] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.416] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.416] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.434] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.434] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.451] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.451] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.469] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.469] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.487] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.487] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.505] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.505] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.523] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.523] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.541] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.541] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.558] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.558] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.575] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.575] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.593] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.593] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.607] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.607] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.623] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.623] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.640] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.640] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.658] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.658] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:49.675] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:49.675] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:50.556] LOG: %cStart Phase TitlePhase color:green;
+[01:00:50.559] LOG: use seasonal splash messages true
+[01:00:53.468] LOG: %cStart Phase SelectChallengePhase color:green;
+[01:00:56.971] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:00:57.107] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.107] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.131] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.131] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.153] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.174] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.174] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.193] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.193] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.212] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.213] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.233] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.233] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.254] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.254] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.274] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.274] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.295] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.295] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.315] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.315] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.336] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.336] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.356] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.356] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.376] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.376] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.397] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.397] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.417] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.417] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.435] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.435] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.452] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.452] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.471] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.471] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.489] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.489] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:57.507] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:00:57.507] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:00:58.604] LOG: %cStart Phase SelectChallengePhase color:green;
+[01:01:05.147] LOG: %cStart Phase TitlePhase color:green;
+[01:01:05.150] LOG: use seasonal splash messages true
+[01:01:09.068] LOG: %cStart Phase SelectFunModePhase color:green;
+[01:02:10.251] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:02:10.387] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.387] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.408] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.408] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.427] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.427] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.444] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.460] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.460] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.477] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.477] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.496] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.496] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.513] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.513] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.532] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.532] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.551] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.551] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.569] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.569] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.586] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.586] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.604] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.604] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.624] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.624] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.641] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.641] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.659] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.659] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.674] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.674] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.690] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.690] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.707] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.707] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.724] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.724] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:02:10.744] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:02:10.744] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:05.148] LOG: %cSaving starter preferences color: blue
+[01:05:05.427] LOG: %cSaving starter preferences color: blue
+[01:05:05.820] LOG: %cSaving starter preferences color: blue
+[01:05:07.366] WARN: cry/495 not found
+[01:05:10.568] WARN: cry/496 not found
+[01:05:41.596] WARN: cry/495 not found
+[01:05:44.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:44.153] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:44.494] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:44.494] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:44.750] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:44.750] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:45.358] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:45.358] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:45.614] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:45.614] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:45.878] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:45.878] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:46.174] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:46.175] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:05:46.911] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 580_2
+[01:05:46.911] LOG: Ducklett's variant icon does not exist. Replacing with default.
+[01:06:40.504] WARN: cry/285 not found
+[01:07:04.555] WARN: cry/285 not found
+[01:07:13.132] WARN: cry/285 not found
+[01:07:57.116] LOG: %cSaving starter preferences color: blue
+[01:07:58.940] LOG: %cSaving starter preferences color: blue
+[01:07:59.379] LOG: %cSaving starter preferences color: blue
+[01:07:59.963] LOG: %cSaving starter preferences color: blue
+[01:08:00.420] LOG: %cSaving starter preferences color: blue
+[01:08:01.259] LOG: %cSaving starter preferences color: blue
+[01:08:01.716] LOG: %cSaving starter preferences color: blue
+[01:08:04.595] LOG: %cSaving starter preferences color: blue
+[01:08:04.963] LOG: %cSaving starter preferences color: blue
+[01:08:06.427] LOG: %cSaving starter preferences color: blue
+[01:08:06.803] LOG: %cSaving starter preferences color: blue
+[01:08:07.979] LOG: %cSaving starter preferences color: blue
+[01:08:08.491] LOG: %cSaving starter preferences color: blue
+[01:08:09.403] LOG: %cSaving starter preferences color: blue
+[01:08:19.052] WARN: cry/374 not found
+[01:08:51.747] WARN: cry/374 not found
+[01:09:02.596] WARN: cry/133 not found
+[01:09:06.600] WARN: cry/133 not found
+[01:09:07.146] WARN: cry/133 not found
+[01:09:30.346] WARN: cry/133 not found
+[01:09:30.690] WARN: cry/133 not found
+[01:10:48.580] WARN: cry/81 not found
+[01:10:54.738] LOG: %cSaving starter preferences color: blue
+[01:10:55.250] LOG: %cSaving starter preferences color: blue
+[01:10:56.058] LOG: %cSaving starter preferences color: blue
+[01:10:58.514] WARN: cry/81 not found
+[01:11:00.334] WARN: cry/82 not found
+[01:11:01.734] WARN: cry/462 not found
+[01:11:19.466] WARN: cry/81 not found
+[01:11:26.769] LOG: %cSaving starter preferences color: blue
+[01:11:27.106] LOG: %cSaving starter preferences color: blue
+[01:11:27.434] LOG: %cSaving starter preferences color: blue
+[01:11:27.681] LOG: %cSaving starter preferences color: blue
+[01:11:38.762] LOG: %cSaving starter preferences color: blue
+[01:11:42.513] LOG: %cSaving starter preferences color: blue
+[01:11:43.410] LOG: %cSaving starter preferences color: blue
+[01:11:44.026] LOG: %cSaving starter preferences color: blue
+[01:11:44.298] LOG: %cSaving starter preferences color: blue
+[01:11:45.770] LOG: %cSaving starter preferences color: blue
+[01:11:47.313] LOG: %cSaving starter preferences color: blue
+[01:11:48.042] LOG: %cSaving starter preferences color: blue
+[01:11:48.490] LOG: %cSaving starter preferences color: blue
+[01:12:21.964] WARN: cry/133 not found
+[01:12:34.507] LOG: %cSaving starter preferences color: blue
+[01:13:04.276] WARN: cry/147 not found
+[01:13:21.440] WARN: cry/285 not found
+[01:13:23.233] LOG: %cSaving starter preferences color: blue
+[01:13:23.553] LOG: %cSaving starter preferences color: blue
+[01:13:31.491] LOG: %cSaving starter preferences color: blue
+[01:13:48.748] WARN: cry/285 not found
+[01:14:13.628] WARN: cry/747 not found
+[01:14:34.098] WARN: cry/747 not found
+[01:14:55.442] WARN: cry/339 not found
+[01:15:16.034] WARN: cry/339 not found
+[01:15:41.010] LOG: %cSaving starter preferences color: blue
+[01:15:44.140] WARN: cry/447 not found
+[01:16:04.161] WARN: cry/747 not found
+[01:16:06.778] WARN: cry/747 not found
+[01:16:08.570] LOG: %cSaving starter preferences color: blue
+[01:16:08.833] LOG: %cSaving starter preferences color: blue
+[01:16:32.028] WARN: cry/747 not found
+[01:16:33.960] LOG: Getting Session Slot id: %d 0
+[01:16:33.960] LOG: Getting Session Slot id: %d 1
+[01:16:33.961] LOG: Getting Session Slot id: %d 2
+[01:16:33.961] LOG: Getting Session Slot id: %d 3
+[01:16:33.961] LOG: Getting Session Slot id: %d 4
+[01:16:34.160] ERROR: Session read failed (missing).
+[01:16:34.165] ERROR: Session read failed (missing).
+[01:16:34.170] ERROR: Session read failed (missing).
+[01:16:34.171] ERROR: Session read failed (missing).
+[01:16:34.182] ERROR: Session read failed (missing).
+[01:18:05.088] LOG: Wave Seed: uUxsVQrGRrB99msxsiN7Vv:Y 1
+[01:18:05.089] LOG: %cStart Phase EncounterPhase color:green;
+[01:18:05.098] LOG: Starting species pool tier: UNCOMMON
+[01:18:05.111] LOG: Pokemon: Wild Meowth | Species ID: 52 | Level: 2 | Nature: Naughty (+Atk/-SpDef)
+[01:18:05.111] LOG: Stats (IVs): HP: 14 (26), Atk: 8 (26), Def: 6 (12), Spatk: 7 (0), Spdef: 5 (7), Spd: 8 (1)
+[01:18:05.111] LOG: Ability: Sniper | Passive Ability: Perfectionist 
+[01:18:05.111] LOG: Moveset: ["Pay Day","Hone Claws","Snarl","Growl"]
+[01:18:05.997] DEBUG: Session data saved to slot 1!
+[01:18:05.999] LOG: Wave Seed: uUxsVQrGRrB99msxsiN7Vv:Y 1
+[01:18:06.670] WARN: cry/52 not found
+[01:18:07.341] LOG: %cStart Phase SummonPhase color:green;
+[01:18:07.899] WARN: cry/81 not found
+[01:18:08.238] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:18:08.574] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:18:08.575] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:18:09.168] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:18:09.171] LOG: %cStart Phase PostSummonPhase color:green;
+[01:18:09.172] LOG: Ran PSP for: Magnemite
+[01:18:09.173] LOG: %cStart Phase PostSummonPhase color:green;
+[01:18:09.173] LOG: Ran PSP for: Meowth
+[01:18:09.174] LOG: %cStart Phase TurnInitPhase color:green;
+[01:18:09.179] LOG: %cStart Phase CommandPhase color:green;
+[01:18:25.593] LOG: Move: FLAMETHROWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Magnemite
+[01:18:25.594] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:18:25.601] LOG: Battle Seed: dk0ILF5Uv4W7NUZJ
+[01:18:25.602] LOG: %cStart Phase TurnStartPhase color:green;
+[01:18:25.604] LOG: %cStart Phase MovePhase color:green;
+[01:18:25.604] LOG: %cUser: Magnemite
+Move: FLAMETHROWER
+Use Mode: NORMAL color:orchid
+[01:18:25.609] LOG: %cStart Phase MessagePhase color:green;
+[01:18:25.806] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:18:26.095] LOG: crit stage: +0
+[01:18:26.100] LOG: Move: Flamethrower | Base damage: 27.92 | Power: 90 | Source attack: 18 | Target defense: 5
+[01:18:26.106] LOG: Move: Flamethrower | Attack damage: 24
+[01:18:26.112] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:18:26.115] LOG: %cStart Phase FaintPhase color:green;
+[01:18:26.120] WARN: cry/52 not found
+[01:18:26.224] LOG: %cStart Phase MessagePhase color:green;
+[01:18:26.833] LOG: %cStart Phase VictoryPhase color:green;
+[01:18:26.835] LOG: [coop:account] account-write scope OPEN (achievement-egg-reward) depth=1
+[01:18:26.837] LOG: %cStart Phase ExpPhase color:green;
+[01:18:27.957] LOG: %cStart Phase MoveEndPhase color:green;
+[01:18:27.957] LOG: %cStart Phase TurnInitPhase color:green;
+[01:18:27.961] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:18:27.961] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:18:27.961] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:18:27.961] LOG: %cStart Phase BerryPhase color:green;
+[01:18:27.961] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:18:27.961] LOG: %cStart Phase TurnEndPhase color:green;
+[01:18:27.963] LOG: %cStart Phase BattleEndPhase color:green;
+[01:18:27.967] LOG: Battle Score: 12 (1 Turns x1)
+[01:18:27.967] LOG: Total Score: 12
+[01:18:27.972] LOG: %cStart Phase EggLapsePhase color:green;
+[01:18:27.972] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:18:27.973] LOG: Wave Seed: uUxsVQrGRrB99msxsiN7Vv:Y 1
+[01:18:35.879] LOG: %cStart Phase NewBattlePhase color:green;
+[01:18:35.880] LOG: Wave Seed: vVytWRsHSsC::ntytjO8Ww;Z 2
+[01:18:35.886] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:18:36.226] LOG: %cStart Phase MessagePhase color:green;
+[01:18:36.628] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:18:36.628] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:18:36.630] LOG: Starting species pool tier: COMMON
+[01:18:36.642] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 3 | Nature: Bashful (-)
+[01:18:36.642] LOG: Stats (IVs): HP: 15 (23), Atk: 10 (22), Def: 7 (12), Spatk: 6 (4), Spdef: 8 (1), Spd: 10 (29)
+[01:18:36.642] LOG: Ability: Intimidate | Passive Ability: Nocturnal 
+[01:18:36.642] LOG: Moveset: ["Roar","Hyper Fang","Howl","Odor Sleuth"]
+[01:18:37.426] DEBUG: Session data saved to slot 1!
+[01:18:37.427] LOG: Wave Seed: vVytWRsHSsC::ntytjO8Ww;Z 2
+[01:18:38.243] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:18:38.243] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:18:38.808] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:18:38.809] LOG: %cStart Phase PostSummonPhase color:green;
+[01:18:38.809] LOG: Ran PSP for: Poochyena
+[01:18:38.810] LOG: %cStart Phase PostSummonPhase color:green;
+[01:18:38.811] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:18:39.113] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:18:39.115] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:18:39.115] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:18:39.159] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:18:39.463] LOG: %cStart Phase MessagePhase color:green;
+[01:18:39.991] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:18:40.034] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:18:40.034] LOG: %cStart Phase TurnInitPhase color:green;
+[01:18:40.038] LOG: %cStart Phase CommandPhase color:green;
+[01:18:42.328] LOG: Move: FLASH_CANNON Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Magnemite
+[01:18:42.328] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:18:42.331] LOG: Battle Seed: EXKLXqQG9cRjhc76
+[01:18:42.331] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[01:18:42.331] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[01:18:42.332] LOG: %cStart Phase TurnStartPhase color:green;
+[01:18:42.333] LOG: %cStart Phase MovePhase color:green;
+[01:18:42.333] LOG: %cUser: Magnemite
+Move: FLASH_CANNON
+Use Mode: NORMAL color:orchid
+[01:18:42.335] LOG: %cStart Phase MessagePhase color:green;
+[01:18:42.542] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:18:43.356] LOG: crit stage: +0
+[01:18:43.360] LOG: Move: Flash Cannon | Base damage: 18.2 | Power: 90 | Source attack: 18 | Target defense: 8
+[01:18:43.366] LOG: Move: Flash Cannon | Attack damage: 23
+[01:18:43.369] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:18:43.372] LOG: %cStart Phase FaintPhase color:green;
+[01:18:44.230] LOG: %cStart Phase MessagePhase color:green;
+[01:18:44.424] LOG: %cStart Phase VictoryPhase color:green;
+[01:18:44.424] LOG: %cStart Phase ExpPhase color:green;
+[01:18:44.830] LOG: %cStart Phase MoveEndPhase color:green;
+[01:18:44.831] LOG: %cStart Phase TurnInitPhase color:green;
+[01:18:44.835] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:18:44.835] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:18:44.835] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:18:44.835] LOG: %cStart Phase BerryPhase color:green;
+[01:18:44.835] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:18:44.835] LOG: %cStart Phase TurnEndPhase color:green;
+[01:18:44.837] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:18:44.838] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:18:45.143] LOG: %cStart Phase MessagePhase color:green;
+[01:18:45.671] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:18:45.714] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:18:45.714] LOG: %cStart Phase BattleEndPhase color:green;
+[01:18:45.718] LOG: Battle Score: 17 (1 Turns x1)
+[01:18:45.718] LOG: Total Score: 29
+[01:18:45.722] LOG: %cStart Phase EggLapsePhase color:green;
+[01:18:45.722] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:18:45.722] LOG: Wave Seed: vVytWRsHSsC::ntytjO8Ww;Z 2
+[01:18:58.362] WARN: cry/147 not found
+[01:19:15.968] LOG: %cStart Phase LearnMovePhase color:green;
+[01:19:17.193] WARN: cry/147 not found
+[01:19:18.195] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[01:19:19.904] LOG: %cStart Phase NewBattlePhase color:green;
+[01:19:19.904] LOG: Wave Seed: wWzuXStITtD;;ouzukP9Xx<[ 3
+[01:19:19.907] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:19:20.253] LOG: %cStart Phase MessagePhase color:green;
+[01:19:20.656] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:19:20.656] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:19:20.658] LOG: Starting species pool tier: COMMON
+[01:19:20.670] LOG: Pokemon: Wild Spinarak | Species ID: 167 | Level: 3 | Nature: Docile (-)
+[01:19:20.670] LOG: Stats (IVs): HP: 15 (7), Atk: 9 (19), Def: 8 (6), Spatk: 8 (25), Spdef: 8 (2), Spd: 7 (5)
+[01:19:20.670] LOG: Ability: Prankster | Passive Ability: Poison Touch 
+[01:19:20.670] LOG: Moveset: ["Pounce","Sonic Boom","Toxic Thread","Fury Swipes"]
+[01:19:21.381] DEBUG: Session data saved to slot 1!
+[01:19:21.382] LOG: Wave Seed: wWzuXStITtD;;ouzukP9Xx<[ 3
+[01:19:21.785] WARN: cry/167 not found
+[01:19:22.190] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:19:22.190] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:19:23.137] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:19:23.137] LOG: %cStart Phase PostSummonPhase color:green;
+[01:19:23.137] LOG: Ran PSP for: Spinarak
+[01:19:23.138] LOG: %cStart Phase TurnInitPhase color:green;
+[01:19:23.142] LOG: %cStart Phase CommandPhase color:green;
+[01:20:06.344] LOG: Move: FLAMETHROWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Magnemite
+[01:20:06.345] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:20:06.347] LOG: Battle Seed: 5cbffF4XYmwZfUrq
+[01:20:06.347] LOG: %cStart Phase TurnStartPhase color:green;
+[01:20:06.348] LOG: %cStart Phase MovePhase color:green;
+[01:20:06.349] LOG: %cUser: Magnemite
+Move: FLAMETHROWER
+Use Mode: NORMAL color:orchid
+[01:20:06.351] LOG: %cStart Phase MessagePhase color:green;
+[01:20:06.559] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:20:06.848] LOG: crit stage: +0
+[01:20:06.853] LOG: Move: Flamethrower | Base damage: 18.2 | Power: 90 | Source attack: 18 | Target defense: 8
+[01:20:06.858] LOG: Move: Flamethrower | Attack damage: 33
+[01:20:06.862] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:20:06.868] LOG: %cStart Phase MessagePhase color:green;
+[01:20:07.246] LOG: %cStart Phase FaintPhase color:green;
+[01:20:07.249] WARN: cry/167 not found
+[01:20:07.351] LOG: %cStart Phase MessagePhase color:green;
+[01:20:07.680] LOG: %cStart Phase VictoryPhase color:green;
+[01:20:07.680] LOG: %cStart Phase ExpPhase color:green;
+[01:20:08.156] LOG: %cStart Phase MoveEndPhase color:green;
+[01:20:08.156] LOG: %cStart Phase TurnInitPhase color:green;
+[01:20:08.159] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:20:08.159] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:20:08.159] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:20:08.159] LOG: %cStart Phase BerryPhase color:green;
+[01:20:08.159] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:20:08.159] LOG: %cStart Phase TurnEndPhase color:green;
+[01:20:08.161] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:20:08.162] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:20:08.464] LOG: %cStart Phase MessagePhase color:green;
+[01:20:08.993] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:20:09.035] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:20:09.035] LOG: %cStart Phase BattleEndPhase color:green;
+[01:20:09.039] LOG: Battle Score: 15 (1 Turns x1)
+[01:20:09.039] LOG: Total Score: 44
+[01:20:09.043] LOG: %cStart Phase EggLapsePhase color:green;
+[01:20:09.043] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:20:09.043] LOG: Wave Seed: wWzuXStITtD;;ouzukP9Xx<[ 3
+[01:20:14.600] LOG: %cStart Phase NewBattlePhase color:green;
+[01:20:14.600] LOG: Wave Seed: xX{vYTuJUuE<<pv{vlQ:Yy=\ 4
+[01:20:14.607] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:20:14.950] LOG: %cStart Phase MessagePhase color:green;
+[01:20:15.352] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:20:15.352] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:20:15.360] LOG: Pokemon: Foe Rattata Redux | Species ID: 10646 | Level: 3 | Nature: Impish (+Def/-SpAtk)
+[01:20:15.360] LOG: Stats (IVs): HP: 15 (9), Atk: 9 (16), Def: 8 (9), Spatk: 5 (13), Spdef: 7 (14), Spd: 9 (15)
+[01:20:15.360] LOG: Ability: Hustle | Passive Ability: Poison Touch 
+[01:20:15.360] LOG: Moveset: ["Hyper Fang","Poison Fang","Endure","Covet"]
+[01:20:16.173] LOG: Generated AI funcs
+[01:20:16.222] DEBUG: Session data saved to slot 1!
+[01:20:16.223] LOG: Wave Seed: xX{vYTuJUuE<<pv{vlQ:Yy=\ 4
+[01:20:17.745] LOG: %cStart Phase SummonPhase color:green;
+[01:20:18.044] WARN: cry/10646 not found
+[01:20:18.248] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:20:18.249] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:20:18.250] LOG: %cStart Phase PostSummonPhase color:green;
+[01:20:18.250] LOG: Ran PSP for: Rattata Redux
+[01:20:18.250] LOG: %cStart Phase TurnInitPhase color:green;
+[01:20:18.254] LOG: %cStart Phase CommandPhase color:green;
+[01:20:18.652] LOG: crit stage: +0
+[01:20:19.161] LOG: crit stage: +0
+[01:20:20.315] LOG: crit stage: +0
+[01:20:29.049] LOG: crit stage: +0
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"tTwrUPqFQqA88lrwrhM6Uu9X","gameModeId":8,"difficulty":"youngster","challenges":[],"roster":[{"id":1862663394,"player":true,"species":81,"formIndex":0,"abilityIndex":1,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":-1,"hp":19,"stats":[19,9,13,18,12,11],"ivs":[31,31,30,31,31,31],"nature":15,"moveset":[{"moveId":909,"ppUsed":0,"ppUp":0},{"moveId":430,"ppUsed":0,"ppUp":0},{"moveId":53,"ppUsed":0,"ppUp":0},{"moveId":58,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":81,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[9,8],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,3,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":53,"targets":[2],"result":1,"useMode":1},{"move":430,"targets":[2],"result":1,"useMode":1},{"move":53,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2618219982,"player":true,"species":133,"formIndex":0,"abilityIndex":2,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,12,11,11,13,11],"ivs":[31,31,30,31,31,27],"nature":0,"moveset":[{"moveId":98,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0},{"moveId":737,"ppUsed":0,"ppUp":0},{"moveId":748,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":133,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":199030895,"player":true,"species":147,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,12,11,11,11,11],"ivs":[31,29,31,27,31,31],"nature":6,"moveset":[{"moveId":893,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":462,"ppUsed":0,"ppUp":0},{"moveId":55,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":147,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3225310553,"player":true,"species":285,"formIndex":0,"abilityIndex":2,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":105,"levelExp":0,"gender":0,"hp":22,"stats":[22,10,12,9,12,11],"ivs":[31,31,30,30,31,31],"nature":13,"moveset":[{"moveId":885,"ppUsed":0,"ppUp":0},{"moveId":480,"ppUsed":0,"ppUp":0},{"moveId":78,"ppUsed":0,"ppUp":0},{"moveId":709,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":285,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":133988146,"player":true,"species":447,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,15,10,9,10,12],"ivs":[31,30,30,31,31,31],"nature":3,"moveset":[{"moveId":823,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":713,"ppUsed":0,"ppUp":0},{"moveId":197,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":447,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":1,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3681819679,"player":true,"species":747,"formIndex":0,"abilityIndex":2,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,11,12,10,11,11],"ivs":[31,29,29,31,31,30],"nature":0,"moveset":[{"moveId":845,"ppUsed":0,"ppUp":0},{"moveId":776,"ppUsed":0,"ppUp":0},{"moveId":839,"ppUsed":0,"ppUp":0},{"moveId":661,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":747,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":3,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":0,"kind":"reward","choice":2},{"type":"command","wave":2,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":1,"kind":"reward","choice":0},{"type":"interaction","seq":2,"kind":"reward","choice":0},{"type":"interaction","seq":3,"kind":"learnMove","choice":2},{"type":"command","wave":3,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":2,"target":2}},{"type":"interaction","seq":4,"kind":"reward","choice":0}],"endState":{"waveIndex":4,"money":1200,"party":[{"species":81,"level":5,"hp":19,"maxHp":19},{"species":133,"level":5,"hp":22,"maxHp":22},{"species":147,"level":5,"hp":20,"maxHp":20},{"species":285,"level":5,"hp":22,"maxHp":22},{"species":447,"level":5,"hp":20,"maxHp":20},{"species":747,"level":5,"hp":22,"maxHp":22}]},"checkpoint":{"wave":1,"seed":"tTwrUPqFQqA88lrwrhM6Uu9X","party":[{"id":1862663394,"player":true,"species":81,"formIndex":0,"abilityIndex":1,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":-1,"hp":19,"stats":[19,9,13,18,12,11],"ivs":[31,31,30,31,31,31],"nature":15,"moveset":[{"moveId":909,"ppUsed":0,"ppUp":0},{"moveId":430,"ppUsed":0,"ppUp":0},{"moveId":53,"ppUsed":0,"ppUp":0},{"moveId":58,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":81,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[9,8],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,3,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":53,"targets":[2],"result":1,"useMode":1},{"move":430,"targets":[2],"result":1,"useMode":1},{"move":53,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2618219982,"player":true,"species":133,"formIndex":0,"abilityIndex":2,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,12,11,11,13,11],"ivs":[31,31,30,31,31,27],"nature":0,"moveset":[{"moveId":98,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0},{"moveId":737,"ppUsed":0,"ppUp":0},{"moveId":748,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":133,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":0,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":199030895,"player":true,"species":147,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":0,"hp":20,"stats":[20,12,11,11,11,11],"ivs":[31,29,31,27,31,31],"nature":6,"moveset":[{"moveId":893,"ppUsed":0,"ppUp":0},{"moveId":552,"ppUsed":0,"ppUp":0},{"moveId":462,"ppUsed":0,"ppUp":0},{"moveId":55,"ppUsed":0,"ppUp":0}],"status":null,"friendship":35,"metLevel":5,"metBiome":-1,"metSpecies":147,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":15,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3225310553,"player":true,"species":285,"formIndex":0,"abilityIndex":2,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":105,"levelExp":0,"gender":0,"hp":22,"stats":[22,10,12,9,12,11],"ivs":[31,31,30,30,31,31],"nature":13,"moveset":[{"moveId":885,"ppUsed":0,"ppUp":0},{"moveId":480,"ppUsed":0,"ppUp":0},{"moveId":78,"ppUsed":0,"ppUp":0},{"moveId":709,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":285,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":11,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":133988146,"player":true,"species":447,"formIndex":0,"abilityIndex":0,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":128,"levelExp":0,"gender":0,"hp":20,"stats":[20,15,10,9,10,12],"ivs":[31,30,30,31,31,31],"nature":3,"moveset":[{"moveId":823,"ppUsed":0,"ppUp":0},{"moveId":813,"ppUsed":0,"ppUp":0},{"moveId":713,"ppUsed":0,"ppUp":0},{"moveId":197,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":447,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":1,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":3681819679,"player":true,"species":747,"formIndex":0,"abilityIndex":2,"passive":true,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":22,"stats":[22,11,12,10,11,11],"ivs":[31,29,29,31,31,30],"nature":0,"moveset":[{"moveId":845,"ppUsed":0,"ppUp":0},{"moveId":776,"ppUsed":0,"ppUp":0},{"moveId":839,"ppUsed":0,"ppUp":0},{"moveId":661,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":747,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":3,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1200,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
