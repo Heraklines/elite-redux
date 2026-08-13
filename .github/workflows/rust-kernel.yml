@@ -3060,7 +3060,6 @@ jobs:
           use er_canonical::{canonicalize, content_digest};
           use er_content::pack::ContentPack;
           use er_sim::snapshot::{PairDeterminismDigest, PairKernelTraceV2};
-          use er_sim::SimulatedPair;
           use er_types::SafeU53;
           use serde::{Deserialize, Serialize};
           use wasm_bindgen::prelude::*;
@@ -3225,12 +3224,7 @@ jobs:
               for scenario in &suite.scenarios {
                   let replay = scenario
                       .trace
-                      .replay_simulated_pair::<SimulatedPair, _>(
-                          Arc::clone(&content),
-                          |pair, operation, _virtual_time_ms| {
-                              pair.apply_trace_operation_v2(operation.clone())
-                          },
-                      )?;
+                      .replay_simulated_pair(Arc::clone(&content))?;
                   if let Some(divergence) = replay.first_divergence {
                       return Err(invalid(format!(
                           "M3 continuation diverged at {}, operation {}, time {} ms, path {}, code {}",
