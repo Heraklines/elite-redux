@@ -2,7 +2,7 @@
 
 use er_content::moves::MoveDefinitionError;
 use er_content::pack::ContentPack;
-use er_rng::audit::RngStream;
+use er_rng::audit::{RngDraw, RngReason, RngStream};
 use er_rng::battle::RngRuntime;
 use er_rng::phaser::RngError;
 use er_state::battle::{
@@ -418,6 +418,17 @@ fn resolve_move_action(
     sync_rng_state(state, runtime)?;
 
     let action_sequence = push_pending_action(action_order, action, move_disposition(&result))?;
+
+    for draw in runtime
+        .audit_entries()
+        .iter()
+        .skip(rng_audit_start)
+        .filter(|draw| {
+            draw.stream == RngStream::Battle && draw.reason == RngReason::ParalysisActivation
+        })
+    {
+        record_battle_rng_draw(draw, mutations, causal_events)?;
+    }
     if let Some(pp) = result.pp_mutation {
         record_mutation(
             mutations,
@@ -434,26 +445,11 @@ fn resolve_move_action(
         .audit_entries()
         .iter()
         .skip(rng_audit_start)
-        .filter(|draw| draw.stream == RngStream::Battle)
+        .filter(|draw| {
+            draw.stream == RngStream::Battle && draw.reason != RngReason::ParalysisActivation
+        })
     {
-        let before = draw
-            .before_state
-            .battle
-            .clone()
-            .ok_or(RngError::MissingBattleState)?;
-        let after = draw
-            .after_state
-            .battle
-            .clone()
-            .ok_or(RngError::MissingBattleState)?;
-        if before == after {
-            continue;
-        }
-        record_mutation(
-            mutations,
-            causal_events,
-            BattleMutation::BattleRngChanged { before, after },
-        );
+        record_battle_rng_draw(draw, mutations, causal_events)?;
     }
     causal_events.push(PresentationCausalEvent::move_used(
         action_sequence,
@@ -488,6 +484,32 @@ fn resolve_move_action(
             )?;
         }
     }
+    Ok(())
+}
+
+fn record_battle_rng_draw(
+    draw: &RngDraw,
+    mutations: &mut Vec<BattleMutation>,
+    causal_events: &mut Vec<PresentationCausalEvent>,
+) -> Result<(), BattleResolveError> {
+    let before = draw
+        .before_state
+        .battle
+        .clone()
+        .ok_or(RngError::MissingBattleState)?;
+    let after = draw
+        .after_state
+        .battle
+        .clone()
+        .ok_or(RngError::MissingBattleState)?;
+    if before == after {
+        return Ok(());
+    }
+    record_mutation(
+        mutations,
+        causal_events,
+        BattleMutation::BattleRngChanged { before, after },
+    );
     Ok(())
 }
 
