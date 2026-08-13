@@ -125,7 +125,7 @@ fn terminal_draft(subsumes: Vec<Revision>) -> Result<AuthorityEntryDraft, Box<dy
         3_u64,
     )?;
     Ok(build_battle_terminal_commit_draft(
-        &context()?,
+        context()?,
         OperationId::new("battle/final-terminal")?,
         terminal,
         subsumes,
@@ -223,6 +223,48 @@ fn ordinary_entries_still_retire_at_full_control_quorum() -> TestResult {
         &committed.entry.operation_id,
         AckStage::PresentationSettled
     ));
+    Ok(())
+}
+
+#[test]
+fn mixed_await_successors_keep_ordinary_control_retirement() -> TestResult {
+    let mut scheduler = KernelScheduler::new();
+    let mut log = AuthorityLog::new(config()?)?;
+    let mut draft = final_predecessor_draft()?;
+    let NextControl::AwaitSuccessor(control) = &mut draft.next_control else {
+        return Err("final predecessor helper did not create an await control".into());
+    };
+    control.allowed_kinds = vec![
+        AuthorityEntryKind::WaveAdvance,
+        AuthorityEntryKind::TerminalCommit,
+    ];
+    control.allow_next_wave_start = true;
+    control.expected_operation_id = None;
+    let committed = log.commit(draft, &mut scheduler)?;
+
+    let first = log.accept_receipt_detailed(
+        receipt(&committed.entry, 1, AckStage::ControlInstalled)?,
+        &mut scheduler,
+    );
+    assert!(matches!(
+        first.verdict,
+        AuthorityReceiptVerdict::Advanced {
+            retired: false,
+            ref waiting_for_seat_ids,
+        } if waiting_for_seat_ids.as_slice() == [seat(2)?]
+    ));
+    let second = log.accept_receipt_detailed(
+        receipt(&committed.entry, 2, AckStage::ControlInstalled)?,
+        &mut scheduler,
+    );
+    assert!(matches!(
+        second.verdict,
+        AuthorityReceiptVerdict::Advanced {
+            retired: true,
+            ref waiting_for_seat_ids,
+        } if waiting_for_seat_ids.is_empty()
+    ));
+    assert!(log.retained().is_empty());
     Ok(())
 }
 

@@ -252,7 +252,7 @@ where
     T: Serialize,
     U: DeserializeOwned,
 {
-    let value = serde_json::to_value(&value).map_err(|error| serialization(path, error))?;
+    let value = serde_json::to_value(value).map_err(|error| serialization(path, error))?;
     serde_json::from_value(value).map_err(|error| BattleTerminalMaterialError::Malformed {
         path: path.to_owned(),
         reason: error.to_string(),

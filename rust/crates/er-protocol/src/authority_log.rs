@@ -1110,13 +1110,27 @@ impl AuthorityLog {
 /// quorum subsumes it.
 fn retirement_stage(entry: &AuthorityEntry) -> Option<i8> {
     match &entry.next_control {
-        NextControl::AwaitSuccessor(control)
-            if control
-                .allowed_kinds
-                .contains(&AuthorityEntryKind::TerminalCommit) => None,
+        NextControl::AwaitSuccessor(_) if is_terminal_predecessor(entry) => None,
         NextControl::Terminal(_) => Some(STAGE_PRESENTATION_SETTLED),
         _ => Some(STAGE_CONTROL_INSTALLED),
     }
+}
+
+fn is_terminal_predecessor(entry: &AuthorityEntry) -> bool {
+    if !matches!(
+        entry.kind,
+        AuthorityEntryKind::TurnCommit | AuthorityEntryKind::ReplacementCommit
+    ) {
+        return false;
+    }
+    let NextControl::AwaitSuccessor(control) = &entry.next_control else {
+        return false;
+    };
+    control.allowed_kinds.as_slice() == [AuthorityEntryKind::TerminalCommit]
+        && control.allowed_interaction_addresses.is_none()
+        && control.allowed_control_addresses.is_none()
+        && !control.allow_next_wave_start
+        && control.expected_operation_id.is_some()
 }
 
 /// Return the peer stage represented by `waiting_for_seat_ids`.  The final

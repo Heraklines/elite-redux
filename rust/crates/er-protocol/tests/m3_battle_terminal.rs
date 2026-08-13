@@ -53,10 +53,10 @@ fn entry_with(
     subsumes: Vec<Revision>,
 ) -> AuthorityEntry {
     let draft = build_battle_terminal_commit_draft(
-        &context(),
-        &operation_id(),
-        &terminal(),
-        &subsumes,
+        context(),
+        operation_id(),
+        terminal(),
+        subsumes,
     )
     .expect("terminal draft");
     AuthorityEntry {
@@ -144,10 +144,10 @@ fn digest_is_independent_of_wire_object_key_order() {
 fn builder_emits_typed_identities_and_sorted_deduplicated_subsumes() {
     let supplied = vec![revision(5), revision(2), revision(5), revision(3)];
     let draft = build_battle_terminal_commit_draft(
-        &context(),
-        &operation_id(),
-        &terminal(),
-        &supplied,
+        context(),
+        operation_id(),
+        terminal(),
+        supplied.clone(),
     )
     .expect("terminal draft");
 
@@ -158,7 +158,7 @@ fn builder_emits_typed_identities_and_sorted_deduplicated_subsumes() {
     assert_eq!(supplied, vec![revision(5), revision(2), revision(5), revision(3)]);
     assert_eq!(
         draft.material.payload,
-        serde_json::to_value(&terminal()).expect("typed terminal payload")
+        serde_json::to_value(terminal()).expect("typed terminal payload")
     );
     assert_eq!(
         draft.material.digest,
@@ -192,18 +192,18 @@ fn constructor_and_builder_reject_malformed_identities_and_zero_subsumes() {
     let mut bad_context = context();
     bad_context.seat_map_id.clear();
     assert!(build_battle_terminal_commit_draft(
-        &bad_context,
-        &operation_id(),
-        &terminal(),
+        bad_context,
+        operation_id(),
+        terminal(),
         Vec::<Revision>::new(),
     )
     .is_err());
 
     let bad_operation = OperationId::new("bad\noperation").expect("construct malformed operation ID");
     assert!(build_battle_terminal_commit_draft(
-        &context(),
-        &bad_operation,
-        &terminal(),
+        context(),
+        bad_operation,
+        terminal(),
         Vec::<Revision>::new(),
     )
     .is_err());
@@ -211,17 +211,17 @@ fn constructor_and_builder_reject_malformed_identities_and_zero_subsumes() {
     let mut bad_terminal = terminal();
     bad_terminal.terminal_id.clear();
     assert!(build_battle_terminal_commit_draft(
-        &context(),
-        &operation_id(),
-        &bad_terminal,
+        context(),
+        operation_id(),
+        bad_terminal,
         Vec::<Revision>::new(),
     )
     .is_err());
 
     assert!(build_battle_terminal_commit_draft(
-        &context(),
-        &operation_id(),
-        &terminal(),
+        context(),
+        operation_id(),
+        terminal(),
         vec![Revision::ZERO],
     )
     .is_err());
@@ -229,20 +229,20 @@ fn constructor_and_builder_reject_malformed_identities_and_zero_subsumes() {
 
 #[test]
 fn serde_rejects_unknown_fields_and_untyped_kind_or_reason() {
-    let mut unknown = serde_json::to_value(&terminal()).expect("terminal JSON");
+    let mut unknown = serde_json::to_value(terminal()).expect("terminal JSON");
     unknown["extra"] = json!(true);
     assert!(serde_json::from_value::<BattleTerminalMaterialV1>(unknown).is_err());
 
-    let mut wrong_kind = serde_json::to_value(&terminal()).expect("terminal JSON");
+    let mut wrong_kind = serde_json::to_value(terminal()).expect("terminal JSON");
     wrong_kind["kind"] = json!("TERMINAL");
     assert!(serde_json::from_value::<BattleTerminalMaterialV1>(wrong_kind).is_err());
 
-    let mut wrong_reason = serde_json::to_value(&terminal()).expect("terminal JSON");
+    let mut wrong_reason = serde_json::to_value(terminal()).expect("terminal JSON");
     wrong_reason["reason"] = json!("future-reason");
     assert!(serde_json::from_value::<BattleTerminalMaterialV1>(wrong_reason).is_err());
 
     for deferred_reason in ["final-flee", "final-boss-credits", "shared-fault"] {
-        let mut deferred = serde_json::to_value(&terminal()).expect("terminal JSON");
+        let mut deferred = serde_json::to_value(terminal()).expect("terminal JSON");
         deferred["reason"] = json!(deferred_reason);
         assert!(serde_json::from_value::<BattleTerminalMaterialV1>(deferred).is_err());
     }
