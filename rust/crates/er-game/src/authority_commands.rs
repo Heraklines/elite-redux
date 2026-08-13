@@ -346,6 +346,22 @@ impl CommandFrontierCompletion {
     }
 }
 
+/// Opaque proof that an admitted command frontier passed the trusted legality
+/// boundary without requiring a cloned game state.
+#[doc(hidden)]
+pub struct ValidatedAdmittedCommandFrontier<'a> {
+    state: &'a GameState,
+    commands: CommandSet,
+}
+
+impl<'a> ValidatedAdmittedCommandFrontier<'a> {
+    /// Consume the proof and return the validated state and canonical commands.
+    #[doc(hidden)]
+    pub fn into_parts(self) -> (&'a GameState, CommandSet) {
+        (self.state, self.commands)
+    }
+}
+
 /// Result of admitting one external replacement proposal.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReplacementAdmissionResult {
@@ -842,6 +858,37 @@ pub fn complete_command_frontier_trusted(
     content: &ContentPack,
 ) -> Result<CommandFrontierCompletion, AuthorityCommandError> {
     complete_command_frontier_inner(state, content, ContentValidationMode::Trusted)
+}
+
+/// Validate an already admitted frontier inside a trusted transaction.
+#[doc(hidden)]
+pub fn validate_admitted_command_frontier_trusted<'a>(
+    state: &'a GameState,
+    content: &ContentPack,
+) -> Result<Option<ValidatedAdmittedCommandFrontier<'a>>, AuthorityCommandError> {
+    validate_transaction_content(state, content, ContentValidationMode::Trusted)?;
+    let battle = active_battle(state)?;
+    if battle.command_state.frontier.is_empty() {
+        return Err(AuthorityCommandError::EmptyOrInvalidFrontier);
+    }
+    for entry in &battle.command_state.frontier {
+        validate_preserved_offer_trusted(state, entry, content)
+            .map_err(AuthorityCommandError::PreservedOffer)?;
+    }
+    if battle
+        .command_state
+        .frontier
+        .iter()
+        .any(|entry| !matches!(&entry.status, CommandFrontierStatus::Admitted { .. }))
+    {
+        return Ok(None);
+    }
+
+    battle.command_state.validate()?;
+    let commands = battle.command_state.admitted_command_set()?;
+    normalize_command_set_trusted(state, &commands, content).map_err(legality)?;
+    validate_state_content_trusted(state, content).map_err(legality)?;
+    Ok(Some(ValidatedAdmittedCommandFrontier { state, commands }))
 }
 
 fn complete_command_frontier_inner(
