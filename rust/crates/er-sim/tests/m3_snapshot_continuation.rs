@@ -1668,7 +1668,11 @@ mod live_coop_production {
             .runtime_identity
             .local_seat;
         let mut found = false;
-        let Some(battle) = endpoint_snapshot(snapshot, PairEndpoint::Host)
+        // A replica retains its own proposal before the authority receives it,
+        // so completion is endpoint-local until the corresponding wire packet
+        // is delivered.  Inspect the runtime being driven rather than the
+        // authority's potentially stale frontier.
+        let Some(battle) = endpoint_snapshot(snapshot, endpoint)
             .game
             .state
             .battle
@@ -2520,25 +2524,13 @@ mod live_coop_production {
             &mut uninterrupted,
             &mut restored,
             raw_key_down(PairEndpoint::Host, PhysicalKey::Enter),
-            "held-submit-menu-down",
+            "held-move-select-down",
         )?;
         apply_same(
             &mut uninterrupted,
             &mut restored,
             raw_key_up(PairEndpoint::Host, PhysicalKey::Enter),
-            "held-submit-menu-up",
-        )?;
-        apply_same(
-            &mut uninterrupted,
-            &mut restored,
-            raw_key_down(PairEndpoint::Host, PhysicalKey::Enter),
-            "held-target-select-down",
-        )?;
-        apply_same(
-            &mut uninterrupted,
-            &mut restored,
-            raw_key_up(PairEndpoint::Host, PhysicalKey::Enter),
-            "held-target-select-up",
+            "held-move-select-up",
         )?;
         apply_same(
             &mut uninterrupted,
@@ -2782,6 +2774,14 @@ mod live_coop_production {
             apply_trace_operation(
                 &mut pair,
                 raw_key_up_v2(PairEndpoint::Host, PhysicalKey::Space),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                raw_key_down_v2(PairEndpoint::Host, PhysicalKey::Enter),
+            )?;
+            apply_trace_operation(
+                &mut pair,
+                raw_key_up_v2(PairEndpoint::Host, PhysicalKey::Enter),
             )?;
             apply_trace_operation(
                 &mut pair,
