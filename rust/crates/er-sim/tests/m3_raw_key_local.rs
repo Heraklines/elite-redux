@@ -1325,6 +1325,25 @@ fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> Tes
             .actionable
     );
     assert_eq!(next_faint_occurrence(&kernel)?, faint_allocator_before + 1,);
+    let pending_faint_queue = json!([{
+        "id": 0,
+        "owner_seat": 1,
+        "pokemon": 1,
+        "replacement": { "kind": "PENDING" },
+        "slot": { "position": 0, "side": "PLAYER" },
+        "source": {
+            "epoch": 1,
+            "resolved_turn": 1,
+            "turn_occurrence": 0,
+            "wave": 1
+        }
+    }]);
+    let state = game_state_json(&kernel)?;
+    assert_eq!(
+        field(field(&state, "battle")?, "faint_queue")?,
+        &pending_faint_queue
+    );
+
     let applied_faint_queue = json!([{
         "id": 0,
         "owner_seat": 1,
@@ -1338,8 +1357,6 @@ fn raw_single_replacement_uses_the_published_forced_replacement_fixture() -> Tes
             "wave": 1
         }
     }]);
-    let state = game_state_json(&kernel)?;
-    assert_eq!(field(field(&state, "battle")?, "faint_queue")?, &applied_faint_queue);
 
     let mut replacement_effects = Vec::new();
     replacement_effects.extend(raw_press(&mut kernel, PhysicalKey::Enter)?);
