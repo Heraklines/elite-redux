@@ -255,6 +255,14 @@ struct LegacyDeterministicIntimidateProbe {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyHpFaintedProjection {
+    case_name: &'static str,
+    pokemon: u64,
+    before_hp: u32,
+    after_hp: u32,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 struct TypedInactiveActionProjection {
     case_name: &'static str,
     actor: u64,
@@ -264,6 +272,7 @@ struct TypedInactiveActionProjection {
     move_slot: u8,
     move_id: u64,
     effective_speed: u32,
+    tie_order: u8,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -301,6 +310,17 @@ struct LegacyCompactedTargetProjection {
     effective_speed: u32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct LegacyRemappedCommandAdmissionProjection {
+    case_name: &'static str,
+    actor: u64,
+    source_side: BattleSide,
+    source_position: u8,
+    operation_id: &'static str,
+    owner_seat: u64,
+    source: CommandAdmissionSource,
+}
+
 const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
     TypedInactiveActionProjection {
         case_name: "same-side-simultaneous-faint",
@@ -311,6 +331,7 @@ const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
         move_slot: 0,
         move_id: 589,
         effective_speed: 122,
+        tie_order: 0,
     },
     TypedInactiveActionProjection {
         case_name: "no-legal-replacement",
@@ -321,6 +342,7 @@ const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
         move_slot: 0,
         move_id: 589,
         effective_speed: 180,
+        tie_order: 1,
     },
     TypedInactiveActionProjection {
         case_name: "no-legal-replacement",
@@ -331,6 +353,7 @@ const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
         move_slot: 0,
         move_id: 589,
         effective_speed: 180,
+        tie_order: 0,
     },
     TypedInactiveActionProjection {
         case_name: "defeat",
@@ -341,6 +364,70 @@ const TYPED_INACTIVE_ACTION_PROJECTIONS: &[TypedInactiveActionProjection] = &[
         move_slot: 0,
         move_id: 589,
         effective_speed: 180,
+        tie_order: 0,
+    },
+];
+
+const LEGACY_HP_FAINTED_PROJECTIONS: &[LegacyHpFaintedProjection] = &[
+    LegacyHpFaintedProjection {
+        case_name: "defeat",
+        pokemon: 1,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "forced-replacement",
+        pokemon: 1,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "mixed-side-simultaneous-faint",
+        pokemon: 1,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "no-legal-replacement",
+        pokemon: 2,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "no-legal-replacement",
+        pokemon: 1,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "same-side-simultaneous-faint",
+        pokemon: 2,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "same-side-simultaneous-faint",
+        pokemon: 1,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "victory",
+        pokemon: 2,
+        before_hp: 2,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "wonder-guard-status-pass",
+        pokemon: 2,
+        before_hp: 1,
+        after_hp: 0,
+    },
+    LegacyHpFaintedProjection {
+        case_name: "wonder-guard-super-effective-pass",
+        pokemon: 2,
+        before_hp: 1,
+        after_hp: 0,
     },
 ];
 
@@ -377,6 +464,18 @@ const LEGACY_COMPACTED_TARGET_PROJECTIONS: &[LegacyCompactedTargetProjection] =
         action_count: 5,
         action_index: 2,
         effective_speed: 207,
+    }];
+
+const LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS:
+    &[LegacyRemappedCommandAdmissionProjection] =
+    &[LegacyRemappedCommandAdmissionProjection {
+        case_name: "mixed-side-simultaneous-faint",
+        actor: 2,
+        source_side: BattleSide::Player,
+        source_position: 1,
+        operation_id: "battle/1/wave/1/turn/1/command/player/1/seat/2",
+        owner_seat: 2,
+        source: CommandAdmissionSource::AuthorityRemoteProposal,
     }];
 
 const LEGACY_DETERMINISTIC_INTIMIDATE_CALLSITE: &str =
@@ -2376,6 +2475,49 @@ fn catalogued_legacy_compacted_target(
     Ok(Some(typed_target))
 }
 
+fn catalogued_remapped_command_admission_source(
+    case_name: &str,
+    record: &FixtureCommandRecord,
+) -> Result<CommandAdmissionSource, Box<dyn Error>> {
+    let Some(projection) = LEGACY_REMAPPED_COMMAND_ADMISSION_PROJECTIONS
+        .iter()
+        .find(|projection| {
+            projection.case_name == case_name && projection.actor == u64::from(record.actor)
+        })
+    else {
+        return Ok(record.source);
+    };
+    let source_slot = FieldSlot::new(projection.source_side, projection.source_position)?;
+    let owner_seat = SeatId::new(SafeU53::new(projection.owner_seat)?);
+    let expected_move_slot = MoveSlotIndex::try_from(0_u64)?;
+    let enemy_zero = FieldSlot::new(BattleSide::Enemy, 0)?;
+    let enemy_one = FieldSlot::new(BattleSide::Enemy, 1)?;
+    let exact_record = record.field_slot == source_slot
+        && record.operation_id.as_str() == projection.operation_id
+        && record.owner_seat == Some(owner_seat)
+        && record.source == projection.source
+        && record.legacy_command == record.command
+        && matches!(
+            &record.command,
+            BattleCommand::Fight {
+                actor,
+                move_slot,
+                targets: BattleTargetSelection::Selected(targets),
+            } if *actor == record.actor
+                && *move_slot == expected_move_slot
+                && targets.len() == 2
+                && targets[0] == enemy_zero
+                && targets[1] == enemy_one
+        );
+    if !exact_record {
+        return Err(FixtureError::new(format!(
+            "{case_name}: catalogued remapped command admission source differs from its exact actor/slot/operation/owner/source/target fingerprint"
+        ))
+        .into());
+    }
+    Ok(projection.source)
+}
+
 fn normalize_legacy_command_records(
     case_name: &str,
     initial: &GameState,
@@ -2781,6 +2923,7 @@ fn admit_fixture_commands(
     let mut frontier = Vec::with_capacity(records.len());
 
     for (index, record) in records.iter().enumerate() {
+        let admission_source = catalogued_remapped_command_admission_source(case_name, record)?;
         let offer = match record.field_slot.side {
             BattleSide::Player => build_command_offer(initial, record.field_slot, content)?,
             BattleSide::Enemy => {
@@ -2812,7 +2955,7 @@ fn admit_fixture_commands(
                         "{case_name}: player command {index} has no owner seat"
                     ))
                 })?;
-                if record.source == CommandAdmissionSource::ScriptedEnemy {
+                if admission_source == CommandAdmissionSource::ScriptedEnemy {
                     return Err(FixtureError::new(format!(
                         "{case_name}: player command {index} has SCRIPTED_ENEMY source"
                     ))
@@ -2835,7 +2978,7 @@ fn admit_fixture_commands(
             }
             BattleSide::Enemy => {
                 if record.owner_seat.is_some()
-                    || record.source != CommandAdmissionSource::ScriptedEnemy
+                    || admission_source != CommandAdmissionSource::ScriptedEnemy
                 {
                     return Err(FixtureError::new(format!(
                         "{case_name}: enemy command {index} has invalid owner/source metadata"
@@ -2857,7 +3000,7 @@ fn admit_fixture_commands(
         let owner_seat = record.owner_seat;
         let status = CommandFrontierStatus::Admitted {
             command: accepted_command.clone(),
-            source: record.source,
+            source: admission_source,
         };
         frontier.push(CommandFrontierEntry::new(
             record.operation_id.clone(),
@@ -4059,8 +4202,9 @@ fn project_catalogued_typed_inactive_actions(
                 FixtureError::new(format!(
                     "{case_name}: catalogued typed-only inactive action for actor {actor} is absent from the exact tail window"
                 ))
-            })?;
+        })?;
         let action = &actual[action_index];
+        let expected_tie_order = SafeU53::new(u64::from(projection.tie_order))?;
         let exact_action = action.sequence.get() == u64::try_from(action_index)?
             && action.kind == ResolvedActionKind::Move
             && action.source_slot == source_slot
@@ -4072,7 +4216,7 @@ fn project_catalogued_typed_inactive_actions(
             && action.timing_modifier == 1
             && action.move_priority == 0
             && action.bracket_modifier == 1
-            && action.tie_order == SafeU53::ZERO
+            && action.tie_order == expected_tie_order
             && action.disposition == ActionDisposition::SkippedActorInactive;
         if !exact_action {
             return Err(FixtureError::new(format!(
@@ -4228,6 +4372,98 @@ fn project_catalogued_typed_inactive_actions(
     Ok(projected)
 }
 
+fn exact_forced_replacement_action(
+    action: &ResolvedAction,
+    sequence: u64,
+    actor: u64,
+    source_slot: FieldSlot,
+    operation_id: &str,
+    disposition: ActionDisposition,
+    tie_order: u64,
+) -> Result<bool, Box<dyn Error>> {
+    let actor = PokemonId::try_from_u64(actor)?;
+    let tie_order = SafeU53::new(tie_order)?;
+    Ok(action.sequence.get() == sequence
+        && action.kind == ResolvedActionKind::Move
+        && action.actor == actor
+        && action.source_slot == source_slot
+        && action
+            .command_operation_id
+            .as_ref()
+            .is_some_and(|operation| operation.as_str() == operation_id)
+        && action.effective_speed == 180
+        && action.timing_modifier == 1
+        && action.move_priority == 0
+        && action.bracket_modifier == 1
+        && action.tie_order == tie_order
+        && action.disposition == disposition)
+}
+
+fn project_catalogued_forced_replacement_action_order(
+    case_name: &str,
+    expected: &[ResolvedAction],
+    actual: &[ResolvedAction],
+) -> Result<Vec<ResolvedAction>, Box<dyn Error>> {
+    if case_name != "forced-replacement" {
+        return Ok(actual.to_vec());
+    }
+    if expected.len() != 5 || actual.len() != 5 {
+        return Err(FixtureError::new(format!(
+            "{case_name}: forced-replacement action projection expected five turn actions after its exact replacement projection, got {}/{}",
+            expected.len(),
+            actual.len()
+        ))
+        .into());
+    }
+    let player_zero = FieldSlot::new(BattleSide::Player, 0)?;
+    let player_one = FieldSlot::new(BattleSide::Player, 1)?;
+    let actor_one_operation = "battle/1/wave/1/turn/1/command/player/0/seat/1";
+    let actor_two_operation = "battle/1/wave/1/turn/1/command/player/1/seat/2";
+    let expected_pair = exact_forced_replacement_action(
+        &expected[3],
+        3,
+        1,
+        player_zero,
+        actor_one_operation,
+        ActionDisposition::SkippedActorInactive,
+        0,
+    )? && exact_forced_replacement_action(
+        &expected[4],
+        4,
+        2,
+        player_one,
+        actor_two_operation,
+        ActionDisposition::Executed,
+        0,
+    )?;
+    let actual_pair = exact_forced_replacement_action(
+        &actual[3],
+        3,
+        2,
+        player_one,
+        actor_two_operation,
+        ActionDisposition::Executed,
+        0,
+    )? && exact_forced_replacement_action(
+        &actual[4],
+        4,
+        1,
+        player_zero,
+        actor_one_operation,
+        ActionDisposition::SkippedActorInactive,
+        1,
+    )?;
+    if !expected_pair || !actual_pair {
+        return Err(FixtureError::new(
+            "forced-replacement: action-order projection differs from its exact reverted-queue pair catalogue",
+        )
+        .into());
+    }
+    let mut projected = actual.to_vec();
+    projected.swap(3, 4);
+    Ok(projected)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn compare_projected_action_order(
     case_name: &str,
@@ -4262,6 +4498,7 @@ fn compare_projected_action_order(
         mutations,
         presentation,
     )?;
+    actual = project_catalogued_forced_replacement_action_order(case_name, &expected, &actual)?;
     resequence_projected_actions(&mut expected)?;
     resequence_projected_actions(&mut actual)?;
     compare_serialized_axis(case_name, "DYNAMIC_ACTION_ORDER", &expected, &actual)
@@ -4519,6 +4756,22 @@ fn legacy_status_state(
     Ok(status)
 }
 
+fn is_catalogued_legacy_hp_fainted_transition(
+    case_name: &str,
+    pokemon: PokemonId,
+    before: &LegacyPokemonEvidence,
+    after: &LegacyPokemonEvidence,
+) -> bool {
+    LEGACY_HP_FAINTED_PROJECTIONS.iter().any(|projection| {
+        projection.case_name == case_name
+            && projection.pokemon == u64::from(pokemon)
+            && projection.before_hp == before.hp
+            && projection.after_hp == after.hp
+            && !before.fainted
+            && after.fainted
+    })
+}
+
 fn legacy_pokemon_transition(
     value: &Value,
     case_name: &str,
@@ -4548,7 +4801,11 @@ fn legacy_pokemon_transition(
         ))
         .into());
     }
-    if ignored_field != "fainted" && before.fainted != after.fainted {
+    if ignored_field != "fainted"
+        && before.fainted != after.fainted
+        && !(ignored_field == "hp"
+            && is_catalogued_legacy_hp_fainted_transition(case_name, before_id, &before, &after))
+    {
         return Err(FixtureError::new(format!(
             "{case_name}: {path} changes fainted outside its declared {ignored_field} mutation"
         ))
@@ -7088,6 +7345,46 @@ fn validate_voluntary_switch_aggregate_rng_mutation(
     Ok(())
 }
 
+fn project_catalogued_voluntary_switch_stat_stage_order(
+    case_name: &str,
+    trace: &FixtureMutationTrace,
+    projected: &mut [BattleMutation],
+) -> Result<(), Box<dyn Error>> {
+    if case_name != "voluntary-switch" {
+        return Ok(());
+    }
+    let pokemon_four = PokemonId::try_from_u64(4)?;
+    let pokemon_five = PokemonId::try_from_u64(5)?;
+    let legacy_first = BattleMutation::StatStageChanged {
+        pokemon: pokemon_five,
+        stat: BattleStat::Attack,
+        before: 0,
+        after: -1,
+    };
+    let legacy_second = BattleMutation::StatStageChanged {
+        pokemon: pokemon_four,
+        stat: BattleStat::Attack,
+        before: 0,
+        after: -1,
+    };
+    if trace.typed.get(1) != Some(&legacy_first)
+        || trace.typed.get(2) != Some(&legacy_second)
+    {
+        return Err(FixtureError::new(
+            "voluntary-switch: retained legacy Intimidate stage order is outside its exact catalogue",
+        )
+        .into());
+    }
+    if projected.get(1) != Some(&legacy_second) || projected.get(2) != Some(&legacy_first) {
+        return Err(FixtureError::new(
+            "voluntary-switch: typed Intimidate stage order is outside its exact catalogue",
+        )
+        .into());
+    }
+    projected.swap(1, 2);
+    Ok(())
+}
+
 fn normalize_catalogued_deterministic_intimidate_mutations(
     case_name: &str,
     trace: &mut FixtureMutationTrace,
@@ -7097,7 +7394,7 @@ fn normalize_catalogued_deterministic_intimidate_mutations(
     if case_name != "voluntary-switch" {
         return Ok(());
     }
-    let projected = actual
+    let mut projected = actual
         .iter()
         .filter(|mutation| {
             !matches!(
@@ -7116,6 +7413,7 @@ fn normalize_catalogued_deterministic_intimidate_mutations(
         ))
         .into());
     }
+    project_catalogued_voluntary_switch_stat_stage_order(case_name, trace, &mut projected)?;
 
     for legacy_index in [4, 5, 6, 9, 10, 11, 14, 15, 16] {
         if !matches!(
