@@ -1499,6 +1499,8 @@ fn m3_raw_menu_events() -> TestResult {
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
     let mut kernel = new_local_kernel(&fixture, &content, RAW_MENU_EVENTS)?;
+    // The raw-input stream exercises one initialized battle without resolving a turn.
+    counts.battles = counts.battles.saturating_add(1);
     for index in 0..RAW_MENU_EVENTS {
         let cycle = index / 4;
         let code = if index % 4 < 2 {
