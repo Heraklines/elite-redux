@@ -168,6 +168,11 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
         pair_names
             == [
                 "new",
+                "new_battle",
+                "snapshot_v2",
+                "from_snapshot",
+                "from_snapshot_v2",
+                "apply_trace_operation_v2",
                 "apply",
                 "key_down",
                 "key_up",
@@ -358,6 +363,7 @@ fn pair_operation_is_the_raw_environment_union() -> AuditResult {
                 "Disconnect",
                 "Reconnect",
                 "PresentationSettled",
+                "BattlePresentationOutcome",
                 "StorageResult",
                 "Suspend",
                 "Resume",

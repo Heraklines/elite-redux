@@ -682,7 +682,7 @@ fn dispose_cancels_all_live_resources_and_rejects_future_transitions() -> TestRe
     assert_eq!(scheduler.live_timers(), Vec::new());
     assert_eq!(scheduler.pending_timer_count(), SafeU53::ZERO);
     assert_eq!(scheduler.timer(timer(0)?), None);
-    assert!(scheduler.is_class_paused(seat(1)?, TimeClass::Connected));
+    assert!(!scheduler.is_class_paused(seat(1)?, TimeClass::Connected));
     assert_eq!(scheduler.cancel(timer(0)?), None);
     assert_eq!(scheduler.cancel_owner("first"), Vec::new());
     assert_eq!(

@@ -592,14 +592,14 @@ fn party_navigation_updates_column_memory_without_changing_instance() -> Result<
     )?;
     let control = navigate_party_menu(&battle, &control, instance(2)?, NavigationDirection::Down)?;
     let control = navigate_party_menu(&battle, &control, instance(2)?, NavigationDirection::Down)?;
-    let slot_zero = party_option_id(pokemon(1)?, PartyIndex::new(0)?)?;
+    let slot_one = party_option_id(pokemon(2)?, PartyIndex::new(1)?)?;
     let slot_two = party_option_id(pokemon(3)?, PartyIndex::new(2)?)?;
     assert_eq!(control.menu.instance_id, instance(2)?);
     assert_eq!(control.menu.selected_option_id, slot_two);
     assert_eq!(control.last_right_option_id, slot_two);
     let control = navigate_party_menu(&battle, &control, instance(2)?, NavigationDirection::Left)?;
-    assert_eq!(control.menu.selected_option_id, slot_zero);
-    assert_eq!(control.last_left_option_id, slot_zero);
+    assert_eq!(control.menu.selected_option_id, slot_one);
+    assert_eq!(control.last_left_option_id, slot_one);
     Ok(())
 }
 

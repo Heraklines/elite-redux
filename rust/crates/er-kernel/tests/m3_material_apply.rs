@@ -194,6 +194,38 @@ fn adapt_legacy_content_pack_condition_subjects(
     Ok(())
 }
 
+fn normalize_legacy_type_chart(
+    content_pack: &mut Value,
+    selected: &ContentPack,
+) -> Result<(), &'static str> {
+    let expected_entries = serde_json::to_value(&selected.type_chart.entries)
+        .map_err(|_| "selected type chart entries do not serialize")?
+        .as_array()
+        .cloned()
+        .ok_or("selected type chart entries are not an array")?;
+    let entries = content_pack
+        .get_mut("type_chart")
+        .and_then(|chart| chart.get_mut("entries"))
+        .and_then(Value::as_array_mut)
+        .ok_or("content fixture type chart entries are missing or invalid")?;
+    let legacy_entries = entries.clone();
+    if legacy_entries.len() != expected_entries.len() {
+        return Err("content fixture type chart entry count differs from selected content");
+    }
+    for expected in &expected_entries {
+        if legacy_entries
+            .iter()
+            .filter(|entry| *entry == expected)
+            .count()
+            != 1
+        {
+            return Err("content fixture type chart differs from selected content");
+        }
+    }
+    *entries = expected_entries;
+    Ok(())
+}
+
 fn adapt_legacy_content_pack(
     artifact: &mut Value,
     selected: &ContentPack,
@@ -233,6 +265,7 @@ fn adapt_legacy_content_pack(
     let content_pack = artifact
         .get_mut("content_pack")
         .ok_or("content fixture content_pack is missing")?;
+    normalize_legacy_type_chart(content_pack, selected)?;
     adapt_legacy_content_pack_condition_subjects(content_pack)?;
     content_pack
         .as_object_mut()
@@ -576,8 +609,8 @@ fn allocator_internal_validation_precedes_endpoint_recovery_classification() {
 fn no_legal_replacement_is_validated_as_explicit_material_evidence() {
     assert!(MATERIAL_SOURCE.contains("pub selection: ReplacementSelection"));
     assert!(MATERIAL_SOURCE.contains("validate_replacement_selection("));
-    assert!(MATERIAL_SOURCE.contains("build_replacement_offer"));
-    assert!(MATERIAL_SOURCE.contains("replacement_offer.is_empty()"));
+    assert!(MATERIAL_SOURCE.contains("legal_replacement_candidates"));
+    assert!(MATERIAL_SOURCE.contains("candidates.is_empty()"));
     assert!(MATERIAL_SOURCE.contains("WaitingReason::ReplacementOwner"));
     assert!(MATERIAL_SOURCE.contains("material.occurrence.id"));
     assert!(MATERIAL_SOURCE.contains("validate_replacement_identity"));

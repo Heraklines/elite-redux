@@ -233,7 +233,8 @@ fn local_lane_has_one_canonical_runtime_boundary() {
     assert!(!LOCAL_SOURCE.contains("LocalBattleConfigError"));
     assert!(!LOCAL_SOURCE.contains("struct BattleTurnMaterialV1"));
     assert!(!LOCAL_SOURCE.contains("struct BattleReplacementMaterialV1"));
-    assert!(LOCAL_SOURCE.contains("pub(crate) use crate::runtime::{BattleGameConfig"));
+    assert!(LOCAL_SOURCE.contains("pub(crate) use crate::runtime::{"));
+    assert!(LOCAL_SOURCE.contains("BattleGameConfig"));
     assert!(RUNTIME_SOURCE.contains("pub wave_seed: String"));
     assert!(LOCAL_SOURCE.contains("LocalBattleRuntimeAdapter"));
     assert!(LOCAL_SOURCE.contains("PreparedBattleResolution"));

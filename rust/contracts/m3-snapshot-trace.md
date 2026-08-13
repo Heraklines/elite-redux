@@ -1000,8 +1000,8 @@ exact matching Restorable V2 origin and never relies on ambient content,
 locale, clock, filesystem, or network state.
 The endpoint root's `replay_seed` is the sole endpoint trace seed; a pair trace
 uses only `initial_snapshot.replay_seed`. Endpoint failures require owner
-`Endpoint`; pair failures require `Host`, `Guest`, or `Environment`. A pair
-effect's origin must agree with every seat/endpoint carried by that effect.
+`Endpoint`; pair failures require `Host`, `Guest`, or `Environment`.
+A pair effect's origin must agree with every seat/endpoint carried by that effect.
 `host.live_resources`, `guest.live_resources`, and `environment_after` are the
 exact post-input projections and must hash consistently with the corresponding
 post-state digests and `pair_after`.
