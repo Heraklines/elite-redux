@@ -7619,7 +7619,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 startRun(difficulty, "normal");
                 return;
               }
-              ui.setOverlayMode(UiMode.OPTION_SELECT, {
+              // Use the independent nested option handler. Reusing OPTION_SELECT here
+              // lets the difficulty handler clear the newly-opened pacing menu as its
+              // own ACTION cleanup finishes, leaving starter select input-blocked.
+              ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, {
                 supportHover: true,
                 options: [
                   {

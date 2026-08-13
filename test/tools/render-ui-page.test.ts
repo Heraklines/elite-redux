@@ -1753,6 +1753,30 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN],
   },
+  "starter-select-sprint-transition": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: game => [
+      {
+        options: [
+          {
+            label: i18next.t("starterSelectUiHandler:difficultyYoungster"),
+            handler: () => {
+              void game.scene.ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, {
+                options: [
+                  { label: i18next.t("starterSelectUiHandler:pacingNormal"), handler: () => true },
+                  { label: i18next.t("starterSelectUiHandler:pacingSprint"), handler: () => true },
+                ],
+              });
+              return true;
+            },
+          },
+        ],
+      },
+    ],
+    // Select Youngster. The parent clears after its callback; DOWN must still
+    // navigate the independently registered pacing handler to Sprint.
+    steps: [Button.ACTION, Button.DOWN],
+  },
   "fun-mode-mega-full": {
     render: game => {
       setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG });
