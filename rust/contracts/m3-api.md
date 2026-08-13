@@ -1412,6 +1412,13 @@ uses the pinned replacement-adapter digest
 and the two public appliers live in `er-game`. `er-kernel` invokes them after
 `er-protocol` admits the opaque Authority envelope. `er-protocol` never imports
 `er-game`, `er-state`, or `er-battle`; this is the frozen dependency boundary.
+CR-0021 aligns the generic opaque TURN successor address with that boundary:
+legacy material may supply top-level `turn`, while frozen M3 material supplies
+top-level `resolved_turn`. Exactly one spelling must be present. Both or
+neither fail closed, and the selected safe-integer coordinate must still equal
+the predecessor control's exact turn. This does not rename or broaden the M3
+material schema; its full validator continues to require only
+`resolved_turn`.
 
 `NoLegalReplacement` is valid only when the exact owner has no living,
 off-field, same-owner party member. It preserves the empty slot and advances
