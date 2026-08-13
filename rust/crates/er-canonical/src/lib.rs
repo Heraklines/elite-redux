@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use serde::Serializer;
+use serde::ser::Impossible;
 use serde::ser::SerializeMap;
 use serde::ser::SerializeSeq;
 use serde::ser::SerializeStruct;
@@ -31,9 +32,16 @@ pub enum CanonicalError {
     DigestMismatch { expected: String, actual: String },
 }
 
+impl serde::ser::Error for CanonicalError {
+    fn custom<T: fmt::Display>(message: T) -> Self {
+        serialization_error(message)
+    }
+}
+
 pub fn canonicalize<T: Serialize>(value: &T) -> Result<String, CanonicalError> {
-    let value = validated_value(value)?;
-    canonicalize_value(&value)
+    let mut output = String::new();
+    serialize_canonical(value, &mut output)?;
+    Ok(output)
 }
 
 pub fn canonicalize_value(value: &Value) -> Result<String, CanonicalError> {
@@ -43,7 +51,9 @@ pub fn canonicalize_value(value: &Value) -> Result<String, CanonicalError> {
 }
 
 pub fn canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalError> {
-    Ok(canonicalize(value)?.into_bytes())
+    let mut output = String::new();
+    serialize_canonical(value, &mut output)?;
+    Ok(output.into_bytes())
 }
 
 pub fn fixture_digest<T: Serialize>(value: &T) -> Result<String, CanonicalError> {
@@ -193,14 +203,846 @@ fn encode_lowercase_hex(bytes: &[u8; 32]) -> String {
     output
 }
 
-fn validated_value<T: Serialize>(value: &T) -> Result<Value, CanonicalError> {
+#[derive(Clone, Copy)]
+enum DeferredNumericError {
+    UnsupportedNumber,
+    UnsafeInteger { value: u64 },
+}
+
+impl DeferredNumericError {
+    fn into_canonical_error(self) -> CanonicalError {
+        match self {
+            Self::UnsupportedNumber => CanonicalError::UnsupportedNumber,
+            Self::UnsafeInteger { value } => CanonicalError::UnsafeInteger { value },
+        }
+    }
+}
+
+fn serialize_canonical<T: Serialize + ?Sized>(
+    value: &T,
+    output: &mut String,
+) -> Result<(), CanonicalError> {
+    validate_numbers(value)?;
+
+    // Unsafe integers and finite floats were rejected only after the legacy
+    // validation and JSON conversion passes. Keep that write-pass ordering
+    // without materializing Value or recursively walking it.
+    let mut deferred_numeric_error = None;
+    serialize_canonical_into(value, output, &mut deferred_numeric_error)?;
+    match deferred_numeric_error {
+        Some(error) => Err(error.into_canonical_error()),
+        None => Ok(()),
+    }
+}
+
+fn validate_numbers<T: Serialize + ?Sized>(value: &T) -> Result<(), CanonicalError> {
     match value.serialize(NumberValidationSerializer) {
-        Ok(()) => Ok(serde_json::to_value(value)?),
+        Ok(()) => Ok(()),
         Err(NumberValidationError::UnsupportedNumber) => Err(CanonicalError::UnsupportedNumber),
         Err(NumberValidationError::Custom(message)) => Err(CanonicalError::Serialization(
             <serde_json::Error as serde::ser::Error>::custom(message),
         )),
     }
+}
+
+fn serialize_canonical_into<T: Serialize + ?Sized>(
+    value: &T,
+    output: &mut String,
+    deferred_numeric_error: &mut Option<DeferredNumericError>,
+) -> Result<(), CanonicalError> {
+    value.serialize(CanonicalSerializer {
+        output,
+        deferred_numeric_error,
+    })
+}
+
+fn serialize_fragment<T: Serialize + ?Sized>(
+    value: &T,
+) -> Result<CanonicalFragment, CanonicalError> {
+    // Object values keep their own deferred error until sorting and duplicate
+    // replacement reproduce the legacy materialized-object traversal order.
+    let mut output = String::new();
+    let mut deferred_numeric_error = None;
+    serialize_canonical_into(value, &mut output, &mut deferred_numeric_error)?;
+    Ok(CanonicalFragment {
+        output,
+        deferred_numeric_error,
+    })
+}
+
+fn serialization_error<T: fmt::Display>(message: T) -> CanonicalError {
+    CanonicalError::Serialization(<serde_json::Error as serde::ser::Error>::custom(message))
+}
+
+fn defer_numeric_error(
+    deferred_numeric_error: &mut Option<DeferredNumericError>,
+    error: DeferredNumericError,
+) {
+    if deferred_numeric_error.is_none() {
+        *deferred_numeric_error = Some(error);
+    }
+}
+
+fn write_signed_integer(
+    output: &mut String,
+    deferred_numeric_error: &mut Option<DeferredNumericError>,
+    value: i64,
+) {
+    let magnitude = value.unsigned_abs();
+    if magnitude > MAX_SAFE_INTEGER {
+        defer_numeric_error(
+            deferred_numeric_error,
+            DeferredNumericError::UnsafeInteger { value: magnitude },
+        );
+    }
+    output.push_str(&value.to_string());
+}
+
+fn write_unsigned_integer(
+    output: &mut String,
+    deferred_numeric_error: &mut Option<DeferredNumericError>,
+    value: u64,
+) {
+    if value > MAX_SAFE_INTEGER {
+        defer_numeric_error(
+            deferred_numeric_error,
+            DeferredNumericError::UnsafeInteger { value },
+        );
+    }
+    output.push_str(&value.to_string());
+}
+
+struct CanonicalFragment {
+    output: String,
+    deferred_numeric_error: Option<DeferredNumericError>,
+}
+
+struct CanonicalSerializer<'output, 'deferred> {
+    output: &'output mut String,
+    deferred_numeric_error: &'deferred mut Option<DeferredNumericError>,
+}
+
+impl<'output, 'deferred> Serializer for CanonicalSerializer<'output, 'deferred> {
+    type Ok = ();
+    type Error = CanonicalError;
+    type SerializeSeq = CanonicalSequence<'output, 'deferred>;
+    type SerializeTuple = CanonicalSequence<'output, 'deferred>;
+    type SerializeTupleStruct = CanonicalSequence<'output, 'deferred>;
+    type SerializeTupleVariant = CanonicalTupleVariant<'output, 'deferred>;
+    type SerializeMap = CanonicalMap<'output, 'deferred>;
+    type SerializeStruct = CanonicalStruct<'output, 'deferred>;
+    type SerializeStructVariant = CanonicalStructVariant<'output, 'deferred>;
+
+    fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
+        self.output.push_str(if value { "true" } else { "false" });
+        Ok(())
+    }
+
+    fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+        self.serialize_i64(value as i64)
+    }
+
+    fn serialize_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+        self.serialize_i64(value as i64)
+    }
+
+    fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+        self.serialize_i64(value as i64)
+    }
+
+    fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+        write_signed_integer(self.output, self.deferred_numeric_error, value);
+        Ok(())
+    }
+
+    fn serialize_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        if value < 0 {
+            let value = i64::try_from(value)
+                .map_err(|_| serialization_error("number out of range"))?;
+            self.serialize_i64(value)
+        } else {
+            let value = u64::try_from(value)
+                .map_err(|_| serialization_error("number out of range"))?;
+            self.serialize_u64(value)
+        }
+    }
+
+    fn serialize_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+        self.serialize_u64(value as u64)
+    }
+
+    fn serialize_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+        self.serialize_u64(value as u64)
+    }
+
+    fn serialize_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+        self.serialize_u64(value as u64)
+    }
+
+    fn serialize_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+        write_unsigned_integer(self.output, self.deferred_numeric_error, value);
+        Ok(())
+    }
+
+    fn serialize_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        let value = u64::try_from(value).map_err(|_| serialization_error("number out of range"))?;
+        self.serialize_u64(value)
+    }
+
+    fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+        if value.is_finite() {
+            defer_numeric_error(
+                self.deferred_numeric_error,
+                DeferredNumericError::UnsupportedNumber,
+            );
+            self.output.push_str(&serde_json::to_string(&value)?);
+        } else {
+            self.output.push_str("null");
+        }
+        Ok(())
+    }
+
+    fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+        if value.is_finite() {
+            defer_numeric_error(
+                self.deferred_numeric_error,
+                DeferredNumericError::UnsupportedNumber,
+            );
+            self.output.push_str(&serde_json::to_string(&value)?);
+        } else {
+            self.output.push_str("null");
+        }
+        Ok(())
+    }
+
+    fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
+        self.output.push_str(&serde_json::to_string(&value)?);
+        Ok(())
+    }
+
+    fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
+        self.output.push_str(&serde_json::to_string(value)?);
+        Ok(())
+    }
+
+    fn serialize_bytes(self, value: &[u8]) -> Result<Self::Ok, Self::Error> {
+        self.output.push('[');
+        for (index, byte) in value.iter().enumerate() {
+            if index > 0 {
+                self.output.push(',');
+            }
+            self.output.push_str(&byte.to_string());
+        }
+        self.output.push(']');
+        Ok(())
+    }
+
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        self.output.push_str("null");
+        Ok(())
+    }
+
+    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        self.output.push_str("null");
+        Ok(())
+    }
+
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
+        self.serialize_unit()
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        self.serialize_str(variant)
+    }
+
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        let value = serialize_fragment(value)?;
+        finish_object(
+            self.output,
+            vec![CanonicalObjectEntry {
+                key: variant.to_owned(),
+                value: value.output,
+                deferred_numeric_error: value.deferred_numeric_error,
+                index: 0,
+            }],
+            self.deferred_numeric_error,
+        )
+    }
+
+    fn serialize_seq(self, length: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        self.output.push('[');
+        Ok(CanonicalSequence {
+            output: self.output,
+            deferred_numeric_error: self.deferred_numeric_error,
+            first: true,
+            _length: length,
+        })
+    }
+
+    fn serialize_tuple(self, length: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        self.serialize_seq(Some(length))
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        length: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        self.serialize_seq(Some(length))
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        length: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Ok(CanonicalTupleVariant {
+            output: self.output,
+            deferred_numeric_error: self.deferred_numeric_error,
+            variant,
+            fields: Vec::with_capacity(length),
+        })
+    }
+
+    fn serialize_map(self, length: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Ok(CanonicalMap {
+            output: self.output,
+            deferred_numeric_error: self.deferred_numeric_error,
+            entries: Vec::with_capacity(length.unwrap_or(0)),
+            pending_key: None,
+        })
+    }
+
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        length: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Ok(CanonicalStruct {
+            output: self.output,
+            deferred_numeric_error: self.deferred_numeric_error,
+            entries: Vec::with_capacity(length),
+        })
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+        length: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Ok(CanonicalStructVariant {
+            output: self.output,
+            deferred_numeric_error: self.deferred_numeric_error,
+            variant,
+            entries: Vec::with_capacity(length),
+        })
+    }
+}
+
+struct CanonicalSequence<'output, 'deferred> {
+    output: &'output mut String,
+    deferred_numeric_error: &'deferred mut Option<DeferredNumericError>,
+    first: bool,
+    _length: Option<usize>,
+}
+
+impl CanonicalSequence<'_, '_> {
+    fn serialize_element<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), CanonicalError> {
+        if self.first {
+            self.first = false;
+        } else {
+            self.output.push(',');
+        }
+        serialize_canonical_into(value, self.output, self.deferred_numeric_error)
+    }
+
+    fn end(self) -> Result<(), CanonicalError> {
+        self.output.push(']');
+        Ok(())
+    }
+}
+
+impl SerializeSeq for CanonicalSequence<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_element<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        CanonicalSequence::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        CanonicalSequence::end(self)
+    }
+}
+
+impl SerializeTuple for CanonicalSequence<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_element<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        CanonicalSequence::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        CanonicalSequence::end(self)
+    }
+}
+
+impl SerializeTupleStruct for CanonicalSequence<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        CanonicalSequence::serialize_element(self, value)
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        CanonicalSequence::end(self)
+    }
+}
+
+struct CanonicalObjectEntry {
+    key: String,
+    value: String,
+    deferred_numeric_error: Option<DeferredNumericError>,
+    index: usize,
+}
+
+fn finish_object(
+    output: &mut String,
+    mut entries: Vec<CanonicalObjectEntry>,
+    deferred_numeric_error: &mut Option<DeferredNumericError>,
+) -> Result<(), CanonicalError> {
+    entries.sort_unstable_by(|left, right| {
+        utf16_key_cmp(&left.key, &right.key).then_with(|| left.index.cmp(&right.index))
+    });
+
+    let mut unique = Vec::with_capacity(entries.len());
+    for entry in entries {
+        if let Some(previous) = unique.last_mut()
+            && previous.key == entry.key
+        {
+            *previous = entry;
+            continue;
+        }
+        unique.push(entry);
+    }
+
+    output.push('{');
+    for (index, entry) in unique.into_iter().enumerate() {
+        if index > 0 {
+            output.push(',');
+        }
+        output.push_str(&serde_json::to_string(&entry.key)?);
+        output.push(':');
+        output.push_str(&entry.value);
+        if deferred_numeric_error.is_none() {
+            *deferred_numeric_error = entry.deferred_numeric_error;
+        }
+    }
+    output.push('}');
+    Ok(())
+}
+
+struct CanonicalMap<'output, 'deferred> {
+    output: &'output mut String,
+    deferred_numeric_error: &'deferred mut Option<DeferredNumericError>,
+    entries: Vec<CanonicalObjectEntry>,
+    pending_key: Option<String>,
+}
+
+impl SerializeMap for CanonicalMap<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_key<T: Serialize + ?Sized>(
+        &mut self,
+        key: &T,
+    ) -> Result<(), Self::Error> {
+        if self.pending_key.is_some() {
+            return Err(serialization_error(
+                "serialize_key called before serializing the previous value",
+            ));
+        }
+        self.pending_key = Some(key.serialize(CanonicalMapKeySerializer)?);
+        Ok(())
+    }
+
+    fn serialize_value<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        let key = self
+            .pending_key
+            .take()
+            .ok_or_else(|| serialization_error("serialize_value called before serialize_key"))?;
+        let value = serialize_fragment(value)?;
+        let index = self.entries.len();
+        self.entries.push(CanonicalObjectEntry {
+            key,
+            value: value.output,
+            deferred_numeric_error: value.deferred_numeric_error,
+            index,
+        });
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        if self.pending_key.is_some() {
+            return Err(serialization_error(
+                "serialize_map ended before serializing a value",
+            ));
+        }
+        finish_object(self.output, self.entries, self.deferred_numeric_error)
+    }
+}
+
+struct CanonicalStruct<'output, 'deferred> {
+    output: &'output mut String,
+    deferred_numeric_error: &'deferred mut Option<DeferredNumericError>,
+    entries: Vec<CanonicalObjectEntry>,
+}
+
+impl SerializeStruct for CanonicalStruct<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        let value = serialize_fragment(value)?;
+        let index = self.entries.len();
+        self.entries.push(CanonicalObjectEntry {
+            key: key.to_owned(),
+            value: value.output,
+            deferred_numeric_error: value.deferred_numeric_error,
+            index,
+        });
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        finish_object(self.output, self.entries, self.deferred_numeric_error)
+    }
+}
+
+struct CanonicalTupleVariant<'output, 'deferred> {
+    output: &'output mut String,
+    deferred_numeric_error: &'deferred mut Option<DeferredNumericError>,
+    variant: &'static str,
+    fields: Vec<CanonicalFragment>,
+}
+
+impl SerializeTupleVariant for CanonicalTupleVariant<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        self.fields.push(serialize_fragment(value)?);
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        let mut value = String::new();
+        let mut variant_deferred_numeric_error = None;
+        value.push('[');
+        for (index, field) in self.fields.into_iter().enumerate() {
+            if index > 0 {
+                value.push(',');
+            }
+            value.push_str(&field.output);
+            if variant_deferred_numeric_error.is_none() {
+                variant_deferred_numeric_error = field.deferred_numeric_error;
+            }
+        }
+        value.push(']');
+        finish_object(
+            self.output,
+            vec![CanonicalObjectEntry {
+                key: self.variant.to_owned(),
+                value,
+                deferred_numeric_error: variant_deferred_numeric_error,
+                index: 0,
+            }],
+            self.deferred_numeric_error,
+        )
+    }
+}
+
+struct CanonicalStructVariant<'output, 'deferred> {
+    output: &'output mut String,
+    deferred_numeric_error: &'deferred mut Option<DeferredNumericError>,
+    variant: &'static str,
+    entries: Vec<CanonicalObjectEntry>,
+}
+
+impl SerializeStructVariant for CanonicalStructVariant<'_, '_> {
+    type Ok = ();
+    type Error = CanonicalError;
+
+    fn serialize_field<T: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &T,
+    ) -> Result<(), Self::Error> {
+        let value = serialize_fragment(value)?;
+        let index = self.entries.len();
+        self.entries.push(CanonicalObjectEntry {
+            key: key.to_owned(),
+            value: value.output,
+            deferred_numeric_error: value.deferred_numeric_error,
+            index,
+        });
+        Ok(())
+    }
+
+    fn end(self) -> Result<Self::Ok, Self::Error> {
+        let mut value = String::new();
+        let mut variant_deferred_numeric_error = None;
+        finish_object(
+            &mut value,
+            self.entries,
+            &mut variant_deferred_numeric_error,
+        )?;
+        finish_object(
+            self.output,
+            vec![CanonicalObjectEntry {
+                key: self.variant.to_owned(),
+                value,
+                deferred_numeric_error: variant_deferred_numeric_error,
+                index: 0,
+            }],
+            self.deferred_numeric_error,
+        )
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CanonicalMapKeySerializer;
+
+impl Serializer for CanonicalMapKeySerializer {
+    type Ok = String;
+    type Error = CanonicalError;
+    type SerializeSeq = Impossible<Self::Ok, Self::Error>;
+    type SerializeTuple = Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleStruct = Impossible<Self::Ok, Self::Error>;
+    type SerializeTupleVariant = Impossible<Self::Ok, Self::Error>;
+    type SerializeMap = Impossible<Self::Ok, Self::Error>;
+    type SerializeStruct = Impossible<Self::Ok, Self::Error>;
+    type SerializeStructVariant = Impossible<Self::Ok, Self::Error>;
+
+    fn serialize_bool(self, value: bool) -> Result<Self::Ok, Self::Error> {
+        Ok(if value { "true" } else { "false" }.to_owned())
+    }
+
+    fn serialize_i8(self, value: i8) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_i16(self, value: i16) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_i32(self, value: i32) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_i64(self, value: i64) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_u8(self, value: u8) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_u16(self, value: u16) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_u32(self, value: u32) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_u64(self, value: u64) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_u128(self, value: u128) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_f32(self, _value: f32) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_f64(self, _value: f64) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_string())
+    }
+
+    fn serialize_str(self, value: &str) -> Result<Self::Ok, Self::Error> {
+        Ok(value.to_owned())
+    }
+
+    fn serialize_bytes(self, _value: &[u8]) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_some<T: Serialize + ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_unit_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        variant: &'static str,
+    ) -> Result<Self::Ok, Self::Error> {
+        Ok(variant.to_owned())
+    }
+
+    fn serialize_newtype_struct<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        value.serialize(self)
+    }
+
+    fn serialize_newtype_variant<T: Serialize + ?Sized>(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _value: &T,
+    ) -> Result<Self::Ok, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_seq(self, _length: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_tuple(self, _length: usize) -> Result<Self::SerializeTuple, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_tuple_struct(
+        self,
+        _name: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeTupleStruct, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_tuple_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeTupleVariant, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_map(self, _length: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_struct(
+        self,
+        _name: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeStruct, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+
+    fn serialize_struct_variant(
+        self,
+        _name: &'static str,
+        _variant_index: u32,
+        _variant: &'static str,
+        _length: usize,
+    ) -> Result<Self::SerializeStructVariant, Self::Error> {
+        Err(serialization_error("key must be a string"))
+    }
+}
+
+#[cfg(test)]
+fn legacy_canonical_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, CanonicalError> {
+    let value = validated_value(value)?;
+    let mut output = String::new();
+    write_value(&value, &mut output, false)?;
+    Ok(output.into_bytes())
+}
+
+#[cfg(test)]
+fn validated_value<T: Serialize>(value: &T) -> Result<Value, CanonicalError> {
+    validate_numbers(value)?;
+    Ok(serde_json::to_value(value)?)
 }
 
 #[derive(Debug)]
@@ -610,10 +1452,15 @@ fn array_index_key(key: &str) -> Option<u32> {
 mod tests {
     use super::{
         CanonicalError, canonical_bytes, canonicalize, canonicalize_value, content_digest,
-        fixture_digest, verify_fixture_digest,
+        fixture_digest, legacy_canonical_bytes, verify_fixture_digest,
     };
+    use serde::ser::SerializeMap;
+    use serde::ser::SerializeSeq;
     use serde::Serialize;
+    use serde::Serializer;
     use serde_json::{Map, Value};
+    use std::cell::Cell;
+    use std::collections::BTreeMap;
     use std::error::Error;
 
     #[derive(Serialize)]
@@ -625,6 +1472,1084 @@ mod tests {
     struct SignedContent {
         top_level: i64,
         nested: NestedSignedContent,
+    }
+
+    #[derive(Serialize)]
+    enum NestedEnum {
+        Unit,
+        Newtype(Option<i64>),
+        Tuple(bool, Vec<Option<String>>),
+        Struct {
+            map: BTreeMap<String, i64>,
+            unit: (),
+        },
+    }
+
+    #[derive(Serialize)]
+    struct DirectShape {
+        nested: BTreeMap<i32, Option<NestedEnum>>,
+        escaped: String,
+        values: Vec<Value>,
+    }
+
+    struct DuplicateSerializedKeys;
+
+    impl Serialize for DuplicateSerializedKeys {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(3))?;
+            map.serialize_entry(&1_i32, "first")?;
+            map.serialize_entry("1", "second")?;
+            map.serialize_entry(&true, "bool")?;
+            map.end()
+        }
+    }
+
+    struct FloatMapKey;
+
+    impl Serialize for FloatMapKey {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry(&1.5_f64, "float-key")?;
+            map.end()
+        }
+    }
+
+    const UNSAFE_INTEGER: u64 = 9_007_199_254_740_992;
+    const CUSTOM_ERROR_MESSAGE: &str = "mixed-invalid custom serialization error";
+
+    #[derive(Serialize)]
+    enum MixedInvalidEnum {
+        UnsafeThenFloat(u64, f64),
+        FloatThenUnsafe(f64, u64),
+        StructUnsafeThenFloat {
+            unsafe_integer: u64,
+            float: f64,
+        },
+        StructFloatThenUnsafe {
+            float: f64,
+            unsafe_integer: u64,
+        },
+    }
+
+    #[derive(Serialize)]
+    struct NestedUnsafeThenFloat {
+        unsafe_integer: u64,
+        nested: MixedInvalidEnum,
+    }
+
+    #[derive(Serialize)]
+    struct NestedFloatThenUnsafe {
+        nested: MixedInvalidEnum,
+        unsafe_integer: u64,
+    }
+
+    struct CustomSerializationError;
+
+    impl Serialize for CustomSerializationError {
+        fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            Err(<S::Error as serde::ser::Error>::custom(CUSTOM_ERROR_MESSAGE))
+        }
+    }
+
+    #[derive(Serialize)]
+    enum WideMixedInvalidEnum {
+        I128ThenNestedFloat(i128, Option<Vec<f64>>),
+        NestedFloatThenU128 {
+            nested: Vec<Option<f64>>,
+            wide: u128,
+        },
+        U128ThenNestedCustom(u128, Option<CustomSerializationError>),
+        NestedCustomThenI128 {
+            nested: Vec<CustomSerializationError>,
+            wide: i128,
+        },
+    }
+
+    enum InvalidStructuralMapCase {
+        InvalidThenFloat,
+        FloatThenInvalid,
+        InvalidThenCustom,
+        CustomThenInvalid,
+        InvalidOnly,
+        InvalidThenI128,
+        I128ThenInvalid,
+        InvalidThenU128,
+        U128ThenInvalid,
+    }
+
+    impl Serialize for InvalidStructuralMapCase {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invalid_key = (1_u8, 2_u8);
+            let mut map = serializer.serialize_map(None)?;
+            match self {
+                Self::InvalidThenFloat => {
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                    map.serialize_entry("later", &1.0_f64)?;
+                }
+                Self::FloatThenInvalid => {
+                    map.serialize_entry("first", &1.0_f64)?;
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                }
+                Self::InvalidThenCustom => {
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                    map.serialize_entry("later", &CustomSerializationError)?;
+                }
+                Self::CustomThenInvalid => {
+                    map.serialize_entry("first", &CustomSerializationError)?;
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                }
+                Self::InvalidOnly => {
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                }
+                Self::InvalidThenI128 => {
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                    map.serialize_entry("later", &i128::MAX)?;
+                }
+                Self::I128ThenInvalid => {
+                    map.serialize_entry("first", &i128::MAX)?;
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                }
+                Self::InvalidThenU128 => {
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                    map.serialize_entry("later", &u128::MAX)?;
+                }
+                Self::U128ThenInvalid => {
+                    map.serialize_entry("first", &u128::MAX)?;
+                    map.serialize_entry(&invalid_key, &0_u8)?;
+                }
+            }
+            map.end()
+        }
+    }
+
+    struct FloatSequenceMapKey;
+
+    impl Serialize for FloatSequenceMapKey {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut sequence = serializer.serialize_seq(Some(2))?;
+            sequence.serialize_element(&0_u8)?;
+            sequence.serialize_element(&1.0_f64)?;
+            sequence.end()
+        }
+    }
+
+    struct CustomSequenceMapKey;
+
+    impl Serialize for CustomSequenceMapKey {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut sequence = serializer.serialize_seq(Some(2))?;
+            sequence.serialize_element(&0_u8)?;
+            sequence.serialize_element(&CustomSerializationError)?;
+            sequence.end()
+        }
+    }
+
+    enum CompoundMapKeyCase {
+        FloatThenLaterValues,
+        CustomThenLaterValues,
+    }
+
+    impl Serialize for CompoundMapKeyCase {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(None)?;
+            match self {
+                Self::FloatThenLaterValues => {
+                    map.serialize_entry(&FloatSequenceMapKey, &0_u8)?;
+                    map.serialize_entry("later-unsafe", &i128::MAX)?;
+                    map.serialize_entry("later-custom", &CustomSerializationError)?;
+                }
+                Self::CustomThenLaterValues => {
+                    map.serialize_entry(&CustomSequenceMapKey, &0_u8)?;
+                    map.serialize_entry("later-float", &1.0_f64)?;
+                    map.serialize_entry("later-wide", &u128::MAX)?;
+                }
+            }
+            map.end()
+        }
+    }
+
+    const STATEFUL_ERROR_MESSAGE: &str = "stateful second invocation error";
+    const STATEFUL_FIRST_ERROR_MESSAGE: &str = "stateful first invocation error";
+
+    struct StatefulDifferentBytes<'calls> {
+        calls: &'calls Cell<usize>,
+    }
+
+    impl Serialize for StatefulDifferentBytes<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                serializer.serialize_str("first invocation")
+            } else {
+                serializer.serialize_str("second invocation")
+            }
+        }
+    }
+
+    struct StatefulSecondInvocationError<'calls> {
+        calls: &'calls Cell<usize>,
+    }
+
+    impl Serialize for StatefulSecondInvocationError<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                serializer.serialize_str("first invocation succeeds")
+            } else {
+                Err(<S::Error as serde::ser::Error>::custom(
+                    STATEFUL_ERROR_MESSAGE,
+                ))
+            }
+        }
+    }
+
+    struct StatefulFirstInvocationError<'calls> {
+        calls: &'calls Cell<usize>,
+    }
+
+    impl Serialize for StatefulFirstInvocationError<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                Err(<S::Error as serde::ser::Error>::custom(
+                    STATEFUL_FIRST_ERROR_MESSAGE,
+                ))
+            } else {
+                serializer.serialize_str("second invocation must not occur")
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum StatefulFloatCase {
+        FiniteF32,
+        NanF32,
+        PositiveInfinityF32,
+        NegativeInfinityF32,
+        FiniteF64,
+        NanF64,
+        PositiveInfinityF64,
+        NegativeInfinityF64,
+    }
+
+    impl StatefulFloatCase {
+        fn is_finite(self) -> bool {
+            matches!(self, Self::FiniteF32 | Self::FiniteF64)
+        }
+    }
+
+    struct StatefulSecondPassFloatValue<'calls> {
+        calls: &'calls Cell<usize>,
+        value: StatefulFloatCase,
+    }
+
+    impl Serialize for StatefulSecondPassFloatValue<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                serializer.serialize_str("validation pass")
+            } else {
+                match self.value {
+                    StatefulFloatCase::FiniteF32 => serializer.serialize_f32(1.5_f32),
+                    StatefulFloatCase::NanF32 => serializer.serialize_f32(f32::NAN),
+                    StatefulFloatCase::PositiveInfinityF32 => {
+                        serializer.serialize_f32(f32::INFINITY)
+                    }
+                    StatefulFloatCase::NegativeInfinityF32 => {
+                        serializer.serialize_f32(f32::NEG_INFINITY)
+                    }
+                    StatefulFloatCase::FiniteF64 => serializer.serialize_f64(1.5_f64),
+                    StatefulFloatCase::NanF64 => serializer.serialize_f64(f64::NAN),
+                    StatefulFloatCase::PositiveInfinityF64 => {
+                        serializer.serialize_f64(f64::INFINITY)
+                    }
+                    StatefulFloatCase::NegativeInfinityF64 => {
+                        serializer.serialize_f64(f64::NEG_INFINITY)
+                    }
+                }
+            }
+        }
+    }
+
+    struct StatefulSecondPassFloatMapKey<'calls> {
+        calls: &'calls Cell<usize>,
+        value: StatefulFloatCase,
+    }
+
+    impl Serialize for StatefulSecondPassFloatMapKey<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                serializer.serialize_u8(0)
+            } else {
+                let mut map = serializer.serialize_map(Some(1))?;
+                match self.value {
+                    StatefulFloatCase::FiniteF32 => map.serialize_entry(&1.5_f32, "value")?,
+                    StatefulFloatCase::NanF32 => map.serialize_entry(&f32::NAN, "value")?,
+                    StatefulFloatCase::PositiveInfinityF32 => {
+                        map.serialize_entry(&f32::INFINITY, "value")?
+                    }
+                    StatefulFloatCase::NegativeInfinityF32 => {
+                        map.serialize_entry(&f32::NEG_INFINITY, "value")?
+                    }
+                    StatefulFloatCase::FiniteF64 => map.serialize_entry(&1.5_f64, "value")?,
+                    StatefulFloatCase::NanF64 => map.serialize_entry(&f64::NAN, "value")?,
+                    StatefulFloatCase::PositiveInfinityF64 => {
+                        map.serialize_entry(&f64::INFINITY, "value")?
+                    }
+                    StatefulFloatCase::NegativeInfinityF64 => {
+                        map.serialize_entry(&f64::NEG_INFINITY, "value")?
+                    }
+                }
+                map.end()
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum StatefulOrderingCase {
+        FloatThenCustom,
+        CustomThenFloat,
+        FloatThenI128,
+        I128ThenFloat,
+        FloatThenU128,
+        U128ThenFloat,
+        FloatThenUnsafe,
+        UnsafeThenFloat,
+        FloatOverwrittenByValid,
+        ValidOverwrittenByFloat,
+        NestedFloatBeforeUnsafe,
+        NestedUnsafeBeforeFloat,
+    }
+
+    impl Serialize for StatefulOrderingCase {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            match self {
+                Self::FloatThenCustom => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.serialize_element(&CustomSerializationError)?;
+                    sequence.end()
+                }
+                Self::CustomThenFloat => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&CustomSerializationError)?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.end()
+                }
+                Self::FloatThenI128 => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.serialize_element(&i128::MAX)?;
+                    sequence.end()
+                }
+                Self::I128ThenFloat => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&i128::MAX)?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.end()
+                }
+                Self::FloatThenU128 => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.serialize_element(&u128::MAX)?;
+                    sequence.end()
+                }
+                Self::U128ThenFloat => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&u128::MAX)?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.end()
+                }
+                Self::FloatThenUnsafe => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.serialize_element(&UNSAFE_INTEGER)?;
+                    sequence.end()
+                }
+                Self::UnsafeThenFloat => {
+                    let mut sequence = serializer.serialize_seq(Some(2))?;
+                    sequence.serialize_element(&UNSAFE_INTEGER)?;
+                    sequence.serialize_element(&1.5_f64)?;
+                    sequence.end()
+                }
+                Self::FloatOverwrittenByValid => {
+                    let mut map = serializer.serialize_map(Some(2))?;
+                    map.serialize_entry("same", &1.5_f64)?;
+                    map.serialize_entry("same", &1_u8)?;
+                    map.end()
+                }
+                Self::ValidOverwrittenByFloat => {
+                    let mut map = serializer.serialize_map(Some(2))?;
+                    map.serialize_entry("same", &1_u8)?;
+                    map.serialize_entry("same", &1.5_f64)?;
+                    map.end()
+                }
+                Self::NestedFloatBeforeUnsafe => {
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry(
+                        "nested",
+                        &NestedUtf16NumericErrors {
+                            float_at_astral_key: true,
+                        },
+                    )?;
+                    map.end()
+                }
+                Self::NestedUnsafeBeforeFloat => {
+                    let mut map = serializer.serialize_map(Some(1))?;
+                    map.serialize_entry(
+                        "nested",
+                        &NestedUtf16NumericErrors {
+                            float_at_astral_key: false,
+                        },
+                    )?;
+                    map.end()
+                }
+            }
+        }
+    }
+
+    struct NestedUtf16NumericErrors {
+        float_at_astral_key: bool,
+    }
+
+    impl Serialize for NestedUtf16NumericErrors {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(2))?;
+            if self.float_at_astral_key {
+                map.serialize_entry("\u{e000}", &UNSAFE_INTEGER)?;
+                map.serialize_entry("\u{10000}", &1.5_f64)?;
+            } else {
+                map.serialize_entry("\u{e000}", &1.5_f64)?;
+                map.serialize_entry("\u{10000}", &UNSAFE_INTEGER)?;
+            }
+            map.end()
+        }
+    }
+
+    struct StatefulSecondPassOrdering<'calls> {
+        calls: &'calls Cell<usize>,
+        case: StatefulOrderingCase,
+    }
+
+    impl Serialize for StatefulSecondPassOrdering<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                serializer.serialize_str("validation pass")
+            } else {
+                self.case.serialize(serializer)
+            }
+        }
+    }
+
+    struct CustomErrorAfterUnsafe;
+
+    impl Serialize for CustomErrorAfterUnsafe {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(1))?;
+            map.serialize_entry("unsafe", &UNSAFE_INTEGER)?;
+            Err(<S::Error as serde::ser::Error>::custom(CUSTOM_ERROR_MESSAGE))
+        }
+    }
+
+    struct OverwrittenUnsafeInteger;
+
+    impl Serialize for OverwrittenUnsafeInteger {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let mut map = serializer.serialize_map(Some(2))?;
+            map.serialize_entry("same", &UNSAFE_INTEGER)?;
+            map.serialize_entry("same", &1_u64)?;
+            map.end()
+        }
+    }
+
+    fn canonical_error_identity(error: CanonicalError) -> (&'static str, String) {
+        let display = error.to_string();
+        match error {
+            CanonicalError::Serialization(source) => {
+                ("Serialization", format!("{display}|{source}"))
+            }
+            CanonicalError::UnsupportedNumber => ("UnsupportedNumber", display),
+            CanonicalError::UnsafeInteger { value } => {
+                ("UnsafeInteger", format!("{display}|{value}"))
+            }
+            CanonicalError::DigestMismatch { expected, actual } => (
+                "DigestMismatch",
+                format!("{display}|{expected}|{actual}"),
+            ),
+        }
+    }
+
+    fn direct_matches_legacy<T: Serialize>(value: &T) {
+        let direct = canonical_result_identity(canonical_bytes(value));
+        let legacy = canonical_result_identity(legacy_canonical_bytes(value));
+        assert_eq!(direct, legacy);
+    }
+
+    type CanonicalResultIdentity = Result<Vec<u8>, (&'static str, String)>;
+
+    fn canonical_result_identity(
+        result: Result<Vec<u8>, CanonicalError>,
+    ) -> CanonicalResultIdentity {
+        result.map_err(canonical_error_identity)
+    }
+
+    fn expected_unsupported_number() -> CanonicalResultIdentity {
+        Err((
+            "UnsupportedNumber",
+            "canonical JSON does not permit floats, NaN, or infinity".to_owned(),
+        ))
+    }
+
+    fn expected_serialization(message: &str) -> CanonicalResultIdentity {
+        Err((
+            "Serialization",
+            format!("JSON serialization failed: {message}|{message}"),
+        ))
+    }
+
+    fn expected_unsafe_integer(value: u64) -> CanonicalResultIdentity {
+        Err((
+            "UnsafeInteger",
+            format!(
+                "integer {value} exceeds JavaScript's maximum safe integer|{value}"
+            ),
+        ))
+    }
+
+    fn stateful_ordering_matches_legacy(
+        case: StatefulOrderingCase,
+        expected: CanonicalResultIdentity,
+    ) {
+        let direct_calls = Cell::new(0);
+        let legacy_calls = Cell::new(0);
+        let direct = canonical_result_identity(canonical_bytes(&StatefulSecondPassOrdering {
+            calls: &direct_calls,
+            case,
+        }));
+        let legacy = canonical_result_identity(legacy_canonical_bytes(
+            &StatefulSecondPassOrdering {
+                calls: &legacy_calls,
+                case,
+            },
+        ));
+
+        assert_eq!(direct, legacy);
+        assert_eq!(direct, expected);
+        assert_eq!(direct_calls.get(), 2);
+        assert_eq!(legacy_calls.get(), 2);
+    }
+
+    #[test]
+    fn direct_serializer_matches_legacy_across_nested_shapes() -> Result<(), Box<dyn Error>> {
+        let mut nested_map = BTreeMap::new();
+        nested_map.insert(10, Some(NestedEnum::Unit));
+        nested_map.insert(2, Some(NestedEnum::Newtype(Some(-1))));
+
+        let mut enum_map = BTreeMap::new();
+        enum_map.insert("z".to_owned(), 2_i64);
+        enum_map.insert("a".to_owned(), -1_i64);
+
+        let shape = DirectShape {
+            nested: nested_map,
+            escaped: "quote\" slash\\ newline\n tab\t control\u{0008}".to_owned(),
+            values: vec![
+                Value::Null,
+                Value::Bool(true),
+                Value::Array(vec![Value::from(3_u64), Value::from(-1_i64)]),
+                Value::Object({
+                    let mut object = Map::new();
+                    object.insert("\u{10000}".to_owned(), Value::String("astral".to_owned()));
+                    object.insert("\u{e000}".to_owned(), Value::String("bmp".to_owned()));
+                    object
+                }),
+            ],
+        };
+
+        direct_matches_legacy(&shape);
+        direct_matches_legacy(&NestedEnum::Tuple(
+            false,
+            vec![Some("first".to_owned()), None],
+        ));
+        direct_matches_legacy(&NestedEnum::Struct {
+            map: enum_map,
+            unit: (),
+        });
+        direct_matches_legacy(&NestedEnum::Newtype(None));
+        direct_matches_legacy(&NestedEnum::Unit);
+        Ok(())
+    }
+
+    #[test]
+    fn direct_serializer_preserves_map_keys_and_last_duplicate() -> Result<(), Box<dyn Error>> {
+        let mut keys = BTreeMap::new();
+        keys.insert(-2_i32, "negative");
+        keys.insert(10_i32, "ten");
+        direct_matches_legacy(&keys);
+        assert_eq!(canonicalize(&keys)?, r#"{"-2":"negative","10":"ten"}"#);
+
+        direct_matches_legacy(&DuplicateSerializedKeys);
+        assert_eq!(
+            canonicalize(&DuplicateSerializedKeys)?,
+            r#"{"1":"second","true":"bool"}"#
+        );
+        direct_matches_legacy(&FloatMapKey);
+        Ok(())
+    }
+
+    #[test]
+    fn direct_serializer_preserves_number_error_equivalence() -> Result<(), Box<dyn Error>> {
+        for source in [
+            "-9007199254740992",
+            "9007199254740992",
+            "1.0",
+            "1e0",
+            "-0.0",
+        ] {
+            let value: Value = serde_json::from_str(source)?;
+            direct_matches_legacy(&value);
+        }
+
+        for value in [-9_007_199_254_740_992_i64, 9_007_199_254_740_992_i64] {
+            direct_matches_legacy(&value);
+        }
+        direct_matches_legacy(&i128::MAX);
+        direct_matches_legacy(&u128::MAX);
+        for value in [f64::NAN, f64::INFINITY, -0.0_f64] {
+            direct_matches_legacy(&value);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn direct_serializer_preserves_mixed_invalid_float_precedence()
+    -> Result<(), Box<dyn Error>> {
+        direct_matches_legacy(&(UNSAFE_INTEGER, 1.0_f64));
+        direct_matches_legacy(&(1.0_f64, UNSAFE_INTEGER));
+        direct_matches_legacy(&MixedInvalidEnum::UnsafeThenFloat(
+            UNSAFE_INTEGER,
+            f64::NAN,
+        ));
+        direct_matches_legacy(&MixedInvalidEnum::FloatThenUnsafe(
+            f64::INFINITY,
+            UNSAFE_INTEGER,
+        ));
+        direct_matches_legacy(&MixedInvalidEnum::StructUnsafeThenFloat {
+            unsafe_integer: UNSAFE_INTEGER,
+            float: 1.0,
+        });
+        direct_matches_legacy(&MixedInvalidEnum::StructFloatThenUnsafe {
+            float: -0.0,
+            unsafe_integer: UNSAFE_INTEGER,
+        });
+        direct_matches_legacy(&NestedUnsafeThenFloat {
+            unsafe_integer: UNSAFE_INTEGER,
+            nested: MixedInvalidEnum::FloatThenUnsafe(1.5, UNSAFE_INTEGER),
+        });
+        direct_matches_legacy(&NestedFloatThenUnsafe {
+            nested: MixedInvalidEnum::UnsafeThenFloat(UNSAFE_INTEGER, 1.5),
+            unsafe_integer: UNSAFE_INTEGER,
+        });
+
+        for source in [
+            r#"{"a":9007199254740992,"z":1.0}"#,
+            r#"{"a":1.0,"z":9007199254740992}"#,
+            r#"{"outer":{"a":9007199254740992,"z":[null,1.0]}}"#,
+            r#"{"outer":{"a":[1.0],"z":9007199254740992}}"#,
+        ] {
+            let value: Value = serde_json::from_str(source)?;
+            direct_matches_legacy(&value);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn direct_serializer_preserves_mixed_invalid_custom_error_precedence()
+    -> Result<(), Box<dyn Error>> {
+        direct_matches_legacy(&(UNSAFE_INTEGER, CustomSerializationError));
+        direct_matches_legacy(&(CustomSerializationError, UNSAFE_INTEGER));
+        direct_matches_legacy(&CustomErrorAfterUnsafe);
+        direct_matches_legacy(&Some((UNSAFE_INTEGER, CustomErrorAfterUnsafe)));
+
+        assert_eq!(
+            canonical_bytes(&(UNSAFE_INTEGER, CustomSerializationError))
+                .map_err(canonical_error_identity),
+            Err((
+                "Serialization",
+                format!(
+                    "JSON serialization failed: {CUSTOM_ERROR_MESSAGE}|{CUSTOM_ERROR_MESSAGE}"
+                ),
+            ))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn validation_prepass_preserves_wide_integer_error_precedence() {
+        direct_matches_legacy(&(i128::MAX, 1.0_f64));
+        direct_matches_legacy(&(1.0_f64, i128::MAX));
+        direct_matches_legacy(&(u128::MAX, 1.0_f64));
+        direct_matches_legacy(&(1.0_f64, u128::MAX));
+        direct_matches_legacy(&(i128::MAX, CustomSerializationError));
+        direct_matches_legacy(&(CustomSerializationError, i128::MAX));
+        direct_matches_legacy(&(u128::MAX, CustomSerializationError));
+        direct_matches_legacy(&(CustomSerializationError, u128::MAX));
+
+        direct_matches_legacy(&WideMixedInvalidEnum::I128ThenNestedFloat(
+            i128::MAX,
+            Some(vec![1.0]),
+        ));
+        direct_matches_legacy(&WideMixedInvalidEnum::NestedFloatThenU128 {
+            nested: vec![None, Some(f64::NAN)],
+            wide: u128::MAX,
+        });
+        direct_matches_legacy(&WideMixedInvalidEnum::U128ThenNestedCustom(
+            u128::MAX,
+            Some(CustomSerializationError),
+        ));
+        direct_matches_legacy(&WideMixedInvalidEnum::NestedCustomThenI128 {
+            nested: vec![CustomSerializationError],
+            wide: i128::MAX,
+        });
+
+        direct_matches_legacy(&(i128::MAX, 0_u8));
+        direct_matches_legacy(&(u128::MAX, 0_u8));
+    }
+
+    #[test]
+    fn validation_prepass_preserves_structural_map_key_error_precedence() {
+        for value in [
+            InvalidStructuralMapCase::InvalidThenFloat,
+            InvalidStructuralMapCase::FloatThenInvalid,
+            InvalidStructuralMapCase::InvalidThenCustom,
+            InvalidStructuralMapCase::CustomThenInvalid,
+            InvalidStructuralMapCase::InvalidOnly,
+            InvalidStructuralMapCase::InvalidThenI128,
+            InvalidStructuralMapCase::I128ThenInvalid,
+            InvalidStructuralMapCase::InvalidThenU128,
+            InvalidStructuralMapCase::U128ThenInvalid,
+        ] {
+            direct_matches_legacy(&value);
+        }
+
+        direct_matches_legacy(&Some(vec![
+            InvalidStructuralMapCase::InvalidThenFloat,
+            InvalidStructuralMapCase::InvalidThenCustom,
+        ]));
+    }
+
+    #[test]
+    fn validation_prepass_traverses_compound_map_keys_before_later_values() {
+        direct_matches_legacy(&CompoundMapKeyCase::FloatThenLaterValues);
+        direct_matches_legacy(&CompoundMapKeyCase::CustomThenLaterValues);
+
+        assert_eq!(
+            canonical_result_identity(canonical_bytes(
+                &CompoundMapKeyCase::FloatThenLaterValues,
+            )),
+            Err((
+                "UnsupportedNumber",
+                "canonical JSON does not permit floats, NaN, or infinity".to_owned(),
+            ))
+        );
+        assert_eq!(
+            canonical_result_identity(canonical_bytes(
+                &CompoundMapKeyCase::CustomThenLaterValues,
+            )),
+            Err((
+                "Serialization",
+                format!(
+                    "JSON serialization failed: {CUSTOM_ERROR_MESSAGE}|{CUSTOM_ERROR_MESSAGE}"
+                ),
+            ))
+        );
+    }
+
+    #[test]
+    fn validation_prepass_preserves_stateful_double_invocation() {
+        let direct_calls = Cell::new(0);
+        let legacy_calls = Cell::new(0);
+        let direct = canonical_result_identity(canonical_bytes(&StatefulDifferentBytes {
+            calls: &direct_calls,
+        }));
+        let legacy = canonical_result_identity(legacy_canonical_bytes(&StatefulDifferentBytes {
+            calls: &legacy_calls,
+        }));
+        assert_eq!(direct, legacy);
+        assert_eq!(direct, Ok(br#""second invocation""#.to_vec()));
+        assert_eq!(direct_calls.get(), 2);
+        assert_eq!(legacy_calls.get(), 2);
+
+        let direct_calls = Cell::new(0);
+        let legacy_calls = Cell::new(0);
+        let direct = canonical_result_identity(canonical_bytes(&StatefulSecondInvocationError {
+            calls: &direct_calls,
+        }));
+        let legacy = canonical_result_identity(legacy_canonical_bytes(
+            &StatefulSecondInvocationError {
+                calls: &legacy_calls,
+            },
+        ));
+        assert_eq!(direct, legacy);
+        assert_eq!(
+            direct,
+            Err((
+                "Serialization",
+                format!(
+                    "JSON serialization failed: {STATEFUL_ERROR_MESSAGE}|{STATEFUL_ERROR_MESSAGE}"
+                ),
+            ))
+        );
+        assert_eq!(direct_calls.get(), 2);
+        assert_eq!(legacy_calls.get(), 2);
+
+        let direct_calls = Cell::new(0);
+        let legacy_calls = Cell::new(0);
+        let direct = canonical_result_identity(canonical_bytes(&StatefulFirstInvocationError {
+            calls: &direct_calls,
+        }));
+        let legacy = canonical_result_identity(legacy_canonical_bytes(
+            &StatefulFirstInvocationError {
+                calls: &legacy_calls,
+            },
+        ));
+        assert_eq!(direct, legacy);
+        assert_eq!(
+            direct,
+            Err((
+                "Serialization",
+                format!(
+                    "JSON serialization failed: {STATEFUL_FIRST_ERROR_MESSAGE}|{STATEFUL_FIRST_ERROR_MESSAGE}"
+                ),
+            ))
+        );
+        assert_eq!(direct_calls.get(), 1);
+        assert_eq!(legacy_calls.get(), 1);
+    }
+
+    #[test]
+    fn stateful_second_pass_float_values_match_legacy() {
+        for value in [
+            StatefulFloatCase::FiniteF32,
+            StatefulFloatCase::NanF32,
+            StatefulFloatCase::PositiveInfinityF32,
+            StatefulFloatCase::NegativeInfinityF32,
+            StatefulFloatCase::FiniteF64,
+            StatefulFloatCase::NanF64,
+            StatefulFloatCase::PositiveInfinityF64,
+            StatefulFloatCase::NegativeInfinityF64,
+        ] {
+            let direct_calls = Cell::new(0);
+            let legacy_calls = Cell::new(0);
+            let direct = canonical_result_identity(canonical_bytes(
+                &StatefulSecondPassFloatValue {
+                    calls: &direct_calls,
+                    value,
+                },
+            ));
+            let legacy = canonical_result_identity(legacy_canonical_bytes(
+                &StatefulSecondPassFloatValue {
+                    calls: &legacy_calls,
+                    value,
+                },
+            ));
+
+            assert_eq!(direct, legacy);
+            if value.is_finite() {
+                assert_eq!(
+                    direct,
+                    Err((
+                        "UnsupportedNumber",
+                        "canonical JSON does not permit floats, NaN, or infinity".to_owned(),
+                    ))
+                );
+            } else {
+                assert_eq!(direct, Ok(b"null".to_vec()));
+            }
+            assert_eq!(direct_calls.get(), 2);
+            assert_eq!(legacy_calls.get(), 2);
+        }
+    }
+
+    #[test]
+    fn stateful_second_pass_float_map_keys_match_legacy() {
+        for value in [
+            StatefulFloatCase::FiniteF32,
+            StatefulFloatCase::NanF32,
+            StatefulFloatCase::PositiveInfinityF32,
+            StatefulFloatCase::NegativeInfinityF32,
+            StatefulFloatCase::FiniteF64,
+            StatefulFloatCase::NanF64,
+            StatefulFloatCase::PositiveInfinityF64,
+            StatefulFloatCase::NegativeInfinityF64,
+        ] {
+            let direct_calls = Cell::new(0);
+            let legacy_calls = Cell::new(0);
+            let direct = canonical_result_identity(canonical_bytes(
+                &StatefulSecondPassFloatMapKey {
+                    calls: &direct_calls,
+                    value,
+                },
+            ));
+            let legacy = canonical_result_identity(legacy_canonical_bytes(
+                &StatefulSecondPassFloatMapKey {
+                    calls: &legacy_calls,
+                    value,
+                },
+            ));
+
+            assert_eq!(direct, legacy);
+            assert_eq!(
+                direct,
+                Err((
+                    "Serialization",
+                    "JSON serialization failed: key must be a string|key must be a string"
+                        .to_owned(),
+                ))
+            );
+            assert_eq!(direct_calls.get(), 2);
+            assert_eq!(legacy_calls.get(), 2);
+        }
+    }
+
+    #[test]
+    fn stateful_second_pass_custom_errors_preempt_deferred_float() {
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::FloatThenCustom,
+            expected_serialization(CUSTOM_ERROR_MESSAGE),
+        );
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::CustomThenFloat,
+            expected_serialization(CUSTOM_ERROR_MESSAGE),
+        );
+    }
+
+    #[test]
+    fn stateful_second_pass_wide_conversion_errors_preempt_deferred_float() {
+        for case in [
+            StatefulOrderingCase::FloatThenI128,
+            StatefulOrderingCase::I128ThenFloat,
+            StatefulOrderingCase::FloatThenU128,
+            StatefulOrderingCase::U128ThenFloat,
+        ] {
+            stateful_ordering_matches_legacy(
+                case,
+                expected_serialization("number out of range"),
+            );
+        }
+    }
+
+    #[test]
+    fn stateful_second_pass_sequences_choose_first_numeric_error() {
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::FloatThenUnsafe,
+            expected_unsupported_number(),
+        );
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::UnsafeThenFloat,
+            expected_unsafe_integer(UNSAFE_INTEGER),
+        );
+    }
+
+    #[test]
+    fn stateful_second_pass_duplicate_keys_keep_last_numeric_error() {
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::FloatOverwrittenByValid,
+            Ok(br#"{"same":1}"#.to_vec()),
+        );
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::ValidOverwrittenByFloat,
+            expected_unsupported_number(),
+        );
+    }
+
+    #[test]
+    fn stateful_second_pass_nested_utf16_order_chooses_first_numeric_error() {
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::NestedFloatBeforeUnsafe,
+            expected_unsupported_number(),
+        );
+        stateful_ordering_matches_legacy(
+            StatefulOrderingCase::NestedUnsafeBeforeFloat,
+            expected_unsafe_integer(UNSAFE_INTEGER),
+        );
+    }
+
+    #[test]
+    fn deferred_unsafe_errors_follow_materialized_object_order_and_duplicates()
+    -> Result<(), Box<dyn Error>> {
+        direct_matches_legacy(&OverwrittenUnsafeInteger);
+        assert_eq!(canonicalize(&OverwrittenUnsafeInteger)?, r#"{"same":1}"#);
+
+        let value: Value = serde_json::from_str(
+            r#"{"z":9007199254740992,"a":9007199254740993}"#,
+        )?;
+        direct_matches_legacy(&value);
+        assert!(matches!(
+            canonical_bytes(&value),
+            Err(CanonicalError::UnsafeInteger {
+                value: 9_007_199_254_740_993
+            })
+        ));
+        Ok(())
     }
 
     #[test]
