@@ -45,7 +45,7 @@ use er_types::battle_ui::{BattlePresentationEvent, PresentationPlanDigest};
 use er_types::{
     AuthorityEntryKind, AwaitSuccessorControl, CommandControlTarget, CommandFrontierControl,
     FrameContext, Material, NextControl, OperationId, ReplacementControl,
-    ReplacementControlAddress, SafeU53, SeatId, TerminalControl,
+    ReplacementControlAddress, SafeU53, SeatId,
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -1149,23 +1149,46 @@ pub(crate) fn protocol_next_control_from_plan(
             }))
         }
         BattleNextDecision::Complete(outcome) => {
-            let label = match outcome {
-                BattleOutcome::Victory => "victory",
-                BattleOutcome::Defeat => "defeat",
-                BattleOutcome::Ongoing => {
-                    return Err(AuthorityTransactionError::ControlProjection {
-                        reason: "ongoing outcome cannot derive terminal control".to_owned(),
-                    });
-                }
-            };
-            Ok(NextControl::Terminal(TerminalControl {
-                terminal_id: format!(
-                    "battle/{}/wave/{}/turn/{}/complete/{label}",
-                    control_plan.battle_id, control_plan.wave, control_plan.turn
-                ),
+            let terminal_operation_id = battle_terminal_operation_id(control_plan, outcome)?;
+            Ok(NextControl::AwaitSuccessor(AwaitSuccessorControl {
+                after_operation_id: predecessor_operation_id.clone(),
+                epoch: authority_epoch.get(),
+                wave: control_plan.wave.get(),
+                turn: control_plan.turn.get(),
+                allowed_kinds: vec![AuthorityEntryKind::TerminalCommit],
+                allowed_interaction_addresses: None,
+                allowed_control_addresses: None,
+                allow_next_wave_start: false,
+                expected_operation_id: Some(terminal_operation_id),
             }))
         }
     }
+}
+
+/// Derive the one terminal operation identity authorized by a completed battle
+/// material entry.  The terminal material builder uses this same string as its
+/// `terminalId`, so the battle entry's `AwaitSuccessor` can name the exact one
+/// legal terminal successor before that successor is published.
+pub(crate) fn battle_terminal_operation_id(
+    control_plan: &BattleControlPlan,
+    outcome: BattleOutcome,
+) -> Result<OperationId, AuthorityTransactionError> {
+    let label = match outcome {
+        BattleOutcome::Victory => "victory",
+        BattleOutcome::Defeat => "defeat",
+        BattleOutcome::Ongoing => {
+            return Err(AuthorityTransactionError::ControlProjection {
+                reason: "ongoing outcome cannot derive terminal operation identity".to_owned(),
+            });
+        }
+    };
+    OperationId::new(format!(
+        "battle/{}/wave/{}/turn/{}/complete/{label}",
+        control_plan.battle_id, control_plan.wave, control_plan.turn
+    ))
+    .map_err(|error| AuthorityTransactionError::ControlProjection {
+        reason: format!("terminal operation identity is invalid: {error}"),
+    })
 }
 
 fn replacement_control_coordinates(
