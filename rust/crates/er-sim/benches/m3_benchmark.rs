@@ -86,10 +86,7 @@ fn invalid(message: impl Into<String>) -> Box<dyn Error> {
 }
 
 fn elapsed_ns(start: Instant) -> u64 {
-    match u64::try_from(start.elapsed().as_nanos()) {
-        Ok(value) => value,
-        Err(_) => u64::MAX,
-    }
+    u64::try_from(start.elapsed().as_nanos()).unwrap_or(u64::MAX)
 }
 
 fn fixture_value(source: &str) -> TestResult<Value> {
@@ -546,7 +543,7 @@ fn battle_config(
 
     let mut run_state = canonical;
     run_state.battle = None;
-    run_state.next_battle_id = battle.battle_id.clone();
+    run_state.next_battle_id = battle.battle_id;
     let player_leads = lead_indices(&battle, BattleSide::Player, battle.format.player_capacity)?;
     let enemy_leads = lead_indices(&battle, BattleSide::Enemy, battle.format.enemy_capacity)?;
     Ok(BattleGameConfig {
@@ -1450,6 +1447,7 @@ fn settle_pair_presentations(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn report(
     scenario_id: &str,
     seed: &str,
