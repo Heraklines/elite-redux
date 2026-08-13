@@ -2,8 +2,8 @@ use std::error::Error;
 
 use er_protocol::{
     AckStage, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLog, AuthorityLogAction,
-    AuthorityLogConfig, AuthorityLogError, AuthorityReceiptVerdict, BackoffPolicy, FrameContext,
-    AuthorityLogSnapshotBridge, KernelScheduler, Material, NextControl, PeerBinding,
+    AuthorityLogConfig, AuthorityLogError, AuthorityLogSnapshotBridge, AuthorityReceiptVerdict,
+    BackoffPolicy, FrameContext, KernelScheduler, Material, NextControl, PeerBinding,
     ReceiptRejectReason, SchedulerCommand, SnapshotError, TimeClass, control_id_of,
 };
 use er_types::battle_ids::CanonicalHexBytes;

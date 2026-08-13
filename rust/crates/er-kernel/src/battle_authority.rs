@@ -421,22 +421,21 @@ pub(crate) fn prepare_authority_turn(
     // already-admitted entry must not consume the policy cursor twice.
     let (scripted_state, staged_policy) =
         admit_scripted_if_pending(staged_state.as_ref(), scripted_policy, content)?;
-    let (complete_state, completed_commands): (Cow<GameState>, _) =
-        if let Some(validated) =
-            validate_admitted_command_frontier_trusted(scripted_state.as_ref(), content)?
-        {
-            let (state, commands) = validated.into_parts();
-            (Cow::Borrowed(state), commands)
-        } else {
-            let completion = complete_command_frontier(scripted_state.as_ref(), content)?;
-            let CommandFrontierCompletion::Complete { state, commands } = completion else {
-                return Err(AuthorityTransactionError::ControlProjection {
-                    reason: "authority resolution requested before exact command frontier completion"
-                        .to_owned(),
-                });
-            };
-            (Cow::Owned(state), commands)
+    let (complete_state, completed_commands): (Cow<GameState>, _) = if let Some(validated) =
+        validate_admitted_command_frontier_trusted(scripted_state.as_ref(), content)?
+    {
+        let (state, commands) = validated.into_parts();
+        (Cow::Borrowed(state), commands)
+    } else {
+        let completion = complete_command_frontier(scripted_state.as_ref(), content)?;
+        let CommandFrontierCompletion::Complete { state, commands } = completion else {
+            return Err(AuthorityTransactionError::ControlProjection {
+                reason: "authority resolution requested before exact command frontier completion"
+                    .to_owned(),
+            });
         };
+        (Cow::Owned(state), commands)
+    };
 
     // Keep the resolver's command evidence tied to the exact completed
     // frontier.  The completion helper returns a canonical set, while the
@@ -753,13 +752,7 @@ fn admit_scripted_if_pending<'a>(
     state: &'a GameState,
     policy: &'a ScriptedEnemyPolicyV1,
     content: &ContentPack,
-) -> Result<
-    (
-        Cow<'a, GameState>,
-        Cow<'a, ScriptedEnemyPolicyV1>,
-    ),
-    AuthorityTransactionError,
-> {
+) -> Result<(Cow<'a, GameState>, Cow<'a, ScriptedEnemyPolicyV1>), AuthorityTransactionError> {
     // This is a temporary admission view needed only when the transaction's
     // input frontier still has pending enemy entries.  A prepared GameRuntime
     // frontier already carrying admitted enemies takes the no-op branch, so

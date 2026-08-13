@@ -206,9 +206,7 @@ fn sanitize_rust_source(source: &str) -> String {
                 if source_bytes[end] == b'/' && source_bytes.get(end + 1) == Some(&b'*') {
                     depth += 1;
                     end += 2;
-                } else if source_bytes[end] == b'*'
-                    && source_bytes.get(end + 1) == Some(&b'/')
-                {
+                } else if source_bytes[end] == b'*' && source_bytes.get(end + 1) == Some(&b'/') {
                     depth -= 1;
                     end += 2;
                 } else {
@@ -271,11 +269,7 @@ fn unique_function_offset(source: &str, signature: &str) -> usize {
     offset + 1
 }
 
-fn extract_function_section(
-    source: &str,
-    signature: &str,
-    next_signature: &str,
-) -> String {
+fn extract_function_section(source: &str, signature: &str, next_signature: &str) -> String {
     let source = normalized_sanitized_source(source);
     let start = unique_function_offset(&source, signature);
     let end = unique_function_offset(&source, next_signature);
@@ -304,7 +298,13 @@ fn rust_source_sanitizer_masks_fake_signatures_and_preserves_code() {
         source.bytes().filter(|byte| *byte == b'\n').count()
     );
     assert!(sanitized.contains("fn real()"));
-    for fake in ["fn fake_line", "fn fake_outer", "fn fake_nested", "fn fake_raw", "fn fake_normal"] {
+    for fake in [
+        "fn fake_line",
+        "fn fake_outer",
+        "fn fake_nested",
+        "fn fake_raw",
+        "fn fake_normal",
+    ] {
         assert!(!sanitized.contains(fake), "sanitizer leaked {fake}");
     }
 }
@@ -883,7 +883,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
     for (name, section, signature) in [
         (
             "apply_turn_material",
-            public_turn,
+            public_turn.as_str(),
             concat!(
                 "pub fn apply_turn_material(\n",
                 "    current: &BattleMaterialApplyContext,",
@@ -891,7 +891,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         ),
         (
             "apply_turn_material_trusted",
-            public_turn_trusted,
+            public_turn_trusted.as_str(),
             concat!(
                 "pub fn apply_turn_material_trusted(\n",
                 "    current: &BattleMaterialApplyContext,",
@@ -930,9 +930,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "reducer-issued TURN entry point changed its borrowed state/seat/allocator/prepared views",
     );
     assert!(
-        reducer_turn.contains(
-            "let transition = prepared.digest_evidence().transition();"
-        ),
+        reducer_turn.contains("let transition = prepared.digest_evidence().transition();"),
         "reducer-issued TURN path no longer obtains transition evidence from prepared",
     );
     assert!(
@@ -970,10 +968,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "validate_turn_rng",
         "validate_replacement_rng",
     ] {
-        assert!(
-            source.contains(required),
-            "missing guard {required}"
-        );
+        assert!(source.contains(required), "missing guard {required}");
     }
     assert!(
         source.contains("BattlePresentationKind::BattleWon")
@@ -1020,9 +1015,7 @@ fn no_legal_replacement_is_validated_as_explicit_material_evidence() {
     assert!(source.contains("validate_replacement_selection_trusted("));
     assert!(source.contains("legal_replacement_candidates"));
     assert!(source.contains("candidates.is_empty()"));
-    assert!(
-        source.contains("stored.replacement == ReplacementProgress::NoLegalReplacement")
-    );
+    assert!(source.contains("stored.replacement == ReplacementProgress::NoLegalReplacement"));
     assert!(source.contains("material.occurrence.id"));
     assert!(source.contains("validate_replacement_identity"));
 }
@@ -1037,10 +1030,7 @@ fn adapter_rejects_non_material_authority_entry_kinds_without_fallback() {
         "AuthorityEntryKind::WaveAdvance",
         "AuthorityEntryKind::TerminalCommit",
     ] {
-        assert!(
-            source.contains(kind),
-            "missing closed kind branch {kind}"
-        );
+        assert!(source.contains(kind), "missing closed kind branch {kind}");
     }
     assert!(source.contains("MalformedBattleMaterial"));
     assert!(!source.contains("fallback"));

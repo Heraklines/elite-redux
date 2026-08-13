@@ -766,13 +766,7 @@ impl AuthorityLog {
         let mut revision = start;
         while revision <= end {
             let revision_id = Revision::new(SafeU53::new(revision).ok()?);
-            required_tail.push(
-                self.retained
-                    .get(&revision_id)?
-                    .entry
-                    .as_ref()
-                    .clone(),
-            );
+            required_tail.push(self.retained.get(&revision_id)?.entry.as_ref().clone());
             revision = revision.checked_add(1)?;
         }
         let last = required_tail.last()?;
@@ -858,13 +852,10 @@ impl AuthorityLog {
         // delays, stages, and lease owners remain live exactly as they were.
         self.local_context = local_context.clone();
         self.peer_bindings = next_peers;
-        let rebound_head = self
-            .retained
-            .get_mut(&self.head_revision)
-            .map(|lease| {
-                Arc::make_mut(&mut lease.entry).context = local_context.clone();
-                Arc::clone(&lease.entry)
-            });
+        let rebound_head = self.retained.get_mut(&self.head_revision).map(|lease| {
+            Arc::make_mut(&mut lease.entry).context = local_context.clone();
+            Arc::clone(&lease.entry)
+        });
         for (revision, lease) in &mut self.retained {
             if *revision != self.head_revision {
                 Arc::make_mut(&mut lease.entry).context = local_context.clone();
@@ -1426,9 +1417,11 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
         };
 
         if let Some(entry) = restored.latest_committed.as_ref() {
-            restored.validate_entry_shape(entry.as_ref()).map_err(|error| {
-                snapshot_invalid("authority_log.latest_committed", error.to_string())
-            })?;
+            restored
+                .validate_entry_shape(entry.as_ref())
+                .map_err(|error| {
+                    snapshot_invalid("authority_log.latest_committed", error.to_string())
+                })?;
         }
 
         let mut timer_ids = BTreeSet::new();

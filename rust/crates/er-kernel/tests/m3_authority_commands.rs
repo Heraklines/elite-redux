@@ -228,9 +228,7 @@ fn sanitize_rust_source(source: &str) -> String {
                 if source_bytes[end] == b'/' && source_bytes.get(end + 1) == Some(&b'*') {
                     depth += 1;
                     end += 2;
-                } else if source_bytes[end] == b'*'
-                    && source_bytes.get(end + 1) == Some(&b'/')
-                {
+                } else if source_bytes[end] == b'*' && source_bytes.get(end + 1) == Some(&b'/') {
                     depth -= 1;
                     end += 2;
                 } else {
@@ -1407,10 +1405,8 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(publish < post_validate);
     assert!(source.contains("PreparedAuthorityReplacement {"));
     assert!(source.contains("apply_reducer_issued_turn_material_trusted as apply_turn_material"));
-    let replacement_start = unique_function_offset(
-        &source,
-        "pub(crate) fn prepare_authority_replacement(",
-    );
+    let replacement_start =
+        unique_function_offset(&source, "pub(crate) fn prepare_authority_replacement(");
     let turn_source = extract_function_section(
         &source,
         "pub(crate) fn prepare_authority_turn(",
@@ -1423,9 +1419,11 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         1,
         "TURN hot path must call trusted frontier validation exactly once"
     );
-    assert!(turn_source.contains(
-        "validate_admitted_command_frontier_trusted(scripted_state.as_ref(), content)?"
-    ));
+    assert!(
+        turn_source.contains(
+            "validate_admitted_command_frontier_trusted(scripted_state.as_ref(), content)?"
+        )
+    );
     assert_eq!(
         turn_source
             .matches("complete_command_frontier(scripted_state.as_ref(), content)?")
@@ -1433,10 +1431,8 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         1,
         "TURN hot path must complete the scripted frontier exactly once"
     );
-    let applier_start = unique_function_offset(
-        &turn_source,
-        "    let applied = apply_turn_material(",
-    );
+    let applier_start =
+        unique_function_offset(&turn_source, "    let applied = apply_turn_material(");
     let applier_end = unique_function_offset(
         &turn_source,
         "    .map_err(AuthorityTransactionError::MaterialApply)?;",
@@ -1453,9 +1449,9 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         1,
         "TURN material applier must receive the advanced allocators"
     );
-    assert!(turn_source.contains(
-        "validate_control_allocator_projection(next_control, &allocators)?"
-    ));
+    assert!(
+        turn_source.contains("validate_control_allocator_projection(next_control, &allocators)?")
+    );
     assert_eq!(
         turn_source
             .matches("validate_control_allocator_projection(")
@@ -1512,10 +1508,8 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(!source.contains("request.protocol_next_control"));
     assert!(!source.contains("ReplacementAdmissionLedger"));
     assert!(!source.contains("replacement_ledger"));
-    let prepared_start = unique_function_offset(
-        &source,
-        "pub(crate) struct AuthorityPreparedTransaction {",
-    );
+    let prepared_start =
+        unique_function_offset(&source, "pub(crate) struct AuthorityPreparedTransaction {");
     let prepared_end = unique_function_offset(&source, "pub(crate) enum PreparedMaterial {");
     assert!(source[prepared_start..prepared_end].contains("scripted_policy_after"));
     let take_entry_start = unique_function_offset(
@@ -1535,14 +1529,12 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         1,
         "authority adapter must have one crate-private production authority-preparation construction seam"
     );
-    assert!(source.contains(
-        "pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry"
-    ));
-    assert!(source.contains("material_bytes: std::mem::take(&mut self.material_bytes)"));
-    let input_start = unique_function_offset(
-        &source,
-        "pub(crate) struct AuthorityTransactionInput<'a> {",
+    assert!(
+        source.contains("pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry")
     );
+    assert!(source.contains("material_bytes: std::mem::take(&mut self.material_bytes)"));
+    let input_start =
+        unique_function_offset(&source, "pub(crate) struct AuthorityTransactionInput<'a> {");
     let input_end = unique_function_offset(&source, "pub(crate) struct AuthorityTurnRequest {");
     let input_source = &source[input_start..input_end];
     for required in [
@@ -1660,10 +1652,8 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     let ready_source = &kernel_source[ready_start..ready_end];
     assert!(!ready_source.contains("canonical_bytes"));
     assert!(!ready_source.contains("fnv1a"));
-    let published_start = unique_function_offset(
-        &source,
-        "pub(crate) struct AuthorityPublishedTransaction {",
-    );
+    let published_start =
+        unique_function_offset(&source, "pub(crate) struct AuthorityPublishedTransaction {");
     let published_end = unique_function_offset(&source, "pub(crate) fn prepare_authority_turn(");
     assert!(source[published_start..published_end].contains("scripted_policy_after"));
     assert!(source.contains("require_turn_equivalence(candidate, &decoded, &applied)?"));
