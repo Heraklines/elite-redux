@@ -28,6 +28,7 @@ use er_game::authority_commands::{
     complete_command_frontier_trusted as complete_command_frontier, internal_no_legal_replacement,
     project_scripted_policy_for_material_trusted as project_scripted_policy_for_material,
 };
+use er_game::internal_event::PreparedAuthorityEntry;
 use er_game::material::{
     BattleMaterialApplyContext, BattleMaterialApplyError, BattleReplacementMaterialV1,
     BattleTurnMaterialV1, MaterialApplyResult,
@@ -188,8 +189,17 @@ impl AuthorityPreparedTransaction {
         &self.menu_allocators
     }
 
-    pub(crate) fn take_material_bytes(&mut self) -> Vec<u8> {
-        std::mem::take(&mut self.material_bytes)
+    /// Construct the one FIFO correlation payload while moving the retained
+    /// canonical bytes out of this prepared transaction.
+    pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry {
+        let entry = &self.prepared.entry;
+        PreparedAuthorityEntry {
+            revision: entry.revision,
+            operation_id: entry.operation_id.clone(),
+            kind: entry.kind,
+            material_bytes: std::mem::take(&mut self.material_bytes),
+            material_digest: entry.material.digest.clone(),
+        }
     }
 
     pub(crate) fn operation_id(&self) -> &OperationId {

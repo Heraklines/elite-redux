@@ -11,7 +11,7 @@ use er_content::pack::ContentPack;
 use er_game::internal_event::{
     AuthorityEntryReadyPayload, BattleResolvedPayload, ButtonEventPayload, ControlInstalledPayload,
     InternalEvent, InternalEventKind, InternalEventQueue, MaterialApplyResult as EventApplyResult,
-    MaterialInstalledPayload, MaterialKind, PreparedAuthorityEntry, PreparedBattleResolution,
+    MaterialInstalledPayload, MaterialKind, PreparedBattleResolution,
     PresentationBarrier, UiEventPayload,
 };
 use er_game::material::{
@@ -2450,26 +2450,11 @@ impl BattleTransaction {
                 )?
             }
         };
-        let (revision, operation_id, kind, material_digest) = {
-            let entry = prepared.prepared_entry();
-            (
-                entry.revision,
-                entry.operation_id.clone(),
-                entry.kind,
-                entry.material.digest.clone(),
-            )
-        };
-        let material_bytes = prepared.take_material_bytes();
+        let prepared_entry = prepared.take_prepared_entry();
         self.pending_authority = Some(prepared);
         self.queue.push(InternalEvent::AuthorityEntryReady(
             AuthorityEntryReadyPayload {
-                prepared: PreparedAuthorityEntry {
-                    revision,
-                    operation_id,
-                    kind,
-                    material_bytes,
-                    material_digest,
-                },
+                prepared: prepared_entry,
             },
         ));
         Ok(())

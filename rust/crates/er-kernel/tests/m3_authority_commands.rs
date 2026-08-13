@@ -1124,7 +1124,21 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         "apply_reducer_issued_turn_material_trusted as apply_turn_material"
     ));
     assert!(source.contains("&prepared,"));
-    assert!(source.contains("validate_control_allocator_projection(&next_control, &allocators)?"));
+    let turn_start = source
+        .find("pub(crate) fn prepare_authority_turn(")
+        .ok_or("authority TURN preparation function missing")?;
+    let replacement_start = source
+        .find("pub(crate) fn prepare_authority_replacement(")
+        .ok_or("authority REPLACEMENT preparation function missing")?;
+    let turn_source = &source[turn_start..replacement_start];
+    assert!(turn_source.contains("validate_control_allocator_projection(next_control, &allocators)?"));
+    assert_eq!(
+        turn_source.matches("validate_control_allocator_projection(").count(),
+        1,
+        "TURN audit must bind allocator projection inside prepare_authority_turn"
+    );
+    assert!(source[replacement_start..]
+        .contains("validate_control_allocator_projection(&next_control, &allocators)?"));
     assert!(source.contains("prepared_admission.allocator_before() != allocators.as_slice()"));
     assert!(source.contains("admit_scripted_if_pending"));
     assert!(source.contains("CommandCollectionState"));
@@ -1157,6 +1171,32 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
         .find("pub(crate) enum PreparedMaterial")
         .ok_or("prepared material type missing")?;
     assert!(source[prepared_start..prepared_end].contains("scripted_policy_after"));
+    assert_eq!(
+        source.matches("PreparedAuthorityEntry {").count(),
+        1,
+        "authority adapter must have one sealed FIFO payload construction seam"
+    );
+    assert!(source.contains(
+        "pub(crate) fn take_prepared_entry(&mut self) -> PreparedAuthorityEntry"
+    ));
+    assert!(source.contains("material_bytes: std::mem::take(&mut self.material_bytes)"));
+    let kernel_source = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/battle_kernel.rs"
+    ));
+    assert!(kernel_source.contains("prepared.take_prepared_entry()"));
+    assert!(!kernel_source.contains("PreparedAuthorityEntry {"));
+    assert!(!kernel_source.contains("take_material_bytes"));
+    assert!(!kernel_source.contains("material_bytes"));
+    let ready_start = kernel_source
+        .find("let prepared_entry = prepared.take_prepared_entry();")
+        .ok_or("BattleKernel FIFO payload handoff missing")?;
+    let ready_end = kernel_source
+        .find("fn reduce_authority_ready(")
+        .ok_or("BattleKernel authority-ready reducer missing")?;
+    let ready_source = &kernel_source[ready_start..ready_end];
+    assert!(!ready_source.contains("canonical_bytes"));
+    assert!(!ready_source.contains("fnv1a"));
     let published_start = source
         .find("pub(crate) struct AuthorityPublishedTransaction")
         .ok_or("published transaction type missing")?;

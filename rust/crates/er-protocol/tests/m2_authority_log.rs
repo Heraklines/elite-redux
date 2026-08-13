@@ -3,9 +3,10 @@ use std::error::Error;
 use er_protocol::{
     AckStage, AuthorityEntryDraft, AuthorityEntryKind, AuthorityLog, AuthorityLogAction,
     AuthorityLogConfig, AuthorityLogError, AuthorityReceiptVerdict, BackoffPolicy, FrameContext,
-    KernelScheduler, Material, NextControl, PeerBinding, ReceiptRejectReason, SchedulerCommand,
-    TimeClass, control_id_of,
+    AuthorityLogSnapshotBridge, KernelScheduler, Material, NextControl, PeerBinding,
+    ReceiptRejectReason, SchedulerCommand, SnapshotError, TimeClass, control_id_of,
 };
+use er_types::battle_ids::CanonicalHexBytes;
 use er_types::{
     CommandControlTarget, CommandFrontierControl, ConnectionGeneration, OperationId, Revision,
     RunId, SafeU53, SeatId, SessionId, TimerId, TimerOwner,
@@ -1142,5 +1143,79 @@ fn maximum_timer_id_is_a_valid_identity_boundary_for_stale_events() -> TestResul
         Err(AuthorityLogError::InvalidEntry { .. })
     ));
     assert_eq!(log.diagnostics(), before);
+    Ok(())
+}
+
+#[test]
+fn snapshot_rejects_divergent_retained_head_but_restores_retired_head_continuity() -> TestResult {
+    let mut scheduler = KernelScheduler::new();
+    let mut log = AuthorityLog::new(config(8, &[(1, 1)])?)?;
+    let committed = log.commit(draft("snapshot-head")?, &mut scheduler)?;
+    let snapshot = log.snapshot_v2()?;
+    snapshot.validate()?;
+
+    let mut divergent = snapshot.clone();
+    let mut divergent_entry = committed.entry.clone();
+    divergent_entry.material.payload = json!({
+        "operation": "snapshot-head-divergent",
+        "epoch": 1,
+        "wave": 1,
+        "turn": 1,
+    });
+    let divergent_bytes = er_canonical::canonical_bytes(&divergent_entry)?;
+    let retained = divergent
+        .retained
+        .first_mut()
+        .ok_or("snapshot did not retain its head entry")?;
+    retained.entry.canonical_entry_bytes = CanonicalHexBytes::from_bytes(&divergent_bytes);
+    divergent.validate()?;
+    assert_ne!(
+        divergent.retained[0].entry.canonical_entry_bytes.as_str(),
+        snapshot
+            .latest_committed
+            .as_ref()
+            .ok_or("snapshot did not retain latest_committed")?
+            .canonical_entry_bytes
+            .as_str()
+    );
+
+    let mut valid_scheduler = scheduler.clone();
+    let restored = AuthorityLog::from_snapshot_v2(snapshot.clone(), &mut valid_scheduler)?;
+    assert_eq!(
+        restored.retained_entry(committed.entry.revision),
+        Some(&committed.entry)
+    );
+    let recovery = restored
+        .recovery_slice(restored.head_revision())
+        .ok_or("restored head continuity proof is missing")?;
+    assert_eq!(recovery.required_tail, vec![committed.entry.clone()]);
+
+    let mut divergent_scheduler = scheduler.clone();
+    let error = AuthorityLog::from_snapshot_v2(divergent, &mut divergent_scheduler)
+        .expect_err("a divergent retained head must be rejected");
+    assert!(matches!(
+        error,
+        SnapshotError::Invalid { path, reason }
+            if path == "authority_log.retained.entry"
+                && reason == "retained head entry must equal latest_committed as a complete AuthorityEntry"
+    ));
+
+    let mut retired_log = log;
+    let _ = retired_log.accept_receipt(
+        receipt(&committed.entry, 1, 1, AckStage::ControlInstalled)?,
+        &mut scheduler,
+    );
+    let retired_snapshot = retired_log.snapshot_v2()?;
+    assert!(retired_snapshot.retained.is_empty());
+    let mut retired_scheduler = scheduler.clone();
+    let retired = AuthorityLog::from_snapshot_v2(retired_snapshot, &mut retired_scheduler)?;
+    assert!(retired.retained_entry(committed.entry.revision).is_none());
+    assert_eq!(
+        retired
+            .recovery_slice(retired.head_revision())
+            .ok_or("retired head continuity proof is missing")?
+            .required_tail,
+        vec![committed.entry]
+    );
     Ok(())
 }

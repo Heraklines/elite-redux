@@ -1413,6 +1413,24 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
                 snapshot_invalid("authority_log.retained.entry", error.to_string())
             })?;
 
+            let entry = if revision == restored.head_revision {
+                let Some(latest_committed) = restored.latest_committed.as_ref() else {
+                    return Err(snapshot_invalid(
+                        "authority_log.retained.entry",
+                        "retained head entry requires latest_committed",
+                    ));
+                };
+                if entry != latest_committed.as_ref() {
+                    return Err(snapshot_invalid(
+                        "authority_log.retained.entry",
+                        "retained head entry must equal latest_committed as a complete AuthorityEntry",
+                    ));
+                }
+                Arc::clone(latest_committed)
+            } else {
+                Arc::new(entry)
+            };
+
             let expected_owner = delivery_timer_owner(&restored.owner_id, revision)?;
             if lease_snapshot.owner != expected_owner {
                 return Err(snapshot_invalid(
@@ -1494,7 +1512,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             restored.retained.insert(
                 revision,
                 DeliveryLease {
-                    entry: Arc::new(entry),
+                    entry,
                     owner: lease_snapshot.owner,
                     peer_stages,
                     timer_id: lease_snapshot.timer_id,

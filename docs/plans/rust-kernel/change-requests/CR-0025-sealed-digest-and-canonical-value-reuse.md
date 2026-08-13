@@ -45,8 +45,12 @@ publication validation.
   generation rebind uses `Arc::make_mut` before changing entry context so a
   failed or discarded transaction cannot mutate its predecessor.
 - Move the one canonical material byte vector into the private prepared-entry
-  event after preparation, and borrow the already-installed game, control, and
-  scripted policy during synchronous pre/post-publication comparison.
+  event after preparation through one crate-private
+  `AuthorityPreparedTransaction::take_prepared_entry` construction
+  seam, and borrow the already-installed game, control, and scripted policy
+  during synchronous pre/post-publication comparison. The FIFO bytes are
+  construction-correlated diagnostic evidence; the prepared AuthorityLog
+  `Material { digest, payload }` remains the publication input.
 
 ## Consequences
 
@@ -58,6 +62,8 @@ allocator, endpoint, content, identity, control, and final transaction checks
 remain mandatory. Public authority-log APIs and snapshots still expose owned
 entries. Only work already proved by an unforgeable reducer capability, an
 already-parsed canonical value, or immutable rollback-owned state is reused.
+The FIFO evidence is not independently canonicalized, hashed, or compared in
+the resolving loop.
 
 ## Acceptance evidence
 
