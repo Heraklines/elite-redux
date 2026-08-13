@@ -25,7 +25,234 @@ const LEGACY_ORACLE_CONTENT_DIGEST: &str =
 const LEGACY_ORACLE_CONTENT_HASH: &str =
     "blake3-v1:3767f847681151a04ce9adc150297774e9b32312dce8cf384234c0e84e3a02a8";
 
+fn blank_non_newline_bytes(source: &[u8], sanitized: &mut [u8], start: usize, end: usize) {
+    for index in start..end {
+        if !matches!(source[index], b'\r' | b'\n') {
+            sanitized[index] = b' ';
+        }
+    }
+}
+
+fn raw_string_start(source: &[u8], start: usize) -> Option<(usize, usize)> {
+    let prefix_len = if source.get(start) == Some(&b'r') {
+        1
+    } else if matches!(source.get(start), Some(&b'b') | Some(&b'c'))
+        && source.get(start + 1) == Some(&b'r')
+    {
+        2
+    } else {
+        return None;
+    };
+
+    let mut quote = start + prefix_len;
+    let mut hash_count = 0;
+    while source.get(quote) == Some(&b'#') {
+        hash_count += 1;
+        quote += 1;
+    }
+    (source.get(quote) == Some(&b'"')).then_some((quote + 1, hash_count))
+}
+
+fn raw_string_end(source: &[u8], start: usize) -> Option<usize> {
+    let (content_start, hash_count) = raw_string_start(source, start)?;
+    let mut index = content_start;
+    while index < source.len() {
+        if source[index] == b'"' {
+            let mut closing = index + 1;
+            let mut matched_hashes = 0;
+            while matched_hashes < hash_count && source.get(closing) == Some(&b'#') {
+                matched_hashes += 1;
+                closing += 1;
+            }
+            if matched_hashes == hash_count {
+                return Some(closing);
+            }
+        }
+        index += 1;
+    }
+    Some(source.len())
+}
+
+fn string_quote_start(source: &[u8], start: usize) -> Option<usize> {
+    if source.get(start) == Some(&b'"') {
+        Some(start)
+    } else if matches!(source.get(start), Some(&b'b') | Some(&b'c'))
+        && source.get(start + 1) == Some(&b'"')
+    {
+        Some(start + 1)
+    } else {
+        None
+    }
+}
+
+fn string_literal_end(source: &[u8], quote_start: usize) -> usize {
+    let mut index = quote_start + 1;
+    while index < source.len() {
+        match source[index] {
+            b'\\' => {
+                index += 1;
+                if index < source.len() {
+                    index += 1;
+                }
+            }
+            b'"' => return index + 1,
+            _ => index += 1,
+        }
+    }
+    source.len()
+}
+
+fn is_ascii_hex(byte: u8) -> bool {
+    matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F')
+}
+
+fn utf8_char_width(byte: u8) -> Option<usize> {
+    match byte {
+        0x00..=0x7f => Some(1),
+        0xc2..=0xdf => Some(2),
+        0xe0..=0xef => Some(3),
+        0xf0..=0xf4 => Some(4),
+        _ => None,
+    }
+}
+
+fn char_literal_end(source: &[u8], quote_start: usize) -> Option<usize> {
+    let mut index = quote_start + 1;
+    let first = *source.get(index)?;
+    if first == b'\\' {
+        index += 1;
+        match source.get(index) {
+            Some(&b'u') if source.get(index + 1) == Some(&b'{') => {
+                index += 2;
+                let mut digits = 0;
+                let mut closed = false;
+                while let Some(&byte) = source.get(index) {
+                    if byte == b'}' {
+                        closed = (1..=6).contains(&digits);
+                        index += 1;
+                        break;
+                    }
+                    if !is_ascii_hex(byte) || digits == 6 {
+                        return None;
+                    }
+                    digits += 1;
+                    index += 1;
+                }
+                if !closed {
+                    return None;
+                }
+            }
+            Some(&b'x') => {
+                index += 1;
+                for _ in 0..2 {
+                    match source.get(index) {
+                        Some(&byte) if is_ascii_hex(byte) => index += 1,
+                        _ => return None,
+                    }
+                }
+            }
+            Some(&byte) if !matches!(byte, b'\r' | b'\n') => index += 1,
+            _ => return None,
+        }
+    } else {
+        if matches!(first, b'\r' | b'\n') {
+            return None;
+        }
+        let width = utf8_char_width(first)?;
+        let end = index + width;
+        if end > source.len()
+            || !source[index + 1..end]
+                .iter()
+                .all(|byte| (byte & 0xc0) == 0x80)
+        {
+            return None;
+        }
+        index = end;
+    }
+
+    (source.get(index) == Some(&b'\'')).then_some(index + 1)
+}
+
+fn char_literal_quote_start(source: &[u8], start: usize) -> Option<usize> {
+    if source.get(start) == Some(&b'\'') {
+        Some(start)
+    } else if source.get(start) == Some(&b'b') && source.get(start + 1) == Some(&b'\'') {
+        Some(start + 1)
+    } else {
+        None
+    }
+}
+
+fn sanitize_rust_source(source: &str) -> String {
+    let source_bytes = source.as_bytes();
+    let mut sanitized = source_bytes.to_vec();
+    let mut index = 0;
+
+    while index < source_bytes.len() {
+        if source_bytes[index] == b'/' && source_bytes.get(index + 1) == Some(&b'/') {
+            let mut end = index + 2;
+            while end < source_bytes.len() && source_bytes[end] != b'\n' {
+                end += 1;
+            }
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if source_bytes[index] == b'/' && source_bytes.get(index + 1) == Some(&b'*') {
+            let mut end = index + 2;
+            let mut depth = 1;
+            while end < source_bytes.len() && depth != 0 {
+                if source_bytes[end] == b'/' && source_bytes.get(end + 1) == Some(&b'*') {
+                    depth += 1;
+                    end += 2;
+                } else if source_bytes[end] == b'*'
+                    && source_bytes.get(end + 1) == Some(&b'/')
+                {
+                    depth -= 1;
+                    end += 2;
+                } else {
+                    end += 1;
+                }
+            }
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if let Some(end) = raw_string_end(source_bytes, index) {
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if let Some(quote_start) = string_quote_start(source_bytes, index) {
+            let end = string_literal_end(source_bytes, quote_start);
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
+        }
+
+        if let Some(quote_start) = char_literal_quote_start(source_bytes, index) {
+            if let Some(end) = char_literal_end(source_bytes, quote_start) {
+                blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+                index = end;
+                continue;
+            }
+        }
+
+        index += 1;
+    }
+
+    String::from_utf8(sanitized).expect("source is valid UTF-8")
+}
+
+fn normalized_sanitized_source(source: &str) -> String {
+    sanitize_rust_source(&source.replace("\r\n", "\n"))
+}
+
 fn unique_function_offset(source: &str, signature: &str) -> usize {
+    let source = normalized_sanitized_source(source);
     assert_eq!(
         source.matches(signature).count(),
         1,
@@ -44,18 +271,42 @@ fn unique_function_offset(source: &str, signature: &str) -> usize {
     offset + 1
 }
 
-fn extract_function_section<'a>(
-    source: &'a str,
+fn extract_function_section(
+    source: &str,
     signature: &str,
     next_signature: &str,
-) -> &'a str {
-    let start = unique_function_offset(source, signature);
-    let end = unique_function_offset(source, next_signature);
+) -> String {
+    let source = normalized_sanitized_source(source);
+    let start = unique_function_offset(&source, signature);
+    let end = unique_function_offset(&source, next_signature);
     assert!(
         start < end,
         "function signature {signature:?} must precede {next_signature:?}",
     );
-    &source[start..end]
+    source[start..end].to_owned()
+}
+
+#[test]
+fn rust_source_sanitizer_masks_fake_signatures_and_preserves_code() {
+    let source = concat!(
+        "fn real() {\n",
+        "// fn fake_line() {}\n",
+        "/* fn fake_outer() { /* fn fake_nested() {} */ } */\n",
+        "let raw = r###\"fn fake_raw() {}\"###;\n",
+        "let normal = \"fn fake_normal() {}\";\n",
+        "}\n",
+    );
+    let sanitized = sanitize_rust_source(source);
+
+    assert_eq!(sanitized.len(), source.len());
+    assert_eq!(
+        sanitized.bytes().filter(|byte| *byte == b'\n').count(),
+        source.bytes().filter(|byte| *byte == b'\n').count()
+    );
+    assert!(sanitized.contains("fn real()"));
+    for fake in ["fn fake_line", "fn fake_outer", "fn fake_nested", "fn fake_raw", "fn fake_normal"] {
+        assert!(!sanitized.contains(fake), "sanitizer leaked {fake}");
+    }
 }
 
 fn is_status_kind_tag(tag: &str) -> bool {
@@ -395,8 +646,9 @@ fn typed_material_codecs_are_closed_and_canonical_only() {
     assert!(decode_turn_material(br#"{}"#).is_err());
     assert!(decode_replacement_material(br#"{}"#).is_err());
 
-    assert!(MATERIAL_SOURCE.contains("serde(deny_unknown_fields)"));
-    assert!(MATERIAL_SOURCE.contains("canonical_bytes(&decoded)? != bytes"));
+    let source = normalized_sanitized_source(MATERIAL_SOURCE);
+    assert!(source.contains("serde(deny_unknown_fields)"));
+    assert!(source.contains("canonical_bytes(&decoded)? != bytes"));
 }
 
 #[test]
@@ -551,39 +803,42 @@ fn replica_maps_every_common_error_to_the_frozen_class() {
 
 #[test]
 fn authority_and_replica_are_role_neutral_and_replica_never_resolves() {
-    assert!(MATERIAL_SOURCE.contains("pub fn apply_turn_material"));
-    assert!(MATERIAL_SOURCE.contains("pub fn apply_replacement_material"));
-    assert!(MATERIAL_SOURCE.contains("validate_turn_evidence"));
-    assert!(MATERIAL_SOURCE.contains("validate_replacement_evidence"));
-    assert!(REPLICA_SOURCE.contains("apply_turn_material(current"));
-    assert!(REPLICA_SOURCE.contains("apply_replacement_material(current"));
-    assert!(!REPLICA_SOURCE.contains("resolve_turn"));
-    assert!(!REPLICA_SOURCE.contains("resolve_replacement"));
+    let material_source = normalized_sanitized_source(MATERIAL_SOURCE);
+    let replica_source = normalized_sanitized_source(REPLICA_SOURCE);
+    assert!(material_source.contains("pub fn apply_turn_material"));
+    assert!(material_source.contains("pub fn apply_replacement_material"));
+    assert!(material_source.contains("validate_turn_evidence"));
+    assert!(material_source.contains("validate_replacement_evidence"));
+    assert!(replica_source.contains("apply_turn_material(current"));
+    assert!(replica_source.contains("apply_replacement_material(current"));
+    assert!(!replica_source.contains("resolve_turn"));
+    assert!(!replica_source.contains("resolve_replacement"));
 }
 
 #[test]
 fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
-    let frontier = MATERIAL_SOURCE
+    let source = normalized_sanitized_source(MATERIAL_SOURCE);
+    let frontier = source
         .find("fn reconcile_turn_frontier")
         .expect("TURN reconciliation exists");
-    let next_frontier = MATERIAL_SOURCE
+    let next_frontier = source
         .find("fn validate_fresh_command_frontier")
         .expect("TURN after-state frontier validation exists");
-    let retained = MATERIAL_SOURCE
+    let retained = source
         .find("fn retained_command")
         .expect("retained command subset guard exists");
-    let admitted = MATERIAL_SOURCE
+    let admitted = source
         .find("fn admitted_command")
         .expect("admitted command subset guard exists");
-    let replacement = MATERIAL_SOURCE
+    let replacement = source
         .find("if current.current_state != material.before_state")
         .expect("REPLACEMENT requires full before-state equality");
     assert!(frontier < retained && frontier < admitted);
     assert!(replacement < frontier && frontier < next_frontier);
-    assert!(MATERIAL_SOURCE.contains("same_frontier_window"));
+    assert!(source.contains("same_frontier_window"));
     assert!(
-        MATERIAL_SOURCE.contains("current_command != remote_command")
-            || MATERIAL_SOURCE.contains("local_command != remote_command")
+        source.contains("current_command != remote_command")
+            || source.contains("local_command != remote_command")
     );
     for required in [
         "CommandFrontierStatus::Pending",
@@ -593,17 +848,17 @@ fn turn_partial_frontier_and_replacement_full_equality_guards_are_present() {
         "project_battle_control_plan",
     ] {
         assert!(
-            MATERIAL_SOURCE.contains(required),
+            source.contains(required),
             "missing frontier guard {required}"
         );
     }
-    assert!(!MATERIAL_SOURCE.contains("fn validate_command_root_menu"));
-    assert!(!MATERIAL_SOURCE.contains("fn validate_replacement_menu"));
+    assert!(!source.contains("fn validate_command_root_menu"));
+    assert!(!source.contains("fn validate_replacement_menu"));
 }
 
 #[test]
 fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
-    let source = MATERIAL_SOURCE.replace("\r\n", "\n");
+    let source = normalized_sanitized_source(MATERIAL_SOURCE);
     let public_turn = extract_function_section(
         &source,
         "pub fn apply_turn_material(",
@@ -739,40 +994,43 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
             "reducer-issued material path omitted {evidence_check}",
         );
     }
-    assert!(!source.contains("skip_digest"));
+    assert!(!MATERIAL_SOURCE.contains("skip_digest"));
 }
 
 #[test]
 fn allocator_internal_validation_precedes_endpoint_recovery_classification() {
-    let internal = MATERIAL_SOURCE
+    let source = normalized_sanitized_source(MATERIAL_SOURCE);
+    let internal = source
         .find("validate_allocator_projection(")
         .expect("internal allocator projection exists");
-    let endpoint = MATERIAL_SOURCE
+    let endpoint = source
         .find("validate_endpoint_allocators(")
         .expect("endpoint allocator comparison exists");
     assert!(internal < endpoint);
-    assert!(MATERIAL_SOURCE.contains("MenuAllocatorMismatch"));
-    assert!(MATERIAL_SOURCE.contains("LocalBeforeStateMismatch"));
-    assert!(MATERIAL_SOURCE.contains("after_id < before_id"));
-    assert!(MATERIAL_SOURCE.contains("*id < before_id || *id >= after_id"));
+    assert!(source.contains("MenuAllocatorMismatch"));
+    assert!(source.contains("LocalBeforeStateMismatch"));
+    assert!(source.contains("after_id < before_id"));
+    assert!(source.contains("*id < before_id || *id >= after_id"));
 }
 
 #[test]
 fn no_legal_replacement_is_validated_as_explicit_material_evidence() {
-    assert!(MATERIAL_SOURCE.contains("pub selection: ReplacementSelection"));
-    assert!(MATERIAL_SOURCE.contains("validate_replacement_selection_trusted("));
-    assert!(MATERIAL_SOURCE.contains("legal_replacement_candidates"));
-    assert!(MATERIAL_SOURCE.contains("candidates.is_empty()"));
+    let source = normalized_sanitized_source(MATERIAL_SOURCE);
+    assert!(source.contains("pub selection: ReplacementSelection"));
+    assert!(source.contains("validate_replacement_selection_trusted("));
+    assert!(source.contains("legal_replacement_candidates"));
+    assert!(source.contains("candidates.is_empty()"));
     assert!(
-        MATERIAL_SOURCE.contains("stored.replacement == ReplacementProgress::NoLegalReplacement")
+        source.contains("stored.replacement == ReplacementProgress::NoLegalReplacement")
     );
-    assert!(MATERIAL_SOURCE.contains("material.occurrence.id"));
-    assert!(MATERIAL_SOURCE.contains("validate_replacement_identity"));
+    assert!(source.contains("material.occurrence.id"));
+    assert!(source.contains("validate_replacement_identity"));
 }
 
 #[test]
 fn adapter_rejects_non_material_authority_entry_kinds_without_fallback() {
-    assert!(!REPLICA_SOURCE.contains("pub fn apply_authority_material_payload"));
+    let source = normalized_sanitized_source(REPLICA_SOURCE);
+    assert!(!source.contains("pub fn apply_authority_material_payload"));
     for kind in [
         "AuthorityEntryKind::InteractionCommit",
         "AuthorityEntryKind::ControlCommit",
@@ -780,10 +1038,10 @@ fn adapter_rejects_non_material_authority_entry_kinds_without_fallback() {
         "AuthorityEntryKind::TerminalCommit",
     ] {
         assert!(
-            REPLICA_SOURCE.contains(kind),
+            source.contains(kind),
             "missing closed kind branch {kind}"
         );
     }
-    assert!(REPLICA_SOURCE.contains("MalformedBattleMaterial"));
-    assert!(!REPLICA_SOURCE.contains("fallback"));
+    assert!(source.contains("MalformedBattleMaterial"));
+    assert!(!source.contains("fallback"));
 }
