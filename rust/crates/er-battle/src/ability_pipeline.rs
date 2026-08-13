@@ -118,9 +118,9 @@ impl DefensiveAbilityOutcome {
     }
 }
 
-/// Evidence for one changed target stage caused by Intimidate.
+/// Evidence for one target stage addressed by Intimidate.
 ///
-/// The nested B05 mutation is semantic evidence only.  It does not mutate a
+/// The nested B05 result preserves both changed and clamped attempts. It does not mutate a
 /// `PokemonState`, allocate a `BattleMutation`, or allocate presentation IDs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct IntimidateStageChange {
@@ -170,6 +170,8 @@ pub enum SwitchInOutcome {
         target_slots: Vec<FieldSlot>,
         /// Only mutations whose canonical stage actually changed.
         mutations: Vec<IntimidateStageChange>,
+        /// Clamped attempts for eligible targets already at the floor.
+        attempts: Vec<IntimidateStageChange>,
     },
     /// Intimidate was evaluated, but every eligible target was already at the
     /// -6 Attack floor or no eligible adjacent opponent was occupied.
@@ -179,6 +181,8 @@ pub enum SwitchInOutcome {
         ability_id: AbilityId,
         /// Adjacent, occupied, non-fainted opponent slots considered.
         target_slots: Vec<FieldSlot>,
+        /// Exact clamped attempts for eligible targets already at the floor.
+        attempts: Vec<IntimidateStageChange>,
     },
 }
 
@@ -192,6 +196,14 @@ impl SwitchInOutcome {
             | Self::Suppressed { .. }
             | Self::NotApplicable { .. }
             | Self::NoMutation { .. } => &[],
+        }
+    }
+
+    /// Return eligible Intimidate attempts that clamped at the current stage.
+    pub fn attempts(&self) -> &[IntimidateStageChange] {
+        match self {
+            Self::Triggered { attempts, .. } | Self::NoMutation { attempts, .. } => attempts,
+            Self::NoOp { .. } | Self::Suppressed { .. } | Self::NotApplicable { .. } => &[],
         }
     }
 
@@ -305,6 +317,7 @@ pub fn evaluate_switch_in(
 
     let mut target_slots = Vec::new();
     let mut mutations = Vec::new();
+    let mut attempts = Vec::new();
     for edge in &battle.format.adjacency {
         let target_slot = if edge.first == incoming_slot {
             edge.second
@@ -336,15 +349,18 @@ pub fn evaluate_switch_in(
 
         target_slots.push(target_slot);
         let mutation = stage_mutation(BattleStat::Attack, target.stat_stages.attack, -1);
+        let change = IntimidateStageChange {
+            source: source_id,
+            source_slot: incoming_slot,
+            target: target_id,
+            target_slot,
+            ability_id: resolved.ability_id,
+            mutation,
+        };
         if mutation.changed {
-            mutations.push(IntimidateStageChange {
-                source: source_id,
-                source_slot: incoming_slot,
-                target: target_id,
-                target_slot,
-                ability_id: resolved.ability_id,
-                mutation,
-            });
+            mutations.push(change);
+        } else {
+            attempts.push(change);
         }
     }
 
@@ -354,6 +370,7 @@ pub fn evaluate_switch_in(
             source_slot: incoming_slot,
             ability_id: resolved.ability_id,
             target_slots,
+            attempts,
         })
     } else {
         Ok(SwitchInOutcome::Triggered {
@@ -362,6 +379,7 @@ pub fn evaluate_switch_in(
             ability_id: resolved.ability_id,
             target_slots,
             mutations,
+            attempts,
         })
     }
 }

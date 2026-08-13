@@ -3027,7 +3027,7 @@ fn rebuild_remote_command_path(
         }
     }
     for prior_control in prior_controls {
-        for menu_count in &menu_counts {
+        for menu_count in menu_counts {
             let first_menu_instance_id = match remote_menu_allocator_before_final(
                 runtime,
                 proposal.owner_seat,

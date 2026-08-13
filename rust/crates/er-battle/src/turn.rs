@@ -59,7 +59,7 @@ use crate::resolver::{
     BattleMutation, BattleNextDecision, BattleReplacementTransition, BattleTransition,
     validate_battle_mutation_evidence,
 };
-use crate::stat_stage::{StatStageError, set_stage};
+use crate::stat_stage::{MIN_STAT_STAGE, StatStageError, set_stage};
 use crate::status::{
     StatusApplicationOutcome, StatusError, StatusResidualInput, StatusResidualOutcome,
     resolve_residual,
@@ -375,6 +375,15 @@ fn apply_switch_in_outcome(
         | SwitchInOutcome::NotApplicable { .. } => {}
     }
 
+    for attempt in outcome.attempts() {
+        causal_events.push(PresentationCausalEvent::stat_stage_attempted(
+            attempt.target,
+            BattleStat::Attack,
+            attempt.mutation.before,
+            attempt.mutation.after,
+        ));
+    }
+
     for change in outcome.mutations() {
         let target = find_pokemon_mut(state, change.target_slot, change.target)?;
         set_stage(
@@ -419,14 +428,17 @@ fn resolve_move_action(
 
     let action_sequence = push_pending_action(action_order, action, move_disposition(&result))?;
 
-    for draw in runtime
+    let new_battle_draws = runtime
         .audit_entries()
         .iter()
         .skip(rng_audit_start)
-        .filter(|draw| {
-            draw.stream == RngStream::Battle && draw.reason == RngReason::ParalysisActivation
-        })
-    {
+        .filter(|draw| draw.stream == RngStream::Battle)
+        .collect::<Vec<_>>();
+    let paralysis_draw_first = new_battle_draws
+        .first()
+        .is_some_and(|draw| draw.reason == RngReason::ParalysisActivation);
+    if paralysis_draw_first {
+        let draw = new_battle_draws[0];
         record_battle_rng_draw(draw, mutations, causal_events)?;
     }
     if let Some(pp) = result.pp_mutation {
@@ -441,13 +453,9 @@ fn resolve_move_action(
             },
         );
     }
-    for draw in runtime
-        .audit_entries()
-        .iter()
-        .skip(rng_audit_start)
-        .filter(|draw| {
-            draw.stream == RngStream::Battle && draw.reason != RngReason::ParalysisActivation
-        })
+    for draw in new_battle_draws
+        .into_iter()
+        .skip(usize::from(paralysis_draw_first))
     {
         record_battle_rng_draw(draw, mutations, causal_events)?;
     }
@@ -572,19 +580,29 @@ fn append_target_mutations(
         }
     }
     for stage in &target.stat_stage_effects {
-        if stage.changed
-            && let Some(pokemon) = target.pokemon
-        {
-            record_mutation(
-                mutations,
-                causal_events,
-                BattleMutation::StatStageChanged {
+        if let Some(pokemon) = target.pokemon {
+            if stage.changed {
+                record_mutation(
+                    mutations,
+                    causal_events,
+                    BattleMutation::StatStageChanged {
+                        pokemon,
+                        stat: stage.stat,
+                        before: stage.before,
+                        after: stage.after,
+                    },
+                );
+            } else if stage.delta < 0
+                && stage.before == MIN_STAT_STAGE
+                && stage.after == MIN_STAT_STAGE
+            {
+                causal_events.push(PresentationCausalEvent::stat_stage_attempted(
                     pokemon,
-                    stat: stage.stat,
-                    before: stage.before,
-                    after: stage.after,
-                },
-            );
+                    stage.stat,
+                    stage.before,
+                    stage.after,
+                ));
+            }
         }
     }
 }

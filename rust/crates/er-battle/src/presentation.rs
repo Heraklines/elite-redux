@@ -11,7 +11,7 @@ use er_types::OperationId;
 use er_types::SafeU53;
 use er_types::battle_ids::{AbilityId, BattlePresentationEventId, FieldSlot, MoveId, PokemonId};
 use er_types::battle_model::{
-    ActionDisposition, BattleOutcome, ResolvedAction, ResolvedActionKind,
+    ActionDisposition, BattleOutcome, BattleStat, ResolvedAction, ResolvedActionKind,
 };
 use er_types::battle_ui::{
     BattlePresentationEvent, BattlePresentationKind, PresentationBlockingPolicy,
@@ -49,6 +49,12 @@ pub enum PresentationCausalEvent {
         pokemon: PokemonId,
         ability_id: AbilityId,
     },
+    StatStageAttempted {
+        pokemon: PokemonId,
+        stat: BattleStat,
+        before: i8,
+        after: i8,
+    },
     Mutation(Box<BattleMutation>),
 }
 
@@ -71,6 +77,20 @@ impl PresentationCausalEvent {
         Self::AbilityActivated {
             pokemon,
             ability_id,
+        }
+    }
+
+    pub const fn stat_stage_attempted(
+        pokemon: PokemonId,
+        stat: BattleStat,
+        before: i8,
+        after: i8,
+    ) -> Self {
+        Self::StatStageAttempted {
+            pokemon,
+            stat,
+            before,
+            after,
         }
     }
 
@@ -252,6 +272,23 @@ fn build_plan(
                 )?;
             }
             PresentationCausalEvent::AbilityActivated { .. } => {}
+            PresentationCausalEvent::StatStageAttempted {
+                pokemon,
+                stat,
+                before,
+                after,
+            } => {
+                push_event(
+                    &mut plan,
+                    material_operation_id,
+                    BattlePresentationKind::StatStageChanged {
+                        pokemon: *pokemon,
+                        stat: *stat,
+                        before: *before,
+                        after: *after,
+                    },
+                )?;
+            }
             PresentationCausalEvent::Mutation(mutation) => {
                 if let Some(kind) = presentation_kind_from_mutation(mutation) {
                     push_event(&mut plan, material_operation_id, kind)?;

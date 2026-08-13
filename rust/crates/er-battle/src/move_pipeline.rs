@@ -467,8 +467,8 @@ fn structural_target_candidates(
             }
             let occupant = entry.occupant?;
             let pokemon = find_pokemon(battle, entry.slot, occupant)?;
-            let valid_state = (pokemon.hp > 0 && !pokemon.fainted)
-                || (pokemon.hp == 0 && pokemon.fainted);
+            let valid_state =
+                (pokemon.hp > 0 && !pokemon.fainted) || (pokemon.hp == 0 && pokemon.fainted);
             valid_state.then_some(entry.slot)
         })
         .collect::<Vec<_>>();

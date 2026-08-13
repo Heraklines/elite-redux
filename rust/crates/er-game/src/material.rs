@@ -16,6 +16,7 @@ use er_battle::{
     BattleMutation, BattleNextDecision, compute_presentation_plan_digest,
     validate_battle_mutation_evidence,
 };
+use er_battle::stat_stage::MIN_STAT_STAGE;
 use er_canonical::{CanonicalError, canonical_bytes, canonicalize};
 use er_content::moves::find_move;
 pub use er_content::pack::ContentPack;
@@ -40,7 +41,7 @@ use er_types::battle_ids::ContentPackHash;
 use er_types::battle_ids::{
     BattleId, BattleSide, FieldSlot, MenuInstanceId, MoveId, PokemonId, TurnIndex, WaveIndex,
 };
-use er_types::battle_model::{FaintOccurrence, ReplacementProgress, ResolvedAction};
+use er_types::battle_model::{BattleStat, FaintOccurrence, ReplacementProgress, ResolvedAction};
 use er_types::battle_ui::{
     BattlePresentationEvent, BattlePresentationKind, PresentationBlockingPolicy,
     PresentationPlanDigest, PresentationSkipPolicy,
@@ -1075,7 +1076,7 @@ fn validate_presentation_kind(
             before,
             after,
         } => {
-            if !mutations.iter().any(|mutation| {
+            let matching_mutation = mutations.iter().any(|mutation| {
                 matches!(
                     mutation,
                     BattleMutation::StatStageChanged {
@@ -1088,7 +1089,22 @@ fn validate_presentation_kind(
                         && old == before
                         && new == after
                 )
-            }) {
+            });
+            let exact_floor_attempt = before == after
+                && *before == MIN_STAT_STAGE
+                && !mutations.iter().any(|mutation| {
+                    matches!(
+                        mutation,
+                        BattleMutation::StatStageChanged {
+                            pokemon: candidate,
+                            stat: changed_stat,
+                            ..
+                        } if candidate == pokemon && changed_stat == stat
+                    )
+                })
+                && stage_in_state(before_state, *pokemon, *stat) == Some(*before)
+                && stage_in_state(after_state, *pokemon, *stat) == Some(*after);
+            if !matching_mutation && !exact_floor_attempt {
                 return Err(BattleMaterialApplyError::InvalidEvidence);
             }
         }
@@ -1819,6 +1835,20 @@ fn party_contains_state(state: &GameState, pokemon: PokemonId) -> bool {
         .battle
         .as_ref()
         .is_some_and(|battle| party_contains(battle, pokemon))
+}
+
+fn stage_in_state(state: &GameState, pokemon: PokemonId, stat: BattleStat) -> Option<i8> {
+    let battle = state.battle.as_ref()?;
+    let stages = &find_pokemon(battle, pokemon)?.stat_stages;
+    Some(match stat {
+        BattleStat::Attack => stages.attack,
+        BattleStat::Defense => stages.defense,
+        BattleStat::SpecialAttack => stages.special_attack,
+        BattleStat::SpecialDefense => stages.special_defense,
+        BattleStat::Speed => stages.speed,
+        BattleStat::Accuracy => stages.accuracy,
+        BattleStat::Evasion => stages.evasion,
+    })
 }
 
 fn find_pokemon(
