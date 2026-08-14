@@ -905,7 +905,9 @@ impl Serializer for CanonicalMapKeySerializer {
         if value.is_finite() {
             serde_json::to_string(&value).map_err(CanonicalError::from)
         } else {
-            Err(serialization_error("key must be a string"))
+            Err(serialization_error(
+                "float key must be finite (got NaN or +/-inf)",
+            ))
         }
     }
 
@@ -913,7 +915,9 @@ impl Serializer for CanonicalMapKeySerializer {
         if value.is_finite() {
             serde_json::to_string(&value).map_err(CanonicalError::from)
         } else {
-            Err(serialization_error("key must be a string"))
+            Err(serialization_error(
+                "float key must be finite (got NaN or +/-inf)",
+            ))
         }
     }
 
@@ -2521,7 +2525,7 @@ mod tests {
                     direct,
                     Err((
                         "Serialization",
-                        "JSON serialization failed: key must be a string|key must be a string"
+                        "JSON serialization failed: float key must be finite (got NaN or +/-inf)|float key must be finite (got NaN or +/-inf)"
                             .to_owned(),
                     ))
                 );
@@ -2601,7 +2605,7 @@ mod tests {
         ] {
             stateful_float_map_matches_legacy(
                 StatefulFloatMapCase::NonfiniteAfterUnsafe(key),
-                expected_serialization("key must be a string"),
+                expected_serialization("float key must be finite (got NaN or +/-inf)"),
             );
         }
     }
