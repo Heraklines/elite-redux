@@ -873,7 +873,12 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
     let reducer_turn = extract_function_section(
         &source,
         "pub fn apply_reducer_issued_turn_material_trusted(",
-        "fn apply_turn_material_inner(",
+        "fn bind_reducer_issued_turn_material<'a>(",
+    );
+    let authority_binder = extract_function_section(
+        &source,
+        "fn bind_reducer_issued_turn_material<'a>(",
+        "fn apply_bound_reducer_turn_material(",
     );
     let turn_inner = extract_function_section(
         &source,
@@ -931,18 +936,14 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "reducer-issued TURN entry point changed its borrowed state/seat/allocator/prepared views",
     );
     assert!(
-        reducer_turn.contains("let transition = prepared.digest_evidence().transition();"),
-        "reducer-issued TURN path no longer obtains transition evidence from prepared",
+        reducer_turn.contains("let proof = bind_reducer_issued_turn_material("),
+        "reducer-issued TURN path no longer binds authority-local material evidence",
     );
     assert!(
-        reducer_turn.contains(concat!(
-            "apply_turn_material_inner(\n",
-            "        current_state,\n",
-            "        local_seat,\n",
-            "        menu_allocators,",
-        )),
-        "reducer-issued TURN path no longer forwards current state, local seat, and menu allocators",
+        reducer_turn.contains("apply_bound_reducer_turn_material(material, proof)"),
+        "reducer-issued TURN path no longer forwards the opaque authority-local proof",
     );
+    assert!(!reducer_turn.contains("apply_turn_material_inner("));
     assert!(
         turn_inner.starts_with(concat!(
             "fn apply_turn_material_inner(\n",
@@ -975,10 +976,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         source.contains("BattlePresentationKind::BattleWon")
             && source.contains("BattlePresentationKind::BattleLost")
     );
-    assert!(
-        reducer_turn.contains("DigestValidationMode::ReducerIssued"),
-        "reducer-issued TURN path no longer selects reducer-issued digest validation",
-    );
+    assert!(!reducer_turn.contains("DigestValidationMode::ReducerIssued"));
     for evidence_check in [
         "transition.before_state != material.before_state",
         "transition.before_digest != material.before_digest",
@@ -986,8 +984,20 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
         "transition.after_digest != material.after_digest",
     ] {
         assert!(
-            reducer_turn.contains(evidence_check),
-            "reducer-issued material path omitted {evidence_check}",
+            authority_binder.contains(evidence_check),
+            "authority-local material binder omitted {evidence_check}",
+        );
+    }
+    for retained_endpoint_guard in [
+        "validate_material_header(",
+        "validate_turn_identity(material)?",
+        "reconcile_turn_frontier(current_state, material, content)?",
+        "validate_endpoint_allocators(",
+        "prepared.bind_authority_local_turn(",
+    ] {
+        assert!(
+            authority_binder.contains(retained_endpoint_guard),
+            "authority-local material binder omitted {retained_endpoint_guard}",
         );
     }
     assert!(!MATERIAL_SOURCE.contains("skip_digest"));
@@ -996,13 +1006,30 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
 #[test]
 fn allocator_internal_validation_precedes_endpoint_recovery_classification() {
     let source = normalized_sanitized_source(MATERIAL_SOURCE);
-    let internal = source
-        .find("validate_allocator_projection(")
+    let turn_inner = extract_function_section(
+        &source,
+        "fn apply_turn_material_inner(",
+        "pub fn apply_replacement_material(",
+    );
+    let authority_binder = extract_function_section(
+        &source,
+        "fn bind_reducer_issued_turn_material<'a>(",
+        "fn apply_bound_reducer_turn_material(",
+    );
+    let internal = turn_inner
+        .find("let menu_allocators = validate_allocator_projection(")
         .expect("internal allocator projection exists");
-    let endpoint = source
+    let strict_endpoint = turn_inner
         .find("validate_endpoint_allocators(")
         .expect("endpoint allocator comparison exists");
-    assert!(internal < endpoint);
+    assert!(internal < strict_endpoint);
+    let authority_endpoint = authority_binder
+        .find("validate_endpoint_allocators(")
+        .expect("authority-local endpoint allocator comparison exists");
+    let proof = authority_binder
+        .find("let proof = prepared.bind_authority_local_turn(")
+        .expect("authority-local proof construction exists");
+    assert!(authority_endpoint < proof);
     assert!(source.contains("MenuAllocatorMismatch"));
     assert!(source.contains("LocalBeforeStateMismatch"));
     assert!(source.contains("after_id < before_id"));
