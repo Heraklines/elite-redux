@@ -103,7 +103,7 @@ fn string_literal_end(source: &[u8], quote_start: usize) -> usize {
 }
 
 fn is_ascii_hex(byte: u8) -> bool {
-    matches!(byte, b'0'..=b'9' | b'a'..=b'f' | b'A'..=b'F')
+    byte.is_ascii_hexdigit()
 }
 
 fn utf8_char_width(byte: u8) -> Option<usize> {
@@ -231,12 +231,12 @@ fn sanitize_rust_source(source: &str) -> String {
             continue;
         }
 
-        if let Some(quote_start) = char_literal_quote_start(source_bytes, index) {
-            if let Some(end) = char_literal_end(source_bytes, quote_start) {
-                blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
-                index = end;
-                continue;
-            }
+        if let Some(quote_start) = char_literal_quote_start(source_bytes, index)
+            && let Some(end) = char_literal_end(source_bytes, quote_start)
+        {
+            blank_non_newline_bytes(source_bytes, &mut sanitized, index, end);
+            index = end;
+            continue;
         }
 
         index += 1;
@@ -259,9 +259,10 @@ fn unique_function_offset(source: &str, signature: &str) -> usize {
 
     let line_anchor = format!("\n{signature}");
     let mut matches = source.match_indices(&line_anchor);
+    let missing_signature = format!("missing line-anchored function signature {signature:?}");
     let (offset, _) = matches
         .next()
-        .unwrap_or_else(|| panic!("missing line-anchored function signature {signature:?}"));
+        .expect(&missing_signature);
     assert!(
         matches.next().is_none(),
         "expected exactly one line-anchored function signature {signature:?}",
