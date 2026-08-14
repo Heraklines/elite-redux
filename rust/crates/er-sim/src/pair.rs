@@ -165,23 +165,38 @@ struct PairSnapshotWire {
     terminal_reason: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PairSnapshotSerializeWire<'a> {
+    sequence: SafeU53,
+    seed: &'a str,
+    virtual_time_ms: SafeU53,
+    clock_timers: &'a [ClockTimerSnapshot],
+    host: &'a EndpointSnapshot,
+    guest: &'a EndpointSnapshot,
+    network: &'a FaultNetworkDiagnostics,
+    presenter: &'a PresenterDiagnostics,
+    storage: &'a StorageDiagnostics,
+    terminal_reason: Option<&'a str>,
+}
+
 impl Serialize for PairSnapshot {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         parse_canonical_seed(&self.seed).map_err(S::Error::custom)?;
-        PairSnapshotWire {
+        PairSnapshotSerializeWire {
             sequence: self.sequence,
-            seed: self.seed.clone(),
+            seed: &self.seed,
             virtual_time_ms: self.virtual_time_ms,
-            clock_timers: self.clock_timers.clone(),
-            host: self.host.clone(),
-            guest: self.guest.clone(),
-            network: self.network.clone(),
-            presenter: self.presenter.clone(),
-            storage: self.storage.clone(),
-            terminal_reason: self.terminal_reason.clone(),
+            clock_timers: &self.clock_timers,
+            host: &self.host,
+            guest: &self.guest,
+            network: &self.network,
+            presenter: &self.presenter,
+            storage: &self.storage,
+            terminal_reason: self.terminal_reason.as_deref(),
         }
         .serialize(serializer)
     }
@@ -766,6 +781,59 @@ impl SimulatedPair {
                     return Err(SimulatedPairError::Adapter {
                         reason: format!(
                             "pair operation failed ({error}); restoring its atomic boundary failed ({rollback_error})"
+                        ),
+                    });
+                }
+                Err(error)
+            }
+        }
+    }
+
+    /// Apply multiple external operations under one atomic pair boundary.
+    ///
+    /// Each operation still follows the ordinary driver synchronization and
+    /// pair transition path, and returns its own complete `PairStep`. If any
+    /// operation fails, the pair (including both keyboard drivers) is restored
+    /// to the state captured before the first operation.
+    pub fn apply_many_atomic(
+        &mut self,
+        operations: impl IntoIterator<Item = PairOperation>,
+    ) -> Result<Vec<PairStep>, SimulatedPairError> {
+        self.ensure_live()?;
+        let operations = operations.into_iter().collect::<Vec<_>>();
+        if operations.is_empty() {
+            return Ok(Vec::new());
+        }
+        if self.sequence == SafeU53::MAX {
+            return Err(SimulatedPairError::Adapter {
+                reason: "pair sequence exhausted".to_owned(),
+            });
+        }
+
+        let rollback = self.capture_rollback_state()?;
+        let result = (|| {
+            let mut steps = Vec::with_capacity(operations.len());
+            for operation in operations {
+                if self.sequence == SafeU53::MAX {
+                    return Err(SimulatedPairError::Adapter {
+                        reason: "pair sequence exhausted".to_owned(),
+                    });
+                }
+                if self.shared_terminal.is_none() {
+                    self.sync_driver_operation(&operation);
+                }
+                steps.push(self.apply_after_driver_sync(operation)?);
+            }
+            Ok(steps)
+        })();
+
+        match result {
+            Ok(steps) => Ok(steps),
+            Err(error) => {
+                if let Err(rollback_error) = self.restore_rollback_state(rollback) {
+                    return Err(SimulatedPairError::Adapter {
+                        reason: format!(
+                            "pair operation batch failed ({error}); restoring its atomic boundary failed ({rollback_error})"
                         ),
                     });
                 }
@@ -2120,10 +2188,15 @@ impl SimulatedPair {
             PairEndpoint::Host => &self.host_kernel,
             PairEndpoint::Guest => &self.guest_kernel,
         };
+        let kernel_snapshot = kernel.snapshot();
+        let state_digest = match content_digest(&kernel_snapshot) {
+            Ok(digest) => digest,
+            Err(error) => format!("invalid-kernel-state:{error}"),
+        };
         EndpointSnapshot {
-            kernel: kernel.snapshot(),
+            kernel: kernel_snapshot,
             ui: kernel.ui_view(),
-            state_digest: kernel.state_digest(),
+            state_digest,
             live_resources: kernel.live_resources(),
             presenter: self.presenter.diagnostics_for(self.seat(endpoint)),
         }
@@ -4480,6 +4553,90 @@ mod tests {
         let second = pair.key_up(PairEndpoint::Host, PhysicalKey::ArrowUp)?;
         assert_eq!(second.sequence, second.snapshot.sequence);
         assert_eq!(second.sequence, SafeU53::new(2)?);
+        Ok(())
+    }
+
+    #[test]
+    fn apply_many_atomic_matches_sequential_steps_and_order() -> TestResult {
+        let operations = vec![
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::ArrowUp,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+            },
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyUp {
+                    code: PhysicalKey::ArrowUp,
+                },
+            },
+            PairOperation::AdvanceTime { delta_ms: safe(1) },
+        ];
+        let mut sequential = SimulatedPair::new(config(0x51, safe(64)))?;
+        let expected_steps = operations
+            .iter()
+            .cloned()
+            .map(|operation| sequential.apply(operation))
+            .collect::<Result<Vec<_>, _>>()?;
+        let expected_snapshot = sequential.snapshot()?;
+        let expected_host_driver = sequential.host_keyboard.export_state();
+        let expected_guest_driver = sequential.guest_keyboard.export_state();
+
+        let mut batched = SimulatedPair::new(config(0x51, safe(64)))?;
+        let actual_steps = batched.apply_many_atomic(operations.clone())?;
+
+        assert_eq!(actual_steps, expected_steps);
+        assert_eq!(batched.snapshot()?, expected_snapshot);
+        assert_eq!(
+            batched.host_keyboard.export_state(),
+            expected_host_driver
+        );
+        assert_eq!(
+            batched.guest_keyboard.export_state(),
+            expected_guest_driver
+        );
+        assert_eq!(
+            actual_steps
+                .iter()
+                .map(|step| &step.operation)
+                .collect::<Vec<_>>(),
+            operations.iter().collect::<Vec<_>>()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn apply_many_atomic_restores_everything_when_a_later_operation_fails() -> TestResult {
+        let mut pair = SimulatedPair::new(config(0x52, safe(64)))?;
+        let before_snapshot = pair.snapshot()?;
+        let before_host_driver = pair.host_keyboard.export_state();
+        let before_guest_driver = pair.guest_keyboard.export_state();
+
+        let result = pair.apply_many_atomic([
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::ArrowUp,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+            },
+            PairOperation::StorageResult {
+                endpoint: PairEndpoint::Host,
+                request_id: safe(999),
+                result: StorageResult::Persisted,
+            },
+        ]);
+
+        assert!(matches!(result, Err(SimulatedPairError::Adapter { .. })));
+        assert_eq!(pair.snapshot()?, before_snapshot);
+        assert_eq!(pair.host_keyboard.export_state(), before_host_driver);
+        assert_eq!(pair.guest_keyboard.export_state(), before_guest_driver);
         Ok(())
     }
 
