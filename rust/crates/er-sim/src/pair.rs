@@ -166,7 +166,7 @@ struct PairSnapshotWire {
 }
 
 #[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename = "PairSnapshotWire", rename_all = "camelCase")]
 struct PairSnapshotSerializeWire<'a> {
     sequence: SafeU53,
     seed: &'a str,
