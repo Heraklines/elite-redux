@@ -16,18 +16,18 @@ use er_game::authority_commands::{
 };
 use er_game::internal_event::{GameIntent, InternalEvent, PreparedBattleResolution};
 use er_game::material::{
-    BATTLE_MATERIAL_SCHEMA_VERSION, BattleTurnMaterialV1,
+    BATTLE_MATERIAL_SCHEMA_VERSION, BattleMaterialApplyError, BattleTurnMaterialV1,
     apply_reducer_issued_turn_material_trusted,
 };
 use er_game::runtime::GameRuntime;
 use er_game::target_menu::build_target_control;
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_state::digest::MechanicalStateDigest;
 use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState};
 use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
 };
+use er_state::digest::MechanicalStateDigest;
 use er_state::field::{FieldSlotState, FieldState};
 use er_state::format::BattleFormat;
 use er_state::pokemon::{
@@ -51,8 +51,8 @@ use er_types::battle_ids::{
     GameModeId, MenuInstanceId, MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex,
     WaveIndex,
 };
-use er_types::battle_ui::PresentationPlanDigest;
 use er_types::battle_model::{FaintOccurrence, StatusKind};
+use er_types::battle_ui::PresentationPlanDigest;
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
 use serde_json::json;
 
@@ -972,6 +972,36 @@ fn tampered_presentation_digest() -> PresentationPlanDigest {
         .expect("tampered presentation digest must be well-formed")
 }
 
+fn replace_run_rng(state: &mut GameState, seed: &str) {
+    state.run_rng = RunRngState {
+        rdg: PhaserRdg::from_seed(seed).state(),
+    };
+}
+
+fn increment_first_menu_allocator(plan: &mut BattleControlPlan) {
+    let schema_version = plan.schema_version;
+    let battle_id = plan.battle_id;
+    let wave = plan.wave;
+    let turn = plan.turn;
+    let seats = plan.seats.clone();
+    let mut allocators = plan.menu_allocators.clone();
+    let allocator = allocators
+        .first_mut()
+        .expect("fixture has a menu allocator");
+    let seat = allocator.seat;
+    let next_value = allocator
+        .next_menu_instance_id
+        .get()
+        .get()
+        .checked_add(1)
+        .and_then(|value| SafeU53::new(value).ok())
+        .expect("fixture menu allocator can advance");
+    *allocator = SeatMenuInstanceAllocator::new(seat, MenuInstanceId::new(next_value))
+        .expect("advanced menu allocator is valid");
+    *plan = BattleControlPlan::new(schema_version, battle_id, wave, turn, seats, allocators)
+        .expect("allocator-only control mutation is valid");
+}
+
 #[test]
 fn authority_local_material_binding_rejects_each_turn_material_field_mutation() -> TestResult {
     let fixture = prepared_turn_fixture()?;
@@ -1037,22 +1067,10 @@ fn authority_local_material_binding_rejects_each_turn_material_field_mutation() 
         }),
         ("rng_audit", |material| material.rng_audit.clear()),
         ("before_state", |material| {
-            material
-                .before_state
-                .battle
-                .as_mut()
-                .expect("fixture has before battle")
-                .turn = TurnIndex::new(SafeU53::new(99).expect("safe value"))
-                .expect("positive turn");
+            replace_run_rng(&mut material.before_state, "tampered-before-state");
         }),
         ("after_state", |material| {
-            material
-                .after_state
-                .battle
-                .as_mut()
-                .expect("fixture has after battle")
-                .turn = TurnIndex::new(SafeU53::new(99).expect("safe value"))
-                .expect("positive turn");
+            replace_run_rng(&mut material.after_state, "tampered-after-state");
         }),
         ("outcome", |material| {
             material.outcome = match material.outcome {
@@ -1075,21 +1093,24 @@ fn authority_local_material_binding_rejects_each_turn_material_field_mutation() 
             material.menu_allocators_before.clear();
         }),
         ("next_control", |material| {
-            let seat_control = material
-                .next_control
-                .seats
-                .first_mut()
-                .expect("fixture has a seat control");
-            seat_control.control = if matches!(
-                &seat_control.control,
-                BattleControl::Complete(BattleOutcome::Victory)
-            ) {
-                BattleControl::Complete(BattleOutcome::Defeat)
-            } else {
-                BattleControl::Complete(BattleOutcome::Victory)
-            };
+            increment_first_menu_allocator(&mut material.next_control);
         }),
     ];
+
+    let serialized = serde_json::to_value(&fixture.material)?;
+    let mut serialized_fields = serialized
+        .as_object()
+        .ok_or("serialized TURN material is not an object")?
+        .keys()
+        .map(|field| field.as_str())
+        .collect::<Vec<_>>();
+    serialized_fields.sort_unstable();
+    let mut mutation_fields = mutations.iter().map(|(field, _)| *field).collect::<Vec<_>>();
+    mutation_fields.sort_unstable();
+    assert_eq!(
+        mutation_fields, serialized_fields,
+        "mutation labels must exactly cover serialized TURN material fields"
+    );
 
     for (field, mutate) in mutations {
         let mut candidate = fixture.material.clone();
@@ -1098,10 +1119,40 @@ fn authority_local_material_binding_rejects_each_turn_material_field_mutation() 
             candidate, fixture.material,
             "{field} mutation did not change the fixture"
         );
+        let before_validity = validate_state_content(&candidate.before_state, &fixture.content);
         assert!(
-            apply(&candidate).is_err(),
+            before_validity.is_ok(),
+            "{field} mutation produced an invalid before_state: {before_validity:?}"
+        );
+        let after_validity = validate_state_content(&candidate.after_state, &fixture.content);
+        assert!(
+            after_validity.is_ok(),
+            "{field} mutation produced an invalid after_state: {after_validity:?}"
+        );
+        let control_validity = candidate.next_control.validate();
+        assert!(
+            control_validity.is_ok(),
+            "{field} mutation produced an invalid next_control: {control_validity:?}"
+        );
+        if field == "before_state" {
+            assert_ne!(candidate.before_state, fixture.material.before_state);
+        } else if field == "after_state" {
+            assert_ne!(candidate.after_state, fixture.material.after_state);
+        } else if field == "next_control" {
+            assert_ne!(candidate.next_control, fixture.material.next_control);
+        }
+        let rejection = apply(&candidate);
+        assert!(
+            rejection.is_err(),
             "binder accepted an independently mutated {field} field"
         );
+        if matches!(field, "before_state" | "after_state" | "next_control") {
+            assert_eq!(
+                rejection.as_ref().err(),
+                Some(&BattleMaterialApplyError::InvalidEvidence),
+                "{field} mutation did not reach the prepared-evidence comparison"
+            );
+        }
     }
     Ok(())
 }
