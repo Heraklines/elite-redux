@@ -275,6 +275,7 @@ pub fn replay_fixture(fixture: &ParityFixture) -> Result<ParityReplayReport, Par
         ));
     }
 
+    let use_frozen_m2_state_digest_compatibility = fixture.protocol_config.is_some();
     let seed = fixture.seed.to_string();
     let mut observations = Vec::with_capacity(fixture.trace.events.len());
     for event in &fixture.trace.events {
@@ -285,7 +286,11 @@ pub fn replay_fixture(fixture: &ParityFixture) -> Result<ParityReplayReport, Par
                     sequence: event.sequence,
                     reason: error.to_string(),
                 })?;
-        let actual = observe(&kernel, &effects)?;
+        let actual = observe(
+            &kernel,
+            &effects,
+            use_frozen_m2_state_digest_compatibility,
+        )?;
         let expected_live_resources_digest = live_resources_digest(&event.expected_live_resources)?;
         if !matches_expected(event, &actual, &expected_live_resources_digest) {
             return Err(ParityReplayError::Divergence(Box::new(ParityDivergence {
@@ -457,13 +462,36 @@ fn protocol_config_for_fixture() -> Result<ProtocolKernelConfig, ParityReplayErr
 fn observe(
     kernel: &GameKernel,
     effects: &[KernelEffect],
+    use_frozen_m2_state_digest_compatibility: bool,
 ) -> Result<ParityObservation, ParityReplayError> {
     Ok(ParityObservation {
         effect_digest: effects_digest(effects)?,
-        state_digest: kernel.state_digest(),
+        state_digest: state_digest_for_evidence(kernel, use_frozen_m2_state_digest_compatibility)?,
         ui_digest: ui_digest(kernel)?,
         live_resources: kernel.live_resources(),
         live_resources_digest: live_resources_digest(&kernel.live_resources())?,
+    })
+}
+
+fn state_digest_for_evidence(
+    kernel: &GameKernel,
+    use_frozen_m2_state_digest_compatibility: bool,
+) -> Result<String, ParityReplayError> {
+    if !use_frozen_m2_state_digest_compatibility {
+        return Ok(kernel.state_digest());
+    }
+
+    let mut snapshot = kernel.snapshot();
+    let state = snapshot.state.as_object_mut().ok_or_else(|| {
+        ParityReplayError::Canonical {
+            field: "state",
+            reason: "frozen M2 compatibility projection requires an object state".to_owned(),
+        }
+    })?;
+    state.remove("legacyPresentations");
+    content_digest(&snapshot).map_err(|error| ParityReplayError::Canonical {
+        field: "state",
+        reason: error.to_string(),
     })
 }
 
