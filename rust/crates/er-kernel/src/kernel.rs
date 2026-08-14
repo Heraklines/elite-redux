@@ -3106,10 +3106,9 @@ impl GameKernel {
         if let Some(legacy_presentations) = legacy_presentations_snapshot(
             &self.pending_presentations,
             &self.completed_presentations,
-        ) {
-            if let Value::Object(fields) = &mut snapshot {
-                fields.insert("legacyPresentations".to_owned(), legacy_presentations);
-            }
+        ) && let Value::Object(fields) = &mut snapshot
+        {
+            fields.insert("legacyPresentations".to_owned(), legacy_presentations);
         }
         snapshot
     }
