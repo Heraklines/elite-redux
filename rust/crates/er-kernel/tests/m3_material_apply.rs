@@ -976,10 +976,10 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
     );
     assert!(!reducer_turn.contains("DigestValidationMode::ReducerIssued"));
     for evidence_check in [
-        "transition.before_state != material.before_state",
-        "transition.before_digest != material.before_digest",
-        "transition.after_state != material.after_state",
-        "transition.after_digest != material.after_digest",
+        "material.before_state != transition.before_state",
+        "material.before_digest != transition.before_digest",
+        "material.after_state != transition.after_state",
+        "material.after_digest != transition.after_digest",
     ] {
         assert!(
             authority_binder.contains(evidence_check),

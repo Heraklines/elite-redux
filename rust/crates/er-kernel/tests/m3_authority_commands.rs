@@ -497,7 +497,11 @@ fn state_for(
     )?)
 }
 
-fn command_state(content: &ContentPack, format: BattleFormat) -> TestResult<GameState> {
+fn command_state_with_enemy_hp(
+    content: &ContentPack,
+    format: BattleFormat,
+    enemy_hp: u32,
+) -> TestResult<GameState> {
     let player_party = (0..format.player_capacity)
         .map(|position| {
             pokemon(
@@ -517,7 +521,7 @@ fn command_state(content: &ContentPack, format: BattleFormat) -> TestResult<Game
                 10 + u64::from(position),
                 None,
                 &[351, 589],
-                100,
+                enemy_hp,
                 90 + u32::from(position),
             )
         })
@@ -666,7 +670,15 @@ struct CommandFixture {
 }
 
 fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<CommandFixture> {
-    let mut state = command_state(content, format)?;
+    command_fixture_with_enemy_hp(content, format, 100)
+}
+
+fn command_fixture_with_enemy_hp(
+    content: &ContentPack,
+    format: BattleFormat,
+    enemy_hp: u32,
+) -> TestResult<CommandFixture> {
+    let mut state = command_state_with_enemy_hp(content, format, enemy_hp)?;
     let control = command_control_plan(&state)?;
     let battle = state.battle.as_ref().ok_or("fixture has no battle")?;
     let mut frontier = Vec::new();
@@ -844,7 +856,9 @@ fn material_from_prepared(
 
 fn prepared_turn_fixture() -> TestResult<PreparedTurnFixture> {
     let content = selected_content_pack()?;
-    let fixture = command_fixture(&content, BattleFormat::single())?;
+    // Keep the existing scripted command, but make this one-turn fixture
+    // terminal so the runtime does not need an unmodeled next-turn script.
+    let fixture = command_fixture_with_enemy_hp(&content, BattleFormat::single(), 1)?;
     let scripted = admit_scripted_enemy_frontier(&fixture.state, &fixture.enemy_policy, &content)?;
     let proposal = fixture
         .human_proposals
