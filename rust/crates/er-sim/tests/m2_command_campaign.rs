@@ -814,8 +814,7 @@ fn assert_control_effect(
         1,
         "expected one control effect for {operation_id}"
     );
-    let Some((effect_revision, effect_operation, effect_control)) = effects.first().copied()
-    else {
+    let Some((effect_revision, effect_operation, effect_control)) = effects.first().copied() else {
         unreachable!("the control effect disappeared");
     };
     assert_eq!(effect_revision, Revision::new(safe(revision)));

@@ -260,9 +260,7 @@ fn unique_function_offset(source: &str, signature: &str) -> usize {
     let line_anchor = format!("\n{signature}");
     let mut matches = source.match_indices(&line_anchor);
     let missing_signature = format!("missing line-anchored function signature {signature:?}");
-    let (offset, _) = matches
-        .next()
-        .expect(&missing_signature);
+    let (offset, _) = matches.next().expect(&missing_signature);
     assert!(
         matches.next().is_none(),
         "expected exactly one line-anchored function signature {signature:?}",

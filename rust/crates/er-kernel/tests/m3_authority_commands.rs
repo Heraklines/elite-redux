@@ -43,8 +43,8 @@ use er_types::battle_command::{
 };
 use er_types::battle_control::{
     BATTLE_CONTROL_PLAN_SCHEMA_VERSION, BattleControl, BattleControlPlan, BattleMenu,
-    BattleMenuOption, CommandRootControl, MenuOptionLayout, MenuOptionVisibility, MoveSelectControl,
-    ReplacementSelectControl, SeatBattleControl, SeatMenuInstanceAllocator,
+    BattleMenuOption, CommandRootControl, MenuOptionLayout, MenuOptionVisibility,
+    MoveSelectControl, ReplacementSelectControl, SeatBattleControl, SeatMenuInstanceAllocator,
 };
 use er_types::battle_ids::{
     AuthorityEpoch, BattleId, BattleSide, ContentPackHash, FaintOccurrenceId, FieldSlot,
@@ -880,11 +880,8 @@ fn prepared_turn_fixture() -> TestResult<PreparedTurnFixture> {
     else {
         return Err("runtime emitted a non-TURN resolution".into());
     };
-    let prepared = runtime.prepare_authority_turn(
-        digest_evidence,
-        &material_operation_id,
-        next_control,
-    )?;
+    let prepared =
+        runtime.prepare_authority_turn(digest_evidence, &material_operation_id, next_control)?;
     if runtime.state() != &prepared.transition().before_state {
         return Err("prepared TURN before state differs from runtime state".into());
     }
@@ -1023,7 +1020,8 @@ fn authority_local_material_binding_rejects_each_turn_material_field_mutation() 
         "valid prepared TURN material was rejected: {baseline:?}"
     );
 
-    let mutations: [(&str, fn(&mut BattleTurnMaterialV1)); 23] = [
+    type Mutation = (&'static str, fn(&mut BattleTurnMaterialV1));
+    let mutations: [Mutation; 23] = [
         ("schema_version", |material| material.schema_version = 0),
         ("oracle_game_sha", |material| {
             material.oracle_game_sha.push_str("-tampered");
@@ -1039,12 +1037,12 @@ fn authority_local_material_binding_rejects_each_turn_material_field_mutation() 
             material.battle_id = BattleId::new(SafeU53::new(99).expect("safe value"));
         }),
         ("wave", |material| {
-            material.wave = WaveIndex::new(SafeU53::new(99).expect("safe value"))
-                .expect("positive wave");
+            material.wave =
+                WaveIndex::new(SafeU53::new(99).expect("safe value")).expect("positive wave");
         }),
         ("resolved_turn", |material| {
-            material.resolved_turn = TurnIndex::new(SafeU53::new(99).expect("safe value"))
-                .expect("positive turn");
+            material.resolved_turn =
+                TurnIndex::new(SafeU53::new(99).expect("safe value")).expect("positive turn");
         }),
         ("before_digest", |material| {
             material.before_digest = tampered_state_digest();
@@ -1105,7 +1103,10 @@ fn authority_local_material_binding_rejects_each_turn_material_field_mutation() 
         .map(|field| field.as_str())
         .collect::<Vec<_>>();
     serialized_fields.sort_unstable();
-    let mut mutation_fields = mutations.iter().map(|(field, _)| *field).collect::<Vec<_>>();
+    let mut mutation_fields = mutations
+        .iter()
+        .map(|(field, _)| *field)
+        .collect::<Vec<_>>();
     mutation_fields.sort_unstable();
     assert_eq!(
         mutation_fields, serialized_fields,

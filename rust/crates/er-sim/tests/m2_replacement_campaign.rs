@@ -1066,8 +1066,10 @@ fn assert_authority_chain(
     let admitted_location = (admitted_receipt.step_index, admitted_receipt.effect_index);
     let material_receipt_location = (material_receipt.step_index, material_receipt.effect_index);
     let control_receipt_location = (control_receipt.step_index, control_receipt.effect_index);
-    let presentation_receipt_location =
-        (presentation_receipt.step_index, presentation_receipt.effect_index);
+    let presentation_receipt_location = (
+        presentation_receipt.step_index,
+        presentation_receipt.effect_index,
+    );
     assert!(entry_location < admitted_location);
     assert!(admitted_location < material_location);
     assert!(material_location < material_receipt_location);

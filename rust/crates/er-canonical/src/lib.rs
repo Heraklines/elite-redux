@@ -2157,12 +2157,11 @@ mod tests {
             calls: &direct_calls,
             case,
         }));
-        let legacy = canonical_result_identity(legacy_canonical_bytes(
-            &StatefulSecondPassFloatMap {
+        let legacy =
+            canonical_result_identity(legacy_canonical_bytes(&StatefulSecondPassFloatMap {
                 calls: &legacy_calls,
                 case,
-            },
-        ));
+            }));
 
         assert_eq!(direct, legacy);
         assert_eq!(direct, expected);
@@ -2542,18 +2541,16 @@ mod tests {
         ] {
             let direct_calls = Cell::new(0);
             let legacy_calls = Cell::new(0);
-            let direct = canonical_result_identity(canonical_bytes(
-                &StatefulSecondPassFloatMapKey {
+            let direct =
+                canonical_result_identity(canonical_bytes(&StatefulSecondPassFloatMapKey {
                     calls: &direct_calls,
                     value: key,
-                },
-            ));
-            let legacy = canonical_result_identity(legacy_canonical_bytes(
-                &StatefulSecondPassFloatMapKey {
+                }));
+            let legacy =
+                canonical_result_identity(legacy_canonical_bytes(&StatefulSecondPassFloatMapKey {
                     calls: &legacy_calls,
                     value: key,
-                },
-            ));
+                }));
 
             assert_eq!(direct, legacy);
             assert_eq!(direct, Ok(expected.as_bytes().to_vec()));

@@ -447,10 +447,7 @@ fn bind_reducer_issued_turn_material<'a>(
         &material.after_state,
     )?;
 
-    let proof = prepared.bind_authority_local_turn(
-        menu_allocators,
-        &material.operation_id,
-    );
+    let proof = prepared.bind_authority_local_turn(menu_allocators, &material.operation_id);
     if proof.material_operation_id() != &expected_operation
         || proof.menu_allocators_before() != menu_allocators
     {

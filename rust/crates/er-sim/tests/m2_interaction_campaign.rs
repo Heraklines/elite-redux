@@ -1545,14 +1545,11 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             .presentations
             .is_empty()
     );
-    let replay_receipt_packets = packet_ids_for_sends(
-        &replacement_queue,
-        &replacement,
-        |effect| {
+    let replay_receipt_packets =
+        packet_ids_for_sends(&replacement_queue, &replacement, |effect| {
             is_receipt_stage(effect, AckStage::ControlInstalled)
                 || is_receipt_stage(effect, AckStage::PresentationSettled)
-        },
-    )?;
+        })?;
     assert_eq!(replay_receipt_packets.len(), 2);
     let Some(&replay_control_packet) = replay_receipt_packets.first() else {
         return Err("missing rebound control receipt packet".into());
@@ -1591,10 +1588,7 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             .retained_revisions
             .is_empty()
     );
-    assert_eq!(
-        receipt_stages(&replay_control)?,
-        Vec::<AckStage>::new()
-    );
+    assert_eq!(receipt_stages(&replay_control)?, Vec::<AckStage>::new());
     assert!(replay_control.snapshot.terminal_reason.is_none());
     trace.push(replay_control);
 
@@ -1605,7 +1599,10 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
         },
     )?;
     assert!(receipt_stages(&replay_settlement)?.is_empty());
-    assert_eq!(replay_settlement.snapshot.guest.state_digest, rebound_digest);
+    assert_eq!(
+        replay_settlement.snapshot.guest.state_digest,
+        rebound_digest
+    );
     assert!(replay_settlement.snapshot.terminal_reason.is_none());
     trace.push(replay_settlement);
     assert_one_guest_application_chain(&trace, &fixture);
@@ -1665,10 +1662,7 @@ fn assert_nonsettled_presentation_is_not_upgraded(
     assert!(presentation_effects(std::slice::from_ref(&duplicate)).is_empty());
     assert!(material_effects(std::slice::from_ref(&duplicate)).is_empty());
     assert!(control_effects(std::slice::from_ref(&duplicate)).is_empty());
-    assert_eq!(
-        duplicate.snapshot.guest.state_digest,
-        post_failure_digest
-    );
+    assert_eq!(duplicate.snapshot.guest.state_digest, post_failure_digest);
     assert!(
         duplicate
             .snapshot
@@ -1677,10 +1671,7 @@ fn assert_nonsettled_presentation_is_not_upgraded(
             .presentations
             .is_empty()
     );
-    assert!(
-        !receipt_stages(&duplicate)?
-            .contains(&AckStage::PresentationSettled)
-    );
+    assert!(!receipt_stages(&duplicate)?.contains(&AckStage::PresentationSettled));
     assert!(duplicate.snapshot.terminal_reason.is_none());
     assert!(
         !duplicate

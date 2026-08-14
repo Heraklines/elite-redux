@@ -535,10 +535,10 @@ fn authority_local_proof_is_opaque_and_not_a_skip_flag() {
 #[test]
 fn authority_local_proof_has_external_compile_fail_privacy_coverage() {
     assert!(INTERNAL_EVENT_SOURCE.contains("```compile_fail"));
-    assert!(INTERNAL_EVENT_SOURCE
-        .contains("er_game::internal_event::AuthorityLocalTurnProof<'static>"));
-    assert!(INTERNAL_EVENT_SOURCE
-        .contains("er_game::internal_event::AuthorityLocalTurnProof {"));
+    assert!(
+        INTERNAL_EVENT_SOURCE.contains("er_game::internal_event::AuthorityLocalTurnProof<'static>")
+    );
+    assert!(INTERNAL_EVENT_SOURCE.contains("er_game::internal_event::AuthorityLocalTurnProof {"));
 }
 
 fn assert_doc_hidden_before(source: &str, item: &str) {
