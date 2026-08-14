@@ -52,6 +52,7 @@ import {
 } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { getErEarlyWaveMovePowerMultiplier } from "#data/elite-redux/er-run-pacing";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
 import {
   erCovertCloakGuards,
@@ -1385,7 +1386,9 @@ export abstract class Move implements Localizable {
     // opponent this turn gets +20% power.
     power.value *= erRendezvousPowerMultiplier(source, target);
 
-    return power.value;
+    return (
+      power.value * getErEarlyWaveMovePowerMultiplier(globalScene.currentBattle?.waveIndex ?? Number.POSITIVE_INFINITY)
+    );
   }
 
   getPriority(user: Pokemon, simulated = true): number {

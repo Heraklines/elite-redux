@@ -33,6 +33,12 @@ const PROFILES: Readonly<Record<ErRunPacing, ErRunPacingProfile>> = {
   },
 };
 
+const EARLY_WAVE_MOVE_POWER_START = 0.4;
+const EARLY_WAVE_MOVE_POWER_CAP: Readonly<Record<ErRunPacing, number>> = {
+  normal: 30,
+  sprint: 15,
+};
+
 let currentPacing: ErRunPacing = "normal";
 let sprintVoucherCredit = 0;
 
@@ -94,6 +100,20 @@ export function getErFinalWave(): number {
 
 export function getErProgressionWave(runWave: number): number {
   return Math.max(1, Math.floor(runWave)) * getErRunPacingProfile().progressionScale;
+}
+
+/** Scale resolved move power from 40% on wave 1 to full power at the pacing cap. */
+export function getErEarlyWaveMovePowerMultiplier(
+  runWave: number,
+  pacing: ErRunPacing = currentPacing,
+): number {
+  const capWave = EARLY_WAVE_MOVE_POWER_CAP[pacing];
+  const wave = Math.max(1, Math.floor(Number.isFinite(runWave) ? runWave : capWave));
+  if (wave >= capWave) {
+    return 1;
+  }
+  const progress = (wave - 1) / (capWave - 1);
+  return EARLY_WAVE_MOVE_POWER_START + (1 - EARLY_WAVE_MOVE_POWER_START) * progress;
 }
 
 export function getErCheckpointInterval(): number {

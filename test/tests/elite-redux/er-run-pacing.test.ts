@@ -14,6 +14,7 @@ import { ghostWavesForCurrentRun } from "#data/elite-redux/er-ghost-waves";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   addErSprintTrainerVoucherCredit,
+  getErEarlyWaveMovePowerMultiplier,
   getErMysteryEncounterLegalWaves,
   getErProgressionWave,
   getErSprintVoucherCredit,
@@ -64,6 +65,19 @@ describe("Classic Sprint pacing", () => {
     expect(mode.isBoss(10)).toBe(true);
     expect(mode.isWaveFinal(100)).toBe(false);
     expect(mode.isWaveFinal(200)).toBe(true);
+  });
+
+  it("ramps move power from 40% to full power at the pacing-specific cap", () => {
+    expect(getErEarlyWaveMovePowerMultiplier(1)).toBe(0.4);
+    expect(getErEarlyWaveMovePowerMultiplier(15)).toBeCloseTo(0.689655);
+    expect(getErEarlyWaveMovePowerMultiplier(30)).toBe(1);
+    expect(getErEarlyWaveMovePowerMultiplier(80)).toBe(1);
+
+    setErRunPacing("sprint");
+    expect(getErEarlyWaveMovePowerMultiplier(1)).toBe(0.4);
+    expect(getErEarlyWaveMovePowerMultiplier(8)).toBe(0.7);
+    expect(getErEarlyWaveMovePowerMultiplier(15)).toBe(1);
+    expect(getErEarlyWaveMovePowerMultiplier(80)).toBe(1);
   });
 
   it("keeps the fixed Sprint gym schedule regardless of the normal offset flag", () => {

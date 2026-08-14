@@ -7941,3 +7941,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Keyboard and gamepad inputs already share the same immediate UI dispatch and repeat interval. No separate controller-delay branch was found; the earlier main-thread triple AI work may improve the reported symptom, but controller latency has not been independently reproduced or signed off with physical gamepad input.
 - Nothing was deployed. The UI remains local pending visual approval.
 - Follow-up visual pass fixed the startup-review icon geometry: icons now use actual object scaling instead of scale values as origin parameters, are centered slightly right of the screen edge, remain fully visible, and retain a fixed gap before every name. The stable six-Pokemon harness capture verifies the final layout; no deployment was performed.
+
+2026-08-15 - Universal early-wave move-power ramp
+
+- All ordinary damaging moves now use 40% of their fully resolved battle power on wave 1 and scale linearly to 100%. Normal pacing reaches full power on wave 30; Sprint reaches full power on wave 15.
+- The multiplier is applied once in the shared move-power calculation, so player attacks, opponent attacks, AI damage forecasts, variable-power moves, ability boosts, and all battle formats use the same deterministic value. Status moves, fixed-damage moves, and one-hit-KO moves retain their existing special paths.
+- Pre-battle callers fall back to full power when no current battle exists, avoiding menu/setup regressions.
+- Verification: pacing suite 12/12 green; focused headless battle symmetry scenario green for both attack directions at waves 1 and 30; production build green with 3,576 transformed modules and 14,365 minified JSON files; scoped formatting and `git diff --check` green. Repository-wide TypeScript continues to fail on pre-existing unrelated ER diagnostics and reports none in the touched files. Nothing was deployed.

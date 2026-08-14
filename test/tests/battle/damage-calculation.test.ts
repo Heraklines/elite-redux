@@ -31,20 +31,20 @@ describe("Battle Mechanics - Damage Calculation", () => {
       .moveset([MoveId.TACKLE, MoveId.DRAGON_RAGE, MoveId.FISSURE, MoveId.JUMP_KICK]);
   });
 
-  it("Tackle deals expected base damage", async () => {
+  it("ramps resolved move power symmetrically for player and opponent attacks", async () => {
     await game.classicMode.startBattle(SpeciesId.CHARIZARD);
 
     const playerPokemon = game.field.getPlayerPokemon();
-    vi.spyOn(playerPokemon, "getEffectiveStat").mockReturnValue(80);
-
     const enemyPokemon = game.field.getEnemyPokemon();
+    vi.spyOn(playerPokemon, "getEffectiveStat").mockReturnValue(90);
     vi.spyOn(enemyPokemon, "getEffectiveStat").mockReturnValue(90);
 
-    // expected base damage = [(2*level/5 + 2) * power * playerATK / enemyDEF / 50] + 2
-    //                      = 31.8666...
-    expect(enemyPokemon.getAttackDamage({ source: playerPokemon, move: allMoves[MoveId.TACKLE] }).damage).toBeCloseTo(
-      31,
-    );
+    expect(allMoves[MoveId.TACKLE].calculateBattlePower(playerPokemon, enemyPokemon)).toBe(16);
+    expect(allMoves[MoveId.TACKLE].calculateBattlePower(enemyPokemon, playerPokemon)).toBe(16);
+
+    game.scene.currentBattle.waveIndex = 30;
+    expect(allMoves[MoveId.TACKLE].calculateBattlePower(playerPokemon, enemyPokemon)).toBe(40);
+    expect(allMoves[MoveId.TACKLE].calculateBattlePower(enemyPokemon, playerPokemon)).toBe(40);
   });
 
   it("Attacks deal 1 damage at minimum", async () => {
