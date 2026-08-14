@@ -3095,16 +3095,23 @@ impl GameKernel {
                 "stagedAuthorityRebind": replica.staged_authority_rebind,
             }),
         };
-        json!({
+        let mut snapshot = json!({
             "protocol": protocol,
             "terminal": self.terminal,
             "liveResources": self.live_resources,
-            "legacyPresentations": legacy_presentations_snapshot(
-                &self.pending_presentations,
-                &self.completed_presentations,
-            ),
             "initError": self.protocol_init_error,
-        })
+        });
+        // Keep the optional R9 projection out of an empty M2 snapshot so its
+        // canonical bytes remain unchanged until presentation evidence exists.
+        if let Some(legacy_presentations) = legacy_presentations_snapshot(
+            &self.pending_presentations,
+            &self.completed_presentations,
+        ) {
+            if let Value::Object(fields) = &mut snapshot {
+                fields.insert("legacyPresentations".to_owned(), legacy_presentations);
+            }
+        }
+        snapshot
     }
 
     fn sync_live_resources(&mut self) {
@@ -3442,7 +3449,11 @@ fn pending_recoveries_snapshot(pending: &BTreeMap<String, PendingRecoveryExpecta
 fn legacy_presentations_snapshot(
     pending: &BTreeMap<PresentationEventId, LegacyPresentationEvidence>,
     completed: &BTreeMap<PresentationEventId, LegacyPresentationCompletionEvidence>,
-) -> Value {
+) -> Option<Value> {
+    if pending.is_empty() && completed.is_empty() {
+        return None;
+    }
+
     let mut entries = pending
         .iter()
         .map(|(event_id, evidence)| {
@@ -3472,12 +3483,12 @@ fn legacy_presentations_snapshot(
         )
     }));
     entries.sort_by_key(|(event_id, _)| *event_id);
-    Value::Array(
+    Some(Value::Array(
         entries
             .into_iter()
             .map(|(_, presentation)| presentation)
             .collect(),
-    )
+    ))
 }
 
 fn network_frame(
