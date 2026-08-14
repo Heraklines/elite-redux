@@ -901,12 +901,20 @@ impl Serializer for CanonicalMapKeySerializer {
         Ok(value.to_string())
     }
 
-    fn serialize_f32(self, _value: f32) -> Result<Self::Ok, Self::Error> {
-        Err(serialization_error("key must be a string"))
+    fn serialize_f32(self, value: f32) -> Result<Self::Ok, Self::Error> {
+        if value.is_finite() {
+            serde_json::to_string(&value).map_err(CanonicalError::from)
+        } else {
+            Err(serialization_error("key must be a string"))
+        }
     }
 
-    fn serialize_f64(self, _value: f64) -> Result<Self::Ok, Self::Error> {
-        Err(serialization_error("key must be a string"))
+    fn serialize_f64(self, value: f64) -> Result<Self::Ok, Self::Error> {
+        if value.is_finite() {
+            serde_json::to_string(&value).map_err(CanonicalError::from)
+        } else {
+            Err(serialization_error("key must be a string"))
+        }
     }
 
     fn serialize_char(self, value: char) -> Result<Self::Ok, Self::Error> {
@@ -1786,9 +1794,39 @@ mod tests {
         }
     }
 
+    #[derive(Clone, Copy)]
+    enum StatefulFloatMapKeyValue {
+        F32(f32),
+        F64(f64),
+    }
+
+    impl StatefulFloatMapKeyValue {
+        fn is_finite(self) -> bool {
+            match self {
+                Self::F32(value) => value.is_finite(),
+                Self::F64(value) => value.is_finite(),
+            }
+        }
+    }
+
+    fn serialize_float_map_entry<M, V>(
+        map: &mut M,
+        key: StatefulFloatMapKeyValue,
+        value: &V,
+    ) -> Result<(), M::Error>
+    where
+        M: SerializeMap,
+        V: Serialize + ?Sized,
+    {
+        match key {
+            StatefulFloatMapKeyValue::F32(key) => map.serialize_entry(&key, value),
+            StatefulFloatMapKeyValue::F64(key) => map.serialize_entry(&key, value),
+        }
+    }
+
     struct StatefulSecondPassFloatMapKey<'calls> {
         calls: &'calls Cell<usize>,
-        value: StatefulFloatCase,
+        value: StatefulFloatMapKeyValue,
     }
 
     impl Serialize for StatefulSecondPassFloatMapKey<'_> {
@@ -1802,22 +1840,57 @@ mod tests {
                 serializer.serialize_u8(0)
             } else {
                 let mut map = serializer.serialize_map(Some(1))?;
-                match self.value {
-                    StatefulFloatCase::FiniteF32 => map.serialize_entry(&1.5_f32, "value")?,
-                    StatefulFloatCase::NanF32 => map.serialize_entry(&f32::NAN, "value")?,
-                    StatefulFloatCase::PositiveInfinityF32 => {
-                        map.serialize_entry(&f32::INFINITY, "value")?
+                serialize_float_map_entry(&mut map, self.value, "value")?;
+                map.end()
+            }
+        }
+    }
+
+    #[derive(Clone, Copy)]
+    enum StatefulFloatMapCase {
+        FloatThenString(StatefulFloatMapKeyValue),
+        StringThenFloat(StatefulFloatMapKeyValue),
+        FloatInvalidThenStringValid(StatefulFloatMapKeyValue),
+        StringValidThenFloatInvalid(StatefulFloatMapKeyValue),
+        NonfiniteAfterUnsafe(StatefulFloatMapKeyValue),
+    }
+
+    struct StatefulSecondPassFloatMap<'calls> {
+        calls: &'calls Cell<usize>,
+        case: StatefulFloatMapCase,
+    }
+
+    impl Serialize for StatefulSecondPassFloatMap<'_> {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let invocation = self.calls.get();
+            self.calls.set(invocation + 1);
+            if invocation == 0 {
+                serializer.serialize_str("validation pass")
+            } else {
+                let mut map = serializer.serialize_map(Some(2))?;
+                match self.case {
+                    StatefulFloatMapCase::FloatThenString(key) => {
+                        serialize_float_map_entry(&mut map, key, "float")?;
+                        map.serialize_entry("1.0", "string")?;
                     }
-                    StatefulFloatCase::NegativeInfinityF32 => {
-                        map.serialize_entry(&f32::NEG_INFINITY, "value")?
+                    StatefulFloatMapCase::StringThenFloat(key) => {
+                        map.serialize_entry("1.0", "string")?;
+                        serialize_float_map_entry(&mut map, key, "float")?;
                     }
-                    StatefulFloatCase::FiniteF64 => map.serialize_entry(&1.5_f64, "value")?,
-                    StatefulFloatCase::NanF64 => map.serialize_entry(&f64::NAN, "value")?,
-                    StatefulFloatCase::PositiveInfinityF64 => {
-                        map.serialize_entry(&f64::INFINITY, "value")?
+                    StatefulFloatMapCase::FloatInvalidThenStringValid(key) => {
+                        serialize_float_map_entry(&mut map, key, &UNSAFE_INTEGER)?;
+                        map.serialize_entry("1.0", &1_u64)?;
                     }
-                    StatefulFloatCase::NegativeInfinityF64 => {
-                        map.serialize_entry(&f64::NEG_INFINITY, "value")?
+                    StatefulFloatMapCase::StringValidThenFloatInvalid(key) => {
+                        map.serialize_entry("1.0", &1_u64)?;
+                        serialize_float_map_entry(&mut map, key, &UNSAFE_INTEGER)?;
+                    }
+                    StatefulFloatMapCase::NonfiniteAfterUnsafe(key) => {
+                        map.serialize_entry("before", &UNSAFE_INTEGER)?;
+                        serialize_float_map_entry(&mut map, key, "value")?;
                     }
                 }
                 map.end()
@@ -2074,6 +2147,29 @@ mod tests {
         assert_eq!(legacy_calls.get(), 2);
     }
 
+    fn stateful_float_map_matches_legacy(
+        case: StatefulFloatMapCase,
+        expected: CanonicalResultIdentity,
+    ) {
+        let direct_calls = Cell::new(0);
+        let legacy_calls = Cell::new(0);
+        let direct = canonical_result_identity(canonical_bytes(&StatefulSecondPassFloatMap {
+            calls: &direct_calls,
+            case,
+        }));
+        let legacy = canonical_result_identity(legacy_canonical_bytes(
+            &StatefulSecondPassFloatMap {
+                calls: &legacy_calls,
+                case,
+            },
+        ));
+
+        assert_eq!(direct, legacy);
+        assert_eq!(direct, expected);
+        assert_eq!(direct_calls.get(), 2);
+        assert_eq!(legacy_calls.get(), 2);
+    }
+
     #[test]
     fn direct_serializer_matches_legacy_across_nested_shapes() -> Result<(), Box<dyn Error>> {
         let mut nested_map = BTreeMap::new();
@@ -2128,6 +2224,10 @@ mod tests {
             r#"{"1":"second","true":"bool"}"#
         );
         direct_matches_legacy(&FloatMapKey);
+        assert_eq!(
+            canonical_result_identity(canonical_bytes(&FloatMapKey)),
+            expected_unsupported_number()
+        );
         Ok(())
     }
 
@@ -2392,14 +2492,14 @@ mod tests {
     #[test]
     fn stateful_second_pass_float_map_keys_match_legacy() {
         for value in [
-            StatefulFloatCase::FiniteF32,
-            StatefulFloatCase::NanF32,
-            StatefulFloatCase::PositiveInfinityF32,
-            StatefulFloatCase::NegativeInfinityF32,
-            StatefulFloatCase::FiniteF64,
-            StatefulFloatCase::NanF64,
-            StatefulFloatCase::PositiveInfinityF64,
-            StatefulFloatCase::NegativeInfinityF64,
+            StatefulFloatMapKeyValue::F32(1.5),
+            StatefulFloatMapKeyValue::F32(f32::NAN),
+            StatefulFloatMapKeyValue::F32(f32::INFINITY),
+            StatefulFloatMapKeyValue::F32(f32::NEG_INFINITY),
+            StatefulFloatMapKeyValue::F64(1.5),
+            StatefulFloatMapKeyValue::F64(f64::NAN),
+            StatefulFloatMapKeyValue::F64(f64::INFINITY),
+            StatefulFloatMapKeyValue::F64(f64::NEG_INFINITY),
         ] {
             let direct_calls = Cell::new(0);
             let legacy_calls = Cell::new(0);
@@ -2415,16 +2515,97 @@ mod tests {
                 }));
 
             assert_eq!(direct, legacy);
-            assert_eq!(
-                direct,
-                Err((
-                    "Serialization",
-                    "JSON serialization failed: key must be a string|key must be a string"
-                        .to_owned(),
-                ))
-            );
+            if value.is_finite() {
+                assert_eq!(direct, Ok(br#"{"1.5":"value"}"#.to_vec()));
+            } else {
+                assert_eq!(
+                    direct,
+                    Err((
+                        "Serialization",
+                        "JSON serialization failed: key must be a string|key must be a string"
+                            .to_owned(),
+                    ))
+                );
+            }
             assert_eq!(direct_calls.get(), 2);
             assert_eq!(legacy_calls.get(), 2);
+        }
+    }
+
+    #[test]
+    fn finite_float_map_keys_match_legacy_exact_json_spelling() {
+        for (key, expected) in [
+            (StatefulFloatMapKeyValue::F32(1.0), r#"{"1.0":"value"}"#),
+            (StatefulFloatMapKeyValue::F32(-0.0), r#"{"-0.0":"value"}"#),
+            (StatefulFloatMapKeyValue::F64(1.0), r#"{"1.0":"value"}"#),
+            (StatefulFloatMapKeyValue::F64(-0.0), r#"{"-0.0":"value"}"#),
+        ] {
+            let direct_calls = Cell::new(0);
+            let legacy_calls = Cell::new(0);
+            let direct = canonical_result_identity(canonical_bytes(
+                &StatefulSecondPassFloatMapKey {
+                    calls: &direct_calls,
+                    value: key,
+                },
+            ));
+            let legacy = canonical_result_identity(legacy_canonical_bytes(
+                &StatefulSecondPassFloatMapKey {
+                    calls: &legacy_calls,
+                    value: key,
+                },
+            ));
+
+            assert_eq!(direct, legacy);
+            assert_eq!(direct, Ok(expected.as_bytes().to_vec()));
+            assert_eq!(direct_calls.get(), 2);
+            assert_eq!(legacy_calls.get(), 2);
+        }
+    }
+
+    #[test]
+    fn finite_float_and_string_map_keys_keep_last_write_in_both_orders() {
+        for key in [
+            StatefulFloatMapKeyValue::F32(1.0),
+            StatefulFloatMapKeyValue::F64(1.0),
+        ] {
+            stateful_float_map_matches_legacy(
+                StatefulFloatMapCase::FloatThenString(key),
+                Ok(br#"{"1.0":"string"}"#.to_vec()),
+            );
+            stateful_float_map_matches_legacy(
+                StatefulFloatMapCase::StringThenFloat(key),
+                Ok(br#"{"1.0":"float"}"#.to_vec()),
+            );
+        }
+    }
+
+    #[test]
+    fn deferred_invalid_map_values_follow_duplicate_replacement() {
+        for key in [
+            StatefulFloatMapKeyValue::F32(1.0),
+            StatefulFloatMapKeyValue::F64(1.0),
+        ] {
+            stateful_float_map_matches_legacy(
+                StatefulFloatMapCase::FloatInvalidThenStringValid(key),
+                Ok(br#"{"1.0":1}"#.to_vec()),
+            );
+            stateful_float_map_matches_legacy(
+                StatefulFloatMapCase::StringValidThenFloatInvalid(key),
+                expected_unsafe_integer(UNSAFE_INTEGER),
+            );
+        }
+    }
+
+    #[test]
+    fn immediate_nonfinite_map_key_error_preempts_deferred_values() {
+        for key in [
+            StatefulFloatMapKeyValue::F32(f32::NAN),
+            StatefulFloatMapKeyValue::F64(f64::INFINITY),
+        ] {
+            stateful_float_map_matches_legacy(
+                StatefulFloatMapCase::NonfiniteAfterUnsafe(key),
+                expected_serialization("key must be a string"),
+            );
         }
     }
 
