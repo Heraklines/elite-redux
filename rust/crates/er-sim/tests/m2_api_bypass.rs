@@ -754,7 +754,13 @@ fn ensure_oracle_available(root: &Path) -> AuditResult {
         let fetch = Command::new("git")
             .current_dir(root)
             .env("GIT_TERMINAL_PROMPT", "0")
-            .args(["fetch", "--no-tags", "--depth=1", "--filter=blob:none", "origin"])
+            .args([
+                "fetch",
+                "--no-tags",
+                "--depth=1",
+                "--filter=blob:none",
+                "origin",
+            ])
             .arg(oracle_ref)
             .output()
             .map_err(|error| format!("fetch pinned oracle branch: {error}"))?;

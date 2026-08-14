@@ -1408,7 +1408,8 @@ fn assert_pair_victory_terminal(
     if evidence.authority_turn_commits.len() != 1 || evidence.replica_turn_commits != 0 {
         return Err(invalid(format!(
             "complete co-op battle authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
-            evidence.authority_turn_commits.len(), evidence.replica_turn_commits
+            evidence.authority_turn_commits.len(),
+            evidence.replica_turn_commits
         )));
     }
 
@@ -1482,7 +1483,8 @@ fn assert_two_client_supported_turn(
     if evidence.authority_turn_commits.len() != 1 || evidence.replica_turn_commits != 0 {
         return Err(invalid(format!(
             "two-client supported turn authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
-            evidence.authority_turn_commits.len(), evidence.replica_turn_commits
+            evidence.authority_turn_commits.len(),
+            evidence.replica_turn_commits
         )));
     }
     Ok(())
