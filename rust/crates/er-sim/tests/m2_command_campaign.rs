@@ -595,7 +595,11 @@ fn assert_authority_local_submission(
     Ok(())
 }
 
-fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) -> TimerId {
+fn assert_repeat_timer(
+    step: &PairStep,
+    endpoint: SeatId,
+    button: GameButton,
+) -> TestResult<TimerId> {
     let timers = step
         .generated_effects
         .iter()
@@ -610,14 +614,18 @@ fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) ->
             _ => None,
         })
         .collect::<Vec<_>>();
-    let Some((timer_id, owner, delay_ms, time_class)) = timers.first().copied() else {
-        panic!("expected one repeat timer for {button:?}");
+    let [timer] = timers.as_slice() else {
+        return Err(format!(
+            "expected exactly one repeat timer for {button:?}, got {}",
+            timers.len()
+        )
+        .into());
     };
-    assert_eq!(timers.len(), 1, "expected one repeat timer for {button:?}");
+    let (timer_id, owner, delay_ms, time_class) = *timer;
     assert_eq!(owner, &TimerOwner::input_repeat(button));
     assert_eq!(delay_ms, safe(250));
     assert_eq!(time_class, TimeClass::HumanInput);
-    timer_id
+    Ok(timer_id)
 }
 
 fn proposal_retry_owner() -> TimerOwner {
@@ -1162,7 +1170,7 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
 
     let stale_input = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowUp, false)?;
     assert_cursor_intent(&stale_input, seat(1), MenuGeneration::new(safe(1)), safe(0));
-    let repeat_timer_id = assert_repeat_timer(&stale_input, seat(1), GameButton::Up);
+    let repeat_timer_id = assert_repeat_timer(&stale_input, seat(1), GameButton::Up)?;
     assert!(
         stale_input
             .snapshot
