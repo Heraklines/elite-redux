@@ -38,6 +38,7 @@ use er_types::{
     ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, NetworkFrame,
     PhysicalKey, RawInputEvent, RunId, SafeU53, SeatId, SessionId, TerminalState, TimeClass,
 };
+use serde::ser::SerializeStruct;
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -50,6 +51,9 @@ const TWO_CLIENT_SUPPORTED_TURNS: u64 = 1_000;
 const BENCHMARK_SEED: &str = "81985529216486895";
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
+const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str =
+    "pokerogue-redux/m3/benchmark-pair-frontier/v1";
+const PAIR_FRONTIER_CHECKSUM_VERSION: u32 = 1;
 
 const PHYSICAL_HIT_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/physical-hit.json");
@@ -697,8 +701,11 @@ fn new_pair(
     let host = seat(1);
     let guest = seat(2);
     let generation = ConnectionGeneration::new(safe(1));
+    let host_game = battle_config(fixture, content.as_ref(), host, force_short_victory)?;
+    let mut guest_game = host_game.clone();
+    guest_game.local_seat = guest;
     Ok(SimulatedPair::new_battle(SimulatedBattlePairConfig {
-        host_game: battle_config(fixture, content.as_ref(), host, force_short_victory)?,
+        host_game,
         host_protocol: authority_protocol(
             "m3-benchmark-pair",
             iteration,
@@ -706,7 +713,7 @@ fn new_pair(
             Some(guest),
             generation,
         )?,
-        guest_game: battle_config(fixture, content.as_ref(), guest, force_short_victory)?,
+        guest_game,
         guest_protocol: replica_protocol("m3-benchmark-pair", iteration, host, guest, generation)?,
         content: Arc::clone(content),
         replay_seed: 0x4c,
@@ -740,6 +747,118 @@ fn absorb<T: Serialize>(checksum: &mut u64, value: &T) -> TestResult {
         *checksum = checksum.wrapping_mul(FNV_PRIME);
     }
     Ok(())
+}
+
+struct PairEndpointFrontier<'a> {
+    endpoint: &'a er_sim::EndpointSnapshot,
+}
+
+impl Serialize for PairEndpointFrontier<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut fields = serializer.serialize_struct("PairEndpointFrontier", 4)?;
+        fields.serialize_field("stateDigest", &self.endpoint.state_digest)?;
+        fields.serialize_field("ui", &self.endpoint.ui)?;
+        fields.serialize_field("liveResources", &self.endpoint.live_resources)?;
+        fields.serialize_field("presenter", &self.endpoint.presenter)?;
+        fields.end()
+    }
+}
+
+struct PairSnapshotFrontier<'a> {
+    snapshot: &'a er_sim::PairSnapshot,
+}
+
+impl Serialize for PairSnapshotFrontier<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let snapshot = self.snapshot;
+        let mut fields = serializer.serialize_struct("PairSnapshotFrontier", 10)?;
+        fields.serialize_field("sequence", &snapshot.sequence)?;
+        fields.serialize_field("seed", &snapshot.seed)?;
+        fields.serialize_field("virtualTimeMs", &snapshot.virtual_time_ms)?;
+        fields.serialize_field("clockTimers", &snapshot.clock_timers)?;
+        fields.serialize_field(
+            "host",
+            &PairEndpointFrontier {
+                endpoint: &snapshot.host,
+            },
+        )?;
+        fields.serialize_field(
+            "guest",
+            &PairEndpointFrontier {
+                endpoint: &snapshot.guest,
+            },
+        )?;
+        fields.serialize_field("network", &snapshot.network)?;
+        fields.serialize_field("presenter", &snapshot.presenter)?;
+        fields.serialize_field("storage", &snapshot.storage)?;
+        fields.serialize_field("terminalReason", &snapshot.terminal_reason)?;
+        fields.end()
+    }
+}
+
+struct PairStepChecksum<'a> {
+    step: &'a PairStep,
+}
+
+impl Serialize for PairStepChecksum<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut fields = serializer.serialize_struct("PairStepChecksum", 7)?;
+        fields.serialize_field("domain", &PAIR_FRONTIER_CHECKSUM_DOMAIN)?;
+        fields.serialize_field("schemaVersion", &PAIR_FRONTIER_CHECKSUM_VERSION)?;
+        fields.serialize_field("sequence", &self.step.sequence)?;
+        fields.serialize_field("operation", &self.step.operation)?;
+        fields.serialize_field("generatedEffects", &self.step.generated_effects)?;
+        fields.serialize_field("effectsDigest", &self.step.effects_digest)?;
+        fields.serialize_field(
+            "snapshot",
+            &PairSnapshotFrontier {
+                snapshot: &self.step.snapshot,
+            },
+        )?;
+        fields.end()
+    }
+}
+
+struct PairSnapshotChecksum<'a> {
+    snapshot: &'a er_sim::PairSnapshot,
+}
+
+impl Serialize for PairSnapshotChecksum<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut fields = serializer.serialize_struct("PairSnapshotChecksum", 3)?;
+        fields.serialize_field("domain", &PAIR_FRONTIER_CHECKSUM_DOMAIN)?;
+        fields.serialize_field("schemaVersion", &PAIR_FRONTIER_CHECKSUM_VERSION)?;
+        fields.serialize_field(
+            "snapshot",
+            &PairSnapshotFrontier {
+                snapshot: self.snapshot,
+            },
+        )?;
+        fields.end()
+    }
+}
+
+fn absorb_pair_step_frontier(checksum: &mut u64, step: &PairStep) -> TestResult {
+    absorb(checksum, &PairStepChecksum { step })
+}
+
+fn absorb_pair_snapshot_frontier(
+    checksum: &mut u64,
+    snapshot: &er_sim::PairSnapshot,
+) -> TestResult {
+    absorb(checksum, &PairSnapshotChecksum { snapshot })
 }
 
 fn assert_no_legacy_success_effects(effects: &[KernelEffect]) {
@@ -1500,14 +1619,41 @@ fn run_pair_operation(
 ) -> TestResult<PairStep> {
     counts.inputs = counts.inputs.saturating_add(1);
     let step = pair.apply(operation)?;
+    observe_pair_step(&step, checksum, counts, pending, evidence)?;
+    Ok(step)
+}
+
+fn run_pair_operations_atomic(
+    pair: &mut SimulatedPair,
+    operations: impl IntoIterator<Item = PairOperation>,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+) -> TestResult {
+    let steps = pair.apply_many_atomic(operations)?;
+    for step in steps {
+        counts.inputs = counts.inputs.saturating_add(1);
+        observe_pair_step(&step, checksum, counts, pending, evidence)?;
+    }
+    Ok(())
+}
+
+fn observe_pair_step(
+    step: &PairStep,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+) -> TestResult {
     assert_no_legacy_success_effects(&step.generated_effects);
     counts.rng_draws = counts
         .rng_draws
         .saturating_add(count_rng_draws(&step.generated_effects));
-    absorb(checksum, &step)?;
-    record_pair_presentations(&step, pending)?;
-    record_pair_turn_evidence(&step, evidence)?;
-    Ok(step)
+    absorb_pair_step_frontier(checksum, step)?;
+    record_pair_presentations(step, pending)?;
+    record_pair_turn_evidence(step, evidence)?;
+    Ok(())
 }
 
 fn run_pair_receipt_pump(
@@ -1517,19 +1663,14 @@ fn run_pair_receipt_pump(
     pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
     evidence: &mut TurnEvidence,
 ) -> TestResult<er_sim::PairSnapshot> {
-    counts.inputs = counts.inputs.saturating_add(1);
-    let step = pair.apply(PairOperation::AdvanceTime { delta_ms: safe(2) })?;
-    assert_no_legacy_success_effects(&step.generated_effects);
-    counts.rng_draws = counts
-        .rng_draws
-        .saturating_add(count_rng_draws(&step.generated_effects));
-    absorb(checksum, &step.operation)?;
-    absorb(checksum, &step.generated_effects)?;
-    absorb(checksum, &step.effects_digest)?;
-    absorb(checksum, &step.snapshot.host.state_digest)?;
-    absorb(checksum, &step.snapshot.guest.state_digest)?;
-    record_pair_presentations(&step, pending)?;
-    record_pair_turn_evidence(&step, evidence)?;
+    let step = run_pair_operation(
+        pair,
+        PairOperation::AdvanceTime { delta_ms: safe(2) },
+        checksum,
+        counts,
+        pending,
+        evidence,
+    )?;
     Ok(step.snapshot)
 }
 
@@ -1564,20 +1705,25 @@ fn settle_pair_presentations(
 ) -> TestResult {
     let mut cursor = 0;
     while cursor < pending.len() {
-        let (endpoint, event_id) = pending[cursor].clone();
-        run_pair_operation(
-            pair,
-            PairOperation::BattlePresentationOutcome {
+        let wave_end = pending.len();
+        let operations = pending[cursor..wave_end]
+            .iter()
+            .cloned()
+            .map(|(endpoint, event_id)| PairOperation::BattlePresentationOutcome {
                 endpoint,
                 event_id,
                 outcome: PresentationSettlementOutcome::Settled,
-            },
+            })
+            .collect::<Vec<_>>();
+        run_pair_operations_atomic(
+            pair,
+            operations,
             checksum,
             counts,
             pending,
             evidence,
         )?;
-        cursor += 1;
+        cursor = wave_end;
     }
     Ok(())
 }
@@ -1818,7 +1964,7 @@ fn m3_two_client_supported_turns() -> TestResult {
         let mut pair = new_pair(&fixture, &content, iteration, false)?;
         let mut pending = Vec::new();
         let mut setup_evidence = TurnEvidence::default();
-        run_pair_operation(
+        let reconnect_step = run_pair_operation(
             &mut pair,
             PairOperation::Reconnect {
                 endpoint: PairEndpoint::Host,
@@ -1828,24 +1974,27 @@ fn m3_two_client_supported_turns() -> TestResult {
             &mut pending,
             &mut setup_evidence,
         )?;
-        let before = pair.snapshot()?;
+        let before = reconnect_step.snapshot;
         let mut evidence = TurnEvidence::default();
+        let mut operations = Vec::with_capacity(13);
         for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
             for _ in 0..3 {
-                raw_press_pair(
-                    &mut pair,
+                operations.push(PairOperation::RawInput {
                     endpoint,
-                    &mut checksum,
-                    &mut counts,
-                    &mut pending,
-                    &mut evidence,
-                    PhysicalKey::Enter,
-                )?;
+                    event: key_down(PhysicalKey::Enter),
+                });
+                operations.push(PairOperation::RawInput {
+                    endpoint,
+                    event: key_up(PhysicalKey::Enter),
+                });
             }
         }
-        run_pair_operation(
+        operations.push(PairOperation::AdvanceTime {
+            delta_ms: safe(2),
+        });
+        run_pair_operations_atomic(
             &mut pair,
-            PairOperation::AdvanceTime { delta_ms: safe(2) },
+            operations,
             &mut checksum,
             &mut counts,
             &mut pending,
@@ -1871,8 +2020,9 @@ fn m3_two_client_supported_turns() -> TestResult {
         assert_two_client_supported_turn(&before, &snapshot, &evidence)?;
         counts.turns = counts.turns.saturating_add(1);
         counts.battles = counts.battles.saturating_add(1);
-        let snapshot = pair.teardown("m3 supported turn teardown")?;
-        absorb(&mut checksum, &snapshot)?;
+        let teardown_snapshot = pair.teardown("m3 supported turn teardown")?;
+        assert_zero_pair_resources(&teardown_snapshot);
+        absorb_pair_snapshot_frontier(&mut checksum, &teardown_snapshot)?;
     }
     assert_eq!(counts.turns, TWO_CLIENT_SUPPORTED_TURNS);
     assert_eq!(counts.battles, TWO_CLIENT_SUPPORTED_TURNS);
@@ -1963,10 +2113,10 @@ fn m3_complete_supported_coop_battle() -> TestResult {
     )?;
     let snapshot = pair.snapshot()?;
     assert_pair_victory_terminal(&snapshot, &evidence)?;
-    absorb(&mut checksum, &snapshot)?;
+    absorb_pair_snapshot_frontier(&mut checksum, &snapshot)?;
     let teardown_snapshot = pair.teardown("m3 complete co-op battle teardown")?;
     assert_zero_pair_resources(&teardown_snapshot);
-    absorb(&mut checksum, &teardown_snapshot)?;
+    absorb_pair_snapshot_frontier(&mut checksum, &teardown_snapshot)?;
     counts.turns = 1;
     counts.battles = 1;
     let execution_elapsed_ns = elapsed_ns(execution_started);
