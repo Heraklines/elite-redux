@@ -853,7 +853,7 @@ fn assert_authority_chain(
                 if *from == authority_seat && frame.frame_type == FrameType::AuthorityEntry
         )
     });
-    let expected_entry_body = serde_json::to_value(expected_entry)?;
+    let expected_entry_body = serde_json::to_value(&expected_entry)?;
     let mut entry_locations = Vec::new();
     for location in entry_candidates {
         let effect = &steps[location.0].generated_effects[location.1];
