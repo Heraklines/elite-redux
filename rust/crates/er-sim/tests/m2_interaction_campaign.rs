@@ -18,8 +18,8 @@ use er_types::{
     AuthorityEntryKind, AuthorityFrontier, AwaitSuccessorControl, CancelPolicy,
     ConnectionGeneration, FRAME_PROTOCOL_VERSION, FrameContext, FrameType, GameButton, InputMap,
     InteractionMenu, InteractionSuccessor, Material, MembershipRevision, MenuGeneration,
-    MenuOption, MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey, ProposalMessage,
-    PresentationEventId, PresentationOutcome, Revision, SafeI53, SafeU53, SeatId,
+    MenuOption, MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey,
+    PresentationEventId, PresentationOutcome, ProposalMessage, Revision, SafeI53, SafeU53, SeatId,
     SharedInteractionControl, TimeClass, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
@@ -1344,9 +1344,7 @@ fn reach_fault_controlled_presentation(
             .guest
             .live_resources
             .presentations,
-        BTreeSet::from([PresentationEventId::new(
-            fixture.interaction_revision.get(),
-        )])
+        BTreeSet::from([PresentationEventId::new(fixture.interaction_revision.get(),)])
     );
     assert_eq!(
         replica_admission.snapshot.guest.presenter.pending_event_ids,
@@ -1396,8 +1394,7 @@ fn assert_one_guest_application_chain(trace: &[PairStep], fixture: &CampaignFixt
 fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
     let mut fixture = build_fixture(CAMPAIGN_SEED + 1, PresenterMode::FaultControlled)?;
     let event_id = PresentationEventId::new(fixture.interaction_revision.get());
-    let (mut trace, control_receipt_packet) =
-        reach_fault_controlled_presentation(&mut fixture)?;
+    let (mut trace, control_receipt_packet) = reach_fault_controlled_presentation(&mut fixture)?;
     let pending_snapshot = fixture.pair.snapshot()?;
     let guest_digest = pending_snapshot.guest.state_digest.clone();
     let host_digest = pending_snapshot.host.state_digest.clone();
@@ -1415,12 +1412,14 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
         is_authority_entry,
         "post-control duplicate entry",
     )?;
-    assert!(!control_delivery
-        .snapshot
-        .host
-        .live_resources
-        .retained_revisions
-        .is_empty());
+    assert!(
+        !control_delivery
+            .snapshot
+            .host
+            .live_resources
+            .retained_revisions
+            .is_empty()
+    );
     trace.push(control_delivery);
 
     let duplicate_pending = fault(
@@ -1465,14 +1464,20 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
         receipt_stages(&original_settlement)?,
         vec![AckStage::PresentationSettled]
     );
-    assert!(original_settlement
-        .snapshot
-        .guest
-        .live_resources
-        .presentations
-        .is_empty());
+    assert!(
+        original_settlement
+            .snapshot
+            .guest
+            .live_resources
+            .presentations
+            .is_empty()
+    );
     assert_eq!(
-        original_settlement.snapshot.guest.presenter.settled_event_ids,
+        original_settlement
+            .snapshot
+            .guest
+            .presenter
+            .settled_event_ids,
         BTreeSet::from([event_id])
     );
     trace.push(original_settlement);
@@ -1483,11 +1488,13 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             packet_id: original_settlement_packet,
         },
     )?;
-    assert!(!dropped_original
-        .snapshot
-        .network
-        .queued_packet_ids
-        .contains(&original_settlement_packet));
+    assert!(
+        !dropped_original
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&original_settlement_packet)
+    );
     trace.push(dropped_original);
 
     let before_rebind = fixture.pair.snapshot()?;
@@ -1518,21 +1525,20 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
     )?;
     assert_eq!(
         receipt_stages(&replacement)?,
-        vec![
-            AckStage::ControlInstalled,
-            AckStage::PresentationSettled,
-        ]
+        vec![AckStage::ControlInstalled, AckStage::PresentationSettled,]
     );
     assert!(presentation_effects(std::slice::from_ref(&replacement)).is_empty());
     assert!(material_effects(std::slice::from_ref(&replacement)).is_empty());
     assert!(control_effects(std::slice::from_ref(&replacement)).is_empty());
     assert_eq!(replacement.snapshot.guest.state_digest, guest_digest);
-    assert!(replacement
-        .snapshot
-        .guest
-        .live_resources
-        .presentations
-        .is_empty());
+    assert!(
+        replacement
+            .snapshot
+            .guest
+            .live_resources
+            .presentations
+            .is_empty()
+    );
     let replacement_settlement_packet = only_packet_for_sends(
         &replacement_queue,
         &replacement,
@@ -1547,19 +1553,26 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             packet_id: replacement_settlement_packet,
         },
     )?;
-    assert!(replacement_delivery
-        .snapshot
-        .host
-        .live_resources
-        .delivery_leases
-        .is_empty());
-    assert!(replacement_delivery
-        .snapshot
-        .host
-        .live_resources
-        .retained_revisions
-        .is_empty());
-    assert_eq!(replacement_delivery.snapshot.guest.state_digest, guest_digest);
+    assert!(
+        replacement_delivery
+            .snapshot
+            .host
+            .live_resources
+            .delivery_leases
+            .is_empty()
+    );
+    assert!(
+        replacement_delivery
+            .snapshot
+            .host
+            .live_resources
+            .retained_revisions
+            .is_empty()
+    );
+    assert_eq!(
+        replacement_delivery.snapshot.guest.state_digest,
+        guest_digest
+    );
     assert_eq!(replacement_delivery.snapshot.host.state_digest, host_digest);
     trace.push(replacement_delivery);
     assert_one_guest_application_chain(&trace, &fixture);
@@ -1576,8 +1589,7 @@ fn assert_nonsettled_presentation_is_not_upgraded(
 ) -> TestResult {
     let mut fixture = build_fixture(seed, PresenterMode::FaultControlled)?;
     let event_id = PresentationEventId::new(fixture.interaction_revision.get());
-    let (mut trace, control_receipt_packet) =
-        reach_fault_controlled_presentation(&mut fixture)?;
+    let (mut trace, control_receipt_packet) = reach_fault_controlled_presentation(&mut fixture)?;
     let before_outcome = fixture.pair.snapshot()?;
 
     let completion = fixture.pair.apply(PairOperation::PresentationSettled {
@@ -1587,13 +1599,18 @@ fn assert_nonsettled_presentation_is_not_upgraded(
     })?;
     assert!(receipt_stages(&completion)?.is_empty());
     assert!(presentation_effects(std::slice::from_ref(&completion)).is_empty());
-    assert_eq!(completion.snapshot.guest.state_digest, before_outcome.guest.state_digest);
-    assert!(completion
-        .snapshot
-        .guest
-        .live_resources
-        .presentations
-        .is_empty());
+    assert_eq!(
+        completion.snapshot.guest.state_digest,
+        before_outcome.guest.state_digest
+    );
+    assert!(
+        completion
+            .snapshot
+            .guest
+            .live_resources
+            .presentations
+            .is_empty()
+    );
     trace.push(completion);
 
     let control_queue = fixture.pair.snapshot()?.network.queued_packet_ids;
@@ -1617,23 +1634,33 @@ fn assert_nonsettled_presentation_is_not_upgraded(
             packet_id: duplicate_entry_packet,
         },
     )?;
-    assert_eq!(receipt_stages(&duplicate)?, vec![AckStage::ControlInstalled]);
+    assert_eq!(
+        receipt_stages(&duplicate)?,
+        vec![AckStage::ControlInstalled]
+    );
     assert!(presentation_effects(std::slice::from_ref(&duplicate)).is_empty());
     assert!(material_effects(std::slice::from_ref(&duplicate)).is_empty());
     assert!(control_effects(std::slice::from_ref(&duplicate)).is_empty());
-    assert_eq!(duplicate.snapshot.guest.state_digest, before_outcome.guest.state_digest);
-    assert!(duplicate
-        .snapshot
-        .guest
-        .live_resources
-        .presentations
-        .is_empty());
-    assert!(!duplicate
-        .snapshot
-        .host
-        .live_resources
-        .retained_revisions
-        .is_empty());
+    assert_eq!(
+        duplicate.snapshot.guest.state_digest,
+        before_outcome.guest.state_digest
+    );
+    assert!(
+        duplicate
+            .snapshot
+            .guest
+            .live_resources
+            .presentations
+            .is_empty()
+    );
+    assert!(
+        !duplicate
+            .snapshot
+            .host
+            .live_resources
+            .retained_revisions
+            .is_empty()
+    );
     trace.push(duplicate);
     assert_one_guest_application_chain(&trace, &fixture);
 

@@ -149,8 +149,7 @@ pub struct GameKernel {
     scheduler: KernelScheduler,
     repeat_timers: BTreeMap<TimerId, RepeatContext>,
     pending_presentations: BTreeMap<PresentationEventId, LegacyPresentationEvidence>,
-    completed_presentations:
-        BTreeMap<PresentationEventId, LegacyPresentationCompletionEvidence>,
+    completed_presentations: BTreeMap<PresentationEventId, LegacyPresentationCompletionEvidence>,
     live_resources: LiveResourceSnapshot,
     protocol_config: Option<ProtocolKernelConfig>,
     protocol: Option<ProtocolState>,
@@ -1311,17 +1310,15 @@ impl GameKernel {
                                 };
                                 replica
                                     .replica
-                                    .presentation_result(
-                                        entry.revision,
-                                        completed_outcome,
-                                    )
+                                    .presentation_result(entry.revision, completed_outcome)
                                     .map_err(kernel_protocol_error)?
                             };
                             effects.extend(self.map_replica_actions(completion_actions)?);
                             continue;
                         }
                     }
-                    self.pending_presentations.insert(event_id, evidence.clone());
+                    self.pending_presentations
+                        .insert(event_id, evidence.clone());
                     effects.push(KernelEffect::Present {
                         endpoint: self.local_endpoint(),
                         event: evidence.event,

@@ -968,10 +968,7 @@ fn assert_authority_chain(
         for replay in stages[4..].chunks(2) {
             assert_eq!(
                 replay,
-                &[
-                    AckStage::ControlInstalled,
-                    AckStage::PresentationSettled,
-                ]
+                &[AckStage::ControlInstalled, AckStage::PresentationSettled,]
             );
         }
     }

@@ -357,12 +357,12 @@ impl<'output, 'deferred> Serializer for CanonicalSerializer<'output, 'deferred> 
 
     fn serialize_i128(self, value: i128) -> Result<Self::Ok, Self::Error> {
         if value < 0 {
-            let value = i64::try_from(value)
-                .map_err(|_| serialization_error("number out of range"))?;
+            let value =
+                i64::try_from(value).map_err(|_| serialization_error("number out of range"))?;
             self.serialize_i64(value)
         } else {
-            let value = u64::try_from(value)
-                .map_err(|_| serialization_error("number out of range"))?;
+            let value =
+                u64::try_from(value).map_err(|_| serialization_error("number out of range"))?;
             self.serialize_u64(value)
         }
     }
@@ -596,10 +596,7 @@ impl SerializeSeq for CanonicalSequence<'_, '_> {
     type Ok = ();
     type Error = CanonicalError;
 
-    fn serialize_element<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         CanonicalSequence::serialize_element(self, value)
     }
 
@@ -612,10 +609,7 @@ impl SerializeTuple for CanonicalSequence<'_, '_> {
     type Ok = ();
     type Error = CanonicalError;
 
-    fn serialize_element<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         CanonicalSequence::serialize_element(self, value)
     }
 
@@ -628,10 +622,7 @@ impl SerializeTupleStruct for CanonicalSequence<'_, '_> {
     type Ok = ();
     type Error = CanonicalError;
 
-    fn serialize_field<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         CanonicalSequence::serialize_element(self, value)
     }
 
@@ -694,10 +685,7 @@ impl SerializeMap for CanonicalMap<'_, '_> {
     type Ok = ();
     type Error = CanonicalError;
 
-    fn serialize_key<T: Serialize + ?Sized>(
-        &mut self,
-        key: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<(), Self::Error> {
         if self.pending_key.is_some() {
             return Err(serialization_error(
                 "serialize_key called before serializing the previous value",
@@ -707,10 +695,7 @@ impl SerializeMap for CanonicalMap<'_, '_> {
         Ok(())
     }
 
-    fn serialize_value<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         let key = self
             .pending_key
             .take()
@@ -778,10 +763,7 @@ impl SerializeTupleVariant for CanonicalTupleVariant<'_, '_> {
     type Ok = ();
     type Error = CanonicalError;
 
-    fn serialize_field<T: Serialize + ?Sized>(
-        &mut self,
-        value: &T,
-    ) -> Result<(), Self::Error> {
+    fn serialize_field<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<(), Self::Error> {
         self.fields.push(serialize_fragment(value)?);
         Ok(())
     }
@@ -1454,10 +1436,10 @@ mod tests {
         CanonicalError, canonical_bytes, canonicalize, canonicalize_value, content_digest,
         fixture_digest, legacy_canonical_bytes, verify_fixture_digest,
     };
-    use serde::ser::SerializeMap;
-    use serde::ser::SerializeSeq;
     use serde::Serialize;
     use serde::Serializer;
+    use serde::ser::SerializeMap;
+    use serde::ser::SerializeSeq;
     use serde_json::{Map, Value};
     use std::cell::Cell;
     use std::collections::BTreeMap;
@@ -1527,14 +1509,8 @@ mod tests {
     enum MixedInvalidEnum {
         UnsafeThenFloat(u64, f64),
         FloatThenUnsafe(f64, u64),
-        StructUnsafeThenFloat {
-            unsafe_integer: u64,
-            float: f64,
-        },
-        StructFloatThenUnsafe {
-            float: f64,
-            unsafe_integer: u64,
-        },
+        StructUnsafeThenFloat { unsafe_integer: u64, float: f64 },
+        StructFloatThenUnsafe { float: f64, unsafe_integer: u64 },
     }
 
     #[derive(Serialize)]
@@ -1556,7 +1532,9 @@ mod tests {
         where
             S: Serializer,
         {
-            Err(<S::Error as serde::ser::Error>::custom(CUSTOM_ERROR_MESSAGE))
+            Err(<S::Error as serde::ser::Error>::custom(
+                CUSTOM_ERROR_MESSAGE,
+            ))
         }
     }
 
@@ -2003,7 +1981,9 @@ mod tests {
         {
             let mut map = serializer.serialize_map(Some(1))?;
             map.serialize_entry("unsafe", &UNSAFE_INTEGER)?;
-            Err(<S::Error as serde::ser::Error>::custom(CUSTOM_ERROR_MESSAGE))
+            Err(<S::Error as serde::ser::Error>::custom(
+                CUSTOM_ERROR_MESSAGE,
+            ))
         }
     }
 
@@ -2031,10 +2011,9 @@ mod tests {
             CanonicalError::UnsafeInteger { value } => {
                 ("UnsafeInteger", format!("{display}|{value}"))
             }
-            CanonicalError::DigestMismatch { expected, actual } => (
-                "DigestMismatch",
-                format!("{display}|{expected}|{actual}"),
-            ),
+            CanonicalError::DigestMismatch { expected, actual } => {
+                ("DigestMismatch", format!("{display}|{expected}|{actual}"))
+            }
         }
     }
 
@@ -2069,9 +2048,7 @@ mod tests {
     fn expected_unsafe_integer(value: u64) -> CanonicalResultIdentity {
         Err((
             "UnsafeInteger",
-            format!(
-                "integer {value} exceeds JavaScript's maximum safe integer|{value}"
-            ),
+            format!("integer {value} exceeds JavaScript's maximum safe integer|{value}"),
         ))
     }
 
@@ -2085,12 +2062,11 @@ mod tests {
             calls: &direct_calls,
             case,
         }));
-        let legacy = canonical_result_identity(legacy_canonical_bytes(
-            &StatefulSecondPassOrdering {
+        let legacy =
+            canonical_result_identity(legacy_canonical_bytes(&StatefulSecondPassOrdering {
                 calls: &legacy_calls,
                 case,
-            },
-        ));
+            }));
 
         assert_eq!(direct, legacy);
         assert_eq!(direct, expected);
@@ -2180,14 +2156,10 @@ mod tests {
     }
 
     #[test]
-    fn direct_serializer_preserves_mixed_invalid_float_precedence()
-    -> Result<(), Box<dyn Error>> {
+    fn direct_serializer_preserves_mixed_invalid_float_precedence() -> Result<(), Box<dyn Error>> {
         direct_matches_legacy(&(UNSAFE_INTEGER, 1.0_f64));
         direct_matches_legacy(&(1.0_f64, UNSAFE_INTEGER));
-        direct_matches_legacy(&MixedInvalidEnum::UnsafeThenFloat(
-            UNSAFE_INTEGER,
-            f64::NAN,
-        ));
+        direct_matches_legacy(&MixedInvalidEnum::UnsafeThenFloat(UNSAFE_INTEGER, f64::NAN));
         direct_matches_legacy(&MixedInvalidEnum::FloatThenUnsafe(
             f64::INFINITY,
             UNSAFE_INTEGER,
@@ -2234,9 +2206,7 @@ mod tests {
                 .map_err(canonical_error_identity),
             Err((
                 "Serialization",
-                format!(
-                    "JSON serialization failed: {CUSTOM_ERROR_MESSAGE}|{CUSTOM_ERROR_MESSAGE}"
-                ),
+                format!("JSON serialization failed: {CUSTOM_ERROR_MESSAGE}|{CUSTOM_ERROR_MESSAGE}"),
             ))
         );
         Ok(())
@@ -2302,23 +2272,17 @@ mod tests {
         direct_matches_legacy(&CompoundMapKeyCase::CustomThenLaterValues);
 
         assert_eq!(
-            canonical_result_identity(canonical_bytes(
-                &CompoundMapKeyCase::FloatThenLaterValues,
-            )),
+            canonical_result_identity(canonical_bytes(&CompoundMapKeyCase::FloatThenLaterValues,)),
             Err((
                 "UnsupportedNumber",
                 "canonical JSON does not permit floats, NaN, or infinity".to_owned(),
             ))
         );
         assert_eq!(
-            canonical_result_identity(canonical_bytes(
-                &CompoundMapKeyCase::CustomThenLaterValues,
-            )),
+            canonical_result_identity(canonical_bytes(&CompoundMapKeyCase::CustomThenLaterValues,)),
             Err((
                 "Serialization",
-                format!(
-                    "JSON serialization failed: {CUSTOM_ERROR_MESSAGE}|{CUSTOM_ERROR_MESSAGE}"
-                ),
+                format!("JSON serialization failed: {CUSTOM_ERROR_MESSAGE}|{CUSTOM_ERROR_MESSAGE}"),
             ))
         );
     }
@@ -2343,11 +2307,10 @@ mod tests {
         let direct = canonical_result_identity(canonical_bytes(&StatefulSecondInvocationError {
             calls: &direct_calls,
         }));
-        let legacy = canonical_result_identity(legacy_canonical_bytes(
-            &StatefulSecondInvocationError {
+        let legacy =
+            canonical_result_identity(legacy_canonical_bytes(&StatefulSecondInvocationError {
                 calls: &legacy_calls,
-            },
-        ));
+            }));
         assert_eq!(direct, legacy);
         assert_eq!(
             direct,
@@ -2366,11 +2329,10 @@ mod tests {
         let direct = canonical_result_identity(canonical_bytes(&StatefulFirstInvocationError {
             calls: &direct_calls,
         }));
-        let legacy = canonical_result_identity(legacy_canonical_bytes(
-            &StatefulFirstInvocationError {
+        let legacy =
+            canonical_result_identity(legacy_canonical_bytes(&StatefulFirstInvocationError {
                 calls: &legacy_calls,
-            },
-        ));
+            }));
         assert_eq!(direct, legacy);
         assert_eq!(
             direct,
@@ -2399,18 +2361,16 @@ mod tests {
         ] {
             let direct_calls = Cell::new(0);
             let legacy_calls = Cell::new(0);
-            let direct = canonical_result_identity(canonical_bytes(
-                &StatefulSecondPassFloatValue {
+            let direct =
+                canonical_result_identity(canonical_bytes(&StatefulSecondPassFloatValue {
                     calls: &direct_calls,
                     value,
-                },
-            ));
-            let legacy = canonical_result_identity(legacy_canonical_bytes(
-                &StatefulSecondPassFloatValue {
+                }));
+            let legacy =
+                canonical_result_identity(legacy_canonical_bytes(&StatefulSecondPassFloatValue {
                     calls: &legacy_calls,
                     value,
-                },
-            ));
+                }));
 
             assert_eq!(direct, legacy);
             if value.is_finite() {
@@ -2443,18 +2403,16 @@ mod tests {
         ] {
             let direct_calls = Cell::new(0);
             let legacy_calls = Cell::new(0);
-            let direct = canonical_result_identity(canonical_bytes(
-                &StatefulSecondPassFloatMapKey {
+            let direct =
+                canonical_result_identity(canonical_bytes(&StatefulSecondPassFloatMapKey {
                     calls: &direct_calls,
                     value,
-                },
-            ));
-            let legacy = canonical_result_identity(legacy_canonical_bytes(
-                &StatefulSecondPassFloatMapKey {
+                }));
+            let legacy =
+                canonical_result_identity(legacy_canonical_bytes(&StatefulSecondPassFloatMapKey {
                     calls: &legacy_calls,
                     value,
-                },
-            ));
+                }));
 
             assert_eq!(direct, legacy);
             assert_eq!(
@@ -2490,10 +2448,7 @@ mod tests {
             StatefulOrderingCase::FloatThenU128,
             StatefulOrderingCase::U128ThenFloat,
         ] {
-            stateful_ordering_matches_legacy(
-                case,
-                expected_serialization("number out of range"),
-            );
+            stateful_ordering_matches_legacy(case, expected_serialization("number out of range"));
         }
     }
 
@@ -2539,9 +2494,7 @@ mod tests {
         direct_matches_legacy(&OverwrittenUnsafeInteger);
         assert_eq!(canonicalize(&OverwrittenUnsafeInteger)?, r#"{"same":1}"#);
 
-        let value: Value = serde_json::from_str(
-            r#"{"z":9007199254740992,"a":9007199254740993}"#,
-        )?;
+        let value: Value = serde_json::from_str(r#"{"z":9007199254740992,"a":9007199254740993}"#)?;
         direct_matches_legacy(&value);
         assert!(matches!(
             canonical_bytes(&value),

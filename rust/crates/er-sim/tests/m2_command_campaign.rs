@@ -1279,16 +1279,20 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert!(!has_material_effect(&stale_repeat, GUEST_OPERATION));
     assert!(!has_control_effect(&stale_repeat, GUEST_OPERATION));
-    assert!(!stale_repeat
-        .generated_effects
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::Present { .. })));
-    assert!(stale_repeat
-        .snapshot
-        .guest
-        .live_resources
-        .presentations
-        .is_empty());
+    assert!(
+        !stale_repeat
+            .generated_effects
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::Present { .. }))
+    );
+    assert!(
+        stale_repeat
+            .snapshot
+            .guest
+            .live_resources
+            .presentations
+            .is_empty()
+    );
     let replay_revisions = authority_entry_revisions(&stale_repeat);
     assert_eq!(
         replay_revisions,
