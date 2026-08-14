@@ -1784,6 +1784,16 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.ACTION, Button.ACTION],
   },
+  "fun-ability-review-rerolled": {
+    mode: UiMode.FUN_ABILITY_REVIEW,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+      return [game.scene.getPlayerParty(), () => {}];
+    },
+    // Reroll once; the final still must show the START button selected.
+    steps: [Button.ACTION],
+    diffTolerance: 0,
+  },
   // The party SUMMARY screen on its ER ABILITIES page, with a BLACK SHINY (#349) lead so the
   // violet-italic GIFT row ("Gift 1/3") + its "R" key-badge cycle prompt are present. steps
   // fires R (Button.CYCLE_SHINY):
@@ -2901,6 +2911,11 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     }
 
     repointGlobalScene(game.scene, ctx);
+    const renderUi: any = game.scene.ui;
+    renderUi.moveTo ??= () => renderUi;
+    if (typeof renderUi.length !== "number") {
+      renderUi.length = 0;
+    }
     await sleep(0);
 
     // Capture Phaser's `Texture "items" has no frame "<key>"` warning - emitted exactly when

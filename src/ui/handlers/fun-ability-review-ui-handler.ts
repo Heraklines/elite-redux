@@ -180,6 +180,9 @@ export class FunAbilityReviewUiHandler extends UiHandler {
     if (this.cursor === 6) {
       rerollFunAbilities();
       this.descriptionPage = 0;
+      // Reroll is a one-shot action. Move focus to START so the next confirm
+      // launches the run instead of silently rerolling forever.
+      this.cursor = 7;
       return true;
     }
     const callback = this.onContinue;

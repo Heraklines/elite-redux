@@ -224,21 +224,54 @@ describe("SelectModifierPhase", () => {
 
     const handler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
     await vi.waitFor(() => expect(handler.options).toHaveLength(5), { timeout: 5_000 });
-    const queueSpy = vi.spyOn(scene.phaseManager, "unshiftNew");
-    const reroll = (phase as unknown as { rerollModifiers: () => boolean }).rerollModifiers.bind(phase);
-    expect(reroll()).toBe(true);
-    expect(queueSpy).toHaveBeenCalledWith(
-      "SelectModifierPhase",
-      1,
-      expect.any(Array),
-      undefined,
-      false,
-      expect.objectContaining({ kind: "inherited" }),
-      undefined,
-      0,
-      5,
-      2,
+    await vi.waitFor(() => expect(handler.getCoopMirrorCursorState()).not.toBeNull(), { timeout: 5_000 });
+    handler.setRowCursor(0);
+    handler.setCursor(0);
+    expect(handler.processInput(Button.ACTION)).toBe(true);
+
+    await vi.waitFor(
+      () => {
+        const rerolledPhase = scene.phaseManager.getCurrentPhase() as SelectModifierPhase;
+        const rerolledState = rerolledPhase as unknown as {
+          rerollCount: number;
+          baseOptionCount: number;
+          freePicksRemaining: number;
+        };
+        expect(rerolledPhase).not.toBe(phase);
+        expect(rerolledPhase.phaseName).toBe("SelectModifierPhase");
+        expect(rerolledState.rerollCount).toBe(1);
+        expect(rerolledState.baseOptionCount).toBe(5);
+        expect(rerolledState.freePicksRemaining).toBe(2);
+      },
+      { timeout: 5_000 },
     );
+
+    await game.phaseInterceptor.to("SelectModifierPhase");
+    const rerolledHandler = scene.ui.handlers.find(
+      h => h instanceof ModifierSelectUiHandler,
+    ) as ModifierSelectUiHandler;
+    await vi.waitFor(() => expect(rerolledHandler.options).toHaveLength(5), { timeout: 5_000 });
+    await vi.waitFor(() => expect(rerolledHandler.getCoopMirrorCursorState()).not.toBeNull(), { timeout: 5_000 });
+
+    rerolledHandler.setRowCursor(1);
+    rerolledHandler.setCursor(0);
+    expect(rerolledHandler.processInput(Button.ACTION)).toBe(true);
+    await vi.waitFor(
+      () => {
+        expect(rerolledHandler.options).toHaveLength(4);
+        const state = scene.phaseManager.getCurrentPhase() as unknown as { freePicksRemaining: number };
+        expect(state.freePicksRemaining).toBe(1);
+        expect(rerolledHandler.getCoopMirrorCursorState()).not.toBeNull();
+      },
+      { timeout: 5_000 },
+    );
+
+    rerolledHandler.setRowCursor(1);
+    rerolledHandler.setCursor(0);
+    expect(rerolledHandler.processInput(Button.ACTION)).toBe(true);
+    await vi.waitFor(() => expect(scene.phaseManager.getCurrentPhase().phaseName).not.toBe("SelectModifierPhase"), {
+      timeout: 5_000,
+    });
   });
 
   it("should generate custom modifier tiers that can upgrade from luck", async () => {

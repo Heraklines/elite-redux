@@ -757,11 +757,17 @@ export class SelectModifierPhase extends BattlePhase {
       this.typeOptions = [];
     } else if (this.freePicksRemaining > 1) {
       // A first-pick reward must resolve synchronously so this same screen can stay open
-      // for pick two. Roll a few spare options, remove nested-picker rewards, then keep
-      // the normal visible count. The second pick uses the full pool as usual.
-      this.typeOptions = this.getModifierTypeOptions(modifierCount + 5)
-        .filter(option => !this.modifierQueuesContinuation(option.type))
-        .slice(0, modifierCount);
+      // for pick two. Party-target items open a separate picker even when the modifier
+      // itself does not queue a continuation phase, so exclude both categories.
+      const immediateOptions: ModifierTypeOption[] = [];
+      for (let attempt = 0; attempt < 8 && immediateOptions.length < modifierCount; attempt++) {
+        immediateOptions.push(
+          ...this.getModifierTypeOptions(modifierCount + 5).filter(
+            option => !(option.type instanceof PokemonModifierType) && !this.modifierQueuesContinuation(option.type),
+          ),
+        );
+      }
+      this.typeOptions = immediateOptions.slice(0, modifierCount);
     } else {
       this.typeOptions = this.getModifierTypeOptions(modifierCount);
     }
