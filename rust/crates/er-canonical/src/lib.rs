@@ -656,7 +656,7 @@ fn finish_object(
         utf16_key_cmp(&left.key, &right.key).then_with(|| left.index.cmp(&right.index))
     });
 
-    let mut unique = Vec::with_capacity(entries.len());
+    let mut unique: Vec<CanonicalObjectEntry> = Vec::with_capacity(entries.len());
     for entry in entries {
         if let Some(previous) = unique.last_mut()
             && previous.key == entry.key
