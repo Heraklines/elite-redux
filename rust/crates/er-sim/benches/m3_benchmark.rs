@@ -35,8 +35,8 @@ use er_types::battle_ids::{
 use er_types::battle_model::BattleOutcome;
 use er_types::battle_ui::{BattleUiProjection, PresentationSettlementOutcome};
 use er_types::{
-    ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TerminalState, TimeClass,
+    ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, NetworkFrame,
+    PhysicalKey, RawInputEvent, RunId, SafeU53, SeatId, SessionId, TerminalState, TimeClass,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -990,9 +990,15 @@ fn record_pair_presentations(
     Ok(())
 }
 
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct TurnCommitIdentity {
+    revision: u64,
+    operation_id: String,
+}
+
 #[derive(Default)]
 struct TurnEvidence {
-    authority_turn_commits: u64,
+    authority_turn_commits: BTreeMap<TurnCommitIdentity, NetworkFrame>,
     replica_turn_commits: u64,
 }
 
@@ -1013,7 +1019,32 @@ fn record_pair_turn_evidence(step: &PairStep, evidence: &mut TurnEvidence) -> Te
             continue;
         }
         if *from == seat(1) {
-            evidence.authority_turn_commits = evidence.authority_turn_commits.saturating_add(1);
+            let revision = frame
+                .body
+                .get("revision")
+                .and_then(Value::as_u64)
+                .ok_or_else(|| invalid("TURN_COMMIT frame has no numeric revision"))?;
+            let operation_id = frame
+                .body
+                .get("operationId")
+                .and_then(Value::as_str)
+                .filter(|operation_id| !operation_id.is_empty())
+                .ok_or_else(|| invalid("TURN_COMMIT frame has no non-empty operationId"))?;
+            let identity = TurnCommitIdentity {
+                revision,
+                operation_id: operation_id.to_owned(),
+            };
+            if let Some(previous_frame) = evidence.authority_turn_commits.get(&identity) {
+                if previous_frame != frame {
+                    return Err(invalid(format!(
+                        "TURN_COMMIT retransmission changed frame for revision {revision} operationId {operation_id}"
+                    )));
+                }
+            } else {
+                evidence
+                    .authority_turn_commits
+                    .insert(identity, frame.clone());
+            }
         } else if *from == seat(2) {
             evidence.replica_turn_commits = evidence.replica_turn_commits.saturating_add(1);
         } else {
@@ -1374,10 +1405,10 @@ fn assert_pair_victory_terminal(
 
     assert_pair_mechanical_convergence(snapshot)?;
     assert_pair_control_convergence(snapshot)?;
-    if evidence.authority_turn_commits != 1 || evidence.replica_turn_commits != 0 {
+    if evidence.authority_turn_commits.len() != 1 || evidence.replica_turn_commits != 0 {
         return Err(invalid(format!(
             "complete co-op battle authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
-            evidence.authority_turn_commits, evidence.replica_turn_commits
+            evidence.authority_turn_commits.len(), evidence.replica_turn_commits
         )));
     }
 
@@ -1448,10 +1479,10 @@ fn assert_two_client_supported_turn(
     }
     assert_pair_mechanical_convergence(after)?;
     assert_pair_control_convergence(after)?;
-    if evidence.authority_turn_commits != 1 || evidence.replica_turn_commits != 0 {
+    if evidence.authority_turn_commits.len() != 1 || evidence.replica_turn_commits != 0 {
         return Err(invalid(format!(
             "two-client supported turn authority/replica TURN_COMMIT evidence was {}/{}; expected 1/0",
-            evidence.authority_turn_commits, evidence.replica_turn_commits
+            evidence.authority_turn_commits.len(), evidence.replica_turn_commits
         )));
     }
     Ok(())
