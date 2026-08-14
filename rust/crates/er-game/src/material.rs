@@ -52,6 +52,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::authority_commands::PreparedAuthorityTurn;
+use crate::internal_event::AuthorityLocalTurnProof;
 use crate::runtime::project_battle_control_plan;
 
 /// The schema version of both typed M3 material DTOs.
@@ -257,7 +258,6 @@ enum ContentValidationMode {
 #[derive(Clone, Copy)]
 enum DigestValidationMode {
     Independent,
-    ReducerIssued,
 }
 
 /// The closed common material-application failure categories.
@@ -337,9 +337,10 @@ pub fn apply_turn_material_trusted(
 }
 
 /// Apply reducer-issued TURN material inside the authority kernel transaction.
-/// The sealed prepared bundle proves the exact finalized state/digest pairs;
-/// decoded replica and independently callable material paths cannot construct
-/// this capability and continue to recompute both digests.
+/// Canonical decoded material is first bound field-for-field to the finalized
+/// resolver/control/allocator evidence.  Only that opaque authority-local
+/// proof may reuse the resolver's already-validated result; public, replica,
+/// recovery, and ordinary trusted paths remain on the strict applier below.
 #[doc(hidden)]
 pub fn apply_reducer_issued_turn_material_trusted(
     current_state: &GameState,
@@ -349,23 +350,145 @@ pub fn apply_reducer_issued_turn_material_trusted(
     content: &ContentPack,
     prepared: &PreparedAuthorityTurn,
 ) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
-    let transition = prepared.digest_evidence().transition();
-    if transition.before_state != material.before_state
-        || transition.before_digest != material.before_digest
-        || transition.after_state != material.after_state
-        || transition.after_digest != material.after_digest
-    {
-        return Err(BattleMaterialApplyError::InvalidEvidence);
-    }
-    apply_turn_material_inner(
+    let proof = bind_reducer_issued_turn_material(
         current_state,
         local_seat,
         menu_allocators,
         material,
         content,
+        prepared,
+    )?;
+    apply_bound_reducer_turn_material(material, proof)
+}
+
+/// Compare canonical decoded TURN material with every field proved by the
+/// finalized authority-local resolver, then retain only the endpoint checks
+/// that cannot be supplied by that resolver proof.  The returned capability
+/// is borrowed from the prepared game evidence and has no wire or DTO shape.
+fn bind_reducer_issued_turn_material<'a>(
+    current_state: &GameState,
+    local_seat: SeatId,
+    menu_allocators: &'a [SeatMenuInstanceAllocator],
+    material: &'a BattleTurnMaterialV1,
+    content: &ContentPack,
+    prepared: &'a PreparedAuthorityTurn,
+) -> Result<AuthorityLocalTurnProof<'a>, BattleMaterialApplyError> {
+    validate_material_header(
+        material.schema_version,
+        &material.oracle_game_sha,
+        &material.content_hash,
+        &material.before_state,
+        &material.after_state,
+        content,
         ContentValidationMode::Trusted,
-        DigestValidationMode::ReducerIssued,
+    )?;
+    validate_turn_identity(material)?;
+
+    let transition = prepared.transition();
+    let before_battle = transition
+        .before_state
+        .battle
+        .as_ref()
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let after_battle = transition
+        .after_state
+        .battle
+        .as_ref()
+        .ok_or(BattleMaterialApplyError::InvalidEvidence)?;
+    let expected_operation = turn_result_operation_id(
+        before_battle.battle_id,
+        before_battle.wave,
+        before_battle.turn,
     )
+    .map_err(|_| BattleMaterialApplyError::MalformedIdentity)?;
+    let expected_presentation_digest = compute_presentation_plan_digest(&transition.presentation)
+        .map_err(|_| BattleMaterialApplyError::InvalidEvidence)?;
+
+    // The resolver's finalized transition is the proof source.  Keep these
+    // comparisons explicit so no material field can become a trusted output
+    // merely because it survived canonical JSON decoding.
+    if material.operation_id != expected_operation
+        || material.battle_id != before_battle.battle_id
+        || material.wave != before_battle.wave
+        || material.resolved_turn != before_battle.turn
+        || material.before_state != transition.before_state
+        || material.before_digest != transition.before_digest
+        || material.after_state != transition.after_state
+        || material.after_digest != transition.after_digest
+        || material.commands != transition.accepted_commands
+        || material.action_order != transition.action_order
+        || material.mutations != transition.mutations
+        || material.presentation != transition.presentation
+        || material.presentation_digest != expected_presentation_digest
+        || material.rng_before != before_battle.battle_rng
+        || material.rng_after != after_battle.battle_rng
+        || material.rng_audit != transition.rng_audit
+        || material.outcome != transition.outcome
+        || material.next_decision != transition.next_decision
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+
+    let prepared_allocators = prepared.admission().allocator_before();
+    if material.menu_allocators_before.as_slice() != prepared_allocators
+        || material.menu_allocators_before.as_slice() != menu_allocators
+        || &material.next_control != prepared.control_plan()
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+
+    // These are endpoint-local checks, not resolver work.  Preserve them so
+    // a local state/allocator frontier cannot be accepted by the proof path.
+    reconcile_turn_frontier(current_state, material, content)?;
+    validate_endpoint_allocators(
+        menu_allocators,
+        local_seat,
+        &material.menu_allocators_before,
+        &material.after_state,
+    )?;
+
+    let proof = prepared.bind_authority_local_turn(
+        menu_allocators,
+        &material.operation_id,
+    );
+    if proof.material_operation_id() != &expected_operation
+        || proof.menu_allocators_before() != menu_allocators
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    Ok(proof)
+}
+
+/// Materialize the canonical decoded material without replaying its
+/// mechanics, command legality, RNG, mutation, or presentation validators.
+/// The resolver proof authorizes the allocator/control derivation and the
+/// candidate-equality assertion, but never replaces the decoded install data.
+fn apply_bound_reducer_turn_material(
+    material: &BattleTurnMaterialV1,
+    proof: AuthorityLocalTurnProof<'_>,
+) -> Result<MaterialApplyResult, BattleMaterialApplyError> {
+    let transition = proof.transition();
+    if transition.after_state != material.after_state
+        || transition.after_digest != material.after_digest
+        || transition.presentation != material.presentation
+        || transition.outcome != material.outcome
+        || transition.next_decision != material.next_decision
+        || proof.control_plan() != &material.next_control
+        || proof.control_plan().menu_allocators.as_slice()
+            != material.next_control.menu_allocators.as_slice()
+    {
+        return Err(BattleMaterialApplyError::InvalidEvidence);
+    }
+    Ok(MaterialApplyResult {
+        after_state: material.after_state.clone(),
+        after_digest: material.after_digest.clone(),
+        presentation: material.presentation.clone(),
+        presentation_digest: material.presentation_digest.clone(),
+        outcome: material.outcome,
+        next_decision: material.next_decision,
+        next_control: material.next_control.clone(),
+        menu_allocators: material.next_control.menu_allocators.clone(),
+    })
 }
 
 fn apply_turn_material_inner(

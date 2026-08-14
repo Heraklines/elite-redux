@@ -31,7 +31,7 @@ use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, MenuInstanc
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
 use thiserror::Error;
 
-use crate::internal_event::TurnDigestEvidence;
+use crate::internal_event::{AuthorityLocalTurnProof, TurnDigestEvidence};
 
 #[derive(Clone, Copy)]
 enum ContentValidationMode {
@@ -295,6 +295,22 @@ impl PreparedAuthorityTurn {
 
     pub(crate) fn digest_evidence(&self) -> &TurnDigestEvidence {
         &self.digest_evidence
+    }
+
+    /// Bind the already-prepared resolver/control evidence into the opaque
+    /// authority-local proof consumed by the material binder.  The material
+    /// module calls this only after canonical decoded fields have been
+    /// compared; no proof constructor is available to er-kernel callers.
+    pub(crate) fn bind_authority_local_turn<'a>(
+        &'a self,
+        menu_allocators_before: &'a [SeatMenuInstanceAllocator],
+        material_operation_id: &'a OperationId,
+    ) -> AuthorityLocalTurnProof<'a> {
+        self.digest_evidence().bind_authority_local_turn(
+            &self.control_plan,
+            menu_allocators_before,
+            material_operation_id,
+        )
     }
 }
 

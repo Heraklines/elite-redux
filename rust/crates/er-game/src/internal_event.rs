@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use er_battle::{BattleReplacementTransition, BattleTransition};
 use er_state::digest::MechanicalStateDigest;
 use er_types::battle_command::{BattleCommandProposalV1, BattleReplacementProposalV1};
-use er_types::battle_control::BattleControlPlan;
+use er_types::battle_control::{BattleControlPlan, SeatMenuInstanceAllocator};
 use er_types::battle_ids::{AuthorityEpoch, FaintOccurrenceId, MenuInstanceId};
 use er_types::{
     AuthorityEntryKind, ButtonEvent, FrameContext, MenuOptionId, OperationId, Revision, SeatId,
@@ -212,9 +212,58 @@ pub struct TurnDigestEvidence {
     transition: BattleTransition,
 }
 
+/// Borrowed authority-local proof assembled only after the canonical TURN
+/// material has been bound to the finalized resolver transition.  The proof
+/// carries no serialized representation and cannot be constructed outside
+/// this crate; its lifetime also prevents it from outliving the prepared
+/// resolver/control evidence it borrows.
+#[doc(hidden)]
+#[derive(Debug, Eq, PartialEq)]
+pub(crate) struct AuthorityLocalTurnProof<'a> {
+    transition: &'a BattleTransition,
+    control_plan: &'a BattleControlPlan,
+    menu_allocators_before: &'a [SeatMenuInstanceAllocator],
+    material_operation_id: &'a OperationId,
+}
+
+impl<'a> AuthorityLocalTurnProof<'a> {
+    pub(crate) fn transition(&self) -> &BattleTransition {
+        self.transition
+    }
+
+    pub(crate) fn control_plan(&self) -> &BattleControlPlan {
+        self.control_plan
+    }
+
+    pub(crate) fn menu_allocators_before(&self) -> &[SeatMenuInstanceAllocator] {
+        self.menu_allocators_before
+    }
+
+    pub(crate) fn material_operation_id(&self) -> &OperationId {
+        self.material_operation_id
+    }
+}
+
 impl TurnDigestEvidence {
     pub(crate) fn from_finalized_transition(transition: BattleTransition) -> Self {
         Self { transition }
+    }
+
+    /// Borrow the resolver, control, allocator, and transaction identity as
+    /// one authority-local proof after the material binder has compared every
+    /// decoded field against this finalized transition.
+    pub(crate) fn bind_authority_local_turn<'a>(
+        &'a self,
+        control_plan: &'a BattleControlPlan,
+        menu_allocators_before: &'a [SeatMenuInstanceAllocator],
+        material_operation_id: &'a OperationId,
+    ) -> AuthorityLocalTurnProof<'a> {
+        AuthorityLocalTurnProof {
+            transition: &self.transition,
+            control_plan,
+            menu_allocators_before,
+            material_operation_id,
+        }
     }
 
     #[doc(hidden)]

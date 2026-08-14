@@ -275,6 +275,37 @@ fn semantic_event_and_transaction_surfaces_are_sealed_for_kernel_integration() {
     }
 }
 
+#[test]
+fn authority_local_proof_is_opaque_and_not_a_skip_flag() {
+    assert_doc_hidden_before(
+        INTERNAL_EVENT_SOURCE,
+        "pub(crate) struct AuthorityLocalTurnProof<'a>",
+    );
+    let proof_start = INTERNAL_EVENT_SOURCE
+        .find("pub(crate) struct AuthorityLocalTurnProof<'a>")
+        .expect("authority-local proof type must remain in the game crate");
+    let proof_end = INTERNAL_EVENT_SOURCE[proof_start..]
+        .find("impl AuthorityLocalTurnProof")
+        .map(|offset| proof_start + offset)
+        .expect("authority-local proof implementation must remain adjacent");
+    let proof_source = &INTERNAL_EVENT_SOURCE[proof_start..proof_end];
+    assert!(proof_source.contains("transition: &'a BattleTransition"));
+    assert!(proof_source.contains("control_plan: &'a BattleControlPlan"));
+    assert!(proof_source.contains("menu_allocators_before: &'a [SeatMenuInstanceAllocator]"));
+    assert!(proof_source.contains("material_operation_id: &'a OperationId"));
+    assert!(!proof_source.contains("pub transition"));
+    assert!(!proof_source.contains("pub control_plan"));
+    assert!(!proof_source.contains("pub menu_allocators_before"));
+    assert!(!proof_source.contains("pub material_operation_id"));
+    assert!(INTERNAL_EVENT_SOURCE.contains("pub(crate) fn bind_authority_local_turn"));
+
+    let authority_source = normalized_sanitized_source(AUTHORITY_COMMAND_SOURCE);
+    assert!(authority_source.contains("pub(crate) fn bind_authority_local_turn"));
+    assert!(authority_source.contains("self.digest_evidence.bind_authority_local_turn("));
+    assert!(!authority_source.contains("skip_digest"));
+    assert!(!authority_source.contains("bypass"));
+}
+
 fn assert_doc_hidden_before(source: &str, item: &str) {
     let position = source.find(item).expect("missing expected source item");
     let preceding = source[..position].lines().rev().take(8);

@@ -1668,3 +1668,118 @@ fn authority_adapter_stages_material_and_log_before_publication() -> TestResult 
     assert!(source.contains("stored.source.turn_occurrence"));
     Ok(())
 }
+
+#[test]
+fn authority_local_material_binding_covers_every_reused_field_and_endpoint_guard() -> TestResult {
+    let material_source = normalized_sanitized_source(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../er-game/src/material.rs"
+    )));
+    let binding = extract_function_section(
+        &material_source,
+        "fn bind_reducer_issued_turn_material<'a>(",
+        "fn apply_bound_reducer_turn_material(",
+    );
+    let reducer = extract_function_section(
+        &material_source,
+        "pub fn apply_reducer_issued_turn_material_trusted(",
+        "fn bind_reducer_issued_turn_material<'a>(",
+    );
+    let applied = extract_function_section(
+        &material_source,
+        "fn apply_bound_reducer_turn_material(",
+        "fn apply_turn_material_inner(",
+    );
+
+    for reused_field in [
+        "material.operation_id != expected_operation",
+        "material.battle_id != before_battle.battle_id",
+        "material.wave != before_battle.wave",
+        "material.resolved_turn != before_battle.turn",
+        "material.before_state != transition.before_state",
+        "material.before_digest != transition.before_digest",
+        "material.after_state != transition.after_state",
+        "material.after_digest != transition.after_digest",
+        "material.commands != transition.accepted_commands",
+        "material.action_order != transition.action_order",
+        "material.mutations != transition.mutations",
+        "material.presentation != transition.presentation",
+        "material.presentation_digest != expected_presentation_digest",
+        "material.rng_before != before_battle.battle_rng",
+        "material.rng_after != after_battle.battle_rng",
+        "material.rng_audit != transition.rng_audit",
+        "material.outcome != transition.outcome",
+        "material.next_decision != transition.next_decision",
+        "material.menu_allocators_before.as_slice() != prepared_allocators",
+        "material.menu_allocators_before.as_slice() != menu_allocators",
+        "&material.next_control != prepared.control_plan()",
+    ] {
+        assert!(
+            binding.contains(reused_field),
+            "authority-local material binding omitted tamper guard {reused_field}"
+        );
+    }
+    for retained_endpoint_guard in [
+        "validate_material_header(",
+        "validate_turn_identity(material)?",
+        "reconcile_turn_frontier(current_state, material, content)?",
+        "validate_endpoint_allocators(",
+        "prepared.bind_authority_local_turn(",
+    ] {
+        assert!(
+            binding.contains(retained_endpoint_guard),
+            "authority-local material binding omitted {retained_endpoint_guard}"
+        );
+    }
+    assert!(reducer.contains("bind_reducer_issued_turn_material("));
+    assert!(reducer.contains("apply_bound_reducer_turn_material(material, proof)"));
+    for candidate_assertion in [
+        "transition.after_state != material.after_state",
+        "transition.after_digest != material.after_digest",
+        "transition.presentation != material.presentation",
+        "transition.outcome != material.outcome",
+        "transition.next_decision != material.next_decision",
+        "proof.control_plan() != &material.next_control",
+        "proof.control_plan().menu_allocators.as_slice()",
+    ] {
+        assert!(
+            applied.contains(candidate_assertion),
+            "authority-local result lost candidate equality assertion {candidate_assertion}"
+        );
+    }
+    for decoded_output in [
+        "after_state: material.after_state.clone()",
+        "after_digest: material.after_digest.clone()",
+        "presentation: material.presentation.clone()",
+        "presentation_digest: material.presentation_digest.clone()",
+        "outcome: material.outcome",
+        "next_decision: material.next_decision",
+        "next_control: material.next_control.clone()",
+        "menu_allocators: material.next_control.menu_allocators.clone()",
+    ] {
+        assert!(
+            applied.contains(decoded_output),
+            "authority-local result does not source {decoded_output} from decoded material"
+        );
+    }
+    for forbidden_replay in [
+        "apply_turn_material_inner(",
+        "validate_turn_commands(",
+        "validate_after_state_and_digest(",
+        "validate_turn_evidence(",
+        "validate_turn_rng(",
+    ] {
+        assert!(
+            !reducer.contains(forbidden_replay),
+            "authority-local reducer-issued path still replays {forbidden_replay}"
+        );
+    }
+    assert!(!material_source.contains("DigestValidationMode::ReducerIssued"));
+    assert!(material_source.contains("DigestValidationMode::Independent"));
+    let authority_source = normalized_sanitized_source(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/battle_authority.rs"
+    )));
+    assert!(authority_source.contains("require_turn_equivalence(candidate, &decoded, &applied)?"));
+    Ok(())
+}
