@@ -1802,6 +1802,17 @@ fn m3_two_client_supported_turns() -> TestResult {
             &mut pending,
             &mut evidence,
         )?;
+        // Presentation settlement queues the replica receipt; give the pair's
+        // deterministic network one pump to deliver that receipt and run the
+        // authority's post-control probe before checking the next frontier.
+        run_pair_operation(
+            &mut pair,
+            PairOperation::AdvanceTime { delta_ms: safe(2) },
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut evidence,
+        )?;
         let snapshot = pair.snapshot()?;
         assert_two_client_supported_turn(&before, &snapshot, &evidence)?;
         counts.turns = counts.turns.saturating_add(1);
