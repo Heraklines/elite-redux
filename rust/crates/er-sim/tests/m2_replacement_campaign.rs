@@ -16,11 +16,12 @@ use er_sim::{
     SimulatedPair, SimulatedPairConfig, SimulatedPairError,
 };
 use er_types::{
-    AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, GameButton, InputFocus, InputMap,
-    KeyBinding, LiveResourceSnapshot, MembershipRevision, MenuGeneration, MenuOption, MenuOptionId,
-    MenuState, NextControl, OperationId, PhysicalKey, PresentationEventId, ProposalMessage,
-    RawInputEvent, ReplacementControl, ReplacementControlAddress, ReplacementMenu, Revision,
-    SafeU53, SeatId, SessionId, TimeClass, TimerOwner, UiIntent, UiState, UiViewKind,
+    AwaitSuccessorControl, CancelPolicy, ConnectionGeneration, FRAME_PROTOCOL_VERSION, GameButton,
+    InputFocus, InputMap, KeyBinding, LiveResourceSnapshot, MembershipRevision, MenuGeneration,
+    MenuOption, MenuOptionId, MenuState, NextControl, OperationId, PhysicalKey,
+    PresentationEventId, ProposalMessage, RawInputEvent, ReplacementControl,
+    ReplacementControlAddress, ReplacementMenu, Revision, SafeU53, SeatId, SessionId, TimeClass,
+    TimerOwner, UiIntent, UiState, UiViewKind,
 };
 use serde_json::{Value, json};
 
@@ -852,6 +853,7 @@ fn assert_authority_chain(
                 if *from == authority_seat && frame.frame_type == FrameType::AuthorityEntry
         )
     });
+    let expected_entry_body = serde_json::to_value(expected_entry)?;
     let mut entry_locations = Vec::new();
     for location in entry_candidates {
         let effect = &steps[location.0].generated_effects[location.1];
@@ -859,16 +861,17 @@ fn assert_authority_chain(
             continue;
         };
         let body = serde_json::from_value::<AuthorityEntryBody>(frame.body.clone())?;
-        if &frame.context == authority_context && body == expected_entry {
+        if body.revision == revision && &body.operation_id == operation_id {
+            assert_eq!(frame.version, FRAME_PROTOCOL_VERSION);
+            assert_eq!(&frame.context, authority_context);
+            assert_eq!(&frame.body, &expected_entry_body);
+            assert_eq!(body, expected_entry);
             entry_locations.push(location);
         }
     }
-    assert_eq!(
-        entry_locations.len(),
-        1,
-        "authority did not emit exactly one fully identified replacement entry"
-    );
-    let entry_location = entry_locations[0];
+    let Some(entry_location) = entry_locations.first().copied() else {
+        return Err("authority did not emit a fully identified replacement entry".into());
+    };
     assert_eq!(guest_frontier(&steps[entry_location.0])?, prior_frontier);
 
     let material_locations = effect_locations(steps, |effect| {
@@ -885,12 +888,14 @@ fn assert_authority_chain(
                 && effect_material == material
         )
     });
+    let Some(material_location) = material_locations.first().copied() else {
+        return Err("replacement material identity was not applied".into());
+    };
     assert_eq!(
         material_locations.len(),
         1,
         "replacement material identity was not applied exactly once"
     );
-    let material_location = material_locations[0];
 
     let control_locations = effect_locations(steps, |effect| {
         matches!(
@@ -906,12 +911,14 @@ fn assert_authority_chain(
                 && effect_control == next_control
         )
     });
+    let Some(control_location) = control_locations.first().copied() else {
+        return Err("replacement control identity was not projected".into());
+    };
     assert_eq!(
         control_locations.len(),
         1,
         "replacement control identity was not projected exactly once"
     );
-    let control_location = control_locations[0];
     let control_effect = &steps[control_location.0].generated_effects[control_location.1];
     let KernelEffect::ProjectAuthorityControl { control, .. } = control_effect else {
         return Err(std::io::Error::other(
@@ -929,12 +936,14 @@ fn assert_authority_chain(
                     && event.event_id == PresentationEventId::new(revision.get())
         )
     });
+    let Some(presentation_location) = presentation_locations.first().copied() else {
+        return Err("replacement presentation identity was not requested".into());
+    };
     assert_eq!(
         presentation_locations.len(),
         1,
         "replacement presentation identity was requested exactly once"
     );
-    let presentation_location = presentation_locations[0];
 
     let receipts = receipt_events(steps, revision, operation_id)?;
     assert!(
@@ -953,8 +962,11 @@ fn assert_authority_chain(
         .iter()
         .map(|receipt| receipt.body.stage)
         .collect::<Vec<_>>();
+    let Some(first_stages) = stages.get(..4) else {
+        return Err("replacement receipt chain has fewer than four stages".into());
+    };
     assert_eq!(
-        &stages[..4],
+        first_stages,
         &[
             AckStage::Admitted,
             AckStage::MaterialApplied,
@@ -963,12 +975,18 @@ fn assert_authority_chain(
         ],
         "replacement receipt chain did not settle its first presentation: {stages:?}"
     );
-    if !stages[4..].is_empty() {
-        assert_eq!(stages[4..].len() % 2, 0);
-        for replay in stages[4..].chunks(2) {
+    let Some(replay_stages) = stages.get(4..) else {
+        return Err("replacement receipt replay slice is unavailable".into());
+    };
+    if !replay_stages.is_empty() {
+        assert_eq!(replay_stages.len() % 2, 0);
+        for replay in replay_stages.chunks(2) {
+            let [control_stage, presentation_stage] = replay else {
+                return Err("replacement receipt replay was not a pair".into());
+            };
             assert_eq!(
-                replay,
-                &[AckStage::ControlInstalled, AckStage::PresentationSettled,]
+                [*control_stage, *presentation_stage],
+                [AckStage::ControlInstalled, AckStage::PresentationSettled]
             );
         }
     }
@@ -1006,9 +1024,15 @@ fn assert_authority_chain(
             }
         );
     }
-    for replay in receipts[4..].chunks(2) {
+    let Some(replay_receipts) = receipts.get(4..) else {
+        return Err("replacement receipt replay slice is unavailable".into());
+    };
+    for replay in replay_receipts.chunks(2) {
+        let [control_receipt, presentation_receipt] = replay else {
+            return Err("replacement receipt replay was not a pair".into());
+        };
         assert_eq!(
-            replay[0].body,
+            control_receipt.body,
             AuthorityReceiptBody {
                 revision,
                 operation_id: operation_id.clone(),
@@ -1017,7 +1041,7 @@ fn assert_authority_chain(
             }
         );
         assert_eq!(
-            replay[1].body,
+            presentation_receipt.body,
             AuthorityReceiptBody {
                 revision,
                 operation_id: operation_id.clone(),
@@ -1027,10 +1051,23 @@ fn assert_authority_chain(
         );
     }
 
-    let admitted_location = (receipts[0].step_index, receipts[0].effect_index);
-    let material_receipt_location = (receipts[1].step_index, receipts[1].effect_index);
-    let control_receipt_location = (receipts[2].step_index, receipts[2].effect_index);
-    let presentation_receipt_location = (receipts[3].step_index, receipts[3].effect_index);
+    let Some(admitted_receipt) = receipts.first() else {
+        return Err("replacement receipt chain has no admitted receipt".into());
+    };
+    let Some(material_receipt) = receipts.get(1) else {
+        return Err("replacement receipt chain has no material receipt".into());
+    };
+    let Some(control_receipt) = receipts.get(2) else {
+        return Err("replacement receipt chain has no control receipt".into());
+    };
+    let Some(presentation_receipt) = receipts.get(3) else {
+        return Err("replacement receipt chain has no presentation receipt".into());
+    };
+    let admitted_location = (admitted_receipt.step_index, admitted_receipt.effect_index);
+    let material_receipt_location = (material_receipt.step_index, material_receipt.effect_index);
+    let control_receipt_location = (control_receipt.step_index, control_receipt.effect_index);
+    let presentation_receipt_location =
+        (presentation_receipt.step_index, presentation_receipt.effect_index);
     assert!(entry_location < admitted_location);
     assert!(admitted_location < material_location);
     assert!(material_location < material_receipt_location);

@@ -610,8 +610,10 @@ fn assert_repeat_timer(step: &PairStep, endpoint: SeatId, button: GameButton) ->
             _ => None,
         })
         .collect::<Vec<_>>();
+    let Some((timer_id, owner, delay_ms, time_class)) = timers.first().copied() else {
+        panic!("expected one repeat timer for {button:?}");
+    };
     assert_eq!(timers.len(), 1, "expected one repeat timer for {button:?}");
-    let (timer_id, owner, delay_ms, time_class) = timers[0];
     assert_eq!(owner, &TimerOwner::input_repeat(button));
     assert_eq!(delay_ms, safe(250));
     assert_eq!(time_class, TimeClass::HumanInput);
@@ -641,7 +643,9 @@ fn assert_proposal_retry_timer(snapshot: &PairSnapshot) -> TimerId {
         1,
         "expected one retained proposal retry timer"
     );
-    let timer = timers[0];
+    let Some(timer) = timers.first() else {
+        unreachable!("the retained proposal retry timer disappeared");
+    };
     assert_eq!(timer.timer.delay_ms, safe(500));
     assert_eq!(timer.remaining_active_ms, safe(500));
     assert!(!timer.paused);
@@ -711,7 +715,10 @@ fn assert_material_effect(
         1,
         "expected one material effect for {operation_id}"
     );
-    let (effect_revision, effect_operation, effect_material) = effects[0];
+    let Some((effect_revision, effect_operation, effect_material)) = effects.first().copied()
+    else {
+        unreachable!("the material effect disappeared");
+    };
     assert_eq!(effect_revision, Revision::new(safe(revision)));
     assert_eq!(effect_operation.as_str(), operation_id);
     assert_eq!(effect_material, material);
@@ -807,7 +814,10 @@ fn assert_control_effect(
         1,
         "expected one control effect for {operation_id}"
     );
-    let (effect_revision, effect_operation, effect_control) = effects[0];
+    let Some((effect_revision, effect_operation, effect_control)) = effects.first().copied()
+    else {
+        unreachable!("the control effect disappeared");
+    };
     assert_eq!(effect_revision, Revision::new(safe(revision)));
     assert_eq!(effect_operation.as_str(), operation_id);
     assert_eq!(effect_control, control);
@@ -1076,9 +1086,11 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .queued_packet_ids
         .into_iter()
         .collect::<Vec<_>>();
-    assert_eq!(queued_entries.len(), 2);
-    let first_entry_packet = queued_entries[0];
-    let second_entry_packet = queued_entries[1];
+    let [first_entry_packet, second_entry_packet] = queued_entries.as_slice() else {
+        return Err("expected exactly two queued authority entries".into());
+    };
+    let first_entry_packet = *first_entry_packet;
+    let second_entry_packet = *second_entry_packet;
 
     let before_n_plus_one = pair.snapshot()?;
     assert_eq!(
@@ -1144,7 +1156,9 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert!(!has_material_effect(&blocked, HOST_OPERATION));
     assert!(!has_control_effect(&blocked, HOST_OPERATION));
-    let tail_request_packet = tail_request_packets[0];
+    let Some(tail_request_packet) = tail_request_packets.first().copied() else {
+        return Err("missing tail request packet".into());
+    };
     steps.push(blocked);
 
     let stale_input = pair.key_down(PairEndpoint::Guest, PhysicalKey::ArrowUp, false)?;
@@ -1279,11 +1293,15 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
     );
     assert!(!has_material_effect(&stale_repeat, GUEST_OPERATION));
     assert!(!has_control_effect(&stale_repeat, GUEST_OPERATION));
-    assert!(
-        !stale_repeat
-            .generated_effects
-            .iter()
-            .any(|effect| matches!(effect, KernelEffect::Present { .. }))
+    assert_eq!(
+        presentation_effect_count(std::slice::from_ref(&stale_repeat), seat(1), 2),
+        1,
+        "the stale-repeat step must present exactly the new revision"
+    );
+    assert_eq!(
+        presentation_effect_count(std::slice::from_ref(&stale_repeat), seat(1), 1),
+        0,
+        "the stale-repeat step must not re-present the completed revision"
     );
     assert!(
         stale_repeat
@@ -1339,8 +1357,11 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         })
         .collect::<Vec<_>>();
     assert_eq!(scheduled_guest_timers.len(), 1);
-    let (scheduled_timer_id, scheduled_owner, scheduled_delay_ms, scheduled_time_class) =
-        scheduled_guest_timers[0];
+    let Some((scheduled_timer_id, scheduled_owner, scheduled_delay_ms, scheduled_time_class)) =
+        scheduled_guest_timers.first().copied()
+    else {
+        return Err("the proposal retry schedule disappeared".into());
+    };
     assert_eq!(scheduled_owner, &proposal_retry_owner());
     assert_eq!(scheduled_delay_ms, safe(500));
     assert_eq!(scheduled_time_class, TimeClass::Connected);
@@ -1378,8 +1399,10 @@ fn run_campaign(seed: u64) -> TestResult<(Vec<PairStep>, PairSnapshot)> {
         .difference(&before_stale_repeat_packets)
         .copied()
         .collect::<Vec<_>>();
+    let Some(retry_packet_id) = retry_packet_ids.first().copied() else {
+        return Err("missing proposal retry packet".into());
+    };
     assert_eq!(retry_packet_ids.len(), 1);
-    let retry_packet_id = retry_packet_ids[0];
     let expected_retry_packet_set = retry_packet_ids.iter().copied().collect::<BTreeSet<_>>();
     assert_eq!(
         stale_repeat.snapshot.network.queued_packet_ids,

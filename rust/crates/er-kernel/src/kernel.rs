@@ -305,6 +305,7 @@ impl LegacyPresentationEvidence {
             && self.operation_id == entry.operation_id
             && self.event.event_id == PresentationEventId::new(entry.revision.get())
             && self.event.event_kind == "authority-entry"
+            && self.event.payload == entry.material.payload
     }
 }
 
@@ -3098,6 +3099,10 @@ impl GameKernel {
             "protocol": protocol,
             "terminal": self.terminal,
             "liveResources": self.live_resources,
+            "legacyPresentations": legacy_presentations_snapshot(
+                &self.pending_presentations,
+                &self.completed_presentations,
+            ),
             "initError": self.protocol_init_error,
         })
     }
@@ -3432,6 +3437,47 @@ fn pending_recoveries_snapshot(pending: &BTreeMap<String, PendingRecoveryExpecta
         );
     }
     Value::Object(snapshot)
+}
+
+fn legacy_presentations_snapshot(
+    pending: &BTreeMap<PresentationEventId, LegacyPresentationEvidence>,
+    completed: &BTreeMap<PresentationEventId, LegacyPresentationCompletionEvidence>,
+) -> Value {
+    let mut entries = pending
+        .iter()
+        .map(|(event_id, evidence)| {
+            (
+                *event_id,
+                json!({
+                    "eventId": event_id,
+                    "status": "pending",
+                    "revision": &evidence.revision,
+                    "operationId": &evidence.operation_id,
+                    "event": &evidence.event,
+                }),
+            )
+        })
+        .collect::<Vec<_>>();
+    entries.extend(completed.iter().map(|(event_id, evidence)| {
+        (
+            *event_id,
+            json!({
+                "eventId": event_id,
+                "status": "completed",
+                "revision": &evidence.presentation.revision,
+                "operationId": &evidence.presentation.operation_id,
+                "event": &evidence.presentation.event,
+                "outcome": &evidence.outcome,
+            }),
+        )
+    }));
+    entries.sort_by_key(|(event_id, _)| *event_id);
+    Value::Array(
+        entries
+            .into_iter()
+            .map(|(_, presentation)| presentation)
+            .collect(),
+    )
 }
 
 fn network_frame(

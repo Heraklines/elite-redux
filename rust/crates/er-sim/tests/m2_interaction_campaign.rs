@@ -574,7 +574,10 @@ where
             packet_ids.len()
         )));
     }
-    Ok(packet_ids[0])
+    packet_ids
+        .first()
+        .copied()
+        .ok_or_else(|| error(format!("{label}: matching packet disappeared")))
 }
 
 fn is_receipt_stage(effect: &KernelEffect, stage: AckStage) -> bool {
@@ -1236,6 +1239,11 @@ fn run_campaign(seed: u64) -> TestResult<CampaignRun> {
                 material: fixture.interaction_revision,
                 control: fixture.interaction_revision,
             },
+            AuthorityFrontier {
+                received: fixture.interaction_revision,
+                material: fixture.interaction_revision,
+                control: fixture.interaction_revision,
+            },
         ]
     );
 
@@ -1288,7 +1296,8 @@ fn receipt_stages(step: &PairStep) -> TestResult<Vec<AckStage>> {
 
 fn reach_fault_controlled_presentation(
     fixture: &mut CampaignFixture,
-) -> TestResult<(Vec<PairStep>, SafeU53)> {
+    hold_duplicate_before_first_delivery: bool,
+) -> TestResult<(Vec<PairStep>, SafeU53, Option<SafeU53>)> {
     let mut trace = fixture
         .pair
         .press(PairEndpoint::Guest, PhysicalKey::Enter)?;
@@ -1311,6 +1320,24 @@ fn reach_fault_controlled_presentation(
     trace.push(authority_admission);
 
     let entry_queue = fixture.pair.snapshot()?.network.queued_packet_ids;
+    let held_duplicate_packet = if hold_duplicate_before_first_delivery {
+        let duplicated_entry = fault(
+            &mut fixture.pair,
+            FaultOperation::Duplicate {
+                packet_id: authority_entry_packet,
+            },
+        )?;
+        let duplicate_packet = new_packet_id(
+            &entry_queue,
+            &duplicated_entry.snapshot.network.queued_packet_ids,
+            "pre-delivery authority entry duplicate",
+        )?;
+        trace.push(duplicated_entry);
+        Some(duplicate_packet)
+    } else {
+        None
+    };
+    let delivery_queue = fixture.pair.snapshot()?.network.queued_packet_ids;
     let replica_admission = fault(
         &mut fixture.pair,
         FaultOperation::Deliver {
@@ -1318,7 +1345,7 @@ fn reach_fault_controlled_presentation(
         },
     )?;
     let control_receipt_packet = only_packet_for_sends(
-        &entry_queue,
+        &delivery_queue,
         &replica_admission,
         |effect| is_receipt_stage(effect, AckStage::ControlInstalled),
         "fault-controlled control receipt",
@@ -1355,7 +1382,7 @@ fn reach_fault_controlled_presentation(
             .presentations
     );
     trace.push(replica_admission);
-    Ok((trace, control_receipt_packet))
+    Ok((trace, control_receipt_packet, held_duplicate_packet))
 }
 
 fn assert_one_guest_application_chain(trace: &[PairStep], fixture: &CampaignFixture) {
@@ -1394,61 +1421,22 @@ fn assert_one_guest_application_chain(trace: &[PairStep], fixture: &CampaignFixt
 fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
     let mut fixture = build_fixture(CAMPAIGN_SEED + 1, PresenterMode::FaultControlled)?;
     let event_id = PresentationEventId::new(fixture.interaction_revision.get());
-    let (mut trace, control_receipt_packet) = reach_fault_controlled_presentation(&mut fixture)?;
+    let (mut trace, control_receipt_packet, held_duplicate_packet) =
+        reach_fault_controlled_presentation(&mut fixture, false)?;
+    assert!(held_duplicate_packet.is_none());
     let pending_snapshot = fixture.pair.snapshot()?;
-    let guest_digest = pending_snapshot.guest.state_digest.clone();
-    let host_digest = pending_snapshot.host.state_digest.clone();
+    let pending_digest = pending_snapshot.guest.state_digest.clone();
 
     let control_queue = pending_snapshot.network.queued_packet_ids;
-    let control_delivery = fault(
-        &mut fixture.pair,
-        FaultOperation::Deliver {
-            packet_id: control_receipt_packet,
-        },
-    )?;
-    let pending_duplicate_packet = only_packet_for_sends(
-        &control_queue,
-        &control_delivery,
-        is_authority_entry,
-        "post-control duplicate entry",
-    )?;
+    assert!(control_queue.contains(&control_receipt_packet));
     assert!(
-        !control_delivery
-            .snapshot
+        pending_snapshot
             .host
             .live_resources
             .retained_revisions
-            .is_empty()
+            .contains(&fixture.interaction_revision)
     );
-    trace.push(control_delivery);
-
-    let duplicate_pending = fault(
-        &mut fixture.pair,
-        FaultOperation::Deliver {
-            packet_id: pending_duplicate_packet,
-        },
-    )?;
-    assert_eq!(
-        receipt_stages(&duplicate_pending)?,
-        vec![AckStage::ControlInstalled]
-    );
-    assert!(presentation_effects(std::slice::from_ref(&duplicate_pending)).is_empty());
-    assert_eq!(duplicate_pending.snapshot.guest.state_digest, guest_digest);
-    assert_eq!(
-        duplicate_pending
-            .snapshot
-            .guest
-            .live_resources
-            .presentations,
-        BTreeSet::from([event_id])
-    );
-    assert_eq!(
-        duplicate_pending.snapshot.guest.presenter.pending_event_ids,
-        BTreeSet::from([event_id])
-    );
-    trace.push(duplicate_pending);
-
-    let settlement_queue = fixture.pair.snapshot()?.network.queued_packet_ids;
+    let settlement_queue = control_queue.clone();
     let original_settlement = fixture.pair.apply(PairOperation::PresentationSettled {
         endpoint: PairEndpoint::Guest,
         event_id,
@@ -1480,6 +1468,8 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             .settled_event_ids,
         BTreeSet::from([event_id])
     );
+    let settled_digest = original_settlement.snapshot.guest.state_digest.clone();
+    assert_ne!(settled_digest, pending_digest);
     trace.push(original_settlement);
 
     let dropped_original = fault(
@@ -1508,13 +1498,29 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
         "rebound duplicate-complete entry",
     )?;
     assert!(presentation_effects(std::slice::from_ref(&rebound)).is_empty());
-    assert_eq!(rebound.snapshot.guest.state_digest, guest_digest);
-    assert_eq!(rebound.snapshot.host.state_digest, host_digest);
+    assert!(material_effects(std::slice::from_ref(&rebound)).is_empty());
+    assert!(control_effects(std::slice::from_ref(&rebound)).is_empty());
+    let rebound_digest = rebound.snapshot.guest.state_digest.clone();
     assert_eq!(
         rebound.snapshot.guest.presenter.settled_event_ids,
         BTreeSet::from([event_id])
     );
     trace.push(rebound);
+
+    let stale_control = fault(
+        &mut fixture.pair,
+        FaultOperation::Drop {
+            packet_id: control_receipt_packet,
+        },
+    )?;
+    assert!(
+        !stale_control
+            .snapshot
+            .network
+            .queued_packet_ids
+            .contains(&control_receipt_packet)
+    );
+    trace.push(stale_control);
 
     let replacement_queue = fixture.pair.snapshot()?.network.queued_packet_ids;
     let replacement = fault(
@@ -1530,7 +1536,7 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
     assert!(presentation_effects(std::slice::from_ref(&replacement)).is_empty());
     assert!(material_effects(std::slice::from_ref(&replacement)).is_empty());
     assert!(control_effects(std::slice::from_ref(&replacement)).is_empty());
-    assert_eq!(replacement.snapshot.guest.state_digest, guest_digest);
+    assert_eq!(replacement.snapshot.guest.state_digest, rebound_digest);
     assert!(
         replacement
             .snapshot
@@ -1539,22 +1545,38 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             .presentations
             .is_empty()
     );
-    let replacement_settlement_packet = only_packet_for_sends(
+    let replay_receipt_packets = packet_ids_for_sends(
         &replacement_queue,
         &replacement,
-        |effect| is_receipt_stage(effect, AckStage::PresentationSettled),
-        "duplicate-complete replacement settlement",
+        |effect| {
+            is_receipt_stage(effect, AckStage::ControlInstalled)
+                || is_receipt_stage(effect, AckStage::PresentationSettled)
+        },
     )?;
+    assert_eq!(replay_receipt_packets.len(), 2);
+    let Some(&replay_control_packet) = replay_receipt_packets.first() else {
+        return Err("missing rebound control receipt packet".into());
+    };
+    let Some(&replay_settlement_packet) = replay_receipt_packets.get(1) else {
+        return Err("missing rebound settlement receipt packet".into());
+    };
+    assert_eq!(
+        receipt_effects(std::slice::from_ref(&replacement))?
+            .into_iter()
+            .map(|receipt| receipt.context.connection_generation)
+            .collect::<Vec<_>>(),
+        vec![generation(1)?, generation(1)?]
+    );
     trace.push(replacement);
 
-    let replacement_delivery = fault(
+    let replay_control = fault(
         &mut fixture.pair,
         FaultOperation::Deliver {
-            packet_id: replacement_settlement_packet,
+            packet_id: replay_control_packet,
         },
     )?;
     assert!(
-        replacement_delivery
+        replay_control
             .snapshot
             .host
             .live_resources
@@ -1562,7 +1584,7 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             .is_empty()
     );
     assert!(
-        replacement_delivery
+        replay_control
             .snapshot
             .host
             .live_resources
@@ -1570,11 +1592,22 @@ fn duplicate_complete_replaces_dropped_settlement_after_rebind() -> TestResult {
             .is_empty()
     );
     assert_eq!(
-        replacement_delivery.snapshot.guest.state_digest,
-        guest_digest
+        receipt_stages(&replay_control)?,
+        Vec::<AckStage>::new()
     );
-    assert_eq!(replacement_delivery.snapshot.host.state_digest, host_digest);
-    trace.push(replacement_delivery);
+    assert!(replay_control.snapshot.terminal_reason.is_none());
+    trace.push(replay_control);
+
+    let replay_settlement = fault(
+        &mut fixture.pair,
+        FaultOperation::Deliver {
+            packet_id: replay_settlement_packet,
+        },
+    )?;
+    assert!(receipt_stages(&replay_settlement)?.is_empty());
+    assert_eq!(replay_settlement.snapshot.guest.state_digest, rebound_digest);
+    assert!(replay_settlement.snapshot.terminal_reason.is_none());
+    trace.push(replay_settlement);
     assert_one_guest_application_chain(&trace, &fixture);
 
     let torn_down = fixture.pair.teardown("m2b-06 focused liveness complete")?;
@@ -1589,7 +1622,11 @@ fn assert_nonsettled_presentation_is_not_upgraded(
 ) -> TestResult {
     let mut fixture = build_fixture(seed, PresenterMode::FaultControlled)?;
     let event_id = PresentationEventId::new(fixture.interaction_revision.get());
-    let (mut trace, control_receipt_packet) = reach_fault_controlled_presentation(&mut fixture)?;
+    let (mut trace, _control_receipt_packet, held_duplicate_packet) =
+        reach_fault_controlled_presentation(&mut fixture, true)?;
+    let Some(duplicate_entry_packet) = held_duplicate_packet else {
+        return Err("fault scenario did not retain its pre-delivery duplicate".into());
+    };
     let before_outcome = fixture.pair.snapshot()?;
 
     let completion = fixture.pair.apply(PairOperation::PresentationSettled {
@@ -1599,7 +1636,7 @@ fn assert_nonsettled_presentation_is_not_upgraded(
     })?;
     assert!(receipt_stages(&completion)?.is_empty());
     assert!(presentation_effects(std::slice::from_ref(&completion)).is_empty());
-    assert_eq!(
+    assert_ne!(
         completion.snapshot.guest.state_digest,
         before_outcome.guest.state_digest
     );
@@ -1611,22 +1648,9 @@ fn assert_nonsettled_presentation_is_not_upgraded(
             .presentations
             .is_empty()
     );
+    let post_failure_digest = completion.snapshot.guest.state_digest.clone();
+    assert_ne!(post_failure_digest, before_outcome.guest.state_digest);
     trace.push(completion);
-
-    let control_queue = fixture.pair.snapshot()?.network.queued_packet_ids;
-    let control_delivery = fault(
-        &mut fixture.pair,
-        FaultOperation::Deliver {
-            packet_id: control_receipt_packet,
-        },
-    )?;
-    let duplicate_entry_packet = only_packet_for_sends(
-        &control_queue,
-        &control_delivery,
-        is_authority_entry,
-        "non-settled duplicate entry",
-    )?;
-    trace.push(control_delivery);
 
     let duplicate = fault(
         &mut fixture.pair,
@@ -1643,7 +1667,7 @@ fn assert_nonsettled_presentation_is_not_upgraded(
     assert!(control_effects(std::slice::from_ref(&duplicate)).is_empty());
     assert_eq!(
         duplicate.snapshot.guest.state_digest,
-        before_outcome.guest.state_digest
+        post_failure_digest
     );
     assert!(
         duplicate
@@ -1653,6 +1677,11 @@ fn assert_nonsettled_presentation_is_not_upgraded(
             .presentations
             .is_empty()
     );
+    assert!(
+        !receipt_stages(&duplicate)?
+            .contains(&AckStage::PresentationSettled)
+    );
+    assert!(duplicate.snapshot.terminal_reason.is_none());
     assert!(
         !duplicate
             .snapshot
