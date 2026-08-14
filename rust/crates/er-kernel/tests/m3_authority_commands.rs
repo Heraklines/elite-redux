@@ -1,20 +1,29 @@
 use std::error::Error;
+use std::sync::Arc;
 
 use er_battle::faint::{FaintCandidate, queue_faint};
 use er_battle::legality::{
     build_command_offer, build_scripted_enemy_offer, validate_state_content,
 };
+use er_battle::{BattleNextDecision, compute_presentation_plan_digest};
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_content::species::find_species;
 use er_game::authority_commands::{
     AuthorityCommandError, CommandAdmissionResult, CommandFrontierCompletion, HumanAdmissionSource,
-    ReplacementAdmissionResult, admit_command_proposal, admit_replacement_proposal,
-    admit_scripted_enemy_frontier, complete_command_frontier, internal_no_legal_replacement,
-    retain_command_tombstones,
+    PreparedAuthorityTurn, ReplacementAdmissionResult, admit_command_proposal,
+    admit_replacement_proposal, admit_scripted_enemy_frontier, complete_command_frontier,
+    internal_no_legal_replacement, retain_command_tombstones,
 };
+use er_game::internal_event::{GameIntent, InternalEvent, PreparedBattleResolution};
+use er_game::material::{
+    BATTLE_MATERIAL_SCHEMA_VERSION, BattleTurnMaterialV1,
+    apply_reducer_issued_turn_material_trusted,
+};
+use er_game::runtime::GameRuntime;
 use er_game::target_menu::build_target_control;
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
+use er_state::digest::MechanicalStateDigest;
 use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState};
 use er_state::conditions::{
     GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind, WeatherState,
@@ -30,17 +39,19 @@ use er_types::battle_command::{
     BattleTargetSelection, CommandAdmissionSource, CommandFrontierEntry, CommandFrontierStatus,
     ReplacementProposalFingerprintEntry, ReplacementSelection, ScriptedEnemyBattleCommandV1,
     ScriptedEnemyPolicyV1, player_command_operation_id, replacement_operation_id,
-    scripted_enemy_command_operation_id,
+    scripted_enemy_command_operation_id, turn_result_operation_id,
 };
 use er_types::battle_control::{
     BATTLE_CONTROL_PLAN_SCHEMA_VERSION, BattleControl, BattleControlPlan, BattleMenu,
-    BattleMenuOption, CommandRootControl, MenuOptionLayout, MenuOptionVisibility,
-    MoveSelectControl, ReplacementSelectControl, SeatBattleControl, SeatMenuInstanceAllocator,
+    BattleMenuOption, CommandRootControl, MenuOptionLayout, MenuOptionVisibility, MoveSelectControl,
+    ReplacementSelectControl, SeatBattleControl, SeatMenuInstanceAllocator,
 };
 use er_types::battle_ids::{
-    AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId, MenuInstanceId,
-    MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
+    AuthorityEpoch, BattleId, BattleSide, ContentPackHash, FaintOccurrenceId, FieldSlot,
+    GameModeId, MenuInstanceId, MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex,
+    WaveIndex,
 };
+use er_types::battle_ui::PresentationPlanDigest;
 use er_types::battle_model::{FaintOccurrence, StatusKind};
 use er_types::{MenuOptionId, OperationId, SafeU53, SeatId};
 use serde_json::json;
@@ -774,6 +785,325 @@ fn command_fixture(content: &ContentPack, format: BattleFormat) -> TestResult<Co
         human_proposals,
         enemy_policy: ScriptedEnemyPolicyV1::new(SafeU53::ZERO, scripted_commands)?,
     })
+}
+
+struct PreparedTurnFixture {
+    content: ContentPack,
+    current_state: GameState,
+    local_seat: SeatId,
+    menu_allocators: Vec<SeatMenuInstanceAllocator>,
+    prepared: PreparedAuthorityTurn,
+    material: BattleTurnMaterialV1,
+}
+
+fn material_from_prepared(
+    prepared: &PreparedAuthorityTurn,
+    content: &ContentPack,
+) -> TestResult<BattleTurnMaterialV1> {
+    let transition = prepared.transition();
+    let before_battle = transition
+        .before_state
+        .battle
+        .as_ref()
+        .ok_or("prepared TURN has no before battle")?;
+    let after_battle = transition
+        .after_state
+        .battle
+        .as_ref()
+        .ok_or("prepared TURN has no after battle")?;
+    Ok(BattleTurnMaterialV1 {
+        schema_version: BATTLE_MATERIAL_SCHEMA_VERSION,
+        oracle_game_sha: content.oracle_game_sha.clone(),
+        content_hash: content.hash.clone(),
+        operation_id: turn_result_operation_id(
+            before_battle.battle_id,
+            before_battle.wave,
+            before_battle.turn,
+        )?,
+        battle_id: before_battle.battle_id,
+        wave: before_battle.wave,
+        resolved_turn: before_battle.turn,
+        before_digest: transition.before_digest.clone(),
+        after_digest: transition.after_digest.clone(),
+        commands: transition.accepted_commands.clone(),
+        action_order: transition.action_order.clone(),
+        mutations: transition.mutations.clone(),
+        presentation: transition.presentation.clone(),
+        presentation_digest: compute_presentation_plan_digest(&transition.presentation)?,
+        rng_before: before_battle.battle_rng.clone(),
+        rng_after: after_battle.battle_rng.clone(),
+        rng_audit: transition.rng_audit.clone(),
+        before_state: transition.before_state.clone(),
+        after_state: transition.after_state.clone(),
+        outcome: transition.outcome,
+        next_decision: transition.next_decision,
+        menu_allocators_before: prepared.admission().allocator_before().to_vec(),
+        next_control: prepared.control_plan().clone(),
+    })
+}
+
+fn prepared_turn_fixture() -> TestResult<PreparedTurnFixture> {
+    let content = selected_content_pack()?;
+    let fixture = command_fixture(&content, BattleFormat::single())?;
+    let scripted = admit_scripted_enemy_frontier(&fixture.state, &fixture.enemy_policy, &content)?;
+    let proposal = fixture
+        .human_proposals
+        .first()
+        .cloned()
+        .ok_or("command fixture has no human proposal")?;
+    let mut runtime = GameRuntime::from_parts(
+        scripted.state,
+        fixture.control,
+        seat(1)?,
+        scripted.policy,
+        Vec::new(),
+        Vec::new(),
+        Arc::new(content.clone()),
+    )?;
+    let reduction = runtime.reduce(GameIntent::CommandProposal {
+        proposal,
+        authority_epoch: AuthorityEpoch::new(safe(1)?),
+    })?;
+    let resolution = reduction
+        .events
+        .into_iter()
+        .find_map(|event| match event {
+            InternalEvent::BattleResolved(payload) => Some(payload.resolution),
+            _ => None,
+        })
+        .ok_or("runtime did not emit a prepared TURN")?;
+    let PreparedBattleResolution::Turn {
+        digest_evidence,
+        material_operation_id,
+        next_control,
+    } = resolution
+    else {
+        return Err("runtime emitted a non-TURN resolution".into());
+    };
+    let prepared = runtime.prepare_authority_turn(
+        digest_evidence,
+        &material_operation_id,
+        next_control,
+    )?;
+    if runtime.state() != &prepared.transition().before_state {
+        return Err("prepared TURN before state differs from runtime state".into());
+    }
+    let current_state = runtime.state().clone();
+    let local_seat = runtime.local_seat();
+    let menu_allocators = runtime.control().menu_allocators.clone();
+    let material = material_from_prepared(&prepared, &content)?;
+    Ok(PreparedTurnFixture {
+        content,
+        current_state,
+        local_seat,
+        menu_allocators,
+        prepared,
+        material,
+    })
+}
+
+// Keep this destructuring exhaustive: adding a material field must update the
+// fixture and the mutation table below before this test can compile.
+fn assert_material_field_inventory(material: &BattleTurnMaterialV1) {
+    let BattleTurnMaterialV1 {
+        schema_version,
+        oracle_game_sha,
+        content_hash,
+        operation_id,
+        battle_id,
+        wave,
+        resolved_turn,
+        before_digest,
+        after_digest,
+        commands,
+        action_order,
+        mutations,
+        presentation,
+        presentation_digest,
+        rng_before,
+        rng_after,
+        rng_audit,
+        before_state,
+        after_state,
+        outcome,
+        next_decision,
+        menu_allocators_before,
+        next_control,
+    } = material;
+    let _ = (
+        schema_version,
+        oracle_game_sha,
+        content_hash,
+        operation_id,
+        battle_id,
+        wave,
+        resolved_turn,
+        before_digest,
+        after_digest,
+        commands,
+        action_order,
+        mutations,
+        presentation,
+        presentation_digest,
+        rng_before,
+        rng_after,
+        rng_audit,
+        before_state,
+        after_state,
+        outcome,
+        next_decision,
+        menu_allocators_before,
+        next_control,
+    );
+}
+
+fn tampered_content_hash() -> ContentPackHash {
+    ContentPackHash::new(format!("blake3-v1:{}", "0".repeat(64)))
+        .expect("tampered content hash must be well-formed")
+}
+
+fn tampered_state_digest() -> MechanicalStateDigest {
+    MechanicalStateDigest::new(format!("blake3-v1:{}", "0".repeat(64)))
+        .expect("tampered state digest must be well-formed")
+}
+
+fn tampered_presentation_digest() -> PresentationPlanDigest {
+    PresentationPlanDigest::new(format!("blake3-v1:{}", "0".repeat(64)))
+        .expect("tampered presentation digest must be well-formed")
+}
+
+#[test]
+fn authority_local_material_binding_rejects_each_turn_material_field_mutation() -> TestResult {
+    let fixture = prepared_turn_fixture()?;
+    assert_material_field_inventory(&fixture.material);
+    let apply = |material: &BattleTurnMaterialV1| {
+        apply_reducer_issued_turn_material_trusted(
+            &fixture.current_state,
+            fixture.local_seat,
+            &fixture.menu_allocators,
+            material,
+            &fixture.content,
+            &fixture.prepared,
+        )
+    };
+
+    let baseline = apply(&fixture.material);
+    assert!(
+        baseline.is_ok(),
+        "valid prepared TURN material was rejected: {baseline:?}"
+    );
+
+    let mutations: [(&str, fn(&mut BattleTurnMaterialV1)); 23] = [
+        ("schema_version", |material| material.schema_version = 0),
+        ("oracle_game_sha", |material| {
+            material.oracle_game_sha.push_str("-tampered");
+        }),
+        ("content_hash", |material| {
+            material.content_hash = tampered_content_hash();
+        }),
+        ("operation_id", |material| {
+            material.operation_id =
+                OperationId::new("material/tampered").expect("tampered operation is valid");
+        }),
+        ("battle_id", |material| {
+            material.battle_id = BattleId::new(SafeU53::new(99).expect("safe value"));
+        }),
+        ("wave", |material| {
+            material.wave = WaveIndex::new(SafeU53::new(99).expect("safe value"))
+                .expect("positive wave");
+        }),
+        ("resolved_turn", |material| {
+            material.resolved_turn = TurnIndex::new(SafeU53::new(99).expect("safe value"))
+                .expect("positive turn");
+        }),
+        ("before_digest", |material| {
+            material.before_digest = tampered_state_digest();
+        }),
+        ("after_digest", |material| {
+            material.after_digest = tampered_state_digest();
+        }),
+        ("commands", |material| material.commands.entries.clear()),
+        ("action_order", |material| material.action_order.clear()),
+        ("mutations", |material| material.mutations.clear()),
+        ("presentation", |material| material.presentation.clear()),
+        ("presentation_digest", |material| {
+            material.presentation_digest = tampered_presentation_digest();
+        }),
+        ("rng_before", |material| {
+            material.rng_before = BattleRngState::new("tampered", material.rng_before.turn);
+        }),
+        ("rng_after", |material| {
+            material.rng_after = BattleRngState::new("tampered", material.rng_after.turn);
+        }),
+        ("rng_audit", |material| material.rng_audit.clear()),
+        ("before_state", |material| {
+            material
+                .before_state
+                .battle
+                .as_mut()
+                .expect("fixture has before battle")
+                .turn = TurnIndex::new(SafeU53::new(99).expect("safe value"))
+                .expect("positive turn");
+        }),
+        ("after_state", |material| {
+            material
+                .after_state
+                .battle
+                .as_mut()
+                .expect("fixture has after battle")
+                .turn = TurnIndex::new(SafeU53::new(99).expect("safe value"))
+                .expect("positive turn");
+        }),
+        ("outcome", |material| {
+            material.outcome = match material.outcome {
+                BattleOutcome::Ongoing => BattleOutcome::Victory,
+                BattleOutcome::Victory => BattleOutcome::Defeat,
+                BattleOutcome::Defeat => BattleOutcome::Ongoing,
+            };
+        }),
+        ("next_decision", |material| {
+            material.next_decision = if matches!(
+                material.next_decision,
+                BattleNextDecision::Complete(BattleOutcome::Victory)
+            ) {
+                BattleNextDecision::Complete(BattleOutcome::Defeat)
+            } else {
+                BattleNextDecision::Complete(BattleOutcome::Victory)
+            };
+        }),
+        ("menu_allocators_before", |material| {
+            material.menu_allocators_before.clear();
+        }),
+        ("next_control", |material| {
+            let seat_control = material
+                .next_control
+                .seats
+                .first_mut()
+                .expect("fixture has a seat control");
+            seat_control.control = if matches!(
+                &seat_control.control,
+                BattleControl::Complete(BattleOutcome::Victory)
+            ) {
+                BattleControl::Complete(BattleOutcome::Defeat)
+            } else {
+                BattleControl::Complete(BattleOutcome::Victory)
+            };
+        }),
+    ];
+
+    for (field, mutate) in mutations {
+        let mut candidate = fixture.material.clone();
+        mutate(&mut candidate);
+        assert_ne!(
+            candidate, fixture.material,
+            "{field} mutation did not change the fixture"
+        );
+        assert!(
+            apply(&candidate).is_err(),
+            "binder accepted an independently mutated {field} field"
+        );
+    }
+    Ok(())
 }
 
 fn pending_replacement_fixture(
