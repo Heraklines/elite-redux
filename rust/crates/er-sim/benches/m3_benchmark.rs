@@ -1510,6 +1510,29 @@ fn run_pair_operation(
     Ok(step)
 }
 
+fn run_pair_receipt_pump(
+    pair: &mut SimulatedPair,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+) -> TestResult<er_sim::PairSnapshot> {
+    counts.inputs = counts.inputs.saturating_add(1);
+    let step = pair.apply(PairOperation::AdvanceTime { delta_ms: safe(2) })?;
+    assert_no_legacy_success_effects(&step.generated_effects);
+    counts.rng_draws = counts
+        .rng_draws
+        .saturating_add(count_rng_draws(&step.generated_effects));
+    absorb(checksum, &step.operation)?;
+    absorb(checksum, &step.generated_effects)?;
+    absorb(checksum, &step.effects_digest)?;
+    absorb(checksum, &step.snapshot.host.state_digest)?;
+    absorb(checksum, &step.snapshot.guest.state_digest)?;
+    record_pair_presentations(&step, pending)?;
+    record_pair_turn_evidence(&step, evidence)?;
+    Ok(step.snapshot)
+}
+
 fn raw_press_pair(
     pair: &mut SimulatedPair,
     endpoint: PairEndpoint,
@@ -1838,15 +1861,13 @@ fn m3_two_client_supported_turns() -> TestResult {
         // Presentation settlement queues the replica receipt; give the pair's
         // deterministic network one pump to deliver that receipt and run the
         // authority's post-control probe before checking the next frontier.
-        run_pair_operation(
+        let snapshot = run_pair_receipt_pump(
             &mut pair,
-            PairOperation::AdvanceTime { delta_ms: safe(2) },
             &mut checksum,
             &mut counts,
             &mut pending,
             &mut evidence,
         )?;
-        let snapshot = pair.snapshot()?;
         assert_two_client_supported_turn(&before, &snapshot, &evidence)?;
         counts.turns = counts.turns.saturating_add(1);
         counts.battles = counts.battles.saturating_add(1);
