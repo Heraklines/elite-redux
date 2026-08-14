@@ -217,6 +217,18 @@ pub struct TurnDigestEvidence {
 /// carries no serialized representation and cannot be constructed outside
 /// this crate; its lifetime also prevents it from outliving the prepared
 /// resolver/control evidence it borrows.
+///
+/// External crates cannot name or construct this proof:
+///
+/// ```compile_fail
+/// let _proof: er_game::internal_event::AuthorityLocalTurnProof<'static> =
+///     er_game::internal_event::AuthorityLocalTurnProof {
+///         transition: todo!(),
+///         control_plan: todo!(),
+///         menu_allocators_before: &[],
+///         material_operation_id: todo!(),
+///     };
+/// ```
 #[doc(hidden)]
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct AuthorityLocalTurnProof<'a> {
