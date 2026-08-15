@@ -1956,22 +1956,12 @@ fn m3_two_client_supported_turns() -> TestResult {
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
     for _ in 0..TWO_CLIENT_SUPPORTED_TURNS {
-        let mut pair = pair_template.try_fork()?;
         let mut pending = Vec::new();
         let mut setup_evidence = TurnEvidence::default();
-        let reconnect_step = run_pair_operation(
-            &mut pair,
-            PairOperation::Reconnect {
-                endpoint: PairEndpoint::Host,
-            },
-            &mut checksum,
-            &mut counts,
-            &mut pending,
-            &mut setup_evidence,
-        )?;
-        let before = reconnect_step.snapshot;
-        let mut evidence = TurnEvidence::default();
-        let mut operations = Vec::with_capacity(13);
+        let mut operations = Vec::with_capacity(14);
+        operations.push(PairOperation::Reconnect {
+            endpoint: PairEndpoint::Host,
+        });
         for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
             for _ in 0..3 {
                 operations.push(PairOperation::RawInput {
@@ -1985,14 +1975,44 @@ fn m3_two_client_supported_turns() -> TestResult {
             }
         }
         operations.push(PairOperation::AdvanceTime { delta_ms: safe(2) });
-        run_pair_operations_atomic(
-            &mut pair,
-            operations,
+        let expected_operations = operations.clone();
+        let (mut pair, steps) = pair_template.try_fork_apply_many_atomic(operations)?;
+        if expected_operations.len() != 14 || steps.len() != expected_operations.len() {
+            return Err(invalid(format!(
+                "two-client supported turn fork batch returned {} steps; expected reconnect+13 workload",
+                steps.len()
+            )));
+        }
+        for (index, (step, expected_operation)) in
+            steps.iter().zip(expected_operations.iter()).enumerate()
+        {
+            if &step.operation != expected_operation {
+                return Err(invalid(format!(
+                    "two-client supported turn fork batch step {index} was {:?}; expected {:?}",
+                    step.operation, expected_operation
+                )));
+            }
+        }
+        counts.inputs = counts.inputs.saturating_add(1);
+        observe_pair_step(
+            &steps[0],
             &mut checksum,
             &mut counts,
             &mut pending,
-            &mut evidence,
+            &mut setup_evidence,
         )?;
+        let before = steps[0].snapshot.clone();
+        let mut evidence = TurnEvidence::default();
+        for step in steps.iter().skip(1) {
+            counts.inputs = counts.inputs.saturating_add(1);
+            observe_pair_step(
+                step,
+                &mut checksum,
+                &mut counts,
+                &mut pending,
+                &mut evidence,
+            )?;
+        }
         settle_pair_presentations(
             &mut pair,
             &mut checksum,

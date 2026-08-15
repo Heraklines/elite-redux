@@ -176,6 +176,7 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
                 "apply",
                 "apply_many_atomic",
                 "try_fork",
+                "try_fork_apply_many_atomic",
                 "key_down",
                 "key_up",
                 "press",
