@@ -44,6 +44,27 @@ coverage
 /typedoc
 /dependency-graph.svg
 
+# Private/local project context. These paths may contain upcoming designs,
+# handoffs, maintainer notes, or machine-specific agent instructions.
+# Resolve local locations through ER_AGENT_CONTEXT_FILE, ER_DESIGN_DOCS_DIR,
+# and ER_HANDOFF_DOCS_DIR; never commit their contents.
+/CLAUDE.md
+/AGENTS.md
+/PARKED.md
+/docs/design/
+/docs/handoffs/
+/docs/audits/
+/docs/coop-*.md
+/docs/fakemon-newcomer-patch.md
+/docs/headless-runner-followup.md
+/docs/ios-stability-investigation.md
+/docs/partner-eevee-multiform.md
+/docs/type-nativization*.md
+/docs/plans/20*.md
+/docs/plans/*agent*.md
+/docs/plans/session-status.md
+/docs/coop-task-ownership.md
+
 # Script outputs
 *.csv
 
