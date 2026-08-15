@@ -105,7 +105,7 @@ pub enum PresenterError {
     ModeMismatch,
 }
 
-pub trait Presenter: fmt::Debug {
+pub trait Presenter: fmt::Debug + Send {
     fn present(
         &mut self,
         endpoint: SeatId,

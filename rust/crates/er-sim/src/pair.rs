@@ -3592,6 +3592,13 @@ mod tests {
     const TEST_OPTION_ID: &str = "pair/rebind-option";
     const TEST_FINGERPRINT: &str = "pair-rebind-fingerprint";
 
+    fn assert_send<T: Send>() {}
+
+    #[test]
+    fn simulated_pair_is_send() {
+        assert_send::<SimulatedPair>();
+    }
+
     fn safe(value: u64) -> SafeU53 {
         SafeU53::new(value).expect("pair test value must fit SafeU53")
     }
