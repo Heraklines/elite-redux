@@ -238,21 +238,12 @@ export function buildLeaderboardPayload({ saveRows, runRows, generatedAt, eligib
       "sessionsWon",
     ),
     integer(
-      "shiny-species",
-      "Shinies",
-      "Distinct Shiny Species",
-      "Most Pokédex species entries with a shiny unlocked.",
-      "shinySpecies",
-    ),
-    integer(
       "black-shiny-species",
       "Shinies",
       "Black Shiny Species",
       "Most starter species lines with a black shiny unlocked.",
       "blackShinySpecies",
     ),
-    integer("shinies-caught", "Shinies", "Shinies Caught", "Most lifetime shiny catches.", "shinyCaught"),
-    integer("shinies-hatched", "Shinies", "Shinies Hatched", "Most lifetime shiny hatches.", "shinyHatched"),
     integer(
       "shiny-lab-effects",
       "Shinies",

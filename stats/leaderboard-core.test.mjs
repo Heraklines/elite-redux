@@ -89,3 +89,13 @@ test("excluded players never appear on save-backed or run-backed boards", () => 
   assert.equal(payload.boards.find(board => board.id === "black-shiny-species").entries[0].player, "Legitimate");
   assert.equal(payload.boards.find(board => board.id === "ace-win-rate").entries[0].player, "Runner");
 });
+
+test("save-import-dependent shiny boards are not published", () => {
+  const payload = buildLeaderboardPayload({ saveRows: [], runRows: [], generatedAt: new Date(NOW).toISOString() });
+  const boardIds = payload.boards.map(board => board.id);
+  assert(!boardIds.includes("shiny-species"));
+  assert(!boardIds.includes("shinies-caught"));
+  assert(!boardIds.includes("shinies-hatched"));
+  assert(boardIds.includes("black-shiny-species"));
+  assert(boardIds.includes("shiny-lab-effects"));
+});
