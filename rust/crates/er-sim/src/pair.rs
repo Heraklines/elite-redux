@@ -4844,8 +4844,8 @@ mod tests {
     }
 
     #[test]
-    fn try_fork_apply_many_atomic_rejects_sequence_exhaustion_after_earlier_operation()
-    -> TestResult {
+    fn try_fork_apply_many_atomic_rejects_sequence_exhaustion_after_earlier_operation() -> TestResult
+    {
         let mut source = SimulatedPair::new(config(0x5b, safe(64)))?;
         source.sequence = safe(SafeU53::MAX.get() - 1);
         let before = source.capture_rollback_state()?;
