@@ -4591,14 +4591,8 @@ mod tests {
 
         assert_eq!(actual_steps, expected_steps);
         assert_eq!(batched.snapshot()?, expected_snapshot);
-        assert_eq!(
-            batched.host_keyboard.export_state(),
-            expected_host_driver
-        );
-        assert_eq!(
-            batched.guest_keyboard.export_state(),
-            expected_guest_driver
-        );
+        assert_eq!(batched.host_keyboard.export_state(), expected_host_driver);
+        assert_eq!(batched.guest_keyboard.export_state(), expected_guest_driver);
         assert_eq!(
             actual_steps
                 .iter()

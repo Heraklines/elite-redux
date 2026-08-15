@@ -174,6 +174,7 @@ fn simulated_pair_and_keyboard_surfaces_are_raw_only() -> AuditResult {
                 "from_snapshot_v2",
                 "apply_trace_operation_v2",
                 "apply",
+                "apply_many_atomic",
                 "key_down",
                 "key_up",
                 "press",

@@ -38,8 +38,8 @@ use er_types::{
     ConnectionGeneration, FrameContext, FrameType, InputFocus, MembershipRevision, NetworkFrame,
     PhysicalKey, RawInputEvent, RunId, SafeU53, SeatId, SessionId, TerminalState, TimeClass,
 };
-use serde::ser::SerializeStruct;
 use serde::Serialize;
+use serde::ser::SerializeStruct;
 use serde_json::{Value, json};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -51,8 +51,7 @@ const TWO_CLIENT_SUPPORTED_TURNS: u64 = 1_000;
 const BENCHMARK_SEED: &str = "81985529216486895";
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
-const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str =
-    "pokerogue-redux/m3/benchmark-pair-frontier/v1";
+const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = "pokerogue-redux/m3/benchmark-pair-frontier/v1";
 const PAIR_FRONTIER_CHECKSUM_VERSION: u32 = 1;
 
 const PHYSICAL_HIT_FIXTURE: &str =
@@ -1709,20 +1708,15 @@ fn settle_pair_presentations(
         let operations = pending[cursor..wave_end]
             .iter()
             .cloned()
-            .map(|(endpoint, event_id)| PairOperation::BattlePresentationOutcome {
-                endpoint,
-                event_id,
-                outcome: PresentationSettlementOutcome::Settled,
-            })
+            .map(
+                |(endpoint, event_id)| PairOperation::BattlePresentationOutcome {
+                    endpoint,
+                    event_id,
+                    outcome: PresentationSettlementOutcome::Settled,
+                },
+            )
             .collect::<Vec<_>>();
-        run_pair_operations_atomic(
-            pair,
-            operations,
-            checksum,
-            counts,
-            pending,
-            evidence,
-        )?;
+        run_pair_operations_atomic(pair, operations, checksum, counts, pending, evidence)?;
         cursor = wave_end;
     }
     Ok(())
@@ -1989,9 +1983,7 @@ fn m3_two_client_supported_turns() -> TestResult {
                 });
             }
         }
-        operations.push(PairOperation::AdvanceTime {
-            delta_ms: safe(2),
-        });
+        operations.push(PairOperation::AdvanceTime { delta_ms: safe(2) });
         run_pair_operations_atomic(
             &mut pair,
             operations,
