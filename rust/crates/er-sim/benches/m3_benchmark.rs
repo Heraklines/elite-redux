@@ -2361,7 +2361,13 @@ fn m3_complete_supported_coop_battle() -> TestResult {
         &mut pending,
         &mut evidence,
     )?;
-    let snapshot = pair.snapshot()?;
+    let snapshot = run_pair_receipt_pump(
+        &mut pair,
+        &mut checksum,
+        &mut counts,
+        &mut pending,
+        &mut evidence,
+    )?;
     assert_pair_victory_terminal(&snapshot, &evidence)?;
     absorb_pair_snapshot_frontier(&mut checksum, &snapshot)?;
     let teardown_snapshot = pair.teardown("m3 complete co-op battle teardown")?;
