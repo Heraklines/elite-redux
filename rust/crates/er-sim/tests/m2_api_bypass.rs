@@ -526,6 +526,31 @@ fn approved_m3_benchmark_worker_guard_rejects_changed_ranges() -> AuditResult {
 }
 
 #[test]
+fn approved_m3_benchmark_worker_guard_rejects_spoofed_checksum_domain() -> AuditResult {
+    let expected_domain =
+        "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v2\";";
+    let source = approved_m3_benchmark_worker_source()
+        .replace(
+            expected_domain,
+            "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v1\";",
+        )
+        + &format!("\n// {expected_domain}");
+    let path = Path::new("rust/crates/er-sim/benches/m3_benchmark.rs");
+    match audit_approved_m3_benchmark_worker(&source, path) {
+        Err(error) => require(
+            error.contains(
+                "must contain exactly one executable approved M3 benchmark checksum domain declaration",
+            ),
+            format!("spoofed checksum domain produced unexpected error: {error}"),
+        ),
+        Ok(()) => Err(
+            "a wrong executable checksum domain with a commented expected declaration was accepted"
+                .to_owned(),
+        ),
+    }
+}
+
+#[test]
 fn approved_m3_benchmark_worker_guard_rejects_renamed_worker_one_join() -> AuditResult {
     let source = approved_m3_benchmark_worker_source().replace(
         "let worker_1_join = worker_1.join();",
@@ -977,7 +1002,6 @@ fn mask_approved_m3_benchmark_worker(
     }
 
     let compact_code = compact(code);
-    let compact_source = compact(source);
     let qualifier = "std::thread::spawn";
     require(
         code.match_indices(qualifier).count() == 1,
@@ -1005,18 +1029,34 @@ fn mask_approved_m3_benchmark_worker(
             ),
         )?;
     }
-    for marker in [
-        "constPAIR_FRONTIER_CHECKSUM_DOMAIN:&str=\"pokerogue-redux/m3/benchmark-pair-frontier/v2\";",
-        "constPAIR_FRONTIER_CHECKSUM_VERSION:u32=2;",
-    ] {
-        require(
-            compact_source.contains(marker),
-            format!(
-                "{} is missing approved M3 benchmark source marker {marker}",
-                path.display()
-            ),
-        )?;
-    }
+    let domain_marker =
+        "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v2\";";
+    let executable_domain_marker = "constPAIR_FRONTIER_CHECKSUM_DOMAIN:&str=;";
+    let executable_domain_count = source
+        .match_indices(domain_marker)
+        .filter(|(start, _)| {
+            let Some(end) = (*start).checked_add(domain_marker.len()) else {
+                return false;
+            };
+            code.get(*start..end)
+                .is_some_and(|slice| compact(slice) == executable_domain_marker)
+        })
+        .count();
+    require(
+        executable_domain_count == 1,
+        format!(
+            "{} must contain exactly one executable approved M3 benchmark checksum domain declaration",
+            path.display()
+        ),
+    )?;
+    let version_marker = "constPAIR_FRONTIER_CHECKSUM_VERSION:u32=2;";
+    require(
+        compact_code.matches(version_marker).count() == 1,
+        format!(
+            "{} must contain exactly one executable approved M3 benchmark checksum version declaration",
+            path.display()
+        ),
+    )?;
     require(
         compact_code.matches("spawn_worker(").count() == 2,
         format!(
