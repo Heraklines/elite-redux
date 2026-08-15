@@ -811,21 +811,7 @@ impl SimulatedPair {
         }
 
         let rollback = self.capture_rollback_state()?;
-        let result = (|| {
-            let mut steps = Vec::with_capacity(operations.len());
-            for operation in operations {
-                if self.sequence == SafeU53::MAX {
-                    return Err(SimulatedPairError::Adapter {
-                        reason: "pair sequence exhausted".to_owned(),
-                    });
-                }
-                if self.shared_terminal.is_none() {
-                    self.sync_driver_operation(&operation);
-                }
-                steps.push(self.apply_after_driver_sync(operation)?);
-            }
-            Ok(steps)
-        })();
+        let result = self.apply_many_atomic_operations(operations);
 
         match result {
             Ok(steps) => Ok(steps),
@@ -852,6 +838,48 @@ impl SimulatedPair {
         let event_budget = self.event_budget;
         let state = self.capture_rollback_state()?;
         Self::from_rollback_state(host_seat, guest_seat, seed, event_budget, state)
+    }
+
+    /// Fork the complete live pair and apply a batch atomically to the
+    /// unpublished fork.
+    #[doc(hidden)]
+    pub fn try_fork_apply_many_atomic(
+        &self,
+        operations: impl IntoIterator<Item = PairOperation>,
+    ) -> Result<(Self, Vec<PairStep>), SimulatedPairError> {
+        self.ensure_live()?;
+        let operations = operations.into_iter().collect::<Vec<_>>();
+        if operations.is_empty() {
+            return Ok((self.try_fork()?, Vec::new()));
+        }
+        if self.sequence == SafeU53::MAX {
+            return Err(SimulatedPairError::Adapter {
+                reason: "pair sequence exhausted".to_owned(),
+            });
+        }
+
+        let mut fork = self.try_fork()?;
+        let steps = fork.apply_many_atomic_operations(operations)?;
+        Ok((fork, steps))
+    }
+
+    fn apply_many_atomic_operations(
+        &mut self,
+        operations: Vec<PairOperation>,
+    ) -> Result<Vec<PairStep>, SimulatedPairError> {
+        let mut steps = Vec::with_capacity(operations.len());
+        for operation in operations {
+            if self.sequence == SafeU53::MAX {
+                return Err(SimulatedPairError::Adapter {
+                    reason: "pair sequence exhausted".to_owned(),
+                });
+            }
+            if self.shared_terminal.is_none() {
+                self.sync_driver_operation(&operation);
+            }
+            steps.push(self.apply_after_driver_sync(operation)?);
+        }
+        Ok(steps)
     }
 
     fn apply_after_driver_sync(
@@ -3580,6 +3608,53 @@ mod tests {
         Ok(OperationId::new(TEST_OPERATION_ID)?)
     }
 
+    fn assert_owner_graph_matches(
+        pair: &SimulatedPair,
+        expected: &PairRollbackState,
+    ) -> TestResult {
+        assert_eq!(pair.host_kernel.snapshot(), expected.host_kernel.snapshot());
+        assert_eq!(pair.guest_kernel.snapshot(), expected.guest_kernel.snapshot());
+        assert_eq!(
+            pair.host_keyboard.export_state(),
+            expected.host_keyboard.export_state()
+        );
+        assert_eq!(
+            pair.guest_keyboard.export_state(),
+            expected.guest_keyboard.export_state()
+        );
+        assert_eq!(pair.sequence, expected.sequence);
+        assert_eq!(pair.clock.export_state(), expected.clock);
+        assert_eq!(pair.network.export_state(), expected.network);
+        assert_eq!(pair.presenter.export_state()?, expected.presenter);
+        assert_eq!(pair.storage.export_state(), expected.storage);
+        assert_eq!(pair.shared_terminal, expected.shared_terminal);
+        assert_eq!(pair.terminal_reason, expected.terminal_reason);
+        assert_eq!(pair.fault_script, expected.fault_script);
+        assert_eq!(pair.last_boundary_order, expected.last_boundary_order);
+        assert_eq!(
+            pair.trace_audit.effect_origins,
+            expected.trace_audit.effect_origins
+        );
+        assert_eq!(
+            pair.trace_audit.host_rng_audit,
+            expected.trace_audit.host_rng_audit
+        );
+        assert_eq!(
+            pair.trace_audit.host_internal_events,
+            expected.trace_audit.host_internal_events
+        );
+        assert_eq!(
+            pair.trace_audit.guest_rng_audit,
+            expected.trace_audit.guest_rng_audit
+        );
+        assert_eq!(
+            pair.trace_audit.guest_internal_events,
+            expected.trace_audit.guest_internal_events
+        );
+        assert_eq!(pair.disposed, expected.disposed);
+        Ok(())
+    }
+
     fn config(seed: u64, event_budget: SafeU53) -> SimulatedPairConfig {
         SimulatedPairConfig {
             host_kernel: KernelConfig::default(),
@@ -4677,6 +4752,127 @@ mod tests {
         assert_eq!(pair.snapshot()?, before_snapshot);
         assert_eq!(pair.host_keyboard.export_state(), before_host_driver);
         assert_eq!(pair.guest_keyboard.export_state(), before_guest_driver);
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_apply_many_atomic_matches_fork_then_apply_and_preserves_source() -> TestResult {
+        let operations = vec![
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::ArrowUp,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+            },
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyUp {
+                    code: PhysicalKey::ArrowUp,
+                },
+            },
+            PairOperation::AdvanceTime { delta_ms: safe(1) },
+        ];
+        let source = SimulatedPair::new(config(0x58, safe(64)))?;
+        let before = source.capture_rollback_state()?;
+
+        let mut expected_fork = source.try_fork()?;
+        let expected_steps = expected_fork.apply_many_atomic(operations.clone())?;
+        let expected_fork_state = expected_fork.capture_rollback_state()?;
+
+        let (actual_fork, actual_steps) = source.try_fork_apply_many_atomic(operations)?;
+
+        assert_eq!(actual_steps, expected_steps);
+        assert_owner_graph_matches(&actual_fork, &expected_fork_state)?;
+        assert_owner_graph_matches(&source, &before)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_apply_many_atomic_drops_failed_fork_without_changing_source() -> TestResult {
+        let mut pair_config = config(0x59, safe(64));
+        pair_config
+            .initial_storage
+            .insert("preexisting".to_owned(), json!({"ready": true}));
+        let mut source = SimulatedPair::new(pair_config)?;
+        source.apply(PairOperation::RawInput {
+            endpoint: PairEndpoint::Host,
+            event: RawInputEvent::KeyDown {
+                code: PhysicalKey::ArrowUp,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+        })?;
+        let before = source.capture_rollback_state()?;
+
+        let result = source.try_fork_apply_many_atomic([
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::ArrowDown,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+            },
+            PairOperation::StorageResult {
+                endpoint: PairEndpoint::Host,
+                request_id: safe(999),
+                result: StorageResult::Persisted,
+            },
+        ]);
+
+        assert!(matches!(result, Err(SimulatedPairError::Adapter { .. })));
+        assert_owner_graph_matches(&source, &before)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_apply_many_atomic_empty_batch_returns_pristine_fork() -> TestResult {
+        let source = SimulatedPair::new(config(0x5a, safe(64)))?;
+        let before = source.capture_rollback_state()?;
+
+        let (fork, steps) = source.try_fork_apply_many_atomic(Vec::<PairOperation>::new())?;
+
+        assert!(steps.is_empty());
+        assert_owner_graph_matches(&source, &before)?;
+        assert_owner_graph_matches(&fork, &before)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_apply_many_atomic_rejects_sequence_exhaustion_after_earlier_operation()
+    -> TestResult {
+        let mut source = SimulatedPair::new(config(0x5b, safe(64)))?;
+        source.sequence = safe(SafeU53::MAX.get() - 1);
+        let before = source.capture_rollback_state()?;
+
+        let result = source.try_fork_apply_many_atomic([
+            PairOperation::AdvanceTime { delta_ms: safe(1) },
+            PairOperation::AdvanceTime { delta_ms: safe(1) },
+        ]);
+
+        assert!(matches!(
+            result,
+            Err(SimulatedPairError::Adapter { reason })
+                if reason == "pair sequence exhausted"
+        ));
+        assert_owner_graph_matches(&source, &before)?;
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_apply_many_atomic_rejects_disposed_source() -> TestResult {
+        let mut source = SimulatedPair::new(config(0x5c, safe(64)))?;
+        source.teardown("disposed fork batch source")?;
+
+        assert!(matches!(
+            source.try_fork_apply_many_atomic(Vec::<PairOperation>::new()),
+            Err(SimulatedPairError::Disposed)
+        ));
         Ok(())
     }
 
