@@ -48,11 +48,13 @@ const RAW_MENU_EVENTS: u64 = 100_000;
 const SIMPLE_TURN_RESOLUTIONS: u64 = 10_000;
 const COMPLETE_SHORT_BATTLES: u64 = 1_000;
 const TWO_CLIENT_SUPPORTED_TURNS: u64 = 1_000;
+const TWO_CLIENT_SUPPORTED_TURN_WORKERS: u64 = 2;
+const TWO_CLIENT_SUPPORTED_TURN_RANGES: [(u64, u64); 2] = [(0, 500), (500, 1_000)];
 const BENCHMARK_SEED: &str = "81985529216486895";
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
-const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = "pokerogue-redux/m3/benchmark-pair-frontier/v1";
-const PAIR_FRONTIER_CHECKSUM_VERSION: u32 = 1;
+const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = "pokerogue-redux/m3/benchmark-pair-frontier/v2";
+const PAIR_FRONTIER_CHECKSUM_VERSION: u32 = 2;
 
 const PHYSICAL_HIT_FIXTURE: &str =
     include_str!("../../../fixtures/m3/oracle/battle-cases/physical-hit.json");
@@ -71,6 +73,30 @@ struct Counts {
     battles: u64,
     inputs: u64,
     rng_draws: u64,
+}
+
+struct TwoClientSupportedTurnWorkerResult {
+    worker: u64,
+    start: u64,
+    end_exclusive: u64,
+    iterations: u64,
+    checksum: u64,
+    counts: Counts,
+    pair_template: SimulatedPair,
+}
+
+#[derive(Serialize)]
+struct TwoClientSupportedTurnReductionRecord {
+    domain: &'static str,
+    version: u32,
+    worker: u64,
+    start: u64,
+    #[serde(rename = "endExclusive")]
+    end_exclusive: u64,
+    iterations: u64,
+    #[serde(rename = "checksum16")]
+    checksum16: String,
+    counts: Counts,
 }
 
 fn safe(value: u64) -> SafeU53 {
@@ -742,6 +768,17 @@ fn raw_input(local_seat: SeatId, event: RawInputEvent) -> KernelInput {
 
 fn absorb<T: Serialize>(checksum: &mut u64, value: &T) -> TestResult {
     for byte in serde_json::to_vec(value)? {
+        *checksum ^= u64::from(byte);
+        *checksum = checksum.wrapping_mul(FNV_PRIME);
+    }
+    Ok(())
+}
+
+fn absorb_length_prefixed_json<T: Serialize>(checksum: &mut u64, value: &T) -> TestResult {
+    let encoded = serde_json::to_vec(value)?;
+    let length = u64::try_from(encoded.len())
+        .map_err(|_| invalid("length-prefixed checksum record is too large"))?;
+    for byte in length.to_be_bytes().into_iter().chain(encoded) {
         *checksum ^= u64::from(byte);
         *checksum = checksum.wrapping_mul(FNV_PRIME);
     }
@@ -1722,6 +1759,200 @@ fn settle_pair_presentations(
     Ok(())
 }
 
+fn run_two_client_supported_turn_worker(
+    worker: u64,
+    start: u64,
+    end_exclusive: u64,
+    pair_template: SimulatedPair,
+) -> TestResult<TwoClientSupportedTurnWorkerResult> {
+    let iterations = end_exclusive
+        .checked_sub(start)
+        .ok_or_else(|| invalid(format!("worker {worker} range is inverted")))?;
+    let mut checksum = FNV_OFFSET;
+    let mut counts = Counts::default();
+    for _ in start..end_exclusive {
+        let mut pending = Vec::new();
+        let mut setup_evidence = TurnEvidence::default();
+        let mut operations = Vec::with_capacity(14);
+        operations.push(PairOperation::Reconnect {
+            endpoint: PairEndpoint::Host,
+        });
+        for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
+            for _ in 0..3 {
+                operations.push(PairOperation::RawInput {
+                    endpoint,
+                    event: key_down(PhysicalKey::Enter),
+                });
+                operations.push(PairOperation::RawInput {
+                    endpoint,
+                    event: key_up(PhysicalKey::Enter),
+                });
+            }
+        }
+        operations.push(PairOperation::AdvanceTime { delta_ms: safe(2) });
+        let expected_operations = operations.clone();
+        let (mut pair, steps) = pair_template.try_fork_apply_many_atomic(operations)?;
+        if expected_operations.len() != 14 || steps.len() != expected_operations.len() {
+            return Err(invalid(format!(
+                "two-client supported turn fork batch returned {} steps; expected reconnect+13 workload",
+                steps.len()
+            )));
+        }
+        let mut step_iter = steps.into_iter();
+        let reconnect_step = step_iter.next().ok_or_else(|| {
+            invalid("two-client supported turn fork batch omitted reconnect step")
+        })?;
+        if reconnect_step.operation != expected_operations[0] {
+            return Err(invalid(format!(
+                "two-client supported turn fork batch step 0 was {:?}; expected {:?}",
+                reconnect_step.operation, expected_operations[0]
+            )));
+        }
+        counts.inputs = counts.inputs.saturating_add(1);
+        observe_pair_step(
+            &reconnect_step,
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut setup_evidence,
+        )?;
+        let before = reconnect_step.snapshot;
+        let mut evidence = TurnEvidence::default();
+        for (index, step) in step_iter.enumerate() {
+            let expected_operation = &expected_operations[index + 1];
+            if &step.operation != expected_operation {
+                return Err(invalid(format!(
+                    "two-client supported turn fork batch step {} was {:?}; expected {:?}",
+                    index + 1,
+                    step.operation,
+                    expected_operation
+                )));
+            }
+            counts.inputs = counts.inputs.saturating_add(1);
+            observe_pair_step(
+                &step,
+                &mut checksum,
+                &mut counts,
+                &mut pending,
+                &mut evidence,
+            )?;
+        }
+        settle_pair_presentations(
+            &mut pair,
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut evidence,
+        )?;
+        // Presentation settlement queues the replica receipt; give the pair's
+        // deterministic network one pump to deliver that receipt and run the
+        // authority's post-control probe before checking the next frontier.
+        let snapshot = run_pair_receipt_pump(
+            &mut pair,
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut evidence,
+        )?;
+        assert_two_client_supported_turn(&before, &snapshot, &evidence)?;
+        counts.turns = counts.turns.saturating_add(1);
+        counts.battles = counts.battles.saturating_add(1);
+        let teardown_snapshot = pair.teardown("m3 supported turn teardown")?;
+        assert_zero_pair_resources(&teardown_snapshot);
+        absorb_pair_snapshot_frontier(&mut checksum, &teardown_snapshot)?;
+    }
+    Ok(TwoClientSupportedTurnWorkerResult {
+        worker,
+        start,
+        end_exclusive,
+        iterations,
+        checksum,
+        counts,
+        pair_template,
+    })
+}
+
+fn checked_add_counts(total: &mut Counts, additional: &Counts) -> TestResult {
+    total.turns = total
+        .turns
+        .checked_add(additional.turns)
+        .ok_or_else(|| invalid("two-client supported turn turns count overflow"))?;
+    total.battles = total
+        .battles
+        .checked_add(additional.battles)
+        .ok_or_else(|| invalid("two-client supported turn battles count overflow"))?;
+    total.inputs = total
+        .inputs
+        .checked_add(additional.inputs)
+        .ok_or_else(|| invalid("two-client supported turn inputs count overflow"))?;
+    total.rng_draws = total
+        .rng_draws
+        .checked_add(additional.rng_draws)
+        .ok_or_else(|| invalid("two-client supported turn rng draws count overflow"))?;
+    Ok(())
+}
+
+fn validate_two_client_supported_turn_workers(
+    workers: &mut [TwoClientSupportedTurnWorkerResult],
+) -> TestResult<u64> {
+    workers.sort_by_key(|result| (result.start, result.end_exclusive, result.worker));
+    let expected_worker_count = usize::try_from(TWO_CLIENT_SUPPORTED_TURN_WORKERS)
+        .map_err(|_| invalid("two-client supported turn worker count overflow"))?;
+    if workers.len() != TWO_CLIENT_SUPPORTED_TURN_RANGES.len()
+        || workers.len() != expected_worker_count
+    {
+        return Err(invalid(format!(
+            "two-client supported turn produced {} workers; expected {}",
+            workers.len(),
+            TWO_CLIENT_SUPPORTED_TURN_WORKERS
+        )));
+    }
+    let mut total_iterations = 0_u64;
+    for (index, (result, (expected_start, expected_end_exclusive))) in workers
+        .iter()
+        .zip(TWO_CLIENT_SUPPORTED_TURN_RANGES)
+        .enumerate()
+    {
+        let expected_worker = u64::try_from(index)
+            .map_err(|_| invalid("two-client supported turn worker index overflow"))?;
+        if result.worker != expected_worker
+            || result.start != expected_start
+            || result.end_exclusive != expected_end_exclusive
+        {
+            return Err(invalid(format!(
+                "two-client supported turn worker {} returned worker={} range {}..{}; expected worker={} range {}..{}",
+                index,
+                result.worker,
+                result.start,
+                result.end_exclusive,
+                expected_worker,
+                expected_start,
+                expected_end_exclusive
+            )));
+        }
+        let expected_iterations = expected_end_exclusive
+            .checked_sub(expected_start)
+            .ok_or_else(|| invalid("two-client supported turn expected range is inverted"))?;
+        if result.iterations != expected_iterations
+            || result.counts.turns != expected_iterations
+            || result.counts.battles != expected_iterations
+        {
+            return Err(invalid(format!(
+                "two-client supported turn worker {} returned iterations={} turns={} battles={}; expected {}",
+                result.worker,
+                result.iterations,
+                result.counts.turns,
+                result.counts.battles,
+                expected_iterations
+            )));
+        }
+        total_iterations = total_iterations
+            .checked_add(result.iterations)
+            .ok_or_else(|| invalid("two-client supported turn iteration count overflow"))?;
+    }
+    Ok(total_iterations)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn report(
     scenario_id: &str,
@@ -1951,108 +2182,84 @@ fn m3_two_client_supported_turns() -> TestResult {
     let content = fixture_content_pack()?;
     let content_load_elapsed_ns = elapsed_ns(content_started);
     let fixture = fixture_value(DOUBLES_FIXTURE)?;
-    let mut pair_template = new_pair(&fixture, &content, 0, false)?;
+    let [pair_template_0, pair_template_1] = [
+        new_pair(&fixture, &content, 0, false)?,
+        new_pair(&fixture, &content, 0, false)?,
+    ];
     let execution_started = Instant::now();
-    let mut checksum = FNV_OFFSET;
+    let spawn_worker = |worker, start, end_exclusive, pair_template| {
+        std::thread::spawn(move || {
+            run_two_client_supported_turn_worker(
+                worker,
+                start,
+                end_exclusive,
+                pair_template,
+            )
+            .map_err(|error| error.to_string())
+            .unwrap_or_else(|error| {
+                panic!("two-client supported turn worker {worker} failed: {error}")
+            })
+        })
+    };
+    let [(worker_0_start, worker_0_end), (worker_1_start, worker_1_end)] =
+        TWO_CLIENT_SUPPORTED_TURN_RANGES;
+    let worker_0 = spawn_worker(0, worker_0_start, worker_0_end, pair_template_0);
+    let worker_1 = spawn_worker(1, worker_1_start, worker_1_end, pair_template_1);
+    let mut worker_results = vec![
+        worker_0
+            .join()
+            .expect("two-client supported turn worker 0 panicked"),
+        worker_1
+            .join()
+            .expect("two-client supported turn worker 1 panicked"),
+    ];
+    let total_iterations = validate_two_client_supported_turn_workers(&mut worker_results)?;
+    assert_eq!(total_iterations, TWO_CLIENT_SUPPORTED_TURNS);
     let mut counts = Counts::default();
-    for _ in 0..TWO_CLIENT_SUPPORTED_TURNS {
-        let mut pending = Vec::new();
-        let mut setup_evidence = TurnEvidence::default();
-        let mut operations = Vec::with_capacity(14);
-        operations.push(PairOperation::Reconnect {
-            endpoint: PairEndpoint::Host,
-        });
-        for endpoint in [PairEndpoint::Host, PairEndpoint::Guest] {
-            for _ in 0..3 {
-                operations.push(PairOperation::RawInput {
-                    endpoint,
-                    event: key_down(PhysicalKey::Enter),
-                });
-                operations.push(PairOperation::RawInput {
-                    endpoint,
-                    event: key_up(PhysicalKey::Enter),
-                });
-            }
-        }
-        operations.push(PairOperation::AdvanceTime { delta_ms: safe(2) });
-        let expected_operations = operations.clone();
-        let (mut pair, steps) = pair_template.try_fork_apply_many_atomic(operations)?;
-        if expected_operations.len() != 14 || steps.len() != expected_operations.len() {
-            return Err(invalid(format!(
-                "two-client supported turn fork batch returned {} steps; expected reconnect+13 workload",
-                steps.len()
-            )));
-        }
-        let mut step_iter = steps.into_iter();
-        let reconnect_step = step_iter.next().ok_or_else(|| {
-            invalid("two-client supported turn fork batch omitted reconnect step")
-        })?;
-        if reconnect_step.operation != expected_operations[0] {
-            return Err(invalid(format!(
-                "two-client supported turn fork batch step 0 was {:?}; expected {:?}",
-                reconnect_step.operation, expected_operations[0]
-            )));
-        }
-        counts.inputs = counts.inputs.saturating_add(1);
-        observe_pair_step(
-            &reconnect_step,
-            &mut checksum,
-            &mut counts,
-            &mut pending,
-            &mut setup_evidence,
-        )?;
-        let before = reconnect_step.snapshot;
-        let mut evidence = TurnEvidence::default();
-        for (index, step) in step_iter.enumerate() {
-            let expected_operation = &expected_operations[index + 1];
-            if &step.operation != expected_operation {
-                return Err(invalid(format!(
-                    "two-client supported turn fork batch step {} was {:?}; expected {:?}",
-                    index + 1,
-                    step.operation,
-                    expected_operation
-                )));
-            }
-            counts.inputs = counts.inputs.saturating_add(1);
-            observe_pair_step(
-                &step,
-                &mut checksum,
-                &mut counts,
-                &mut pending,
-                &mut evidence,
-            )?;
-        }
-        settle_pair_presentations(
-            &mut pair,
-            &mut checksum,
-            &mut counts,
-            &mut pending,
-            &mut evidence,
-        )?;
-        // Presentation settlement queues the replica receipt; give the pair's
-        // deterministic network one pump to deliver that receipt and run the
-        // authority's post-control probe before checking the next frontier.
-        let snapshot = run_pair_receipt_pump(
-            &mut pair,
-            &mut checksum,
-            &mut counts,
-            &mut pending,
-            &mut evidence,
-        )?;
-        assert_two_client_supported_turn(&before, &snapshot, &evidence)?;
-        counts.turns = counts.turns.saturating_add(1);
-        counts.battles = counts.battles.saturating_add(1);
-        let teardown_snapshot = pair.teardown("m3 supported turn teardown")?;
-        assert_zero_pair_resources(&teardown_snapshot);
-        absorb_pair_snapshot_frontier(&mut checksum, &teardown_snapshot)?;
+    for result in &worker_results {
+        checked_add_counts(&mut counts, &result.counts)?;
     }
-    let execution_elapsed_ns = elapsed_ns(execution_started);
-    let template_teardown_snapshot =
-        pair_template.teardown("m3 supported turn template teardown")?;
-    assert_zero_pair_resources(&template_teardown_snapshot);
-    absorb_pair_snapshot_frontier(&mut checksum, &template_teardown_snapshot)?;
     assert_eq!(counts.turns, TWO_CLIENT_SUPPORTED_TURNS);
     assert_eq!(counts.battles, TWO_CLIENT_SUPPORTED_TURNS);
+    let mut checksum = FNV_OFFSET;
+    for result in &worker_results {
+        absorb_length_prefixed_json(
+            &mut checksum,
+            &TwoClientSupportedTurnReductionRecord {
+                domain: PAIR_FRONTIER_CHECKSUM_DOMAIN,
+                version: PAIR_FRONTIER_CHECKSUM_VERSION,
+                worker: result.worker,
+                start: result.start,
+                end_exclusive: result.end_exclusive,
+                iterations: result.iterations,
+                checksum16: format!("{:016x}", result.checksum),
+                counts: result.counts.clone(),
+            },
+        )?;
+    }
+    let execution_elapsed_ns = elapsed_ns(execution_started);
+    let reported_ranges = worker_results
+        .iter()
+        .map(|result| {
+            json!({
+                "worker": result.worker,
+                "start": result.start,
+                "endExclusive": result.end_exclusive,
+                "iterations": result.iterations,
+                "checksum16": format!("{:016x}", result.checksum),
+                "counts": &result.counts,
+            })
+        })
+        .collect::<Vec<_>>();
+    for result in &mut worker_results {
+        let teardown_reason = format!(
+            "m3 supported turn worker {} template teardown",
+            result.worker
+        );
+        let template_teardown_snapshot = result.pair_template.teardown(&teardown_reason)?;
+        assert_zero_pair_resources(&template_teardown_snapshot);
+        absorb_pair_snapshot_frontier(&mut checksum, &template_teardown_snapshot)?;
+    }
     report(
         "two-client-supported-turns",
         BENCHMARK_SEED,
@@ -2066,8 +2273,27 @@ fn m3_two_client_supported_turns() -> TestResult {
             "input_architecture": "two authority/replica endpoints driven by raw physical keydown/keyUp",
             "fixture": "doubles-single-target",
             "endpoints": ["host", "guest"],
+            "workers": TWO_CLIENT_SUPPORTED_TURN_WORKERS,
+            "ranges": reported_ranges,
+            "reduction": {
+                "encoding": "u64 big-endian length prefix followed by serde_json",
+                "record_fields": [
+                    "domain",
+                    "version",
+                    "worker",
+                    "start",
+                    "endExclusive",
+                    "iterations",
+                    "checksum16",
+                    "counts",
+                ],
+                "sort": ["start", "endExclusive", "worker"],
+                "domain": PAIR_FRONTIER_CHECKSUM_DOMAIN,
+                "version": PAIR_FRONTIER_CHECKSUM_VERSION,
+            },
             "pair_initialization_excluded": true,
             "pair_fork_included": true,
+            "template_teardown_excluded": true,
         }),
     )
 }
