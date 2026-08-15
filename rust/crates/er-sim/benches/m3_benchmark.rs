@@ -1717,26 +1717,35 @@ fn run_pair_until_shared_terminal(
     counts: &mut Counts,
     pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
     evidence: &mut TurnEvidence,
-) -> TestResult<(er_sim::PairSnapshot, usize)> {
-    for pump_count in 1..=MAX_TERMINAL_RECEIPT_PUMPS {
-        let snapshot = run_pair_receipt_pump(pair, checksum, counts, pending, evidence)?;
+) -> TestResult<(er_sim::PairSnapshot, usize, usize)> {
+    let mut snapshot = pair.snapshot()?;
+    let mut pump_count = 0;
+    let mut settlement_waves = 0;
+    loop {
         if snapshot.terminal_reason.is_some() {
-            return Ok((snapshot, pump_count));
+            return Ok((snapshot, pump_count, settlement_waves));
+        }
+        if !pending.is_empty() {
+            settle_pair_presentations(pair, checksum, counts, pending, evidence)?;
+            settlement_waves += 1;
+            snapshot = pair.snapshot()?;
+            continue;
         }
         if pump_count == MAX_TERMINAL_RECEIPT_PUMPS {
             return Err(invalid(format!(
-                "shared terminal not reached after receipt pump cap {MAX_TERMINAL_RECEIPT_PUMPS}; final virtual_time_ms={}, final network.queued_packet_ids={:?}, observed pending vector length={}, authority_turn_commits.len()={}, replica_turn_commits={}",
+                "shared terminal not reached after receipt pump cap {MAX_TERMINAL_RECEIPT_PUMPS}; final virtual_time_ms={}, final network.queued_packet_ids={:?}, outstanding pending length={}, pump count={}, settlement-wave count={}, authority_turn_commits.len()={}, replica_turn_commits={}",
                 snapshot.virtual_time_ms.get(),
                 snapshot.network.queued_packet_ids,
                 pending.len(),
+                pump_count,
+                settlement_waves,
                 evidence.authority_turn_commits.len(),
                 evidence.replica_turn_commits,
             )));
         }
+        snapshot = run_pair_receipt_pump(pair, checksum, counts, pending, evidence)?;
+        pump_count += 1;
     }
-    Err(invalid(format!(
-        "terminal receipt pump cap {MAX_TERMINAL_RECEIPT_PUMPS} must be positive"
-    )))
 }
 
 fn raw_press_pair(
@@ -1785,6 +1794,7 @@ fn settle_pair_presentations(
         run_pair_operations_atomic(pair, operations, checksum, counts, pending, evidence)?;
         cursor = wave_end;
     }
+    pending.clear();
     Ok(())
 }
 
@@ -2390,16 +2400,22 @@ fn m3_complete_supported_coop_battle() -> TestResult {
         &mut pending,
         &mut evidence,
     )?;
-    let (snapshot, terminal_receipt_pumps) = run_pair_until_shared_terminal(
-        &mut pair,
-        &mut checksum,
-        &mut counts,
-        &mut pending,
-        &mut evidence,
-    )?;
+    let (snapshot, terminal_receipt_pumps, terminal_settlement_waves) =
+        run_pair_until_shared_terminal(
+            &mut pair,
+            &mut checksum,
+            &mut counts,
+            &mut pending,
+            &mut evidence,
+        )?;
     if terminal_receipt_pumps < 2 {
         return Err(invalid(format!(
             "pinned complete co-op replay terminalized after {terminal_receipt_pumps} receipt pump(s); expected at least 2"
+        )));
+    }
+    if terminal_settlement_waves < 1 {
+        return Err(invalid(format!(
+            "pinned complete co-op replay terminalized after {terminal_settlement_waves} terminal presentation settlement wave(s); expected at least 1"
         )));
     }
     assert_pair_victory_terminal(&snapshot, &evidence)?;
@@ -2426,6 +2442,7 @@ fn m3_complete_supported_coop_battle() -> TestResult {
             "terminal": "shared victory terminal with converged canonical/control/UI state",
             "terminal_receipt_pumps": terminal_receipt_pumps,
             "terminal_receipt_pump_limit": MAX_TERMINAL_RECEIPT_PUMPS,
+            "terminal_presentation_settlement_waves": terminal_settlement_waves,
         }),
     )
 }
