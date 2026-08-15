@@ -1,0 +1,40 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:70cb2211f4fa35ffca8089eed77b7ca72cb93466:run-31854559217.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:153.0) Gecko/20100101 Firefox/153.0
+platform: Win32
+screen:   1920x1080 @1x  devmem:?
+boot:     boot-start@0ms -> loading-complete@15856ms -> title-shown@19904ms
+lastSess: ok (reached title)
+mode:     0  wave:?
+seed:     a9zwzRXzIqD9nK0LaAsCPYjn
+party:    
+enemy:    
+
+----- COMMENT -----
+tested a few times.
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:70cb2211f4fa35ffca8089eed77b7ca72cb93466:run-31854559217.1","source":"github","sha":"70cb2211f4fa35ffca8089eed77b7ca72cb93466","workflow":{"provider":"github-actions","runId":"31854559217","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[06:42:45.874] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[06:42:46.781] LOG: [ER] build {"version":1,"id":"github:70cb2211f4fa35ffca8089eed77b7ca72cb93466:run-31854559217.1","source":"github","sha":"70cb2211f4fa35ffca8089eed77b7ca72cb93466","workflow":{"provider":"github-actions","runId":"31854559217","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[06:42:47.013] LOG: [dev-tools] loaded — 766 scenarios + Send Logs button
+[06:43:00.362] DEBUG: Destroying loading scene
+[06:43:00.362] DEBUG: Destroyed loading scene
+[06:43:00.625] LOG: Seed: a9zwzRXzIqD9nK0LaAsCPYjn
+[06:43:00.625] LOG: Wave Seed: a9zwzRXzIqD9nK0LaAsCPYjn 0
+[06:43:03.333] LOG: %cStart Phase LoginPhase color:green;
+[06:43:03.659] LOG: Client Session: MxxzrhOu8qgYjMu54GKg6YrnPHp3JjHq
+[06:43:04.298] DEBUG: Using cached system data
+[06:43:04.397] LOG: %cStart Phase TitlePhase color:green;
+[06:43:04.402] LOG: use seasonal splash messages true
+[06:43:08.274] ERROR: [unhandledrejection] TypeError: can't access property "revertMode", this is undefined
+T9</revertModes/<@https://elite-redux-staging.pages.dev/assets/battle-scene-D97veCNN.js:1088:6293
+revertModes@https://elite-redux-staging.pages.dev/assets/battle-scene-D97veCNN.js:1088:6235
+executeIf@https://elite-redux-staging.pages.dev/assets/BBCodeText-CfuVQJnq.js:1:63818
+T9</revertModes/</<@https://elite-redux-staging.pages.dev/assets/battle-scene-D97veCNN.js:1088:6321
+
+
+----- REPLAY TRACE (JSON) -----
+(none)
