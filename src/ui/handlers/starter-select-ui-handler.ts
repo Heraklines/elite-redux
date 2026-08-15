@@ -38,8 +38,10 @@ import {
   countErBlackShinyStarters,
   ER_BLACK_SHINY_LUCK,
   ER_BLACK_SHINY_TINT,
+  enforceErBlackShinyStarterLimit,
   getErBlackShinySpriteSource,
   isErBlackShinyStarterSelection,
+  reconcileErBlackShinyStarterSelection,
 } from "#data/elite-redux/er-black-shinies";
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
@@ -5913,7 +5915,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // Initiates the small up and down idle animation
         this.iconAnimHandler.addOrUpdate(icon, PokemonIconAnimMode.PASSIVE);
 
-        const starterIndex = this.starterSpecies.indexOf(species);
+        const starterIndex = this.starterSpecies.findIndex(selected => selected.speciesId === species.speciesId);
 
         const props = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
 
@@ -6805,7 +6807,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       );
 
       if (forSeen ? this.speciesStarterDexEntry?.seenAttr : this.speciesStarterDexEntry?.caughtAttr) {
-        const starterIndex = this.starterSpecies.indexOf(species);
+        const starterIndex = this.starterSpecies.findIndex(selected => selected.speciesId === species.speciesId);
         const selectedProps = globalScene.gameData.getSpeciesDexAttrProps(species, this.dexAttrCursor);
 
         if (starterIndex > -1) {
@@ -7522,6 +7524,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (this.starterSpecies.length === 0) {
       return false;
     }
+
+    // A selected party slot can outlive the preview object used to cycle its
+    // appearance (forms and reconstructed species are not guaranteed to share
+    // object identity). Reconcile the explicit t4 preference at the launch
+    // boundary so a visibly selected Black Shiny cannot enter as its underlying
+    // epic/red variant. Variant 2 alone is deliberately insufficient here.
+    this.starters = enforceErBlackShinyStarterLimit(
+      this.starters.map(starter =>
+        reconcileErBlackShinyStarterSelection(
+          starter,
+          !!this.getSpeciesData(starter.speciesId).starterDataEntry.erBlackShiny,
+          this.starterPreferences[starter.speciesId],
+        ),
+      ),
+    );
 
     const ui = this.getUi();
 
