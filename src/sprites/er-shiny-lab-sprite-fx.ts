@@ -41,7 +41,11 @@ type PokemonLike = {
   formIndex: number;
   variant: Variant;
   shiny: boolean;
-  customPokemonData?: { erShinyLab?: ErShinyLabSavedLook | undefined; erShinyLabSuppressLocal?: boolean } | null;
+  customPokemonData?: {
+    erShinyLab?: ErShinyLabSavedLook | undefined;
+    erShinyLabSuppressLocal?: boolean;
+    erBlackShiny?: boolean | undefined;
+  } | null;
   summonData?: { illusion?: { formIndex?: number; variant?: Variant } | null };
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string;
   getBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string;
@@ -414,19 +418,36 @@ export function getErShinyLabSavedLookForSpecies(speciesId: number, shiny: boole
 export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
   species: { speciesId: number };
   shiny: boolean;
-  customPokemonData?: { erShinyLab?: ErShinyLabSavedLook | undefined; erShinyLabSuppressLocal?: boolean } | null;
+  customPokemonData?: {
+    erShinyLab?: ErShinyLabSavedLook | undefined;
+    erShinyLabSuppressLocal?: boolean;
+    erBlackShiny?: boolean | undefined;
+  } | null;
 }): ErShinyLabSpriteFxLook | null {
   if (!pokemon.shiny) {
     return null;
   }
   const carriedLook = decodeErShinyLabSavedLook(pokemon.customPokemonData?.erShinyLab);
-  if (carriedLook) {
-    return carriedLook;
+  const look =
+    carriedLook
+    ?? (pokemon.customPokemonData?.erShinyLabSuppressLocal
+      ? null
+      : getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny));
+  if (!look?.loadout.palette || !pokemon.customPokemonData?.erBlackShiny) {
+    return look;
   }
-  if (pokemon.customPokemonData?.erShinyLabSuppressLocal) {
-    return null;
-  }
-  return getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny);
+
+  // Starter Select renders t4 from the authored black atlas and deliberately
+  // suppresses species palettes. Apply the same rule after launch: a saved or
+  // locally equipped red-shiny palette must not recolor a selected Black Shiny.
+  // Surface, aura, parameter, and name effects remain equipped.
+  return {
+    ...look,
+    loadout: {
+      ...look.loadout,
+      palette: null,
+    },
+  };
 }
 
 /**

@@ -503,4 +503,22 @@ describe("ER Shiny Lab data layer", () => {
       around: "staticfield",
     });
   });
+
+  it("keeps a Black Shiny on its t4 atlas while retaining non-palette Lab effects", () => {
+    const look = encodeErShinyLabPreset({
+      loadout: { palette: "duoneon", surface: "starmap", around: "staticfield" },
+      params: labParams({ surfAmt: 0.8, aroAmt: 0.6, seed: 123 }),
+    });
+    const pokemon = {
+      species: getPokemonSpecies(SpeciesId.BULBASAUR),
+      shiny: true,
+      customPokemonData: { erBlackShiny: true, erShinyLab: look },
+    };
+
+    expect(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout).toEqual({
+      palette: null,
+      surface: "starmap",
+      around: "staticfield",
+    });
+  });
 });
