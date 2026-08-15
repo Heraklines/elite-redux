@@ -449,6 +449,111 @@ fn lexical_boundary_audit_ignores_comments_and_literals() -> AuditResult {
     )
 }
 
+fn approved_m3_benchmark_worker_source() -> &'static str {
+    r#"
+const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = "pokerogue-redux/m3/benchmark-pair-frontier/v2";
+const PAIR_FRONTIER_CHECKSUM_VERSION: u32 = 2;
+const TWO_CLIENT_SUPPORTED_TURNS: u64 = 1_000;
+const TWO_CLIENT_SUPPORTED_TURN_RANGES: [(u64, u64); 2] = [(0, 500), (500, 1_000)];
+
+fn benchmark() {
+    let worker = std::thread::spawn(|| {});
+    let worker_0_start = 0;
+    let worker_0_end = 500;
+    let worker_1_start = 500;
+    let worker_1_end = 1_000;
+    let pair_template_0 = ();
+    let pair_template_1 = ();
+    let worker_0 = spawn_worker(0, worker_0_start, worker_0_end, pair_template_0);
+    let worker_1 = spawn_worker(1, worker_1_start, worker_1_end, pair_template_1);
+    let worker_0_join = worker_0.join();
+    let worker_1_join = worker_1.join();
+    let total_iterations = TWO_CLIENT_SUPPORTED_TURNS;
+    assert_eq!(total_iterations, TWO_CLIENT_SUPPORTED_TURNS);
+    reduce(Reduction {
+        domain: PAIR_FRONTIER_CHECKSUM_DOMAIN,
+        version: PAIR_FRONTIER_CHECKSUM_VERSION,
+    });
+}
+"#
+}
+
+fn audit_approved_m3_benchmark_worker(source: &str, path: &Path) -> AuditResult {
+    let masked = mask_non_code(source);
+    let code = strip_test_modules(&masked, path)?;
+    assert_no_forbidden_benchmark_tokens(source, &code, path)
+}
+
+#[test]
+fn approved_m3_benchmark_worker_guard_accepts_exact_source() -> AuditResult {
+    let path = Path::new("rust/crates/er-sim/benches/m3_benchmark.rs");
+    audit_approved_m3_benchmark_worker(approved_m3_benchmark_worker_source(), path)
+}
+
+#[test]
+fn approved_m3_benchmark_worker_guard_rejects_second_thread_spawn() -> AuditResult {
+    let source = format!(
+        "{}\nlet extra = std::thread::spawn(|| {{}});",
+        approved_m3_benchmark_worker_source()
+    );
+    let path = Path::new("rust/crates/er-sim/benches/m3_benchmark.rs");
+    match audit_approved_m3_benchmark_worker(&source, path) {
+        Err(error) => require(
+            error.contains("must contain exactly one approved M3 benchmark worker qualifier"),
+            format!("second thread spawn produced unexpected error: {error}"),
+        ),
+        Ok(()) => Err("second thread spawn was accepted by the approved worker guard".to_owned()),
+    }
+}
+
+#[test]
+fn approved_m3_benchmark_worker_guard_rejects_changed_ranges() -> AuditResult {
+    let source = approved_m3_benchmark_worker_source().replace(
+        "[(0, 500), (500, 1_000)]",
+        "[(0, 499), (499, 1_000)]",
+    );
+    let path = Path::new("rust/crates/er-sim/benches/m3_benchmark.rs");
+    match audit_approved_m3_benchmark_worker(&source, path) {
+        Err(error) => require(
+            error.contains("is missing approved M3 benchmark worker marker")
+                && error.contains(
+                    "constTWO_CLIENT_SUPPORTED_TURN_RANGES:[(u64,u64);2]=[(0,500),(500,1_000)];",
+                ),
+            format!("changed ranges produced unexpected error: {error}"),
+        ),
+        Ok(()) => Err("changed fixed ranges were accepted by the approved worker guard".to_owned()),
+    }
+}
+
+#[test]
+fn approved_m3_benchmark_worker_guard_rejects_renamed_worker_one_join() -> AuditResult {
+    let source = approved_m3_benchmark_worker_source().replace(
+        "let worker_1_join = worker_1.join();",
+        "let worker_1_join = worker_1.finish();",
+    );
+    let path = Path::new("rust/crates/er-sim/benches/m3_benchmark.rs");
+    match audit_approved_m3_benchmark_worker(&source, path) {
+        Err(error) => require(
+            error.contains("is missing approved M3 benchmark worker marker")
+                && error.contains("letworker_1_join=worker_1.join();"),
+            format!("renamed worker_1 join produced unexpected error: {error}"),
+        ),
+        Ok(()) => Err("renamed worker_1 join was accepted by the approved worker guard".to_owned()),
+    }
+}
+
+#[test]
+fn generic_benchmark_guard_rejects_approved_worker_outside_m3_benchmark() -> AuditResult {
+    let path = Path::new("rust/crates/er-sim/benches/other.rs");
+    match audit_approved_m3_benchmark_worker(approved_m3_benchmark_worker_source(), path) {
+        Err(error) => require(
+            error.contains("contains forbidden benchmark escape hatch thread"),
+            format!("generic benchmark guard produced unexpected error: {error}"),
+        ),
+        Ok(()) => Err("approved worker was accepted outside m3_benchmark.rs".to_owned()),
+    }
+}
+
 #[test]
 fn production_core_has_no_escape_hatches_or_test_transition_branches() -> AuditResult {
     let root = repository_root();
@@ -934,7 +1039,12 @@ fn mask_approved_m3_benchmark_worker(
         )?;
     }
 
-    let start = code.find(qualifier).expect("validated qualifier is present");
+    let start: usize = code.find(qualifier).ok_or_else(|| {
+        format!(
+            "{} approved M3 benchmark worker qualifier disappeared before masking",
+            path.display()
+        )
+    })?;
     let mut output = code.as_bytes().to_vec();
     mask_range(
         &mut output,
