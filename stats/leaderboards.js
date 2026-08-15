@@ -2,6 +2,24 @@
 
 const DATA_URL = "./data/leaderboards.json";
 const MOBILE_QUERY = "(max-width: 900px)";
+const BOARD_HINTS = {
+  "achievement-points": "Points from unlocked achievements.",
+  ribbons: "Victory ribbons across all starter species.",
+  "shiny-lab-effects": "Shiny Lab species effects unlocked.",
+  "black-market-runs": "Runs where the Black Market was used.",
+  "ace-win-rate": "Ace win rate; minimum 50 completed runs.",
+  "elite-win-rate": "Elite win rate; minimum 50 completed runs.",
+  "hell-win-rate": "Hell win rate; minimum 50 completed runs.",
+  "average-wave": "Mean finishing wave; minimum 20 completed runs.",
+  "median-wave": "Middle finishing wave; minimum 20 completed runs.",
+  "unique-winning-starters": "Distinct opening starter lines used in victories.",
+  "challenge-combinations": "Distinct sets of challenge modifiers cleared.",
+  "monotype-clears": "Victories with any monotype challenge.",
+  "hell-monotype-clears": "Hell victories with any monotype challenge.",
+  "no-repeat-streak": "Best win streak without reusing an opening starter; losses reset it.",
+  "form-30-days": "Win rate in the last 30 days; minimum 50 runs.",
+  "form-90-days": "Win rate in the last 90 days; minimum 50 runs.",
+};
 
 const els = {
   groups: document.getElementById("groups"),
@@ -98,6 +116,7 @@ function boardByHash() {
 
 function renderChrome() {
   const activeGroup = currentBoardId ? groupOf(currentBoardId) : null;
+  const activeHint = BOARD_HINTS[currentBoardId] ?? "";
 
   if (media.matches) {
     const groupOptions = groups
@@ -107,13 +126,15 @@ function renderChrome() {
       groups
         .find(g => g.name === activeGroup)
         ?.boards.map(
-          b => `<option value="${esc(b.id)}"${b.id === currentBoardId ? " selected" : ""}>${esc(b.label)}</option>`,
+          b => `<option value="${esc(b.id)}"${b.id === currentBoardId ? " selected" : ""}${
+            BOARD_HINTS[b.id] ? ` title="${esc(BOARD_HINTS[b.id])}"` : ""
+          }>${esc(b.label)}</option>`,
         )
         .join("") ?? "";
     els.groups.innerHTML = `<label class="visually-hidden" for="group-select">Category</label>
       <select id="group-select">${groupOptions}</select>`;
     els.metrics.innerHTML = `<label class="visually-hidden" for="metric-select">Leaderboard metric</label>
-      <select id="metric-select">${metricOptions}</select>`;
+      <select id="metric-select"${activeHint ? ` title="${esc(activeHint)}"` : ""}>${metricOptions}</select>`;
     return;
   }
 
@@ -130,7 +151,9 @@ function renderChrome() {
     ? g.boards
         .map(
           b => `<button type="button" class="metric-pill${b.id === currentBoardId ? " is-active" : ""}"
-          data-board="${esc(b.id)}" aria-pressed="${b.id === currentBoardId}">${esc(b.label)}</button>`,
+          data-board="${esc(b.id)}" aria-pressed="${b.id === currentBoardId}"${
+            BOARD_HINTS[b.id] ? ` title="${esc(BOARD_HINTS[b.id])}"` : ""
+          }>${esc(b.label)}</button>`,
         )
         .join("")
     : "";
