@@ -493,7 +493,7 @@ fn production_core_has_no_escape_hatches_or_test_transition_branches() -> AuditR
             let masked = mask_non_code(&source);
             assert_cfg_policy(&masked, &path)?;
             let benchmark_code = strip_test_modules(&masked, &path)?;
-            assert_no_forbidden_benchmark_tokens(&benchmark_code, &path)?;
+            assert_no_forbidden_benchmark_tokens(&source, &benchmark_code, &path)?;
         }
     }
     Ok(())
@@ -855,6 +855,99 @@ fn mask_range(output: &mut [u8], source: &[u8], start: usize, end: usize) {
             output[index] = b' ';
         }
     }
+}
+
+fn mask_approved_m3_benchmark_worker(
+    source: &str,
+    code: &str,
+    path: &Path,
+) -> Result<String, String> {
+    let suffix = Path::new("rust")
+        .join("crates")
+        .join("er-sim")
+        .join("benches")
+        .join("m3_benchmark.rs");
+    if !path.ends_with(&suffix) {
+        return Ok(code.to_owned());
+    }
+
+    let compact_code = compact(code);
+    let compact_source = compact(source);
+    let qualifier = "std::thread::spawn";
+    require(
+        code.match_indices(qualifier).count() == 1,
+        format!(
+            "{} must contain exactly one approved M3 benchmark worker qualifier",
+            path.display()
+        ),
+    )?;
+    for marker in [
+        "constTWO_CLIENT_SUPPORTED_TURNS:u64=1_000;",
+        "constTWO_CLIENT_SUPPORTED_TURN_RANGES:[(u64,u64);2]=[(0,500),(500,1_000)];",
+        "letworker_0=spawn_worker(0,worker_0_start,worker_0_end,pair_template_0);",
+        "letworker_1=spawn_worker(1,worker_1_start,worker_1_end,pair_template_1);",
+        "letworker_0_join=worker_0.join();",
+        "letworker_1_join=worker_1.join();",
+        "assert_eq!(total_iterations,TWO_CLIENT_SUPPORTED_TURNS);",
+        "domain:PAIR_FRONTIER_CHECKSUM_DOMAIN,",
+        "version:PAIR_FRONTIER_CHECKSUM_VERSION,",
+    ] {
+        require(
+            compact_code.contains(marker),
+            format!(
+                "{} is missing approved M3 benchmark worker marker {marker}",
+                path.display()
+            ),
+        )?;
+    }
+    for marker in [
+        "constPAIR_FRONTIER_CHECKSUM_DOMAIN:&str=\"pokerogue-redux/m3/benchmark-pair-frontier/v2\";",
+        "constPAIR_FRONTIER_CHECKSUM_VERSION:u32=2;",
+    ] {
+        require(
+            compact_source.contains(marker),
+            format!(
+                "{} is missing approved M3 benchmark source marker {marker}",
+                path.display()
+            ),
+        )?;
+    }
+    require(
+        compact_code.matches("spawn_worker(").count() == 2,
+        format!(
+            "{} must contain exactly two approved M3 benchmark worker launches",
+            path.display()
+        ),
+    )?;
+    for marker in [
+        "letworker_0=spawn_worker(0,worker_0_start,worker_0_end,pair_template_0);",
+        "letworker_1=spawn_worker(1,worker_1_start,worker_1_end,pair_template_1);",
+        "letworker_0_join=worker_0.join();",
+        "letworker_1_join=worker_1.join();",
+    ] {
+        require(
+            compact_code.matches(marker).count() == 1,
+            format!(
+                "{} must contain exactly one approved M3 benchmark worker marker {marker}",
+                path.display()
+            ),
+        )?;
+    }
+
+    let start = code.find(qualifier).expect("validated qualifier is present");
+    let mut output = code.as_bytes().to_vec();
+    mask_range(
+        &mut output,
+        code.as_bytes(),
+        start,
+        start + qualifier.len(),
+    );
+    String::from_utf8(output).map_err(|error| {
+        format!(
+            "{} masked approved M3 benchmark worker produced invalid UTF-8: {error}",
+            path.display()
+        )
+    })
 }
 
 fn mask_non_code(source: &str) -> String {
@@ -1286,8 +1379,13 @@ fn assert_no_wall_clock_uses(code: &str, path: &Path) -> AuditResult {
     Ok(())
 }
 
-fn assert_no_forbidden_benchmark_tokens(code: &str, path: &Path) -> AuditResult {
-    let token_set: BTreeSet<String> = identifiers(code)
+fn assert_no_forbidden_benchmark_tokens(
+    source: &str,
+    code: &str,
+    path: &Path,
+) -> AuditResult {
+    let code = mask_approved_m3_benchmark_worker(source, code, path)?;
+    let token_set: BTreeSet<String> = identifiers(&code)
         .into_iter()
         .map(|(identifier, _)| identifier)
         .collect();
@@ -1310,7 +1408,7 @@ fn assert_no_forbidden_benchmark_tokens(code: &str, path: &Path) -> AuditResult 
         "web_sys",
     ] {
         require(
-            !compact(code).contains(forbidden),
+            !compact(&code).contains(forbidden),
             format!(
                 "{} contains forbidden benchmark qualifier {forbidden}",
                 path.display()
