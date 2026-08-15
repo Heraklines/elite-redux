@@ -842,6 +842,18 @@ impl SimulatedPair {
         }
     }
 
+    /// Fork the complete live pair without crossing the serialized snapshot boundary.
+    #[doc(hidden)]
+    pub fn try_fork(&self) -> Result<Self, SimulatedPairError> {
+        self.ensure_live()?;
+        let host_seat = self.host_seat;
+        let guest_seat = self.guest_seat;
+        let seed = self.seed;
+        let event_budget = self.event_budget;
+        let state = self.capture_rollback_state()?;
+        Self::from_rollback_state(host_seat, guest_seat, seed, event_budget, state)
+    }
+
     fn apply_after_driver_sync(
         &mut self,
         operation: PairOperation,
@@ -925,10 +937,24 @@ impl SimulatedPair {
         })
     }
 
-    fn restore_rollback_state(
-        &mut self,
+    fn from_rollback_state(
+        host_seat: SeatId,
+        guest_seat: SeatId,
+        seed: u64,
+        event_budget: SafeU53,
         state: PairRollbackState,
-    ) -> Result<(), SimulatedPairError> {
+    ) -> Result<Self, SimulatedPairError> {
+        if event_budget == SafeU53::ZERO {
+            return Err(SimulatedPairError::InvalidConfig {
+                reason: "event budget must be positive".to_owned(),
+            });
+        }
+        if host_seat == guest_seat {
+            return Err(SimulatedPairError::InvalidConfig {
+                reason: "host and guest seats must be distinct".to_owned(),
+            });
+        }
+
         let PairRollbackState {
             host_kernel,
             guest_kernel,
@@ -951,21 +977,41 @@ impl SimulatedPair {
         let presenter = restore_presenter(presenter).map_err(adapter_error)?;
         let storage = MemoryStorage::from_state(storage).map_err(adapter_error)?;
 
-        self.host_kernel = host_kernel;
-        self.guest_kernel = guest_kernel;
-        self.host_keyboard = host_keyboard;
-        self.guest_keyboard = guest_keyboard;
-        self.sequence = sequence;
-        self.clock = clock;
-        self.network = network;
-        self.presenter = presenter;
-        self.storage = storage;
-        self.shared_terminal = shared_terminal;
-        self.terminal_reason = terminal_reason;
-        self.fault_script = fault_script;
-        self.last_boundary_order = last_boundary_order;
-        self.trace_audit = trace_audit;
-        self.disposed = disposed;
+        Ok(Self {
+            host_kernel,
+            guest_kernel,
+            host_seat,
+            guest_seat,
+            host_keyboard,
+            guest_keyboard,
+            sequence,
+            seed,
+            event_budget,
+            clock,
+            network,
+            presenter,
+            storage,
+            shared_terminal,
+            terminal_reason,
+            fault_script,
+            last_boundary_order,
+            trace_audit,
+            disposed,
+        })
+    }
+
+    fn restore_rollback_state(
+        &mut self,
+        state: PairRollbackState,
+    ) -> Result<(), SimulatedPairError> {
+        let restored = Self::from_rollback_state(
+            self.host_seat,
+            self.guest_seat,
+            self.seed,
+            self.event_budget,
+            state,
+        )?;
+        *self = restored;
         Ok(())
     }
 
@@ -4631,6 +4677,195 @@ mod tests {
         assert_eq!(pair.snapshot()?, before_snapshot);
         assert_eq!(pair.host_keyboard.export_state(), before_host_driver);
         assert_eq!(pair.guest_keyboard.export_state(), before_guest_driver);
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_preserves_pristine_snapshot_and_private_owners() -> TestResult {
+        let pair = SimulatedPair::new(config(0x53, safe(64)))?;
+        let fork = pair.try_fork()?;
+
+        assert_eq!(pair.snapshot()?, fork.snapshot()?);
+        assert_eq!(pair.host_seat, fork.host_seat);
+        assert_eq!(pair.guest_seat, fork.guest_seat);
+        assert_eq!(pair.seed, fork.seed);
+        assert_eq!(pair.event_budget, fork.event_budget);
+        assert_eq!(
+            pair.host_keyboard.export_state(),
+            fork.host_keyboard.export_state()
+        );
+        assert_eq!(
+            pair.guest_keyboard.export_state(),
+            fork.guest_keyboard.export_state()
+        );
+        assert_ne!(
+            std::ptr::addr_of!(pair.host_kernel),
+            std::ptr::addr_of!(fork.host_kernel)
+        );
+        assert_ne!(
+            std::ptr::addr_of!(pair.guest_kernel),
+            std::ptr::addr_of!(fork.guest_kernel)
+        );
+        assert_ne!(
+            std::ptr::addr_of!(pair.host_keyboard),
+            std::ptr::addr_of!(fork.host_keyboard)
+        );
+        assert_ne!(
+            std::ptr::addr_of!(pair.guest_keyboard),
+            std::ptr::addr_of!(fork.guest_keyboard)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_keeps_source_and_sibling_isolated_after_mutation_and_teardown() -> TestResult {
+        let mut source = SimulatedPair::new(config(0x54, safe(64)))?;
+        let mut sibling = source.try_fork()?;
+        let pristine = source.snapshot()?;
+
+        source.key_down(PairEndpoint::Host, PhysicalKey::ArrowUp, false)?;
+        let source_after_mutation = source.snapshot()?;
+        assert_ne!(source_after_mutation, pristine);
+        assert_eq!(sibling.snapshot()?, pristine);
+
+        sibling.key_down(PairEndpoint::Guest, PhysicalKey::ArrowDown, false)?;
+        assert_eq!(source.snapshot()?, source_after_mutation);
+
+        sibling.teardown("fork sibling teardown")?;
+        assert_eq!(source.snapshot()?, source_after_mutation);
+        assert!(matches!(sibling.snapshot(), Err(SimulatedPairError::Disposed)));
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_replays_the_same_operations_deterministically() -> TestResult {
+        let operations = vec![
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::ArrowUp,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+            },
+            PairOperation::AdvanceTime { delta_ms: safe(1) },
+            PairOperation::RawInput {
+                endpoint: PairEndpoint::Host,
+                event: RawInputEvent::KeyUp {
+                    code: PhysicalKey::ArrowUp,
+                },
+            },
+        ];
+        let mut source = SimulatedPair::new(config(0x55, safe(64)))?;
+        let mut fork = source.try_fork()?;
+
+        let source_steps = source.apply_many_atomic(operations.clone())?;
+        let fork_steps = fork.apply_many_atomic(operations)?;
+
+        assert_eq!(source_steps, fork_steps);
+        assert_eq!(source.snapshot()?, fork.snapshot()?);
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_preserves_populated_private_environment_state() -> TestResult {
+        let mut pair_config = protocol_pair_config(0x56, false)?;
+        pair_config.presenter = PresenterMode::FaultControlled;
+        pair_config
+            .initial_storage
+            .insert("fork-populated".to_owned(), json!({"ready": true}));
+        let mut pair = SimulatedPair::new(pair_config)?;
+        let _proposal = raw_press_proposal(&mut pair)?;
+
+        let event_id = PresentationEventId::new(safe(92))?;
+        let mut work = VecDeque::new();
+        pair.consume_effect(
+            KernelEffect::Present {
+                endpoint: test_seat(TEST_HOST_SEAT),
+                event: PresentationEvent {
+                    event_id,
+                    event_kind: "fork-populated".to_owned(),
+                    payload: json!({"pending": true}),
+                },
+            },
+            &mut work,
+        )?;
+        assert!(work.is_empty());
+
+        pair.storage.allocate_request_for(
+            test_seat(TEST_HOST_SEAT),
+            "fork-pending",
+            Some(json!({"pending": true})),
+        )?;
+        let packet_id = pair
+            .snapshot()?
+            .network
+            .queued_packet_ids
+            .into_iter()
+            .next()
+            .ok_or_else(|| std::io::Error::other("populated fork fixture must queue a packet"))?;
+        pair.apply(PairOperation::Fault {
+            operation: FaultOperation::Delay {
+                packet_id,
+                additional_ms: safe(7),
+            },
+        })?;
+        pair.advance_time(safe(20))?;
+
+        let fork = pair.try_fork()?;
+        assert_eq!(pair.snapshot()?, fork.snapshot()?);
+        assert_eq!(pair.host_kernel.snapshot(), fork.host_kernel.snapshot());
+        assert_eq!(pair.guest_kernel.snapshot(), fork.guest_kernel.snapshot());
+        assert_eq!(
+            pair.host_keyboard.export_state(),
+            fork.host_keyboard.export_state()
+        );
+        assert_eq!(
+            pair.guest_keyboard.export_state(),
+            fork.guest_keyboard.export_state()
+        );
+        assert_eq!(pair.clock.export_state(), fork.clock.export_state());
+        assert_eq!(pair.network.export_state(), fork.network.export_state());
+        assert_eq!(
+            pair.presenter.export_state()?,
+            fork.presenter.export_state()?
+        );
+        assert_eq!(pair.storage.export_state(), fork.storage.export_state());
+        assert_eq!(pair.shared_terminal, fork.shared_terminal);
+        assert_eq!(pair.terminal_reason, fork.terminal_reason);
+        assert_eq!(pair.fault_script, fork.fault_script);
+        assert_eq!(pair.last_boundary_order, fork.last_boundary_order);
+        assert_eq!(
+            pair.trace_audit.effect_origins,
+            fork.trace_audit.effect_origins
+        );
+        assert_eq!(pair.trace_audit.host_rng_audit, fork.trace_audit.host_rng_audit);
+        assert_eq!(
+            pair.trace_audit.host_internal_events,
+            fork.trace_audit.host_internal_events
+        );
+        assert_eq!(
+            pair.trace_audit.guest_rng_audit,
+            fork.trace_audit.guest_rng_audit
+        );
+        assert_eq!(
+            pair.trace_audit.guest_internal_events,
+            fork.trace_audit.guest_internal_events
+        );
+        assert_eq!(pair.disposed, fork.disposed);
+        Ok(())
+    }
+
+    #[test]
+    fn try_fork_rejects_disposed_source() -> TestResult {
+        let mut pair = SimulatedPair::new(config(0x57, safe(64)))?;
+        pair.teardown("disposed fork source")?;
+
+        assert!(matches!(
+            pair.try_fork(),
+            Err(SimulatedPairError::Disposed)
+        ));
         Ok(())
     }
 
