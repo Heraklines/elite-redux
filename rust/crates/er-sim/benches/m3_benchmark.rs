@@ -1951,11 +1951,12 @@ fn m3_two_client_supported_turns() -> TestResult {
     let content = fixture_content_pack()?;
     let content_load_elapsed_ns = elapsed_ns(content_started);
     let fixture = fixture_value(DOUBLES_FIXTURE)?;
+    let mut pair_template = new_pair(&fixture, &content, 0, false)?;
     let execution_started = Instant::now();
     let mut checksum = FNV_OFFSET;
     let mut counts = Counts::default();
-    for iteration in 0..TWO_CLIENT_SUPPORTED_TURNS {
-        let mut pair = new_pair(&fixture, &content, iteration, false)?;
+    for _ in 0..TWO_CLIENT_SUPPORTED_TURNS {
+        let mut pair = pair_template.try_fork()?;
         let mut pending = Vec::new();
         let mut setup_evidence = TurnEvidence::default();
         let reconnect_step = run_pair_operation(
@@ -2016,6 +2017,11 @@ fn m3_two_client_supported_turns() -> TestResult {
         assert_zero_pair_resources(&teardown_snapshot);
         absorb_pair_snapshot_frontier(&mut checksum, &teardown_snapshot)?;
     }
+    let execution_elapsed_ns = elapsed_ns(execution_started);
+    let template_teardown_snapshot =
+        pair_template.teardown("m3 supported turn template teardown")?;
+    assert_zero_pair_resources(&template_teardown_snapshot);
+    absorb_pair_snapshot_frontier(&mut checksum, &template_teardown_snapshot)?;
     assert_eq!(counts.turns, TWO_CLIENT_SUPPORTED_TURNS);
     assert_eq!(counts.battles, TWO_CLIENT_SUPPORTED_TURNS);
     report(
@@ -2025,12 +2031,14 @@ fn m3_two_client_supported_turns() -> TestResult {
         0,
         checksum,
         content_load_elapsed_ns,
-        elapsed_ns(execution_started),
+        execution_elapsed_ns,
         &counts,
         json!({
             "input_architecture": "two authority/replica endpoints driven by raw physical keydown/keyUp",
             "fixture": "doubles-single-target",
             "endpoints": ["host", "guest"],
+            "pair_initialization_excluded": true,
+            "pair_fork_included": true,
         }),
     )
 }
