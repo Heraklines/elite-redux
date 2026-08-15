@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS system_saves (
   data       TEXT    NOT NULL,
   trainer_id INTEGER,
   secret_id  INTEGER,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  leaderboard_stats TEXT
 );
 
 -- Up to 5 session (run) saves per user, one per slot. Composite PK keeps an

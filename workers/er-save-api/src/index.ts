@@ -44,6 +44,7 @@ import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type"
 import { SpeciesId } from "../../../src/enums/species-id";
 import { TrainerType } from "../../../src/enums/trainer-type";
 import { TrainerVariant } from "../../../src/enums/trainer-variant";
+import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
   applyResultReport,
   finalizeExpiredLoneReport,
@@ -718,15 +719,18 @@ async function handleSystemUpdate(
   if (guard) {
     return guard;
   }
+  await ensureLeaderboardStatsColumn(env);
   // Store uncompressed (lazy migration): a legacy "GZ1:" row is replaced with
   // plaintext here on its next write; reads stay back-compat via decompressSave.
   const stored = data;
   const trainerId = Number.parseInt(url.searchParams.get("trainerId") ?? "", 10);
   const secretId = Number.parseInt(url.searchParams.get("secretId") ?? "", 10);
+  const leaderboardStats = extractLeaderboardStats(data);
   await env.DB.prepare(
-    `INSERT INTO system_saves (user_id, data, trainer_id, secret_id, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5)
-       ON CONFLICT(user_id) DO UPDATE SET data = ?2, trainer_id = ?3, secret_id = ?4, updated_at = ?5`,
+    `INSERT INTO system_saves (user_id, data, trainer_id, secret_id, updated_at, leaderboard_stats)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+       ON CONFLICT(user_id) DO UPDATE SET data = ?2, trainer_id = ?3, secret_id = ?4, updated_at = ?5,
+         leaderboard_stats = COALESCE(?6, leaderboard_stats)`,
   )
     .bind(
       auth.uid,
@@ -734,9 +738,21 @@ async function handleSystemUpdate(
       Number.isFinite(trainerId) ? trainerId : null,
       Number.isFinite(secretId) ? secretId : null,
       Date.now(),
+      leaderboardStats,
     )
     .run();
   return text("", 200, cors);
+}
+
+let leaderboardStatsColumnPromise: Promise<void> | null = null;
+
+function ensureLeaderboardStatsColumn(env: Env): Promise<void> {
+  leaderboardStatsColumnPromise ??= (async () => {
+    try {
+      await env.DB.prepare("ALTER TABLE system_saves ADD COLUMN leaderboard_stats TEXT").run();
+    } catch {}
+  })();
+  return leaderboardStatsColumnPromise;
 }
 
 function parseSlot(url: URL): number | null {

@@ -42,6 +42,7 @@ export interface SystemSaveData {
   dexData: DexData;
   starterData: StarterData;
   gameStats: GameStats;
+  leaderboardStats?: LeaderboardSaveStats;
   unlocks: Unlocks;
   achvUnlocks: AchvUnlocks;
   voucherUnlocks: VoucherUnlocks;
@@ -98,6 +99,24 @@ export interface SystemSaveData {
    * round-trip; the display UI is intentionally deferred. Absent = none earned yet.
    */
   erTitles?: string[];
+}
+
+export interface LeaderboardSaveStats {
+  version: number;
+  achievementCount: number;
+  achievementPoints: number;
+  ribbons: number;
+  sessionsWon: number;
+  shinySpecies: number;
+  blackShinySpecies: number;
+  shinyCaught: number;
+  shinyHatched: number;
+  shinyLabEffects: number;
+  uniqueRelics: number;
+  eggsPulled: number;
+  highestDamage: number;
+  highestHeal: number;
+  blackMarketRuns: number;
 }
 
 export interface SessionSaveData {

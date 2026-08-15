@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="dark" />
+    <title>Leaderboards · Pokerogue Redux</title>
+    <link rel="stylesheet" href="./leaderboards.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand">
+        <a class="brand-name" href="./">Pokerogue <b>Redux</b></a>
+        <span class="brand-product">Leaderboards</span>
+        <a class="site-link" href="./">Pokédex &amp; Usage</a>
+      </div>
+      <div class="search" id="search">
+        <label class="visually-hidden" for="player-search"
+          >Search players in the published leaderboards</label
+        >
+        <input
+          id="player-search"
+          type="search"
+          placeholder="Search a player…"
+          autocomplete="off"
+          spellcheck="false"
+          role="combobox"
+          aria-expanded="false"
+          aria-controls="search-results"
+        />
+        <div
+          class="search-pop"
+          id="search-results"
+          role="listbox"
+          aria-label="Matching players"
+          hidden
+        ></div>
+      </div>
+      <p class="site-meta" id="meta"></p>
+    </header>
+
+    <div class="nav-area">
+      <nav class="nav-groups" id="groups" aria-label="Leaderboard categories"></nav>
+      <nav class="nav-metrics" id="metrics" aria-label="Leaderboard metrics"></nav>
+    </div>
+
+    <main>
+      <div class="state" id="state" role="status">Loading leaderboards…</div>
+      <section class="board" id="board" hidden aria-live="polite"></section>
+    </main>
+
+    <noscript><p class="state">The leaderboards require JavaScript.</p></noscript>
+    <script src="./leaderboards.js"></script>
+  </body>
+</html>

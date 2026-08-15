@@ -147,6 +147,7 @@ import {
 import { ChallengeData } from "#system/challenge-data";
 import { EggData } from "#system/egg-data";
 import { GameStats } from "#system/game-stats";
+import { buildLeaderboardSaveStats } from "#system/leaderboard-save-stats";
 import { defaultDirectorState, type LLMDirectorState, mergeDirectorState } from "#system/llm-director/director-state";
 import { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import { notificationManager } from "#system/notifications/notification-manager";
@@ -655,6 +656,7 @@ export class GameData {
       dexData: this.dexData,
       starterData: this.starterData,
       gameStats: this.gameStats,
+      leaderboardStats: buildLeaderboardSaveStats(this.achvUnlocks, this.dexData, this.starterData, this.gameStats),
       unlocks: this.unlocks,
       achvUnlocks: this.achvUnlocks,
       voucherUnlocks: this.voucherUnlocks,
