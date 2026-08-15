@@ -1987,7 +1987,7 @@ fn m3_two_client_supported_turns() -> TestResult {
         let reconnect_step = step_iter.next().ok_or_else(|| {
             invalid("two-client supported turn fork batch omitted reconnect step")
         })?;
-        if &reconnect_step.operation != &expected_operations[0] {
+        if reconnect_step.operation != expected_operations[0] {
             return Err(invalid(format!(
                 "two-client supported turn fork batch step 0 was {:?}; expected {:?}",
                 reconnect_step.operation, expected_operations[0]
