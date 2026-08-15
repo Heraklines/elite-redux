@@ -146,7 +146,6 @@ import { TournamentListUiHandler } from "#ui/tournament-list-ui-handler";
 import type { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
-import { executeIf } from "#utils/common";
 import i18next from "i18next";
 import { AdminUiHandler } from "./handlers/admin-ui-handler";
 import { RenameRunFormUiHandler } from "./handlers/rename-run-ui-handler";
@@ -1497,13 +1496,12 @@ export class UI extends Phaser.GameObjects.Container {
     });
   }
 
-  revertModes(): Promise<void> {
-    return new Promise<void>(resolve => {
-      if (this?.modeChain?.length === 0) {
-        return resolve();
+  async revertModes(): Promise<void> {
+    while (this.modeChain.length > 0) {
+      if (!(await this.revertMode())) {
+        break;
       }
-      this.revertMode().then(success => executeIf(success, this.revertModes).then(() => resolve()));
-    });
+    }
   }
 
   public getModeChain(): UiMode[] {
