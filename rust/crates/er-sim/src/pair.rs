@@ -3620,7 +3620,10 @@ mod tests {
         expected: &PairRollbackState,
     ) -> TestResult {
         assert_eq!(pair.host_kernel.snapshot(), expected.host_kernel.snapshot());
-        assert_eq!(pair.guest_kernel.snapshot(), expected.guest_kernel.snapshot());
+        assert_eq!(
+            pair.guest_kernel.snapshot(),
+            expected.guest_kernel.snapshot()
+        );
         assert_eq!(
             pair.host_keyboard.export_state(),
             expected.host_keyboard.export_state()
