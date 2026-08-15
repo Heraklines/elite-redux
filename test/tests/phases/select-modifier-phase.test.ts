@@ -8,8 +8,8 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { PlayerPokemon } from "#field/pokemon";
 import type { CustomModifierSettings } from "#modifiers/modifier-type";
-import { ModifierTypeOption } from "#modifiers/modifier-type";
-import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { getLuckUpgradeOdds, ModifierTypeOption } from "#modifiers/modifier-type";
+import { resolveRewardRerollTierPolicy, SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { initSceneWithoutEncounterPhase } from "#test/utils/game-manager-utils";
 import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
@@ -39,6 +39,35 @@ describe("SelectModifierPhase", () => {
       .startingLevel(200)
       .enemySpecies(SpeciesId.MAGIKARP)
       .battleStyle("single");
+  });
+
+  it("ER: Luck monotonically improves reward-tier upgrade odds through the supported cap", () => {
+    const odds = Array.from({ length: 19 }, (_, luck) => getLuckUpgradeOdds(luck));
+    for (let luck = 1; luck < odds.length; luck++) {
+      expect(odds[luck]).toBeLessThanOrEqual(odds[luck - 1]);
+    }
+    expect(4 / odds[0]).toBeCloseTo(0.039, 2);
+    expect(4 / odds[18]).toBeCloseTo(0.222, 2);
+  });
+
+  it("ER: rarity locks preserve visible tiers without applying Luck twice", () => {
+    const previous = [ModifierTier.GREAT, ModifierTier.MASTER, ModifierTier.LUXURY];
+    expect(resolveRewardRerollTierPolicy(true, 1, previous)).toEqual({
+      tiers: previous,
+      allowLuckUpgrades: false,
+    });
+  });
+
+  it("ER: unlocked rerolls preserve Master and Luxury floors while rerolling lower tiers", () => {
+    expect(resolveRewardRerollTierPolicy(true, 1, [ModifierTier.GREAT, ModifierTier.ULTRA]).allowLuckUpgrades).toBe(
+      false,
+    );
+    expect(
+      resolveRewardRerollTierPolicy(false, 1, [ModifierTier.GREAT, ModifierTier.MASTER, ModifierTier.LUXURY]),
+    ).toEqual({
+      tiers: [undefined, ModifierTier.MASTER, ModifierTier.LUXURY],
+      allowLuckUpgrades: true,
+    });
   });
 
   it("should start a select modifier phase", async () => {
@@ -291,6 +320,22 @@ describe("SelectModifierPhase", () => {
       modifierTypes.POKEBALL().name,
       modifierTypes.VOUCHER().name,
     ]);
+  });
+
+  it("ER: Sprint keeps ordinary Pokemon-targeted rewards in the first-pick pool", async () => {
+    await game.classicMode.startBattle(SpeciesId.ABRA);
+    const phase = new SelectModifierPhase(0, undefined, undefined, false, { kind: "ambient" }, undefined, 0, 2, 2);
+    vi.spyOn(phase, "getModifierTypeOptions").mockReturnValue([
+      new ModifierTypeOption(modifierTypes.POTION(), 0),
+      new ModifierTypeOption(modifierTypes.POKEBALL(), 0),
+    ]);
+    scene.phaseManager.unshiftPhase(phase);
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const handler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
+    await vi.waitFor(() => expect(handler.options).toHaveLength(2), { timeout: 5_000 });
+    expect(handler.options.map(option => option.modifierTypeOption.type.id)).toEqual(["POTION", "POKEBALL"]);
   });
 
   it("should generate custom modifier tiers that can upgrade from luck", async () => {

@@ -757,13 +757,15 @@ export class SelectModifierPhase extends BattlePhase {
     if (coopIsWatcher) {
       this.typeOptions = [];
     } else if (this.freePicksRemaining > 1) {
-      // A first-pick reward must resolve synchronously so this same screen can stay open
-      // for pick two. Party-target items open a separate picker even when the modifier
-      // itself does not queue a continuation phase, so exclude both categories.
+      // Keep true nested pickers off the first of multiple picks because they retain a
+      // continuation copy of this phase. Ordinary Pokemon-targeted rewards are safe:
+      // their party callback returns here, consumes one pick, and rearms this screen.
+      // Excluding every PokemonModifierType reduced Sprint's pool mostly to balls,
+      // vouchers, money, and global charms.
       const immediateOptions: ModifierTypeOption[] = [];
       for (let attempt = 0; attempt < 8 && immediateOptions.length < modifierCount; attempt++) {
         const eligible = this.getModifierTypeOptions(modifierCount + 5).filter(
-          option => !(option.type instanceof PokemonModifierType) && !this.modifierQueuesContinuation(option.type),
+          option => !this.modifierQueuesContinuation(option.type),
         );
         immediateOptions.splice(
           0,
