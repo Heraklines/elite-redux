@@ -3254,7 +3254,26 @@ export function getPlayerModifierTypeOptions(
 
   overridePlayerModifierTypeOptions(options, party);
 
-  return options;
+  return getUniqueModifierTypeOptions(options);
+}
+
+/** Reward options conflict when they render as the same item or share an explicit exclusion group. */
+export function modifierTypeOptionsConflict(left: ModifierTypeOption, right: ModifierTypeOption): boolean {
+  return (
+    left.type.name === right.type.name
+    || (left.type.group != null && right.type.group != null && left.type.group === right.type.group)
+  );
+}
+
+/** Preserve roll order while ensuring a reward screen never displays duplicate offers. */
+export function getUniqueModifierTypeOptions(options: readonly ModifierTypeOption[]): ModifierTypeOption[] {
+  const unique: ModifierTypeOption[] = [];
+  for (const option of options) {
+    if (!unique.some(existing => modifierTypeOptionsConflict(existing, option))) {
+      unique.push(option);
+    }
+  }
+  return unique;
 }
 
 /**
@@ -3280,8 +3299,7 @@ function getModifierTypeOptionWithRetry(
   while (
     (existingOptions.length > 0
       && ++r < retryCount
-      && existingOptions.filter(o => o.type.name === candidate?.type.name || o.type.group === candidate?.type.group)
-        .length > 0)
+      && existingOptions.some(option => candidate != null && modifierTypeOptionsConflict(option, candidate)))
     || !candidateValidity.value
   ) {
     candidate = getNewModifierTypeOption(

@@ -117,6 +117,7 @@ import {
   FusePokemonModifierType,
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
+  getUniqueModifierTypeOptions,
   PokemonAbilityModifierType,
   PokemonAddMoveSlotModifierType,
   PokemonModifierType,
@@ -761,10 +762,13 @@ export class SelectModifierPhase extends BattlePhase {
       // itself does not queue a continuation phase, so exclude both categories.
       const immediateOptions: ModifierTypeOption[] = [];
       for (let attempt = 0; attempt < 8 && immediateOptions.length < modifierCount; attempt++) {
-        immediateOptions.push(
-          ...this.getModifierTypeOptions(modifierCount + 5).filter(
-            option => !(option.type instanceof PokemonModifierType) && !this.modifierQueuesContinuation(option.type),
-          ),
+        const eligible = this.getModifierTypeOptions(modifierCount + 5).filter(
+          option => !(option.type instanceof PokemonModifierType) && !this.modifierQueuesContinuation(option.type),
+        );
+        immediateOptions.splice(
+          0,
+          immediateOptions.length,
+          ...getUniqueModifierTypeOptions([...immediateOptions, ...eligible]),
         );
       }
       this.typeOptions = immediateOptions.slice(0, modifierCount);

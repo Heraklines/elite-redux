@@ -274,6 +274,25 @@ describe("SelectModifierPhase", () => {
     });
   });
 
+  it("ER: Sprint never repeats immediate rewards across generated batches", async () => {
+    await game.classicMode.startBattle(SpeciesId.ABRA);
+    const phase = new SelectModifierPhase(0, undefined, undefined, false, { kind: "ambient" }, undefined, 0, 6, 2);
+    vi.spyOn(phase, "getModifierTypeOptions").mockReturnValue([
+      new ModifierTypeOption(modifierTypes.POKEBALL(), 0),
+      new ModifierTypeOption(modifierTypes.VOUCHER(), 0),
+    ]);
+    scene.phaseManager.unshiftPhase(phase);
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const handler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
+    await vi.waitFor(() => expect(handler.options).toHaveLength(2), { timeout: 5_000 });
+    expect(handler.options.map(option => option.modifierTypeOption.type.name)).toEqual([
+      modifierTypes.POKEBALL().name,
+      modifierTypes.VOUCHER().name,
+    ]);
+  });
+
   it("should generate custom modifier tiers that can upgrade from luck", async () => {
     await game.classicMode.startBattle(SpeciesId.ABRA, SpeciesId.VOLCARONA);
     scene.money = 1000000;
