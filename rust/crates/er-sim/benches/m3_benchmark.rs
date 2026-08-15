@@ -2196,23 +2196,21 @@ fn m3_two_client_supported_turns() -> TestResult {
                 pair_template,
             )
             .map_err(|error| error.to_string())
-            .unwrap_or_else(|error| {
-                panic!("two-client supported turn worker {worker} failed: {error}")
-            })
         })
     };
     let [(worker_0_start, worker_0_end), (worker_1_start, worker_1_end)] =
         TWO_CLIENT_SUPPORTED_TURN_RANGES;
     let worker_0 = spawn_worker(0, worker_0_start, worker_0_end, pair_template_0);
     let worker_1 = spawn_worker(1, worker_1_start, worker_1_end, pair_template_1);
-    let mut worker_results = vec![
-        worker_0
-            .join()
-            .expect("two-client supported turn worker 0 panicked"),
-        worker_1
-            .join()
-            .expect("two-client supported turn worker 1 panicked"),
-    ];
+    let worker_0_join = worker_0.join();
+    let worker_1_join = worker_1.join();
+    let worker_0_result = worker_0_join
+        .map_err(|_| invalid("worker 0 panicked"))?
+        .map_err(|error| invalid(format!("worker 0 failed: {error}")))?;
+    let worker_1_result = worker_1_join
+        .map_err(|_| invalid("worker 1 panicked"))?
+        .map_err(|error| invalid(format!("worker 1 failed: {error}")))?;
+    let mut worker_results = vec![worker_0_result, worker_1_result];
     let total_iterations = validate_two_client_supported_turn_workers(&mut worker_results)?;
     assert_eq!(total_iterations, TWO_CLIENT_SUPPORTED_TURNS);
     let mut counts = Counts::default();
