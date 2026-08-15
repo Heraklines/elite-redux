@@ -1983,30 +1983,39 @@ fn m3_two_client_supported_turns() -> TestResult {
                 steps.len()
             )));
         }
-        for (index, (step, expected_operation)) in
-            steps.iter().zip(expected_operations.iter()).enumerate()
-        {
-            if &step.operation != expected_operation {
-                return Err(invalid(format!(
-                    "two-client supported turn fork batch step {index} was {:?}; expected {:?}",
-                    step.operation, expected_operation
-                )));
-            }
+        let mut step_iter = steps.into_iter();
+        let reconnect_step = step_iter.next().ok_or_else(|| {
+            invalid("two-client supported turn fork batch omitted reconnect step")
+        })?;
+        if &reconnect_step.operation != &expected_operations[0] {
+            return Err(invalid(format!(
+                "two-client supported turn fork batch step 0 was {:?}; expected {:?}",
+                reconnect_step.operation, expected_operations[0]
+            )));
         }
         counts.inputs = counts.inputs.saturating_add(1);
         observe_pair_step(
-            &steps[0],
+            &reconnect_step,
             &mut checksum,
             &mut counts,
             &mut pending,
             &mut setup_evidence,
         )?;
-        let before = steps[0].snapshot.clone();
+        let before = reconnect_step.snapshot;
         let mut evidence = TurnEvidence::default();
-        for step in steps.iter().skip(1) {
+        for (index, step) in step_iter.enumerate() {
+            let expected_operation = &expected_operations[index + 1];
+            if &step.operation != expected_operation {
+                return Err(invalid(format!(
+                    "two-client supported turn fork batch step {} was {:?}; expected {:?}",
+                    index + 1,
+                    step.operation,
+                    expected_operation
+                )));
+            }
             counts.inputs = counts.inputs.saturating_add(1);
             observe_pair_step(
-                step,
+                &step,
                 &mut checksum,
                 &mut counts,
                 &mut pending,
