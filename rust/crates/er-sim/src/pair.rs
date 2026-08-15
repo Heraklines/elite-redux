@@ -4969,7 +4969,7 @@ mod tests {
 
     #[test]
     fn try_fork_preserves_populated_private_environment_state() -> TestResult {
-        let mut pair_config = protocol_pair_config(0x56, false)?;
+        let mut pair_config = protocol_pair_config(0x56, true)?;
         pair_config.presenter = PresenterMode::FaultControlled;
         pair_config
             .initial_storage
