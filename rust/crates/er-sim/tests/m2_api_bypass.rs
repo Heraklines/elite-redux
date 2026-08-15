@@ -508,10 +508,8 @@ fn approved_m3_benchmark_worker_guard_rejects_second_thread_spawn() -> AuditResu
 
 #[test]
 fn approved_m3_benchmark_worker_guard_rejects_changed_ranges() -> AuditResult {
-    let source = approved_m3_benchmark_worker_source().replace(
-        "[(0, 500), (500, 1_000)]",
-        "[(0, 499), (499, 1_000)]",
-    );
+    let source = approved_m3_benchmark_worker_source()
+        .replace("[(0, 500), (500, 1_000)]", "[(0, 499), (499, 1_000)]");
     let path = Path::new("rust/crates/er-sim/benches/m3_benchmark.rs");
     match audit_approved_m3_benchmark_worker(&source, path) {
         Err(error) => require(
@@ -527,8 +525,7 @@ fn approved_m3_benchmark_worker_guard_rejects_changed_ranges() -> AuditResult {
 
 #[test]
 fn approved_m3_benchmark_worker_guard_rejects_spoofed_checksum_domain() -> AuditResult {
-    let expected_domain =
-        "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v2\";";
+    let expected_domain = "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v2\";";
     let source = approved_m3_benchmark_worker_source()
         .replace(
             expected_domain,
@@ -1029,8 +1026,7 @@ fn mask_approved_m3_benchmark_worker(
             ),
         )?;
     }
-    let domain_marker =
-        "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v2\";";
+    let domain_marker = "const PAIR_FRONTIER_CHECKSUM_DOMAIN: &str = \"pokerogue-redux/m3/benchmark-pair-frontier/v2\";";
     let executable_domain_marker = "constPAIR_FRONTIER_CHECKSUM_DOMAIN:&str=;";
     let executable_domain_count = source
         .match_indices(domain_marker)
@@ -1086,12 +1082,7 @@ fn mask_approved_m3_benchmark_worker(
         )
     })?;
     let mut output = code.as_bytes().to_vec();
-    mask_range(
-        &mut output,
-        code.as_bytes(),
-        start,
-        start + qualifier.len(),
-    );
+    mask_range(&mut output, code.as_bytes(), start, start + qualifier.len());
     String::from_utf8(output).map_err(|error| {
         format!(
             "{} masked approved M3 benchmark worker produced invalid UTF-8: {error}",
@@ -1529,11 +1520,7 @@ fn assert_no_wall_clock_uses(code: &str, path: &Path) -> AuditResult {
     Ok(())
 }
 
-fn assert_no_forbidden_benchmark_tokens(
-    source: &str,
-    code: &str,
-    path: &Path,
-) -> AuditResult {
+fn assert_no_forbidden_benchmark_tokens(source: &str, code: &str, path: &Path) -> AuditResult {
     let code = mask_approved_m3_benchmark_worker(source, code, path)?;
     let token_set: BTreeSet<String> = identifiers(&code)
         .into_iter()
