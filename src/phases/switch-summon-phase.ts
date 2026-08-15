@@ -266,9 +266,8 @@ export class SwitchSummonPhase extends SummonPhase {
     // replacements, U-turn/forced switches, baton pass, and the opening lead are
     // all excluded. Applied to the incoming mon after its fieldSetup(true) below.
     const bondedCharmStages: ErBondedCharmSnapshot =
-      this.player
-      && this.switchType === SwitchType.SWITCH
-      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
+      this.switchType === SwitchType.SWITCH
+      && (!this.player || globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON)
         ? erBondedCharmSnapshot(this.lastPokemon)
         : [];
     const saltCircleSource =

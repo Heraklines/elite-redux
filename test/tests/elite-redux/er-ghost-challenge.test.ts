@@ -23,6 +23,7 @@ import {
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
 import { isErGhostChallengeActive } from "#data/elite-redux/er-ghost-waves";
+import { erBloodPactDealMultiplier } from "#data/elite-redux/er-relics";
 import { getChallengeFavour } from "#data/elite-redux/er-shiny-favour";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
@@ -35,7 +36,10 @@ import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import type { EnemyPokemon } from "#field/pokemon";
+import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
+import { getModifierDataTypeFactory } from "#system/modifier-data";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -170,6 +174,57 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     expect(hasErGhostOverride(trainer!)).toBe(true);
     // Story fixed battles stay scripted - only the generic wave-5 filler is
     // ghosted (rival/evil-team/E4/champion checks live in handleFixedBattle).
+  });
+
+  it("restores ghost inventory additively and destroys it on theft", async () => {
+    const inventorySnapshot: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "ghost-inventory-test",
+      party: [{ ...SNAPSHOT.party[0], heldItems: [["WIDE_LENS", 1]] }],
+      relics: [["bloodPact", 1, null]],
+    };
+    game.override.startingWave(5);
+    setPrefetchedGhostTeamsForTests([inventorySnapshot]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+
+    const trainer = game.scene.currentBattle.trainer!;
+    const enemy = game.scene.getEnemyParty()[0] as EnemyPokemon;
+    expect(hasErGhostOverride(trainer)).toBe(true);
+
+    const baselineType = getModifierDataTypeFactory("LEFTOVERS")!();
+    baselineType.id = "LEFTOVERS";
+    const baseline = baselineType.newModifier(enemy) as PokemonHeldItemModifier;
+    await game.scene.addEnemyModifier(baseline, true, true);
+    // Re-run the inventory layer directly to prove it never clears the normal
+    // generated inventory that precedes it in generateEnemyModifiers.
+    (
+      game.scene as unknown as {
+        addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void;
+      }
+    ).addErGhostSnapshotInventory([enemy]);
+
+    const enemyItems = game.scene.findModifiers(
+      m => m instanceof PokemonHeldItemModifier && m.pokemonId === enemy.id,
+      false,
+    ) as PokemonHeldItemModifier[];
+    expect(enemyItems.some(m => m.type.id === "LEFTOVERS")).toBe(true);
+    const ghostItem = enemyItems.find(m => m.type.id === "WIDE_LENS");
+    expect(ghostItem).toBeDefined();
+    expect(game.scene.findModifiers(m => m instanceof ErRelicModifier && m.kind === "bloodPact", false)).toHaveLength(
+      1,
+    );
+    expect(erBloodPactDealMultiplier(false)).toBeCloseTo(1.2, 5);
+
+    const player = game.scene.getPlayerParty()[0];
+    expect(game.scene.tryTransferHeldItemModifier(ghostItem!, player, false)).toBe(false);
+    expect(game.scene.hasModifier(ghostItem!, true)).toBe(false);
+    expect(
+      game.scene.findModifiers(
+        m => m instanceof PokemonHeldItemModifier && m.pokemonId === player.id && m.type.id === "WIDE_LENS",
+        true,
+      ),
+    ).toHaveLength(0);
   });
 
   it("consecutive waves prefer DIFFERENT uploaders (no more 'always Arctic Flame')", async () => {

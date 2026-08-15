@@ -6,9 +6,10 @@
 // Unit tests for the ER ghost-team gauntlet scheduling (#217).
 
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
-import { markTrainerAsGhost } from "#data/elite-redux/er-ghost-teams";
+import { markTrainerAsGhost, shouldUseLateHellGhostTrainer } from "#data/elite-redux/er-ghost-teams";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { resetErRunPacing, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import type { Trainer } from "#field/trainer";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -18,6 +19,7 @@ const FIXED_WAVES = new Set([182, 184, 186, 188, 190, 195]);
 describe("ER ghost teams", () => {
   afterEach(() => {
     resetErDifficulty();
+    resetErRunPacing();
   });
 
   it("spawns the right number of ghosts per difficulty (Ace 1 / Elite 3 / Hell 8)", () => {
@@ -62,5 +64,27 @@ describe("ER ghost teams", () => {
     setErDifficulty("ace");
     expect(isErGhostWave(196)).toBe(true);
     expect(isErGhostWave(192)).toBe(false);
+  });
+
+  it("replaces about half of late Hell trainer encounters deterministically", () => {
+    setErDifficulty("hell");
+    expect(shouldUseLateHellGhostTrainer(100, "run-a")).toBe(false);
+    const normalRolls = Array.from({ length: 100 }, (_, i) => shouldUseLateHellGhostTrainer(101 + i, "run-a"));
+    expect(normalRolls.filter(Boolean).length).toBeGreaterThanOrEqual(40);
+    expect(normalRolls.filter(Boolean).length).toBeLessThanOrEqual(60);
+    expect(shouldUseLateHellGhostTrainer(137, "run-a")).toBe(shouldUseLateHellGhostTrainer(137, "run-a"));
+
+    setErRunPacing("sprint");
+    expect(shouldUseLateHellGhostTrainer(50, "run-a")).toBe(false);
+    const sprintRolls = Array.from({ length: 100 }, (_, i) => shouldUseLateHellGhostTrainer(51 + i, "run-a"));
+    expect(sprintRolls.filter(Boolean).length).toBeGreaterThanOrEqual(40);
+    expect(sprintRolls.filter(Boolean).length).toBeLessThanOrEqual(60);
+  });
+
+  it("never enables late replacement outside Hell", () => {
+    setErDifficulty("elite");
+    expect(shouldUseLateHellGhostTrainer(150, "run-a")).toBe(false);
+    setErRunPacing("sprint");
+    expect(shouldUseLateHellGhostTrainer(75, "run-a")).toBe(false);
   });
 });

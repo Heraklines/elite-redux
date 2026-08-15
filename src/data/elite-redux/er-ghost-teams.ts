@@ -61,7 +61,7 @@ import type { Nature } from "#enums/nature";
 import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
-import type { EnemyPokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
@@ -163,6 +163,12 @@ const SHARED_CACHE_CAP = 240;
 const GHOST_PRIMARY_WAVE_WINDOW = 20;
 /** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
 const PREFETCH_LEAD_WAVES = 15;
+/** Late Hell runs replace half of ordinary trainer encounters with ghosts. */
+const LATE_HELL_GHOST_RATE_DENOMINATOR = 2;
+const LATE_HELL_GHOST_START_WAVE: Readonly<Record<"normal" | "sprint", number>> = {
+  normal: 100,
+  sprint: 50,
+};
 /**
  * A ghost team fielded at wave W is preferentially drawn from a run that ended
  * within this many waves of W. Widened 20 -> 40 (#422 follow-up): the high ghost
@@ -598,9 +604,7 @@ function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
   }
 }
 
-/** Serialise the run's active ER relics as [kind, stackCount, chosenWeather] snapshots.
- * RECORDS-ONLY: persisted for analytics; NEVER reconstructed or applied to a fielded ghost
- * (markTrainerAsGhost ignores this field entirely). Best-effort and never throws. */
+/** Serialise active ER relics as [kind, stackCount, chosenWeather] snapshots. */
 function serializeRelics(): [string, number, number | null][] {
   try {
     return globalScene
@@ -656,8 +660,7 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     opponentParty,
     starters: captureRunStarterLines(),
     challenges: captureRunChallenges(),
-    // ER (relics): records-only snapshot of the run's relics; persisted to runs.relics
-    // for analytics. NEVER applied to the fielded ghost (markTrainerAsGhost ignores it).
+    // Fielded ghosts restore these relics in addition to normal encounter buffs.
     relics: serializeRelics(),
     killedByGhost: killerGhost != null || undefined,
     ghostSourceName: killerGhost?.trainerName,
@@ -1067,7 +1070,10 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
 
   const targets: number[] = [];
   const eligibilityWave = isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
-  if (isErGhostChallengeActive()) {
+  const pacing = isErSprintRun() ? "sprint" : "normal";
+  const lateHellPrefetch =
+    getErDifficulty() === "hell" && waveIndex > LATE_HELL_GHOST_START_WAVE[pacing] - PREFETCH_LEAD_WAVES;
+  if (isErGhostChallengeActive() || lateHellPrefetch) {
     const currentBucket = Math.floor((Math.max(1, eligibilityWave) - 1) / 10) * 10 + 1;
     targets.push(currentBucket);
     if (currentBucket + 10 <= 200) {
@@ -1094,6 +1100,32 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
     requestGhostBand(difficulty, target, primaryEnd, 20);
     requestGhostBand(difficulty, primaryEnd + 1, fallbackEnd, 10);
   }
+}
+
+/**
+ * Deterministic late-Hell replacement roll. Ordinary trainer encounters after
+ * wave 100 (normal) or 50 (Sprint) become ghosts half the time. The explicit
+ * Ghost Trainers challenge bypasses this helper because it already replaces
+ * every trainer encounter.
+ */
+export function shouldUseLateHellGhostTrainer(
+  waveIndex: number,
+  seed: string = String(globalScene?.seed ?? ""),
+): boolean {
+  if (getErDifficulty() !== "hell") {
+    return false;
+  }
+  const pacing = isErSprintRun() ? "sprint" : "normal";
+  if (waveIndex <= LATE_HELL_GHOST_START_WAVE[pacing]) {
+    return false;
+  }
+  const key = `${seed}:late-hell-ghost:${waveIndex}:${pacing}`;
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % LATE_HELL_GHOST_RATE_DENOMINATOR === 0;
 }
 
 /** The uploader of the most recently fielded ghost - the picker avoids
@@ -1195,7 +1227,9 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   // MYSTERY GAUNTLET (#814): the scripted ghost wave always fields a ghost when one
   // is available, regardless of the endgame wave table or the challenge.
   const gauntletGhost = erGauntletActive() && erGauntletWaveKind(waveIndex) === "ghost";
-  if (!gauntletGhost && !isErGhostWave(waveIndex) && !(trainerWave && isErGhostChallengeActive())) {
+  const challengeGhost = trainerWave && isErGhostChallengeActive();
+  const lateHellGhost = trainerWave && !challengeGhost && shouldUseLateHellGhostTrainer(waveIndex);
+  if (!gauntletGhost && !isErGhostWave(waveIndex) && !challengeGhost && !lateHellGhost) {
     if (trainerWave && ghostByWave.size > 0) {
       // Tripwire for the live "silent wave miss" reports: a ghost was already
       // fielded THIS RUN (so it must be a challenge run), yet the challenge
@@ -1568,6 +1602,12 @@ export function applyGhostTrainerPresentation(
 /** True if this trainer is an ER ghost battle. */
 export function hasErGhostOverride(trainer: Trainer): boolean {
   return GHOST_BY_TRAINER.has(trainer);
+}
+
+/** Whether a Pokemon belongs to the enemy side of the active ghost battle. */
+export function isErGhostEnemyPokemon(pokemon: Pokemon | null | undefined): boolean {
+  const trainer = globalScene?.currentBattle?.trainer;
+  return !!pokemon?.isEnemy() && !!trainer && GHOST_BY_TRAINER.has(trainer);
 }
 
 /**

@@ -51,6 +51,7 @@ import {
   erLuckyHeartChanceBonus,
 } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
+import { isErGhostEnemyPokemon } from "#data/elite-redux/er-ghost-teams";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { getErEarlyWaveMovePowerMultiplier } from "#data/elite-redux/er-run-pacing";
 import { clearErAilments } from "#data/elite-redux/er-status-cure";
@@ -3789,6 +3790,20 @@ export class ErSwapHeldItemAttr extends MoveEffectAttr {
 
     if (userItems.length === 0 && targetItems.length === 0) {
       return false;
+    }
+
+    // A player's Trick/Switcheroo against a ghost follows the same rule as
+    // every other theft source: the ghost's item disappears, while the
+    // player's own inventory never moves onto the snapshot team.
+    if (user.isPlayer() && isErGhostEnemyPokemon(target)) {
+      let removed = false;
+      for (const { mod, count } of targetItems) {
+        const before = mod.stackCount;
+        globalScene.tryTransferHeldItemModifier(mod, user, false, count, true, true, true);
+        removed ||= mod.stackCount < before;
+      }
+      globalScene.updateModifiers(false);
+      return removed;
     }
 
     // itemLost=false: a swap is not a loss (the mon receives a replacement), so

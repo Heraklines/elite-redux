@@ -7948,3 +7948,11 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The multiplier is applied once in the shared move-power calculation, so player attacks, opponent attacks, AI damage forecasts, variable-power moves, ability boosts, and all battle formats use the same deterministic value. Status moves, fixed-damage moves, and one-hit-KO moves retain their existing special paths.
 - Pre-battle callers fall back to full power when no current battle exists, avoiding menu/setup regressions.
 - Verification: pacing suite 12/12 green; focused headless battle symmetry scenario green for both attack directions at waves 1 and 30; production build green with 3,576 transformed modules and 14,365 minified JSON files; scoped formatting and `git diff --check` green. Repository-wide TypeScript continues to fail on pre-existing unrelated ER diagnostics and reports none in the touched files. Nothing was deployed.
+
+2026-08-15 - Hell and Ghost Trainers snapshot inventory
+
+- In Hell pacing, ordinary trainer encounters after wave 100 in Normal or wave 50 in Sprint deterministically become ghost trainers at an approximately 50% rate. The Ghost Trainers challenge continues to make every eligible trainer encounter a ghost.
+- Every ghost source now uses the same inventory rules: held items and relics from the saved ghost snapshot are restored onto the enemy party, then normal encounter additions such as ward stones, resist berries, boss bars, and other generated modifiers remain layered on top.
+- Combat-relevant relic behavior is side-aware, so enemy ghost relics affect their owner without granting player relic progression or achievements. Run-economy relic effects remain player-only because a one-battle ghost has no persistent shop, map, egg, or run economy.
+- Ghost-held items cannot enter the player's inventory through Thief-style transfer, Trick/Switcheroo, Mini Black Hole, or the shared held-item transfer path. A valid theft instead removes the item from the ghost.
+- Added GitHub-runner coverage for Hell Normal/Sprint thresholds and distribution, deterministic selection, additive snapshot inventory and relic restoration, Ghost Trainers challenge coverage, and theft destruction. No deployment was performed.

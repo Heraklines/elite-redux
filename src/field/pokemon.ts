@@ -5895,13 +5895,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * Blood Pact = +20% on ALL of the team's hits. All return 1 when their relic
      * isn't held or the condition isn't met.
      */
-    const erRelicMultiplier = source.isPlayer()
-      ? erMoraleBannerMultiplier()
-        * erTwinLinkMultiplier(moveType)
-        * erMoltenCoreFireMultiplier(moveType)
-        * erCapacitorElectricMultiplier(moveType)
-        * erBloodPactDealMultiplier()
-      : 1;
+    const sourceIsPlayer = source.isPlayer();
+    const erRelicMultiplier =
+      erMoraleBannerMultiplier(sourceIsPlayer)
+      * erTwinLinkMultiplier(moveType, sourceIsPlayer)
+      * erMoltenCoreFireMultiplier(moveType, sourceIsPlayer)
+      * erCapacitorElectricMultiplier(moveType, sourceIsPlayer)
+      * erBloodPactDealMultiplier(sourceIsPlayer);
 
     /**
      * ER relics (#439): Blood Pact's double edge - while held, the player's mons
@@ -5909,7 +5909,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * relic isn't held. Multiplies with the offensive bonus only on the rare
      * player-vs-player hit.
      */
-    const erRelicDefenderMultiplier = this.isPlayer() ? erBloodPactTakeMultiplier() : 1;
+    const erRelicDefenderMultiplier = erBloodPactTakeMultiplier(this.isPlayer());
 
     /**
      * ER Library (5928): a repeated use of a move recorded in a Library holder's

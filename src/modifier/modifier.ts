@@ -2601,6 +2601,10 @@ export class ErRelicModifier extends PersistentModifier {
 
   override add(modifiers: PersistentModifier[], virtual: boolean): boolean {
     const result = super.add(modifiers, virtual);
+    const enemyModifiers = new Set(globalScene.findModifiers(() => true, false));
+    if (modifiers.some(modifier => enemyModifiers.has(modifier))) {
+      return result;
+    }
     // catalog-v2 (#900) MUSEUM_QUALITY: acquiring a relic KIND (deduped in the persisted set). Lazy
     // import so the modifier module's static graph never pulls the achievement layer; fully guarded.
     try {
@@ -3936,8 +3940,13 @@ export abstract class HeldItemTransferModifier extends PokemonHeldItemModifier {
       }
       const randItemIndex = pokemon.randBattleSeedInt(itemModifiers.length);
       const randItem = itemModifiers[randItemIndex];
+      const stackBefore = randItem.stackCount;
       if (globalScene.tryTransferHeldItemModifier(randItem, pokemon, false)) {
         transferredModifierTypes.push(randItem.type);
+        itemModifiers.splice(randItemIndex, 1);
+      } else if (randItem.stackCount < stackBefore && randItem.stackCount <= 0) {
+        // Ghost theft destroys the item and intentionally reports no transfer.
+        // Remove the exhausted local candidate so multi-steal items can proceed.
         itemModifiers.splice(randItemIndex, 1);
       }
     }

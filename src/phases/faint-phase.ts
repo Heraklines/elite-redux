@@ -18,7 +18,7 @@ import {
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
-import { erMomentumEngineOnEnemyKo, erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
+import { erMomentumEngineOnFoeKo, erRelicRecordFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
 import { notifyMoodyFormationFaint } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import {
   observeMoodyRuntimeFaint,
@@ -185,10 +185,10 @@ export class FaintPhase extends PokemonPhase {
       recordErStreakFaint(pokemon);
       // ER relics (#439): a player faint breaks Morale Banner's faint-free bonus
       // for the rest of this biome.
-      erRelicRecordPlayerFaint();
+      erRelicRecordFaint(true);
       // ER relics (#439): Anchor - if the slot 6 mon is now the last one standing,
       // fully heal it once per biome (last stand). No-op unless the relic is held.
-      erTryAnchorLastStand();
+      erTryAnchorLastStand(true);
       globalScene.currentBattle.playerFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,
@@ -196,14 +196,15 @@ export class FaintPhase extends PokemonPhase {
     } else {
       globalScene.currentBattle.enemyFaints += 1;
       erRecordAchievementEnemyFaint(pokemon);
-      // ER relics (#439): Momentum Engine - each enemy KO grants the active player
-      // mon +1 Speed stage (resets each battle). No-op unless the relic is held.
-      erMomentumEngineOnEnemyKo();
+      erRelicRecordFaint(false);
+      erTryAnchorLastStand(false);
       globalScene.currentBattle.enemyFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,
       });
     }
+    // Momentum Engine belongs to the side that scored this KO.
+    erMomentumEngineOnFoeKo(pokemon.isPlayer());
 
     // #691 (host-language leak): the guest REGENERATES "X fainted!" in its OWN language from the `faint`
     // event (narrate=true), so the host must NOT also stream its (host-language) `fainted` line - suppress

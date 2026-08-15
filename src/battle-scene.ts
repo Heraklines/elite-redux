@@ -79,9 +79,11 @@ import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redu
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
   applyGhostTrainerPresentation,
+  getErGhostSnapshot,
   getErGhostSnapshotSpecies,
   ghostWavesForCurrentRun,
   hasErGhostOverride,
+  isErGhostEnemyPokemon,
   markTrainerAsGhost,
   maybePrefetchGhostTeams,
   takeGhostForWave,
@@ -92,8 +94,11 @@ import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { erGauntletActive, erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { resetErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import {
+  ER_RELIC_CONFIG,
+  type ErRelicKind,
   erCoinPurseBonusPercent,
   erMysteryCharmTargetBonus,
+  resetErEnemyRelicBattleState,
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -231,6 +236,7 @@ import type { Achv } from "#system/achv";
 import { achvs, ModifierAchv, MoneyAchv } from "#system/achv";
 import { GameData } from "#system/game-data";
 import { initGameSpeed } from "#system/game-speed";
+import { getModifierDataTypeFactory } from "#system/modifier-data";
 import type { PokemonData } from "#system/pokemon-data";
 import { MusicPreference } from "#system/settings";
 import type { Voucher } from "#system/voucher";
@@ -4158,6 +4164,33 @@ export class BattleScene extends SceneBase {
       return false;
     }
 
+    // Ghost inventory is a snapshot of another run, not loot. Any cross-side
+    // theft that would otherwise succeed destroys the requested quantity on
+    // the ghost instead of cloning it into the player's run.
+    if (source?.isEnemy() && target.isPlayer() && isErGhostEnemyPokemon(source)) {
+      if (!this.canTransferHeldItemModifier(itemModifier, target, transferQuantity)) {
+        return false;
+      }
+      const countTaken = Math.min(transferQuantity, itemModifier.stackCount);
+      if (countTaken <= 0) {
+        return false;
+      }
+      itemModifier.stackCount -= countTaken;
+      if (itemModifier.stackCount <= 0) {
+        this.removeModifier(itemModifier, true);
+      }
+      if (itemLost) {
+        applyAbAttrs("PostItemLostAbAttr", { pokemon: source });
+      }
+      if (!ignoreUpdate) {
+        this.updateModifiers(false, instant);
+      }
+      this.phaseManager.queueMessage(
+        `${source.getNameToRender()}'s ${itemModifier.type.name} faded away instead of being stolen!`,
+      );
+      return false;
+    }
+
     const newItemModifier = itemModifier.clone() as PokemonHeldItemModifier;
     newItemModifier.pokemonId = target.id;
     // Form stones move as held inventory, not as an implicit transformation.
@@ -4296,6 +4329,57 @@ export class BattleScene extends SceneBase {
     });
   }
 
+  /** Add a ghost snapshot's inventory after normal enemy generation. */
+  private addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void {
+    const trainer = this.currentBattle.trainer;
+    const snapshot = trainer ? getErGhostSnapshot(trainer) : null;
+    if (!snapshot) {
+      return;
+    }
+    resetErEnemyRelicBattleState();
+
+    for (let i = 0; i < party.length; i++) {
+      const enemy = party[i];
+      const member = snapshot.party[i];
+      for (const [typeId, rawStack] of member?.heldItems ?? []) {
+        const type = getModifierDataTypeFactory(typeId)?.();
+        if (!(type instanceof PokemonHeldItemModifierType)) {
+          console.warn(`[ghost] skipped unknown held-item modifier ${typeId}`);
+          continue;
+        }
+        type.id = typeId;
+        const modifier = type.newModifier(enemy);
+        const stack = Math.floor(Number(rawStack));
+        if (!(modifier instanceof PokemonHeldItemModifier) || !Number.isFinite(stack) || stack <= 0) {
+          continue;
+        }
+        modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+        void this.addEnemyModifier(modifier, true, true);
+      }
+    }
+
+    for (const [rawKind, rawStack, rawWeather] of snapshot.relics ?? []) {
+      if (!Object.hasOwn(ER_RELIC_CONFIG, rawKind)) {
+        console.warn(`[ghost] skipped unknown relic ${rawKind}`);
+        continue;
+      }
+      const kind = rawKind as ErRelicKind;
+      const typeId = `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+      const type = getModifierDataTypeFactory(typeId)?.();
+      if (type) {
+        type.id = typeId;
+      }
+      const modifier = type?.newModifier();
+      const stack = Math.floor(Number(rawStack));
+      if (!(modifier instanceof ErRelicModifier) || !Number.isFinite(stack) || stack <= 0) {
+        continue;
+      }
+      modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+      modifier.chosenWeather = Number.isFinite(rawWeather) ? rawWeather : null;
+      void this.addEnemyModifier(modifier, true, true);
+    }
+  }
+
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
       if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
@@ -4408,6 +4492,9 @@ export class BattleScene extends SceneBase {
       // ER: layer the soft ER → PokeRogue held-item conversion on top of the
       // baseline roll for any ER-roster trainer mons in the party.
       applyErTrainerHeldItems(party);
+      // Ghost snapshots are additive: preserve every generated item, ward,
+      // boss layer above, then restore the inventory captured with the team.
+      this.addErGhostSnapshotInventory(party);
       // ER Factory (#439 §3): the production line - every WILD mon is GUARANTEED
       // to hold at least one item, with stacking chances for a 2nd/3rd. Tops up
       // each wild mon's baseline roll to the floor (never reduces a luckier roll).
