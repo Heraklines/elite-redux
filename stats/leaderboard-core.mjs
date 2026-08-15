@@ -3,6 +3,9 @@ export const WIN_RATE_MIN_RUNS = 50;
 export const WAVE_MIN_RUNS = 20;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const EXCLUDED_PLAYER_KEYS = new Set(["schadetalon", "zyfa"]);
+
+const isExcludedPlayer = player => EXCLUDED_PLAYER_KEYS.has(String(player).trim().toLocaleLowerCase("en-US"));
 
 const number = value => {
   const parsed = Number(value);
@@ -166,7 +169,7 @@ export function aggregateRuns(rows, now = Date.now()) {
 function rankedEntries(rows, valueOf, detailOf = () => "", extraOf = () => ({})) {
   const sorted = rows
     .map(row => ({ row, value: number(valueOf(row)) }))
-    .filter(item => item.row.player && item.value > 0)
+    .filter(item => item.row.player && !isExcludedPlayer(item.row.player) && item.value > 0)
     .toSorted((a, b) => b.value - a.value || String(a.row.player).localeCompare(String(b.row.player)))
     .slice(0, TOP_LIMIT);
   let previous = null;

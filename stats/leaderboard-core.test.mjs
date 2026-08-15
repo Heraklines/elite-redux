@@ -72,3 +72,20 @@ test("save-backed boards rank values and preserve ties", () => {
     ],
   );
 });
+
+test("excluded players never appear on save-backed or run-backed boards", () => {
+  const saveRows = [
+    { player: "SchadeTalon", blackShinySpecies: 912 },
+    { player: "Legitimate", blackShinySpecies: 35 },
+  ];
+  const runRows = [
+    ...Array.from({ length: WIN_RATE_MIN_RUNS }, (_, index) => run("ZYFA", index)),
+    ...Array.from({ length: WIN_RATE_MIN_RUNS }, (_, index) => run("Runner", index)),
+  ];
+  const payload = buildLeaderboardPayload({ saveRows, runRows, generatedAt: new Date(NOW).toISOString() });
+  const players = payload.boards.flatMap(board => board.entries.map(entry => entry.player.toLowerCase()));
+  assert(!players.includes("schadetalon"));
+  assert(!players.includes("zyfa"));
+  assert.equal(payload.boards.find(board => board.id === "black-shiny-species").entries[0].player, "Legitimate");
+  assert.equal(payload.boards.find(board => board.id === "ace-win-rate").entries[0].player, "Runner");
+});
