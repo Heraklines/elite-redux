@@ -134,8 +134,7 @@ export interface GhostTeamSnapshot {
   challenges?: [number, number][] | undefined;
   /**
    * ER (relics): the run's active ER relics at capture, as [kind, stackCount, chosenWeather]
-   * snapshots. RECORDS-ONLY - persisted to the `runs.relics` blob for analytics. Relics are
-   * the uploader's own run buffs and are NEVER reconstructed or applied to the fielded ghost.
+   * snapshots. Persisted to the `runs.relics` blob and restored on fielded ghosts.
    */
   relics?: [string, number, number | null][] | undefined;
   /** ER (Colosseum): true when a GHOST trainer dealt the run-ending defeat -
@@ -279,6 +278,15 @@ export function isErGhostTeamLegal(snapshot: GhostTeamSnapshot): boolean {
   }
 }
 
+/** Late-Hell ghosts must carry real saved held items, not a legacy bare roster. */
+export function hasErGhostSavedItems(snapshot: GhostTeamSnapshot): boolean {
+  return snapshot.party.some(member =>
+    (member.heldItems ?? []).some(
+      ([typeId, stack]) => typeof typeId === "string" && typeId.length > 0 && Number.isFinite(stack) && stack > 0,
+    ),
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Env + local storage helpers.
 // -----------------------------------------------------------------------------
@@ -317,6 +325,7 @@ async function sampleRunsFromServer(
   count: number,
   minWave: number,
   maxWave = 200,
+  requireSavedItems = false,
 ): Promise<GhostTeamSnapshot[]> {
   const base = serverBase();
   const token = getCookie(sessionIdKey);
@@ -327,7 +336,7 @@ async function sampleRunsFromServer(
   }
   try {
     const res = await fetch(
-      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}`,
+      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}`,
       { method: "GET", headers: { Accept: "application/json", Authorization: token } },
     );
     if (!res.ok) {
@@ -979,10 +988,13 @@ async function fetchGhostTeams(
   count: number,
   minWave: number,
   maxWave = 200,
+  requireSavedItems = false,
 ): Promise<GhostTeamSnapshot[]> {
   // Preferred: the authenticated shared pool (other players' runs that got deep
   // enough — `minWave` keeps shallow runs out of late ghost waves).
-  const fromServer = await sampleRunsFromServer(difficulty, count, minWave, maxWave);
+  const fromServer = (await sampleRunsFromServer(difficulty, count, minWave, maxWave, requireSavedItems)).filter(
+    snapshot => !requireSavedItems || hasErGhostSavedItems(snapshot),
+  );
   if (fromServer.length > 0) {
     saveSharedGhostCache(fromServer);
     return fromServer;
@@ -992,12 +1004,14 @@ async function fetchGhostTeams(
     try {
       const sep = url.includes("?") ? "&" : "?";
       const res = await fetch(
-        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}`,
+        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}`,
         { method: "GET", headers: { Accept: "application/json" } },
       );
       if (res.ok) {
         const data = await res.json();
-        const list = (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot);
+        const list = (Array.isArray(data) ? data : (data?.teams ?? []))
+          .filter(isValidSnapshot)
+          .filter(snapshot => !requireSavedItems || hasErGhostSavedItems(snapshot));
         if (list.length > 0) {
           saveSharedGhostCache(list as GhostTeamSnapshot[]);
           return list as GhostTeamSnapshot[];
@@ -1014,7 +1028,8 @@ async function fetchGhostTeams(
     snapshot =>
       snapshot.waveReached >= minWave
       && snapshot.waveReached <= maxWave
-      && ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty),
+      && ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty)
+      && (!requireSavedItems || hasErGhostSavedItems(snapshot)),
   );
   return cached.slice(-count);
 }
@@ -1028,16 +1043,17 @@ function requestGhostBand(
   minWave: number,
   maxWave: number,
   count: number,
+  requireSavedItems = false,
 ): void {
   if (minWave > maxWave) {
     return;
   }
-  const key = `${difficulty}:${minWave}:${maxWave}`;
+  const key = `${difficulty}:${minWave}:${maxWave}:${requireSavedItems ? "saved-items" : "any"}`;
   if (requestedGhostBands.has(key) || (ghostBandRetryAfter.get(key) ?? 0) > Date.now()) {
     return;
   }
   requestedGhostBands.add(key);
-  void fetchGhostTeams(difficulty, count, minWave, maxWave)
+  void fetchGhostTeams(difficulty, count, minWave, maxWave, requireSavedItems)
     .then(teams => {
       if (teams.length === 0) {
         requestedGhostBands.delete(key);
@@ -1097,8 +1113,8 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   for (const target of targets) {
     const primaryEnd = Math.min(200, target + GHOST_PRIMARY_WAVE_WINDOW);
     const fallbackEnd = Math.min(200, target + ER_GHOST_WAVE_WINDOW);
-    requestGhostBand(difficulty, target, primaryEnd, 20);
-    requestGhostBand(difficulty, primaryEnd + 1, fallbackEnd, 10);
+    requestGhostBand(difficulty, target, primaryEnd, 20, lateHellPrefetch);
+    requestGhostBand(difficulty, primaryEnd + 1, fallbackEnd, 10, lateHellPrefetch);
   }
 }
 
@@ -1126,6 +1142,15 @@ export function shouldUseLateHellGhostTrainer(
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0) % LATE_HELL_GHOST_RATE_DENOMINATOR === 0;
+}
+
+/** Whether every ghost considered for this wave must have saved held items. */
+export function shouldRequireLateHellGhostItems(waveIndex: number): boolean {
+  if (getErDifficulty() !== "hell") {
+    return false;
+  }
+  const pacing = isErSprintRun() ? "sprint" : "normal";
+  return waveIndex > LATE_HELL_GHOST_START_WAVE[pacing];
 }
 
 /** The uploader of the most recently fielded ghost - the picker avoids
@@ -1267,7 +1292,10 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   // accounts, and semantic team hashes are never recycled during a run. If both
   // bands are empty, the caller fields a normal trainer.
   const challengeMode = isErGhostChallengeActive();
-  const legal = pool.filter(snapshot => isErGhostTeamLegal(snapshot));
+  const requireSavedItems = shouldRequireLateHellGhostItems(waveIndex);
+  const legal = pool.filter(
+    snapshot => isErGhostTeamLegal(snapshot) && (!requireSavedItems || hasErGhostSavedItems(snapshot)),
+  );
   const unseen = legal.filter(snapshot => {
     return (
       !usedGhostIds.has(snapshot.id)

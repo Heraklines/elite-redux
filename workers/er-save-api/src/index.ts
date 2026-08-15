@@ -2163,7 +2163,7 @@ async function handleRunCreate(
     ghostSourceRunId?: unknown;
     /** ER Ghost Trainer Editor: the uploader's authored presentation blob (additive/optional). */
     presentation?: unknown;
-    /** ER (relics): the run's active relics at capture, records-only (additive/optional). */
+    /** ER (relics): the run's active relics at capture (additive/optional). */
     relics?: unknown;
     /** ER ghost notifications: every ghost this run fought (additive/optional). */
     ghostsFought?: unknown;
@@ -2207,9 +2207,9 @@ async function handleRunCreate(
   const presentationStr =
     run.presentation && typeof run.presentation === "object" ? JSON.stringify(run.presentation) : null;
   const presentationBlob = presentationStr && presentationStr.length <= 4096 ? presentationStr : null;
-  // ER (relics): the run's active relics at capture. RECORDS-ONLY - stored verbatim
-  // (opaque JSON, size-capped) for analytics; the encountering client NEVER reads or
-  // applies these to the fielded ghost. Old clients omit `relics` -> stays null.
+  // ER (relics): the run's active relics at capture. Stored verbatim (opaque JSON,
+  // size-capped); sampled ghosts receive this blob so the client can restore it.
+  // Old clients omit `relics` and remain eligible for non-inventory ghost battles.
   const relicsStr = Array.isArray(run.relics) ? JSON.stringify(run.relics) : null;
   const relicsBlob = relicsStr && relicsStr.length <= 2048 ? relicsStr : null;
   await ensureRunStatColumns(env);
@@ -2514,6 +2514,7 @@ type RunSampleRow = {
   opponent_team: string | null;
   challenges: string | null;
   presentation?: string | null;
+  relics?: string | null;
 };
 
 /**
@@ -2534,6 +2535,7 @@ async function enumerateEligibleRunCandidates(
   minWave: number,
   maxWave: number,
   pageSize: number,
+  requireSavedItems = false,
 ): Promise<RunSampleCandidate[]> {
   const candidates: RunSampleCandidate[] = [];
   let cursorWave = minWave - 1;
@@ -2543,6 +2545,7 @@ async function enumerateEligibleRunCandidates(
       `SELECT rowid AS rid, wave, user_id AS userId FROM runs
          WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
            AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+           ${requireSavedItems ? "AND player_team LIKE '%\"heldItems\":%'" : ""}
            AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
          ORDER BY wave, rowid LIMIT ?6`,
     )
@@ -2628,6 +2631,7 @@ async function handleRunSample(
   const maxWave = Number.isFinite(maxWaveParsed)
     ? Math.min(Math.max(maxWaveParsed, minWave), GHOST_SAMPLE_MAX_WAVE)
     : GHOST_SAMPLE_MAX_WAVE;
+  const requireSavedItems = url.searchParams.get("requireSavedItems") === "1";
   if (minWave > GHOST_SAMPLE_MAX_WAVE) {
     return json({ teams: [] }, 200, cors);
   }
@@ -2654,12 +2658,12 @@ async function handleRunSample(
   // pagination, maximise distinct uploaders, then fetch only the selected rows.
   // This avoids both shallow-row bias and prolific-uploader domination.
   const cols =
-    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
+    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
   // Index the (wave, rowid) keyset walk. Cheap no-op once created; lazy so an
   // already-deployed prod DB gains it without a manual migration (mirrors
   // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
   await ensureRunSampleIndex(env);
-  const eligible = await enumerateEligibleRunCandidates(env, auth.uid, minWave, maxWave, 2000);
+  const eligible = await enumerateEligibleRunCandidates(env, auth.uid, minWave, maxWave, 2000, requireSavedItems);
   const byUploader = new Map<number, RunSampleCandidate[]>();
   for (const candidate of eligible) {
     const group = byUploader.get(candidate.userId) ?? [];
@@ -2721,6 +2725,7 @@ async function handleRunSample(
           // ER Ghost Trainer Editor: pass the authored presentation through to the
           // encountering client (which sanitises it before applying). Bad JSON -> omit.
           presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
+          relics: row.relics ? JSON.parse(row.relics) : undefined,
         };
       } catch {
         return null;
@@ -2757,7 +2762,7 @@ async function handleRunDeadliest(
   const filterDifficulty = difficulty && difficulty !== "any";
   const { results } = await env.DB.prepare(
     `SELECT r.id, r.username, r.outcome, r.difficulty, r.wave, r.created_at, r.player_team,
-            r.opponent_name, r.opponent_team, r.presentation, COUNT(*) AS kills
+            r.opponent_name, r.opponent_team, r.presentation, r.relics, COUNT(*) AS kills
        FROM runs k
        JOIN runs r ON r.id = k.ghost_source_run_id
        WHERE k.killed_by_ghost = 1 AND k.ghost_source_run_id IS NOT NULL
@@ -2779,6 +2784,7 @@ async function handleRunDeadliest(
       opponent_name: string | null;
       opponent_team: string | null;
       presentation: string | null;
+      relics: string | null;
       kills: number;
     }>();
   const teams = (results ?? [])
@@ -2796,6 +2802,7 @@ async function handleRunDeadliest(
           opponentName: row.opponent_name ?? undefined,
           opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
           presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
+          relics: row.relics ? JSON.parse(row.relics) : undefined,
         };
       } catch {
         return null;
@@ -2894,8 +2901,8 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
     // title/dialogue/FX) JSON blob. Additive + nullable; opaque to the worker
     // (the encountering client sanitises it before applying).
     "presentation TEXT",
-    // ER (relics): the run's active relics at capture. RECORDS-ONLY JSON blob
-    // (analytics); never read back / applied to a fielded ghost. Additive + nullable.
+    // ER (relics): the run's active relics at capture. Sampled inventory-qualified
+    // ghosts read this back so their complete saved loadout can be reconstructed.
     "relics TEXT",
   ]) {
     try {

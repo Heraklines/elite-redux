@@ -6,7 +6,12 @@
 // Unit tests for the ER ghost-team gauntlet scheduling (#217).
 
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
-import { markTrainerAsGhost, shouldUseLateHellGhostTrainer } from "#data/elite-redux/er-ghost-teams";
+import {
+  hasErGhostSavedItems,
+  markTrainerAsGhost,
+  shouldRequireLateHellGhostItems,
+  shouldUseLateHellGhostTrainer,
+} from "#data/elite-redux/er-ghost-teams";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { resetErRunPacing, setErRunPacing } from "#data/elite-redux/er-run-pacing";
@@ -86,5 +91,53 @@ describe("ER ghost teams", () => {
     expect(shouldUseLateHellGhostTrainer(150, "run-a")).toBe(false);
     setErRunPacing("sprint");
     expect(shouldUseLateHellGhostTrainer(75, "run-a")).toBe(false);
+  });
+
+  it("requires saved held items after the Hell threshold while leaving relics optional", () => {
+    const base = {
+      id: "inventory-check",
+      trainerName: "Inventory Ghost",
+      difficulty: "hell",
+      waveReached: 150,
+      isVictory: true,
+      timestamp: 1,
+      party: [
+        {
+          speciesId: 25,
+          formIndex: 0,
+          abilityIndex: 0,
+          ivs: [31, 31, 31, 31, 31, 31],
+          nature: 0,
+          level: 80,
+          gender: 0,
+          shiny: false,
+          variant: 0,
+          passive: false,
+          moves: [],
+        },
+      ],
+    } satisfies GhostTeamSnapshot;
+    expect(hasErGhostSavedItems(base)).toBe(false);
+    expect(hasErGhostSavedItems({ ...base, relics: [["bloodPact", 1, null]] })).toBe(false);
+    expect(
+      hasErGhostSavedItems({
+        ...base,
+        party: [{ ...base.party[0], heldItems: [["LEFTOVERS", 1]] }],
+      }),
+    ).toBe(true);
+    expect(
+      hasErGhostSavedItems({
+        ...base,
+        party: [{ ...base.party[0], heldItems: [["LEFTOVERS", 1]] }],
+        relics: [["bloodPact", 1, null]],
+      }),
+    ).toBe(true);
+
+    setErDifficulty("hell");
+    expect(shouldRequireLateHellGhostItems(100)).toBe(false);
+    expect(shouldRequireLateHellGhostItems(101)).toBe(true);
+    setErRunPacing("sprint");
+    expect(shouldRequireLateHellGhostItems(50)).toBe(false);
+    expect(shouldRequireLateHellGhostItems(51)).toBe(true);
   });
 });
