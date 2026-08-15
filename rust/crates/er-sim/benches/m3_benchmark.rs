@@ -50,6 +50,7 @@ const COMPLETE_SHORT_BATTLES: u64 = 1_000;
 const TWO_CLIENT_SUPPORTED_TURNS: u64 = 1_000;
 const TWO_CLIENT_SUPPORTED_TURN_WORKERS: u64 = 2;
 const TWO_CLIENT_SUPPORTED_TURN_RANGES: [(u64, u64); 2] = [(0, 500), (500, 1_000)];
+const MAX_TERMINAL_RECEIPT_PUMPS: usize = 32;
 const BENCHMARK_SEED: &str = "81985529216486895";
 const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME: u64 = 0x0000_0100_0000_01b3;
@@ -1710,6 +1711,34 @@ fn run_pair_receipt_pump(
     Ok(step.snapshot)
 }
 
+fn run_pair_until_shared_terminal(
+    pair: &mut SimulatedPair,
+    checksum: &mut u64,
+    counts: &mut Counts,
+    pending: &mut Vec<(PairEndpoint, BattlePresentationEventId)>,
+    evidence: &mut TurnEvidence,
+) -> TestResult<(er_sim::PairSnapshot, usize)> {
+    for pump_count in 1..=MAX_TERMINAL_RECEIPT_PUMPS {
+        let snapshot = run_pair_receipt_pump(pair, checksum, counts, pending, evidence)?;
+        if snapshot.terminal_reason.is_some() {
+            return Ok((snapshot, pump_count));
+        }
+        if pump_count == MAX_TERMINAL_RECEIPT_PUMPS {
+            return Err(invalid(format!(
+                "shared terminal not reached after receipt pump cap {MAX_TERMINAL_RECEIPT_PUMPS}; final virtual_time_ms={}, final network.queued_packet_ids={:?}, observed pending vector length={}, authority_turn_commits.len()={}, replica_turn_commits={}",
+                snapshot.virtual_time_ms.get(),
+                snapshot.network.queued_packet_ids,
+                pending.len(),
+                evidence.authority_turn_commits.len(),
+                evidence.replica_turn_commits,
+            )));
+        }
+    }
+    Err(invalid(format!(
+        "terminal receipt pump cap {MAX_TERMINAL_RECEIPT_PUMPS} must be positive"
+    )))
+}
+
 fn raw_press_pair(
     pair: &mut SimulatedPair,
     endpoint: PairEndpoint,
@@ -2361,13 +2390,18 @@ fn m3_complete_supported_coop_battle() -> TestResult {
         &mut pending,
         &mut evidence,
     )?;
-    let snapshot = run_pair_receipt_pump(
+    let (snapshot, terminal_receipt_pumps) = run_pair_until_shared_terminal(
         &mut pair,
         &mut checksum,
         &mut counts,
         &mut pending,
         &mut evidence,
     )?;
+    if terminal_receipt_pumps < 2 {
+        return Err(invalid(format!(
+            "pinned complete co-op replay terminalized after {terminal_receipt_pumps} receipt pump(s); expected at least 2"
+        )));
+    }
     assert_pair_victory_terminal(&snapshot, &evidence)?;
     absorb_pair_snapshot_frontier(&mut checksum, &snapshot)?;
     let teardown_snapshot = pair.teardown("m3 complete co-op battle teardown")?;
@@ -2390,6 +2424,8 @@ fn m3_complete_supported_coop_battle() -> TestResult {
             "fixture": "doubles-single-target with deterministic short-battle enemy boundary",
             "initialization_excluded": true,
             "terminal": "shared victory terminal with converged canonical/control/UI state",
+            "terminal_receipt_pumps": terminal_receipt_pumps,
+            "terminal_receipt_pump_limit": MAX_TERMINAL_RECEIPT_PUMPS,
         }),
     )
 }
