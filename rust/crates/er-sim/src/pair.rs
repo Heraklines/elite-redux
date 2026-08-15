@@ -4733,7 +4733,10 @@ mod tests {
 
         sibling.teardown("fork sibling teardown")?;
         assert_eq!(source.snapshot()?, source_after_mutation);
-        assert!(matches!(sibling.snapshot(), Err(SimulatedPairError::Disposed)));
+        assert!(matches!(
+            sibling.snapshot(),
+            Err(SimulatedPairError::Disposed)
+        ));
         Ok(())
     }
 
@@ -4778,7 +4781,7 @@ mod tests {
         let mut pair = SimulatedPair::new(pair_config)?;
         let _proposal = raw_press_proposal(&mut pair)?;
 
-        let event_id = PresentationEventId::new(safe(92))?;
+        let event_id = PresentationEventId::new(safe(92));
         let mut work = VecDeque::new();
         pair.consume_effect(
             KernelEffect::Present {
@@ -4840,7 +4843,10 @@ mod tests {
             pair.trace_audit.effect_origins,
             fork.trace_audit.effect_origins
         );
-        assert_eq!(pair.trace_audit.host_rng_audit, fork.trace_audit.host_rng_audit);
+        assert_eq!(
+            pair.trace_audit.host_rng_audit,
+            fork.trace_audit.host_rng_audit
+        );
         assert_eq!(
             pair.trace_audit.host_internal_events,
             fork.trace_audit.host_internal_events
@@ -4862,10 +4868,7 @@ mod tests {
         let mut pair = SimulatedPair::new(config(0x57, safe(64)))?;
         pair.teardown("disposed fork source")?;
 
-        assert!(matches!(
-            pair.try_fork(),
-            Err(SimulatedPairError::Disposed)
-        ));
+        assert!(matches!(pair.try_fork(), Err(SimulatedPairError::Disposed)));
         Ok(())
     }
 
