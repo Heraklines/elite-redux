@@ -3,14 +3,6 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import type {
-  CoopAuthorityEntry,
-  CoopFrameContextV2,
-  CoopNextControl,
-  CoopScheduler,
-  CoopTimeClass,
-  CoopTimerOwner,
-} from "#data/elite-redux/coop/authority-v2/contract";
 import {
   buildTerminalCommitEntry,
   buildWaveAdvanceEntry,
@@ -19,9 +11,17 @@ import {
 import {
   AuthorityLog,
   authorityEntryProofScopeOf,
-  revokeAuthorityEntryProofScope,
   type CoopAuthorityWire,
+  revokeAuthorityEntryProofScope,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
+import type {
+  CoopAuthorityEntry,
+  CoopFrameContextV2,
+  CoopNextControl,
+  CoopScheduler,
+  CoopTimeClass,
+  CoopTimerOwner,
+} from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopTailProofBodyV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import {
   type CoopV2AuthorityProposalWaitObservation,
@@ -47,12 +47,7 @@ const REPLICA_CONTEXT: CoopFrameContextV2 = { ...CONTEXT, senderSeatId: 1 };
 
 const REPLICA_SCHEDULER: CoopScheduler = {
   now: (_timeClass: CoopTimeClass) => 0,
-  schedule: (
-    _owner: CoopTimerOwner,
-    _delayMs: number,
-    _timeClass: CoopTimeClass,
-    _callback: () => void,
-  ) => () => {},
+  schedule: (_owner: CoopTimerOwner, _delayMs: number, _timeClass: CoopTimeClass, _callback: () => void) => () => {},
   cancelOwner: (_ownerId: string) => {},
 };
 
@@ -675,10 +670,9 @@ describe("Authority V2 interaction control ledger", () => {
           throw new Error(`invalid ${label} boundary did not retain its correlated request`);
         }
         const correlated = request as ReplicaBoundaryRequest;
-        expect(
-          harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(correlated, "manifest")),
-          label,
-        ).toEqual({ kind: "pending" });
+        expect(harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(correlated, "manifest")), label).toEqual(
+          { kind: "pending" },
+        );
         for (const source of harness.sources) {
           expect(harness.log.admit(source).kind, label).toBe("gap");
         }
@@ -867,52 +861,114 @@ describe("Authority V2 interaction control ledger", () => {
 
   it("restores an uninstalled predecessor when a later boundary reservation step collides", () => {
     const ledger = new CoopV2InteractionControlLedger();
-    const predecessor = turnEntry(3, "uninstalled-predecessor", commandControl());
-    expect(ledger.prepareAuthorityEntry(predecessor)).not.toBeNull();
-    expect(ledger.activeControl).toBeNull();
+    const authority = new AuthorityLog({
+      localContext: CONTEXT,
+      scheduler: REPLICA_SCHEDULER,
+      send: () => {},
+      peerBindings: [{ seatId: 1, connectionGeneration: REPLICA_CONTEXT.connectionGeneration }],
+    });
+    const destination = wait("rollback-boundary", null, ["TURN_COMMIT"]);
+    const blocker = authority.commit(turnEntry(1, "rollback-boundary", destination));
 
-    // This unrelated claim occupies the boundary's destination address. The boundary proof can consume the
-    // uninstalled predecessor, but registration must then fail and roll the whole snapshot back.
-    const blocker: CoopAuthorityEntry = {
-      context: CONTEXT,
-      revision: 2,
-      operationId: "terminal-address-blocker",
-      kind: "TERMINAL_COMMIT",
-      material: { digest: "digest-terminal-address-blocker", payload: { wave: 5, turn: 1 } },
-      nextControl: { kind: "TERMINAL", terminalId: "rollback-terminal" },
-      subsumes: [],
-    };
+    // A non-boundary source can legally own this exact wait address without a boundary proof. Install it so
+    // its dense TURN successor is also legal, while retaining the claim that the later boundary must collide.
+    expect(blocker.revision).toBe(1);
     expect(ledger.registerEntry(blocker)).toBe(true);
     expect(ledger.markMaterialApplied(blocker)).toBe(true);
-    const authenticatedSourceCountBeforeCollision = ledger.authenticatedSourceCount;
+    expect(ledger.project(destination, null)).toMatchObject({
+      kind: "installed",
+      controlId: controlIdOf(destination),
+    });
+    expect(ledger.sourceEntryOf(destination)).toMatchObject({
+      revision: blocker.revision,
+      operationId: blocker.operationId,
+    });
 
-    const boundary: CoopAuthorityEntry = {
-      ...buildTerminalCommitEntry({
+    const predecessorControl = shared("rollback-predecessor-surface");
+    const predecessor = authority.commit(turnEntry(2, "uninstalled-predecessor", predecessorControl));
+    expect(predecessor.revision).toBe(blocker.revision + 1);
+    expect(ledger.registerEntry(predecessor)).toBe(true);
+    expect(ledger.markMaterialApplied(predecessor)).toBe(true);
+    const waiterToken = {};
+    expect(
+      ledger.projectAuthorityProposalWait(
+        predecessorControl,
+        proposalWait({ controlOperationId: predecessorControl.operationId, waiterToken }),
+        0,
+      ),
+    ).toMatchObject({ kind: "installed", controlId: controlIdOf(predecessorControl) });
+    expect(ledger.revokeAuthorityProposalWait(predecessorControl, waiterToken)).toBe(true);
+    expect(ledger.activeControl).toBeNull();
+
+    const authenticatedSourceCountBeforeCollision = ledger.authenticatedSourceCount;
+    const blockerSourceBeforeCollision = ledger.sourceEntryOf(destination);
+    const predecessorSourceBeforeCollision = ledger.sourceEntryOf(predecessorControl);
+    const reservations: ((() => void) | null)[] = [];
+    let prepareCalls = 0;
+    const firstAttempt = authority.commitDetailed(
+      buildWaveAdvanceEntry({
         context: CONTEXT,
         operationId: "rollback-boundary",
-        terminal: {
-          kind: "terminal",
-          terminalId: "rollback-terminal",
-          reason: "game-over",
-          wave: 5,
-          turn: 1,
-        },
-        subsumes: [3],
+        transition: BOUNDARY_TRANSITION,
+        destination,
+        subsumes: [blocker.revision, predecessor.revision],
       }),
-      revision: 4,
-    };
-    expect(ledger.prepareAuthorityEntry(boundary)).toBeNull();
+      entry => {
+        prepareCalls += 1;
+        const proof = authorityEntryProofScopeOf(entry);
+        expect(proof?.kind).toBe("authority-retained");
+        if (proof?.kind === "authority-retained") {
+          expect(proof.boundarySources).toEqual([blocker, predecessor]);
+        }
+        expect(controlIdOf(entry.nextControl)).toBe(controlIdOf(blocker.nextControl));
+        const reservation = ledger.prepareAuthorityEntry(entry);
+        reservations.push(reservation);
+        return reservation;
+      },
+    );
+    expect(firstAttempt.kind).toBe("deferred");
+    if (firstAttempt.kind !== "deferred") {
+      throw new Error("destination collision did not defer the exact boundary");
+    }
+    const boundary = firstAttempt.entry;
+    expect(boundary.revision).toBe(predecessor.revision + 1);
+    expect(prepareCalls).toBe(1);
+    expect(reservations).toEqual([null]);
+    expect(authorityEntryProofScopeOf(boundary)).toBeNull();
 
     // The predecessor was materially reserved but never projected; rollback must leave it in exactly that
-    // state so the real projector can still install it after the failed later reservation.
+    // state, preserve the blocker, and remove every partially reconciled boundary source/claim.
     expect(ledger.authenticatedSourceCount).toBe(authenticatedSourceCountBeforeCollision);
-    expect(ledger.latestControl).toEqual(predecessor.nextControl);
+    expect(ledger.latestControl).toEqual(predecessorControl);
     expect(ledger.activeControl).toBeNull();
-    expect(ledger.isMaterialApplied(predecessor.nextControl)).toBe(true);
-    expect(ledger.sourceEntryOf(predecessor.nextControl)).toMatchObject({
-      revision: predecessor.revision,
-      operationId: predecessor.operationId,
+    expect(ledger.isMaterialApplied(destination)).toBe(true);
+    expect(ledger.isMaterialApplied(predecessorControl)).toBe(true);
+    expect(ledger.sourceEntryOf(destination)).toEqual(blockerSourceBeforeCollision);
+    expect(ledger.sourceEntryOf(predecessorControl)).toEqual(predecessorSourceBeforeCollision);
+
+    // A validated recovery removes the stale address owner while restoring the same uninstalled predecessor.
+    // The authority's exact pending body then retries at the same revision and completes its reservation.
+    expect(ledger.adoptRecoveryFrontier(predecessor)).toBe(true);
+    expect(ledger.activeControl).toBeNull();
+    expect(ledger.latestControl).toEqual(predecessorControl);
+    expect(ledger.sourceEntryOf(destination)).toBeNull();
+    const retry = authority.retryDeferredCommit(boundary.operationId);
+    expect(retry.kind).toBe("committed");
+    if (retry.kind !== "committed") {
+      throw new Error("legal boundary retry did not commit after the address collision cleared");
+    }
+    expect(retry.entry).toBe(boundary);
+    expect(prepareCalls).toBe(2);
+    expect(reservations[0]).toBeNull();
+    expect(reservations[1]).not.toBeNull();
+    expect(ledger.sourceEntryOf(destination)).toMatchObject({
+      revision: boundary.revision,
+      operationId: boundary.operationId,
     });
+    expect(ledger.isMaterialApplied(destination)).toBe(true);
+    expect(ledger.latestControl).toEqual(destination);
+    expect(ledger.activeControl).toBeNull();
+    authority.dispose("destination collision fixture complete");
   });
 
   it("reopens a superseded command address as a new lease generation after an ordered modal", () => {

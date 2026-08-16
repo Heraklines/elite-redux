@@ -22,19 +22,18 @@
 // =============================================================================
 
 import {
-  AuthorityLog,
-  authorityEntryProofScopeOf,
-  type AuthorityLogOptions,
-  type AuthorityDeliveryExhaustion,
-  AuthorityRetentionOverflowError,
-  type CoopAuthorityWire,
-} from "#data/elite-redux/coop/authority-v2/authority-log";
-import {
   buildTerminalCommitEntry,
   buildWaveAdvanceEntry,
   type CoopWaveTransitionMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
-import { CoopV2InteractionControlLedger } from "#data/elite-redux/coop/authority-v2/interaction-control-ledger";
+import {
+  type AuthorityDeliveryExhaustion,
+  AuthorityLog,
+  type AuthorityLogOptions,
+  AuthorityRetentionOverflowError,
+  authorityEntryProofScopeOf,
+  type CoopAuthorityWire,
+} from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
   CoopAuthorityEntry,
   CoopAuthorityReceipt,
@@ -50,6 +49,7 @@ import {
   type CoopTailProofBodyV2,
   type CoopTailRequestBodyV2,
 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+import { CoopV2InteractionControlLedger } from "#data/elite-redux/coop/authority-v2/interaction-control-ledger";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import { validateInboundFrame } from "#data/elite-redux/coop/authority-v2/protocol-validator";
 import {
@@ -559,13 +559,16 @@ function makeShadowBoundaryDuo(options: {
         if (frame.body.kind === "WAVE_ADVANCE") {
           boundaryFrame = frame;
         }
-        if (proofSourcesActive && !alteredProofSource && options.alterProofSource != null) {
+        if (
+          proofSourcesActive
+          && !alteredProofSource
+          && options.alterProofSource != null
+          && frame.body.revision === 3
+        ) {
           // Corrupt only the final predecessor source so the manifest and earlier sources remain exact.
-          if (frame.body.revision === 3) {
-            alteredProofSource = true;
-            guest.handleInboundFrame(options.alterProofSource(frame));
-            return;
-          }
+          alteredProofSource = true;
+          guest.handleInboundFrame(options.alterProofSource(frame));
+          return;
         }
       }
       guest.handleInboundFrame(frame);
@@ -1030,9 +1033,7 @@ describe("authority-v2 log", () => {
       context: seat2Context,
       requestId: canonicalBoundaryProofRequestId(seat2Context, 1),
     };
-    expect(seat2Request.requestId).toBe(
-      `authority-v2:${seat2Context.sessionId}:seat2:boundary-proof:1`,
-    );
+    expect(seat2Request.requestId).toBe(`authority-v2:${seat2Context.sessionId}:seat2:boundary-proof:1`);
     const seat2Response = authorityTailResponse(harness, seat2Request);
     expect(seat2Response.manifest.body.requestId).toBe(seat2Request.requestId);
     expect(seat2Response.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
@@ -1057,9 +1058,7 @@ describe("authority-v2 log", () => {
       ...firstRequest,
       requestId: canonicalBoundaryProofRequestId(firstRequest.context, 2),
     };
-    expect(newerRequest.requestId).toBe(
-      `authority-v2:${firstRequest.context.sessionId}:seat1:boundary-proof:2`,
-    );
+    expect(newerRequest.requestId).toBe(`authority-v2:${firstRequest.context.sessionId}:seat1:boundary-proof:2`);
     const newerResponse = authorityTailResponse(harness, newerRequest);
     expect(newerResponse.manifest.body.sourceRevisions).toEqual([1, 2, 3]);
     expect(newerResponse.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
@@ -1091,8 +1090,7 @@ describe("authority-v2 log", () => {
       harness.authority.handleTailRequest(request.context, {
         ...tailRequestBody(request),
         requestId: canonicalRequestId,
-        candidateRevision:
-          attempt % 2 === 0 ? request.candidateRevision : request.candidateRevision + attempt + 1,
+        candidateRevision: attempt % 2 === 0 ? request.candidateRevision : request.candidateRevision + attempt + 1,
         candidateOperationId: `nonexistent-operation-${attempt}`,
       });
       expect(harness.authoritySent, `nonexistent candidate ${attempt}`).toEqual([]);
@@ -1189,7 +1187,10 @@ describe("authority-v2 log", () => {
         candidateRevision: candidate.revision,
         candidateOperationId: candidate.operationId,
       });
-      expect(localSent.map(wire => wire.kind), requestId).toEqual(["tailProof", "deliver", "tailProof"]);
+      expect(
+        localSent.map(wire => wire.kind),
+        requestId,
+      ).toEqual(["tailProof", "deliver", "tailProof"]);
       expect(localSent[0], requestId).toMatchObject({ kind: "tailProof", body: { requestId } });
       expect(boundaryProofDiagnostics(log).tailProofResponses).toBe(1);
 
@@ -1240,10 +1241,7 @@ describe("authority-v2 log", () => {
     assertAfter("manifest omitted mandatory predecessor", (harness, request) => {
       const sourceRevisions = [1, 2];
       expect(
-        harness.replica.acceptBoundaryProofFrame(
-          frameContext(),
-          proofBody(request, "manifest", { sourceRevisions }),
-        ),
+        harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest", { sourceRevisions })),
       ).toEqual({ kind: "pending" });
       for (const source of harness.sources.slice(0, 2)) {
         expect(harness.replica.admit(source).kind).toBe("gap");
@@ -1260,10 +1258,7 @@ describe("authority-v2 log", () => {
     assertAfter("manifest omitted claimed source", (harness, request) => {
       const sourceRevisions = [1, 3];
       expect(
-        harness.replica.acceptBoundaryProofFrame(
-          frameContext(),
-          proofBody(request, "manifest", { sourceRevisions }),
-        ),
+        harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest", { sourceRevisions })),
       ).toEqual({ kind: "pending" });
       for (const source of [harness.sources[0], harness.sources[2]]) {
         if (source == null) {
@@ -1296,20 +1291,24 @@ describe("authority-v2 log", () => {
       return { disposition: harness.replica.admit(altered), boundary: harness.boundary };
     });
 
-    assertAfter("exact duplicate source", (harness, request) => {
-      expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
-        kind: "pending",
-      });
-      const source = harness.sources[0];
-      if (source == null) {
-        throw new Error("duplicate-source fixture lost its first source");
-      }
-      expect(harness.replica.admit(source).kind).toBe("gap");
-      const duplicate = harness.replica.admit(structuredClone(source));
-      expect(duplicate).toEqual({ kind: "gap", missingFrom: request.missingFrom });
-      expect(harness.replica.hasBoundaryProofCapture()).toBe(true);
-      return { disposition: duplicate, boundary: harness.boundary };
-    }, "gap");
+    assertAfter(
+      "exact duplicate source",
+      (harness, request) => {
+        expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
+          kind: "pending",
+        });
+        const source = harness.sources[0];
+        if (source == null) {
+          throw new Error("duplicate-source fixture lost its first source");
+        }
+        expect(harness.replica.admit(source).kind).toBe("gap");
+        const duplicate = harness.replica.admit(structuredClone(source));
+        expect(duplicate).toEqual({ kind: "gap", missingFrom: request.missingFrom });
+        expect(harness.replica.hasBoundaryProofCapture()).toBe(true);
+        return { disposition: duplicate, boundary: harness.boundary };
+      },
+      "gap",
+    );
 
     assertAfter("unlisted source", (harness, request) => {
       expect(
@@ -1331,10 +1330,7 @@ describe("authority-v2 log", () => {
       ["wrong candidate head/range", frameContext(), { fromRevision: 2 }],
     ] as const) {
       assertAfter(label, (harness, request) => ({
-        disposition: harness.replica.acceptBoundaryProofFrame(
-          context,
-          proofBody(request, "manifest", body),
-        ),
+        disposition: harness.replica.acceptBoundaryProofFrame(context, proofBody(request, "manifest", body)),
         boundary: harness.boundary,
       }));
     }
@@ -1396,9 +1392,7 @@ describe("authority-v2 log", () => {
     if (predecessor == null) {
       throw new Error("retention-cliff fixture has no predecessor");
     }
-    const boundary = authority.commit(
-      waveBoundaryEntry("post-520-boundary", frameContext(), [predecessor.revision]),
-    );
+    const boundary = authority.commit(waveBoundaryEntry("post-520-boundary", frameContext(), [predecessor.revision]));
     expect(authority.acceptReceipt(receipt(boundary, "admitted"))).toBe(false);
     expect(authority.retained().map(entry => entry.revision)).toEqual([boundary.revision]);
 
@@ -1749,46 +1743,43 @@ describe("authority-v2 log", () => {
     expect(delivered(sent).filter(entry => entry.operationId === deferred.operationId)).toEqual([deferred]);
   });
 
-  it(
-    "rejects partial, ineligible, unknown, duplicate, out-of-range, and omitted-predecessor authority subsumes",
-    () => {
-      const cases: readonly [string, readonly number[]][] = [
-        ["partial", [3]],
-        ["ineligible", [1, 2, 3]],
-        ["unknown", [1, 3, 99]],
-        ["duplicate", [1, 3, 3]],
-        ["out-of-range", [0, 1, 3]],
-        ["omitted-predecessor", [1]],
-      ];
-      for (const [label, subsumes] of cases) {
-        const localScheduler = new FakeScheduler();
-        const localSent: CoopAuthorityWire[] = [];
-        const log = makeLog(localScheduler, localSent);
-        log.commit(
-          entryInput("eligible-source-1", {
-            kind: "TURN_COMMIT",
-            nextControl: successorWait("eligible-source-1", ["INTERACTION_COMMIT"]),
-          }),
-        );
-        log.commit(
-          entryInput("ineligible-source-2", {
-            kind: "INTERACTION_COMMIT",
-            nextControl: successorWait("ineligible-source-2", ["TURN_COMMIT"]),
-          }),
-        );
-        log.commit(
-          entryInput("eligible-source-3", {
-            kind: "TURN_COMMIT",
-            nextControl: commandControl(),
-          }),
-        );
+  it("rejects partial, ineligible, unknown, duplicate, out-of-range, and omitted-predecessor authority subsumes", () => {
+    const cases: readonly [string, readonly number[]][] = [
+      ["partial", [3]],
+      ["ineligible", [1, 2, 3]],
+      ["unknown", [1, 3, 99]],
+      ["duplicate", [1, 3, 3]],
+      ["out-of-range", [0, 1, 3]],
+      ["omitted-predecessor", [1]],
+    ];
+    for (const [label, subsumes] of cases) {
+      const localScheduler = new FakeScheduler();
+      const localSent: CoopAuthorityWire[] = [];
+      const log = makeLog(localScheduler, localSent);
+      log.commit(
+        entryInput("eligible-source-1", {
+          kind: "TURN_COMMIT",
+          nextControl: successorWait("eligible-source-1", ["INTERACTION_COMMIT"]),
+        }),
+      );
+      log.commit(
+        entryInput("ineligible-source-2", {
+          kind: "INTERACTION_COMMIT",
+          nextControl: successorWait("ineligible-source-2", ["TURN_COMMIT"]),
+        }),
+      );
+      log.commit(
+        entryInput("eligible-source-3", {
+          kind: "TURN_COMMIT",
+          nextControl: commandControl(),
+        }),
+      );
 
-        const candidate = { ...waveBoundaryEntry(`invalid-authority-${label}`, frameContext(), [1, 3]), subsumes };
-        expect(() => log.commit(candidate), label).toThrow();
-        expect(log.diagnostics()).toMatchObject({ headRevision: 3, retainedEntries: 3 });
-      }
-    },
-  );
+      const candidate = { ...waveBoundaryEntry(`invalid-authority-${label}`, frameContext(), [1, 3]), subsumes };
+      expect(() => log.commit(candidate), label).toThrow();
+      expect(log.diagnostics()).toMatchObject({ headRevision: 3, retainedEntries: 3 });
+    }
+  });
 
   it("refuses a hot-rejoin rebind that changes a stable session axis or rolls a generation back", () => {
     const log = makeLog(scheduler, sent, {
@@ -2755,11 +2746,7 @@ describe("authority-v2 log", () => {
       revision: predecessor.revision,
       operationId: predecessor.operationId,
     });
-    expect(delivered(sent).map(entry => entry.operationId)).toEqual([
-      "live-proof-1",
-      "live-proof-2",
-      "live-proof-3",
-    ]);
+    expect(delivered(sent).map(entry => entry.operationId)).toEqual(["live-proof-1", "live-proof-2", "live-proof-3"]);
   });
 
   it("prunes exact subsumed source proof while retaining the new wave or terminal boundary source", () => {
