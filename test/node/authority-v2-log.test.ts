@@ -411,6 +411,10 @@ function tailRequestBody(request: CorrelatedTailRequest): CoopTailRequestBodyV2 
   };
 }
 
+function canonicalBoundaryProofRequestId(context: CoopFrameContextV2, sequence: number): string {
+  return `authority-v2:${context.sessionId}:seat${context.senderSeatId}:boundary-proof:${sequence}`;
+}
+
 interface ExactTailResponse {
   readonly manifest: Extract<CoopAuthorityWire, { kind: "tailProof" }>;
   readonly sources: readonly Extract<CoopAuthorityWire, { kind: "deliver" }>[];
@@ -1016,15 +1020,22 @@ describe("authority-v2 log", () => {
     const firstRequest = beginCorrelatedBoundaryProof(harness);
     const firstResponse = authorityTailResponse(harness, firstRequest);
     const firstBytes = JSON.stringify(harness.authoritySent);
+    expect(firstRequest.requestId).toBe(canonicalBoundaryProofRequestId(firstRequest.context, 1));
     expect(firstResponse.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
     expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(1);
 
-    harness.authoritySent.length = 0;
-    harness.authority.handleTailRequest(
-      { ...firstRequest.context, senderSeatId: 2 },
-      tailRequestBody(firstRequest),
+    const seat2Context = { ...firstRequest.context, senderSeatId: 2 };
+    const seat2Request: CorrelatedTailRequest = {
+      ...firstRequest,
+      context: seat2Context,
+      requestId: canonicalBoundaryProofRequestId(seat2Context, 1),
+    };
+    expect(seat2Request.requestId).toBe(
+      `authority-v2:${seat2Context.sessionId}:seat2:boundary-proof:1`,
     );
-    expect(JSON.stringify(harness.authoritySent)).toBe(firstBytes);
+    const seat2Response = authorityTailResponse(harness, seat2Request);
+    expect(seat2Response.manifest.body.requestId).toBe(seat2Request.requestId);
+    expect(seat2Response.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
     expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(2);
 
     // Candidate admission retires every exact source lease while the candidate itself remains retained.
@@ -1044,8 +1055,11 @@ describe("authority-v2 log", () => {
 
     const newerRequest: CorrelatedTailRequest = {
       ...firstRequest,
-      requestId: `${firstRequest.requestId}:newer`,
+      requestId: canonicalBoundaryProofRequestId(firstRequest.context, 2),
     };
+    expect(newerRequest.requestId).toBe(
+      `authority-v2:${firstRequest.context.sessionId}:seat1:boundary-proof:2`,
+    );
     const newerResponse = authorityTailResponse(harness, newerRequest);
     expect(newerResponse.manifest.body.sourceRevisions).toEqual([1, 2, 3]);
     expect(newerResponse.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
@@ -1069,15 +1083,14 @@ describe("authority-v2 log", () => {
   it("does not spend correlated cache capacity on invalid or nonexistent candidates", () => {
     const harness = makeCorrelatedBoundaryHarness([1, 2, 3], { retainCapacity: 4 });
     const request = beginCorrelatedBoundaryProof(harness);
-
-    harness.authority.handleTailRequest(request.context, { ...tailRequestBody(request), requestId: "" });
-    expect(harness.authoritySent).toEqual([]);
+    const canonicalRequestId = canonicalBoundaryProofRequestId(request.context, 1);
+    expect(request.requestId).toBe(canonicalRequestId);
 
     for (let attempt = 0; attempt < 4; attempt++) {
       harness.authoritySent.length = 0;
       harness.authority.handleTailRequest(request.context, {
         ...tailRequestBody(request),
-        requestId: `nonexistent-candidate-${attempt}`,
+        requestId: canonicalRequestId,
         candidateRevision:
           attempt % 2 === 0 ? request.candidateRevision : request.candidateRevision + attempt + 1,
         candidateOperationId: `nonexistent-operation-${attempt}`,
@@ -1092,9 +1105,46 @@ describe("authority-v2 log", () => {
     expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(1);
   });
 
-  it("reclaims every cached request ID when its sequential candidate retires", () => {
+  it("rejects noncanonical proof ranges without consuming seq1 or poisoning its exact retry", () => {
+    const harness = makeCorrelatedBoundaryHarness();
+    const request = beginCorrelatedBoundaryProof(harness);
+    expect(request.missingFrom).toBe(1);
+    expect(request.requestId).toBe(canonicalBoundaryProofRequestId(request.context, 1));
+    const retainedBefore = harness.authority.retained();
+    const diagnosticsBefore = harness.authority.diagnostics();
+
+    for (const [label, fromRevision] of [
+      ["lower", request.missingFrom - 1],
+      ["higher", request.missingFrom + 1],
+    ] as const) {
+      harness.authoritySent.length = 0;
+      harness.authority.handleTailRequest(request.context, {
+        ...tailRequestBody(request),
+        fromRevision,
+      });
+      expect(harness.authoritySent, `${label} noncanonical range`).toEqual([]);
+      expect(harness.authority.retained(), `${label} noncanonical range`).toEqual(retainedBefore);
+      expect(harness.authority.diagnostics(), `${label} noncanonical range`).toMatchObject({
+        headRevision: diagnosticsBefore.headRevision,
+        retainedEntries: diagnosticsBefore.retainedEntries,
+      });
+      expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(0);
+    }
+
+    const response = authorityTailResponse(harness, request);
+    expect(response.manifest.body).toMatchObject({
+      requestId: request.requestId,
+      fromRevision: request.missingFrom,
+      sourceRevisions: [1, 2, 3],
+    });
+    expect(response.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(1);
+  });
+
+  it("reclaims retired-candidate IDs while fencing old sequences from newer candidates", () => {
     const localSent: CoopAuthorityWire[] = [];
     const log = makeLog(new FakeScheduler(), localSent, { retainCapacity: 2 });
+    const peerContext = frameContext({ senderSeatId: 1 });
 
     for (let wave = 1; wave <= 3; wave++) {
       const sourceOperationId = `cache-source-wave-${wave}`;
@@ -1118,19 +1168,30 @@ describe("authority-v2 log", () => {
         }),
       );
 
-      for (let requestOrdinal = 0; requestOrdinal < 2; requestOrdinal++) {
-        const requestId = `candidate-${candidate.revision}-request-${requestOrdinal}`;
+      if (wave > 1) {
+        const retiredCandidateRequestId = canonicalBoundaryProofRequestId(peerContext, wave - 1);
         localSent.length = 0;
-        log.handleTailRequest(frameContext({ senderSeatId: 1 }), {
+        log.handleTailRequest(peerContext, {
           fromRevision: source.revision,
-          requestId,
+          requestId: retiredCandidateRequestId,
           candidateRevision: candidate.revision,
           candidateOperationId: candidate.operationId,
         });
-        expect(localSent.map(wire => wire.kind), requestId).toEqual(["tailProof", "deliver", "tailProof"]);
-        expect(localSent[0], requestId).toMatchObject({ kind: "tailProof", body: { requestId } });
+        expect(localSent, `retired sequence ${wave - 1} targeting candidate ${candidate.revision}`).toEqual([]);
+        expect(boundaryProofDiagnostics(log).tailProofResponses).toBe(0);
       }
-      expect(boundaryProofDiagnostics(log).tailProofResponses).toBe(2);
+
+      const requestId = canonicalBoundaryProofRequestId(peerContext, wave);
+      localSent.length = 0;
+      log.handleTailRequest(peerContext, {
+        fromRevision: source.revision,
+        requestId,
+        candidateRevision: candidate.revision,
+        candidateOperationId: candidate.operationId,
+      });
+      expect(localSent.map(wire => wire.kind), requestId).toEqual(["tailProof", "deliver", "tailProof"]);
+      expect(localSent[0], requestId).toMatchObject({ kind: "tailProof", body: { requestId } });
+      expect(boundaryProofDiagnostics(log).tailProofResponses).toBe(1);
 
       expect(log.acceptReceipt(receipt(candidate, "admitted"))).toBe(false);
       expect(log.acceptReceipt(receipt(candidate, "materialApplied"))).toBe(false);
