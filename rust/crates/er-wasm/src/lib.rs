@@ -49,7 +49,7 @@ pub mod tests {
             "trace_version": 1,
             "schema_version": 1,
             "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
-            "protocol_version": "er-coop-47",
+            "protocol_version": "er-coop-48",
             "content_hash": "content-hash",
             "rust_toolchain": "1.97.1"
         },

@@ -5,7 +5,7 @@
   "authority_contract": "authority-v2",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "protocol_version": "er-coop-47",
+  "protocol_version": "er-coop-48",
   "frame_protocol_version": 2,
   "source_oracle": "schemas/kernel/source/authority-v2-map-v1.json",
   "coverage_categories": {

@@ -4744,7 +4744,7 @@ fn valid_entry_body() -> Value {
     })
 }
 
-fn known_frame_cases() -> [(&'static str, Value); 7] {
+fn known_frame_cases() -> [(&'static str, Value); 8] {
     [
         ("authorityEntry", valid_entry_body()),
         (
@@ -4752,6 +4752,18 @@ fn known_frame_cases() -> [(&'static str, Value); 7] {
             json!({"revision": 0, "operationId": "operation-1", "stage": "admitted"}),
         ),
         ("tailRequest", json!({"fromRevision": 0})),
+        (
+            "tailProof",
+            json!({
+                "phase": "manifest",
+                "requestId": "request-1",
+                "fromRevision": 0,
+                "candidateRevision": 2,
+                "candidateOperationId": "candidate-1",
+                "headRevision": 2,
+                "sourceRevisions": [1]
+            }),
+        ),
         (
             "recoveryRequest",
             json!({"requestId": "request-1", "capturedFrontier": 0, "reason": "rejoin"}),
@@ -4975,6 +4987,7 @@ fn raw_frame_seeded_generator_is_total_and_preserves_precedence() -> TestResult 
                             FrameType::AuthorityEntry
                                 | FrameType::AuthorityReceipt
                                 | FrameType::TailRequest
+                                | FrameType::TailProof
                                 | FrameType::RecoveryRequest
                                 | FrameType::RecoveryBundle
                                 | FrameType::RecoveryApplied

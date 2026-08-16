@@ -15,8 +15,9 @@ use crate::{
     RawInputEvent, Revision, RunId, SafeU53, SeatId, SessionId, TimerId, UiState, UiViewModel,
 };
 
-pub const PROTOCOL_VERSION: &str = "er-coop-47";
+pub const PROTOCOL_VERSION: &str = "er-coop-48";
 pub const FRAME_PROTOCOL_VERSION: u32 = 2;
+pub const TAIL_PROOF_MAX_SOURCE_REVISIONS: usize = 512;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -456,6 +457,8 @@ pub enum FrameType {
     AuthorityReceipt,
     #[serde(rename = "tailRequest")]
     TailRequest,
+    #[serde(rename = "tailProof")]
+    TailProof,
     #[serde(rename = "recoveryRequest")]
     RecoveryRequest,
     #[serde(rename = "recoveryBundle")]
@@ -1125,7 +1128,7 @@ mod tests {
         let Some(frame_types) = frame_types else {
             return;
         };
-        assert_eq!(frame_types.len(), 7);
+        assert_eq!(frame_types.len(), 8);
         for frame_type in frame_types {
             let mut frame_with_type = frame.clone();
             let inserted = frame_with_type

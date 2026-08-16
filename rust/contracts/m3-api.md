@@ -7,7 +7,7 @@ Pinned inputs:
 
 - M2 base: `7357166c19bdb5cf0e32c84b0f74f22e79d80798`;
 - TypeScript oracle: `3b534099919efae827019d4a3f3c4ab0ecd6d67b`;
-- Authority compatibility identifier: `er-coop-47`;
+- Authority compatibility identifier: `er-coop-48`;
 - schema versions: `rust/contracts/m3-contract.toml`;
 - writer ownership: `rust/contracts/m3-ownership.toml`.
 

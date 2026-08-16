@@ -7,7 +7,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 export const SCHEMA_VERSION = 1;
 export const PROJECT_NAME = "PokéRogue Redux";
 export const ORACLE_GAME_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
-export const EXPECTED_PROTOCOL_VERSION = "er-coop-47";
+export const ORACLE_PROTOCOL_VERSION = "er-coop-47";
+export const ACTIVE_PROTOCOL_VERSION = "er-coop-48";
+export const EXPECTED_PROTOCOL_VERSION = ACTIVE_PROTOCOL_VERSION;
 export const FIXTURE_DIGEST_KIND = "fixture-content-sha256-v1";
 export const FIXTURE_DIGEST_DESCRIPTION =
   "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.";
@@ -37,6 +39,19 @@ export const SOURCE_FILES = Object.freeze({
   snesPadConfig: "src/configs/inputs/pad-unlicensed-snes.ts",
   xboxPadConfig: "src/configs/inputs/pad-xbox360.ts",
 });
+
+/**
+ * Active M3 protocol sources are intentionally allowed to advance beyond the
+ * immutable oracle tree. Their extracted values are still checked by the
+ * schema builder and committed fixtures, while all other consumed sources
+ * remain byte-pinned to the oracle.
+ */
+export const ACTIVE_M3_SOURCE_FILES = Object.freeze([
+  SOURCE_FILES.coopTransport,
+  SOURCE_FILES.nextControl,
+  SOURCE_FILES.frameCodec,
+  SOURCE_FILES.protocolValidator,
+]);
 
 const INPUT_CONFIGS = Object.freeze([
   ["keyboard", SOURCE_FILES.keyboardConfig, "CFG_KEYBOARD_QWERTY"],
@@ -69,9 +84,10 @@ export function readSource(root, relativePath) {
 
 /**
  * Prove that this checkout is a descendant of the pinned oracle and that every
- * production source consumed by the exporter is byte-identical to that oracle
- * tree. Worker commits may add the owned exporter/fixture paths, but a source
- * drift or an unrelated base is a closed failure.
+ * non-active production source consumed by the exporter is byte-identical to
+ * that oracle tree. The active M3 protocol inputs are validated by extraction
+ * and committed fixtures; unrelated source drift or an unrelated base is a
+ * closed failure.
  */
 export function verifyOracleSha(root = ROOT) {
   let actual;
@@ -107,12 +123,16 @@ export function verifyOracleSha(root = ROOT) {
       execFileSync("git", ["-C", root, "cat-file", "-e", `${ORACLE_GAME_SHA}:${relativePath}`], {
         stdio: ["ignore", "ignore", "pipe"],
       });
-      execFileSync("git", ["-C", root, "diff", "--quiet", "--no-ext-diff", ORACLE_GAME_SHA, "--", relativePath], {
-        stdio: ["ignore", "ignore", "pipe"],
-      });
+      if (!ACTIVE_M3_SOURCE_FILES.includes(relativePath)) {
+        execFileSync(
+          "git",
+          ["-C", root, "diff", "--quiet", "--no-ext-diff", ORACLE_GAME_SHA, "--", relativePath],
+          { stdio: ["ignore", "ignore", "pipe"] },
+        );
+      }
     } catch {
       fail(
-        `consumed source drifted from oracle ${ORACLE_GAME_SHA}: ${relativePath} (git diff against oracle tree is non-empty or unavailable)`,
+        `consumed source is unavailable or unexpectedly drifted from oracle ${ORACLE_GAME_SHA}: ${relativePath}`,
       );
     }
   }

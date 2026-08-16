@@ -30,5 +30,6 @@ pub use er_types::{
     FrameContext, FrameType, Material, MaterialApplicationOutcome, NetworkFrame, NetworkPayload,
     NextControl, ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle,
     RecoveryBundleBody, RecoveryFenceState, RecoveryFenceView, RecoveryPhase, RecoveryRequestBody,
-    SafeI53, TailRequestBody, TerminalFrameBody, TimeClass, TimerOwner,
+    SafeI53, TailProofBody, TailProofPhase, TailRequestBody, TerminalFrameBody, TimeClass,
+    TimerOwner,
 };

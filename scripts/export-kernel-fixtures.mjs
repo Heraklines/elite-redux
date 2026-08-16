@@ -753,7 +753,10 @@ function buildButtonPayload(schema) {
 }
 
 function buildProtocolPayload(schema) {
-  assert(schema.protocol.pairing_version === EXPECTED_PROTOCOL_VERSION, "protocol version drifted from er-coop-47");
+  assert(
+    schema.protocol.pairing_version === EXPECTED_PROTOCOL_VERSION,
+    `protocol version drifted from ${EXPECTED_PROTOCOL_VERSION}`,
+  );
   return {
     pairing: {
       source_file: schema.source_files.coopTransport,
@@ -853,7 +856,7 @@ function assertCompleteness(schema, files) {
     assert(names.has(required), `required fixture file ${required} was not generated`);
   }
   assert(schema.buttons.members.length === 18, "Button enum fixture is incomplete");
-  assert(schema.protocol.authority_frame_types.length === 7, "Authority V2 frame type fixture is incomplete");
+  assert(schema.protocol.authority_frame_types.length === 8, "Authority V2 frame type fixture is incomplete");
   assert(schema.authority_v2.entry_kinds.length === 6, "Authority V2 entry-kind fixture is incomplete");
   assert(schema.authority_v2.next_control_kinds.length === 5, "next-control fixture is incomplete");
   assert(schema.authority_v2.ack_stages.length === 4, "receipt fixture is incomplete");

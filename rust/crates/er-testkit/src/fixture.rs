@@ -16,7 +16,7 @@ const INVALID_FIXTURE_SENTINEL: &str = "__invalid_fixture_name__\0";
 const FIXTURE_SCHEMA_VERSION: u32 = 1;
 const FIXTURE_PROJECT_NAME: &str = "PokéRogue Redux";
 const FIXTURE_ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
-const FIXTURE_PROTOCOL_VERSION: &str = "er-coop-47";
+const FIXTURE_PROTOCOL_VERSION: &str = "er-coop-48";
 const FIXTURE_DIGEST_KIND: &str = "fixture-content-sha256-v1";
 const FIXTURE_DIGEST_DEFINITION: &str = "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.";
 

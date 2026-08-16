@@ -81,7 +81,7 @@ jobs:
             /src/
           submodules: false
 
-      - name: Require M2-identical production TypeScript and source lock
+      - name: Require the immutable production surface and active protocol sync
         shell: bash
         run: |
           set -euo pipefail
@@ -97,8 +97,56 @@ jobs:
           git merge-base --is-ancestor "$base" "$GITHUB_SHA"
           locked_runtime=(.nvmrc .gitmodules package.json pnpm-lock.yaml pnpm-workspace.yaml src)
           git diff --exit-code "$oracle" "$base" -- "${locked_runtime[@]}"
+          # This is the exact audited production TypeScript delta already
+          # integrated between M2 and the M3 parent. Any additional source
+          # path remains locked to the M2 base and fails this check.
+          integrated_production_ts=(
+            src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts
+            src/data/elite-redux/coop/authority-v2/authority-log.ts
+            src/data/elite-redux/coop/authority-v2/control-ledger.ts
+            src/data/elite-redux/coop/authority-v2/cutover-interaction.ts
+            src/data/elite-redux/coop/authority-v2/cutover-wave.ts
+            src/data/elite-redux/coop/authority-v2/frame-codec.ts
+            src/data/elite-redux/coop/authority-v2/next-control.ts
+            src/data/elite-redux/coop/authority-v2/protocol-validator.ts
+            src/data/elite-redux/coop/authority-v2/shadow.ts
+            src/data/elite-redux/coop/coop-battle-stream.ts
+            src/data/elite-redux/coop/coop-biome-operation.ts
+            src/data/elite-redux/coop/coop-enemy-builder.ts
+            src/data/elite-redux/coop/coop-faint-switch-operation.ts
+            src/data/elite-redux/coop/coop-me-operation.ts
+            src/data/elite-redux/coop/coop-operation-journal.ts
+            src/data/elite-redux/coop/coop-rendezvous.ts
+            src/data/elite-redux/coop/coop-reward-operation.ts
+            src/data/elite-redux/coop/coop-runtime.ts
+            src/data/elite-redux/coop/coop-transport.ts
+            src/data/elite-redux/er-ghost-teams.ts
+            src/field/pokemon.ts
+            src/phases/battle-end-phase.ts
+            src/phases/biome-shop-phase.ts
+            src/phases/command-phase.ts
+            src/phases/coop-guest-faint-switch-phase.ts
+            src/phases/coop-replay-me-phase.ts
+            src/phases/coop-replay-phases.ts
+            src/phases/coop-replay-turn-phase.ts
+            src/phases/er-ability-capsule-phase.ts
+            src/phases/er-crossroads-phase.ts
+            src/phases/er-greater-ability-capsule-phase.ts
+            src/phases/er-greater-ability-randomizer-phase.ts
+            src/phases/er-stormglass-picker-phase.ts
+            src/phases/mystery-encounter-phases.ts
+            src/phases/select-biome-phase.ts
+            src/phases/select-modifier-phase.ts
+            src/phases/switch-phase.ts
+            src/ui/handlers/mystery-encounter-ui-handler.ts
+          )
+          allowed_source_exclusions=()
+          for path in "${integrated_production_ts[@]}"; do
+            allowed_source_exclusions+=(":(exclude)$path")
+          done
           git diff --exit-code "$base" "$GITHUB_SHA" -- \
-            "${locked_runtime[@]}" rust/source-lock.toml
+            "${locked_runtime[@]}" rust/source-lock.toml \
+            "${allowed_source_exclusions[@]}"
           oracle_gitlinks="$(git ls-tree -r "$oracle" | awk '$1 == "160000"')"
           base_gitlinks="$(git ls-tree -r "$base" | awk '$1 == "160000"')"
           head_gitlinks="$(git ls-tree -r "$GITHUB_SHA" | awk '$1 == "160000"')"
@@ -234,7 +282,7 @@ jobs:
           if source_lock.get("oracle_game_sha") != expected_lock["oracle_game_sha"]:
               raise SystemExit("M3 oracle pin differs from rust/source-lock.toml")
           if source_lock.get("protocol_version") != expected_lock["oracle_protocol_version"]:
-              raise SystemExit("M3 protocol pin differs from rust/source-lock.toml")
+              raise SystemExit("M3 oracle protocol pin differs from rust/source-lock.toml")
           expected_source_lock = {
               "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
               "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
@@ -244,7 +292,7 @@ jobs:
               "input_repeat_interval_ms": 250,
           }
           if source_lock != expected_source_lock:
-              raise SystemExit("rust/source-lock.toml differs from the frozen M2 source lock")
+              raise SystemExit("rust/source-lock.toml differs from the immutable M2 oracle source lock")
           if ownership.get("m2_base_sha") != expected_lock["m2_base_sha"]:
               raise SystemExit("ownership M2 base differs from contract lock")
           if ownership.get("oracle_game_sha") != expected_lock["oracle_game_sha"]:
@@ -1816,9 +1864,17 @@ jobs:
             src/configs/inputs/pad-unlicensed-snes.ts
             src/configs/inputs/pad-xbox360.ts
           )
+          active_m3_sources=(
+            src/data/elite-redux/coop/coop-transport.ts
+            src/data/elite-redux/coop/authority-v2/next-control.ts
+            src/data/elite-redux/coop/authority-v2/frame-codec.ts
+            src/data/elite-redux/coop/authority-v2/protocol-validator.ts
+          )
           for path in "${consumed_sources[@]}"; do
             git cat-file -e "${ORACLE_SHA}:${path}"
-            git diff --quiet --no-ext-diff "$ORACLE_SHA" -- "$path"
+            if [[ " ${active_m3_sources[*]} " != *" $path "* ]]; then
+              git diff --quiet --no-ext-diff "$ORACLE_SHA" -- "$path"
+            fi
           done
 
       - name: Resolve the repository Rust toolchain semantics
@@ -4002,7 +4058,7 @@ jobs:
           assert(value.accepted === true && value.acceptance_status === "accepted", "measurement was not accepted");
           assert(value.oracle_game_sha === process.env.ORACLE_SHA, "oracle SHA mismatch");
           assert(value.oracle_branch === "ci/coop/v2-showdown-command-coordinate-20260720", "oracle branch mismatch");
-          assert(value.protocol_version === "er-coop-47", "protocol version mismatch");
+          assert(value.protocol_version === "er-coop-48", "protocol version mismatch");
           assert(value.frame_protocol_version === 2, "frame protocol version mismatch");
           assert(JSON.stringify(value.cross_target_suite_target) === JSON.stringify(manifest.cross_target_suite_target), "cross-target suite target mismatch");
           assert(typeof value.manifest_sha256 === "string" && /^[0-9a-f]{64}$/u.test(value.manifest_sha256), "manifest digest missing");

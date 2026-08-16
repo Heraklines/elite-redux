@@ -76,7 +76,7 @@ mod tests {
     "trace_version": 1,
     "schema_version": 1,
     "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
-    "protocol_version": "er-coop-47",
+    "protocol_version": "er-coop-48",
     "content_hash": "blake3-v1:fixture-content",
     "rust_toolchain": "1.97.1"
   },
@@ -293,7 +293,7 @@ mod tests {
             trace.header.oracle_game_sha,
             "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
         );
-        assert_eq!(trace.header.protocol_version, "er-coop-47");
+        assert_eq!(trace.header.protocol_version, "er-coop-48");
         assert_eq!(trace.header.content_hash, "blake3-v1:fixture-content");
         assert_eq!(trace.header.rust_toolchain, "1.97.1");
         assert_eq!(trace.initial_snapshot.ui, crate::UiState::default());

@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use er_types::{
     AuthorityEntryBody, AuthorityReceiptBody, FRAME_PROTOCOL_VERSION, FrameContext, FrameType,
     NetworkFrame, RawFrame, RecoveryAppliedProof, RecoveryBundleBody, RecoveryRequestBody,
-    TailRequestBody, TerminalFrameBody,
+    TAIL_PROOF_MAX_SOURCE_REVISIONS, TailProofBody, TailRequestBody, TerminalFrameBody,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Number, Value};
@@ -18,6 +18,7 @@ pub enum ValidatedFrameBody {
     AuthorityEntry(AuthorityEntryBody),
     AuthorityReceipt(AuthorityReceiptBody),
     TailRequest(TailRequestBody),
+    TailProof(TailProofBody),
     RecoveryRequest(RecoveryRequestBody),
     RecoveryBundle(RecoveryBundleBody),
     RecoveryApplied(RecoveryAppliedProof),
@@ -64,6 +65,7 @@ enum KnownFrameType {
     AuthorityEntry,
     AuthorityReceipt,
     TailRequest,
+    TailProof,
     RecoveryRequest,
     RecoveryBundle,
     RecoveryApplied,
@@ -76,6 +78,7 @@ impl KnownFrameType {
             "authorityEntry" => Some(Self::AuthorityEntry),
             "authorityReceipt" => Some(Self::AuthorityReceipt),
             "tailRequest" => Some(Self::TailRequest),
+            "tailProof" => Some(Self::TailProof),
             "recoveryRequest" => Some(Self::RecoveryRequest),
             "recoveryBundle" => Some(Self::RecoveryBundle),
             "recoveryApplied" => Some(Self::RecoveryApplied),
@@ -89,6 +92,7 @@ impl KnownFrameType {
             Self::AuthorityEntry => "authorityEntry",
             Self::AuthorityReceipt => "authorityReceipt",
             Self::TailRequest => "tailRequest",
+            Self::TailProof => "tailProof",
             Self::RecoveryRequest => "recoveryRequest",
             Self::RecoveryBundle => "recoveryBundle",
             Self::RecoveryApplied => "recoveryApplied",
@@ -101,6 +105,7 @@ impl KnownFrameType {
             Self::AuthorityEntry => FrameType::AuthorityEntry,
             Self::AuthorityReceipt => FrameType::AuthorityReceipt,
             Self::TailRequest => FrameType::TailRequest,
+            Self::TailProof => FrameType::TailProof,
             Self::RecoveryRequest => FrameType::RecoveryRequest,
             Self::RecoveryBundle => FrameType::RecoveryBundle,
             Self::RecoveryApplied => FrameType::RecoveryApplied,
@@ -681,6 +686,7 @@ fn deserialize_validated_body(
         KnownFrameType::AuthorityEntry => decode(value).map(ValidatedFrameBody::AuthorityEntry),
         KnownFrameType::AuthorityReceipt => decode(value).map(ValidatedFrameBody::AuthorityReceipt),
         KnownFrameType::TailRequest => decode(value).map(ValidatedFrameBody::TailRequest),
+        KnownFrameType::TailProof => decode(value).map(ValidatedFrameBody::TailProof),
         KnownFrameType::RecoveryRequest => decode(value).map(ValidatedFrameBody::RecoveryRequest),
         KnownFrameType::RecoveryBundle => decode(value).map(ValidatedFrameBody::RecoveryBundle),
         KnownFrameType::RecoveryApplied => decode(value).map(ValidatedFrameBody::RecoveryApplied),
@@ -1482,11 +1488,111 @@ fn tail_request_body_issues(value: Option<&Value>, marker: Option<&str>) -> Vec<
     let Some(body) = object_value(value, marker) else {
         return vec!["not an object".to_owned()];
     };
-    if is_non_negative_safe_integer(body.get("fromRevision")) {
-        Vec::new()
-    } else {
-        vec!["fromRevision".to_owned()]
+    let mut issues = Vec::new();
+    if !is_non_negative_safe_integer(body.get("fromRevision")) {
+        issues.push("fromRevision".to_owned());
     }
+    let optional_fields = ["requestId", "candidateRevision", "candidateOperationId"];
+    let present = optional_fields
+        .iter()
+        .filter(|field| body.contains_key(**field))
+        .count();
+    if present != 0 && present != optional_fields.len() {
+        issues.push("boundaryProofRequest: all-or-none tuple".to_owned());
+        return issues;
+    }
+    if present == optional_fields.len() {
+        if !is_non_empty_string(body.get("requestId")) {
+            issues.push("requestId".to_owned());
+        }
+        if !is_positive_safe_integer(body.get("candidateRevision")) {
+            issues.push("candidateRevision".to_owned());
+        }
+        if !is_non_empty_string(body.get("candidateOperationId")) {
+            issues.push("candidateOperationId".to_owned());
+        }
+        if let (Some(from_revision), Some(candidate_revision)) = (
+            safe_integer(body.get("fromRevision")),
+            safe_integer(body.get("candidateRevision")),
+        ) && candidate_revision > 0
+            && candidate_revision <= from_revision
+        {
+            issues.push("candidateRevision: must be greater than fromRevision".to_owned());
+        }
+    }
+    issues
+}
+
+fn tail_proof_body_issues(value: Option<&Value>, marker: Option<&str>) -> Vec<String> {
+    let Some(body) = object_value(value, marker) else {
+        return vec!["not an object".to_owned()];
+    };
+
+    let mut issues = Vec::new();
+    if !matches!(body.get("phase").and_then(Value::as_str), Some("manifest" | "complete")) {
+        issues.push("phase".to_owned());
+    }
+    if !is_non_empty_string(body.get("requestId")) {
+        issues.push("requestId".to_owned());
+    }
+    if !is_non_negative_safe_integer(body.get("fromRevision")) {
+        issues.push("fromRevision".to_owned());
+    }
+    if !is_positive_safe_integer(body.get("candidateRevision")) {
+        issues.push("candidateRevision".to_owned());
+    }
+    if !is_non_empty_string(body.get("candidateOperationId")) {
+        issues.push("candidateOperationId".to_owned());
+    }
+    if !is_non_negative_safe_integer(body.get("headRevision")) {
+        issues.push("headRevision".to_owned());
+    }
+    if let (Some(from_revision), Some(candidate_revision)) = (
+        safe_integer(body.get("fromRevision")),
+        safe_integer(body.get("candidateRevision")),
+    ) && candidate_revision > 0
+        && candidate_revision <= from_revision
+    {
+        issues.push("candidateRevision: must be greater than fromRevision".to_owned());
+    }
+    if let (Some(head_revision), Some(candidate_revision)) = (
+        safe_integer(body.get("headRevision")),
+        safe_integer(body.get("candidateRevision")),
+    ) && candidate_revision > 0
+        && head_revision < candidate_revision
+    {
+        issues.push("headRevision: must be at least candidateRevision".to_owned());
+    }
+
+    let Some(source_revisions) = body.get("sourceRevisions").and_then(Value::as_array) else {
+        issues.push("sourceRevisions".to_owned());
+        return issues;
+    };
+    if source_revisions.len() > TAIL_PROOF_MAX_SOURCE_REVISIONS {
+        issues.push("sourceRevisions: exceeds retention capacity".to_owned());
+    }
+    let from_revision = safe_integer(body.get("fromRevision"));
+    let candidate_revision = safe_integer(body.get("candidateRevision"));
+    let mut prior = None;
+    for (index, revision) in source_revisions.iter().enumerate() {
+        let Some(revision) = safe_integer(Some(revision)).filter(|revision| *revision > 0) else {
+            issues.push(format!("sourceRevisions[{index}]"));
+            continue;
+        };
+        if prior.is_some_and(|previous| revision <= previous) {
+            issues.push(format!(
+                "sourceRevisions[{index}]: must be strictly increasing"
+            ));
+        }
+        if let (Some(from_revision), Some(candidate_revision)) = (from_revision, candidate_revision)
+            && candidate_revision > 0
+            && (revision < from_revision || revision >= candidate_revision)
+        {
+            issues.push(format!("sourceRevisions[{index}]: outside proof range"));
+        }
+        prior = Some(revision);
+    }
+    issues
 }
 
 fn recovery_request_body_issues(value: Option<&Value>, marker: Option<&str>) -> Vec<String> {
@@ -1608,6 +1714,7 @@ fn body_issues_for(
         KnownFrameType::AuthorityEntry => authority_entry_body_issues(body, marker),
         KnownFrameType::AuthorityReceipt => authority_receipt_body_issues(body, marker),
         KnownFrameType::TailRequest => tail_request_body_issues(body, marker),
+        KnownFrameType::TailProof => tail_proof_body_issues(body, marker),
         KnownFrameType::RecoveryRequest => recovery_request_body_issues(body, marker),
         KnownFrameType::RecoveryBundle => recovery_bundle_body_issues(body, marker),
         KnownFrameType::RecoveryApplied => recovery_applied_body_issues(body, marker),

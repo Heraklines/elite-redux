@@ -1,5 +1,5 @@
 {
-  "canonical_digest": "c5f4498d121b8c43aaa13350de3ac2fdd1fff680334b3a051e57779d012ff327",
+  "canonical_digest": "f42daa2533716716bb4f73e3172b2d0e8775d33567ba3cda95a1c069742cc1ea",
   "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
   "digest_kind": "fixture-content-sha256-v1",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
@@ -4467,12 +4467,13 @@
         "authorityEntry",
         "authorityReceipt",
         "tailRequest",
+        "tailProof",
         "recoveryRequest",
         "recoveryBundle",
         "recoveryApplied",
         "terminal"
       ],
-      "pairing_version": "er-coop-47"
+      "pairing_version": "er-coop-48"
     },
     "replay_trace": {
       "supported_versions": [
@@ -4505,7 +4506,7 @@
     }
   },
   "project_name": "PokéRogue Redux",
-  "protocol_version": "er-coop-47",
+  "protocol_version": "er-coop-48",
   "schema_version": 1,
   "source_file": "scripts/export-kernel-schema.mjs"
 }

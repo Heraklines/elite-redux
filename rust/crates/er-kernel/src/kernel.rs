@@ -1654,6 +1654,7 @@ impl GameKernel {
             ValidatedFrameBody::TailRequest(body) => {
                 self.dispatch_tail_request(endpoint, context, body)
             }
+            ValidatedFrameBody::TailProof(_) => Ok(Vec::new()),
             ValidatedFrameBody::RecoveryRequest(body) => {
                 self.dispatch_recovery_request(endpoint, context, body)
             }
@@ -3534,6 +3535,9 @@ pub(crate) fn tail_request_frame(
         FrameType::TailRequest,
         serde_json::to_value(TailRequestBody {
             from_revision: missing_from,
+            request_id: None,
+            candidate_revision: None,
+            candidate_operation_id: None,
         })
         .map_err(|error| error.to_string())?,
     )

@@ -127,7 +127,7 @@
     "source_file": "src/data/elite-redux/coop/authority-v2/next-control.ts"
   },
   "project_name": "PokéRogue Redux",
-  "protocol_version": "er-coop-47",
+  "protocol_version": "er-coop-48",
   "schema_version": 1,
   "source_file": "src/data/elite-redux/coop/authority-v2/next-control.ts"
 }

@@ -5,7 +5,9 @@ use er_protocol::{
     FrameValidator, InboundFrameResult, ValidatedFrame, ValidatedFrameBody, frame_context_issues,
     frame_contexts_compatible, frame_contexts_equal, validate_inbound_frame,
 };
-use er_types::{AckStage, AuthorityEntryKind, FrameContext, FrameType, NextControl, RawFrame};
+use er_types::{
+    AckStage, AuthorityEntryKind, FrameContext, FrameType, NextControl, RawFrame, TailProofPhase,
+};
 use serde_json::{Value, json};
 
 fn context_value() -> Value {
@@ -103,6 +105,7 @@ fn expected_frame_type(frame_type: &str) -> FrameType {
         "authorityEntry" => FrameType::AuthorityEntry,
         "authorityReceipt" => FrameType::AuthorityReceipt,
         "tailRequest" => FrameType::TailRequest,
+        "tailProof" => FrameType::TailProof,
         "recoveryRequest" => FrameType::RecoveryRequest,
         "recoveryBundle" => FrameType::RecoveryBundle,
         "recoveryApplied" => FrameType::RecoveryApplied,
@@ -237,6 +240,37 @@ fn assert_typed_body_values(frame_type: &str, body: &ValidatedFrameBody) {
                 panic!("tailRequest did not reconstruct its concrete body");
             };
             assert_eq!(body.from_revision.get().get(), 0);
+            if let (Some(request_id), Some(candidate_revision), Some(candidate_operation_id)) = (
+                body.request_id.as_ref(),
+                body.candidate_revision,
+                body.candidate_operation_id.as_ref(),
+            ) {
+                assert_eq!(request_id.as_str(), "request");
+                assert_eq!(candidate_revision.get(), 2);
+                assert_eq!(candidate_operation_id.as_str(), "candidate");
+            } else {
+                assert!(body.request_id.is_none());
+                assert!(body.candidate_revision.is_none());
+                assert!(body.candidate_operation_id.is_none());
+            }
+        }
+        "tailProof" => {
+            let ValidatedFrameBody::TailProof(body) = body else {
+                panic!("tailProof did not reconstruct its concrete body");
+            };
+            assert_eq!(body.phase, TailProofPhase::Manifest);
+            assert_eq!(body.request_id.as_str(), "request");
+            assert_eq!(body.from_revision.get().get(), 0);
+            assert_eq!(body.candidate_revision.get().get(), 2);
+            assert_eq!(body.candidate_operation_id.as_str(), "candidate");
+            assert_eq!(body.head_revision.get().get(), 2);
+            assert_eq!(
+                body.source_revisions
+                    .iter()
+                    .map(|value| value.get())
+                    .collect::<Vec<_>>(),
+                vec![1]
+            );
         }
         "recoveryRequest" => {
             let ValidatedFrameBody::RecoveryRequest(body) = body else {
@@ -296,14 +330,34 @@ fn assert_valid_text(frame_type: &str, context: &str, body: &str) -> Box<Validat
 }
 
 #[test]
-fn accepts_all_seven_known_frame_types_and_rehydrates_their_bodies() {
+fn accepts_all_eight_known_frame_types_and_rehydrates_their_bodies() {
     let cases = [
         (
             "authorityEntry",
             entry_body("TURN_COMMIT", command_control()),
         ),
         ("authorityReceipt", receipt_body()),
-        ("tailRequest", json!({"fromRevision": 0})),
+        (
+            "tailRequest",
+            json!({
+                "fromRevision": 0,
+                "requestId": "request",
+                "candidateRevision": 2,
+                "candidateOperationId": "candidate"
+            }),
+        ),
+        (
+            "tailProof",
+            json!({
+                "phase": "manifest",
+                "requestId": "request",
+                "fromRevision": 0,
+                "candidateRevision": 2,
+                "candidateOperationId": "candidate",
+                "headRevision": 2,
+                "sourceRevisions": [1]
+            }),
+        ),
         (
             "recoveryRequest",
             json!({"requestId": "request", "capturedFrontier": 0, "reason": "reconnect"}),

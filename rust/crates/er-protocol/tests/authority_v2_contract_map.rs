@@ -17,7 +17,8 @@ const PARITY_FIXTURE_PATH: &str = "test/kernel-fixtures/v1/authority-v2/contract
 const PROJECT_NAME: &str = "PokéRogue Redux";
 const ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const ORACLE_BRANCH: &str = "ci/coop/v2-showdown-command-coordinate-20260720";
-const PROTOCOL_VERSION: &str = "er-coop-47";
+const PROTOCOL_VERSION: &str = "er-coop-48";
+const ORACLE_PROTOCOL_VERSION: &str = "er-coop-47";
 const AUTHORITY_CONTRACT: &str = "authority-v2";
 const FRAME_PROTOCOL_VERSION: u64 = 2;
 const SOURCE_SCHEMA_VERSION: u64 = 1;
@@ -1045,7 +1046,7 @@ fn validate_source_lock() -> TestResult {
     let expected = [
         ("oracle_game_sha", ORACLE_GAME_SHA),
         ("oracle_branch", ORACLE_BRANCH),
-        ("protocol_version", PROTOCOL_VERSION),
+        ("protocol_version", ORACLE_PROTOCOL_VERSION),
         ("schema_version", "1"),
         ("input_repeat_delay_ms", "250"),
         ("input_repeat_interval_ms", "250"),
@@ -1604,7 +1605,7 @@ fn validate_map() -> TestResult {
     assert_eq!(string_field(source_lock, "oracle_branch")?, ORACLE_BRANCH);
     assert_eq!(
         string_field(source_lock, "protocol_version")?,
-        PROTOCOL_VERSION
+        ORACLE_PROTOCOL_VERSION
     );
 
     let source_files = array(&oracle, "source_files")?;

@@ -3108,6 +3108,7 @@ impl BattleTransaction {
             ValidatedFrameBody::TailRequest(body) => {
                 self.receive_tail_request(endpoint, context, body)
             }
+            ValidatedFrameBody::TailProof(_) => Ok(()),
             ValidatedFrameBody::RecoveryRequest(body) => {
                 self.receive_recovery_request(endpoint, context, body)
             }

@@ -1,5 +1,5 @@
 {
-  "canonical_digest": "8789fb4d3831daece6cee158a362382117a5faea7c2d9dba61f4a7f1c44c13a6",
+  "canonical_digest": "27423fd5c203f82589517be99b39fc496b09542e13b9807e36bb61565a55e506",
   "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
   "digest_kind": "fixture-content-sha256-v1",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
@@ -43,7 +43,7 @@
         "source_file": "src/data/elite-redux/coop/authority-v2/next-control.ts"
       },
       {
-        "canonical_digest": "a677ad0bf28efedab94164f35726f0f5ca1bd69fddd45685e512ecac47d846a8",
+        "canonical_digest": "265d276e47ccb76bc2af5a02b41412c5e0a90803acb7d2392acc64b05af92771",
         "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
         "digest_kind": "fixture-content-sha256-v1",
         "fixture_file": "test/kernel-fixtures/v1/protocol.json",
@@ -64,7 +64,7 @@
         "source_file": "src/data/elite-redux/replay-trace.ts"
       },
       {
-        "canonical_digest": "c5f4498d121b8c43aaa13350de3ac2fdd1fff680334b3a051e57779d012ff327",
+        "canonical_digest": "f42daa2533716716bb4f73e3172b2d0e8775d33567ba3cda95a1c069742cc1ea",
         "digest_definition": "SHA-256 over UTF-8 bytes of stable JSON.stringify(stableValue(payload)); object keys are code-point lexicographic and no trailing newline is included.",
         "digest_kind": "fixture-content-sha256-v1",
         "fixture_file": "test/kernel-fixtures/v1/schema.json",
@@ -74,7 +74,7 @@
     "manifest_version": 1
   },
   "project_name": "PokéRogue Redux",
-  "protocol_version": "er-coop-47",
+  "protocol_version": "er-coop-48",
   "schema_version": 1,
   "source_file": "scripts/export-kernel-fixtures.mjs"
 }

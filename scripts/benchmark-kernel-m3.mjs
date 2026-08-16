@@ -24,7 +24,8 @@ const RSS_MARKER = "__RUST_KERNEL_M3_MAX_RSS_KIB__";
 const SCHEMA_VERSION = 1;
 const ORACLE_GAME_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const ORACLE_BRANCH = "ci/coop/v2-showdown-command-coordinate-20260720";
-const PROTOCOL_VERSION = "er-coop-47";
+const ACTIVE_PROTOCOL_VERSION = "er-coop-48";
+const ORACLE_PROTOCOL_VERSION = "er-coop-47";
 const FRAME_PROTOCOL_VERSION = 2;
 const OWNERSHIP_SCHEMA_VERSION = 6;
 const TOOLCHAIN = Object.freeze({
@@ -287,7 +288,7 @@ function validateManifest(manifestPath) {
   if (manifest.oracle_branch !== ORACLE_BRANCH) {
     fail("manifest oracle_branch is not frozen");
   }
-  if (manifest.protocol_version !== PROTOCOL_VERSION) {
+  if (manifest.protocol_version !== ACTIVE_PROTOCOL_VERSION) {
     fail("manifest protocol_version is not frozen");
   }
   if (manifest.frame_protocol_version !== FRAME_PROTOCOL_VERSION) {
@@ -325,8 +326,8 @@ function validateManifest(manifestPath) {
   if (lock.oracle_branch !== ORACLE_BRANCH) {
     fail("source lock oracle branch does not match M3 manifest");
   }
-  if (lock.protocol_version !== PROTOCOL_VERSION) {
-    fail("source lock protocol does not match M3 manifest");
+  if (lock.protocol_version !== ORACLE_PROTOCOL_VERSION) {
+    fail("source lock oracle protocol does not match the immutable M3 oracle pin");
   }
 
   if (!Array.isArray(manifest.source_paths) || manifest.source_paths.length !== 1) {
@@ -441,7 +442,7 @@ function metadataResult(validated) {
     toolchain: TOOLCHAIN,
     oracle_game_sha: ORACLE_GAME_SHA,
     oracle_branch: ORACLE_BRANCH,
-    protocol_version: PROTOCOL_VERSION,
+    protocol_version: ACTIVE_PROTOCOL_VERSION,
     frame_protocol_version: FRAME_PROTOCOL_VERSION,
     cross_target_suite_target: CROSS_TARGET_SUITE_TARGET,
     manifest_sha256: validated.manifestSha256,
@@ -801,7 +802,7 @@ function measuredResult(validated, setup, measurements) {
     toolchain: TOOLCHAIN,
     oracle_game_sha: ORACLE_GAME_SHA,
     oracle_branch: ORACLE_BRANCH,
-    protocol_version: PROTOCOL_VERSION,
+    protocol_version: ACTIVE_PROTOCOL_VERSION,
     frame_protocol_version: FRAME_PROTOCOL_VERSION,
     cross_target_suite_target: CROSS_TARGET_SUITE_TARGET,
     manifest_sha256: validated.manifestSha256,

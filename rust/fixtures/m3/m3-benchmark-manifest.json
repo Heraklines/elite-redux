@@ -4,7 +4,7 @@
   "project": "Pok\u00e9Rogue Redux",
   "oracle_game_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "oracle_branch": "ci/coop/v2-showdown-command-coordinate-20260720",
-  "protocol_version": "er-coop-47",
+  "protocol_version": "er-coop-48",
   "frame_protocol_version": 2,
   "source_lock_schema_version": 1,
   "ownership_schema_version": 6,
