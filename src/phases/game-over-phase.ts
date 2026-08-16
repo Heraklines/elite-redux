@@ -25,7 +25,11 @@ import {
 } from "#data/elite-redux/er-community-run-state";
 import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
-import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
+import {
+  hasErGhostOverride,
+  recordGhostTeamOnGameOver,
+  reportErEndlessGhostEncounter,
+} from "#data/elite-redux/er-ghost-teams";
 import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
@@ -113,6 +117,10 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
     // Otherwise, continue standard Game Over logic
+
+    if (!this.isVictory && globalScene.currentBattle.trainer && hasErGhostOverride(globalScene.currentBattle.trainer)) {
+      reportErEndlessGhostEncounter("ghost-win");
+    }
 
     // The ME hook above is allowed to turn a battle loss back into a live encounter. Only a true terminal
     // can prove continuationReady; otherwise the retained battle transaction must remain owned by the

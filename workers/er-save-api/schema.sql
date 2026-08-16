@@ -92,6 +92,29 @@ CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created
 -- is served straight from it and only the eligible wave band is scanned.
 CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave);
 
+-- Idempotent, anonymized Endless ghost performance. The worker also creates
+-- these lazily so existing deployments require no manual migration.
+CREATE TABLE IF NOT EXISTS ghost_encounter_result_events (
+  event_id          TEXT PRIMARY KEY,
+  source_run_id     TEXT NOT NULL,
+  reporter_user_id  INTEGER NOT NULL,
+  result            TEXT NOT NULL,
+  player_kos        INTEGER NOT NULL,
+  player_hp_removed REAL NOT NULL,
+  turns_survived    INTEGER NOT NULL,
+  created_at        INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ghost_run_performance (
+  source_run_id    TEXT PRIMARY KEY,
+  appearances     INTEGER NOT NULL DEFAULT 0,
+  wins            INTEGER NOT NULL DEFAULT 0,
+  player_kos_sum  INTEGER NOT NULL DEFAULT 0,
+  hp_removed_sum  REAL NOT NULL DEFAULT 0,
+  turns_sum       INTEGER NOT NULL DEFAULT 0,
+  updated_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ghost_performance_wins ON ghost_run_performance (wins, appearances);
+
 -- Shared dev TEST-SUITE progress (staging only). So the QA team doesn't re-run
 -- each other's scenarios: every Pass / Fail / Send-Logs from the in-game test
 -- suite is appended here, and the "passed" set is shared across all browsers and

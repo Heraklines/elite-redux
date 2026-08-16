@@ -34,6 +34,32 @@ export interface ErEndlessGhostRoute {
   encounterIndex: number;
 }
 
+export interface ErEndlessNemesisEntry {
+  snapshotId: string;
+  rank: number;
+  lastEncounter: number;
+}
+
+export interface ErEndlessGhostEncounter {
+  sourceSnapshotId: string;
+  eventId: string;
+  playerKos: number;
+  playerHpDamage: number;
+  playerStartingMaxHp: number;
+  reducedToOne: boolean;
+  topPerformer: boolean;
+  finalized: boolean;
+}
+
+export interface ErEndlessGhostResult {
+  sourceSnapshotId: string;
+  eventId: string;
+  result: "player-win" | "ghost-win";
+  playerKos: number;
+  playerHpRemoved: number;
+  turnsSurvived: number;
+}
+
 export interface ErEndlessDeferredDamage {
   fieldIndex: number;
   isPlayer: boolean;
@@ -45,7 +71,7 @@ export interface ErEndlessMoveSnapshot {
   moveId: number;
   ppUsed: number;
   ppUp: number;
-  maxPpOverride?: number;
+  maxPpOverride?: number | undefined;
 }
 
 export interface ErEndlessBattleRuntimeSaveData {
@@ -72,6 +98,7 @@ export interface ErEndlessBattleRuntimeSaveData {
   suppressedRelics: { player?: string; enemy?: string };
   formSnapshots: Record<string, number>;
   echoMoveSignatures: Record<string, string>;
+  raidEmptyMinionSlots: number[];
   lastWeather?: number;
   lastTerrain?: number;
 }
@@ -84,8 +111,10 @@ export interface ErEndlessSaveData {
   ghostEncounters: number;
   activeRifts: ErEndlessActiveRift[];
   ghostHistory: ErEndlessGhostHistoryEntry[];
-  ghostRoute?: ErEndlessGhostRoute;
-  battleRuntime?: ErEndlessBattleRuntimeSaveData;
+  nemesisLineages?: ErEndlessNemesisEntry[] | undefined;
+  currentGhostEncounter?: ErEndlessGhostEncounter | undefined;
+  ghostRoute?: ErEndlessGhostRoute | undefined;
+  battleRuntime?: ErEndlessBattleRuntimeSaveData | undefined;
 }
 
 export const ER_ENDLESS_CYCLE_EQUIVALENT_WAVES = 200;
@@ -196,6 +225,7 @@ function cloneBattleRuntime(value: ErEndlessBattleRuntimeSaveData): ErEndlessBat
     suppressedRelics: { ...(value.suppressedRelics ?? {}) },
     formSnapshots: { ...(value.formSnapshots ?? {}) },
     echoMoveSignatures: { ...(value.echoMoveSignatures ?? {}) },
+    raidEmptyMinionSlots: [...(value.raidEmptyMinionSlots ?? [])],
   };
 }
 
@@ -204,6 +234,8 @@ function cloneState(value: ErEndlessSaveData): ErEndlessSaveData {
     ...value,
     activeRifts: value.activeRifts.map(rift => ({ ...rift })),
     ghostHistory: value.ghostHistory.map(entry => ({ ...entry })),
+    nemesisLineages: (value.nemesisLineages ?? []).map(entry => ({ ...entry })),
+    currentGhostEncounter: value.currentGhostEncounter == null ? undefined : { ...value.currentGhostEncounter },
     ghostRoute: value.ghostRoute == null
       ? undefined
       : { ...value.ghostRoute, snapshotIds: [...value.ghostRoute.snapshotIds] },
@@ -232,6 +264,7 @@ export function restoreErEndlessContinuation(data: ErEndlessSaveData | undefined
     state = null;
     return false;
   }
+  const battleRuntime = data.battleRuntime;
   state = {
     version: 1,
     enteredAtWave: Math.floor(data.enteredAtWave),
@@ -243,6 +276,26 @@ export function restoreErEndlessContinuation(data: ErEndlessSaveData | undefined
       .slice(0, 8)
       .map(rift => ({ ...rift, pulsesRemaining: Math.floor(rift.pulsesRemaining) })),
     ghostHistory: (data.ghostHistory ?? []).slice(-80).map(entry => ({ ...entry })),
+    nemesisLineages: (data.nemesisLineages ?? [])
+      .filter(entry => typeof entry?.snapshotId === "string" && entry.snapshotId.length > 0)
+      .slice(-40)
+      .map(entry => ({
+        snapshotId: entry.snapshotId,
+        rank: Math.max(1, Math.floor(entry.rank ?? 1)),
+        lastEncounter: Math.max(0, Math.floor(entry.lastEncounter ?? 0)),
+      })),
+    currentGhostEncounter: data.currentGhostEncounter == null
+      ? undefined
+      : {
+          sourceSnapshotId: String(data.currentGhostEncounter.sourceSnapshotId ?? ""),
+          eventId: String(data.currentGhostEncounter.eventId ?? ""),
+          playerKos: Math.max(0, Math.floor(data.currentGhostEncounter.playerKos ?? 0)),
+          playerHpDamage: Math.max(0, Math.floor(data.currentGhostEncounter.playerHpDamage ?? 0)),
+          playerStartingMaxHp: Math.max(1, Math.floor(data.currentGhostEncounter.playerStartingMaxHp ?? 1)),
+          reducedToOne: data.currentGhostEncounter.reducedToOne === true,
+          topPerformer: data.currentGhostEncounter.topPerformer === true,
+          finalized: data.currentGhostEncounter.finalized === true,
+        },
     ghostRoute: data.ghostRoute == null
       ? undefined
       : {
@@ -252,7 +305,7 @@ export function restoreErEndlessContinuation(data: ErEndlessSaveData | undefined
           snapshotIds: (data.ghostRoute.snapshotIds ?? []).map(String).slice(0, 3),
           encounterIndex: Math.max(0, Math.min(3, Math.floor(data.ghostRoute.encounterIndex ?? 0))),
         },
-    battleRuntime: data.battleRuntime?.wave > 0 ? cloneBattleRuntime(data.battleRuntime) : undefined,
+    battleRuntime: battleRuntime != null && battleRuntime.wave > 0 ? cloneBattleRuntime(battleRuntime) : undefined,
   };
   return true;
 }
@@ -431,6 +484,8 @@ export function initializeErEndlessContinuation(enteredAtWave: number, seed: str
     ghostEncounters: 0,
     activeRifts: [],
     ghostHistory: [],
+    nemesisLineages: [],
+    currentGhostEncounter: undefined,
     ghostRoute: undefined,
     battleRuntime: undefined,
   };
@@ -493,6 +548,95 @@ export function recordErEndlessGhost(snapshotId: string, uploaderKey: string, te
   state.ghostEncounters++;
   state.ghostHistory.push({ snapshotId, uploaderKey, teamFingerprint, encounter: state.ghostEncounters });
   state.ghostHistory = state.ghostHistory.filter(entry => state!.ghostEncounters - entry.encounter < 60).slice(-120);
+}
+
+export function getErEndlessNemesisRank(snapshotId: string): number {
+  return state?.nemesisLineages?.find(entry => entry.snapshotId === snapshotId)?.rank ?? 0;
+}
+
+/** Every tenth ghost encounter may deliberately revive the strongest personal Nemesis. */
+export function getErEndlessReturningNemesisId(): string | undefined {
+  if (state == null || (state.ghostEncounters + 1) % 10 !== 0) {
+    return undefined;
+  }
+  return (state.nemesisLineages ?? [])
+    .filter(entry => state!.ghostEncounters - entry.lastEncounter >= 5)
+    .sort((left, right) => right.rank - left.rank || left.lastEncounter - right.lastEncounter)[0]
+    ?.snapshotId;
+}
+
+export function beginErEndlessGhostEncounter(
+  snapshotId: string,
+  playerStartingMaxHp: number,
+  topPerformer: boolean,
+): void {
+  if (state == null) {
+    return;
+  }
+  state.currentGhostEncounter = {
+    sourceSnapshotId: snapshotId,
+    eventId: `${state.seed}:${state.ghostEncounters}:${snapshotId}`,
+    playerKos: 0,
+    playerHpDamage: 0,
+    playerStartingMaxHp: Math.max(1, Math.floor(playerStartingMaxHp)),
+    reducedToOne: false,
+    topPerformer,
+    finalized: false,
+  };
+}
+
+export function recordErEndlessGhostPlayerDamage(amount: number): void {
+  const encounter = state?.currentGhostEncounter;
+  if (encounter && !encounter.finalized && Number.isFinite(amount) && amount > 0) {
+    encounter.playerHpDamage += Math.floor(amount);
+  }
+}
+
+export function recordErEndlessGhostPlayerFaint(consciousParty: number): void {
+  const encounter = state?.currentGhostEncounter;
+  if (!encounter || encounter.finalized) {
+    return;
+  }
+  encounter.playerKos++;
+  encounter.reducedToOne ||= consciousParty <= 1;
+}
+
+export function finalizeErEndlessGhostEncounter(
+  result: ErEndlessGhostResult["result"],
+  turnsSurvived: number,
+): ErEndlessGhostResult | null {
+  const encounter = state?.currentGhostEncounter;
+  if (state == null || !encounter || encounter.finalized) {
+    return null;
+  }
+  encounter.finalized = true;
+  const qualifies = result === "ghost-win"
+    || encounter.playerKos >= 4
+    || encounter.reducedToOne
+    || encounter.topPerformer;
+  if (qualifies) {
+    const lineages = state.nemesisLineages ??= [];
+    const existing = lineages.find(entry => entry.snapshotId === encounter.sourceSnapshotId);
+    if (existing) {
+      existing.rank++;
+      existing.lastEncounter = state.ghostEncounters;
+    } else {
+      lineages.push({
+        snapshotId: encounter.sourceSnapshotId,
+        rank: 1,
+        lastEncounter: state.ghostEncounters,
+      });
+      state.nemesisLineages = lineages.slice(-40);
+    }
+  }
+  return {
+    sourceSnapshotId: encounter.sourceSnapshotId,
+    eventId: encounter.eventId,
+    result,
+    playerKos: encounter.playerKos,
+    playerHpRemoved: Math.min(1, encounter.playerHpDamage / encounter.playerStartingMaxHp),
+    turnsSurvived: Math.max(0, Math.floor(turnsSurvived)),
+  };
 }
 
 export function getErEndlessGhostRoute(): Readonly<ErEndlessGhostRoute> | undefined {

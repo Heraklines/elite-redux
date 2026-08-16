@@ -17,8 +17,12 @@ import {
 } from "#data/elite-redux/er-achievement-tracker";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
-import { isErEndlessRaidWave } from "#data/elite-redux/er-endless-continuation";
-import { claimErEndlessGraveReturn, recordErEndlessKo } from "#data/elite-redux/er-endless-rift-runtime";
+import { isErEndlessRaidWave, recordErEndlessGhostPlayerFaint } from "#data/elite-redux/er-endless-continuation";
+import {
+  claimErEndlessGraveReturn,
+  markErEndlessRaidMinionSlotEmpty,
+  recordErEndlessKo,
+} from "#data/elite-redux/er-endless-rift-runtime";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
 import { erMomentumEngineOnFoeKo, erRelicRecordFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
 import { notifyMoodyFormationFaint } from "#data/elite-redux/moody/moody-formation-game-adapter";
@@ -127,6 +131,11 @@ export class FaintPhase extends PokemonPhase {
     moodyFieldObservation.finalize();
     notifyMoodyFormationFaint(faintPokemon, this.source);
     notifyMoodyCoordinatorFinalizedFaint(faintPokemon, this.source);
+    if (faintPokemon.isPlayer()) {
+      recordErEndlessGhostPlayerFaint(
+        globalScene.getPlayerParty().filter(pokemon => pokemon.isAllowedInBattle()).length,
+      );
+    }
 
     /**
      * In case the current pokemon was just switched in, make sure it is counted as participating in the combat.
@@ -311,9 +320,10 @@ export class FaintPhase extends PokemonPhase {
     } else {
       globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
       let willSwitchIn = false;
+      const endlessRaid = isErEndlessRaidWave(globalScene.currentBattle.waveIndex);
       if (
-        [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
-        || isErEndlessRaidWave(globalScene.currentBattle.waveIndex)
+        !endlessRaid
+        && [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
       ) {
         // Slot-gate the replacement only in DOUBLES (each partner refills its own slot).
         // In a single battle ANY reserve must come in: mixed trainerSlot values (e.g. a
@@ -400,7 +410,16 @@ export class FaintPhase extends PokemonPhase {
               globalScene.currentBattle.addPostBattleLoot(pokemon as EnemyPokemon);
             }
           }
+          const endlessRaidMinionSlot =
+            !pokemon.isPlayer()
+            && isErEndlessRaidWave(globalScene.currentBattle.waveIndex)
+            && globalScene.getEnemyParty()[0] !== pokemon
+              ? pokemon.getFieldIndex()
+              : -1;
           pokemon.leaveField();
+          if (endlessRaidMinionSlot >= 0) {
+            markErEndlessRaidMinionSlotEmpty(endlessRaidMinionSlot);
+          }
           if (!pokemon.isPlayer() && endlessGraveReturn) {
             const enemy = pokemon as EnemyPokemon;
             enemy.resetStatus(false, false, false, false);

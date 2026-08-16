@@ -7956,3 +7956,13 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Combat-relevant relic behavior is side-aware, so enemy ghost relics affect their owner without granting player relic progression or achievements. Run-economy relic effects remain player-only because a one-battle ghost has no persistent shop, map, egg, or run economy.
 - Ghost-held items cannot enter the player's inventory through Thief-style transfer, Trick/Switcheroo, Mini Black Hole, or the shared held-item transfer path. A valid theft instead removes the item from the ghost.
 - Added GitHub-runner coverage for Hell Normal/Sprint thresholds and distribution, deterministic selection, additive snapshot inventory and relic restoration, Ghost Trainers challenge coverage, and theft destruction. No deployment was performed.
+
+2026-08-17 - Postgame Endless continuation
+
+- Completing the final boss in any supported run now offers a continuation into Endless without resetting the party, inventory, relics, boons, curses, pacing, difficulty, or run identity. Declining preserves the normal completed-run flow.
+- Endless loops the 200-equivalent-wave world cadence while retaining permanent progression. Rift pressure starts immediately, pulses every five Normal waves or three Sprint waves, overlaps at the specified depth cadence, and uses the established curse UI when a Rift is acquired.
+- Ordinary trainer encounters are victorious cross-player ghosts with their complete saved held-item and relic snapshots. Normal generated encounter modifiers still layer on top, ghost items cannot be stolen, and attempted theft removes the item instead.
+- Ghosts are normalized against the current player party: player-top level parity with the short Youngster/Ace opening offset, plus role-matched vitamin totals redistributed according to each ghost member's own statline.
+- Added 50-equivalent-wave raids and the 200-equivalent-wave Primal Cascoon finale, including boss segments, two active minions, reserve entry every second segment break, cleanses, seven-move finale support, and the Endless Avalanche curve.
+- Added anonymized, idempotent ghost performance reporting and exact danger weighting. A save-persistent hidden Nemesis relationship can promote dangerous returning ghosts with equipment, boon, donor, replacement, and segment upgrades without exposing account data or adding a player-facing Nemesis label.
+- Endless state, active Rifts, battle overlays, routes, Nemesis progression, and encounter accounting serialize with the run. Focused state regressions are delegated to GitHub Actions; no local test execution or deployment was performed.

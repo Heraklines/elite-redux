@@ -125,6 +125,7 @@ import {
   hasErEndlessRift,
   isErEndlessContinuationActive,
   isErEndlessRaidWave,
+  recordErEndlessGhostPlayerDamage,
 } from "#data/elite-redux/er-endless-continuation";
 import {
   applyErEndlessCalculatedDamage,
@@ -134,6 +135,7 @@ import {
   getErEndlessEffectiveTypes,
   getErEndlessStatusStatMultiplier,
   onErEndlessStatusInflicted,
+  queueErEndlessRaidReserve,
 } from "#data/elite-redux/er-endless-rift-runtime";
 import {
   chooseMoveIndex,
@@ -6380,6 +6382,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage = this.hp - 1;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase, result, isCritical);
+    if (this.isPlayer() && damage > 0) {
+      recordErEndlessGhostPlayerDamage(damage);
+    }
     notifyMoodyRuntimeDamageApplied(source, this, damage, !isIndirectDamage);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
@@ -10308,6 +10313,7 @@ export class EnemyPokemon extends Pokemon {
       this.bossSegmentIndex--;
       if (isErEndlessRaidWave(globalScene.currentBattle.waveIndex) && globalScene.getEnemyParty()[0] === this) {
         const brokenSegments = this.bossSegments - 1 - this.bossSegmentIndex;
+        queueErEndlessRaidReserve(brokenSegments);
         const stages = this.getStatStages();
         if (brokenSegments % 2 === 0) {
           for (let index = 0; index < stages.length; index++) {

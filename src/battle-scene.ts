@@ -4454,6 +4454,7 @@ export class BattleScene extends SceneBase {
             this.getEnemyParty(),
             this.currentBattle.waveIndex,
             snapshot?.endlessEchoStage === 3,
+            snapshot?.endlessNemesisRank ?? 0,
           ),
         );
       } else if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
@@ -4497,7 +4498,9 @@ export class BattleScene extends SceneBase {
         chances += Math.ceil(Math.floor(getErEndlessEquivalentDepth(this.currentBattle.waveIndex) / 10) / teamSize);
         const echoStage = getErGhostSnapshot(this.currentBattle.trainer!)?.endlessEchoStage;
         const equipmentBonus = echoStage === 3 ? 0.5 : echoStage === 2 ? 0.25 : 0;
-        chances += Math.ceil(chances * equipmentBonus);
+        const nemesisRank = getErGhostSnapshot(this.currentBattle.trainer!)?.endlessNemesisRank ?? 0;
+        const nemesisEquipmentBonus = nemesisRank >= 4 ? 0.75 : nemesisRank >= 2 ? 0.5 : nemesisRank >= 1 ? 0.25 : 0;
+        chances += Math.ceil(chances * Math.max(equipmentBonus, nemesisEquipmentBonus));
       }
 
       const party = this.getEnemyParty();

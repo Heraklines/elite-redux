@@ -30,7 +30,7 @@ import {
 } from "#data/elite-redux/er-endless-continuation";
 import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
-import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { hasErGhostOverride, reportErEndlessGhostEncounter } from "#data/elite-redux/er-ghost-teams";
 import { resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import {
   getErProgressionWave,
@@ -180,6 +180,9 @@ export class VictoryPhase extends PokemonPhase {
       .getEnemyParty()
       .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)));
     if (retainedResolvedVictory || endlessRaidBossDefeated || (!endlessRaid && ordinaryEnemySideDefeated)) {
+      if (globalScene.currentBattle.trainer && hasErGhostOverride(globalScene.currentBattle.trainer)) {
+        reportErEndlessGhostEncounter("player-win");
+      }
       removeQueuedPostVictoryCombatPhases();
       // Co-op (#633, authoritative wave-advance handshake): this is the real WIN / wave-clear
       // branch (not the exp-only / mystery-encounter paths, which returned above). The host is

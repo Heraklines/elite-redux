@@ -55,6 +55,7 @@ import {
 } from "#data/elite-redux/er-trainer-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
+import { isErEndlessContinuationActive } from "#data/elite-redux/er-endless-continuation";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { grantErResistBerries, maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
@@ -903,7 +904,7 @@ const ER_VITAMINS_APPLIED = new WeakSet<EnemyPokemon>();
  */
 export function applyErTrainerVitaminCatchup(party: readonly EnemyPokemon[]): void {
   try {
-    if (!globalScene.currentBattle?.trainer || party.length === 0) {
+    if (!globalScene.currentBattle?.trainer || party.length === 0 || isErEndlessContinuationActive()) {
       return;
     }
     // N = the most vitamins (summed stack counts) on a SINGLE player mon.

@@ -1293,7 +1293,7 @@ export class EncounterPhase extends BattlePhase {
             ] as const;
             enemySpecies =
               e === 0
-                ? getPokemonSpecies(ErSpeciesId.CASCOON_PRIMAL)
+                ? getPokemonSpecies(ErSpeciesId.CASCOON_PRIMAL as SpeciesId)
                 : getPokemonSpecies(raidMinions[(e - 1) % raidMinions.length]);
           }
           // Elite Redux: on Elite/Hell the classic final boss (Eternatus) is
@@ -1433,10 +1433,16 @@ export class EncounterPhase extends BattlePhase {
           + pokemon.getMoveset().reduce((sum, move) => sum + Math.max(0, move.getMove().power), 0);
         return threat(right) - threat(left);
       });
-      const echoStage = getErGhostSnapshot(battle.trainer)?.endlessEchoStage;
+      const endlessGhostSnapshot = getErGhostSnapshot(battle.trainer);
+      const echoStage = endlessGhostSnapshot?.endlessEchoStage;
+      const nemesisRank = endlessGhostSnapshot?.endlessNemesisRank ?? 0;
+      if (nemesisRank >= 1) {
+        segmentBudget += 2;
+      }
       const echoSegmentIds = new Set(
         echoStage === 2 || echoStage === 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : [],
       );
+      const nemesisSegmentIds = new Set(nemesisRank >= 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : []);
       const allocations = new Map<number, number>();
       for (let index = 0; segmentBudget > 0 && ranked.length > 0; index++, segmentBudget--) {
         const pokemon = ranked[index % ranked.length];
@@ -1446,7 +1452,8 @@ export class EncounterPhase extends BattlePhase {
         const extra =
           (allocations.get(pokemon.id) ?? 0)
           + (hasErEndlessRift("segment-bloom") ? 1 : 0)
-          + (echoSegmentIds.has(pokemon.id) ? 1 : 0);
+          + (echoSegmentIds.has(pokemon.id) ? 1 : 0)
+          + (nemesisSegmentIds.has(pokemon.id) ? 1 : 0);
         if (extra > 0) {
           pokemon.setBoss(true, 1 + extra);
         }

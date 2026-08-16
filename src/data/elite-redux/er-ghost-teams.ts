@@ -30,9 +30,14 @@
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import {
   advanceErEndlessGhostRoute,
+  beginErEndlessGhostEncounter,
   beginErEndlessGhostRoute,
   canUseErEndlessGhost,
+  finalizeErEndlessGhostEncounter,
+  getErEndlessEquivalentDepth,
   getErEndlessGhostRoute,
+  getErEndlessNemesisRank,
+  getErEndlessReturningNemesisId,
   hasErEndlessRift,
   isErEndlessContinuationActive,
   recordErEndlessGhost,
@@ -64,16 +69,19 @@ import {
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { modifierTypes } from "#data/data-lists";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
 import type { Nature } from "#enums/nature";
-import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatModifier, ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
+import { PERMANENT_STATS, Stat, type PermanentStat } from "#enums/stat";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { Variant } from "#sprites/variant";
 import { sessionIdKey } from "#utils/common";
@@ -162,6 +170,18 @@ export interface GhostTeamSnapshot {
   presentation?: GhostTrainerProfile | undefined;
   /** Transient Endless route metadata; never uploaded as part of a completed run. */
   endlessEchoStage?: 1 | 2 | 3 | undefined;
+  /** Aggregate, anonymized battle performance attached by the run-history worker. */
+  endlessPerformance?: {
+    appearances: number;
+    wins: number;
+    averagePlayerKos: number;
+    averagePlayerHpRemoved: number;
+    averageTurnsSurvived: number;
+    dangerScore: number;
+    topPerformer?: boolean | undefined;
+  } | undefined;
+  /** Hidden per-save relationship level; intentionally never rendered. */
+  endlessNemesisRank?: number | undefined;
 }
 
 const MAX_PARTY = 6;
@@ -389,6 +409,23 @@ async function fetchEndlessLineage(sourceRunId: string, count = 4): Promise<Ghos
   } catch {
     return [];
   }
+}
+
+export function reportErEndlessGhostEncounter(result: "player-win" | "ghost-win"): void {
+  const report = finalizeErEndlessGhostEncounter(result, globalScene.currentBattle?.turn ?? 0);
+  if (!report) {
+    return;
+  }
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    return;
+  }
+  void fetch(`${base}/savedata/run/ghost-result`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: token },
+    body: JSON.stringify(report),
+  }).catch(() => undefined);
 }
 
 /**
@@ -1293,6 +1330,20 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
   for (let i = 0; i < key.length; i++) {
     h = (h * 31 + key.charCodeAt(i)) >>> 0;
   }
+  if (isErEndlessContinuationActive()) {
+    const depth = getErEndlessEquivalentDepth(waveIndex);
+    const weights = pool.map(snapshot =>
+      1 + Math.min(1, depth / 500) * 20 * Math.max(0, Math.min(1, snapshot.endlessPerformance?.dangerScore ?? 0)),
+    );
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    let roll = (h / 0x1_0000_0000) * total;
+    for (let index = 0; index < pool.length; index++) {
+      roll -= weights[index];
+      if (roll < 0) {
+        return pool[index];
+      }
+    }
+  }
   return pool[h % pool.length];
 }
 
@@ -1303,11 +1354,13 @@ function augmentErEndlessGhost(
 ): GhostTeamSnapshot {
   const donorCount = hasErEndlessRift("full-procession")
     ? 2
-    : hasErEndlessRift("seventh-shadow") || echoStage === 3
+    : hasErEndlessRift("seventh-shadow") || echoStage === 3 || (snapshot.endlessNemesisRank ?? 0) >= 2
       ? 1
       : 0;
-  const replaceOne = hasErEndlessRift("counter-draft");
-  if (donorCount === 0 && !replaceOne && echoStage == null) {
+  const nemesisRank = snapshot.endlessNemesisRank ?? 0;
+  const totalDonors = nemesisRank >= 3 ? Math.max(2, donorCount) : donorCount;
+  const replaceOne = hasErEndlessRift("counter-draft") || nemesisRank >= 3;
+  if (totalDonors === 0 && !replaceOne && echoStage == null && nemesisRank === 0) {
     return snapshot;
   }
   const result = structuredClone(snapshot);
@@ -1347,7 +1400,7 @@ function augmentErEndlessGhost(
     });
     result.party[replaceIndex] = chooseDonor(10);
   }
-  for (let slot = 0; slot < donorCount && result.party.length < 8; slot++) {
+  for (let slot = 0; slot < totalDonors && result.party.length < 8; slot++) {
     result.party.push(chooseDonor(slot));
   }
   return result;
@@ -1401,6 +1454,15 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
         && isErGhostTeamLegal(snapshot)
         && canUseErEndlessGhost(snapshot.id, uploader, fingerprint);
     });
+    const returningNemesisId = getErEndlessReturningNemesisId();
+    const returningNemesis = returningNemesisId == null
+      ? undefined
+      : (prefetched ?? []).find(snapshot =>
+          snapshot.id === returningNemesisId
+          && snapshot.isVictory
+          && hasErGhostSavedItems(snapshot)
+          && isErGhostTeamLegal(snapshot),
+        );
     let route = getErEndlessGhostRoute();
     if (route == null && hasErEndlessRift("parallel-lives")) {
       const byUploader = new Map<string, GhostTeamSnapshot[]>();
@@ -1438,7 +1500,7 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     const routed = routeSnapshotId == null
       ? undefined
       : (prefetched ?? []).find(snapshot => snapshot.id === routeSnapshotId);
-    const next = routed ?? pickGhost(allEligible, waveIndex);
+    const next = returningNemesis ?? routed ?? pickGhost(allEligible, waveIndex);
     if (!next) {
       return null;
     }
@@ -1448,12 +1510,19 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     const echoStage = route?.riftId === "echo-hunt"
       ? (Math.min(3, route.encounterIndex + 1) as 1 | 2 | 3)
       : undefined;
-    const augmented = augmentErEndlessGhost(next, waveIndex, echoStage);
+    const ranked = structuredClone(next);
+    ranked.endlessNemesisRank = getErEndlessNemesisRank(next.id);
+    const augmented = augmentErEndlessGhost(ranked, waveIndex, echoStage);
     if (route != null) {
       advanceErEndlessGhostRoute();
     }
     ghostByWave.set(waveIndex, augmented);
     lastGhostUploader = next.trainerName ?? "";
+    beginErEndlessGhostEncounter(
+      next.id,
+      globalScene.getPlayerParty().reduce((sum, pokemon) => sum + pokemon.getMaxHp(), 0),
+      next.endlessPerformance?.topPerformer === true,
+    );
     return augmented;
   }
   // ER (#422): with the Ghost Trainers challenge active, EVERY trainer wave
@@ -1713,6 +1782,127 @@ export function setPrefetchedGhostTeamsForTests(teams: GhostTeamSnapshot[]): voi
 // Spawn — build a ghost Trainer + its team.
 // -----------------------------------------------------------------------------
 const GHOST_BY_TRAINER = new WeakMap<Trainer, GhostTeamSnapshot>();
+const ENDLESS_GHOST_VITAMINS = new WeakMap<Trainer, number[][]>();
+
+function getRoleVector(stats: readonly number[]): readonly [number, number, number] {
+  const total = Math.max(1, stats.reduce((sum, value) => sum + value, 0));
+  const offense = Math.max(1, stats[Stat.ATK] + stats[Stat.SPATK]);
+  return [
+    (stats[Stat.ATK] - stats[Stat.SPATK]) / offense,
+    stats[Stat.SPD] / total,
+    (stats[Stat.HP] + stats[Stat.DEF] + stats[Stat.SPDEF]) / total,
+  ];
+}
+
+function roleDistance(left: readonly number[], right: readonly number[]): number {
+  return left.reduce((sum, value, index) => sum + (value - right[index]) ** 2, 0);
+}
+
+function distributeVitamins(member: GhostMember, total: number): number[] {
+  const species = getPokemonSpecies(member.speciesId);
+  const result = PERMANENT_STATS.map(() => 0);
+  if (!species || total <= 0) {
+    return result;
+  }
+  const weights = species.baseStats.map(value => Math.max(1, value));
+  const weightTotal = weights.reduce((sum, value) => sum + value, 0);
+  const credit = PERMANENT_STATS.map(() => 0);
+  let remaining = total;
+  while (remaining > 0 && PERMANENT_STATS.some(stat => result[stat] < Math.max(0, member.ivs[stat] ?? 0))) {
+    let chosen: PermanentStat | null = null;
+    for (const stat of PERMANENT_STATS) {
+      if (result[stat] >= Math.max(0, member.ivs[stat] ?? 0)) {
+        continue;
+      }
+      credit[stat] += weights[stat];
+      if (chosen == null || credit[stat] > credit[chosen]) {
+        chosen = stat;
+      }
+    }
+    if (chosen == null) {
+      break;
+    }
+    result[chosen]++;
+    credit[chosen] -= weightTotal;
+    remaining--;
+  }
+  return result;
+}
+
+function buildEndlessGhostVitaminPlan(snapshot: GhostTeamSnapshot): number[][] {
+  const playerParty = globalScene.getPlayerParty();
+  const vitaminByPokemon = new Map<number, number[]>();
+  for (const pokemon of playerParty) {
+    vitaminByPokemon.set(pokemon.id, PERMANENT_STATS.map(() => 0));
+  }
+  for (const modifier of globalScene.findModifiers(candidate => candidate instanceof BaseStatModifier, true)) {
+    const vitamin = modifier as BaseStatModifier;
+    const profile = vitaminByPokemon.get(vitamin.pokemonId);
+    if (profile) {
+      profile[vitamin.getStat()] += vitamin.getStackCount();
+    }
+  }
+  const players = playerParty.map(pokemon => ({
+    role: getRoleVector(pokemon.getSpeciesForm().baseStats),
+    total: (vitaminByPokemon.get(pokemon.id) ?? []).reduce((sum, value) => sum + value, 0),
+  }));
+  const unused = new Set(players.map((_player, index) => index));
+  return snapshot.party.map(member => {
+    if (players.length === 0) {
+      return PERMANENT_STATS.map(() => 0);
+    }
+    const species = getPokemonSpecies(member.speciesId);
+    const role = getRoleVector(species?.baseStats ?? [1, 1, 1, 1, 1, 1]);
+    const candidates = unused.size > 0 ? [...unused] : players.map((_player, index) => index);
+    const match = candidates.reduce((best, index) =>
+      roleDistance(role, players[index].role) < roleDistance(role, players[best].role) ? index : best,
+    candidates[0]);
+    unused.delete(match);
+    return distributeVitamins(member, players[match].total);
+  });
+}
+
+function applyEndlessGhostVitamins(trainer: Trainer, enemy: EnemyPokemon, memberIndex: number): void {
+  const snapshot = GHOST_BY_TRAINER.get(trainer);
+  if (!snapshot || !isErEndlessContinuationActive()) {
+    return;
+  }
+  let plan = ENDLESS_GHOST_VITAMINS.get(trainer);
+  if (!plan) {
+    plan = buildEndlessGhostVitaminPlan(snapshot);
+    ENDLESS_GHOST_VITAMINS.set(trainer, plan);
+  }
+  for (const stat of PERMANENT_STATS) {
+    const count = plan[memberIndex]?.[stat] ?? 0;
+    if (count <= 0) {
+      continue;
+    }
+    const type = new BaseStatBoosterModifierType(stat).withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER);
+    const modifier = type.newModifier(enemy) as BaseStatModifier | null;
+    if (modifier) {
+      modifier.stackCount = count;
+      globalScene.addEnemyModifier(modifier, true, true);
+    }
+  }
+  enemy.calculateStats();
+}
+
+function getEndlessGhostLevel(fallback: number, runWave: number): number {
+  if (!isErEndlessContinuationActive()) {
+    return fallback;
+  }
+  const playerTopLevel = globalScene.getPlayerParty().reduce(
+    (highest, pokemon) => pokemon.isAllowedInBattle() ? Math.max(highest, pokemon.level) : highest,
+    0,
+  );
+  if (playerTopLevel <= 0) {
+    return fallback;
+  }
+  const baseOffset = getErDifficulty() === "youngster" ? 2 : getErDifficulty() === "ace" ? 1 : 0;
+  const depth = getErEndlessEquivalentDepth(runWave);
+  const offset = Math.ceil(baseOffset * Math.max(0, 20 - depth) / 20);
+  return Math.max(1, playerTopLevel - offset);
+}
 
 /**
  * Build the placeholder-token context from the ENCOUNTERING player's side, at the
@@ -1912,7 +2102,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
         species = prev;
       }
     }
-    const level = battle?.enemyLevels?.[index] ?? member.level;
+    const level = getEndlessGhostLevel(battle?.enemyLevels?.[index] ?? member.level, runWave);
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
     // addEnemyPokemon runs the universal BST gate. Ghost selection's +40-wave
     // window is not sufficient on its own: the uploader may already own a
@@ -1952,6 +2142,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     // else: keep the level-appropriate moveset addEnemyPokemon already generated for the
     // final (devolved or BST-swapped) species.
     enemy.generateName();
+    applyEndlessGhostVitamins(trainer, enemy, index);
     return enemy;
   } catch {
     return null;

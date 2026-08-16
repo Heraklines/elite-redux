@@ -2401,6 +2401,173 @@ async function ensureRunSampleIndex(env: Env): Promise<void> {
   }
 }
 
+let ghostPerformanceTablesReady = false;
+async function ensureGhostPerformanceTables(env: Env): Promise<void> {
+  if (ghostPerformanceTablesReady) {
+    return;
+  }
+  await env.DB.batch([
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS ghost_encounter_result_events (
+         event_id TEXT PRIMARY KEY,
+         source_run_id TEXT NOT NULL,
+         reporter_user_id INTEGER NOT NULL,
+         result TEXT NOT NULL,
+         player_kos INTEGER NOT NULL,
+         player_hp_removed REAL NOT NULL,
+         turns_survived INTEGER NOT NULL,
+         created_at INTEGER NOT NULL
+       )`,
+    ),
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS ghost_run_performance (
+         source_run_id TEXT PRIMARY KEY,
+         appearances INTEGER NOT NULL DEFAULT 0,
+         wins INTEGER NOT NULL DEFAULT 0,
+         player_kos_sum INTEGER NOT NULL DEFAULT 0,
+         hp_removed_sum REAL NOT NULL DEFAULT 0,
+         turns_sum INTEGER NOT NULL DEFAULT 0,
+         updated_at INTEGER NOT NULL
+       )`,
+    ),
+    env.DB.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_ghost_performance_wins ON ghost_run_performance (wins, appearances)",
+    ),
+  ]);
+  ghostPerformanceTablesReady = true;
+}
+
+type GhostPerformanceRow = {
+  source_run_id: string;
+  appearances: number;
+  wins: number;
+  player_kos_sum: number;
+  hp_removed_sum: number;
+  turns_sum: number;
+};
+
+function ghostPerformancePayload(row: GhostPerformanceRow, topPerformer: boolean): Record<string, unknown> {
+  const appearances = Math.max(0, row.appearances);
+  const divisor = Math.max(1, appearances);
+  const averagePlayerKos = Math.max(0, row.player_kos_sum) / divisor;
+  const averagePlayerHpRemoved = Math.max(0, row.hp_removed_sum) / divisor;
+  const averageTurnsSurvived = Math.max(0, row.turns_sum) / divisor;
+  const posteriorWinRate = (Math.max(0, row.wins) + 0.5) / (appearances + 10);
+  const closeFightScore = 0.6 * Math.min(1, averagePlayerKos / 6) + 0.4 * Math.min(1, averagePlayerHpRemoved);
+  return {
+    appearances,
+    wins: Math.max(0, row.wins),
+    averagePlayerKos,
+    averagePlayerHpRemoved,
+    averageTurnsSurvived,
+    dangerScore: Math.max(0, Math.min(1, 0.75 * posteriorWinRate + 0.25 * closeFightScore)),
+    ...(topPerformer ? { topPerformer: true } : {}),
+  };
+}
+
+async function attachGhostPerformance(env: Env, teams: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  if (teams.length === 0) {
+    return teams;
+  }
+  await ensureGhostPerformanceTables(env);
+  const ids = teams.map(team => String(team.id ?? "")).filter(Boolean);
+  const placeholders = ids.map((_, index) => `?${index + 1}`).join(", ");
+  const performance =
+    ids.length === 0
+      ? []
+      : ((
+          await env.DB.prepare(
+            `SELECT source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum
+           FROM ghost_run_performance WHERE source_run_id IN (${placeholders})`,
+          )
+            .bind(...ids)
+            .all<GhostPerformanceRow>()
+        ).results ?? []);
+  const topRows =
+    (
+      await env.DB.prepare(
+        `SELECT source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum
+       FROM ghost_run_performance
+      WHERE appearances >= 3
+      ORDER BY (
+        0.75 * ((wins + 0.5) / (appearances + 10.0))
+        + 0.25 * (
+          0.6 * MIN(1.0, (player_kos_sum * 1.0 / appearances) / 6.0)
+          + 0.4 * MIN(1.0, hp_removed_sum * 1.0 / appearances)
+        )
+      ) DESC
+      LIMIT 10`,
+      ).all<GhostPerformanceRow>()
+    ).results ?? [];
+  const top = new Set(topRows.map(row => row.source_run_id));
+  const byId = new Map(performance.map(row => [row.source_run_id, row]));
+  return teams.map(team => {
+    const id = String(team.id ?? "");
+    const row = byId.get(id);
+    return row == null ? team : { ...team, endlessPerformance: ghostPerformancePayload(row, top.has(id)) };
+  });
+}
+
+async function handleGhostResult(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const raw = await readSaveBody(request);
+  if (raw == null) {
+    return text("Ghost result too large.", 413, cors);
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return text("Invalid ghost result.", 400, cors);
+  }
+  const eventId = typeof body.eventId === "string" ? body.eventId.slice(0, 220) : "";
+  const sourceRunId = typeof body.sourceSnapshotId === "string" ? body.sourceSnapshotId.slice(0, 160) : "";
+  const result = body.result === "ghost-win" || body.result === "player-win" ? body.result : null;
+  if (!eventId || !sourceRunId || !result) {
+    return text("Ghost result is missing identity or outcome.", 400, cors);
+  }
+  const source = await env.DB.prepare(
+    "SELECT id FROM runs WHERE id = ?1 AND user_id != ?2 AND outcome = 'victory' LIMIT 1",
+  )
+    .bind(sourceRunId, auth.uid)
+    .first<{ id: string }>();
+  if (!source) {
+    return text("Unknown ghost source.", 404, cors);
+  }
+  const playerKos = Math.max(0, Math.min(8, Math.floor(Number(body.playerKos) || 0)));
+  const playerHpRemoved = Math.max(0, Math.min(1, Number(body.playerHpRemoved) || 0));
+  const turnsSurvived = Math.max(0, Math.min(1000, Math.floor(Number(body.turnsSurvived) || 0)));
+  await ensureGhostPerformanceTables(env);
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO ghost_encounter_result_events
+       (event_id, source_run_id, reporter_user_id, result, player_kos, player_hp_removed, turns_survived, created_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+  )
+    .bind(eventId, sourceRunId, auth.uid, result, playerKos, playerHpRemoved, turnsSurvived, Date.now())
+    .run();
+  if ((inserted.meta.changes ?? 0) > 0) {
+    await env.DB.prepare(
+      `INSERT INTO ghost_run_performance
+         (source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum, updated_at)
+       VALUES (?1, 1, ?2, ?3, ?4, ?5, ?6)
+       ON CONFLICT(source_run_id) DO UPDATE SET
+         appearances = appearances + 1,
+         wins = wins + excluded.wins,
+         player_kos_sum = player_kos_sum + excluded.player_kos_sum,
+         hp_removed_sum = hp_removed_sum + excluded.hp_removed_sum,
+         turns_sum = turns_sum + excluded.turns_sum,
+         updated_at = excluded.updated_at`,
+    )
+      .bind(sourceRunId, result === "ghost-win" ? 1 : 0, playerKos, playerHpRemoved, turnsSurvived, Date.now())
+      .run();
+  }
+  return json({ ok: true, recorded: (inserted.meta.changes ?? 0) > 0 }, 200, cors);
+}
+
 /**
  * ER ghost notifications: the battles where the CALLER's ghost fought another
  * player, since `?since=<ts>` (the client tracks last-seen locally — no write).
@@ -2740,7 +2907,10 @@ async function handleRunSample(
       .all<RunSampleRow>();
     results = fetched.results ?? [];
   }
-  const teams = (results ?? []).map(row => runSampleRowToGhost(row, difficulty)).filter(t => t !== null);
+  const teams = await attachGhostPerformance(
+    env,
+    (results ?? []).map(row => runSampleRowToGhost(row, difficulty)).filter(t => t !== null),
+  );
   return json({ teams }, 200, cors);
 }
 
@@ -2779,7 +2949,11 @@ async function handleRunLineage(
   )
     .bind(source.user_id, sourceRunId, GHOST_SAMPLE_MAX_WAVE, count)
     .all<RunSampleRow>();
-  return json({ teams: (results ?? []).map(row => runSampleRowToGhost(row)).filter(team => team !== null) }, 200, cors);
+  const teams = await attachGhostPerformance(
+    env,
+    (results ?? []).map(row => runSampleRowToGhost(row)).filter(team => team !== null),
+  );
+  return json({ teams }, 200, cors);
 }
 
 /**
@@ -5257,6 +5431,9 @@ export default {
       }
       if (pathname === "/savedata/run/lineage" && method === "GET") {
         return await handleRunLineage(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/ghost-result" && method === "POST") {
+        return await handleGhostResult(request, auth, env, cors);
       }
       if (pathname === "/savedata/run/deadliest" && method === "GET") {
         return await handleRunDeadliest(url, auth, env, cors);

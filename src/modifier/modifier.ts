@@ -31,6 +31,7 @@ import { BerryType } from "#enums/berry-type";
 import { Color, ShadowColor } from "#enums/color";
 import type { FormChangeItem } from "#enums/form-change-item";
 import { LearnMoveType } from "#enums/learn-move-type";
+import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import type { PokeballType } from "#enums/pokeball";
@@ -905,6 +906,10 @@ export class BaseStatModifier extends PokemonHeldItemModifier {
 
   getArgs(): any[] {
     return super.getArgs().concat(this.stat);
+  }
+
+  getStat(): PermanentStat {
+    return this.stat;
   }
 
   /**

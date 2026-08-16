@@ -19,14 +19,14 @@ import { WeatherType } from "#enums/weather-type";
 import { TerrainType } from "#data/terrain";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import { PokemonMove } from "#moves/pokemon-move";
+import type { PokemonMove } from "#moves/pokemon-move";
 import { toDmgValue } from "#utils/common";
 
 export type ErEndlessMoveOutcome = "hit" | "miss" | "failed" | "immune";
 
 export interface ErEndlessSwitchTransfer {
-  stages?: number[];
-  status?: StatusEffect;
+  stages?: number[] | undefined;
+  status?: StatusEffect | undefined;
 }
 
 let applyingSoulLink = false;
@@ -101,6 +101,25 @@ function ensureMoveSnapshot(pokemon: Pokemon, current: ErEndlessBattleRuntimeSav
   }));
 }
 
+type PokemonMoveConstructor = new (
+  moveId: MoveId,
+  ppUsed?: number,
+  ppUp?: number,
+  maxPpOverride?: number,
+) => PokemonMove;
+
+function createPokemonMove(
+  pokemon: Pokemon,
+  moveId: MoveId,
+  ppUsed = 0,
+  ppUp = 0,
+  maxPpOverride?: number,
+): PokemonMove {
+  const reference = pokemon.getMoveset()[0];
+  const MoveConstructor = reference.constructor as PokemonMoveConstructor;
+  return new MoveConstructor(moveId, ppUsed, ppUp, maxPpOverride);
+}
+
 function selectTemporaryMove(
   domain: string,
   excluded: ReadonlySet<MoveId>,
@@ -129,7 +148,7 @@ function installMetronomeVeilMoves(pokemon: Pokemon, current: ErEndlessBattleRun
     selected.push(move);
     excluded.add(move.id);
   }
-  pokemon.moveset = selected.map(move => new PokemonMove(move.id, 0, 0, 4));
+  pokemon.moveset = selected.map(move => createPokemonMove(pokemon, move.id, 0, 0, 4));
 }
 
 function installMoveScramblerCharges(pokemon: Pokemon, current: ErEndlessBattleRuntimeSaveData): void {
@@ -139,7 +158,7 @@ function installMoveScramblerCharges(pokemon: Pokemon, current: ErEndlessBattleR
   }
   pokemon.moveset = pokemon.getMoveset().map(move => {
     const remaining = Math.max(1, move.getMovePp() - move.ppUsed);
-    return new PokemonMove(move.moveId, 0, 0, remaining);
+    return createPokemonMove(pokemon, move.moveId, 0, 0, remaining);
   });
 }
 
@@ -168,7 +187,50 @@ function emptyRuntime(wave: number): ErEndlessBattleRuntimeSaveData {
     suppressedRelics: {},
     formSnapshots: {},
     echoMoveSignatures: {},
+    raidEmptyMinionSlots: [],
   };
+}
+
+/** Remember a defeated raid minion seat until a later boss-segment pulse refills it. */
+export function markErEndlessRaidMinionSlotEmpty(fieldIndex: number): void {
+  const current = runtime();
+  if (
+    !current
+    || !Number.isSafeInteger(fieldIndex)
+    || fieldIndex < 0
+    || current.raidEmptyMinionSlots.includes(fieldIndex)
+  ) {
+    return;
+  }
+  current.raidEmptyMinionSlots.push(fieldIndex);
+  current.raidEmptyMinionSlots.sort((left, right) => left - right);
+}
+
+/** Refill one empty minion seat on every second raid-boss segment break. */
+export function queueErEndlessRaidReserve(brokenSegments: number): void {
+  const current = runtime();
+  if (!current || brokenSegments <= 0 || brokenSegments % 2 !== 0) {
+    return;
+  }
+  const fieldIndex = current.raidEmptyMinionSlots.shift();
+  if (fieldIndex == null) {
+    return;
+  }
+  const activeSlots = Math.max(1, globalScene.currentBattle.getBattlerCount());
+  const reserveIndex = globalScene
+    .getEnemyParty()
+    .findIndex((pokemon, index) => index >= activeSlots && pokemon.isAllowedInBattle() && !pokemon.isOnField());
+  if (reserveIndex < 0) {
+    return;
+  }
+  globalScene.phaseManager.unshiftNew(
+    "SwitchSummonPhase",
+    SwitchType.SWITCH,
+    fieldIndex,
+    reserveIndex,
+    false,
+    false,
+  );
 }
 
 export function finalizeErEndlessBattleRuntime(): void {
@@ -357,7 +419,8 @@ export function restoreErEndlessBattleOverlays(): void {
   for (const pokemon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
     const snapshot = current.moveSnapshots[pokemonKey(pokemon)];
     if (snapshot) {
-      pokemon.moveset = snapshot.map(move => new PokemonMove(
+      pokemon.moveset = snapshot.map(move => createPokemonMove(
+        pokemon,
         move.moveId as MoveId,
         move.ppUsed,
         move.ppUp,
@@ -506,7 +569,7 @@ export function applyErEndlessDirectDamage(
   const current = runtime();
   if (current && hasErEndlessRift("soul-link") && !applyingSoulLink) {
     const allies = (target.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField())
-      .filter((pokemon): pokemon is Pokemon => pokemon != null && pokemon.isActive(true) && !pokemon.isFainted(true));
+      .filter(pokemon => pokemon != null && pokemon.isActive(true) && !pokemon.isFainted(true));
     if (allies.length > 1) {
       const base = Math.floor(damage / allies.length);
       let remainder = damage - base * allies.length;
@@ -886,7 +949,8 @@ export function recordErEndlessMoveOutcome(
       `scramble:${current.wave}:${key}:${slot}:${globalScene.currentBattle.turn}:${currentMove.ppUsed}`,
       excluded,
     );
-    user.moveset[slot] = new PokemonMove(
+    user.moveset[slot] = createPokemonMove(
+      user,
       replacement.id,
       currentMove.ppUsed,
       0,
@@ -909,7 +973,7 @@ export function applyErEndlessTurnEnd(): void {
   const turn = globalScene.currentBattle.turn ?? 1;
   const completedTurn = Math.max(0, turn - 1);
   const allActive = [...globalScene.getPlayerField(), ...globalScene.getEnemyField()].filter(
-    (pokemon): pokemon is Pokemon => pokemon != null && pokemon.isActive(true),
+    pokemon => pokemon != null && pokemon.isActive(true),
   );
   if (hasErEndlessRift("entropy")) {
     for (const pokemon of allActive) {

@@ -1,7 +1,9 @@
 import {
   advanceErEndlessGhostRoute,
+  beginErEndlessGhostEncounter,
   beginErEndlessGhostRoute,
   canUseErEndlessGhost,
+  finalizeErEndlessGhostEncounter,
   getErEndlessActiveRifts,
   getErEndlessCycle,
   getErEndlessCycleWave,
@@ -9,14 +11,18 @@ import {
   getErEndlessEquivalentDepth,
   getErEndlessGhostRoute,
   getErEndlessHeldItemCandidateIndex,
+  getErEndlessNemesisRank,
   getErEndlessPlayerAvalancheCount,
   getErEndlessRateBonus,
+  getErEndlessReturningNemesisId,
   getErEndlessSaveData,
   initializeErEndlessContinuation,
   isErEndlessCycleFinale,
   isErEndlessRaidWave,
   pulseErEndlessRifts,
   recordErEndlessGhost,
+  recordErEndlessGhostPlayerDamage,
+  recordErEndlessGhostPlayerFaint,
   resetErEndlessContinuation,
   restoreErEndlessContinuation,
 } from "#data/elite-redux/er-endless-continuation";
@@ -114,6 +120,34 @@ describe("Elite Redux Endless continuation", () => {
     expect(advanceErEndlessGhostRoute()).toBe(1);
     expect(advanceErEndlessGhostRoute()).toBe(0);
     expect(getErEndlessGhostRoute()).toBeUndefined();
+  });
+
+  it("persists hidden Nemesis progression and schedules a returning opponent", () => {
+    initializeErEndlessContinuation(200, "nemesis");
+    recordErEndlessGhost("run-a", "owner-a", "team-a");
+    beginErEndlessGhostEncounter("run-a", 1000, false);
+    recordErEndlessGhostPlayerDamage(500);
+    recordErEndlessGhostPlayerFaint(3);
+    recordErEndlessGhostPlayerFaint(1);
+    expect(finalizeErEndlessGhostEncounter("player-win", 12)).toEqual({
+      sourceSnapshotId: "run-a",
+      eventId: "nemesis:1:run-a",
+      result: "player-win",
+      playerKos: 2,
+      playerHpRemoved: 0.5,
+      turnsSurvived: 12,
+    });
+    expect(finalizeErEndlessGhostEncounter("player-win", 12)).toBeNull();
+    expect(getErEndlessNemesisRank("run-a")).toBe(1);
+
+    for (let encounter = 2; encounter <= 9; encounter++) {
+      recordErEndlessGhost(`run-${encounter}`, `owner-${encounter}`, `team-${encounter}`);
+    }
+    expect(getErEndlessReturningNemesisId()).toBe("run-a");
+    const saved = getErEndlessSaveData();
+    resetErEndlessContinuation();
+    expect(restoreErEndlessContinuation(saved)).toBe(true);
+    expect(getErEndlessNemesisRank("run-a")).toBe(1);
   });
 
   it("uses tier, stack count, and stable id for Predatory Theft", () => {

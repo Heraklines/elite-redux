@@ -255,6 +255,7 @@ export function generateEndlessEnemyBoonLoadout(
   party: readonly Pokemon[],
   waveIndex: number,
   counterBiased = false,
+  nemesisRank = 0,
 ): MoodyEnemyBoonLoadout {
   const endless = getErEndlessState();
   if (endless == null) {
@@ -270,12 +271,14 @@ export function generateEndlessEnemyBoonLoadout(
     2166136261,
   );
   const multiplier = 1 + (mix32(stringSeed ^ waveIndex ^ 0x6d2b79f5) & 1);
+  const nemesisMultiplier =
+    nemesisRank >= 4 ? Math.min(2, 1.5 + (nemesisRank - 2) * 0.125) : nemesisRank >= 2 ? 1.5 : 1;
   return generateEnemyBoonLoadout(
     party,
     waveIndex,
-    referencePower * multiplier,
+    Math.max(1, Math.round(referencePower * multiplier * nemesisMultiplier) + (nemesisRank >= 1 ? 1 : 0)),
     stringSeed,
-    counterBiased ? 4 : undefined,
+    counterBiased || nemesisRank >= 1 ? (nemesisRank >= 2 ? 4 : 2) : undefined,
   );
 }
 
