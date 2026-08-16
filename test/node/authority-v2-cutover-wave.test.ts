@@ -96,6 +96,15 @@ function identity(localSeatId: number): CoopV2ShadowIdentity {
   };
 }
 
+function hotRejoinedIdentity(localSeatId: number): CoopV2ShadowIdentity {
+  return {
+    ...identity(localSeatId),
+    membershipRevision: SESSION.membershipRevision + 1,
+    connectionGeneration: 1,
+    peerBindings: [{ seatId: localSeatId === 0 ? 1 : 0, connectionGeneration: 1 }],
+  };
+}
+
 function routeInto(harness: CoopAuthorityV2Shadow, frame: CoopFrameV2): void {
   registerCoopV2ShadowInbound(valid => harness.handleInboundFrame(valid));
   try {
@@ -404,6 +413,287 @@ describe("authority-v2 wave/terminal host commits", () => {
         revision: deferred.revision,
         operationId: deferred.operationId,
       });
+    } finally {
+      cutover.dispose();
+      duo.dispose();
+    }
+  });
+
+  it("defers a terminal with its exact typed body, then commits it once after predecessor control proof without a retry timer", () => {
+    let terminalReservationReady = false;
+    let predecessorMaterialReady = false;
+    const committedTerminals: CoopAuthorityEntry[] = [];
+    const hostLiveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TERMINAL_COMMIT",
+      ownsControl: () => false,
+      prepareAuthorityEntry: (_ctx, entry) => {
+        if (entry.kind === "TERMINAL_COMMIT") {
+          return terminalReservationReady ? () => {} : null;
+        }
+        return () => {};
+      },
+      authorityEntryCommitted: (_ctx, entry) => {
+        if (entry.kind === "TERMINAL_COMMIT") {
+          committedTerminals.push(entry);
+        }
+      },
+      applyMaterial: () => true,
+      projectControl: () => null,
+    };
+    const guestLiveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: () => false,
+      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      projectControl: () => null,
+    };
+    const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
+    const cutover = new CoopV2WaveCutover(duo.host);
+    try {
+      const predecessorDisposition = duo.host.commitAuthorityEntryDetailed(
+        retainedTurnPredecessor(duo.host.authenticatedFrameContext),
+      );
+      expect(predecessorDisposition.kind).toBe("committed");
+      if (predecessorDisposition.kind !== "committed") {
+        return;
+      }
+      const predecessorTimers = duo.host.diagnostics().pendingTimers;
+      const terminalInput = {
+        operationId: TERMINAL_MATERIAL.terminalId,
+        terminal: TERMINAL_MATERIAL,
+        legacyDigest: digestOfMaterial(TERMINAL_MATERIAL),
+        legacyImage: TERMINAL_MATERIAL,
+        subsumes: [predecessorDisposition.entry.revision],
+      };
+
+      const deferredDisposition = cutover.commitHostTerminalDetailed(terminalInput);
+      expect(deferredDisposition).toMatchObject({
+        kind: "deferred",
+        reason: "predecessor-control-not-installed",
+      });
+      if (deferredDisposition.kind !== "deferred") {
+        return;
+      }
+      const deferred = deferredDisposition.entry;
+      expect(deferred).toMatchObject({
+        revision: predecessorDisposition.entry.revision + 1,
+        operationId: TERMINAL_MATERIAL.terminalId,
+        kind: "TERMINAL_COMMIT",
+        material: { digest: digestOfMaterial(TERMINAL_MATERIAL), payload: TERMINAL_MATERIAL },
+        nextControl: { kind: "TERMINAL", terminalId: TERMINAL_MATERIAL.terminalId },
+        subsumes: [predecessorDisposition.entry.revision],
+      });
+      expect(deferred.context).toEqual(duo.host.authenticatedFrameContext);
+      expect(deferred.material.payload).toEqual(TERMINAL_MATERIAL);
+      expect(
+        duo.host.diagnostics().pendingTimers,
+        "parking the terminal does not allocate a second retry timer",
+      ).toBe(predecessorTimers);
+      expect(duo.host.diagnostics()).toMatchObject({ committed: 1, parityChecks: 0, parityMatches: 0 });
+      expect(committedTerminals).toHaveLength(0);
+
+      predecessorMaterialReady = true;
+      expect(duo.guest.retryPendingReplicaEntries()).toBe(1);
+      expect(duo.host.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
+
+      terminalReservationReady = true;
+      const committedDisposition = cutover.retryDeferredHostTerminalDetailed();
+      expect(committedDisposition.kind).toBe("committed");
+      if (committedDisposition.kind !== "committed") {
+        return;
+      }
+      expect(committedDisposition.entry).toEqual(deferred);
+      expect(committedDisposition.entry.revision).toBe(deferred.revision);
+      expect(committedDisposition.entry.material).toEqual(deferred.material);
+      expect(committedDisposition.entry.nextControl).toEqual(deferred.nextControl);
+      expect(committedDisposition.entry.subsumes).toEqual(deferred.subsumes);
+      expect(committedTerminals).toHaveLength(1);
+      expect(committedTerminals[0]).toEqual(deferred);
+      expect(duo.host.diagnostics()).toMatchObject({
+        committed: 2,
+        parityChecks: 1,
+        parityMatches: 1,
+        retained: 0,
+        pendingTimers: 0,
+      });
+      expect(cutover.retryDeferredHostTerminalDetailed()).toMatchObject({ kind: "failed" });
+      expect(committedTerminals).toHaveLength(1);
+    } finally {
+      cutover.dispose();
+      duo.dispose();
+    }
+  });
+
+  it("fails closed when a parked wave reuses changed ordered subsumes or immutable context axes, without publishing compatibility", () => {
+    let boundaryReservationReady = false;
+    let predecessorMaterialReady = false;
+    const committedBoundaries: CoopAuthorityEntry[] = [];
+    const hostLiveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
+      ownsControl: () => false,
+      prepareAuthorityEntry: (_ctx, entry) =>
+        entry.kind === "WAVE_ADVANCE" ? (boundaryReservationReady ? () => {} : null) : () => {},
+      authorityEntryCommitted: (_ctx, entry) => {
+        if (entry.kind === "WAVE_ADVANCE") {
+          committedBoundaries.push(entry);
+        }
+      },
+      applyMaterial: () => true,
+      projectControl: () => null,
+    };
+    const guestLiveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: () => false,
+      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      projectControl: () => null,
+    };
+    const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
+    const cutover = new CoopV2WaveCutover(duo.host);
+    try {
+      const predecessorDisposition = duo.host.commitAuthorityEntryDetailed(
+        retainedTurnPredecessor(duo.host.authenticatedFrameContext),
+      );
+      expect(predecessorDisposition.kind).toBe("committed");
+      if (predecessorDisposition.kind !== "committed") {
+        return;
+      }
+      const boundaryInput: CoopV2ShadowWaveTap = {
+        operationId: "sol-audit-deferred-wave",
+        transition: WAVE_MATERIAL,
+        destination: boundaryCommand(),
+        legacyDigest: digestOfMaterial(WAVE_MATERIAL),
+        legacyImage: WAVE_MATERIAL,
+        subsumes: [predecessorDisposition.entry.revision],
+      };
+      const deferredDisposition = cutover.commitHostWaveDetailed(boundaryInput);
+      expect(deferredDisposition.kind).toBe("deferred");
+      if (deferredDisposition.kind !== "deferred") {
+        return;
+      }
+      const deferred = deferredDisposition.entry;
+
+      const changedSubsumes = cutover.commitHostWaveDetailed({
+        ...boundaryInput,
+        subsumes: [predecessorDisposition.entry.revision, deferred.revision],
+      });
+      expect(changedSubsumes).toMatchObject({ kind: "failed" });
+      const changedStagedIdentity = cutover.commitHostWaveDetailed({
+        ...boundaryInput,
+        transition: { ...WAVE_MATERIAL, wave: WAVE_MATERIAL.wave + 1 },
+      });
+      expect(changedStagedIdentity).toMatchObject({ kind: "failed" });
+      expect(duo.host.diagnostics()).toMatchObject({ committed: 1, parityChecks: 0 });
+      expect(committedBoundaries).toHaveLength(0);
+
+      expect(() =>
+        duo.host.rebindIdentity({
+          ...hotRejoinedIdentity(0),
+          runId: "sol-audit-different-run",
+        }),
+      ).toThrow(/stable authenticated axis/);
+      const stillDeferred = cutover.retryDeferredHostWaveDetailed();
+      expect(stillDeferred.kind).toBe("deferred");
+      if (stillDeferred.kind === "deferred") {
+        expect(stillDeferred.entry).toEqual(deferred);
+      }
+      expect(committedBoundaries).toHaveLength(0);
+      expect(duo.guest.diagnostics().applied).toBe(0);
+    } finally {
+      cutover.dispose();
+      duo.dispose();
+    }
+  });
+
+  it("allows an authenticated monotonic hot rejoin to commit the parked wave body at the same revision exactly once", () => {
+    let boundaryReservationReady = false;
+    let predecessorMaterialReady = false;
+    const committedBoundaries: CoopAuthorityEntry[] = [];
+    const hostLiveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
+      ownsControl: () => false,
+      prepareAuthorityEntry: (_ctx, entry) =>
+        entry.kind === "WAVE_ADVANCE" ? (boundaryReservationReady ? () => {} : null) : () => {},
+      authorityEntryCommitted: (_ctx, entry) => {
+        if (entry.kind === "WAVE_ADVANCE") {
+          committedBoundaries.push(entry);
+        }
+      },
+      applyMaterial: () => true,
+      projectControl: () => null,
+    };
+    const guestLiveReplica: CoopV2LiveReplicaSeams = {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT",
+      ownsControl: () => false,
+      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      projectControl: () => null,
+    };
+    const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
+    const cutover = new CoopV2WaveCutover(duo.host);
+    try {
+      const predecessorDisposition = duo.host.commitAuthorityEntryDetailed(
+        retainedTurnPredecessor(duo.host.authenticatedFrameContext),
+      );
+      expect(predecessorDisposition.kind).toBe("committed");
+      if (predecessorDisposition.kind !== "committed") {
+        return;
+      }
+      const boundaryInput: CoopV2ShadowWaveTap = {
+        operationId: "hot-rejoin-deferred-wave",
+        transition: WAVE_MATERIAL,
+        destination: boundaryCommand(),
+        legacyDigest: digestOfMaterial(WAVE_MATERIAL),
+        legacyImage: WAVE_MATERIAL,
+        subsumes: [predecessorDisposition.entry.revision],
+      };
+      const deferredDisposition = cutover.commitHostWaveDetailed(boundaryInput);
+      expect(deferredDisposition.kind).toBe("deferred");
+      if (deferredDisposition.kind !== "deferred") {
+        return;
+      }
+      const deferred = deferredDisposition.entry;
+
+      // Rebind the replica first so the authority's immediate retained redelivery is admitted on the new
+      // authenticated channel. Only membershipRevision/connectionGeneration and peer generations advance.
+      const timersBeforeRebind = duo.host.diagnostics().pendingTimers;
+      duo.guest.rebindIdentity(hotRejoinedIdentity(1));
+      duo.host.rebindIdentity(hotRejoinedIdentity(0));
+      expect(duo.host.diagnostics().pendingTimers).toBe(timersBeforeRebind);
+      predecessorMaterialReady = true;
+      expect(duo.guest.retryPendingReplicaEntries()).toBe(1);
+      expect(duo.host.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
+
+      boundaryReservationReady = true;
+      const committedDisposition = cutover.retryDeferredHostWaveDetailed();
+      expect(committedDisposition.kind).toBe("committed");
+      if (committedDisposition.kind !== "committed") {
+        return;
+      }
+      const committed = committedDisposition.entry;
+      expect(committed.revision).toBe(deferred.revision);
+      expect(committed.operationId).toBe(deferred.operationId);
+      expect(committed.kind).toBe(deferred.kind);
+      expect(committed.material).toEqual(deferred.material);
+      expect(committed.nextControl).toEqual(deferred.nextControl);
+      expect(committed.subsumes).toEqual(deferred.subsumes);
+      expect(committed.context).toMatchObject({
+        ...deferred.context,
+        membershipRevision: SESSION.membershipRevision + 1,
+        connectionGeneration: 1,
+      });
+      expect(committedBoundaries).toHaveLength(1);
+      expect(committedBoundaries[0]).toEqual(committed);
+      expect(duo.host.diagnostics()).toMatchObject({
+        committed: 2,
+        parityChecks: 1,
+        parityMatches: 1,
+        retained: 0,
+        pendingTimers: 0,
+      });
+      expect(duo.host.authorityFrontier()).toMatchObject({
+        revision: deferred.revision,
+        operationId: deferred.operationId,
+      });
+      expect(cutover.retryDeferredHostWaveDetailed()).toMatchObject({ kind: "failed" });
+      expect(committedBoundaries).toHaveLength(1);
     } finally {
       cutover.dispose();
       duo.dispose();

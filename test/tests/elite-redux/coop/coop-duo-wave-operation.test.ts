@@ -40,11 +40,15 @@ import {
   awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
+  captureCoopAutomaticVictorySealIdentity,
   clearCoopRuntime,
   coopRetainedGameOverSupersedesReplay,
+  deferCoopAutomaticVictorySealAtBattleEnd,
   flushCoopWaveResolvedAfterTurnCommit,
   getCoopV2Shadow,
   getCoopWaveBoundaryStatus,
+  isCoopV2InteractionHumanInputFrozen,
+  sealCoopAutomaticVictoryBoundary,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -261,6 +265,193 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     });
 
     expect(raw, "the compatibility hint publishes exactly once after successful turn retention").toHaveBeenCalledOnce();
+    logs.flush();
+  }, 300_000);
+
+  it("parks a real early-game-over terminal without raw compatibility, ignores duplicate callbacks, and cancels its microtask redrive on teardown", async () => {
+    const rig = await bootDuo({ startingWave: 7 });
+    const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+    const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("gameOver"));
+    const parked = rig.hostRuntime.v2DeferredHostBoundary;
+    expect(parked).not.toBeNull();
+    expect(parked).toMatchObject({
+      kind: "terminal",
+      wave: 7,
+      compatibility: { kind: "wave-resolved", outcome: "gameOver" },
+    });
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+
+    const parkedState = parked?.authoritativeState;
+    rig.hostScene.currentBattle.turn += 1;
+    await withClient(rig.hostCtx, () => {
+      broadcastCoopWaveResolved("gameOver");
+      broadcastCoopWaveEndState(false);
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
+    expect(rig.hostRuntime.v2DeferredHostBoundary?.authoritativeState).toBe(parkedState);
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+
+    await withClient(rig.hostCtx, () => clearCoopRuntime());
+    await Promise.resolve();
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+    logs.flush();
+  }, 300_000);
+
+  it("commits a parked early-game-over terminal through the proof edge and emits one waveResolved carrier", async () => {
+    const rig = await bootDuo({ startingWave: 7 });
+    const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+    const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    let blockBoundary = true;
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blockBoundary && (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT")) {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("gameOver"));
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toMatchObject({
+      kind: "terminal",
+      compatibility: { kind: "wave-resolved", outcome: "gameOver" },
+    });
+    await withClient(rig.hostCtx, () => {
+      broadcastCoopWaveResolved("gameOver");
+      broadcastCoopWaveEndState(false);
+    });
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+
+    blockBoundary = false;
+    await withClient(rig.hostCtx, async () => {
+      isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+      await Promise.resolve();
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
+    expect(rawResolved).toHaveBeenCalledOnce();
+    expect(rawEndState).not.toHaveBeenCalled();
+    expect(getCoopV2Shadow(rig.hostRuntime)?.diagnostics()).toMatchObject({ committed: 2 });
+
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("gameOver"));
+    expect(rawResolved).toHaveBeenCalledOnce();
+    logs.flush();
+  }, 300_000);
+
+  it("parks a real BattleEnd wave with the exact state image and waveEndState compatibility disposition", async () => {
+    const rig = await bootDuo({ startingWave: 3 });
+    const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+    const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("win"));
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    await withClient(rig.hostCtx, () => broadcastCoopWaveEndState(true));
+
+    const parked = rig.hostRuntime.v2DeferredHostBoundary;
+    expect(parked).not.toBeNull();
+    expect(parked).toMatchObject({
+      kind: "wave",
+      wave: 3,
+      transition: { outcome: "win", wave: 3 },
+      compatibility: { kind: "wave-end" },
+    });
+    expect(parked?.authoritativeState).toBeDefined();
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+
+    const parkedState = parked?.authoritativeState;
+    rig.hostScene.currentBattle.turn += 1;
+    await withClient(rig.hostCtx, () => {
+      broadcastCoopWaveResolved("win");
+      broadcastCoopWaveEndState(true);
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
+    expect(rig.hostRuntime.v2DeferredHostBoundary?.authoritativeState).toBe(parkedState);
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+    logs.flush();
+  }, 300_000);
+
+  it("keeps the automatic-victory seal parked until exact wave commit, then consumes it with one waveEndState carrier", async () => {
+    const rig = await bootDuo({ startingWave: 3 });
+    const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+    const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    let blockBoundary = true;
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blockBoundary && (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT")) {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("win"));
+    const sealIdentity = await withClient(rig.hostCtx, () => captureCoopAutomaticVictorySealIdentity(3));
+    expect(sealIdentity).not.toBeNull();
+    if (sealIdentity == null || sealIdentity.turn == null) {
+      return;
+    }
+    await retireDuoInitialCommandForBoundaryTest(rig);
+
+    await withClient(rig.hostCtx, () => {
+      // BattleEnd has advanced one ambient turn, while the seal retains the source turn identity.
+      rig.hostScene.currentBattle.turn = sealIdentity.turn! + 1;
+      expect(deferCoopAutomaticVictorySealAtBattleEnd(sealIdentity)).toBe(true);
+      expect(sealCoopAutomaticVictoryBoundary(sealIdentity)).toBe(true);
+    });
+    const parked = rig.hostRuntime.v2DeferredHostBoundary;
+    expect(parked).toMatchObject({
+      kind: "wave",
+      wave: 3,
+      compatibility: { kind: "wave-end" },
+    });
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+
+    await withClient(rig.hostCtx, () => {
+      expect(sealCoopAutomaticVictoryBoundary(sealIdentity)).toBe(true);
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
+    expect(rawEndState).not.toHaveBeenCalled();
+
+    blockBoundary = false;
+    await withClient(rig.hostCtx, async () => {
+      // Re-projecting the authenticated predecessor control is the production proof edge that queues the
+      // exact deferred retry. The callback runs on the next microtask while this runtime remains active.
+      isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+      await Promise.resolve();
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).toHaveBeenCalledOnce();
     logs.flush();
   }, 300_000);
 
