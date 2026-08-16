@@ -373,8 +373,8 @@
       "description": "Aumenta drásticamente la posibilidad de que un Pokémon salvaje sea variocolor."
     },
     "ABILITY_CHARM": {
-      "name": "Amuleto Habilidad",
-      "description": "Aumenta drásticamente la posibilidad de que un Pokémon salvaje tenga una habilidad oculta."
+      "name": "Amuleto de Evento Misterioso",
+      "description": "Duplica la probabilidad de que aparezca un evento misterioso."
     },
     "CATCHING_CHARM": {
       "name": "Amuleto Captura",

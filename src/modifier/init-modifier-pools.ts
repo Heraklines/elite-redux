@@ -20,6 +20,7 @@ import {
   BerryModifier,
   DamageCalculatorModifier,
   DoubleBattleChanceBoosterModifier,
+  MysteryEventRateBoosterModifier,
   SpeciesCritBoosterModifier,
   TurnStatusEffectModifier,
 } from "#modifiers/modifier";
@@ -702,7 +703,15 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.BATON, 2),
     new WeightedModifierType(modifierTypes.SOUL_DEW, 7),
     new WeightedModifierType(modifierTypes.CATCHING_CHARM, () => (globalScene.gameMode.isClassic ? 0 : 4), 4),
-    new WeightedModifierType(modifierTypes.ABILITY_CHARM, skipInClassicAfterWave(189, 6)),
+    new WeightedModifierType(
+      modifierTypes.ABILITY_CHARM,
+      () =>
+        globalScene.currentBattle.waveIndex < globalScene.gameMode.getMysteryEncounterLegalWaves()[1]
+        && !globalScene.findModifier(modifier => modifier instanceof MysteryEventRateBoosterModifier)
+          ? 6
+          : 0,
+      6,
+    ),
     // ER custom Rogue-tier consumables.
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),

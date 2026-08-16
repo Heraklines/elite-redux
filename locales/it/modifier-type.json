@@ -373,8 +373,8 @@
       "description": "Misterioso amuleto luminoso che aumenta la probabilità di incontrare Pokémon cromatici."
     },
     "ABILITY_CHARM": {
-      "name": "Abilitamuleto",
-      "description": "Aumenta drasticamente la possibilità che un Pokémon selvatico abbia un’abilità nascosta."
+      "name": "Amuleto Evento Misterioso",
+      "description": "Raddoppia la probabilità che appaia un evento misterioso."
     },
     "CATCHING_CHARM": {
       "name": "Catturamuleto",

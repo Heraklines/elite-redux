@@ -97,7 +97,6 @@ import {
   GigantamaxAccessModifier,
   HealingBoosterModifier,
   HealShopCostModifier,
-  HiddenAbilityRateBoosterModifier,
   HitHealModifier,
   IvScannerModifier,
   LevelIncrementBoosterModifier,
@@ -109,6 +108,7 @@ import {
   MoneyMultiplierModifier,
   MoneyRewardModifier,
   MultipleParticipantExpBonusModifier,
+  MysteryEventRateBoosterModifier,
   type PersistentModifier,
   PokemonAddMoveSlotModifier,
   PokemonAllMovePpRestoreModifier,
@@ -2839,7 +2839,7 @@ const modifierTypeInitObj = Object.freeze({
     new ModifierType(
       "modifierType:ModifierType.ABILITY_CHARM",
       "ability_charm",
-      (type, _args) => new HiddenAbilityRateBoosterModifier(type),
+      (type, _args) => new MysteryEventRateBoosterModifier(type),
     ),
   CATCHING_CHARM: () =>
     new ModifierType(

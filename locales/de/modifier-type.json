@@ -373,8 +373,8 @@
       "description": "Erhöht die Chance deutlich, dass ein wildes Pokémon ein schillernd ist."
     },
     "ABILITY_CHARM": {
-      "name": "Fähigkeitspin",
-      "description": "Erhöht die Chance deutlich, dass ein wildes Pokémon eine versteckte Fähigkeit hat."
+      "name": "Mystery-Event-Pin",
+      "description": "Verdoppelt die Chance, dass ein Mystery-Event erscheint."
     },
     "CATCHING_CHARM": {
       "name": "Superfangpin",

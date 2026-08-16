@@ -195,6 +195,7 @@ import {
   HealingBoosterModifier,
   ModifierBar,
   MultipleParticipantExpBonusModifier,
+  MysteryEventRateBoosterModifier,
   PersistentModifier,
   PokemonExpBoosterModifier,
   PokemonFormChangeItemModifier,
@@ -5259,17 +5260,21 @@ export class BattleScene extends SceneBase {
     // (Graveyard/Ruins ~2.2x) feel haunted, quiet ones (Sea/Plains ~0.7x) almost
     // never roll one. Multiplies the per-wave roll, so it composes with the Mystery
     // Charm run target. Skipped when a rate override is forcing the rate.
-    const successRate =
+    const successRate = new NumberHolder(
       Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE === null
         ? favoredEncounterRate * erBiomeEventRateMult(this.arena.biomeId)
-        : Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE;
+        : Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE,
+    );
+    if (Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE === null) {
+      this.applyModifiers(MysteryEventRateBoosterModifier, true, successRate);
+    }
 
     let roll = 0;
     // Always rolls the check on the same offset to ensure no RNG changes from reloading session
     this.executeWithSeedOffset(() => {
       roll = randSeedInt(MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT);
     }, waveIndex * 3000);
-    return roll < successRate;
+    return roll < successRate.value;
   }
 
   /**

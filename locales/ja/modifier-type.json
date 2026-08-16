@@ -373,8 +373,8 @@
       "description": "色違いの ポケモンと 大きく 出会いやすくなる"
     },
     "ABILITY_CHARM": {
-      "name": "とくせいおまもり",
-      "description": "隠れ特性がある ポケモンと 大きく 出会いやすくなる"
+      "name": "ミステリーイベントのおまもり",
+      "description": "ミステリーイベントが 発生する 確率を 2倍にする"
     },
     "CATCHING_CHARM": {
       "name": "ゆれないおまもり",

@@ -3707,30 +3707,27 @@ export class MoneyInterestModifier extends PersistentModifier {
   }
 }
 
-export class HiddenAbilityRateBoosterModifier extends PersistentModifier {
+export class MysteryEventRateBoosterModifier extends PersistentModifier {
   match(modifier: Modifier): boolean {
-    return modifier instanceof HiddenAbilityRateBoosterModifier;
+    return modifier instanceof MysteryEventRateBoosterModifier;
   }
 
-  clone(): HiddenAbilityRateBoosterModifier {
-    return new HiddenAbilityRateBoosterModifier(this.type, this.stackCount);
+  clone(): MysteryEventRateBoosterModifier {
+    return new MysteryEventRateBoosterModifier(this.type, this.stackCount);
   }
 
-  /**
-   * Applies {@linkcode HiddenAbilityRateBoosterModifier}
-   * @param boost {@linkcode NumberHolder} holding the boost value
-   * @returns always `true`
-   */
   override apply(boost: NumberHolder): boolean {
-    boost.value *= Math.pow(2, -1 - this.getStackCount());
+    boost.value *= 2;
 
     return true;
   }
 
   getMaxStackCount(): number {
-    return 4;
+    return 1;
   }
 }
+
+export const HiddenAbilityRateBoosterModifier = MysteryEventRateBoosterModifier;
 
 export class ShinyRateBoosterModifier extends PersistentModifier {
   match(modifier: Modifier): boolean {
@@ -4657,6 +4654,7 @@ const ModifierClassMap = Object.freeze({
   MoneyRewardModifier,
   DamageMoneyRewardModifier,
   MoneyInterestModifier,
+  MysteryEventRateBoosterModifier,
   HiddenAbilityRateBoosterModifier,
   ShinyRateBoosterModifier,
   CriticalCatchChanceBoosterModifier,

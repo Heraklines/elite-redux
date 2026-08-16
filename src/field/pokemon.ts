@@ -300,7 +300,6 @@ import {
   EnemyDamageReducerModifier,
   EnemyFusionChanceModifier,
   EvoTrackerModifier,
-  HiddenAbilityRateBoosterModifier,
   PokemonBaseStatFlatModifier,
   PokemonBaseStatTotalModifier,
   PokemonFormChangeItemModifier,
@@ -378,7 +377,6 @@ import { cachedFetch } from "#utils/fetch-utils";
 import { isSlotActive } from "#utils/passive-utils";
 import { decodeNickname, getFusedSpeciesName, getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { inSpeedOrder } from "#utils/speed-order-generator";
-import { ValueHolder } from "#utils/value-holder";
 import { QuantizerCelebi } from "@material/material-color-utilities";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -877,16 +875,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   /** Generate `abilityIndex` based on species and hidden ability if not pre-defined. */
   private generateAbilityIndex(): number {
-    const hiddenAbilityChance = new ValueHolder(BASE_HIDDEN_ABILITY_RATE);
-    // Ability Charms should only affect wild Pokemon
-    // TODO: move this `if` check into the ability charm code
-    if (!this.hasTrainer()) {
-      globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-    }
-
-    // Neither RNG roll depends on the outcome of the other, so that Ability Charms do not affect RNG.
     const regularAbility = this.species.ability2 === this.species.ability1 ? 0 : randSeedInt(2);
-    const useHiddenAbility = this.species.abilityHidden ? !randSeedInt(hiddenAbilityChance.value) : false;
+    const useHiddenAbility = this.species.abilityHidden ? !randSeedInt(BASE_HIDDEN_ABILITY_RATE) : false;
 
     return useHiddenAbility ? 2 : regularAbility;
   }
@@ -4762,10 +4752,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return;
     }
 
-    const hiddenAbilityChance = new ValueHolder(haThreshold);
-    globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-
-    if (!randSeedInt(hiddenAbilityChance.value)) {
+    if (!randSeedInt(haThreshold)) {
       this.abilityIndex = 2;
     }
   }
@@ -4775,12 +4762,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param forStarter - Whether this fusion is being generated for a starter Pokémon; default `false`
    */
   public generateFusionSpecies(forStarter?: boolean): void {
-    const hiddenAbilityChance = new ValueHolder(BASE_HIDDEN_ABILITY_RATE);
-    if (!this.hasTrainer()) {
-      globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-    }
-
-    const hasHiddenAbility = !randSeedInt(hiddenAbilityChance.value);
+    const hasHiddenAbility = !randSeedInt(BASE_HIDDEN_ABILITY_RATE);
     const randAbilityIndex = randSeedInt(2);
 
     const filter = forStarter

@@ -106,7 +106,6 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
   mysteryCharm: {
     name: "Mystery Charm",
     description: "Mystery encounters appear far more often while you hold this charm (about one every 5 waves).",
-    // A purple-tinted Ability Charm (the hidden-ability charm), recolored for MEs.
     icon: "ability_charm",
     tint: 0xc080f8,
     maxStack: 1,

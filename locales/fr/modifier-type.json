@@ -373,8 +373,8 @@
       "description": "Augmente énormément les chances de rencontrer un Pokémon sauvage chromatique."
     },
     "ABILITY_CHARM": {
-      "name": "Charme Talent",
-      "description": "Augmente énormément les chances de rencontrer un Pokémon sauvage avec un talent caché."
+      "name": "Charme Événement Mystère",
+      "description": "Double les chances qu’un événement mystère apparaisse."
     },
     "CATCHING_CHARM": {
       "name": "Charme Stabilité",
