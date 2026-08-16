@@ -44,12 +44,26 @@ import {
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
+import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-pin-state";
+import { COOP_ME_BATTLE_HANDOFF } from "#data/elite-redux/coop/coop-me-pump";
+import {
+  COOP_ME_BATTLE_SETTLED_CHOICE,
+  COOP_ME_REWARD_SETTLED_CHOICE,
+} from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   CoopOperationHost,
   createCoopRuntimeOpState,
   setActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
-import { clearCoopRuntime, coopHostStreamMeMessage, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  commitCoopMeBattleSettlementAtBattleEnd,
+  coopMeOwnerRelayBattleHandoff,
+  coopHostStreamMeMessage,
+  registerCoopMeTerminalRedrive,
+  settleCoopV2InteractionOperation,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -58,6 +72,7 @@ import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { BattleEndPhase } from "#phases/battle-end-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   awaitRewardShopPhaseExit,
@@ -91,6 +106,37 @@ const ME_WAVE = 12;
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/** Read the typed ME_TERMINAL discriminator without treating a raw/legacy carrier as Authority V2 proof. */
+function authorityMeTerminalKind(entry: {
+  readonly kind?: unknown;
+  readonly material?: { readonly payload?: unknown };
+}): string | null {
+  if (entry.kind !== "INTERACTION_COMMIT") {
+    return null;
+  }
+  const material = entry.material?.payload;
+  if (material == null || typeof material !== "object" || Array.isArray(material)) {
+    return null;
+  }
+  const envelope = (material as { readonly envelope?: unknown }).envelope;
+  if (envelope == null || typeof envelope !== "object" || Array.isArray(envelope)) {
+    return null;
+  }
+  const pendingOperation = (envelope as { readonly pendingOperation?: unknown }).pendingOperation;
+  if (pendingOperation == null || typeof pendingOperation !== "object" || Array.isArray(pendingOperation)) {
+    return null;
+  }
+  const pending = pendingOperation as {
+    readonly kind?: unknown;
+    readonly payload?: unknown;
+  };
+  if (pending.kind !== "ME_TERMINAL" || pending.payload == null || typeof pending.payload !== "object") {
+    return null;
+  }
+  const terminal = (pending.payload as { readonly terminal?: unknown }).terminal;
+  return typeof terminal === "string" ? terminal : null;
 }
 
 describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (Wave-2c)", () => {
@@ -156,11 +202,95 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
 
     const submitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
     const applyOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+    let blockRewardSettlement = true;
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blockRewardSettlement && authorityMeTerminalKind(entry) === "reward-settled") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
 
-    // Drive the HOST through the whole ME (buffers present + meResync + LEAVE), then the guest replays.
+    // Drive the HOST through the option, then stop before the real reward phase starts. The typed
+    // predecessor-control gate must park the exact reward-settled transaction instead of opening the
+    // picker or ending the owning phase.
     let guestReplayPhase!: Phase;
     await withClient(rig.hostCtx, async () => {
-      await runMysteryEncounterToEnd(game, 1);
+      await runSelectMysteryEncounterOption(game, 1);
+      game.onNextPrompt(
+        "MysteryEncounterOptionSelectedPhase",
+        UiMode.MESSAGE,
+        () => {
+          hostScene.ui.getMessageHandler().processInput(Button.ACTION);
+        },
+        () => game.isCurrentPhase("MysteryEncounterRewardsPhase"),
+      );
+      await game.phaseInterceptor.to("MysteryEncounterRewardsPhase", false);
+      const rewards = hostScene.phaseManager.getCurrentPhase();
+      expect(rewards?.phaseName, "host reached the automatic-preparation reward boundary").toBe(
+        "MysteryEncounterRewardsPhase",
+      );
+      const rewardsEnd = vi.spyOn(rewards!, "end");
+      rewards!.start();
+      await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
+        timeout: 2_000,
+        interval: 10,
+      });
+
+      const parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+      expect(parked, "typed predecessor control parks the no-battle ME terminal").not.toBeNull();
+      expect(parked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
+      expect(
+        (parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+      ).toBe("reward-settled");
+      expect(rewardsEnd, "the owning reward phase remains current before the V2 proof edge").not.toHaveBeenCalled();
+      expect(hostScene.phaseManager.getCurrentPhase(), "the reward phase does not progress while parked").toBe(
+        rewards,
+      );
+      expect(hostScene.phaseManager.getQueuedPhaseNames(), "no picker or post-ME tail opens while parked").not.toContain(
+        "SelectModifierPhase",
+      );
+
+      const parkedOperationId = parked!.operationId;
+      const parkedRevision = parked!.revision;
+      const parkedEnvelope = JSON.stringify(parked!.envelope);
+      const capturedDeferred = meOp.captureCoopMeDeferredTerminal(parkedOperationId);
+      expect(capturedDeferred?.operationId).toBe(parkedOperationId);
+      expect(capturedDeferred?.revision).toBe(parkedRevision);
+      expect(JSON.stringify(capturedDeferred?.envelope)).toBe(parkedEnvelope);
+
+      // A second owner must not replace the first phase/promise callback, even when it registers the
+      // same immutable operation. The original parked record stays live for the proof edge.
+      const duplicateRegistrationCancel = vi.fn();
+      expect(
+        registerCoopMeTerminalRedrive(rig.hostRuntime, parkedOperationId, vi.fn(), duplicateRegistrationCancel),
+      ).toBeNull();
+      expect(duplicateRegistrationCancel, "duplicate register attempts cancel only their new callback").toHaveBeenCalledOnce();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive?.operationId).toBe(parkedOperationId);
+
+      blockRewardSettlement = false;
+      expect(settleCoopV2InteractionOperation(parkedOperationId, rig.hostRuntime)).toBe(true);
+      await vi.waitFor(() => expect(rewardsEnd).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive, "the exact parked state releases after commit").toBeNull();
+      expect(rewardsEnd, "the deferred reward tail resumes exactly once after commit").toHaveBeenCalledTimes(1);
+      expect(meOp.captureCoopMeDeferredTerminal(parkedOperationId), "retained deferred state releases once").toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        interactionCounter: counterBefore,
+        terminal: "reward-settled",
+        terminalOperationId: parkedOperationId,
+        terminalStep: 0,
+        terminalChoice: COOP_ME_REWARD_SETTLED_CHOICE,
+      });
+      expect(parkedRevision).toBeGreaterThan(0);
+      expect(parkedEnvelope).toContain(parkedOperationId);
+
+      // Duplicate proof callbacks are harmless: the one-shot redrive is disarmed before the tail runs.
+      expect(settleCoopV2InteractionOperation(parkedOperationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      expect(rewardsEnd, "duplicate settlement proof cannot double-run the reward tail").toHaveBeenCalledTimes(1);
+
       await game.phaseInterceptor.to("SelectModifierPhase", false);
       const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
       // Drive the embedded reward shop to its leave (the host is the forced reward owner mid-ME).
@@ -739,6 +869,267 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     logs.flush();
   }, 300_000);
 
+  it("parks host BattleEnd battle-settlement until typed proof, then installs control before one tail", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      await runSelectMysteryEncounterOption(game, 1);
+      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 0 });
+    });
+
+    let blockBattleSettlement = true;
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blockBattleSettlement && authorityMeTerminalKind(entry) === "battle-settled") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+    const plan = {
+      result: "victory" as const,
+      continuation: "encounter" as const,
+      trainerVictory: false,
+      rewardSurfaces: [],
+      eggLapse: false,
+    };
+
+    await withClient(rig.hostCtx, async () => {
+      const battleEnd = new BattleEndPhase(true, null, plan);
+      hostScene.phaseManager.clearPhaseQueue();
+      hostScene.phaseManager.unshiftPhase(battleEnd);
+      hostScene.phaseManager.shiftPhase();
+      expect(hostScene.phaseManager.getCurrentPhase()).toBe(battleEnd);
+      const battleEndEnd = vi.spyOn(battleEnd, "end");
+      battleEnd.start();
+
+      const parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+      expect(parked).not.toBeNull();
+      expect(parked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
+      expect(
+        (parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+      ).toBe("battle-settled");
+      expect(battleEndEnd, "the BattleEnd tail remains parked before typed commit").not.toHaveBeenCalled();
+      expect(hostScene.phaseManager.getCurrentPhase()).toBe(battleEnd);
+
+      const parkedOperationId = parked!.operationId;
+      const parkedRevision = parked!.revision;
+      const parkedEnvelope = JSON.stringify(parked!.envelope);
+      const capturedDeferred = meOp.captureCoopMeDeferredTerminal(parkedOperationId);
+      expect(capturedDeferred?.operationId).toBe(parkedOperationId);
+      expect(capturedDeferred?.revision).toBe(parkedRevision);
+      expect(JSON.stringify(capturedDeferred?.envelope)).toBe(parkedEnvelope);
+
+      blockBattleSettlement = false;
+      expect(settleCoopV2InteractionOperation(parkedOperationId, rig.hostRuntime)).toBe(true);
+      await vi.waitFor(() => expect(battleEndEnd).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(meOp.captureCoopMeDeferredTerminal(parkedOperationId)).toBeNull();
+      expect(battleEndEnd, "BattleEnd resumes exactly once after the proof edge").toHaveBeenCalledOnce();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        terminal: "battle-settled",
+        terminalOperationId: parkedOperationId,
+        terminalStep: 1,
+        terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
+      });
+      expect(parkedRevision).toBeGreaterThan(0);
+      expect(parkedEnvelope).toContain(parkedOperationId);
+
+      expect(settleCoopV2InteractionOperation(parkedOperationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      expect(battleEndEnd, "duplicate settlement proof cannot double-run BattleEnd").toHaveBeenCalledOnce();
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it("defers the async owner battle handoff, then advances battle0-settled1-battle2-settled3 once", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      await runSelectMysteryEncounterOption(game, 1);
+      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 0 });
+    });
+
+    let blockedTerminal: "battle-settled" | "battle" | null = "battle-settled";
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blockedTerminal != null && authorityMeTerminalKind(entry) === blockedTerminal) {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+    const originalRelay = rig.hostRuntime.mePump.relayMeBattleHandoff.bind(rig.hostRuntime.mePump);
+    const rawHandoff = vi.spyOn(rig.hostRuntime.mePump, "relayMeBattleHandoff").mockImplementation(
+      (hostTurn, sendRawTerminal) => {
+        // The continuation helper must install and validate the exact successor control before the raw
+        // pump can signal the spawned battle.
+        expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 2 });
+        originalRelay(hostTurn, sendRawTerminal);
+      },
+    );
+    const plan = {
+      result: "victory" as const,
+      continuation: "encounter" as const,
+      trainerVictory: false,
+      rewardSurfaces: [],
+      eggLapse: false,
+    };
+
+    await withClient(rig.hostCtx, async () => {
+      const settled1Tail = vi.fn();
+      const settled1Deferred = vi.fn();
+      expect(commitCoopMeBattleSettlementAtBattleEnd(plan, settled1Tail, settled1Deferred)).toBe(true);
+      const settled1Parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+      expect(settled1Parked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
+      expect(
+        (settled1Parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+      ).toBe("battle-settled");
+      expect(settled1Deferred, "battle settlement parks its owning tail before proof").toHaveBeenCalledOnce();
+      expect(settled1Tail, "settled1 tail does not run before the exact proof").not.toHaveBeenCalled();
+      const settled1OperationId = settled1Parked!.operationId;
+      const settled1Revision = settled1Parked!.revision;
+      const settled1Envelope = JSON.stringify(settled1Parked!.envelope);
+      const capturedSettled1 = meOp.captureCoopMeDeferredTerminal(settled1OperationId);
+      expect(capturedSettled1?.operationId).toBe(settled1OperationId);
+      expect(capturedSettled1?.revision).toBe(settled1Revision);
+      expect(JSON.stringify(capturedSettled1?.envelope)).toBe(settled1Envelope);
+
+      blockedTerminal = null;
+      expect(settleCoopV2InteractionOperation(settled1OperationId, rig.hostRuntime)).toBe(true);
+      await vi.waitFor(() => expect(settled1Tail).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        terminal: "battle-settled",
+        terminalOperationId: settled1OperationId,
+        terminalStep: 1,
+        terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
+      });
+      expect(meOp.captureCoopMeDeferredTerminal(settled1OperationId)).toBeNull();
+
+      blockedTerminal = "battle";
+      let handoffSettled = false;
+      const handoffPromise = coopMeOwnerRelayBattleHandoff({
+        encounterMode: hostScene.currentBattle.mysteryEncounter?.encounterMode,
+        disableSwitch: false,
+      }).then(result => {
+        handoffSettled = true;
+        return result;
+      });
+      await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
+        timeout: 2_000,
+        interval: 10,
+      });
+      await Promise.resolve();
+      const handoffParked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+      expect(handoffParked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
+      expect(
+        (handoffParked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+      ).toBe("battle");
+      expect(rawHandoff, "the raw pump waits for the exact handoff proof").not.toHaveBeenCalled();
+      expect(handoffSettled, "the async handoff Promise remains unresolved before proof").toBe(false);
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        terminal: "battle-settled",
+        terminalStep: 1,
+        terminalOperationId: settled1OperationId,
+      });
+      const handoffOperationId = handoffParked!.operationId;
+      const handoffRevision = handoffParked!.revision;
+      const handoffEnvelope = JSON.stringify(handoffParked!.envelope);
+      const capturedHandoff = meOp.captureCoopMeDeferredTerminal(handoffOperationId);
+      expect(capturedHandoff?.operationId).toBe(handoffOperationId);
+      expect(capturedHandoff?.revision).toBe(handoffRevision);
+      expect(JSON.stringify(capturedHandoff?.envelope)).toBe(handoffEnvelope);
+      expect(handoffRevision).toBeGreaterThan(settled1Revision);
+
+      blockedTerminal = null;
+      expect(settleCoopV2InteractionOperation(handoffOperationId, rig.hostRuntime)).toBe(true);
+      await vi.waitFor(() => expect(rawHandoff).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
+      await expect(handoffPromise).resolves.toBe(true);
+      expect(handoffSettled, "the handoff Promise resolves after the exact proof").toBe(true);
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        terminal: "battle",
+        terminalOperationId: handoffOperationId,
+        terminalStep: 2,
+        terminalChoice: COOP_ME_BATTLE_HANDOFF,
+      });
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(meOp.captureCoopMeDeferredTerminal(handoffOperationId)).toBeNull();
+
+      expect(settleCoopV2InteractionOperation(handoffOperationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      expect(rawHandoff, "duplicate handoff proof cannot relay the raw pump twice").toHaveBeenCalledOnce();
+
+      blockedTerminal = "battle-settled";
+      const settled3Tail = vi.fn();
+      const settled3Deferred = vi.fn();
+      expect(commitCoopMeBattleSettlementAtBattleEnd(plan, settled3Tail, settled3Deferred)).toBe(true);
+      const settled3Parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+      expect(
+        (settled3Parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+      ).toBe("battle-settled");
+      expect(settled3Deferred).toHaveBeenCalledOnce();
+      expect(settled3Tail).not.toHaveBeenCalled();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 2 });
+      const settled3OperationId = settled3Parked!.operationId;
+      const settled3Revision = settled3Parked!.revision;
+      const settled3Envelope = JSON.stringify(settled3Parked!.envelope);
+      expect(settled3Revision).toBeGreaterThan(handoffRevision);
+      const capturedSettled3 = meOp.captureCoopMeDeferredTerminal(settled3OperationId);
+      expect(capturedSettled3?.operationId).toBe(settled3OperationId);
+      expect(capturedSettled3?.revision).toBe(settled3Revision);
+      expect(JSON.stringify(capturedSettled3?.envelope)).toBe(settled3Envelope);
+
+      blockedTerminal = null;
+      expect(settleCoopV2InteractionOperation(settled3OperationId, rig.hostRuntime)).toBe(true);
+      await vi.waitFor(() => expect(settled3Tail).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        terminal: "battle-settled",
+        terminalOperationId: settled3OperationId,
+        terminalStep: 3,
+        terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
+      });
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(meOp.captureCoopMeDeferredTerminal(settled3OperationId)).toBeNull();
+      expect(settleCoopV2InteractionOperation(settled3OperationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      expect(settled3Tail, "duplicate settled3 proof cannot rerun the tail").toHaveBeenCalledOnce();
+
+      blockedTerminal = "battle";
+      let canceledHandoff = false;
+      const canceledPromise = coopMeOwnerRelayBattleHandoff({
+        encounterMode: hostScene.currentBattle.mysteryEncounter?.encounterMode,
+        disableSwitch: false,
+      }).then(result => {
+        canceledHandoff = true;
+        return result;
+      });
+      await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
+        timeout: 2_000,
+        interval: 10,
+      });
+      expect(rawHandoff).toHaveBeenCalledOnce();
+      clearCoopRuntime();
+      await expect(canceledPromise).resolves.toBe(false);
+      expect(canceledHandoff, "teardown resolves the parked handoff as canceled").toBe(true);
+      expect(rawHandoff, "teardown cannot relay a canceled handoff").toHaveBeenCalledOnce();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+    });
+
+    logs.flush();
+  }, 300_000);
+
   // =====================================================================================
   // LEG 3 - BATTLE-HANDOFF ME (the #859/#860 phantom class). The committed terminal STATES "battle"
   // BEFORE the guest builds its ME-battle phases, so it routes off the OPERATION, never a leftover chain.
@@ -754,14 +1145,68 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
 
     const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
     const submitSpy = vi.spyOn(CoopOperationHost.prototype, "submit");
+    let blockBattleHandoff = true;
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blockBattleHandoff && authorityMeTerminalKind(entry) === "battle") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+    const rawHandoff = vi.spyOn(rig.hostRuntime.mePump, "relayMeBattleHandoff");
 
-    // Drive the HOST through the BATTLE option (relays COOP_ME_BATTLE_HANDOFF on 9M, NO meResync on 8M).
+    // Drive the HOST through the BATTLE option. The typed predecessor-control gate must park the exact
+    // operation: no phase handoff or compatibility relay may run until the proof edge commits it.
     await withClient(rig.hostCtx, async () => {
-      await runSelectMysteryEncounterOption(game, 1);
+      const optionPromise = runSelectMysteryEncounterOption(game, 1);
+      await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull());
+      const parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+      expect(parked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
+      expect(
+        (parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+      ).toBe("battle");
+      const parkedOperationId = parked!.operationId;
+      const parkedRevision = parked!.revision;
+      const parkedEnvelope = JSON.stringify(parked!.envelope);
+      const capturedDeferred = meOp.captureCoopMeDeferredTerminal(parkedOperationId);
+      expect(capturedDeferred?.operationId).toBe(parkedOperationId);
+      expect(capturedDeferred?.revision).toBe(parkedRevision);
+      expect(JSON.stringify(capturedDeferred?.envelope)).toBe(parkedEnvelope);
+      expect(rawHandoff, "raw battle handoff waits for the typed commit").not.toHaveBeenCalled();
+      expect(hostScene.phaseManager.getCurrentPhase()?.phaseName).not.toBe("MysteryEncounterBattlePhase");
+
+      const duplicateRegistrationCancel = vi.fn();
+      expect(
+        registerCoopMeTerminalRedrive(rig.hostRuntime, parkedOperationId, vi.fn(), duplicateRegistrationCancel),
+      ).toBeNull();
+      expect(duplicateRegistrationCancel).toHaveBeenCalledOnce();
+
+      blockBattleHandoff = false;
+      expect(settleCoopV2InteractionOperation(parkedOperationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      await Promise.resolve();
+      await optionPromise;
       await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
       expect(hostScene.phaseManager.getCurrentPhase()?.phaseName, "host spawned the ME battle").toBe(
         "MysteryEncounterBattlePhase",
       );
+      expect(rawHandoff, "the handoff resumes exactly once after the proof edge").toHaveBeenCalledOnce();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(meOp.captureCoopMeDeferredTerminal(parkedOperationId)).toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({
+        interactionCounter: counterBefore,
+        terminal: "battle",
+        terminalOperationId: parkedOperationId,
+        terminalStep: 0,
+        hostTurn: expect.any(Number),
+      });
+      expect(parkedRevision).toBeGreaterThan(0);
+      expect(parkedEnvelope).toContain(parkedOperationId);
+      expect(settleCoopV2InteractionOperation(parkedOperationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      expect(rawHandoff, "duplicate proof callbacks cannot double-run the handoff").toHaveBeenCalledOnce();
     });
 
     // Drive the guest: the terminal race resolves the 9M battle-handoff; the guest finishes WITHOUT leaving.

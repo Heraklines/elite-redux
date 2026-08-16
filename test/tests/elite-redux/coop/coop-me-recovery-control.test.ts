@@ -10,17 +10,21 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import {
+  captureCoopMeDeferredTerminal,
+  clearCoopMeDeferredTerminalState,
+  commitMeOwnerIntentDetailed,
   resetCoopMeOperationFlag,
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
-import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { makeCoopOperationId, type CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { CoopOperationHost } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   assembleCoopRuntime,
   clearCoopRuntime,
   getCoopRuntime,
+  registerCoopMeTerminalRedrive,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -33,6 +37,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 function terminalOp(counter: number, step: number): string {
   return makeCoopOperationId(1, 0, (COOP_ME_TERM_SEQ_BASE + counter) * 8000 + 4000 + step, "ME_TERMINAL");
+}
+
+function deferredTerminalEnvelope(operationId: string, revision: number): CoopAuthoritativeEnvelopeV1 {
+  return {
+    version: 1,
+    sessionEpoch: 1,
+    revision,
+    wave: 7,
+    turn: 0,
+    logicalPhase: "MYSTERY_ENCOUNTER",
+    pendingOperation: {
+      id: operationId,
+      kind: "ME_TERMINAL",
+      owner: 0,
+      status: "committed",
+      payload: { terminal: "leave" },
+    },
+    authoritativeState: {} as CoopAuthoritativeEnvelopeV1["authoritativeState"],
+  };
 }
 
 interface ReplayRecoverySeam {
@@ -126,6 +149,94 @@ describe("CoopReplayMePhase fail-closed terminal recovery", () => {
     seam.handleTerminalAction({ choice: -1 });
 
     expect(leave).not.toHaveBeenCalled();
+  });
+
+  it("keeps the operation-disabled owner boundary on the legacy no-op path", () => {
+    expect(
+      commitMeOwnerIntentDetailed({
+        kind: "ME_PICK",
+        seq: COOP_ME_PUMP_SEQ_BASE,
+        pinned: 0,
+        step: 0,
+        payload: { optionIndex: 0 },
+        localRole: "host",
+        wave: 7,
+        turn: 0,
+      }),
+    ).toEqual({ kind: "disabled" });
+  });
+
+  it("parks one immutable ME terminal, rejects duplicate/missing/foreign registration, and cancels teardown once", () => {
+    clearCoopRuntime();
+    const { host } = createLoopbackPair();
+    const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    runtime.controller.role = "host";
+    setCoopRuntime(runtime);
+
+    const terminalState = runtime.opState.surfaces.get("me") as {
+      deferredTerminalByPinned: Map<
+        number,
+        { operationId: string; pinned: number; revision: number; envelope: CoopAuthoritativeEnvelopeV1 }
+      >;
+    };
+    const pinned = 7;
+    const operationId = terminalOp(pinned, 0);
+    const envelope = deferredTerminalEnvelope(operationId, 4);
+    terminalState.deferredTerminalByPinned.set(pinned, { operationId, pinned, revision: 4, envelope });
+
+    const resume = vi.fn();
+    const cancel = vi.fn();
+    const unregister = registerCoopMeTerminalRedrive(runtime, operationId, resume, cancel);
+    expect(unregister).not.toBeNull();
+    expect(runtime.v2DeferredMeTerminalRedrive).toMatchObject({ operationId, revision: 4, envelope });
+    const captured = captureCoopMeDeferredTerminal(operationId);
+    expect(captured?.operationId).toBe(operationId);
+    expect(captured?.revision).toBe(4);
+    expect(JSON.stringify(captured?.envelope)).toBe(JSON.stringify(envelope));
+
+    const duplicateCancel = vi.fn();
+    expect(registerCoopMeTerminalRedrive(runtime, operationId, vi.fn(), duplicateCancel)).toBeNull();
+    expect(duplicateCancel, "duplicate registration cancels only its replacement callback").toHaveBeenCalledOnce();
+    expect(runtime.v2DeferredMeTerminalRedrive?.operationId).toBe(operationId);
+    expect(resume).not.toHaveBeenCalled();
+
+    const foreignCancel = vi.fn();
+    expect(registerCoopMeTerminalRedrive(runtime, terminalOp(pinned, 1), vi.fn(), foreignCancel)).toBeNull();
+    expect(foreignCancel, "a different operation cannot steal the parked slot").toHaveBeenCalledOnce();
+    expect(runtime.v2DeferredMeTerminalRedrive?.operationId).toBe(operationId);
+
+    unregister!();
+    unregister!();
+    expect(cancel, "the owning cancel callback is one-shot").toHaveBeenCalledOnce();
+    expect(runtime.v2DeferredMeTerminalRedrive).toBeNull();
+    expect(resume).not.toHaveBeenCalled();
+    clearCoopMeDeferredTerminalState();
+    expect(captureCoopMeDeferredTerminal(operationId), "released deferred state is not retained").toBeNull();
+
+    const missingCancel = vi.fn();
+    expect(registerCoopMeTerminalRedrive(runtime, terminalOp(8, 0), vi.fn(), missingCancel)).toBeNull();
+    expect(missingCancel, "a missing committed envelope fails closed").toHaveBeenCalledOnce();
+
+    const foreignRuntimeCancel = vi.fn();
+    runtime.controller.role = "guest";
+    expect(registerCoopMeTerminalRedrive(runtime, operationId, vi.fn(), foreignRuntimeCancel)).toBeNull();
+    expect(foreignRuntimeCancel, "authority loss cancels the parked callback").toHaveBeenCalledOnce();
+
+    runtime.controller.role = "host";
+    const teardownOperationId = terminalOp(9, 0);
+    terminalState.deferredTerminalByPinned.set(9, {
+      operationId: teardownOperationId,
+      pinned: 9,
+      revision: 5,
+      envelope: deferredTerminalEnvelope(teardownOperationId, 5),
+    });
+    const teardownResume = vi.fn();
+    const teardownCancel = vi.fn();
+    expect(registerCoopMeTerminalRedrive(runtime, teardownOperationId, teardownResume, teardownCancel)).not.toBeNull();
+    clearCoopRuntime();
+    expect(runtime.v2DeferredMeTerminalRedrive).toBeNull();
+    expect(teardownCancel, "runtime teardown cancels the promise exactly once").toHaveBeenCalledOnce();
+    expect(teardownResume).not.toHaveBeenCalled();
   });
 
   it("post-battle ME completion also rejects null and foreign terminals before the exact leave", () => {

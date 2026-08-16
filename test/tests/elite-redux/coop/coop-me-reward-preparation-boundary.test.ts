@@ -15,10 +15,14 @@ describe("Mystery battle reward preparation boundary", () => {
   it("keeps reward settlement out of BattleEnd", () => {
     const battleEnd = source("src/phases/battle-end-phase.ts");
     const boundaryStart = battleEnd.indexOf("    let meSettlementRetained = false;");
-    const boundaryEnd = battleEnd.indexOf("    // Normal retained wins", boundaryStart);
-    const boundary = battleEnd.slice(boundaryStart, boundaryEnd);
+    const boundaryEnd = battleEnd.indexOf("    continueMeSettlementTail(meSettlementRetained);", boundaryStart);
+    const boundary = battleEnd.slice(
+      boundaryStart,
+      boundaryEnd < 0 ? boundaryEnd : boundaryEnd + "    continueMeSettlementTail(meSettlementRetained);".length,
+    );
 
     expect(boundaryStart).toBeGreaterThanOrEqual(0);
+    expect(boundaryEnd).toBeGreaterThan(boundaryStart);
     expect(boundary).toContain('this.meSettlementPlan?.continuation === "rewards"');
     expect(boundary).toContain("shouldDeferCoopMeBattleSettlementUntilRewardPreparation()");
     expect(boundary).toMatch(
@@ -34,19 +38,31 @@ describe("Mystery battle reward preparation boundary", () => {
 
     const prepareCall = method.indexOf("const preparation = rewardPlan.prepareAutomaticEffects();");
     const prepareAwait = method.indexOf("await preparation;");
-    const capture = method.indexOf("commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);");
-    const noBattleCapture = method.indexOf(
-      "commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);",
+    const capture = method.search(
+      /commitCoopMeBattleSettlementAfterRewardPreparation\(\s*this\.meSettlementPlan,\s*continueAfterSettlement,\s*\(\) => \{\s*settlementDeferred = true;/u,
     );
-    const picker = method.indexOf("encounter.doEncounterRewards();");
+    const noBattleCapture = method.search(
+      /commitCoopMeNoBattleRewardSettlementAfterPreparation\(\s*this\.meSettlementPlan,\s*continueAfterSettlement,\s*\(\) => \{\s*settlementDeferred = true;/u,
+    );
+    const continuationStart = method.indexOf("const continueAfterSettlement = (): void => {");
+    const continuationEnd = method.indexOf("\n    };", continuationStart);
+    const continuation = method.slice(continuationStart, continuationEnd);
+    const deferredGuard = method.indexOf("if (settlementDeferred)");
+    const tail = method.indexOf("continueAfterSettlement();", deferredGuard);
+    const picker = continuation.indexOf("encounter.doEncounterRewards();");
 
     expect(methodStart).toBeGreaterThanOrEqual(0);
     expect(prepareCall).toBeGreaterThanOrEqual(0);
     expect(prepareAwait).toBeGreaterThan(prepareCall);
+    expect(continuationStart).toBeGreaterThan(prepareAwait);
+    expect(continuationEnd).toBeGreaterThan(continuationStart);
+    expect(picker).toBeGreaterThanOrEqual(0);
     expect(capture).toBeGreaterThan(prepareAwait);
     expect(noBattleCapture).toBeGreaterThan(capture);
-    expect(picker).toBeGreaterThan(capture);
-    expect(picker).toBeGreaterThan(noBattleCapture);
+    expect(deferredGuard).toBeGreaterThan(noBattleCapture);
+    expect(tail).toBeGreaterThan(deferredGuard);
+    expect(method.match(/continueAfterSettlement\(\);/gu) ?? []).toHaveLength(1);
+    expect(method).not.toContain("setTimeout(");
   });
 
   it("requires a retained no-battle state image before a typed raw reward carrier can open UI", () => {
@@ -69,6 +85,98 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(replay).toMatch(
       /terminal === "reward-settled"[\s\S]*?globalScene\.phaseManager\.clearPhaseQueue\(\)[\s\S]*?"MysteryEncounterRewardsPhase"/u,
     );
+  });
+
+  it("keeps every host ME terminal deferral exact, fenced, and legacy-safe", () => {
+    const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
+    const helperStart = runtime.indexOf("function continueCoopMeTerminalCommit(");
+    const helperEnd = runtime.indexOf("\n/** Redrive only the exact ME terminal", helperStart);
+    const helper = runtime.slice(helperStart, helperEnd);
+    const registerStart = runtime.indexOf("export function registerCoopMeTerminalRedrive(");
+    const registerEnd = runtime.indexOf("\nfunction notifyCoopMeTerminalRedrive", registerStart);
+    const register = runtime.slice(registerStart, registerEnd);
+    const redriveStart = runtime.indexOf("function redriveCoopMeTerminal(");
+    const redriveEnd = runtime.indexOf("\ntype CoopMeTerminalContinuationResult", redriveStart);
+    const redrive = runtime.slice(redriveStart, redriveEnd);
+    const handoffStart = runtime.indexOf("export async function coopMeOwnerRelayBattleHandoff(");
+    const handoff = runtime.slice(handoffStart);
+    const battleSettlementStart = runtime.indexOf("export function commitCoopMeBattleSettlementAtBattleEnd(");
+    const noBattleSettlementStart = runtime.indexOf(
+      "export function commitCoopMeNoBattleRewardSettlementAfterPreparation(",
+    );
+    const battleSettlement = runtime.slice(battleSettlementStart, noBattleSettlementStart);
+    const noBattleSettlement = runtime.slice(noBattleSettlementStart, handoffStart);
+
+    expect(helperStart).toBeGreaterThanOrEqual(0);
+    expect(helperEnd).toBeGreaterThan(helperStart);
+    expect(registerStart).toBeGreaterThanOrEqual(0);
+    expect(registerEnd).toBeGreaterThan(registerStart);
+    expect(redriveStart).toBeGreaterThanOrEqual(0);
+    expect(redriveEnd).toBeGreaterThan(redriveStart);
+    expect(handoffStart).toBeGreaterThanOrEqual(0);
+    expect(battleSettlementStart).toBeGreaterThanOrEqual(0);
+    expect(noBattleSettlementStart).toBeGreaterThan(battleSettlementStart);
+
+    // A malformed/mismatched disposition cannot park anything: operation id, revision, envelope id/kind,
+    // and byte identity are all checked before the owning callback is registered.
+    expect(helper).toContain("dispositionEnvelope?.revision === dispositionRevision");
+    expect(helper).toContain("dispositionEnvelope?.pendingOperation?.id === disposition.operationId");
+    expect(helper).toContain("dispositionEnvelope?.pendingOperation?.kind === \"ME_TERMINAL\"");
+    expect(helper).toContain("deferred.envelope.revision !== disposition.revision");
+    expect(helper).toContain("deferred.envelope.pendingOperation?.id !== disposition.operationId");
+    expect(helper).toContain("deferred.envelope.pendingOperation?.kind !== \"ME_TERMINAL\"");
+    expect(helper).toContain("JSON.stringify(deferred.envelope) === JSON.stringify(disposition.envelope)");
+    expect(helper.indexOf("installControl();")).toBeLessThan(helper.indexOf("captureCoopActiveMysteryControl()"));
+    expect(helper).toContain("releaseCoopMeDeferredTerminal(fence.operationId)");
+    expect(helper).toContain("registerCoopMeTerminalRedrive(");
+    expect(helper).not.toContain("setTimeout(");
+
+    // Missing cutover and shared-terminal/runtime/context/battle/pin fences fail closed before a tail can run.
+    expect(redrive).toContain("const cutover = coopV2InteractionCutovers.get(runtime);");
+    expect(redrive).toContain("if (cutover == null)");
+    expect(redrive).toContain("clearCoopMeTerminalRedrive(runtime);");
+    expect(helper).toContain("isCoopSharedTerminalFrozen(runtime)");
+    expect(helper).toContain("getCoopRuntime() !== runtime");
+    expect(helper).toContain("coopSessionGeneration() !== fence.generation");
+    expect(helper).toContain("globalScene !== fence.scene");
+    expect(helper).toContain("getCoopController() !== fence.controller");
+    expect(helper).toContain("globalScene.currentBattle !== fence.battle");
+    expect(helper).toContain("coopMeInteractionStartValue() !== fence.pinned");
+    expect(helper).toContain("(globalScene.currentBattle?.waveIndex ?? -1) !== fence.wave");
+
+    // Only one exact parked callback is admitted; duplicate registration, authority loss, and an absent
+    // deferred envelope cancel/fail closed instead of replacing the owner or inventing a retry.
+    expect(register).toContain("operationId.length === 0");
+    expect(register).toContain('runtime.controller.authorityRole !== "authority"');
+    expect(register).toContain("parked != null && parked.operationId !== operationId");
+    expect(register).toContain("refusing duplicate deferred ME terminal wake");
+    expect(register).toContain("const deferred = withActiveCoopRuntimeOpState");
+    expect(register).toContain("if (deferred == null)");
+    expect(register).toContain("onCancel?.();");
+
+    // The host handoff has a Promise-owned deferred branch; raw relay and its compatibility flag are only
+    // reached from the validated continuation, while the legacy retry remains restricted to failed commits.
+    const deferredHandoff = handoff.slice(
+      handoff.indexOf('if (disposition.kind === "deferred")'),
+      handoff.indexOf('if (disposition.kind === "failed" && isCoopMeOperationEnabled())'),
+    );
+    expect(deferredHandoff).toContain("new Promise<boolean>");
+    expect(deferredHandoff).toContain("return await deferred;");
+    expect(deferredHandoff).toContain("relayBattleHandoff();");
+    expect(deferredHandoff).not.toContain("setTimeout(");
+    expect(handoff).toContain('pump.relayMeBattleHandoff(hostTurn, !isCoopOperationJournalActive());');
+    expect(handoff).toContain('if (disposition.kind === "failed" && isCoopMeOperationEnabled())');
+    expect(handoff).toContain("await new Promise<void>(resolve => setTimeout(resolve, 250));");
+
+    // The pre-existing disabled/no-journal and non-authoritative paths remain ordinary no-ops/legacy paths;
+    // only the live host journal reaches the new typed terminal helper.
+    for (const settlement of [battleSettlement, noBattleSettlement]) {
+      expect(settlement).toContain("!isCoopMeOperationEnabled()");
+      expect(settlement).toContain("!isCoopOperationJournalActive()");
+      expect(settlement).toContain('runtime.controller.role !== "host"');
+    }
+    expect(handoff).toContain("return coopMeInteractionStartValue() < 0;");
+    expect(handoff).toContain("isCoopOperationJournalActive() && runtime.controller.role === \"host\"");
   });
 
   it("keeps setEncounterRewards callsites on a typed preparation/surface adapter", () => {
