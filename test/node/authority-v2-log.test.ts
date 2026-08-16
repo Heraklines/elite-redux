@@ -24,9 +24,14 @@
 import {
   AuthorityLog,
   type AuthorityLogOptions,
+  type AuthorityDeliveryExhaustion,
   AuthorityRetentionOverflowError,
   type CoopAuthorityWire,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
+import {
+  buildWaveAdvanceEntry,
+  type CoopWaveTransitionMaterialV2,
+} from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type {
   CoopAuthorityEntry,
   CoopAuthorityReceipt,
@@ -180,6 +185,32 @@ function entryInput(
     nextControl: opts.nextControl ?? commandControl(),
     subsumes: opts.subsumes ?? [],
   };
+}
+
+const TEST_WAVE_TRANSITION: CoopWaveTransitionMaterialV2 = {
+  kind: "wave-advance",
+  wave: 1,
+  turn: 1,
+  outcome: "win",
+  nextWave: 2,
+  biomeChange: false,
+  eggLapse: false,
+  meBoundary: "none",
+  victoryKind: "wild",
+};
+
+function waveBoundaryEntry(
+  operationId: string,
+  context: CoopFrameContextV2 = frameContext(),
+  subsumes: readonly number[] = [],
+): Omit<CoopAuthorityEntry, "revision"> {
+  return buildWaveAdvanceEntry({
+    context,
+    operationId,
+    transition: TEST_WAVE_TRANSITION,
+    destination: commandControl({ epoch: context.sessionEpoch, wave: 2, turn: 1 }),
+    subsumes,
+  });
 }
 
 function fullEntry(
@@ -571,6 +602,49 @@ describe("authority-v2 log", () => {
     expect(log.controlInstalledThrough()).toBe(1);
   });
 
+  it("readdresses a deferred boundary after its predecessor retires without recapturing or allocating a revision", () => {
+    let prepareCalls = 0;
+    const log = makeLog(scheduler, sent);
+    const predecessor = log.commit(
+      entryInput("boundary-predecessor", {
+        kind: "TURN_COMMIT",
+        nextControl: commandControl(),
+      }),
+    );
+    const deferredDisposition = log.commitDetailed(
+      waveBoundaryEntry("deferred-boundary", frameContext(), [predecessor.revision]),
+      () => {
+        prepareCalls += 1;
+        return prepareCalls === 1 ? null : () => {};
+      },
+    );
+    expect(deferredDisposition.kind).toBe("deferred");
+    if (deferredDisposition.kind !== "deferred") {
+      return;
+    }
+    const deferred = deferredDisposition.entry;
+    expect(deferred).toMatchObject({ revision: 2, operationId: "deferred-boundary", kind: "WAVE_ADVANCE" });
+    expect(log.retained().map(entry => entry.revision)).toEqual([predecessor.revision]);
+
+    // The older retained lease can complete independently while the exact boundary remains deferred.
+    expect(log.acceptReceipt(receipt(predecessor, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(predecessor, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(predecessor, "controlInstalled"))).toBe(true);
+    expect(log.retained()).toHaveLength(0);
+
+    const retry = log.retryDeferredCommit(deferred.operationId);
+    expect(retry.kind).toBe("committed");
+    if (retry.kind !== "committed") {
+      return;
+    }
+    expect(retry.entry).toEqual(deferred);
+    expect(retry.entry.revision).toBe(deferred.revision);
+    expect(retry.entry.material).toEqual(deferred.material);
+    expect(prepareCalls).toBe(2);
+    expect(delivered(sent).filter(entry => entry.operationId === deferred.operationId)).toHaveLength(1);
+    expect(log.diagnostics()).toMatchObject({ headRevision: deferred.revision, retainedEntries: 1 });
+  });
+
   it("refuses a hot-rejoin rebind that changes a stable session axis or rolls a generation back", () => {
     const log = makeLog(scheduler, sent, {
       localContext: frameContext({ membershipRevision: 7, connectionGeneration: 3 }),
@@ -591,6 +665,53 @@ describe("authority-v2 log", () => {
         { seatId: 1, connectionGeneration: 4 },
       ]),
     ).toThrow(/peer seat or rolled back/u);
+  });
+
+  it("hot-rejoin readdresses the exact deferred boundary while preserving its operation, revision, and material", () => {
+    let prepareCalls = 0;
+    const initialContext = frameContext({ membershipRevision: 7, connectionGeneration: 3 });
+    const log = makeLog(scheduler, sent, {
+      localContext: initialContext,
+      peerBindings: [{ seatId: 1, connectionGeneration: 5 }],
+    });
+    const deferredDisposition = log.commitDetailed(
+      waveBoundaryEntry("deferred-rejoin-boundary", initialContext),
+      () => {
+        prepareCalls += 1;
+        return prepareCalls === 1 ? null : () => {};
+      },
+    );
+    expect(deferredDisposition.kind).toBe("deferred");
+    if (deferredDisposition.kind !== "deferred") {
+      return;
+    }
+    const deferred = deferredDisposition.entry;
+
+    expect(
+      log.rebindConnection(frameContext({ membershipRevision: 8, connectionGeneration: 4 }), [
+        { seatId: 1, connectionGeneration: 6 },
+      ]),
+    ).toBe(0);
+    expect(log.retained()).toHaveLength(0);
+
+    const retry = log.retryDeferredCommit(deferred.operationId);
+    expect(retry.kind).toBe("committed");
+    if (retry.kind !== "committed") {
+      return;
+    }
+    expect(retry.entry).toMatchObject({
+      kind: "WAVE_ADVANCE",
+      operationId: deferred.operationId,
+      revision: deferred.revision,
+      context: {
+        membershipRevision: 8,
+        connectionGeneration: 4,
+      },
+    });
+    expect(retry.entry.material).toEqual(deferred.material);
+    expect(retry.entry.nextControl).toEqual(deferred.nextControl);
+    expect(prepareCalls).toBe(2);
+    expect(delivered(sent)).toEqual([retry.entry]);
   });
 
   it("keeps receipt, material, and control truth separate and retries only the unfinished stage", () => {
@@ -764,6 +885,20 @@ describe("authority-v2 log", () => {
     expect(scheduler.ownerCount("authority-v2:session-A:seat0:deliver:1")).toBe(0);
     // b itself is only admitted (required = materialApplied since no nextControl), so its retry remains live.
     expect(log.diagnostics().activeDeliveryTimers).toBe(1);
+  });
+
+  it("rejects every successor after a terminal frontier", () => {
+    const log = makeLog(scheduler, sent);
+    const terminal = log.commit(
+      entryInput("terminal-frontier", {
+        kind: "TERMINAL_COMMIT",
+        nextControl: { kind: "TERMINAL", terminalId: "terminal-frontier" },
+      }),
+    );
+
+    expect(() => log.commit(entryInput("after-terminal"))).toThrow(/terminal frontier is final/u);
+    expect(log.diagnostics()).toMatchObject({ headRevision: terminal.revision, retainedEntries: 1 });
+    expect(log.retained().map(entry => entry.operationId)).toEqual([terminal.operationId]);
   });
 
   it("presentationSettled is NEVER required for retirement", () => {
@@ -1479,6 +1614,41 @@ describe("authority-v2 log", () => {
     expect(attempts).toBeGreaterThan(1);
     expect(log.retained()).toHaveLength(1);
     expect(log.diagnostics().activeDeliveryTimers).toBe(1);
+  });
+
+  it("emits one delivery-exhaustion disposition while retaining an inert entry without an orphan timer", () => {
+    const exhausted: AuthorityDeliveryExhaustion[] = [];
+    const log = makeLog(scheduler, sent, {
+      maxDeliveryAttempts: 2,
+      onDeliveryExhausted: disposition => exhausted.push(disposition),
+    });
+    const committed = log.commit(entryInput("op-exhausted"));
+
+    scheduler.fireAll();
+    scheduler.fireAll();
+    expect(exhausted).toHaveLength(1);
+    expect(exhausted[0]).toMatchObject({
+      kind: "delivery-exhausted",
+      reason: "max-delivery-attempts",
+      revision: committed.revision,
+      operationId: committed.operationId,
+      attempts: 2,
+      maxAttempts: 2,
+      entry: committed,
+    });
+    expect(log.retained()).toEqual([committed]);
+    expect(log.diagnostics()).toMatchObject({
+      retainedEntries: 1,
+      deliveryLeases: 1,
+      activeDeliveryTimers: 0,
+      deliveryExhaustions: 1,
+      exhaustedRevisions: [committed.revision],
+    });
+    expect(scheduler.liveCount()).toBe(0);
+
+    scheduler.fireAll();
+    expect(exhausted).toHaveLength(1);
+    expect(delivered(sent)).toHaveLength(3);
   });
 
   it("retention immutability: mutating the committed return cannot rewrite the delivered/retained entry", () => {
