@@ -727,7 +727,7 @@ describe("Authority V2 interaction control ledger", () => {
     expect(harness.ledger.markMaterialApplied(harness.boundary)).toBe(true);
   });
 
-  it("hot rejoin kills the old object/request and reissues proof only after a fresh exact capture", () => {
+  it("hot rejoin fences old-context frames and reissues proof only after a fresh exact capture", () => {
     const harness = replicaBoundaryHarness();
     const oldRequest = beginReplicaBoundaryProof(harness);
     completeReplicaBoundaryProof(harness, oldRequest);
@@ -748,9 +748,12 @@ describe("Authority V2 interaction control ledger", () => {
       throw new Error("hot rejoin did not issue a fresh correlated boundary request");
     }
     const correlated = freshRequest as ReplicaBoundaryRequest;
-    expect(correlated.requestId).not.toBe(oldRequest.requestId);
+    expect(correlated.context).not.toEqual(oldRequest.context);
     expect(correlated.context).toEqual(nextReplicaContext);
     expect(harness.log.admit(oldEntry)).toEqual({ kind: "rejected", reason: "membership-mismatch" });
+    for (const oldSource of harness.sources) {
+      expect(harness.log.admit(oldSource)).toEqual({ kind: "rejected", reason: "membership-mismatch" });
+    }
     if (oldScope?.kind === "replica-dense-frontier") {
       expect(oldScope.isActive()).toBe(false);
     }

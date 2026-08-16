@@ -1207,24 +1207,25 @@ describe("authority-v2 log", () => {
   });
 
   it("fails closed for incomplete, omitted, altered, unlisted, and mismatched correlated source proofs", () => {
-    const rejectAfter = (
+    const assertAfter = (
       label: string,
       arrange: (
         harness: CorrelatedBoundaryHarness,
         request: CorrelatedTailRequest,
       ) => { readonly disposition: { readonly kind: string }; readonly boundary: CoopAuthorityEntry },
+      expectedKind: "rejected" | "gap" = "rejected",
     ): void => {
       const harness = makeCorrelatedBoundaryHarness();
       const request = beginCorrelatedBoundaryProof(harness);
       const { disposition, boundary } = arrange(harness, request);
-      expect(disposition.kind, label).toBe("rejected");
+      expect(disposition.kind, label).toBe(expectedKind);
       expect(authorityEntryProofScopeOf(boundary), label).toBeNull();
       expect(harness.replica.receivedThrough(), label).toBe(3);
       expect(harness.replica.appliedThrough(), label).toBe(3);
       expect(harness.replica.controlInstalledThrough(), label).toBe(3);
     };
 
-    rejectAfter("missing delivered source", (harness, request) => {
+    assertAfter("missing delivered source", (harness, request) => {
       const manifest = proofBody(request, "manifest");
       expect(harness.replica.acceptBoundaryProofFrame(frameContext(), manifest)).toEqual({ kind: "pending" });
       for (const source of harness.sources.slice(0, 2)) {
@@ -1236,7 +1237,7 @@ describe("authority-v2 log", () => {
       };
     });
 
-    rejectAfter("manifest omitted mandatory predecessor", (harness, request) => {
+    assertAfter("manifest omitted mandatory predecessor", (harness, request) => {
       const sourceRevisions = [1, 2];
       expect(
         harness.replica.acceptBoundaryProofFrame(
@@ -1256,7 +1257,7 @@ describe("authority-v2 log", () => {
       };
     });
 
-    rejectAfter("manifest omitted claimed source", (harness, request) => {
+    assertAfter("manifest omitted claimed source", (harness, request) => {
       const sourceRevisions = [1, 3];
       expect(
         harness.replica.acceptBoundaryProofFrame(
@@ -1279,7 +1280,7 @@ describe("authority-v2 log", () => {
       };
     });
 
-    rejectAfter("altered duplicate source", (harness, request) => {
+    assertAfter("altered duplicate source", (harness, request) => {
       expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
         kind: "pending",
       });
@@ -1295,7 +1296,7 @@ describe("authority-v2 log", () => {
       return { disposition: harness.replica.admit(altered), boundary: harness.boundary };
     });
 
-    rejectAfter("exact duplicate source", (harness, request) => {
+    assertAfter("exact duplicate source", (harness, request) => {
       expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
         kind: "pending",
       });
@@ -1304,10 +1305,13 @@ describe("authority-v2 log", () => {
         throw new Error("duplicate-source fixture lost its first source");
       }
       expect(harness.replica.admit(source).kind).toBe("gap");
-      return { disposition: harness.replica.admit(source), boundary: harness.boundary };
-    });
+      const duplicate = harness.replica.admit(structuredClone(source));
+      expect(duplicate).toEqual({ kind: "gap", missingFrom: request.missingFrom });
+      expect(harness.replica.hasBoundaryProofCapture()).toBe(true);
+      return { disposition: duplicate, boundary: harness.boundary };
+    }, "gap");
 
-    rejectAfter("unlisted source", (harness, request) => {
+    assertAfter("unlisted source", (harness, request) => {
       expect(
         harness.replica.acceptBoundaryProofFrame(
           frameContext(),
@@ -1326,7 +1330,7 @@ describe("authority-v2 log", () => {
       ["wrong context", frameContext({ membershipRevision: 2 }), {}],
       ["wrong candidate head/range", frameContext(), { fromRevision: 2 }],
     ] as const) {
-      rejectAfter(label, (harness, request) => ({
+      assertAfter(label, (harness, request) => ({
         disposition: harness.replica.acceptBoundaryProofFrame(
           context,
           proofBody(request, "manifest", body),
@@ -1335,7 +1339,7 @@ describe("authority-v2 log", () => {
       }));
     }
 
-    rejectAfter("wrong completion head", (harness, request) => {
+    assertAfter("wrong completion head", (harness, request) => {
       expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
         kind: "pending",
       });
@@ -1628,7 +1632,7 @@ describe("authority-v2 log", () => {
     });
 
     expect(violations).toHaveLength(1);
-    expect(violations[0]?.join(" ")).toContain(duo.requestId);
+    expect(violations[0]?.join(" ")).toContain("boundary-proof predecessor absent or identity-conflicting");
     expect(boundaryAdmissionCalls).toBe(0);
     expect(boundaryMaterialApplications).toBe(0);
     expect(duo.guest.diagnostics()).toMatchObject({ admitted: 3, applied: 3, shadowStateSize: 3 });
