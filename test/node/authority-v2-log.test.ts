@@ -29,9 +29,11 @@ import {
   type CoopAuthorityWire,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
 import {
+  buildTerminalCommitEntry,
   buildWaveAdvanceEntry,
   type CoopWaveTransitionMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import { CoopV2InteractionControlLedger } from "#data/elite-redux/coop/authority-v2/interaction-control-ledger";
 import type {
   CoopAuthorityEntry,
   CoopAuthorityReceipt,
@@ -213,6 +215,25 @@ function waveBoundaryEntry(
   });
 }
 
+function terminalBoundaryEntry(
+  operationId: string,
+  context: CoopFrameContextV2 = frameContext(),
+  subsumes: readonly number[] = [],
+): Omit<CoopAuthorityEntry, "revision"> {
+  return buildTerminalCommitEntry({
+    context,
+    operationId,
+    terminal: {
+      kind: "terminal",
+      terminalId: operationId,
+      reason: "game-over",
+      wave: TEST_WAVE_TRANSITION.wave,
+      turn: TEST_WAVE_TRANSITION.turn,
+    },
+    subsumes,
+  });
+}
+
 function fullEntry(
   revision: number,
   operationId: string,
@@ -256,6 +277,28 @@ function makeReplicaLog(scheduler: FakeScheduler, sent: CoopAuthorityWire[], ove
     peerBindings: [{ seatId: 0, connectionGeneration: frameContext().connectionGeneration }],
     ...over,
   });
+}
+
+function reserveAndInstallMechanicalControl(ledger: CoopV2InteractionControlLedger) {
+  return (entry: CoopAuthorityEntry): (() => void) | null => {
+    const rollback = ledger.prepareAuthorityEntry(entry);
+    if (rollback == null) {
+      return null;
+    }
+    if (entry.nextControl.kind !== "COMMAND_FRONTIER" && entry.nextControl.kind !== "TERMINAL") {
+      rollback();
+      return null;
+    }
+    const result = ledger.projectMechanical(entry.nextControl, () => ({
+      kind: "installed",
+      controlId: controlIdOf(entry.nextControl),
+    }));
+    if (result.kind !== "installed" && result.kind !== "already-installed") {
+      rollback();
+      return null;
+    }
+    return rollback;
+  };
 }
 
 function delivered(sent: CoopAuthorityWire[]): CoopAuthorityEntry[] {
@@ -644,6 +687,109 @@ describe("authority-v2 log", () => {
     expect(delivered(sent).filter(entry => entry.operationId === deferred.operationId)).toHaveLength(1);
     expect(log.diagnostics()).toMatchObject({ headRevision: deferred.revision, retainedEntries: 1 });
   });
+
+  it("retries the exact approved boundary after an unrelated lease retires and rejects changed deferred bodies", () => {
+    let prepareCalls = 0;
+    const log = makeLog(scheduler, sent);
+    const unrelated = log.commit(
+      entryInput("unrelated-retained-turn", {
+        kind: "TURN_COMMIT",
+        nextControl: commandControl(),
+      }),
+    );
+    const predecessor = log.commit(
+      entryInput("boundary-predecessor-2", {
+        kind: "TURN_COMMIT",
+        nextControl: commandControl(),
+      }),
+    );
+    const boundaryInput = waveBoundaryEntry("deferred-boundary-2", frameContext(), [1, 2]);
+    const deferredDisposition = log.commitDetailed(boundaryInput, entry => {
+      prepareCalls += 1;
+      expect(entry.revision).toBe(3);
+      return prepareCalls === 1 ? null : () => {};
+    });
+    expect(deferredDisposition.kind).toBe("deferred");
+    if (deferredDisposition.kind !== "deferred") {
+      return;
+    }
+    const deferred = deferredDisposition.entry;
+    expect(log.retained().map(entry => entry.revision)).toEqual([unrelated.revision, predecessor.revision]);
+
+    // Only the unrelated older lease retires. The stale predecessor that made the boundary approval valid
+    // remains live, while the exact captured source list still includes the retired revision 1.
+    expect(log.acceptReceipt(receipt(unrelated, "admitted"))).toBe(false);
+    expect(log.acceptReceipt(receipt(unrelated, "materialApplied"))).toBe(false);
+    expect(log.acceptReceipt(receipt(unrelated, "controlInstalled"))).toBe(true);
+    expect(log.retained().map(entry => entry.revision)).toEqual([predecessor.revision]);
+
+    expect(() => log.commit({ ...boundaryInput, operationId: "changed-deferred-boundary" })).toThrow(
+      /deferred successor is already awaiting predecessor control/u,
+    );
+    // Omitting the originally approved predecessor/source revision is also a changed deferred body.
+    expect(() => log.commit(waveBoundaryEntry(deferred.operationId, frameContext(), [predecessor.revision]))).toThrow(
+      /deferred successor is already awaiting predecessor control/u,
+    );
+    expect(log.retryDeferredCommit("wrong-deferred-operation")).toEqual({
+      kind: "failed",
+      reason: "AuthorityLog deferred operation mismatch: expected wrong-deferred-operation",
+    });
+
+    const retry = log.retryDeferredCommit(deferred.operationId);
+    expect(retry.kind).toBe("committed");
+    if (retry.kind !== "committed") {
+      return;
+    }
+    expect(retry.entry).toEqual(deferred);
+    expect(retry.entry).toMatchObject({
+      revision: deferred.revision,
+      operationId: deferred.operationId,
+      material: deferred.material,
+    });
+    expect(prepareCalls).toBe(2);
+    expect(delivered(sent).filter(entry => entry.operationId === deferred.operationId)).toEqual([deferred]);
+  });
+
+  it(
+    "rejects partial, ineligible, unknown, duplicate, out-of-range, and omitted-predecessor authority subsumes",
+    () => {
+      const cases: readonly [string, readonly number[]][] = [
+        ["partial", [3]],
+        ["ineligible", [1, 2, 3]],
+        ["unknown", [1, 3, 99]],
+        ["duplicate", [1, 3, 3]],
+        ["out-of-range", [0, 1, 3]],
+        ["omitted-predecessor", [1]],
+      ];
+      for (const [label, subsumes] of cases) {
+        const localScheduler = new FakeScheduler();
+        const localSent: CoopAuthorityWire[] = [];
+        const log = makeLog(localScheduler, localSent);
+        log.commit(
+          entryInput("eligible-source-1", {
+            kind: "TURN_COMMIT",
+            nextControl: successorWait("eligible-source-1", ["INTERACTION_COMMIT"]),
+          }),
+        );
+        log.commit(
+          entryInput("ineligible-source-2", {
+            kind: "INTERACTION_COMMIT",
+            nextControl: successorWait("ineligible-source-2", ["TURN_COMMIT"]),
+          }),
+        );
+        log.commit(
+          entryInput("eligible-source-3", {
+            kind: "TURN_COMMIT",
+            nextControl: commandControl(),
+          }),
+        );
+
+        const candidate = { ...waveBoundaryEntry(`invalid-authority-${label}`, frameContext(), [1, 3]), subsumes };
+        expect(() => log.commit(candidate), label).toThrow();
+        expect(log.diagnostics()).toMatchObject({ headRevision: 3, retainedEntries: 3 });
+      }
+    },
+  );
 
   it("refuses a hot-rejoin rebind that changes a stable session axis or rolls a generation back", () => {
     const log = makeLog(scheduler, sent, {
@@ -1569,6 +1715,92 @@ describe("authority-v2 log", () => {
     const third = log.commit(entryInput("op-3"));
     expect(third.revision).toBe(3);
     expect(log.retained().map(entry => entry.revision)).toEqual([second.revision, third.revision]);
+  });
+
+  it("refuses a boundary whose live retained proof exceeds the ledger bound without evicting sources", () => {
+    const controlLedger = new CoopV2InteractionControlLedger(2);
+    const log = makeLog(scheduler, sent, { retainCapacity: 3 });
+    const prepare = reserveAndInstallMechanicalControl(controlLedger);
+    const first = log.commit(
+      entryInput("live-proof-1", { kind: "TURN_COMMIT", nextControl: commandControl() }),
+      prepare,
+    );
+    const second = log.commit(
+      entryInput("live-proof-2", { kind: "TURN_COMMIT", nextControl: commandControl() }),
+      prepare,
+    );
+    const activeBeforeRefusal = controlLedger.activeControl;
+
+    const refused = log.commitDetailed(
+      entryInput("live-proof-3", { kind: "TURN_COMMIT", nextControl: commandControl() }),
+      prepare,
+    );
+    expect(refused).toMatchObject({ kind: "deferred", reason: "predecessor-control-not-installed" });
+    expect(log.retained().map(entry => entry.revision)).toEqual([first.revision, second.revision]);
+    expect(log.diagnostics()).toMatchObject({ headRevision: 2, retainedEntries: 2 });
+    expect(controlLedger.authenticatedSourceCount).toBe(2);
+    expect(controlLedger.activeControl).toEqual(activeBeforeRefusal);
+    expect(delivered(sent).map(entry => entry.operationId)).toEqual(["live-proof-1", "live-proof-2"]);
+  });
+
+  it("prunes exact subsumed source proof while retaining the new wave or terminal boundary source", () => {
+    for (const boundaryKind of ["wave", "terminal"] as const) {
+      const localScheduler = new FakeScheduler();
+      const localSent: CoopAuthorityWire[] = [];
+      const controlLedger = new CoopV2InteractionControlLedger();
+      const log = makeLog(localScheduler, localSent);
+      const prepare = reserveAndInstallMechanicalControl(controlLedger);
+      for (const revision of [1, 2, 3]) {
+        log.commit(
+          entryInput(`source-${boundaryKind}-${revision}`, {
+            kind: "TURN_COMMIT",
+            nextControl: commandControl(),
+          }),
+          prepare,
+        );
+      }
+
+      const boundaryInput =
+        boundaryKind === "wave"
+          ? waveBoundaryEntry("source-pruned-wave", frameContext(), [1, 2, 3])
+          : terminalBoundaryEntry("source-pruned-terminal", frameContext(), [1, 2, 3]);
+      const boundary = log.commit(boundaryInput, prepare);
+
+      expect(controlLedger.authenticatedSourceCount).toBe(1);
+      expect(controlLedger.sourceEntryOf(commandControl())).toBeNull();
+      expect(controlLedger.sourceEntryOf(boundary.nextControl)).toMatchObject({
+        revision: boundary.revision,
+        operationId: boundary.operationId,
+      });
+      expect(log.retained().map(entry => entry.revision)).toEqual([1, 2, 3, 4]);
+    }
+  });
+
+  it("reconciles the authority source archive to current retention across more than 512 retired commits", () => {
+    const controlLedger = new CoopV2InteractionControlLedger();
+    const log = makeLog(scheduler, sent);
+    const prepare = reserveAndInstallMechanicalControl(controlLedger);
+
+    for (let revision = 1; revision <= 520; revision++) {
+      const committed = log.commit(
+        entryInput(`ordinary-retired-${revision}`, {
+          kind: "TURN_COMMIT",
+          nextControl: commandControl(),
+        }),
+        prepare,
+      );
+      expect(log.acceptReceipt(receipt(committed, "admitted"))).toBe(false);
+      expect(log.acceptReceipt(receipt(committed, "materialApplied"))).toBe(false);
+      expect(log.acceptReceipt(receipt(committed, "controlInstalled"))).toBe(true);
+    }
+
+    expect(log.diagnostics()).toMatchObject({
+      headRevision: 520,
+      retainedEntries: 0,
+      activeDeliveryTimers: 0,
+    });
+    expect(controlLedger.authenticatedSourceCount).toBe(1);
+    expect(scheduler.liveCount()).toBe(0);
   });
 
   it("publishes nothing and burns no revision when authority-local successor reservation fails", () => {
