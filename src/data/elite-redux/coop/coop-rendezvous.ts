@@ -207,6 +207,8 @@ export class CoopRendezvous {
       since: number;
     }
   >();
+  /** Highest valid immutable entry-carrier tick observed for each retained turn-one wave. */
+  private readonly entryPresentationProgress = new Map<number, { tick: number; revision: number }>();
 
   constructor(transport: CoopTransport, opts: CoopRendezvousOptions = {}) {
     this.transport = transport;
@@ -267,6 +269,42 @@ export class CoopRendezvous {
     } catch (error) {
       coopWarn("rendezvous", `recovery terminal hook threw point=${failure.point} (boundary remains closed)`, error);
     }
+  }
+
+  /**
+   * Observe genuinely newer complete retained entry-carrier progress without consuming it. A carrier is
+   * presentation progress, not command proof: it only re-arms pacing for the exact turn-one command wait
+   * and never increments the bounded missing-peer recovery counter. Identical or older retransmissions are
+   * deliberately ignored so a retained replay cannot keep a dead peer alive forever.
+   */
+  private noteEntryPresentationProgress(wave: number, tick: number): void {
+    if (
+      !Number.isSafeInteger(wave)
+      || wave < 0
+      || !Number.isSafeInteger(tick)
+      || tick < 0
+    ) {
+      return;
+    }
+    const previous = this.entryPresentationProgress.get(wave);
+    if (previous != null && tick <= previous.tick) {
+      return;
+    }
+    this.entryPresentationProgress.set(wave, {
+      tick,
+      revision: (previous?.revision ?? 0) + 1,
+    });
+    while (this.entryPresentationProgress.size > 8) {
+      const oldestWave = Math.min(...this.entryPresentationProgress.keys());
+      this.entryPresentationProgress.delete(oldestWave);
+    }
+  }
+
+  private entryPresentationProgressFor(point: string): { tick: number; revision: number } | null {
+    const address = rendezvousPointAddress(point);
+    return address.turn === 1 && address.wave != null
+      ? this.entryPresentationProgress.get(address.wave) ?? null
+      : null;
   }
 
   /**
@@ -468,6 +506,7 @@ export class CoopRendezvous {
       let settled = false;
       let recoveryAttempts = 0;
       let cancelTimer: () => void = () => {};
+      let presentationProgressRevision = this.entryPresentationProgressFor(point)?.revision ?? 0;
       const finish = (res: CoopRendezvousResult) => {
         if (settled) {
           return;
@@ -508,6 +547,21 @@ export class CoopRendezvous {
             }
             if (this.partnerArrived.has(point)) {
               finish({ point, timedOut: false });
+              return;
+            }
+            const presentationProgress = this.entryPresentationProgressFor(point);
+            if (
+              presentationProgress != null
+              && presentationProgress.revision !== presentationProgressRevision
+            ) {
+              presentationProgressRevision = presentationProgress.revision;
+              this.pendingSince.set(point, Date.now());
+              coopLog(
+                "rendezvous",
+                `RENDEZVOUS PRESENTATION PROGRESS point=${point} revision=${presentationProgressRevision} `
+                  + "- extending pacing without spending recovery budget",
+              );
+              cancelTimer = armRecoveryTimer();
               return;
             }
             if (recoveryAttempts >= maxRecoveryAttempts) {
@@ -622,6 +676,7 @@ export class CoopRendezvous {
     this.pendingSince.clear();
     this.localArrived.clear();
     this.partnerArrived.clear();
+    this.entryPresentationProgress.clear();
     for (const route of this.pendingRouteAcks.values()) {
       route.cancel();
       route.abort();
@@ -649,6 +704,7 @@ export class CoopRendezvous {
     }
     this.localArrived.clear();
     this.partnerArrived.clear();
+    this.entryPresentationProgress.clear();
     this.latestGuestRoute = null;
     for (const route of this.pendingRouteAcks.values()) {
       route.cancel();
@@ -658,6 +714,20 @@ export class CoopRendezvous {
   }
 
   private handle(msg: CoopMessage): void {
+    if (msg.t === "enemyPartySync") {
+      const authoritativeState = msg.authoritativeState;
+      if (
+        msg.entryPresentation !== undefined
+        && Array.isArray(msg.entryPresentation)
+        && authoritativeState != null
+        && authoritativeState.wave === msg.wave
+        && Number.isSafeInteger(authoritativeState.tick)
+        && authoritativeState.tick >= 0
+      ) {
+        this.noteEntryPresentationProgress(msg.wave, authoritativeState.tick);
+      }
+      return;
+    }
     if (msg.t === "phaseRoute") {
       if (this.transport.role !== "guest") {
         return;
@@ -856,6 +926,7 @@ export class CoopRendezvous {
       let settled = false;
       let recoveryAttempts = 0;
       let cancel = () => {};
+      let presentationProgressRevision = this.entryPresentationProgressFor(point)?.revision ?? 0;
       const endMachineWait = beginCoopMachineWait(`coop-rendezvous-route:${point}<-${displacedPoint}`);
       const settle = (timedOut: boolean) => {
         if (settled) {
@@ -884,6 +955,7 @@ export class CoopRendezvous {
       };
       const finish = () => settle(false);
       const abort = () => settle(true);
+      let armRetryTimer: () => void;
       const sendAndArm = () => {
         if (settled) {
           return;
@@ -899,7 +971,31 @@ export class CoopRendezvous {
         } catch (error) {
           coopWarn("rendezvous", `host phaseRoute send threw rev=${revision} (retry remains bounded)`, error);
         }
+        armRetryTimer();
+      };
+      armRetryTimer = () => {
         cancel = this.schedule(() => {
+          if (settled) {
+            return;
+          }
+          const presentationProgress = this.entryPresentationProgressFor(point);
+          if (
+            presentationProgress != null
+            && presentationProgress.revision !== presentationProgressRevision
+          ) {
+            presentationProgressRevision = presentationProgress.revision;
+            const route = this.pendingRouteAcks.get(revision);
+            if (route != null) {
+              route.since = Date.now();
+            }
+            coopLog(
+              "rendezvous",
+              `RENDEZVOUS ROUTE PRESENTATION PROGRESS point=${point} revision=${presentationProgressRevision} `
+                + "- extending pacing without spending recovery budget",
+            );
+            armRetryTimer();
+            return;
+          }
           if (recoveryAttempts >= maxRecoveryAttempts) {
             this.recoveryExhausted({
               point,

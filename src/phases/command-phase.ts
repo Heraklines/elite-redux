@@ -75,7 +75,7 @@ import { PokeballType } from "#enums/pokeball";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { getMoveTargets } from "#moves/move-utils";
-import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
+import { CoopFinalizeTurnPhase, type CoopV2ControlSuccessorClaim } from "#phases/coop-replay-phases";
 import {
   applyCoopEncounterAuthority,
   rebroadcastCoopWaveStartAuthorityAfterEntryEffects,
@@ -111,6 +111,15 @@ export class CommandPhase extends FieldPhase {
    * into a {@linkcode CoopReplayTurnPhase} that applies + finalizes it. Null when not parked / not armed.
    */
   private parkedReplacementUnsub: (() => void) | null = null;
+
+  /** True only after this exact phase crossed its V2 command boundary and is a live public surface. */
+  private commandControlSurfaceOpen = false;
+
+  /** Invalidates delayed rendezvous/UI continuations when an already-open surface is re-entered. */
+  private commandSurfaceGeneration = 0;
+
+  /** A late immutable COMMAND_FRONTIER parks this exact phase while its public surface is re-entered. */
+  private commandControlReentryPending = false;
 
   constructor(fieldIndex: number) {
     super();
@@ -788,6 +797,9 @@ export class CommandPhase extends FieldPhase {
   }
 
   public override start(): void {
+    const surfaceGeneration = ++this.commandSurfaceGeneration;
+    this.commandControlSurfaceOpen = false;
+
     // The host's final turn-one entry image must exist BEFORE Authority V2 authors command-open.
     // PostSummon can mutate weather, terrain, HP, forms, stages, and presentation after the encounter's
     // original wave-start carrier. Previously the V2 gate captured that older image first, then
@@ -833,12 +845,15 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
+    this.commandControlSurfaceOpen = true;
+
     // CommandPhase is the first stable boundary after the authoritative renderer gate may have
     // neutralized structural SummonPhase. Restore trainer chrome only; Pokémon visibility and field
     // membership must come from an authoritative seat manifest, never a local presentation guess.
     ensureCoopAuthoritativeCommandPresentation();
 
     if (!entryAuthorityPrepared && !this.tryCoopCheckpointSync()) {
+      this.commandControlSurfaceOpen = false;
       return;
     }
 
@@ -915,12 +930,101 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     void pendingBarrier.then(crossed => {
-      if (crossed) {
+      if (
+        crossed
+        && this.commandSurfaceGeneration === surfaceGeneration
+        && globalScene.phaseManager.getCurrentPhase() === this
+      ) {
         // The single continuation funnel re-consumes the latest wave-start authority immediately before
         // public input opens, including after a retained phase-route displacement.
         this.enterOwnCommandBoundary();
       }
     });
+  }
+
+  /**
+   * Validate the immutable command frontier against this already-open real phase. This is deliberately
+   * non-mutating: the runtime has already authenticated and applied the complete entry before it calls
+   * {@linkcode releaseForCoopV2Control}. In particular, mutable turnCommands are never proof of control.
+   */
+  private acceptsCoopV2ControlSuccessor(successor: CoopV2ControlSuccessorClaim): boolean {
+    if (!this.commandControlSurfaceOpen || this.commandControlReentryPending) {
+      return false;
+    }
+    const controller = getCoopController();
+    const battle = globalScene.currentBattle;
+    const pokemon = globalScene.getPlayerField()[this.fieldIndex];
+    const control = successor.nextControl;
+    if (
+      controller == null
+      || battle == null
+      || pokemon == null
+      || control.kind !== "COMMAND_FRONTIER"
+      || control.commands.length === 0
+      || successor.sessionEpoch !== controller.sessionEpoch
+      || control.epoch !== controller.sessionEpoch
+      || control.wave !== battle.waveIndex
+      || control.turn !== battle.turn
+    ) {
+      return false;
+    }
+
+    // Showdown guests render the reflected player side, so authenticate the same canonical coordinate
+    // that recordCoopV2CommandControlStarted uses. Classic co-op remains field-index aligned.
+    const canonicalFieldIndex =
+      isVersusSession() && controller.role === "guest"
+        ? battle.arrangement.enemyOffset + this.fieldIndex
+        : this.fieldIndex;
+    const expectedOwnerSeatId = isVersusSession()
+      ? controller.role === "guest"
+        ? controller.localSeatId
+        : controller.authoritySeatId
+      : (() => {
+          const seatPokemon = pokemon as PlayerPokemon & { coopOwnerSeatId?: number };
+          const owner = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
+          return Number.isSafeInteger(seatPokemon.coopOwnerSeatId) && (seatPokemon.coopOwnerSeatId as number) >= 0
+            ? (seatPokemon.coopOwnerSeatId as number)
+            : owner === "host"
+              ? 0
+              : 1;
+        })();
+    return control.commands.some(
+      command =>
+        command.ownerSeatId === expectedOwnerSeatId
+        && command.fieldIndex === canonicalFieldIndex
+        && command.pokemonId === pokemon.id,
+    );
+  }
+
+  /** Runtime hook for a late CONTROL_COMMIT: expose only an exact live CommandPhase as its material consumer. */
+  public canReleaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    return this.acceptsCoopV2ControlSuccessor(successor);
+  }
+
+  /**
+   * Re-enter the same public surface after the immutable frontier is material-applied. Closing input first
+   * prevents a late command choice from crossing the old unqualified surface; the normal start path then
+   * observes the already-applied frontier without authoring another CONTROL_COMMIT.
+   */
+  public releaseForCoopV2Control(successor: CoopV2ControlSuccessorClaim): boolean {
+    if (!this.acceptsCoopV2ControlSuccessor(successor)) {
+      return false;
+    }
+    this.commandControlReentryPending = true;
+    this.commandControlSurfaceOpen = false;
+    this.commandSurfaceGeneration++;
+    this.clearShowdownTurnClock();
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+      if (
+        !this.commandControlReentryPending
+        || globalScene.phaseManager.getCurrentPhase() !== this
+      ) {
+        return;
+      }
+      this.commandControlReentryPending = false;
+      this.start();
+    });
+    return true;
   }
 
   /** Execute a forced owned-slot action only after the reciprocal command boundary, else open its UI. */
@@ -1836,7 +1940,7 @@ export class CommandPhase extends FieldPhase {
     useMode: boolean | MoveUseMode = false,
     move?: TurnMove,
   ): boolean {
-    if (isCoopV2CommandAdmissionFrozen()) {
+    if (this.commandControlReentryPending || isCoopV2CommandAdmissionFrozen()) {
       coopWarn("v2-recovery", `Command admission refused field=${this.fieldIndex}: recovery owns the frontier`);
       return false;
     }
@@ -2017,6 +2121,9 @@ export class CommandPhase extends FieldPhase {
   }
 
   end() {
+    this.commandControlSurfaceOpen = false;
+    this.commandControlReentryPending = false;
+    this.commandSurfaceGeneration++;
     this.clearShowdownTurnClock();
     this.clearParkedReplacementWake();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
