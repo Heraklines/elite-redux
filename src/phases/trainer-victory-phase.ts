@@ -26,6 +26,7 @@ import {
   snapshotCoopTrainerVictoryBoundary,
 } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import { erRecordAchievementTrainerVictory } from "#data/elite-redux/er-achievement-tracker";
+import { getErEndlessRateBonus, isErEndlessContinuationActive } from "#data/elite-redux/er-endless-continuation";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { addErSprintTrainerVoucherCredit, isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { BiomeId } from "#enums/biome-id";
@@ -148,9 +149,12 @@ function queueTrainerVictoryRewards(victory: CoopTrainerVictoryBoundary): void {
 
   // Per-account ER trainer vouchers: Youngster 0, Ace 1, Elite 2, Hell 3.
   const difficulty = getErDifficulty();
-  const erVoucherCount = isErSprintMode(globalScene.gameMode.modeId)
-    ? addErSprintTrainerVoucherCredit(difficulty)
-    : { youngster: 0, ace: 1, elite: 2, hell: 3 }[difficulty];
+  const baseVoucherCount = { youngster: 0, ace: 1, elite: 2, hell: 3 }[difficulty];
+  const erVoucherCount = isErEndlessContinuationActive()
+    ? baseVoucherCount * (1 + getErEndlessRateBonus(victory.sourceWave))
+    : isErSprintMode(globalScene.gameMode.modeId)
+      ? addErSprintTrainerVoucherCredit(difficulty)
+      : baseVoucherCount;
   for (let i = 0; i < erVoucherCount; i++) {
     globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.VOUCHER);
   }

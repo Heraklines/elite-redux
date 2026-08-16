@@ -45,6 +45,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
+import { resetErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { resetGenericTrainerTracking } from "#data/elite-redux/er-generic-trainer-run-state";
@@ -7613,6 +7614,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               resetGenericTrainerTracking();
               resetErCustomTrainerTracking();
               resetErGhostRunState();
+              resetErEndlessContinuation();
               resetErMapNodes();
               // ER (#486): dev/testing seed - pre-stock Treasure-Map fragments
               // AFTER the reset so a scenario can test the X-Marks-the-Spot payout.

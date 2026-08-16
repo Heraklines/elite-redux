@@ -17,6 +17,8 @@ import {
 } from "#data/elite-redux/er-achievement-tracker";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { isErEndlessRaidWave } from "#data/elite-redux/er-endless-continuation";
+import { claimErEndlessGraveReturn, recordErEndlessKo } from "#data/elite-redux/er-endless-rift-runtime";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
 import { erMomentumEngineOnFoeKo, erRelicRecordFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
 import { notifyMoodyFormationFaint } from "#data/elite-redux/moody/moody-formation-game-adapter";
@@ -100,6 +102,7 @@ export class FaintPhase extends PokemonPhase {
     };
 
     if (this.source) {
+      recordErEndlessKo(this.source);
       faintPokemon.getTag(BattlerTagType.DESTINY_BOND)?.lapse(this.source, BattlerTagLapseType.CUSTOM);
       faintPokemon.getTag(BattlerTagType.GRUDGE)?.lapse(faintPokemon, BattlerTagLapseType.CUSTOM, this.source);
     }
@@ -268,6 +271,7 @@ export class FaintPhase extends PokemonPhase {
       }
     }
 
+    const endlessGraveReturn = !this.player && claimErEndlessGraveReturn(pokemon);
     if (this.player) {
       /** The total number of Pokemon in the player's party that can legally fight */
       const legalPlayerPokemon = globalScene.getPokemonAllowedInBattle();
@@ -307,7 +311,10 @@ export class FaintPhase extends PokemonPhase {
     } else {
       globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
       let willSwitchIn = false;
-      if ([BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)) {
+      if (
+        [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
+        || isErEndlessRaidWave(globalScene.currentBattle.waveIndex)
+      ) {
         // Slot-gate the replacement only in DOUBLES (each partner refills its own slot).
         // In a single battle ANY reserve must come in: mixed trainerSlot values (e.g. a
         // double-variant trainer config rolled into a single format) otherwise soft-lock
@@ -322,7 +329,7 @@ export class FaintPhase extends PokemonPhase {
                 && !p.isOnField()
                 && (!globalScene.currentBattle.double || p.trainerSlot === (pokemon as EnemyPokemon).trainerSlot),
             ).length > 0;
-        if (hasReservePartyMember) {
+        if (hasReservePartyMember || endlessGraveReturn) {
           // Showdown 1v1 (versus faint-replacement): the enemy side is the remote human GUEST's own
           // team, so the HOST must AWAIT the guest's relayed replacement pick instead of AI auto-picking
           // (the guest's renderer opens its own faint picker off this streamed faint and relays the
@@ -388,10 +395,27 @@ export class FaintPhase extends PokemonPhase {
             // ER Wasteland: pull the guaranteed wild drop FIRST (while the mon's
             // items still carry its pokemonId), THEN sweep the rest to post-battle
             // loot (which nulls the pokemonId for the ability-gated steal pool).
-            this.applyErWastelandWildDrop(pokemon as EnemyPokemon);
-            globalScene.currentBattle.addPostBattleLoot(pokemon as EnemyPokemon);
+            if (!endlessGraveReturn) {
+              this.applyErWastelandWildDrop(pokemon as EnemyPokemon);
+              globalScene.currentBattle.addPostBattleLoot(pokemon as EnemyPokemon);
+            }
           }
           pokemon.leaveField();
+          if (!pokemon.isPlayer() && endlessGraveReturn) {
+            const enemy = pokemon as EnemyPokemon;
+            enemy.resetStatus(false, false, false, false);
+            enemy.hp = Math.max(1, Math.ceil(enemy.getMaxHp() / 2));
+            for (const move of enemy.getMoveset()) {
+              move.ppUsed = Math.max(0, move.getMovePp() - Math.ceil(move.getMovePp() / 2));
+            }
+            enemy.setBoss(true, 1);
+            const party = globalScene.currentBattle.enemyParty;
+            const partyIndex = party.indexOf(enemy);
+            if (partyIndex >= 0) {
+              party.splice(partyIndex, 1);
+              party.push(enemy);
+            }
+          }
           this.end();
         },
       });

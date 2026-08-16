@@ -21,6 +21,7 @@ import {
 import { erBiomeTrainerRateMult } from "#data/elite-redux/er-biome-encounters";
 import { erNotorietyTrainerChancePct } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import { isErEndlessContinuationActive, isErEndlessRaidWave } from "#data/elite-redux/er-endless-continuation";
 import { isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
@@ -449,6 +450,9 @@ export class GameMode implements GameModeConfig {
    * @returns if the current wave is final for classic or daily OR a minor boss in endless
    */
   isWaveFinal(waveIndex: number, modeId: GameModes = this.modeId): boolean {
+    if (isErEndlessContinuationActive()) {
+      return false;
+    }
     switch (modeId) {
       case GameModes.CLASSIC:
       case GameModes.CHALLENGE:
@@ -475,6 +479,9 @@ export class GameMode implements GameModeConfig {
    * @returns true if waveIndex is a multiple of 10
    */
   isBoss(waveIndex: number): boolean {
+    if (isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex)) {
+      return true;
+    }
     return isErSprintMode(this.modeId) ? isErCheckpointWave(waveIndex) : waveIndex % 10 === 0;
   }
 

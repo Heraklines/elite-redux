@@ -36,6 +36,7 @@ import {
   erRecordAchievementMoveResolution,
 } from "#data/elite-redux/er-achievement-tracker";
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
+import { applyErEndlessContagion, recordErEndlessMoveOutcome } from "#data/elite-redux/er-endless-rift-runtime";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import {
@@ -473,6 +474,7 @@ export class MoveEffectPhase extends PokemonPhase {
               ? "failed"
               : "immune";
       notifyMoodyFormationMoveResolved(user, this.move, outcome);
+      recordErEndlessMoveOutcome(user, this.move, outcome, targets[0]);
     }
 
     this.updateSubstitutes();
@@ -1119,6 +1121,7 @@ export class MoveEffectPhase extends PokemonPhase {
     // vanilla status-token path above is enemy-only).
     if (dealsDamage && this.move.is("AttackMove")) {
       const makesContact = this.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target });
+      applyErEndlessContagion(user, target, makesContact, dealsDamage);
       erApplyCommunityOnHitItems(user, target, makesContact);
       // ER reactive held items (Cell Battery / Absorb Bulb / Snowball / Luminous
       // Moss / Weakness Policy): the struck holder raises a stat once, then it's

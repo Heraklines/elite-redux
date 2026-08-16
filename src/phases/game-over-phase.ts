@@ -23,6 +23,7 @@ import {
   setCommunityRunState,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
+import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
@@ -73,6 +74,7 @@ export class GameOverPhase extends BattlePhase {
 
   start() {
     super.start();
+    restoreErEndlessBattleOverlays();
 
     // Showdown 1v1 (C3): a versus match NEVER runs the classic game-over (no save / ribbons /
     // achievements / cloud). Route the player's loss (or an unexpected showdown game-over) to the
@@ -316,7 +318,11 @@ export class GameOverPhase extends BattlePhase {
               // down its OWN runtime when its OWN GameOverPhase reaches here. No-op for solo (clearCoopRuntime
               // early-returns when there is no active session).
               clearCoopRuntime();
-              globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
+              if (this.shouldOfferEndlessContinuation()) {
+                globalScene.phaseManager.pushNew("EndlessOfferPhase", endCardPhase);
+              } else {
+                globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
+              }
               this.end();
             });
           };
@@ -392,6 +398,18 @@ export class GameOverPhase extends BattlePhase {
     } else {
       doGameOver(false);
     }
+  }
+
+  private shouldOfferEndlessContinuation(): boolean {
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    return (
+      this.isVictory
+      && !globalScene.gameMode.isEndless
+      && !globalScene.gameMode.isDaily
+      && !globalScene.gameMode.isShowdown
+      && !globalScene.gameMode.isCoop
+      && globalScene.gameMode.isWaveFinal(wave)
+    );
   }
 
   /**

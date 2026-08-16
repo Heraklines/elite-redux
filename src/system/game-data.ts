@@ -65,6 +65,12 @@ import {
   restoreErCustomTrainerTracking,
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
+import {
+  getErEndlessRateBonus,
+  getErEndlessSaveData,
+  isErEndlessContinuationActive,
+  restoreErEndlessContinuation,
+} from "#data/elite-redux/er-endless-continuation";
 import { getFunModeConfig, resetFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import {
@@ -2005,6 +2011,7 @@ export class GameData {
       // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
       erDifficulty: getErDifficulty(),
       erRunPacing: getErRunPacing(),
+      erEndlessState: getErEndlessSaveData(),
       erSprintVoucherCredit: getErSprintVoucherCredit(),
       funModeConfig: globalScene.gameMode.isFun ? { ...getFunModeConfig() } : undefined,
       moodyModeState: globalScene.gameMode.isFun && getFunModeConfig().moodyMode ? getMoodyModeSaveData() : undefined,
@@ -5219,6 +5226,7 @@ export class GameData {
     // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
     setErRunPacing(fromSession.erRunPacing ?? "normal");
+    restoreErEndlessContinuation(fromSession.erEndlessState);
     restoreErSprintVoucherCredit(fromSession.erSprintVoucherCredit);
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreGenericTrainerTracking(fromSession.erLastGenericTrainerType);
@@ -7262,12 +7270,19 @@ export class GameData {
     // were stockpiled outside the run, so it must NOT inherit the favour bonus —
     // otherwise hatching a backlog of eggs during a trivial high-favour challenge
     // would farm triple candy. Egg hatches still keep the always-on flat 35%.
-    if (count > 0 && !globalScene.gameMode.isFun) {
+    if (count > 0 && (!globalScene.gameMode.isFun || isErEndlessContinuationActive())) {
       const favourMultiplier = fromEgg ? 1 : getRunCandyMultiplier();
       // #402: the lower difficulties' dedicated perk is CANDY (Youngster 2x,
       // Ace 1.5x). Run-scoped like favour, so egg-hatch backlogs are excluded.
       const difficultyMultiplier = fromEgg ? 1 : getErDifficultyCandyMultiplier();
-      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * favourMultiplier * difficultyMultiplier));
+      const endlessBonus =
+        !fromEgg && isErEndlessContinuationActive()
+          ? getErEndlessRateBonus(globalScene.currentBattle?.waveIndex ?? 0)
+          : 0;
+      count = Math.max(
+        1,
+        Math.round(count * ER_CANDY_GAIN_MULTIPLIER * (favourMultiplier * difficultyMultiplier + endlessBonus)),
+      );
     }
 
     // The ROOT id, not speciesId: the candy bar does a raw starterData[id] read, and

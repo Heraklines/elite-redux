@@ -28,6 +28,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { erBattleEntrantOrdinal, erBattleOnce } from "#data/elite-redux/er-relic-battle-state";
+import {
+  getErEndlessRelicNumericMultiplier,
+  isErEndlessRelicSuppressed,
+} from "#data/elite-redux/er-endless-rift-runtime";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -365,6 +369,9 @@ const GAMBLERS_COIN_WIN_PCT = 55;
 
 /** Total stacks of the given relic held by one side (team-wide). */
 export function getErRelicStacks(kind: ErRelicKind, forPlayer = true): number {
+  if (isErEndlessRelicSuppressed(kind, forPlayer)) {
+    return 0;
+  }
   let stacks = 0;
   for (const mod of globalScene?.findModifiers(
     m => m instanceof ErRelicModifier && (m as ErRelicModifier).kind === kind,
@@ -407,7 +414,9 @@ export function erApplyFieldMedic(): void {
       if (!pokemon || pokemon.isFainted() || pokemon.isFullHp()) {
         continue;
       }
-      const healed = pokemon.heal(toDmgValue(pokemon.getMaxHp() / FIELD_MEDIC_HEAL_DENOM));
+      const healed = pokemon.heal(
+        toDmgValue((pokemon.getMaxHp() / FIELD_MEDIC_HEAL_DENOM) * getErEndlessRelicNumericMultiplier()),
+      );
       if (healed > 0) {
         pokemon.updateInfo();
         globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} was tended by the Field Medic!`);
@@ -545,7 +554,7 @@ export function erMoraleBannerMultiplier(forPlayer = true): number {
   if (MORALE_BANNER_BROKEN[relicSide(forPlayer)] || !hasErRelic("moraleBanner", forPlayer)) {
     return 1;
   }
-  return 1 + MORALE_BANNER_PERCENT / 100;
+  return 1 + (MORALE_BANNER_PERCENT / 100) * getErEndlessRelicNumericMultiplier();
 }
 
 /**
@@ -583,7 +592,7 @@ export function erTwinLinkMultiplier(moveType: PokemonType, forPlayer = true): n
   if (shared === null || shared !== moveType) {
     return 1;
   }
-  return 1 + TWIN_LINK_PERCENT / 100;
+  return 1 + (TWIN_LINK_PERCENT / 100) * getErEndlessRelicNumericMultiplier();
 }
 
 /**
@@ -591,7 +600,9 @@ export function erTwinLinkMultiplier(moveType: PokemonType, forPlayer = true): n
  * moves while held. Queried from {@linkcode Pokemon.getAttackDamage}.
  */
 export function erMoltenCoreFireMultiplier(moveType: PokemonType, forPlayer = true): number {
-  return moveType === PokemonType.FIRE && hasErRelic("moltenCore", forPlayer) ? 1.2 : 1;
+  return moveType === PokemonType.FIRE && hasErRelic("moltenCore", forPlayer)
+    ? 1 + 0.2 * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
@@ -599,7 +610,9 @@ export function erMoltenCoreFireMultiplier(moveType: PokemonType, forPlayer = tr
  * moves while held. Queried from {@linkcode Pokemon.getAttackDamage}.
  */
 export function erCapacitorElectricMultiplier(moveType: PokemonType, forPlayer = true): number {
-  return moveType === PokemonType.ELECTRIC && hasErRelic("capacitor", forPlayer) ? 1.2 : 1;
+  return moveType === PokemonType.ELECTRIC && hasErRelic("capacitor", forPlayer)
+    ? 1 + 0.2 * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
@@ -609,7 +622,9 @@ export function erCapacitorElectricMultiplier(moveType: PokemonType, forPlayer =
  * a player SOURCE there). Returns 1 when the relic isn't held.
  */
 export function erBloodPactDealMultiplier(forPlayer = true): number {
-  return hasErRelic("bloodPact", forPlayer) ? 1 + BLOOD_PACT_DEAL_PERCENT / 100 : 1;
+  return hasErRelic("bloodPact", forPlayer)
+    ? 1 + (BLOOD_PACT_DEAL_PERCENT / 100) * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
@@ -620,7 +635,9 @@ export function erBloodPactDealMultiplier(forPlayer = true): number {
  * offensive bonus on a player-vs-player hit, which only happens in odd modes.
  */
 export function erBloodPactTakeMultiplier(forPlayer = true): number {
-  return hasErRelic("bloodPact", forPlayer) ? 1 + BLOOD_PACT_TAKE_PERCENT / 100 : 1;
+  return hasErRelic("bloodPact", forPlayer)
+    ? 1 + (BLOOD_PACT_TAKE_PERCENT / 100) * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**

@@ -22,8 +22,16 @@ import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tra
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
+import {
+  hasErEndlessRift,
+  isErEndlessCycleBoundaryAfterWave,
+  isErEndlessRaidWave,
+  shouldErEndlessRiftPulseAfterWave,
+} from "#data/elite-redux/er-endless-continuation";
+import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import {
   getErProgressionWave,
   getErStorySourceWave,
@@ -83,6 +91,9 @@ export class VictoryPhase extends PokemonPhase {
 
   start() {
     super.start();
+    if (!this.isExpOnly) {
+      restoreErEndlessBattleOverlays();
+    }
 
     // A retained normal-wave Victory can run after a speculative next Battle has already been installed.
     // Its immutable WAVE_ADVANCE statement—not that mutable ambient object—owns encounter classification.
@@ -163,12 +174,12 @@ export class VictoryPhase extends PokemonPhase {
     const retainedResolvedVictory =
       this.coopSourceWave != null
       && (retainedSourceTransition?.outcome === "win" || retainedSourceTransition?.outcome === "capture");
-    if (
-      retainedResolvedVictory
-      || !globalScene
-        .getEnemyParty()
-        .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)))
-    ) {
+    const endlessRaid = isErEndlessRaidWave(globalScene.currentBattle.waveIndex);
+    const endlessRaidBossDefeated = endlessRaid && globalScene.getEnemyParty()[0]?.isFainted(true) === true;
+    const ordinaryEnemySideDefeated = !globalScene
+      .getEnemyParty()
+      .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)));
+    if (retainedResolvedVictory || endlessRaidBossDefeated || (!endlessRaid && ordinaryEnemySideDefeated)) {
       removeQueuedPostVictoryCombatPhases();
       // Co-op (#633, authoritative wave-advance handshake): this is the real WIN / wave-clear
       // branch (not the exp-only / mystery-encounter paths, which returned above). The host is
@@ -314,8 +325,9 @@ export class VictoryPhase extends PokemonPhase {
         const erRouting = erBiomeRoutingActive();
         // The authoritative guest must NEVER derive this boundary locally. A one-bit disagreement here is
         // the wave-10 split: one queue opens SelectBiomePhase while the other advances without the map.
-        const biomeEnding = tailControl.biomeChange;
-        const fireBiomeShop = checkpointWave && !gameMode.isDaily;
+        const endlessCycleBoundary = isErEndlessCycleBoundaryAfterWave(currentWaveIndex);
+        const biomeEnding = tailControl.biomeChange || endlessCycleBoundary;
+        const fireBiomeShop = checkpointWave && !gameMode.isDaily && !hasErEndlessRift("no-sanctuary");
         const raiseCrossroads =
           !biomeEnding
           && erRouting
@@ -340,6 +352,7 @@ export class VictoryPhase extends PokemonPhase {
           && !biomeEnding
           && !sprintClassic
           && !isCoopAuthoritativeGuest()
+          && !hasErEndlessRift("no-sanctuary")
           && isMoodyAutomaticBiomeHealingEnabled()
         ) {
           globalScene.phaseManager.pushNew("PartyHealPhase", false);
@@ -401,7 +414,10 @@ export class VictoryPhase extends PokemonPhase {
           }
         }
 
-        if (biomeEnding) {
+        if (endlessCycleBoundary) {
+          resetErMapNodes();
+          globalScene.phaseManager.pushNew("SwitchBiomePhase", BiomeId.TOWN);
+        } else if (biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase", currentWaveIndex, postBattleSettlementTurn);
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
@@ -429,6 +445,9 @@ export class VictoryPhase extends PokemonPhase {
           );
         }
 
+        if (shouldErEndlessRiftPulseAfterWave(currentWaveIndex)) {
+          globalScene.phaseManager.pushNew("EndlessRiftPulsePhase", currentWaveIndex);
+        }
         globalScene.phaseManager.pushNew("NewBattlePhase");
       } else if (gameMode.isShowdown) {
         if (automaticVictorySeal != null) {

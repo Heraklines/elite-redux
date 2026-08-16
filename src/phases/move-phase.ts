@@ -12,6 +12,7 @@ import {
   recordCoopEvent,
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
+import { consumeErEndlessMoveCost } from "#data/elite-redux/er-endless-rift-runtime";
 import {
   notifyMoodyFormationMoveAttempt,
   notifyMoodyFormationMoveResolved,
@@ -732,7 +733,10 @@ export class MovePhase extends PokemonPhase {
         move,
         1 + this.getPpIncreaseFromPressure(this.getActiveTargetPokemon()),
       );
-      move.usePp(ppUsed);
+      const endlessCost = consumeErEndlessMoveCost(this.pokemon, move.getMove(), ppUsed);
+      if (endlessCost.useIndividualPp) {
+        move.usePp(endlessCost.ppCost);
+      }
       globalScene.eventTarget.dispatchEvent(new MoveUsedEvent(this.pokemon.id, move.getMove(), move.ppUsed));
     }
   }

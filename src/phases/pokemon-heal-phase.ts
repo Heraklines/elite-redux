@@ -121,7 +121,7 @@ export class PokemonHealPhase extends CommonAnimPhase {
       if (this.preventFullHeal && pokemon.hp + healAmount.value >= pokemon.getMaxHp()) {
         healAmount.value = pokemon.getMaxHp() - pokemon.hp - 1;
       }
-      healAmount.value = pokemon.heal(healAmount.value);
+      healAmount.value = pokemon.heal(healAmount.value, this.revive);
       if (healAmount.value) {
         globalScene.damageNumberHandler.add(pokemon, healAmount.value, HitResult.HEAL);
       }

@@ -8,6 +8,7 @@ import { syncBlisteringSunFieldPair } from "#data/elite-redux/ability-upgrades/r
 import { isToxicTerrainProtected } from "#data/elite-redux/archetypes/ability-meta-consumers";
 import { isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { applyErEndlessTurnEnd } from "#data/elite-redux/er-endless-rift-runtime";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
 import { erApplyStickyBarbTurnEnd } from "#data/elite-redux/er-tactical-items";
 import { completeMoodyFormationTurn } from "#data/elite-redux/moody/moody-formation-game-adapter";
@@ -207,6 +208,8 @@ export class TurnEndPhase extends FieldPhase {
         pokemon.damageAndUpdate(debt, { result: HitResult.INDIRECT });
       }
     }
+
+    applyErEndlessTurnEnd();
 
     this.erAutoShiftNonAdjacentSurvivors();
 

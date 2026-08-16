@@ -2517,6 +2517,29 @@ type RunSampleRow = {
   relics?: string | null;
 };
 
+function runSampleRowToGhost(row: RunSampleRow, fallbackDifficulty = ""): Record<string, unknown> | null {
+  try {
+    return {
+      id: row.id,
+      sourceUserId: String(row.user_id),
+      trainerName: row.username ?? "Trainer",
+      difficulty: row.difficulty ?? fallbackDifficulty,
+      mode: row.mode ?? undefined,
+      waveReached: row.wave ?? 0,
+      isVictory: row.outcome === "victory",
+      timestamp: row.created_at,
+      party: JSON.parse(row.player_team),
+      opponentName: row.opponent_name ?? undefined,
+      opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+      challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
+      presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
+      relics: row.relics ? JSON.parse(row.relics) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Endless contamination guard (CORRECTNESS): a classic/challenge run ends at wave 200
  * (game-mode.ts isWaveFinal); ENDLESS runs go to 250/500/1000+ with absurd kits. A
@@ -2536,6 +2559,7 @@ async function enumerateEligibleRunCandidates(
   maxWave: number,
   pageSize: number,
   requireSavedItems = false,
+  victoriesOnly = false,
 ): Promise<RunSampleCandidate[]> {
   const candidates: RunSampleCandidate[] = [];
   let cursorWave = minWave - 1;
@@ -2546,6 +2570,7 @@ async function enumerateEligibleRunCandidates(
          WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
            AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
            ${requireSavedItems ? "AND player_team LIKE '%\"heldItems\":%'" : ""}
+           ${victoriesOnly ? "AND outcome = 'victory'" : ""}
            AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
          ORDER BY wave, rowid LIMIT ?6`,
     )
@@ -2632,6 +2657,7 @@ async function handleRunSample(
     ? Math.min(Math.max(maxWaveParsed, minWave), GHOST_SAMPLE_MAX_WAVE)
     : GHOST_SAMPLE_MAX_WAVE;
   const requireSavedItems = url.searchParams.get("requireSavedItems") === "1";
+  const victoriesOnly = url.searchParams.get("victoriesOnly") === "1";
   if (minWave > GHOST_SAMPLE_MAX_WAVE) {
     return json({ teams: [] }, 200, cors);
   }
@@ -2663,7 +2689,15 @@ async function handleRunSample(
   // already-deployed prod DB gains it without a manual migration (mirrors
   // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
   await ensureRunSampleIndex(env);
-  const eligible = await enumerateEligibleRunCandidates(env, auth.uid, minWave, maxWave, 2000, requireSavedItems);
+  const eligible = await enumerateEligibleRunCandidates(
+    env,
+    auth.uid,
+    minWave,
+    maxWave,
+    2000,
+    requireSavedItems,
+    victoriesOnly,
+  );
   const byUploader = new Map<number, RunSampleCandidate[]>();
   for (const candidate of eligible) {
     const group = byUploader.get(candidate.userId) ?? [];
@@ -2706,33 +2740,46 @@ async function handleRunSample(
       .all<RunSampleRow>();
     results = fetched.results ?? [];
   }
-  const teams = (results ?? [])
-    .map(row => {
-      try {
-        return {
-          id: row.id,
-          sourceUserId: String(row.user_id),
-          trainerName: row.username ?? "Trainer",
-          difficulty: row.difficulty ?? difficulty,
-          mode: row.mode ?? undefined,
-          waveReached: row.wave ?? 0,
-          isVictory: row.outcome === "victory",
-          timestamp: row.created_at,
-          party: JSON.parse(row.player_team),
-          opponentName: row.opponent_name ?? undefined,
-          opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
-          challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
-          // ER Ghost Trainer Editor: pass the authored presentation through to the
-          // encountering client (which sanitises it before applying). Bad JSON -> omit.
-          presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
-          relics: row.relics ? JSON.parse(row.relics) : undefined,
-        };
-      } catch {
-        return null;
-      }
-    })
-    .filter(t => t !== null);
+  const teams = (results ?? []).map(row => runSampleRowToGhost(row, difficulty)).filter(t => t !== null);
   return json({ teams }, 200, cors);
+}
+
+/** Other victorious, item-bearing runs from the owner of one opaque source run. */
+async function handleRunLineage(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const sourceRunId = (url.searchParams.get("sourceRunId") ?? "").trim();
+  const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 4) : 4;
+  if (!sourceRunId || sourceRunId.length > 160) {
+    return json({ teams: [] }, 200, cors);
+  }
+  const source = await env.DB.prepare(
+    `SELECT user_id FROM runs
+       WHERE id = ?1 AND user_id != ?2 AND outcome = 'victory'
+         AND wave <= ?3 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+       LIMIT 1`,
+  )
+    .bind(sourceRunId, auth.uid, GHOST_SAMPLE_MAX_WAVE)
+    .first<{ user_id: number }>();
+  if (source == null) {
+    return json({ teams: [] }, 200, cors);
+  }
+  const cols =
+    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
+  const { results } = await env.DB.prepare(
+    `SELECT ${cols} FROM runs
+       WHERE user_id = ?1 AND id != ?2 AND outcome = 'victory' AND wave <= ?3
+         AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+         AND player_team LIKE '%"heldItems":%'
+       ORDER BY created_at DESC LIMIT ?4`,
+  )
+    .bind(source.user_id, sourceRunId, GHOST_SAMPLE_MAX_WAVE, count)
+    .all<RunSampleRow>();
+  return json({ teams: (results ?? []).map(row => runSampleRowToGhost(row)).filter(team => team !== null) }, 200, cors);
 }
 
 /**
@@ -5207,6 +5254,9 @@ export default {
       }
       if (pathname === "/savedata/run/sample" && method === "GET") {
         return await handleRunSample(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/lineage" && method === "GET") {
+        return await handleRunLineage(url, auth, env, cors);
       }
       if (pathname === "/savedata/run/deadliest" && method === "GET") {
         return await handleRunDeadliest(url, auth, env, cors);

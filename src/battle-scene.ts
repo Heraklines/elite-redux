@@ -29,6 +29,7 @@ import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import {
   type BattleFormat,
+  DOUBLE_FORMAT,
   getBattleFormatById,
   legacyFormat,
   SINGLE_FORMAT,
@@ -71,6 +72,16 @@ import {
   pinErBlackShinyGiftAbility,
   promoteToErBlackShinyInBattle,
 } from "#data/elite-redux/er-black-shinies";
+import {
+  getErEndlessCycle,
+  getErEndlessCycleWave,
+  getErEndlessEquivalentDepth,
+  getErEndlessRateBonus,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  isErEndlessCycleFinale,
+  isErEndlessRaidWave,
+} from "#data/elite-redux/er-endless-continuation";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
@@ -101,19 +112,26 @@ import {
   resetErEnemyRelicBattleState,
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
-import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  getErDifficulty,
+  getErDifficultyCandyMultiplier,
+  getErDifficultyShinyMultiplier,
+  isErVanillaDifficulty,
+} from "#data/elite-redux/er-run-difficulty";
 import {
   getErMysteryEncounterTarget,
   getErProgressionWave,
   isErChapterStartWave,
   isErSprintMode,
 } from "#data/elite-redux/er-run-pacing";
+import { getRunCandyMultiplier, getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
+  generateEndlessEnemyBoonLoadout,
   generateMoodyEnemyBoonLoadout,
   resetMoodyEnemyBoonLoadout,
   setMoodyEnemyBoonLoadout,
@@ -2038,6 +2056,12 @@ export class BattleScene extends SceneBase {
       resolved.trainer = opponent;
       return;
     }
+    if (isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex)) {
+      resolved.battleType = BattleType.WILD;
+      resolved.double = true;
+      resolved.format = TRIPLE_FORMAT;
+      return;
+    }
     // ER ghost gauntlet (#217): begin pre-fetching ghost teams well before the
     // endgame waves where they spawn (no-op except once, around wave 150).
     maybePrefetchGhostTeams(waveIndex);
@@ -2394,6 +2418,26 @@ export class BattleScene extends SceneBase {
     // occupants, and leave the restored turn with no valid progression path.
     if (props.format != null) {
       return props.format;
+    }
+
+    if (
+      hasErEndlessRift("format-roulette")
+      && (props.battleType === BattleType.WILD || props.battleType === BattleType.TRAINER)
+      && !isErEndlessRaidWave(props.waveIndex)
+    ) {
+      let roll = 0;
+      this.executeWithSeedOffset(
+        () => {
+          roll = randSeedInt(100);
+        },
+        props.waveIndex,
+        "er-endless-format-roulette",
+      );
+      const requestedWidth = roll < 35 ? 1 : roll < 75 ? 2 : 3;
+      const playerWidth = Math.max(1, Math.min(3, this.getPokemonAllowedInBattle().length));
+      const trainerWidth = props.trainer == null ? 3 : Math.max(1, Math.min(3, props.trainer.getPartyTemplate().size));
+      const width = Math.min(requestedWidth, playerWidth, trainerWidth);
+      return width === 3 ? TRIPLE_FORMAT : width === 2 ? DOUBLE_FORMAT : SINGLE_FORMAT;
     }
 
     // Triples Only is a direct format invariant for regular battles. Do not make it
@@ -2984,6 +3028,10 @@ export class BattleScene extends SceneBase {
       return 0;
     }
 
+    if (isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex)) {
+      return 6 + Math.floor(getErEndlessEquivalentDepth(waveIndex) / 100) + (isErEndlessCycleFinale(waveIndex) ? 2 : 0);
+    }
+
     if (this.gameMode.isDaily && this.gameMode.isWaveFinal(waveIndex)) {
       if (this.gameMode.dailyConfig?.boss?.segments != null) {
         return this.gameMode.dailyConfig.boss.segments;
@@ -3230,6 +3278,9 @@ export class BattleScene extends SceneBase {
     if (!this.biomeWaveText.visible) {
       return null;
     }
+    if (isErEndlessContinuationActive()) {
+      return this.currentBattle?.waveIndex ?? null;
+    }
     const match = / - ([0-9]+)$/u.exec(this.biomeWaveText.text);
     if (match == null) {
       return null;
@@ -3247,8 +3298,16 @@ export class BattleScene extends SceneBase {
     const isBoss = this.gameMode.isBoss(this.currentBattle.waveIndex);
     const biomeString: string = getBiomeName(this.arena.biomeId);
     this.fieldUI.moveAbove(this.biomeWaveText, this.luckText);
+    const endless = isErEndlessContinuationActive();
+    const endlessBonus = endless ? getErEndlessRateBonus(this.currentBattle.waveIndex) : 0;
+    const heading = endless
+      ? `${biomeString} - C${getErEndlessCycle(this.currentBattle.waveIndex)}:${getErEndlessCycleWave(this.currentBattle.waveIndex)}`
+      : `${biomeString} - ${this.currentBattle.waveIndex}`;
+    const rateLine = endless
+      ? `ENDLESS RATES  Shiny x${getErDifficultyShinyMultiplier() * getRunShinyMultiplier() + endlessBonus}  Candy x${getErDifficultyCandyMultiplier() * getRunCandyMultiplier() + endlessBonus}  Vouchers x${1 + endlessBonus}`
+      : "";
     this.biomeWaveText
-      .setText(biomeString + " - " + this.currentBattle.waveIndex.toString())
+      .setText(rateLine ? `${heading}\n${rateLine}` : heading)
       .setColor(isBoss ? "#f89890" : "#ffffff")
       .setShadowColor(isBoss ? "#984038" : "#636363")
       .setVisible(true);
@@ -3343,7 +3402,7 @@ export class BattleScene extends SceneBase {
         + (enemyModifierCount ? (enemyModifierCount <= 12 ? 15 : 24) : 0)
         + biomeWaveTextHeight / 2,
     );
-    this.moneyText.setY(this.biomeWaveText.y + 10);
+    this.moneyText.setY(this.biomeWaveText.y + (isErEndlessContinuationActive() ? 18 : 10));
     this.scoreText.setY(this.moneyText.y + 10);
     [this.luckLabelText, this.luckText].map(l =>
       l.setY((this.scoreText.visible ? this.scoreText : this.moneyText).y + 10),
@@ -4384,7 +4443,20 @@ export class BattleScene extends SceneBase {
 
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
-      if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
+      if (
+        isErEndlessContinuationActive()
+        && this.currentBattle.trainer
+        && hasErGhostOverride(this.currentBattle.trainer)
+      ) {
+        const snapshot = getErGhostSnapshot(this.currentBattle.trainer);
+        setMoodyEnemyBoonLoadout(
+          generateEndlessEnemyBoonLoadout(
+            this.getEnemyParty(),
+            this.currentBattle.waveIndex,
+            snapshot?.endlessEchoStage === 3,
+          ),
+        );
+      } else if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
         prepareMoodyCoordinatorEnemyGeneration(this.getEnemyParty().some(pokemon => pokemon.isBoss()));
         setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(this.getEnemyParty(), this.currentBattle.waveIndex));
       } else {
@@ -4414,6 +4486,18 @@ export class BattleScene extends SceneBase {
         if (notoMult > 1) {
           chances = Math.ceil(chances * notoMult);
         }
+      }
+
+      const endlessGhost =
+        isErEndlessContinuationActive()
+        && this.currentBattle.trainer != null
+        && hasErGhostOverride(this.currentBattle.trainer);
+      if (endlessGhost) {
+        const teamSize = Math.max(1, this.currentBattle.trainer!.getPartyTemplate().size);
+        chances += Math.ceil(Math.floor(getErEndlessEquivalentDepth(this.currentBattle.waveIndex) / 10) / teamSize);
+        const echoStage = getErGhostSnapshot(this.currentBattle.trainer!)?.endlessEchoStage;
+        const equipmentBonus = echoStage === 3 ? 0.5 : echoStage === 2 ? 0.25 : 0;
+        chances += Math.ceil(chances * equipmentBonus);
       }
 
       const party = this.getEnemyParty();
@@ -4492,6 +4576,30 @@ export class BattleScene extends SceneBase {
       // Ghost snapshots are additive: preserve every generated item, ward,
       // boss layer above, then restore the inventory captured with the team.
       this.addErGhostSnapshotInventory(party);
+      if (endlessGhost) {
+        const extraRelicStacks = Math.floor(getErEndlessEquivalentDepth(this.currentBattle.waveIndex) / 100);
+        const relicKinds = Object.keys(ER_RELIC_CONFIG) as ErRelicKind[];
+        for (let index = 0; index < extraRelicStacks; index++) {
+          let kindIndex = 0;
+          this.executeWithSeedOffset(
+            () => {
+              kindIndex = randSeedInt(relicKinds.length);
+            },
+            this.currentBattle.waveIndex + index,
+            "er-endless-ghost-relic",
+          );
+          const kind = relicKinds[kindIndex];
+          const typeId = `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+          const type = getModifierDataTypeFactory(typeId)?.();
+          if (type) {
+            type.id = typeId;
+          }
+          const modifier = type?.newModifier();
+          if (modifier instanceof ErRelicModifier) {
+            void this.addEnemyModifier(modifier, true, true);
+          }
+        }
+      }
       // ER Factory (#439 §3): the production line - every WILD mon is GUARANTEED
       // to hold at least one item, with stacking chances for a 2nd/3rd. Tops up
       // each wild mon's baseline roll to the floor (never reduces a luckier roll).

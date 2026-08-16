@@ -36,6 +36,7 @@ import {
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { type ErEndlessActiveRift, getErEndlessRiftDefinition } from "#data/elite-redux/er-endless-continuation";
 import { type MoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
 import { getMoodyModeState, MOODY_CURSE_BY_ID } from "#data/elite-redux/moody/moody-state";
 import type { MoodyCurseInstance } from "#data/elite-redux/moody/moody-types";
@@ -490,6 +491,25 @@ export class UI extends Phaser.GameObjects.Container {
         {
           title: `${definition == null ? "DREAD ?" : MOODY_DREAD_LABEL[definition.dread]} - ${definition?.name ?? curse.curseId}`,
           lines,
+        },
+      ],
+      confirmLabel: "CONTINUE",
+      requireConfirm: true,
+    });
+  }
+
+  /** Reuse the curse-received report surface for a newly acquired Endless Rift. */
+  public showEndlessRiftReceived(rift: ErEndlessActiveRift): Promise<"confirm" | "cancel"> {
+    const definition = getErEndlessRiftDefinition(rift.id);
+    return this.showMoodyReport({
+      title: "RIFT RECEIVED",
+      sections: [
+        {
+          title: `${definition?.category === "pressure" ? "PRESSURE" : "MUTATION"} - ${definition?.name ?? rift.id}`,
+          lines: [
+            definition?.description ?? "No description available.",
+            `Duration: ${rift.pulsesRemaining} Rift pulse${rift.pulsesRemaining === 1 ? "" : "s"}.`,
+          ],
         },
       ],
       confirmLabel: "CONTINUE",

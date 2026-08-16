@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { applyErEndlessBattleStart } from "#data/elite-redux/er-endless-rift-runtime";
 
 /**
  * Phase to handle actions on a new encounter that must take place after other setup
@@ -22,6 +23,7 @@ export class InitEncounterPhase extends Phase {
         `${controller.sessionEpoch}:${globalScene.currentBattle.waveIndex}`,
       );
     }
+    applyErEndlessBattleStart();
     for (const pokemon of globalScene.getField(true)) {
       if (pokemon.isEnemy() || pokemon.turnData.summonedThisTurn) {
         globalScene.phaseManager.unshiftNew("PostSummonPhase", pokemon.getBattlerIndex());

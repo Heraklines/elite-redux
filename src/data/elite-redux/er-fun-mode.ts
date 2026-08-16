@@ -194,6 +194,23 @@ export function getFunAbilityAvalancheIds(
   return selected;
 }
 
+/** Deterministic safe ability additions for post-clear Endless Avalanche. */
+export function getEndlessAbilityAvalancheIds(
+  pokemonId: number,
+  count: number,
+  excludedIds: readonly AbilityId[] = [],
+  battleSalt = 0,
+): AbilityId[] {
+  const excluded = new Set(excludedIds);
+  const available = abilityPool().filter(abilityId => !excluded.has(abilityId));
+  const selected: AbilityId[] = [];
+  for (let slot = 0; slot < count && available.length > 0; slot++) {
+    const index = deterministicIndex(pokemonId ^ battleSalt, 0xe11d + slot, available.length);
+    selected.push(available.splice(index, 1)[0]);
+  }
+  return selected;
+}
+
 const FUN_TYPES: readonly PokemonType[] = [
   PokemonType.NORMAL,
   PokemonType.FIGHTING,

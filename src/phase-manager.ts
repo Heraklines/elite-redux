@@ -73,6 +73,9 @@ import { EggSummaryPhase } from "#phases/egg-summary-phase";
 import { EncounterPhase } from "#phases/encounter-phase";
 import { EndCardPhase } from "#phases/end-card-phase";
 import { EndEvolutionPhase } from "#phases/end-evolution-phase";
+import { EndlessContinuationPhase } from "#phases/endless-continuation-phase";
+import { EndlessOfferPhase } from "#phases/endless-offer-phase";
+import { EndlessRiftPulsePhase } from "#phases/endless-rift-pulse-phase";
 import { EnemyCommandPhase } from "#phases/enemy-command-phase";
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
 import { ErClosedCircuitBurstPhase } from "#phases/er-closed-circuit-burst-phase";
@@ -266,6 +269,9 @@ const PHASES = Object.freeze({
   EggSummaryPhase,
   EncounterPhase,
   EndCardPhase,
+  EndlessContinuationPhase,
+  EndlessOfferPhase,
+  EndlessRiftPulsePhase,
   EndEvolutionPhase,
   EnemyCommandPhase,
   ErDexNavPhase,

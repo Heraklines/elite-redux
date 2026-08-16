@@ -1,5 +1,9 @@
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
+import {
+  canApplyErEndlessAvalancheTrigger,
+  recordErEndlessAvalancheTrigger,
+} from "#data/elite-redux/er-endless-rift-runtime";
 import type {
   AbAttrBaseParams,
   AbAttrMap,
@@ -96,6 +100,10 @@ function applySingleAbAttrs<T extends AbAttrString>(
     if (!attrFilter(attr)) {
       continue;
     }
+    const discreteAvalancheTrigger = attr.showAbility === true;
+    if (!simulated && !canApplyErEndlessAvalancheTrigger(pokemon, ability.id, discreteAvalancheTrigger)) {
+      continue;
+    }
 
     // TODO: Make `getCondition` default to `() => true` instead of `null`
     const condition = attr.getCondition();
@@ -125,6 +133,12 @@ function applySingleAbAttrs<T extends AbAttrString>(
 
     // The `as any` cast here uses the same reasoning as above.
     attr.apply(params as any);
+    if (
+      !simulated
+      && recordErEndlessAvalancheTrigger(pokemon, ability.id, attr.constructor.name, discreteAvalancheTrigger)
+    ) {
+      attr.apply(params as any);
+    }
 
     if (abShown) {
       globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, false, slot);

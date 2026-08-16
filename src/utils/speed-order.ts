@@ -1,6 +1,7 @@
 import type { Pokemon } from "#app/field/pokemon";
 import { globalScene } from "#app/global-scene";
 import { BooleanHolder, randSeedShuffle } from "#app/utils/common";
+import { hasErEndlessRift } from "#data/elite-redux/er-endless-continuation";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { Stat } from "#enums/stat";
 
@@ -81,6 +82,9 @@ function sortBySpeed<T extends Pokemon | HasPokemon>(groupedPokemonList: T[][]):
   /** 'true' if Trick Room is on the field. */
   const speedReversed = new BooleanHolder(false);
   globalScene.arena.applyTags(ArenaTagType.TRICK_ROOM, speedReversed);
+  if (hasErEndlessRift("pulsing-trick-room")) {
+    speedReversed.value = (globalScene.currentBattle.turn ?? 1) % 2 === 1;
+  }
   if (speedReversed.value) {
     groupedPokemonList.reverse();
   }

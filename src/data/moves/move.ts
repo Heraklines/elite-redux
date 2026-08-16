@@ -51,6 +51,8 @@ import {
   erLuckyHeartChanceBonus,
 } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
+import { getErEndlessHeldItemCandidateIndex } from "#data/elite-redux/er-endless-continuation";
+import { getErEndlessMovePriorityDelta } from "#data/elite-redux/er-endless-rift-runtime";
 import { isErGhostEnemyPokemon } from "#data/elite-redux/er-ghost-teams";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { getErEarlyWaveMovePowerMultiplier } from "#data/elite-redux/er-run-pacing";
@@ -1397,7 +1399,7 @@ export abstract class Move implements Localizable {
     applyMoveAttrs("IncrementMovePriorityAttr", user, null, this, priority);
     applyAbAttrs("ChangeMovePriorityAbAttr", { pokemon: user, simulated, move: this, priority });
 
-    return priority.value + getMoodyMovePriorityDelta(user, this);
+    return priority.value + getMoodyMovePriorityDelta(user, this) + getErEndlessMovePriorityDelta(user, this);
   }
 
   public getPriorityModifier(user: Pokemon, simulated = true): MovePriorityInBracket {
@@ -3695,11 +3697,16 @@ export class StealHeldItemChanceAttr extends MoveEffectAttr {
       : target.hasTrainer()
         ? ModifierPoolType.TRAINER
         : ModifierPoolType.WILD;
-    const highestItemTier = heldItems
-      .map(m => m.type.getOrInferTier(poolType))
-      .reduce((highestTier, tier) => Math.max(tier!, highestTier), 0); // TODO: is the bang after tier correct?
-    const tierHeldItems = heldItems.filter(m => m.type.getOrInferTier(poolType) === highestItemTier);
-    const stolenItem = tierHeldItems[user.randBattleSeedInt(tierHeldItems.length)];
+    const stolenItem =
+      heldItems[
+        getErEndlessHeldItemCandidateIndex(
+          heldItems,
+          user.randBattleSeedInt(heldItems.length),
+          modifier => modifier.type.getOrInferTier(poolType) ?? 0,
+          modifier => modifier.stackCount,
+          modifier => modifier.type.id,
+        )
+      ];
     if (!globalScene.tryTransferHeldItemModifier(stolenItem, user, false)) {
       return false;
     }
@@ -3910,7 +3917,21 @@ export class RemoveHeldItemAttr extends MoveEffectAttr {
       return false;
     }
 
-    const removedItem = heldItems[user.randBattleSeedInt(heldItems.length)];
+    const poolType = target.isPlayer()
+      ? ModifierPoolType.PLAYER
+      : target.hasTrainer()
+        ? ModifierPoolType.TRAINER
+        : ModifierPoolType.WILD;
+    const removedItem =
+      heldItems[
+        getErEndlessHeldItemCandidateIndex(
+          heldItems,
+          user.randBattleSeedInt(heldItems.length),
+          modifier => modifier.type.getOrInferTier(poolType) ?? 0,
+          modifier => modifier.stackCount,
+          modifier => modifier.type.id,
+        )
+      ];
 
     // Decrease item amount and update icon
     target.loseHeldItem(removedItem);

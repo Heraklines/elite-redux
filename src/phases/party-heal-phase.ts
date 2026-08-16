@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { hasErEndlessRift } from "#data/elite-redux/er-endless-continuation";
 import { clearAllErStatuses } from "#data/elite-redux/er-status-cure";
 import { ChallengeType } from "#enums/challenge-type";
 import { BattlePhase } from "#phases/battle-phase";
@@ -30,19 +31,26 @@ export class PartyHealPhase extends BattlePhase {
     globalScene.ui.fadeOut(1000).then(() => {
       const preventRevive = new BooleanHolder(false);
       applyChallenges(ChallengeType.PREVENT_REVIVE, preventRevive);
+      const restless = hasErEndlessRift("restless-checkpoints");
       for (const pokemon of globalScene.getPlayerParty()) {
         // Prevent reviving fainted pokemon during certain challenges
         if (pokemon.isFainted() && preventRevive.value) {
           continue;
         }
 
-        pokemon.hp = pokemon.getMaxHp();
+        if (restless) {
+          pokemon.hp = pokemon.isFainted()
+            ? Math.max(1, Math.floor(pokemon.getMaxHp() * 0.25))
+            : pokemon.hp + Math.ceil((pokemon.getMaxHp() - pokemon.hp) * 0.5);
+        } else {
+          pokemon.hp = pokemon.getMaxHp();
+        }
         pokemon.resetStatus(true, false, false, true);
         // The between-wave rest is a full restore, so it also clears ER custom statuses
         // (Bleed / Frostbite / Fear) which vanilla resetStatus does not touch.
         clearAllErStatuses(pokemon);
         for (const move of pokemon.moveset) {
-          move.ppUsed = 0;
+          move.ppUsed = restless ? Math.floor(move.ppUsed * 0.5) : 0;
         }
         pokemon.updateInfo(true);
       }

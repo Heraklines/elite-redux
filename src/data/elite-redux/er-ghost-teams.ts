@@ -28,6 +28,15 @@
 // =============================================================================
 
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import {
+  advanceErEndlessGhostRoute,
+  beginErEndlessGhostRoute,
+  canUseErEndlessGhost,
+  getErEndlessGhostRoute,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  recordErEndlessGhost,
+} from "#data/elite-redux/er-endless-continuation";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
@@ -151,6 +160,8 @@ export interface GhostTeamSnapshot {
    * through sanitizeGhostProfile before applying (it arrives from an untrusted peer).
    */
   presentation?: GhostTrainerProfile | undefined;
+  /** Transient Endless route metadata; never uploaded as part of a completed run. */
+  endlessEchoStage?: 1 | 2 | 3 | undefined;
 }
 
 const MAX_PARTY = 6;
@@ -326,6 +337,7 @@ async function sampleRunsFromServer(
   minWave: number,
   maxWave = 200,
   requireSavedItems = false,
+  victoriesOnly = false,
 ): Promise<GhostTeamSnapshot[]> {
   const base = serverBase();
   const token = getCookie(sessionIdKey);
@@ -336,7 +348,7 @@ async function sampleRunsFromServer(
   }
   try {
     const res = await fetch(
-      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}`,
+      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}${victoriesOnly ? "&victoriesOnly=1" : ""}`,
       { method: "GET", headers: { Accept: "application/json", Authorization: token } },
     );
     if (!res.ok) {
@@ -349,6 +361,32 @@ async function sampleRunsFromServer(
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
     console.warn("[er-ghost] server sample fetch failed:", err);
+    return [];
+  }
+}
+
+const endlessLineageRequests = new Set<string>();
+
+async function fetchEndlessLineage(sourceRunId: string, count = 4): Promise<GhostTeamSnapshot[]> {
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function" || endlessLineageRequests.has(sourceRunId)) {
+    return [];
+  }
+  endlessLineageRequests.add(sourceRunId);
+  try {
+    const response = await fetch(
+      `${base}/savedata/run/lineage?sourceRunId=${encodeURIComponent(sourceRunId)}&count=${count}`,
+      { method: "GET", headers: { Accept: "application/json", Authorization: token } },
+    );
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    return (Array.isArray(data) ? data : (data?.teams ?? []))
+      .filter(isValidSnapshot)
+      .filter(snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot));
+  } catch {
     return [];
   }
 }
@@ -640,7 +678,11 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   // run is the "endless contamination" bug. Daily is a separate, throwaway mode. Only
   // classic / classic-challenge teams are valid ghosts. (The worker /sample query
   // ALSO filters these, so already-uploaded endless rows are excluded server-side.)
-  if (globalScene?.gameMode?.isEndless || globalScene?.gameMode?.isDaily) {
+  if (
+    globalScene?.gameMode?.isEndless
+    || globalScene?.gameMode?.isDaily
+    || isErEndlessContinuationActive()
+  ) {
     return null;
   }
   const party = globalScene?.getPlayerParty?.() ?? [];
@@ -989,11 +1031,19 @@ async function fetchGhostTeams(
   minWave: number,
   maxWave = 200,
   requireSavedItems = false,
+  victoriesOnly = false,
 ): Promise<GhostTeamSnapshot[]> {
   // Preferred: the authenticated shared pool (other players' runs that got deep
   // enough — `minWave` keeps shallow runs out of late ghost waves).
-  const fromServer = (await sampleRunsFromServer(difficulty, count, minWave, maxWave, requireSavedItems)).filter(
-    snapshot => !requireSavedItems || hasErGhostSavedItems(snapshot),
+  const fromServer = (await sampleRunsFromServer(
+    difficulty,
+    count,
+    minWave,
+    maxWave,
+    requireSavedItems,
+    victoriesOnly,
+  )).filter(snapshot =>
+    (!requireSavedItems || hasErGhostSavedItems(snapshot)) && (!victoriesOnly || snapshot.isVictory),
   );
   if (fromServer.length > 0) {
     saveSharedGhostCache(fromServer);
@@ -1004,14 +1054,16 @@ async function fetchGhostTeams(
     try {
       const sep = url.includes("?") ? "&" : "?";
       const res = await fetch(
-        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}`,
+        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}${victoriesOnly ? "&victoriesOnly=1" : ""}`,
         { method: "GET", headers: { Accept: "application/json" } },
       );
       if (res.ok) {
         const data = await res.json();
         const list = (Array.isArray(data) ? data : (data?.teams ?? []))
           .filter(isValidSnapshot)
-          .filter(snapshot => !requireSavedItems || hasErGhostSavedItems(snapshot));
+          .filter(snapshot =>
+            (!requireSavedItems || hasErGhostSavedItems(snapshot)) && (!victoriesOnly || snapshot.isVictory),
+          );
         if (list.length > 0) {
           saveSharedGhostCache(list as GhostTeamSnapshot[]);
           return list as GhostTeamSnapshot[];
@@ -1028,10 +1080,23 @@ async function fetchGhostTeams(
     snapshot =>
       snapshot.waveReached >= minWave
       && snapshot.waveReached <= maxWave
-      && ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty)
-      && (!requireSavedItems || hasErGhostSavedItems(snapshot)),
+      && (victoriesOnly || ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty))
+      && (!requireSavedItems || hasErGhostSavedItems(snapshot))
+      && (!victoriesOnly || snapshot.isVictory),
   );
   return cached.slice(-count);
+}
+
+/** Preload the all-difficulty victorious-item pool before Endless enters its first encounter. */
+export async function prepareErEndlessGhostPool(): Promise<void> {
+  seedGhostPoolFromSharedCache();
+  const local = loadLocalGhostTeams().filter(
+    snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot),
+  );
+  mergeGhostPool(local);
+  const shared = await fetchGhostTeams(getErDifficulty(), 20, 0, 200, true, true);
+  mergeGhostPool(shared, true);
+  prefetchStarted = true;
 }
 
 /**
@@ -1083,6 +1148,22 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
     return;
   }
   seedGhostPoolFromSharedCache();
+
+  if (isErEndlessContinuationActive()) {
+    prefetchStarted = true;
+    void fetchGhostTeams(getErDifficulty(), 20, 0, 200, true, true).then(teams => mergeGhostPool(teams, true));
+    if (hasErEndlessRift("parallel-lives") || hasErEndlessRift("echo-hunt")) {
+      const source = (prefetched ?? []).find(snapshot =>
+        snapshot.isVictory
+        && hasErGhostSavedItems(snapshot)
+        && !endlessLineageRequests.has(snapshot.id),
+      );
+      if (source) {
+        void fetchEndlessLineage(source.id).then(teams => mergeGhostPool(teams, true));
+      }
+    }
+    return;
+  }
 
   const targets: number[] = [];
   const eligibilityWave = isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
@@ -1215,6 +1296,63 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
   return pool[h % pool.length];
 }
 
+function augmentErEndlessGhost(
+  snapshot: GhostTeamSnapshot,
+  waveIndex: number,
+  echoStage?: 1 | 2 | 3,
+): GhostTeamSnapshot {
+  const donorCount = hasErEndlessRift("full-procession")
+    ? 2
+    : hasErEndlessRift("seventh-shadow") || echoStage === 3
+      ? 1
+      : 0;
+  const replaceOne = hasErEndlessRift("counter-draft");
+  if (donorCount === 0 && !replaceOne && echoStage == null) {
+    return snapshot;
+  }
+  const result = structuredClone(snapshot);
+  result.endlessEchoStage = echoStage;
+  const donorTeams = (prefetched ?? []).filter(candidate =>
+    candidate.id !== snapshot.id
+    && candidate.isVictory
+    && hasErGhostSavedItems(candidate)
+    && isErGhostTeamLegal(candidate),
+  );
+  const donorMembers = donorTeams.flatMap(candidate => candidate.party);
+  if (donorMembers.length === 0) {
+    return result;
+  }
+  const usedSpecies = new Set(result.party.map(member => member.speciesId));
+  const chooseDonor = (slot: number): GhostMember => {
+    const distinct = donorMembers.filter(member => !usedSpecies.has(member.speciesId));
+    const pool = distinct.length > 0 ? distinct : donorMembers;
+    const key = `${globalScene.seed}:endless-donor:${waveIndex}:${snapshot.id}:${slot}`;
+    let hash = 2166136261;
+    for (const char of key) {
+      hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    }
+    const donor = structuredClone(pool[(hash >>> 0) % pool.length]);
+    usedSpecies.add(donor.speciesId);
+    return donor;
+  };
+  if (replaceOne && result.party.length > 0) {
+    let replaceIndex = 0;
+    let lowestBst = Number.POSITIVE_INFINITY;
+    result.party.forEach((member, index) => {
+      const bst = getPokemonSpecies(member.speciesId)?.baseTotal ?? 0;
+      if (bst < lowestBst) {
+        lowestBst = bst;
+        replaceIndex = index;
+      }
+    });
+    result.party[replaceIndex] = chooseDonor(10);
+  }
+  for (let slot = 0; slot < donorCount && result.party.length < 8; slot++) {
+    result.party.push(chooseDonor(slot));
+  }
+  return result;
+}
+
 /** Fixed carrier for the staging-only Mystery schedule; deliberately independent of network/account pools. */
 function mysteryGauntletGhost(): GhostTeamSnapshot {
   const member = (speciesId: number): GhostMember => ({
@@ -1247,6 +1385,77 @@ function mysteryGauntletGhost(): GhostTeamSnapshot {
  * Stable within a run: the same wave always yields the same ghost.
  */
 export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostTeamSnapshot | null {
+  if (isErEndlessContinuationActive()) {
+    if (!trainerWave) {
+      return null;
+    }
+    const existing = ghostByWave.get(waveIndex);
+    if (existing) {
+      return existing;
+    }
+    const allEligible = (prefetched ?? []).filter(snapshot => {
+      const uploader = ghostUploaderKey(snapshot);
+      const fingerprint = ghostTeamFingerprint(snapshot);
+      return snapshot.isVictory
+        && hasErGhostSavedItems(snapshot)
+        && isErGhostTeamLegal(snapshot)
+        && canUseErEndlessGhost(snapshot.id, uploader, fingerprint);
+    });
+    let route = getErEndlessGhostRoute();
+    if (route == null && hasErEndlessRift("parallel-lives")) {
+      const byUploader = new Map<string, GhostTeamSnapshot[]>();
+      for (const snapshot of allEligible) {
+        const key = ghostUploaderKey(snapshot);
+        const group = byUploader.get(key) ?? [];
+        group.push(snapshot);
+        byUploader.set(key, group);
+      }
+      const candidates = [...byUploader.entries()].filter(([, snapshots]) => snapshots.length >= 3);
+      if (candidates.length > 0) {
+        const [sourceUserId, snapshots] = candidates[waveIndex % candidates.length];
+        beginErEndlessGhostRoute({
+          riftId: "parallel-lives",
+          sourceUserId,
+          sourceSnapshotId: snapshots[0].id,
+          snapshotIds: snapshots.slice(0, 3).map(snapshot => snapshot.id),
+        });
+        route = getErEndlessGhostRoute();
+      }
+    }
+    if (route == null && hasErEndlessRift("echo-hunt")) {
+      const source = pickGhost(allEligible, waveIndex);
+      if (source) {
+        beginErEndlessGhostRoute({
+          riftId: "echo-hunt",
+          sourceUserId: ghostUploaderKey(source),
+          sourceSnapshotId: source.id,
+          snapshotIds: [source.id, source.id, source.id],
+        });
+        route = getErEndlessGhostRoute();
+      }
+    }
+    const routeSnapshotId = route?.snapshotIds[route.encounterIndex];
+    const routed = routeSnapshotId == null
+      ? undefined
+      : (prefetched ?? []).find(snapshot => snapshot.id === routeSnapshotId);
+    const next = routed ?? pickGhost(allEligible, waveIndex);
+    if (!next) {
+      return null;
+    }
+    const uploader = ghostUploaderKey(next);
+    const fingerprint = ghostTeamFingerprint(next);
+    recordErEndlessGhost(next.id, uploader, fingerprint);
+    const echoStage = route?.riftId === "echo-hunt"
+      ? (Math.min(3, route.encounterIndex + 1) as 1 | 2 | 3)
+      : undefined;
+    const augmented = augmentErEndlessGhost(next, waveIndex, echoStage);
+    if (route != null) {
+      advanceErEndlessGhostRoute();
+    }
+    ghostByWave.set(waveIndex, augmented);
+    lastGhostUploader = next.trainerName ?? "";
+    return augmented;
+  }
   // ER (#422): with the Ghost Trainers challenge active, EVERY trainer wave
   // is a ghost wave (the caller says whether this wave fields a trainer).
   // MYSTERY GAUNTLET (#814): the scripted ghost wave always fields a ghost when one
@@ -1534,7 +1743,7 @@ export function buildGhostDialogueCtx(): GhostDialogueContext {
 /** Flag a freshly-built Trainer as a ghost, and size its party to the snapshot. */
 export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot): void {
   GHOST_BY_TRAINER.set(trainer, snapshot);
-  const size = Math.min(snapshot.party.length, MAX_PARTY);
+  const size = Math.min(snapshot.party.length, isErEndlessContinuationActive() ? 8 : MAX_PARTY);
   // Shadow the instance method so getPartyLevels / genParty field exactly the
   // ghost's team size (the shared trainer config is left untouched).
   trainer.getPartyTemplate = () => new TrainerPartyTemplate(size, PartyMemberStrength.STRONGER);

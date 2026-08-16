@@ -12,6 +12,8 @@ import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/a
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { getErEndlessHeldItemCandidateIndex, hasErEndlessRift } from "#data/elite-redux/er-endless-continuation";
+import { applyErEndlessHealing } from "#data/elite-redux/er-endless-rift-runtime";
 import { canUseFunMegaStone, getFunRealMegaChange } from "#data/elite-redux/er-fun-mega-mode";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
@@ -735,6 +737,9 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
    */
   override shouldApply(pokemon?: Pokemon, ..._args: unknown[]): boolean {
     if (!pokemon || !(this.pokemonId === -1 || pokemon.id === this.pokemonId)) {
+      return false;
+    }
+    if (hasErEndlessRift("empty-hands") && !(this instanceof PokemonFormChangeItemModifier)) {
       return false;
     }
     // ER Frisk / Supersweet Syrup "disable held item" rider: the ER_ITEM_DISABLED
@@ -2229,14 +2234,12 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
         // a plain Potion counts. The item still restores its HP normally.
         pokemon.removeTag(BattlerTagType.ER_BLEED);
       }
-      pokemon.hp = Math.min(
-        pokemon.hp
-          + Math.max(
-            Math.ceil(Math.max(Math.floor(this.restorePercent * 0.01 * pokemon.getMaxHp()), restorePoints)),
-            1,
-          ),
-        pokemon.getMaxHp(),
+      const requested = Math.max(
+        Math.ceil(Math.max(Math.floor(this.restorePercent * 0.01 * pokemon.getMaxHp()), restorePoints)),
+        1,
       );
+      const restored = this.fainted ? applyErEndlessHealing(pokemon, requested, true).amount : requested;
+      pokemon.hp = Math.min(pokemon.hp + restored, pokemon.getMaxHp());
       // #900 Guardian Angel: reviving a co-op partner's fainted mon (pure local observer).
       // Lazily imported (fire-and-forget) so modifier.ts's module graph does NOT statically
       // pull the co-op/showdown chain, which would cycle back here (er-resist-berries extends
@@ -3935,7 +3938,19 @@ export abstract class HeldItemTransferModifier extends PokemonHeldItemModifier {
       if (itemModifiers.length === 0) {
         break;
       }
-      const randItemIndex = pokemon.randBattleSeedInt(itemModifiers.length);
+      const randomIndex = pokemon.randBattleSeedInt(itemModifiers.length);
+      const poolType = targetPokemon.isPlayer()
+        ? ModifierPoolType.PLAYER
+        : targetPokemon.hasTrainer()
+          ? ModifierPoolType.TRAINER
+          : ModifierPoolType.WILD;
+      const randItemIndex = getErEndlessHeldItemCandidateIndex(
+        itemModifiers,
+        randomIndex,
+        modifier => modifier.type.getOrInferTier(poolType) ?? 0,
+        modifier => modifier.stackCount,
+        modifier => modifier.type.id,
+      );
       const randItem = itemModifiers[randItemIndex];
       const stackBefore = randItem.stackCount;
       if (globalScene.tryTransferHeldItemModifier(randItem, pokemon, false)) {

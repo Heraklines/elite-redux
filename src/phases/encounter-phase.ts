@@ -54,8 +54,17 @@ import type {
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
+import {
+  consumeErEndlessRift,
+  getErEndlessEquivalentDepth,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  isErEndlessRaidWave,
+} from "#data/elite-redux/er-endless-continuation";
+import { applyErEndlessBattleStart, prepareErEndlessBattleRuntime } from "#data/elite-redux/er-endless-rift-runtime";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { rollFunTerrain, rollFunWeather } from "#data/elite-redux/er-fun-mode";
+import { getErGhostSnapshot, hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import {
   erApplyCovenantHeal,
@@ -84,6 +93,7 @@ import {
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -1271,6 +1281,21 @@ export class EncounterPhase extends BattlePhase {
           battle.enemyParty[e] = battle.trainer?.genPartyMember(e)!; // TODO:: is the bang correct here?
         } else {
           let enemySpecies = globalScene.randomSpecies(battle.waveIndex, level, true);
+          const endlessRaid = isErEndlessRaidWave(battle.waveIndex);
+          if (endlessRaid) {
+            const raidMinions = [
+              SpeciesId.DUSTOX,
+              SpeciesId.BEAUTIFLY,
+              SpeciesId.BEEDRILL,
+              SpeciesId.VESPIQUEN,
+              SpeciesId.VOLCARONA,
+              SpeciesId.SCIZOR,
+            ] as const;
+            enemySpecies =
+              e === 0
+                ? getPokemonSpecies(ErSpeciesId.CASCOON_PRIMAL)
+                : getPokemonSpecies(raidMinions[(e - 1) % raidMinions.length]);
+          }
           // Elite Redux: on Elite/Hell the classic final boss (Eternatus) is
           // replaced by a two-phase Cascoon → Primal Cascoon encounter.
           if (battle.isClassicFinalBoss) {
@@ -1291,8 +1316,19 @@ export class EncounterPhase extends BattlePhase {
             enemySpecies,
             level,
             TrainerSlot.NONE,
-            !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
+            endlessRaid ? e === 0 : !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
           );
+          if (endlessRaid) {
+            if (e === 0) {
+              battle.enemyParty[e].setBoss(
+                true,
+                globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies, true),
+              );
+              battle.enemyParty[e].moveset = CASCOON_ANGELS_WRATH_MOVES.map(([, moveId]) => new PokemonMove(moveId));
+            } else {
+              battle.enemyParty[e].setBoss(true, 1 + Math.floor(getErEndlessEquivalentDepth(battle.waveIndex) / 400));
+            }
+          }
           applyMoodyCoordinatorWildEncounter(battle.enemyParty[e]);
           if (globalScene.currentBattle.isClassicFinalBoss) {
             battle.enemyParty[e].ivs.fill(31);
@@ -1382,6 +1418,59 @@ export class EncounterPhase extends BattlePhase {
       return true;
     });
 
+    if (isErEndlessContinuationActive() && battle.trainer && hasErGhostOverride(battle.trainer)) {
+      if (hasErEndlessRift("grave-return")) {
+        const runtime = prepareErEndlessBattleRuntime();
+        if (runtime) {
+          runtime.graveReturnAvailable = true;
+        }
+      }
+      const depth = getErEndlessEquivalentDepth(battle.waveIndex);
+      let segmentBudget = 1 + Math.floor(depth / 50);
+      const ranked = [...battle.enemyParty].toSorted((left, right) => {
+        const threat = (pokemon: EnemyPokemon) =>
+          pokemon.getSpeciesForm().baseTotal
+          + pokemon.getMoveset().reduce((sum, move) => sum + Math.max(0, move.getMove().power), 0);
+        return threat(right) - threat(left);
+      });
+      const echoStage = getErGhostSnapshot(battle.trainer)?.endlessEchoStage;
+      const echoSegmentIds = new Set(
+        echoStage === 2 || echoStage === 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : [],
+      );
+      const allocations = new Map<number, number>();
+      for (let index = 0; segmentBudget > 0 && ranked.length > 0; index++, segmentBudget--) {
+        const pokemon = ranked[index % ranked.length];
+        allocations.set(pokemon.id, (allocations.get(pokemon.id) ?? 0) + 1);
+      }
+      for (const pokemon of battle.enemyParty) {
+        const extra =
+          (allocations.get(pokemon.id) ?? 0)
+          + (hasErEndlessRift("segment-bloom") ? 1 : 0)
+          + (echoSegmentIds.has(pokemon.id) ? 1 : 0);
+        if (extra > 0) {
+          pokemon.setBoss(true, 1 + extra);
+        }
+      }
+      for (const id of [
+        "seventh-shadow",
+        "full-procession",
+        "counter-draft",
+        "segment-bloom",
+        "grave-return",
+      ] as const) {
+        consumeErEndlessRift(id);
+      }
+    }
+
+    if (isErEndlessContinuationActive()) {
+      consumeErEndlessRift("avalanche-surge");
+    }
+
+    applyErEndlessBattleStart();
+    for (const pokemon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
+      loadEnemyAssets.push(pokemon.loadAssets());
+    }
+
     // Co-op HOST (#633): the enemy party's IDENTITY is generated here, but its HELD ITEMS
     // are not attached until generateEnemyModifiers() runs in the loadEnemyAssets.then()
     // block below. So the broadcast (which must carry the host's held items so the guest
@@ -1423,7 +1512,11 @@ export class EncounterPhase extends BattlePhase {
     } else {
       const overridedBossSegments = Overrides.ENEMY_HEALTH_SEGMENTS_OVERRIDE > 1;
       // for double battles, reduce the health segments for boss Pokemon unless there is an override
-      if (!overridedBossSegments && battle.enemyParty.filter(p => p.isBoss()).length > 1) {
+      if (
+        !isErEndlessRaidWave(battle.waveIndex)
+        && !overridedBossSegments
+        && battle.enemyParty.filter(p => p.isBoss()).length > 1
+      ) {
         for (const enemyPokemon of battle.enemyParty) {
           // If the enemy pokemon is a boss and wasn't populated from data source, then update the number of segments
           if (enemyPokemon.isBoss() && !enemyPokemon.isPopulatedFromDataSource) {

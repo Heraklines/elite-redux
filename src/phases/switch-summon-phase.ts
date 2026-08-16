@@ -15,6 +15,7 @@ import { getActiveCoopV2ReplacementCutover } from "#data/elite-redux/coop/author
 import { failCoopSharedSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
+import { completeErEndlessSwitch, prepareErEndlessSwitch } from "#data/elite-redux/er-endless-rift-runtime";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { notifyMoodyFormationSwitch } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { notifyMoodyRuntimeEntry } from "#data/elite-redux/moody/moody-runtime-field-engine";
@@ -288,6 +289,7 @@ export class SwitchSummonPhase extends SummonPhase {
     const voluntaryMoodySwitch =
       this.switchType === SwitchType.SWITCH
       && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON;
+    const endlessTransfer = prepareErEndlessSwitch(this.lastPokemon, voluntaryMoodySwitch);
     notifyMoodyFormationSwitch(this.lastPokemon, switchedInPokemon, voluntaryMoodySwitch);
     notifyMoodyCoordinatorDirectPairSwitch(this.lastPokemon, switchedInPokemon, voluntaryMoodySwitch);
 
@@ -380,6 +382,7 @@ export class SwitchSummonPhase extends SummonPhase {
       // survive. No-op for an empty snapshot (relic absent / not a voluntary
       // player switch).
       erBondedCharmApply(switchedInPokemon, bondedCharmStages);
+      completeErEndlessSwitch(this.lastPokemon, switchedInPokemon, endlessTransfer);
       notifyMoodyRuntimeEntry(switchedInPokemon, this.switchType !== SwitchType.INITIAL_SWITCH);
       this.summon();
     };

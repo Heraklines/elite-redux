@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { getErEndlessEquivalentDepth, getErEndlessState } from "#data/elite-redux/er-endless-continuation";
 import {
   MOODY_PASSIVE_PARTIAL_BOON_IDS,
   MOODY_PASSIVE_SUPPORTED_BOON_IDS,
@@ -204,8 +205,18 @@ export function generateMoodyEnemyBoonLoadout(
   if (state == null || budget === 0) {
     return { waveIndex, boons: [] };
   }
+  return generateEnemyBoonLoadout(party, waveIndex, budget, state.seed, counterWeightOverride);
+}
+
+function generateEnemyBoonLoadout(
+  party: readonly Pokemon[],
+  waveIndex: number,
+  budget: number,
+  seedInput: number,
+  counterWeightOverride?: number,
+): MoodyEnemyBoonLoadout {
   const boons: MoodyBoonInstance[] = [];
-  const seed = mix32(state.seed ^ Math.imul(waveIndex + 1, 0x85ebca6b));
+  const seed = mix32(seedInput ^ Math.imul(waveIndex + 1, 0x85ebca6b));
   const fieldCounterWeight = counterWeightOverride ?? getMoodyRuntimeCounterWeight();
   const counterCandidates = Math.max(
     1,
@@ -237,6 +248,35 @@ export function generateMoodyEnemyBoonLoadout(
     }
   }
   return { waveIndex, boons };
+}
+
+/** Endless ghosts inherit the player's boon power, then gain depth-scaled power. */
+export function generateEndlessEnemyBoonLoadout(
+  party: readonly Pokemon[],
+  waveIndex: number,
+  counterBiased = false,
+): MoodyEnemyBoonLoadout {
+  const endless = getErEndlessState();
+  if (endless == null) {
+    return { waveIndex, boons: [] };
+  }
+  const depth = getErEndlessEquivalentDepth(waveIndex);
+  const referencePower = getMoodyBoonBudget() + Math.floor(depth / 25);
+  if (referencePower <= 0) {
+    return { waveIndex, boons: [] };
+  }
+  const stringSeed = [...endless.seed].reduce(
+    (hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619),
+    2166136261,
+  );
+  const multiplier = 1 + (mix32(stringSeed ^ waveIndex ^ 0x6d2b79f5) & 1);
+  return generateEnemyBoonLoadout(
+    party,
+    waveIndex,
+    referencePower * multiplier,
+    stringSeed,
+    counterBiased ? 4 : undefined,
+  );
 }
 
 export function setMoodyEnemyBoonLoadout(loadout: MoodyEnemyBoonLoadout | null): void {
