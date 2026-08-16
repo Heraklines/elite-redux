@@ -65,7 +65,6 @@ const PASSIVE_OVERLAP: Readonly<Record<string, ReadonlySet<MoodyRuntimeCommandKi
   "layered-armor": commandKinds("modify-damage"),
   "type-tax": commandKinds("modify-damage"),
   "slow-to-warm": commandKinds("modify-damage", "modify-speed"),
-  "exposed-flank": commandKinds("modify-damage"),
   "accumulated-fatigue": commandKinds("modify-damage"),
   "withering-pp": commandKinds("consume-extra-pp"),
   "brittle-weakness": commandKinds("modify-damage"),

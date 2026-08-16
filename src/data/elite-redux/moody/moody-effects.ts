@@ -213,7 +213,6 @@ const SUPPORTED_CURSE_ID_LIST = [
   "thin-wallet",
   "type-tax",
   "slow-to-warm",
-  "exposed-flank",
   "accumulated-fatigue",
   "withering-pp",
   "brittle-weakness",
@@ -255,7 +254,6 @@ export const MOODY_PASSIVE_PARTIAL_BOON_IDS: ReadonlySet<string> = new Set([
 
 export const MOODY_PASSIVE_PARTIAL_CURSE_IDS: ReadonlySet<string> = new Set([
   "slow-to-warm",
-  "exposed-flank",
   "accumulated-fatigue",
   "withering-pp",
   "hollow-victory",
@@ -1145,11 +1143,6 @@ function applyCurse(
       if (actorOwned && context.flags?.firstMoveAfterEntry && context.move?.isDamaging) {
         applyMultiplier(result, applications, curse.curseId, "outgoingDamageMultiplier", 0.85);
         applyDelta(result, applications, curse.curseId, "priorityDelta", -1);
-      }
-      break;
-    case "exposed-flank":
-      if (targetOwned && context.flags?.firstDirectHitReceived) {
-        applyMultiplier(result, applications, curse.curseId, "incomingDamageMultiplier", 1.15);
       }
       break;
     case "accumulated-fatigue":

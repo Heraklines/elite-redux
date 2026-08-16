@@ -42,6 +42,7 @@ describe("Moody Mode catalog", () => {
       ),
     ).toBe(true);
     expect(MOODY_CURSES.every(curse => !curse.description.includes("\n---"))).toBe(true);
+    expect(MOODY_CURSES.find(curse => curse.id === "slow-to-warm")?.dread).toBe(2);
     const playerFacingText = [
       ...MOODY_BOONS.flatMap(boon => [
         boon.base,

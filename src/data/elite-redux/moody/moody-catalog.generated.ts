@@ -2486,7 +2486,7 @@ export const MOODY_CURSES = [
     id: "slow-to-warm",
     number: 6,
     name: "Slow to Warm",
-    dread: 1,
+    dread: 2,
     description:
       "Each Pokémon’s first damaging move after entering deals 15% less damage and acts with reduced Speed priority.",
   },

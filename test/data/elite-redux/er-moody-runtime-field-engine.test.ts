@@ -565,6 +565,12 @@ describe("Moody live field engine", () => {
       }
     }
     expect(isMoodyRuntimeCommandOwnedByPassive({ kind: "split-damage", effectId: "deferred-pain" })).toBe(false);
+    expect(isMoodyRuntimeCommandOwnedByPassive({ kind: "modify-damage", effectId: "exposed-flank" })).toBe(false);
+    expect(
+      applyMoodyRuntimeDamageCommandValues(100, 100, [
+        { kind: "modify-damage", effectId: "exposed-flank", multiplier: 1.15 },
+      ]),
+    ).toBeCloseTo(115);
   });
 
   it("persists deferred commands to their registered consumer and consumes them once", () => {

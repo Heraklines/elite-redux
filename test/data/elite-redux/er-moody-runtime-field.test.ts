@@ -782,6 +782,57 @@ describe("Moody runtime field deterministic mechanics", () => {
     expect(replacement.state.values["persistent:restless-lead:last-lead"]).toBe(ally.id);
   });
 
+  it("applies Exposed Flank only to a Pokemon's first direct hit in each battle", () => {
+    const firstHit = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("exposed-flank")],
+      state: createMoodyRuntimeFieldState(),
+      event: { ...base, kind: "before-damage", source: enemy, target: player, amount: 40, direct: true },
+    });
+    expect(firstHit.commands).toContainEqual(
+      expect.objectContaining({ kind: "modify-damage", effectId: "exposed-flank", multiplier: 1.15 }),
+    );
+
+    const laterTurn = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("exposed-flank")],
+      state: firstHit.state,
+      event: {
+        ...base,
+        turn: base.turn + 1,
+        kind: "before-damage",
+        source: enemy,
+        target: player,
+        amount: 40,
+        direct: true,
+      },
+    });
+    expect(laterTurn.commands).not.toContainEqual(
+      expect.objectContaining({ kind: "modify-damage", effectId: "exposed-flank" }),
+    );
+
+    const nextBattle = resolveMoodyRuntimeField({
+      ownerSide: "player",
+      boons: [],
+      curses: [curse("exposed-flank")],
+      state: laterTurn.state,
+      event: {
+        ...base,
+        battleId: "battle:next",
+        kind: "before-damage",
+        source: enemy,
+        target: player,
+        amount: 40,
+        direct: true,
+      },
+    });
+    expect(nextBattle.commands).toContainEqual(
+      expect.objectContaining({ kind: "modify-damage", effectId: "exposed-flank", multiplier: 1.15 }),
+    );
+  });
+
   it("applies Type Tax only to duplicated move types and emits nothing for unaffected types", () => {
     const event = boonEvent("prismatic-opening").event;
     expect(event.kind).toBe("before-move");

@@ -1506,9 +1506,17 @@ Every duplicate party typing after the first reduces the power of that type’s 
 
 The second and subsequent copies or stacks of the same item operate at reduced effectiveness.
 
+---
+
+## Dread II
+
 ### 06. Slow to Warm
 
 Each Pokémon’s first damaging move after entering deals 15% less damage and acts with reduced Speed priority.
+
+---
+
+## Dread I
 
 ### 07. Fading Momentum
 
