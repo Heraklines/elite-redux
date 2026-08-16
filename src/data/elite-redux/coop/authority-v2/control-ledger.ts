@@ -20,7 +20,13 @@
 import {
   boundarySupersessionAllowsSuccessorEntry,
   type CoopBoundarySupersessionEntry,
+  isBoundarySupersessionCandidate,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import {
+  type AuthorityEntryProofScope,
+  authorityEntryProofScopeOf,
+  consumeReplicaEntryProofScope,
+} from "#data/elite-redux/coop/authority-v2/authority-log";
 import type { CoopAuthorityEntry, CoopControlInstallResult } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   controlAllowsSuccessorEntry,
@@ -126,10 +132,23 @@ function sameRewardSurface(
   return left.ordinal === right.ordinal && left.surfaceId === right.surfaceId;
 }
 
+/** Hard live-proof bound aligned with the authority log default; overflow refuses rather than evicts evidence. */
+export const COOP_V2_AUTHENTICATED_SOURCE_CAPACITY = 512;
+
 /** Per-runtime global control ledger; never shared between the two in-process browser engines. */
 export class CoopV2ControlLedger {
   private readonly claims = new Map<string, InteractionControlClaim>();
+  /** Address reuse may replace a claim, so immutable source authentication has its own revision keyspace. */
+  private readonly authenticatedSources = new Map<number, CoopAuthorityEntry>();
+  private readonly authenticatedSourceCapacity: number;
   private activeControlId: string | null = null;
+
+  constructor(authenticatedSourceCapacity = COOP_V2_AUTHENTICATED_SOURCE_CAPACITY) {
+    if (!Number.isSafeInteger(authenticatedSourceCapacity) || authenticatedSourceCapacity <= 0) {
+      throw new Error("CoopV2ControlLedger requires a positive authenticated-source capacity");
+    }
+    this.authenticatedSourceCapacity = authenticatedSourceCapacity;
+  }
 
   /**
    * Atomically reserve an authority-authored entry before it is published. This is the local half of the
@@ -138,17 +157,39 @@ export class CoopV2ControlLedger {
    */
   prepareAuthorityEntry(entry: CoopAuthorityEntry): (() => void) | null {
     const priorClaims = this.cloneClaims();
+    const priorAuthenticatedSources = this.cloneAuthenticatedSources();
     const priorActiveControlId = this.activeControlId;
     const restore = (): void => {
       this.claims.clear();
       for (const [controlId, claim] of priorClaims) {
         this.claims.set(controlId, claim);
       }
+      this.authenticatedSources.clear();
+      for (const [revision, source] of priorAuthenticatedSources) {
+        this.authenticatedSources.set(revision, source);
+      }
       this.activeControlId = priorActiveControlId;
     };
-    if (!this.admitSuccessor(entry) || !this.registerEntry(entry) || !this.markMaterialApplied(entry)) {
+    const proofScope = authorityEntryProofScopeOf(entry);
+    const authorityProofScope = proofScope?.kind === "authority-retained" ? proofScope : null;
+    const proofSources = authorityProofScope == null ? null : this.mergeProofSources(authorityProofScope, entry);
+    if (
+      (authorityProofScope != null
+        && (proofSources == null || !this.reconcileAuthenticatedSources(proofSources, entry)))
+      || !this.admitSuccessor(entry)
+      || !this.registerEntry(entry)
+      || !this.markMaterialApplied(entry)
+    ) {
       restore();
       return null;
+    }
+    if (authorityProofScope?.boundarySources != null) {
+      // Initial admission already proved this exact canonical list. Once the boundary reservation succeeds,
+      // those sources are represented by its frozen approval and the new boundary source remains live.
+      for (const revision of entry.subsumes) {
+        this.authenticatedSources.delete(revision);
+      }
+      this.authenticatedSources.set(entry.revision, structuredClone(entry));
     }
     let live = true;
     return () => {
@@ -172,6 +213,25 @@ export class CoopV2ControlLedger {
     ) {
       return false;
     }
+    const proofScope = authorityEntryProofScopeOf(entry);
+    if (proofScope?.kind === "authority-retained") {
+      const proofSources = this.mergeProofSources(proofScope, entry);
+      if (proofSources == null || !this.reconcileAuthenticatedSources(proofSources, entry)) {
+        return false;
+      }
+    } else if (
+      proofScope?.kind === "replica-dense-frontier"
+      && !this.reconcileAuthenticatedSources([proofScope.source], entry)
+    ) {
+      // Replica admission reaches registerEntry only after admitSuccessor consumed the prior control. The
+      // dense proof therefore bounds history to this exact authenticated source without weakening bypass.
+      return false;
+    }
+    const authenticatedSource = this.authenticatedSources.get(entry.revision);
+    if (!this.canRegisterAuthenticatedSource(authenticatedSource, entry)) {
+      // Never evict an older revision: AuthorityLog may still retain it as exact boundary evidence.
+      return false;
+    }
     const controlId = controlIdOf(control);
     const prior = this.claims.get(controlId);
     if (prior != null) {
@@ -180,6 +240,11 @@ export class CoopV2ControlLedger {
         && prior.sourceOperationId === entry.operationId
         && controlsEqual(prior.control, control);
       if (duplicate) {
+        // Refresh only the authenticated channel axes after hot rejoin; mechanical identity was checked above.
+        this.authenticatedSources.set(entry.revision, structuredClone(entry));
+        if (proofScope != null) {
+          consumeReplicaEntryProofScope(entry, proofScope);
+        }
         return true;
       }
       // A modal interaction can temporarily supersede command control and then return to the exact same
@@ -191,15 +256,20 @@ export class CoopV2ControlLedger {
         return false;
       }
     }
+    const sourceEntry = structuredClone(entry);
+    this.authenticatedSources.set(entry.revision, sourceEntry);
     this.claims.set(controlId, {
       revision: entry.revision,
       sourceOperationId: entry.operationId,
-      sourceEntry: structuredClone(entry),
+      sourceEntry: structuredClone(sourceEntry),
       control: structuredClone(control),
       materialApplied: false,
       superseded: false,
       installed: null,
     });
+    if (proofScope != null) {
+      consumeReplicaEntryProofScope(entry, proofScope);
+    }
     return true;
   }
 
@@ -573,6 +643,9 @@ export class CoopV2ControlLedger {
     ) {
       return false;
     }
+    if (sourceEntry != null) {
+      this.authenticatedSources.set(revision, structuredClone(sourceEntry));
+    }
     const controlId = controlIdOf(control);
     this.claims.set(controlId, {
       revision,
@@ -588,7 +661,13 @@ export class CoopV2ControlLedger {
 
   clear(): void {
     this.claims.clear();
+    this.authenticatedSources.clear();
     this.activeControlId = null;
+  }
+
+  /** Bounded proof count exposed for lifecycle/capacity diagnostics without leaking source material. */
+  get authenticatedSourceCount(): number {
+    return this.authenticatedSources.size;
   }
 
   private latestUnsupersededClaim(): InteractionControlClaim | null {
@@ -602,21 +681,141 @@ export class CoopV2ControlLedger {
   }
 
   /**
-   * The authority log proves the exact retained list. The local control ledger
-   * can only prove source entries it has authenticated, so it applies the same
-   * typed/causal predicate and rejects every claimed revision it cannot name.
+   * The authority log proves the exact retained list. The local ledger resolves
+   * every claimed revision from its independent authenticated revision archive,
+   * so reusable control-address replacement cannot erase boundary evidence.
    */
   private allowsBoundarySupersession(
     predecessor: CoopBoundarySupersessionEntry,
     successor: CoopBoundarySupersessionEntry,
   ): boolean {
-    const trusted = successor.subsumes.map(revision =>
-      [...this.claims.values()].map(claim => claim.sourceEntry).find(entry => entry?.revision === revision),
-    );
+    const proofScope = authorityEntryProofScopeOf(successor as CoopAuthorityEntry);
+    if (proofScope?.kind === "replica-dense-frontier") {
+      // This privilege is attached by AuthorityLog.admit to this exact object identity only. The dense
+      // cursor proves every named old revision was authenticated; the typed predicate still proves the
+      // active predecessor, terminal finality, exact next revision, and canonical material/control relation.
+      return (
+        proofScope.isActive()
+        && sameAuthenticatedSource(proofScope.source, successor as CoopAuthorityEntry)
+        && proofScope.source.context.membershipRevision === successor.context.membershipRevision
+        && proofScope.source.context.connectionGeneration === successor.context.connectionGeneration
+        && successor.revision === proofScope.authenticatedThrough + 1
+        && successor.subsumes.every(
+          revision => Number.isSafeInteger(revision) && revision > 0 && revision <= proofScope.authenticatedThrough,
+        )
+        && isBoundarySupersessionCandidate(predecessor, successor)
+      );
+    }
+    const trusted = successor.subsumes.map(revision => this.authenticatedSources.get(revision));
     if (trusted.some(entry => entry == null)) {
       return false;
     }
     return boundarySupersessionAllowsSuccessorEntry(predecessor, successor, trusted as CoopAuthorityEntry[]);
+  }
+
+  /** Merge only the exact initially approved boundary list into the current live-retention snapshot. */
+  private mergeProofSources(
+    scope: Extract<AuthorityEntryProofScope, { readonly kind: "authority-retained" }>,
+    candidate: CoopAuthorityEntry,
+  ): readonly CoopAuthorityEntry[] | null {
+    const boundarySources = scope.boundarySources;
+    if (
+      boundarySources != null
+      && (boundarySources.length !== candidate.subsumes.length
+        || boundarySources.some((source, index) => source.revision !== candidate.subsumes[index]))
+    ) {
+      return null;
+    }
+    const merged = new Map<number, CoopAuthorityEntry>();
+    for (const source of [...scope.retainedSources, ...(boundarySources ?? [])]) {
+      const prior = merged.get(source.revision);
+      if (prior != null && !sameAuthenticatedSource(prior, source)) {
+        return null;
+      }
+      if (prior == null) {
+        merged.set(source.revision, source);
+        continue;
+      }
+      const sourceIsNewer =
+        source.context.membershipRevision >= prior.context.membershipRevision
+        && source.context.connectionGeneration >= prior.context.connectionGeneration;
+      const priorIsNewer =
+        prior.context.membershipRevision >= source.context.membershipRevision
+        && prior.context.connectionGeneration >= source.context.connectionGeneration;
+      if (!sourceIsNewer && !priorIsNewer) {
+        return null;
+      }
+      if (sourceIsNewer) {
+        merged.set(source.revision, source);
+      }
+    }
+    return [...merged.values()];
+  }
+
+  /**
+   * Replace history with AuthorityLog's exact live proof set. This is the only pruning path for ordinary
+   * chains: no age/capacity eviction guesses whether a still-retained revision is safe to discard.
+   */
+  private reconcileAuthenticatedSources(
+    retainedSources: readonly CoopAuthorityEntry[],
+    candidate: CoopAuthorityEntry,
+  ): boolean {
+    if (retainedSources.length > this.authenticatedSourceCapacity) {
+      return false;
+    }
+    const next = new Map<number, CoopAuthorityEntry>();
+    for (const source of retainedSources) {
+      if (next.has(source.revision)) {
+        return false;
+      }
+      const prior = this.authenticatedSources.get(source.revision);
+      if (prior != null) {
+        if (!sameAuthenticatedSource(prior, source)) {
+          return false;
+        }
+        const sourceIsNewer =
+          source.context.membershipRevision >= prior.context.membershipRevision
+          && source.context.connectionGeneration >= prior.context.connectionGeneration;
+        const priorIsNewer =
+          prior.context.membershipRevision >= source.context.membershipRevision
+          && prior.context.connectionGeneration >= source.context.connectionGeneration;
+        if (!sourceIsNewer && !priorIsNewer) {
+          return false;
+        }
+        next.set(source.revision, structuredClone(sourceIsNewer ? source : prior));
+        continue;
+      }
+      next.set(source.revision, structuredClone(source));
+    }
+    const retainedCandidate = next.get(candidate.revision);
+    if (
+      retainedCandidate == null
+      || !sameAuthenticatedSource(retainedCandidate, candidate)
+      || retainedCandidate.context.membershipRevision !== candidate.context.membershipRevision
+      || retainedCandidate.context.connectionGeneration !== candidate.context.connectionGeneration
+    ) {
+      return false;
+    }
+    this.authenticatedSources.clear();
+    for (const [revision, source] of next) {
+      this.authenticatedSources.set(revision, source);
+    }
+    return true;
+  }
+
+  private canRegisterAuthenticatedSource(prior: CoopAuthorityEntry | undefined, entry: CoopAuthorityEntry): boolean {
+    if (prior == null) {
+      return this.authenticatedSources.size < this.authenticatedSourceCapacity;
+    }
+    return this.canRefreshAuthenticatedSource(prior, entry);
+  }
+
+  private canRefreshAuthenticatedSource(prior: CoopAuthorityEntry, entry: CoopAuthorityEntry): boolean {
+    return (
+      sameAuthenticatedSource(prior, entry)
+      && entry.context.membershipRevision >= prior.context.membershipRevision
+      && entry.context.connectionGeneration >= prior.context.connectionGeneration
+    );
   }
 
   /** Snapshot mutable claim flags while preserving the opaque live phase/handler identities by reference. */
@@ -639,6 +838,29 @@ export class CoopV2ControlLedger {
       ]),
     );
   }
+
+  private cloneAuthenticatedSources(): Map<number, CoopAuthorityEntry> {
+    return new Map([...this.authenticatedSources].map(([revision, source]) => [revision, structuredClone(source)]));
+  }
+}
+
+function sameAuthenticatedSource(left: CoopAuthorityEntry, right: CoopAuthorityEntry): boolean {
+  return (
+    left.revision === right.revision
+    && left.operationId === right.operationId
+    && left.kind === right.kind
+    && left.material.digest === right.material.digest
+    && JSON.stringify(left.material.payload) === JSON.stringify(right.material.payload)
+    && controlsEqual(left.nextControl, right.nextControl)
+    && left.subsumes.length === right.subsumes.length
+    && left.subsumes.every((revision, index) => revision === right.subsumes[index])
+    && left.context.sessionId === right.context.sessionId
+    && left.context.runId === right.context.runId
+    && left.context.sessionEpoch === right.context.sessionEpoch
+    && left.context.seatMapId === right.context.seatMapId
+    && left.context.senderSeatId === right.context.senderSeatId
+    && left.context.authoritySeatId === right.context.authoritySeatId
+  );
 }
 
 /** @deprecated Transitional test/import alias; production owns one global V2 control ledger. */

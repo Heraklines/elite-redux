@@ -42,7 +42,10 @@
 // no-orphan-timer invariant directly.
 // =============================================================================
 
-import { boundarySupersessionAllowsSuccessorEntry } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import {
+  boundarySupersessionAllowsSuccessorEntry,
+  isBoundarySupersessionCandidate,
+} from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   freezeAuthorityEntry,
   isSameSessionIdentity,
@@ -243,6 +246,73 @@ interface DeliveryLease {
   exhaustionNotified: boolean;
 }
 
+/** Immutable approval captured only after the full retained-frontier boundary predicate passes. */
+interface AuthorityBoundaryApproval {
+  readonly predecessorRevision: number;
+  readonly predecessorOperationId: string;
+  readonly predecessorControlId: string;
+  readonly successorRevision: number;
+  readonly successorOperationId: string;
+  readonly successorKind: CoopAuthorityEntry["kind"];
+  readonly successorMaterialDigest: string;
+  readonly successorControlId: string;
+  readonly subsumes: readonly number[];
+  /** Exact retained source images that made the initial canonical subsumes proof succeed. */
+  readonly trustedSources: readonly CoopAuthorityEntry[];
+}
+
+/**
+ * Exact proof scope exposed only while an AuthorityLog-authenticated entry is synchronously handed to the
+ * live control ledger. The retained set bounds archive lifetime; boundarySources preserves an initially
+ * approved deferred boundary even if an unrelated retained lease retires before retry.
+ */
+export type AuthorityEntryProofScope =
+  | {
+      readonly kind: "authority-retained";
+      readonly retainedSources: readonly CoopAuthorityEntry[];
+      readonly boundarySources: readonly CoopAuthorityEntry[] | null;
+    }
+  | {
+      readonly kind: "replica-dense-frontier";
+      readonly source: CoopAuthorityEntry;
+      /** Every positive revision at or below this cursor was authenticated and mechanically completed. */
+      readonly authenticatedThrough: number;
+      /** Prevent a retained object reference from reusing this privilege after its log frontier moved. */
+      readonly isActive: () => boolean;
+    };
+
+const authorityEntryProofScopes = new WeakMap<CoopAuthorityEntry, AuthorityEntryProofScope>();
+
+/** Internal live-ledger seam: an unrecognized object identity never inherits another entry's proof. */
+export function authorityEntryProofScopeOf(entry: CoopAuthorityEntry): AuthorityEntryProofScope | null {
+  return authorityEntryProofScopes.get(entry) ?? null;
+}
+
+/** Consume the replica's one-shot handoff after the intended live ledger registers the admitted entry. */
+export function consumeReplicaEntryProofScope(entry: CoopAuthorityEntry, scope: AuthorityEntryProofScope): void {
+  if (scope.kind === "replica-dense-frontier" && authorityEntryProofScopes.get(entry) === scope) {
+    authorityEntryProofScopes.delete(entry);
+  }
+}
+
+function withAuthorityEntryProofScope<T>(
+  entry: CoopAuthorityEntry,
+  scope: AuthorityEntryProofScope,
+  callback: () => T,
+): T {
+  const prior = authorityEntryProofScopes.get(entry);
+  authorityEntryProofScopes.set(entry, scope);
+  try {
+    return callback();
+  } finally {
+    if (prior == null) {
+      authorityEntryProofScopes.delete(entry);
+    } else {
+      authorityEntryProofScopes.set(entry, prior);
+    }
+  }
+}
+
 function allPeersReached(lease: DeliveryLease, requiredStage: number): boolean {
   return [...lease.peerStages.values()].every(peer => peer.stage >= requiredStage);
 }
@@ -353,6 +423,8 @@ export class AuthorityLog implements CoopAuthorityLog {
   private pendingAuthorityCommit: {
     readonly entry: CoopAuthorityEntry;
     readonly prepare?: (entry: CoopAuthorityEntry) => (() => void) | null;
+    /** Null for an ordinary successor; non-null only after full initial boundary authorization. */
+    readonly boundaryApproval: AuthorityBoundaryApproval | null;
   } | null = null;
   private pendingReplicaSuccessorControl: {
     readonly revision: number;
@@ -500,6 +572,7 @@ export class AuthorityLog implements CoopAuthorityLog {
               cloneEntry({ ...this.pendingAuthorityCommit.entry, context: reboundLocalContext }),
             ),
             ...(this.pendingAuthorityCommit.prepare == null ? {} : { prepare: this.pendingAuthorityCommit.prepare }),
+            boundaryApproval: this.pendingAuthorityCommit.boundaryApproval,
           };
     const reboundLeases: {
       readonly lease: DeliveryLease;
@@ -624,12 +697,14 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.latestNextControl == null
       || (this.latestCommittedOperationId != null
         && controlAllowsSuccessorEntry(this.latestNextControl, this.latestCommittedOperationId, candidate));
-    const boundarySuccessorAllowed =
-      !ordinarySuccessorAllowed
-      && this.latestCommittedEntry != null
-      && this.retainedWindow.has(this.latestCommittedEntry.revision)
-      && boundarySupersessionAllowsSuccessorEntry(this.latestCommittedEntry, candidate, this.retained());
-    if (!ordinarySuccessorAllowed && !boundarySuccessorAllowed) {
+    const boundaryApproval = ordinarySuccessorAllowed
+      ? null
+      : pending == null
+        ? this.captureBoundaryApproval(candidate)
+        : this.deferredBoundaryApprovalAllows(pending.boundaryApproval, candidate)
+          ? pending.boundaryApproval
+          : null;
+    if (!ordinarySuccessorAllowed && boundaryApproval == null) {
       throw new Error(
         `AuthorityLog.commit: ${candidate.kind} is not authorized by predecessor control after `
           + `${this.latestCommittedOperationId ?? "(missing predecessor)"}`,
@@ -666,9 +741,14 @@ export class AuthorityLog implements CoopAuthorityLog {
     let rollback: (() => void) | null = null;
     try {
       const reservation = prepare ?? pending?.prepare;
-      rollback = reservation?.(committed) ?? null;
+      rollback =
+        reservation == null
+          ? null
+          : withAuthorityEntryProofScope(committed, this.entryProofScope(boundaryApproval), () =>
+              reservation(committed),
+            );
       if (reservation != null && rollback == null) {
-        this.pendingAuthorityCommit = { entry: committed, prepare: reservation };
+        this.pendingAuthorityCommit = { entry: committed, prepare: reservation, boundaryApproval };
         throw new AuthorityCommitDeferredError(committed);
       }
     } catch (error) {
@@ -991,6 +1071,26 @@ export class AuthorityLog implements CoopAuthorityLog {
         }
         this.pendingReplicaSuccessorControl = null;
         this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
+        // The live replica ledger receives this same object immediately after admit(). Its local proof need
+        // is the newly admitted revision only; completed predecessors are represented by the dense log cursor.
+        authorityEntryProofScopes.set(
+          entry,
+          Object.freeze({
+            kind: "replica-dense-frontier",
+            source: freezeAuthorityEntry(cloneEntry(entry)),
+            authenticatedThrough: entry.revision - 1,
+            isActive: () => {
+              const pending = this.pendingReplicaEntry;
+              return (
+                !this.disposed
+                && pending?.revision === entry.revision
+                && pending.operationId === entry.operationId
+                && pending.context.membershipRevision === entry.context.membershipRevision
+                && pending.context.connectionGeneration === entry.context.connectionGeneration
+              );
+            },
+          }),
+        );
         return { kind: "admitted" };
     }
   }
@@ -1171,6 +1271,82 @@ export class AuthorityLog implements CoopAuthorityLog {
   // ---------------------------------------------------------------------------
   // Internals
   // ---------------------------------------------------------------------------
+
+  /** Snapshot the exact currently retained proof set for one synchronous authority-local reservation. */
+  private entryProofScope(boundaryApproval: AuthorityBoundaryApproval | null): AuthorityEntryProofScope {
+    return Object.freeze({
+      kind: "authority-retained",
+      retainedSources: Object.freeze([...this.retained()]),
+      boundarySources: boundaryApproval?.trustedSources ?? null,
+    });
+  }
+
+  /** Capture the full retained-frontier proof once, before a boundary may enter the deferred state. */
+  private captureBoundaryApproval(candidate: CoopAuthorityEntry): AuthorityBoundaryApproval | null {
+    const predecessor = this.latestCommittedEntry;
+    const retained = this.retained();
+    if (
+      predecessor == null
+      || !this.retainedWindow.has(predecessor.revision)
+      || !boundarySupersessionAllowsSuccessorEntry(predecessor, candidate, retained)
+    ) {
+      return null;
+    }
+    const trustedSources = candidate.subsumes.map(revision => retained.find(source => source.revision === revision));
+    if (trustedSources.some(source => source == null)) {
+      return null;
+    }
+    return Object.freeze({
+      predecessorRevision: predecessor.revision,
+      predecessorOperationId: predecessor.operationId,
+      predecessorControlId: controlIdOf(predecessor.nextControl),
+      successorRevision: candidate.revision,
+      successorOperationId: candidate.operationId,
+      successorKind: candidate.kind,
+      successorMaterialDigest: candidate.material.digest,
+      successorControlId: controlIdOf(candidate.nextControl),
+      subsumes: Object.freeze([...candidate.subsumes]),
+      trustedSources: Object.freeze(
+        (trustedSources as CoopAuthorityEntry[]).map(source => freezeAuthorityEntry(cloneEntry(source))),
+      ),
+    });
+  }
+
+  /**
+   * Reuse only the proof captured for this exact immutable deferred body. Older unrelated leases may have
+   * retired since initial authorization, but the latest stale predecessor must still be the same retained,
+   * non-terminal frontier and the structural/causal boundary predicate must still hold.
+   */
+  private deferredBoundaryApprovalAllows(
+    approval: AuthorityBoundaryApproval | null,
+    candidate: CoopAuthorityEntry,
+  ): boolean {
+    const predecessor = this.latestCommittedEntry;
+    return (
+      approval != null
+      && predecessor != null
+      && this.latestCommittedOperationId === approval.predecessorOperationId
+      && this.latestNextControl != null
+      && this.latestNextControl.kind !== "TERMINAL"
+      && controlsEqual(this.latestNextControl, predecessor.nextControl)
+      && this.retainedWindow.has(approval.predecessorRevision)
+      && predecessor.revision === approval.predecessorRevision
+      && predecessor.operationId === approval.predecessorOperationId
+      && controlIdOf(predecessor.nextControl) === approval.predecessorControlId
+      && candidate.revision === approval.successorRevision
+      && candidate.revision === predecessor.revision + 1
+      && candidate.operationId === approval.successorOperationId
+      && candidate.kind === approval.successorKind
+      && candidate.material.digest === approval.successorMaterialDigest
+      && controlIdOf(candidate.nextControl) === approval.successorControlId
+      && sameRevisionList(candidate.subsumes, approval.subsumes)
+      && sameRevisionList(
+        approval.trustedSources.map(source => source.revision),
+        approval.subsumes,
+      )
+      && isBoundarySupersessionCandidate(predecessor, candidate)
+    );
+  }
 
   /** Emit at most one request for an unchanged unfinished mechanical frontier. */
   private requestTailOnce(missingFrom: number): void {
@@ -1357,6 +1533,10 @@ function sameAuthorityCommitBody(left: CoopAuthorityEntry, right: Omit<CoopAutho
       subsumes: right.subsumes,
     })
   );
+}
+
+function sameRevisionList(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((revision, index) => revision === right[index]);
 }
 
 /** Structurally clone an opaque JSON payload so retention is independent of the caller's object. */
