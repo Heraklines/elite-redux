@@ -91,6 +91,7 @@ import {
   isCoopV2WaveCutoverActive,
   isCoopV2WaveEnabled,
   setActiveCoopV2WaveCutover,
+  type CoopV2WaveTerminalCommitDisposition,
 } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import {
   type CoopV2InteractionProjectionPlan,
@@ -3361,6 +3362,9 @@ function prepareCoopSharedTerminal(runtime: CoopRuntime, reason: string): boolea
   state.reason = reason;
   // A shared terminal owns progression now; no parked ME callback may wake a stale scene afterward.
   clearCoopMeTerminalRedrive(runtime);
+  // A shared terminal also owns any still-uncommitted host wave boundary; never leave a queued redrive
+  // able to publish a successor after the terminal fence has become authoritative.
+  clearCoopV2DeferredHostBoundary(runtime);
   let prepared = true;
   try {
     runtime.membership.terminate();
@@ -4118,6 +4122,32 @@ interface CoopV2WaveLiveTransaction {
   continuationReady: boolean;
 }
 
+type CoopV2DeferredHostBoundaryCompatibility =
+  | {
+      readonly kind: "wave-resolved";
+      readonly outcome: CoopWaveOutcome;
+      readonly captureParty?: string[] | undefined;
+      readonly presentation?: CoopCapturePresentation | undefined;
+    }
+  | { readonly kind: "wave-end" };
+
+/**
+ * The one exact host wave/terminal image retained when the ordered authority log cannot yet consume its
+ * predecessor. The cutover owns the retry body; this runtime record owns the boundary identity and prevents
+ * a later phase callback from recapturing state or minting a second operation.
+ */
+interface CoopV2DeferredHostBoundary {
+  readonly kind: "wave" | "terminal";
+  readonly operationId: string;
+  readonly revision: number;
+  readonly wave: number;
+  readonly stateTick: number;
+  readonly transition: CoopWaveAdvancePayload;
+  readonly authoritativeState: CoopAuthoritativeBattleStateV1;
+  readonly entry: CoopAuthorityEntry;
+  readonly compatibility: CoopV2DeferredHostBoundaryCompatibility;
+}
+
 /**
  * Exact command generations constructed while the correlated recovery fence owns the phase tree.
  *
@@ -4287,6 +4317,8 @@ export interface CoopRuntime {
   v2ProjectedInteractionControlId: string | null;
   /** Runtime-owned V2 wave/terminal transactions awaiting safe DATA and real destination proof. */
   readonly v2WaveTransactions: Map<number, CoopV2WaveLiveTransaction>;
+  /** One exact host boundary parked by a typed predecessor-control deferral. */
+  v2DeferredHostBoundary: CoopV2DeferredHostBoundary | null;
   /**
    * Bounded read-only completion evidence. Completed entries leave the live map as soon as their exact
    * public destination installs; retaining only their immutable status makes observability honest without
@@ -4582,6 +4614,97 @@ const coopV2ControlCutovers = new WeakMap<CoopRuntime, CoopV2ControlCutover>();
 const coopV2CommandProofRetryQueued = new WeakSet<CoopRuntime>();
 /** Coalesce exact interaction control-installed redrives without re-entering the projector stack. */
 const coopV2InteractionRedriveQueued = new WeakSet<CoopRuntime>();
+/** Coalesce exact host wave/terminal redrives without re-entering an authority projector stack. */
+const coopV2HostBoundaryRedriveQueued = new WeakSet<CoopRuntime>();
+/** Cancellation handles for host-boundary redrives queued while another duo runtime is ambient. */
+const coopV2HostBoundaryRedriveCancels = new WeakMap<CoopRuntime, () => void>();
+
+type CoopV2HostBoundaryRedriveEdge = "predecessor-control-installed" | "safe-command-proof";
+
+function freezeCoopV2HostBoundaryValue<T>(value: T): T {
+  const visited = new WeakSet<object>();
+  const visit = (candidate: unknown): void => {
+    if (candidate == null || typeof candidate !== "object" || visited.has(candidate)) {
+      return;
+    }
+    visited.add(candidate);
+    for (const child of Object.values(candidate as Record<string, unknown>)) {
+      visit(child);
+    }
+    Object.freeze(candidate);
+  };
+  visit(value);
+  return value;
+}
+
+function sameCoopV2HostBoundaryTransition(
+  left: CoopWaveAdvancePayload,
+  right: CoopWaveAdvancePayload,
+): boolean {
+  try {
+    const { settledStateTick: _leftTick, ...leftIdentity } = left;
+    const { settledStateTick: _rightTick, ...rightIdentity } = right;
+    return canonicalize(leftIdentity) === canonicalize(rightIdentity);
+  } catch {
+    return false;
+  }
+}
+
+function sameCoopV2HostBoundaryState(
+  left: CoopAuthoritativeBattleStateV1,
+  right: CoopAuthoritativeBattleStateV1,
+): boolean {
+  try {
+    return canonicalize(left) === canonicalize(right);
+  } catch {
+    return false;
+  }
+}
+
+function clearCoopV2DeferredHostBoundary(runtime: CoopRuntime): void {
+  runtime.v2DeferredHostBoundary = null;
+  coopV2HostBoundaryRedriveQueued.delete(runtime);
+  const cancel = coopV2HostBoundaryRedriveCancels.get(runtime);
+  if (cancel != null) {
+    cancel();
+    coopV2HostBoundaryRedriveCancels.delete(runtime);
+  }
+}
+
+function scheduleCoopV2DeferredHostBoundaryRetry(
+  runtime: CoopRuntime,
+  edge: CoopV2HostBoundaryRedriveEdge,
+): void {
+  if (runtime.v2DeferredHostBoundary == null) {
+    return;
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    clearCoopV2DeferredHostBoundary(runtime);
+    return;
+  }
+  if (coopV2HostBoundaryRedriveQueued.has(runtime)) {
+    return;
+  }
+  coopV2HostBoundaryRedriveQueued.add(runtime);
+  queueMicrotask(() => {
+    if (!coopV2HostBoundaryRedriveQueued.has(runtime)) {
+      return;
+    }
+    let invoked = false;
+    let cancel: (() => void) | null = null;
+    cancel = runWhenCoopRuntimeActive(runtime, () => {
+      invoked = true;
+      if (coopV2HostBoundaryRedriveCancels.get(runtime) === cancel) {
+        coopV2HostBoundaryRedriveCancels.delete(runtime);
+      }
+      coopV2HostBoundaryRedriveQueued.delete(runtime);
+      retryCoopV2DeferredHostBoundary(runtime, edge);
+    });
+    if (!invoked) {
+      coopV2HostBoundaryRedriveCancels.set(runtime, cancel);
+    }
+  });
+}
 
 function scheduleCoopV2InteractionHostEnvelopeRetry(runtime: CoopRuntime): void {
   if (coopV2InteractionRedriveQueued.has(runtime)) {
@@ -4636,6 +4759,9 @@ function scheduleCoopV2CommandProofRetry(runtime: CoopRuntime): void {
  * appears mechanically healthy.
  */
 function activateCoopV2Runtime(runtime: CoopRuntime): void {
+  if (runtime.controller.authorityRole !== "authority") {
+    clearCoopV2DeferredHostBoundary(runtime);
+  }
   const harness = coopV2ShadowHarnesses.get(runtime);
   if (harness == null) {
     clearActiveCoopV2Shadow();
@@ -5440,6 +5566,7 @@ function projectCoopV2AuthorityProposalWait(runtime: CoopRuntime, wait: CoopV2Au
   );
   if (result.kind === "installed" || result.kind === "already-installed") {
     runtime.v2InstalledInteractionTargets.add(result.controlId);
+    scheduleCoopV2DeferredHostBoundaryRetry(runtime, "predecessor-control-installed");
     return true;
   }
   return false;
@@ -5470,6 +5597,7 @@ function projectCoopV2InteractionControl(
       if (waveTransaction != null && waveTransaction.dataApplied) {
         completeCoopV2WaveTransaction(runtime, waveTransaction);
       }
+      scheduleCoopV2DeferredHostBoundaryRetry(runtime, "predecessor-control-installed");
       scheduleCoopV2InteractionHostEnvelopeRetry(runtime);
     }
     return result;
@@ -5536,6 +5664,7 @@ function projectCoopV2InteractionControl(
     if (waveTransaction != null && waveTransaction.dataApplied) {
       completeCoopV2WaveTransaction(runtime, waveTransaction);
     }
+    scheduleCoopV2DeferredHostBoundaryRetry(runtime, "predecessor-control-installed");
     scheduleCoopV2InteractionHostEnvelopeRetry(runtime);
   }
   return result;
@@ -5910,6 +6039,10 @@ function buildCoopV2LiveSeams(
         }
         return;
       }
+      // This is an authenticated authority-side controlInstalled proof. A wave/terminal commit that was
+      // retained behind this predecessor must redrive its exact cutover image now, not rebuild through a
+      // generic interaction or durability retry path.
+      scheduleCoopV2DeferredHostBoundaryRetry(runtime, "predecessor-control-installed");
       if (entry.nextControl.kind === "COMMAND_FRONTIER") {
         // An authority-side CommandPhase can have reached its V2 gate while a same-address interaction
         // still owned control. The later ordered command-open is the only event allowed to wake it.
@@ -7790,6 +7923,7 @@ function disposeCoopV2Shadow(runtime: CoopRuntime): void {
   runtime.v2DeferredCommandStarts.clear();
   runtime.v2DeferredInteractionStarts.clear();
   clearCoopMeTerminalRedrive(runtime);
+  clearCoopV2DeferredHostBoundary(runtime);
   const controlCutover = coopV2ControlCutovers.get(runtime);
   if (controlCutover != null) {
     controlCutover.dispose();
@@ -8392,6 +8526,7 @@ export function recordCoopV2CommandControlStarted(
           },
     );
     if (missing.length === 0 && (projected.kind === "installed" || projected.kind === "already-installed")) {
+      scheduleCoopV2DeferredHostBoundaryRetry(runtime, "safe-command-proof");
       scheduleCoopV2CommandProofRetry(runtime);
     }
   }
@@ -8694,6 +8829,22 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
     return;
   }
   const wave = globalScene.currentBattle.waveIndex;
+  const parked = active.v2DeferredHostBoundary;
+  if (parked != null) {
+    if (parked.wave !== wave || parked.transition.outcome !== outcome) {
+      failCoopSharedSession(
+        `A deferred host boundary for wave ${parked.wave} conflicted with ${outcome} wave ${wave}.`,
+      );
+      return;
+    }
+    // The first deferred callback already owns the immutable transition/state and its eventual raw
+    // compatibility carrier. Do not rebuild a duplicate transition or stage it over the parked image.
+    coopLog(
+      "v2-wave",
+      `waveResolved observes parked host ${parked.kind} wave=${parked.wave} op=${parked.operationId} rev=${parked.revision}`,
+    );
+    return;
+  }
   const alreadySettled = settledHostWaveTransitions.get(wave);
   if (alreadySettled != null) {
     if (outcome === "gameOver" && alreadySettled.nextWave === wave) {
@@ -8714,7 +8865,23 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
   // Normal win/capture/flee transitions settle later in BattleEnd. GameOver has no BattleEndPhase, so seal
   // its terminal DATA first; a throwing/dropped raw presentation carrier cannot suppress correctness.
   if (outcome === "gameOver") {
-    commitCoopSettledWaveAdvance(wave, transition);
+    const disposition = commitCoopSettledWaveAdvance(wave, transition, undefined, {
+      kind: "wave-resolved",
+      outcome,
+      presentation,
+    });
+    if (disposition == null || disposition.kind === "failed") {
+      failCoopSharedSession(
+        disposition == null
+          ? `Could not seal the complete authoritative transition for wave ${wave}.`
+          : disposition.reason,
+      );
+      return;
+    }
+    if (disposition.kind === "deferred") {
+      coopLog("v2-wave", `game-over host terminal parked wave=${wave}; awaiting predecessor control proof`);
+      return;
+    }
   }
   const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
   if ((outcome === "win" || outcome === "flee") && isCoopRecording()) {
@@ -9877,29 +10044,60 @@ function commitCoopSettledWaveAdvance(
   wave: number,
   transition: CoopWaveAdvancePayload,
   capturedState?: CoopAuthoritativeBattleStateV1,
-): CoopAuthoritativeBattleStateV1 | null {
+  compatibility: CoopV2DeferredHostBoundaryCompatibility = { kind: "wave-end" },
+): CoopSettledWaveAdvanceDisposition | null {
   const runtime = active;
   if (runtime == null || runtime.controller.role !== "host") {
     return null;
   }
-  const state = capturedState ?? captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
-  if (state == null || state.wave !== wave) {
-    coopWarn("runtime", `settled WAVE_ADVANCE capture rejected wave=${wave}`);
-    if (usesRetainedCoopWaveTransaction(runtime)) {
-      failCoopSharedSession(`Could not capture the complete settled state for wave ${wave}.`);
+
+  // A typed predecessor deferral already owns the exact state image. A later phase callback may repeat
+  // this boundary while the authority is still waiting, but it must not recapture the mutable scene or
+  // ask the cutover to rebuild/retry through its commit API.
+  const parked = runtime.v2DeferredHostBoundary;
+  if (parked != null) {
+    if (
+      parked.wave !== wave
+      || !sameCoopV2HostBoundaryTransition(parked.transition, transition)
+      || (capturedState != null
+        && (capturedState.tick !== parked.stateTick
+          || !sameCoopV2HostBoundaryState(capturedState, parked.authoritativeState)))
+    ) {
+      return {
+        kind: "failed",
+        reason: `a different settled host boundary reused deferred wave ${parked.wave}`,
+      };
     }
-    return null;
+    coopLog(
+      "v2-wave",
+      `settled boundary remains parked wave=${parked.wave} ${parked.kind} op=${parked.operationId} rev=${parked.revision}`,
+    );
+    return { kind: "deferred", state: parked.authoritativeState };
+  }
+
+  const state = capturedState ?? captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+  if (state == null || state.wave !== wave || transition.wave !== wave) {
+    coopWarn("runtime", `settled WAVE_ADVANCE capture rejected wave=${wave}`);
+    return { kind: "failed", reason: `Could not capture the complete settled state for wave ${wave}.` };
   }
   const settledTransition: CoopWaveAdvancePayload = {
     ...transition,
     settledStateTick: state.tick,
   };
   if (isCoopV2WaveCutoverActive()) {
-    if (!commitCoopV2SettledWaveAdvance(runtime, settledTransition, state)) {
-      failCoopSharedSession(`Could not retain the complete Authority V2 transition for wave ${wave}.`);
-      return null;
+    const disposition = commitCoopV2SettledWaveAdvance(runtime, settledTransition, state, compatibility);
+    if (disposition.kind === "failed") {
+      return { kind: "failed", reason: disposition.reason };
     }
-    settledHostWaveTransitions.set(wave, settledTransition);
+    if (disposition.kind === "deferred") {
+      return { kind: "deferred", state };
+    }
+    if (!recordCoopCommittedHostWaveBoundary(wave, settledTransition)) {
+      return {
+        kind: "failed",
+        reason: `the committed Authority V2 transition for wave ${wave} lost its staged identity`,
+      };
+    }
   } else {
     const envelope = commitWaveAdvanceOwnerIntent(
       {
@@ -9912,26 +10110,64 @@ function commitCoopSettledWaveAdvance(
       runtime.waveOperationBinding,
     );
     if (usesRetainedCoopWaveTransaction(runtime) && envelope == null) {
-      failCoopSharedSession(`Could not retain the complete authoritative transition for wave ${wave}.`);
-      return null;
+      return { kind: "failed", reason: `Could not retain the complete authoritative transition for wave ${wave}.` };
     }
-    if (envelope != null) {
-      settledHostWaveTransitions.set(wave, settledTransition);
+    if (envelope != null && !recordCoopCommittedHostWaveBoundary(wave, settledTransition)) {
+      return {
+        kind: "failed",
+        reason: `the committed transition for wave ${wave} lost its staged identity`,
+      };
+    }
+    if (envelope == null) {
+      // Legacy/non-retained sessions intentionally keep their best-effort behavior, but still retire the
+      // process-local staging marker once no retained authority owns it.
+      retireCoopPendingHostWaveTransition(wave);
     }
   }
   coopLog(
     "runtime",
     `settled WAVE_ADVANCE committed wave=${wave} tick=${state.tick} next=${settledTransition.nextLogicalPhase}/wave${settledTransition.nextWave}`,
   );
+  return { kind: "committed", state };
+}
+
+type CoopSettledWaveAdvanceDisposition =
+  | { readonly kind: "committed"; readonly state: CoopAuthoritativeBattleStateV1 }
+  | { readonly kind: "deferred"; readonly state: CoopAuthoritativeBattleStateV1 }
+  | { readonly kind: "failed"; readonly reason: string };
+
+/** One process-local pending marker retirement helper shared by retained and legacy commit paths. */
+function retireCoopPendingHostWaveTransition(wave: number): void {
   pendingHostWaveTransitions.delete(wave);
-  return state;
+}
+
+function recordCoopCommittedHostWaveBoundary(
+  wave: number,
+  transition: CoopWaveAdvancePayload,
+): boolean {
+  const pending = pendingHostWaveTransitions.get(wave);
+  if (pending != null && !sameCoopV2HostBoundaryTransition(pending, transition)) {
+    coopWarn("v2-wave", `refused to retire a different staged host transition wave=${wave}`);
+    return false;
+  }
+  const settled = settledHostWaveTransitions.get(wave);
+  if (settled != null && !sameCoopV2HostBoundaryTransition(settled, transition)) {
+    coopWarn("v2-wave", `refused to overwrite a different settled host transition wave=${wave}`);
+    return false;
+  }
+  settledHostWaveTransitions.set(wave, transition);
+  // This is the sole correctness retirement point. A deferred predecessor leaves the pending marker in
+  // place until this exact committed retry reaches here.
+  retireCoopPendingHostWaveTransition(wave);
+  return true;
 }
 
 function commitCoopV2SettledWaveAdvance(
   runtime: CoopRuntime,
   transition: CoopWaveAdvancePayload,
   state: CoopAuthoritativeBattleStateV1,
-): boolean {
+  compatibility: CoopV2DeferredHostBoundaryCompatibility,
+): CoopV2WaveTerminalCommitDisposition {
   const cutover = coopV2WaveCutovers.get(runtime);
   if (
     cutover == null
@@ -9939,7 +10175,7 @@ function commitCoopV2SettledWaveAdvance(
     || transition.wave !== state.wave
     || transition.settledStateTick !== state.tick
   ) {
-    return false;
+    return { kind: "failed", reason: "the settled host boundary did not match its authority state" };
   }
   const authorityCarrier = {
     authoritativeState: structuredClone(state),
@@ -9958,14 +10194,37 @@ function commitCoopV2SettledWaveAdvance(
       turn: state.turn,
       authorityCarrier,
     };
-    return (
-      cutover.commitHostTerminal({
-        operationId: terminalId,
-        terminal: material,
-        legacyImage: material,
-        legacyDigest: digestOfMaterial(material),
-      }) != null
-    );
+    const input = {
+      operationId: terminalId,
+      terminal: material,
+      legacyImage: material,
+      legacyDigest: digestOfMaterial(material),
+    };
+    if (runtime.v2DeferredHostBoundary != null) {
+      return { kind: "failed", reason: "a host boundary is already deferred" };
+    }
+    const disposition = cutover.commitHostTerminalDetailed(input);
+    if (disposition.kind === "deferred") {
+      const entry = disposition.entry;
+      const record: CoopV2DeferredHostBoundary = freezeCoopV2HostBoundaryValue({
+        kind: "terminal",
+        operationId: entry.operationId,
+        revision: entry.revision,
+        wave: transition.wave,
+        stateTick: state.tick,
+        transition: freezeCoopV2HostBoundaryValue(structuredClone(transition)),
+        authoritativeState: freezeCoopV2HostBoundaryValue(structuredClone(state)),
+        entry: freezeCoopV2HostBoundaryValue(structuredClone(entry)),
+        compatibility: freezeCoopV2HostBoundaryValue(structuredClone(compatibility)),
+      });
+      runtime.v2DeferredHostBoundary = record;
+      coopLog(
+        "v2-wave",
+        `parked deferred host terminal wave=${record.wave} op=${record.operationId} rev=${record.revision} `
+          + `reason=${disposition.reason}`,
+      );
+    }
+    return disposition;
   }
 
   const base = {
@@ -9981,7 +10240,7 @@ function commitCoopV2SettledWaveAdvance(
   const victoryKind = transition.victoryKind;
   if (transition.outcome !== "flee" && victoryKind == null) {
     coopWarn("v2-wave", `refused victory without an authoritative victoryKind wave=${transition.wave}`);
-    return false;
+    return { kind: "failed", reason: "refused victory without an authoritative victoryKind" };
   }
   const material: CoopWaveTransitionMaterialV2 =
     transition.outcome === "flee"
@@ -9989,7 +10248,7 @@ function commitCoopV2SettledWaveAdvance(
       : { ...base, outcome: transition.outcome, victoryKind: victoryKind as "wild" | "trainer" };
   const destinationSurface = resolveCoopV2SettledWaveDestination(transition);
   if (destinationSurface == null) {
-    return false;
+    return { kind: "failed", reason: "settled wave has no stated executable tail" };
   }
   const operationId = `V2/WAVE/e${runtime.controller.sessionEpoch}/w${transition.wave}/tick${state.tick}`;
   let destination: CoopWaveAdvanceDestination;
@@ -10035,15 +10294,193 @@ function commitCoopV2SettledWaveAdvance(
       expectedOperationId: null,
     };
   }
+  const input = {
+    operationId,
+    transition: material,
+    destination,
+    legacyImage: material,
+    legacyDigest: digestOfMaterial(material),
+  };
+  if (runtime.v2DeferredHostBoundary != null) {
+    return { kind: "failed", reason: "a host boundary is already deferred" };
+  }
+  const disposition = cutover.commitHostWaveDetailed(input);
+  if (disposition.kind === "deferred") {
+    const entry = disposition.entry;
+    const record: CoopV2DeferredHostBoundary = freezeCoopV2HostBoundaryValue({
+      kind: "wave",
+      operationId: entry.operationId,
+      revision: entry.revision,
+      wave: transition.wave,
+      stateTick: state.tick,
+      transition: freezeCoopV2HostBoundaryValue(structuredClone(transition)),
+      authoritativeState: freezeCoopV2HostBoundaryValue(structuredClone(state)),
+      entry: freezeCoopV2HostBoundaryValue(structuredClone(entry)),
+      compatibility: freezeCoopV2HostBoundaryValue(structuredClone(compatibility)),
+    });
+    runtime.v2DeferredHostBoundary = record;
+    coopLog(
+      "v2-wave",
+      `parked deferred host wave wave=${record.wave} op=${record.operationId} rev=${record.revision} `
+        + `reason=${disposition.reason}`,
+    );
+  }
+  return disposition;
+}
+
+function matchesCoopV2DeferredHostBoundaryDisposition(
+  parked: CoopV2DeferredHostBoundary,
+  disposition: CoopV2WaveTerminalCommitDisposition,
+): boolean {
+  if (disposition.kind !== "committed" && disposition.kind !== "deferred") {
+    return false;
+  }
+  const entry = disposition.entry;
+  if (
+    (parked.kind === "wave" && entry.kind !== "WAVE_ADVANCE")
+    || (parked.kind === "terminal" && entry.kind !== "TERMINAL_COMMIT")
+    || entry.operationId !== parked.operationId
+    || entry.revision !== parked.revision
+    || entry.material.digest !== parked.entry.material.digest
+  ) {
+    return false;
+  }
+  try {
+    if (
+      canonicalize(entry.material.payload) !== canonicalize(parked.entry.material.payload)
+      || canonicalize(entry.nextControl) !== canonicalize(parked.entry.nextControl)
+    ) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+  const decoded = decodeCoopV2WaveTransaction(entry);
   return (
-    cutover.commitHostWave({
-      operationId,
-      transition: material,
-      destination,
-      legacyImage: material,
-      legacyDigest: digestOfMaterial(material),
-    }) != null
+    decoded != null
+    && decoded.entryRevision === parked.revision
+    && decoded.operationId === parked.operationId
+    && decoded.transition.wave === parked.wave
+    && decoded.authoritativeState.wave === parked.wave
+    && decoded.authoritativeState.tick === parked.stateTick
+    && decoded.transition.settledStateTick === parked.stateTick
+    && sameCoopV2HostBoundaryTransition(decoded.transition, parked.transition)
+    && sameCoopV2HostBoundaryState(decoded.authoritativeState, parked.authoritativeState)
   );
+}
+
+/**
+ * Redrive one exact deferred host boundary from an authenticated predecessor proof. This helper never
+ * invokes a builder, a generic interaction retry, or a timer; the cutover owns the retained operation and
+ * revision, while this runtime verifies the returned disposition before retiring its staging identity.
+ */
+function retryCoopV2DeferredHostBoundary(runtime: CoopRuntime, edge: CoopV2HostBoundaryRedriveEdge): boolean {
+  const parked = runtime.v2DeferredHostBoundary;
+  if (parked == null) {
+    return false;
+  }
+  if (active !== runtime) {
+    return false;
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    clearCoopV2DeferredHostBoundary(runtime);
+    return false;
+  }
+  if (isCoopSharedTerminalFrozen(runtime)) {
+    clearCoopV2DeferredHostBoundary(runtime);
+    return false;
+  }
+  const cutover = coopV2WaveCutovers.get(runtime);
+  if (cutover == null) {
+    clearCoopV2DeferredHostBoundary(runtime);
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Authority V2 lost the deferred ${parked.kind} cutover wave=${parked.wave} `
+        + `op=${parked.operationId} at ${edge}.`,
+    );
+    return false;
+  }
+
+  const disposition = cutover.retryDeferredHostBoundaryDetailed();
+  if (disposition.kind === "deferred") {
+    if (!matchesCoopV2DeferredHostBoundaryDisposition(parked, disposition)) {
+      clearCoopV2DeferredHostBoundary(runtime);
+      failCoopRuntimeSharedSession(
+        runtime,
+        `Authority V2 returned a mismatched deferred ${parked.kind} boundary at ${edge} `
+          + `(wave=${parked.wave}, op=${parked.operationId}, rev=${parked.revision}).`,
+      );
+      return false;
+    }
+    coopLog(
+      "v2-wave",
+      `deferred host ${parked.kind} remains parked wave=${parked.wave} op=${parked.operationId} `
+        + `rev=${parked.revision} edge=${edge}`,
+    );
+    return false;
+  }
+  if (disposition.kind === "failed") {
+    clearCoopV2DeferredHostBoundary(runtime);
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Authority V2 failed exact deferred ${parked.kind} redrive wave=${parked.wave} `
+        + `op=${parked.operationId} rev=${parked.revision} at ${edge}: ${disposition.reason}`,
+    );
+    return false;
+  }
+  if (!matchesCoopV2DeferredHostBoundaryDisposition(parked, disposition)) {
+    clearCoopV2DeferredHostBoundary(runtime);
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Authority V2 committed a mismatched deferred ${parked.kind} boundary at ${edge} `
+        + `(wave=${parked.wave}, op=${parked.operationId}, rev=${parked.revision}).`,
+    );
+    return false;
+  }
+
+  const pendingSeal = pendingAutomaticVictorySeals.get(runtime);
+  if (
+    pendingSeal != null
+    && (pendingSeal.identity.wave !== parked.wave
+      || !sameCoopV2HostBoundaryTransition(pendingSeal.transition, parked.transition))
+  ) {
+    clearCoopV2DeferredHostBoundary(runtime);
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Authority V2 committed deferred ${parked.kind} wave=${parked.wave} against a different victory seal.`,
+    );
+    return false;
+  }
+  if (!recordCoopCommittedHostWaveBoundary(parked.wave, parked.transition)) {
+    clearCoopV2DeferredHostBoundary(runtime);
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Authority V2 committed deferred ${parked.kind} wave=${parked.wave} but its staged identity was lost.`,
+    );
+    return false;
+  }
+  if (pendingSeal != null) {
+    pendingAutomaticVictorySeals.delete(runtime);
+  }
+  clearCoopV2DeferredHostBoundary(runtime);
+  if (parked.compatibility.kind === "wave-resolved") {
+    sendCoopWaveResolvedCompatibility(
+      parked.wave,
+      parked.compatibility.outcome,
+      parked.compatibility.captureParty,
+      parked.compatibility.presentation,
+      parked.transition,
+    );
+  } else {
+    sendCoopWaveEndStateCompatibility(parked.wave, parked.authoritativeState);
+  }
+  coopLog(
+    "v2-wave",
+    `authority committed exact deferred host ${parked.kind} wave=${parked.wave} `
+      + `op=${parked.operationId} rev=${parked.revision} tick=${parked.stateTick} `
+      + `compat=${parked.compatibility.kind} edge=${edge}`,
+  );
+  return true;
 }
 
 type CoopV2SettledWaveDestinationSurface =
@@ -10186,6 +10623,23 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
     failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} did not match its staged boundary.`);
     return false;
   }
+  const parked = runtime.v2DeferredHostBoundary;
+  if (parked != null) {
+    if (
+      parked.wave !== identity.wave
+      || !sameCoopV2HostBoundaryTransition(parked.transition, pending.transition)
+    ) {
+      failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} conflicted with its parked boundary.`);
+      return false;
+    }
+    // The exact state was already captured and retained by the first deferred attempt. Leave the seal and
+    // pending transition parked; the authenticated proof-edge retry owns the eventual compatibility send.
+    coopLog(
+      "v2-wave",
+      `automatic victory seal remains parked wave=${identity.wave} op=${parked.operationId} rev=${parked.revision}`,
+    );
+    return true;
+  }
   const currentWave = globalScene.currentBattle?.waveIndex ?? -1;
   const currentTurn = globalScene.currentBattle?.turn ?? -1;
   if (
@@ -10207,9 +10661,21 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
     return false;
   }
   const state = normalizeCoopSettledPostBattleState(capturedState);
-  if (commitCoopSettledWaveAdvance(identity.wave, pending.transition, state) == null) {
-    failCoopSharedSession(`Could not retain the complete automatic victory state for wave ${identity.wave}.`);
+  const disposition = commitCoopSettledWaveAdvance(identity.wave, pending.transition, state);
+  if (disposition == null || disposition.kind === "failed") {
+    failCoopSharedSession(
+      disposition == null
+        ? `Could not retain the complete automatic victory state for wave ${identity.wave}.`
+        : disposition.reason,
+    );
     return false;
+  }
+  if (disposition.kind === "deferred") {
+    coopLog(
+      "v2-wave",
+      `automatic victory state captured and parked wave=${identity.wave}; awaiting predecessor control proof`,
+    );
+    return true;
   }
   pendingAutomaticVictorySeals.delete(runtime);
   sendCoopWaveEndStateCompatibility(identity.wave, state);
@@ -10228,6 +10694,20 @@ export function broadcastCoopWaveEndState(isVictory?: boolean): void {
     return;
   }
   const wave = globalScene.currentBattle.waveIndex;
+  const parked = active.v2DeferredHostBoundary;
+  if (parked != null) {
+    if (parked.wave !== wave) {
+      failCoopSharedSession(`A different wave ${wave} reached BattleEnd while wave ${parked.wave} was parked.`);
+      return;
+    }
+    // The deferred attempt already owns the immutable state image. Do not recapture it or send a raw
+    // compatibility carrier before the exact Authority V2 retry commits.
+    coopLog(
+      "v2-wave",
+      `BattleEnd observes parked host ${parked.kind} wave=${parked.wave} op=${parked.operationId} rev=${parked.revision}`,
+    );
+    return;
+  }
   let state: CoopAuthoritativeBattleStateV1;
   try {
     const capturedState = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
@@ -10252,14 +10732,23 @@ export function broadcastCoopWaveEndState(isVictory?: boolean): void {
         ?? (!usesRetainedCoopWaveTransaction() && isVictory !== undefined
           ? buildCoopWaveAdvancePayload(isVictory ? "win" : "flee", wave)
           : null));
-    if (
-      transition != null
-      && commitCoopSettledWaveAdvance(wave, transition, state) == null
-      && usesRetainedCoopWaveTransaction()
-    ) {
-      return;
+    if (transition != null) {
+      const disposition = commitCoopSettledWaveAdvance(wave, transition, state);
+      if (disposition == null || disposition.kind === "failed") {
+        if (usesRetainedCoopWaveTransaction()) {
+          failCoopSharedSession(
+            disposition == null
+              ? `Could not seal the retained authoritative transition for wave ${wave}.`
+              : disposition.reason,
+          );
+        }
+        return;
+      }
+      if (disposition.kind === "deferred") {
+        coopLog("v2-wave", `BattleEnd captured and parked host boundary wave=${wave}; awaiting predecessor proof`);
+        return;
+      }
     }
-    pendingHostWaveTransitions.delete(wave);
   } catch (e) {
     coopWarn("runtime", `seal settled WAVE_ADVANCE failed wave=${wave}`, e);
     if (usesRetainedCoopWaveTransaction()) {
@@ -11375,6 +11864,7 @@ export function assembleCoopRuntime(
     v2ProjectedReplacementControlId: null,
     v2ProjectedInteractionControlId: null,
     v2WaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
+    v2DeferredHostBoundary: null,
     v2CompletedWaveTransactions: new Map<number, CoopV2WaveLiveTransaction>(),
   };
   sharedTerminalStates.set(runtime, {
