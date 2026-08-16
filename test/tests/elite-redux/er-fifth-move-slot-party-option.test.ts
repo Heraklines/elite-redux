@@ -18,7 +18,7 @@
 // overflow for the supported 5-move cap.
 // =============================================================================
 
-import { PartyOption } from "#ui/handlers/party-ui-handler";
+import { isMovePartyOption, PartyOption } from "#ui/handlers/party-ui-handler";
 import { describe, expect, it } from "vitest";
 
 describe("Party move-select supports the ER 5th move slot", () => {
@@ -36,5 +36,10 @@ describe("Party move-select supports the ER 5th move slot", () => {
   it("MOVE_5 does not collide with the ALL / ABILITY_SLOT option ranges", () => {
     expect(PartyOption.MOVE_5).toBeLessThan(PartyOption.ALL);
     expect(PartyOption.MOVE_5).toBeLessThan(PartyOption.ABILITY_SLOT_0);
+  });
+
+  it("recognizes every current move slot beyond MOVE_5", () => {
+    expect(isMovePartyOption(PartyOption.MOVE_1 + 7, 8)).toBe(true);
+    expect(isMovePartyOption(PartyOption.MOVE_1 + 8, 8)).toBe(false);
   });
 });

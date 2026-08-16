@@ -83,6 +83,7 @@ import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { ErGreaterAbilityCapsulePhase } from "#phases/er-greater-ability-capsule-phase";
 import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-randomizer-phase";
+import { ErGreaterMoveRandomizerPhase } from "#phases/er-greater-move-randomizer-phase";
 import { ErOmniformTransformWaitPhase } from "#phases/er-omniform-transform-wait-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { ErShatteredPsycheBonusPhase } from "#phases/er-shattered-psyche-bonus-phase";
@@ -216,6 +217,7 @@ const PHASES = Object.freeze({
   ErAbilityCapsulePhase,
   ErGreaterAbilityCapsulePhase,
   ErGreaterAbilityRandomizerPhase,
+  ErGreaterMoveRandomizerPhase,
   ErClosedCircuitBurstPhase,
   ErOmniformTransformWaitPhase,
   ErShatteredPsycheBonusPhase,

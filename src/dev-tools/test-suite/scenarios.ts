@@ -32,7 +32,7 @@ import {
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
-import { modifierTypes } from "#data/data-lists";
+import { allMoves, modifierTypes } from "#data/data-lists";
 import { ER_CRACKED_VESSEL_ABILITY_ID } from "#data/elite-redux/abilities/newcomer-signature-abilities";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
@@ -6114,6 +6114,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
     // keep levelling Garchomp to reopen the panel - no global XP override needed.
     shopItems: [modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY],
   },
+  {
+    label: "Move Randomizers: type + category",
+    description:
+      "Garchomp has 8 move slots and Dragon/Ground/Fire typing, with Fire added at runtime.\n"
+      + "DO: KO Magikarp, then choose either randomizer. Pick Garchomp and any of its 8\n"
+      + "move slots. The normal item replaces that slot immediately. The Greater item asks\n"
+      + "for Physical, Special, or Status after the slot. Run the scenario once per item.\n"
+      + "EXPECT: the chosen slot changes, every result is Dragon, Ground, or Fire type, and\n"
+      + "the Greater result also matches the selected category. All 8 slots remain usable.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.FIRE_FANG, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (player) {
+        player.customPokemonData.bonusMoveSlots = 4;
+        allMoves
+          .filter(
+            move => move != null && move.id !== MoveId.NONE && move.id !== MoveId.STRUGGLE && !move.isUnimplemented,
+          )
+          .slice(0, 4)
+          .forEach((move, index) => player.setMove(4 + index, move.id));
+        player.summonData.addedType = PokemonType.FIRE;
+      }
+    },
+    shopItems: [modifierTypes.MOVE_RANDOMIZER, modifierTypes.ER_GREATER_MOVE_RANDOMIZER],
+  },
   // ===========================================================================
   // FEATURES — this session
   // ===========================================================================
@@ -6343,6 +6381,39 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     onBattleStart: () => boostPlayer(allStages(2)),
+  },
+  {
+    label: "Pharaoh's Ankh: 1 HP marker",
+    description:
+      "Pharaoh's Ankh is active and Snorlax begins at low HP.\n"
+      + "DO: let Magikarp hit Snorlax with Tackle, then open the party screen.\n"
+      + "EXPECT: Ankh activates once, Snorlax remains at 1 HP, and neither its battle\n"
+      + "display nor party slot shows the FNT status marker.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_PHARAOH_ANKH" }],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK, MoveId.SPLASH],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const pokemon = globalScene.getPlayerPokemon();
+      if (pokemon) {
+        pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * 0.15));
+        pokemon.updateInfo();
+      }
+    },
   },
   {
     label: "ER Relics: Lookout/Quartermaster/Collector (#439)",

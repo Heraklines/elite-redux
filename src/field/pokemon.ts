@@ -6230,6 +6230,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
       if (surviveDamage.value) {
         damage = this.hp - 1;
+        if (this.status?.effect === StatusEffect.FAINT) {
+          this.clearStatus(false, false);
+        }
         // catalog-v2 (#900) IMMORTAL_OBJECT: a RELIC (not an ability) prevented this faint.
         if (erRelicSaved) {
           erRecordAchievementRelicSurvive(this);

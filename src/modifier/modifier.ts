@@ -17,6 +17,7 @@ import { applyErEndlessHealing } from "#data/elite-redux/er-endless-rift-runtime
 import { canUseFunMegaStone, getFunRealMegaChange } from "#data/elite-redux/er-fun-mega-mode";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
+import { randomizePokemonMove } from "#data/elite-redux/er-move-randomizer";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { isMoodyCoordinatorReviveAllowed } from "#data/elite-redux/moody/moody-coordinator-combat-state";
@@ -2383,6 +2384,23 @@ export class PokemonNatureChangeModifier extends ConsumablePokemonModifier {
     playerPokemon.setCustomNature(this.nature);
     globalScene.gameData.unlockSpeciesNature(playerPokemon.species, this.nature);
 
+    return true;
+  }
+}
+
+export class PokemonRandomizeMoveModifier extends ConsumablePokemonMoveModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    return randomizePokemonMove(playerPokemon, this.moveIndex);
+  }
+}
+
+export class ErGreaterMoveRandomizerModifier extends ConsumablePokemonMoveModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    globalScene.phaseManager.unshiftNew(
+      "ErGreaterMoveRandomizerPhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+      this.moveIndex,
+    );
     return true;
   }
 }

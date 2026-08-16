@@ -498,6 +498,11 @@ export enum PartyOption {
   ABILITY_SLOT_3,
 }
 
+export function isMovePartyOption(option: PartyOption, moveCount: number): boolean {
+  const moveIndex = option - PartyOption.MOVE_1;
+  return moveIndex >= 0 && moveIndex < moveCount;
+}
+
 export type PartySelectCallback = (cursor: number, option: PartyOption) => void;
 export type PartyModifierTransferSelectCallback = (
   fromCursor: number,
@@ -1278,7 +1283,7 @@ export class PartyUiHandler extends MessageUiHandler {
         }
       }
       if (filterResult === null && this.partyUiMode === PartyUiMode.MOVE_MODIFIER) {
-        filterResult = this.moveSelectFilter(pokemon.moveset[this.optionsCursor]);
+        filterResult = this.moveSelectFilter(pokemon.moveset[option - PartyOption.MOVE_1]);
       }
     } else {
       filterResult = (this.selectFilter as PokemonModifierTransferSelectFilter)(
@@ -1487,23 +1492,19 @@ export class PartyUiHandler extends MessageUiHandler {
     }
 
     if (
-      [
+      ([
         PartyOption.SEND_OUT, // When sending out at the start of battle, or due to an effect
         PartyOption.PASS_BATON, // When passing the baton due to the Baton Pass move
         PartyOption.REVIVE,
         PartyOption.APPLY,
         PartyOption.TEACH,
-        PartyOption.MOVE_1,
-        PartyOption.MOVE_2,
-        PartyOption.MOVE_3,
-        PartyOption.MOVE_4,
-        PartyOption.MOVE_5,
         PartyOption.ABILITY_SLOT_0,
         PartyOption.ABILITY_SLOT_1,
         PartyOption.ABILITY_SLOT_2,
         PartyOption.ABILITY_SLOT_3,
         PartyOption.SELECT,
       ].includes(option)
+        || (this.partyUiMode === PartyUiMode.MOVE_MODIFIER && isMovePartyOption(option, pokemon.moveset.length)))
       && this.selectCallback
     ) {
       this.clearOptions();
@@ -2355,54 +2356,51 @@ export class PartyUiHandler extends MessageUiHandler {
           && this.partyUiMode !== PartyUiMode.DISCARD)
         || option === PartyOption.CANCEL
       ) {
-        switch (option) {
-          case PartyOption.MOVE_1:
-          case PartyOption.MOVE_2:
-          case PartyOption.MOVE_3:
-          case PartyOption.MOVE_4:
-          case PartyOption.MOVE_5: {
-            const move = pokemon.moveset[option - PartyOption.MOVE_1];
-            if (this.showMovePp) {
-              const maxPP = move.getMovePp();
-              const currPP = maxPP - move.ppUsed;
-              optionName = `${move.getName()} ${currPP}/${maxPP}`;
-            } else {
-              optionName = move.getName();
-            }
-            break;
+        const moveIndex = option - PartyOption.MOVE_1;
+        if (this.partyUiMode === PartyUiMode.MOVE_MODIFIER && isMovePartyOption(option, pokemon.moveset.length)) {
+          const move = pokemon.moveset[moveIndex];
+          if (this.showMovePp) {
+            const maxPP = move.getMovePp();
+            const currPP = maxPP - move.ppUsed;
+            optionName = `${move.getName()} ${currPP}/${maxPP}`;
+          } else {
+            optionName = move.getName();
           }
-          case PartyOption.ABILITY_SLOT_0:
-          case PartyOption.ABILITY_SLOT_1:
-          case PartyOption.ABILITY_SLOT_2:
-          case PartyOption.ABILITY_SLOT_3: {
-            const slot = option - PartyOption.ABILITY_SLOT_0;
-            const entry = pokemon.getAbilitySlots().find(s => s.slot === slot);
-            const slotLabel = slot === 0 ? "Ability" : `Innate ${slot}`;
-            optionName = `${slotLabel}: ${entry?.ability.name ?? "-"}`;
-            break;
-          }
-          default: {
-            const formChangeItemModifiers = this.getFormChangeItemsModifiers(pokemon);
-            if (formChangeItemModifiers && option >= PartyOption.FORM_CHANGE_ITEM) {
-              const modifier = formChangeItemModifiers[option - PartyOption.FORM_CHANGE_ITEM];
-              optionName = `${modifier.active ? i18next.t("partyUiHandler:deactivate") : i18next.t("partyUiHandler:activate")} ${modifier.type.name}`;
-            } else if (option === PartyOption.UNPAUSE_EVOLUTION) {
-              optionName = `${pokemon.pauseEvolutions ? i18next.t("partyUiHandler:unpauseEvolution") : i18next.t("partyUiHandler:pauseEvolution")}`;
-            } else if (option === PartyOption.MOVE) {
-              // ER party reorder: "Move" picks the source mon, "Swap here" the target.
-              optionName = this.transferMode ? "Swap here" : "Move";
-            } else if (option === PartyOption.SHIFT) {
-              // Multi-format (triple+): swap field positions with the commanding mon.
-              optionName = "Shift";
-            } else if (option === PartyOption.GIVE_TO_PARTNER) {
-              // Co-op (#633, P3): hand this mon to the other player.
-              optionName = i18next.t("partyUiHandler:coopGiveToPartner");
-            } else if (this.localizedOptions.includes(option)) {
-              optionName = i18next.t(`partyUiHandler:${toCamelCase(PartyOption[option])}`);
-            } else {
-              optionName = toTitleCase(PartyOption[option]);
+        } else {
+          switch (option) {
+            case PartyOption.ABILITY_SLOT_0:
+            case PartyOption.ABILITY_SLOT_1:
+            case PartyOption.ABILITY_SLOT_2:
+            case PartyOption.ABILITY_SLOT_3: {
+              const slot = option - PartyOption.ABILITY_SLOT_0;
+              const entry = pokemon.getAbilitySlots().find(s => s.slot === slot);
+              const slotLabel = slot === 0 ? "Ability" : `Innate ${slot}`;
+              optionName = `${slotLabel}: ${entry?.ability.name ?? "-"}`;
+              break;
             }
-            break;
+            default: {
+              const formChangeItemModifiers = this.getFormChangeItemsModifiers(pokemon);
+              if (formChangeItemModifiers && option >= PartyOption.FORM_CHANGE_ITEM) {
+                const modifier = formChangeItemModifiers[option - PartyOption.FORM_CHANGE_ITEM];
+                optionName = `${modifier.active ? i18next.t("partyUiHandler:deactivate") : i18next.t("partyUiHandler:activate")} ${modifier.type.name}`;
+              } else if (option === PartyOption.UNPAUSE_EVOLUTION) {
+                optionName = `${pokemon.pauseEvolutions ? i18next.t("partyUiHandler:unpauseEvolution") : i18next.t("partyUiHandler:pauseEvolution")}`;
+              } else if (option === PartyOption.MOVE) {
+                // ER party reorder: "Move" picks the source mon, "Swap here" the target.
+                optionName = this.transferMode ? "Swap here" : "Move";
+              } else if (option === PartyOption.SHIFT) {
+                // Multi-format (triple+): swap field positions with the commanding mon.
+                optionName = "Shift";
+              } else if (option === PartyOption.GIVE_TO_PARTNER) {
+                // Co-op (#633, P3): hand this mon to the other player.
+                optionName = i18next.t("partyUiHandler:coopGiveToPartner");
+              } else if (this.localizedOptions.includes(option)) {
+                optionName = i18next.t(`partyUiHandler:${toCamelCase(PartyOption[option])}`);
+              } else {
+                optionName = toTitleCase(PartyOption[option]);
+              }
+              break;
+            }
           }
         }
       } else if (this.isRememberMoveLikeMode()) {

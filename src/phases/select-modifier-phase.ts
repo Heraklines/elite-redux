@@ -110,6 +110,7 @@ import {
   ErDexNavModifierType,
   ErGreaterAbilityCapsuleModifierType,
   ErGreaterAbilityRandomizerModifierType,
+  ErGreaterMoveRandomizerModifierType,
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
   EvolutionItemModifierType,
@@ -1358,6 +1359,7 @@ export class SelectModifierPhase extends BattlePhase {
       || modifierType instanceof ErAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+      || modifierType instanceof ErGreaterMoveRandomizerModifierType
       || modifierType instanceof ErDexNavModifierType
     );
   }

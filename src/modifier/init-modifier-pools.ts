@@ -650,6 +650,7 @@ function initUltraModifierPool() {
     // (permanently unlock one innate, or run-unlock two). Rarer than the GREAT-tier
     // normal capsule, so a lower weight.
     new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_CAPSULE, 2),
+    new WeightedModifierType(modifierTypes.MOVE_RANDOMIZER, 4),
     // ER Expert Belt: ULTRA per maintainer (2026-07-16) - x1.2 super-effective
     // damage, single stack per mon (getMaxHeldItemCount 1).
     new WeightedModifierType(modifierTypes.ER_EXPERT_BELT, 3),
@@ -715,6 +716,7 @@ function initRogueModifierPool() {
     // ER custom Rogue-tier consumables.
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
+    new WeightedModifierType(modifierTypes.ER_GREATER_MOVE_RANDOMIZER, () => (globalScene.gameMode.isCoop ? 0 : 2), 2),
     new WeightedModifierType(modifierTypes.ER_OMNI_GEM, 3),
     // ER tactical held items - batch 2 ROGUE-tier additions (2026-07-16).
     new WeightedModifierType(modifierTypes.ER_METRONOME_ITEM, 3),

@@ -26,6 +26,7 @@ import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
+import { getMoveRandomizerCandidates } from "#data/elite-redux/er-move-randomizer";
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
@@ -81,6 +82,7 @@ import {
   ErDexNavModifier,
   ErGreaterAbilityCapsuleModifier,
   ErGreaterAbilityRandomizerModifier,
+  ErGreaterMoveRandomizerModifier,
   ErLearnersShroomModifier,
   ErRelicModifier,
   ErTmCaseModifier,
@@ -129,6 +131,7 @@ import {
   PokemonPpRestoreModifier,
   PokemonPpUpModifier,
   PokemonRandomizeAbilityModifier,
+  PokemonRandomizeMoveModifier,
   PokemonStatusHealModifier,
   PreserveBerryModifier,
   RememberMoveModifier,
@@ -773,6 +776,53 @@ export class PokemonNatureChangeModifierType extends PokemonModifierType {
 
   getPregenArgs(): any[] {
     return [this.nature];
+  }
+}
+
+export class PokemonRandomizeMoveModifierType extends PokemonMoveModifierType {
+  constructor() {
+    super(
+      "",
+      "move_randomizer",
+      (type, args) => new PokemonRandomizeMoveModifier(type, (args[0] as PlayerPokemon).id, args[1] as number),
+      (pokemon: PlayerPokemon) =>
+        getMoveRandomizerCandidates(pokemon).length > 0 ? null : PartyUiHandler.NoEffectMessage,
+      () => null,
+      "move_randomizer",
+    );
+  }
+
+  get name(): string {
+    return i18next.t("modifierType:moveRandomizer.name");
+  }
+
+  getDescription(): string {
+    return i18next.t("modifierType:moveRandomizer.description");
+  }
+}
+
+export class ErGreaterMoveRandomizerModifierType extends PokemonMoveModifierType {
+  constructor() {
+    super(
+      "",
+      "move_randomizer",
+      (type, args) => new ErGreaterMoveRandomizerModifier(type, (args[0] as PlayerPokemon).id, args[1] as number),
+      (pokemon: PlayerPokemon) =>
+        !globalScene.gameMode.isCoop && getMoveRandomizerCandidates(pokemon).length > 0
+          ? null
+          : PartyUiHandler.NoEffectMessage,
+      () => null,
+      "move_randomizer",
+    );
+    this.iconTint = 0x7af0ff;
+  }
+
+  get name(): string {
+    return i18next.t("modifierType:erGreaterMoveRandomizer.name");
+  }
+
+  getDescription(): string {
+    return i18next.t("modifierType:erGreaterMoveRandomizer.description");
   }
 }
 
@@ -2400,6 +2450,9 @@ const modifierTypeInitObj = Object.freeze({
 
   PP_UP: () => new PokemonPpUpModifierType("modifierType:ModifierType.PP_UP", "pp_up", 1),
   PP_MAX: () => new PokemonPpUpModifierType("modifierType:ModifierType.PP_MAX", "pp_max", 3),
+
+  MOVE_RANDOMIZER: () => new PokemonRandomizeMoveModifierType(),
+  ER_GREATER_MOVE_RANDOMIZER: () => new ErGreaterMoveRandomizerModifierType(),
 
   // ER Rogue-tier consumables.
   ABILITY_RANDOMIZER: () => new PokemonRandomizeAbilityModifierType(),
