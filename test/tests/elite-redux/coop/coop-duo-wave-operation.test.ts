@@ -54,6 +54,7 @@ import {
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
+  type CoopMessage,
   type CoopRole,
   type CoopTransport,
   createLoopbackPair,
@@ -81,6 +82,7 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type DuoRig,
+  disposeDuoRig,
   drainLoopback,
   installDuoLogCapture,
   retireDuoInitialCommandForBoundaryTest,
@@ -512,6 +514,12 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   it("parks a real BattleEnd wave, preserves it across hot rejoin, and sends waveEndState exactly once", async () => {
     const rejoinPair = createDuoHotRejoinPair();
     const rig = await bootDuo({ startingWave: 3, pair: rejoinPair });
+    const guestCompatibilityMessages: CoopMessage[] = [];
+    const unsubscribeGuestCompatibility = rig.guestRuntime.localTransport.onMessage(message => {
+      if (message.t === "waveResolved" || message.t === "waveEndState") {
+        guestCompatibilityMessages.push(structuredClone(message));
+      }
+    });
     const hostGenerationAtBoot = rejoinPair.host.connectionGeneration();
     const guestGenerationAtBoot = rejoinPair.guest.connectionGeneration();
     expect(rejoinPair.host.state, "the real host WebRTC transport booted on an open channel").toBe("connected");
@@ -594,36 +602,79 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(staleAuthorityFrame.ctx).toEqual(hostContext);
     const parkedImage = structuredClone(parked);
     const parkedRevision = parked.revision;
-    const membershipBeforeRejoin = rig.hostRuntime.membership.snapshot();
+    const { settledStateTick, ...waveResolvedTransition } = parked.transition;
+    expect(settledStateTick).toBe(parked.stateTick);
+    const expectedGuestCompatibilityMessages = JSON.parse(
+      JSON.stringify([
+        { t: "waveResolved", wave: 3, outcome: "win", transition: waveResolvedTransition },
+        { t: "waveEndState", wave: 3, state: parked.authoritativeState },
+      ]),
+    ) as CoopMessage[];
+    const hostMembershipBeforeRejoin = rig.hostRuntime.membership.snapshot();
+    const guestMembershipBeforeRejoin = rig.guestRuntime.membership.snapshot();
     const timersBeforeRejoin = hostShadow.diagnostics().pendingTimers;
+    expect(timersBeforeRejoin, "the parked wave owns no retry timer before proof").toBe(0);
+    const guestDurability = rig.guestRuntime.durability;
+    expect(guestDurability).not.toBeNull();
+    if (guestDurability == null) {
+      unsubscribeGuestCompatibility();
+      logs.flush();
+      return;
+    }
+    const guestDurabilityReconnect = vi.spyOn(guestDurability, "reconnect");
+    let releaseHostRejoin!: () => void;
+    let releaseGuestRejoin!: () => void;
+    const hostRejoinGate = new Promise<void>(resolve => {
+      releaseHostRejoin = resolve;
+    });
+    const guestRejoinGate = new Promise<void>(resolve => {
+      releaseGuestRejoin = resolve;
+    });
     let replacementCount = 0;
-    const rejoinDriver = async (): Promise<boolean> => {
-      await Promise.resolve();
+    rig.hostRuntime.rejoinDriver = async (): Promise<boolean> => {
+      await hostRejoinGate;
       if (replacementCount === 0) {
         rejoinPair.replaceChannels();
         replacementCount++;
       }
       return true;
     };
-    rig.hostRuntime.rejoinDriver = rejoinDriver;
-    rig.guestRuntime.rejoinDriver = rejoinDriver;
+    rig.guestRuntime.rejoinDriver = async (): Promise<boolean> => {
+      await guestRejoinGate;
+      return true;
+    };
 
-    let recoveringMembership = membershipBeforeRejoin;
-    await withClient(rig.hostCtx, async () => {
+    let hostRecoveringMembership = hostMembershipBeforeRejoin;
+    let guestRecoveringMembership = guestMembershipBeforeRejoin;
+    withClientSync(rig.hostCtx, () => {
       rejoinPair.initialWires.host.close();
-      recoveringMembership = rig.hostRuntime.membership.snapshot();
-      for (let turn = 0; turn < 8; turn++) {
+      hostRecoveringMembership = rig.hostRuntime.membership.snapshot();
+      guestRecoveringMembership = rig.guestRuntime.membership.snapshot();
+    });
+    expect(hostRecoveringMembership, "the host runtime marks only its guest peer absent on carrier loss").toEqual({
+      ...hostMembershipBeforeRejoin,
+      state: "recovering",
+      revision: hostMembershipBeforeRejoin.revision + 1,
+      members: [
+        { ...hostMembershipBeforeRejoin.members[0], present: true },
+        { ...hostMembershipBeforeRejoin.members[1], present: false },
+      ],
+    });
+    expect(guestRecoveringMembership, "the guest runtime marks only its host peer absent on carrier loss").toEqual({
+      ...guestMembershipBeforeRejoin,
+      state: "recovering",
+      revision: guestMembershipBeforeRejoin.revision + 1,
+      members: [
+        { ...guestMembershipBeforeRejoin.members[0], present: false },
+        { ...guestMembershipBeforeRejoin.members[1], present: true },
+      ],
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      releaseHostRejoin();
+      for (let turn = 0; turn < 12 && rig.hostRuntime.membership.snapshot().state !== "active"; turn++) {
         await Promise.resolve();
       }
-    });
-    expect(recoveringMembership, "the runtime observed the carrier loss before the async replacement").toMatchObject({
-      state: "recovering",
-      revision: membershipBeforeRejoin.revision + 1,
-      connectionGeneration: membershipBeforeRejoin.connectionGeneration,
-      members: [
-        { seatId: 0, present: true },
-        { seatId: 1, present: false },
-      ],
     });
     expect(replacementCount).toBe(1);
     expect(rejoinPair.initialWires.host.readyState).toBe("closed");
@@ -632,31 +683,73 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(rejoinPair.guest.state).toBe("connected");
     expect(rejoinPair.host.connectionGeneration()).toBe(hostGenerationAtBoot + 1);
     expect(rejoinPair.guest.connectionGeneration()).toBe(guestGenerationAtBoot + 1);
-    expect(rig.hostRuntime.membership.snapshot()).toMatchObject({
+    expect(rig.hostRuntime.membership.snapshot()).toEqual({
+      ...hostRecoveringMembership,
       state: "active",
-      revision: recoveringMembership.revision + 1,
+      revision: hostRecoveringMembership.revision + 1,
       connectionGeneration: rejoinPair.host.connectionGeneration(),
       members: [
-        { seatId: 0, present: true },
-        { seatId: 1, present: true },
+        { ...hostRecoveringMembership.members[0], present: true },
+        { ...hostRecoveringMembership.members[1], present: true },
       ],
     });
+    expect(
+      rig.guestRuntime.membership.snapshot(),
+      "the unresolved guest driver cannot borrow the host's active completion context",
+    ).toEqual(guestRecoveringMembership);
 
-    const reboundGuestShadow = await withClient(rig.guestCtx, () => getCoopV2Shadow(rig.guestRuntime));
     const reboundHostShadow = await withClient(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime));
     const reboundCutover = await withClient(rig.hostCtx, () => getActiveCoopV2WaveCutover());
-    expect(reboundGuestShadow).toBe(guestShadow);
     expect(reboundHostShadow).toBe(hostShadow);
-    expect(reboundGuestShadow?.authenticatedFrameContext).toEqual({
-      ...guestContext,
-      connectionGeneration: guestContext.connectionGeneration + 1,
-    });
     expect(reboundHostShadow?.authenticatedFrameContext).toEqual({
       ...hostContext,
       connectionGeneration: hostContext.connectionGeneration + 1,
     });
     expect(reboundCutover?.authenticatedFrameContext).toEqual(reboundHostShadow?.authenticatedFrameContext);
     expect(hostShadow.diagnostics().pendingTimers).toBe(timersBeforeRejoin);
+
+    const hostV2QueueBeforeGuestCompletion = rejoinPair.host.deferredV2FrameCount();
+    await withClient(rig.guestCtx, async () => {
+      releaseGuestRejoin();
+      for (let turn = 0; turn < 12 && rig.guestRuntime.membership.snapshot().state !== "active"; turn++) {
+        await Promise.resolve();
+      }
+    });
+    expect(rig.guestRuntime.membership.snapshot()).toEqual({
+      ...guestRecoveringMembership,
+      state: "active",
+      revision: guestRecoveringMembership.revision + 1,
+      connectionGeneration: rejoinPair.guest.connectionGeneration(),
+      members: [
+        { ...guestRecoveringMembership.members[0], present: true },
+        { ...guestRecoveringMembership.members[1], present: true },
+      ],
+    });
+    expect(
+      guestDurabilityReconnect,
+      "guest completion runs its production durability resync exactly once",
+    ).toHaveBeenCalledOnce();
+    expect(
+      guestShadow.authenticatedFrameContext,
+      "the guest completion rebound the retained shadow before this test queried the public accessor again",
+    ).toEqual({
+      ...guestContext,
+      connectionGeneration: guestContext.connectionGeneration + 1,
+    });
+    const expectedRecoveryRequestId =
+      `REC/e${guestContext.sessionEpoch}/m${guestContext.membershipRevision}`
+      + `/s${guestContext.senderSeatId}/g${guestContext.connectionGeneration + 1}/q1`;
+    expect(guestShadow.diagnostics().recovery).toMatchObject({
+      fenceState: "held",
+      activeReplicaRequest: expectedRecoveryRequestId,
+      completedReplicaProofs: 0,
+    });
+    expect(
+      rejoinPair.host.deferredV2FrameCount(),
+      "guest post-rejoin recovery sent its authenticated request over the replacement carrier",
+    ).toBe(hostV2QueueBeforeGuestCompletion + 1);
+    const reboundGuestShadow = await withClient(rig.guestCtx, () => getCoopV2Shadow(rig.guestRuntime));
+    expect(reboundGuestShadow).toBe(guestShadow);
     expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
     expect(rig.hostRuntime.v2DeferredHostBoundary?.entry).toBe(parked.entry);
     expect(rig.hostRuntime.v2DeferredHostBoundary).toEqual(parkedImage);
@@ -683,7 +776,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     ).toBe(parked);
     expect(rawResolved).not.toHaveBeenCalled();
     expect(rawEndState).not.toHaveBeenCalled();
+    expect(guestCompatibilityMessages).toEqual([]);
 
+    const guestDiagnosticsBeforeRedrive = guestShadow.diagnostics();
+    const guestV2QueueBeforeRedrive = rejoinPair.guest.deferredV2FrameCount();
     await withClient(rig.hostCtx, async () => {
       isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
       await Promise.resolve();
@@ -691,6 +787,42 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
     expect(rawResolved).toHaveBeenCalledOnce();
     expect(rawEndState).toHaveBeenCalledOnce();
+    expect(rawResolved).toHaveBeenCalledWith(3, "win", undefined, undefined, waveResolvedTransition);
+    expect(rawEndState).toHaveBeenCalledWith(3, parked.authoritativeState);
+    expect(
+      rejoinPair.guest.deferredV2FrameCount(),
+      "the committed authority entry crossed the replacement WebRTC carrier into the guest V2 inbox",
+    ).toBe(guestV2QueueBeforeRedrive + 1);
+    expect(
+      guestCompatibilityMessages,
+      "raw compatibility remains queued until the guest replacement-carrier inbox is pumped",
+    ).toEqual([]);
+
+    await withClient(rig.guestCtx, () => drainLoopback());
+    const guestDiagnosticsAfterRedrive = guestShadow.diagnostics();
+    expect(rejoinPair.guest.deferredV2FrameCount()).toBe(0);
+    expect(guestCompatibilityMessages).toEqual(expectedGuestCompatibilityMessages);
+    expect(guestDiagnosticsAfterRedrive.admitted).toBe(guestDiagnosticsBeforeRedrive.admitted + 1);
+    expect(guestDiagnosticsAfterRedrive.applied).toBe(guestDiagnosticsBeforeRedrive.applied);
+    expect(guestDiagnosticsAfterRedrive.receiptsSent).toBe(guestDiagnosticsBeforeRedrive.receiptsSent + 1);
+    expect(
+      guestShadow.authorityFrontier(),
+      "the guest admitted the exact readdressed wave entry while its real recovery fence held material",
+    ).toMatchObject({ revision: parkedRevision, operationId: parked.operationId });
+    expect(getCoopWaveBoundaryStatus(3, rig.guestRuntime)).toBeNull();
+    expect(guestShadow.diagnostics().recovery).toMatchObject({
+      fenceState: "held",
+      activeReplicaRequest: expectedRecoveryRequestId,
+      completedReplicaProofs: 0,
+    });
+    expect(rejoinPair.host.deferredV2FrameCount()).toBe(hostV2QueueBeforeGuestCompletion + 2);
+    await withClient(rig.hostCtx, () => drainLoopback());
+    expect(rejoinPair.host.deferredV2FrameCount()).toBe(0);
+    expect(hostShadow.diagnostics()).toMatchObject({
+      retained: 1,
+      pendingTimers: timersBeforeRejoin + 1,
+    });
+
     await withClient(rig.hostCtx, async () => {
       isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
       await Promise.resolve();
@@ -699,6 +831,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     await withClient(rig.hostCtx, () => broadcastCoopWaveEndState(true));
     expect(rawResolved).toHaveBeenCalledOnce();
     expect(rawEndState).toHaveBeenCalledOnce();
+    expect(rejoinPair.guest.deferredV2FrameCount()).toBe(0);
+    await withClient(rig.guestCtx, () => drainLoopback());
+    expect(guestCompatibilityMessages).toEqual(expectedGuestCompatibilityMessages);
+    expect(guestShadow.diagnostics().admitted).toBe(guestDiagnosticsAfterRedrive.admitted);
     const guestQueueDepthAfterCommit = rejoinPair.guest.deferredV2FrameCount();
     withClientSync(rig.guestCtx, () => {
       rejoinPair.initialWires.guest.injectRaw(staleAuthorityWire);
@@ -707,7 +843,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(rejoinPair.guest.deferredV2FrameCount()).toBe(guestQueueDepthAfterCommit);
     expect(rawResolved).toHaveBeenCalledOnce();
     expect(rawEndState).toHaveBeenCalledOnce();
-    expect(hostShadow.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
+    unsubscribeGuestCompatibility();
+    disposeDuoRig(rig);
+    expect(hostShadow.diagnostics()).toMatchObject({ disposed: true, retained: 0, pendingTimers: 0 });
+    expect(guestShadow.diagnostics()).toMatchObject({ disposed: true, retained: 0, pendingTimers: 0 });
     logs.flush();
   }, 300_000);
 
