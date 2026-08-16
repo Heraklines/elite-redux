@@ -71,9 +71,10 @@ import type {
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import type {
-  CoopTailProofBodyV2,
-  CoopTailRequestBodyV2,
+import {
+  COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS,
+  type CoopTailProofBodyV2,
+  type CoopTailRequestBodyV2,
 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { frameContextsEqual } from "#data/elite-redux/coop/authority-v2/frame-context";
 import {
@@ -315,12 +316,14 @@ interface ReplicaBoundaryProofCapture {
   readonly requestId: string;
   readonly requestContext: CoopFrameContextV2;
   readonly authorityContext: CoopFrameContextV2;
-  readonly predecessorSeed: CoopAuthorityEntry;
+  /** Local authenticated identity constraint; never injected into the manifest source snapshot. */
+  readonly predecessorIdentity: CoopAuthorityEntry;
   manifest: CoopTailProofBodyV2 | null;
   readonly sources: Map<number, CoopAuthorityEntry>;
 }
 
 interface TailProofResponseCache {
+  readonly kind: "response";
   readonly requesterSeatId: number;
   readonly requestContext: CoopFrameContextV2;
   readonly authorityContext: CoopFrameContextV2;
@@ -331,6 +334,22 @@ interface TailProofResponseCache {
   readonly manifest: CoopTailProofBodyV2;
   readonly entries: readonly CoopAuthorityEntry[];
   readonly complete: CoopTailProofBodyV2;
+}
+
+interface RejectedTailProofRequestCache {
+  readonly kind: "rejected";
+}
+
+type TailProofRequestCache = TailProofResponseCache | RejectedTailProofRequestCache;
+
+interface BoundaryProofSourceRejection {
+  readonly requestId: string;
+  readonly reason: string;
+}
+
+interface RejectedBoundaryProofSourceContext {
+  readonly authorityContext: CoopFrameContextV2;
+  readonly rejection: BoundaryProofSourceRejection;
 }
 
 export type AuthorityBoundaryProofFrameDisposition =
@@ -474,8 +493,11 @@ export class AuthorityLog implements CoopAuthorityLog {
 
   /** AUTHORITY: retained-but-unretired entries, bounded + revision-ordered, keyed by their delivery lease. */
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
-  /** AUTHORITY: one immutable proof response per authenticated peer; replaced by a newer request ID. */
-  private readonly tailProofResponses = new Map<number, TailProofResponseCache>();
+  /** AUTHORITY: frozen retired entries that may still be exact sources for a later boundary proof. */
+  private readonly retiredBoundarySources = new Map<number, CoopAuthorityEntry>();
+  /** AUTHORITY: immutable request-ID outcomes retained for the complete authenticated channel lifecycle. */
+  private readonly tailProofResponses = new Map<number, Map<string, TailProofRequestCache>>();
+  private tailProofResponseCount = 0;
   /** REPLICA: separate received, material-applied, and control-installed ordering frontiers. */
   private readonly ledger: AuthorityLedger;
   /** REPLICA: exact authenticated source provenance, bounded independently of unresolved authority leases. */
@@ -486,6 +508,10 @@ export class AuthorityLog implements CoopAuthorityLog {
   private pendingReplicaPredecessor: CoopAuthorityEntry | null = null;
   /** Tail-refresh capture is observational only: it never advances the ordered ledger. */
   private boundaryProofCapture: ReplicaBoundaryProofCapture | null = null;
+  /** Synchronous exact-key handoff for a rejected proof-source authorityEntry. */
+  private pendingBoundaryProofSourceRejection: BoundaryProofSourceRejection | null = null;
+  /** Terminal fence: no later entry in the failed authenticated generation can reach the mechanical ledger. */
+  private rejectedBoundaryProofSourceContext: RejectedBoundaryProofSourceContext | null = null;
   private completedBoundaryProof: {
     readonly candidate: CoopAuthorityEntry;
     readonly predecessor: CoopAuthorityEntry;
@@ -703,6 +729,12 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.latestCommittedEntry == null
         ? null
         : freezeAuthorityEntry(cloneEntry({ ...this.latestCommittedEntry, context: reboundLocalContext }));
+    const reboundRetiredBoundarySources = [...this.retiredBoundarySources].map(
+      ([revision, source]) => [
+        revision,
+        freezeAuthorityEntry(cloneEntry({ ...source, context: reboundLocalContext })),
+      ] as const,
+    );
     const reboundPendingAuthorityCommit =
       this.pendingAuthorityCommit == null
         ? null
@@ -743,8 +775,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.localContext = reboundLocalContext;
     this.peerBindings = peers;
     this.tailProofResponses.clear();
+    this.tailProofResponseCount = 0;
+    this.retiredBoundarySources.clear();
+    for (const [revision, source] of reboundRetiredBoundarySources) {
+      this.retiredBoundarySources.set(revision, source);
+    }
     this.pendingTailRequestFrom = null;
     this.pendingTailRequestProofId = null;
+    this.pendingBoundaryProofSourceRejection = null;
+    this.rejectedBoundaryProofSourceContext = null;
     this.pendingReplicaEntry = reboundReplicaEntry;
     this.pendingReplicaPredecessor = reboundReplicaPredecessor;
     this.boundaryProofCapture = null;
@@ -1198,8 +1237,12 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (peer == null || request.requestId.length === 0 || request.candidateOperationId.length === 0) {
       return;
     }
-    const cached = this.tailProofResponses.get(peer.seatId);
-    if (cached != null && cached.requestId === request.requestId) {
+    let peerResponses = this.tailProofResponses.get(peer.seatId);
+    const cached = peerResponses?.get(request.requestId);
+    if (cached != null) {
+      if (cached.kind === "rejected") {
+        return;
+      }
       if (
         frameContextsEqual(cached.requestContext, context)
         && cached.fromRevision === request.fromRevision
@@ -1209,12 +1252,21 @@ export class AuthorityLog implements CoopAuthorityLog {
       ) {
         this.sendTailProofResponse(cached);
       }
-      // A request ID is single-use for one authenticated peer. Conflicting reuse fails closed and cannot
-      // replace the immutable response cached for the original request.
+      // Conflicting reuse rejects only this invocation. Preserve a successful immutable response so every
+      // later exact replay of the original metadata receives the same frozen bytes for the full lifecycle.
       return;
     }
-    // A newer request ID replaces the one active response for this peer before a fresh snapshot is built.
-    this.tailProofResponses.delete(peer.seatId);
+    // Reserve every new authenticated ID before consulting mutable retained state. At capacity, all new IDs
+    // remain rejected until hot rebind/dispose clears the lifecycle cache; no evict-and-recompute is possible.
+    if (this.tailProofResponseCount >= this.retentionCapacity) {
+      return;
+    }
+    if (peerResponses == null) {
+      peerResponses = new Map<string, TailProofRequestCache>();
+      this.tailProofResponses.set(peer.seatId, peerResponses);
+    }
+    peerResponses.set(request.requestId, Object.freeze({ kind: "rejected" }));
+    this.tailProofResponseCount += 1;
     const candidateLease = this.retainedWindow.get(request.candidateRevision);
     const candidate = candidateLease?.entry;
     if (
@@ -1224,12 +1276,8 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return;
     }
-    const snapshot = Object.freeze(
-      this.retained()
-        .filter(entry => entry.revision >= request.fromRevision && entry.revision < request.candidateRevision)
-        .map(entry => entry),
-    );
-    if (snapshot.length > this.retentionCapacity) {
+    const snapshot = this.captureTailProofSources(request.fromRevision, request.candidateRevision);
+    if (snapshot == null) {
       return;
     }
     const sourceRevisions = Object.freeze(snapshot.map(entry => entry.revision));
@@ -1244,6 +1292,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     const manifest: CoopTailProofBodyV2 = Object.freeze({ phase: "manifest", ...proofBase });
     const complete: CoopTailProofBodyV2 = Object.freeze({ phase: "complete", ...proofBase });
     const response: TailProofResponseCache = Object.freeze({
+      kind: "response",
       requesterSeatId: peer.seatId,
       requestContext: Object.freeze({ ...context }),
       authorityContext: Object.freeze({ ...this.localContext }),
@@ -1255,8 +1304,37 @@ export class AuthorityLog implements CoopAuthorityLog {
       entries: snapshot,
       complete,
     });
-    this.tailProofResponses.set(peer.seatId, response);
+    peerResponses.set(request.requestId, response);
     this.sendTailProofResponse(response);
+  }
+
+  /** Freeze one exact archive+live source image, rejecting overlap conflicts and over-capacity manifests. */
+  private captureTailProofSources(
+    fromRevision: number,
+    candidateRevision: number,
+  ): readonly CoopAuthorityEntry[] | null {
+    const sources = new Map<number, CoopAuthorityEntry>();
+    for (const entry of [...this.retiredBoundarySources.values(), ...this.retained()]) {
+      if (entry.revision < fromRevision || entry.revision >= candidateRevision) {
+        continue;
+      }
+      if (!frameContextsEqual(entry.context, this.localContext)) {
+        return null;
+      }
+      const prior = sources.get(entry.revision);
+      if (prior != null && !sameReplicaEntry(prior, entry)) {
+        return null;
+      }
+      sources.set(entry.revision, entry);
+    }
+    const snapshot = [...sources.values()].sort((left, right) => left.revision - right.revision);
+    if (
+      snapshot.length > this.retentionCapacity
+      || snapshot.length > COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS
+    ) {
+      return null;
+    }
+    return Object.freeze(snapshot);
   }
 
   /** Replay one immutable cached response in its original manifest/source/completion order. */
@@ -1274,6 +1352,7 @@ export class AuthorityLog implements CoopAuthorityLog {
 
   /** Classify + admit one delivered entry against the local frame context + ordering cursor. */
   admit(entry: CoopAuthorityEntry): CoopAdmitResult {
+    this.pendingBoundaryProofSourceRejection = null;
     if (this.disposed) {
       return { kind: "rejected", reason: "disposed" };
     }
@@ -1302,6 +1381,14 @@ export class AuthorityLog implements CoopAuthorityLog {
       || entry.context.connectionGeneration !== authorityPeer.connectionGeneration
     ) {
       return { kind: "rejected", reason: "authority-sender-mismatch" };
+    }
+    const rejectedProofContext = this.rejectedBoundaryProofSourceContext;
+    if (
+      rejectedProofContext != null
+      && frameContextsEqual(entry.context, rejectedProofContext.authorityContext)
+    ) {
+      this.pendingBoundaryProofSourceRejection = rejectedProofContext.rejection;
+      return { kind: "rejected", reason: "boundary-proof-failed" };
     }
     if (this.boundaryProofCapture != null) {
       const candidateDuplicate = this.isBoundaryProofCandidate(entry);
@@ -1528,7 +1615,6 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return;
     }
-    this.tailProofResponses.clear();
     // Replica: fast-forward the applied cursor past any gap the snapshot filled.
     this.ledger.adoptFrontier(revision);
     if (this.replicaProofEntryIdentity != null) {
@@ -1602,7 +1688,6 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return false;
     }
-    this.tailProofResponses.clear();
     if (this.replicaProofEntryIdentity != null) {
       revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
     }
@@ -1641,8 +1726,12 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.retainedWindow.clear();
     this.tailProofResponses.clear();
+    this.tailProofResponseCount = 0;
+    this.retiredBoundarySources.clear();
     this.pendingTailRequestFrom = null;
     this.pendingTailRequestProofId = null;
+    this.pendingBoundaryProofSourceRejection = null;
+    this.rejectedBoundaryProofSourceContext = null;
     if (this.replicaProofEntryIdentity != null) {
       revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
     }
@@ -1747,11 +1836,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return false;
     }
-    // Never let a recovered epoch floor equal/exceed the exact successor candidate. The predecessor seed
-    // carries an already-retired predecessor, while retained sources still use this bounded floor.
+    // The request range must cover every source whose exact body can authorize this boundary. This numeric
+    // lower bound grants nothing by itself; the manifest and byte-identical deliveries remain mandatory.
+    const firstRequiredRevision = candidate.subsumes.reduce(
+      (lowest, revision) => Math.min(lowest, revision),
+      predecessor.revision,
+    );
     const fromRevision = Math.max(
       0,
-      Math.min(this.replicaProofEpochStartRevision, predecessor.revision),
+      Math.min(this.replicaProofEpochStartRevision, firstRequiredRevision),
     );
     const requestId = `${this.ownerBase}:boundary-proof:${++this.boundaryProofRequestSequence}`;
     const capturedCandidate = freezeAuthorityEntry(cloneEntry(candidate));
@@ -1763,7 +1856,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       requestId,
       requestContext: Object.freeze({ ...this.localContext }),
       authorityContext: Object.freeze({ ...capturedCandidate.context }),
-      predecessorSeed: freezeAuthorityEntry(cloneEntry(predecessor)),
+      predecessorIdentity: freezeAuthorityEntry(cloneEntry(predecessor)),
       manifest: null,
       sources: new Map<number, CoopAuthorityEntry>(),
     };
@@ -1782,13 +1875,11 @@ export class AuthorityLog implements CoopAuthorityLog {
       return "pending";
     }
     if (!frameContextsEqual(entry.context, capture.authorityContext)) {
-      this.failBoundaryProofCapture();
-      return "rejected";
+      return this.rejectBoundaryProofSource(capture, "boundary-proof source context mismatch");
     }
     if (entry.revision === capture.candidate.revision) {
       if (!sameReplicaEntry(capture.candidate, entry)) {
-        this.failBoundaryProofCapture();
-        return "rejected";
+        return this.rejectBoundaryProofSource(capture, "boundary-proof candidate identity conflict");
       }
       // The authority's ordinary candidate lease is not a proof delimiter. Keep it parked until the exact
       // matching completion frame arrives.
@@ -1796,19 +1887,44 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     const manifest = capture.manifest;
     if (manifest == null || !manifest.sourceRevisions.includes(entry.revision)) {
-      this.failBoundaryProofCapture();
-      return "rejected";
+      return this.rejectBoundaryProofSource(capture, "boundary-proof source missing from active manifest");
     }
     const prior = capture.sources.get(entry.revision);
     if (prior != null) {
-      return sameReplicaEntry(prior, entry) ? "pending" : (this.failBoundaryProofCapture(), "rejected");
+      return sameReplicaEntry(prior, entry)
+        ? "pending"
+        : this.rejectBoundaryProofSource(capture, "boundary-proof duplicate source identity conflict");
     }
-    if (capture.sources.size >= this.retentionCapacity) {
-      this.failBoundaryProofCapture();
-      return "rejected";
+    if (
+      capture.sources.size >= this.retentionCapacity
+      || capture.sources.size >= COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS
+    ) {
+      return this.rejectBoundaryProofSource(capture, "boundary-proof source capacity exceeded");
     }
     capture.sources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
     return "pending";
+  }
+
+  /** Preserve the active request key across capture teardown so Shadow can terminalize unconditionally. */
+  private rejectBoundaryProofSource(
+    capture: ReplicaBoundaryProofCapture,
+    reason: string,
+  ): "rejected" {
+    const rejection = Object.freeze({ requestId: capture.requestId, reason });
+    this.pendingBoundaryProofSourceRejection = rejection;
+    this.rejectedBoundaryProofSourceContext = Object.freeze({
+      authorityContext: capture.authorityContext,
+      rejection,
+    });
+    this.failBoundaryProofCapture();
+    return "rejected";
+  }
+
+  /** Consume only the rejection produced by the immediately preceding synchronous admit call. */
+  takeBoundaryProofSourceRejection(): BoundaryProofSourceRejection | null {
+    const rejection = this.pendingBoundaryProofSourceRejection;
+    this.pendingBoundaryProofSourceRejection = null;
+    return rejection;
   }
 
   /** Accept one exact manifest/completion frame with an explicit semantic disposition. */
@@ -1862,21 +1978,27 @@ export class AuthorityLog implements CoopAuthorityLog {
       return { kind: "rejected", reason: "boundary-proof source snapshot incomplete" };
     }
     const sources = [...capture.sources.values()].sort((left, right) => left.revision - right.revision);
-    const predecessor = capture.predecessorSeed;
-    const seededSource = sources.find(source => source.revision === predecessor.revision);
-    if (seededSource != null && !sameReplicaEntry(seededSource, predecessor)) {
+    const predecessorIdentity = capture.predecessorIdentity;
+    const predecessor = sources.find(source => source.revision === predecessorIdentity.revision);
+    if (predecessor == null || !sameReplicaEntry(predecessor, predecessorIdentity)) {
       this.failBoundaryProofCapture();
-      return { kind: "rejected", reason: "boundary-proof predecessor seed conflict" };
+      return { kind: "rejected", reason: "boundary-proof predecessor absent or identity-conflicting" };
     }
-    const completeSources =
-      seededSource == null
-        ? [predecessor, ...sources].sort((left, right) => left.revision - right.revision)
-        : sources;
-    if (completeSources.length > this.retentionCapacity) {
+    if (
+      !manifest.sourceRevisions.includes(predecessor.revision)
+      || capture.candidate.subsumes.some(revision => !manifest.sourceRevisions.includes(revision))
+    ) {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof required source omitted from manifest" };
+    }
+    if (
+      sources.length > this.retentionCapacity
+      || sources.length > COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS
+    ) {
       this.failBoundaryProofCapture();
       return { kind: "rejected", reason: "boundary-proof source capacity exceeded" };
     }
-    const proof = this.evaluateReplicaBoundary(capture.candidate, predecessor, completeSources);
+    const proof = this.evaluateReplicaBoundary(capture.candidate, predecessor, sources);
     const candidate = capture.candidate;
     this.boundaryProofCapture = null;
     this.pendingTailRequestFrom = null;
@@ -1891,7 +2013,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       predecessor: proof.predecessor,
       trustedSources: proof.trustedSources,
       capturedSources: Object.freeze(
-        completeSources.map(source => freezeAuthorityEntry(cloneEntry(source))),
+        sources.map(source => freezeAuthorityEntry(cloneEntry(source))),
       ),
     };
     return { kind: "completed", candidate };
@@ -2247,10 +2369,27 @@ export class AuthorityLog implements CoopAuthorityLog {
     });
   }
 
-  /** Retire one revision: stop its lease (cancel timers) and drop it from retention. Returns true iff present. */
+  /** Preserve one immutable retired source without ever exceeding the authority retention capacity. */
+  private archiveRetiredBoundarySource(entry: CoopAuthorityEntry): boolean {
+    const prior = this.retiredBoundarySources.get(entry.revision);
+    if (prior != null) {
+      return sameReplicaEntry(prior, entry);
+    }
+    while (this.retiredBoundarySources.size >= this.retentionCapacity) {
+      const oldestRevision = Math.min(...this.retiredBoundarySources.keys());
+      if (!Number.isSafeInteger(oldestRevision)) {
+        return false;
+      }
+      this.retiredBoundarySources.delete(oldestRevision);
+    }
+    this.retiredBoundarySources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
+    return true;
+  }
+
+  /** Retire one revision: archive its exact body, cancel its timer, and drop it from live retention. */
   private retire(revision: number): boolean {
     const lease = this.retainedWindow.get(revision);
-    if (lease == null) {
+    if (lease == null || !this.archiveRetiredBoundarySource(lease.entry)) {
       return false;
     }
     const quorumStage = Math.min(...[...lease.peerStages.values()].map(peer => peer.stage));
@@ -2264,11 +2403,6 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.stopLease(lease);
     this.retainedWindow.delete(revision);
-    for (const [seatId, response] of this.tailProofResponses) {
-      if (response.candidateRevision === revision) {
-        this.tailProofResponses.delete(seatId);
-      }
-    }
     this.exhaustedRevisionSet.delete(revision);
     return true;
   }

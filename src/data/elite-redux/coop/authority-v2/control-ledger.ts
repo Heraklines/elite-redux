@@ -187,23 +187,28 @@ export class CoopV2ControlLedger {
     const proofScope = authorityEntryProofScopeOf(entry);
     const authorityProofScope = proofScope?.kind === "authority-retained" ? proofScope : null;
     const proofSources = authorityProofScope == null ? null : this.mergeProofSources(authorityProofScope, entry);
-    if (
-      (authorityProofScope != null
-        && (proofSources == null || !this.reconcileAuthenticatedSources(proofSources, entry)))
-      || !this.admitSuccessor(entry)
-      || !this.registerEntry(entry)
-      || !this.markMaterialApplied(entry)
-    ) {
-      restore();
-      return null;
-    }
-    if (authorityProofScope?.boundarySources != null) {
-      // Initial admission already proved this exact canonical list. Once the boundary reservation succeeds,
-      // those sources are represented by its frozen approval and the new boundary source remains live.
-      for (const revision of entry.subsumes) {
-        this.authenticatedSources.delete(revision);
+    try {
+      if (
+        (authorityProofScope != null
+          && (proofSources == null || !this.reconcileAuthenticatedSources(proofSources, entry)))
+        || !this.admitAndRegisterEntry(entry)
+        || !this.markMaterialApplied(entry)
+      ) {
+        restore();
+        return null;
       }
-      this.authenticatedSources.set(entry.revision, structuredClone(entry));
+      if (authorityProofScope?.boundarySources != null) {
+        // Initial admission already proved this exact canonical list. Once the boundary reservation succeeds,
+        // those sources are represented by its frozen approval and the new boundary source remains live.
+        for (const revision of entry.subsumes) {
+          this.authenticatedSources.delete(revision);
+        }
+        this.authenticatedSources.set(entry.revision, structuredClone(entry));
+      }
+    } catch (error) {
+      restore();
+      revokeAuthorityEntryProofScope(entry);
+      throw error;
     }
     let live = true;
     return () => {
@@ -333,6 +338,30 @@ export class CoopV2ControlLedger {
     return true;
   }
 
+  /**
+   * Admit and register one immutable entry as a single exception-safe ledger transaction.
+   *
+   * `admitSuccessor` may revoke the live predecessor before `registerEntry` clones and records the new
+   * claim. Any throw from either half restores the exact pre-admission snapshot and revokes the one-shot
+   * entry proof before propagating the fault to the shared terminal owner.
+   */
+  admitAndRegisterEntry(entry: CoopAuthorityEntry): boolean {
+    const rollback = this.pendingAdmissionRollback ?? {
+      entry,
+      claims: this.cloneClaims(),
+      authenticatedSources: this.cloneAuthenticatedSources(),
+      activeControlId: this.activeControlId,
+    };
+    try {
+      return this.admitSuccessor(entry) && this.registerEntry(entry);
+    } catch (error) {
+      this.restoreSnapshot(this.pendingAdmissionRollback ?? rollback);
+      this.pendingAdmissionRollback = null;
+      revokeAuthorityEntryProofScope(entry);
+      throw error;
+    }
+  }
+
   /** Mark only the exact registered revision materially complete. */
   markMaterialApplied(entry: CoopAuthorityEntry): boolean {
     const control = controlOf(entry);
@@ -357,6 +386,9 @@ export class CoopV2ControlLedger {
     if (this.pendingAdmissionRollback != null) {
       if (this.pendingAdmissionRollback.entry === entry) {
         if (isBoundaryEntry(entry) && !this.hasLiveBoundaryProof(entry, authorityEntryProofScopeOf(entry))) {
+          const rollback = this.pendingAdmissionRollback;
+          this.restoreSnapshot(rollback);
+          this.pendingAdmissionRollback = null;
           revokeAuthorityEntryProofScope(entry);
           return false;
         }

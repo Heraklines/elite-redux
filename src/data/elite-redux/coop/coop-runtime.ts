@@ -6283,7 +6283,7 @@ function buildCoopV2LiveSeams(
     },
     admitEntry: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean => {
       const releasesRecoveredWait = runtime.v2ControlLedger.activeControl?.kind === "AWAIT_SUCCESSOR";
-      if (!runtime.v2ControlLedger.admitSuccessor(entry) || !runtime.v2ControlLedger.registerEntry(entry)) {
+      if (!runtime.v2ControlLedger.admitAndRegisterEntry(entry)) {
         return false;
       }
       // A recovered AWAIT_SUCCESSOR keeps its apply phase parked through mere admission. Only immutable

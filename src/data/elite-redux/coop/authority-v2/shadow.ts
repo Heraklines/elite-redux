@@ -590,6 +590,8 @@ export class CoopAuthorityV2Shadow {
   private readonly replicaAdmissionRetries = new Set<number>();
   /** Revisions that exhausted their one permitted live-admission retry; later duplicates are inert. */
   private readonly replicaAdmissionExhausted = new Set<number>();
+  /** Exact proof request IDs whose source rejection already entered the shared protocol terminal. */
+  private readonly reportedBoundaryProofSourceRejections = new Set<string>();
   /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
   private readonly replicaEntriesInFlight = new Set<number>();
   /** V2-native phase barriers resolved exclusively from authenticated authority-log receipt quorum. */
@@ -1464,6 +1466,16 @@ export class CoopAuthorityV2Shadow {
     const prior = this.frameContext;
     const priorRuntimeContext = this.runtimeContext;
     const priorPeerBindings = this.peerBindings;
+    const authenticatedBindingChanged =
+      next.membershipRevision !== prior.membershipRevision
+      || next.connectionGeneration !== prior.connectionGeneration
+      || identity.peerBindings.length !== priorPeerBindings.length
+      || identity.peerBindings.some((peer, index) => {
+        const priorPeer = priorPeerBindings[index];
+        return priorPeer == null
+          || peer.seatId !== priorPeer.seatId
+          || peer.connectionGeneration !== priorPeer.connectionGeneration;
+      });
     const nextRuntimeContext = Object.freeze({
       ...this.ctx,
       membershipRevision: identity.membershipRevision,
@@ -1495,6 +1507,12 @@ export class CoopAuthorityV2Shadow {
       );
     }
     const priorPendingReplicaEntries = new Map(this.pendingReplicaEntries);
+    const priorReportedBoundaryProofSourceRejections = new Set(this.reportedBoundaryProofSourceRejections);
+    if (authenticatedBindingChanged) {
+      // AuthorityLog may synchronously emit a fresh proof response while rebinding. Publish the new
+      // deduplication epoch before that callback, then restore the old epoch if authentication rejects.
+      this.reportedBoundaryProofSourceRejections.clear();
+    }
     // AuthorityLog may synchronously redeliver on loopback. Publish the receiving context first so a receipt
     // that re-enters before rebindConnection returns is checked and signed against the replacement channel.
     // Publish the prepared pending map in the same transaction; restore it if log rebind rejects the whole
@@ -1516,6 +1534,10 @@ export class CoopAuthorityV2Shadow {
       this.pendingReplicaEntries.clear();
       for (const [revision, entry] of priorPendingReplicaEntries) {
         this.pendingReplicaEntries.set(revision, entry);
+      }
+      this.reportedBoundaryProofSourceRejections.clear();
+      for (const requestId of priorReportedBoundaryProofSourceRejections) {
+        this.reportedBoundaryProofSourceRejections.add(requestId);
       }
       throw error;
     }
@@ -1582,6 +1604,7 @@ export class CoopAuthorityV2Shadow {
     this.pendingReplicaEntries.clear();
     this.replicaAdmissionRetries.clear();
     this.replicaAdmissionExhausted.clear();
+    this.reportedBoundaryProofSourceRejections.clear();
     this.replicaEntriesInFlight.clear();
     this.ledger.clear();
   }
@@ -1666,6 +1689,11 @@ export class CoopAuthorityV2Shadow {
     const result = this.log.admit(entry);
     this.logReplicaAdmission(entry, result.kind);
     if (result.kind === "rejected") {
+      const proofRejection = this.log.takeBoundaryProofSourceRejection();
+      if (proofRejection != null) {
+        this.reportBoundaryProofSourceRejection(entry, proofRejection);
+        return false;
+      }
       this.reportOwnedReplicaViolation(entry, `entry.${result.reason}`);
       return false;
     }
@@ -2194,6 +2222,29 @@ export class CoopAuthorityV2Shadow {
   /** Authority: authenticate and answer ordinary or correlated retained-tail requests. */
   private redeliverTail(context: CoopFrameContextV2, request: CoopTailRequestBodyV2): void {
     this.log.handleTailRequest(context, request);
+  }
+
+  /** A manifest-source conflict is protocol-terminal regardless of which gameplay surface owns the entry. */
+  private reportBoundaryProofSourceRejection(
+    entry: CoopAuthorityEntry,
+    rejection: { readonly requestId: string; readonly reason: string },
+  ): void {
+    if (this.reportedBoundaryProofSourceRejections.has(rejection.requestId)) {
+      return;
+    }
+    this.reportedBoundaryProofSourceRejections.add(rejection.requestId);
+    reportProtocolViolation(
+      {
+        kind: "protocol-violation",
+        frameType: "authorityEntry",
+        issues: [
+          `boundaryProof.requestId=${rejection.requestId}`,
+          `boundaryProof.revision=${entry.revision}`,
+          rejection.reason,
+        ],
+      },
+      this.onProtocolViolation,
+    );
   }
 
   /** Fingerprint an interaction entry through whichever interaction adapter recognizes it, or null. */
