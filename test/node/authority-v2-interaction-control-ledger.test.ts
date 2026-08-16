@@ -16,7 +16,13 @@ import {
   buildWaveAdvanceEntry,
   type CoopWaveTransitionMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
-import { AuthorityLog, authorityEntryProofScopeOf } from "#data/elite-redux/coop/authority-v2/authority-log";
+import {
+  AuthorityLog,
+  authorityEntryProofScopeOf,
+  revokeAuthorityEntryProofScope,
+  type CoopAuthorityWire,
+} from "#data/elite-redux/coop/authority-v2/authority-log";
+import type { CoopTailProofBodyV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import {
   type CoopV2AuthorityProposalWaitObservation,
   type CoopV2InteractionControl,
@@ -205,44 +211,50 @@ function proposalWait(
 interface ReplicaBoundaryHarness {
   readonly log: AuthorityLog;
   readonly ledger: CoopV2InteractionControlLedger;
+  readonly sent: CoopAuthorityWire[];
+  readonly sources: readonly CoopAuthorityEntry[];
   readonly boundary: CoopAuthorityEntry;
 }
 
 function replicaBoundaryHarness(subsumes: readonly number[] = [1, 2, 3]): ReplicaBoundaryHarness {
+  const sent: CoopAuthorityWire[] = [];
   const log = new AuthorityLog({
     localContext: REPLICA_CONTEXT,
     scheduler: REPLICA_SCHEDULER,
-    send: () => {},
+    send: wire => sent.push(wire),
     peerBindings: [{ seatId: 0, connectionGeneration: CONTEXT.connectionGeneration }],
   });
   const ledger = new CoopV2InteractionControlLedger();
-  let predecessor: CoopAuthorityEntry | null = null;
+  const sources: CoopAuthorityEntry[] = [];
   for (const revision of [1, 2, 3]) {
     const predecessorControl = commandControl();
     const source = turnEntry(revision, `recovered-replica-source-${revision}`, predecessorControl);
     if (
-      !ledger.admitSuccessor(source)
+      log.admit(source).kind !== "admitted"
+      || !ledger.admitSuccessor(source)
       || !ledger.registerEntry(source)
       || !ledger.markMaterialApplied(source)
+      || !log.recordReplicaStage(source, "materialApplied")
     ) {
-      throw new Error("replica boundary harness could not journal its dense predecessor sources");
+      throw new Error("replica boundary harness could not journal its exact predecessor sources");
     }
     const installed = ledger.projectMechanical(predecessorControl, () => ({
       kind: "installed",
       controlId: controlIdOf(predecessorControl),
     }));
-    if (installed.kind !== "installed" && installed.kind !== "already-installed") {
-      throw new Error("replica boundary harness could not install its dense predecessor sources");
+    if (
+      (installed.kind !== "installed" && installed.kind !== "already-installed")
+      || !log.recordReplicaStage(source, "controlInstalled")
+    ) {
+      throw new Error("replica boundary harness could not install its exact predecessor sources");
     }
-    predecessor = source;
+    sources.push(source);
   }
-  if (predecessor == null) {
-    throw new Error("replica boundary harness has no predecessor");
-  }
-  log.adoptFrontier(predecessor.revision);
   return {
     log,
     ledger,
+    sent,
+    sources,
     boundary: {
       ...buildWaveAdvanceEntry({
         context: CONTEXT,
@@ -255,6 +267,63 @@ function replicaBoundaryHarness(subsumes: readonly number[] = [1, 2, 3]): Replic
       subsumes,
     },
   };
+}
+
+type ReplicaBoundaryRequest = Extract<CoopAuthorityWire, { kind: "requestTail" }> & {
+  readonly requestId: string;
+  readonly candidateRevision: number;
+  readonly candidateOperationId: string;
+};
+
+function beginReplicaBoundaryProof(harness: ReplicaBoundaryHarness): ReplicaBoundaryRequest {
+  const admission = harness.log.admit(harness.boundary);
+  if (admission.kind !== "gap") {
+    throw new Error(`replica boundary harness expected a proof gap, received ${admission.kind}`);
+  }
+  const request = harness.sent.at(-1);
+  if (
+    request?.kind !== "requestTail"
+    || request.requestId == null
+    || request.candidateRevision == null
+    || request.candidateOperationId == null
+  ) {
+    throw new Error("replica boundary harness did not emit a correlated tail request");
+  }
+  return request as ReplicaBoundaryRequest;
+}
+
+function boundaryProofBody(
+  request: ReplicaBoundaryRequest,
+  phase: CoopTailProofBodyV2["phase"],
+  sourceRevisions: readonly number[] = [1, 2, 3],
+): CoopTailProofBodyV2 {
+  return {
+    phase,
+    requestId: request.requestId,
+    fromRevision: request.missingFrom,
+    candidateRevision: request.candidateRevision,
+    candidateOperationId: request.candidateOperationId,
+    headRevision: request.candidateRevision,
+    sourceRevisions,
+  };
+}
+
+function completeReplicaBoundaryProof(
+  harness: ReplicaBoundaryHarness,
+  request = beginReplicaBoundaryProof(harness),
+  sources: readonly CoopAuthorityEntry[] = harness.sources,
+): void {
+  expect(harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(request, "manifest"))).toEqual({
+    kind: "pending",
+  });
+  for (const source of sources) {
+    expect(harness.log.admit(source)).toEqual({ kind: "gap", missingFrom: request.missingFrom });
+  }
+  expect(harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(request, "complete"))).toMatchObject({
+    kind: "completed",
+    candidate: harness.boundary,
+  });
+  expect(harness.log.admit(harness.boundary)).toEqual({ kind: "admitted" });
 }
 
 describe("Authority V2 interaction control ledger", () => {
@@ -535,82 +604,122 @@ describe("Authority V2 interaction control ledger", () => {
     }
   });
 
-  it("requires an exact AuthorityLog-issued proof for a legal replica boundary", () => {
+  it("admits a replica boundary only after manifest -> exact sources -> complete and scopes one exact object", () => {
     const harness = replicaBoundaryHarness();
     const direct = structuredClone(harness.boundary);
+    const emptyLedger = new CoopV2InteractionControlLedger();
 
-    // The control ledger cannot self-authenticate a boundary from its reusable address/archive alone.
+    // Boundary kinds never self-authenticate, even when recovery left no active claim.
+    expect(emptyLedger.admitSuccessor(harness.boundary)).toBe(false);
+    expect(emptyLedger.admitSuccessor(direct)).toBe(false);
     expect(harness.ledger.admitSuccessor(harness.boundary)).toBe(false);
+
+    const request = beginReplicaBoundaryProof(harness);
+    expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
+    expect(harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(request, "manifest"))).toEqual({
+      kind: "pending",
+    });
+    for (const source of harness.sources) {
+      expect(harness.log.admit(source)).toEqual({ kind: "gap", missingFrom: request.missingFrom });
+    }
+    expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
+    expect(harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(request, "complete"))).toMatchObject({
+      kind: "completed",
+      candidate: harness.boundary,
+    });
     expect(harness.log.admit(harness.boundary)).toEqual({ kind: "admitted" });
-    expect(authorityEntryProofScopeOf(harness.boundary)).toMatchObject({
+
+    const scope = authorityEntryProofScopeOf(harness.boundary);
+    expect(scope).toMatchObject({
       kind: "replica-dense-frontier",
+      source: harness.boundary,
       authenticatedThrough: 3,
     });
+    if (scope?.kind !== "replica-dense-frontier") {
+      throw new Error("replica boundary did not receive its exact proof scope");
+    }
+    expect(scope.trustedSources.map(source => source.revision)).toEqual([1, 2, 3]);
+    expect(scope.authenticatedSources.map(source => source.revision)).toEqual([4]);
 
-    // A clone has the same bytes but no AuthorityLog-issued object identity, so it cannot consume the proof.
+    // A byte-identical clone has no object capability; only the log-admitted object consumes the scope.
     expect(harness.ledger.admitSuccessor(direct)).toBe(false);
     expect(harness.ledger.admitSuccessor(harness.boundary)).toBe(true);
     expect(harness.ledger.registerEntry(harness.boundary)).toBe(true);
     expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
     expect(harness.ledger.markMaterialApplied(harness.boundary)).toBe(true);
 
-    // The consumed object is one-shot; a stale reuse cannot authorize another successor.
+    // Scope consumption is one-shot: the stale admitted object cannot authorize another boundary transition.
     expect(harness.ledger.admitSuccessor(harness.boundary)).toBe(false);
   });
 
-  it("rejects partial, ineligible, unknown, duplicate, out-of-range, and omitted-predecessor replica subsumes", () => {
-    const cases: readonly [string, readonly number[], "admitted" | "rejected"][] = [
-      ["partial", [1, 3], "admitted"],
-      ["ineligible", [2, 3], "admitted"],
-      ["unknown", [1, 3, 99], "admitted"],
-      ["duplicate", [1, 3, 3], "admitted"],
-      ["out-of-range", [0, 1, 3], "rejected"],
-      ["omitted-mandatory-predecessor", [1, 2], "admitted"],
+  it("cannot mint a replica proof for partial, unknown, duplicate, ranged, or predecessor-omitting subsumes", () => {
+    const cases: readonly [string, readonly number[]][] = [
+      ["partial", [1, 3]],
+      ["ineligible/partial", [2, 3]],
+      ["unknown", [1, 2, 3, 99]],
+      ["duplicate", [1, 2, 3, 3]],
+      ["out-of-range", [0, 1, 2, 3]],
+      ["omitted-mandatory-predecessor", [1, 2]],
     ];
-    for (const [label, subsumes, admissionKind] of cases) {
+    for (const [label, subsumes] of cases) {
       const harness = replicaBoundaryHarness(subsumes);
-      expect(harness.log.admit(harness.boundary).kind, label).toBe(admissionKind);
-      if (admissionKind !== "admitted") {
-        continue;
+      const first = harness.log.admit(harness.boundary);
+      if (first.kind === "gap") {
+        const request = harness.sent.at(-1);
+        if (
+          request?.kind !== "requestTail"
+          || request.requestId == null
+          || request.candidateRevision == null
+          || request.candidateOperationId == null
+        ) {
+          throw new Error(`invalid ${label} boundary did not retain its correlated request`);
+        }
+        const correlated = request as ReplicaBoundaryRequest;
+        expect(
+          harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(correlated, "manifest")),
+          label,
+        ).toEqual({ kind: "pending" });
+        for (const source of harness.sources) {
+          expect(harness.log.admit(source).kind, label).toBe("gap");
+        }
+        expect(
+          harness.log.acceptBoundaryProofFrame(CONTEXT, boundaryProofBody(correlated, "complete")).kind,
+          label,
+        ).toBe("rejected");
+      } else {
+        expect(first.kind, label).toBe("rejected");
       }
-      expect(authorityEntryProofScopeOf(harness.boundary), label).toMatchObject({ kind: "replica-dense-frontier" });
+      expect(authorityEntryProofScopeOf(harness.boundary), label).toBeNull();
       expect(harness.ledger.admitSuccessor(harness.boundary), label).toBe(false);
     }
   });
 
-  it("revokes a refused replica proof and reissues it for an exact duplicate before material apply", () => {
+  it("restores a partial same-object admission when its proof is revoked, then reissues only that object", () => {
     const harness = replicaBoundaryHarness();
-    expect(harness.log.admit(harness.boundary)).toEqual({ kind: "admitted" });
+    completeReplicaBoundaryProof(harness);
+    const predecessor = harness.sources.at(-1);
+    if (predecessor == null) {
+      throw new Error("replica rollback fixture has no predecessor");
+    }
+    const activeBefore = harness.ledger.activeControl;
+    const sourceCountBefore = harness.ledger.authenticatedSourceCount;
 
-    // Occupy the boundary destination so the live ledger refuses the exact admitted object after consuming
-    // and rolling back the predecessor transaction.
-    const blocker = turnEntry(2, "replica-boundary-destination-blocker", commandControl(6));
-    expect(harness.ledger.registerEntry(blocker)).toBe(true);
-    expect(harness.ledger.markMaterialApplied(blocker)).toBe(true);
-    expect(harness.ledger.prepareAuthorityEntry(harness.boundary)).toBeNull();
-    expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
+    expect(harness.ledger.admitSuccessor(harness.boundary)).toBe(true);
+    revokeAuthorityEntryProofScope(harness.boundary);
+    expect(harness.ledger.admitSuccessor(harness.boundary)).toBe(false);
 
-    const predecessorControl = commandControl();
-    const predecessor = turnEntry(3, "recovered-replica-predecessor", predecessorControl);
-    harness.ledger.clear();
-    expect(
-      harness.ledger.adoptRecoveryControl(
-        predecessor.revision,
-        predecessor.operationId,
-        predecessorControl,
-        predecessor,
-      ),
-    ).toBe(true);
-    expect(
-      harness.ledger.projectMechanical(predecessorControl, () => ({
-        kind: "installed",
-        controlId: controlIdOf(predecessorControl),
-      })),
-    ).toMatchObject({ kind: "installed" });
+    // A same-entry retry without proof is a failed transaction, not permission to leave the predecessor
+    // superseded after the callback lost its capability between admit and register.
+    expect(harness.ledger.activeControl).toEqual(activeBefore);
+    expect(harness.ledger.latestControl).toEqual(predecessor.nextControl);
+    expect(harness.ledger.authenticatedSourceCount).toBe(sourceCountBefore);
+    expect(harness.ledger.sourceEntryOf(predecessor.nextControl)).toMatchObject({
+      revision: predecessor.revision,
+      operationId: predecessor.operationId,
+    });
 
-    // The live duplicate is legitimate and receives a fresh exact proof handoff. Registration consumes that
-    // handoff before the later material-applied fact is recorded.
     expect(harness.log.admit(harness.boundary)).toEqual({ kind: "duplicate-pending-material" });
+    expect(harness.log.reissueReplicaEntryProof(harness.boundary)).toBe(true);
     expect(authorityEntryProofScopeOf(harness.boundary)).toMatchObject({ kind: "replica-dense-frontier" });
     expect(harness.ledger.admitSuccessor(harness.boundary)).toBe(true);
     expect(harness.ledger.registerEntry(harness.boundary)).toBe(true);
@@ -618,30 +727,49 @@ describe("Authority V2 interaction control ledger", () => {
     expect(harness.ledger.markMaterialApplied(harness.boundary)).toBe(true);
   });
 
-  it("drops an old replica proof across hot rejoin and reissues it only for the rebound object", () => {
+  it("hot rejoin kills the old object/request and reissues proof only after a fresh exact capture", () => {
     const harness = replicaBoundaryHarness();
+    const oldRequest = beginReplicaBoundaryProof(harness);
+    completeReplicaBoundaryProof(harness, oldRequest);
     const oldEntry = harness.boundary;
-    expect(harness.log.admit(oldEntry)).toEqual({ kind: "admitted" });
     const oldScope = authorityEntryProofScopeOf(oldEntry);
     expect(oldScope).toMatchObject({ kind: "replica-dense-frontier" });
 
-    expect(
-      harness.log.rebindConnection(
-        { ...REPLICA_CONTEXT, membershipRevision: 2, connectionGeneration: 2 },
-        [{ seatId: 0, connectionGeneration: 2 }],
-      ),
-    ).toBe(0);
+    const nextReplicaContext = { ...REPLICA_CONTEXT, membershipRevision: 2, connectionGeneration: 2 };
+    const nextAuthorityContext = { ...CONTEXT, membershipRevision: 2, connectionGeneration: 2 };
+    expect(harness.log.rebindConnection(nextReplicaContext, [{ seatId: 0, connectionGeneration: 2 }])).toBe(0);
+    const freshRequest = harness.sent.at(-1);
+    if (
+      freshRequest?.kind !== "requestTail"
+      || freshRequest.requestId == null
+      || freshRequest.candidateRevision == null
+      || freshRequest.candidateOperationId == null
+    ) {
+      throw new Error("hot rejoin did not issue a fresh correlated boundary request");
+    }
+    const correlated = freshRequest as ReplicaBoundaryRequest;
+    expect(correlated.requestId).not.toBe(oldRequest.requestId);
+    expect(correlated.context).toEqual(nextReplicaContext);
     expect(harness.log.admit(oldEntry)).toEqual({ kind: "rejected", reason: "membership-mismatch" });
     if (oldScope?.kind === "replica-dense-frontier") {
       expect(oldScope.isActive()).toBe(false);
     }
     expect(harness.ledger.admitSuccessor(oldEntry)).toBe(false);
 
-    const reboundEntry: CoopAuthorityEntry = {
-      ...oldEntry,
-      context: { ...oldEntry.context, membershipRevision: 2, connectionGeneration: 2 },
-    };
+    const reboundSources = harness.sources.map(source => ({ ...source, context: nextAuthorityContext }));
+    const reboundEntry: CoopAuthorityEntry = { ...oldEntry, context: nextAuthorityContext };
+    expect(
+      harness.log.acceptBoundaryProofFrame(nextAuthorityContext, boundaryProofBody(correlated, "manifest")),
+    ).toEqual({ kind: "pending" });
+    for (const source of reboundSources) {
+      expect(harness.log.admit(source)).toEqual({ kind: "gap", missingFrom: correlated.missingFrom });
+    }
+    expect(
+      harness.log.acceptBoundaryProofFrame(nextAuthorityContext, boundaryProofBody(correlated, "complete")),
+    ).toMatchObject({ kind: "completed", candidate: reboundEntry });
     expect(harness.log.admit(reboundEntry)).toEqual({ kind: "duplicate-pending-material" });
+    expect(authorityEntryProofScopeOf(reboundEntry)).toBeNull();
+    expect(harness.log.reissueReplicaEntryProof(reboundEntry)).toBe(true);
     expect(authorityEntryProofScopeOf(reboundEntry)).toMatchObject({
       kind: "replica-dense-frontier",
       authenticatedThrough: 3,
@@ -652,7 +780,7 @@ describe("Authority V2 interaction control ledger", () => {
     expect(harness.ledger.markMaterialApplied(reboundEntry)).toBe(true);
   });
 
-  it("refuses a replica terminal after a terminal even with a log-issued exact proof", () => {
+  it("refuses terminal-after-terminal before any replica proof can mint", () => {
     const log = new AuthorityLog({
       localContext: REPLICA_CONTEXT,
       scheduler: REPLICA_SCHEDULER,
@@ -678,14 +806,19 @@ describe("Authority V2 interaction control ledger", () => {
     if (firstControl.kind !== "TERMINAL") {
       throw new Error("terminal fixture lost its terminal control");
     }
-    expect(ledger.adoptRecoveryControl(first.revision, first.operationId, firstControl, first)).toBe(true);
+    expect(log.admit(first)).toEqual({ kind: "admitted" });
+    expect(authorityEntryProofScopeOf(first)).toMatchObject({ source: first });
+    expect(ledger.admitSuccessor(first)).toBe(true);
+    expect(ledger.registerEntry(first)).toBe(true);
+    expect(ledger.markMaterialApplied(first)).toBe(true);
     expect(
       ledger.projectMechanical(firstControl, () => ({
         kind: "installed",
         controlId: controlIdOf(firstControl),
       })),
     ).toMatchObject({ kind: "installed" });
-    log.adoptFrontier(first.revision);
+    expect(log.recordReplicaStage(first, "materialApplied")).toBe(true);
+    expect(log.recordReplicaStage(first, "controlInstalled")).toBe(true);
 
     const second: CoopAuthorityEntry = {
       ...buildTerminalCommitEntry({
@@ -702,8 +835,8 @@ describe("Authority V2 interaction control ledger", () => {
       }),
       revision: 2,
     };
-    expect(log.admit(second)).toEqual({ kind: "admitted" });
-    expect(authorityEntryProofScopeOf(second)).toMatchObject({ kind: "replica-dense-frontier" });
+    expect(log.admit(second)).toEqual({ kind: "rejected", reason: "predecessor-control-mismatch" });
+    expect(authorityEntryProofScopeOf(second)).toBeNull();
     expect(ledger.admitSuccessor(second)).toBe(false);
   });
 

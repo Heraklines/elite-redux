@@ -23,6 +23,7 @@
 
 import {
   AuthorityLog,
+  authorityEntryProofScopeOf,
   type AuthorityLogOptions,
   type AuthorityDeliveryExhaustion,
   AuthorityRetentionOverflowError,
@@ -43,7 +44,24 @@ import type {
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import {
+  COOP_FRAME_PROTOCOL_VERSION,
+  type CoopFrameV2,
+  type CoopTailProofBodyV2,
+  type CoopTailRequestBodyV2,
+} from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
+import { validateInboundFrame } from "#data/elite-redux/coop/authority-v2/protocol-validator";
+import {
+  type CoopSchedulerClock,
+  type CoopTimerHandle,
+  createCoopScheduler,
+} from "#data/elite-redux/coop/authority-v2/scheduler";
+import {
+  CoopAuthorityV2Shadow,
+  type CoopV2LiveReplicaSeams,
+  type CoopV2ShadowIdentity,
+} from "#data/elite-redux/coop/authority-v2/shadow";
 import { beforeEach, describe, expect, it } from "vitest";
 
 // ---------------------------------------------------------------------------
@@ -305,6 +323,296 @@ function delivered(sent: CoopAuthorityWire[]): CoopAuthorityEntry[] {
   return sent
     .filter((w): w is Extract<CoopAuthorityWire, { kind: "deliver" }> => w.kind === "deliver")
     .map(w => w.entry);
+}
+
+function boundaryProofDiagnostics(log: AuthorityLog): {
+  readonly retiredBoundarySources: number;
+  readonly tailProofResponses: number;
+} {
+  return log.diagnostics() as ReturnType<AuthorityLog["diagnostics"]> & {
+    readonly retiredBoundarySources: number;
+    readonly tailProofResponses: number;
+  };
+}
+
+type CorrelatedTailRequest = Extract<CoopAuthorityWire, { kind: "requestTail" }> & {
+  readonly requestId: string;
+  readonly candidateRevision: number;
+  readonly candidateOperationId: string;
+};
+
+interface CorrelatedBoundaryHarness {
+  readonly authority: AuthorityLog;
+  readonly replica: AuthorityLog;
+  readonly authoritySent: CoopAuthorityWire[];
+  readonly replicaSent: CoopAuthorityWire[];
+  readonly sources: readonly CoopAuthorityEntry[];
+  readonly boundary: CoopAuthorityEntry;
+}
+
+function completeReplicaEntry(log: AuthorityLog, entry: CoopAuthorityEntry): void {
+  if (
+    log.admit(entry).kind !== "admitted"
+    || !log.recordReplicaStage(entry, "materialApplied")
+    || !log.recordReplicaStage(entry, "controlInstalled")
+  ) {
+    throw new Error(`could not mechanically complete replica revision ${entry.revision}`);
+  }
+}
+
+function makeCorrelatedBoundaryHarness(
+  subsumes: readonly number[] = [1, 2, 3],
+  authorityOptions: Partial<AuthorityLogOptions> = {},
+): CorrelatedBoundaryHarness {
+  const authoritySent: CoopAuthorityWire[] = [];
+  const replicaSent: CoopAuthorityWire[] = [];
+  const authority = makeLog(new FakeScheduler(), authoritySent, authorityOptions);
+  const replica = makeReplicaLog(new FakeScheduler(), replicaSent);
+  const sources = [1, 2, 3].map(revision =>
+    authority.commit(
+      entryInput(`correlated-source-${revision}`, {
+        kind: "TURN_COMMIT",
+        nextControl: commandControl(),
+      }),
+    ),
+  );
+  for (const source of sources) {
+    completeReplicaEntry(replica, source);
+  }
+  const boundary = authority.commit(waveBoundaryEntry("correlated-boundary", frameContext(), subsumes));
+  authoritySent.length = 0;
+  replicaSent.length = 0;
+  return { authority, replica, authoritySent, replicaSent, sources, boundary };
+}
+
+function beginCorrelatedBoundaryProof(harness: CorrelatedBoundaryHarness): CorrelatedTailRequest {
+  const disposition = harness.replica.admit(harness.boundary);
+  if (disposition.kind !== "gap") {
+    throw new Error(`correlated boundary expected a gap, received ${disposition.kind}`);
+  }
+  const request = harness.replicaSent.at(-1);
+  if (
+    request?.kind !== "requestTail"
+    || request.requestId == null
+    || request.candidateRevision == null
+    || request.candidateOperationId == null
+  ) {
+    throw new Error("replica did not emit a correlated boundary-tail request");
+  }
+  return request as CorrelatedTailRequest;
+}
+
+function tailRequestBody(request: CorrelatedTailRequest): CoopTailRequestBodyV2 {
+  return {
+    fromRevision: request.missingFrom,
+    requestId: request.requestId,
+    candidateRevision: request.candidateRevision,
+    candidateOperationId: request.candidateOperationId,
+  };
+}
+
+interface ExactTailResponse {
+  readonly manifest: Extract<CoopAuthorityWire, { kind: "tailProof" }>;
+  readonly sources: readonly Extract<CoopAuthorityWire, { kind: "deliver" }>[];
+  readonly complete: Extract<CoopAuthorityWire, { kind: "tailProof" }>;
+}
+
+function authorityTailResponse(
+  harness: Pick<CorrelatedBoundaryHarness, "authority" | "authoritySent">,
+  request: CorrelatedTailRequest,
+): ExactTailResponse {
+  harness.authoritySent.length = 0;
+  harness.authority.handleTailRequest(request.context, tailRequestBody(request));
+  const [manifest, ...rest] = harness.authoritySent;
+  const complete = rest.at(-1);
+  const sources = rest.slice(0, -1);
+  if (
+    manifest?.kind !== "tailProof"
+    || manifest.body.phase !== "manifest"
+    || complete?.kind !== "tailProof"
+    || complete.body.phase !== "complete"
+    || sources.some(wire => wire.kind !== "deliver")
+  ) {
+    throw new Error("authority did not emit manifest -> exact sources -> complete");
+  }
+  return {
+    manifest,
+    sources: sources as Extract<CoopAuthorityWire, { kind: "deliver" }>[],
+    complete,
+  };
+}
+
+function proofBody(
+  request: CorrelatedTailRequest,
+  phase: CoopTailProofBodyV2["phase"],
+  overrides: Partial<CoopTailProofBodyV2> = {},
+): CoopTailProofBodyV2 {
+  return {
+    phase,
+    requestId: request.requestId,
+    fromRevision: request.missingFrom,
+    candidateRevision: request.candidateRevision,
+    candidateOperationId: request.candidateOperationId,
+    headRevision: request.candidateRevision,
+    sourceRevisions: [1, 2, 3],
+    ...overrides,
+  };
+}
+
+function tailProofValidation(body: CoopTailProofBodyV2, context = frameContext()) {
+  return validateInboundFrame({
+    v: COOP_FRAME_PROTOCOL_VERSION,
+    t: "tailProof",
+    ctx: context,
+    body,
+  });
+}
+
+function admitAndRegisterAtomically(ledger: CoopV2InteractionControlLedger, entry: CoopAuthorityEntry): boolean {
+  const atomicLedger = ledger as CoopV2InteractionControlLedger & {
+    admitAndRegisterEntry?: (candidate: CoopAuthorityEntry) => boolean;
+  };
+  const admit = atomicLedger.admitAndRegisterEntry;
+  if (admit == null) {
+    throw new Error("control ledger does not expose atomic replica admission");
+  }
+  return admit.call(ledger, entry);
+}
+
+class InertShadowClock implements CoopSchedulerClock {
+  private nextHandle = 0;
+  private readonly callbacks = new Map<number, () => void>();
+
+  now(): number {
+    return 0;
+  }
+
+  setTimer(callback: () => void, _delayMs: number): CoopTimerHandle {
+    const handle = ++this.nextHandle;
+    this.callbacks.set(handle, callback);
+    return handle;
+  }
+
+  clearTimer(handle: CoopTimerHandle): void {
+    this.callbacks.delete(handle as number);
+  }
+}
+
+function shadowIdentity(localSeatId: number): CoopV2ShadowIdentity {
+  const context = frameContext();
+  return {
+    runtimeId: `${context.sessionId}:boundary-proof:seat${localSeatId}`,
+    sessionId: context.sessionId,
+    runId: context.runId,
+    epoch: context.sessionEpoch,
+    localSeatId,
+    authoritySeatId: context.authoritySeatId,
+    membershipRevision: context.membershipRevision,
+    seatMapId: context.seatMapId,
+    connectionGeneration: context.connectionGeneration,
+    peerBindings: [{ seatId: localSeatId === 0 ? 1 : 0, connectionGeneration: context.connectionGeneration }],
+  };
+}
+
+interface ShadowBoundaryDuo {
+  readonly host: CoopAuthorityV2Shadow;
+  readonly guest: CoopAuthorityV2Shadow;
+  readonly boundary: CoopAuthorityEntry;
+  readonly boundaryFrame: Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  readonly requestId: string;
+  dispose(): void;
+}
+
+function makeShadowBoundaryDuo(options: {
+  readonly liveReplica: CoopV2LiveReplicaSeams;
+  readonly onProtocolViolation: (issues: readonly string[]) => void;
+  readonly alterProofSource?: (
+    frame: Extract<CoopFrameV2, { t: "authorityEntry" }>,
+  ) => Extract<CoopFrameV2, { t: "authorityEntry" }>;
+}): ShadowBoundaryDuo {
+  let host!: CoopAuthorityV2Shadow;
+  let guest!: CoopAuthorityV2Shadow;
+  let boundaryFrame: Extract<CoopFrameV2, { t: "authorityEntry" }> | null = null;
+  let requestId: string | null = null;
+  let proofSourcesActive = false;
+  let alteredProofSource = false;
+
+  host = new CoopAuthorityV2Shadow({
+    identity: shadowIdentity(0),
+    scene: {} as never,
+    transport: {} as never,
+    scheduler: createCoopScheduler(new InertShadowClock()),
+    send: frame => {
+      if (frame.t === "tailProof") {
+        proofSourcesActive = frame.body.phase === "manifest";
+        guest.handleInboundFrame(frame);
+        if (frame.body.phase === "complete") {
+          proofSourcesActive = false;
+        }
+        return;
+      }
+      if (frame.t === "authorityEntry") {
+        if (frame.body.kind === "WAVE_ADVANCE") {
+          boundaryFrame = frame;
+        }
+        if (proofSourcesActive && !alteredProofSource && options.alterProofSource != null) {
+          // Corrupt only the final predecessor source so the manifest and earlier sources remain exact.
+          if (frame.body.revision === 3) {
+            alteredProofSource = true;
+            guest.handleInboundFrame(options.alterProofSource(frame));
+            return;
+          }
+        }
+      }
+      guest.handleInboundFrame(frame);
+    },
+  });
+  guest = new CoopAuthorityV2Shadow({
+    identity: shadowIdentity(1),
+    scene: {} as never,
+    transport: {} as never,
+    scheduler: createCoopScheduler(new InertShadowClock()),
+    liveReplica: options.liveReplica,
+    onProtocolViolation: violation => options.onProtocolViolation(violation.issues),
+    send: frame => {
+      if (frame.t !== "tailRequest") {
+        // Keep every source retained on the authority. Only proof requests cross this deterministic seam.
+        return;
+      }
+      requestId = frame.body.requestId ?? null;
+      host.handleInboundFrame(frame);
+    },
+  });
+
+  for (const revision of [1, 2, 3]) {
+    const disposition = host.commitAuthorityEntryDetailed(
+      entryInput(`shadow-proof-source-${revision}`, {
+        context: host.authenticatedFrameContext,
+        kind: "TURN_COMMIT",
+        nextControl: commandControl(),
+      }),
+    );
+    if (disposition.kind !== "committed") {
+      throw new Error(`shadow boundary source ${revision} did not commit`);
+    }
+  }
+  const boundaryDisposition = host.commitAuthorityEntryDetailed(
+    waveBoundaryEntry("shadow-correlated-boundary", host.authenticatedFrameContext, [1, 2, 3]),
+  );
+  if (boundaryDisposition.kind !== "committed" || boundaryFrame == null || requestId == null) {
+    throw new Error("shadow boundary fixture did not complete its correlated wire setup");
+  }
+  return {
+    host,
+    guest,
+    boundary: boundaryDisposition.entry,
+    boundaryFrame,
+    requestId,
+    dispose: () => {
+      host.dispose();
+      guest.dispose();
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -643,6 +951,632 @@ describe("authority-v2 log", () => {
     expect(log.recordReplicaStage(reboundEntry, "materialApplied")).toBe(true);
     expect(log.recordReplicaStage(reboundEntry, "controlInstalled")).toBe(true);
     expect(log.controlInstalledThrough()).toBe(1);
+  });
+
+  it("requires manifest -> exact sources -> complete and parks candidate duplicates on one request ID", () => {
+    const harness = makeCorrelatedBoundaryHarness();
+    const request = beginCorrelatedBoundaryProof(harness);
+    const firstRequestBytes = JSON.stringify(harness.replicaSent.at(-1));
+
+    expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
+    expect(harness.replica.receivedThrough()).toBe(3);
+    expect(harness.replica.appliedThrough()).toBe(3);
+    expect(harness.replica.controlInstalledThrough()).toBe(3);
+
+    // The candidate is explicitly not a delimiter. Before the manifest arrives, an exact duplicate can
+    // only wake the same correlated request and cannot advance any mechanical frontier.
+    expect(harness.replica.admit(harness.boundary)).toEqual({ kind: "gap", missingFrom: request.missingFrom });
+    expect(JSON.stringify(harness.replicaSent.at(-1))).toBe(firstRequestBytes);
+    expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
+    expect(harness.replica.receivedThrough()).toBe(3);
+
+    const response = authorityTailResponse(harness, request);
+    expect(response.manifest.body).toMatchObject({
+      phase: "manifest",
+      requestId: request.requestId,
+      sourceRevisions: [1, 2, 3],
+    });
+    expect(response.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
+    expect(response.sources.at(-1)?.entry).toEqual(harness.sources.at(-1));
+    expect(response.sources.some(wire => wire.entry.revision === harness.boundary.revision)).toBe(false);
+
+    expect(harness.replica.acceptBoundaryProofFrame(response.manifest.context, response.manifest.body)).toEqual({
+      kind: "pending",
+    });
+    for (const source of response.sources) {
+      expect(harness.replica.admit(source.entry)).toEqual({ kind: "gap", missingFrom: request.missingFrom });
+    }
+    expect(authorityEntryProofScopeOf(harness.boundary)).toBeNull();
+    expect(harness.replica.receivedThrough()).toBe(3);
+    expect(harness.replica.acceptBoundaryProofFrame(response.complete.context, response.complete.body)).toMatchObject({
+      kind: "completed",
+      candidate: harness.boundary,
+    });
+    expect(harness.replica.receivedThrough()).toBe(3);
+
+    expect(harness.replica.admit(harness.boundary)).toEqual({ kind: "admitted" });
+    const scope = authorityEntryProofScopeOf(harness.boundary);
+    expect(scope).toMatchObject({ kind: "replica-dense-frontier", authenticatedThrough: 3 });
+    if (scope?.kind !== "replica-dense-frontier") {
+      throw new Error("completed correlated proof did not mint an exact replica scope");
+    }
+    expect(scope.trustedSources.map(source => source.revision)).toEqual([1, 2, 3]);
+    expect(scope.authenticatedSources.map(source => source.revision)).toEqual([4]);
+    expect(harness.replica.receivedThrough()).toBe(4);
+    expect(harness.replica.appliedThrough()).toBe(3);
+  });
+
+  it("replays each (seat, requestId) proof byte-identically after a newer request and source retirement", () => {
+    const harness = makeCorrelatedBoundaryHarness([1, 2, 3], {
+      peerBindings: [
+        { seatId: 1, connectionGeneration: frameContext().connectionGeneration },
+        { seatId: 2, connectionGeneration: frameContext().connectionGeneration },
+      ],
+    });
+    const firstRequest = beginCorrelatedBoundaryProof(harness);
+    const firstResponse = authorityTailResponse(harness, firstRequest);
+    const firstBytes = JSON.stringify(harness.authoritySent);
+    expect(firstResponse.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(1);
+
+    harness.authoritySent.length = 0;
+    harness.authority.handleTailRequest(
+      { ...firstRequest.context, senderSeatId: 2 },
+      tailRequestBody(firstRequest),
+    );
+    expect(JSON.stringify(harness.authoritySent)).toBe(firstBytes);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(2);
+
+    // Candidate admission retires every exact source lease while the candidate itself remains retained.
+    expect(harness.authority.acceptReceipt(receipt(harness.boundary, "admitted"))).toBe(false);
+    expect(
+      harness.authority.acceptReceipt(
+        receipt(harness.boundary, "admitted", {
+          context: { ...harness.boundary.context, senderSeatId: 2 },
+        }),
+      ),
+    ).toBe(false);
+    expect(harness.authority.retained().map(entry => entry.revision)).toEqual([harness.boundary.revision]);
+    expect(boundaryProofDiagnostics(harness.authority)).toMatchObject({
+      retiredBoundarySources: 3,
+      tailProofResponses: 2,
+    });
+
+    const newerRequest: CorrelatedTailRequest = {
+      ...firstRequest,
+      requestId: `${firstRequest.requestId}:newer`,
+    };
+    const newerResponse = authorityTailResponse(harness, newerRequest);
+    expect(newerResponse.manifest.body.sourceRevisions).toEqual([1, 2, 3]);
+    expect(newerResponse.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(3);
+
+    // Conflicting reuse of a successful live-candidate key is inert and cannot poison its frozen response.
+    harness.authoritySent.length = 0;
+    harness.authority.handleTailRequest(firstRequest.context, {
+      ...tailRequestBody(firstRequest),
+      candidateOperationId: "conflicting-live-candidate",
+    });
+    expect(harness.authoritySent).toEqual([]);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(3);
+
+    harness.authoritySent.length = 0;
+    harness.authority.handleTailRequest(firstRequest.context, tailRequestBody(firstRequest));
+    expect(JSON.stringify(harness.authoritySent)).toBe(firstBytes);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(3);
+  });
+
+  it("does not spend correlated cache capacity on invalid or nonexistent candidates", () => {
+    const harness = makeCorrelatedBoundaryHarness([1, 2, 3], { retainCapacity: 4 });
+    const request = beginCorrelatedBoundaryProof(harness);
+
+    harness.authority.handleTailRequest(request.context, { ...tailRequestBody(request), requestId: "" });
+    expect(harness.authoritySent).toEqual([]);
+
+    for (let attempt = 0; attempt < 4; attempt++) {
+      harness.authoritySent.length = 0;
+      harness.authority.handleTailRequest(request.context, {
+        ...tailRequestBody(request),
+        requestId: `nonexistent-candidate-${attempt}`,
+        candidateRevision:
+          attempt % 2 === 0 ? request.candidateRevision : request.candidateRevision + attempt + 1,
+        candidateOperationId: `nonexistent-operation-${attempt}`,
+      });
+      expect(harness.authoritySent, `nonexistent candidate ${attempt}`).toEqual([]);
+    }
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(0);
+
+    const response = authorityTailResponse(harness, request);
+    expect(response.manifest.body.requestId).toBe(request.requestId);
+    expect(response.sources.map(wire => wire.entry.revision)).toEqual([1, 2, 3]);
+    expect(boundaryProofDiagnostics(harness.authority).tailProofResponses).toBe(1);
+  });
+
+  it("reclaims every cached request ID when its sequential candidate retires", () => {
+    const localSent: CoopAuthorityWire[] = [];
+    const log = makeLog(new FakeScheduler(), localSent, { retainCapacity: 2 });
+
+    for (let wave = 1; wave <= 3; wave++) {
+      const sourceOperationId = `cache-source-wave-${wave}`;
+      const source = log.commit({
+        ...entryInput(sourceOperationId, {
+          kind: "TURN_COMMIT",
+          nextControl: commandControl({ wave, turn: 1 }),
+        }),
+        material: {
+          digest: `digest-${sourceOperationId}`,
+          payload: { epoch: frameContext().sessionEpoch, wave, turn: 1 },
+        },
+      });
+      const candidate = log.commit(
+        buildWaveAdvanceEntry({
+          context: frameContext(),
+          operationId: `cache-candidate-wave-${wave}`,
+          transition: { ...TEST_WAVE_TRANSITION, wave, nextWave: wave + 1 },
+          destination: commandControl({ wave: wave + 1, turn: 1 }),
+          subsumes: [source.revision],
+        }),
+      );
+
+      for (let requestOrdinal = 0; requestOrdinal < 2; requestOrdinal++) {
+        const requestId = `candidate-${candidate.revision}-request-${requestOrdinal}`;
+        localSent.length = 0;
+        log.handleTailRequest(frameContext({ senderSeatId: 1 }), {
+          fromRevision: source.revision,
+          requestId,
+          candidateRevision: candidate.revision,
+          candidateOperationId: candidate.operationId,
+        });
+        expect(localSent.map(wire => wire.kind), requestId).toEqual(["tailProof", "deliver", "tailProof"]);
+        expect(localSent[0], requestId).toMatchObject({ kind: "tailProof", body: { requestId } });
+      }
+      expect(boundaryProofDiagnostics(log).tailProofResponses).toBe(2);
+
+      expect(log.acceptReceipt(receipt(candidate, "admitted"))).toBe(false);
+      expect(log.acceptReceipt(receipt(candidate, "materialApplied"))).toBe(false);
+      expect(log.acceptReceipt(receipt(candidate, "controlInstalled"))).toBe(true);
+      expect(log.retained()).toEqual([]);
+      expect(boundaryProofDiagnostics(log)).toMatchObject({
+        retiredBoundarySources: 2,
+        tailProofResponses: 0,
+      });
+    }
+
+    expect(log.diagnostics()).toMatchObject({ headRevision: 6, retainedEntries: 0, activeDeliveryTimers: 0 });
+  });
+
+  it("fails closed for incomplete, omitted, altered, unlisted, and mismatched correlated source proofs", () => {
+    const rejectAfter = (
+      label: string,
+      arrange: (
+        harness: CorrelatedBoundaryHarness,
+        request: CorrelatedTailRequest,
+      ) => { readonly disposition: { readonly kind: string }; readonly boundary: CoopAuthorityEntry },
+    ): void => {
+      const harness = makeCorrelatedBoundaryHarness();
+      const request = beginCorrelatedBoundaryProof(harness);
+      const { disposition, boundary } = arrange(harness, request);
+      expect(disposition.kind, label).toBe("rejected");
+      expect(authorityEntryProofScopeOf(boundary), label).toBeNull();
+      expect(harness.replica.receivedThrough(), label).toBe(3);
+      expect(harness.replica.appliedThrough(), label).toBe(3);
+      expect(harness.replica.controlInstalledThrough(), label).toBe(3);
+    };
+
+    rejectAfter("missing delivered source", (harness, request) => {
+      const manifest = proofBody(request, "manifest");
+      expect(harness.replica.acceptBoundaryProofFrame(frameContext(), manifest)).toEqual({ kind: "pending" });
+      for (const source of harness.sources.slice(0, 2)) {
+        expect(harness.replica.admit(source).kind).toBe("gap");
+      }
+      return {
+        disposition: harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "complete")),
+        boundary: harness.boundary,
+      };
+    });
+
+    rejectAfter("manifest omitted mandatory predecessor", (harness, request) => {
+      const sourceRevisions = [1, 2];
+      expect(
+        harness.replica.acceptBoundaryProofFrame(
+          frameContext(),
+          proofBody(request, "manifest", { sourceRevisions }),
+        ),
+      ).toEqual({ kind: "pending" });
+      for (const source of harness.sources.slice(0, 2)) {
+        expect(harness.replica.admit(source).kind).toBe("gap");
+      }
+      return {
+        disposition: harness.replica.acceptBoundaryProofFrame(
+          frameContext(),
+          proofBody(request, "complete", { sourceRevisions }),
+        ),
+        boundary: harness.boundary,
+      };
+    });
+
+    rejectAfter("manifest omitted claimed source", (harness, request) => {
+      const sourceRevisions = [1, 3];
+      expect(
+        harness.replica.acceptBoundaryProofFrame(
+          frameContext(),
+          proofBody(request, "manifest", { sourceRevisions }),
+        ),
+      ).toEqual({ kind: "pending" });
+      for (const source of [harness.sources[0], harness.sources[2]]) {
+        if (source == null) {
+          throw new Error("omitted-source fixture lost a retained source");
+        }
+        expect(harness.replica.admit(source).kind).toBe("gap");
+      }
+      return {
+        disposition: harness.replica.acceptBoundaryProofFrame(
+          frameContext(),
+          proofBody(request, "complete", { sourceRevisions }),
+        ),
+        boundary: harness.boundary,
+      };
+    });
+
+    rejectAfter("altered duplicate source", (harness, request) => {
+      expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
+        kind: "pending",
+      });
+      const source = harness.sources[0];
+      if (source == null) {
+        throw new Error("altered-source fixture lost its first source");
+      }
+      expect(harness.replica.admit(source).kind).toBe("gap");
+      const altered: CoopAuthorityEntry = {
+        ...source,
+        material: { ...source.material, digest: `${source.material.digest}-altered` },
+      };
+      return { disposition: harness.replica.admit(altered), boundary: harness.boundary };
+    });
+
+    rejectAfter("exact duplicate source", (harness, request) => {
+      expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
+        kind: "pending",
+      });
+      const source = harness.sources[0];
+      if (source == null) {
+        throw new Error("duplicate-source fixture lost its first source");
+      }
+      expect(harness.replica.admit(source).kind).toBe("gap");
+      return { disposition: harness.replica.admit(source), boundary: harness.boundary };
+    });
+
+    rejectAfter("unlisted source", (harness, request) => {
+      expect(
+        harness.replica.acceptBoundaryProofFrame(
+          frameContext(),
+          proofBody(request, "manifest", { sourceRevisions: [1, 3] }),
+        ),
+      ).toEqual({ kind: "pending" });
+      const unlisted = harness.sources[1];
+      if (unlisted == null) {
+        throw new Error("unlisted-source fixture lost revision 2");
+      }
+      return { disposition: harness.replica.admit(unlisted), boundary: harness.boundary };
+    });
+
+    for (const [label, context, body] of [
+      ["wrong request", frameContext(), { requestId: "other-boundary-proof" }],
+      ["wrong context", frameContext({ membershipRevision: 2 }), {}],
+      ["wrong candidate head/range", frameContext(), { fromRevision: 2 }],
+    ] as const) {
+      rejectAfter(label, (harness, request) => ({
+        disposition: harness.replica.acceptBoundaryProofFrame(
+          context,
+          proofBody(request, "manifest", body),
+        ),
+        boundary: harness.boundary,
+      }));
+    }
+
+    rejectAfter("wrong completion head", (harness, request) => {
+      expect(harness.replica.acceptBoundaryProofFrame(frameContext(), proofBody(request, "manifest"))).toEqual({
+        kind: "pending",
+      });
+      for (const source of harness.sources) {
+        expect(harness.replica.admit(source).kind).toBe("gap");
+      }
+      return {
+        disposition: harness.replica.acceptBoundaryProofFrame(
+          frameContext(),
+          proofBody(request, "complete", { headRevision: request.candidateRevision + 1 }),
+        ),
+        boundary: harness.boundary,
+      };
+    });
+  });
+
+  it("rejects reordered, duplicate, and out-of-range proof manifests at the public frame boundary", () => {
+    const harness = makeCorrelatedBoundaryHarness();
+    const request = beginCorrelatedBoundaryProof(harness);
+    for (const [label, sourceRevisions] of [
+      ["reordered", [2, 1, 3]],
+      ["duplicate", [1, 2, 2, 3]],
+      ["below range", [0, 1, 2, 3]],
+      ["candidate in range", [1, 2, 3, 4]],
+    ] as const) {
+      const verdict = tailProofValidation(proofBody(request, "manifest", { sourceRevisions }));
+      expect(verdict.kind, label).toBe("protocol-violation");
+      expect(authorityEntryProofScopeOf(harness.boundary), label).toBeNull();
+      expect(harness.replica.receivedThrough(), label).toBe(3);
+    }
+  });
+
+  it("refreshes an exact archived predecessor after 520 ordinary commits without a candidate delimiter", () => {
+    const authorityScheduler = new FakeScheduler();
+    const replicaScheduler = new FakeScheduler();
+    const authoritySent: CoopAuthorityWire[] = [];
+    const replicaSent: CoopAuthorityWire[] = [];
+    const authority = makeLog(authorityScheduler, authoritySent);
+    const replica = makeReplicaLog(replicaScheduler, replicaSent);
+    let predecessor: CoopAuthorityEntry | null = null;
+
+    for (let revision = 1; revision <= 520; revision++) {
+      const source = authority.commit(
+        entryInput(`archived-source-${revision}`, { kind: "TURN_COMMIT", nextControl: commandControl() }),
+      );
+      completeReplicaEntry(replica, source);
+      predecessor = source;
+      if (revision < 520) {
+        expect(authority.acceptReceipt(receipt(source, "admitted"))).toBe(false);
+        expect(authority.acceptReceipt(receipt(source, "materialApplied"))).toBe(false);
+        expect(authority.acceptReceipt(receipt(source, "controlInstalled"))).toBe(true);
+      }
+    }
+    if (predecessor == null) {
+      throw new Error("retention-cliff fixture has no predecessor");
+    }
+    const boundary = authority.commit(
+      waveBoundaryEntry("post-520-boundary", frameContext(), [predecessor.revision]),
+    );
+    expect(authority.acceptReceipt(receipt(boundary, "admitted"))).toBe(false);
+    expect(authority.retained().map(entry => entry.revision)).toEqual([boundary.revision]);
+
+    authoritySent.length = 0;
+    replicaSent.length = 0;
+    const firstAdmission = replica.admit(boundary);
+    expect(firstAdmission.kind).toBe("gap");
+    const request = replicaSent.at(-1);
+    if (
+      request?.kind !== "requestTail"
+      || request.requestId == null
+      || request.candidateRevision == null
+      || request.candidateOperationId == null
+    ) {
+      throw new Error("post-520 boundary did not request an exact archived proof");
+    }
+    const correlated = request as CorrelatedTailRequest;
+    expect(correlated.missingFrom).toBe(predecessor.revision);
+    const response = authorityTailResponse({ authority, authoritySent }, correlated);
+    expect(response.manifest.body.sourceRevisions).toEqual([predecessor.revision]);
+    expect(response.sources.map(wire => wire.entry.revision)).toEqual([predecessor.revision]);
+    expect(response.sources.some(wire => wire.entry.revision === boundary.revision)).toBe(false);
+    expect(boundaryProofDiagnostics(authority)).toMatchObject({
+      retiredBoundarySources: 512,
+      tailProofResponses: 1,
+    });
+
+    expect(replica.acceptBoundaryProofFrame(response.manifest.context, response.manifest.body)).toEqual({
+      kind: "pending",
+    });
+    const proofSource = response.sources[0];
+    if (proofSource == null) {
+      throw new Error("post-520 proof omitted its archived predecessor");
+    }
+    expect(replica.admit(proofSource.entry)).toEqual({ kind: "gap", missingFrom: correlated.missingFrom });
+    expect(replica.acceptBoundaryProofFrame(response.complete.context, response.complete.body)).toMatchObject({
+      kind: "completed",
+      candidate: boundary,
+    });
+    expect(replica.admit(boundary)).toEqual({ kind: "admitted" });
+    const scope = authorityEntryProofScopeOf(boundary);
+    expect(scope).toMatchObject({ kind: "replica-dense-frontier", authenticatedThrough: 520 });
+    if (scope?.kind !== "replica-dense-frontier") {
+      throw new Error("post-520 boundary did not receive its exact proof scope");
+    }
+    expect(scope.trustedSources.map(source => source.revision)).toEqual([520]);
+    expect(scope.authenticatedSources.map(source => source.revision)).toEqual([521]);
+    expect(authorityScheduler.liveCount()).toBe(1);
+    expect(replicaScheduler.liveCount()).toBe(0);
+  });
+
+  it("keeps the first live-ledger refusal silent, terminals the second, and makes later duplicates inert", () => {
+    const violations: string[][] = [];
+    const callbackEntries: CoopAuthorityEntry[] = [];
+    const proofWasLive: boolean[] = [];
+    let boundaryMaterialApplications = 0;
+    const duo = makeShadowBoundaryDuo({
+      onProtocolViolation: issues => violations.push([...issues]),
+      liveReplica: {
+        ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
+        ownsControl: () => false,
+        admitEntry: (_ctx, entry) => {
+          if (entry.kind !== "WAVE_ADVANCE") {
+            return true;
+          }
+          callbackEntries.push(entry);
+          const scope = authorityEntryProofScopeOf(entry);
+          proofWasLive.push(scope?.kind === "replica-dense-frontier" && scope.isActive());
+          return false;
+        },
+        applyMaterial: (_ctx, entry) => {
+          if (entry.kind !== "WAVE_ADVANCE") {
+            return null;
+          }
+          boundaryMaterialApplications += 1;
+          return true;
+        },
+        projectControl: () => null,
+      },
+    });
+
+    expect(callbackEntries).toHaveLength(1);
+    expect(proofWasLive).toEqual([true]);
+    expect(violations).toEqual([]);
+    expect(boundaryMaterialApplications).toBe(0);
+    expect(authorityEntryProofScopeOf(callbackEntries[0] as CoopAuthorityEntry)).toBeNull();
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 3, applied: 3, shadowStateSize: 3 });
+
+    duo.guest.handleInboundFrame(duo.boundaryFrame);
+    expect(callbackEntries).toHaveLength(2);
+    expect(proofWasLive).toEqual([true, true]);
+    expect(violations).toHaveLength(1);
+    expect(boundaryMaterialApplications).toBe(0);
+    expect(authorityEntryProofScopeOf(callbackEntries[1] as CoopAuthorityEntry)).toBeNull();
+
+    for (let duplicate = 0; duplicate < 3; duplicate++) {
+      duo.guest.handleInboundFrame(duo.boundaryFrame);
+    }
+    expect(callbackEntries).toHaveLength(2);
+    expect(violations).toHaveLength(1);
+    expect(boundaryMaterialApplications).toBe(0);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 3, applied: 3, shadowStateSize: 3 });
+    duo.dispose();
+  });
+
+  it("turns admission callback throws before or after partial mutation into one fenced terminal", () => {
+    for (const throwPoint of ["before", "after-admit"] as const) {
+      const violations: string[][] = [];
+      const liveLedger = new CoopV2InteractionControlLedger();
+      const callbackEntries: CoopAuthorityEntry[] = [];
+      let boundaryMaterialApplications = 0;
+      let postRegisterFaults = 0;
+      if (throwPoint === "after-admit") {
+        const register = liveLedger.registerEntry.bind(liveLedger);
+        liveLedger.registerEntry = entry => {
+          const registered = register(entry);
+          if (registered && entry.kind === "WAVE_ADVANCE") {
+            postRegisterFaults += 1;
+            throw new Error("synthetic post-register callback fault");
+          }
+          return registered;
+        };
+      }
+      const duo = makeShadowBoundaryDuo({
+        onProtocolViolation: issues => violations.push([...issues]),
+        liveReplica: {
+          ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
+          ownsControl: () => false,
+          admitEntry: (_ctx, entry) => {
+            if (entry.kind !== "WAVE_ADVANCE") {
+              if (
+                !liveLedger.admitSuccessor(entry)
+                || !liveLedger.registerEntry(entry)
+                || !liveLedger.markMaterialApplied(entry)
+              ) {
+                throw new Error(`could not seed live source ${entry.revision}`);
+              }
+              const projected = liveLedger.projectMechanical(entry.nextControl, () => ({
+                kind: "installed",
+                controlId: controlIdOf(entry.nextControl),
+              }));
+              if (projected.kind !== "installed" && projected.kind !== "already-installed") {
+                throw new Error(`could not install live source ${entry.revision}`);
+              }
+              return true;
+            }
+            callbackEntries.push(entry);
+            if (throwPoint === "after-admit") {
+              return admitAndRegisterAtomically(liveLedger, entry);
+            }
+            throw new Error(`boundary callback threw ${throwPoint}`);
+          },
+          applyMaterial: (_ctx, entry) => {
+            if (entry.kind !== "WAVE_ADVANCE") {
+              return null;
+            }
+            boundaryMaterialApplications += 1;
+            return true;
+          },
+          projectControl: () => null,
+        },
+      });
+
+      expect(callbackEntries, throwPoint).toHaveLength(1);
+      const attempted = callbackEntries[0];
+      if (attempted == null) {
+        throw new Error(`callback throw fixture ${throwPoint} did not retain its exact entry`);
+      }
+      expect(violations, throwPoint).toHaveLength(1);
+      expect(boundaryMaterialApplications, throwPoint).toBe(0);
+      expect(authorityEntryProofScopeOf(attempted), throwPoint).toBeNull();
+      expect(postRegisterFaults, throwPoint).toBe(throwPoint === "after-admit" ? 1 : 0);
+
+      // Atomic admission restores the predecessor before the shared terminal callback returns. No stale
+      // exact object or clone can recover the consumed/revoked proof afterward.
+      expect(liveLedger.activeControl, throwPoint).toEqual(commandControl());
+      expect(liveLedger.latestControl, throwPoint).toEqual(commandControl());
+      expect(liveLedger.authenticatedSourceCount, throwPoint).toBe(3);
+      expect(liveLedger.sourceEntryOf(commandControl()), throwPoint).toMatchObject({
+        revision: 3,
+        operationId: "shadow-proof-source-3",
+      });
+      expect(liveLedger.admitSuccessor(attempted), throwPoint).toBe(false);
+      expect(liveLedger.admitSuccessor(structuredClone(attempted)), throwPoint).toBe(false);
+
+      duo.guest.handleInboundFrame(duo.boundaryFrame);
+      duo.guest.handleInboundFrame(duo.boundaryFrame);
+      expect(callbackEntries, throwPoint).toHaveLength(1);
+      expect(violations, throwPoint).toHaveLength(1);
+      expect(boundaryMaterialApplications, throwPoint).toBe(0);
+      expect(duo.guest.diagnostics(), throwPoint).toMatchObject({ admitted: 3, applied: 3, shadowStateSize: 3 });
+      duo.dispose();
+    }
+  });
+
+  it("reports one unconditional shared terminal keyed to the request when an exact proof source is altered", () => {
+    const violations: string[][] = [];
+    let boundaryAdmissionCalls = 0;
+    let boundaryMaterialApplications = 0;
+    const duo = makeShadowBoundaryDuo({
+      onProtocolViolation: issues => violations.push([...issues]),
+      alterProofSource: frame => ({
+        ...frame,
+        body: {
+          ...frame.body,
+          material: {
+            ...frame.body.material,
+            digest: `${frame.body.material.digest}-altered-proof-source`,
+          },
+        },
+      }),
+      liveReplica: {
+        // Proof sources are deliberately unowned: source rejection must still reach the shared terminal.
+        ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
+        ownsControl: () => false,
+        admitEntry: (_ctx, entry) => {
+          if (entry.kind === "WAVE_ADVANCE") {
+            boundaryAdmissionCalls += 1;
+          }
+          return true;
+        },
+        applyMaterial: (_ctx, entry) => {
+          if (entry.kind !== "WAVE_ADVANCE") {
+            return null;
+          }
+          boundaryMaterialApplications += 1;
+          return true;
+        },
+        projectControl: () => null,
+      },
+    });
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0]?.join(" ")).toContain(duo.requestId);
+    expect(boundaryAdmissionCalls).toBe(0);
+    expect(boundaryMaterialApplications).toBe(0);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 3, applied: 3, shadowStateSize: 3 });
+
+    duo.guest.handleInboundFrame(duo.boundaryFrame);
+    expect(violations).toHaveLength(1);
+    expect(boundaryAdmissionCalls).toBe(0);
+    expect(boundaryMaterialApplications).toBe(0);
+    duo.dispose();
   });
 
   it("readdresses a deferred boundary after its predecessor retires without recapturing or allocating a revision", () => {
@@ -1719,28 +2653,48 @@ describe("authority-v2 log", () => {
 
   it("refuses a boundary whose live retained proof exceeds the ledger bound without evicting sources", () => {
     const controlLedger = new CoopV2InteractionControlLedger(2);
-    const log = makeLog(scheduler, sent, { retainCapacity: 3 });
-    const prepare = reserveAndInstallMechanicalControl(controlLedger);
-    const first = log.commit(
-      entryInput("live-proof-1", { kind: "TURN_COMMIT", nextControl: commandControl() }),
-      prepare,
+    const log = makeLog(scheduler, sent, { retainCapacity: 4 });
+    const sources = [1, 2, 3].map(revision =>
+      log.commit(entryInput(`live-proof-${revision}`, { kind: "TURN_COMMIT", nextControl: commandControl() })),
     );
-    const second = log.commit(
-      entryInput("live-proof-2", { kind: "TURN_COMMIT", nextControl: commandControl() }),
-      prepare,
-    );
+    const predecessor = sources.at(-1);
+    if (predecessor == null) {
+      throw new Error("bounded live-proof fixture has no predecessor");
+    }
+    expect(
+      controlLedger.adoptRecoveryControl(
+        predecessor.revision,
+        predecessor.operationId,
+        predecessor.nextControl,
+        predecessor,
+      ),
+    ).toBe(true);
+    expect(
+      controlLedger.projectMechanical(predecessor.nextControl, () => ({
+        kind: "installed",
+        controlId: controlIdOf(predecessor.nextControl),
+      })),
+    ).toMatchObject({ kind: "installed" });
     const activeBeforeRefusal = controlLedger.activeControl;
 
     const refused = log.commitDetailed(
-      entryInput("live-proof-3", { kind: "TURN_COMMIT", nextControl: commandControl() }),
-      prepare,
+      waveBoundaryEntry("live-proof-overflow-boundary", frameContext(), [1, 2, 3]),
+      entry => controlLedger.prepareAuthorityEntry(entry),
     );
     expect(refused).toMatchObject({ kind: "deferred", reason: "predecessor-control-not-installed" });
-    expect(log.retained().map(entry => entry.revision)).toEqual([first.revision, second.revision]);
-    expect(log.diagnostics()).toMatchObject({ headRevision: 2, retainedEntries: 2 });
-    expect(controlLedger.authenticatedSourceCount).toBe(2);
+    expect(log.retained().map(entry => entry.revision)).toEqual([1, 2, 3]);
+    expect(log.diagnostics()).toMatchObject({ headRevision: 3, retainedEntries: 3 });
+    expect(controlLedger.authenticatedSourceCount).toBe(1);
     expect(controlLedger.activeControl).toEqual(activeBeforeRefusal);
-    expect(delivered(sent).map(entry => entry.operationId)).toEqual(["live-proof-1", "live-proof-2"]);
+    expect(controlLedger.sourceEntryOf(predecessor.nextControl)).toMatchObject({
+      revision: predecessor.revision,
+      operationId: predecessor.operationId,
+    });
+    expect(delivered(sent).map(entry => entry.operationId)).toEqual([
+      "live-proof-1",
+      "live-proof-2",
+      "live-proof-3",
+    ]);
   });
 
   it("prunes exact subsumed source proof while retaining the new wave or terminal boundary source", () => {
