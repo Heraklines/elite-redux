@@ -231,6 +231,31 @@ function turnTap(operationId = "TURN/w5/t1", legacyDigest = "legacy-turn") {
   };
 }
 
+function orderedInteractionEntry(
+  harness: CoopAuthorityV2Shadow,
+  actionOrdinal: number,
+): Omit<CoopAuthorityEntry, "revision"> {
+  const operationId = `retained-interaction-${actionOrdinal}`;
+  return {
+    context: harness.authenticatedFrameContext,
+    operationId,
+    kind: "INTERACTION_COMMIT",
+    material: {
+      digest: `retained-interaction-digest-${actionOrdinal}`,
+      payload: {
+        envelope: {
+          sessionEpoch: SESSION.epoch,
+          wave: 5,
+          turn: 1,
+          pendingOperation: { id: operationId, kind: "REWARD" },
+        },
+      },
+    },
+    nextControl: awaitSuccessor(operationId, 5, 1, true),
+    subsumes: [],
+  };
+}
+
 afterEach(() => {
   clearActiveCoopV2Shadow();
   clearCoopV2ShadowInbound();
@@ -611,6 +636,348 @@ describe("authority-v2 shadow harness", () => {
     host.dispose();
     expect(host.tapTurnCommit(turnTap("TURN/after-dispose"))).toBeNull();
     expect(host.diagnostics().committed).toBe(0);
+  });
+});
+
+describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
+  it("retains an authenticated successor gap and redrives it inline after predecessor control installs", () => {
+    const clock = new FakeClock();
+    const authorityDeliveries: number[] = [];
+    const appliedRevisions: number[] = [];
+    let controlReady = false;
+    let guest!: CoopAuthorityV2Shadow;
+
+    const host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (frame.t === "authorityEntry") {
+          authorityDeliveries.push(frame.body.revision);
+        }
+        guest.handleInboundFrame(frame);
+      },
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      // Keep receipts off the authority wire so the successor can only be completed by the replica's inline
+      // retained-entry redrive, never by an authority redelivery or a timer tick.
+      send: () => {},
+      scheduler: createCoopScheduler(clock),
+      liveReplica: {
+        ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "INTERACTION_COMMIT",
+        ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        applyMaterial: (_ctx, entry) => {
+          appliedRevisions.push(entry.revision);
+          return true;
+        },
+        projectControl: (_ctx, control) =>
+          controlReady
+            ? { kind: "installed", controlId: controlIdOf(control) }
+            : { kind: "deferred", reason: "successor surface is still parked" },
+      },
+    });
+
+    expect(
+      host.tapTurnCommit({ ...turnTap("TURN/retained-gap-predecessor"), nextCommandFrontier: null }),
+    ).not.toBeNull();
+    expect(
+      host.tapInteraction({ entry: orderedInteractionEntry(host, 0), legacyDigest: "legacy-retained-gap-successor" }),
+    ).not.toBeNull();
+    expect(authorityDeliveries).toEqual([1, 2]);
+    expect(appliedRevisions).toEqual([1]);
+    expect(guest.diagnostics()).toMatchObject({
+      admitted: 1,
+      applied: 1,
+      controlLedgerSize: 0,
+      shadowStateSize: 1,
+    });
+
+    controlReady = true;
+    // Revision 1 completes first; its exact retained revision-2 gap is then consumed in the same call stack.
+    expect(guest.retryPendingReplicaEntries()).toBe(1);
+    expect(authorityDeliveries).toEqual([1, 2]);
+    expect(appliedRevisions).toEqual([1, 2]);
+    expect(guest.diagnostics()).toMatchObject({
+      admitted: 2,
+      applied: 2,
+      controlLedgerSize: 2,
+      shadowStateSize: 2,
+    });
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("keeps exact retained duplicates idempotent and rejects conflicting same-revision bodies", () => {
+    const clock = new FakeClock();
+    const violations: string[][] = [];
+    let materialMutations = 0;
+    let controlAttempts = 0;
+    let deliveredEntry: Extract<CoopFrameV2, { t: "authorityEntry" }> | null = null;
+    let guest!: CoopAuthorityV2Shadow;
+
+    const host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (frame.t === "authorityEntry") {
+          deliveredEntry = frame;
+        }
+        guest.handleInboundFrame(frame);
+      },
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: () => {},
+      scheduler: createCoopScheduler(clock),
+      onProtocolViolation: violation => violations.push([...violation.issues]),
+      liveReplica: {
+        ownsEntry: entry => entry.kind === "TURN_COMMIT",
+        ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        applyMaterial: () => {
+          materialMutations += 1;
+          return true;
+        },
+        projectControl: () => {
+          controlAttempts += 1;
+          return { kind: "deferred", reason: "retain this revision for duplicate checks" };
+        },
+      },
+    });
+
+    expect(host.tapTurnCommit({ ...turnTap("TURN/retained-duplicate"), nextCommandFrontier: null })).not.toBeNull();
+    if (deliveredEntry == null) {
+      throw new Error("the retained duplicate fixture did not receive its authority entry");
+    }
+    expect(materialMutations).toBe(1);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0, shadowStateSize: 1 });
+
+    // The exact same retained body resumes only the unfinished control stage.
+    guest.handleInboundFrame(deliveredEntry);
+    expect(materialMutations).toBe(1);
+    expect(controlAttempts).toBe(2);
+    expect(violations).toEqual([]);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0, shadowStateSize: 1 });
+
+    const conflictingEntry: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
+      ...deliveredEntry,
+      body: {
+        ...deliveredEntry.body,
+        material: {
+          ...deliveredEntry.body.material,
+          digest: `${deliveredEntry.body.material.digest}-conflict`,
+        },
+      },
+    };
+    guest.handleInboundFrame(conflictingEntry);
+    expect(materialMutations).toBe(1);
+    expect(controlAttempts).toBe(2);
+    expect(violations).toContainEqual(["entry.conflicting-pending-revision-1"]);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0, shadowStateSize: 1 });
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("re-addresses retained admitted and gap entries across hot rebind and rejects the old generation", () => {
+    const clock = new FakeClock();
+    const violations: string[][] = [];
+    const hostDeliveries: Extract<CoopFrameV2, { t: "authorityEntry" }>[] = [];
+    const appliedRevisions: number[] = [];
+    const installedControls: string[] = [];
+    let controlReady = false;
+    let receiptsReachHost = false;
+    let host!: CoopAuthorityV2Shadow;
+    let guest!: CoopAuthorityV2Shadow;
+
+    host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (frame.t === "authorityEntry") {
+          hostDeliveries.push(frame);
+        }
+        guest.handleInboundFrame(frame);
+      },
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (receiptsReachHost) {
+          host.handleInboundFrame(frame);
+        }
+      },
+      scheduler: createCoopScheduler(clock),
+      onProtocolViolation: violation => violations.push([...violation.issues]),
+      liveReplica: {
+        ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "INTERACTION_COMMIT",
+        ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        applyMaterial: (_ctx, entry) => {
+          appliedRevisions.push(entry.revision);
+          return true;
+        },
+        projectControl: (_ctx, control) => {
+          if (!controlReady) {
+            return { kind: "deferred", reason: "hot-rejoin fixture keeps control pending" };
+          }
+          const controlId = controlIdOf(control);
+          installedControls.push(controlId);
+          return { kind: "installed", controlId };
+        },
+      },
+    });
+
+    expect(host.tapTurnCommit({ ...turnTap("TURN/hot-rejoin-retained"), nextCommandFrontier: null })).not.toBeNull();
+    expect(
+      host.tapInteraction({ entry: orderedInteractionEntry(host, 1), legacyDigest: "legacy-hot-rejoin-gap" }),
+    ).not.toBeNull();
+    expect(hostDeliveries.map(frame => frame.body.revision)).toEqual([1, 2]);
+    expect(host.diagnostics().retained).toBe(2);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0 });
+
+    controlReady = true;
+    const guestRebound: CoopV2ShadowIdentity = {
+      ...identity(1),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 0, connectionGeneration: 1 }],
+    };
+    const hostRebound: CoopV2ShadowIdentity = {
+      ...identity(0),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 1, connectionGeneration: 1 }],
+    };
+    expect(guest.rebindIdentity(guestRebound)).toBe(0);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0 });
+
+    const originalEntry = hostDeliveries.find(frame => frame.body.revision === 1);
+    if (originalEntry == null) {
+      throw new Error("the hot-rejoin fixture did not retain the predecessor frame");
+    }
+    const oldGenerationEntry: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
+      ...originalEntry,
+      ctx: { ...originalEntry.ctx, membershipRevision: 2, connectionGeneration: 0 },
+    };
+    guest.handleInboundFrame(oldGenerationEntry);
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0 });
+    expect(violations).toContainEqual(["entry.authority-sender-mismatch"]);
+
+    receiptsReachHost = true;
+    expect(host.rebindIdentity(hostRebound)).toBe(2);
+    expect(hostDeliveries.slice(2).length).toBeGreaterThanOrEqual(2);
+    expect(
+      hostDeliveries
+        .slice(2)
+        .every(frame => frame.ctx.membershipRevision === 2 && frame.ctx.connectionGeneration === 1),
+    ).toBe(true);
+    expect(appliedRevisions).toEqual([1, 2]);
+    expect(installedControls).toHaveLength(2);
+    expect(host.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
+    expect(guest.diagnostics()).toMatchObject({
+      admitted: 2,
+      applied: 2,
+      controlLedgerSize: 2,
+      shadowStateSize: 2,
+    });
+
+    host.dispose();
+    guest.dispose();
+  });
+
+  it("fails closed at retention capacity without evicting the unresolved frontier", () => {
+    const clock = new FakeClock();
+    const deliveredRevisions: number[] = [];
+    const host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => {
+        if (frame.t === "authorityEntry") {
+          deliveredRevisions.push(frame.body.revision);
+        }
+      },
+      scheduler: createCoopScheduler(clock),
+    });
+
+    for (let actionOrdinal = 0; actionOrdinal < 512; actionOrdinal++) {
+      expect(
+        host.tapInteraction({
+          entry: orderedInteractionEntry(host, actionOrdinal),
+          legacyDigest: `legacy-capacity-${actionOrdinal}`,
+        }),
+      ).toMatchObject({ revision: actionOrdinal + 1 });
+    }
+    expect(deliveredRevisions).toEqual(Array.from({ length: 512 }, (_value, index) => index + 1));
+    expect(host.diagnostics()).toMatchObject({ committed: 512, retained: 512, pendingTimers: 512 });
+
+    expect(
+      host.tapInteraction({ entry: orderedInteractionEntry(host, 512), legacyDigest: "legacy-capacity-overflow" }),
+    ).toBeNull();
+    expect(deliveredRevisions).toEqual(Array.from({ length: 512 }, (_value, index) => index + 1));
+    expect(host.authorityFrontier()?.revision).toBe(512);
+    expect(host.diagnostics()).toMatchObject({ committed: 512, retained: 512, pendingTimers: 512, faults: 1 });
+
+    host.dispose();
+    expect(clock.pendingCount).toBe(0);
+  });
+
+  it("disposes retained replica entries and authority leases without pending timers", () => {
+    const clock = new FakeClock();
+    let guest!: CoopAuthorityV2Shadow;
+
+    const host = new CoopAuthorityV2Shadow({
+      identity: identity(0),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: frame => guest.handleInboundFrame(frame),
+      scheduler: createCoopScheduler(clock),
+    });
+    guest = new CoopAuthorityV2Shadow({
+      identity: identity(1),
+      scene: STUB_SCENE,
+      transport: STUB_TRANSPORT,
+      send: () => {},
+      scheduler: createCoopScheduler(clock),
+      liveReplica: {
+        ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "INTERACTION_COMMIT",
+        ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        applyMaterial: () => true,
+        projectControl: () => ({ kind: "deferred", reason: "leave both revisions pending for disposal" }),
+      },
+    });
+
+    expect(host.tapTurnCommit({ ...turnTap("TURN/dispose-pending"), nextCommandFrontier: null })).not.toBeNull();
+    expect(
+      host.tapInteraction({ entry: orderedInteractionEntry(host, 3), legacyDigest: "legacy-dispose-gap" }),
+    ).not.toBeNull();
+    expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, shadowStateSize: 1, controlLedgerSize: 0 });
+
+    guest.dispose();
+    expect(guest.retryPendingReplicaEntries()).toBe(0);
+    expect(guest.diagnostics()).toMatchObject({
+      disposed: true,
+      retained: 0,
+      pendingTimers: 0,
+      shadowStateSize: 0,
+      controlLedgerSize: 0,
+    });
+
+    host.dispose();
+    expect(host.diagnostics()).toMatchObject({ disposed: true, retained: 0, pendingTimers: 0 });
+    expect(clock.pendingCount).toBe(0);
   });
 });
 
