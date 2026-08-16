@@ -64,12 +64,36 @@ describe("Egg Generation Tests", () => {
     expect(gachaSpeciesCount).toBeGreaterThan(0.4 * EGG_HATCH_COUNT);
     expect(gachaSpeciesCount).toBeLessThan(0.6 * EGG_HATCH_COUNT);
   });
-  it("should never be allowed to generate Eternatus via the legendary gacha", () => {
+  it("should keep Eternatus out of the rotating legendary gacha focus pool", () => {
     const validLegendaryGachaSpecies = getValidLegendaryGachaSpecies();
     for (const speciesId of validLegendaryGachaSpecies) {
       expect(speciesEggTiers[speciesId]).toBe(EggTier.LEGENDARY);
     }
     expect(validLegendaryGachaSpecies.includes(SpeciesId.ETERNATUS)).toBe(false);
+  });
+  it("should hatch Eternatus from the regular legendary egg pool", () => {
+    const scene = game.scene;
+
+    for (const [speciesId, tier] of Object.entries(speciesEggTiers)) {
+      if (tier === EggTier.LEGENDARY) {
+        scene.gameData.dexData[Number(speciesId)].caughtAttr = 1n;
+      }
+    }
+    scene.gameData.dexData[SpeciesId.ETERNATUS].caughtAttr = 0n;
+    scene.gameData.eggs = scene.gameData.eggs.filter(storedEgg => storedEgg.species !== SpeciesId.ETERNATUS);
+    scene.gameData.unlockPity[EggTier.LEGENDARY] = 9;
+
+    const egg = new Egg({
+      scene,
+      sourceType: EggSourceType.GACHA_MOVE,
+      tier: EggTier.LEGENDARY,
+      isShiny: false,
+      variantTier: VariantTier.STANDARD,
+    });
+
+    expect(egg.tier).toBe(EggTier.LEGENDARY);
+    expect(egg.species).toBe(SpeciesId.ETERNATUS);
+    expect(egg.generatePlayerPokemon().species.speciesId).toBe(SpeciesId.ETERNATUS);
   });
   it("should hatch an Arceus. Set from species", () => {
     const scene = game.scene;
