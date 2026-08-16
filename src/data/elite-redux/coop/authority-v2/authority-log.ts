@@ -1272,12 +1272,21 @@ export class AuthorityLog implements CoopAuthorityLog {
   // Internals
   // ---------------------------------------------------------------------------
 
-  /** Snapshot the exact currently retained proof set for one synchronous authority-local reservation. */
+  /** Snapshot the retained proof set plus any frozen boundary sources for one synchronous local reservation. */
   private entryProofScope(boundaryApproval: AuthorityBoundaryApproval | null): AuthorityEntryProofScope {
+    const boundarySources = boundaryApproval?.trustedSources ?? null;
+    const retainedSources = new Map<number, CoopAuthorityEntry>(
+      this.retained().map(source => [source.revision, source] as const),
+    );
+    for (const source of boundarySources ?? []) {
+      if (!retainedSources.has(source.revision)) {
+        retainedSources.set(source.revision, source);
+      }
+    }
     return Object.freeze({
       kind: "authority-retained",
-      retainedSources: Object.freeze([...this.retained()]),
-      boundarySources: boundaryApproval?.trustedSources ?? null,
+      retainedSources: Object.freeze([...retainedSources.values()]),
+      boundarySources,
     });
   }
 
@@ -1314,7 +1323,7 @@ export class AuthorityLog implements CoopAuthorityLog {
 
   /**
    * Reuse only the proof captured for this exact immutable deferred body. Older unrelated leases may have
-   * retired since initial authorization, but the latest stale predecessor must still be the same retained,
+   * retired since initial authorization, but the latest stale predecessor must still be the same immutable,
    * non-terminal frontier and the structural/causal boundary predicate must still hold.
    */
   private deferredBoundaryApprovalAllows(
@@ -1329,7 +1338,6 @@ export class AuthorityLog implements CoopAuthorityLog {
       && this.latestNextControl != null
       && this.latestNextControl.kind !== "TERMINAL"
       && controlsEqual(this.latestNextControl, predecessor.nextControl)
-      && this.retainedWindow.has(approval.predecessorRevision)
       && predecessor.revision === approval.predecessorRevision
       && predecessor.operationId === approval.predecessorOperationId
       && controlIdOf(predecessor.nextControl) === approval.predecessorControlId
