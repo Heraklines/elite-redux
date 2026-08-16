@@ -40,10 +40,15 @@ import type {
   CoopRecoveryAppliedBodyV2,
   CoopRecoveryBundleBodyV2,
   CoopRecoveryRequestBodyV2,
+  CoopTailProofBodyV2,
   CoopTailRequestBodyV2,
   CoopTerminalBodyV2,
 } from "#data/elite-redux/coop/authority-v2/frame-codec";
-import { COOP_FRAME_PROTOCOL_VERSION, decodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+import {
+  COOP_FRAME_PROTOCOL_VERSION,
+  COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS,
+  decodeFrameV2,
+} from "#data/elite-redux/coop/authority-v2/frame-codec";
 import {
   frameContextIssues,
   isFrameContextV2,
@@ -176,7 +181,101 @@ function tailRequestBodyIssues(body: unknown): string[] {
   if (!isPlainObject(body)) {
     return ["not an object"];
   }
-  return isNonNegSafeInt(body.fromRevision) ? [] : ["fromRevision"];
+  const issues: string[] = [];
+  if (!isNonNegSafeInt(body.fromRevision)) {
+    issues.push("fromRevision");
+  }
+  const optionalFields = ["requestId", "candidateRevision", "candidateOperationId"] as const;
+  const present = optionalFields.filter(field => field in body);
+  if (present.length !== 0 && present.length !== optionalFields.length) {
+    issues.push("boundaryProofRequest: all-or-none tuple");
+    return issues;
+  }
+  if (present.length === optionalFields.length) {
+    if (!isNonEmptyString(body.requestId)) {
+      issues.push("requestId");
+    }
+    if (!isPositiveSafeInt(body.candidateRevision)) {
+      issues.push("candidateRevision");
+    }
+    if (!isNonEmptyString(body.candidateOperationId)) {
+      issues.push("candidateOperationId");
+    }
+    if (
+      isNonNegSafeInt(body.fromRevision)
+      && isPositiveSafeInt(body.candidateRevision)
+      && body.candidateRevision <= body.fromRevision
+    ) {
+      issues.push("candidateRevision: must be greater than fromRevision");
+    }
+  }
+  return issues;
+}
+
+function tailProofBodyIssues(body: unknown): string[] {
+  if (!isPlainObject(body)) {
+    return ["not an object"];
+  }
+  const issues: string[] = [];
+  if (!inList(["manifest", "complete"], body.phase)) {
+    issues.push("phase");
+  }
+  if (!isNonEmptyString(body.requestId)) {
+    issues.push("requestId");
+  }
+  if (!isNonNegSafeInt(body.fromRevision)) {
+    issues.push("fromRevision");
+  }
+  if (!isPositiveSafeInt(body.candidateRevision)) {
+    issues.push("candidateRevision");
+  }
+  if (!isNonEmptyString(body.candidateOperationId)) {
+    issues.push("candidateOperationId");
+  }
+  if (!isNonNegSafeInt(body.headRevision)) {
+    issues.push("headRevision");
+  }
+  if (
+    isNonNegSafeInt(body.fromRevision)
+    && isPositiveSafeInt(body.candidateRevision)
+    && body.candidateRevision <= body.fromRevision
+  ) {
+    issues.push("candidateRevision: must be greater than fromRevision");
+  }
+  if (
+    isNonNegSafeInt(body.headRevision)
+    && isPositiveSafeInt(body.candidateRevision)
+    && body.headRevision < body.candidateRevision
+  ) {
+    issues.push("headRevision: must be at least candidateRevision");
+  }
+  if (!Array.isArray(body.sourceRevisions)) {
+    issues.push("sourceRevisions");
+    return issues;
+  }
+  if (body.sourceRevisions.length > COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS) {
+    issues.push("sourceRevisions: exceeds retention capacity");
+  }
+  let prior: number | null = null;
+  for (let index = 0; index < body.sourceRevisions.length; index++) {
+    const revision = body.sourceRevisions[index];
+    if (!isPositiveSafeInt(revision)) {
+      issues.push(`sourceRevisions[${index}]`);
+      continue;
+    }
+    if (prior != null && revision <= prior) {
+      issues.push(`sourceRevisions[${index}]: must be strictly increasing`);
+    }
+    if (
+      isNonNegSafeInt(body.fromRevision)
+      && isPositiveSafeInt(body.candidateRevision)
+      && (revision < body.fromRevision || revision >= body.candidateRevision)
+    ) {
+      issues.push(`sourceRevisions[${index}]: outside proof range`);
+    }
+    prior = revision;
+  }
+  return issues;
 }
 
 function recoveryRequestBodyIssues(body: unknown): string[] {
@@ -282,6 +381,8 @@ function bodyIssuesFor(frameType: CoopFrameTypeV2, body: unknown): string[] {
       return authorityReceiptBodyIssues(body);
     case "tailRequest":
       return tailRequestBodyIssues(body);
+    case "tailProof":
+      return tailProofBodyIssues(body);
     case "recoveryRequest":
       return recoveryRequestBodyIssues(body);
     case "recoveryBundle":
@@ -307,6 +408,9 @@ function isAuthorityReceiptBody(body: unknown): body is CoopAuthorityReceiptBody
 }
 function isTailRequestBody(body: unknown): body is CoopTailRequestBodyV2 {
   return tailRequestBodyIssues(body).length === 0;
+}
+function isTailProofBody(body: unknown): body is CoopTailProofBodyV2 {
+  return tailProofBodyIssues(body).length === 0;
 }
 function isRecoveryRequestBody(body: unknown): body is CoopRecoveryRequestBodyV2 {
   return recoveryRequestBodyIssues(body).length === 0;
@@ -353,6 +457,10 @@ function assembleValidFrame(frameType: CoopFrameTypeV2, ctx: unknown, body: unkn
     case "tailRequest":
       return isTailRequestBody(body)
         ? { kind: "valid", frame: { v, t: "tailRequest", ctx, body } }
+        : violation(frameType, ["body"]);
+    case "tailProof":
+      return isTailProofBody(body)
+        ? { kind: "valid", frame: { v, t: "tailProof", ctx, body } }
         : violation(frameType, ["body"]);
     case "recoveryRequest":
       return isRecoveryRequestBody(body)

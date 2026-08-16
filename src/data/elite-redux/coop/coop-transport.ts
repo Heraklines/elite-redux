@@ -135,7 +135,9 @@ export type CoopRole = "host" | "guest";
 // er-coop-47 makes stable actor identity mandatory for every identity-bearing presentation event and
 // aligns every materialized move target with its stable actor. A protocol-46 renderer can still fall back
 // to a transient battler index after switch/faint/reorder, so mixed builds must refuse pairing.
-export const COOP_PROTOCOL_VERSION = "er-coop-47";
+// er-coop-48 adds correlated exact boundary tail-proof manifest/completion; older peers treat the mechanical
+// frame as cosmetic and can deadlock, so pairing must reject them.
+export const COOP_PROTOCOL_VERSION = "er-coop-48";
 
 /**
  * Protocol-33 authority evidence is deliberately progressive.  Mechanical convergence is not proof that

@@ -39,11 +39,15 @@ import type { CoopRecoveryAppliedProofV2 } from "#data/elite-redux/coop/authorit
 /** The single-source v2 wire protocol version. Bump when the envelope shape changes. */
 export const COOP_FRAME_PROTOCOL_VERSION = 2 as const;
 
+/** Structural ceiling for one boundary-proof source manifest; it matches the default retained-log cap. */
+export const COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS = 512;
+
 /** The mechanically relevant v2 frame types Lane 5 codes + validates. */
 export type CoopFrameTypeV2 =
   | "authorityEntry"
   | "authorityReceipt"
   | "tailRequest"
+  | "tailProof"
   | "recoveryRequest"
   | "recoveryBundle"
   | "recoveryApplied"
@@ -54,6 +58,7 @@ export const COOP_FRAME_TYPES_V2: readonly CoopFrameTypeV2[] = [
   "authorityEntry",
   "authorityReceipt",
   "tailRequest",
+  "tailProof",
   "recoveryRequest",
   "recoveryBundle",
   "recoveryApplied",
@@ -78,6 +83,25 @@ export type CoopAuthorityReceiptBodyV2 = Omit<CoopAuthorityReceipt, "context">;
 /** tailRequest body: the replica asks the authority to redeliver retained entries from a revision. */
 export interface CoopTailRequestBodyV2 {
   readonly fromRevision: number;
+  /** Optional correlated boundary-proof request; all three fields are present together or omitted. */
+  readonly requestId?: string;
+  readonly candidateRevision?: number;
+  readonly candidateOperationId?: string;
+}
+
+/** The two synchronous phases of one exact retained-tail boundary proof. */
+export type CoopTailProofPhaseV2 = "manifest" | "complete";
+
+/** tailProof body: the authority's exact snapshot manifest or completion proof. */
+export interface CoopTailProofBodyV2 {
+  readonly phase: CoopTailProofPhaseV2;
+  readonly requestId: string;
+  readonly fromRevision: number;
+  readonly candidateRevision: number;
+  readonly candidateOperationId: string;
+  readonly headRevision: number;
+  /** Exact retained source revisions sent between the manifest and complete frames. */
+  readonly sourceRevisions: readonly number[];
 }
 
 /** recoveryRequest body: the recovering peer requests a bundle for its captured frontier. */
@@ -123,6 +147,7 @@ export type CoopFrameV2 =
   | CoopFrameEnvelopeV2<"authorityEntry", CoopAuthorityEntryBodyV2>
   | CoopFrameEnvelopeV2<"authorityReceipt", CoopAuthorityReceiptBodyV2>
   | CoopFrameEnvelopeV2<"tailRequest", CoopTailRequestBodyV2>
+  | CoopFrameEnvelopeV2<"tailProof", CoopTailProofBodyV2>
   | CoopFrameEnvelopeV2<"recoveryRequest", CoopRecoveryRequestBodyV2>
   | CoopFrameEnvelopeV2<"recoveryBundle", CoopRecoveryBundleBodyV2>
   | CoopFrameEnvelopeV2<"recoveryApplied", CoopRecoveryAppliedBodyV2>

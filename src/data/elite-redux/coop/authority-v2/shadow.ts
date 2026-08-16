@@ -125,7 +125,12 @@ import type {
   CoopReplicaMechanicalStage,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
-import { COOP_FRAME_PROTOCOL_VERSION, type CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+import {
+  COOP_FRAME_PROTOCOL_VERSION,
+  type CoopFrameV2,
+  type CoopTailProofBodyV2,
+  type CoopTailRequestBodyV2,
+} from "#data/elite-redux/coop/authority-v2/frame-codec";
 import {
   assertFrameContextV2,
   bindFrameContext,
@@ -583,6 +588,8 @@ export class CoopAuthorityV2Shadow {
    * retry after the one-shot log token is revoked; a second refusal is semantically impossible and terminal.
    */
   private readonly replicaAdmissionRetries = new Set<number>();
+  /** Revisions that exhausted their one permitted live-admission retry; later duplicates are inert. */
+  private readonly replicaAdmissionExhausted = new Set<number>();
   /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
   private readonly replicaEntriesInFlight = new Set<number>();
   /** V2-native phase barriers resolved exclusively from authenticated authority-log receipt quorum. */
@@ -1218,7 +1225,52 @@ export class CoopAuthorityV2Shadow {
           break;
         }
         case "tailRequest": {
-          this.redeliverTail(frame.body.fromRevision);
+          this.redeliverTail(frame.ctx, frame.body);
+          break;
+        }
+        case "tailProof": {
+          const disposition = this.log.acceptBoundaryProofFrame(frame.ctx, frame.body);
+          switch (disposition.kind) {
+            case "pending":
+            case "ignored":
+              // A duplicate/lost-frame replay may be pending; only an exact complete disposition can
+              // release the parked candidate. An inactive/old proof is inert by design.
+              break;
+            case "rejected":
+              // Semantic proof rejection is terminal, not a recoverable tail gap: otherwise a malformed
+              // proof could park the candidate forever without the shared protocol terminal.
+              reportProtocolViolation(
+                {
+                  kind: "protocol-violation",
+                  frameType: "tailProof",
+                  issues: [disposition.reason],
+                },
+                this.onProtocolViolation,
+              );
+              break;
+            case "completed": {
+              const candidate = disposition.candidate;
+              const pending = this.pendingReplicaEntries.get(candidate.revision);
+              if (pending == null || !samePendingReplicaEntry(pending, candidate)) {
+                if (
+                  pending == null
+                  && this.replicaEntriesInFlight.has(candidate.revision)
+                  && this.log.hasCompletedBoundaryProofCandidate(candidate)
+                ) {
+                  // The outer candidate admission will park this exact object immediately after the
+                  // synchronous proof response returns; leave the completed proof armed for that redrive.
+                  break;
+                }
+                this.log.discardBoundaryProof();
+                this.reportPendingReplicaViolation(candidate, "boundary-proof-pending-candidate-missing");
+                return;
+              }
+              // Completion is the sole boundary release point. Redrive only the exact parked candidate;
+              // manifest-listed sources remain proof evidence and never enter the mechanical pipeline.
+              this.applyReplicaEntry(pending);
+              break;
+            }
+          }
           break;
         }
         case "recoveryRequest":
@@ -1529,6 +1581,7 @@ export class CoopAuthorityV2Shadow {
     this.shadowState.clear();
     this.pendingReplicaEntries.clear();
     this.replicaAdmissionRetries.clear();
+    this.replicaAdmissionExhausted.clear();
     this.replicaEntriesInFlight.clear();
     this.ledger.clear();
   }
@@ -1584,15 +1637,32 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     this.replicaEntriesInFlight.add(entry.revision);
+    let applied = false;
     try {
-      return this.applyReplicaEntryOnce(entry);
+      applied = this.applyReplicaEntryOnce(entry);
     } finally {
       this.replicaEntriesInFlight.delete(entry.revision);
     }
+    // Loopback can deliver manifest/sources/complete synchronously from inside log.admit(). The complete
+    // frame must not reject merely because this outer call has not yet retained the candidate; once the gap
+    // path parks it, perform the sole exact-candidate redrive after the in-flight guard is released.
+    if (
+      !applied
+      && this.log.hasCompletedBoundaryProofCandidate(entry)
+      && this.pendingReplicaEntries.has(entry.revision)
+    ) {
+      return this.applyReplicaEntry(entry);
+    }
+    return applied;
   }
 
   /** One non-re-entrant ordered admission/application attempt. */
   private applyReplicaEntryOnce(entry: CoopAuthorityEntry): boolean {
+    if (this.replicaAdmissionExhausted.has(entry.revision)) {
+      // A quarantined live-ledger admission is terminal. Exact and later redeliveries are inert and can
+      // never reach materialization or acquire a third admission call.
+      return false;
+    }
     const result = this.log.admit(entry);
     this.logReplicaAdmission(entry, result.kind);
     if (result.kind === "rejected") {
@@ -1631,19 +1701,7 @@ export class CoopAuthorityV2Shadow {
       this.proposalLeases.observeCommitted(entry.operationId);
     }
     if (result.kind === "admitted") {
-      const liveAdmission = this.liveReplica?.admitEntry;
-      if (liveAdmission == null) {
-        // Pure shadow application has no live ledger that can consume this capability; do not leave a
-        // caller-reusable privilege in the module WeakMap.
-        revokeAuthorityEntryProofScope(entry);
-      } else if (!liveAdmission.call(this.liveReplica, this.runtimeContext, entry)) {
-        revokeAuthorityEntryProofScope(entry);
-        this.replicaAdmissionRetries.add(entry.revision);
-        // A local capacity refusal must not turn the shared protocol terminal. AuthorityLog still owns the
-        // exact pending image and will redeliver it; only an identity conflict is terminal on this path.
-        if (!this.retainPendingReplicaEntry(entry, false)) {
-          return false;
-        }
+      if (!this.tryLiveReplicaAdmission(entry, false)) {
         return false;
       }
       this.admitted += 1;
@@ -1654,18 +1712,29 @@ export class CoopAuthorityV2Shadow {
       (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control")
     ) {
       if (this.replicaAdmissionRetries.has(entry.revision)) {
-        if (!this.log.reissueReplicaEntryProof(entry)) {
-          revokeAuthorityEntryProofScope(entry);
-          this.reportOwnedReplicaViolation(entry, "entry.control-ledger-retry-proof-refused");
+        // Quarantine before reissue/callback: every failure path below is terminal and later duplicates are
+        // inert, including a callback that mutates external state and then throws.
+        this.replicaAdmissionExhausted.add(entry.revision);
+        if (!this.retainPendingReplicaEntry(entry, false)) {
+          this.quarantineReplicaAdmission(entry, "entry.control-ledger-retry-retention-refused", true);
           return false;
         }
-        const liveAdmission = this.liveReplica?.admitEntry;
-        if (liveAdmission == null || !liveAdmission.call(this.liveReplica, this.runtimeContext, entry)) {
-          revokeAuthorityEntryProofScope(entry);
-          this.reportOwnedReplicaViolation(entry, "entry.control-ledger-retry-refused");
+        let proofReissued = false;
+        try {
+          proofReissued = this.log.reissueReplicaEntryProof(entry);
+        } catch {
+          this.quarantineReplicaAdmission(entry, "entry.control-ledger-retry-proof-threw", true);
+          return false;
+        }
+        if (!proofReissued) {
+          this.quarantineReplicaAdmission(entry, "entry.control-ledger-retry-proof-refused", true);
+          return false;
+        }
+        if (!this.tryLiveReplicaAdmission(entry, true)) {
           return false;
         }
         this.replicaAdmissionRetries.delete(entry.revision);
+        this.replicaAdmissionExhausted.delete(entry.revision);
         this.admitted += 1;
       }
       if (!this.retainPendingReplicaEntry(entry)) {
@@ -1718,6 +1787,74 @@ export class CoopAuthorityV2Shadow {
       }
     }
     return completed;
+  }
+
+  /** Invoke the live admission seam exactly once for the requested attempt and fence every failure. */
+  private tryLiveReplicaAdmission(entry: CoopAuthorityEntry, retry: boolean): boolean {
+    const liveAdmission = this.liveReplica?.admitEntry;
+    if (liveAdmission == null) {
+      revokeAuthorityEntryProofScope(entry);
+      if (!retry && this.liveReplica?.ownsEntry(entry) !== true) {
+        // No live owner exists for this entry, so pure-shadow bookkeeping may continue without a retained
+        // one-shot capability.
+        return true;
+      }
+      this.quarantineReplicaAdmission(
+        entry,
+        retry ? "entry.control-ledger-retry-seam-missing" : "entry.control-ledger-admission-seam-missing",
+        retry,
+      );
+      return false;
+    }
+    let admitted: boolean;
+    try {
+      admitted = liveAdmission.call(this.liveReplica, this.runtimeContext, entry);
+    } catch {
+      revokeAuthorityEntryProofScope(entry);
+      this.quarantineReplicaAdmission(
+        entry,
+        retry ? "entry.control-ledger-retry-threw" : "entry.control-ledger-admission-threw",
+        retry,
+      );
+      return false;
+    }
+    if (admitted) {
+      // Production ledger consumption normally revokes this one-shot scope itself. Revoke unconditionally
+      // as the final fence so a custom/buggy true callback cannot leave a reusable WeakMap capability.
+      revokeAuthorityEntryProofScope(entry);
+      return true;
+    }
+    revokeAuthorityEntryProofScope(entry);
+    if (retry) {
+      this.quarantineReplicaAdmission(entry, "entry.control-ledger-retry-refused", true);
+      return false;
+    }
+    if (!this.retainPendingReplicaEntry(entry, false)) {
+      this.quarantineReplicaAdmission(entry, "entry.control-ledger-admission-retention-refused", false);
+      return false;
+    }
+    this.replicaAdmissionRetries.add(entry.revision);
+    // The first refusal is deliberately silent: the authority's retained lease owns the one allowed retry.
+    return false;
+  }
+
+  /** Retain/quarantine one log-admitted revision and report one shared terminal for an admission failure. */
+  private quarantineReplicaAdmission(entry: CoopAuthorityEntry, issue: string, reportExisting: boolean): void {
+    revokeAuthorityEntryProofScope(entry);
+    this.retainPendingReplicaEntry(entry, false);
+    this.replicaAdmissionRetries.delete(entry.revision);
+    const wasExhausted = this.replicaAdmissionExhausted.has(entry.revision);
+    this.replicaAdmissionExhausted.add(entry.revision);
+    if (!wasExhausted || reportExisting) {
+      reportProtocolViolation(
+        {
+          kind: "protocol-violation",
+          frameType: "authorityEntry",
+          issues: [`revision=${entry.revision}`, issue],
+        },
+        this.onProtocolViolation,
+      );
+    }
   }
 
   /** Keep a bounded, caller-independent authenticated image for every incomplete replica revision. */
@@ -2026,8 +2163,18 @@ export class CoopAuthorityV2Shadow {
     try {
       if (wire.kind === "deliver") {
         this.sendFrame(deliverFrame(wire.entry));
+      } else if (wire.kind === "requestTail") {
+        this.sendFrame(
+          tailRequestFrame(
+            wire.context,
+            wire.missingFrom,
+            wire.requestId,
+            wire.candidateRevision,
+            wire.candidateOperationId,
+          ),
+        );
       } else {
-        this.sendFrame(tailRequestFrame(wire.context, wire.missingFrom));
+        this.sendFrame(tailProofFrame(wire.context, wire.body));
       }
     } catch (error) {
       this.fault(`emitWire(${wire.kind})`, error);
@@ -2044,13 +2191,9 @@ export class CoopAuthorityV2Shadow {
     }
   }
 
-  /** Authority: re-deliver every retained entry at or after `fromRevision` (a replica gap request). */
-  private redeliverTail(fromRevision: number): void {
-    for (const entry of this.log.retained()) {
-      if (entry.revision >= fromRevision) {
-        this.emitWire({ kind: "deliver", entry });
-      }
-    }
+  /** Authority: authenticate and answer ordinary or correlated retained-tail requests. */
+  private redeliverTail(context: CoopFrameContextV2, request: CoopTailRequestBodyV2): void {
+    this.log.handleTailRequest(context, request);
   }
 
   /** Fingerprint an interaction entry through whichever interaction adapter recognizes it, or null. */
@@ -2103,8 +2246,27 @@ function receiptFrame(receipt: CoopAuthorityReceipt): CoopFrameV2 {
   return { v: COOP_FRAME_PROTOCOL_VERSION, t: "authorityReceipt", ctx: context, body };
 }
 
-function tailRequestFrame(ctx: CoopFrameContextV2, fromRevision: number): CoopFrameV2 {
-  return { v: COOP_FRAME_PROTOCOL_VERSION, t: "tailRequest", ctx, body: { fromRevision } };
+function tailRequestFrame(
+  ctx: CoopFrameContextV2,
+  fromRevision: number,
+  requestId?: string,
+  candidateRevision?: number,
+  candidateOperationId?: string,
+): CoopFrameV2 {
+  const body: CoopTailRequestBodyV2 =
+    requestId === undefined || candidateRevision === undefined || candidateOperationId === undefined
+      ? { fromRevision }
+      : { fromRevision, requestId, candidateRevision, candidateOperationId };
+  return {
+    v: COOP_FRAME_PROTOCOL_VERSION,
+    t: "tailRequest",
+    ctx,
+    body,
+  };
+}
+
+function tailProofFrame(ctx: CoopFrameContextV2, body: CoopTailProofBodyV2): CoopFrameV2 {
+  return { v: COOP_FRAME_PROTOCOL_VERSION, t: "tailProof", ctx, body };
 }
 
 function describeError(error: unknown): string {

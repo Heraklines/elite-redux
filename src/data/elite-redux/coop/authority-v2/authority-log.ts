@@ -71,6 +71,11 @@ import type {
   CoopTimeClass,
   CoopTimerOwner,
 } from "#data/elite-redux/coop/authority-v2/contract";
+import type {
+  CoopTailProofBodyV2,
+  CoopTailRequestBodyV2,
+} from "#data/elite-redux/coop/authority-v2/frame-codec";
+import { frameContextsEqual } from "#data/elite-redux/coop/authority-v2/frame-context";
 import {
   controlAllowsSuccessorEntry,
   controlIdOf,
@@ -130,7 +135,15 @@ function validatePeerBindings(
  */
 export type CoopAuthorityWire =
   | { readonly kind: "deliver"; readonly entry: CoopAuthorityEntry }
-  | { readonly kind: "requestTail"; readonly context: CoopFrameContextV2; readonly missingFrom: number };
+  | {
+      readonly kind: "requestTail";
+      readonly context: CoopFrameContextV2;
+      readonly missingFrom: number;
+      readonly requestId?: string;
+      readonly candidateRevision?: number;
+      readonly candidateOperationId?: string;
+    }
+  | { readonly kind: "tailProof"; readonly context: CoopFrameContextV2; readonly body: CoopTailProofBodyV2 };
 
 /** Exponential backoff schedule for delivery redelivery (active-time; the scheduler owns the actual clock). */
 export interface DeliveryBackoff {
@@ -299,8 +312,32 @@ const replicaProofStates = new WeakMap<AuthorityEntryProofScope, ReplicaProofSta
 interface ReplicaBoundaryProofCapture {
   readonly candidate: CoopAuthorityEntry;
   readonly fromRevision: number;
+  readonly requestId: string;
+  readonly requestContext: CoopFrameContextV2;
+  readonly authorityContext: CoopFrameContextV2;
+  readonly predecessorSeed: CoopAuthorityEntry;
+  manifest: CoopTailProofBodyV2 | null;
   readonly sources: Map<number, CoopAuthorityEntry>;
 }
+
+interface TailProofResponseCache {
+  readonly requesterSeatId: number;
+  readonly requestContext: CoopFrameContextV2;
+  readonly authorityContext: CoopFrameContextV2;
+  readonly requestId: string;
+  readonly fromRevision: number;
+  readonly candidateRevision: number;
+  readonly candidateOperationId: string;
+  readonly manifest: CoopTailProofBodyV2;
+  readonly entries: readonly CoopAuthorityEntry[];
+  readonly complete: CoopTailProofBodyV2;
+}
+
+export type AuthorityBoundaryProofFrameDisposition =
+  | { readonly kind: "pending" }
+  | { readonly kind: "completed"; readonly candidate: CoopAuthorityEntry }
+  | { readonly kind: "rejected"; readonly reason: string }
+  | { readonly kind: "ignored"; readonly reason: string };
 
 /** Internal live-ledger seam: an unrecognized object identity never inherits another entry's proof. */
 export function authorityEntryProofScopeOf(entry: CoopAuthorityEntry): AuthorityEntryProofScope | null {
@@ -437,6 +474,8 @@ export class AuthorityLog implements CoopAuthorityLog {
 
   /** AUTHORITY: retained-but-unretired entries, bounded + revision-ordered, keyed by their delivery lease. */
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
+  /** AUTHORITY: one immutable proof response per authenticated peer; replaced by a newer request ID. */
+  private readonly tailProofResponses = new Map<number, TailProofResponseCache>();
   /** REPLICA: separate received, material-applied, and control-installed ordering frontiers. */
   private readonly ledger: AuthorityLedger;
   /** REPLICA: exact authenticated source provenance, bounded independently of unresolved authority leases. */
@@ -466,6 +505,8 @@ export class AuthorityLog implements CoopAuthorityLog {
    * request remains sufficient until this frontier advances.
    */
   private pendingTailRequestFrom: number | null = null;
+  /** Proof request ID most recently emitted for the pending tail cursor; separate from active capture state. */
+  private pendingTailRequestProofId: string | null = null;
   /** AUTHORITY: the highest revision assigned (commit assigns headRevision + 1). */
   private headRevision = 0;
   /** AUTHORITY: constant-size successor metadata for a snapshot taken after the head entry retired. */
@@ -490,8 +531,12 @@ export class AuthorityLog implements CoopAuthorityLog {
     readonly predecessor: CoopAuthorityEntry;
     readonly trustedSources: readonly CoopAuthorityEntry[];
   } | null = null;
+  /** A rebound boundary entry must obtain a fresh exact tail proof before a retry can mint a live scope. */
+  private pendingReplicaBoundaryProofRefresh: CoopAuthorityEntry | null = null;
   /** The object identity carrying the current live replica proof token, if any. */
   private replicaProofEntryIdentity: CoopAuthorityEntry | null = null;
+  /** Deterministic per-log correlation sequence; it is never reset across a hot rejoin. */
+  private boundaryProofRequestSequence = 0;
   /** Bounded quorum-stage tombstones so a waiter registered after synchronous loopback retirement is sound. */
   private readonly retiredOperationStages = new Map<string, number>();
   private readonly exhaustedRevisionSet = new Set<number>();
@@ -612,6 +657,13 @@ export class AuthorityLog implements CoopAuthorityLog {
       throw new Error("AuthorityLog.rebindConnection has no bound authority peer for replica provenance");
     }
     const priorReplicaProofIdentity = this.replicaProofEntryIdentity;
+    const hadPendingReplicaBoundaryApproval = this.pendingReplicaBoundaryApproval != null;
+    const priorBoundaryCandidate =
+      this.boundaryProofCapture?.candidate
+      ?? (hadPendingReplicaBoundaryApproval ? this.pendingReplicaEntry : null);
+    if (priorBoundaryCandidate != null && authority == null) {
+      throw new Error("AuthorityLog.rebindConnection has no bound authority peer for boundary proof");
+    }
     const reboundReplicaEntry =
       this.pendingReplicaEntry == null || authority == null
         ? this.pendingReplicaEntry
@@ -631,25 +683,6 @@ export class AuthorityLog implements CoopAuthorityLog {
         this.rebindReplicaSource(source, reboundLocalContext.membershipRevision, authority?.connectionGeneration),
       ] as const,
     );
-    const reboundReplicaBoundaryApproval =
-      this.pendingReplicaBoundaryApproval == null
-        ? null
-        : {
-            predecessor: this.rebindReplicaSource(
-              this.pendingReplicaBoundaryApproval.predecessor,
-              reboundLocalContext.membershipRevision,
-              authority?.connectionGeneration,
-            ),
-            trustedSources: Object.freeze(
-              this.pendingReplicaBoundaryApproval.trustedSources.map(source =>
-                this.rebindReplicaSource(
-                  source,
-                  reboundLocalContext.membershipRevision,
-                  authority?.connectionGeneration,
-                )
-              ),
-            ),
-          };
     const reboundReplicaPredecessor =
       this.pendingReplicaPredecessor == null
         ? null
@@ -657,6 +690,14 @@ export class AuthorityLog implements CoopAuthorityLog {
             this.pendingReplicaPredecessor,
             reboundLocalContext.membershipRevision,
             authority?.connectionGeneration,
+          );
+    const reboundBoundaryCandidate =
+      priorBoundaryCandidate == null || authority == null
+        ? priorBoundaryCandidate
+        : this.rebindReplicaSource(
+            priorBoundaryCandidate,
+            reboundLocalContext.membershipRevision,
+            authority.connectionGeneration,
           );
     const reboundLatestCommittedEntry =
       this.latestCommittedEntry == null
@@ -701,7 +742,9 @@ export class AuthorityLog implements CoopAuthorityLog {
 
     this.localContext = reboundLocalContext;
     this.peerBindings = peers;
+    this.tailProofResponses.clear();
     this.pendingTailRequestFrom = null;
+    this.pendingTailRequestProofId = null;
     this.pendingReplicaEntry = reboundReplicaEntry;
     this.pendingReplicaPredecessor = reboundReplicaPredecessor;
     this.boundaryProofCapture = null;
@@ -710,7 +753,11 @@ export class AuthorityLog implements CoopAuthorityLog {
     for (const [revision, source] of reboundReplicaAuthenticatedSources) {
       this.replicaAuthenticatedSources.set(revision, source);
     }
-    this.pendingReplicaBoundaryApproval = reboundReplicaBoundaryApproval;
+    // A boundary approval is tied to the old authority snapshot and channel generation. It is deliberately
+    // discarded on rebind; the exact pending candidate must obtain a fresh correlated tail proof first.
+    this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaBoundaryProofRefresh =
+      reboundBoundaryCandidate;
     if (priorReplicaProofIdentity != null) {
       revokeAuthorityEntryProofScope(priorReplicaProofIdentity);
     }
@@ -725,13 +772,11 @@ export class AuthorityLog implements CoopAuthorityLog {
       }
     }
 
-    // Preserve a live token only across the exact log-owned rebound object. A shadow retry will revoke this
-    // private handoff and issue a fresh token for the actual object it passes to the live ledger.
-    if (priorReplicaProofIdentity != null && reboundReplicaEntry != null) {
-      this.installReplicaProofScope(
-        reboundReplicaEntry,
-        reboundReplicaBoundaryApproval?.trustedSources ?? [],
-      );
+    // Start the fresh proof under the replacement request/context immediately. The shadow has already
+    // published its rebound pending-entry map before calling us, so synchronous loopback completion can
+    // redrive the exact candidate without waiting for an ordinary lease delimiter.
+    if (reboundBoundaryCandidate != null && !this.beginBoundaryProofCapture(reboundBoundaryCandidate)) {
+      this.pendingReplicaBoundaryProofRefresh = null;
     }
 
     // Publish only after every live lease and replica cursor observes the new binding. The send carrier may
@@ -1116,6 +1161,113 @@ export class AuthorityLog implements CoopAuthorityLog {
     });
   }
 
+  /**
+   * Handle an authenticated replica tail request. Ordinary requests retain their historical redelivery
+   * behavior; a correlated boundary request receives one synchronous manifest, frozen source tail, and
+   * completion frame. The candidate itself is deliberately never used as a proof delimiter.
+   */
+  handleTailRequest(context: CoopFrameContextV2, request: CoopTailRequestBodyV2): void {
+    if (
+      this.disposed
+      || !this.isAuthenticatedPeerContext(context)
+      || !Number.isSafeInteger(request.fromRevision)
+      || request.fromRevision < 0
+    ) {
+      return;
+    }
+    const proofFields = [request.requestId, request.candidateRevision, request.candidateOperationId];
+    const proofFieldCount = proofFields.filter(value => value !== undefined).length;
+    if (proofFieldCount === 0) {
+      for (const entry of this.retained()) {
+        if (entry.revision >= request.fromRevision) {
+          this.sendGuarded({ kind: "deliver", entry });
+        }
+      }
+      return;
+    }
+    if (
+      proofFieldCount !== proofFields.length
+      || !isValidOperationId(request.requestId)
+      || !isValidRevision(request.candidateRevision)
+      || !isValidOperationId(request.candidateOperationId)
+      || request.candidateRevision <= request.fromRevision
+    ) {
+      return;
+    }
+    const peer = this.peerBindings.find(candidatePeer => candidatePeer.seatId === context.senderSeatId);
+    if (peer == null || request.requestId.length === 0 || request.candidateOperationId.length === 0) {
+      return;
+    }
+    const cached = this.tailProofResponses.get(peer.seatId);
+    if (cached != null && cached.requestId === request.requestId) {
+      if (
+        frameContextsEqual(cached.requestContext, context)
+        && cached.fromRevision === request.fromRevision
+        && cached.candidateRevision === request.candidateRevision
+        && cached.candidateOperationId === request.candidateOperationId
+        && frameContextsEqual(cached.authorityContext, this.localContext)
+      ) {
+        this.sendTailProofResponse(cached);
+      }
+      // A request ID is single-use for one authenticated peer. Conflicting reuse fails closed and cannot
+      // replace the immutable response cached for the original request.
+      return;
+    }
+    // A newer request ID replaces the one active response for this peer before a fresh snapshot is built.
+    this.tailProofResponses.delete(peer.seatId);
+    const candidateLease = this.retainedWindow.get(request.candidateRevision);
+    const candidate = candidateLease?.entry;
+    if (
+      candidate == null
+      || candidate.operationId !== request.candidateOperationId
+      || !frameContextsEqual(candidate.context, this.localContext)
+    ) {
+      return;
+    }
+    const snapshot = Object.freeze(
+      this.retained()
+        .filter(entry => entry.revision >= request.fromRevision && entry.revision < request.candidateRevision)
+        .map(entry => entry),
+    );
+    if (snapshot.length > this.retentionCapacity) {
+      return;
+    }
+    const sourceRevisions = Object.freeze(snapshot.map(entry => entry.revision));
+    const proofBase = {
+      requestId: request.requestId,
+      fromRevision: request.fromRevision,
+      candidateRevision: request.candidateRevision,
+      candidateOperationId: request.candidateOperationId,
+      headRevision: this.headRevision,
+      sourceRevisions,
+    } as const;
+    const manifest: CoopTailProofBodyV2 = Object.freeze({ phase: "manifest", ...proofBase });
+    const complete: CoopTailProofBodyV2 = Object.freeze({ phase: "complete", ...proofBase });
+    const response: TailProofResponseCache = Object.freeze({
+      requesterSeatId: peer.seatId,
+      requestContext: Object.freeze({ ...context }),
+      authorityContext: Object.freeze({ ...this.localContext }),
+      requestId: request.requestId,
+      fromRevision: request.fromRevision,
+      candidateRevision: request.candidateRevision,
+      candidateOperationId: request.candidateOperationId,
+      manifest,
+      entries: snapshot,
+      complete,
+    });
+    this.tailProofResponses.set(peer.seatId, response);
+    this.sendTailProofResponse(response);
+  }
+
+  /** Replay one immutable cached response in its original manifest/source/completion order. */
+  private sendTailProofResponse(response: TailProofResponseCache): void {
+    this.sendGuarded({ kind: "tailProof", context: response.authorityContext, body: response.manifest });
+    for (const entry of response.entries) {
+      this.sendGuarded({ kind: "deliver", entry });
+    }
+    this.sendGuarded({ kind: "tailProof", context: response.authorityContext, body: response.complete });
+  }
+
   // ---------------------------------------------------------------------------
   // REPLICA side
   // ---------------------------------------------------------------------------
@@ -1152,9 +1304,14 @@ export class AuthorityLog implements CoopAuthorityLog {
       return { kind: "rejected", reason: "authority-sender-mismatch" };
     }
     if (this.boundaryProofCapture != null) {
+      const candidateDuplicate = this.isBoundaryProofCandidate(entry);
+      const missingFrom = this.boundaryProofCapture.fromRevision;
       const captureResult = this.collectBoundaryProofEntry(entry);
       if (captureResult === "pending") {
-        return { kind: "gap", missingFrom: this.boundaryProofCapture.fromRevision };
+        if (candidateDuplicate) {
+          this.redriveBoundaryProofRequest();
+        }
+        return { kind: "gap", missingFrom };
       }
       if (captureResult === "rejected") {
         return { kind: "rejected", reason: "boundary-proof-failed" };
@@ -1168,10 +1325,30 @@ export class AuthorityLog implements CoopAuthorityLog {
         if (!this.isPendingReplicaEntry(entry)) {
           return { kind: "rejected", reason: "revision-identity-conflict" };
         }
+        if (
+          this.pendingReplicaBoundaryProofRefresh != null
+          && sameReplicaEntry(this.pendingReplicaBoundaryProofRefresh, entry)
+          && this.completedBoundaryProof == null
+        ) {
+          if (this.beginBoundaryProofCapture(entry)) {
+            return { kind: "gap", missingFrom: this.boundaryProofCapture?.fromRevision ?? 1 };
+          }
+          return { kind: "rejected", reason: "boundary-proof-refresh-refused" };
+        }
         return { kind: "duplicate-pending-material" };
       case "duplicate-pending-control":
         if (!this.isPendingReplicaEntry(entry)) {
           return { kind: "rejected", reason: "revision-identity-conflict" };
+        }
+        if (
+          this.pendingReplicaBoundaryProofRefresh != null
+          && sameReplicaEntry(this.pendingReplicaBoundaryProofRefresh, entry)
+          && this.completedBoundaryProof == null
+        ) {
+          if (this.beginBoundaryProofCapture(entry)) {
+            return { kind: "gap", missingFrom: this.boundaryProofCapture?.fromRevision ?? 1 };
+          }
+          return { kind: "rejected", reason: "boundary-proof-refresh-refused" };
         }
         return { kind: "duplicate-pending-control" };
       case "gap": {
@@ -1208,14 +1385,17 @@ export class AuthorityLog implements CoopAuthorityLog {
           && !this.reconcileReplicaAuthenticatedSources(boundaryApproval.capturedSources, entry.subsumes)
         ) {
           this.completedBoundaryProof = null;
+          this.revokeReplicaProofToken();
           return { kind: "rejected", reason: "replica-proof-frontier-conflict" };
         }
         if (!this.hasReplicaSourceRoom(entry, boundaryApproval != null)) {
           this.completedBoundaryProof = null;
+          this.revokeReplicaProofToken();
           return { kind: "rejected", reason: "replica-proof-capacity" };
         }
         if (!this.ledger.markReceived(entry.revision)) {
           this.completedBoundaryProof = null;
+          this.revokeReplicaProofToken();
           return { kind: "rejected", reason: "replica-ledger-refused-admission" };
         }
         if (boundaryApproval != null) {
@@ -1226,12 +1406,14 @@ export class AuthorityLog implements CoopAuthorityLog {
             this.replicaAuthenticatedSources.delete(revision);
           }
           this.pendingReplicaBoundaryApproval = boundaryApproval;
+          this.pendingReplicaBoundaryProofRefresh = null;
         } else {
           this.pendingReplicaBoundaryApproval = null;
+          this.pendingReplicaBoundaryProofRefresh = null;
         }
         this.rememberReplicaSource(entry, boundaryApproval != null);
         this.pendingReplicaSuccessorControl = null;
-        this.pendingReplicaPredecessor = null;
+        this.pendingReplicaPredecessor = boundaryApproval?.predecessor ?? null;
         this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
         this.completedBoundaryProof = null;
         // The live replica ledger receives this same object immediately after admit(). The scope contains
@@ -1249,12 +1431,30 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (this.disposed || !this.isPendingReplicaEntry(entry)) {
       return false;
     }
-    const approval = this.pendingReplicaBoundaryApproval;
+    const completed =
+      this.completedBoundaryProof != null && sameReplicaEntry(this.completedBoundaryProof.candidate, entry)
+        ? this.completedBoundaryProof
+        : null;
+    if (this.pendingReplicaBoundaryProofRefresh != null && completed == null) {
+      return false;
+    }
+    const approval =
+      this.pendingReplicaBoundaryProofRefresh != null && completed != null
+        ? {
+            predecessor: completed.predecessor,
+            trustedSources: completed.trustedSources,
+          }
+        : this.pendingReplicaBoundaryApproval;
     if (
       approval != null
       && !boundarySupersessionAllowsSuccessorEntry(approval.predecessor, entry, approval.trustedSources)
     ) {
       return false;
+    }
+    if (this.pendingReplicaBoundaryProofRefresh != null && completed != null) {
+      this.pendingReplicaBoundaryApproval = approval;
+      this.pendingReplicaBoundaryProofRefresh = null;
+      this.completedBoundaryProof = null;
     }
     this.installReplicaProofScope(entry, approval?.trustedSources ?? []);
     return true;
@@ -1285,9 +1485,11 @@ export class AuthorityLog implements CoopAuthorityLog {
       // Pure-shadow admission has no live ledger callback to consume the one-shot scope; mechanical
       // completion is the terminal point for any deferred boundary approval in that mode.
       this.pendingReplicaBoundaryApproval = null;
+      this.pendingReplicaBoundaryProofRefresh = null;
       this.pendingReplicaEntry = null;
       if (this.pendingTailRequestFrom != null && this.ledger.controlInstalledThrough() >= this.pendingTailRequestFrom) {
         this.pendingTailRequestFrom = null;
+        this.pendingTailRequestProofId = null;
       }
     }
     return advanced;
@@ -1326,6 +1528,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return;
     }
+    this.tailProofResponses.clear();
     // Replica: fast-forward the applied cursor past any gap the snapshot filled.
     this.ledger.adoptFrontier(revision);
     if (this.replicaProofEntryIdentity != null) {
@@ -1333,9 +1536,12 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.replicaProofEntryIdentity = null;
     this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaBoundaryProofRefresh = null;
     this.pendingReplicaPredecessor = null;
     this.boundaryProofCapture = null;
     this.completedBoundaryProof = null;
+    this.pendingTailRequestFrom = null;
+    this.pendingTailRequestProofId = null;
     this.pendingReplicaEntry = null;
     this.replicaAuthenticatedSources.clear();
     // A high-water starts a new bounded proof epoch. Future boundaries refresh from this known floor.
@@ -1396,14 +1602,18 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return false;
     }
+    this.tailProofResponses.clear();
     if (this.replicaProofEntryIdentity != null) {
       revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
     }
     this.replicaProofEntryIdentity = null;
     this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaBoundaryProofRefresh = null;
     this.pendingReplicaPredecessor = null;
     this.boundaryProofCapture = null;
     this.completedBoundaryProof = null;
+    this.pendingTailRequestFrom = null;
+    this.pendingTailRequestProofId = null;
     this.replicaAuthenticatedSources.clear();
     this.replicaProofEpochStartRevision = entry.revision;
     this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
@@ -1430,13 +1640,16 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.stopLease(lease);
     }
     this.retainedWindow.clear();
+    this.tailProofResponses.clear();
     this.pendingTailRequestFrom = null;
+    this.pendingTailRequestProofId = null;
     if (this.replicaProofEntryIdentity != null) {
       revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
     }
     this.replicaProofEntryIdentity = null;
     this.replicaAuthenticatedSources.clear();
     this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaBoundaryProofRefresh = null;
     this.pendingReplicaPredecessor = null;
     this.boundaryProofCapture = null;
     this.completedBoundaryProof = null;
@@ -1475,6 +1688,24 @@ export class AuthorityLog implements CoopAuthorityLog {
   // Internals
   // ---------------------------------------------------------------------------
 
+  /** Authenticate a tail requester against the current session, membership, peer, and connection generation. */
+  private isAuthenticatedPeerContext(context: CoopFrameContextV2): boolean {
+    if (
+      !isValidFrameContext(context)
+      || this.localContext.senderSeatId !== this.localContext.authoritySeatId
+      || !isSameSessionIdentity(context, this.localContext)
+      || context.sessionEpoch !== this.localContext.sessionEpoch
+      || context.membershipRevision !== this.localContext.membershipRevision
+      || context.authoritySeatId !== this.localContext.authoritySeatId
+      || context.senderSeatId === this.localContext.senderSeatId
+      || context.senderSeatId === context.authoritySeatId
+    ) {
+      return false;
+    }
+    const peer = this.peerBindings.find(candidate => candidate.seatId === context.senderSeatId);
+    return peer != null && context.connectionGeneration === peer.connectionGeneration;
+  }
+
   /** Snapshot the retained proof set plus any frozen boundary sources for one synchronous local reservation. */
   private entryProofScope(boundaryApproval: AuthorityBoundaryApproval | null): AuthorityEntryProofScope {
     const boundarySources = boundaryApproval?.trustedSources ?? null;
@@ -1494,10 +1725,19 @@ export class AuthorityLog implements CoopAuthorityLog {
     });
   }
 
-  /** Start a bounded retained-tail proof refresh without touching the ordered mechanical frontier. */
+  /** Start a bounded correlated retained-tail proof refresh without touching the ordered mechanical frontier. */
   private beginBoundaryProofCapture(candidate: CoopAuthorityEntry): boolean {
-    const pending = this.pendingReplicaSuccessorControl;
-    const predecessor = this.pendingReplicaPredecessor
+    const pending =
+      this.pendingReplicaSuccessorControl
+      ?? (this.pendingReplicaPredecessor == null
+        ? null
+        : {
+            revision: this.pendingReplicaPredecessor.revision,
+            operationId: this.pendingReplicaPredecessor.operationId,
+            control: this.pendingReplicaPredecessor.nextControl,
+          });
+    const predecessor =
+      this.pendingReplicaPredecessor
       ?? (pending == null ? undefined : this.replicaAuthenticatedSources.get(pending.revision));
     if (
       pending == null
@@ -1507,69 +1747,171 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return false;
     }
-    const fromRevision = Math.max(1, this.replicaProofEpochStartRevision);
+    // Never let a recovered epoch floor equal/exceed the exact successor candidate. The predecessor seed
+    // carries an already-retired predecessor, while retained sources still use this bounded floor.
+    const fromRevision = Math.max(
+      0,
+      Math.min(this.replicaProofEpochStartRevision, predecessor.revision),
+    );
+    const requestId = `${this.ownerBase}:boundary-proof:${++this.boundaryProofRequestSequence}`;
+    const capturedCandidate = freezeAuthorityEntry(cloneEntry(candidate));
     this.completedBoundaryProof = null;
+    this.revokeReplicaProofToken();
     this.boundaryProofCapture = {
-      candidate,
+      candidate: capturedCandidate,
       fromRevision,
-      // The predecessor may have retired on the authority after its exact control was installed locally;
-      // keep that authenticated frontier image as the seed, then append the currently retained tail.
-      sources: new Map<number, CoopAuthorityEntry>([[predecessor.revision, predecessor]]),
+      requestId,
+      requestContext: Object.freeze({ ...this.localContext }),
+      authorityContext: Object.freeze({ ...capturedCandidate.context }),
+      predecessorSeed: freezeAuthorityEntry(cloneEntry(predecessor)),
+      manifest: null,
+      sources: new Map<number, CoopAuthorityEntry>(),
     };
-    this.requestTailOnce(fromRevision);
+    this.requestTailOnce(fromRevision, {
+      requestId,
+      candidateRevision: capturedCandidate.revision,
+      candidateOperationId: capturedCandidate.operationId,
+    });
     return true;
   }
 
-  /** Collect only retained-tail images; the repeated candidate is the exact delimiter that closes capture. */
-  private collectBoundaryProofEntry(entry: CoopAuthorityEntry): "pending" | "completed" | "rejected" {
+  /** Collect only manifest-listed source images; candidate redelivery is always parked and inert. */
+  private collectBoundaryProofEntry(entry: CoopAuthorityEntry): "pending" | "rejected" {
     const capture = this.boundaryProofCapture;
     if (capture == null) {
-      return "completed";
-    }
-    if (entry.revision > capture.candidate.revision) {
       return "pending";
     }
-    if (entry.revision < capture.candidate.revision) {
-      if (entry.revision < capture.fromRevision) {
-        return "pending";
-      }
-      const prior = capture.sources.get(entry.revision);
-      if (prior != null) {
-        return sameReplicaEntry(prior, entry) ? "pending" : "rejected";
-      }
-      // The seeded predecessor may have retired before this request, so one exact source can sit outside
-      // the currently retained tail. It is bounded and must be subsumed before the candidate is cached.
-      if (capture.sources.size >= this.retentionCapacity + 1) {
-        this.boundaryProofCapture = null;
-        this.pendingTailRequestFrom = null;
+    if (!frameContextsEqual(entry.context, capture.authorityContext)) {
+      this.failBoundaryProofCapture();
+      return "rejected";
+    }
+    if (entry.revision === capture.candidate.revision) {
+      if (!sameReplicaEntry(capture.candidate, entry)) {
+        this.failBoundaryProofCapture();
         return "rejected";
       }
-      capture.sources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
+      // The authority's ordinary candidate lease is not a proof delimiter. Keep it parked until the exact
+      // matching completion frame arrives.
       return "pending";
     }
-    if (!sameReplicaEntry(capture.candidate, entry)) {
-      this.boundaryProofCapture = null;
-      this.pendingTailRequestFrom = null;
+    const manifest = capture.manifest;
+    if (manifest == null || !manifest.sourceRevisions.includes(entry.revision)) {
+      this.failBoundaryProofCapture();
       return "rejected";
     }
-    const predecessor = this.pendingReplicaPredecessor
-      ?? this.replicaAuthenticatedSources.get(this.pendingReplicaSuccessorControl?.revision ?? -1);
+    const prior = capture.sources.get(entry.revision);
+    if (prior != null) {
+      return sameReplicaEntry(prior, entry) ? "pending" : (this.failBoundaryProofCapture(), "rejected");
+    }
+    if (capture.sources.size >= this.retentionCapacity) {
+      this.failBoundaryProofCapture();
+      return "rejected";
+    }
+    capture.sources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
+    return "pending";
+  }
+
+  /** Accept one exact manifest/completion frame with an explicit semantic disposition. */
+  acceptBoundaryProofFrame(
+    context: CoopFrameContextV2,
+    body: CoopTailProofBodyV2,
+  ): AuthorityBoundaryProofFrameDisposition {
+    const capture = this.boundaryProofCapture;
+    if (this.disposed) {
+      return { kind: "ignored", reason: "disposed" };
+    }
+    if (capture == null) {
+      return { kind: "ignored", reason: "no active boundary-proof request" };
+    }
+    if (
+      !frameContextsEqual(capture.requestContext, this.localContext)
+      || !frameContextsEqual(context, capture.authorityContext)
+      || body.requestId !== capture.requestId
+      || body.fromRevision !== capture.fromRevision
+      || body.candidateRevision !== capture.candidate.revision
+      || body.candidateOperationId !== capture.candidate.operationId
+    ) {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof request/context metadata mismatch" };
+    }
+    if (body.phase !== "manifest" && body.phase !== "complete") {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof phase malformed" };
+    }
+    if (body.phase === "manifest") {
+      if (capture.manifest != null) {
+        if (!sameTailProofBody(capture.manifest, body)) {
+          this.failBoundaryProofCapture();
+          return { kind: "rejected", reason: "boundary-proof manifest metadata conflict" };
+        }
+        return { kind: "pending" };
+      }
+      capture.manifest = cloneTailProofBody(body);
+      return { kind: "pending" };
+    }
+    const manifest = capture.manifest;
+    if (manifest == null || !sameTailProofBody(manifest, body)) {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof complete-before-manifest or metadata mismatch" };
+    }
+    if (
+      capture.sources.size !== manifest.sourceRevisions.length
+      || manifest.sourceRevisions.some(revision => !capture.sources.has(revision))
+    ) {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof source snapshot incomplete" };
+    }
     const sources = [...capture.sources.values()].sort((left, right) => left.revision - right.revision);
-    const proof = this.evaluateReplicaBoundary(entry, predecessor, sources);
+    const predecessor = capture.predecessorSeed;
+    const seededSource = sources.find(source => source.revision === predecessor.revision);
+    if (seededSource != null && !sameReplicaEntry(seededSource, predecessor)) {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof predecessor seed conflict" };
+    }
+    const completeSources =
+      seededSource == null
+        ? [predecessor, ...sources].sort((left, right) => left.revision - right.revision)
+        : sources;
+    if (completeSources.length > this.retentionCapacity) {
+      this.failBoundaryProofCapture();
+      return { kind: "rejected", reason: "boundary-proof source capacity exceeded" };
+    }
+    const proof = this.evaluateReplicaBoundary(capture.candidate, predecessor, completeSources);
+    const candidate = capture.candidate;
     this.boundaryProofCapture = null;
     this.pendingTailRequestFrom = null;
+    this.pendingTailRequestProofId = null;
     if (proof == null) {
-      return "rejected";
+      this.completedBoundaryProof = null;
+      this.revokeReplicaProofToken();
+      return { kind: "rejected", reason: "boundary-proof predicate rejected exact snapshot" };
     }
     this.completedBoundaryProof = {
-      candidate: entry,
+      candidate,
       predecessor: proof.predecessor,
       trustedSources: proof.trustedSources,
       capturedSources: Object.freeze(
-        sources.map(source => freezeAuthorityEntry(cloneEntry(source))),
+        completeSources.map(source => freezeAuthorityEntry(cloneEntry(source))),
       ),
     };
-    return "completed";
+    return { kind: "completed", candidate };
+  }
+
+  /** Discard a completed proof when the wiring cannot find its exact parked candidate. */
+  discardBoundaryProof(): void {
+    this.failBoundaryProofCapture();
+    this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaBoundaryProofRefresh = null;
+  }
+
+  /** Fail closed and revoke every token held by the discarded proof epoch. */
+  private failBoundaryProofCapture(): void {
+    this.boundaryProofCapture = null;
+    this.pendingTailRequestFrom = null;
+    this.pendingTailRequestProofId = null;
+    this.completedBoundaryProof = null;
+    this.pendingReplicaBoundaryProofRefresh = null;
+    this.revokeReplicaProofToken();
   }
 
   /** Full canonical boundary predicate over exactly the captured retained frontier. */
@@ -1603,6 +1945,11 @@ export class AuthorityLog implements CoopAuthorityLog {
   /** True while a retained-tail refresh is parked; no live material/control path may release the predecessor. */
   hasBoundaryProofCapture(): boolean {
     return this.boundaryProofCapture != null;
+  }
+
+  /** True only for the exact candidate whose frozen proof completed and is awaiting mechanical redrive. */
+  hasCompletedBoundaryProofCandidate(entry: CoopAuthorityEntry): boolean {
+    return this.completedBoundaryProof != null && sameReplicaEntry(this.completedBoundaryProof.candidate, entry);
   }
 
   /** Only the original exact candidate is retained for a hot-rejoin retry during a parked capture. */
@@ -1682,6 +2029,14 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.replicaAuthenticatedSources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
   }
 
+  /** Revoke the current live handoff without changing the mechanical frontier. */
+  private revokeReplicaProofToken(): void {
+    if (this.replicaProofEntryIdentity != null) {
+      revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
+    }
+    this.replicaProofEntryIdentity = null;
+  }
+
   /** Issue the only replica bypass capability; scope identity and body stay tied to this exact object. */
   private installReplicaProofScope(
     entry: CoopAuthorityEntry,
@@ -1728,6 +2083,7 @@ export class AuthorityLog implements CoopAuthorityLog {
         }
         this.replicaProofEpochStartRevision = entry.revision;
         this.pendingReplicaBoundaryApproval = null;
+        this.pendingReplicaBoundaryProofRefresh = null;
       }
     };
     replicaProofStates.set(scope, state);
@@ -1850,13 +2206,45 @@ export class AuthorityLog implements CoopAuthorityLog {
     );
   }
 
-  /** Emit at most one request for an unchanged unfinished mechanical frontier. */
-  private requestTailOnce(missingFrom: number): void {
-    if (this.pendingTailRequestFrom === missingFrom) {
+  /** Emit at most one ordinary request, or one fresh correlated proof request, for an unfinished frontier. */
+  private requestTailOnce(
+    missingFrom: number,
+    proof?: { readonly requestId: string; readonly candidateRevision: number; readonly candidateOperationId: string },
+  ): void {
+    if (
+      this.pendingTailRequestFrom === missingFrom
+      && (proof == null
+        ? this.pendingTailRequestProofId == null
+        : this.pendingTailRequestProofId === proof.requestId)
+    ) {
       return;
     }
     this.pendingTailRequestFrom = missingFrom;
-    this.sendGuarded({ kind: "requestTail", context: this.localContext, missingFrom });
+    this.pendingTailRequestProofId = proof?.requestId ?? null;
+    this.sendGuarded({
+      kind: "requestTail",
+      context: this.localContext,
+      missingFrom,
+      ...(proof == null ? {} : proof),
+    });
+  }
+
+  /** Re-emit the active proof request with the same correlation after a lease duplicate wakes the replica. */
+  private redriveBoundaryProofRequest(): void {
+    const capture = this.boundaryProofCapture;
+    if (this.disposed || capture == null) {
+      return;
+    }
+    this.pendingTailRequestFrom = capture.fromRevision;
+    this.pendingTailRequestProofId = capture.requestId;
+    this.sendGuarded({
+      kind: "requestTail",
+      context: capture.requestContext,
+      missingFrom: capture.fromRevision,
+      requestId: capture.requestId,
+      candidateRevision: capture.candidate.revision,
+      candidateOperationId: capture.candidate.operationId,
+    });
   }
 
   /** Retire one revision: stop its lease (cancel timers) and drop it from retention. Returns true iff present. */
@@ -1876,6 +2264,11 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.stopLease(lease);
     this.retainedWindow.delete(revision);
+    for (const [seatId, response] of this.tailProofResponses) {
+      if (response.candidateRevision === revision) {
+        this.tailProofResponses.delete(seatId);
+      }
+    }
     this.exhaustedRevisionSet.delete(revision);
     return true;
   }
@@ -2092,6 +2485,30 @@ function sameAuthorityCommitBody(left: CoopAuthorityEntry, right: Omit<CoopAutho
 
 function sameRevisionList(left: readonly number[], right: readonly number[]): boolean {
   return left.length === right.length && left.every((revision, index) => revision === right[index]);
+}
+
+/** Manifest and completion must carry byte-identical snapshot metadata; only phase may differ. */
+function sameTailProofBody(left: CoopTailProofBodyV2, right: CoopTailProofBodyV2): boolean {
+  return (
+    left.requestId === right.requestId
+    && left.fromRevision === right.fromRevision
+    && left.candidateRevision === right.candidateRevision
+    && left.candidateOperationId === right.candidateOperationId
+    && left.headRevision === right.headRevision
+    && sameRevisionList(left.sourceRevisions, right.sourceRevisions)
+  );
+}
+
+function cloneTailProofBody(body: CoopTailProofBodyV2): CoopTailProofBodyV2 {
+  return Object.freeze({
+    phase: body.phase,
+    requestId: body.requestId,
+    fromRevision: body.fromRevision,
+    candidateRevision: body.candidateRevision,
+    candidateOperationId: body.candidateOperationId,
+    headRevision: body.headRevision,
+    sourceRevisions: Object.freeze([...body.sourceRevisions]),
+  });
 }
 
 /** Structurally clone an opaque JSON payload so retention is independent of the caller's object. */
