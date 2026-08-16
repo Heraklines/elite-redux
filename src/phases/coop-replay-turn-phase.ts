@@ -221,7 +221,8 @@ export class CoopReplayTurnPhase extends Phase {
    * GameOver never emits that normal turn-resolution carrier, so this exact wait is otherwise impossible.
    */
   public abortIfRetainedTerminalSuperseded(settledTurn: number, reason: string): boolean {
-    if (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority())) {
+    const exactGameOver = coopRetainedGameOverSupersedesReplay(this.sourceWave, this.turn);
+    if (exactGameOver && (this.turn > settledTurn || (this.turn === settledTurn && this.isAwaitingAuthority()))) {
       return this.abortPhantom(reason);
     }
     // Deferred WON settlement (won-by-faint on the winning turn): the automatic victory boundary settles on
@@ -233,7 +234,7 @@ export class CoopReplayTurnPhase extends Phase {
     // external wake so the source-turn replay dissolves the instant the WAVE_ADVANCE lands.
     if (
       this.isAwaitingAuthority()
-      && coopRetainedWinSupersedesReplay(globalScene.currentBattle?.waveIndex ?? 0, this.turn)
+      && coopRetainedWinSupersedesReplay(this.sourceWave, this.turn)
     ) {
       return this.abortPhantom(reason);
     }
@@ -387,7 +388,7 @@ export class CoopReplayTurnPhase extends Phase {
         // final presentation phase. Once every ordered live event has drained, that exact admitted terminal
         // is the completion fence: waiting for a turnResolution here can never succeed. End into the
         // already-appended CoopWaveAdvanceBoundaryPhase; do not synthesize a finalize or advance a turn.
-        const wave = globalScene.currentBattle?.waveIndex ?? 0;
+        const wave = this.sourceWave;
         if (coopRetainedGameOverSupersedesReplay(wave, this.turn)) {
           coopWarn(
             "replay",
@@ -596,6 +597,7 @@ export class CoopReplayTurnPhase extends Phase {
               if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
                 return;
               }
+              retryCoopV2PendingAuthorityAtSafeBoundary();
               coopLog(
                 "replay",
                 `guest replacement rev=${envelope.authorityRevision ?? "?"} installed next picker `
@@ -722,6 +724,7 @@ export class CoopReplayTurnPhase extends Phase {
             if (!streamer.acknowledgeReplacement(envelope, "continuationReady")) {
               return;
             }
+            retryCoopV2PendingAuthorityAtSafeBoundary();
             if (waveWon && coopHasPendingWaveAdvance()) {
               // Message-order A (WAVE_ADVANCE landed BEFORE this checkpoint): coop-runtime already queued the
               // safe-boundary CoopWaveAdvanceBoundaryPhase behind us. Re-parking (continue -> awaitTurn) would

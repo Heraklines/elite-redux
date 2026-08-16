@@ -733,6 +733,13 @@ export function commitFaintSwitchAuthorityResult(
 ): CoopFaintSwitchCommitReceipt | null {
   const replacementCutover = getActiveCoopV2ReplacementCutover();
   if (params.localRole === "host" && replacementCutover != null) {
+    // A half-wiped owner has no replacement transaction to commit. Keep the legacy no-pick
+    // close path in charge; a typed null image must never create a V2 checkpoint obligation.
+    const resolutionCode = params.payload.data[COOP_FAINT_SWITCH_RESOLUTION_INDEX];
+    const speciesId = params.speciesId ?? params.payload.data[1] ?? 0;
+    if (resolutionCode === COOP_FAINT_SWITCH_RESOLUTION_NONE || params.payload.partySlot < 0 || !(speciesId > 0)) {
+      return { operationId: null };
+    }
     try {
       const staged = replacementCutover.stageHostReplacement(
         replacementTapFromParams(params, replacementCutover.authenticatedFrameContext.sessionEpoch),
@@ -865,13 +872,10 @@ export function materializeCoopV2ReplacementPickerTerminal(
   }
   const terminal = s.pickerTerminals.get(address.fieldIndex);
   if (terminal == null) {
-    // An explicit no-legal-replacement terminal is produced for a wiped owner half. The renderer correctly
-    // does not open a modal with zero legal choices, so absence of a terminal is the exact material proof,
-    // not a reason to retain this entry forever.
+    // V2 never stages a no-legal-replacement image. A null selection is therefore not a valid
+    // replacement transaction and must remain fail-closed if one is received from a stale peer.
     if (image.selected === null) {
-      rememberSettledPicker(s, key);
-      settleCoopV2FaintSwitchProposalRetry(s, image, localSeatId);
-      return true;
+      return false;
     }
     return false;
   }

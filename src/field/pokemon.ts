@@ -6116,7 +6116,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // value at the universal mutation seam so moves, berries, terrain, abilities, drain effects, and
     // linked-heal mechanics cannot silently jump only on the guest's end-of-turn checkpoint. Emit before
     // Soulmate recursively copies the heal so the immutable event order matches the host's mutation order.
-    if (healAmount > 0 && isCoopRecording()) {
+    if (healAmount > 0 && this.isOnField() && this.getBattlerIndex() !== BattlerIndex.ATTACKER && isCoopRecording()) {
       recordCoopEvent({
         k: "hp",
         bi: this.getBattlerIndex(),

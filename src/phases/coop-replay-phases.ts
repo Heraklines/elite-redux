@@ -1010,9 +1010,9 @@ export class CoopSwitchReplayPhase extends Phase {
       settleCoopPresentationOutcome(this.outcomeToken, outcome);
       try {
         if (incoming != null) {
-          incoming.setVisible(true);
-          incoming.getSprite()?.setVisible(true);
-          incoming.getSprite()?.clearTint();
+          incoming.setVisible(true).setAlpha(1);
+          incoming.getSprite()?.setVisible(true).setAlpha(1).clearTint();
+          incoming.getTintSprite()?.setVisible(false).setAlpha(1).clearTint();
           incoming.showInfo();
           void incoming.updateInfo();
         }
@@ -1039,15 +1039,45 @@ export class CoopSwitchReplayPhase extends Phase {
         return;
       }
       const party = player ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-      const exactSlot = party.findIndex(mon => mon?.id === this.presentation.pokemonId);
+      if (this.presentation.actor.pokemonId !== this.presentation.pokemonId
+        || (player ? "player" : "enemy") !== this.presentation.actor.side) {
+        coopWarn("replay", `switch presentation actor/address mismatch bi=${this.presentation.bi}`);
+        finish({ kind: "failed", reason: "switch-actor-address-mismatch", actorFingerprint });
+        return;
+      }
+      const matchingActors = party.filter(mon => mon?.id === this.presentation.pokemonId);
+      const exactSlot = matchingActors.length === 1
+        ? party.indexOf(matchingActors[0])
+        : -1;
       const partySlot = exactSlot;
-      if (partySlot < 0 || partySlot === located.position) {
+      const candidate = partySlot < 0 ? undefined : party[partySlot];
+      if (
+        candidate == null
+        || candidate.species?.speciesId !== this.presentation.speciesId
+        || candidate.id !== this.presentation.pokemonId
+      ) {
         coopWarn(
           "replay",
           `switch presentation could not resolve incoming id=${this.presentation.pokemonId} `
             + `species=${this.presentation.speciesId} slot=${this.presentation.partySlot}`,
         );
         finish({ kind: "failed", reason: "switch-incoming-identity-unresolved", actorFingerprint });
+        return;
+      }
+      if (partySlot === located.position) {
+        const fieldActor = globalScene.getField()[this.presentation.bi];
+        if (
+          fieldActor !== candidate
+          || candidate.getBattlerIndex() !== this.presentation.bi
+          || globalScene.field.getIndex(candidate) < 0
+          || !candidate.isOnField()
+        ) {
+          coopWarn("replay", `switch presentation seated actor failed exact address bi=${this.presentation.bi}`);
+          finish({ kind: "failed", reason: "switch-seated-actor-address-mismatch", actorFingerprint });
+          return;
+        }
+        incoming = candidate;
+        finish({ kind: "rendered", actorFingerprint });
         return;
       }
       const outgoing = party[located.position];

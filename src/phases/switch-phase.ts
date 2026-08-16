@@ -452,11 +452,6 @@ export class SwitchPhase extends BattlePhase {
             failCoopSharedSession("The authoritative no-replacement choice could not be retained.");
             return;
           }
-          if (receipt.v2Staged === true) {
-            // No SwitchSummonPhase follows a half-wipe. Queue the post-resolution capture explicitly so
-            // the typed null selection and complete sealed-slot carrier cannot remain staged forever.
-            scene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
-          }
         }
         coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);
         return super.end();
@@ -487,6 +482,17 @@ export class SwitchPhase extends BattlePhase {
         (slotIndex: number, option: PartyOption) => {
           if (!ownerBoundaryStillLive()) {
             failCoopSharedSession("The owner replacement flow lost its exact phase boundary before committing.");
+            return;
+          }
+          if (
+            authoritative
+            && isCoopV2ReplacementCutoverActive()
+            && (ownerRuntime == null
+              || getCoopRuntime() !== ownerRuntime
+              || this.coopV2ControlOperationId == null
+              || !notifyCoopV2InteractionSurfaceReady(ownerRuntime))
+          ) {
+            failCoopSharedSession("The owner replacement picker lost its exact public-surface proof.");
             return;
           }
           const isBaton = option === PartyOption.PASS_BATON;
@@ -612,6 +618,16 @@ export class SwitchPhase extends BattlePhase {
       this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
       fieldIndex,
       (slotIndex: number, option: PartyOption) => {
+        if (
+          versusRuntime != null
+          && (getCoopRuntime() !== versusRuntime
+            || globalScene.phaseManager.getCurrentPhase() !== this
+            || this.coopV2ControlOperationId == null
+            || !notifyCoopV2InteractionSurfaceReady(versusRuntime))
+        ) {
+          failCoopSharedSession("The Showdown replacement picker lost its exact public-surface proof.");
+          return;
+        }
         if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
           if (!this.stageVersusHostOwnReplacement(slotIndex)) {
             return;

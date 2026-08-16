@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { replacementOperationId } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
+import { isCoopV2ReplacementCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-replacement";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   addressCoopFaintSwitchChoiceData,
@@ -241,6 +242,16 @@ export class CoopGuestFaintSwitchPhase extends Phase {
         this.fieldIndex,
         (slotIndex: number) => {
           if (settled) {
+            return;
+          }
+          if (
+            isCoopV2ReplacementCutoverActive()
+            && (getCoopRuntime() !== runtime
+              || globalScene.phaseManager.getCurrentPhase() !== this
+              || this.coopV2ControlOperationId !== controlOperationId
+              || !notifyCoopV2InteractionSurfaceReady(runtime))
+          ) {
+            failCoopSharedSession("The guest replacement picker lost its exact public-surface proof.");
             return;
           }
           settled = true;
