@@ -47,6 +47,8 @@ const CTX: CoopFrameContextV2 = {
   connectionGeneration: 1,
 };
 
+const BOUNDARY_PROOF_REQUEST_ID = `authority-v2:${CTX.sessionId}:seat${CTX.senderSeatId}:boundary-proof:1`;
+
 const CTX_FIELDS: readonly (keyof CoopFrameContextV2)[] = [
   "sessionId",
   "runId",
@@ -87,7 +89,7 @@ const FRAMES: Record<CoopFrameTypeV2, CoopFrameV2> = {
     ctx: CTX,
     body: {
       fromRevision: 2,
-      requestId: "tail-proof-1",
+      requestId: BOUNDARY_PROOF_REQUEST_ID,
       candidateRevision: 5,
       candidateOperationId: "op-1",
     },
@@ -98,7 +100,7 @@ const FRAMES: Record<CoopFrameTypeV2, CoopFrameV2> = {
     ctx: CTX,
     body: {
       phase: "manifest",
-      requestId: "tail-proof-1",
+      requestId: BOUNDARY_PROOF_REQUEST_ID,
       fromRevision: 2,
       candidateRevision: 5,
       candidateOperationId: "op-1",
@@ -250,7 +252,7 @@ describe("authority-v2 correlated boundary-tail frame bodies", () => {
     ctx: CTX,
     body: {
       fromRevision: 1,
-      requestId: "proof-request-1",
+      requestId: BOUNDARY_PROOF_REQUEST_ID,
       candidateRevision: 4,
       candidateOperationId: "candidate-4",
     },
@@ -258,7 +260,7 @@ describe("authority-v2 correlated boundary-tail frame bodies", () => {
 
   const proofBody = {
     phase: "manifest" as const,
-    requestId: "proof-request-1",
+    requestId: BOUNDARY_PROOF_REQUEST_ID,
     fromRevision: 1,
     candidateRevision: 4,
     candidateOperationId: "candidate-4",
