@@ -338,6 +338,7 @@ interface TailProofResponseCache {
 
 interface RejectedTailProofRequestCache {
   readonly kind: "rejected";
+  readonly candidateRevision: number;
 }
 
 type TailProofRequestCache = TailProofResponseCache | RejectedTailProofRequestCache;
@@ -412,9 +413,11 @@ function allPeersReached(lease: DeliveryLease, requiredStage: number): boolean {
   return [...lease.peerStages.values()].every(peer => peer.stage >= requiredStage);
 }
 
-/** Live counts for the no-orphan-timer + bounded-retention invariants (asserted directly in tests). */
+/** Live counts for no-orphan timers plus bounded entry/proof retention (asserted directly in tests). */
 export interface AuthorityLogDiagnostics {
   readonly retainedEntries: number;
+  readonly retiredBoundarySources: number;
+  readonly tailProofResponses: number;
   readonly deliveryLeases: number;
   readonly activeDeliveryTimers: number;
   readonly receivedThrough: number;
@@ -495,7 +498,7 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
   /** AUTHORITY: frozen retired entries that may still be exact sources for a later boundary proof. */
   private readonly retiredBoundarySources = new Map<number, CoopAuthorityEntry>();
-  /** AUTHORITY: immutable request-ID outcomes retained for the complete authenticated channel lifecycle. */
+  /** AUTHORITY: immutable request-ID outcomes retained only while their exact candidate remains live. */
   private readonly tailProofResponses = new Map<number, Map<string, TailProofRequestCache>>();
   private tailProofResponseCount = 0;
   /** REPLICA: separate received, material-applied, and control-installed ordering frontiers. */
@@ -1237,6 +1240,17 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (peer == null || request.requestId.length === 0 || request.candidateOperationId.length === 0) {
       return;
     }
+    // Invalid/stale candidate floods consume no request-ID capacity. A valid request is bound to the exact
+    // currently retained authority entry before either an existing response is replayed or a new ID counted.
+    const candidateLease = this.retainedWindow.get(request.candidateRevision);
+    const candidate = candidateLease?.entry;
+    if (
+      candidate == null
+      || candidate.operationId !== request.candidateOperationId
+      || !frameContextsEqual(candidate.context, this.localContext)
+    ) {
+      return;
+    }
     let peerResponses = this.tailProofResponses.get(peer.seatId);
     const cached = peerResponses?.get(request.requestId);
     if (cached != null) {
@@ -1253,11 +1267,11 @@ export class AuthorityLog implements CoopAuthorityLog {
         this.sendTailProofResponse(cached);
       }
       // Conflicting reuse rejects only this invocation. Preserve a successful immutable response so every
-      // later exact replay of the original metadata receives the same frozen bytes for the full lifecycle.
+      // later exact replay receives the same frozen bytes while that exact candidate remains retained.
       return;
     }
-    // Reserve every new authenticated ID before consulting mutable retained state. At capacity, all new IDs
-    // remain rejected until hot rebind/dispose clears the lifecycle cache; no evict-and-recompute is possible.
+    // The hard cap covers simultaneously live, candidate-authenticated request IDs. Candidate retirement
+    // removes all of its outcomes, so ordinary sequential boundaries cannot permanently consume capacity.
     if (this.tailProofResponseCount >= this.retentionCapacity) {
       return;
     }
@@ -1265,19 +1279,24 @@ export class AuthorityLog implements CoopAuthorityLog {
       peerResponses = new Map<string, TailProofRequestCache>();
       this.tailProofResponses.set(peer.seatId, peerResponses);
     }
-    peerResponses.set(request.requestId, Object.freeze({ kind: "rejected" }));
+    peerResponses.set(
+      request.requestId,
+      Object.freeze({ kind: "rejected", candidateRevision: candidate.revision }),
+    );
     this.tailProofResponseCount += 1;
-    const candidateLease = this.retainedWindow.get(request.candidateRevision);
-    const candidate = candidateLease?.entry;
-    if (
-      candidate == null
-      || candidate.operationId !== request.candidateOperationId
-      || !frameContextsEqual(candidate.context, this.localContext)
-    ) {
-      return;
-    }
     const snapshot = this.captureTailProofSources(request.fromRevision, request.candidateRevision);
     if (snapshot == null) {
+      return;
+    }
+    const predecessor = snapshot.find(entry => entry.revision === candidate.revision - 1);
+    const snapshotRevisions = new Set(snapshot.map(entry => entry.revision));
+    if (
+      predecessor == null
+      || !isBoundarySupersessionCandidate(predecessor, candidate)
+      || candidate.subsumes.some(revision => !snapshotRevisions.has(revision))
+    ) {
+      // Keep the immutable rejected outcome for this still-live candidate. In particular, never emit a
+      // manifest that names less than the exact predecessor/subsumed proof required by the candidate body.
       return;
     }
     const sourceRevisions = Object.freeze(snapshot.map(entry => entry.revision));
@@ -1752,11 +1771,13 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.exhaustedRevisionSet.clear();
   }
 
-  /** Live counts for the no-orphan-timer + bounded-retention invariants (tests assert these directly). */
+  /** Live counts for no-orphan timers plus bounded entry/proof retention (tests assert these directly). */
   diagnostics(): AuthorityLogDiagnostics {
     const leases = this.retainedWindow.values();
     return {
       retainedEntries: leases.length,
+      retiredBoundarySources: this.retiredBoundarySources.size,
+      tailProofResponses: this.tailProofResponseCount,
       deliveryLeases: leases.length,
       activeDeliveryTimers: leases.filter(l => l.cancelTimer != null && !l.stopped).length,
       receivedThrough: this.ledger.receivedThrough(),
@@ -1836,16 +1857,13 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return false;
     }
-    // The request range must cover every source whose exact body can authorize this boundary. This numeric
-    // lower bound grants nothing by itself; the manifest and byte-identical deliveries remain mandatory.
+    // The candidate predicate above validates every required revision as a safe positive integer. Request
+    // exactly their minimum: old unrelated epoch history grants nothing and must not inflate this snapshot.
     const firstRequiredRevision = candidate.subsumes.reduce(
       (lowest, revision) => Math.min(lowest, revision),
       predecessor.revision,
     );
-    const fromRevision = Math.max(
-      0,
-      Math.min(this.replicaProofEpochStartRevision, firstRequiredRevision),
-    );
+    const fromRevision = firstRequiredRevision;
     const requestId = `${this.ownerBase}:boundary-proof:${++this.boundaryProofRequestSequence}`;
     const capturedCandidate = freezeAuthorityEntry(cloneEntry(candidate));
     this.completedBoundaryProof = null;
@@ -2386,6 +2404,24 @@ export class AuthorityLog implements CoopAuthorityLog {
     return true;
   }
 
+  /** Drop every immutable outcome tied to a candidate that can no longer answer an exact retained lookup. */
+  private releaseTailProofResponsesForCandidate(candidateRevision: number): void {
+    let released = 0;
+    for (const [seatId, responses] of this.tailProofResponses) {
+      for (const [requestId, outcome] of responses) {
+        if (outcome.candidateRevision !== candidateRevision) {
+          continue;
+        }
+        responses.delete(requestId);
+        released += 1;
+      }
+      if (responses.size === 0) {
+        this.tailProofResponses.delete(seatId);
+      }
+    }
+    this.tailProofResponseCount -= released;
+  }
+
   /** Retire one revision: archive its exact body, cancel its timer, and drop it from live retention. */
   private retire(revision: number): boolean {
     const lease = this.retainedWindow.get(revision);
@@ -2403,6 +2439,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.stopLease(lease);
     this.retainedWindow.delete(revision);
+    this.releaseTailProofResponsesForCandidate(revision);
     this.exhaustedRevisionSet.delete(revision);
     return true;
   }
