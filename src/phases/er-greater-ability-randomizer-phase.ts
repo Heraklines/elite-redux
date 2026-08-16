@@ -186,6 +186,9 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     }
     this.choiceCache.set(mon.id, choices);
     this.coopV2ControlOperationId = operationId;
+    if (globalScene.phaseManager.getCurrentPhase() === this) {
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    }
     return true;
   }
 

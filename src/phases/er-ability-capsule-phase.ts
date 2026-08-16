@@ -165,6 +165,9 @@ export class ErAbilityCapsulePhase extends Phase {
       return false;
     }
     this.coopV2ControlOperationId = operationId;
+    if (globalScene.phaseManager.getCurrentPhase() === this) {
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+    }
     return true;
   }
 

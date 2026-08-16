@@ -128,6 +128,14 @@ describe.skipIf(!RUN)("co-op DUO Stormglass: committed weather survives raw carr
       vi.spyOn(globalScene.ui, "showText").mockImplementation(() => undefined);
       vi.spyOn(globalScene.ui, "setMode").mockResolvedValue(true as never);
       await drainLoopback();
+      const phase = globalScene.phaseManager.getCurrentPhase();
+      expect(phase?.phaseName, "the guest projected Stormglass successor became current").toBe(
+        "ErStormglassPickerPhase",
+      );
+      // PhaseInterceptor suppresses PhaseManager.startCurrentPhase in engine tests. Production starts the
+      // projected phase itself; explicitly cross that intercepted start edge before observing the result.
+      phase!.start();
+      await drainLoopback();
       expect(getStormglassWeather()).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.SANDSTORM);
       expect(globalScene.arena.weather?.turnsLeft).toBe(5);
