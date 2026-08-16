@@ -44,35 +44,63 @@ import {
   resetCoopMeOperationState,
   setCoopMeOperationEnabled,
 } from "#data/elite-redux/coop/coop-me-operation";
-import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  captureCoopActiveMysteryControl,
+  coopMeInteractionStartValue,
+  setCoopMeInteractionStart,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF } from "#data/elite-redux/coop/coop-me-pump";
 import {
   COOP_ME_BATTLE_SETTLED_CHOICE,
   COOP_ME_REWARD_SETTLED_CHOICE,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
+  isCoopOperationJournalActive,
+  setCoopOperationDurability,
+} from "#data/elite-redux/coop/coop-operation-journal";
+import {
   CoopOperationHost,
   createCoopRuntimeOpState,
   setActiveCoopRuntimeOpState,
+  withActiveCoopRuntimeOpState,
 } from "#data/elite-redux/coop/coop-operation-runtime";
 import {
+  type CoopRuntime,
+  assembleCoopRuntime,
   clearCoopRuntime,
   commitCoopMeBattleSettlementAtBattleEnd,
+  commitCoopMeNoBattleRewardSettlementAfterPreparation,
+  coopSessionGeneration,
   coopMeOwnerRelayBattleHandoff,
   coopHostStreamMeMessage,
+  failCoopSharedSession,
+  getCoopRuntime,
+  getCoopV2Shadow,
+  isCoopSharedTerminalFrozen,
   registerCoopMeTerminalRedrive,
   settleCoopV2InteractionOperation,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  type CoopAccountIdentityV1,
+  type CoopFrameContextV1,
+  type CoopP33AuthenticatedContextV1,
+  type CoopSessionBindingV1,
+  createFreshCoopP33Context,
+} from "#data/elite-redux/coop/coop-session-binding";
+import { COOP_PROTOCOL_VERSION, type CoopMessage, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { BattleEndPhase } from "#phases/battle-end-phase";
+import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
+import { MysteryEncounterBattlePhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
   awaitRewardShopPhaseExit,
@@ -95,6 +123,7 @@ import {
 } from "#test/tools/coop-duo-harness";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { runMysteryEncounterToEnd, runSelectMysteryEncounterOption } from "#test/utils/encounter-test-utils";
+import { ColosseumUiHandler } from "#ui/colosseum-ui-handler";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -102,6 +131,298 @@ const RUN = process.env.ER_SCENARIO === "1";
 
 /** A valid ME wave (WILD, non-boss, in [10,180], waveIndex % 10 != 1). */
 const ME_WAVE = 12;
+
+const ME_REJOIN_AUTHORITY: CoopAccountIdentityV1 = {
+  version: 1,
+  accountId: "er-account:me-authority",
+  displayName: "ME Authority",
+  canonicalUsername: "me-authority",
+};
+
+const ME_REJOIN_REPLICA: CoopAccountIdentityV1 = {
+  version: 1,
+  accountId: "er-account:me-replica",
+  displayName: "ME Replica",
+  canonicalUsername: "me-replica",
+};
+
+/** Minimal cross-wired channel used by the production WebRtcTransport hot-rejoin adapter. */
+class MeHotRejoinWire implements CoopWireChannel {
+  readyState = "open";
+  bufferedAmount = 0;
+  bufferedAmountLowThreshold = 0;
+  peer: MeHotRejoinWire | null = null;
+  private messageHandler: ((data: string) => void) | null = null;
+  private closeHandler: (() => void) | null = null;
+
+  send(data: string): void {
+    if (this.readyState !== "open" || this.peer?.readyState !== "open") {
+      return;
+    }
+    this.peer.messageHandler?.(data);
+  }
+
+  close(): void {
+    if (this.readyState === "closed") {
+      return;
+    }
+    this.readyState = "closed";
+    this.closeHandler?.();
+    if (this.peer != null && this.peer.readyState !== "closed") {
+      this.peer.readyState = "closed";
+      this.peer.closeHandler?.();
+    }
+  }
+
+  onMessage(handler: (data: string) => void): void {
+    this.messageHandler = handler;
+  }
+
+  onOpen(_handler: () => void): void {
+    // Replacement wires are already open, matching the proven WebRtcTransport hot-rejoin fixture.
+  }
+
+  onClose(handler: () => void): void {
+    this.closeHandler = handler;
+  }
+
+  onBufferedAmountLow(_handler: () => void): void {
+    // This narrow fixture never applies backpressure.
+  }
+
+  injectRaw(data: string): void {
+    this.messageHandler?.(data);
+  }
+}
+
+function linkedMeHotRejoinWires(): { authority: MeHotRejoinWire; replica: MeHotRejoinWire } {
+  const authority = new MeHotRejoinWire();
+  const replica = new MeHotRejoinWire();
+  authority.peer = replica;
+  replica.peer = authority;
+  return { authority, replica };
+}
+
+function meHotRejoinContext(
+  connectionGeneration: number,
+  peerConnectionGeneration: number,
+  bearer: string,
+): CoopP33AuthenticatedContextV1 {
+  const context = createFreshCoopP33Context({
+    pairingId: "ME_TERMINAL_REJOIN",
+    pairingBearer: bearer,
+    transportRole: "answerer",
+    account: ME_REJOIN_AUTHORITY,
+    peerAccount: ME_REJOIN_REPLICA,
+    connectionGeneration,
+    peerConnectionGeneration,
+  });
+  if (context == null) {
+    throw new Error("authenticated ME hot-rejoin context was rejected");
+  }
+  return context;
+}
+
+async function waitForCoopMessage<T extends CoopMessage>(
+  received: readonly CoopMessage[],
+  predicate: (message: CoopMessage) => message is T,
+  label: string,
+): Promise<T> {
+  let found: T | undefined;
+  await vi.waitFor(
+    () => {
+      found = received.find(predicate);
+      expect(found, label).toBeDefined();
+    },
+    { timeout: 2_000, interval: 10 },
+  );
+  return found!;
+}
+
+interface AuthenticatedMeRuntimeFixture {
+  readonly runtime: CoopRuntime;
+  readonly localTransport: WebRtcTransport;
+  readonly peerTransport: WebRtcTransport;
+  readonly initialContext: CoopP33AuthenticatedContextV1;
+  readonly initialAuthorityWire: MeHotRejoinWire;
+  readonly received: CoopMessage[];
+  readonly capabilities: readonly string[];
+  readonly binding: CoopSessionBindingV1;
+}
+
+async function assembleAuthenticatedMeRuntime(): Promise<AuthenticatedMeRuntimeFixture> {
+  const initialContext = meHotRejoinContext(0, 0, "A".repeat(43));
+  const wires = linkedMeHotRejoinWires();
+  const localTransport = new WebRtcTransport("host", wires.authority, initialContext.connectionGeneration);
+  const peerTransport = new WebRtcTransport("guest", wires.replica, initialContext.peerConnectionGeneration);
+  const received: CoopMessage[] = [];
+  peerTransport.onMessage(message => received.push(message));
+  const runtime = assembleCoopRuntime(localTransport, {
+    username: initialContext.account.displayName,
+    netcodeMode: "authoritative",
+    p33: initialContext,
+  });
+  setCoopRuntime(runtime);
+  runtime.controller.connect();
+
+  const hello = await waitForCoopMessage(
+    received,
+    (message): message is Extract<CoopMessage, { t: "hello" }> => message.t === "hello",
+    "the authority advertised its authenticated capability hello",
+  );
+  const fingerprint = await waitForCoopMessage(
+    received,
+    (message): message is Extract<CoopMessage, { t: "dataFingerprint" }> => message.t === "dataFingerprint",
+    "the authority advertised its functional fingerprint",
+  );
+  const capabilities = [...(hello.capabilities ?? [])];
+  peerTransport.send({
+    t: "hello",
+    version: COOP_PROTOCOL_VERSION,
+    pairingId: initialContext.pairingId,
+    account: initialContext.peerAccount,
+    transportRole: "offerer",
+    authorityClaim: "replica",
+    capabilities,
+  });
+  peerTransport.send({ t: "dataFingerprint", fp: fingerprint.fp });
+  await Promise.resolve();
+
+  const startPromise = runtime.controller.sendResumeStartNew(2_000);
+  const start = await waitForCoopMessage(
+    received,
+    (message): message is Extract<CoopMessage, { t: "resumeStartNew" }> => message.t === "resumeStartNew",
+    "the authority committed the fresh authenticated run",
+  );
+  peerTransport.send({ t: "resumeDecisionAck", decisionId: start.decisionId });
+  const bindingMessage = await waitForCoopMessage(
+    received,
+    (message): message is Extract<CoopMessage, { t: "sessionBinding" }> => message.t === "sessionBinding",
+    "the authority published the authenticated seat binding",
+  );
+  peerTransport.send({
+    t: "sessionBindingAck",
+    bindingId: bindingMessage.binding.bindingId,
+    seatId: 1,
+    accountId: initialContext.peerAccount.accountId,
+    accepted: true,
+  });
+  await expect(startPromise).resolves.toBe(true);
+  await vi.waitFor(() => expect(runtime.controller.p33FrameContext()).not.toBeNull(), {
+    timeout: 2_000,
+    interval: 10,
+  });
+  expect(runtime.controller.authorityRole).toBe("authority");
+  expect(getCoopV2Shadow(runtime), "binding-ready installed the production Authority V2 shadow").not.toBeNull();
+
+  return {
+    runtime,
+    localTransport,
+    peerTransport,
+    initialContext,
+    initialAuthorityWire: wires.authority,
+    received,
+    capabilities,
+    binding: bindingMessage.binding,
+  };
+}
+
+interface AuthenticatedHotRejoin {
+  readonly nextContext: CoopP33AuthenticatedContextV1;
+  readonly replacementReady: Promise<MeHotRejoinWire>;
+  readonly driverCompleted: Promise<void>;
+  allowBinding(): void;
+}
+
+function beginAuthenticatedMeHotRejoin(fixture: AuthenticatedMeRuntimeFixture): AuthenticatedHotRejoin {
+  const { runtime, localTransport, peerTransport, initialAuthorityWire, binding, capabilities, received } = fixture;
+  const nextContext = meHotRejoinContext(1, 1, "B".repeat(43));
+  let releaseBinding!: () => void;
+  const bindingGate = new Promise<void>(resolve => {
+    releaseBinding = resolve;
+  });
+  let resolveReplacement!: (wire: MeHotRejoinWire) => void;
+  let rejectReplacement!: (error: unknown) => void;
+  const replacementReady = new Promise<MeHotRejoinWire>((resolve, reject) => {
+    resolveReplacement = resolve;
+    rejectReplacement = reject;
+  });
+  let resolveDriver!: () => void;
+  let rejectDriver!: (error: unknown) => void;
+  const driverCompleted = new Promise<void>((resolve, reject) => {
+    resolveDriver = resolve;
+    rejectDriver = reject;
+  });
+
+  received.length = 0;
+  runtime.rejoinDriver = async () => {
+    try {
+      // The signaling Worker is the one external seam. Feed its already-authenticated replacement context
+      // through the exact production order from coop-webrtc-connect: adopt first, then replace the live wire.
+      if (!runtime.controller.adoptP33Rejoin(nextContext)) {
+        throw new Error("production controller refused the authenticated ME hot rejoin");
+      }
+      const replacement = linkedMeHotRejoinWires();
+      peerTransport.replaceChannel(replacement.replica);
+      localTransport.replaceChannel(replacement.authority);
+      resolveReplacement(replacement.authority);
+      await bindingGate;
+
+      peerTransport.send({
+        t: "hello",
+        version: COOP_PROTOCOL_VERSION,
+        pairingId: nextContext.pairingId,
+        account: nextContext.peerAccount,
+        transportRole: "offerer",
+        authorityClaim: "replica",
+        capabilities: [...capabilities],
+        existingBinding: {
+          sessionId: binding.sessionId,
+          ...(binding.runId == null ? {} : { runId: binding.runId }),
+          sessionEpoch: binding.sessionEpoch,
+          seatMapId: binding.seatMap.seatMapId,
+          authoritySeatId: binding.authoritySeatId,
+          membershipRevision: binding.membershipRevision,
+        },
+      });
+      const reboundBinding = await waitForCoopMessage(
+        received,
+        (message): message is Extract<CoopMessage, { t: "sessionBinding" }> => message.t === "sessionBinding",
+        "the replacement channel replayed the retained authenticated binding",
+      );
+      peerTransport.send({
+        t: "sessionBindingAck",
+        bindingId: reboundBinding.binding.bindingId,
+        seatId: 1,
+        accountId: nextContext.peerAccount.accountId,
+        accepted: true,
+      });
+      await vi.waitFor(
+        () => {
+          expect(runtime.controller.p33FrameContext()).toMatchObject({
+            membershipRevision: binding.membershipRevision + 1,
+            connectionGeneration: nextContext.connectionGeneration,
+          });
+        },
+        { timeout: 2_000, interval: 10 },
+      );
+      resolveDriver();
+      return true;
+    } catch (error) {
+      rejectReplacement(error);
+      rejectDriver(error);
+      throw error;
+    }
+  };
+  initialAuthorityWire.close();
+
+  return {
+    nextContext,
+    replacementReady,
+    driverCompleted,
+    allowBinding: releaseBinding,
+  };
+}
 
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
@@ -143,6 +464,119 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+
+  async function prepareBattleSettledHandoffBoundary() {
+    await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+    await withClient(rig.hostCtx, async () => {
+      await runSelectMysteryEncounterOption(game, 1);
+      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 0 });
+      const tail = vi.fn();
+      expect(
+        commitCoopMeBattleSettlementAtBattleEnd(
+          {
+            result: "victory",
+            continuation: "encounter",
+            trainerVictory: false,
+            rewardSurfaces: [],
+            eggLapse: false,
+          },
+          tail,
+        ),
+      ).toBe(true);
+      await vi.waitFor(() => expect(tail).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle-settled", terminalStep: 1 });
+    });
+    return { hostScene, rig };
+  }
+
+  interface BattleSettledHandoffBoundary {
+    readonly hostScene: BattleScene;
+    readonly rig: { readonly hostRuntime: CoopRuntime };
+  }
+
+  async function prepareAuthenticatedBattleSettledHandoffBoundary() {
+    await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    toCoop(hostScene);
+    const authenticated = await assembleAuthenticatedMeRuntime();
+    await runSelectMysteryEncounterOption(game, 1);
+    await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+    expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 0 });
+    const tail = vi.fn();
+    expect(
+      commitCoopMeBattleSettlementAtBattleEnd(
+        {
+          result: "victory",
+          continuation: "encounter",
+          trainerVictory: false,
+          rewardSurfaces: [],
+          eggLapse: false,
+        },
+        tail,
+      ),
+    ).toBe(true);
+    await vi.waitFor(() => expect(tail).toHaveBeenCalledOnce(), { timeout: 2_000, interval: 10 });
+    expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle-settled", terminalStep: 1 });
+    return { hostScene, rig: { hostRuntime: authenticated.runtime }, authenticated };
+  }
+
+  async function parkSecondHandoff(boundary: BattleSettledHandoffBoundary) {
+    const { hostScene, rig } = boundary;
+    let blocked = true;
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (blocked && authorityMeTerminalKind(entry) === "battle") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+    const rawHandoff = vi.spyOn(rig.hostRuntime.mePump, "relayMeBattleHandoff");
+    const priorControl = captureCoopActiveMysteryControl();
+    expect(priorControl).toMatchObject({ terminal: "battle-settled", terminalStep: 1 });
+    let resolutionCount = 0;
+    let promiseSettled = false;
+    const promise = coopMeOwnerRelayBattleHandoff({
+      encounterMode: hostScene.currentBattle.mysteryEncounter?.encounterMode,
+      disableSwitch: false,
+    });
+    void promise.then(() => {
+      resolutionCount++;
+      promiseSettled = true;
+    });
+    await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
+      timeout: 2_000,
+      interval: 10,
+    });
+    const parked = rig.hostRuntime.v2DeferredMeTerminalRedrive!;
+    const immutable = JSON.stringify(parked);
+    const retained = meOp.captureCoopMeDeferredTerminal(parked.operationId);
+    expect(retained?.operationId).toBe(parked.operationId);
+    expect(retained?.revision).toBe(parked.revision);
+    expect(JSON.stringify(retained?.envelope)).toBe(JSON.stringify(parked.envelope));
+    await Promise.resolve();
+    expect(rawHandoff, "raw relay stays behind the exact proof").not.toHaveBeenCalled();
+    expect(promiseSettled, "the owner handoff Promise remains parked").toBe(false);
+    expect(JSON.stringify(rig.hostRuntime.v2DeferredMeTerminalRedrive)).toBe(immutable);
+    return {
+      immutable,
+      parked,
+      priorControl,
+      promise,
+      promiseSettled: () => promiseSettled,
+      rawHandoff,
+      releaseProof: () => {
+        blocked = false;
+      },
+      resolutionCount: () => resolutionCount,
+    };
+  }
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -267,7 +701,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       expect(
         registerCoopMeTerminalRedrive(rig.hostRuntime, parkedOperationId, vi.fn(), duplicateRegistrationCancel),
       ).toBeNull();
-      expect(duplicateRegistrationCancel, "duplicate register attempts cancel only their new callback").toHaveBeenCalledOnce();
+      expect(
+        duplicateRegistrationCancel,
+        "duplicate register attempts cancel only their new callback",
+      ).toHaveBeenCalledOnce();
       expect(rig.hostRuntime.v2DeferredMeTerminalRedrive?.operationId).toBe(parkedOperationId);
 
       blockRewardSettlement = false;
@@ -948,19 +1385,15 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     logs.flush();
   }, 300_000);
 
-  it("defers the async owner battle handoff, then advances battle0-settled1-battle2-settled3 once", async () => {
-    await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+  it("runs real Colosseum battle0-settled1-battle2-settled3 phases under exact typed proof", async () => {
+    game.override.startingWave(42);
+    await game.runToMysteryEncounter(MysteryEncounterType.COLOSSEUM, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
+    expect(hostScene.currentBattle.mysteryEncounter?.encounterType).toBe(MysteryEncounterType.COLOSSEUM);
     const pair = createLoopbackPair();
     const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
 
-    await withClient(rig.hostCtx, async () => {
-      await runSelectMysteryEncounterOption(game, 1);
-      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
-      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 0 });
-    });
-
-    let blockedTerminal: "battle-settled" | "battle" | null = "battle-settled";
+    let blockedTerminal: "battle" | "battle-settled" | null = "battle";
     const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
       rig.hostRuntime.v2ControlLedger,
     );
@@ -970,161 +1403,592 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       }
       return originalPrepare(entry);
     });
+    let expectedRawStep = 0;
     const originalRelay = rig.hostRuntime.mePump.relayMeBattleHandoff.bind(rig.hostRuntime.mePump);
-    const rawHandoff = vi.spyOn(rig.hostRuntime.mePump, "relayMeBattleHandoff").mockImplementation(
-      (hostTurn, sendRawTerminal) => {
-        // The continuation helper must install and validate the exact successor control before the raw
-        // pump can signal the spawned battle.
-        expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 2 });
+    const rawHandoff = vi
+      .spyOn(rig.hostRuntime.mePump, "relayMeBattleHandoff")
+      .mockImplementation((hostTurn, sendRawTerminal) => {
+        expect(captureCoopActiveMysteryControl(), "typed control is installed before either raw relay").toMatchObject({
+          terminal: "battle",
+          terminalStep: expectedRawStep,
+          terminalChoice: COOP_ME_BATTLE_HANDOFF,
+        });
         originalRelay(hostTurn, sendRawTerminal);
-      },
-    );
-    const plan = {
-      result: "victory" as const,
-      continuation: "encounter" as const,
-      trainerVictory: false,
-      rewardSurfaces: [],
-      eggLapse: false,
-    };
+      });
 
     await withClient(rig.hostCtx, async () => {
-      const settled1Tail = vi.fn();
-      const settled1Deferred = vi.fn();
-      expect(commitCoopMeBattleSettlementAtBattleEnd(plan, settled1Tail, settled1Deferred)).toBe(true);
-      const settled1Parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
-      expect(settled1Parked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
-      expect(
-        (settled1Parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
-      ).toBe("battle-settled");
-      expect(settled1Deferred, "battle settlement parks its owning tail before proof").toHaveBeenCalledOnce();
-      expect(settled1Tail, "settled1 tail does not run before the exact proof").not.toHaveBeenCalled();
-      const settled1OperationId = settled1Parked!.operationId;
-      const settled1Revision = settled1Parked!.revision;
-      const settled1Envelope = JSON.stringify(settled1Parked!.envelope);
-      const capturedSettled1 = meOp.captureCoopMeDeferredTerminal(settled1OperationId);
-      expect(capturedSettled1?.operationId).toBe(settled1OperationId);
-      expect(capturedSettled1?.revision).toBe(settled1Revision);
-      expect(JSON.stringify(capturedSettled1?.envelope)).toBe(settled1Envelope);
+      const terminalRevisions: number[] = [];
+      const controlRevisions: number[] = [];
+      const parkedTerminal = (terminal: "battle" | "battle-settled") => {
+        const parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
+        expect(parked, `${terminal} owns one parked production transaction`).not.toBeNull();
+        expect(parked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
+        expect(
+          (parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
+        ).toBe(terminal);
+        const captured = meOp.captureCoopMeDeferredTerminal(parked!.operationId);
+        expect(captured?.operationId).toBe(parked!.operationId);
+        expect(captured?.revision).toBe(parked!.revision);
+        expect(JSON.stringify(captured?.envelope)).toBe(JSON.stringify(parked!.envelope));
+        terminalRevisions.push(parked!.revision);
+        return parked!;
+      };
+      const recordControl = (terminal: "battle" | "battle-settled", step: number, operationId: string) => {
+        const control = captureCoopActiveMysteryControl();
+        expect(control).toMatchObject({ terminal, terminalStep: step, terminalOperationId: operationId });
+        controlRevisions.push(control!.revision);
+      };
+      const reachRealBattleEnd = async (ordinal: number) => {
+        const battlePhase = hostScene.phaseManager.getCurrentPhase();
+        expect(battlePhase, `round ${ordinal} reached its production battle phase`).toBeInstanceOf(
+          MysteryEncounterBattlePhase,
+        );
+        const battleStart = vi.spyOn(battlePhase, "start");
+        battlePhase.start();
+        expect(battleStart, `round ${ordinal} battle starts once`).toHaveBeenCalledOnce();
+        await driveClientPhaseQueueTo(hostScene, "TurnInitPhase");
 
-      blockedTerminal = null;
-      expect(settleCoopV2InteractionOperation(settled1OperationId, rig.hostRuntime)).toBe(true);
-      await vi.waitFor(() => expect(settled1Tail).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
-      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
-      expect(captureCoopActiveMysteryControl()).toMatchObject({
-        terminal: "battle-settled",
-        terminalOperationId: settled1OperationId,
-        terminalStep: 1,
-        terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
-      });
-      expect(meOp.captureCoopMeDeferredTerminal(settled1OperationId)).toBeNull();
+        const enemies = hostScene.getEnemyParty();
+        expect(enemies.length, `round ${ordinal} has a real Colosseum enemy party`).toBeGreaterThan(0);
+        for (const enemy of enemies) {
+          enemy.hp = 0;
+          enemy.doSetStatus(StatusEffect.FAINT);
+          enemy.leaveField(true, true, false);
+          expect(enemy.isFainted(true)).toBe(true);
+        }
+        const victory = hostScene.phaseManager.create("VictoryPhase", enemies[0]!.getBattlerIndex());
+        const victoryStart = vi.spyOn(victory, "start");
+        expect(hostScene.phaseManager.overridePhase(victory), `round ${ordinal} installs real Victory`).toBe(true);
+        victory.start();
+        expect(victoryStart, `round ${ordinal} Victory runs once`).toHaveBeenCalledOnce();
+        expect(hostScene.phaseManager.getQueuedPhaseNames()).toContain("BattleEndPhase");
+        hostScene.phaseManager.getCurrentPhase().end();
 
-      blockedTerminal = "battle";
-      let handoffSettled = false;
-      const handoffPromise = coopMeOwnerRelayBattleHandoff({
-        encounterMode: hostScene.currentBattle.mysteryEncounter?.encounterMode,
-        disableSwitch: false,
-      }).then(result => {
-        handoffSettled = true;
-        return result;
-      });
+        const battleEnd = hostScene.phaseManager.getCurrentPhase();
+        expect(battleEnd, `round ${ordinal} reaches its production BattleEnd`).toBeInstanceOf(BattleEndPhase);
+        return {
+          battlePhase,
+          battleEnd,
+          battleEndStart: vi.spyOn(battleEnd, "start"),
+          battleEndEnd: vi.spyOn(battleEnd, "end"),
+        };
+      };
+      const settleRealBattleEnd = async (
+        ordinal: number,
+        boundary: Awaited<ReturnType<typeof reachRealBattleEnd>>,
+      ) => {
+        blockedTerminal = "battle-settled";
+        boundary.battleEnd.start();
+        expect(boundary.battleEndStart, `round ${ordinal} BattleEnd starts once`).toHaveBeenCalledOnce();
+        const parked = parkedTerminal("battle-settled");
+        expect(boundary.battleEndEnd, `round ${ordinal} BattleEnd tail waits for proof`).not.toHaveBeenCalled();
+        expect(hostScene.phaseManager.getCurrentPhase()).toBe(boundary.battleEnd);
+        const immutable = JSON.stringify(parked);
+        await Promise.resolve();
+        expect(JSON.stringify(rig.hostRuntime.v2DeferredMeTerminalRedrive)).toBe(immutable);
+
+        blockedTerminal = null;
+        expect(settleCoopV2InteractionOperation(parked.operationId, rig.hostRuntime)).toBe(true);
+        await vi.waitFor(() => expect(boundary.battleEndEnd).toHaveBeenCalledTimes(1), {
+          timeout: 2_000,
+          interval: 10,
+        });
+        recordControl("battle-settled", ordinal * 2 - 1, parked.operationId);
+        expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+        expect(meOp.captureCoopMeDeferredTerminal(parked.operationId)).toBeNull();
+        expect(settleCoopV2InteractionOperation(parked.operationId, rig.hostRuntime)).toBe(true);
+        await Promise.resolve();
+        expect(boundary.battleEndEnd, `round ${ordinal} duplicate proof cannot rerun its tail`).toHaveBeenCalledOnce();
+        return parked;
+      };
+
+      const firstSelection = runSelectMysteryEncounterOption(game, 1);
       await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
-        timeout: 2_000,
+        timeout: 10_000,
         interval: 10,
       });
+      const battle0 = parkedTerminal("battle");
+      const battle0Envelope = JSON.stringify(battle0);
+      expect(rawHandoff, "round 1 raw handoff is suppressed before typed proof").not.toHaveBeenCalled();
+      expect(hostScene.phaseManager.getCurrentPhase()).not.toBeInstanceOf(MysteryEncounterBattlePhase);
       await Promise.resolve();
-      const handoffParked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
-      expect(handoffParked?.envelope.pendingOperation?.kind).toBe("ME_TERMINAL");
-      expect(
-        (handoffParked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
-      ).toBe("battle");
-      expect(rawHandoff, "the raw pump waits for the exact handoff proof").not.toHaveBeenCalled();
-      expect(handoffSettled, "the async handoff Promise remains unresolved before proof").toBe(false);
-      expect(captureCoopActiveMysteryControl()).toMatchObject({
-        terminal: "battle-settled",
-        terminalStep: 1,
-        terminalOperationId: settled1OperationId,
-      });
-      const handoffOperationId = handoffParked!.operationId;
-      const handoffRevision = handoffParked!.revision;
-      const handoffEnvelope = JSON.stringify(handoffParked!.envelope);
-      const capturedHandoff = meOp.captureCoopMeDeferredTerminal(handoffOperationId);
-      expect(capturedHandoff?.operationId).toBe(handoffOperationId);
-      expect(capturedHandoff?.revision).toBe(handoffRevision);
-      expect(JSON.stringify(capturedHandoff?.envelope)).toBe(handoffEnvelope);
-      expect(handoffRevision).toBeGreaterThan(settled1Revision);
+      expect(JSON.stringify(rig.hostRuntime.v2DeferredMeTerminalRedrive)).toBe(battle0Envelope);
 
       blockedTerminal = null;
-      expect(settleCoopV2InteractionOperation(handoffOperationId, rig.hostRuntime)).toBe(true);
-      await vi.waitFor(() => expect(rawHandoff).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
-      await expect(handoffPromise).resolves.toBe(true);
-      expect(handoffSettled, "the handoff Promise resolves after the exact proof").toBe(true);
-      expect(captureCoopActiveMysteryControl()).toMatchObject({
-        terminal: "battle",
-        terminalOperationId: handoffOperationId,
-        terminalStep: 2,
-        terminalChoice: COOP_ME_BATTLE_HANDOFF,
-      });
+      expect(settleCoopV2InteractionOperation(battle0.operationId, rig.hostRuntime)).toBe(true);
+      await firstSelection;
+      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      expect(rawHandoff).toHaveBeenCalledTimes(1);
+      recordControl("battle", 0, battle0.operationId);
       expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
-      expect(meOp.captureCoopMeDeferredTerminal(handoffOperationId)).toBeNull();
+      expect(meOp.captureCoopMeDeferredTerminal(battle0.operationId)).toBeNull();
 
-      expect(settleCoopV2InteractionOperation(handoffOperationId, rig.hostRuntime)).toBe(true);
-      await Promise.resolve();
-      expect(rawHandoff, "duplicate handoff proof cannot relay the raw pump twice").toHaveBeenCalledOnce();
+      const firstBattle = await reachRealBattleEnd(1);
+      const settled1 = await settleRealBattleEnd(1, firstBattle);
 
-      blockedTerminal = "battle-settled";
-      const settled3Tail = vi.fn();
-      const settled3Deferred = vi.fn();
-      expect(commitCoopMeBattleSettlementAtBattleEnd(plan, settled3Tail, settled3Deferred)).toBe(true);
-      const settled3Parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
-      expect(
-        (settled3Parked?.envelope.pendingOperation?.payload as { readonly terminal?: string } | undefined)?.terminal,
-      ).toBe("battle-settled");
-      expect(settled3Deferred).toHaveBeenCalledOnce();
-      expect(settled3Tail).not.toHaveBeenCalled();
-      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 2 });
-      const settled3OperationId = settled3Parked!.operationId;
-      const settled3Revision = settled3Parked!.revision;
-      const settled3Envelope = JSON.stringify(settled3Parked!.envelope);
-      expect(settled3Revision).toBeGreaterThan(handoffRevision);
-      const capturedSettled3 = meOp.captureCoopMeDeferredTerminal(settled3OperationId);
-      expect(capturedSettled3?.operationId).toBe(settled3OperationId);
-      expect(capturedSettled3?.revision).toBe(settled3Revision);
-      expect(JSON.stringify(capturedSettled3?.envelope)).toBe(settled3Envelope);
+      game.onNextPrompt(
+        "TrainerVictoryPhase",
+        UiMode.MESSAGE,
+        () => hostScene.ui.getMessageHandler().processInput(Button.ACTION),
+        () => game.isCurrentPhase("MysteryEncounterRewardsPhase"),
+      );
+      await game.phaseInterceptor.to("MysteryEncounterRewardsPhase", false);
+      const firstRewards = hostScene.phaseManager.getCurrentPhase();
+      const firstRewardsStart = vi.spyOn(firstRewards, "start");
+      const firstRewardsEnd = vi.spyOn(firstRewards, "end");
+      await game.phaseInterceptor.to("ColosseumChoicePhase", false);
+      expect(firstRewardsStart, "the real between-round reward phase starts once").toHaveBeenCalledOnce();
+      expect(firstRewardsEnd, "the real between-round reward tail runs once").toHaveBeenCalledOnce();
 
-      blockedTerminal = null;
-      expect(settleCoopV2InteractionOperation(settled3OperationId, rig.hostRuntime)).toBe(true);
-      await vi.waitFor(() => expect(settled3Tail).toHaveBeenCalledTimes(1), { timeout: 2_000, interval: 10 });
-      expect(captureCoopActiveMysteryControl()).toMatchObject({
-        terminal: "battle-settled",
-        terminalOperationId: settled3OperationId,
-        terminalStep: 3,
-        terminalChoice: COOP_ME_BATTLE_SETTLED_CHOICE,
-      });
-      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
-      expect(meOp.captureCoopMeDeferredTerminal(settled3OperationId)).toBeNull();
-      expect(settleCoopV2InteractionOperation(settled3OperationId, rig.hostRuntime)).toBe(true);
-      await Promise.resolve();
-      expect(settled3Tail, "duplicate settled3 proof cannot rerun the tail").toHaveBeenCalledOnce();
-
-      blockedTerminal = "battle";
-      let canceledHandoff = false;
-      const canceledPromise = coopMeOwnerRelayBattleHandoff({
-        encounterMode: hostScene.currentBattle.mysteryEncounter?.encounterMode,
-        disableSwitch: false,
-      }).then(result => {
-        canceledHandoff = true;
-        return result;
-      });
-      await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
-        timeout: 2_000,
+      const board = hostScene.phaseManager.getCurrentPhase();
+      expect(board).toBeInstanceOf(ColosseumChoicePhase);
+      const boardStart = vi.spyOn(board, "start");
+      const boardEnd = vi.spyOn(board, "end");
+      board.start();
+      expect(boardStart).toHaveBeenCalledOnce();
+      await vi.waitFor(() => expect(hostScene.ui.getMode()).toBe(UiMode.COLOSSEUM), {
+        timeout: 10_000,
         interval: 10,
       });
-      expect(rawHandoff).toHaveBeenCalledOnce();
+
+      blockedTerminal = "battle";
+      expectedRawStep = 2;
+      const colosseumUi = hostScene.ui.getHandler<ColosseumUiHandler>();
+      expect(colosseumUi.processInput(Button.ACTION), "the real board accepts CONTINUE").toBe(true);
+      await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
+        timeout: 10_000,
+        interval: 10,
+      });
+      const battle2 = parkedTerminal("battle");
+      expect(rawHandoff, "round 2 raw handoff is suppressed before typed proof").toHaveBeenCalledTimes(1);
+      expect(boardEnd, "the real Colosseum board owns the unresolved handoff Promise").not.toHaveBeenCalled();
+      expect(hostScene.phaseManager.getCurrentPhase()).toBe(board);
+
+      blockedTerminal = null;
+      expect(settleCoopV2InteractionOperation(battle2.operationId, rig.hostRuntime)).toBe(true);
+      await vi.waitFor(() => expect(boardEnd).toHaveBeenCalledTimes(1), { timeout: 10_000, interval: 10 });
+      expect(rawHandoff).toHaveBeenCalledTimes(2);
+      recordControl("battle", 2, battle2.operationId);
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(meOp.captureCoopMeDeferredTerminal(battle2.operationId)).toBeNull();
+      expect(settleCoopV2InteractionOperation(battle2.operationId, rig.hostRuntime)).toBe(true);
+      await Promise.resolve();
+      expect(rawHandoff, "duplicate round-2 proof cannot relay twice").toHaveBeenCalledTimes(2);
+      expect(boardEnd, "duplicate round-2 proof cannot end the board twice").toHaveBeenCalledOnce();
+
+      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      const secondBattle = await reachRealBattleEnd(2);
+      const settled3 = await settleRealBattleEnd(2, secondBattle);
+      expect(secondBattle.battlePhase, "round 2 owns a distinct production battle phase").not.toBe(
+        firstBattle.battlePhase,
+      );
+      expect(secondBattle.battleEnd, "round 2 owns a distinct production BattleEnd").not.toBe(firstBattle.battleEnd);
+
+      expect([battle0.revision, settled1.revision, battle2.revision, settled3.revision]).toEqual(terminalRevisions);
+      expect(terminalRevisions).toHaveLength(4);
+      for (let i = 1; i < terminalRevisions.length; i++) {
+        expect(terminalRevisions[i]!).toBeGreaterThan(terminalRevisions[i - 1]!);
+        expect(controlRevisions[i]!).toBeGreaterThan(controlRevisions[i - 1]!);
+      }
+      expect(controlRevisions).toHaveLength(4);
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it.each([
+    { label: "scene replacement", mutation: "scene", freezes: true },
+    { label: "controller replacement", mutation: "controller", freezes: true },
+    { label: "battle replacement", mutation: "battle", freezes: true },
+    { label: "pinned-interaction replacement", mutation: "pin", freezes: true },
+    { label: "authority loss", mutation: "authority", freezes: false },
+  ] as const)("cancels a parked owner handoff on $label without a raw relay or promise leak", async testCase => {
+    const boundary = await prepareBattleSettledHandoffBoundary();
+    const { hostScene, rig } = boundary;
+
+    await withClient(rig.hostCtx, async () => {
+      const pending = await parkSecondHandoff(boundary);
+      const pinned = coopMeInteractionStartValue();
+      const originalBattle = hostScene.currentBattle;
+      const originalController = rig.hostRuntime.controller;
+      const replacementController = rig.guestRuntime.controller;
+      const replacementControllerRole = replacementController.role;
+      const runtimeControllerSlot = rig.hostRuntime as unknown as { controller: typeof originalController };
+
+      try {
+        switch (testCase.mutation) {
+          case "scene":
+            expect(rig.guestScene).not.toBe(hostScene);
+            initGlobalScene(rig.guestScene);
+            break;
+          case "controller":
+            expect(replacementController).not.toBe(originalController);
+            replacementController.role = "host";
+            runtimeControllerSlot.controller = replacementController;
+            break;
+          case "battle":
+            expect(rig.guestScene.currentBattle).not.toBe(originalBattle);
+            hostScene.currentBattle = rig.guestScene.currentBattle;
+            break;
+          case "pin":
+            setCoopMeInteractionStart(pinned + 2);
+            break;
+          case "authority":
+            originalController.role = "guest";
+            break;
+        }
+
+        pending.releaseProof();
+        expect(settleCoopV2InteractionOperation(pending.parked.operationId, rig.hostRuntime)).toBe(true);
+        await expect(pending.promise).resolves.toBe(false);
+        expect(pending.promiseSettled()).toBe(true);
+        expect(pending.resolutionCount(), "the parked Promise has one cancellation completion").toBe(1);
+        expect(
+          pending.rawHandoff,
+          "an invalidated handoff never reaches the compatibility pump",
+        ).not.toHaveBeenCalled();
+        expect(rig.hostRuntime.v2DeferredMeTerminalRedrive, "the runtime releases its parked callback").toBeNull();
+        expect(
+          withActiveCoopRuntimeOpState(rig.hostRuntime.opState, () =>
+            meOp.captureCoopMeDeferredTerminal(pending.parked.operationId),
+          ),
+          "the runtime releases its retained deferred envelope",
+        ).toBeNull();
+        expect(isCoopSharedTerminalFrozen(rig.hostRuntime)).toBe(testCase.freezes);
+
+        expect(settleCoopV2InteractionOperation(pending.parked.operationId, rig.hostRuntime)).toBe(true);
+        await Promise.resolve();
+        expect(pending.resolutionCount(), "a duplicate proof cannot recancel the Promise").toBe(1);
+        expect(pending.rawHandoff).not.toHaveBeenCalled();
+      } finally {
+        switch (testCase.mutation) {
+          case "scene":
+            initGlobalScene(hostScene);
+            break;
+          case "controller":
+            runtimeControllerSlot.controller = originalController;
+            replacementController.role = replacementControllerRole;
+            break;
+          case "battle":
+            hostScene.currentBattle = originalBattle;
+            break;
+          case "pin":
+            setCoopMeInteractionStart(pinned);
+            break;
+          case "authority":
+            originalController.role = "host";
+            break;
+        }
+      }
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it("keeps the exact parked Promise across an authenticated channel hot rejoin and resumes once", async () => {
+    const boundary = await prepareAuthenticatedBattleSettledHandoffBoundary();
+    const { authenticated, rig } = boundary;
+    const runtime = rig.hostRuntime;
+    const generation = coopSessionGeneration();
+    const pending = await parkSecondHandoff(boundary);
+    const exactPromise = pending.promise;
+    const oldMembership = runtime.controller.p33MembershipSnapshot()!;
+    const oldLocalFrame = runtime.controller.p33FrameContext()!;
+    const oldPeerFrame: CoopFrameContextV1 = {
+      ...oldLocalFrame,
+      fromSeatId: 1,
+      connectionGeneration: authenticated.initialContext.peerConnectionGeneration,
+    };
+    const shadow = getCoopV2Shadow(runtime)!;
+    const rebindIdentity = vi.spyOn(shadow, "rebindIdentity");
+    const oldShadowFrame = structuredClone(shadow.authenticatedFrameContext);
+    const oldFrontier = shadow.authorityFrontier();
+    expect(oldFrontier, "the first battle and settlement established a real retained V2 frontier").not.toBeNull();
+    expect(runtime.controller.validateP33PeerFrameContext(oldPeerFrame, oldMembership.revision)).toBe(true);
+
+    const rejoin = beginAuthenticatedMeHotRejoin(authenticated);
+    await rejoin.replacementReady;
+    expect(rejoin.nextContext.pairingBearer, "the Worker-authenticated bearer rotated with the channel").not.toBe(
+      authenticated.initialContext.pairingBearer,
+    );
+    expect(authenticated.localTransport.connectionGeneration(), "the live transport advanced in place").toBe(1);
+    expect(runtime.membership.snapshot()).toMatchObject({ state: "recovering", connectionGeneration: 0 });
+    expect(runtime.controller.p33FrameContext(), "the replacement channel has not re-proved its binding").toBeNull();
+    expect(getCoopV2Shadow(runtime), "the retained shadow is unavailable until authenticated rebind").toBeNull();
+    expect(runtime.controller.validateP33PeerFrameContext(oldPeerFrame, oldMembership.revision)).toBe(false);
+    expect(
+      runtime.controller.adoptP33Rejoin(authenticated.initialContext),
+      "the superseded context and bearer cannot roll the authenticated generation back",
+    ).toBe(false);
+    authenticated.initialAuthorityWire.injectRaw(
+      JSON.stringify({
+        t: "sessionBindingAck",
+        bindingId: authenticated.binding.bindingId,
+        seatId: 1,
+        accountId: authenticated.initialContext.peerAccount.accountId,
+        accepted: true,
+      } satisfies CoopMessage),
+    );
+    expect(runtime.controller.p33FrameContext(), "a frame from the superseded wire is inert").toBeNull();
+    expect(pending.promise, "the exact owner handoff Promise survives transport replacement").toBe(exactPromise);
+    expect(pending.promiseSettled()).toBe(false);
+    expect(pending.rawHandoff).not.toHaveBeenCalled();
+    expect(runtime.v2DeferredMeTerminalRedrive, "channel replacement retains the exact parked callback").toBe(
+      pending.parked,
+    );
+    expect(JSON.stringify(runtime.v2DeferredMeTerminalRedrive)).toBe(pending.immutable);
+
+    rejoin.allowBinding();
+    await rejoin.driverCompleted;
+    await vi.waitFor(
+      () => expect(runtime.membership.snapshot()).toMatchObject({ state: "active", connectionGeneration: 1 }),
+      { timeout: 2_000, interval: 10 },
+    );
+    const reboundMembership = runtime.controller.p33MembershipSnapshot()!;
+    const reboundLocalFrame = runtime.controller.p33FrameContext()!;
+    const reboundPeerFrame: CoopFrameContextV1 = {
+      ...reboundLocalFrame,
+      fromSeatId: 1,
+      connectionGeneration: rejoin.nextContext.peerConnectionGeneration,
+    };
+    expect(
+      rebindIdentity,
+      "the authenticated binding-ready lifecycle rebound the retained shadow before any test lookup",
+    ).toHaveBeenCalledOnce();
+    const reboundFrameBeforeLookup = structuredClone(shadow.authenticatedFrameContext);
+    const reboundShadow = getCoopV2Shadow(runtime);
+    expect(reboundShadow, "binding-ready reuses the one retained production shadow").toBe(shadow);
+    expect(reboundFrameBeforeLookup).toMatchObject({
+      sessionId: oldShadowFrame.sessionId,
+      runId: oldShadowFrame.runId,
+      sessionEpoch: oldShadowFrame.sessionEpoch,
+      seatMapId: oldShadowFrame.seatMapId,
+      membershipRevision: oldShadowFrame.membershipRevision + 1,
+      connectionGeneration: oldShadowFrame.connectionGeneration + 1,
+    });
+    expect(reboundShadow!.authorityFrontier(), "rebind preserves the global revision/control frontier").toEqual(
+      oldFrontier,
+    );
+    expect(reboundMembership.revision).toBe(oldMembership.revision + 1);
+    expect(runtime.controller.validateP33PeerFrameContext(oldPeerFrame, oldMembership.revision)).toBe(false);
+    expect(runtime.controller.validateP33PeerFrameContext(reboundPeerFrame, reboundMembership.revision)).toBe(true);
+    expect(coopSessionGeneration(), "same-runtime hot rejoin does not create a teardown generation").toBe(generation);
+    expect(pending.promise).toBe(exactPromise);
+    expect(pending.promiseSettled(), "binding replay cannot resolve the parked gameplay continuation").toBe(false);
+    expect(pending.rawHandoff).not.toHaveBeenCalled();
+    expect(runtime.v2DeferredMeTerminalRedrive, "authenticated rebind retains the exact parked callback").toBe(
+      pending.parked,
+    );
+    expect(JSON.stringify(runtime.v2DeferredMeTerminalRedrive)).toBe(pending.immutable);
+
+    pending.releaseProof();
+    expect(settleCoopV2InteractionOperation(pending.parked.operationId, runtime)).toBe(true);
+    await expect(exactPromise).resolves.toBe(true);
+    expect(pending.resolutionCount()).toBe(1);
+    expect(pending.rawHandoff, "the exact post-rebind proof relays once").toHaveBeenCalledOnce();
+    expect(captureCoopActiveMysteryControl()).toMatchObject({
+      terminal: "battle",
+      terminalStep: 2,
+      terminalOperationId: pending.parked.operationId,
+      terminalChoice: COOP_ME_BATTLE_HANDOFF,
+    });
+    expect(captureCoopActiveMysteryControl()!.revision).toBeGreaterThan(pending.priorControl!.revision);
+    expect(runtime.v2DeferredMeTerminalRedrive).toBeNull();
+    expect(
+      withActiveCoopRuntimeOpState(runtime.opState, () =>
+        meOp.captureCoopMeDeferredTerminal(pending.parked.operationId),
+      ),
+    ).toBeNull();
+
+    expect(settleCoopV2InteractionOperation(pending.parked.operationId, runtime)).toBe(true);
+    await Promise.resolve();
+    expect(pending.rawHandoff, "duplicate proof cannot relay after hot rejoin").toHaveBeenCalledOnce();
+    expect(pending.resolutionCount()).toBe(1);
+
+    logs.flush();
+  }, 300_000);
+
+  it("shared-terminal freeze cancels a parked handoff once and suppresses every gameplay continuation", async () => {
+    const boundary = await prepareBattleSettledHandoffBoundary();
+    const { rig } = boundary;
+
+    await withClient(rig.hostCtx, async () => {
+      const pending = await parkSecondHandoff(boundary);
+      failCoopSharedSession("test-only parked ME terminal freeze");
+      await expect(pending.promise).resolves.toBe(false);
+
+      expect(isCoopSharedTerminalFrozen(rig.hostRuntime)).toBe(true);
+      expect(pending.resolutionCount()).toBe(1);
+      expect(pending.rawHandoff).not.toHaveBeenCalled();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(
+        withActiveCoopRuntimeOpState(rig.hostRuntime.opState, () =>
+          meOp.captureCoopMeDeferredTerminal(pending.parked.operationId),
+        ),
+      ).toBeNull();
+      await Promise.resolve();
+      expect(pending.resolutionCount(), "terminal preparation cannot leak or recancel the Promise").toBe(1);
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it("session-generation teardown cancels a parked handoff and clears both deferred owners", async () => {
+    const boundary = await prepareBattleSettledHandoffBoundary();
+    const { rig } = boundary;
+
+    await withClient(rig.hostCtx, async () => {
+      const pending = await parkSecondHandoff(boundary);
+      const generation = coopSessionGeneration();
       clearCoopRuntime();
-      await expect(canceledPromise).resolves.toBe(false);
-      expect(canceledHandoff, "teardown resolves the parked handoff as canceled").toBe(true);
-      expect(rawHandoff, "teardown cannot relay a canceled handoff").toHaveBeenCalledOnce();
+      await expect(pending.promise).resolves.toBe(false);
+
+      expect(coopSessionGeneration()).toBe(generation + 1);
+      expect(getCoopRuntime()).toBeNull();
+      expect(pending.resolutionCount()).toBe(1);
+      expect(pending.rawHandoff).not.toHaveBeenCalled();
       expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(
+        withActiveCoopRuntimeOpState(rig.hostRuntime.opState, () =>
+          meOp.captureCoopMeDeferredTerminal(pending.parked.operationId),
+        ),
+      ).toBeNull();
+      await Promise.resolve();
+      expect(pending.resolutionCount(), "teardown leaves no unresolved Promise continuation").toBe(1);
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it("runtime replacement cancels the old parked handoff before installing the new runtime", async () => {
+    const boundary = await prepareBattleSettledHandoffBoundary();
+    const { rig } = boundary;
+    const replacementPair = createLoopbackPair();
+    const replacement = assembleCoopRuntime(replacementPair.host, {
+      username: "Replacement Host",
+      netcodeMode: "authoritative",
+    });
+    replacement.controller.role = "host";
+
+    await withClient(rig.hostCtx, async () => {
+      const pending = await parkSecondHandoff(boundary);
+      clearCoopRuntime();
+      setCoopRuntime(replacement);
+      await expect(pending.promise).resolves.toBe(false);
+
+      expect(getCoopRuntime()).toBe(replacement);
+      expect(pending.resolutionCount()).toBe(1);
+      expect(pending.rawHandoff).not.toHaveBeenCalled();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(
+        withActiveCoopRuntimeOpState(rig.hostRuntime.opState, () =>
+          meOp.captureCoopMeDeferredTerminal(pending.parked.operationId),
+        ),
+      ).toBeNull();
+      await Promise.resolve();
+      expect(pending.resolutionCount(), "replacement leaves no old-runtime Promise leak").toBe(1);
+      clearCoopRuntime();
+      replacementPair.guest.close();
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it("operation-disabled/no-journal owner handoff uses the compatibility pump once and never installs V2 control", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+    const hostScene = game.scene;
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      setCoopMeOperationEnabled(false);
+      setCoopOperationDurability(null);
+      expect(isCoopMeOperationEnabled()).toBe(false);
+      expect(isCoopOperationJournalActive()).toBe(false);
+      const rawHandoff = vi.spyOn(rig.hostRuntime.mePump, "relayMeBattleHandoff");
+
+      await runSelectMysteryEncounterOption(game, 1);
+      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      expect(hostScene.phaseManager.getCurrentPhase()).toBeInstanceOf(MysteryEncounterBattlePhase);
+      expect(rawHandoff, "legacy owner handoff retains its compatibility pump").toHaveBeenCalledOnce();
+      expect(rawHandoff).toHaveBeenCalledWith(expect.any(Number), true);
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "pending" });
+
+      const disabledTail = vi.fn();
+      const disabledDeferred = vi.fn();
+      const plan = {
+        result: "victory" as const,
+        continuation: "encounter" as const,
+        trainerVictory: false,
+        rewardSurfaces: [],
+        eggLapse: false,
+      };
+      expect(commitCoopMeBattleSettlementAtBattleEnd(plan, disabledTail, disabledDeferred)).toBe(false);
+      setCoopMeOperationEnabled(true);
+      expect(isCoopMeOperationEnabled()).toBe(true);
+      expect(isCoopOperationJournalActive()).toBe(false);
+      expect(commitCoopMeBattleSettlementAtBattleEnd(plan, disabledTail, disabledDeferred)).toBe(false);
+      expect(disabledTail).not.toHaveBeenCalled();
+      expect(disabledDeferred).not.toHaveBeenCalled();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "pending" });
+      expect(rawHandoff, "settlement no-ops do not manufacture another compatibility relay").toHaveBeenCalledOnce();
+    });
+
+    logs.flush();
+  }, 300_000);
+
+  it("no-journal no-battle settlement stays unparked and the real legacy reward picker opens", async () => {
+    await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [
+      SpeciesId.SNORLAX,
+      SpeciesId.GENGAR,
+    ]);
+    const hostScene = game.scene;
+    const pair = createLoopbackPair();
+    const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+    await withClient(rig.hostCtx, async () => {
+      setCoopMeOperationEnabled(false);
+      setCoopOperationDurability(null);
+      await runSelectMysteryEncounterOption(game, 1);
+      game.onNextPrompt(
+        "MysteryEncounterOptionSelectedPhase",
+        UiMode.MESSAGE,
+        () => hostScene.ui.getMessageHandler().processInput(Button.ACTION),
+        () => game.isCurrentPhase("MysteryEncounterRewardsPhase"),
+      );
+      await game.phaseInterceptor.to("MysteryEncounterRewardsPhase", false);
+      const rewards = hostScene.phaseManager.getCurrentPhase();
+      expect(rewards?.phaseName).toBe("MysteryEncounterRewardsPhase");
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "pending" });
+
+      const tail = vi.fn();
+      const deferred = vi.fn();
+      const plan = {
+        result: "victory" as const,
+        continuation: "rewards" as const,
+        trainerVictory: false,
+        rewardSurfaces: [],
+        eggLapse: true,
+      };
+      expect(commitCoopMeNoBattleRewardSettlementAfterPreparation(plan, tail, deferred)).toBe(false);
+      setCoopMeOperationEnabled(true);
+      expect(isCoopMeOperationEnabled()).toBe(true);
+      expect(isCoopOperationJournalActive()).toBe(false);
+      expect(commitCoopMeNoBattleRewardSettlementAfterPreparation(plan, tail, deferred)).toBe(false);
+      expect(tail).not.toHaveBeenCalled();
+      expect(deferred).not.toHaveBeenCalled();
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+
+      const rewardsStart = vi.spyOn(rewards, "start");
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+      expect(rewardsStart, "the legacy production reward phase runs exactly once").toHaveBeenCalledOnce();
+      expect(hostScene.phaseManager.getCurrentPhase()?.phaseName, "legacy rewards still open the real picker").toBe(
+        "SelectModifierPhase",
+      );
+      expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
+      expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "pending" });
     });
 
     logs.flush();

@@ -8,21 +8,23 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 function source(path: string): string {
-  return readFileSync(resolve(process.cwd(), path), "utf8");
+  return readFileSync(resolve(process.cwd(), path), "utf8").replace(/\r\n?/gu, "\n");
 }
 
 describe("Mystery battle reward preparation boundary", () => {
   it("keeps reward settlement out of BattleEnd", () => {
     const battleEnd = source("src/phases/battle-end-phase.ts");
     const boundaryStart = battleEnd.indexOf("    let meSettlementRetained = false;");
+    const boundaryGuard = battleEnd.indexOf("    if (meSettlementDeferred)", boundaryStart);
     const boundaryEnd = battleEnd.indexOf("    continueMeSettlementTail(meSettlementRetained);", boundaryStart);
+    expect(boundaryStart).toBeGreaterThanOrEqual(0);
+    expect(boundaryGuard).toBeGreaterThan(boundaryStart);
+    expect(boundaryEnd).toBeGreaterThan(boundaryStart);
+    expect(boundaryEnd).toBeGreaterThan(boundaryGuard);
     const boundary = battleEnd.slice(
       boundaryStart,
-      boundaryEnd < 0 ? boundaryEnd : boundaryEnd + "    continueMeSettlementTail(meSettlementRetained);".length,
+      boundaryEnd + "    continueMeSettlementTail(meSettlementRetained);".length,
     );
-
-    expect(boundaryStart).toBeGreaterThanOrEqual(0);
-    expect(boundaryEnd).toBeGreaterThan(boundaryStart);
     expect(boundary).toContain('this.meSettlementPlan?.continuation === "rewards"');
     expect(boundary).toContain("shouldDeferCoopMeBattleSettlementUntilRewardPreparation()");
     expect(boundary).toMatch(
@@ -33,7 +35,9 @@ describe("Mystery battle reward preparation boundary", () => {
   it("awaits automatic preparation before capture and opens the picker only afterward", () => {
     const rewardsPhase = source("src/phases/mystery-encounter-phases.ts");
     const methodStart = rewardsPhase.indexOf("  async doEncounterRewardsAndContinue(): Promise<void> {");
-    const methodEnd = rewardsPhase.indexOf("\n  }\n}\n\n/**", methodStart);
+    const methodEnd = rewardsPhase.indexOf("\n  /** A malformed typed plan", methodStart);
+    expect(methodStart).toBeGreaterThanOrEqual(0);
+    expect(methodEnd).toBeGreaterThan(methodStart);
     const method = rewardsPhase.slice(methodStart, methodEnd);
 
     const prepareCall = method.indexOf("const preparation = rewardPlan.prepareAutomaticEffects();");
@@ -46,16 +50,16 @@ describe("Mystery battle reward preparation boundary", () => {
     );
     const continuationStart = method.indexOf("const continueAfterSettlement = (): void => {");
     const continuationEnd = method.indexOf("\n    };", continuationStart);
+    expect(continuationStart).toBeGreaterThanOrEqual(0);
+    expect(continuationEnd).toBeGreaterThan(continuationStart);
     const continuation = method.slice(continuationStart, continuationEnd);
     const deferredGuard = method.indexOf("if (settlementDeferred)");
     const tail = method.indexOf("continueAfterSettlement();", deferredGuard);
     const picker = continuation.indexOf("encounter.doEncounterRewards();");
 
-    expect(methodStart).toBeGreaterThanOrEqual(0);
     expect(prepareCall).toBeGreaterThanOrEqual(0);
     expect(prepareAwait).toBeGreaterThan(prepareCall);
     expect(continuationStart).toBeGreaterThan(prepareAwait);
-    expect(continuationEnd).toBeGreaterThan(continuationStart);
     expect(picker).toBeGreaterThanOrEqual(0);
     expect(capture).toBeGreaterThan(prepareAwait);
     expect(noBattleCapture).toBeGreaterThan(capture);
@@ -90,22 +94,24 @@ describe("Mystery battle reward preparation boundary", () => {
   it("keeps every host ME terminal deferral exact, fenced, and legacy-safe", () => {
     const runtime = source("src/data/elite-redux/coop/coop-runtime.ts");
     const helperStart = runtime.indexOf("function continueCoopMeTerminalCommit(");
-    const helperEnd = runtime.indexOf("\n/** Redrive only the exact ME terminal", helperStart);
-    const helper = runtime.slice(helperStart, helperEnd);
+    const helperEnd = runtime.indexOf(
+      "\n/**\n * Production phase terminal proof for an authoritative interaction result.",
+      helperStart,
+    );
     const registerStart = runtime.indexOf("export function registerCoopMeTerminalRedrive(");
     const registerEnd = runtime.indexOf("\nfunction notifyCoopMeTerminalRedrive", registerStart);
-    const register = runtime.slice(registerStart, registerEnd);
     const redriveStart = runtime.indexOf("function redriveCoopMeTerminal(");
     const redriveEnd = runtime.indexOf("\ntype CoopMeTerminalContinuationResult", redriveStart);
-    const redrive = runtime.slice(redriveStart, redriveEnd);
     const handoffStart = runtime.indexOf("export async function coopMeOwnerRelayBattleHandoff(");
-    const handoff = runtime.slice(handoffStart);
+    const handoffEnd = runtime.indexOf("\n/**\n * Set up a LOCAL co-op session", handoffStart);
     const battleSettlementStart = runtime.indexOf("export function commitCoopMeBattleSettlementAtBattleEnd(");
     const noBattleSettlementStart = runtime.indexOf(
       "export function commitCoopMeNoBattleRewardSettlementAfterPreparation(",
     );
-    const battleSettlement = runtime.slice(battleSettlementStart, noBattleSettlementStart);
-    const noBattleSettlement = runtime.slice(noBattleSettlementStart, handoffStart);
+    const noBattleSettlementEnd = runtime.indexOf(
+      "export function holdForCoopMeBattleSettlementAtBattleEnd(",
+      noBattleSettlementStart,
+    );
 
     expect(helperStart).toBeGreaterThanOrEqual(0);
     expect(helperEnd).toBeGreaterThan(helperStart);
@@ -114,8 +120,17 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(redriveStart).toBeGreaterThanOrEqual(0);
     expect(redriveEnd).toBeGreaterThan(redriveStart);
     expect(handoffStart).toBeGreaterThanOrEqual(0);
+    expect(handoffEnd).toBeGreaterThan(handoffStart);
     expect(battleSettlementStart).toBeGreaterThanOrEqual(0);
     expect(noBattleSettlementStart).toBeGreaterThan(battleSettlementStart);
+    expect(noBattleSettlementEnd).toBeGreaterThan(noBattleSettlementStart);
+
+    const helper = runtime.slice(helperStart, helperEnd);
+    const register = runtime.slice(registerStart, registerEnd);
+    const redrive = runtime.slice(redriveStart, redriveEnd);
+    const handoff = runtime.slice(handoffStart, handoffEnd);
+    const battleSettlement = runtime.slice(battleSettlementStart, noBattleSettlementStart);
+    const noBattleSettlement = runtime.slice(noBattleSettlementStart, noBattleSettlementEnd);
 
     // A malformed/mismatched disposition cannot park anything: operation id, revision, envelope id/kind,
     // and byte identity are all checked before the owning callback is registered.
@@ -126,7 +141,10 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(helper).toContain("deferred.envelope.pendingOperation?.id !== disposition.operationId");
     expect(helper).toContain("deferred.envelope.pendingOperation?.kind !== \"ME_TERMINAL\"");
     expect(helper).toContain("JSON.stringify(deferred.envelope) === JSON.stringify(disposition.envelope)");
-    expect(helper.indexOf("installControl();")).toBeLessThan(helper.indexOf("captureCoopActiveMysteryControl()"));
+    const installControl = helper.indexOf("installControl();");
+    const validateControl = helper.indexOf("captureCoopActiveMysteryControl()");
+    expect(installControl).toBeGreaterThanOrEqual(0);
+    expect(validateControl).toBeGreaterThan(installControl);
     expect(helper).toContain("releaseCoopMeDeferredTerminal(fence.operationId)");
     expect(helper).toContain("registerCoopMeTerminalRedrive(");
     expect(helper).not.toContain("setTimeout(");
@@ -156,10 +174,14 @@ describe("Mystery battle reward preparation boundary", () => {
 
     // The host handoff has a Promise-owned deferred branch; raw relay and its compatibility flag are only
     // reached from the validated continuation, while the legacy retry remains restricted to failed commits.
-    const deferredHandoff = handoff.slice(
-      handoff.indexOf('if (disposition.kind === "deferred")'),
-      handoff.indexOf('if (disposition.kind === "failed" && isCoopMeOperationEnabled())'),
+    const deferredHandoffStart = handoff.indexOf('if (disposition.kind === "deferred")');
+    const deferredHandoffEnd = handoff.indexOf(
+      'if (disposition.kind === "failed" && isCoopMeOperationEnabled())',
+      deferredHandoffStart,
     );
+    expect(deferredHandoffStart).toBeGreaterThanOrEqual(0);
+    expect(deferredHandoffEnd).toBeGreaterThan(deferredHandoffStart);
+    const deferredHandoff = handoff.slice(deferredHandoffStart, deferredHandoffEnd);
     expect(deferredHandoff).toContain("new Promise<boolean>");
     expect(deferredHandoff).toContain("return await deferred;");
     expect(deferredHandoff).toContain("relayBattleHandoff();");
@@ -216,6 +238,8 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(replay).not.toContain("destination.addHeal");
     const settlementPlanStart = runtime.indexOf("export interface CoopMeBattleSettlementPlan");
     const settlementPlanEnd = runtime.indexOf("\n}\n", settlementPlanStart);
+    expect(settlementPlanStart).toBeGreaterThanOrEqual(0);
+    expect(settlementPlanEnd).toBeGreaterThan(settlementPlanStart);
     const settlementPlan = runtime.slice(settlementPlanStart, settlementPlanEnd);
     expect(settlementPlan).toContain("readonly rewardSurfaces: readonly CoopMeRewardSurfaceProjection[];");
     expect(settlementPlan).not.toContain("rewardShop");
@@ -229,10 +253,9 @@ describe("Mystery battle reward preparation boundary", () => {
       'coopLog("me", "retained reward continuation: guest opens only the host-stated surfaces"',
     );
     const retainedGuestEnd = rewardsPhase.indexOf("      const guestEncounter", retainedGuestStart);
-    const retainedGuest = rewardsPhase.slice(retainedGuestStart, retainedGuestEnd);
-
     expect(retainedGuestStart).toBeGreaterThanOrEqual(0);
     expect(retainedGuestEnd).toBeGreaterThan(retainedGuestStart);
+    const retainedGuest = rewardsPhase.slice(retainedGuestStart, retainedGuestEnd);
     expect(phaseTree).toContain("addLevel.push(phase);");
     expect(phaseTree).toContain("return this.levels[this.currentLevel].shift();");
     expect(retainedGuest).toContain("for (const [ordinal, surface] of this.authoritativeRewardSurfaces.entries())");
