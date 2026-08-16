@@ -198,15 +198,22 @@ export function successorWaitAllows(
   // #automatic victory deferral: a faint whose wave is WON the SAME turn (sourceTurn N) settles its
   // WAVE_ADVANCE at settlementTurn N+1.
   //
-  // The bounded N-or-N+1 rule for WAVE_ADVANCE/TERMINAL_COMMIT belongs to ANY wait that authorizes a
-  // COMPLETE settlement boundary - both a victory (WAVE_ADVANCE) AND a game-over (TERMINAL_COMMIT) may
-  // follow. That is the broad TURN_COMMIT-adapter wait AND a faint's REPLACEMENT terminal successor (which
-  // authorizes INTERACTION_COMMIT/WAVE_ADVANCE/TERMINAL_COMMIT): a guest replacement that wins the wave the
-  // same turn must let its deferred settlement land. A single-direction wait (e.g. only WAVE_ADVANCE) is a
-  // precise prediction that stays EXACT, and arbitrary N+2 drift remains fail-closed.
+  // The bounded N-or-N+1 rule for WAVE_ADVANCE/TERMINAL_COMMIT is a narrow same-wave settlement bypass for
+  // the validated TURN/REPLACEMENT waits. Both a victory and a game-over may follow those waits, while a
+  // single-direction wait (e.g. only WAVE_ADVANCE) remains an exact prediction and arbitrary N+2 drift stays
+  // fail-closed.
   const controlOnly = wait.allowedKinds.length === 1 && wait.allowedKinds[0] === "CONTROL_COMMIT";
+  const canonicalBroadSettlementKinds = [
+    "CONTROL_COMMIT",
+    "REPLACEMENT_COMMIT",
+    "INTERACTION_COMMIT",
+    "WAVE_ADVANCE",
+    "TERMINAL_COMMIT",
+  ] as const;
   const settlementBoundaryWait =
-    wait.allowedKinds.includes("WAVE_ADVANCE") && wait.allowedKinds.includes("TERMINAL_COMMIT");
+    !wait.allowNextWaveStart
+    && wait.allowedKinds.length === canonicalBroadSettlementKinds.length
+    && canonicalBroadSettlementKinds.every(kind => wait.allowedKinds.includes(kind));
   if (address.wave === wait.wave + 1) {
     // Battle-open control and settled wave/terminal material are authored at turn 1. A mystery encounter
     // is the one mechanical surface that legitimately opens before that battle turn exists: its complete

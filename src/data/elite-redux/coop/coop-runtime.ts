@@ -1666,9 +1666,10 @@ const pendingHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
 /** Settled host transactions retained by wave, including a terminal victory that supersedes GameOver's echo. */
 const settledHostWaveTransitions = new Map<number, CoopWaveAdvancePayload>();
 /**
- * A normal victory observed while its material battle turn is still recording. The transition is staged
+ * A win or flee observed while its material battle turn is still recording. The transition is staged
  * immediately so BattleEnd can freeze its identity, but its raw compatibility hint cannot leave the host
- * until the immutable turn commit has been accepted for retention.
+ * until the immutable turn commit has been accepted for retention. Capture is intentionally excluded because
+ * its party carrier has separate semantics.
  */
 const deferredHostWaveResolved = new Map<
   number,
@@ -5222,6 +5223,7 @@ function revokeCoopV2AuthorityProposalWait(runtime: CoopRuntime, wait: CoopV2Aut
 function projectCoopV2InteractionControl(
   runtime: CoopRuntime,
   control: Extract<ProjectableControl, { kind: "SHARED_INTERACTION" | "REPLACEMENT" | "AWAIT_SUCCESSOR" }>,
+  phaseToken?: object,
 ): CoopControlInstallResult {
   const controlId = controlIdOf(control);
   if (control.kind === "AWAIT_SUCCESSOR") {
@@ -5263,7 +5265,7 @@ function projectCoopV2InteractionControl(
   }
 
   const contract = coopV2InteractionProofContract(control);
-  const observation = observeCoopV2InteractionSurface(contract);
+  const observation = observeCoopV2InteractionSurface(contract, phaseToken);
   const messageShopWatcherReady =
     control.kind === "REPLACEMENT"
     || observation?.uiMode !== UiMode.MESSAGE
@@ -5271,12 +5273,14 @@ function projectCoopV2InteractionControl(
       && runtime.controller.localSeatId !== control.ownerSeatId
       && (observation.phaseToken as { coopBiomeWatcherContinuationReady?: boolean }).coopBiomeWatcherContinuationReady
         === true);
+  const exactPhaseProof = phaseToken !== undefined;
   const publicSurface =
-    (control.kind === "REPLACEMENT" && runtime.controller.localSeatId !== control.ownerSeatId)
+    (!exactPhaseProof && control.kind === "REPLACEMENT" && runtime.controller.localSeatId !== control.ownerSeatId)
     || (contract != null
       && observation != null
       && (contract.phaseNames as readonly string[]).includes(observation.phaseName)
       && (contract.uiModes as readonly number[]).includes(observation.uiMode)
+      && (!exactPhaseProof || observation.operationId === control.operationId)
       && messageShopWatcherReady);
   if (!publicSurface || (control.kind !== "REPLACEMENT" && observation == null)) {
     return {
@@ -5357,6 +5361,7 @@ function coopV2InteractionProofContract(
 
 function observeCoopV2InteractionSurface(
   contract: CoopV2InteractionProofContract | null = null,
+  phaseToken?: object,
 ): CoopV2InteractionSurfaceObservation | null {
   try {
     const phase = globalScene.phaseManager?.getCurrentPhase();
@@ -5369,6 +5374,10 @@ function observeCoopV2InteractionSurface(
     if (phase == null || handler == null || typeof phase !== "object" || typeof handler !== "object") {
       return null;
     }
+    // An explicit token is the caller's retained proof identity. The live phase and handler are still
+    // inspected below for the current actionable surface and operation, but a retained source-wave phase
+    // need not be the PhaseManager cursor at the moment its handler reports readiness.
+    const proofPhaseToken = phaseToken ?? phase;
     const handlerActive = handler.active === true;
     const actionable =
       handlerActive && typeof handler.isCoopV2InputActionable === "function" && handler.isCoopV2InputActionable();
@@ -5393,7 +5402,7 @@ function observeCoopV2InteractionSurface(
       // V2 identity binds the concrete registered subclass without changing that load-bearing legacy name.
       phaseName: concretePhaseName,
       uiMode: globalScene.ui.getMode(),
-      phaseToken: phase,
+      phaseToken: proofPhaseToken,
       handlerToken: handler,
       handlerActive,
       actionable,
@@ -5495,7 +5504,10 @@ export function coopHostEngineDialogueMessageAdvanceAllowed(ctx: {
 }
 
 /** Retry the exact retained interaction claim after a real phase reports that its public handler is active. */
-export function notifyCoopV2InteractionSurfaceReady(runtime: CoopRuntime | null = active): boolean {
+export function notifyCoopV2InteractionSurfaceReady(
+  runtime: CoopRuntime | null = active,
+  phaseToken?: object,
+): boolean {
   if (runtime == null || !coopV2ShadowHarnesses.has(runtime)) {
     return false;
   }
@@ -5503,7 +5515,7 @@ export function notifyCoopV2InteractionSurfaceReady(runtime: CoopRuntime | null 
   if (control?.kind !== "SHARED_INTERACTION" && control?.kind !== "REPLACEMENT") {
     return false;
   }
-  const projected = projectCoopV2InteractionControl(runtime, control);
+  const projected = projectCoopV2InteractionControl(runtime, control, phaseToken);
   coopV2ShadowHarnesses.get(runtime)?.retryPendingReplicaEntries();
   return projected.kind === "installed" || projected.kind === "already-installed";
 }
@@ -6992,10 +7004,8 @@ function enterCoopV2BiomeInteractionControlBoundary(
   spec: CoopV2BiomeInteractionOpenSpec,
 ): CoopV2InteractionBoundaryVerdict {
   const runtime = active;
-  const battle = globalScene.currentBattle;
   if (
     runtime == null
-    || battle == null
     || !coopV2ControlCutovers.has(runtime)
     || !coopV2InteractionCutovers.has(runtime)
   ) {
@@ -7009,16 +7019,7 @@ function enterCoopV2BiomeInteractionControlBoundary(
     || input.sourceWave <= 0
     || !Number.isSafeInteger(input.sourceTurn)
     || input.sourceTurn < 0
-    || battle.waveIndex !== input.sourceWave
   ) {
-    return "failed";
-  }
-  // The picker is enqueued at the exact post-BattleEnd settlement turn and starts only after the terminal
-  // reward result has installed its wait at that same address. Its constructor-captured coordinate is also
-  // used by the eventual result envelope, so open, result, recovery, and replay remain one ordered w/t
-  // boundary instead of consulting a later speculative battle.
-  const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
-  if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
     return "failed";
   }
   const control: Extract<CoopNextControl, { kind: "SHARED_INTERACTION" }> = {
@@ -7027,8 +7028,8 @@ function enterCoopV2BiomeInteractionControlBoundary(
     operationId: input.operationId,
     ownerSeatId: input.ownerSeatId,
     epoch: runtime.controller.sessionEpoch,
-    wave: state.wave,
-    turn: state.turn,
+    wave: input.sourceWave,
+    turn: input.sourceTurn,
     operationKind: spec.operationKind,
     successor: {
       operationKinds: [spec.operationKind],
@@ -7041,51 +7042,71 @@ function enterCoopV2BiomeInteractionControlBoundary(
     return "failed";
   }
   const current = runtime.v2ControlLedger.latestControl;
+  // A retained, address-equal materialized control is already authenticated and may be resumed without a
+  // mutable battle cursor. Authority creation below still requires the live source battle and exact capture.
+  if (
+    current != null
+    && controlsEqual(current, control)
+    && runtime.v2ControlLedger.isMaterialApplied(current)
+  ) {
+    return "ready";
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    if (current?.kind === "TERMINAL") {
+      return "failed";
+    }
+    const controlId = controlIdOf(control);
+    const existing = runtime.v2DeferredInteractionStarts.get(controlId);
+    if (existing != null && existing.phaseToken !== input.phaseToken) {
+      return "failed";
+    }
+    runtime.v2DeferredInteractionStarts.set(controlId, {
+      phaseToken: input.phaseToken,
+      resume: input.resume,
+    });
+    coopLog("v2-control", `parked ${spec.label} until ordered interaction-open ${controlId}`);
+    return "deferred";
+  }
+  const battle = globalScene.currentBattle;
+  if (battle == null || battle.waveIndex !== input.sourceWave) {
+    return "failed";
+  }
+  // The picker is enqueued at the exact post-BattleEnd settlement turn and starts only after the terminal
+  // reward result has installed its wait at that same address. Its constructor-captured coordinate is also
+  // used by the eventual result envelope, so open, result, recovery, and replay remain one ordered w/t
+  // boundary instead of consulting a later speculative battle.
+  const state = captureCoopAuthoritativeBattleState(input.sourceTurn);
+  if (state == null || state.wave !== input.sourceWave || state.turn !== input.sourceTurn) {
+    return "failed";
+  }
   if (current != null && controlsEqual(current, control) && runtime.v2ControlLedger.isMaterialApplied(current)) {
     return "ready";
   }
-  if (runtime.controller.authorityRole === "authority") {
-    const cutover = coopV2ControlCutovers.get(runtime);
-    const frontier = cutover?.authorityFrontier()?.nextControl ?? null;
-    if (frontier != null && controlsEqual(frontier, control)) {
-      return "ready";
-    }
-    if (cutover == null || frontier?.kind !== "AWAIT_SUCCESSOR" || !frontier.allowedKinds.includes("CONTROL_COMMIT")) {
-      coopWarn(
-        "v2-control",
-        `${spec.label} predecessor is ${frontier?.kind ?? "none"}, expected CONTROL_COMMIT-authorizing wait`,
-      );
-      return "failed";
-    }
-    const material: CoopInteractionOpenMaterialV2 = {
-      kind: "interaction-open",
-      wave: state.wave,
-      turn: state.turn,
-      authoritativeState: state,
-      control,
-      projection: {
-        kind: spec.projectionKind,
-        sourceWave: input.sourceWave,
-      },
-    };
-    const operationId = `V2/CONTROL/INTERACTION/${input.operationId}`;
-    return cutover.commitHostInteractionOpen({ operationId, material }) == null ? "failed" : "ready";
+  const cutover = coopV2ControlCutovers.get(runtime);
+  const frontier = cutover?.authorityFrontier()?.nextControl ?? null;
+  if (frontier != null && controlsEqual(frontier, control)) {
+    return "ready";
   }
-
-  if (current?.kind === "TERMINAL") {
+  if (cutover == null || frontier?.kind !== "AWAIT_SUCCESSOR" || !frontier.allowedKinds.includes("CONTROL_COMMIT")) {
+    coopWarn(
+      "v2-control",
+      `${spec.label} predecessor is ${frontier?.kind ?? "none"}, expected CONTROL_COMMIT-authorizing wait`,
+    );
     return "failed";
   }
-  const controlId = controlIdOf(control);
-  const existing = runtime.v2DeferredInteractionStarts.get(controlId);
-  if (existing != null && existing.phaseToken !== input.phaseToken) {
-    return "failed";
-  }
-  runtime.v2DeferredInteractionStarts.set(controlId, {
-    phaseToken: input.phaseToken,
-    resume: input.resume,
-  });
-  coopLog("v2-control", `parked ${spec.label} until ordered interaction-open ${controlId}`);
-  return "deferred";
+  const material: CoopInteractionOpenMaterialV2 = {
+    kind: "interaction-open",
+    wave: state.wave,
+    turn: state.turn,
+    authoritativeState: state,
+    control,
+    projection: {
+      kind: spec.projectionKind,
+      sourceWave: input.sourceWave,
+    },
+  };
+  const operationId = `V2/CONTROL/INTERACTION/${input.operationId}`;
+  return cutover.commitHostInteractionOpen({ operationId, material }) == null ? "failed" : "ready";
 }
 
 /** Author the every-five-waves Crossroads interaction-open. */
@@ -8445,7 +8466,7 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
     commitCoopSettledWaveAdvance(wave, transition);
   }
   const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
-  if (outcome === "win" && isCoopRecording()) {
+  if ((outcome === "win" || outcome === "flee") && isCoopRecording()) {
     deferredHostWaveResolved.set(wave, { outcome, captureParty, presentation, transition });
     coopLog(
       "runtime",
@@ -8457,14 +8478,14 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
 }
 
 /**
- * Capture the exact normal-victory marker owned by the runtime at the immutable turn boundary.
+ * Capture the exact deferred wave-outcome marker owned by the runtime at the immutable turn boundary.
  *
  * A missing marker is ordinary (most turns). If one exists, every identity must still match the active
  * host runtime and its staged transition; returning a best-effort value after any mismatch would let a
  * stale map entry choose the next V2 control, so inconsistent state throws and the commit phase terminates
  * the shared session fail-closed.
  */
-export function captureCoopDeferredWaveOutcomeForTurnCommit(wave: number): "win" | null {
+export function captureCoopDeferredWaveOutcomeForTurnCommit(wave: number): "win" | "flee" | null {
   const deferred = deferredHostWaveResolved.get(wave);
   if (deferred == null) {
     return null;
@@ -8473,16 +8494,16 @@ export function captureCoopDeferredWaveOutcomeForTurnCommit(wave: number): "win"
   if (
     active == null
     || active.controller.role !== "host"
-    || deferred.outcome !== "win"
+    || (deferred.outcome !== "win" && deferred.outcome !== "flee")
     || deferred.transition.wave !== wave
     || staged == null
     || staged !== deferred.transition
     || staged.wave !== wave
-    || staged.outcome !== "win"
+    || staged.outcome !== deferred.outcome
   ) {
-    throw new Error(`the deferred normal-victory marker for wave ${wave} lost its staged transition identity`);
+    throw new Error(`the deferred wave-outcome marker for wave ${wave} lost its staged transition identity`);
   }
-  return "win";
+  return deferred.outcome;
 }
 
 // Keep the universal move engine independent from this orchestration module. In any co-op session the
