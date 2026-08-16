@@ -229,6 +229,7 @@ import type { GameManager } from "#test/framework/game-manager";
 import type { GameWrapper } from "#test/framework/game-wrapper";
 import { TextInterceptor } from "#test/framework/text-interceptor";
 import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
+import { PartyUiMode } from "#ui/party-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import fs from "node:fs";
 import path from "node:path";
@@ -1906,6 +1907,7 @@ export async function driveClientPhaseQueueTo(
   const perPhaseTimeoutMs = options.perPhaseTimeoutMs ?? 10_000;
   const peerCtx = peerContextByScene.get(scene);
   const startedPeerPhases = new WeakSet<Phase>();
+  const startedPhases = options.startedPhases ?? new WeakSet<Phase>();
   const pumpPeer =
     options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases));
 
@@ -1928,8 +1930,8 @@ export async function driveClientPhaseQueueTo(
     // installation, so refresh the completion model at each real phase boundary before that phase can
     // exercise the exact launch-ready gate. This wraps only newly seen Pokemon and remains idempotent.
     installHeadlessPlayerAtlasCompletionModel(scene);
-    if (!options.startedPhases?.has(phase)) {
-      options.startedPhases?.add(phase);
+    if (!startedPhases.has(phase)) {
+      startedPhases.add(phase);
       phase.start();
     }
     const deadline = Date.now() + perPhaseTimeoutMs;
@@ -2210,6 +2212,7 @@ export async function settleDuoPromise<T>(
  * test green.
  */
 export async function materializeGuestInputAfterReplacement(scene: BattleScene): Promise<void> {
+  const startedPhases = new WeakSet<Phase>();
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
   if (current?.phaseName === "CoopFinalizeTurnPhase" || queued.includes("CoopFinalizeTurnPhase")) {
@@ -2219,8 +2222,12 @@ export async function materializeGuestInputAfterReplacement(scene: BattleScene):
         : await driveClientPhaseQueueTo(scene, "replacement CoopFinalizeTurnPhase", {
             matches: phase => phase.phaseName === "CoopFinalizeTurnPhase",
             perPhaseTimeoutMs: 5_000,
+            startedPhases,
           });
-    finalize.start();
+    if (!startedPhases.has(finalize)) {
+      startedPhases.add(finalize);
+      finalize.start();
+    }
     const deadline = Date.now() + 5_000;
     while (scene.phaseManager.getCurrentPhase() === finalize) {
       await drainLoopback();
@@ -2768,13 +2775,18 @@ export async function buildDuo(
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).
-  setCoopRuntimeFn(hostRuntime);
-  hostRuntime.controller.connect();
-  setCoopRuntimeFn(guestRuntime);
-  guestRuntime.controller.connect();
-  await drainLoopback();
-
   const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair: runtimePair };
+  withClientSync(hostCtx, () => {
+    setCoopRuntimeFn(hostRuntime);
+    hostRuntime.controller.connect();
+  });
+  withClientSync(guestCtx, () => {
+    setCoopRuntimeFn(guestRuntime);
+    guestRuntime.controller.connect();
+  });
+  await withClient(hostCtx, () => drainLoopback());
+  await withClient(guestCtx, () => drainLoopback());
+
   // Production installs both runtimes before Encounter/Summon. This direct-mirror fixture deliberately
   // pairs after the solo host already reached CommandPhase, so it must migrate BOTH boundaries it skipped:
   // publish the complete retained wave-start carrier and open the scoped turn recorder before the guest's
@@ -3169,6 +3181,7 @@ export async function driveGuestReplayTurn(
   const realBoundary = realGuestCommandBoundaries.get(guestScene);
   let replay: Phase;
   let replayStarted = false;
+  const startedReplayPhases = new WeakSet<Phase>();
   if (current?.phaseName === "CoopReplayTurnPhase") {
     replay = current;
   } else {
@@ -3196,6 +3209,7 @@ export async function driveGuestReplayTurn(
     }
   }
   if (!replayStarted) {
+    startedReplayPhases.add(replay);
     replay.start();
   }
   await drainLoopback();
@@ -3214,6 +3228,7 @@ export async function driveGuestReplayTurn(
   let lastPhase: Phase | null = null;
   let postFinalizeReplacement: Phase | null = null;
   const startedHostTailPhases = new WeakSet<Phase>();
+  let finalized = false;
   let stall = 0;
   for (let i = 0; i < 256; i++) {
     const cur = guestScene.phaseManager.getCurrentPhase();
@@ -3231,6 +3246,12 @@ export async function driveGuestReplayTurn(
           `guest replay STRANDED before finalize on ${cur?.phaseName ?? "(none)"}; queued=[${queued.join(",")}]`,
         );
       }
+      if (!finalized) {
+        throw new Error(
+          `guest replay exited without CoopFinalizeTurnPhase on ${cur?.phaseName ?? "(none)"}; `
+            + `queued=[${queued.join(",")}]`,
+        );
+      }
       return;
     }
     if (cur === lastPhase) {
@@ -3244,7 +3265,10 @@ export async function driveGuestReplayTurn(
     const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
     if (cur !== startedPhase) {
       startedPhase = cur;
-      cur.start();
+      if (!startedReplayPhases.has(cur)) {
+        startedReplayPhases.add(cur);
+        cur.start();
+      }
     }
     await drainLoopback();
     // A parked replica may have just emitted tailRequest / a compatibility ACK
@@ -3282,11 +3306,21 @@ export async function driveGuestReplayTurn(
     // input successor; every other post-finalize surface remains the caller's next boundary as before.
     if (wasFinalize) {
       const successor = guestScene.phaseManager.getCurrentPhase();
+      if (successor === cur) {
+        // The finalizer is asynchronous and remains parked while its checkpoint/receipt work settles.
+        // Keep pumping this same object; re-entering it would duplicate the terminal side effects and
+        // could displace the parked finalizer with a synthetic successor.
+        continue;
+      }
+      finalized = true;
       if (successor?.phaseName !== "CoopGuestFaintSwitchPhase") {
         return;
       }
       postFinalizeReplacement = successor;
     }
+  }
+  if (!finalized) {
+    throw new Error("guest replay exceeded its phase pump without running CoopFinalizeTurnPhase");
   }
 }
 
@@ -3993,18 +4027,20 @@ export async function driveHostPartyRewardOwner(
     option?: number;
     /** Start/arrive the other real client at this same reciprocal shop boundary before the owner commits. */
     partnerReady?: () => Promise<void>;
+    /** Pump the other real client between owner-side UI drains while the reciprocal shop is open. */
+    partnerPump?: () => Promise<void>;
     /** Let the other client materialize the retained terminal after the owner commits. */
     partnerSettle?: () => Promise<void>;
   } = {},
 ): Promise<number> {
   const slot = opts.slot ?? 0;
   const option = opts.option ?? 0;
-  hostPhase.start();
   // V2 reciprocal shop rendezvous: the owner ARRIVEs at shop:<wave>:<counter> and AWAITs the partner before
   // its committed pick may enter the authority log. Park the watcher at that same barrier here (as a real
   // second browser reaching the shop would) so the party-target commit is admitted, not refused into a
   // shared-session terminal. Mirrors driveHostRewardShopOwner's partnerReady seam.
   await opts.partnerReady?.();
+  hostPhase.start();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
   // Find the first PARTY-TARGET reward (the inverse of driveHostRewardShopOwner's non-party filter).
@@ -4045,6 +4081,11 @@ export async function driveHostPartyRewardOwner(
   if (!partyReady) {
     throw new Error(`party reward ${idx} did not open an actionable PARTY surface at interaction ${pinned}`);
   }
+  const partyHandler = globalScene.ui.getHandler() as unknown as {
+    partyUiMode?: PartyUiMode;
+    fusionPreviewActive?: boolean;
+  };
+  const isSplice = partyHandler.partyUiMode === PartyUiMode.SPLICE;
   for (let cursor = 0; cursor < slot; cursor++) {
     if (!globalScene.ui.processInput(Button.DOWN)) {
       throw new Error(`party reward UI could not navigate to party slot ${slot} at interaction ${pinned}`);
@@ -4053,23 +4094,51 @@ export async function driveHostPartyRewardOwner(
   if (!globalScene.ui.processInput(Button.ACTION)) {
     throw new Error(`party reward UI could not open options for slot ${slot} at interaction ${pinned}`);
   }
-  // Ordinary PokemonModifierType rewards expose APPLY as the first option. The optional legacy `option`
-  // remains supported for callers that need a later option, but navigation still travels through the real
-  // options handler instead of calling its callback.
-  for (let cursor = 0; cursor < option; cursor++) {
-    if (!globalScene.ui.processInput(Button.DOWN)) {
-      throw new Error(`party reward UI could not navigate to option ${option} at interaction ${pinned}`);
+  if (isSplice) {
+    // SPLICE's first public menu is the base-mon menu: APPLY locks that mon and only then exposes the
+    // second-Pokemon cursor. Selecting the second mon before APPLY bypasses the real transfer/preview path.
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`party reward UI could not APPLY the splice base at interaction ${pinned}`);
     }
-  }
-  if (!globalScene.ui.processInput(Button.ACTION)) {
-    throw new Error(`party reward UI rejected option ${option} at interaction ${pinned}`);
+    const fusionPreviewWasActive = partyHandler.fusionPreviewActive === true;
+    const delta = option - slot;
+    const button = delta >= 0 ? Button.DOWN : Button.UP;
+    for (let cursor = 0; cursor < Math.abs(delta); cursor++) {
+      if (!globalScene.ui.processInput(button)) {
+        throw new Error(`party reward UI could not navigate to splice partner ${option} at interaction ${pinned}`);
+      }
+    }
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`party reward UI could not select splice partner ${option} at interaction ${pinned}`);
+    }
+    // Headless rigs may not build the fusion preview panel. In that case the first ACTION opens the real
+    // transfer options and the second ACTION selects SPLICE; neither branch invokes a private callback.
+    if (!fusionPreviewWasActive) {
+      if (!globalScene.ui.processInput(Button.ACTION)) {
+        throw new Error(`party reward UI could not confirm splice partner ${option} at interaction ${pinned}`);
+      }
+    }
+  } else {
+    // Ordinary PokemonModifierType rewards expose APPLY as the first option. The optional legacy `option`
+    // remains supported for callers that need a later option, but navigation still travels through the real
+    // options handler instead of calling its callback.
+    for (let cursor = 0; cursor < option; cursor++) {
+      if (!globalScene.ui.processInput(Button.DOWN)) {
+        throw new Error(`party reward UI could not navigate to option ${option} at interaction ${pinned}`);
+      }
+    }
+    if (!globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`party reward UI rejected option ${option} at interaction ${pinned}`);
+    }
   }
   // The handler terminal restores MODIFIER_SELECT asynchronously, then the authoritative result publishes.
   for (let i = 0; i < 8; i++) {
     await drainLoopback();
+    await opts.partnerPump?.();
   }
   await opts.partnerSettle?.();
   await drainLoopback();
+  await awaitRewardShopPhaseExit(hostPhase);
   return pinned;
 }
 
@@ -4953,7 +5022,12 @@ function feedHostFightMove(
 /** Restore the window-start session state after the test launcher has built the checkpoint wave. */
 function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable<ReplayTrace["checkpoint"]>): void {
   const party = scene.getPlayerParty();
-  party.splice(0, party.length);
+  const previousParty = [...party];
+  const previousById = new Map(previousParty.map(mon => [mon.id, mon]));
+  const previousFieldIds = new Set(
+    previousParty.filter(mon => scene.field.getIndex(mon) >= 0).map(mon => mon.id),
+  );
+  const restoredParty: PlayerPokemon[] = [];
   for (const [index, raw] of checkpoint.party.entries()) {
     const checkpointMoves = (raw.moveset ?? []).map(move => PokemonMove.loadMove(move));
     const data = new PokemonData(raw);
@@ -4970,11 +5044,52 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
       data.nature ?? 0,
       data,
     );
-    mon.coopOwner = data.coopOwner ?? (index % 2 === 0 ? "host" : "guest");
+    const previous = previousById.get(mon.id);
+    const previousIdentity = previous as (PlayerPokemon & { coopOwnerSeatId?: number }) | undefined;
+    mon.coopOwner = data.coopOwner ?? previous?.coopOwner ?? (index % 2 === 0 ? "host" : "guest");
+    if (previousIdentity?.coopOwnerSeatId != null) {
+      (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = previousIdentity.coopOwnerSeatId;
+    } else {
+      (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = mon.coopOwner === "host" ? 0 : 1;
+    }
     mon.calculateStats();
     // Test overrides may replace a constructor's moveset; the checkpoint is authoritative.
     mon.moveset = checkpointMoves;
-    party.push(mon);
+    stubBattleInfo(mon);
+    if (previous != null) {
+      mon.fieldPosition = previous.fieldPosition;
+      mon.switchOutStatus = previous.switchOutStatus;
+      mon.visible = previous.visible;
+      mon.active = previous.active;
+      mon.x = previous.x;
+      mon.y = previous.y;
+      const previousBattleInfo = (previous as unknown as { battleInfo?: { visible?: boolean } }).battleInfo;
+      const restoredBattleInfo = (mon as unknown as { battleInfo?: { visible?: boolean } }).battleInfo;
+      if (restoredBattleInfo != null) {
+        restoredBattleInfo.visible = previousBattleInfo?.visible ?? previous.visible;
+      }
+    }
+    restoredParty.push(mon);
+  }
+
+  // Replace the party and its Phaser field children as one synchronous restoration. Capturing only the
+  // party array leaves globalScene.field holding stale Pokemon objects, so the next frontier records the
+  // wrong IDs/owners or reports a parked actor as absent. Re-add in the old field order to preserve seating
+  // and on-field membership without inventing a new active slot from checkpoint data.
+  for (const previous of previousParty) {
+    if (previousFieldIds.has(previous.id)) {
+      scene.field.remove(previous, false);
+    }
+  }
+  party.splice(0, party.length, ...restoredParty);
+  const restoredById = new Map(restoredParty.map(mon => [mon.id, mon]));
+  for (const previous of previousParty) {
+    if (previousFieldIds.has(previous.id)) {
+      const restored = restoredById.get(previous.id);
+      if (restored != null) {
+        scene.field.add(restored);
+      }
+    }
   }
 
   scene.money = checkpoint.money;

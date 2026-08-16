@@ -52,6 +52,7 @@ import {
   beginRewardShopWatch,
   buildDuo,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
@@ -65,7 +66,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { createScheduledCoopPair, type ScheduledCoopPair } from "#test/tools/coop-scheduled-transport";
-import { PartyOption } from "#ui/party-ui-handler";
+import { PartyOption, PartyUiMode } from "#ui/party-ui-handler";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -110,12 +111,14 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
 
   /** Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). */
   function wireGuestCommand(rig: DuoRig): void {
-    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) =>
+      withClientSync(rig.guestCtx, () => ({
+        command: Command.FIGHT,
+        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+        moveId: MoveId.TACKLE,
+        targets: [BattlerIndex.ENEMY_2],
+      }))
+    );
   }
 
   /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx,
@@ -162,6 +165,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
           partnerReady: async () => {
             await withClient(rig.guestCtx, () => beginRewardShopWatch(guestShop));
           },
+          partnerPump: () => withClient(rig.guestCtx, () => drainLoopback()),
           partnerSettle: () =>
             withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop, { alreadyStarted: true })),
         }),
@@ -174,6 +178,7 @@ describe.skipIf(!RUN)("co-op DUO reward sub-pickers: owner drives, watcher adopt
           partnerReady: async () => {
             await withClient(rig.hostCtx, () => beginRewardShopWatch(hostShop));
           },
+          partnerPump: () => withClient(rig.hostCtx, () => drainLoopback()),
           partnerSettle: () => withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop, { alreadyStarted: true })),
         }),
       );

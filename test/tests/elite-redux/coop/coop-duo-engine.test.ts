@@ -19,7 +19,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
-import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, getCoopV2Shadow, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -32,18 +31,17 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import {
+  buildDuo,
   buildGuestScene,
   buildRuntime,
-  type ClientCtx,
   drainLoopback,
   driveClientPhaseQueueTo,
-  emptyGhostSnapshot,
+  driveGuestReplayTurn,
   installDuoLogCapture,
-  installHeadlessPlayerAtlasCompletionModel,
-  mirrorHostBattleToGuest,
   reachInterceptedRewardShop,
   shiftQueuedGuestBootTail,
   withClient,
+  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { installHeadlessCoopSemanticProjectionOracle } from "#test/tools/coop-semantic-presentation";
 import Phaser from "phaser";
@@ -199,64 +197,27 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
   }, 120_000);
 
   it("DUO: host plays a turn, the REAL guest engine RECVs+RESOLVEs+applies the checkpoint over loopback", async () => {
-    // ===== HOST engine =====
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const hostScene = game.scene;
     const pair = createLoopbackPair();
-    // Assemble BOTH runtimes over the ONE loopback pair (assembleCoopRuntime does NOT clear/close,
-    // so building the guest does not disconnect the host - the inventory's "assemble once" rule).
-    const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
-    const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
-    hostRuntime.controller.role = "host";
-    guestRuntime.controller.role = "guest";
-
-    hostScene.gameMode = getGameMode(GameModes.COOP);
-    const hostField = hostScene.getPlayerField();
-    hostField[COOP_HOST_FIELD_INDEX].coopOwner = "host";
-    hostField[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
-    const hostCtx: ClientCtx = {
-      label: "host",
-      scene: hostScene,
-      runtime: hostRuntime,
-      rndState: Phaser.Math.RND.state(),
-      ghost: emptyGhostSnapshot(),
-    };
-
-    // ===== GUEST engine (a 2nd real BattleScene) =====
-    const guestScene = buildGuestScene(game);
-    const guestCtx: ClientCtx = {
-      label: "guest",
-      scene: guestScene,
-      runtime: guestRuntime,
-      rndState: Phaser.Math.RND.state(),
-      ghost: emptyGhostSnapshot(),
-    };
-    await withClient(guestCtx, () => {
-      mirrorHostBattleToGuest(hostScene, guestScene);
-      // This older hand-assembled spike bypasses buildDuo, so wire the same HEADLESS-only Phaser cache/live
-      // key completion model explicitly. The production projection path below remains otherwise unchanged.
-      installHeadlessPlayerAtlasCompletionModel(guestScene);
-      const gf = guestScene.getPlayerField();
-      gf[COOP_HOST_FIELD_INDEX].coopOwner = "host";
-      gf[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
+    // The shared builder mirrors the real guest and adopts the already-open host CommandPhase through the
+    // same pre-pair frontier proof used by every two-engine fixture. It preserves the host's actual actor
+    // instead of synthesizing a control receipt from a hand-assembled context.
+    const rig = await buildDuo(game, pair, setCoopRuntime, scene => {
+      scene.gameMode = getGameMode(GameModes.COOP);
     });
-
-    // Connect both controllers (exchange hello / dataFingerprint over the live loopback).
-    setCoopRuntime(hostRuntime);
-    hostRuntime.controller.connect();
-    setCoopRuntime(guestRuntime);
-    guestRuntime.controller.connect();
-    await drainLoopback();
+    const { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx } = rig;
 
     // The REAL guest engine answers the host's commandRequest for ITS OWN slot via the
     // production CoopBattleSync relay (the guest's transport endpoint), picking move 0. This is
     // the genuine guest-side command channel - not a hand-authored turnResolution.
-    guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-      moveId: MoveId.TACKLE,
-      targets: [BattlerIndex.ENEMY_2],
-    }));
+    guestRuntime.battleSync.onCommandRequest(({ moveSlots }) =>
+      withClientSync(guestCtx, () => ({
+        command: Command.FIGHT,
+        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+        moveId: MoveId.TACKLE,
+        targets: [BattlerIndex.ENEMY_2],
+      }))
+    );
 
     // Track the exact carrier the guest received. Legacy applies the numeric checkpoint directly; Authority
     // V2 intentionally bypasses that function and proves the immutable carrier reached its material boundary.
@@ -341,62 +302,3 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     logs.flush();
   }, 180_000);
 });
-
-/**
- * Pump a guest scene's phase queue to completion (it has no PhaseInterceptor; the harness made
- * startCurrentPhase inert). Runs each current phase, drains loopback between, until the queue is
- * empty or a no-progress hang is detected (which FAILS the spike with both logs already captured).
- */
-/**
- * The presentation phases {@linkcode CoopReplayTurnPhase} unshifts (anim pump + deferred finalize),
- * plus the MessagePhase a `message` event queues. The checkpoint + wave-advance run in the deferred
- * {@linkcode CoopFinalizeTurnPhase} (LAST on the tree level), so we drain these to observe the
- * checkpoint applied. (Mirrors the single-engine guest test's REPLAY_DRAIN_PHASES.)
- */
-const REPLAY_DRAIN_PHASES = new Set([
-  "MessagePhase",
-  "CoopMoveAnimReplayPhase",
-  "CoopHpDrainReplayPhase",
-  "CoopStatStageReplayPhase",
-  "CoopStatusReplayPhase",
-  "CoopFaintReplayPhase",
-  "CoopFinalizeTurnPhase",
-]);
-
-/**
- * Start a guest {@linkcode CoopReplayTurnPhase} for `turn` and drain the presentation phases it
- * unshifts PLUS the deferred {@linkcode CoopFinalizeTurnPhase} (which applies the host's checkpoint,
- * verifies the checksum, queues turn-end + the wave-advance tail). Throws on a no-progress hang so
- * the spike FAILS loudly (with both clients' logs already captured). The drain runs each phase to
- * completion; the anim/tween work is force-ended headlessly.
- */
-async function driveGuestReplayTurn(
-  guestScene: { phaseManager: { create: (n: "CoopReplayTurnPhase", t: number) => Phase; getCurrentPhase(): Phase } },
-  turn: number,
-): Promise<void> {
-  const replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-  replay.start();
-  await drainLoopback();
-  let lastName = "";
-  let stall = 0;
-  for (let i = 0; i < 64; i++) {
-    const cur = guestScene.phaseManager.getCurrentPhase();
-    if (cur == null || !REPLAY_DRAIN_PHASES.has(cur.phaseName)) {
-      return;
-    }
-    if (cur.phaseName === lastName) {
-      if (++stall > 16) {
-        throw new Error(`guest replay HANG: stuck on ${cur.phaseName} - see dev-logs/coop-duo/`);
-      }
-    } else {
-      stall = 0;
-    }
-    lastName = cur.phaseName;
-    const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
-    cur.start();
-    await drainLoopback();
-    if (wasFinalize) {
-      return;
-    }
-  }
-}

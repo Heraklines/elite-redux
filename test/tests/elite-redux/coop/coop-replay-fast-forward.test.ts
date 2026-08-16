@@ -142,20 +142,54 @@ describe.skipIf(!RUN)("co-op replay pacing: animations-off fast-forward (coop/fi
   const driveReplayTurnCapturingSequence = async (turn: number): Promise<string[]> => {
     const sequence: string[] = [];
     const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    await new Promise(r => setTimeout(r, 0));
-    for (let i = 0; i < 40; i++) {
+    const startedPhases = new WeakSet<object>();
+    const seenPhases = new WeakSet<object>();
+    let lastPhase: object | null = null;
+    let samePhaseWaits = 0;
+    let sawFinalize = false;
+    const startOnce = (phase: object & { start(): void }): void => {
+      if (startedPhases.has(phase)) {
+        return;
+      }
+      startedPhases.add(phase);
+      phase.start();
+    };
+    startOnce(replay);
+    for (let i = 0; i < 80; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
       if (cur == null || !REPLAY_DRAIN_PHASES.some(name => cur.is(name))) {
+        if (!sawFinalize) {
+          throw new Error(
+            `replay fast-forward left the drain before CoopFinalizeTurnPhase on ${cur?.phaseName ?? "(none)"}`,
+          );
+        }
         break;
       }
       const wasFinalize = cur.is("CoopFinalizeTurnPhase");
-      sequence.push(cur.phaseName);
-      cur.start();
-      await new Promise(r => setTimeout(r, 0));
-      if (wasFinalize) {
-        break;
+      if (cur === lastPhase) {
+        samePhaseWaits += 1;
+        if (samePhaseWaits > 24) {
+          throw new Error(`replay fast-forward stalled on ${cur.phaseName}`);
+        }
+      } else {
+        lastPhase = cur;
+        samePhaseWaits = 0;
       }
+      if (!seenPhases.has(cur)) {
+        seenPhases.add(cur);
+        sequence.push(cur.phaseName);
+      }
+      startOnce(cur);
+      await new Promise(r => setTimeout(r, 0));
+      if (wasFinalize && game.scene.phaseManager.getCurrentPhase() !== cur) {
+        sawFinalize = true;
+      }
+    }
+    if (!sawFinalize) {
+      throw new Error("replay fast-forward completed without leaving a real CoopFinalizeTurnPhase");
+    }
+    if (game.scene.phaseManager.getCurrentPhase() === lastPhase) {
+      throw new Error("replay fast-forward left the real finalizer parked as current");
     }
     return sequence;
   };
