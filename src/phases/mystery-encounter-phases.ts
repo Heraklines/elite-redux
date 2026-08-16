@@ -471,6 +471,7 @@ export class MysteryEncounterPhase extends Phase {
       const controller = getCoopController();
       const generation = coopSessionGeneration();
       const pinned = coopMeInteractionStartValue();
+      const battle = globalScene.currentBattle;
       const wave = globalScene.currentBattle?.waveIndex ?? -1;
       this.coopSelectionBoundaryLive = (): boolean =>
         globalScene === boundScene
@@ -478,6 +479,7 @@ export class MysteryEncounterPhase extends Phase {
         && getCoopController() === controller
         && coopSessionGeneration() === generation
         && coopMeInteractionStartValue() === pinned
+        && globalScene.currentBattle === battle
         && (globalScene.currentBattle?.waveIndex ?? -1) === wave
         && globalScene.phaseManager.getCurrentPhase() === this;
     }
@@ -495,12 +497,14 @@ export class MysteryEncounterPhase extends Phase {
       const controller = getCoopController();
       const generation = coopSessionGeneration();
       const pinned = coopMeInteractionStartValue();
+      const battle = globalScene.currentBattle;
       const live = (): boolean =>
         globalScene === boundScene
         && getCoopRuntime() === runtime
         && getCoopController() === controller
         && coopSessionGeneration() === generation
         && coopMeInteractionStartValue() === pinned
+        && globalScene.currentBattle === battle
         && globalScene.phaseManager.getCurrentPhase() === this;
       void globalScene.ui
         .setModeBoundedWhen(UiMode.MYSTERY_ENCOUNTER, 2_000, live, this.optionSelectSettings)
@@ -821,11 +825,24 @@ export class MysteryEncounterPhase extends Phase {
 
     // Populate dialogue tokens for option requirements
     globalScene.currentBattle.mysteryEncounter!.populateDialogueTokensFromRequirements();
+    const ownerScene = globalScene;
+    const ownerBattle = ownerScene.currentBattle;
+    const ownerRuntime = getCoopRuntime();
+    const ownerController = getCoopController();
+    const ownerGeneration = coopSessionGeneration();
+    const ownerPhase = this;
+    const ownerStillLive = (): boolean =>
+      ownerScene === globalScene
+      && ownerBattle === globalScene.currentBattle
+      && ownerRuntime === getCoopRuntime()
+      && ownerController === getCoopController()
+      && ownerGeneration === coopSessionGeneration()
+      && globalScene.phaseManager.getCurrentPhase() === ownerPhase;
 
     if (option.onPreOptionPhase) {
       globalScene.executeWithSeedOffset(async () => {
         return await option.onPreOptionPhase!().then(result => {
-          if (result == null || result) {
+          if ((result == null || result) && ownerStillLive()) {
             this.continueEncounter();
           }
         });
@@ -841,17 +858,34 @@ export class MysteryEncounterPhase extends Phase {
    * Queues {@linkcode MysteryEncounterOptionSelectedPhase}, displays option.selected dialogue and ends phase
    */
   continueEncounter() {
+    const scene = globalScene;
+    const battle = scene.currentBattle;
+    const runtime = getCoopRuntime();
+    const controller = getCoopController();
+    const generation = coopSessionGeneration();
+    const ownerStillLive = (): boolean =>
+      scene === globalScene
+      && scene.currentBattle === battle
+      && runtime === getCoopRuntime()
+      && controller === getCoopController()
+      && generation === coopSessionGeneration()
+      && scene.phaseManager.getCurrentPhase() === this;
     const endDialogueAndContinueEncounter = () => {
-      globalScene.phaseManager.pushNew("MysteryEncounterOptionSelectedPhase");
-      this.end();
+      if (ownerStillLive()) {
+        scene.phaseManager.pushNew("MysteryEncounterOptionSelectedPhase");
+        this.end();
+      }
     };
 
-    const optionSelectDialogue = globalScene.currentBattle?.mysteryEncounter?.selectedOption?.dialogue;
+    const optionSelectDialogue = battle?.mysteryEncounter?.selectedOption?.dialogue;
     if (optionSelectDialogue?.selected && optionSelectDialogue.selected.length > 0) {
       // Handle intermediate dialogue (between player selection event and the onOptionSelect logic)
       const selectedDialogue = optionSelectDialogue.selected;
       let i = 0;
       const showNextDialogue = () => {
+        if (!ownerStillLive()) {
+          return;
+        }
         const nextAction = i === selectedDialogue.length - 1 ? endDialogueAndContinueEncounter : showNextDialogue;
         const dialogue = selectedDialogue[i];
         let title: string | null = null;
@@ -862,7 +896,7 @@ export class MysteryEncounterPhase extends Phase {
 
         i++;
         if (title) {
-          globalScene.ui.showDialogue(
+          scene.ui.showDialogue(
             text ?? "",
             title,
             null,
@@ -871,7 +905,7 @@ export class MysteryEncounterPhase extends Phase {
             i === 1 ? this.FIRST_DIALOGUE_PROMPT_DELAY : 0,
           );
         } else {
-          globalScene.ui.showText(text ?? "", null, nextAction, i === 1 ? this.FIRST_DIALOGUE_PROMPT_DELAY : 0, true);
+          scene.ui.showText(text ?? "", null, nextAction, i === 1 ? this.FIRST_DIALOGUE_PROMPT_DELAY : 0, true);
         }
       };
 
@@ -879,7 +913,11 @@ export class MysteryEncounterPhase extends Phase {
       // late mode transition clear the freshly-installed prompt/action callback: the selected line was
       // visible but ACTION returned false forever (live Hot Spring / other simple ME softlock). Finish
       // the handler transition first, then publish the dialogue and its continuation.
-      globalScene.ui.setMode(UiMode.MESSAGE).then(showNextDialogue);
+      void scene.ui.setMode(UiMode.MESSAGE).then(() => {
+        if (ownerStillLive()) {
+          showNextDialogue();
+        }
+      });
     } else {
       endDialogueAndContinueEncounter();
     }
@@ -889,7 +927,23 @@ export class MysteryEncounterPhase extends Phase {
    * Ends phase
    */
   end() {
-    globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+    const scene = globalScene;
+    const battle = scene.currentBattle;
+    const runtime = getCoopRuntime();
+    const controller = getCoopController();
+    const generation = coopSessionGeneration();
+    void scene.ui.setMode(UiMode.MESSAGE).then(() => {
+      if (
+        scene === globalScene
+        && scene.currentBattle === battle
+        && runtime === getCoopRuntime()
+        && controller === getCoopController()
+        && generation === coopSessionGeneration()
+        && scene.phaseManager.getCurrentPhase() === this
+      ) {
+        super.end();
+      }
+    });
   }
 }
 
@@ -906,6 +960,12 @@ export class MysteryEncounterOptionSelectedPhase extends Phase {
 
   constructor() {
     super();
+    // The authoritative guest must not dereference the local ME mechanics object while a
+    // replay-owned phase is being constructed. The start() guard is too late for queued phases.
+    if (isCoopAuthoritativeGuest()) {
+      this.onOptionSelect = () => Promise.resolve();
+      return;
+    }
     this.onOptionSelect = globalScene.currentBattle.mysteryEncounter!.selectedOption!.onOptionPhase;
   }
 
@@ -1313,6 +1373,11 @@ export class MysteryEncounterRewardsPhase extends Phase {
   private readonly authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null;
   /** Settlement retained after automatic reward preparation on the authoritative host. */
   private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
+  private owningScene: typeof globalScene | null = null;
+  private owningBattle: typeof globalScene.currentBattle | null = null;
+  private owningRuntime: ReturnType<typeof getCoopRuntime> = null;
+  private owningController: ReturnType<typeof getCoopController> = null;
+  private owningGeneration = -1;
 
   constructor(
     addHealPhase = false,
@@ -1330,6 +1395,11 @@ export class MysteryEncounterRewardsPhase extends Phase {
    */
   start() {
     super.start();
+    this.owningScene = globalScene;
+    this.owningBattle = globalScene.currentBattle;
+    this.owningRuntime = getCoopRuntime();
+    this.owningController = getCoopController();
+    this.owningGeneration = coopSessionGeneration();
     // Co-op AUTHORITATIVE GUEST (#633, CHANGE-1 / B1): do NOT blanket early-end. The guest must run
     // the embedded reward shop as the reward WATCHER (CHANGE-2 forces host=owner, so the guest
     // adopts the host's exact streamed items). Skip the host-only engine work (onRewards /
@@ -1384,7 +1454,10 @@ export class MysteryEncounterRewardsPhase extends Phase {
         this.end();
         return;
       }
-      const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
+      const guestEncounter = this.owningBattle?.mysteryEncounter;
+      if (guestEncounter == null || !this.ownerStillLive()) {
+        return;
+      }
       coopLog("me", "reward-owner override: guest runs reward shop as WATCHER (host=owner)", {
         counter: coopMeInteractionStartValue(),
         hasDoEncounterRewards: !!guestEncounter.doEncounterRewards,
@@ -1397,25 +1470,40 @@ export class MysteryEncounterRewardsPhase extends Phase {
       const preparation = guestRewardPlan?.prepareAutomaticEffects();
       if (preparation != null) {
         preparation.then(
-          () => this.openLegacyGuestRewardSurface(),
-          error => this.handleRewardPreparationFailure(error),
+          () => {
+            if (this.ownerStillLive()) {
+              this.openLegacyGuestRewardSurface();
+            }
+          },
+          error => {
+            if (this.ownerStillLive()) {
+              this.handleRewardPreparationFailure(error);
+            }
+          },
         );
         return;
       }
       this.openLegacyGuestRewardSurface();
       return;
     }
-    const encounter = globalScene.currentBattle.mysteryEncounter!;
+    const encounter = this.owningBattle?.mysteryEncounter;
+    if (encounter == null || !this.ownerStillLive()) {
+      return;
+    }
 
     if (encounter.doContinueEncounter) {
       encounter.doContinueEncounter().then(() => {
-        this.end();
+        if (this.ownerStillLive()) {
+          this.end();
+        }
       });
     } else {
       globalScene.executeWithSeedOffset(() => {
         if (encounter.onRewards) {
           encounter.onRewards().then(() => {
-            this.doEncounterRewardsAndContinue();
+            if (this.ownerStillLive()) {
+              void this.doEncounterRewardsAndContinue();
+            }
           });
         } else {
           this.doEncounterRewardsAndContinue();
@@ -1427,10 +1515,13 @@ export class MysteryEncounterRewardsPhase extends Phase {
 
   /** Preserve the pre-plan legacy guest watcher path after any automatic helper preparation. */
   private openLegacyGuestRewardSurface(): void {
-    if (globalScene.phaseManager.getCurrentPhase() !== this) {
+    if (!this.ownerStillLive()) {
       return;
     }
-    const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
+    const guestEncounter = this.owningBattle?.mysteryEncounter;
+    if (guestEncounter == null) {
+      return;
+    }
     if (guestEncounter.doEncounterRewards) {
       guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
     } else if (this.addHealPhase) {
@@ -1448,7 +1539,13 @@ export class MysteryEncounterRewardsPhase extends Phase {
    * Queues encounter EXP and rewards phases, {@linkcode PostMysteryEncounterPhase}, and ends phase
    */
   async doEncounterRewardsAndContinue(): Promise<void> {
-    const encounter = globalScene.currentBattle.mysteryEncounter!;
+    if (!this.ownerStillLive()) {
+      return;
+    }
+    const encounter = this.owningBattle?.mysteryEncounter;
+    if (encounter == null) {
+      return;
+    }
 
     if (encounter.doEncounterExp) {
       encounter.doEncounterExp();
@@ -1469,10 +1566,7 @@ export class MysteryEncounterRewardsPhase extends Phase {
         return;
       }
     }
-    if (
-      globalScene.currentBattle?.mysteryEncounter !== encounter
-      || globalScene.phaseManager.getCurrentPhase() !== this
-    ) {
+    if (!this.ownerStillLive() || this.owningBattle?.mysteryEncounter !== encounter) {
       return;
     }
 
@@ -1483,6 +1577,11 @@ export class MysteryEncounterRewardsPhase extends Phase {
       if (!battleSettlementRetained) {
         commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);
       }
+    }
+    // The no-battle fallback may synchronously terminalize and clear the owning runtime/battle.
+    // Never open modifiers or queue a post-ME phase against that cleared owner.
+    if (!this.ownerStillLive()) {
+      return;
     }
 
     if (encounter.doEncounterRewards) {
@@ -1510,12 +1609,28 @@ export class MysteryEncounterRewardsPhase extends Phase {
 
   /** A malformed typed plan is a shared terminal, never an indefinitely parked reward phase. */
   private handleRewardPreparationFailure(error: unknown): void {
+    if (!this.ownerStillLive()) {
+      return;
+    }
     coopWarn("me", "Mystery reward preparation rejected its typed surface plan", error);
     if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
       failCoopSharedSession("Mystery reward preparation produced an invalid shared surface plan.");
       return;
     }
     throw error;
+  }
+
+  /** Async reward work may outlive a retained no-battle terminal; never reopen a cleared battle. */
+  private ownerStillLive(): boolean {
+    return (
+      this.owningScene === globalScene
+      && this.owningBattle != null
+      && this.owningBattle === globalScene.currentBattle
+      && this.owningRuntime === getCoopRuntime()
+      && this.owningController === getCoopController()
+      && this.owningGeneration === coopSessionGeneration()
+      && globalScene.phaseManager.getCurrentPhase() === this
+    );
   }
 }
 

@@ -67,6 +67,7 @@ import { abortActiveCoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import type { ErQuizResult } from "#phases/er-quiz-phase";
 import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-handler";
+import type { MysteryEncounterUiHandler } from "#ui/handlers/mystery-encounter-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
 
@@ -272,6 +273,7 @@ export class CoopReplayMePhase extends Phase {
   private boundController: ReturnType<typeof getCoopController> = null;
   private boundGeneration = -1;
   private boundScene: typeof globalScene | null = null;
+  private boundBattle: typeof globalScene.currentBattle | null = null;
   /** Once-resolved shop edge, inherited by every outcome-pump re-arm just like the terminal arm. */
   private liveShopArm: MeShopArm | undefined;
   /** Outcome waiter installed before a queued post-battle successor can be overtaken by its old instance. */
@@ -281,6 +283,7 @@ export class CoopReplayMePhase extends Phase {
   private boundaryStillLive(): boolean {
     return (
       this.boundScene === globalScene
+      && this.boundBattle === globalScene.currentBattle
       && activeCoopReplayMePhase === this
       && getCoopRuntime() === this.boundRuntime
       && getCoopController() === this.boundController
@@ -289,23 +292,72 @@ export class CoopReplayMePhase extends Phase {
     );
   }
 
+  /** UI continuations must still belong to this exact phase, not merely the retained replay pin. */
+  private surfaceBoundaryStillLive(): boolean {
+    return this.boundaryStillLive() && globalScene.phaseManager.getCurrentPhase() === this;
+  }
+
   private openModeBounded(mode: UiMode, ...args: unknown[]): Promise<"completed" | "forced" | "superseded"> {
-    return globalScene.ui.setModeBoundedWhen(mode, 2_000, () => this.boundaryStillLive(), ...args);
+    const scene = globalScene;
+    const battle = scene.currentBattle;
+    const runtime = this.boundRuntime;
+    const controller = this.boundController;
+    const generation = this.boundGeneration;
+    const phase = this;
+    const ownerStillLive = (): boolean =>
+      scene === globalScene
+      && scene.currentBattle === battle
+      && runtime === getCoopRuntime()
+      && controller === getCoopController()
+      && generation === coopSessionGeneration()
+      && activeCoopReplayMePhase === phase
+      && scene.phaseManager.getCurrentPhase() === phase
+      && coopMeInteractionStartValue() === this.interactionCounter;
+    return scene.ui.setModeBoundedWhen(mode, 2_000, ownerStillLive, ...args);
   }
 
   /** Open the exact Mystery handler, then publish readiness only for this still-live addressed generation. */
   private openV2MysterySurface(): void {
+    const scene = globalScene;
+    const battle = scene.currentBattle;
+    const runtime = this.boundRuntime;
+    const controller = this.boundController;
+    const generation = this.boundGeneration;
+    const operationId = this.coopV2ControlOperationId;
+    const ownerStillLive = (): boolean =>
+      scene === globalScene
+      && scene.currentBattle === battle
+      && runtime === getCoopRuntime()
+      && controller === getCoopController()
+      && generation === coopSessionGeneration()
+      && activeCoopReplayMePhase === this
+      && scene.phaseManager.getCurrentPhase() === this
+      && coopMeInteractionStartValue() === this.interactionCounter;
+    if (!ownerStillLive() || operationId == null) {
+      return;
+    }
+    // setMode does not call show again when the mode is unchanged and the old handler is still
+    // active. Clear that cosmetic instance first so repeated rounds receive a fresh generation.
+    const handler = scene.ui.handlers[UiMode.MYSTERY_ENCOUNTER] as MysteryEncounterUiHandler | undefined;
+    if (scene.ui.getMode() === UiMode.MYSTERY_ENCOUNTER && handler?.active) {
+      handler.clear();
+    }
     const opening = this.openModeBounded(UiMode.MYSTERY_ENCOUNTER, undefined);
     // setModeBoundedWhen may install the handler synchronously. Publish in that same call stack so a public
     // input cannot commit the next entry before this presentation records controlInstalled. The notifier is
     // fail-closed: it proves the exact phase, operation id, mode, handler, and actionability before advancing.
-    if (this.boundaryStillLive() && this.coopV2ControlOperationId != null) {
-      notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
+    if (ownerStillLive() && this.coopV2ControlOperationId === operationId) {
+      notifyCoopV2InteractionSurfaceReady(runtime, this);
     }
     // Retain the settled retry for implementations where the UI handler becomes actionable asynchronously.
     void opening.then(opened => {
-      if (opened !== "superseded" && this.boundaryStillLive() && this.coopV2ControlOperationId != null) {
-        notifyCoopV2InteractionSurfaceReady(this.boundRuntime);
+      if (opened !== "superseded" && ownerStillLive() && this.coopV2ControlOperationId === operationId) {
+        // The replay selector is already bound to the exact retained presentation. Its one-second
+        // guard is only click-through protection for ordinary solo openings; release it here so a
+        // verified replay generation cannot wait on a cosmetic timer.
+        const boundHandler = scene.ui.handlers[UiMode.MYSTERY_ENCOUNTER] as MysteryEncounterUiHandler | undefined;
+        boundHandler?.unblockInput();
+        notifyCoopV2InteractionSurfaceReady(runtime, this);
       }
     });
   }
@@ -324,6 +376,7 @@ export class CoopReplayMePhase extends Phase {
     this.boundController = getCoopController();
     this.boundGeneration = coopSessionGeneration();
     this.boundScene = globalScene;
+    this.boundBattle = globalScene.currentBattle;
     if (resumeSettlement != null) {
       this.acceptedTerminal = {
         kind: "battle-settled",
@@ -387,6 +440,7 @@ export class CoopReplayMePhase extends Phase {
     this.boundController = getCoopController();
     this.boundGeneration = coopSessionGeneration();
     this.boundScene = globalScene;
+    this.boundBattle = globalScene.currentBattle;
     coopLog("me", "guest diverted into CoopReplayMePhase", {
       counter: this.interactionCounter,
       seqMe: this.seq,
@@ -886,7 +940,7 @@ export class CoopReplayMePhase extends Phase {
   }
 
   private subPromptTicketLive(identity: string): boolean {
-    return this.boundaryStillLive() && this.subPromptIntentGate.canSubmit(identity);
+    return this.surfaceBoundaryStillLive() && this.subPromptIntentGate.canSubmit(identity);
   }
 
   public relayGuestSubPick(value: number, presentationIdentity?: string): boolean {
@@ -1293,7 +1347,7 @@ export class CoopReplayMePhase extends Phase {
     // chosen index, relay it, and loop. A cancel option relays the out-of-range "not selected" index.
     const labels = subPrompt.labels;
     void this.openModeBounded(UiMode.MESSAGE).then(opened => {
-      if (opened === "superseded" || !this.boundaryStillLive()) {
+      if (opened === "superseded" || !this.surfaceBoundaryStillLive()) {
         return;
       }
       const options = labels.map((label, idx) => ({

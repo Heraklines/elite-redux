@@ -1,6 +1,11 @@
 import { globalScene } from "#app/global-scene";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
-import { getCoopController, notifyCoopV2InteractionSurfaceReady } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopSessionGeneration,
+  getCoopController,
+  getCoopRuntime,
+  notifyCoopV2InteractionSurfaceReady,
+} from "#data/elite-redux/coop/coop-runtime";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -54,6 +59,8 @@ export class MysteryEncounterUiHandler extends UiHandler {
   // co-op guest whose ME opened before displayEncounterOptions populated it - reads [] rather than crashing on
   // `optionsMeetsReqs[cursor]` of undefined.
   private optionsMeetsReqs: boolean[] = [];
+  /** Monotonic identity for each visible selector generation. */
+  private surfaceGeneration = 0;
 
   protected viewPartyIndex = 0;
   protected viewPartyXPosition = 0;
@@ -107,6 +114,13 @@ export class MysteryEncounterUiHandler extends UiHandler {
   override show(args: any[]): boolean {
     super.show(args);
 
+    // The same handler instance is reused for repeated ME rounds and handoffs. Reset the
+    // click-through guard for every visible generation; otherwise a prior round's release can
+    // make a freshly-rendered selector actionable before its presentation is bound.
+    this.surfaceGeneration += 1;
+    const surfaceGeneration = this.surfaceGeneration;
+    this.blockInput = true;
+
     this.overrideSettings = (args[0] as OptionSelectSettings) ?? {};
     const showDescriptionContainer =
       this.overrideSettings?.hideDescription == null ? true : !this.overrideSettings.hideDescription;
@@ -128,7 +142,7 @@ export class MysteryEncounterUiHandler extends UiHandler {
     }
     if (this.blockInput) {
       setTimeout(() => {
-        this.unblockInput();
+        this.unblockInput(surfaceGeneration);
       }, 1000);
     }
     this.displayOptionTooltip();
@@ -162,12 +176,33 @@ export class MysteryEncounterUiHandler extends UiHandler {
             ...this.overrideSettings,
             slideInDescription: false,
           };
-          globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
-            globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, overrideSettings);
-            setTimeout(() => {
-              this.setCursor(this.viewPartyIndex);
-              this.unblockInput();
-            }, 300);
+          const scene = globalScene;
+          const battle = scene.currentBattle;
+          const runtime = getCoopRuntime();
+          const generation = coopSessionGeneration();
+          const phase = scene.phaseManager.getCurrentPhase();
+          const ownerStillLive = (): boolean =>
+            scene === globalScene
+            && scene.currentBattle === battle
+            && getCoopRuntime() === runtime
+            && coopSessionGeneration() === generation
+            && scene.phaseManager.getCurrentPhase() === phase;
+          scene.ui.setMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
+            if (!ownerStillLive()) {
+              return;
+            }
+            void scene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, overrideSettings).then(() => {
+              if (!ownerStillLive()) {
+                return;
+              }
+              const nextGeneration = this.surfaceGeneration;
+              setTimeout(() => {
+                if (ownerStillLive()) {
+                  this.setCursor(this.viewPartyIndex);
+                  this.unblockInput(nextGeneration);
+                }
+              }, 300);
+            });
           });
         } else if (
           this.blockInput
@@ -326,7 +361,10 @@ export class MysteryEncounterUiHandler extends UiHandler {
    * When ME UI first displays, the option buttons will be disabled temporarily to prevent player accidentally clicking through hastily
    * This method is automatically called after a short delay but can also be called manually
    */
-  unblockInput() {
+  unblockInput(surfaceGeneration = this.surfaceGeneration) {
+    if (surfaceGeneration !== this.surfaceGeneration) {
+      return;
+    }
     if (this.blockInput) {
       this.blockInput = false;
       for (let i = 0; i < this.optionsContainer.length - 1; i++) {
@@ -344,7 +382,11 @@ export class MysteryEncounterUiHandler extends UiHandler {
       // projector therefore cannot prove executable control from either of the phase's initial readiness
       // probes. Publish the actual false -> true actionability edge or ME_PRESENT remains uninstalled and
       // every later ME_PICK is correctly held behind it as a revision gap.
-      notifyCoopV2InteractionSurfaceReady();
+    }
+    // Readiness is an idempotent edge, but it must be emitted for every exact actionable
+    // generation, including a replay surface that was already cosmetically unblocked.
+    if (this.active && !this.blockInput) {
+      notifyCoopV2InteractionSurfaceReady(getCoopRuntime(), globalScene.phaseManager.getCurrentPhase());
     }
   }
 
@@ -736,6 +778,8 @@ export class MysteryEncounterUiHandler extends UiHandler {
 
   override clear(): void {
     super.clear();
+    // Invalidate delayed releases from the generation being torn down.
+    this.surfaceGeneration += 1;
     this.overrideSettings = undefined;
     this.optionsContainer.setVisible(false);
     this.optionsContainer.removeAll(true);
