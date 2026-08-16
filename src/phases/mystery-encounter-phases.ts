@@ -1604,41 +1604,72 @@ export class MysteryEncounterRewardsPhase extends Phase {
       return;
     }
 
+    let postSettlementTailStarted = false;
+    const continueAfterSettlement = (): void => {
+      if (postSettlementTailStarted) {
+        return;
+      }
+      postSettlementTailStarted = true;
+      if (isCoopSharedTerminalFrozen(this.owningRuntime)) {
+        return;
+      }
+      if (!this.ownerStillLive() || this.owningBattle?.mysteryEncounter !== encounter) {
+        failCoopSharedSession("Mystery reward settlement continuation lost its owning phase.");
+        return;
+      }
+
+      if (encounter.doEncounterRewards) {
+        encounter.doEncounterRewards();
+      } else if (this.addHealPhase) {
+        globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+        const declaredSurface = this.meSettlementPlan?.rewardSurfaces[0];
+        globalScene.phaseManager.unshiftNew(
+          "SelectModifierPhase",
+          0,
+          undefined,
+          {
+            fillRemaining: false,
+            rerollMultiplier: -1,
+          },
+          false,
+          { kind: "ambient" },
+          declaredSurface?.kind === "modifier" ? { surfaceId: declaredSurface.surfaceId, ordinal: 0 } : undefined,
+        );
+      }
+
+      globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
+      this.end();
+    };
+
     // Capture the complete P36 ordered plan after automatic preparation and before any standard modifier
     // picker becomes interactive.
+    let settlementDeferred = false;
     if (this.meSettlementPlan != null) {
-      const battleSettlementRetained = commitCoopMeBattleSettlementAfterRewardPreparation(this.meSettlementPlan);
+      const battleSettlementRetained = commitCoopMeBattleSettlementAfterRewardPreparation(
+        this.meSettlementPlan,
+        continueAfterSettlement,
+        () => {
+          settlementDeferred = true;
+        },
+      );
       if (!battleSettlementRetained) {
-        commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);
+        commitCoopMeNoBattleRewardSettlementAfterPreparation(
+          this.meSettlementPlan,
+          continueAfterSettlement,
+          () => {
+            settlementDeferred = true;
+          },
+        );
       }
+    }
+    if (settlementDeferred) {
+      // The exact ME terminal redrive owns the remaining reward tail. Teardown/cancellation clears the
+      // parked callback, so no picker or PostMysteryEncounterPhase can open after an invalidated boundary.
+      return;
     }
     // The no-battle fallback may synchronously terminalize and clear the owning runtime/battle.
     // Never open modifiers or queue a post-ME phase against that cleared owner.
-    if (!this.ownerStillLive()) {
-      return;
-    }
-
-    if (encounter.doEncounterRewards) {
-      encounter.doEncounterRewards();
-    } else if (this.addHealPhase) {
-      globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
-      const declaredSurface = this.meSettlementPlan?.rewardSurfaces[0];
-      globalScene.phaseManager.unshiftNew(
-        "SelectModifierPhase",
-        0,
-        undefined,
-        {
-          fillRemaining: false,
-          rerollMultiplier: -1,
-        },
-        false,
-        { kind: "ambient" },
-        declaredSurface?.kind === "modifier" ? { surfaceId: declaredSurface.surfaceId, ordinal: 0 } : undefined,
-      );
-    }
-
-    globalScene.phaseManager.pushNew("PostMysteryEncounterPhase");
-    this.end();
+    continueAfterSettlement();
   }
 
   /** A malformed typed plan is a shared terminal, never an indefinitely parked reward phase. */

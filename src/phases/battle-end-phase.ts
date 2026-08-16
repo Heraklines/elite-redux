@@ -24,6 +24,7 @@ import {
   holdForCoopMeBattleSettlementAtBattleEnd,
   isCoopAuthoritativeGuest,
   isCoopSettledWaveBoundaryPending,
+  isCoopSharedTerminalFrozen,
   shouldDeferCoopMeBattleSettlementUntilRewardPreparation,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopAuthorityContinuationSurface } from "#data/elite-redux/coop/coop-ui-registry";
@@ -258,7 +259,39 @@ export class BattleEndPhase extends BattlePhase {
     }
 
     globalScene.updateModifiers();
+    let meSettlementTailStarted = false;
+    const continueMeSettlementTail = (meSettlementRetained: boolean): void => {
+      if (meSettlementTailStarted) {
+        return;
+      }
+      meSettlementTailStarted = true;
+      if (isCoopSharedTerminalFrozen()) {
+        return;
+      }
+      if (globalScene.phaseManager.getCurrentPhase() !== this) {
+        failCoopSharedSession("Mystery BattleEnd settlement continuation lost its owning phase.");
+        return;
+      }
+      // Normal retained wins still have automatic TrainerVictory/Money/Modifier/Egg/buff/heal children ahead
+      // of their first interactive continuation. Stage that exact phase-owned boundary here and let the
+      // explicit CoopVictorySealPhase capture after those children drain. Capture/flee and legacy sessions
+      // retain the established BattleEnd settlement timing.
+      if (!meSettlementRetained && !deferCoopAutomaticVictorySealAtBattleEnd(this.automaticVictorySeal)) {
+        broadcastCoopWaveEndState(this.isVictory);
+      }
+      // Keep the enemy objects serializable through the settled capture, then tear down presentation exactly
+      // as before. The retained post-battle image explicitly marks enemy seats hidden on the guest.
+      for (const p of globalScene.getEnemyParty()) {
+        try {
+          p.destroy();
+        } catch {
+          console.warn("Unable to destroy stale pokemon object in BattleEndPhase:", p);
+        }
+      }
+      this.end();
+    };
     let meSettlementRetained = false;
+    let meSettlementDeferred = false;
     if (
       this.meSettlementPlan?.continuation === "rewards"
       && shouldDeferCoopMeBattleSettlementUntilRewardPreparation()
@@ -268,25 +301,20 @@ export class BattleEndPhase extends BattlePhase {
       // preparation rather than retaining a stale pre-reward image here.
       meSettlementRetained = true;
     } else if (this.meSettlementPlan != null) {
-      meSettlementRetained = commitCoopMeBattleSettlementAtBattleEnd(this.meSettlementPlan);
+      meSettlementRetained = commitCoopMeBattleSettlementAtBattleEnd(
+        this.meSettlementPlan,
+        () => continueMeSettlementTail(true),
+        () => {
+          meSettlementDeferred = true;
+        },
+      );
     }
-    // Normal retained wins still have automatic TrainerVictory/Money/Modifier/Egg/buff/heal children ahead
-    // of their first interactive continuation. Stage that exact phase-owned boundary here and let the
-    // explicit CoopVictorySealPhase capture after those children drain. Capture/flee and legacy sessions
-    // retain the established BattleEnd settlement timing.
-    if (!meSettlementRetained && !deferCoopAutomaticVictorySealAtBattleEnd(this.automaticVictorySeal)) {
-      broadcastCoopWaveEndState(this.isVictory);
+    if (meSettlementDeferred) {
+      // The exact ME terminal redrive owns the remaining BattleEnd tail. Teardown/cancellation clears the
+      // parked callback, so this phase cannot resume after the shared boundary has been invalidated.
+      return;
     }
-    // Keep the enemy objects serializable through the settled capture, then tear down presentation exactly
-    // as before. The retained post-battle image explicitly marks enemy seats hidden on the guest.
-    for (const p of globalScene.getEnemyParty()) {
-      try {
-        p.destroy();
-      } catch {
-        console.warn("Unable to destroy stale pokemon object in BattleEndPhase:", p);
-      }
-    }
-    this.end();
+    continueMeSettlementTail(meSettlementRetained);
   }
 
   private releaseRetainedBoundary(): void {

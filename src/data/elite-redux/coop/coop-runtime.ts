@@ -264,13 +264,15 @@ import {
   COOP_ME_AUTHORITY_TURN,
   captureCoopMeDeferredTerminal,
   clearCoopMeDeferredTerminalState,
-  commitMeOwnerIntent,
+  commitMeOwnerIntentDetailed,
   isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
   isCoopMeQuizAnswerOperationId,
   receiveCoopMeTerminalTransactionFor,
+  releaseCoopMeDeferredTerminal,
   resetCoopMeOperationState,
   setCoopMeOperationRevisionFloor,
+  type CoopMeOwnerCommitDisposition,
   // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates ME operation callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -4292,6 +4294,8 @@ export interface CoopRuntime {
     readonly revision: number;
     readonly envelope: CoopAuthoritativeEnvelopeV1;
     readonly resume: () => void;
+    /** Resolves an async local continuation closed when the parked entry is invalidated before commit. */
+    onCancel: (() => void) | null;
     /** Cancels both the pre-activation microtask and any owning-runtime activation it installs. */
     wakeCancel: (() => void) | null;
   } | null;
@@ -4334,10 +4338,13 @@ function clearCoopMeTerminalRedrive(runtime: CoopRuntime): void {
   const parked = runtime.v2DeferredMeTerminalRedrive;
   runtime.v2DeferredMeTerminalRedrive = null;
   const cancelWake = parked?.wakeCancel ?? null;
+  const cancelContinuation = parked?.onCancel ?? null;
   if (parked != null) {
     parked.wakeCancel = null;
+    parked.onCancel = null;
   }
   cancelWake?.();
+  cancelContinuation?.();
   withActiveCoopRuntimeOpState(runtime.opState, clearCoopMeDeferredTerminalState);
 }
 
@@ -4349,12 +4356,15 @@ export function registerCoopMeTerminalRedrive(
   runtime: CoopRuntime | null,
   operationId: string,
   resume: () => void,
+  onCancel: (() => void) | undefined = undefined,
 ): (() => void) | null {
   if (runtime == null || operationId.length === 0) {
+    onCancel?.();
     return null;
   }
   if (runtime.controller.authorityRole !== "authority") {
     clearCoopMeTerminalRedrive(runtime);
+    onCancel?.();
     return null;
   }
   const parked = runtime.v2DeferredMeTerminalRedrive;
@@ -4363,21 +4373,22 @@ export function registerCoopMeTerminalRedrive(
       "v2-interaction",
       `refusing a second deferred ME terminal wake ${operationId}; ${parked.operationId} is still parked`,
     );
+    onCancel?.();
     return null;
   }
   if (parked != null) {
-    return () => {
-      if (runtime.v2DeferredMeTerminalRedrive === parked) {
-        runtime.v2DeferredMeTerminalRedrive = null;
-        const cancelWake = parked.wakeCancel;
-        parked.wakeCancel = null;
-        cancelWake?.();
-      }
-    };
+    // A second caller cannot safely inherit the first caller's local continuation: the two closures may own
+    // different phases or promises even though the immutable terminal is the same. Cancel the duplicate
+    // explicitly and leave the original owner parked; returning an existing cancel closure here would make
+    // the new caller report DEFERRED with a completion that can never resolve.
+    coopWarn("v2-interaction", `refusing duplicate deferred ME terminal wake ${operationId}`);
+    onCancel?.();
+    return null;
   }
   const deferred = withActiveCoopRuntimeOpState(runtime.opState, () => captureCoopMeDeferredTerminal(operationId));
   if (deferred == null) {
     coopWarn("v2-interaction", `cannot park ME terminal wake without exact envelope id=${operationId}`);
+    onCancel?.();
     return null;
   }
   const record: NonNullable<CoopRuntime["v2DeferredMeTerminalRedrive"]> = {
@@ -4385,6 +4396,7 @@ export function registerCoopMeTerminalRedrive(
     revision: deferred.revision,
     envelope: deferred.envelope,
     resume,
+    onCancel: onCancel ?? null,
     wakeCancel: null,
   };
   runtime.v2DeferredMeTerminalRedrive = record;
@@ -4392,8 +4404,11 @@ export function registerCoopMeTerminalRedrive(
     if (runtime.v2DeferredMeTerminalRedrive === record) {
       runtime.v2DeferredMeTerminalRedrive = null;
       const cancelWake = record.wakeCancel;
+      const cancelContinuation = record.onCancel;
       record.wakeCancel = null;
+      record.onCancel = null;
       cancelWake?.();
+      cancelContinuation?.();
     }
   };
 }
@@ -4524,6 +4539,210 @@ function redriveCoopMeTerminal(runtime: CoopRuntime, edge: CoopMeTerminalRedrive
     `Authority V2 failed exact ME terminal redrive ${parked.operationId} at ${edge}: ${disposition.reason}`,
   );
   return false;
+}
+
+type CoopMeTerminalContinuationResult = "committed" | "deferred" | "failed";
+
+interface CoopMeTerminalContinuationFence {
+  readonly scene: unknown;
+  readonly controller: unknown;
+  readonly battle: unknown;
+  readonly generation: number;
+  readonly pinned: number;
+  readonly wave: number;
+  readonly operationId: string;
+  readonly revision: number;
+  readonly step: number;
+  readonly terminal: CoopMeTerminalPayload["terminal"];
+  readonly hostTurn: number;
+  readonly choice: number;
+  readonly label: string;
+}
+
+function exactCoopMeTerminalDispositionRevision(disposition: CoopMeOwnerCommitDisposition): number | null {
+  const revision =
+    disposition.kind === "deferred"
+      ? disposition.revision
+      : disposition.kind === "committed"
+        ? disposition.envelope?.revision
+        : undefined;
+  return typeof revision === "number" && Number.isSafeInteger(revision) && revision >= 0 ? revision : null;
+}
+
+/**
+ * Finish one exact host ME terminal, or park only its immutable Authority V2 envelope until the proof edge
+ * commits it. The callback is deliberately shared by settlement and handoff so no caller can rebuild the
+ * payload, mint a second revision, or accidentally fall back to a generic interaction retry.
+ */
+function continueCoopMeTerminalCommit(
+  runtime: CoopRuntime,
+  disposition: CoopMeOwnerCommitDisposition,
+  fence: CoopMeTerminalContinuationFence,
+  installControl: () => void,
+  onSuccess?: (() => void) | undefined,
+  onCancel?: (() => void) | undefined,
+  onDeferred?: (() => void) | undefined,
+): CoopMeTerminalContinuationResult {
+  let cancellationNotified = false;
+  const cancelContinuation = (): void => {
+    if (cancellationNotified) {
+      return;
+    }
+    cancellationNotified = true;
+    onCancel?.();
+  };
+  const failContinuation = (reason: string): void => {
+    cancelContinuation();
+    failCoopRuntimeSharedSession(
+      runtime,
+      `Mystery ${fence.label} continuation failed id=${fence.operationId} rev=${fence.revision}: ${reason}`,
+      {
+        boundary: "surface",
+        reasonCode: "continuation-failed",
+        wave: fence.wave,
+        boundaryRevision: fence.revision,
+      },
+    );
+  };
+  const abandonContinuation = (): void => {
+    cancelContinuation();
+    withActiveCoopRuntimeOpState(runtime.opState, clearCoopMeDeferredTerminalState);
+  };
+  const dispositionRevision =
+    disposition.kind === "deferred" ? disposition.revision : disposition.kind === "committed" ? disposition.envelope?.revision : undefined;
+  const dispositionEnvelope =
+    disposition.kind === "deferred" || disposition.kind === "committed" ? disposition.envelope : undefined;
+  const dispositionIdentityValid =
+    (disposition.kind === "committed" || disposition.kind === "deferred")
+    && disposition.operationId === fence.operationId
+    && typeof dispositionRevision === "number"
+    && Number.isSafeInteger(dispositionRevision)
+    && dispositionRevision >= 0
+    && fence.revision === dispositionRevision
+    && dispositionEnvelope?.revision === dispositionRevision
+    && dispositionEnvelope?.pendingOperation?.id === disposition.operationId
+    && dispositionEnvelope?.pendingOperation?.kind === "ME_TERMINAL";
+  if (
+    (disposition.kind === "committed" || disposition.kind === "deferred")
+    && !dispositionIdentityValid
+  ) {
+    failContinuation("commit disposition identity changed before local completion");
+    return "failed";
+  }
+  const finish = (): boolean => {
+    if (
+      isCoopSharedTerminalFrozen(runtime)
+      || getCoopRuntime() !== runtime
+      || coopSessionGeneration() !== fence.generation
+      || runtime.controller.authorityRole !== "authority"
+    ) {
+      // Teardown, shared-terminal preparation, and authority loss own the boundary. Do not fail a new
+      // session or invoke a continuation against a runtime that is no longer allowed to commit it.
+      abandonContinuation();
+      return false;
+    }
+    if (
+      globalScene !== fence.scene
+      || getCoopController() !== fence.controller
+      || globalScene.currentBattle !== fence.battle
+      || coopMeInteractionStartValue() !== fence.pinned
+      || (globalScene.currentBattle?.waveIndex ?? -1) !== fence.wave
+    ) {
+      failContinuation("scene, controller, battle, session, or pin fence changed");
+      return false;
+    }
+    try {
+      // The exact terminal control is the local predecessor proof. Install and validate it before any
+      // downstream handoff, picker, or BattleEnd tail can signal gameplay/UI progression.
+      installControl();
+      const control = captureCoopActiveMysteryControl();
+      if (
+        control?.interactionCounter !== fence.pinned
+        || control?.terminal !== fence.terminal
+        || control?.terminalOperationId !== fence.operationId
+        || control?.terminalStep !== fence.step
+        || control?.terminalChoice !== fence.choice
+        || control?.hostTurn !== fence.hostTurn
+      ) {
+        failContinuation("exact terminal control was not installed");
+        return false;
+      }
+      if (disposition.kind === "deferred") {
+        withActiveCoopRuntimeOpState(runtime.opState, () => releaseCoopMeDeferredTerminal(fence.operationId));
+      }
+      onSuccess?.();
+      return true;
+    } catch (error) {
+      coopWarn("me", `Mystery ${fence.label} continuation threw`, error);
+      failContinuation(error instanceof Error ? error.message : String(error));
+      return false;
+    }
+  };
+
+  if (disposition.kind === "committed") {
+    return finish() ? "committed" : "failed";
+  }
+  if (disposition.kind !== "deferred") {
+    return "failed";
+  }
+
+  let deferred: ReturnType<typeof captureCoopMeDeferredTerminal>;
+  try {
+    deferred = withActiveCoopRuntimeOpState(
+      runtime.opState,
+      () => captureCoopMeDeferredTerminal(disposition.operationId),
+    );
+  } catch (error) {
+    coopWarn("me", `Mystery ${fence.label} deferred envelope capture threw`, error);
+    failContinuation("deferred envelope capture threw");
+    return "failed";
+  }
+  let sameEnvelope = false;
+  try {
+    sameEnvelope = deferred != null && JSON.stringify(deferred.envelope) === JSON.stringify(disposition.envelope);
+  } catch (error) {
+    coopWarn("me", `Mystery ${fence.label} deferred envelope comparison threw`, error);
+  }
+  if (
+    deferred == null
+    || deferred.operationId !== disposition.operationId
+    || deferred.revision !== disposition.revision
+    || deferred.envelope.revision !== disposition.revision
+    || deferred.envelope.pendingOperation?.id !== disposition.operationId
+    || deferred.envelope.pendingOperation?.kind !== "ME_TERMINAL"
+    || !sameEnvelope
+  ) {
+    failContinuation("deferred operation identity or immutable envelope changed");
+    return "failed";
+  }
+  const cancel = registerCoopMeTerminalRedrive(
+    runtime,
+    disposition.operationId,
+    () => {
+      finish();
+    },
+    cancelContinuation,
+  );
+  if (cancel == null) {
+    if (
+      getCoopRuntime() === runtime
+      && runtime.controller.authorityRole === "authority"
+      && !isCoopSharedTerminalFrozen(runtime)
+    ) {
+      failContinuation("owning runtime could not park the exact redrive");
+    } else {
+      abandonContinuation();
+    }
+    return "failed";
+  }
+  try {
+    onDeferred?.();
+  } catch (error) {
+    coopWarn("me", `Mystery ${fence.label} deferred parking callback threw`, error);
+    failContinuation(error instanceof Error ? error.message : String(error));
+    return "failed";
+  }
+  return "deferred";
 }
 
 /**
@@ -11036,7 +11255,11 @@ export function shouldDeferCoopMeBattleSettlementUntilRewardPreparation(): boole
   return pinned >= 0 && prior?.interactionCounter === pinned && prior.terminal === "battle";
 }
 
-export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettlementPlan): boolean {
+export function commitCoopMeBattleSettlementAtBattleEnd(
+  plan: CoopMeBattleSettlementPlan,
+  onSuccess?: (() => void) | undefined,
+  onDeferred?: (() => void) | undefined,
+): boolean {
   const runtime = active;
   const battle = globalScene.currentBattle;
   if (
@@ -11067,7 +11290,7 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
       ...plan,
     },
   } satisfies CoopMeTerminalPayload;
-  const operationId = commitMeOwnerIntent({
+  const disposition = commitMeOwnerIntentDetailed({
     kind: "ME_TERMINAL",
     seq: COOP_ME_TERM_SEQ_BASE + pinned,
     pinned,
@@ -11078,17 +11301,55 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
     turn: COOP_ME_AUTHORITY_TURN,
     beforeAuthorityCommit: id => settleCoopV2InteractionOperation(id, runtime),
   });
-  if (operationId == null) {
+  if (disposition.kind !== "committed" && disposition.kind !== "deferred") {
     runtime.durability?.reconnect();
     failCoopSharedSession("Mystery battle settlement could not be retained");
     return true;
   }
-  setCoopMeTerminalControl("battle-settled", battle.turn, {
-    operationId,
-    step,
-    choice: COOP_ME_BATTLE_SETTLED_CHOICE,
-  });
-  coopLog("me", `host retained post-BattleEnd settlement step=${step} id=${operationId}`);
+  const operationId = disposition.operationId;
+  const revision = exactCoopMeTerminalDispositionRevision(disposition);
+  if (revision == null) {
+    runtime.durability?.reconnect();
+    failCoopSharedSession("Mystery battle settlement committed without its exact envelope/revision");
+    return true;
+  }
+  const continuation = continueCoopMeTerminalCommit(
+    runtime,
+    disposition,
+    {
+      scene: globalScene,
+      controller: runtime.controller,
+      battle,
+      generation: coopSessionGeneration(),
+      pinned,
+      wave: battle.waveIndex,
+      operationId,
+      revision,
+      step,
+      terminal: "battle-settled",
+      hostTurn: battle.turn,
+      choice: COOP_ME_BATTLE_SETTLED_CHOICE,
+      label: "battle settlement",
+    },
+    () => {
+      setCoopMeTerminalControl("battle-settled", battle.turn, {
+        operationId,
+        step,
+        choice: COOP_ME_BATTLE_SETTLED_CHOICE,
+      });
+    },
+    onSuccess,
+    undefined,
+    onDeferred,
+  );
+  if (continuation === "failed") {
+    return true;
+  }
+  coopLog(
+    "me",
+    `host retained post-BattleEnd settlement step=${step} id=${operationId}`
+      + `${continuation === "deferred" ? ` rev=${revision} (deferred)` : ""}`,
+  );
   return true;
 }
 
@@ -11097,7 +11358,11 @@ export function commitCoopMeBattleSettlementAtBattleEnd(plan: CoopMeBattleSettle
  * deliberately a distinct lifecycle cursor from `battle-settled`: no BattleEnd exists to park or infer
  * from, and reconnect control must not enable the battle-handoff renderer exemption.
  */
-export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopMeBattleSettlementPlan): boolean {
+export function commitCoopMeNoBattleRewardSettlementAfterPreparation(
+  plan: CoopMeBattleSettlementPlan,
+  onSuccess?: (() => void) | undefined,
+  onDeferred?: (() => void) | undefined,
+): boolean {
   const runtime = active;
   const battle = globalScene.currentBattle;
   if (
@@ -11133,7 +11398,7 @@ export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopM
       ...plan,
     },
   } satisfies CoopMeTerminalPayload;
-  const operationId = commitMeOwnerIntent({
+  const disposition = commitMeOwnerIntentDetailed({
     kind: "ME_TERMINAL",
     seq: COOP_ME_TERM_SEQ_BASE + pinned,
     pinned,
@@ -11144,17 +11409,55 @@ export function commitCoopMeNoBattleRewardSettlementAfterPreparation(plan: CoopM
     turn: COOP_ME_AUTHORITY_TURN,
     beforeAuthorityCommit: id => settleCoopV2InteractionOperation(id, runtime),
   });
-  if (operationId == null) {
+  if (disposition.kind !== "committed" && disposition.kind !== "deferred") {
     runtime.durability?.reconnect();
     failCoopSharedSession("Mystery no-battle reward settlement could not be retained");
     return true;
   }
-  setCoopMeTerminalControl("reward-settled", battle.turn, {
-    operationId,
-    step,
-    choice: COOP_ME_REWARD_SETTLED_CHOICE,
-  });
-  coopLog("me", `host retained no-battle pre-reward settlement step=${step} id=${operationId}`);
+  const operationId = disposition.operationId;
+  const revision = exactCoopMeTerminalDispositionRevision(disposition);
+  if (revision == null) {
+    runtime.durability?.reconnect();
+    failCoopSharedSession("Mystery no-battle reward settlement committed without its exact envelope/revision");
+    return true;
+  }
+  const continuation = continueCoopMeTerminalCommit(
+    runtime,
+    disposition,
+    {
+      scene: globalScene,
+      controller: runtime.controller,
+      battle,
+      generation: coopSessionGeneration(),
+      pinned,
+      wave: battle.waveIndex,
+      operationId,
+      revision,
+      step,
+      terminal: "reward-settled",
+      hostTurn: battle.turn,
+      choice: COOP_ME_REWARD_SETTLED_CHOICE,
+      label: "no-battle reward settlement",
+    },
+    () => {
+      setCoopMeTerminalControl("reward-settled", battle.turn, {
+        operationId,
+        step,
+        choice: COOP_ME_REWARD_SETTLED_CHOICE,
+      });
+    },
+    onSuccess,
+    undefined,
+    onDeferred,
+  );
+  if (continuation === "failed") {
+    return true;
+  }
+  coopLog(
+    "me",
+    `host retained no-battle pre-reward settlement step=${step} id=${operationId}`
+      + `${continuation === "deferred" ? ` rev=${revision} (deferred)` : ""}`,
+  );
   return true;
 }
 
@@ -11270,8 +11573,9 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
         disableSwitch,
       },
     } satisfies CoopMeTerminalPayload;
-    const commit = (): string | null =>
-      commitMeOwnerIntent({
+    const battle = globalScene.currentBattle;
+    const commit = (): CoopMeOwnerCommitDisposition =>
+      commitMeOwnerIntentDetailed({
         kind: "ME_TERMINAL",
         seq: COOP_ME_TERM_SEQ_BASE + pinned,
         pinned,
@@ -11282,8 +11586,91 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
         turn: COOP_ME_AUTHORITY_TURN,
         beforeAuthorityCommit: id => settleCoopV2InteractionOperation(id, runtime),
       });
-    let operationId = commit();
-    if (operationId == null && isCoopMeOperationEnabled()) {
+    const applyHandoffDisposition = async (disposition: CoopMeOwnerCommitDisposition): Promise<boolean> => {
+      if (disposition.kind !== "committed" && disposition.kind !== "deferred") {
+        return false;
+      }
+      const operationId = disposition.operationId;
+      const revision = exactCoopMeTerminalDispositionRevision(disposition);
+      if (revision == null) {
+        failCoopRuntimeSharedSession(
+          runtime,
+          `Mystery battle handoff ${disposition.kind} disposition omitted its exact envelope/revision`,
+          {
+            boundary: "surface",
+            reasonCode: "invalid-authority",
+            wave,
+            boundaryRevision: pinned,
+          },
+        );
+        return false;
+      }
+      const fence: CoopMeTerminalContinuationFence = {
+        scene,
+        controller,
+        battle,
+        generation,
+        pinned,
+        wave,
+        operationId,
+        revision,
+        step,
+        terminal: "battle",
+        hostTurn,
+        choice: COOP_ME_BATTLE_HANDOFF,
+        label: "battle handoff",
+      };
+      const installControl = (): void => {
+        setCoopMeTerminalControl("battle", hostTurn, {
+          operationId,
+          step,
+          choice: COOP_ME_BATTLE_HANDOFF,
+        });
+      };
+      const relayBattleHandoff = (): void => {
+        // A deferred outcome may not signal the spawned battle until the exact Authority V2 entry is
+        // committed and its terminal control has been validated by continueCoopMeTerminalCommit.
+        pump.relayMeBattleHandoff(hostTurn, !isCoopOperationJournalActive());
+      };
+      if (disposition.kind === "deferred") {
+        let resolveDeferred: ((value: boolean) => void) | null = null;
+        const deferred = new Promise<boolean>(resolve => {
+          resolveDeferred = resolve;
+        });
+        const continuation = continueCoopMeTerminalCommit(
+          runtime,
+          disposition,
+          fence,
+          installControl,
+          () => {
+            relayBattleHandoff();
+            resolveDeferred?.(true);
+          },
+          () => resolveDeferred?.(false),
+        );
+        if (continuation === "deferred") {
+          coopLog("me", `owner-relay battle-handoff deferred id=${operationId} rev=${revision}`);
+          return await deferred;
+        }
+        return continuation === "committed";
+      }
+      const continuation = continueCoopMeTerminalCommit(
+        runtime,
+        disposition,
+        fence,
+        installControl,
+        relayBattleHandoff,
+      );
+      return continuation === "committed";
+    };
+    let disposition = commit();
+    if (disposition.kind === "deferred") {
+      return await applyHandoffDisposition(disposition);
+    }
+    if (disposition.kind === "committed") {
+      return await applyHandoffDisposition(disposition);
+    }
+    if (disposition.kind === "failed" && isCoopMeOperationEnabled()) {
       coopWarn("me", "owner-relay battle-handoff retention failed; retrying exact transaction after reconnect");
       runtime.durability?.reconnect();
       await new Promise<void>(resolve => setTimeout(resolve, 250));
@@ -11293,24 +11680,24 @@ export async function coopMeOwnerRelayBattleHandoff(options?: {
         || getCoopController() !== controller
         || coopSessionGeneration() !== generation
         || coopMeInteractionStartValue() !== pinned
+        || globalScene.currentBattle !== battle
         || (globalScene.currentBattle?.waveIndex ?? -1) !== wave
       ) {
         return false;
       }
-      operationId = commit();
+      disposition = commit();
+      if (disposition.kind === "deferred" || disposition.kind === "committed") {
+        return await applyHandoffDisposition(disposition);
+      }
     }
-    if (operationId == null && isCoopMeOperationEnabled()) {
+    if (disposition.kind === "failed" && isCoopMeOperationEnabled()) {
       failCoopSharedSession("Mystery battle handoff terminal could not commit after exact retry");
       return false;
     }
-    if (operationId != null) {
-      setCoopMeTerminalControl("battle", hostTurn, {
-        operationId,
-        step,
-        choice: COOP_ME_BATTLE_HANDOFF,
-      });
+    if (disposition.kind === "disabled") {
+      // Legacy/non-V2 behavior: the compatibility pump remains the authority when the ME operation is off.
+      pump.relayMeBattleHandoff(hostTurn, !isCoopOperationJournalActive());
     }
-    pump.relayMeBattleHandoff(hostTurn, !isCoopOperationJournalActive());
     return true;
   } catch (e) {
     coopWarn("me", "owner-relay battle-handoff failed; stopping shared session before battle setup", e);
