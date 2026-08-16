@@ -167,7 +167,9 @@ describe.skipIf(!RUN)("co-op DUO enemy faint-replacement RENDER: guest summons t
     await playTurn(rig, KO_MOVE, HOLD_MOVE);
     // playTurn already ran TurnEndPhase, which increments currentBattle.turn. Materialize that live next
     // boundary; adding another one asked the harness for a phantom turn that neither engine had reached.
-    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn);
+    await arriveGuestCommandBoundary(rig, rig.hostScene.currentBattle.waveIndex, rig.hostScene.currentBattle.turn, {
+      proveGuestCommand: true,
+    });
     await withClient(rig.hostCtx, async () => {
       await game.phaseInterceptor.to("CommandPhase");
     });

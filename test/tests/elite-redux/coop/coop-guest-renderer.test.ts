@@ -498,6 +498,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const battle = globalScene.currentBattle;
     const retained = battle.enemyParty[0];
     const extra = battle.enemyParty[1];
+    makeDisplayedIdentityUnique(retained);
     const leaveField = vi.spyOn(extra, "leaveField");
     expect(globalScene.field.getIndex(extra), "the locally rolled extra begins on the field").toBeGreaterThanOrEqual(0);
 
@@ -512,7 +513,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       leaveField,
       "renderer truncation never invokes pre-leave abilities or form mechanics",
     ).not.toHaveBeenCalled();
-    expect(battle.enemyParty).toEqual([retained]);
+    expect(battle.enemyParty).toHaveLength(1);
+    expect(battle.enemyParty[0]).toBe(retained);
     expect(globalScene.field.getIndex(extra), "the obsolete display child is removed directly").toBe(-1);
     expect(battle.double, "wild battle shape follows the one-slot authority image").toBe(false);
   });

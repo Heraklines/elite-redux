@@ -270,7 +270,8 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
       if (
         existing != null
         && !detachedDisplayedIdentity
-        && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)
+        && wantSpecies !== undefined
+        && existing.species.speciesId === wantSpecies
       ) {
         continue; // same mon - the corrector pass below converges its state
       }
