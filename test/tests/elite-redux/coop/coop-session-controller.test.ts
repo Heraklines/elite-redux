@@ -71,17 +71,17 @@ describe("co-op session controller (#633, P1)", () => {
       clearNegotiatedCoopCapabilities();
     });
 
-    it("rejects an older peer that cannot decode the complete battle presentation stream", async () => {
-      // er-coop-47: a 46 peer can fall back to transient battler indices because stable presentation
-      // actor identities were optional, so pairing must fail closed instead of accepting different visuals.
-      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-47");
+    it("rejects an older peer that cannot complete the correlated boundary-tail handshake", async () => {
+      // er-coop-48: a 47 peer treats the correlated exact boundary-tail proof as cosmetic and can deadlock,
+      // so pairing must fail closed instead of accepting a stalled handshake.
+      expect(COOP_PROTOCOL_VERSION).toBe("er-coop-48");
       const { host, guest } = createLoopbackPair();
       const controller = new CoopSessionController(host, {
         username: "Host",
         version: COOP_PROTOCOL_VERSION,
       });
       controller.connect();
-      guest.send({ t: "hello", version: "er-coop-46", username: "Cached", role: "guest", epoch: 0 });
+      guest.send({ t: "hello", version: "er-coop-47", username: "Cached", role: "guest", epoch: 0 });
       await flush();
 
       expect(controller.versionMismatch).toBe(true);
