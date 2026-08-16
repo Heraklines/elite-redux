@@ -401,14 +401,17 @@ export function translatePreparedGhostLevels(
 export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], members: readonly GhostMember[]): number {
   let applied = 0;
   party.forEach((mon, index) => {
-    for (const [typeId, rawCount] of members[index]?.heldItems ?? []) {
+    for (const [typeId, rawCount, generatedTypeArgs] of members[index]?.heldItems ?? []) {
       const factory = getModifierDataTypeFactory(typeId);
       if (typeof factory !== "function") {
         continue;
       }
       try {
         const storedType = factory();
-        const type = storedType instanceof ModifierTypeGenerator ? storedType.generateType([mon]) : storedType;
+        const type =
+          storedType instanceof ModifierTypeGenerator
+            ? storedType.generateType([mon], Array.isArray(generatedTypeArgs) ? generatedTypeArgs : undefined)
+            : storedType;
         if (!(type instanceof PokemonHeldItemModifierType)) {
           continue;
         }

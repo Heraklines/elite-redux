@@ -105,10 +105,10 @@ export interface GhostMember {
   passive: boolean;
   moves: number[];
   /** ER (Graveyard ME): the items this member was holding, as
-   * [modifierTypeId, stackCount] pairs. Omitted when none / for legacy
+   * [modifierTypeId, stackCount, generatedTypeArgs?] tuples. Omitted when none / for legacy
    * snapshots captured before item recording (those fall back to a random
    * Ultra-tier item or berry when a memento is granted). */
-  heldItems?: [string, number][] | undefined;
+  heldItems?: [string, number, unknown[]?][] | undefined;
   /**
    * ER Shiny Lab: compact equipped look for cross-player ghosts. The viewer
    * clamps every id before applying so malformed snapshots become plain.
@@ -671,9 +671,8 @@ function serializeShinyLabLook(p: any): ErShinyLabSavedLook | undefined {
   return normalizeErShinyLabSavedLook(encodeErShinyLabPreset({ loadout, params }));
 }
 
-/** Serialise a member's held items as [modifierTypeId, stackCount] pairs, or [] when
- * none. Best-effort and never throws - item data is non-essential to the snapshot. */
-function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
+/** Serialise a member's held items, including generated-type arguments when needed. */
+function serializeHeldItems(p: any, isPlayer: boolean): [string, number, unknown[]?][] {
   try {
     const id = p?.id;
     if (id == null) {
@@ -681,7 +680,14 @@ function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
     }
     return globalScene
       .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === id, isPlayer)
-      .map(m => [(m as PokemonHeldItemModifier).type.id, (m as PokemonHeldItemModifier).getStackCount()] as [string, number])
+      .map(m => {
+        const modifier = m as PokemonHeldItemModifier;
+        const type = modifier.type as { id: string; getPregenArgs?: () => unknown[] };
+        const generatedTypeArgs = typeof type.getPregenArgs === "function" ? type.getPregenArgs() : undefined;
+        return Array.isArray(generatedTypeArgs) && generatedTypeArgs.length > 0
+          ? ([type.id, modifier.getStackCount(), generatedTypeArgs] as [string, number, unknown[]])
+          : ([type.id, modifier.getStackCount()] as [string, number]);
+      })
       .filter(([typeId]) => !!typeId);
   } catch {
     return [];

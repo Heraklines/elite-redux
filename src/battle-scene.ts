@@ -232,6 +232,7 @@ import {
   getLuckTextTint,
   getPartyLuckValue,
   type ModifierType,
+  ModifierTypeGenerator,
   PokemonHeldItemModifierType,
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -4417,8 +4418,19 @@ export class BattleScene extends SceneBase {
     for (let i = 0; i < party.length; i++) {
       const enemy = party[i];
       const member = snapshot.party[i];
-      for (const [typeId, rawStack] of member?.heldItems ?? []) {
-        const type = getModifierDataTypeFactory(typeId)?.();
+      for (const [itemIndex, [typeId, rawStack, generatedTypeArgs]] of (member?.heldItems ?? []).entries()) {
+        const factory = getModifierDataTypeFactory(typeId);
+        let type: ModifierType | null | undefined = factory?.();
+        if (type instanceof ModifierTypeGenerator) {
+          const generator = type;
+          this.executeWithSeedOffset(
+            () => {
+              type = generator.generateType([enemy], Array.isArray(generatedTypeArgs) ? generatedTypeArgs : undefined);
+            },
+            this.currentBattle.waveIndex + i * 100 + itemIndex,
+            `${snapshot.id}:ghost-held-item`,
+          );
+        }
         if (!(type instanceof PokemonHeldItemModifierType)) {
           console.warn(`[ghost] skipped unknown held-item modifier ${typeId}`);
           continue;
