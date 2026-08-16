@@ -4,39 +4,20 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import type { BattleScene } from "#app/battle-scene";
+import { initGlobalScene } from "#app/global-scene";
 import { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
 import type { Pokemon } from "#field/pokemon";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  baseEnd: vi.fn(),
+  shiftPhase: vi.fn(),
   playSound: vi.fn(),
   addDamageNumber: vi.fn(),
   addEvent: vi.fn(),
   callback: undefined as (() => void) | undefined,
   timer: { repeatCount: 0 },
-}));
-
-vi.mock("#app/global-scene", () => ({
-  globalScene: {
-    playSound: mocks.playSound,
-    damageNumberHandler: { add: mocks.addDamageNumber },
-    time: { addEvent: mocks.addEvent },
-    currentBattle: { isClassicFinalBoss: false },
-  },
-}));
-
-vi.mock("#phases/pokemon-phase", () => ({
-  PokemonPhase: class {
-    getPokemon(): Pokemon | undefined {
-      return;
-    }
-
-    end(): void {
-      mocks.baseEnd();
-    }
-  },
 }));
 
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
@@ -50,6 +31,20 @@ describe("DamageAnimPhase", () => {
       mocks.callback = config.callback;
       return mocks.timer;
     });
+    initGlobalScene({
+      playSound: mocks.playSound,
+      damageNumberHandler: { add: mocks.addDamageNumber },
+      time: { addEvent: mocks.addEvent },
+      phaseManager: { shiftPhase: mocks.shiftPhase },
+      currentBattle: {
+        isClassicFinalBoss: false,
+        arrangement: {
+          locate: () => ({ side: 0, position: 0 }),
+          ownerOf: () => 0,
+        },
+      },
+      getField: () => [],
+    } as unknown as BattleScene);
   });
 
   it("keeps the original target when its field slot changes during the flash", async () => {
@@ -71,7 +66,7 @@ describe("DamageAnimPhase", () => {
 
     expect(sprite.setVisible).toHaveBeenCalledWith(true);
     expect(pokemon.updateInfo).toHaveBeenCalledOnce();
-    expect(mocks.baseEnd).toHaveBeenCalledOnce();
+    expect(mocks.shiftPhase).toHaveBeenCalledWith(phase);
     expect(getPokemon).toHaveBeenCalledTimes(1);
   });
 
@@ -80,7 +75,7 @@ describe("DamageAnimPhase", () => {
     phase.getPokemon = vi.fn(() => undefined as unknown as Pokemon);
 
     expect(() => (phase as unknown as { applyDamage(): void }).applyDamage()).not.toThrow();
-    expect(mocks.baseEnd).toHaveBeenCalledOnce();
+    expect(mocks.shiftPhase).toHaveBeenCalledWith(phase);
     expect(mocks.addEvent).not.toHaveBeenCalled();
   });
 });
