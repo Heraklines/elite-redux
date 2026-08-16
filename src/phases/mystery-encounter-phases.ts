@@ -57,6 +57,7 @@ import {
   getCoopNetcodeMode,
   getCoopRuntime,
   isCoopAuthoritativeGuest,
+  isCoopSharedTerminalFrozen,
   registerCoopMeTerminalRedrive,
   setCoopMeBattleInteractionCounter,
   settleCoopV2InteractionOperation,
@@ -1758,6 +1759,9 @@ export class PostMysteryEncounterPhase extends Phase {
    */
   continueEncounter() {
     const endPhase = () => {
+      const committedOperationId = this.deferredTerminalOperationId;
+      const committedRevision =
+        committedOperationId == null ? undefined : captureCoopMeDeferredTerminal(committedOperationId)?.revision;
       // Co-op AUTHORITATIVE host (#633, CHANGE-4 / P4): UNCONDITIONALLY stream the comprehensive
       // ME-terminal resync (full party / ME-save weighting / RNG cursor / dex) AFTER all side
       // effects, BEFORE coopEndMePump. The host is the sole engine for every authoritative ME
@@ -1788,14 +1792,26 @@ export class PostMysteryEncounterPhase extends Phase {
           );
         } catch (error) {
           coopWarn("me", "host terminal outcome capture failed; retaining Mystery boundary", error);
-          failCoopSharedSession("Mystery terminal outcome could not be captured");
+          if (committedOperationId == null) {
+            failCoopSharedSession("Mystery terminal outcome could not be captured");
+          } else {
+            failCoopSharedSession(
+              `Mystery terminal outcome capture failed after authority commit id=${committedOperationId}`
+                + `${committedRevision == null ? "" : ` rev=${committedRevision}`}.`,
+              {
+                boundary: "surface",
+                reasonCode: "continuation-failed",
+                ...(committedRevision == null ? {} : { boundaryRevision: committedRevision }),
+              },
+            );
+          }
           return;
         }
       }
       // Co-op (#633): the encounter is over - close the input pump (owner sends the leave
       // sentinel; host advances the alternation turn once for the whole encounter). Done before
       // queuing the next wave so the watcher's loop ends cleanly. No-op in solo.
-      const terminalResult = coopEndMePump(terminalOutcome, this.deferredTerminalOperationId ?? undefined);
+      const terminalResult = coopEndMePump(terminalOutcome, committedOperationId ?? undefined);
       if (terminalResult.kind !== "completed") {
         if (terminalResult.kind === "deferred") {
           // A predecessor-control deferral is liveness, not a failed terminal. Park the exact operation and
@@ -1817,6 +1833,7 @@ export class PostMysteryEncounterPhase extends Phase {
                 || getCoopRuntime() !== runtime
                 || getCoopController() !== controller
                 || coopSessionGeneration() !== generation
+                || isCoopSharedTerminalFrozen(runtime)
                 || coopMeInteractionStartValue() !== pinned
                 || (globalScene.currentBattle?.waveIndex ?? -1) !== wave
                 || globalScene.phaseManager.getCurrentPhase() !== this
@@ -1832,6 +1849,22 @@ export class PostMysteryEncounterPhase extends Phase {
             }
             this.deferredTerminalRetryCancel = cancel;
           }
+          return;
+        }
+        if (committedOperationId != null) {
+          // The immutable authority entry already committed. A local pump/phase completion failure cannot
+          // revisit effects or submit another operation; fail the shared run closed with its causal key.
+          this.deferredTerminalRetryCancel?.();
+          this.deferredTerminalRetryCancel = null;
+          failCoopSharedSession(
+            `Mystery terminal local completion failed after authority commit id=${committedOperationId}`
+              + `${committedRevision == null ? "" : ` rev=${committedRevision}`}: ${terminalResult.reason}`,
+            {
+              boundary: "surface",
+              reasonCode: "continuation-failed",
+              ...(committedRevision == null ? {} : { boundaryRevision: committedRevision }),
+            },
+          );
           return;
         }
         // A terminal commit is the causal authorization for BOTH peers to leave this encounter. Never

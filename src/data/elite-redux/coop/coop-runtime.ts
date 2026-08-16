@@ -4261,6 +4261,8 @@ export interface CoopRuntime {
     readonly revision: number;
     readonly envelope: CoopAuthoritativeEnvelopeV1;
     readonly resume: () => void;
+    /** Cancels both the pre-activation microtask and any owning-runtime activation it installs. */
+    wakeCancel: (() => void) | null;
   } | null;
   /** Address-exact interaction claims shared by ordinary delivery, authority-local control, and recovery. */
   readonly v2ControlLedger: CoopV2ControlLedger;
@@ -4296,7 +4298,13 @@ export interface CoopRuntime {
 let active: CoopRuntime | null = null;
 
 function clearCoopMeTerminalRedrive(runtime: CoopRuntime): void {
+  const parked = runtime.v2DeferredMeTerminalRedrive;
   runtime.v2DeferredMeTerminalRedrive = null;
+  const cancelWake = parked?.wakeCancel ?? null;
+  if (parked != null) {
+    parked.wakeCancel = null;
+  }
+  cancelWake?.();
   withActiveCoopRuntimeOpState(runtime.opState, clearCoopMeDeferredTerminalState);
 }
 
@@ -4328,6 +4336,9 @@ export function registerCoopMeTerminalRedrive(
     return () => {
       if (runtime.v2DeferredMeTerminalRedrive === parked) {
         runtime.v2DeferredMeTerminalRedrive = null;
+        const cancelWake = parked.wakeCancel;
+        parked.wakeCancel = null;
+        cancelWake?.();
       }
     };
   }
@@ -4336,35 +4347,87 @@ export function registerCoopMeTerminalRedrive(
     coopWarn("v2-interaction", `cannot park ME terminal wake without exact envelope id=${operationId}`);
     return null;
   }
-  const record = {
+  const record: NonNullable<CoopRuntime["v2DeferredMeTerminalRedrive"]> = {
     operationId,
     revision: deferred.revision,
     envelope: deferred.envelope,
     resume,
+    wakeCancel: null,
   };
   runtime.v2DeferredMeTerminalRedrive = record;
   return () => {
     if (runtime.v2DeferredMeTerminalRedrive === record) {
       runtime.v2DeferredMeTerminalRedrive = null;
+      const cancelWake = record.wakeCancel;
+      record.wakeCancel = null;
+      cancelWake?.();
     }
   };
 }
 
 function notifyCoopMeTerminalRedrive(runtime: CoopRuntime, operationId: string): void {
   const parked = runtime.v2DeferredMeTerminalRedrive;
-  if (parked == null || parked.operationId !== operationId) {
+  if (parked == null || parked.operationId !== operationId || parked.wakeCancel != null) {
     return;
   }
-  // Clear before scheduling so a synchronous/loopback wake cannot run the exact terminal twice.
-  runtime.v2DeferredMeTerminalRedrive = null;
+  // Keep the committed completion runtime-owned until its phase callback actually begins. The one stored
+  // cancellation closes both gaps: teardown can invalidate this microtask before it registers anything,
+  // or remove the callback from pendingRuntimeActivations while another duo runtime is ambient.
+  let live = true;
+  let cancelActivation: (() => void) | null = null;
+  const cancelWake = (): void => {
+    if (!live) {
+      return;
+    }
+    live = false;
+    cancelActivation?.();
+    cancelActivation = null;
+  };
+  parked.wakeCancel = cancelWake;
   queueMicrotask(() => {
-    runWhenCoopRuntimeActive(runtime, () => {
+    if (!live || runtime.v2DeferredMeTerminalRedrive !== parked) {
+      return;
+    }
+    if (isCoopSharedTerminalFrozen(runtime)) {
+      clearCoopMeTerminalRedrive(runtime);
+      return;
+    }
+    let invoked = false;
+    const cancel = runWhenCoopRuntimeActive(runtime, () => {
+      invoked = true;
+      if (!live || runtime.v2DeferredMeTerminalRedrive !== parked) {
+        return;
+      }
+      if (isCoopSharedTerminalFrozen(runtime) || runtime.controller.authorityRole !== "authority") {
+        clearCoopMeTerminalRedrive(runtime);
+        return;
+      }
+      // Disarm before entering phase code so duplicate commit notifications cannot wake it twice. The exact
+      // deferred completion remains in the runtime's operation state until the phase consumes it successfully;
+      // if phase code throws, shared-terminal preparation clears that retained state instead of retrying it.
+      live = false;
+      parked.wakeCancel = null;
+      runtime.v2DeferredMeTerminalRedrive = null;
       try {
         parked.resume();
       } catch (error) {
         coopWarn("v2-interaction", `deferred ME terminal wake threw id=${operationId}`, error);
+        failCoopRuntimeSharedSession(
+          runtime,
+          `Deferred ME terminal local completion threw after authority commit id=${parked.operationId} rev=${parked.revision}.`,
+          {
+            boundary: "surface",
+            reasonCode: "continuation-failed",
+            boundaryRevision: parked.revision,
+          },
+        );
       }
     });
+    if (!invoked && live && runtime.v2DeferredMeTerminalRedrive === parked) {
+      cancelActivation = cancel;
+      return;
+    }
+    cancel();
   });
 }
 
@@ -4396,6 +4459,11 @@ function redriveCoopMeTerminal(runtime: CoopRuntime, edge: CoopMeTerminalRedrive
   if (runtime.controller.authorityRole !== "authority") {
     clearCoopMeTerminalRedrive(runtime);
     return false;
+  }
+  if (parked.wakeCancel != null) {
+    // The authority entry already committed and its exact once-only local completion is waiting for this
+    // runtime to become ambient. Runtime-active/control/surface edges must not submit that envelope again.
+    return true;
   }
   const cutover = coopV2InteractionCutovers.get(runtime);
   if (cutover == null) {
