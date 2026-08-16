@@ -80,6 +80,7 @@ export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<Co
   "authorityEntry",
   "authorityReceipt",
   "tailRequest",
+  "tailProof",
   "recoveryRequest",
   "recoveryBundle",
   "recoveryApplied",
@@ -155,6 +156,8 @@ export interface CoopFaultCounters {
   passthrough: number;
   /** Deterministic single-shot drops fired (armed via {@linkcode CoopFaultPair.armNextDrop}) - the authoritative-fault leg. */
   oneShotDropped: number;
+  /** Deterministic single-shot duplicate deliveries fired (armed via {@linkcode CoopFaultPair.armNextDuplicate}). */
+  oneShotDuplicated: number;
 }
 
 function freshCounters(): CoopFaultCounters {
@@ -168,6 +171,7 @@ function freshCounters(): CoopFaultCounters {
     heldAtClose: 0,
     passthrough: 0,
     oneShotDropped: 0,
+    oneShotDuplicated: 0,
   };
 }
 
@@ -234,6 +238,8 @@ class CoopFaultTransport implements CoopTransport {
    * authoritative backbone (which is NOT in the default faultable set) without widening the fuzz surface.
    */
   private readonly pendingDrops = new Map<CoopMessageType, number>();
+  /** DETERMINISTIC single-shot duplicate deliveries, used to replay an exact proof frame without changing it. */
+  private readonly pendingDuplicates = new Map<CoopMessageType, number>();
 
   constructor(
     private readonly inner: CoopTransport,
@@ -287,6 +293,11 @@ class CoopFaultTransport implements CoopTransport {
     this.pendingDrops.set(type, (this.pendingDrops.get(type) ?? 0) + 1);
   }
 
+  /** Arm a DETERMINISTIC single-shot duplicate of the next message of `type` sent on THIS endpoint. */
+  armDuplicate(type: CoopMessageType): void {
+    this.pendingDuplicates.set(type, (this.pendingDuplicates.get(type) ?? 0) + 1);
+  }
+
   /** Consume a pending one-shot drop for `type` if one is armed. Returns true when the message must be dropped. */
   private takeOneShotDrop(type: CoopMessageType): boolean {
     const n = this.pendingDrops.get(type) ?? 0;
@@ -297,6 +308,20 @@ class CoopFaultTransport implements CoopTransport {
       this.pendingDrops.delete(type);
     } else {
       this.pendingDrops.set(type, n - 1);
+    }
+    return true;
+  }
+
+  /** Consume a pending one-shot duplicate for `type` if one is armed. */
+  private takeOneShotDuplicate(type: CoopMessageType): boolean {
+    const n = this.pendingDuplicates.get(type) ?? 0;
+    if (n <= 0) {
+      return false;
+    }
+    if (n === 1) {
+      this.pendingDuplicates.delete(type);
+    } else {
+      this.pendingDuplicates.set(type, n - 1);
     }
     return true;
   }
@@ -334,6 +359,13 @@ class CoopFaultTransport implements CoopTransport {
     // pass for prior holds (a real drop does not freeze the channel), matching the probabilistic drop path.
     if (this.takeOneShotDrop(msg.t)) {
       this.counters.oneShotDropped += 1;
+      this.tickHeld();
+      return;
+    }
+    if (this.takeOneShotDuplicate(msg.t)) {
+      this.counters.oneShotDuplicated += 1;
+      this.inner.send(msg);
+      this.inner.send(structuredClone(msg));
       this.tickHeld();
       return;
     }
@@ -396,7 +428,10 @@ export interface CoopFaultPair {
   pending?: (role: CoopRole) => number;
   /** Preserve the boot-to-manual delivery switch when composing scheduling with fault injection. */
   setAutomaticDelivery?: (automatic: boolean) => void;
-  /** Total faults injected across BOTH directions (drop + reorder + delay + one-shot drops). Asserted > 0 so a run is not vacuous. */
+  /**
+   * Total faults injected across BOTH directions (drop + reorder + delay + one-shot drop/duplicate).
+   * Asserted > 0 so a run is not vacuous.
+   */
   faultsInjected(): number;
   /** Swap the live fault profile on BOTH endpoints mid-run (for a burst-then-recover test). */
   setProfile(profile: CoopFaultProfile): void;
@@ -407,6 +442,8 @@ export interface CoopFaultPair {
    * high-risk message around a boundary, then assert convergence-or-loud-timeout.
    */
   armNextDrop(type: CoopMessageType, direction?: "host" | "guest" | "both"): void;
+  /** Arm a deterministic duplicate of the next message of `type` on the given direction(s). */
+  armNextDuplicate(type: CoopMessageType, direction?: "host" | "guest" | "both"): void;
 }
 
 /** Options for {@linkcode wrapCoopFaultPair}. */
@@ -457,7 +494,8 @@ export function wrapCoopFaultPair(
       ? { setAutomaticDelivery: scheduled.setAutomaticDelivery.bind(pair) }
       : {}),
     faultsInjected(): number {
-      const f = (c: CoopFaultCounters) => c.dropped + c.reordered + c.delayed + c.oneShotDropped;
+      const f = (c: CoopFaultCounters) =>
+        c.dropped + c.reordered + c.delayed + c.oneShotDropped + c.oneShotDuplicated;
       return f(hostCounters) + f(guestCounters);
     },
     setProfile(next: CoopFaultProfile): void {
@@ -472,6 +510,14 @@ export function wrapCoopFaultPair(
       }
       if (direction === "guest" || direction === "both") {
         guest.armDrop(type);
+      }
+    },
+    armNextDuplicate(type: CoopMessageType, direction: "host" | "guest" | "both" = "both"): void {
+      if (direction === "host" || direction === "both") {
+        host.armDuplicate(type);
+      }
+      if (direction === "guest" || direction === "both") {
+        guest.armDuplicate(type);
       }
     },
   };

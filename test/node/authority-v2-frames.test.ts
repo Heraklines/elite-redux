@@ -20,7 +20,12 @@
 
 import type { CoopFrameContextV2, CoopRuntimeContext } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopFrameTypeV2, CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
-import { COOP_FRAME_TYPES_V2, decodeFrameV2, encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+import {
+  COOP_FRAME_TYPES_V2,
+  COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS,
+  decodeFrameV2,
+  encodeFrameV2,
+} from "#data/elite-redux/coop/authority-v2/frame-codec";
 import {
   bindFrameContext,
   CoopFrameContextError,
@@ -76,7 +81,31 @@ const FRAMES: Record<CoopFrameTypeV2, CoopFrameV2> = {
     ctx: CTX,
     body: { revision: 5, operationId: "op-1", stage: "controlInstalled", controlId: "ctrl-1" },
   },
-  tailRequest: { v: 2, t: "tailRequest", ctx: CTX, body: { fromRevision: 2 } },
+  tailRequest: {
+    v: 2,
+    t: "tailRequest",
+    ctx: CTX,
+    body: {
+      fromRevision: 2,
+      requestId: "tail-proof-1",
+      candidateRevision: 5,
+      candidateOperationId: "op-1",
+    },
+  },
+  tailProof: {
+    v: 2,
+    t: "tailProof",
+    ctx: CTX,
+    body: {
+      phase: "manifest",
+      requestId: "tail-proof-1",
+      fromRevision: 2,
+      candidateRevision: 5,
+      candidateOperationId: "op-1",
+      headRevision: 5,
+      sourceRevisions: [2, 3, 4],
+    },
+  },
   recoveryRequest: {
     v: 2,
     t: "recoveryRequest",
@@ -197,6 +226,135 @@ describe("authority-v2 frame codec (round-trip)", () => {
       body: { revision: 1, operationId: "op", stage: "admitted" },
     };
     expect(validateInboundFrame(frame).kind).toBe("valid");
+  });
+
+  it("round-trips both correlated tail-proof phases with the same manifest metadata", () => {
+    const tailProofFrame = FRAMES.tailProof as Extract<CoopFrameV2, { t: "tailProof" }>;
+    const base = tailProofFrame.body;
+    for (const phase of ["manifest", "complete"] as const) {
+      const frame: Extract<CoopFrameV2, { t: "tailProof" }> = {
+        ...tailProofFrame,
+        body: { ...base, phase },
+      };
+      const wire = encodeFrameV2(frame);
+      expect(decodeFrameV2(wire)).toMatchObject({ kind: "envelope", frameType: "tailProof" });
+      expect(validateInboundFrame(wire)).toEqual({ kind: "valid", frame });
+    }
+  });
+});
+
+describe("authority-v2 correlated boundary-tail frame bodies", () => {
+  const correlatedRequest = {
+    v: 2 as const,
+    t: "tailRequest" as const,
+    ctx: CTX,
+    body: {
+      fromRevision: 1,
+      requestId: "proof-request-1",
+      candidateRevision: 4,
+      candidateOperationId: "candidate-4",
+    },
+  };
+
+  const proofBody = {
+    phase: "manifest" as const,
+    requestId: "proof-request-1",
+    fromRevision: 1,
+    candidateRevision: 4,
+    candidateOperationId: "candidate-4",
+    headRevision: 4,
+    sourceRevisions: [1, 2, 3],
+  };
+
+  it("accepts an omitted tuple and an all-or-none correlated tailRequest tuple", () => {
+    expect(
+      validateInboundFrame({
+        ...correlatedRequest,
+        body: { fromRevision: 1 },
+      }),
+    ).toMatchObject({ kind: "valid" });
+    expect(validateInboundFrame(correlatedRequest)).toMatchObject({ kind: "valid" });
+
+    for (const field of ["requestId", "candidateRevision", "candidateOperationId"] as const) {
+      const partial: Record<string, unknown> = { ...correlatedRequest.body };
+      delete partial[field];
+      const result = validateInboundFrame({ ...correlatedRequest, body: partial });
+      expect(result.kind, `partial ${field}`).toBe("protocol-violation");
+      if (result.kind === "protocol-violation") {
+        expect(result.issues).toContain("body.boundaryProofRequest: all-or-none tuple");
+      }
+    }
+
+    const nonAdvancing = validateInboundFrame({
+      ...correlatedRequest,
+      body: { ...correlatedRequest.body, candidateRevision: correlatedRequest.body.fromRevision },
+    });
+    expect(nonAdvancing.kind).toBe("protocol-violation");
+    if (nonAdvancing.kind === "protocol-violation") {
+      expect(nonAdvancing.issues).toContain("body.candidateRevision: must be greater than fromRevision");
+    }
+  });
+
+  it("accepts matching manifest and complete tailProof frames", () => {
+    for (const phase of ["manifest", "complete"] as const) {
+      const result = validateInboundFrame({
+        v: 2,
+        t: "tailProof",
+        ctx: CTX,
+        body: { ...proofBody, phase },
+      });
+      expect(result.kind, phase).toBe("valid");
+    }
+  });
+
+  it("rejects malformed proof phases and every invalid source-list/head relation", () => {
+    const cases: readonly [string, Record<string, unknown>, string][] = [
+      ["bad phase", { phase: "snapshot" }, "body.phase"],
+      [
+        "non-monotonic sources",
+        { sourceRevisions: [1, 3, 2] },
+        "body.sourceRevisions[2]: must be strictly increasing",
+      ],
+      [
+        "duplicate sources",
+        { sourceRevisions: [1, 2, 2] },
+        "body.sourceRevisions[2]: must be strictly increasing",
+      ],
+      ["out-of-range source", { sourceRevisions: [1, 2, 4] }, "body.sourceRevisions[2]: outside proof range"],
+      ["head behind candidate", { headRevision: 3 }, "body.headRevision: must be at least candidateRevision"],
+    ];
+
+    for (const [label, override, issue] of cases) {
+      const result = validateInboundFrame({
+        v: 2,
+        t: "tailProof",
+        ctx: CTX,
+        body: { ...proofBody, ...override },
+      });
+      expect(result.kind, label).toBe("protocol-violation");
+      if (result.kind === "protocol-violation") {
+        expect(result.issues, label).toContain(issue);
+      }
+    }
+
+    const overCapacity = validateInboundFrame({
+      v: 2,
+      t: "tailProof",
+      ctx: CTX,
+      body: {
+        ...proofBody,
+        candidateRevision: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 3,
+        headRevision: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 3,
+        sourceRevisions: Array.from(
+          { length: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 1 },
+          (_value, index) => index + 1,
+        ),
+      },
+    });
+    expect(overCapacity.kind).toBe("protocol-violation");
+    if (overCapacity.kind === "protocol-violation") {
+      expect(overCapacity.issues).toContain("body.sourceRevisions: exceeds retention capacity");
+    }
   });
 });
 

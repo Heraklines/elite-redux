@@ -58,6 +58,12 @@ import {
 } from "#data/elite-redux/coop/authority-v2/shadow";
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  faultableTypes,
+  type CoopFaultPair,
+  type CoopFaultProfile,
+  wrapCoopFaultPair,
+} from "#test/tools/coop-fault-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // --- deterministic test doubles ---------------------------------------------
@@ -253,6 +259,315 @@ function orderedInteractionEntry(
     },
     nextControl: awaitSuccessor(operationId, 5, 1, true),
     subsumes: [],
+  };
+}
+
+function narrowBoundaryWait(afterOperationId: string): Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }> {
+  return {
+    kind: "AWAIT_SUCCESSOR",
+    afterOperationId,
+    epoch: SESSION.epoch,
+    wave: 5,
+    turn: 1,
+    allowedKinds: ["INTERACTION_COMMIT"],
+    allowNextWaveStart: false,
+    expectedOperationId: null,
+  };
+}
+
+function boundaryWaveTap(operationId: string, predecessorRevision: number) {
+  return {
+    operationId,
+    transition: {
+      kind: "wave-advance" as const,
+      wave: 5,
+      turn: 1,
+      outcome: "win" as const,
+      nextWave: 6,
+      biomeChange: false,
+      eggLapse: false,
+      meBoundary: "none" as const,
+      victoryKind: "wild" as const,
+    },
+    destination: narrowBoundaryWait(operationId),
+    legacyDigest: `legacy-${operationId}`,
+    subsumes: [predecessorRevision],
+  };
+}
+
+interface ManualBoundaryDuo {
+  readonly clock: FakeClock;
+  readonly host: CoopAuthorityV2Shadow;
+  readonly guest: CoopAuthorityV2Shadow;
+  readonly hostToGuest: CoopFrameV2[];
+  readonly guestToHost: CoopFrameV2[];
+  readonly appliedRevisions: number[];
+  readonly violations: string[][];
+  dispose(): void;
+}
+
+function cloneFrame(frame: CoopFrameV2): CoopFrameV2 {
+  return structuredClone(frame);
+}
+
+function takeFrame(
+  queue: CoopFrameV2[],
+  description: string,
+  predicate: (frame: CoopFrameV2) => boolean,
+): CoopFrameV2 {
+  const index = queue.findIndex(predicate);
+  if (index < 0) {
+    throw new Error(`missing ${description}`);
+  }
+  return queue.splice(index, 1)[0];
+}
+
+function makeManualBoundaryDuo(): ManualBoundaryDuo {
+  const clock = new FakeClock();
+  const hostToGuest: CoopFrameV2[] = [];
+  const guestToHost: CoopFrameV2[] = [];
+  const appliedRevisions: number[] = [];
+  const violations: string[][] = [];
+  let host!: CoopAuthorityV2Shadow;
+  let guest!: CoopAuthorityV2Shadow;
+
+  host = new CoopAuthorityV2Shadow({
+    identity: identity(0),
+    scene: STUB_SCENE,
+    transport: STUB_TRANSPORT,
+    send: frame => hostToGuest.push(cloneFrame(frame)),
+    scheduler: createCoopScheduler(clock),
+  });
+  guest = new CoopAuthorityV2Shadow({
+    identity: identity(1),
+    scene: STUB_SCENE,
+    transport: STUB_TRANSPORT,
+    send: frame => guestToHost.push(cloneFrame(frame)),
+    scheduler: createCoopScheduler(clock),
+    onProtocolViolation: violation => violations.push([...violation.issues]),
+    liveReplica: {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
+      ownsControl: () => true,
+      applyMaterial: (_ctx, entry) => {
+        appliedRevisions.push(entry.revision);
+        return true;
+      },
+      projectControl: (_ctx, control) => ({ kind: "installed", controlId: controlIdOf(control) }),
+    },
+  });
+
+  return {
+    clock,
+    host,
+    guest,
+    hostToGuest,
+    guestToHost,
+    appliedRevisions,
+    violations,
+    dispose: () => {
+      host.dispose();
+      guest.dispose();
+    },
+  };
+}
+
+function makeSynchronousBoundaryDuo(): {
+  readonly clock: FakeClock;
+  readonly host: CoopAuthorityV2Shadow;
+  readonly guest: CoopAuthorityV2Shadow;
+  readonly appliedRevisions: number[];
+  readonly violations: string[][];
+  dispose(): void;
+} {
+  const clock = new FakeClock();
+  const appliedRevisions: number[] = [];
+  const violations: string[][] = [];
+  let host!: CoopAuthorityV2Shadow;
+  let guest!: CoopAuthorityV2Shadow;
+  host = new CoopAuthorityV2Shadow({
+    identity: identity(0),
+    scene: STUB_SCENE,
+    transport: STUB_TRANSPORT,
+    send: frame => guest.handleInboundFrame(frame),
+    scheduler: createCoopScheduler(clock),
+  });
+  guest = new CoopAuthorityV2Shadow({
+    identity: identity(1),
+    scene: STUB_SCENE,
+    transport: STUB_TRANSPORT,
+    send: frame => {
+      if (frame.t !== "authorityReceipt") {
+        host.handleInboundFrame(frame);
+      }
+    },
+    scheduler: createCoopScheduler(clock),
+    onProtocolViolation: violation => violations.push([...violation.issues]),
+    liveReplica: {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
+      ownsControl: () => true,
+      applyMaterial: (_ctx, entry) => {
+        appliedRevisions.push(entry.revision);
+        return true;
+      },
+      projectControl: (_ctx, control) => ({ kind: "installed", controlId: controlIdOf(control) }),
+    },
+  });
+  return {
+    clock,
+    host,
+    guest,
+    appliedRevisions,
+    violations,
+    dispose: () => {
+      host.dispose();
+      guest.dispose();
+    },
+  };
+}
+
+function stageManualBoundaryCandidate(duo: ManualBoundaryDuo): {
+  predecessorFrame: Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  candidateFrame: Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  firstRequest: Extract<CoopFrameV2, { t: "tailRequest" }>;
+} {
+  const predecessorOperationId = "BOUNDARY/predecessor";
+  const predecessor = duo.host.tapTurnCommit({
+    ...turnTap(predecessorOperationId),
+    nextCommandFrontier: null,
+    nextSuccessorWait: narrowBoundaryWait(predecessorOperationId),
+  });
+  expect(predecessor).not.toBeNull();
+  if (predecessor == null) {
+    throw new Error("boundary predecessor was not committed");
+  }
+  const predecessorFrame = takeFrame(
+    duo.hostToGuest,
+    "predecessor authorityEntry",
+    frame => frame.t === "authorityEntry" && frame.body.revision === 1,
+  ) as Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  duo.guest.handleInboundFrame(predecessorFrame);
+  expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1 });
+
+  const candidateOperationId = "BOUNDARY/wave";
+  const candidate = duo.host.tapWaveAdvance(boundaryWaveTap(candidateOperationId, predecessor.revision));
+  expect(candidate).not.toBeNull();
+  if (candidate == null) {
+    throw new Error("boundary candidate was not committed");
+  }
+  const candidateFrame = takeFrame(
+    duo.hostToGuest,
+    "boundary candidate authorityEntry",
+    frame => frame.t === "authorityEntry" && frame.body.revision === 2,
+  ) as Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  duo.guest.handleInboundFrame(candidateFrame);
+  expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1 });
+
+  const firstRequest = takeFrame(
+    duo.guestToHost,
+    "correlated tailRequest",
+    frame => frame.t === "tailRequest" && frame.body.requestId != null,
+  ) as Extract<CoopFrameV2, { t: "tailRequest" }>;
+  return { predecessorFrame, candidateFrame, firstRequest };
+}
+
+function answerManualBoundaryRequest(
+  duo: ManualBoundaryDuo,
+  request: Extract<CoopFrameV2, { t: "tailRequest" }>,
+): {
+  manifest: Extract<CoopFrameV2, { t: "tailProof" }>;
+  source: Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  complete: Extract<CoopFrameV2, { t: "tailProof" }>;
+} {
+  duo.host.handleInboundFrame(request);
+  const manifest = takeFrame(
+    duo.hostToGuest,
+    "tail-proof manifest",
+    frame => frame.t === "tailProof" && frame.body.phase === "manifest",
+  ) as Extract<CoopFrameV2, { t: "tailProof" }>;
+  const source = takeFrame(
+    duo.hostToGuest,
+    "manifest-listed source authorityEntry",
+    frame => frame.t === "authorityEntry" && frame.body.revision === 1,
+  ) as Extract<CoopFrameV2, { t: "authorityEntry" }>;
+  const complete = takeFrame(
+    duo.hostToGuest,
+    "tail-proof complete",
+    frame => frame.t === "tailProof" && frame.body.phase === "complete",
+  ) as Extract<CoopFrameV2, { t: "tailProof" }>;
+  return { manifest, source, complete };
+}
+
+async function flushLoopbackMicrotasks(rounds = 12): Promise<void> {
+  for (let index = 0; index < rounds; index++) {
+    await Promise.resolve();
+  }
+}
+
+interface FaultBoundaryDuo {
+  readonly clock: FakeClock;
+  readonly host: CoopAuthorityV2Shadow;
+  readonly guest: CoopAuthorityV2Shadow;
+  readonly pair: CoopFaultPair;
+  readonly appliedRevisions: number[];
+  readonly violations: string[][];
+  dispose(): void;
+}
+
+function makeFaultBoundaryDuo(profile: CoopFaultProfile): FaultBoundaryDuo {
+  const rawPair = createLoopbackPair();
+  const pair = wrapCoopFaultPair(rawPair, profile, { seed: 0x4d335441 });
+  // The production legacy subscriber is what drains the loopback early-rx buffer. The shadow itself uses the
+  // separate per-instance v2 receiver and must not borrow a module-global handler.
+  pair.host.onMessage(() => {});
+  pair.guest.onMessage(() => {});
+  const clock = new FakeClock();
+  const appliedRevisions: number[] = [];
+  const violations: string[][] = [];
+  let host!: CoopAuthorityV2Shadow;
+  let guest!: CoopAuthorityV2Shadow;
+  host = new CoopAuthorityV2Shadow({
+    identity: identity(0),
+    scene: STUB_SCENE,
+    transport: pair.host,
+    send: frame => pair.host.send(frame),
+    scheduler: createCoopScheduler(clock),
+  });
+  guest = new CoopAuthorityV2Shadow({
+    identity: identity(1),
+    scene: STUB_SCENE,
+    transport: pair.guest,
+    send: frame => {
+      // Hold the authority lease open for the proof fixture. Tail requests still use the real faulting
+      // transport; only replica receipts are withheld until a test explicitly wants lease retirement.
+      if (frame.t !== "authorityReceipt") {
+        pair.guest.send(frame);
+      }
+    },
+    scheduler: createCoopScheduler(clock),
+    onProtocolViolation: violation => violations.push([...violation.issues]),
+    liveReplica: {
+      ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
+      ownsControl: () => true,
+      applyMaterial: (_ctx, entry) => {
+        appliedRevisions.push(entry.revision);
+        return true;
+      },
+      projectControl: (_ctx, control) => ({ kind: "installed", controlId: controlIdOf(control) }),
+    },
+  });
+  return {
+    clock,
+    host,
+    guest,
+    pair,
+    appliedRevisions,
+    violations,
+    dispose: () => {
+      host.dispose();
+      guest.dispose();
+      pair.host.close();
+      pair.guest.close();
+    },
   };
 }
 
@@ -978,6 +1293,357 @@ describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
     host.dispose();
     expect(host.diagnostics()).toMatchObject({ disposed: true, retained: 0, pendingTimers: 0 });
     expect(clock.pendingCount).toBe(0);
+  });
+});
+
+describe("authority-v2 correlated boundary-tail proof", () => {
+  it("completes the exact candidate on a synchronous loopback without reentrant premature release", () => {
+    const duo = makeSynchronousBoundaryDuo();
+    const predecessor = duo.host.tapTurnCommit({
+      ...turnTap("SYNC/predecessor"),
+      nextCommandFrontier: null,
+      nextSuccessorWait: narrowBoundaryWait("SYNC/predecessor"),
+    });
+    expect(predecessor).not.toBeNull();
+    const candidate = duo.host.tapWaveAdvance(boundaryWaveTap("SYNC/candidate", 1));
+    expect(candidate).not.toBeNull();
+
+    expect(duo.appliedRevisions).toEqual([1, 2]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 2, applied: 2, shadowStateSize: 2 });
+    expect(duo.violations).toEqual([]);
+    expect(duo.host.diagnostics()).toMatchObject({ retained: 2 });
+    duo.dispose();
+    expect(duo.clock.pendingCount).toBe(0);
+  });
+
+  it("orchestrates manifest -> listed source -> matching complete and redrives only the exact candidate", () => {
+    const duo = makeManualBoundaryDuo();
+    const { candidateFrame, firstRequest } = stageManualBoundaryCandidate(duo);
+
+    // The candidate can arrive again while the observational proof is parked. It remains inert, and the
+    // only retry is the same correlated request rather than an ordinary unbounded tail loop.
+    duo.guest.handleInboundFrame(candidateFrame);
+    const proofRequests = duo.guestToHost.filter(
+      (frame): frame is Extract<CoopFrameV2, { t: "tailRequest" }> => frame.t === "tailRequest" && frame.body.requestId != null,
+    );
+    expect(proofRequests).toHaveLength(2);
+    expect(proofRequests[0]?.body).toEqual(firstRequest.body);
+    expect(proofRequests[1]?.body).toEqual(firstRequest.body);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, shadowStateSize: 1 });
+    expect(duo.appliedRevisions).toEqual([1]);
+
+    const proof = answerManualBoundaryRequest(duo, firstRequest);
+    expect(proof.manifest.body.sourceRevisions).toEqual([1]);
+    expect(proof.complete.body).toEqual({ ...proof.manifest.body, phase: "complete" });
+
+    duo.guest.handleInboundFrame(proof.manifest);
+    expect(duo.appliedRevisions).toEqual([1]);
+    duo.guest.handleInboundFrame(proof.source);
+    expect(duo.appliedRevisions).toEqual([1]);
+    duo.guest.handleInboundFrame(proof.complete);
+
+    // The listed predecessor is evidence only: it never enters the mechanical pipeline a second time. The
+    // complete frame is the sole release point for the parked candidate.
+    expect(duo.appliedRevisions).toEqual([1, 2]);
+    expect(duo.guest.diagnostics()).toMatchObject({
+      admitted: 2,
+      applied: 2,
+      shadowStateSize: 2,
+      controlLedgerSize: 2,
+    });
+    expect(duo.violations).toEqual([]);
+
+    // Let the real receipt path retire both retained leases. Supersession may cause one ordinary candidate
+    // redelivery, but it remains a duplicate-complete and cannot re-apply the candidate.
+    for (const receipt of duo.guestToHost.filter(frame => frame.t === "authorityReceipt")) {
+      duo.host.handleInboundFrame(receipt);
+    }
+    expect(duo.host.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
+    expect(duo.guest.diagnostics()).toMatchObject({ pendingTimers: 0 });
+    expect(duo.clock.pendingCount).toBe(0);
+    duo.dispose();
+  });
+
+  it("does not complete the parked candidate after manifest or listed source alone", () => {
+    const duo = makeManualBoundaryDuo();
+    const { firstRequest } = stageManualBoundaryCandidate(duo);
+    const proof = answerManualBoundaryRequest(duo, firstRequest);
+
+    duo.guest.handleInboundFrame(proof.manifest);
+    duo.guest.handleInboundFrame(proof.source);
+    expect(duo.appliedRevisions).toEqual([1]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, shadowStateSize: 1 });
+    expect(duo.violations).toEqual([]);
+
+    duo.guest.handleInboundFrame(proof.complete);
+    expect(duo.appliedRevisions).toEqual([1, 2]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 2, applied: 2 });
+    duo.dispose();
+  });
+
+  it("rejects a complete frame before its manifest and leaves the candidate parked", () => {
+    const duo = makeManualBoundaryDuo();
+    const { firstRequest } = stageManualBoundaryCandidate(duo);
+    const proof = answerManualBoundaryRequest(duo, firstRequest);
+
+    duo.guest.handleInboundFrame(proof.complete);
+    expect(duo.appliedRevisions).toEqual([1]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, shadowStateSize: 1 });
+    expect(duo.violations).toHaveLength(1);
+
+    // Once the semantic rejection is terminal, the late manifest cannot reopen the old capture.
+    duo.guest.handleInboundFrame(proof.manifest);
+    expect(duo.appliedRevisions).toEqual([1]);
+    expect(duo.violations).toHaveLength(1);
+    duo.dispose();
+  });
+
+  it("rejects mismatched proof metadata once and ignores the now-stale completion", () => {
+    const cases = [
+      {
+        label: "request",
+        mutateManifest: (manifest: Extract<CoopFrameV2, { t: "tailProof" }>) => ({
+          ...manifest,
+          body: { ...manifest.body, requestId: "wrong-request" },
+        }),
+      },
+      {
+        label: "context",
+        mutateManifest: (manifest: Extract<CoopFrameV2, { t: "tailProof" }>) => ({
+          ...manifest,
+          ctx: { ...manifest.ctx, connectionGeneration: manifest.ctx.connectionGeneration + 1 },
+        }),
+      },
+      {
+        label: "candidate",
+        mutateManifest: (manifest: Extract<CoopFrameV2, { t: "tailProof" }>) => ({
+          ...manifest,
+          body: { ...manifest.body, candidateOperationId: "wrong-candidate" },
+        }),
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const duo = makeManualBoundaryDuo();
+      const { firstRequest } = stageManualBoundaryCandidate(duo);
+      const proof = answerManualBoundaryRequest(duo, firstRequest);
+      duo.guest.handleInboundFrame(testCase.mutateManifest(proof.manifest));
+      duo.guest.handleInboundFrame(proof.complete);
+      expect(duo.appliedRevisions, testCase.label).toEqual([1]);
+      expect(duo.violations, testCase.label).toHaveLength(1);
+
+      // The failed request is terminalized once; replaying an old completion after the capture is gone is inert.
+      duo.guest.handleInboundFrame(proof.complete);
+      expect(duo.violations, testCase.label).toHaveLength(1);
+      duo.dispose();
+    }
+  });
+
+  it("rejects head and manifest-source mismatches as one semantic proof terminal", () => {
+    for (const mismatch of ["head", "manifest-sources"] as const) {
+      const duo = makeManualBoundaryDuo();
+      const { firstRequest } = stageManualBoundaryCandidate(duo);
+      const proof = answerManualBoundaryRequest(duo, firstRequest);
+      duo.guest.handleInboundFrame(proof.manifest);
+      duo.guest.handleInboundFrame(proof.source);
+      const complete =
+        mismatch === "head"
+          ? {
+              ...proof.complete,
+              body: { ...proof.complete.body, headRevision: proof.complete.body.headRevision + 1 },
+            }
+          : {
+              ...proof.complete,
+              body: { ...proof.complete.body, sourceRevisions: [] },
+            };
+      duo.guest.handleInboundFrame(complete);
+      expect(duo.appliedRevisions, mismatch).toEqual([1]);
+      expect(duo.violations, mismatch).toHaveLength(1);
+      duo.guest.handleInboundFrame(proof.complete);
+      expect(duo.violations, mismatch).toHaveLength(1);
+      duo.dispose();
+    }
+  });
+
+  it("does not augment an omitted predecessor/subsumes source from local state", () => {
+    const duo = makeManualBoundaryDuo();
+    const { firstRequest } = stageManualBoundaryCandidate(duo);
+    const proof = answerManualBoundaryRequest(duo, firstRequest);
+    const omittedManifest = {
+      ...proof.manifest,
+      body: { ...proof.manifest.body, sourceRevisions: [] },
+    };
+    const omittedComplete = {
+      ...proof.complete,
+      body: { ...proof.complete.body, sourceRevisions: [] },
+    };
+
+    duo.guest.handleInboundFrame(omittedManifest);
+    duo.guest.handleInboundFrame(omittedComplete);
+    expect(duo.appliedRevisions).toEqual([1]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1 });
+    expect(duo.violations).toHaveLength(1);
+    duo.dispose();
+  });
+
+  it("emits one request-identified shared terminal for an unowned proof source, even when duplicated", () => {
+    const duo = makeManualBoundaryDuo();
+    const { firstRequest } = stageManualBoundaryCandidate(duo);
+    const proof = answerManualBoundaryRequest(duo, firstRequest);
+    duo.guest.handleInboundFrame(proof.manifest);
+    const unownedSource: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
+      ...proof.source,
+      body: {
+        ...proof.source.body,
+        revision: 3,
+        operationId: "BOUNDARY/unowned-source",
+        kind: "CONTROL_COMMIT",
+        material: { digest: "unowned-source-digest", payload: { source: "not-listed" } },
+        nextControl: narrowBoundaryWait("BOUNDARY/unowned-source"),
+        subsumes: [],
+      },
+    };
+
+    duo.guest.handleInboundFrame(unownedSource);
+    duo.guest.handleInboundFrame(unownedSource);
+    expect(duo.appliedRevisions).toEqual([1]);
+    expect(duo.violations).toHaveLength(1);
+    expect(JSON.stringify(duo.violations[0])).toContain(String(firstRequest.body.requestId));
+    duo.dispose();
+  });
+
+  it("ignores old proof frames after an authenticated rebind while a fresh request/context releases the candidate", () => {
+    const duo = makeManualBoundaryDuo();
+    const { firstRequest } = stageManualBoundaryCandidate(duo);
+    const oldProof = answerManualBoundaryRequest(duo, firstRequest);
+
+    const hostRebound: CoopV2ShadowIdentity = {
+      ...identity(0),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 1, connectionGeneration: 1 }],
+    };
+    const guestRebound: CoopV2ShadowIdentity = {
+      ...identity(1),
+      membershipRevision: 2,
+      connectionGeneration: 1,
+      peerBindings: [{ seatId: 0, connectionGeneration: 1 }],
+    };
+    expect(duo.host.rebindIdentity(hostRebound)).toBe(2);
+    const reboundEntries = duo.hostToGuest.splice(0);
+    expect(reboundEntries.map(frame => (frame.t === "authorityEntry" ? frame.body.revision : -1))).toEqual([1, 2]);
+    expect(reboundEntries.every(frame => frame.t === "authorityEntry" && frame.ctx.connectionGeneration === 1)).toBe(true);
+    expect(duo.guest.rebindIdentity(guestRebound)).toBe(0);
+
+    const freshRequest = takeFrame(
+      duo.guestToHost,
+      "fresh rebound tailRequest",
+      frame =>
+        frame.t === "tailRequest"
+        && frame.body.requestId != null
+        && frame.body.requestId !== firstRequest.body.requestId,
+    ) as Extract<CoopFrameV2, { t: "tailRequest" }>;
+    expect(freshRequest.ctx).toMatchObject({ membershipRevision: 2, connectionGeneration: 1 });
+    expect(freshRequest.body.candidateRevision).toBe(firstRequest.body.candidateRevision);
+    duo.host.handleInboundFrame(freshRequest);
+
+    const freshManifest = takeFrame(
+      duo.hostToGuest,
+      "fresh rebound manifest",
+      frame => frame.t === "tailProof" && frame.body.phase === "manifest" && frame.ctx.connectionGeneration === 1,
+    ) as Extract<CoopFrameV2, { t: "tailProof" }>;
+    const freshSource = takeFrame(
+      duo.hostToGuest,
+      "fresh rebound source",
+      frame => frame.t === "authorityEntry" && frame.body.revision === 1 && frame.ctx.connectionGeneration === 1,
+    ) as Extract<CoopFrameV2, { t: "authorityEntry" }>;
+    const freshComplete = takeFrame(
+      duo.hostToGuest,
+      "fresh rebound complete",
+      frame => frame.t === "tailProof" && frame.body.phase === "complete" && frame.ctx.connectionGeneration === 1,
+    ) as Extract<CoopFrameV2, { t: "tailProof" }>;
+    expect(freshManifest.body.requestId).toBe(freshRequest.body.requestId);
+    expect(freshComplete.body).toEqual({ ...freshManifest.body, phase: "complete" });
+
+    duo.guest.handleInboundFrame(freshManifest);
+    duo.guest.handleInboundFrame(freshSource);
+    duo.guest.handleInboundFrame(freshComplete);
+    expect(duo.appliedRevisions).toEqual([1, 2]);
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 2, applied: 2 });
+
+    // The host's rebind replay is fresh channel evidence, not a second proof source. Delivering those exact
+    // authority images settles their receipts without re-applying either revision.
+    for (const reboundEntry of reboundEntries) {
+      duo.guest.handleInboundFrame(reboundEntry);
+    }
+
+    // The old proof has the old request/context and arrives after the fresh capture is closed. Both frames are
+    // inert; they cannot mint a second proof scope or re-apply the candidate.
+    duo.guest.handleInboundFrame(oldProof.manifest);
+    duo.guest.handleInboundFrame(oldProof.complete);
+    expect(duo.appliedRevisions).toEqual([1, 2]);
+    expect(duo.violations).toEqual([]);
+
+    for (const receipt of duo.guestToHost.filter(
+      frame => frame.t === "authorityReceipt" && frame.ctx.connectionGeneration === 1,
+    )) {
+      duo.host.handleInboundFrame(receipt);
+    }
+    expect(duo.host.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
+    expect(duo.clock.pendingCount).toBe(0);
+    duo.dispose();
+  });
+
+  it("keeps dropped/reordered proof frames fail-closed and accepts an exact duplicated manifest", async () => {
+    const cases = [
+      {
+        label: "dropped",
+        profile: { drop: 0, reorder: 0, delay: 0, faultable: faultableTypes(["tailProof"]) },
+        arm: (pair: CoopFaultPair) => pair.armNextDrop("tailProof", "host"),
+        expectApplied: [1],
+      },
+      {
+        label: "reordered",
+        profile: { drop: 0, reorder: 1, delay: 0, faultable: faultableTypes(["tailProof"]) },
+        arm: (_pair: CoopFaultPair) => {},
+        expectApplied: [1],
+      },
+      {
+        label: "duplicated",
+        profile: { drop: 0, reorder: 0, delay: 0, faultable: faultableTypes(["tailProof"]) },
+        arm: (pair: CoopFaultPair) => pair.armNextDuplicate("tailProof", "host"),
+        expectApplied: [1, 2],
+      },
+    ] as const;
+
+    for (const testCase of cases) {
+      const duo = makeFaultBoundaryDuo(testCase.profile);
+      testCase.arm(duo.pair);
+      const predecessor = duo.host.tapTurnCommit({
+        ...turnTap(`FAULT/${testCase.label}/predecessor`),
+        nextCommandFrontier: null,
+        nextSuccessorWait: narrowBoundaryWait(`FAULT/${testCase.label}/predecessor`),
+      });
+      expect(predecessor, testCase.label).not.toBeNull();
+      await flushLoopbackMicrotasks();
+      const candidate = duo.host.tapWaveAdvance(boundaryWaveTap(`FAULT/${testCase.label}/candidate`, 1));
+      expect(candidate, testCase.label).not.toBeNull();
+      await flushLoopbackMicrotasks(24);
+
+      expect(duo.appliedRevisions, testCase.label).toEqual(testCase.expectApplied);
+      expect(duo.pair.faultsInjected(), testCase.label).toBeGreaterThan(0);
+      if (testCase.label === "duplicated") {
+        expect(duo.pair.counters.host.oneShotDuplicated).toBe(1);
+        expect(duo.violations).toEqual([]);
+      } else {
+        expect(duo.violations, testCase.label).toHaveLength(1);
+        expect(duo.guest.diagnostics(), testCase.label).toMatchObject({ applied: 1 });
+      }
+
+      duo.dispose();
+      expect(duo.clock.pendingCount, testCase.label).toBe(0);
+      expect(duo.host.diagnostics(), testCase.label).toMatchObject({ retained: 0, pendingTimers: 0 });
+    }
   });
 });
 
