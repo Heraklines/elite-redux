@@ -532,6 +532,164 @@ export function terminalSubsumes(retained: readonly CoopAuthorityEntry[]): numbe
 }
 
 // ---------------------------------------------------------------------------
+// Boundary supersession proof.
+// ---------------------------------------------------------------------------
+
+/** The minimum entry shape needed by the fail-closed boundary authorizer. */
+export type CoopBoundarySupersessionEntry = Pick<
+  CoopAuthorityEntry,
+  "context" | "revision" | "operationId" | "kind" | "material" | "nextControl" | "subsumes"
+>;
+
+interface BoundaryCoordinate {
+  readonly epoch: number;
+  readonly wave: number;
+  readonly turn: number;
+}
+
+function controlBoundaryCoordinate(control: CoopNextControl): BoundaryCoordinate | null {
+  if (control.kind === "TERMINAL") {
+    return null;
+  }
+  return { epoch: control.epoch, wave: control.wave, turn: control.turn };
+}
+
+function boundaryMaterialCoordinate(
+  entry: Pick<CoopBoundarySupersessionEntry, "context" | "kind" | "material">,
+): BoundaryCoordinate | null {
+  const payload = entry.material.payload;
+  if (entry.kind === "WAVE_ADVANCE" && isValidWaveTransitionMaterial(payload)) {
+    return { epoch: entry.context.sessionEpoch, wave: payload.wave, turn: payload.turn };
+  }
+  if (entry.kind === "TERMINAL_COMMIT" && isValidTerminalMaterial(payload)) {
+    return { epoch: entry.context.sessionEpoch, wave: payload.wave, turn: payload.turn };
+  }
+  return null;
+}
+
+/**
+ * Validate the complete typed body needed before a boundary can supersede a
+ * stale predecessor. The ordinary entry validator deliberately treats
+ * material as opaque; this narrower guard proves the two boundary kinds have
+ * their canonical digest, destination, and material/control relationship.
+ */
+export function isStructurallyValidBoundaryEntry(
+  entry: Pick<CoopBoundarySupersessionEntry, "context" | "operationId" | "kind" | "material" | "nextControl">,
+): boolean {
+  if (entry.kind === "WAVE_ADVANCE") {
+    const material = entry.material.payload;
+    if (
+      !isValidWaveTransitionMaterial(material)
+      || digestOfMaterial(material) !== entry.material.digest
+      || entry.nextControl.kind === "TERMINAL"
+    ) {
+      return false;
+    }
+    if (material.nextWave <= material.wave || entry.nextControl.epoch !== entry.context.sessionEpoch) {
+      return false;
+    }
+    if (entry.nextControl.kind === "COMMAND_FRONTIER") {
+      return entry.nextControl.wave === material.nextWave && entry.nextControl.turn === 1;
+    }
+    return (
+      entry.nextControl.kind === "AWAIT_SUCCESSOR"
+      && entry.nextControl.afterOperationId === entry.operationId
+      && entry.nextControl.wave === material.wave
+      && entry.nextControl.turn === material.turn
+    );
+  }
+  if (entry.kind === "TERMINAL_COMMIT") {
+    const material = entry.material.payload;
+    return (
+      isValidTerminalMaterial(material)
+      && digestOfMaterial(material) === entry.material.digest
+      && entry.nextControl.kind === "TERMINAL"
+      && entry.nextControl.terminalId === material.terminalId
+    );
+  }
+  return false;
+}
+
+function sameRevisionList(left: readonly number[], right: readonly number[]): boolean {
+  return left.length === right.length && left.every((revision, index) => revision === right[index]);
+}
+
+function isSameOrLaterBoundary(
+  predecessor: CoopBoundarySupersessionEntry,
+  successor: CoopBoundarySupersessionEntry,
+): boolean {
+  const predecessorCoordinate = controlBoundaryCoordinate(predecessor.nextControl);
+  const successorCoordinate = boundaryMaterialCoordinate(successor);
+  if (
+    predecessorCoordinate == null
+    || successorCoordinate == null
+    || predecessorCoordinate.epoch !== successor.context.sessionEpoch
+    || predecessorCoordinate.epoch !== successorCoordinate.epoch
+  ) {
+    return false;
+  }
+  return (
+    successorCoordinate.wave > predecessorCoordinate.wave
+    || (successorCoordinate.wave === predecessorCoordinate.wave
+      && successorCoordinate.turn >= predecessorCoordinate.turn)
+  );
+}
+
+/**
+ * Structural/causal portion of the boundary bypass. This is intentionally
+ * independent of retention so the live control ledger can use only its
+ * authenticated source-entry claims; AuthorityLog adds the stricter exact
+ * retained-frontier check below.
+ */
+export function isBoundarySupersessionCandidate(
+  predecessor: CoopBoundarySupersessionEntry,
+  successor: CoopBoundarySupersessionEntry,
+): boolean {
+  if (
+    predecessor.nextControl.kind === "TERMINAL"
+    || (successor.kind !== "WAVE_ADVANCE" && successor.kind !== "TERMINAL_COMMIT")
+    || !isStructurallyValidBoundaryEntry(successor)
+    || !isSameOrLaterBoundary(predecessor, successor)
+    || successor.subsumes.includes(predecessor.revision) === false
+    || successor.operationId === predecessor.operationId
+  ) {
+    return false;
+  }
+  return successor.subsumes.every(isValidRevision) && new Set(successor.subsumes).size === successor.subsumes.length;
+}
+
+/**
+ * Full AuthorityLog boundary proof. Every claimed subsumption must be an
+ * exact member of the retained frontier, and the list must equal the adapter's
+ * canonical boundary set. Unknown revisions, partial lists, and stale copies
+ * therefore fail closed before any lease can be retired.
+ */
+export function boundarySupersessionAllowsSuccessorEntry(
+  predecessor: CoopBoundarySupersessionEntry,
+  successor: CoopBoundarySupersessionEntry,
+  retained: readonly CoopAuthorityEntry[],
+): boolean {
+  if (!isBoundarySupersessionCandidate(predecessor, successor)) {
+    return false;
+  }
+  const trustedPredecessor = retained.find(
+    entry => entry.revision === predecessor.revision && entry.operationId === predecessor.operationId,
+  );
+  if (trustedPredecessor == null) {
+    return false;
+  }
+  const expected =
+    successor.kind === "WAVE_ADVANCE"
+      ? waveBoundarySubsumes(retained, (successor.material.payload as CoopWaveTransitionMaterialV2).wave)
+      : terminalSubsumes(retained);
+  return (
+    expected.length > 0
+    && sameRevisionList(successor.subsumes, expected)
+    && expected.includes(trustedPredecessor.revision)
+  );
+}
+
+// ---------------------------------------------------------------------------
 // REPLICA: the applier seam. An ApplyMaterialFn (replica.ts) that ADOPTS the
 // typed transition/terminal material through an injected sink and confirms the
 // digest. The guest CONSTRUCTS its post-battle phases BY ADOPTION of this

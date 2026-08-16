@@ -17,6 +17,10 @@
 // because a phase was queued or because some handler happened to be active.
 // =============================================================================
 
+import {
+  boundarySupersessionAllowsSuccessorEntry,
+  type CoopBoundarySupersessionEntry,
+} from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type { CoopAuthorityEntry, CoopControlInstallResult } from "#data/elite-redux/coop/authority-v2/contract";
 import {
   controlAllowsSuccessorEntry,
@@ -225,10 +229,22 @@ export class CoopV2ControlLedger {
     if (active == null) {
       return true;
     }
-    if (active.installed == null || entry.revision !== active.revision + 1) {
+    if (entry.revision !== active.revision + 1) {
       return false;
     }
-    if (!controlAllowsSuccessorEntry(active.control, active.sourceOperationId, entry)) {
+    const ordinarySuccessorAllowed = controlAllowsSuccessorEntry(active.control, active.sourceOperationId, entry);
+    // Ordinary progression consumes a live installed control; an uninstalled predecessor is still a local
+    // prepare deferral, not permission to publish the next entry.
+    if (ordinarySuccessorAllowed && active.installed == null) {
+      return false;
+    }
+    // A stale wave/terminal boundary is the deliberate exception to the installed-control prerequisite:
+    // its exact retained/proven source-entry + canonical subsumes proof is what releases the circular wait.
+    // No generic successor reaches this branch, and any later prepare failure restores this claim snapshot.
+    if (
+      !ordinarySuccessorAllowed
+      && (active.sourceEntry == null || !this.allowsBoundarySupersession(active.sourceEntry, entry))
+    ) {
       return false;
     }
     active.superseded = true;
@@ -583,6 +599,24 @@ export class CoopV2ControlLedger {
       }
     }
     return latest;
+  }
+
+  /**
+   * The authority log proves the exact retained list. The local control ledger
+   * can only prove source entries it has authenticated, so it applies the same
+   * typed/causal predicate and rejects every claimed revision it cannot name.
+   */
+  private allowsBoundarySupersession(
+    predecessor: CoopBoundarySupersessionEntry,
+    successor: CoopBoundarySupersessionEntry,
+  ): boolean {
+    const trusted = successor.subsumes.map(revision =>
+      [...this.claims.values()].map(claim => claim.sourceEntry).find(entry => entry?.revision === revision),
+    );
+    if (trusted.some(entry => entry == null)) {
+      return false;
+    }
+    return boundarySupersessionAllowsSuccessorEntry(predecessor, successor, trusted as CoopAuthorityEntry[]);
   }
 
   /** Snapshot mutable claim flags while preserving the opaque live phase/handler identities by reference. */

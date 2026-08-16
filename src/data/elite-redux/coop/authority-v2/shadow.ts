@@ -105,12 +105,13 @@ import {
   terminalSubsumes,
   waveBoundarySubsumes,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import { freezeAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import {
-  AuthorityLog,
   type AuthorityCommitDisposition,
+  type AuthorityDeliveryExhaustion,
+  AuthorityLog,
   type CoopAuthorityWire,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
-import { freezeAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
@@ -303,6 +304,8 @@ export interface CoopV2ShadowDeps {
   readonly send: (frame: CoopFrameV2) => void;
   /** Optional injected scheduler (a deterministic fake for tests); default a real scheduler the harness owns. */
   readonly scheduler?: CoopSchedulerImpl;
+  /** Optional bounded redelivery cap; omission preserves unbounded production redelivery. */
+  readonly maxDeliveryAttempts?: number;
   /**
    * Optional LIVE replica seams (cutover surface 1). When present, a delivered CUTOVER-kind entry is applied
    * against REAL engine state + the real phase manager instead of the in-memory shadow ledger. Absent =>
@@ -316,6 +319,8 @@ export interface CoopV2ShadowDeps {
    * by pure-shadow/node harnesses, where violations remain evidence-only and cannot affect legacy mechanics.
    */
   readonly onProtocolViolation?: (violation: Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>) => void;
+  /** Optional one-shot delivery-exhaustion sink; omission routes the disposition into protocol/shared-terminal. */
+  readonly onDeliveryExhausted?: (disposition: AuthorityDeliveryExhaustion) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -432,6 +437,9 @@ export interface CoopV2ShadowDiagnostics {
   readonly pendingTimers: number;
   readonly controlLedgerSize: number;
   readonly shadowStateSize: number;
+  readonly deliveryExhaustions: number;
+  readonly deliveryExhaustionCallbackFailures: number;
+  readonly exhaustedRevisions: readonly number[];
   readonly disposed: boolean;
   readonly recovery: CoopRecoveryChannelV2Diagnostics | null;
 }
@@ -557,6 +565,7 @@ export class CoopAuthorityV2Shadow {
   private readonly onProtocolViolation:
     | ((violation: Extract<CoopInboundFrameResultV2, { kind: "protocol-violation" }>) => void)
     | undefined;
+  private readonly onDeliveryExhausted: ((disposition: AuthorityDeliveryExhaustion) => void) | undefined;
   private readonly shadowState = new Map<number, ShadowStateRecord>();
   /**
    * Replica entries that are admitted but still waiting on their real material/control boundary.
@@ -625,16 +634,19 @@ export class CoopAuthorityV2Shadow {
     this.frameContext = bindFrameContext(this.ctx, connection);
 
     this.lifecycle = new CoopLifecycle(this.ctx, reason => this.ctxHandle.dispose(reason));
+    this.onProtocolViolation = deps.onProtocolViolation;
+    this.onDeliveryExhausted = deps.onDeliveryExhausted;
     this.log = new AuthorityLog({
       localContext: this.frameContext,
       scheduler: this.scheduler,
       send: wire => this.emitWire(wire),
       peerBindings: id.peerBindings,
       ownerId: `authority-v2-shadow:${id.sessionId}:seat${id.localSeatId}`,
+      ...(deps.maxDeliveryAttempts === undefined ? {} : { maxDeliveryAttempts: deps.maxDeliveryAttempts }),
+      onDeliveryExhausted: disposition => this.handleDeliveryExhausted(disposition),
     });
 
     this.liveReplica = deps.liveReplica ?? null;
-    this.onProtocolViolation = deps.onProtocolViolation;
     this.projector = new CoopShadowControlProjector(this.ledger, this.liveReplica);
     const liveRecovery = deps.liveRecovery;
     this.recoveryChannel =
@@ -1515,6 +1527,7 @@ export class CoopAuthorityV2Shadow {
   }
 
   diagnostics(): CoopV2ShadowDiagnostics {
+    const authority = this.log.diagnostics();
     return {
       committed: this.committed,
       admitted: this.admitted,
@@ -1527,6 +1540,9 @@ export class CoopAuthorityV2Shadow {
       pendingTimers: this.scheduler.pendingTimerCount,
       controlLedgerSize: this.ledger.size,
       shadowStateSize: this.shadowState.size,
+      deliveryExhaustions: authority.deliveryExhaustions,
+      deliveryExhaustionCallbackFailures: authority.deliveryExhaustionCallbackFailures,
+      exhaustedRevisions: authority.exhaustedRevisions,
       disposed: this.disposed,
       recovery: this.recoveryChannel?.diagnostics() ?? null,
     };
@@ -1608,10 +1624,11 @@ export class CoopAuthorityV2Shadow {
       if (!this.retainPendingReplicaEntry(entry)) {
         return false;
       }
-    } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
-      if (!this.retainPendingReplicaEntry(entry)) {
-        return false;
-      }
+    } else if (
+      (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control")
+      && !this.retainPendingReplicaEntry(entry)
+    ) {
+      return false;
     }
     const resume =
       result.kind === "duplicate-pending-control"
@@ -1696,15 +1713,109 @@ export class CoopAuthorityV2Shadow {
             return this.liveReplica.prepareAuthorityEntry?.(this.runtimeContext, candidate) ?? null;
           },
     );
+    return this.finalizeAuthorityCommit(disposition);
+  }
+
+  /** Retry the exact deferred authority image retained by AuthorityLog. */
+  retryDeferredAuthorityEntry(expectedOperationId?: string): AuthorityCommitDisposition {
+    if (this.disposed) {
+      return { kind: "failed", reason: "shadow harness is disposed" };
+    }
+    return this.finalizeAuthorityCommit(this.log.retryDeferredCommit(expectedOperationId));
+  }
+
+  /** Commit a typed WAVE_ADVANCE and record parity only after its exact revision is committed. */
+  commitWaveAdvanceDetailed(input: CoopV2ShadowWaveTap): AuthorityCommitDisposition {
+    this.lastObservedWave = input.transition.wave;
+    if (input.transition.turn >= 1) {
+      this.lastObservedTurn = input.transition.turn;
+    }
+    try {
+      const built = buildWaveAdvanceEntry({
+        context: this.frameContext,
+        operationId: input.operationId,
+        transition: input.transition,
+        destination: input.destination,
+        subsumes: input.subsumes ?? waveBoundarySubsumes(this.log.retained(), input.transition.wave),
+      });
+      const disposition = this.commitAuthorityEntryDetailed(built);
+      if (disposition.kind === "committed") {
+        this.recordWaveAdvanceParity(input, disposition.entry);
+      }
+      return disposition;
+    } catch (error) {
+      this.fault("commitWaveAdvanceDetailed", error);
+      return { kind: "failed", reason: describeError(error) };
+    }
+  }
+
+  /** Retry a typed WAVE_ADVANCE using the exact AuthorityLog-owned revision/body. */
+  retryDeferredWaveAdvanceDetailed(input: CoopV2ShadowWaveTap): AuthorityCommitDisposition {
+    const disposition = this.retryDeferredAuthorityEntry(input.operationId);
+    if (disposition.kind === "committed") {
+      this.recordWaveAdvanceParity(input, disposition.entry);
+    }
+    return disposition;
+  }
+
+  /** Commit a typed TERMINAL_COMMIT and record parity only after its exact revision is committed. */
+  commitTerminalDetailed(input: CoopV2ShadowTerminalTap): AuthorityCommitDisposition {
+    try {
+      const built = buildTerminalCommitEntry({
+        context: this.frameContext,
+        operationId: input.operationId,
+        terminal: input.terminal,
+        subsumes: input.subsumes ?? terminalSubsumes(this.log.retained()),
+      });
+      const disposition = this.commitAuthorityEntryDetailed(built);
+      if (disposition.kind === "committed") {
+        this.recordTerminalParity(input, disposition.entry);
+      }
+      return disposition;
+    } catch (error) {
+      this.fault("commitTerminalDetailed", error);
+      return { kind: "failed", reason: describeError(error) };
+    }
+  }
+
+  /** Retry a typed TERMINAL_COMMIT using the exact AuthorityLog-owned revision/body. */
+  retryDeferredTerminalDetailed(input: CoopV2ShadowTerminalTap): AuthorityCommitDisposition {
+    const disposition = this.retryDeferredAuthorityEntry(input.operationId);
+    if (disposition.kind === "committed") {
+      this.recordTerminalParity(input, disposition.entry);
+    }
+    return disposition;
+  }
+
+  private finalizeAuthorityCommit(disposition: AuthorityCommitDisposition): AuthorityCommitDisposition {
     if (disposition.kind !== "committed") {
       return disposition;
     }
     const committed = disposition.entry;
     this.committed += 1;
     if (this.liveReplica?.ownsEntry(committed) === true) {
-      this.liveReplica.authorityEntryCommitted?.(this.runtimeContext, committed);
+      try {
+        this.liveReplica.authorityEntryCommitted?.(this.runtimeContext, committed);
+      } catch (error) {
+        // The log has already committed and retained the exact entry. A live
+        // callback fault is evidence, not permission to report a false failed
+        // commit or to invoke the callback a second time on retry.
+        this.fault(`authorityEntryCommitted(${committed.revision})`, error);
+      }
     }
     return disposition;
+  }
+
+  private recordWaveAdvanceParity(input: CoopV2ShadowWaveTap, entry: CoopAuthorityEntry): void {
+    const shadow = shadowOfWaveTerminalEntry(entry);
+    const comparand = input.legacyImage == null ? input.legacyDigest : digestOfMaterial(input.legacyImage);
+    this.logParity("WAVE_ADVANCE", entry.revision, shadow.materialDigest === comparand, "materialDigest");
+  }
+
+  private recordTerminalParity(input: CoopV2ShadowTerminalTap, entry: CoopAuthorityEntry): void {
+    const shadow = shadowOfWaveTerminalEntry(entry);
+    const comparand = input.legacyImage == null ? input.legacyDigest : digestOfMaterial(input.legacyImage);
+    this.logParity("TERMINAL_COMMIT", entry.revision, shadow.materialDigest === comparand, "materialDigest");
   }
 
   /** Commit an entry to the shadow log (which delivers it over the wire) and count it. */
@@ -1766,6 +1877,35 @@ export class CoopAuthorityV2Shadow {
         kind: "protocol-violation",
         frameType: "authorityEntry",
         issues: [`revision=${entry.revision}`, issue],
+      },
+      this.onProtocolViolation,
+    );
+  }
+
+  /** Route a one-shot capped-lease disposition into a caller sink or the existing shared-terminal hook. */
+  private handleDeliveryExhausted(disposition: AuthorityDeliveryExhaustion): void {
+    coopWarn(
+      "v2-authority",
+      `delivery exhausted rev=${disposition.revision} op=${disposition.operationId} `
+        + `kind=${disposition.entryKind} attempts=${disposition.attempts}/${disposition.maxAttempts}`,
+    );
+    if (this.onDeliveryExhausted != null) {
+      try {
+        this.onDeliveryExhausted(disposition);
+      } catch (error) {
+        this.fault("delivery-exhaustion-callback", error);
+      }
+      return;
+    }
+    reportProtocolViolation(
+      {
+        kind: "protocol-violation",
+        frameType: "authorityEntry",
+        issues: [
+          `delivery.exhausted.revision=${disposition.revision}`,
+          `delivery.exhausted.operation=${disposition.operationId}`,
+          `delivery.exhausted.attempts=${disposition.attempts}/${disposition.maxAttempts}`,
+        ],
       },
       this.onProtocolViolation,
     );
@@ -2108,14 +2248,15 @@ function samePendingReplicaEntry(left: CoopAuthorityEntry, right: CoopAuthorityE
       material: left.material,
       nextControl: left.nextControl,
       subsumes: left.subsumes,
-    }) === JSON.stringify({
-      context: right.context,
-      operationId: right.operationId,
-      kind: right.kind,
-      material: right.material,
-      nextControl: right.nextControl,
-      subsumes: right.subsumes,
     })
+      === JSON.stringify({
+        context: right.context,
+        operationId: right.operationId,
+        kind: right.kind,
+        material: right.material,
+        nextControl: right.nextControl,
+        subsumes: right.subsumes,
+      })
   );
 }
 

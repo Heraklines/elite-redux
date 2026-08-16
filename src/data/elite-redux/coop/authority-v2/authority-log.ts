@@ -42,6 +42,7 @@
 // no-orphan-timer invariant directly.
 // =============================================================================
 
+import { boundarySupersessionAllowsSuccessorEntry } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   freezeAuthorityEntry,
   isSameSessionIdentity,
@@ -165,6 +166,20 @@ export type AuthorityCommitDisposition =
     }
   | { readonly kind: "failed"; readonly reason: string };
 
+/** One-shot boundary notification when a bounded delivery lease can no longer redrive itself. */
+export interface AuthorityDeliveryExhaustion {
+  readonly kind: "delivery-exhausted";
+  readonly reason: "max-delivery-attempts";
+  readonly revision: number;
+  readonly operationId: string;
+  readonly entryKind: CoopAuthorityEntry["kind"];
+  /** Number of scheduled redelivery attempts that were actually sent. */
+  readonly attempts: number;
+  readonly maxAttempts: number;
+  /** The exact retained immutable entry; exhaustion never retires or evicts it. */
+  readonly entry: CoopAuthorityEntry;
+}
+
 /** Internal compatibility error: the historical commit() API still throws, while detailed callers classify it. */
 class AuthorityCommitDeferredError extends Error {
   readonly entry: CoopAuthorityEntry;
@@ -201,6 +216,8 @@ export interface AuthorityLogOptions {
    * mechanical retirement or dispose). A cap bounds a pathologically dark channel; retention is unaffected.
    */
   readonly maxDeliveryAttempts?: number;
+  /** One-shot diagnostic/disposition hook when a capped lease becomes inert while still retained. */
+  readonly onDeliveryExhausted?: (disposition: AuthorityDeliveryExhaustion) => void;
 }
 
 /**
@@ -222,6 +239,8 @@ interface DeliveryLease {
   stopped: boolean;
   /** Whether this entry's subsumption list has already been actioned (once, on first reaching admitted). */
   subsumptionDone: boolean;
+  /** Whether the bounded-attempt disposition has already been emitted for this lease. */
+  exhaustionNotified: boolean;
 }
 
 function allPeersReached(lease: DeliveryLease, requiredStage: number): boolean {
@@ -240,6 +259,9 @@ export interface AuthorityLogDiagnostics {
   readonly retentionCapacity: number;
   readonly retentionRefusals: number;
   readonly wireSendFailures: number;
+  readonly deliveryExhaustions: number;
+  readonly deliveryExhaustionCallbackFailures: number;
+  readonly exhaustedRevisions: readonly number[];
   readonly disposed: boolean;
 }
 
@@ -300,6 +322,7 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly backoff: DeliveryBackoff;
   private readonly deliveryTimeClass: CoopTimeClass;
   private readonly maxDeliveryAttempts: number | null;
+  private readonly onDeliveryExhausted: ((disposition: AuthorityDeliveryExhaustion) => void) | undefined;
   private readonly retentionCapacity: number;
   private peerBindings: readonly CoopAuthorityPeerBindingV2[];
 
@@ -338,8 +361,11 @@ export class AuthorityLog implements CoopAuthorityLog {
   } | null = null;
   /** Bounded quorum-stage tombstones so a waiter registered after synchronous loopback retirement is sound. */
   private readonly retiredOperationStages = new Map<string, number>();
+  private readonly exhaustedRevisionSet = new Set<number>();
   private retentionRefusals = 0;
   private wireSendFailures = 0;
+  private deliveryExhaustions = 0;
+  private deliveryExhaustionCallbackFailures = 0;
   private disposed = false;
 
   constructor(options: AuthorityLogOptions) {
@@ -353,10 +379,14 @@ export class AuthorityLog implements CoopAuthorityLog {
       options.ownerId ?? `authority-v2:${options.localContext.sessionId}:seat${options.localContext.senderSeatId}`;
     this.backoff = options.backoff ?? COOP_DEFAULT_DELIVERY_BACKOFF;
     this.deliveryTimeClass = options.deliveryTimeClass ?? "connected";
-    this.maxDeliveryAttempts =
-      options.maxDeliveryAttempts != null && Number.isSafeInteger(options.maxDeliveryAttempts)
-        ? options.maxDeliveryAttempts
-        : null;
+    if (
+      options.maxDeliveryAttempts != null
+      && (!Number.isSafeInteger(options.maxDeliveryAttempts) || options.maxDeliveryAttempts < 0)
+    ) {
+      throw new Error("AuthorityLog requires maxDeliveryAttempts to be a non-negative safe integer");
+    }
+    this.maxDeliveryAttempts = options.maxDeliveryAttempts ?? null;
+    this.onDeliveryExhausted = options.onDeliveryExhausted;
     this.peerBindings = validatePeerBindings(options.peerBindings, options.localContext.senderSeatId);
     this.retentionCapacity = options.retainCapacity ?? COOP_DEFAULT_RETAIN_CAPACITY;
     this.retainedWindow = new BoundedRevisionWindow<DeliveryLease>(this.retentionCapacity);
@@ -469,7 +499,7 @@ export class AuthorityLog implements CoopAuthorityLog {
             entry: freezeAuthorityEntry(
               cloneEntry({ ...this.pendingAuthorityCommit.entry, context: reboundLocalContext }),
             ),
-            prepare: this.pendingAuthorityCommit.prepare,
+            ...(this.pendingAuthorityCommit.prepare == null ? {} : { prepare: this.pendingAuthorityCommit.prepare }),
           };
     const reboundLeases: {
       readonly lease: DeliveryLease;
@@ -576,23 +606,34 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       throw new Error("AuthorityLog.commit: entry context is not bound to the local authority");
     }
-    if (this.latestNextControl?.kind === "TERMINAL") {
-      throw new Error("AuthorityLog.commit: terminal frontier is final");
-    }
-    if (
-      this.latestNextControl != null
-      && (this.latestCommittedOperationId == null
-        || !controlAllowsSuccessorEntry(this.latestNextControl, this.latestCommittedOperationId, entry))
-    ) {
-      throw new Error(
-        `AuthorityLog.commit: ${entry.kind} is not authorized by predecessor control after `
-          + `${this.latestCommittedOperationId ?? "(missing predecessor)"}`,
-      );
-    }
     const revision = pending?.entry.revision ?? this.headRevision + 1;
     const candidate = pending?.entry ?? { ...entry, revision };
     if (!isValidAuthorityEntry(candidate)) {
       throw new Error("AuthorityLog.commit: malformed mechanical entry or missing successor control");
+    }
+    if (
+      (pending == null && revision !== this.headRevision + 1)
+      || (pending != null && revision !== pending.entry.revision)
+    ) {
+      throw new Error("AuthorityLog.commit: revision is not the next dense authority revision");
+    }
+    if (this.latestNextControl?.kind === "TERMINAL") {
+      throw new Error("AuthorityLog.commit: terminal frontier is final");
+    }
+    const ordinarySuccessorAllowed =
+      this.latestNextControl == null
+      || (this.latestCommittedOperationId != null
+        && controlAllowsSuccessorEntry(this.latestNextControl, this.latestCommittedOperationId, candidate));
+    const boundarySuccessorAllowed =
+      !ordinarySuccessorAllowed
+      && this.latestCommittedEntry != null
+      && this.retainedWindow.has(this.latestCommittedEntry.revision)
+      && boundarySupersessionAllowsSuccessorEntry(this.latestCommittedEntry, candidate, this.retained());
+    if (!ordinarySuccessorAllowed && !boundarySuccessorAllowed) {
+      throw new Error(
+        `AuthorityLog.commit: ${candidate.kind} is not authorized by predecessor control after `
+          + `${this.latestCommittedOperationId ?? "(missing predecessor)"}`,
+      );
     }
     // Own an immutable, caller-independent copy so a caller reusing/mutating its source object can never
     // rewrite what a later redelivery transmits (the retention immutability boundary).
@@ -616,6 +657,7 @@ export class AuthorityLog implements CoopAuthorityLog {
       cancelTimer: null,
       stopped: false,
       subsumptionDone: false,
+      exhaustionNotified: false,
     };
     if (!this.retainedWindow.set(revision, lease)) {
       this.retentionRefusals += 1;
@@ -649,6 +691,27 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.sendGuarded({ kind: "deliver", entry: committed });
     this.scheduleRedelivery(lease);
     return committed;
+  }
+
+  /**
+   * Retry the one exact authority-local deferred commit without asking a caller
+   * to rebuild or re-address its body. Rebind updates the retained immutable
+   * image in place, so this seam preserves operation identity and revision
+   * across a hot rejoin.
+   */
+  retryDeferredCommit(expectedOperationId?: string): AuthorityCommitDisposition {
+    const pending = this.pendingAuthorityCommit;
+    if (pending == null) {
+      return { kind: "failed", reason: "AuthorityLog has no deferred authority commit" };
+    }
+    if (expectedOperationId != null && pending.entry.operationId !== expectedOperationId) {
+      return {
+        kind: "failed",
+        reason: `AuthorityLog deferred operation mismatch: expected ${expectedOperationId}`,
+      };
+    }
+    const { revision: _revision, ...body } = pending.entry;
+    return this.commitDetailed(body, pending.prepare);
   }
 
   /**
@@ -1079,6 +1142,9 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.pendingAuthorityCommit = null;
     this.latestCommittedOperationId = null;
     this.latestNextControl = null;
+    this.latestCommittedEntry = null;
+    this.retiredOperationStages.clear();
+    this.exhaustedRevisionSet.clear();
   }
 
   /** Live counts for the no-orphan-timer + bounded-retention invariants (tests assert these directly). */
@@ -1095,6 +1161,9 @@ export class AuthorityLog implements CoopAuthorityLog {
       retentionCapacity: this.retentionCapacity,
       retentionRefusals: this.retentionRefusals,
       wireSendFailures: this.wireSendFailures,
+      deliveryExhaustions: this.deliveryExhaustions,
+      deliveryExhaustionCallbackFailures: this.deliveryExhaustionCallbackFailures,
+      exhaustedRevisions: [...this.exhaustedRevisionSet].sort((left, right) => left - right),
       disposed: this.disposed,
     };
   }
@@ -1129,6 +1198,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.stopLease(lease);
     this.retainedWindow.delete(revision);
+    this.exhaustedRevisionSet.delete(revision);
     return true;
   }
 
@@ -1177,8 +1247,10 @@ export class AuthorityLog implements CoopAuthorityLog {
       return;
     }
     if (this.maxDeliveryAttempts != null && lease.attempts >= this.maxDeliveryAttempts) {
-      // Attempt cap reached: the loop goes inert (retention still holds until retirement / dispose).
-      lease.stopped = true;
+      // Attempt cap reached: retain the exact entry, stop only this lease, and
+      // publish one explicit disposition so the caller can enter the existing
+      // protocol/shared-terminal path instead of inheriting a silent stall.
+      this.markDeliveryExhausted(lease);
       return;
     }
     const delay = this.backoffDelay(lease.attempts);
@@ -1196,6 +1268,42 @@ export class AuthorityLog implements CoopAuthorityLog {
     lease.attempts += 1;
     this.sendGuarded({ kind: "deliver", entry: lease.entry });
     this.scheduleRedelivery(lease);
+  }
+
+  /** Stop + report a capped lease exactly once; retention remains authoritative until normal retirement. */
+  private markDeliveryExhausted(lease: DeliveryLease): void {
+    if (lease.exhaustionNotified || this.disposed || !this.retainedWindow.has(lease.revision)) {
+      return;
+    }
+    lease.exhaustionNotified = true;
+    lease.stopped = true;
+    this.deliveryExhaustions += 1;
+    this.exhaustedRevisionSet.add(lease.revision);
+    while (this.exhaustedRevisionSet.size > this.retentionCapacity) {
+      const oldest = [...this.exhaustedRevisionSet].sort((left, right) => left - right)[0];
+      if (oldest == null) {
+        break;
+      }
+      this.exhaustedRevisionSet.delete(oldest);
+    }
+    const disposition: AuthorityDeliveryExhaustion = Object.freeze({
+      kind: "delivery-exhausted",
+      reason: "max-delivery-attempts",
+      revision: lease.revision,
+      operationId: lease.entry.operationId,
+      entryKind: lease.entry.kind,
+      attempts: lease.attempts,
+      maxAttempts: this.maxDeliveryAttempts ?? lease.attempts,
+      entry: lease.entry,
+    });
+    if (this.onDeliveryExhausted == null) {
+      return;
+    }
+    try {
+      this.onDeliveryExhausted(disposition);
+    } catch {
+      this.deliveryExhaustionCallbackFailures += 1;
+    }
   }
 
   /** A carrier throw never loses a committed entry or kills its owned redelivery loop. */
@@ -1230,25 +1338,25 @@ function cloneEntry(entry: CoopAuthorityEntry): CoopAuthorityEntry {
 }
 
 /** Compare a retry request with the exact deferred body without treating revision as a new allocation. */
-function sameAuthorityCommitBody(
-  left: CoopAuthorityEntry,
-  right: Omit<CoopAuthorityEntry, "revision">,
-): boolean {
-  return JSON.stringify({
-    context: left.context,
-    operationId: left.operationId,
-    kind: left.kind,
-    material: left.material,
-    nextControl: left.nextControl,
-    subsumes: left.subsumes,
-  }) === JSON.stringify({
-    context: right.context,
-    operationId: right.operationId,
-    kind: right.kind,
-    material: right.material,
-    nextControl: right.nextControl,
-    subsumes: right.subsumes,
-  });
+function sameAuthorityCommitBody(left: CoopAuthorityEntry, right: Omit<CoopAuthorityEntry, "revision">): boolean {
+  return (
+    JSON.stringify({
+      context: left.context,
+      operationId: left.operationId,
+      kind: left.kind,
+      material: left.material,
+      nextControl: left.nextControl,
+      subsumes: left.subsumes,
+    })
+    === JSON.stringify({
+      context: right.context,
+      operationId: right.operationId,
+      kind: right.kind,
+      material: right.material,
+      nextControl: right.nextControl,
+      subsumes: right.subsumes,
+    })
+  );
 }
 
 /** Structurally clone an opaque JSON payload so retention is independent of the caller's object. */
