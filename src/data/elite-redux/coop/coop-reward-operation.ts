@@ -20,7 +20,10 @@
 // author state or advance its ordinal.
 // =============================================================================
 
-import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
+import {
+  getCoopV2InteractionCutover,
+  isCoopV2InteractionCutoverActive,
+} from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
 import {
   applyCoopAuthoritativeBattleState,
@@ -46,14 +49,14 @@ import {
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   applyCoopOperationEnvelope,
+  type CoopOperationJournalCommitDisposition,
   type CoopOperationEnvelopeApplyContext,
   getActiveCoopOperationDurability,
   isCoopOperationAuthorityV2Apply,
   isCoopOperationJournalActive,
   isCoopOperationJournalActiveFor,
   registerCoopOperationApplier,
-  tryJournalCoopCommittedEnvelope,
-  tryJournalCoopCommittedEnvelopeFor,
+  tryJournalCoopCommittedEnvelopeDetailed,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -338,6 +341,10 @@ interface RewardOpState {
   readonly preparedIntents: Map<string, PreparedRewardIntent>;
   /** Exact immutable host results survive a journal failure/retry without recapturing a later state tick. */
   readonly committedResultEnvelopes: Map<string, CoopAuthoritativeEnvelopeV1>;
+  /** Result envelopes whose exact journal admission already completed. */
+  readonly admittedResultOperations: Set<string>;
+  /** Result envelopes parked only because the predecessor control is not installed yet. */
+  readonly deferredResultOperations: Set<string>;
   /**
    * Newest complete post-action authority image for each pinned reward interaction. Mystery finalization
    * can run after the battle renderer has torn down enough live objects that a fresh full-state capture is
@@ -361,6 +368,8 @@ registerCoopOpSurfaceState(
     ownerTerminalOperations: new Map(),
     preparedIntents: new Map(),
     committedResultEnvelopes: new Map(),
+    admittedResultOperations: new Set<string>(),
+    deferredResultOperations: new Set<string>(),
     latestResultStateByPinned: new Map(),
   }),
 );
@@ -414,10 +423,18 @@ function journalActive(binding?: CoopRewardOperationBinding | null): boolean {
   return binding == null ? isCoopOperationJournalActive() : isCoopOperationJournalActiveFor(binding.durability);
 }
 
-function retainEnvelope(envelope: CoopAuthoritativeEnvelopeV1, binding?: CoopRewardOperationBinding | null): boolean {
+function retainEnvelopeDetailed(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopRewardOperationBinding | null,
+): CoopOperationJournalCommitDisposition {
   return binding == null
-    ? tryJournalCoopCommittedEnvelope(envelope)
-    : tryJournalCoopCommittedEnvelopeFor(binding.durability, envelope);
+    ? tryJournalCoopCommittedEnvelopeDetailed(envelope)
+    : tryJournalCoopCommittedEnvelopeDetailed(envelope, binding.durability);
+}
+
+function retainEnvelope(envelope: CoopAuthoritativeEnvelopeV1, binding?: CoopRewardOperationBinding | null): boolean {
+  const disposition = retainEnvelopeDetailed(envelope, binding);
+  return disposition.kind === "disabled" || disposition.kind === "committed";
 }
 
 /**
@@ -492,6 +509,8 @@ export function resetCoopRewardOperationState(): void {
   s.stateAppliedOperations.clear();
   s.preparedIntents.clear();
   s.committedResultEnvelopes.clear();
+  s.admittedResultOperations.clear();
+  s.deferredResultOperations.clear();
   s.latestResultStateByPinned.clear();
   s.watcherStateByRole.host = freshWatcherRoleState();
   s.watcherStateByRole.guest = freshWatcherRoleState();
@@ -732,6 +751,17 @@ export interface CoopRewardOwnerCommitResult {
   readonly revision: number;
 }
 
+/** Detailed host-result admission state used by the phase continuation gate. */
+export type CoopRewardAuthoritativeResultDisposition =
+  | { readonly kind: "committed"; readonly operationId: string; readonly revision: number }
+  | {
+      readonly kind: "deferred";
+      readonly operationId: string;
+      readonly revision: number;
+      readonly reason: "predecessor-control-not-installed";
+    }
+  | { readonly kind: "failed"; readonly operationId: string; readonly reason: string };
+
 /** Phase-local mechanical state not represented by the shared battle snapshot. */
 export interface CoopRewardSurfaceResultState {
   readonly remainingStock?: readonly number[];
@@ -856,31 +886,91 @@ export function commitRewardOwnerIntent(
  * exact envelope is cached before journal publication, so a failed publication retries the same state tick
  * and operation id instead of executing or recapturing the action a second time.
  */
-export function commitRewardAuthoritativeResult(
+function committedResultDisposition(
+  s: RewardOpState,
+  prepared: PreparedRewardIntent,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): CoopRewardAuthoritativeResultDisposition {
+  const operationId = envelope.pendingOperation?.id ?? prepared.intent.id;
+  s.deferredResultOperations.delete(operationId);
+  s.admittedResultOperations.add(operationId);
+  retainLatestRewardResultState(s, prepared, envelope.authoritativeState);
+  advancePreparedWatcher(prepared);
+  return {
+    kind: "committed",
+    operationId,
+    revision: envelope.revision,
+  };
+}
+
+function deferredResultDisposition(
+  s: RewardOpState,
+  operationId: string,
+  revision: number,
+): CoopRewardAuthoritativeResultDisposition {
+  s.deferredResultOperations.add(operationId);
+  return {
+    kind: "deferred",
+    operationId,
+    revision,
+    reason: "predecessor-control-not-installed",
+  };
+}
+
+function resultJournalDisposition(
+  s: RewardOpState,
+  prepared: PreparedRewardIntent,
+  envelope: CoopAuthoritativeEnvelopeV1,
+  disposition: CoopOperationJournalCommitDisposition,
+): CoopRewardAuthoritativeResultDisposition {
+  switch (disposition.kind) {
+    case "disabled":
+    case "committed":
+      return committedResultDisposition(s, prepared, envelope);
+    case "deferred":
+      return deferredResultDisposition(s, prepared.intent.id, envelope.revision);
+    case "failed":
+      return { kind: "failed", operationId: prepared.intent.id, reason: disposition.reason };
+  }
+}
+
+/**
+ * HOST safe seam with lossless admission detail. The compatibility wrapper below intentionally keeps its
+ * historical nullable contract for biome-shop callers; the phase uses this function so a predecessor
+ * control stall remains live instead of being treated as a shared-session failure.
+ */
+export function commitRewardAuthoritativeResultDetailed(
   operationId: string,
   authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
   binding?: CoopRewardOperationBinding | null,
   surfaceResult?: CoopRewardSurfaceResultState,
-): CoopRewardOwnerCommitResult | null {
+): CoopRewardAuthoritativeResultDisposition {
+  const failed = (reason: string): CoopRewardAuthoritativeResultDisposition => ({
+    kind: "failed",
+    operationId,
+    reason,
+  });
   if (!isCoopRewardOperationEnabled() || !journalActive(binding)) {
-    return null;
+    return failed("authoritative reward result mode is inactive");
   }
   const s = state(binding);
   const key = preparedKey("host", operationId);
   const prepared = s.preparedIntents.get(key);
   if (prepared == null) {
     coopWarn("reward", `authoritative reward result has no prepared host intent id=${operationId}`);
-    return null;
+    return failed("no prepared host intent");
   }
 
   const retained = s.committedResultEnvelopes.get(operationId);
   if (retained != null) {
-    if (!retainEnvelope(retained, binding)) {
-      return null;
+    if (s.admittedResultOperations.has(operationId)) {
+      return {
+        kind: "committed",
+        operationId,
+        revision: retained.revision,
+      };
     }
-    retainLatestRewardResultState(s, prepared, retained.authoritativeState);
-    advancePreparedWatcher(prepared);
-    return { operationId, revision: retained.revision };
+    return resultJournalDisposition(s, prepared, retained, retainEnvelopeDetailed(retained, binding));
   }
 
   const resultState = authoritativeState ?? authorityStateHooks.capture(prepared.turn);
@@ -889,7 +979,7 @@ export function commitRewardAuthoritativeResult(
       "reward",
       `authoritative reward result refused incomplete state id=${operationId} wave=${prepared.wave} turn=${prepared.turn}`,
     );
-    return null;
+    return failed("incomplete authoritative state");
   }
   const resultPayload =
     prepared.surface === "reward"
@@ -902,7 +992,7 @@ export function commitRewardAuthoritativeResult(
       : buildCompleteMarketResultPayload(prepared.intent.payload, prepared, surfaceResult);
   if (resultPayload == null) {
     coopWarn("reward", `authoritative reward result refused incomplete continuation state id=${operationId}`);
-    return null;
+    return failed("incomplete continuation state");
   }
   const resultIntent: CoopPendingOperation = {
     ...prepared.intent,
@@ -915,30 +1005,99 @@ export function commitRewardAuthoritativeResult(
   );
   if (res.kind !== "committed" && res.kind !== "reack") {
     coopWarn("reward", `authoritative reward result rejected (${res.kind}) id=${operationId}`);
-    return null;
+    return failed(`host commit rejected: ${res.kind}`);
   }
   if (
     !samePayload(res.kind === "reack" ? res.op.payload : res.envelope.pendingOperation?.payload, resultIntent.payload)
   ) {
     coopWarn("reward", `authoritative reward result changed across commit id=${operationId}`);
-    return null;
+    return failed("host commit changed the result payload");
   }
+  // Cache the complete envelope before attempting negotiated publication. A deferred publication must
+  // never recapture state or submit the gameplay action a second time.
   s.committedResultEnvelopes.set(operationId, res.envelope);
   retainLatestRewardResultState(s, prepared, resultState);
-  if (!retainEnvelope(res.envelope, binding)) {
+  const disposition = resultJournalDisposition(
+    s,
+    prepared,
+    res.envelope,
+    retainEnvelopeDetailed(res.envelope, binding),
+  );
+  if (disposition.kind === "failed") {
     coopWarn(
       "reward",
       `authoritative reward result could not enter the negotiated authority log id=${operationId} `
+        + `legacyRevision=${res.envelope.revision} reason=${disposition.reason}`,
+    );
+    return disposition;
+  }
+  if (disposition.kind === "deferred") {
+    coopLog(
+      "reward",
+      `authoritative reward result deferred behind predecessor control id=${operationId} `
         + `legacyRevision=${res.envelope.revision}`,
     );
-    return null;
+    return disposition;
   }
-  advancePreparedWatcher(prepared);
   coopLog(
     "reward",
     `${prepared.surface} authoritative RESULT retained rev=${res.envelope.revision} tick=${resultState.tick} id=${operationId}`,
   );
-  return { operationId, revision: res.envelope.revision };
+  return disposition;
+}
+
+/** Compatibility result shape retained for existing reward/market callers. */
+export function commitRewardAuthoritativeResult(
+  operationId: string,
+  authoritativeState?: CoopAuthoritativeBattleStateV1 | null,
+  binding?: CoopRewardOperationBinding | null,
+  surfaceResult?: CoopRewardSurfaceResultState,
+): CoopRewardOwnerCommitResult | null {
+  const disposition = commitRewardAuthoritativeResultDetailed(operationId, authoritativeState, binding, surfaceResult);
+  return disposition.kind === "committed"
+    ? { operationId: disposition.operationId, revision: disposition.revision }
+    : null;
+}
+
+/**
+ * Redrive the exact result parked by a predecessor-control disposition. The caller invokes this only after
+ * the real control-installed/public-surface chokepoint reports ready; the cutover owns the pending entry and
+ * therefore preserves its already-assigned revision and envelope instead of creating a replacement.
+ */
+export function retryCoopDeferredRewardAuthoritativeResult(
+  operationId: string,
+  binding?: CoopRewardOperationBinding | null,
+  controlInstalled = false,
+): CoopRewardAuthoritativeResultDisposition {
+  const s = state(binding);
+  const prepared = s.preparedIntents.get(preparedKey("host", operationId));
+  const retained = s.committedResultEnvelopes.get(operationId);
+  if (prepared == null || retained == null) {
+    return { kind: "failed", operationId, reason: "deferred result envelope is no longer retained" };
+  }
+  if (s.admittedResultOperations.has(operationId)) {
+    return { kind: "committed", operationId, revision: retained.revision };
+  }
+  if (!s.deferredResultOperations.has(operationId)) {
+    return commitRewardAuthoritativeResultDetailed(operationId, undefined, binding);
+  }
+
+  const cutover = getCoopV2InteractionCutover(binding?.durability);
+  if (cutover == null) {
+    return commitRewardAuthoritativeResultDetailed(operationId, undefined, binding);
+  }
+  const committed = cutover.retryDeferredHostEnvelopes();
+  if (committed > 0) {
+    // AuthorityLog permits one deferred successor at a time. A committed count without this exact parked
+    // result is a protocol mismatch, never permission to invent a new operation or revision.
+    if (!s.deferredResultOperations.has(operationId)) {
+      return { kind: "failed", operationId, reason: "redrive committed an untracked reward result" };
+    }
+    return committedResultDisposition(s, prepared, retained);
+  }
+  return controlInstalled
+    ? { kind: "failed", operationId, reason: "deferred reward result redrive failed after control installation" }
+    : deferredResultDisposition(s, operationId, retained.revision);
 }
 
 function completeRewardContinuation(

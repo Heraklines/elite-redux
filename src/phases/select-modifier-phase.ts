@@ -13,14 +13,16 @@ import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   adoptRewardWatcherChoice,
+  commitRewardAuthoritativeResultDetailed,
   type CoopRewardOperationBinding,
+  type CoopRewardAuthoritativeResultDisposition,
   captureCoopRewardOperationBinding,
-  commitRewardAuthoritativeResult,
   commitRewardOwnerIntent,
   coopRewardMirrorSeq,
   isCoopRewardActionTerminal,
   isCoopRewardRetainedResultMode,
   isValidCoopRewardSurfaceIdentity,
+  retryCoopDeferredRewardAuthoritativeResult,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
@@ -270,6 +272,11 @@ export class SelectModifierPhase extends BattlePhase {
   private readonly coopAwaitingAuthorityResults = new Set<string>();
   /** Host terminal results parked until the guest proves the exact material state was installed. */
   private readonly coopAwaitingMaterialResults = new Set<string>();
+  /** One bounded continuation for an exact result parked behind predecessor control. */
+  private coopDeferredAuthorityResume: {
+    readonly operationId: string;
+    readonly resume: () => void;
+  } | null = null;
   /** Live owner callback reused after a retained paid result temporarily parks the interactive shop. */
   private coopModifierSelectCallback: ModifierSelectCallback | null = null;
   /** The interaction-turn counter observed when THIS shop opened (#633). Makes the
@@ -281,6 +288,8 @@ export class SelectModifierPhase extends BattlePhase {
   protected readonly coopSourceAddress: CoopRetainedWaveContinuationAddress | null;
   /** Runtime that constructed this phase; async UI completion may resume under the other in-process client. */
   private readonly coopOwningRuntime = getCoopRuntime();
+  /** Session generation captured with the phase; a replaced session cannot inherit its async continuations. */
+  private readonly coopOwningSessionGeneration = coopSessionGeneration();
   /** Scene that owns this phase. Unlike ambient `globalScene`, this stays stable across duo-harness context swaps. */
   private readonly coopOwningScene = globalScene;
   /** A retained guest continuation with no single source identity may not open or mutate a reward surface. */
@@ -485,28 +494,29 @@ export class SelectModifierPhase extends BattlePhase {
                 return;
               }
               const operationId = this.coopPendingAuthorityOperationId;
+              const finishAfterCommit = (): void => {
+                recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+                super.end();
+                this.coopAdvanceInteraction();
+              };
               if (
                 operationId != null
                 && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)
               ) {
                 void messageReady.then(() => {
                   this.coopProveV2RewardOperationComplete(operationId);
-                  if (!this.coopCommitPendingAuthorityResult(operationId)) {
+                  if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
                     return;
                   }
-                  recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
-                  super.end();
-                  this.coopAdvanceInteraction();
+                  finishAfterCommit();
                 });
                 return;
               }
               // #record-replay (single-player): capture the reward-shop LEAVE (no-op unless recording / in co-op).
-              recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
-              if (!this.coopCommitPendingAuthorityResult(operationId)) {
+              if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
                 return;
               }
-              super.end();
-              this.coopAdvanceInteraction();
+              finishAfterCommit();
             },
             () => this.resetModifierSelect(modifierSelectCallback),
           );
@@ -633,25 +643,26 @@ export class SelectModifierPhase extends BattlePhase {
         return true;
       }
       const operationId = this.coopPendingAuthorityOperationId;
+      const finishAfterCommit = (): void => {
+        recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+        super.end();
+        this.coopAdvanceInteraction();
+      };
       if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
         void messageReady.then(() => {
           this.coopProveV2RewardOperationComplete(operationId);
-          if (!this.coopCommitPendingAuthorityResult(operationId)) {
+          if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
             return;
           }
-          recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
-          super.end();
-          this.coopAdvanceInteraction();
+          finishAfterCommit();
         });
         return true;
       }
       // #record-replay (single-player): no reward to pick is a LEAVE (no-op unless recording / in co-op).
-      recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
-      if (!this.coopCommitPendingAuthorityResult(operationId)) {
+      if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
         return true;
       }
-      super.end();
-      this.coopAdvanceInteraction();
+      finishAfterCommit();
       return true;
     }
     const modifierType = this.typeOptions[cursor].type;
@@ -787,18 +798,29 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopRewardSurface,
     );
     globalScene.ui.clearText();
+    const finishAfterCommit = (): void => {
+      super.end();
+    };
     if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
       void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
         this.coopProveV2RewardOperationComplete(operationId);
-        if (this.coopCommitPendingAuthorityResult(operationId)) {
-          super.end();
+        if (this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
+          finishAfterCommit();
         }
       });
     } else {
-      if (!this.coopCommitPendingAuthorityResult(operationId)) {
+      if (
+        !this.coopCommitPendingAuthorityResult(operationId, () => {
+          void globalScene.ui
+            .setMode(UiMode.MESSAGE)
+            .then(() => this.coopResumeOnOwningRuntime(finishAfterCommit));
+        })
+      ) {
         return true;
       }
-      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      void globalScene.ui
+        .setMode(UiMode.MESSAGE)
+        .then(() => this.coopResumeOnOwningRuntime(finishAfterCommit));
     }
     // #record-replay (single-player): capture the reroll (a fresh SelectModifierPhase follows with its
     // own reward/skip interaction). No-op unless recording / in co-op.
@@ -1125,11 +1147,7 @@ export class SelectModifierPhase extends BattlePhase {
       // move-learn continuation re-opens it via the copy phase, which re-begins the mirror).
       this.coopEndMirror();
       globalScene.ui.clearText();
-      const finish = (): void => {
-        this.coopProveV2RewardOperationComplete(operationId);
-        if (!this.coopCommitPendingAuthorityResult(operationId)) {
-          return;
-        }
+      const finishAfterCommit = (): void => {
         super.end();
         // Co-op (#633): picking a free reward that does NOT queue a move-learn
         // continuation ends the whole interaction -> advance the alternation turn
@@ -1138,17 +1156,21 @@ export class SelectModifierPhase extends BattlePhase {
           this.coopAdvanceInteraction();
         }
       };
+      const finish = (): void => {
+        this.coopProveV2RewardOperationComplete(operationId);
+        if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
+          return;
+        }
+        finishAfterCommit();
+      };
       if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
         void globalScene.ui.setMode(UiMode.MESSAGE).then(finish);
       } else {
         globalScene.ui.setMode(UiMode.MESSAGE);
-        if (!this.coopCommitPendingAuthorityResult(operationId)) {
+        if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
           return false;
         }
-        super.end();
-        if (!queuesContinuation) {
-          this.coopAdvanceInteraction();
-        }
+        finishAfterCommit();
       }
     }
     return result;
@@ -1209,24 +1231,38 @@ export class SelectModifierPhase extends BattlePhase {
       PartyUiMode.SPLICE,
       -1,
       (fromSlotIndex: number, spliceSlotIndex: number) => {
-        if (
-          spliceSlotIndex !== undefined
-          && fromSlotIndex < 6
-          && spliceSlotIndex < 6
-          && fromSlotIndex !== spliceSlotIndex
-        ) {
-          globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
-            this.coopResolvedModifierOption = spliceSlotIndex;
-            // Co-op (#633): relay the resolved fusion pair so the watcher mirrors it.
-            if (this.coopFlushPending([fromSlotIndex, spliceSlotIndex], cost)) {
-              return;
-            }
-            const modifier = modifierType.newModifier(party[fromSlotIndex], party[spliceSlotIndex])!; //TODO: is the bang correct?
-            this.applyModifier(modifier, cost, true);
-          });
-        } else {
-          this.resetModifierSelect(modifierSelectCallback);
-        }
+        this.coopResumeOnOwningRuntime(() => {
+          if (!this.coopShopSceneAlive("fusion party callback")) {
+            return;
+          }
+          if (
+            spliceSlotIndex !== undefined
+            && fromSlotIndex < 6
+            && spliceSlotIndex < 6
+            && fromSlotIndex !== spliceSlotIndex
+          ) {
+            this.coopOwningScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+              this.coopResumeOnOwningRuntime(() => {
+                if (!this.coopShopSceneAlive("fusion target apply")) {
+                  return;
+                }
+                this.coopResolvedModifierOption = spliceSlotIndex;
+                // Co-op (#633): relay the resolved fusion pair so the watcher mirrors it.
+                if (this.coopFlushPending([fromSlotIndex, spliceSlotIndex], cost)) {
+                  return;
+                }
+                const owningParty = this.coopOwningScene.getPlayerParty();
+                const modifier = modifierType.newModifier(
+                  owningParty[fromSlotIndex],
+                  owningParty[spliceSlotIndex],
+                )!; //TODO: is the bang correct?
+                this.applyModifier(modifier, cost, true);
+              });
+            });
+          } else {
+            this.resetModifierSelect(modifierSelectCallback);
+          }
+        });
       },
       modifierType.selectFilter,
     );
@@ -1284,19 +1320,29 @@ export class SelectModifierPhase extends BattlePhase {
       partyUiMode,
       -1,
       (slotIndex: number, option: PartyOption) => {
-        if (slotIndex < 6) {
-          globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
-            this.coopResolvedModifierOption = option;
-            // Co-op (#633): relay the resolved target slot + sub-option to the watcher.
-            if (this.coopFlushPending([slotIndex, option], cost)) {
-              return;
-            }
-            const modifier = this.buildPokemonModifier(modifierType, slotIndex, option, offerKey);
-            this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
-          });
-        } else {
-          this.resetModifierSelect(modifierSelectCallback);
-        }
+        this.coopResumeOnOwningRuntime(() => {
+          if (!this.coopShopSceneAlive("modifier party callback")) {
+            return;
+          }
+          if (slotIndex < 6) {
+            this.coopOwningScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
+              this.coopResumeOnOwningRuntime(() => {
+                if (!this.coopShopSceneAlive("modifier target apply")) {
+                  return;
+                }
+                this.coopResolvedModifierOption = option;
+                // Co-op (#633): relay the resolved target slot + sub-option to the watcher.
+                if (this.coopFlushPending([slotIndex, option], cost)) {
+                  return;
+                }
+                const modifier = this.buildPokemonModifier(modifierType, slotIndex, option, offerKey);
+                this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
+              });
+            });
+          } else {
+            this.resetModifierSelect(modifierSelectCallback);
+          }
+        });
       },
       pokemonModifierType.selectFilter,
       modifierType instanceof PokemonMoveModifierType
@@ -1379,7 +1425,10 @@ export class SelectModifierPhase extends BattlePhase {
       // opens MODIFIER_SELECT. The authority-local ledger therefore cannot prove the successor in the
       // commit stack itself. Publish the same address-exact phase/handler proof used by recovery only after
       // the real handler is active; otherwise the first reward result cannot consume its presentation.
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      const installed = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
+      if (installed) {
+        this.coopRedriveDeferredAuthorityResult();
+      }
     };
     if (this.coopOwningRuntime == null) {
       notify();
@@ -1651,6 +1700,14 @@ export class SelectModifierPhase extends BattlePhase {
           return true;
         }
         const generation = coopSessionGeneration();
+        const finishAfterCommit = (): void => {
+          coopLog(
+            "reward",
+            `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
+          );
+          recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+          this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+        };
         globalScene.ui
           .setMode(UiMode.MESSAGE)
           .then(() => {
@@ -1659,15 +1716,10 @@ export class SelectModifierPhase extends BattlePhase {
             }
             runWhenCoopRuntimeActive(runtime, () => {
               this.coopProveV2RewardOperationComplete(prepared.operationId);
-              if (!this.coopCommitPendingAuthorityResult(prepared.operationId)) {
+              if (!this.coopCommitPendingAuthorityResult(prepared.operationId, finishAfterCommit)) {
                 return;
               }
-              coopLog(
-                "reward",
-                `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
-              );
-              recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
-              this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+              finishAfterCommit();
             });
           })
           .catch(error => {
@@ -1678,20 +1730,25 @@ export class SelectModifierPhase extends BattlePhase {
           });
         return true;
       }
-      if (!this.coopCommitPendingAuthorityResult(prepared.operationId)) {
+      const finishAfterCommit = (): void => {
+        coopLog(
+          "reward",
+          `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
+        );
+        recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+        if (getCoopRuntime()?.spoof == null) {
+          this.coopAwaitTerminalMaterialApplied(prepared.operationId);
+        }
+      };
+      if (!this.coopCommitPendingAuthorityResult(prepared.operationId, finishAfterCommit)) {
         return true;
       }
-      coopLog(
-        "reward",
-        `OWNER retained terminal before continuation seq=${this.coopInteractionStart} id=${prepared.operationId}`,
-      );
       // Preserve the replay decision point. A real peer owns an independent renderer and must materially
       // apply this exact canonical result before this phase may tear down or advance the shared counter.
       // The local-dev SpoofGuest has no scene on which to apply/ACK the result, so it deliberately keeps the
       // historical fall-through contract and lets the caller finish locally after the retained commit.
-      recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
+      finishAfterCommit();
       if (getCoopRuntime()?.spoof == null) {
-        this.coopAwaitTerminalMaterialApplied(prepared.operationId);
         return true;
       }
       return false;
@@ -1760,8 +1817,51 @@ export class SelectModifierPhase extends BattlePhase {
     return false;
   }
 
+  /** Retry one exact result after the real control-installed/public-surface chokepoint wakes this phase. */
+  private coopRedriveDeferredAuthorityResult(): void {
+    const operationId = this.coopPendingAuthorityOperationId;
+    if (operationId == null || getCoopController()?.role !== "host") {
+      return;
+    }
+    this.coopResumeOnOwningRuntime(() => {
+      if (!this.coopShopSceneAlive("deferred reward result redrive")) {
+        this.clearDeferredAuthorityContinuation(operationId);
+        return;
+      }
+      const disposition: CoopRewardAuthoritativeResultDisposition = retryCoopDeferredRewardAuthoritativeResult(
+        operationId,
+        this.coopRewardOperationBinding,
+        true,
+      );
+      if (disposition.kind === "deferred") {
+        return;
+      }
+      if (disposition.kind === "failed") {
+        this.clearDeferredAuthorityContinuation(operationId);
+        getCoopRuntime()?.durability?.reconnect();
+        failCoopSharedSession(`Reward result ${operationId} could not redrive: ${disposition.reason}`);
+        return;
+      }
+      if (this.coopPendingAuthorityOperationId === operationId) {
+        this.coopPendingAuthorityOperationId = null;
+      }
+      const parked = this.coopDeferredAuthorityResume;
+      this.coopDeferredAuthorityResume = null;
+      if (parked?.operationId === operationId) {
+        if (!this.coopShopSceneAlive("deferred reward result resume")) {
+          this.clearDeferredAuthorityContinuation(operationId);
+          return;
+        }
+        parked.resume();
+      }
+    }, () => this.clearDeferredAuthorityContinuation(operationId));
+  }
+
   /** HOST: publish the complete post-action result before any continuation surface opens. */
-  private coopCommitPendingAuthorityResult(operationId = this.coopPendingAuthorityOperationId): boolean {
+  private coopCommitPendingAuthorityResult(
+    operationId = this.coopPendingAuthorityOperationId,
+    deferredResume?: () => void,
+  ): boolean {
     // A host-owned terminal already committed at the relay seam and armed its peer-material barrier. Stop a
     // following legacy caller before teardown/counter advance; the barrier callback owns that continuation.
     // Local SpoofGuest sessions never arm this set and therefore retain their synchronous fall-through.
@@ -1774,18 +1874,47 @@ export class SelectModifierPhase extends BattlePhase {
     if (getCoopController()?.role !== "host") {
       return false;
     }
-    const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding, {
-      continuation: {
-        surface: "reward",
-        pinned: this.coopInteractionStart,
-        reroll: this.rerollCount,
-        options: serializeRewardOptions(this.typeOptions),
-        ...(this.coopRewardSurface == null ? {} : { rewardSurface: this.coopRewardSurface }),
+    const disposition = commitRewardAuthoritativeResultDetailed(
+      operationId,
+      undefined,
+      this.coopRewardOperationBinding,
+      {
+        continuation: {
+          surface: "reward",
+          pinned: this.coopInteractionStart,
+          reroll: this.rerollCount,
+          options: serializeRewardOptions(this.typeOptions),
+          ...(this.coopRewardSurface == null ? {} : { rewardSurface: this.coopRewardSurface }),
+        },
       },
-    });
-    if (committed == null) {
+    );
+    if (disposition.kind === "deferred") {
+      if (
+        deferredResume != null
+        && (this.coopDeferredAuthorityResume == null || this.coopDeferredAuthorityResume.operationId === operationId)
+      ) {
+        this.coopDeferredAuthorityResume = { operationId, resume: deferredResume };
+      }
+      // A proof edge may have installed the predecessor control in the same turn as this result. Give the
+      // real surface/chokepoint one bounded retry; if it is still unavailable, the parked exact envelope
+      // remains live until the next genuine control-installed notification.
+      this.coopResumeOnOwningRuntime(() => {
+        if (!this.coopShopSceneAlive("deferred reward result readiness check")) {
+          this.clearDeferredAuthorityContinuation(operationId);
+          return;
+        }
+        if (notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this)) {
+          this.coopRedriveDeferredAuthorityResult();
+        }
+      }, () => this.clearDeferredAuthorityContinuation(operationId));
+      return false;
+    }
+    if (disposition.kind === "failed") {
+      this.clearDeferredAuthorityContinuation(operationId);
       getCoopRuntime()?.durability?.reconnect();
-      failCoopSharedSession(`Reward result ${operationId} could not capture/retain complete host state`);
+      failCoopSharedSession(
+        `Reward result ${operationId} could not capture/retain complete host state: ${disposition.reason}`,
+      );
       return false;
     }
     if (this.coopPendingAuthorityOperationId === operationId) {
@@ -2175,20 +2304,40 @@ export class SelectModifierPhase extends BattlePhase {
     });
   }
 
+  private clearDeferredAuthorityContinuation(operationId: string): void {
+    if (this.coopDeferredAuthorityResume?.operationId === operationId) {
+      this.coopDeferredAuthorityResume = null;
+    }
+    if (this.coopPendingAuthorityOperationId === operationId) {
+      this.coopPendingAuthorityOperationId = null;
+    }
+  }
+
+  private clearStaleDeferredAuthorityContinuation(): void {
+    const operationId = this.coopDeferredAuthorityResume?.operationId ?? this.coopPendingAuthorityOperationId;
+    if (operationId != null) {
+      this.clearDeferredAuthorityContinuation(operationId);
+    }
+  }
+
   /**
    * Run a post-await continuation only under the runtime/scene that constructed this phase. Ambient
    * `globalScene` is process-wide and can point at the other duo-harness client when a promise settles.
    * Binding both together makes the production entitlement check testable without weakening it for the
    * harness. The returned cancel handle is intentionally unused: session teardown clears runtime work.
    */
-  private coopResumeOnOwningRuntime(callback: () => void): void {
+  private coopResumeOnOwningRuntime(callback: () => void, onStale?: () => void): void {
     if (this.coopOwningRuntime == null) {
       callback();
       return;
     }
     runWhenCoopRuntimeActive(this.coopOwningRuntime, () => {
-      if (globalScene !== this.coopOwningScene) {
+      if (
+        globalScene !== this.coopOwningScene
+        || coopSessionGeneration() !== this.coopOwningSessionGeneration
+      ) {
         coopWarn("reward", "stale shop continuation DROPPED: owning runtime was rebound to another scene");
+        onStale?.();
         return;
       }
       callback();
@@ -2203,7 +2352,10 @@ export class SelectModifierPhase extends BattlePhase {
     }
     return new Promise<T | null>((resolve, reject) => {
       runWhenCoopRuntimeActive(runtime, () => {
-        if (globalScene !== this.coopOwningScene) {
+        if (
+          globalScene !== this.coopOwningScene
+          || coopSessionGeneration() !== this.coopOwningSessionGeneration
+        ) {
           coopWarn("reward", "stale shop continuation DROPPED: owning runtime was rebound to another scene");
           resolve(null);
           return;
@@ -2223,6 +2375,14 @@ export class SelectModifierPhase extends BattlePhase {
    * captured scene, not ambient `globalScene`, so a legitimate duo-client context swap never over-fires.
    */
   private coopShopSceneAlive(context: string): boolean {
+    if (
+      this.coopOwningRuntime != null
+      && coopSessionGeneration() !== this.coopOwningSessionGeneration
+    ) {
+      coopWarn("reward", `stale shop continuation DROPPED (${context}): owning session was replaced`);
+      this.clearStaleDeferredAuthorityContinuation();
+      return false;
+    }
     const battleLive = this.coopOwningScene.currentBattle != null;
     const currentPhase = this.coopOwningScene.phaseManager.getCurrentPhase();
     if (battleLive && currentPhase === this) {
@@ -2234,6 +2394,7 @@ export class SelectModifierPhase extends BattlePhase {
         + `${battleLive ? `phase was replaced by ${currentPhase?.phaseName ?? "none"}` : "currentBattle is gone"} `
         + "- not opening the shop screen (#872/P33 anti-freeze)",
     );
+    this.clearStaleDeferredAuthorityContinuation();
     return false;
   }
 
@@ -2582,10 +2743,13 @@ export class SelectModifierPhase extends BattlePhase {
         this.coopEndMirror();
         void globalScene.ui.setMode(UiMode.MESSAGE);
         this.coopProveV2RewardOperationComplete(operationId);
-        if (!this.coopCommitPendingAuthorityResult(operationId)) {
+        const finishAfterCommit = (): void => {
+          this.coopAwaitTerminalMaterialApplied(operationId);
+        };
+        if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
           return true;
         }
-        this.coopAwaitTerminalMaterialApplied(operationId);
+        finishAfterCommit();
         return true;
       }
       if (!projectionOnly) {
@@ -2593,15 +2757,27 @@ export class SelectModifierPhase extends BattlePhase {
           failCoopSharedSession("Host reward watcher terminal had no retained operation identity");
           return true;
         }
-        if (!this.coopCommitPendingAuthorityResult(operationId)) {
+        const finishAfterCommit = (): void => {
+          this.coopRelayedMoney = -1;
+          this.coopEndMirror();
+          if (hostRetainedTerminal) {
+            void globalScene.ui.setMode(UiMode.MESSAGE);
+            this.coopAwaitTerminalMaterialApplied(operationId!);
+          }
+        };
+        if (!this.coopCommitPendingAuthorityResult(operationId, finishAfterCommit)) {
           return true;
         }
+        finishAfterCommit();
+      } else {
+        this.coopRelayedMoney = -1;
+        this.coopEndMirror();
       }
-      this.coopRelayedMoney = -1;
-      this.coopEndMirror();
       if (hostRetainedTerminal) {
-        void globalScene.ui.setMode(UiMode.MESSAGE);
-        this.coopAwaitTerminalMaterialApplied(operationId!);
+        if (projectionOnly) {
+          void globalScene.ui.setMode(UiMode.MESSAGE);
+          this.coopAwaitTerminalMaterialApplied(operationId!);
+        }
         return true;
       }
       // This retained terminal already owns the structural continuation. Do not defer the queue shift behind
