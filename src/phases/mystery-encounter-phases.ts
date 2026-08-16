@@ -211,7 +211,7 @@ function coopBeginMePump(): void {
  */
 type CoopEndMePumpResult =
   | { readonly kind: "completed" }
-  | { readonly kind: "deferred"; readonly operationId: string }
+  | { readonly kind: "deferred"; readonly operationId: string; readonly revision: number }
   | { readonly kind: "failed"; readonly reason: string };
 
 function coopEndMePump(
@@ -288,7 +288,7 @@ function coopEndMePump(
           "me",
           `coopEndMePump HOLD: exact leave deferred id=${disposition.operationId} rev=${disposition.revision}`,
         );
-        return { kind: "deferred", operationId: disposition.operationId };
+        return { kind: "deferred", operationId: disposition.operationId, revision: disposition.revision };
       }
       if (disposition.kind !== "committed") {
         const reason = disposition.kind === "failed" ? disposition.reason : "ME operation disabled";
@@ -1826,19 +1826,38 @@ export class PostMysteryEncounterPhase extends Phase {
             const pinned = coopMeInteractionStartValue();
             const wave = globalScene.currentBattle?.waveIndex ?? -1;
             const operationId = terminalResult.operationId;
+            const revision = terminalResult.revision;
             const cancel = registerCoopMeTerminalRedrive(runtime, operationId, () => {
               this.deferredTerminalRetryCancel = null;
+              const liveRuntime = getCoopRuntime();
+              if (
+                isCoopSharedTerminalFrozen(runtime)
+                || coopSessionGeneration() !== generation
+                || liveRuntime == null
+                || liveRuntime !== runtime
+              ) {
+                // Shared-terminal/session teardown owns the retained completion. A different ambient duo
+                // runtime is likewise never a reason to fail or mutate this operation from the wrong scene.
+                return;
+              }
               if (
                 globalScene !== scene
-                || getCoopRuntime() !== runtime
                 || getCoopController() !== controller
-                || coopSessionGeneration() !== generation
-                || isCoopSharedTerminalFrozen(runtime)
                 || coopMeInteractionStartValue() !== pinned
                 || (globalScene.currentBattle?.waveIndex ?? -1) !== wave
                 || globalScene.phaseManager.getCurrentPhase() !== this
               ) {
-                releaseCoopMeDeferredTerminal(operationId);
+                // The authority entry is durable and this exact owning session is still live. Discarding its
+                // sole local completion key would strand the host, so preserve it and fail the pair closed.
+                failCoopSharedSession(
+                  "Mystery terminal continuation fence changed after authority commit "
+                    + `id=${operationId} rev=${revision}.`,
+                  {
+                    boundary: "surface",
+                    reasonCode: "continuation-failed",
+                    boundaryRevision: revision,
+                  },
+                );
                 return;
               }
               endPhase();
