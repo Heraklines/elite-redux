@@ -40,6 +40,7 @@ import {
   getCoopController,
   isCoopAuthoritativeGuest,
   registerCoopActiveReplayTurnAborter,
+  retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent, CoopPresentationActorRef } from "#data/elite-redux/coop/coop-transport";
 import {
@@ -510,6 +511,7 @@ export class CoopReplayTurnPhase extends Phase {
             if (!streamer.acknowledgeReplacement(envelope, "materialApplied")) {
               return;
             }
+            retryCoopV2PendingAuthorityAtSafeBoundary();
             const presentation = this.beginReplacementPresentation(streamer, envelope);
             // A destination-scoped headless oracle can prove the projection synchronously. Do not insert
             // an `await` in that branch: the two-engine harness swaps its process-global scene between

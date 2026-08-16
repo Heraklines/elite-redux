@@ -619,6 +619,9 @@ export class CommandPhase extends FieldPhase {
       });
       return false;
     }
+    if (getCoopNetcodeMode() !== "authoritative") {
+      return true;
+    }
     const { turn, waveIndex } = globalScene.currentBattle;
     // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was
     // dead (a live co-op session is ALWAYS authoritative since M3) and is deleted. The per-turn
