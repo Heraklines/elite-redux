@@ -155,6 +155,27 @@ export class AuthorityRetentionOverflowError extends Error {
   }
 }
 
+/** Typed outcome for an authority commit attempt. A deferred entry already owns its future revision. */
+export type AuthorityCommitDisposition =
+  | { readonly kind: "committed"; readonly entry: CoopAuthorityEntry }
+  | {
+      readonly kind: "deferred";
+      readonly entry: CoopAuthorityEntry;
+      readonly reason: "predecessor-control-not-installed";
+    }
+  | { readonly kind: "failed"; readonly reason: string };
+
+/** Internal compatibility error: the historical commit() API still throws, while detailed callers classify it. */
+class AuthorityCommitDeferredError extends Error {
+  readonly entry: CoopAuthorityEntry;
+
+  constructor(entry: CoopAuthorityEntry) {
+    super(`AuthorityLog.commit: predecessor control is not installed for revision ${entry.revision}`);
+    this.name = "AuthorityCommitDeferredError";
+    this.entry = entry;
+  }
+}
+
 export interface AuthorityLogOptions {
   /** Local frame identity - admit() classifies inbound entries against this (epoch / membership / seatMap). */
   readonly localContext: CoopFrameContextV2;
@@ -305,6 +326,11 @@ export class AuthorityLog implements CoopAuthorityLog {
   private latestCommittedOperationId: string | null = null;
   /** AUTHORITY: one immutable frontier body retained after delivery retirement for exact recovery rebuild. */
   private latestCommittedEntry: CoopAuthorityEntry | null = null;
+  /** AUTHORITY: one exact, not-yet-published successor retained after a local predecessor-control deferral. */
+  private pendingAuthorityCommit: {
+    readonly entry: CoopAuthorityEntry;
+    readonly prepare?: (entry: CoopAuthorityEntry) => (() => void) | null;
+  } | null = null;
   private pendingReplicaSuccessorControl: {
     readonly revision: number;
     readonly operationId: string;
@@ -436,6 +462,15 @@ export class AuthorityLog implements CoopAuthorityLog {
       this.latestCommittedEntry == null
         ? null
         : freezeAuthorityEntry(cloneEntry({ ...this.latestCommittedEntry, context: reboundLocalContext }));
+    const reboundPendingAuthorityCommit =
+      this.pendingAuthorityCommit == null
+        ? null
+        : {
+            entry: freezeAuthorityEntry(
+              cloneEntry({ ...this.pendingAuthorityCommit.entry, context: reboundLocalContext }),
+            ),
+            prepare: this.pendingAuthorityCommit.prepare,
+          };
     const reboundLeases: {
       readonly lease: DeliveryLease;
       readonly entry: CoopAuthorityEntry;
@@ -465,6 +500,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.pendingTailRequestFrom = null;
     this.pendingReplicaEntry = reboundReplicaEntry;
     this.latestCommittedEntry = reboundLatestCommittedEntry;
+    this.pendingAuthorityCommit = reboundPendingAuthorityCommit;
     for (const rebound of reboundLeases) {
       rebound.lease.entry = rebound.entry;
       rebound.lease.peerStages.clear();
@@ -486,6 +522,28 @@ export class AuthorityLog implements CoopAuthorityLog {
   // AUTHORITY side
   // ---------------------------------------------------------------------------
 
+  /** Detailed commit API; commit() below remains the compatibility throwing wrapper. */
+  commitDetailed(
+    entry: Omit<CoopAuthorityEntry, "revision">,
+    prepare?: (entry: CoopAuthorityEntry) => (() => void) | null,
+  ): AuthorityCommitDisposition {
+    try {
+      return { kind: "committed", entry: this.commit(entry, prepare) };
+    } catch (error) {
+      if (error instanceof AuthorityCommitDeferredError) {
+        return {
+          kind: "deferred",
+          entry: error.entry,
+          reason: "predecessor-control-not-installed",
+        };
+      }
+      return {
+        kind: "failed",
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   /**
    * Commit the next entry: assign the next global revision, freeze + retain it, reserve the authority-local
    * successor, then publish + start redelivery. A failed local reservation is indistinguishable from a
@@ -497,6 +555,10 @@ export class AuthorityLog implements CoopAuthorityLog {
   ): CoopAuthorityEntry {
     if (this.disposed) {
       throw new Error("AuthorityLog.commit after dispose");
+    }
+    const pending = this.pendingAuthorityCommit;
+    if (pending != null && !sameAuthorityCommitBody(pending.entry, entry)) {
+      throw new Error("AuthorityLog.commit: a deferred successor is already awaiting predecessor control");
     }
     if (!isValidOperationId(entry.operationId)) {
       throw new Error(`AuthorityLog.commit: invalid operationId ${String(entry.operationId)}`);
@@ -527,14 +589,14 @@ export class AuthorityLog implements CoopAuthorityLog {
           + `${this.latestCommittedOperationId ?? "(missing predecessor)"}`,
       );
     }
-    const revision = this.headRevision + 1;
-    const candidate = { ...entry, revision };
+    const revision = pending?.entry.revision ?? this.headRevision + 1;
+    const candidate = pending?.entry ?? { ...entry, revision };
     if (!isValidAuthorityEntry(candidate)) {
       throw new Error("AuthorityLog.commit: malformed mechanical entry or missing successor control");
     }
     // Own an immutable, caller-independent copy so a caller reusing/mutating its source object can never
     // rewrite what a later redelivery transmits (the retention immutability boundary).
-    const committed = freezeAuthorityEntry(cloneEntry(candidate));
+    const committed = pending?.entry ?? freezeAuthorityEntry(cloneEntry(candidate));
 
     const lease: DeliveryLease = {
       revision,
@@ -561,9 +623,11 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     let rollback: (() => void) | null = null;
     try {
-      rollback = prepare?.(committed) ?? null;
-      if (prepare != null && rollback == null) {
-        throw new Error("AuthorityLog.commit: authority-local successor reservation refused");
+      const reservation = prepare ?? pending?.prepare;
+      rollback = reservation?.(committed) ?? null;
+      if (reservation != null && rollback == null) {
+        this.pendingAuthorityCommit = { entry: committed, prepare: reservation };
+        throw new AuthorityCommitDeferredError(committed);
       }
     } catch (error) {
       // No timer or wire egress exists yet. Remove the provisional lease and ask a successful reservation
@@ -576,6 +640,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     // never burns a number and cannot create an unfillable replica gap. The same is now true of a local
     // successor-reservation refusal above.
     this.headRevision = revision;
+    this.pendingAuthorityCommit = null;
     this.latestNextControl = structuredClone(committed.nextControl);
     this.latestCommittedOperationId = committed.operationId;
     this.latestCommittedEntry = committed;
@@ -939,6 +1004,14 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (this.pendingTailRequestFrom != null && revision >= this.pendingTailRequestFrom) {
       this.pendingTailRequestFrom = null;
     }
+    if (
+      this.pendingAuthorityCommit != null
+      && (this.pendingAuthorityCommit.entry.revision <= revision || terminal?.nextControl.kind === "TERMINAL")
+    ) {
+      // Recovery has either proven this reserved revision or installed an irrevocable terminal frontier;
+      // never let the stale reservation block a later exact frontier retry.
+      this.pendingAuthorityCommit = null;
+    }
     if (this.pendingReplicaEntry != null && this.pendingReplicaEntry.revision <= revision) {
       this.pendingReplicaEntry = null;
     }
@@ -1003,6 +1076,7 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.pendingTailRequestFrom = null;
     this.pendingReplicaEntry = null;
     this.pendingReplicaSuccessorControl = null;
+    this.pendingAuthorityCommit = null;
     this.latestCommittedOperationId = null;
     this.latestNextControl = null;
   }
@@ -1153,6 +1227,28 @@ function cloneEntry(entry: CoopAuthorityEntry): CoopAuthorityEntry {
     nextControl: structuredClone(entry.nextControl),
     subsumes: [...entry.subsumes],
   };
+}
+
+/** Compare a retry request with the exact deferred body without treating revision as a new allocation. */
+function sameAuthorityCommitBody(
+  left: CoopAuthorityEntry,
+  right: Omit<CoopAuthorityEntry, "revision">,
+): boolean {
+  return JSON.stringify({
+    context: left.context,
+    operationId: left.operationId,
+    kind: left.kind,
+    material: left.material,
+    nextControl: left.nextControl,
+    subsumes: left.subsumes,
+  }) === JSON.stringify({
+    context: right.context,
+    operationId: right.operationId,
+    kind: right.kind,
+    material: right.material,
+    nextControl: right.nextControl,
+    subsumes: right.subsumes,
+  });
 }
 
 /** Structurally clone an opaque JSON payload so retention is independent of the caller's object. */

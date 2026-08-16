@@ -105,7 +105,12 @@ import {
   terminalSubsumes,
   waveBoundarySubsumes,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
-import { AuthorityLog, type CoopAuthorityWire } from "#data/elite-redux/coop/authority-v2/authority-log";
+import {
+  AuthorityLog,
+  type AuthorityCommitDisposition,
+  type CoopAuthorityWire,
+} from "#data/elite-redux/coop/authority-v2/authority-log";
+import { freezeAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type {
   CoopAuthoritativeMaterial,
   CoopAuthorityEntry,
@@ -558,8 +563,9 @@ export class CoopAuthorityV2Shadow {
    *
    * Authority redelivery remains the durable retry owner. This bounded local reference only lets an engine
    * chokepoint (for example, the exact frame a reward UI becomes actionable) retry immediately instead of
-   * racing a fast user against the next 250ms delivery lease. The ordered ledger permits at most one
-   * mechanically incomplete revision, so this cannot become a second journal.
+   * racing a fast user against the next 250ms delivery lease. The map is bounded by the authority log's
+   * retention capacity and never evicts an unresolved exact entry; authenticated gap deliveries may remain
+   * here until their ordered frontier closes.
    */
   private readonly pendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
   /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
@@ -1392,11 +1398,44 @@ export class CoopAuthorityV2Shadow {
       ...this.ctx,
       membershipRevision: identity.membershipRevision,
     });
+    const authorityPeer = identity.peerBindings.find(peer => peer.seatId === identity.authoritySeatId);
+    if (this.pendingReplicaEntries.size > 0 && authorityPeer == null) {
+      throw new Error("CoopAuthorityV2Shadow.rebindIdentity has no bound authority peer for pending entries");
+    }
+    if (this.pendingReplicaEntries.size > this.log.diagnostics().retentionCapacity) {
+      throw new Error("CoopAuthorityV2Shadow.rebindIdentity pending entries exceed retention capacity");
+    }
+    // Prepare every retained admitted/gap image before changing the live context. The authority connection
+    // generation is the sender axis on replica entries; preserving revision/material/control while replacing
+    // only the advancing channel axes makes eager retry valid after a hot rejoin.
+    const reboundPendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
+    for (const [revision, entry] of this.pendingReplicaEntries) {
+      reboundPendingReplicaEntries.set(
+        revision,
+        freezeAuthorityEntry(
+          structuredClone({
+            ...entry,
+            context: {
+              ...entry.context,
+              membershipRevision: identity.membershipRevision,
+              connectionGeneration: authorityPeer?.connectionGeneration ?? entry.context.connectionGeneration,
+            },
+          }),
+        ),
+      );
+    }
+    const priorPendingReplicaEntries = new Map(this.pendingReplicaEntries);
     // AuthorityLog may synchronously redeliver on loopback. Publish the receiving context first so a receipt
     // that re-enters before rebindConnection returns is checked and signed against the replacement channel.
+    // Publish the prepared pending map in the same transaction; restore it if log rebind rejects the whole
+    // replacement so no stale context survives a failed hot rejoin.
     this.frameContext = Object.freeze({ ...next });
     this.runtimeContext = nextRuntimeContext;
     this.peerBindings = identity.peerBindings;
+    this.pendingReplicaEntries.clear();
+    for (const [revision, entry] of reboundPendingReplicaEntries) {
+      this.pendingReplicaEntries.set(revision, entry);
+    }
     let redelivered: number;
     try {
       redelivered = this.log.rebindConnection(next, identity.peerBindings);
@@ -1404,6 +1443,10 @@ export class CoopAuthorityV2Shadow {
       this.frameContext = prior;
       this.runtimeContext = priorRuntimeContext;
       this.peerBindings = priorPeerBindings;
+      this.pendingReplicaEntries.clear();
+      for (const [revision, entry] of priorPendingReplicaEntries) {
+        this.pendingReplicaEntries.set(revision, entry);
+      }
       throw error;
     }
     this.recoveryChannel?.rebind();
@@ -1534,6 +1577,12 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     if (result.kind === "gap") {
+      // Admission has already authenticated the entry (context, ownership, and epoch). Retain the exact
+      // gap image so the control-installed predecessor can synchronously re-drive it; releasing the local
+      // modal edge must never discard an authenticated future revision.
+      if (!this.retainPendingReplicaEntry(entry)) {
+        return false;
+      }
       // A later authenticated replacement may carry the exact terminal needed to let the currently
       // admitted turn finish its presentation/finalize path. Release only that local modal edge; the
       // gap entry remains unadmitted and emits no receipt until ordinary ordered redelivery reaches it.
@@ -1556,9 +1605,13 @@ export class CoopAuthorityV2Shadow {
         return false;
       }
       this.admitted += 1;
-      this.pendingReplicaEntries.set(entry.revision, entry);
+      if (!this.retainPendingReplicaEntry(entry)) {
+        return false;
+      }
     } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
-      this.pendingReplicaEntries.set(entry.revision, entry);
+      if (!this.retainPendingReplicaEntry(entry)) {
+        return false;
+      }
     }
     const resume =
       result.kind === "duplicate-pending-control"
@@ -1575,16 +1628,60 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     this.pendingReplicaEntries.delete(entry.revision);
-    if (result.kind === "duplicate-complete") {
+    const newlyApplied = result.kind !== "duplicate-complete";
+    if (newlyApplied) {
+      this.applied += 1;
+    }
+    // A predecessor's controlInstalled receipt advances the only ordered frontier that can admit a
+    // retained gap. Re-drive the exact next revision immediately, without waiting for another transport
+    // delivery or a later external retry hook.
+    this.redriveContiguousPendingReplicaEntries();
+    return newlyApplied;
+  }
+
+  /** Re-drive only authenticated entries that are now exactly contiguous with the installed frontier. */
+  private redriveContiguousPendingReplicaEntries(): number {
+    let completed = 0;
+    while (!this.disposed) {
+      const nextRevision = this.log.controlInstalledThrough() + 1;
+      const next = this.pendingReplicaEntries.get(nextRevision);
+      if (next == null || this.replicaEntriesInFlight.has(next.revision)) {
+        break;
+      }
+      try {
+        if (!this.applyReplicaEntry(next)) {
+          break;
+        }
+        completed += 1;
+      } catch (error) {
+        this.fault(`redriveReplica(${next.revision})`, error);
+        break;
+      }
+    }
+    return completed;
+  }
+
+  /** Keep a bounded, caller-independent authenticated image for every incomplete replica revision. */
+  private retainPendingReplicaEntry(entry: CoopAuthorityEntry): boolean {
+    const prior = this.pendingReplicaEntries.get(entry.revision);
+    if (prior != null) {
+      if (samePendingReplicaEntry(prior, entry)) {
+        return true;
+      }
+      this.reportPendingReplicaViolation(entry, `entry.conflicting-pending-revision-${entry.revision}`);
       return false;
     }
-    this.applied += 1;
+    if (this.pendingReplicaEntries.size >= this.log.diagnostics().retentionCapacity) {
+      this.reportPendingReplicaViolation(entry, `entry.pending-retention-capacity-${entry.revision}`);
+      return false;
+    }
+    this.pendingReplicaEntries.set(entry.revision, freezeAuthorityEntry(structuredClone(entry)));
     return true;
   }
 
-  /** Commit an entry to the shadow log (which delivers it over the wire) and count it. */
-  private commit(entry: Omit<CoopAuthorityEntry, "revision">): CoopAuthorityEntry {
-    const committed = this.log.commit(
+  /** Detailed authority commit seam used by cutover callers that must retain a deferred revision. */
+  commitAuthorityEntryDetailed(entry: Omit<CoopAuthorityEntry, "revision">): AuthorityCommitDisposition {
+    const disposition = this.log.commitDetailed(
       entry,
       this.liveReplica == null
         ? undefined
@@ -1599,11 +1696,28 @@ export class CoopAuthorityV2Shadow {
             return this.liveReplica.prepareAuthorityEntry?.(this.runtimeContext, candidate) ?? null;
           },
     );
+    if (disposition.kind !== "committed") {
+      return disposition;
+    }
+    const committed = disposition.entry;
     this.committed += 1;
     if (this.liveReplica?.ownsEntry(committed) === true) {
       this.liveReplica.authorityEntryCommitted?.(this.runtimeContext, committed);
     }
-    return committed;
+    return disposition;
+  }
+
+  /** Commit an entry to the shadow log (which delivers it over the wire) and count it. */
+  private commit(entry: Omit<CoopAuthorityEntry, "revision">): CoopAuthorityEntry {
+    const disposition = this.commitAuthorityEntryDetailed(entry);
+    if (disposition.kind === "committed") {
+      return disposition.entry;
+    }
+    throw new Error(
+      disposition.kind === "deferred"
+        ? `AuthorityLog.commit deferred revision ${disposition.entry.revision}`
+        : disposition.reason,
+    );
   }
 
   /**
@@ -1640,6 +1754,18 @@ export class CoopAuthorityV2Shadow {
         kind: "protocol-violation",
         frameType: "authorityEntry",
         issues: [issue],
+      },
+      this.onProtocolViolation,
+    );
+  }
+
+  /** Pending-entry identity/capacity failures are protocol violations even before a live cutover owns them. */
+  private reportPendingReplicaViolation(entry: CoopAuthorityEntry, issue: string): void {
+    reportProtocolViolation(
+      {
+        kind: "protocol-violation",
+        frameType: "authorityEntry",
+        issues: [`revision=${entry.revision}`, issue],
       },
       this.onProtocolViolation,
     );
@@ -1969,6 +2095,28 @@ function routeValidatedInboundFrame(
       reportProtocolViolation(result, onProtocolViolation);
       return "protocol-violation";
   }
+}
+
+/** Full immutable identity for a retained replica image; digest-only checks are insufficient for conflicts. */
+function samePendingReplicaEntry(left: CoopAuthorityEntry, right: CoopAuthorityEntry): boolean {
+  return (
+    left.revision === right.revision
+    && JSON.stringify({
+      context: left.context,
+      operationId: left.operationId,
+      kind: left.kind,
+      material: left.material,
+      nextControl: left.nextControl,
+      subsumes: left.subsumes,
+    }) === JSON.stringify({
+      context: right.context,
+      operationId: right.operationId,
+      kind: right.kind,
+      material: right.material,
+      nextControl: right.nextControl,
+      subsumes: right.subsumes,
+    })
+  );
 }
 
 function reportProtocolViolation(

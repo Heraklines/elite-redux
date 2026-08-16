@@ -1057,6 +1057,14 @@ export function decodeCoopV2InteractionEnvelope(entry: CoopAuthorityEntry): Coop
 
 export class CoopV2InteractionCutover {
   private readonly harness: CoopAuthorityV2Shadow;
+  private readonly pendingEnvelopes = new Map<
+    string,
+    {
+      readonly surfaceClass: CoopOperationSurfaceClass;
+      readonly envelope: CoopAuthoritativeEnvelopeV1;
+      readonly entry: CoopAuthorityEntry;
+    }
+  >();
   private disposed = false;
 
   constructor(harness: CoopAuthorityV2Shadow) {
@@ -1068,38 +1076,109 @@ export class CoopV2InteractionCutover {
   }
 
   /** Commit one complete, settled interaction result as the sole retained authority. */
+  commitHostEnvelopeDetailed(
+    surfaceClass: CoopOperationSurfaceClass,
+    envelope: CoopAuthoritativeEnvelopeV1,
+  ): CoopV2InteractionCommitDisposition {
+    if (this.disposed) {
+      return { kind: "failed", reason: "interaction cutover is disposed" };
+    }
+    const operationId = envelope.pendingOperation?.id;
+    const pending = operationId == null ? undefined : this.pendingEnvelopes.get(operationId);
+    if (pending != null) {
+      if (pending.surfaceClass !== surfaceClass || JSON.stringify(pending.envelope) !== JSON.stringify(envelope)) {
+        return { kind: "failed", reason: "a different envelope reused a deferred operation id" };
+      }
+    }
+    const entry =
+      pending == null
+        ? buildCoopV2InteractionEnvelopeEntry({
+            context: this.authenticatedFrameContext,
+            surfaceClass,
+            envelope,
+          })
+        : readdressAuthorityEntry(pending.entry, this.authenticatedFrameContext);
+    if (entry == null) {
+      return { kind: "failed", reason: "interaction envelope is incomplete or malformed" };
+    }
+    let disposition: ReturnType<CoopAuthorityV2Shadow["commitAuthorityEntryDetailed"]>;
+    try {
+      disposition = this.harness.commitAuthorityEntryDetailed(stripAuthorityRevision(entry));
+    } catch (error) {
+      return { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
+    }
+    if (disposition.kind === "committed") {
+      if (operationId != null) {
+        this.pendingEnvelopes.delete(operationId);
+      }
+      return { kind: "committed", entry: disposition.entry };
+    }
+    if (disposition.kind === "deferred") {
+      if (operationId != null) {
+        this.pendingEnvelopes.set(operationId, {
+          surfaceClass,
+          envelope: structuredClone(envelope),
+          entry: disposition.entry,
+        });
+      }
+      return {
+        kind: "deferred",
+        entry: disposition.entry,
+        reason: disposition.reason,
+      };
+    }
+    if (operationId != null) {
+      this.pendingEnvelopes.delete(operationId);
+    }
+    return { kind: "failed", reason: disposition.reason };
+  }
+
   commitHostEnvelope(
     surfaceClass: CoopOperationSurfaceClass,
     envelope: CoopAuthoritativeEnvelopeV1,
   ): CoopAuthorityEntry | null {
+    const disposition = this.commitHostEnvelopeDetailed(surfaceClass, envelope);
+    return disposition.kind === "committed" ? (disposition.entry ?? null) : null;
+  }
+
+  /** Retry exact deferred entries after the authenticated predecessor control has installed. */
+  retryDeferredHostEnvelopes(): number {
     if (this.disposed) {
-      return null;
+      return 0;
     }
-    const entry = buildCoopV2InteractionEnvelopeEntry({
-      context: this.authenticatedFrameContext,
-      surfaceClass,
-      envelope,
-    });
-    if (entry == null) {
-      return null;
-    }
-    const committed = this.harness.tapInteraction({
-      entry,
-      legacyDigest: entry.material.digest,
-      legacyImage: entry,
-    });
-    if (committed == null) {
-      return null;
+    let committed = 0;
+    for (const [operationId, pending] of this.pendingEnvelopes) {
+      const reboundEntry = readdressAuthorityEntry(pending.entry, this.authenticatedFrameContext);
+      const disposition = this.harness.commitAuthorityEntryDetailed(stripAuthorityRevision(reboundEntry));
+      if (disposition.kind === "committed") {
+        this.pendingEnvelopes.delete(operationId);
+        committed += 1;
+      } else if (disposition.kind === "deferred") {
+        this.pendingEnvelopes.set(operationId, { ...pending, entry: disposition.entry });
+      } else {
+        this.pendingEnvelopes.delete(operationId);
+      }
     }
     return committed;
   }
 
   dispose(): void {
     this.disposed = true;
+    this.pendingEnvelopes.clear();
   }
 }
 
-export type CoopV2InteractionCommitResult = "not-cutover" | "committed" | "failed";
+export type CoopV2InteractionCommitDisposition =
+  | { readonly kind: "not-cutover" }
+  | { readonly kind: "committed"; readonly entry?: CoopAuthorityEntry | null }
+  | {
+      readonly kind: "deferred";
+      readonly entry: CoopAuthorityEntry;
+      readonly reason: "predecessor-control-not-installed";
+    }
+  | { readonly kind: "failed"; readonly reason: string };
+
+export type CoopV2InteractionCommitResult = "not-cutover" | "committed" | "deferred" | "failed";
 
 let activeCutover: CoopV2InteractionCutover | null = null;
 const cutoverByDurability = new WeakMap<CoopDurabilityManager, CoopV2InteractionCutover>();
@@ -1130,31 +1209,62 @@ export function unbindCoopV2InteractionCutover(
   }
 }
 
+export function getCoopV2InteractionCutover(
+  durability?: CoopDurabilityManager | null,
+): CoopV2InteractionCutover | null {
+  if (durability === undefined) {
+    return activeCutover;
+  }
+  return durability === null ? null : cutoverByDurability.get(durability) ?? null;
+}
+
 export function isCoopV2InteractionCutoverActive(durability?: CoopDurabilityManager | null): boolean {
-  return (durability == null ? activeCutover : cutoverByDurability.get(durability)) != null;
+  return getCoopV2InteractionCutover(durability) != null;
 }
 
 /**
  * Common old-journal seam: commit eligible interaction results into V2. A
  * negotiated cutover never falls back to `op:global` after a failed V2 commit.
  */
+export function commitCoopV2InteractionEnvelopeDetailed(
+  surfaceClass: CoopOperationSurfaceClass,
+  envelope: CoopAuthoritativeEnvelopeV1,
+  durability?: CoopDurabilityManager | null,
+): CoopV2InteractionCommitDisposition {
+  const disposition = interactionEnvelopeDisposition(envelope);
+  if (disposition === "unrelated") {
+    return { kind: "not-cutover" };
+  }
+  const cutover = getCoopV2InteractionCutover(durability);
+  if (cutover == null) {
+    return { kind: "not-cutover" };
+  }
+  // The authority accepted this proposal/observation, but it is deliberately absent from the mechanical
+  // log. A later complete presentation or terminal result carries the progression revision.
+  if (disposition === "telemetry") {
+    return { kind: "committed", entry: null };
+  }
+  return cutover.commitHostEnvelopeDetailed(surfaceClass, envelope);
+}
+
+/** Compatibility string wrapper for legacy journal callers. */
 export function commitCoopV2InteractionEnvelope(
   surfaceClass: CoopOperationSurfaceClass,
   envelope: CoopAuthoritativeEnvelopeV1,
   durability?: CoopDurabilityManager | null,
 ): CoopV2InteractionCommitResult {
-  const disposition = interactionEnvelopeDisposition(envelope);
-  if (disposition === "unrelated") {
-    return "not-cutover";
-  }
-  const cutover = durability == null ? activeCutover : cutoverByDurability.get(durability);
-  if (cutover == null) {
-    return "not-cutover";
-  }
-  // The authority accepted this proposal/observation, but it is deliberately absent from the mechanical
-  // log. A later complete presentation or terminal result carries the progression revision.
-  if (disposition === "telemetry") {
-    return "committed";
-  }
-  return cutover.commitHostEnvelope(surfaceClass, envelope) == null ? "failed" : "committed";
+  return commitCoopV2InteractionEnvelopeDetailed(surfaceClass, envelope, durability).kind;
+}
+
+function stripAuthorityRevision(entry: CoopAuthorityEntry): Omit<CoopAuthorityEntry, "revision"> {
+  const { revision: _revision, ...body } = entry;
+  return body;
+}
+
+/** Re-address a retained deferred image without recomputing its revision/material/control identity. */
+function readdressAuthorityEntry(entry: CoopAuthorityEntry, context: CoopFrameContextV2): CoopAuthorityEntry {
+  return {
+    ...entry,
+    context: { ...context },
+  };
 }

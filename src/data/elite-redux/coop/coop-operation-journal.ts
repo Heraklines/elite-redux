@@ -51,7 +51,7 @@
 // =============================================================================
 
 import {
-  commitCoopV2InteractionEnvelope,
+  commitCoopV2InteractionEnvelopeDetailed,
   isCoopV2InteractionCutoverActive,
 } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { recordCoopCausalEvent } from "#data/elite-redux/coop/coop-causal-trace";
@@ -223,14 +223,21 @@ export function getActiveCoopOperationDurability(): CoopDurabilityManager | null
   return activeDurability;
 }
 
+/** Resolve an explicitly captured binding: null is disabled; only omission uses the ambient runtime. */
+export function getCoopOperationDurabilityBinding(
+  manager?: CoopDurabilityManager | null,
+): CoopDurabilityManager | null {
+  return manager === undefined ? activeDurability : manager;
+}
+
 /** Whether the operation commit path currently journals (durability manager installed). */
 export function isCoopOperationJournalActive(): boolean {
   return activeDurability != null;
 }
 
 /** Explicit-runtime sibling for a callback that captured its owning durability manager. */
-export function isCoopOperationJournalActiveFor(manager: CoopDurabilityManager | null): boolean {
-  return manager != null;
+export function isCoopOperationJournalActiveFor(manager?: CoopDurabilityManager | null): boolean {
+  return getCoopOperationDurabilityBinding(manager) != null;
 }
 
 /**
@@ -241,10 +248,20 @@ export function notifyCoopOperationContinuationSurface(
   surface: CoopOperationContinuationSurface,
   address: CoopOperationContinuationAddress,
 ): number {
-  if (isCoopV2InteractionCutoverActive(activeDurability)) {
+  return notifyCoopOperationContinuationSurfaceFor(undefined, surface, address);
+}
+
+/** Captured-runtime sibling; an explicit null cannot fall back to the ambient cutover. */
+export function notifyCoopOperationContinuationSurfaceFor(
+  manager: CoopDurabilityManager | null | undefined,
+  surface: CoopOperationContinuationSurface,
+  address: CoopOperationContinuationAddress,
+): number {
+  const bound = getCoopOperationDurabilityBinding(manager);
+  if (isCoopV2InteractionCutoverActive(bound)) {
     return 0;
   }
-  return activeDurability?.notifyOperationContinuationSurface(surface, address) ?? 0;
+  return bound?.notifyOperationContinuationSurface(surface, address) ?? 0;
 }
 
 /**
@@ -255,10 +272,20 @@ export function notifyCoopOperationAuthorityContinuationSurface(
   surface: CoopOperationContinuationSurface,
   address: CoopOperationContinuationAddress,
 ): number {
-  if (isCoopV2InteractionCutoverActive(activeDurability)) {
+  return notifyCoopOperationAuthorityContinuationSurfaceFor(undefined, surface, address);
+}
+
+/** Captured-runtime sibling; an explicit null cannot fall back to the ambient cutover. */
+export function notifyCoopOperationAuthorityContinuationSurfaceFor(
+  manager: CoopDurabilityManager | null | undefined,
+  surface: CoopOperationContinuationSurface,
+  address: CoopOperationContinuationAddress,
+): number {
+  const bound = getCoopOperationDurabilityBinding(manager);
+  if (isCoopV2InteractionCutoverActive(bound)) {
     return 0;
   }
-  return activeDurability?.notifyOperationAuthorityContinuationSurface(surface, address) ?? 0;
+  return bound?.notifyOperationAuthorityContinuationSurface(surface, address) ?? 0;
 }
 
 /**
@@ -269,37 +296,45 @@ export function notifyCoopOperationAuthorityContinuationSurface(
  * conflicting same-revision payload. Never throws. Terminal callers must remain closed on false.
  */
 export function tryJournalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  return tryJournalCoopCommittedEnvelopeFor(activeDurability, envelope);
+  return tryJournalCoopCommittedEnvelopeFor(undefined, envelope);
 }
 
-/**
- * Retain through the supplied runtime's manager instead of the ambient process selector. Async Phaser/UI
- * callbacks in the two-engine harness can resume after another client was installed; binding publication
- * explicitly prevents a host result from being committed into its peer's journal.
- */
-export function tryJournalCoopCommittedEnvelopeFor(
-  manager: CoopDurabilityManager | null,
+export type CoopOperationJournalCommitDisposition =
+  | { readonly kind: "disabled" }
+  | { readonly kind: "committed" }
+  | { readonly kind: "deferred"; readonly reason: "predecessor-control-not-installed" }
+  | { readonly kind: "failed"; readonly reason: string };
+
+export function tryJournalCoopCommittedEnvelopeDetailed(
   envelope: CoopAuthoritativeEnvelopeV1,
-): boolean {
+  manager?: CoopDurabilityManager | null,
+): CoopOperationJournalCommitDisposition {
+  const bound = getCoopOperationDurabilityBinding(manager);
   const cls = coopOperationClassForEnvelope(envelope);
   if (cls == null) {
-    return false;
+    return { kind: "failed", reason: "unmapped operation surface" };
   }
-  const v2Result = commitCoopV2InteractionEnvelope(cls, envelope, manager);
-  if (v2Result !== "not-cutover") {
-    return v2Result === "committed";
+  const v2Disposition = commitCoopV2InteractionEnvelopeDetailed(cls, envelope, bound);
+  if (v2Disposition.kind === "deferred") {
+    return { kind: "deferred", reason: v2Disposition.reason };
   }
-  if (manager == null) {
-    return true;
+  if (v2Disposition.kind === "failed") {
+    return { kind: "failed", reason: v2Disposition.reason };
+  }
+  if (v2Disposition.kind === "committed") {
+    return { kind: "committed" };
+  }
+  if (bound == null) {
+    return { kind: "disabled" };
   }
   let retained = false;
   try {
-    retained = manager.commit("op:global", envelope.revision, { t: "envelope", envelope });
+    retained = bound.commit("op:global", envelope.revision, { t: "envelope", envelope });
   } catch {
     retained = false;
   }
   if (!retained) {
-    return false;
+    return { kind: "failed", reason: "durability manager rejected the envelope" };
   }
   if (isCoopOperationSurfaceClass(cls)) {
     journalCommittedClasses.add(cls);
@@ -321,7 +356,20 @@ export function tryJournalCoopCommittedEnvelopeFor(
     turn: envelope.turn,
     detail: `class=${cls} kind=${envelope.pendingOperation?.kind ?? "none"}`,
   });
-  return true;
+  return { kind: "committed" };
+}
+
+/**
+ * Retain through the supplied runtime's manager instead of the ambient process selector. Async Phaser/UI
+ * callbacks in the two-engine harness can resume after another client was installed; binding publication
+ * explicitly prevents a host result from being committed into its peer's journal.
+ */
+export function tryJournalCoopCommittedEnvelopeFor(
+  manager: CoopDurabilityManager | null | undefined,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  const disposition = tryJournalCoopCommittedEnvelopeDetailed(envelope, manager);
+  return disposition.kind === "disabled" || disposition.kind === "committed";
 }
 
 /** Compatibility wrapper for surfaces whose live migration still treats the journal as a backstop. */
