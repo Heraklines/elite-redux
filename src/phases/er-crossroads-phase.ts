@@ -40,6 +40,7 @@ import {
   adoptBiomeWatcherChoice,
   armCoopBiomeIntentResend,
   awaitCoopBiomeCommitReceipt,
+  awaitCoopBiomeCommitReceiptWithOrphanBackstop,
   type CoopBiomeCommitReceipt,
   type CoopBiomeOperationBinding,
   type CoopBiomeRelayResult,
@@ -160,10 +161,17 @@ export class ErCrossroadsPhase extends Phase {
   /** Runtime that constructed this phase; async picker completion may resume under the other harness client. */
   private readonly coopOwningRuntime = getCoopRuntime();
   /** Exact operation runtime retained across UI/network callbacks. */
-  private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
+  private readonly coopBiomeOperationBinding: CoopBiomeOperationBinding | null;
 
-  constructor(sourceWave: number | null = null, sourceTurn: number | null = null) {
+  constructor(
+    sourceWave: number | null = null,
+    sourceTurn: number | null = null,
+    coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null,
+  ) {
     super();
+    this.coopBiomeOperationBinding =
+      coopBiomeOperationBinding
+      ?? (this.coopOwningRuntime == null ? null : captureCoopBiomeOperationBinding());
     if (sourceWave != null && (!Number.isSafeInteger(sourceWave) || sourceWave < 0)) {
       throw new Error(`[coop-op] Crossroads received invalid source wave ${sourceWave}`);
     }
@@ -224,7 +232,9 @@ export class ErCrossroadsPhase extends Phase {
   }
 
   private requireCoopBiomeOperationBinding(): CoopBiomeOperationBinding {
-    this.coopBiomeOperationBinding ??= captureCoopBiomeOperationBinding();
+    if (this.coopBiomeOperationBinding == null) {
+      throw new Error("[coop-op] Crossroads continuation has no pinned runtime binding");
+    }
     return this.coopBiomeOperationBinding;
   }
 
@@ -312,7 +322,12 @@ export class ErCrossroadsPhase extends Phase {
       globalScene.ui.setMode(UiMode.MESSAGE);
       if (moveOn) {
         setErLeaveBiomeNow();
-        globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
+        globalScene.phaseManager.unshiftNew(
+          "SelectBiomePhase",
+          this.coopSourceWave,
+          this.coopSourceTurn,
+          this.coopBiomeOperationBinding,
+        );
       } else {
         erMarkBiomeStay(this.coopSourceWave);
       }
@@ -535,7 +550,7 @@ export class ErCrossroadsPhase extends Phase {
         }, 10);
         return;
       }
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
       // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
       // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
       // merely queuing this phase is deliberately insufficient.
@@ -667,7 +682,7 @@ export class ErCrossroadsPhase extends Phase {
       }
       this.clearCrossroadsCommitRecovery();
       getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
       // The watcher is a real public continuation too. Only the authoritative guest runtime can consume
       // this notification, so owner parity cannot leave the retained wave waiting on the wrong renderer.
       this.notifyCoopContinuationSurfaceReady();
@@ -731,10 +746,28 @@ export class ErCrossroadsPhase extends Phase {
   private async finishCommittedCrossroadsWatcher(operationId: string, pinned: number): Promise<void> {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
-    const receipt = await awaitCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
+    const wait = await awaitCoopBiomeCommitReceiptWithOrphanBackstop(
+      operationId,
+      this.requireCoopBiomeOperationBinding(),
+      this.coopOwningRuntime?.controller ?? null,
+      pinned,
+    );
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
+    if (wait.orphaned) {
+      getCoopUiMirror()?.endSession();
+      void globalScene.ui
+        .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave))
+        .catch(error => coopWarn("reward", "crossroads orphan cosmetic teardown failed", error));
+      this.parkCrossroadsCommitRecovery(() => {
+        this.finishCommittedCrossroadsWatcher(operationId, pinned).catch(e =>
+          coopWarn("reward", "crossroads WATCHER receipt retry threw - remaining closed", e),
+        );
+      });
+      return;
+    }
+    const receipt = wait.receipt;
     const choice = this.committedCrossroadsChoice(receipt, operationId);
     if (choice == null) {
       this.parkCrossroadsCommitRecovery(() => {
@@ -1034,7 +1067,12 @@ export class ErCrossroadsPhase extends Phase {
             setErLeaveBiomeNow();
           }
           setCoopBiomeInteractionStart(pinned);
-          globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
+          globalScene.phaseManager.unshiftNew(
+            "SelectBiomePhase",
+            this.coopSourceWave,
+            this.coopSourceTurn,
+            this.coopBiomeOperationBinding,
+          );
         } else {
           if (!authoritativeProjection) {
             erMarkBiomeStay(this.coopSourceWave);
@@ -1087,7 +1125,12 @@ export class ErCrossroadsPhase extends Phase {
       // End the biome now: flag the early exit (isNewBiome honors it) and open the
       // World Map node picker ahead of the queued NewBattlePhase.
       setErLeaveBiomeNow();
-      globalScene.phaseManager.unshiftNew("SelectBiomePhase", this.coopSourceWave);
+      globalScene.phaseManager.unshiftNew(
+        "SelectBiomePhase",
+        this.coopSourceWave,
+        this.coopSourceTurn,
+        this.coopBiomeOperationBinding,
+      );
     } else {
       // STAY: the run continues in this biome. If this is a deliberate choice to
       // linger PAST the notoriety-free window, arm the overstay anchor - from here

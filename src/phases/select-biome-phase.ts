@@ -6,6 +6,7 @@ import {
   armCoopBiomeIntentResend,
   awaitCoopBiomeCommitReceipt,
   awaitCoopBiomeTransitionCommitReceipt,
+  awaitCoopBiomeTransitionCommitReceiptWithOrphanBackstop,
   type CoopBiomeCommitReceipt,
   type CoopBiomeOperationBinding,
   type CoopBiomeRelayResult,
@@ -179,12 +180,19 @@ export class SelectBiomePhase extends BattlePhase {
   /** The local transition terminal is applied once even when immutable-result publication must retry. */
   private coopAppliedTerminal: { readonly destination: BiomeId; readonly operationId?: string } | null = null;
   /** Runtime/durability selectors captured before any rendezvous, timer, or Phaser UI callback can resume. */
-  private coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null;
+  private readonly coopBiomeOperationBinding: CoopBiomeOperationBinding | null;
   /** Exact runtime retained across UI/network callbacks in the two-engine topology. */
   private readonly coopOwningRuntime = getCoopRuntime();
 
-  constructor(coopSourceWave: number | null = null, coopSourceTurn: number | null = null) {
+  constructor(
+    coopSourceWave: number | null = null,
+    coopSourceTurn: number | null = null,
+    coopBiomeOperationBinding: CoopBiomeOperationBinding | null = null,
+  ) {
     super();
+    this.coopBiomeOperationBinding =
+      coopBiomeOperationBinding
+      ?? (this.coopOwningRuntime == null ? null : captureCoopBiomeOperationBinding());
     if (coopSourceTurn != null && (!Number.isSafeInteger(coopSourceTurn) || coopSourceTurn < 0)) {
       throw new Error(`[coop-op] SelectBiomePhase received invalid source turn ${coopSourceTurn}`);
     }
@@ -237,7 +245,9 @@ export class SelectBiomePhase extends BattlePhase {
   }
 
   private requireCoopBiomeOperationBinding(): CoopBiomeOperationBinding {
-    this.coopBiomeOperationBinding ??= captureCoopBiomeOperationBinding();
+    if (this.coopBiomeOperationBinding == null) {
+      throw new Error("[coop-op] SelectBiome continuation has no pinned runtime binding");
+    }
     return this.coopBiomeOperationBinding;
   }
 
@@ -789,13 +799,33 @@ export class SelectBiomePhase extends BattlePhase {
   ): Promise<void> {
     const generation = coopSessionGeneration();
     const wave = this.requireCoopSourceWave();
+    const binding = this.requireCoopBiomeOperationBinding();
     const address = { sourceWave: wave, interactivePinned: pinned } as const;
-    const receipt =
-      getCoopBiomeTransitionCommitReceipt(address, this.requireCoopBiomeOperationBinding())
-      ?? (await awaitCoopBiomeTransitionCommitReceipt(address, this.requireCoopBiomeOperationBinding()));
+    const retained = getCoopBiomeTransitionCommitReceipt(address, binding);
+    const wait = retained == null
+      ? await awaitCoopBiomeTransitionCommitReceiptWithOrphanBackstop(
+          address,
+          binding,
+          this.coopOwningRuntime?.controller ?? null,
+          pinned,
+        )
+      : { receipt: retained, orphaned: false };
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
+    if (wait.orphaned) {
+      getCoopUiMirror()?.endSession();
+      void globalScene.ui
+        .setModeBoundedWhen(UiMode.MESSAGE, 2_000, () => this.boundaryStillLive(generation, wave))
+        .catch(error => coopWarn("reward", "biome orphan cosmetic teardown failed", error));
+      this.parkBiomeCommitRecovery(() => {
+        this.finishCommittedBiomeWatcher(revealed, operationId, pinned).catch(e =>
+          coopWarn("reward", "biome pick WATCHER receipt retry threw - remaining closed", e),
+        );
+      });
+      return;
+    }
+    const receipt = wait.receipt;
     const deterministicOperationId = coopAuthoritativeBiomeTransitionOperationId(
       wave,
       this.requireCoopBiomeOperationBinding(),
@@ -1019,7 +1049,7 @@ export class SelectBiomePhase extends BattlePhase {
         }, 10);
         return;
       }
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime);
+      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
       notifyCoopWaveContinuationSurfaceReady(wave);
     };
     if (this.coopOwningRuntime == null) {

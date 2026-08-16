@@ -140,6 +140,21 @@ export class BiomeShopPhase extends SelectModifierPhase {
    */
   private coopBiomeContinuation = false;
 
+  constructor(...args: ConstructorParameters<typeof SelectModifierPhase>) {
+    super(...args);
+    // Pin the reward/runtime selectors while this phase is constructed; later market UI and relay callbacks
+    // must not rebind to whichever co-op engine happens to be ambient after an await.
+    if (this.coopBiomeOwningRuntime != null) {
+      this.coopRewardOperationBinding = captureCoopRewardOperationBinding();
+    }
+  }
+
+  /** An explicitly captured null durability disables V2; it must not fall back to the ambient cutover. */
+  private isBoundCoopV2InteractionActive(): boolean {
+    const durability = this.coopRewardOperationBinding?.durability;
+    return durability != null && isCoopV2InteractionCutoverActive(durability);
+  }
+
   /** Closed Authority V2 constructor identity; curated Mystery markets override this explicitly. */
   protected coopMarketProjectionKind(): CoopMarketProjectionKind {
     return "biome";
@@ -777,7 +792,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           this.coopRewardOperationBinding,
         );
         if (!isCoopRewardOperationEnabled() || commit != null) {
-          const v2 = isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+          const v2 = this.isBoundCoopV2InteractionActive();
           let v2HostAdvanced = false;
           if (v2 && commit != null) {
             if (role === "host") {
@@ -995,7 +1010,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.coopV2ControlOperationId = presentationOperationId;
     }
     const projection = relay.consumeRewardOptionsProjection(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL);
-    if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability) && projection == null) {
+    if (this.isBoundCoopV2InteractionActive() && projection == null) {
       this.coopBiomeAuthoritativeStockUnavailable("guest owner received V2 market options without exact stock");
       return;
     }
@@ -1082,7 +1097,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         this.coopV2ControlOperationId = presentationOperationId;
       }
       const projection = relay.consumeRewardOptionsProjection(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL);
-      if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability) && projection == null) {
+      if (this.isBoundCoopV2InteractionActive() && projection == null) {
         this.coopBiomeAuthoritativeStockUnavailable("watcher received V2 market options without exact stock");
         return;
       }
@@ -1169,7 +1184,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
           return;
         }
         if (decision.authoritativeProjection !== true && decision.operationId != null) {
-          if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+          if (this.isBoundCoopV2InteractionActive()) {
             if (!this.advanceCoopBiomeTerminal(this.coopBiomeStart)) {
               return;
             }
@@ -1359,7 +1374,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
       // SHOP_PRESENT is committed while its concrete market handler is still opening. Bind the immutable
       // presentation to this exact BIOME_SHOP (or watcher MESSAGE) generation once it is genuinely live,
       // so the next SHOP_BUY can consume an installed predecessor instead of racing an unproven claim.
-      notifyCoopV2InteractionSurfaceReady(runtime);
+      notifyCoopV2InteractionSurfaceReady(runtime, this);
     };
     runWhenCoopRuntimeActive(runtime, notify);
   }
@@ -1483,7 +1498,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
         && isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)
         && preparedOperationId != null
       ) {
-        if (isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
+        if (this.isBoundCoopV2InteractionActive()) {
           const runtime = getCoopRuntime();
           const generation = coopSessionGeneration();
           const pinned = this.coopBiomeStart;

@@ -48,6 +48,7 @@ import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/co
 import { captureCoopAuthoritativeBattleState } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_CAP_OP_BIOME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { getCoopOrphanGraceMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAuthoritativeEnvelopeV1,
@@ -250,7 +251,9 @@ function journalActive(binding?: CoopBiomeOperationBinding | null): boolean {
 }
 
 function v2InteractionActive(binding?: CoopBiomeOperationBinding | null): boolean {
-  return isCoopV2InteractionCutoverActive(binding?.durability);
+  return binding == null
+    ? isCoopV2InteractionCutoverActive()
+    : binding.durability != null && isCoopV2InteractionCutoverActive(binding.durability);
 }
 
 function retainEnvelope(envelope: CoopAuthoritativeEnvelopeV1, binding?: CoopBiomeOperationBinding | null): boolean {
@@ -449,6 +452,7 @@ function isValidCrossroadsPickPayload(payload: CoopCrossroadsPickPayload): boole
 export function preflightCoopBiomeJournalMaterialization(
   envelope: CoopAuthoritativeEnvelopeV1,
   binding?: CoopBiomeOperationBinding | null,
+  options?: { readonly allowExistingTransitionPermit?: boolean },
 ): CoopBiomeJournalMaterializationPlan | null {
   const s = state(binding);
   const op = envelope.pendingOperation;
@@ -495,7 +499,10 @@ export function preflightCoopBiomeJournalMaterialization(
       destinationBiomeId: payload.biomeId,
       nextWave: payload.nextWave,
     };
-    if ((!exactInteractiveAddress && !exactDeterministicAddress) || !canArmCoopBiomeTransitionTailPermit(permit)) {
+    if (
+      (!exactInteractiveAddress && !exactDeterministicAddress)
+      || (!options?.allowExistingTransitionPermit && !canArmCoopBiomeTransitionTailPermit(permit))
+    ) {
       return null;
     }
   } else {
@@ -532,10 +539,24 @@ export function publishCoopBiomeJournalMaterialization(
   binding?: CoopBiomeOperationBinding | null,
 ): boolean {
   const s = state(binding);
+  const { receipt } = plan;
+  const existing = s.committedReceipts.get(receipt.operationId);
+  if (existing != null) {
+    const sameReceipt =
+      existing.kind === receipt.kind
+      && existing.revision === receipt.revision
+      && existing.wave === receipt.wave
+      && JSON.stringify(existing.payload) === JSON.stringify(receipt.payload);
+    if (!sameReceipt) {
+      return false;
+    }
+    // A retry of an already-frozen result only reasserts its receipt; it must not arm the renderer tail again.
+    s.pendingJournalMaterializations.add(receipt.operationId);
+    return true;
+  }
   if (plan.permit != null && !armCoopBiomeTransitionTailPermit(plan.permit)) {
     return false;
   }
-  const { receipt } = plan;
   s.pendingJournalMaterializations.add(receipt.operationId);
   s.committedReceipts.set(receipt.operationId, receipt);
   const waiters = s.receiptWaiters.get(receipt.operationId);
@@ -546,6 +567,17 @@ export function publishCoopBiomeJournalMaterialization(
     }
   }
   return true;
+}
+
+/** Publish a host-local receipt from an already frozen result without claiming its transition permit again. */
+function publishCoopBiomeAuthorityReceipt(
+  envelope: CoopAuthoritativeEnvelopeV1,
+  binding?: CoopBiomeOperationBinding | null,
+): boolean {
+  const plan = preflightCoopBiomeJournalMaterialization(envelope, binding, {
+    allowExistingTransitionPermit: true,
+  });
+  return plan != null && publishCoopBiomeJournalMaterialization({ ...plan, permit: null }, binding);
 }
 
 /** Backward-compatible atomic helper for non-relay callers. */
@@ -594,6 +626,72 @@ export async function awaitCoopBiomeCommitReceipt(
       resolve(null);
     }, biomeCommitWaitMs);
   });
+}
+
+export interface CoopBiomePeerAdvanceProbe {
+  readonly awaitPeerAdvancePast: (counter: number) => { promise: Promise<void>; cancel: () => void };
+}
+
+export interface CoopBiomeCommitReceiptWait {
+  readonly receipt: CoopBiomeCommitReceipt | null;
+  readonly orphaned: boolean;
+}
+
+/** Race any exact receipt wait against the same raw-counter orphan backstop used by the legacy relay path. */
+async function awaitCoopBiomeReceiptPromiseWithOrphanBackstop(
+  receiptPromise: Promise<CoopBiomeCommitReceipt | null>,
+  controller: CoopBiomePeerAdvanceProbe | null,
+  pinnedCounter: number,
+): Promise<CoopBiomeCommitReceiptWait> {
+  if (controller == null) {
+    return { receipt: await receiptPromise, orphaned: false };
+  }
+  const orphan = controller.awaitPeerAdvancePast(pinnedCounter);
+  const first = await Promise.race([
+    receiptPromise.then(receipt => ({ kind: "receipt" as const, receipt })),
+    orphan.promise.then(() => ({ kind: "orphan" as const })),
+  ]);
+  if (first.kind === "receipt") {
+    orphan.cancel();
+    return { receipt: first.receipt, orphaned: false };
+  }
+  const graced = await Promise.race([
+    receiptPromise.then(receipt => ({ kind: "receipt" as const, receipt })),
+    new Promise<{ readonly kind: "orphan" }>(resolve =>
+      setTimeout(() => resolve({ kind: "orphan" }), getCoopOrphanGraceMs())
+    ),
+  ]);
+  return graced.kind === "receipt"
+    ? { receipt: graced.receipt, orphaned: false }
+    : { receipt: null, orphaned: true };
+}
+
+/** Durable/V2 receipt wait for one operation with the same raw-counter orphan backstop as legacy relay. */
+export async function awaitCoopBiomeCommitReceiptWithOrphanBackstop(
+  operationId: string,
+  binding: CoopBiomeOperationBinding,
+  controller: CoopBiomePeerAdvanceProbe | null,
+  pinnedCounter: number,
+): Promise<CoopBiomeCommitReceiptWait> {
+  return awaitCoopBiomeReceiptPromiseWithOrphanBackstop(
+    awaitCoopBiomeCommitReceipt(operationId, binding),
+    controller,
+    pinnedCounter,
+  );
+}
+
+/** Durable/V2 receipt wait for either authority-local terminal at one SelectBiome boundary. */
+export async function awaitCoopBiomeTransitionCommitReceiptWithOrphanBackstop(
+  address: CoopBiomeTransitionReceiptAddress,
+  binding: CoopBiomeOperationBinding,
+  controller: CoopBiomePeerAdvanceProbe | null,
+  pinnedCounter: number,
+): Promise<CoopBiomeCommitReceiptWait> {
+  return awaitCoopBiomeReceiptPromiseWithOrphanBackstop(
+    awaitCoopBiomeTransitionCommitReceipt(address, binding),
+    controller,
+    pinnedCounter,
+  );
 }
 
 function biomeTransitionReceiptOperationIds(
@@ -1200,7 +1298,11 @@ export function commitBiomeAuthoritativeResult(
   }
   const retained = s.committedResultEnvelopes.get(operationId);
   if (retained != null) {
-    if (!armPreparedBiomeTail(s, prepared, retained) || !retainEnvelope(retained, binding)) {
+    if (
+      !armPreparedBiomeTail(s, prepared, retained)
+      || !retainEnvelope(retained, binding)
+      || !publishCoopBiomeAuthorityReceipt(retained, binding)
+    ) {
       return null;
     }
     return {
@@ -1245,7 +1347,11 @@ export function commitBiomeAuthoritativeResult(
   // consume another operation/global revision. The local transition permit is installed first so a remote
   // replica can never observe a published result that the authority itself is unable to project.
   s.committedResultEnvelopes.set(operationId, envelope);
-  if (!armPreparedBiomeTail(s, prepared, envelope) || !retainEnvelope(envelope, binding)) {
+  if (
+    !armPreparedBiomeTail(s, prepared, envelope)
+    || !retainEnvelope(envelope, binding)
+    || !publishCoopBiomeAuthorityReceipt(envelope, binding)
+  ) {
     return null;
   }
   const payload = envelope.pendingOperation?.payload as CoopBiomePickPayload | CoopCrossroadsPickPayload;
