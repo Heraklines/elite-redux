@@ -49,6 +49,7 @@ import type {
   CoopAuthorityEntry,
   CoopCommandControlTarget,
   CoopControlInstallResult,
+  CoopFrameContextV2,
   CoopNextControl,
   CoopRuntimeContext,
 } from "#data/elite-redux/coop/authority-v2/contract";
@@ -10328,31 +10329,50 @@ function commitCoopV2SettledWaveAdvance(
   return disposition;
 }
 
+function sameCoopV2DeferredHostBoundaryEntry(
+  parked: CoopV2DeferredHostBoundary,
+  returned: CoopAuthorityEntry,
+  currentContext: CoopFrameContextV2,
+): boolean {
+  try {
+    if (
+      (parked.kind === "wave" && returned.kind !== "WAVE_ADVANCE")
+      || (parked.kind === "terminal" && returned.kind !== "TERMINAL_COMMIT")
+      || returned.context.membershipRevision < parked.entry.context.membershipRevision
+      || returned.context.connectionGeneration < parked.entry.context.connectionGeneration
+    ) {
+      return false;
+    }
+    // AuthorityLog.rebindConnection may advance only these channel axes. The returned entry must already
+    // be stamped with the cutover's current authenticated context; normalizing those two axes back to the
+    // parked image then makes the remaining full entry comparison exact, including context and subsumes.
+    if (canonicalize(returned.context) !== canonicalize(currentContext)) {
+      return false;
+    }
+    const readdressed = {
+      ...returned,
+      context: {
+        ...returned.context,
+        membershipRevision: parked.entry.context.membershipRevision,
+        connectionGeneration: parked.entry.context.connectionGeneration,
+      },
+    };
+    return canonicalize(readdressed) === canonicalize(parked.entry);
+  } catch {
+    return false;
+  }
+}
+
 function matchesCoopV2DeferredHostBoundaryDisposition(
   parked: CoopV2DeferredHostBoundary,
   disposition: CoopV2WaveTerminalCommitDisposition,
+  currentContext: CoopFrameContextV2,
 ): boolean {
   if (disposition.kind !== "committed" && disposition.kind !== "deferred") {
     return false;
   }
   const entry = disposition.entry;
-  if (
-    (parked.kind === "wave" && entry.kind !== "WAVE_ADVANCE")
-    || (parked.kind === "terminal" && entry.kind !== "TERMINAL_COMMIT")
-    || entry.operationId !== parked.operationId
-    || entry.revision !== parked.revision
-    || entry.material.digest !== parked.entry.material.digest
-  ) {
-    return false;
-  }
-  try {
-    if (
-      canonicalize(entry.material.payload) !== canonicalize(parked.entry.material.payload)
-      || canonicalize(entry.nextControl) !== canonicalize(parked.entry.nextControl)
-    ) {
-      return false;
-    }
-  } catch {
+  if (!sameCoopV2DeferredHostBoundaryEntry(parked, entry, currentContext)) {
     return false;
   }
   const decoded = decodeCoopV2WaveTransaction(entry);
@@ -10402,8 +10422,9 @@ function retryCoopV2DeferredHostBoundary(runtime: CoopRuntime, edge: CoopV2HostB
   }
 
   const disposition = cutover.retryDeferredHostBoundaryDetailed();
+  const currentContext = cutover.authenticatedFrameContext;
   if (disposition.kind === "deferred") {
-    if (!matchesCoopV2DeferredHostBoundaryDisposition(parked, disposition)) {
+    if (!matchesCoopV2DeferredHostBoundaryDisposition(parked, disposition, currentContext)) {
       clearCoopV2DeferredHostBoundary(runtime);
       failCoopRuntimeSharedSession(
         runtime,
@@ -10428,7 +10449,7 @@ function retryCoopV2DeferredHostBoundary(runtime: CoopRuntime, edge: CoopV2HostB
     );
     return false;
   }
-  if (!matchesCoopV2DeferredHostBoundaryDisposition(parked, disposition)) {
+  if (!matchesCoopV2DeferredHostBoundaryDisposition(parked, disposition, currentContext)) {
     clearCoopV2DeferredHostBoundary(runtime);
     failCoopRuntimeSharedSession(
       runtime,
