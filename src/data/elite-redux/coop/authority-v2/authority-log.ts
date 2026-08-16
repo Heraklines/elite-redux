@@ -1234,13 +1234,34 @@ export class AuthorityLog implements CoopAuthorityLog {
       return;
     }
     const peer = this.peerBindings.find(candidatePeer => candidatePeer.seatId === context.senderSeatId);
-    const requestSequence = this.parseBoundaryProofRequestSequence(context, request.requestId);
+    if (peer == null || request.requestId.length === 0 || request.candidateOperationId.length === 0) {
+      return;
+    }
+    const candidateLease = this.retainedWindow.get(request.candidateRevision);
+    const candidate = candidateLease?.entry;
     if (
-      peer == null
-      || requestSequence == null
-      || request.requestId.length === 0
-      || request.candidateOperationId.length === 0
+      candidate == null
+      || candidate.operationId !== request.candidateOperationId
+      || !frameContextsEqual(candidate.context, this.localContext)
     ) {
+      return;
+    }
+    const predecessorRevision = candidate.revision - 1;
+    if (!isValidRevision(predecessorRevision) || candidate.subsumes.some(revision => !isValidRevision(revision))) {
+      return;
+    }
+    const canonicalFromRevision = candidate.subsumes.reduce(
+      (minimumRevision, revision) => Math.min(minimumRevision, revision),
+      predecessorRevision,
+    );
+    if (!isValidRevision(canonicalFromRevision) || request.fromRevision !== canonicalFromRevision) {
+      return;
+    }
+
+    // Only a canonical request may enter correlation replay/high-water handling. A genuinely new ID receives
+    // no cache slot or sequence authority until the complete current retained proof has passed.
+    const requestSequence = this.parseBoundaryProofRequestSequence(context, request.requestId);
+    if (requestSequence == null) {
       return;
     }
     const peerResponses = this.tailProofResponses.get(peer.seatId);
@@ -1260,17 +1281,6 @@ export class AuthorityLog implements CoopAuthorityLog {
       return;
     }
 
-    // A genuinely new ID receives no cache slot or sequence authority until the complete current retained
-    // proof has passed. Invalid ordinary/stale/missing-source candidates therefore consume no capacity.
-    const candidateLease = this.retainedWindow.get(request.candidateRevision);
-    const candidate = candidateLease?.entry;
-    if (
-      candidate == null
-      || candidate.operationId !== request.candidateOperationId
-      || !frameContextsEqual(candidate.context, this.localContext)
-    ) {
-      return;
-    }
     const snapshot = this.captureTailProofSources(request.fromRevision, request.candidateRevision);
     if (snapshot == null) {
       return;
