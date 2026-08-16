@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
+import type { Pokemon } from "#field/pokemon";
 import { PokemonPhase } from "#phases/pokemon-phase";
 import type { DamageResult } from "#types/damage-result";
 import { fixedInt } from "#utils/common";
@@ -47,7 +48,24 @@ export class DamageAnimPhase extends PokemonPhase {
     this.amount = amount;
   }
 
+  private finishDamage(pokemon: Pokemon): void {
+    if (!pokemon.isActive()) {
+      this.end(pokemon);
+      return;
+    }
+    pokemon.updateInfo().then(
+      () => this.end(pokemon),
+      () => this.end(pokemon),
+    );
+  }
+
   private applyDamage() {
+    const pokemon = this.getPokemon() as Pokemon | undefined;
+    if (!pokemon) {
+      super.end();
+      return;
+    }
+
     switch (this.damageResult) {
       case HitResult.EFFECTIVE:
       case HitResult.CONFUSION:
@@ -64,35 +82,33 @@ export class DamageAnimPhase extends PokemonPhase {
     }
 
     if (this.amount) {
-      globalScene.damageNumberHandler.add(this.getPokemon(), this.amount, this.damageResult, this.critical);
+      globalScene.damageNumberHandler.add(pokemon, this.amount, this.damageResult, this.critical);
     }
 
     if (this.damageResult !== HitResult.INDIRECT && this.amount > 0) {
+      const sprite = pokemon.getSprite();
       const flashTimer = globalScene.time.addEvent({
         delay: 100,
         repeat: 5,
         startAt: 200,
         callback: () => {
-          this.getPokemon()
-            .getSprite()
-            .setVisible(flashTimer.repeatCount % 2 === 0);
+          if (sprite?.active) {
+            sprite.setVisible(flashTimer.repeatCount % 2 === 0);
+          }
           if (!flashTimer.repeatCount) {
-            this.getPokemon()
-              .updateInfo()
-              .then(() => this.end());
+            this.finishDamage(pokemon);
           }
         },
       });
     } else {
-      this.getPokemon()
-        .updateInfo()
-        .then(() => this.end());
+      this.finishDamage(pokemon);
     }
   }
 
-  public override end() {
-    if (globalScene.currentBattle.isClassicFinalBoss) {
-      globalScene.initFinalBossPhaseTwo(this.getPokemon());
+  public override end(pokemon?: Pokemon) {
+    const target = pokemon ?? (this.getPokemon() as Pokemon | undefined);
+    if (globalScene.currentBattle.isClassicFinalBoss && target) {
+      globalScene.initFinalBossPhaseTwo(target);
     } else {
       super.end();
     }

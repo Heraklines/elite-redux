@@ -72,6 +72,7 @@ import {
   getOmniformEvolutions,
   type OmniformEvolutionEntry,
 } from "#ui/omniform-evolution-view";
+import { resolveSummaryStarterProgress } from "#ui/summary-starter-progress";
 import { addBBCodeTextObject, addTextObject, getBBCodeFrag, getTextColor, updateCandyCountTextStyle } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
@@ -687,21 +688,21 @@ export class SummaryUiHandler extends UiHandler {
       this.megaIcon.on("pointerout", () => globalScene.ui.hideTooltip());
     }
 
-    if (
-      globalScene.gameData.starterData[this.pokemon.species.getRootSpeciesId()].classicWinCount > 0
-      && globalScene.gameData.starterData[this.pokemon.species.getRootSpeciesId(true)].classicWinCount > 0
-    ) {
-      this.championRibbon.setVisible(true);
-    } else {
-      this.championRibbon.setVisible(false);
-    }
+    const trueRootSpeciesId = this.pokemon.species.getRootSpeciesId(true);
+    const {
+      root: rootStarterData,
+      trueRoot: trueRootStarterData,
+      current: starterData,
+    } = resolveSummaryStarterProgress(globalScene.gameData.starterData, rootSpeciesId, trueRootSpeciesId);
 
-    let currentFriendship = globalScene.gameData.starterData[this.pokemon.species.getRootSpeciesId()].friendship;
-    if (!currentFriendship || currentFriendship === undefined) {
-      currentFriendship = 0;
-    }
+    this.championRibbon.setVisible(
+      (rootStarterData?.classicWinCount ?? 0) > 0 && (trueRootStarterData?.classicWinCount ?? 0) > 0,
+    );
 
-    const friendshipCap = getStarterValueFriendshipCap(speciesStarterCosts[this.pokemon.species.getRootSpeciesId()]);
+    const currentFriendship = starterData?.friendship ?? 0;
+    const friendshipCap = getStarterValueFriendshipCap(
+      speciesStarterCosts[rootSpeciesId] ?? speciesStarterCosts[trueRootSpeciesId] ?? 1,
+    );
     const candyCropY = 16 - 16 * (currentFriendship / friendshipCap);
 
     if (this.candyShadow.visible) {
@@ -711,7 +712,7 @@ export class SummaryUiHandler extends UiHandler {
       this.candyShadow.on("pointerout", () => globalScene.ui.hideTooltip());
     }
 
-    const candyCount = globalScene.gameData.starterData[this.pokemon.species.getRootSpeciesId()].candyCount;
+    const candyCount = starterData?.candyCount ?? 0;
     this.candyCountText.setText(`×${candyCount}`);
     updateCandyCountTextStyle(this.candyCountText, candyCount);
 

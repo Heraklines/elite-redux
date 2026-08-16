@@ -182,6 +182,7 @@ import type { Pokemon } from "#field/pokemon";
 import { EnemyPokemon, PlayerPokemon } from "#field/pokemon";
 import { PokemonSpriteSparkleHandler } from "#field/pokemon-sprite-sparkle-handler";
 import { Trainer } from "#field/trainer";
+import { materializeHeldModifierConfig } from "#modifiers/held-modifier-config";
 import type { Modifier, ModifierPredicate, TurnHeldItemTransferModifier } from "#modifiers/modifier";
 import {
   ConsumableModifier,
@@ -4426,15 +4427,10 @@ export class BattleScene extends SceneBase {
       party.forEach((enemyPokemon: EnemyPokemon, i: number) => {
         if (heldModifiersConfigs && i < heldModifiersConfigs.length && heldModifiersConfigs[i]) {
           for (const mt of heldModifiersConfigs[i]) {
-            let modifier: PokemonHeldItemModifier;
-            if (mt.modifier instanceof PokemonHeldItemModifierType) {
-              modifier = mt.modifier.newModifier(enemyPokemon);
-            } else {
-              modifier = mt.modifier as PokemonHeldItemModifier;
-              modifier.pokemonId = enemyPokemon.id;
+            const modifier = materializeHeldModifierConfig(mt, enemyPokemon);
+            if (!modifier) {
+              continue;
             }
-            modifier.stackCount = mt.stackCount ?? 1;
-            modifier.isTransferable = mt.isTransferable ?? modifier.isTransferable;
             this.addEnemyModifier(modifier, true);
           }
         } else {

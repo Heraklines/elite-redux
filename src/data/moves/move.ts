@@ -12584,7 +12584,8 @@ export function initMoves() {
       .attr(StatStageChangeAttr, [Stat.ACC], -1),
     new AttackMove(MoveId.FLASH_CANNON, PokemonType.STEEL, MoveCategory.SPECIAL, 80, 100, 10, 10, 0, 4) //
       .attr(StatStageChangeAttr, [Stat.SPDEF], -1),
-    new AttackMove(MoveId.ROCK_CLIMB, PokemonType.NORMAL, MoveCategory.PHYSICAL, 90, 85, 20, 20, 0, 4) //
+    new ChargingAttackMove(MoveId.ROCK_CLIMB, PokemonType.NORMAL, MoveCategory.PHYSICAL, 90, 85, 20, 20, 0, 4) //
+      .chargeText(i18next.t("moveTriggers:isChargingPower", { pokemonName: "{USER}" }))
       .attr(ConfuseAttr),
     new StatusMove(MoveId.DEFOG, PokemonType.FLYING, -1, 15, -1, 0, 4)
       .attr(StatStageChangeAttr, [Stat.EVA], -1)
