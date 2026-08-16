@@ -76,6 +76,7 @@ import {
   getErEndlessCycle,
   getErEndlessCycleWave,
   getErEndlessEquivalentDepth,
+  getErEndlessNemesisRelicBudgetMultiplier,
   getErEndlessRateBonus,
   hasErEndlessRift,
   isErEndlessContinuationActive,
@@ -4398,6 +4399,7 @@ export class BattleScene extends SceneBase {
       return;
     }
     resetErEnemyRelicBattleState();
+    const relicBudgetMultiplier = getErEndlessNemesisRelicBudgetMultiplier(snapshot.endlessNemesisRank ?? 0);
 
     for (let i = 0; i < party.length; i++) {
       const enemy = party[i];
@@ -4435,7 +4437,7 @@ export class BattleScene extends SceneBase {
       if (!(modifier instanceof ErRelicModifier) || !Number.isFinite(stack) || stack <= 0) {
         continue;
       }
-      modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+      modifier.stackCount = Math.min(Math.ceil(stack * relicBudgetMultiplier), modifier.getMaxStackCount());
       modifier.chosenWeather = Number.isFinite(rawWeather) ? rawWeather : null;
       void this.addEnemyModifier(modifier, true, true);
     }

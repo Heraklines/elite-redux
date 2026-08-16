@@ -12,6 +12,7 @@ import {
   getErEndlessGhostRoute,
   getErEndlessHeldItemCandidateIndex,
   getErEndlessNemesisRank,
+  getErEndlessNemesisRelicBudgetMultiplier,
   getErEndlessPlayerAvalancheCount,
   getErEndlessRateBonus,
   getErEndlessReturningNemesisId,
@@ -148,6 +149,15 @@ describe("Elite Redux Endless continuation", () => {
     resetErEndlessContinuation();
     expect(restoreErEndlessContinuation(saved)).toBe(true);
     expect(getErEndlessNemesisRank("run-a")).toBe(1);
+  });
+
+  it("scales saved relic stacks only after the second Nemesis return", () => {
+    expect(getErEndlessNemesisRelicBudgetMultiplier(0)).toBe(1);
+    expect(getErEndlessNemesisRelicBudgetMultiplier(1)).toBe(1);
+    expect(getErEndlessNemesisRelicBudgetMultiplier(2)).toBe(1.5);
+    expect(getErEndlessNemesisRelicBudgetMultiplier(3)).toBe(1.5);
+    expect(getErEndlessNemesisRelicBudgetMultiplier(4)).toBe(1.75);
+    expect(getErEndlessNemesisRelicBudgetMultiplier(20)).toBe(1.75);
   });
 
   it("uses tier, stack count, and stable id for Predatory Theft", () => {

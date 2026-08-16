@@ -554,6 +554,14 @@ export function getErEndlessNemesisRank(snapshotId: string): number {
   return state?.nemesisLineages?.find(entry => entry.snapshotId === snapshotId)?.rank ?? 0;
 }
 
+/** Scale only a returning Nemesis's saved relic stacks; ordinary ghosts retain their authentic snapshot. */
+export function getErEndlessNemesisRelicBudgetMultiplier(rank: number): number {
+  if (rank >= 4) {
+    return 1.75;
+  }
+  return rank >= 2 ? 1.5 : 1;
+}
+
 /** Every tenth ghost encounter may deliberately revive the strongest personal Nemesis. */
 export function getErEndlessReturningNemesisId(): string | undefined {
   if (state == null || (state.ghostEncounters + 1) % 10 !== 0) {
