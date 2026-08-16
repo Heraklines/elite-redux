@@ -30,25 +30,26 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
+import { getActiveCoopV2WaveCutover } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
 } from "#data/elite-redux/coop/coop-operation-journal";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import {
   awaitCoopSettledWaveAdvanceAtBattleEnd,
   broadcastCoopWaveEndState,
   broadcastCoopWaveResolved,
-  captureCoopAutomaticVictorySealIdentity,
   clearCoopRuntime,
   coopRetainedGameOverSupersedesReplay,
-  deferCoopAutomaticVictorySealAtBattleEnd,
   flushCoopWaveResolvedAfterTurnCommit,
   getCoopV2Shadow,
   getCoopWaveBoundaryStatus,
+  isCoopSharedTerminalFrozen,
   isCoopV2InteractionHumanInputFrozen,
-  sealCoopAutomaticVictoryBoundary,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -61,6 +62,8 @@ import {
   setCoopWaveAdvanceOperationEnabled,
 } from "#data/elite-redux/coop/coop-wave-operation";
 import { BattleType } from "#enums/battle-type";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -76,6 +79,7 @@ import {
   installDuoLogCapture,
   retireDuoInitialCommandForBoundaryTest,
   withClient,
+  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -355,15 +359,16 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     logs.flush();
   }, 300_000);
 
-  it("parks a real BattleEnd wave with the exact state image and waveEndState compatibility disposition", async () => {
+  it("parks a real BattleEnd wave, preserves it across hot rejoin, and sends waveEndState exactly once", async () => {
     const rig = await bootDuo({ startingWave: 3 });
     const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
     const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    let blockBoundary = true;
     const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
       rig.hostRuntime.v2ControlLedger,
     );
     vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
-      if (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT") {
+      if (blockBoundary && (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT")) {
         return null;
       }
       return originalPrepare(entry);
@@ -395,13 +400,123 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(rig.hostRuntime.v2DeferredHostBoundary?.authoritativeState).toBe(parkedState);
     expect(rawResolved).not.toHaveBeenCalled();
     expect(rawEndState).not.toHaveBeenCalled();
+
+    expect(Object.isFrozen(parked)).toBe(true);
+    expect(Object.isFrozen(parked?.entry)).toBe(true);
+    expect(Object.isFrozen(parked?.entry.context)).toBe(true);
+    expect(Object.isFrozen(parked?.entry.material)).toBe(true);
+    expect(Object.isFrozen(parked?.entry.subsumes)).toBe(true);
+
+    const hostShadow = getCoopV2Shadow(rig.hostRuntime);
+    const guestShadow = getCoopV2Shadow(rig.guestRuntime);
+    expect(hostShadow).not.toBeNull();
+    expect(guestShadow).not.toBeNull();
+    if (hostShadow == null || guestShadow == null) {
+      logs.flush();
+      return;
+    }
+    const hostContext = hostShadow.authenticatedFrameContext;
+    const guestContext = guestShadow.authenticatedFrameContext;
+    const reboundMembershipRevision = hostContext.membershipRevision + 1;
+    guestShadow.rebindIdentity({
+      runtimeId: `${guestContext.sessionId}:seat${guestContext.senderSeatId}`,
+      sessionId: guestContext.sessionId,
+      runId: guestContext.runId,
+      epoch: guestContext.sessionEpoch,
+      localSeatId: guestContext.senderSeatId,
+      authoritySeatId: guestContext.authoritySeatId,
+      membershipRevision: reboundMembershipRevision,
+      seatMapId: guestContext.seatMapId,
+      connectionGeneration: guestContext.connectionGeneration + 1,
+      peerBindings: [{ seatId: hostContext.senderSeatId, connectionGeneration: hostContext.connectionGeneration + 1 }],
+    });
+    hostShadow.rebindIdentity({
+      runtimeId: `${hostContext.sessionId}:seat${hostContext.senderSeatId}`,
+      sessionId: hostContext.sessionId,
+      runId: hostContext.runId,
+      epoch: hostContext.sessionEpoch,
+      localSeatId: hostContext.senderSeatId,
+      authoritySeatId: hostContext.authoritySeatId,
+      membershipRevision: reboundMembershipRevision,
+      seatMapId: hostContext.seatMapId,
+      connectionGeneration: hostContext.connectionGeneration + 1,
+      peerBindings: [{ seatId: guestContext.senderSeatId, connectionGeneration: guestContext.connectionGeneration + 1 }],
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
+    expect(rig.hostRuntime.v2DeferredHostBoundary?.entry).toBe(parked?.entry);
+
+    blockBoundary = false;
+    await withClient(rig.hostCtx, async () => {
+      isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+      await Promise.resolve();
+    });
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
+    expect(rawResolved).toHaveBeenCalledOnce();
+    expect(rawEndState).toHaveBeenCalledOnce();
+    await withClient(rig.hostCtx, async () => {
+      isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+      await Promise.resolve();
+    });
+    expect(rawEndState).toHaveBeenCalledOnce();
     logs.flush();
   }, 300_000);
 
-  it("keeps the automatic-victory seal parked until exact wave commit, then consumes it with one waveEndState carrier", async () => {
+  it("enters the shared terminal when deferred redrive returns a changed entry/context, without compatibility", async () => {
     const rig = await bootDuo({ startingWave: 3 });
     const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
     const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
+      rig.hostRuntime.v2ControlLedger,
+    );
+    vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
+      if (entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT") {
+        return null;
+      }
+      return originalPrepare(entry);
+    });
+
+    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("win"));
+    await retireDuoInitialCommandForBoundaryTest(rig);
+    await withClient(rig.hostCtx, () => broadcastCoopWaveEndState(true));
+
+    const parked = rig.hostRuntime.v2DeferredHostBoundary;
+    const cutover = await withClient(rig.hostCtx, () => getActiveCoopV2WaveCutover());
+    expect(parked).not.toBeNull();
+    expect(cutover).not.toBeNull();
+    if (parked == null || cutover == null) {
+      logs.flush();
+      return;
+    }
+    const changedEntry: CoopAuthorityEntry = {
+      ...parked.entry,
+      context: {
+        ...parked.entry.context,
+        connectionGeneration: parked.entry.context.connectionGeneration + 1,
+      },
+      subsumes: [...parked.entry.subsumes, parked.entry.revision],
+    };
+    vi.spyOn(cutover, "retryDeferredHostBoundaryDetailed").mockReturnValue({
+      kind: "committed",
+      entry: changedEntry,
+    });
+
+    await withClient(rig.hostCtx, async () => {
+      isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+      await Promise.resolve();
+    });
+    expect(isCoopSharedTerminalFrozen(rig.hostRuntime)).toBe(true);
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+    logs.flush();
+  }, 300_000);
+
+  it("runs automatic victory through BattleEnd and child phases before parking the owned victory seal", async () => {
+    const rig = await bootDuo({ startingWave: 3 });
+    const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
+    const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
+    const addBattleScore = vi.spyOn(rig.hostScene.currentBattle, "addBattleScore");
+    const scoreBeforeBattleEnd = rig.hostScene.score;
     let blockBoundary = true;
     const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
       rig.hostRuntime.v2ControlLedger,
@@ -413,44 +528,68 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       return originalPrepare(entry);
     });
 
-    await withClient(rig.hostCtx, () => broadcastCoopWaveResolved("win"));
-    const sealIdentity = await withClient(rig.hostCtx, () => captureCoopAutomaticVictorySealIdentity(3));
-    expect(sealIdentity).not.toBeNull();
-    if (sealIdentity == null || sealIdentity.turn == null) {
-      return;
-    }
-    await retireDuoInitialCommandForBoundaryTest(rig);
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) =>
+      withClientSync(rig.guestCtx, () => ({
+        command: Command.FIGHT,
+        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+        moveId: MoveId.TACKLE,
+        targets: [BattlerIndex.ENEMY_2],
+      }))
+    );
 
-    await withClient(rig.hostCtx, () => {
-      // BattleEnd has advanced one ambient turn, while the seal retains the source turn identity.
-      rig.hostScene.currentBattle.turn = sealIdentity.turn! + 1;
-      expect(deferCoopAutomaticVictorySealAtBattleEnd(sealIdentity)).toBe(true);
-      expect(sealCoopAutomaticVictoryBoundary(sealIdentity)).toBe(true);
+    game.phaseInterceptor.clearLogs();
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      await game.phaseInterceptor.to("CoopTurnCommitPhase");
     });
+    await withClient(rig.guestCtx, () => drainLoopback());
+
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CoopVictorySealPhase");
+    });
+
+    const phaseLog = game.phaseInterceptor.log;
+    const battleEndIndex = phaseLog.indexOf("BattleEndPhase");
+    const eggLapseIndex = phaseLog.indexOf("EggLapsePhase");
+    const victorySealIndex = phaseLog.indexOf("CoopVictorySealPhase");
+    expect(battleEndIndex).toBeGreaterThanOrEqual(0);
+    expect(eggLapseIndex).toBeGreaterThan(battleEndIndex);
+    expect(victorySealIndex).toBeGreaterThan(eggLapseIndex);
+    expect(addBattleScore).toHaveBeenCalledOnce();
+    expect(rig.hostScene.score).not.toBe(scoreBeforeBattleEnd);
+
     const parked = rig.hostRuntime.v2DeferredHostBoundary;
     expect(parked).toMatchObject({
       kind: "wave",
       wave: 3,
+      transition: { outcome: "win", wave: 3 },
       compatibility: { kind: "wave-end" },
     });
-    expect(rawResolved).not.toHaveBeenCalled();
-    expect(rawEndState).not.toHaveBeenCalled();
-
-    await withClient(rig.hostCtx, () => {
-      expect(sealCoopAutomaticVictoryBoundary(sealIdentity)).toBe(true);
-    });
-    expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
+    expect(parked?.authoritativeState.score).toBe(rig.hostScene.score);
+    expect(parked?.authoritativeState.turn).toBe(rig.hostScene.currentBattle.turn);
+    expect(parked?.authoritativeState.tick).toBeGreaterThan(0);
+    expect(parked?.authoritativeState.field.filter(seat => seat.side === "enemy")).not.toHaveLength(0);
+    expect(
+      parked?.authoritativeState.field
+        .filter(seat => seat.side === "enemy")
+        .every(seat => seat.presented === false),
+    ).toBe(true);
+    expect(rawResolved).toHaveBeenCalledOnce();
     expect(rawEndState).not.toHaveBeenCalled();
 
     blockBoundary = false;
     await withClient(rig.hostCtx, async () => {
-      // Re-projecting the authenticated predecessor control is the production proof edge that queues the
-      // exact deferred retry. The callback runs on the next microtask while this runtime remains active.
       isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
       await Promise.resolve();
     });
     expect(rig.hostRuntime.v2DeferredHostBoundary).toBeNull();
-    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawResolved).toHaveBeenCalledOnce();
+    expect(rawEndState).toHaveBeenCalledOnce();
+    await withClient(rig.hostCtx, async () => {
+      isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
+      await Promise.resolve();
+    });
     expect(rawEndState).toHaveBeenCalledOnce();
     logs.flush();
   }, 300_000);

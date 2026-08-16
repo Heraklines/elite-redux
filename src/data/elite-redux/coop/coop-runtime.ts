@@ -4356,7 +4356,7 @@ export function registerCoopMeTerminalRedrive(
   runtime: CoopRuntime | null,
   operationId: string,
   resume: () => void,
-  onCancel: (() => void) | undefined = undefined,
+  onCancel?: () => void,
 ): (() => void) | null {
   if (runtime == null || operationId.length === 0) {
     onCancel?.();
