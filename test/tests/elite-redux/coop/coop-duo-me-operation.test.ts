@@ -36,6 +36,16 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import type { CoopAuthorityEntry, CoopFrameContextV2 } from "#data/elite-redux/coop/authority-v2/contract";
+import {
+  COOP_FRAME_PROTOCOL_VERSION,
+  type CoopFrameV2,
+  encodeFrameV2,
+} from "#data/elite-redux/coop/authority-v2/frame-codec";
+import {
+  CoopAuthorityV2Shadow,
+  type CoopV2ShadowIdentity,
+} from "#data/elite-redux/coop/authority-v2/shadow";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import * as meOp from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -100,7 +110,9 @@ import { StatusEffect } from "#enums/status-effect";
 import { UiMode } from "#enums/ui-mode";
 import { BattleEndPhase } from "#phases/battle-end-phase";
 import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
+import { FaintPhase } from "#phases/faint-phase";
 import { MysteryEncounterBattlePhase } from "#phases/mystery-encounter-phases";
+import { VictoryPhase } from "#phases/victory-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   awaitRewardShopPhaseExit,
@@ -203,6 +215,34 @@ function linkedMeHotRejoinWires(): { authority: MeHotRejoinWire; replica: MeHotR
   return { authority, replica };
 }
 
+function meAuthorityEntryFrame(entry: CoopAuthorityEntry): Extract<CoopFrameV2, { t: "authorityEntry" }> {
+  const { context, ...body } = entry;
+  return { v: COOP_FRAME_PROTOCOL_VERSION, t: "authorityEntry", ctx: context, body };
+}
+
+function meReplicaShadowIdentity(
+  authorityFrame: CoopFrameContextV2,
+  replicaConnectionGeneration: number,
+): CoopV2ShadowIdentity {
+  return {
+    runtimeId: `${authorityFrame.sessionId}:me-terminal-replica`,
+    sessionId: authorityFrame.sessionId,
+    runId: authorityFrame.runId,
+    epoch: authorityFrame.sessionEpoch,
+    localSeatId: 1,
+    authoritySeatId: authorityFrame.authoritySeatId,
+    membershipRevision: authorityFrame.membershipRevision,
+    seatMapId: authorityFrame.seatMapId,
+    connectionGeneration: replicaConnectionGeneration,
+    peerBindings: [
+      {
+        seatId: authorityFrame.authoritySeatId,
+        connectionGeneration: authorityFrame.connectionGeneration,
+      },
+    ],
+  };
+}
+
 function meHotRejoinContext(
   connectionGeneration: number,
   peerConnectionGeneration: number,
@@ -243,14 +283,16 @@ interface AuthenticatedMeRuntimeFixture {
   readonly runtime: CoopRuntime;
   readonly localTransport: WebRtcTransport;
   readonly peerTransport: WebRtcTransport;
+  readonly replicaShadow: CoopAuthorityV2Shadow;
   readonly initialContext: CoopP33AuthenticatedContextV1;
   readonly initialAuthorityWire: MeHotRejoinWire;
+  readonly initialReplicaWire: MeHotRejoinWire;
   readonly received: CoopMessage[];
   readonly capabilities: readonly string[];
   readonly binding: CoopSessionBindingV1;
 }
 
-async function assembleAuthenticatedMeRuntime(): Promise<AuthenticatedMeRuntimeFixture> {
+async function assembleAuthenticatedMeRuntime(scene: BattleScene): Promise<AuthenticatedMeRuntimeFixture> {
   const initialContext = meHotRejoinContext(0, 0, "A".repeat(43));
   const wires = linkedMeHotRejoinWires();
   const localTransport = new WebRtcTransport("host", wires.authority, initialContext.connectionGeneration);
@@ -313,14 +355,26 @@ async function assembleAuthenticatedMeRuntime(): Promise<AuthenticatedMeRuntimeF
     interval: 10,
   });
   expect(runtime.controller.authorityRole).toBe("authority");
-  expect(getCoopV2Shadow(runtime), "binding-ready installed the production Authority V2 shadow").not.toBeNull();
+  const authorityShadow = getCoopV2Shadow(runtime);
+  expect(authorityShadow, "binding-ready installed the production Authority V2 shadow").not.toBeNull();
+  const replicaShadow = new CoopAuthorityV2Shadow({
+    identity: meReplicaShadowIdentity(
+      authorityShadow!.authenticatedFrameContext,
+      initialContext.peerConnectionGeneration,
+    ),
+    scene,
+    transport: peerTransport,
+    send: frame => peerTransport.send(frame),
+  });
 
   return {
     runtime,
     localTransport,
     peerTransport,
+    replicaShadow,
     initialContext,
     initialAuthorityWire: wires.authority,
+    initialReplicaWire: wires.replica,
     received,
     capabilities,
     binding: bindingMessage.binding,
@@ -329,7 +383,7 @@ async function assembleAuthenticatedMeRuntime(): Promise<AuthenticatedMeRuntimeF
 
 interface AuthenticatedHotRejoin {
   readonly nextContext: CoopP33AuthenticatedContextV1;
-  readonly replacementReady: Promise<MeHotRejoinWire>;
+  readonly replacementReady: Promise<{ authority: MeHotRejoinWire; replica: MeHotRejoinWire }>;
   readonly driverCompleted: Promise<void>;
   allowBinding(): void;
 }
@@ -341,12 +395,14 @@ function beginAuthenticatedMeHotRejoin(fixture: AuthenticatedMeRuntimeFixture): 
   const bindingGate = new Promise<void>(resolve => {
     releaseBinding = resolve;
   });
-  let resolveReplacement!: (wire: MeHotRejoinWire) => void;
+  let resolveReplacement!: (wires: { authority: MeHotRejoinWire; replica: MeHotRejoinWire }) => void;
   let rejectReplacement!: (error: unknown) => void;
-  const replacementReady = new Promise<MeHotRejoinWire>((resolve, reject) => {
-    resolveReplacement = resolve;
-    rejectReplacement = reject;
-  });
+  const replacementReady = new Promise<{ authority: MeHotRejoinWire; replica: MeHotRejoinWire }>(
+    (resolve, reject) => {
+      resolveReplacement = resolve;
+      rejectReplacement = reject;
+    },
+  );
   let resolveDriver!: () => void;
   let rejectDriver!: (error: unknown) => void;
   const driverCompleted = new Promise<void>((resolve, reject) => {
@@ -365,7 +421,7 @@ function beginAuthenticatedMeHotRejoin(fixture: AuthenticatedMeRuntimeFixture): 
       const replacement = linkedMeHotRejoinWires();
       peerTransport.replaceChannel(replacement.replica);
       localTransport.replaceChannel(replacement.authority);
-      resolveReplacement(replacement.authority);
+      resolveReplacement(replacement);
       await bindingGate;
 
       peerTransport.send({
@@ -503,7 +559,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     await game.runToMysteryEncounter(MysteryEncounterType.FIGHT_OR_FLIGHT, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
     const hostScene = game.scene;
     toCoop(hostScene);
-    const authenticated = await assembleAuthenticatedMeRuntime();
+    const authenticated = await assembleAuthenticatedMeRuntime(hostScene);
     await runSelectMysteryEncounterOption(game, 1);
     await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
     expect(captureCoopActiveMysteryControl()).toMatchObject({ terminal: "battle", terminalStep: 0 });
@@ -528,11 +584,13 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
   async function parkSecondHandoff(boundary: BattleSettledHandoffBoundary) {
     const { hostScene, rig } = boundary;
     let blocked = true;
+    let exactDeferredEntry: CoopAuthorityEntry | null = null;
     const originalPrepare = rig.hostRuntime.v2ControlLedger.prepareAuthorityEntry.bind(
       rig.hostRuntime.v2ControlLedger,
     );
     vi.spyOn(rig.hostRuntime.v2ControlLedger, "prepareAuthorityEntry").mockImplementation(entry => {
       if (blocked && authorityMeTerminalKind(entry) === "battle") {
+        exactDeferredEntry = structuredClone(entry);
         return null;
       }
       return originalPrepare(entry);
@@ -560,12 +618,18 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     expect(retained?.operationId).toBe(parked.operationId);
     expect(retained?.revision).toBe(parked.revision);
     expect(JSON.stringify(retained?.envelope)).toBe(JSON.stringify(parked.envelope));
+    expect(exactDeferredEntry, "the parked terminal retained its exact withheld Authority V2 entry").toMatchObject({
+      revision: parked.revision,
+      operationId: parked.operationId,
+      kind: "INTERACTION_COMMIT",
+    });
     await Promise.resolve();
     expect(rawHandoff, "raw relay stays behind the exact proof").not.toHaveBeenCalled();
     expect(promiseSettled, "the owner handoff Promise remains parked").toBe(false);
     expect(JSON.stringify(rig.hostRuntime.v2DeferredMeTerminalRedrive)).toBe(immutable);
     return {
       immutable,
+      exactDeferredEntry: exactDeferredEntry!,
       parked,
       priorControl,
       promise,
@@ -1419,6 +1483,28 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     await withClient(rig.hostCtx, async () => {
       const terminalRevisions: number[] = [];
       const controlRevisions: number[] = [];
+      const journeyLogStart = game.phaseInterceptor.log.length;
+      const watchProductionPhaseStart = (phase: Phase, label: string) => {
+        const leaseSnapshots: { readonly pendingTokens: number; readonly activeLabels: readonly string[] }[] = [];
+        const originalStart = phase.start.bind(phase);
+        const start = vi.spyOn(phase, "start").mockImplementation(() => {
+          const snapshot = rig.hostRuntime.mutationLedger.snapshot();
+          leaseSnapshots.push(snapshot);
+          expect(
+            snapshot.activeLabels,
+            `${label} crosses PhaseInterceptor.run's production mutation boundary before start`,
+          ).toContain(`phase:${phase.phaseName}`);
+          expect(snapshot.pendingTokens, `${label} holds a live mutation lease while it starts`).toBeGreaterThan(0);
+          originalStart();
+        });
+        return { leaseSnapshots, start };
+      };
+      const expectPhaseLeaseReleased = (phase: Phase, label: string) => {
+        expect(
+          rig.hostRuntime.mutationLedger.snapshot().activeLabels,
+          `${label} releases its exact mutation lease only when the phase manager shifts it`,
+        ).not.toContain(`phase:${phase.phaseName}`);
+      };
       const parkedTerminal = (terminal: "battle" | "battle-settled") => {
         const parked = rig.hostRuntime.v2DeferredMeTerminalRedrive;
         expect(parked, `${terminal} owns one parked production transaction`).not.toBeNull();
@@ -1443,34 +1529,73 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         expect(battlePhase, `round ${ordinal} reached its production battle phase`).toBeInstanceOf(
           MysteryEncounterBattlePhase,
         );
-        const battleStart = vi.spyOn(battlePhase, "start");
-        battlePhase.start();
-        expect(battleStart, `round ${ordinal} battle starts once`).toHaveBeenCalledOnce();
-        await driveClientPhaseQueueTo(hostScene, "TurnInitPhase");
+        const battleStart = watchProductionPhaseStart(battlePhase, `round ${ordinal} MysteryEncounterBattlePhase`);
+        const battleEnd = vi.spyOn(battlePhase, "end");
+        await game.phaseInterceptor.to("TurnInitPhase", false);
+        expect(battleStart.start, `round ${ordinal} battle starts once through the interceptor`).toHaveBeenCalledOnce();
+        expect(battleStart.leaseSnapshots).toHaveLength(1);
+        expect(battleEnd, `round ${ordinal} battle transition runs once`).toHaveBeenCalledOnce();
+        expectPhaseLeaseReleased(battlePhase, `round ${ordinal} MysteryEncounterBattlePhase`);
 
         const enemies = hostScene.getEnemyParty();
         expect(enemies.length, `round ${ordinal} has a real Colosseum enemy party`).toBeGreaterThan(0);
-        for (const enemy of enemies) {
+        const activeEnemies = hostScene.getEnemyField().filter(enemy => enemy != null && !enemy.isFainted());
+        expect(activeEnemies.length, `round ${ordinal} has a live enemy field target`).toBeGreaterThan(0);
+        const finishingEnemy = activeEnemies[0]!;
+        for (const enemy of enemies.filter(enemy => enemy !== finishingEnemy)) {
           enemy.hp = 0;
           enemy.doSetStatus(StatusEffect.FAINT);
           enemy.leaveField(true, true, false);
           expect(enemy.isFainted(true)).toBe(true);
         }
-        const victory = hostScene.phaseManager.create("VictoryPhase", enemies[0]!.getBattlerIndex());
-        const victoryStart = vi.spyOn(victory, "start");
-        expect(hostScene.phaseManager.overridePhase(victory), `round ${ordinal} installs real Victory`).toBe(true);
-        victory.start();
-        expect(victoryStart, `round ${ordinal} Victory runs once`).toHaveBeenCalledOnce();
-        expect(hostScene.phaseManager.getQueuedPhaseNames()).toContain("BattleEndPhase");
-        hostScene.phaseManager.getCurrentPhase().end();
+        const hpBefore = finishingEnemy.hp;
+        expect(hpBefore, `round ${ordinal} finishing enemy is alive before the arranged KO`).toBeGreaterThan(0);
+        expect(
+          finishingEnemy.damage(hpBefore, true, true),
+          `round ${ordinal} uses Pokemon.damage's real faint enqueue edge`,
+        ).toBe(hpBefore);
+        expect(finishingEnemy.isFainted()).toBe(true);
+        expect(hostScene.phaseManager.getQueuedPhaseNames(), `round ${ordinal} queued a real FaintPhase`).toContain(
+          "FaintPhase",
+        );
+        expect(
+          hostScene.phaseManager.getQueuedPhaseNames(),
+          `round ${ordinal} cannot synthesize Victory before FaintPhase runs`,
+        ).not.toContain("VictoryPhase");
 
-        const battleEnd = hostScene.phaseManager.getCurrentPhase();
-        expect(battleEnd, `round ${ordinal} reaches its production BattleEnd`).toBeInstanceOf(BattleEndPhase);
+        await game.phaseInterceptor.to("FaintPhase", false);
+        const faintPhase = hostScene.phaseManager.getCurrentPhase();
+        expect(faintPhase, `round ${ordinal} reaches the queued production faint phase`).toBeInstanceOf(FaintPhase);
+        const faintStart = watchProductionPhaseStart(faintPhase, `round ${ordinal} FaintPhase`);
+        const faintEnd = vi.spyOn(faintPhase, "end");
+        await game.phaseInterceptor.to("VictoryPhase", false);
+        expect(
+          faintStart.start,
+          `round ${ordinal} FaintPhase starts once through the interceptor`,
+        ).toHaveBeenCalledOnce();
+        expect(faintStart.leaseSnapshots).toHaveLength(1);
+        expect(faintEnd, `round ${ordinal} FaintPhase completes once`).toHaveBeenCalledOnce();
+        expectPhaseLeaseReleased(faintPhase, `round ${ordinal} FaintPhase`);
+
+        const victoryPhase = hostScene.phaseManager.getCurrentPhase();
+        expect(victoryPhase, `round ${ordinal} reaches Victory only from the faint queue`).toBeInstanceOf(VictoryPhase);
+        const victoryStart = watchProductionPhaseStart(victoryPhase, `round ${ordinal} VictoryPhase`);
+        const victoryEnd = vi.spyOn(victoryPhase, "end");
+        await game.phaseInterceptor.to("BattleEndPhase", false);
+        expect(
+          victoryStart.start,
+          `round ${ordinal} Victory starts once through the interceptor`,
+        ).toHaveBeenCalledOnce();
+        expect(victoryStart.leaseSnapshots).toHaveLength(1);
+        expect(victoryEnd, `round ${ordinal} Victory queues and shifts its real tail once`).toHaveBeenCalledOnce();
+        expectPhaseLeaseReleased(victoryPhase, `round ${ordinal} VictoryPhase`);
+
+        const productionBattleEnd = hostScene.phaseManager.getCurrentPhase();
+        expect(productionBattleEnd, `round ${ordinal} reaches its production BattleEnd`).toBeInstanceOf(BattleEndPhase);
         return {
           battlePhase,
-          battleEnd,
-          battleEndStart: vi.spyOn(battleEnd, "start"),
-          battleEndEnd: vi.spyOn(battleEnd, "end"),
+          battleEnd: productionBattleEnd,
+          battleEndEnd: vi.spyOn(productionBattleEnd, "end"),
         };
       };
       const settleRealBattleEnd = async (
@@ -1478,11 +1603,24 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         boundary: Awaited<ReturnType<typeof reachRealBattleEnd>>,
       ) => {
         blockedTerminal = "battle-settled";
-        boundary.battleEnd.start();
-        expect(boundary.battleEndStart, `round ${ordinal} BattleEnd starts once`).toHaveBeenCalledOnce();
+        const battleEndStart = watchProductionPhaseStart(boundary.battleEnd, `round ${ordinal} BattleEndPhase`);
+        const progression = game.phaseInterceptor.to("TrainerVictoryPhase", false);
+        await vi.waitFor(() => expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).not.toBeNull(), {
+          timeout: 2_000,
+          interval: 10,
+        });
+        expect(
+          battleEndStart.start,
+          `round ${ordinal} BattleEnd starts once through the interceptor`,
+        ).toHaveBeenCalledOnce();
+        expect(battleEndStart.leaseSnapshots).toHaveLength(1);
         const parked = parkedTerminal("battle-settled");
         expect(boundary.battleEndEnd, `round ${ordinal} BattleEnd tail waits for proof`).not.toHaveBeenCalled();
         expect(hostScene.phaseManager.getCurrentPhase()).toBe(boundary.battleEnd);
+        expect(
+          rig.hostRuntime.mutationLedger.snapshot().activeLabels,
+          `round ${ordinal} keeps the BattleEnd mutation lease across the typed-proof await`,
+        ).toContain("phase:BattleEndPhase");
         const immutable = JSON.stringify(parked);
         await Promise.resolve();
         expect(JSON.stringify(rig.hostRuntime.v2DeferredMeTerminalRedrive)).toBe(immutable);
@@ -1493,6 +1631,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
           timeout: 2_000,
           interval: 10,
         });
+        await progression;
+        expect(hostScene.phaseManager.getCurrentPhase()?.phaseName).toBe("TrainerVictoryPhase");
+        expectPhaseLeaseReleased(boundary.battleEnd, `round ${ordinal} BattleEndPhase`);
         recordControl("battle-settled", ordinal * 2 - 1, parked.operationId);
         expect(rig.hostRuntime.v2DeferredMeTerminalRedrive).toBeNull();
         expect(meOp.captureCoopMeDeferredTerminal(parked.operationId)).toBeNull();
@@ -1526,6 +1667,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       const firstBattle = await reachRealBattleEnd(1);
       const settled1 = await settleRealBattleEnd(1, firstBattle);
 
+      const firstTrainerVictory = hostScene.phaseManager.getCurrentPhase();
+      const trainerVictoryStart = watchProductionPhaseStart(firstTrainerVictory, "round 1 TrainerVictoryPhase");
+      const trainerVictoryEnd = vi.spyOn(firstTrainerVictory, "end");
       game.onNextPrompt(
         "TrainerVictoryPhase",
         UiMode.MESSAGE,
@@ -1533,23 +1677,36 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         () => game.isCurrentPhase("MysteryEncounterRewardsPhase"),
       );
       await game.phaseInterceptor.to("MysteryEncounterRewardsPhase", false);
+      expect(
+        trainerVictoryStart.start,
+        "the real trainer-victory phase starts once through the interceptor",
+      ).toHaveBeenCalledOnce();
+      expect(trainerVictoryStart.leaseSnapshots).toHaveLength(1);
+      expect(trainerVictoryEnd, "the trainer-victory transition completes once").toHaveBeenCalledOnce();
+      expectPhaseLeaseReleased(firstTrainerVictory, "round 1 TrainerVictoryPhase");
       const firstRewards = hostScene.phaseManager.getCurrentPhase();
-      const firstRewardsStart = vi.spyOn(firstRewards, "start");
+      const firstRewardsStart = watchProductionPhaseStart(firstRewards, "round 1 MysteryEncounterRewardsPhase");
       const firstRewardsEnd = vi.spyOn(firstRewards, "end");
       await game.phaseInterceptor.to("ColosseumChoicePhase", false);
-      expect(firstRewardsStart, "the real between-round reward phase starts once").toHaveBeenCalledOnce();
+      expect(
+        firstRewardsStart.start,
+        "the real between-round reward phase starts once through the interceptor",
+      ).toHaveBeenCalledOnce();
+      expect(firstRewardsStart.leaseSnapshots).toHaveLength(1);
       expect(firstRewardsEnd, "the real between-round reward tail runs once").toHaveBeenCalledOnce();
+      expectPhaseLeaseReleased(firstRewards, "round 1 MysteryEncounterRewardsPhase");
 
       const board = hostScene.phaseManager.getCurrentPhase();
       expect(board).toBeInstanceOf(ColosseumChoicePhase);
-      const boardStart = vi.spyOn(board, "start");
+      const boardStart = watchProductionPhaseStart(board, "round 1 ColosseumChoicePhase");
       const boardEnd = vi.spyOn(board, "end");
-      board.start();
-      expect(boardStart).toHaveBeenCalledOnce();
+      const boardProgression = game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
       await vi.waitFor(() => expect(hostScene.ui.getMode()).toBe(UiMode.COLOSSEUM), {
         timeout: 10_000,
         interval: 10,
       });
+      expect(boardStart.start, "the real Colosseum board starts once through the interceptor").toHaveBeenCalledOnce();
+      expect(boardStart.leaseSnapshots).toHaveLength(1);
 
       blockedTerminal = "battle";
       expectedRawStep = 2;
@@ -1563,6 +1720,10 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       expect(rawHandoff, "round 2 raw handoff is suppressed before typed proof").toHaveBeenCalledTimes(1);
       expect(boardEnd, "the real Colosseum board owns the unresolved handoff Promise").not.toHaveBeenCalled();
       expect(hostScene.phaseManager.getCurrentPhase()).toBe(board);
+      expect(
+        rig.hostRuntime.mutationLedger.snapshot().activeLabels,
+        "the board mutation lease remains held while its handoff Promise is parked",
+      ).toContain("phase:ColosseumChoicePhase");
 
       blockedTerminal = null;
       expect(settleCoopV2InteractionOperation(battle2.operationId, rig.hostRuntime)).toBe(true);
@@ -1576,7 +1737,9 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       expect(rawHandoff, "duplicate round-2 proof cannot relay twice").toHaveBeenCalledTimes(2);
       expect(boardEnd, "duplicate round-2 proof cannot end the board twice").toHaveBeenCalledOnce();
 
-      await game.phaseInterceptor.to("MysteryEncounterBattlePhase", false);
+      await boardProgression;
+      expect(hostScene.phaseManager.getCurrentPhase()).toBeInstanceOf(MysteryEncounterBattlePhase);
+      expectPhaseLeaseReleased(board, "round 1 ColosseumChoicePhase");
       const secondBattle = await reachRealBattleEnd(2);
       const settled3 = await settleRealBattleEnd(2, secondBattle);
       expect(secondBattle.battlePhase, "round 2 owns a distinct production battle phase").not.toBe(
@@ -1591,6 +1754,31 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         expect(controlRevisions[i]!).toBeGreaterThan(controlRevisions[i - 1]!);
       }
       expect(controlRevisions).toHaveLength(4);
+      const terminalJourneyPhases = new Set([
+        "MysteryEncounterBattlePhase",
+        "FaintPhase",
+        "VictoryPhase",
+        "BattleEndPhase",
+        "TrainerVictoryPhase",
+        "MysteryEncounterRewardsPhase",
+        "ColosseumChoicePhase",
+      ]);
+      expect(
+        game.phaseInterceptor.log.slice(journeyLogStart).filter(phase => terminalJourneyPhases.has(phase)),
+        "both rounds traverse the production scheduler through faint/victory/BattleEnd and the real board",
+      ).toEqual([
+        "MysteryEncounterBattlePhase",
+        "FaintPhase",
+        "VictoryPhase",
+        "BattleEndPhase",
+        "TrainerVictoryPhase",
+        "MysteryEncounterRewardsPhase",
+        "ColosseumChoicePhase",
+        "MysteryEncounterBattlePhase",
+        "FaintPhase",
+        "VictoryPhase",
+        "BattleEndPhase",
+      ]);
     });
 
     logs.flush();
@@ -1687,7 +1875,7 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
 
   it("keeps the exact parked Promise across an authenticated channel hot rejoin and resumes once", async () => {
     const boundary = await prepareAuthenticatedBattleSettledHandoffBoundary();
-    const { authenticated, rig } = boundary;
+    const { authenticated, hostScene, rig } = boundary;
     const runtime = rig.hostRuntime;
     const generation = coopSessionGeneration();
     const pending = await parkSecondHandoff(boundary);
@@ -1704,10 +1892,17 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     const oldShadowFrame = structuredClone(shadow.authenticatedFrameContext);
     const oldFrontier = shadow.authorityFrontier();
     expect(oldFrontier, "the first battle and settlement established a real retained V2 frontier").not.toBeNull();
+    expect(pending.exactDeferredEntry).toMatchObject({
+      context: oldShadowFrame,
+      revision: oldFrontier!.revision + 1,
+      operationId: pending.parked.operationId,
+      kind: "INTERACTION_COMMIT",
+    });
     expect(runtime.controller.validateP33PeerFrameContext(oldPeerFrame, oldMembership.revision)).toBe(true);
+    const replicaInbound = vi.spyOn(authenticated.replicaShadow, "handleInboundFrame");
 
     const rejoin = beginAuthenticatedMeHotRejoin(authenticated);
-    await rejoin.replacementReady;
+    const replacement = await rejoin.replacementReady;
     expect(rejoin.nextContext.pairingBearer, "the Worker-authenticated bearer rotated with the channel").not.toBe(
       authenticated.initialContext.pairingBearer,
     );
@@ -1720,6 +1915,38 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
       runtime.controller.adoptP33Rejoin(authenticated.initialContext),
       "the superseded context and bearer cannot roll the authenticated generation back",
     ).toBe(false);
+    const replicaBeforeStaleEntry = authenticated.replicaShadow.diagnostics();
+    const guestQueueBeforeStaleEntry = authenticated.peerTransport.outboundQueueDepth();
+    const livePhaseBeforeStaleEntry = hostScene.phaseManager.getCurrentPhase();
+    const liveQueueBeforeStaleEntry = hostScene.phaseManager.getQueuedPhaseNames();
+    const liveControlBeforeStaleEntry = structuredClone(captureCoopActiveMysteryControl());
+    const staleDeferredFrame = meAuthorityEntryFrame(pending.exactDeferredEntry);
+    authenticated.initialReplicaWire.injectRaw(encodeFrameV2(staleDeferredFrame));
+    await Promise.resolve();
+    expect(
+      replicaInbound,
+      "the retired WebRTC guest endpoint generation-fences the exact old-context authorityEntry before routing",
+    ).not.toHaveBeenCalled();
+    expect(authenticated.replicaShadow.diagnostics()).toMatchObject({
+      admitted: replicaBeforeStaleEntry.admitted,
+      applied: replicaBeforeStaleEntry.applied,
+      controlLedgerSize: replicaBeforeStaleEntry.controlLedgerSize,
+      shadowStateSize: replicaBeforeStaleEntry.shadowStateSize,
+    });
+    expect(
+      authenticated.peerTransport.outboundQueueDepth(),
+      "the superseded entry emits no receipt or queued transport traffic",
+    ).toBe(guestQueueBeforeStaleEntry);
+    expect(hostScene.phaseManager.getCurrentPhase(), "stale transport traffic cannot replace the live phase").toBe(
+      livePhaseBeforeStaleEntry,
+    );
+    expect(
+      hostScene.phaseManager.getQueuedPhaseNames(),
+      "stale transport traffic cannot mutate the live phase queue",
+    ).toEqual(liveQueueBeforeStaleEntry);
+    expect(captureCoopActiveMysteryControl(), "stale transport traffic cannot install terminal control").toEqual(
+      liveControlBeforeStaleEntry,
+    );
     authenticated.initialAuthorityWire.injectRaw(
       JSON.stringify({
         t: "sessionBindingAck",
@@ -1781,6 +2008,65 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
     );
     expect(JSON.stringify(runtime.v2DeferredMeTerminalRedrive)).toBe(pending.immutable);
 
+    expect(
+      authenticated.replicaShadow.rebindIdentity(
+        meReplicaShadowIdentity(
+          reboundShadow!.authenticatedFrameContext,
+          rejoin.nextContext.peerConnectionGeneration,
+        ),
+      ),
+      "the retained guest shadow rotates only its authenticated membership/channel axes",
+    ).toBeGreaterThanOrEqual(0);
+    const replicaBeforeFreshEntry = authenticated.replicaShadow.diagnostics();
+    const freshDeferredEntry: CoopAuthorityEntry = {
+      ...structuredClone(pending.exactDeferredEntry),
+      context: structuredClone(reboundShadow!.authenticatedFrameContext),
+    };
+    expect(freshDeferredEntry).toMatchObject({
+      revision: pending.parked.revision,
+      operationId: pending.parked.operationId,
+      context: {
+        membershipRevision: oldShadowFrame.membershipRevision + 1,
+        connectionGeneration: oldShadowFrame.connectionGeneration + 1,
+      },
+    });
+    const livePhaseBeforeFreshEntry = hostScene.phaseManager.getCurrentPhase();
+    const liveQueueBeforeFreshEntry = hostScene.phaseManager.getQueuedPhaseNames();
+    const liveControlBeforeFreshEntry = structuredClone(captureCoopActiveMysteryControl());
+    const freshDeferredFrame = meAuthorityEntryFrame(freshDeferredEntry);
+    replacement.replica.injectRaw(encodeFrameV2(freshDeferredFrame));
+    await Promise.resolve();
+    expect(
+      replicaInbound,
+      "the replacement WebRTC guest receiver routes the fresh-context authorityEntry into the real shadow",
+    ).toHaveBeenCalledOnce();
+    expect(
+      replicaInbound,
+      "the replacement receiver decodes the exact fresh-context authorityEntry",
+    ).toHaveBeenCalledWith(freshDeferredFrame);
+    const replicaAfterFreshEntry = authenticated.replicaShadow.diagnostics();
+    expect(replicaAfterFreshEntry).toMatchObject({
+      admitted: replicaBeforeFreshEntry.admitted + 1,
+      applied: replicaBeforeFreshEntry.applied + 1,
+      controlLedgerSize: replicaBeforeFreshEntry.controlLedgerSize + 1,
+      shadowStateSize: replicaBeforeFreshEntry.shadowStateSize + 1,
+    });
+    expect(hostScene.phaseManager.getCurrentPhase(), "replica admission alone cannot replace the owner phase").toBe(
+      livePhaseBeforeFreshEntry,
+    );
+    expect(
+      hostScene.phaseManager.getQueuedPhaseNames(),
+      "replica admission alone cannot mutate the owner phase queue",
+    ).toEqual(liveQueueBeforeFreshEntry);
+    expect(captureCoopActiveMysteryControl(), "replica admission alone cannot install owner terminal control").toEqual(
+      liveControlBeforeFreshEntry,
+    );
+    expect(pending.promise, "transport admission cannot replace the exact parked owner Promise").toBe(exactPromise);
+    expect(pending.promiseSettled(), "fresh peer traffic alone cannot release the owner continuation").toBe(false);
+    expect(pending.rawHandoff).not.toHaveBeenCalled();
+    expect(runtime.v2DeferredMeTerminalRedrive).toBe(pending.parked);
+    expect(JSON.stringify(runtime.v2DeferredMeTerminalRedrive)).toBe(pending.immutable);
+
     pending.releaseProof();
     expect(settleCoopV2InteractionOperation(pending.parked.operationId, runtime)).toBe(true);
     await expect(exactPromise).resolves.toBe(true);
@@ -1799,11 +2085,24 @@ describe.skipIf(!RUN)("co-op DUO mystery encounter via the operation primitive (
         meOp.captureCoopMeDeferredTerminal(pending.parked.operationId),
       ),
     ).toBeNull();
+    await vi.waitFor(() => expect(replicaInbound).toHaveBeenCalledTimes(2), { timeout: 2_000, interval: 10 });
+    expect(
+      replicaInbound,
+      "the production proof publishes the same fresh readdressed entry through the replacement receiver",
+    ).toHaveBeenNthCalledWith(2, freshDeferredFrame);
+    expect(authenticated.replicaShadow.diagnostics()).toMatchObject({
+      admitted: replicaAfterFreshEntry.admitted,
+      applied: replicaAfterFreshEntry.applied,
+      controlLedgerSize: replicaAfterFreshEntry.controlLedgerSize,
+      shadowStateSize: replicaAfterFreshEntry.shadowStateSize,
+    });
 
     expect(settleCoopV2InteractionOperation(pending.parked.operationId, runtime)).toBe(true);
     await Promise.resolve();
     expect(pending.rawHandoff, "duplicate proof cannot relay after hot rejoin").toHaveBeenCalledOnce();
     expect(pending.resolutionCount()).toBe(1);
+    authenticated.replicaShadow.dispose("authenticated ME receiver proof complete");
+    expect(authenticated.replicaShadow.diagnostics()).toMatchObject({ disposed: true, pendingTimers: 0 });
 
     logs.flush();
   }, 300_000);
