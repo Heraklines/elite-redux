@@ -109,7 +109,7 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [461, "Uses Tickle on entry. After lowering a target's stats, follows up with a 20 BP Covet."],
   [
     511,
-    "On entry, eligible opposing Pokemon must use Struggle for one turn. Psychic, Dark, Heavy Metal, and Superheavy Pokemon are immune.",
+    "On entry, the opposing lead must use Struggle for one turn. Psychic, Dark, Heavy Metal, and Superheavy Pokemon are immune.",
   ],
   [479, "Ability-provided perfect accuracy is disabled for all Pokemon. The holder can always flee from wild battles."],
   [518, "On contact, steals up to 4 PP from the used move and restores it to one random depleted move."],
