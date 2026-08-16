@@ -1226,9 +1226,10 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   }
   const pool = prefetched ?? [];
   // A source run must have ended at or after this wave. Prefer an unseen source
-  // within +20; allow +40 only when primary is empty. Snapshot ids, source
-  // accounts, and semantic team hashes are never recycled during a run. If both
-  // bands are empty, the caller fields a normal trainer.
+  // within +20; allow +40 only when primary is empty. In challenge mode, if
+  // both bands are empty, use the closest deeper unseen legal team, then recycle
+  // a legal team only after the distinct eligible candidates are exhausted.
+  // Normal scheduled ghost runs remain restricted to the +40 depth window.
   const challengeMode = isErGhostChallengeActive();
   const legal = pool.filter(snapshot => isErGhostTeamLegal(snapshot));
   const unseen = legal.filter(snapshot => {
@@ -1248,7 +1249,48 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
       snapshot.waveReached >= waveIndex
       && snapshot.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW,
   );
-  const next = pickGhost(primary.length > 0 ? primary : fallback, waveIndex);
+  let next = pickGhost(primary.length > 0 ? primary : fallback, waveIndex);
+  if (!next && challengeMode) {
+    // The challenge promises a ghost on every trainer wave. Prefer the closest
+    // legal deeper run once all unseen in-window candidates are unavailable.
+    const deeperUnseen = unseen.filter(snapshot => snapshot.waveReached > waveIndex + ER_GHOST_WAVE_WINDOW);
+    if (deeperUnseen.length > 0) {
+      const closestWave = Math.min(...deeperUnseen.map(snapshot => snapshot.waveReached));
+      next = pickGhost(
+        deeperUnseen.filter(snapshot => snapshot.waveReached === closestWave),
+        waveIndex,
+      );
+    }
+
+    if (!next) {
+      // Keep the source-user and semantic-team ledgers intact. Recycling is the
+      // final challenge-only escape hatch once every eligible legal identity is
+      // already represented in those ledgers.
+      const recycledPrimary = legal.filter(
+        snapshot =>
+          snapshot.waveReached >= waveIndex
+          && snapshot.waveReached <= waveIndex + GHOST_PRIMARY_WAVE_WINDOW,
+      );
+      const recycledFallback = legal.filter(
+        snapshot =>
+          snapshot.waveReached >= waveIndex
+          && snapshot.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW,
+      );
+      const recycledInWindow = recycledPrimary.length > 0 ? recycledPrimary : recycledFallback;
+      next = pickGhost(recycledInWindow, waveIndex);
+
+      if (!next) {
+        const recycledDeeper = legal.filter(snapshot => snapshot.waveReached > waveIndex + ER_GHOST_WAVE_WINDOW);
+        if (recycledDeeper.length > 0) {
+          const closestWave = Math.min(...recycledDeeper.map(snapshot => snapshot.waveReached));
+          next = pickGhost(
+            recycledDeeper.filter(snapshot => snapshot.waveReached === closestWave),
+            waveIndex,
+          );
+        }
+      }
+    }
+  }
   if (!next) {
     if (challengeMode) {
       // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - the smoking gun for "normal trainer in ghost mode"
