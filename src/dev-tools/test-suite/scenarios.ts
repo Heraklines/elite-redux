@@ -57,6 +57,7 @@ import {
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_TITANEON_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
+import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import {
   type ErDifficulty,
@@ -98,10 +99,15 @@ import { TimeOfDay } from "#enums/time-of-day";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
-import type { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { ErRelicModifier, type PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
-import { erCommunityItemModifierType, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
+import {
+  erCommunityItemModifierType,
+  ModifierTypeGenerator,
+  PokemonHeldItemModifierType,
+} from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
+import { getModifierDataTypeFactory } from "#system/modifier-data";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
@@ -393,22 +399,23 @@ export function translatePreparedGhostLevels(
 
 /** Restore every resolvable held item stored on a sampled ghost roster. */
 export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], members: readonly GhostMember[]): number {
-  const registry = modifierTypes as Record<string, ModifierTypeFunc | undefined>;
   let applied = 0;
   party.forEach((mon, index) => {
     for (const [typeId, rawCount] of members[index]?.heldItems ?? []) {
-      const factory = registry[typeId];
+      const factory = getModifierDataTypeFactory(typeId);
       if (typeof factory !== "function") {
         continue;
       }
       try {
-        const type = factory();
+        const storedType = factory();
+        const type = storedType instanceof ModifierTypeGenerator ? storedType.generateType([mon]) : storedType;
         if (!(type instanceof PokemonHeldItemModifierType)) {
           continue;
         }
-        const modifier = type.withIdFromFunc(factory).newModifier(mon) as PokemonHeldItemModifier;
+        type.id = typeId;
+        const modifier = type.newModifier(mon) as PokemonHeldItemModifier;
         modifier.pokemonId = mon.id;
-        modifier.stackCount = Math.max(1, Math.floor(Number(rawCount) || 1));
+        modifier.stackCount = Math.min(Math.max(1, Math.floor(Number(rawCount) || 1)), modifier.getMaxStackCount());
         globalScene.addModifier(modifier, true, false, false, true);
         applied++;
       } catch {
@@ -417,6 +424,33 @@ export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], mem
       }
     }
   });
+  globalScene.updateModifiers(true);
+  return applied;
+}
+
+/** Restore every valid player relic stored on a sampled ghost run. */
+export function applyPreparedGhostRelics(snapshot: GhostTeamSnapshot): number {
+  let applied = 0;
+  for (const [rawKind, rawStack, rawWeather] of snapshot.relics ?? []) {
+    if (!Object.hasOwn(ER_RELIC_CONFIG, rawKind)) {
+      continue;
+    }
+    const kind = rawKind as ErRelicKind;
+    const typeId = `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+    const type = getModifierDataTypeFactory(typeId)?.();
+    if (type) {
+      type.id = typeId;
+    }
+    const modifier = type?.newModifier();
+    const stack = Math.floor(Number(rawStack));
+    if (!(modifier instanceof ErRelicModifier) || !Number.isFinite(stack) || stack <= 0) {
+      continue;
+    }
+    modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+    modifier.chosenWeather = Number.isFinite(rawWeather) ? rawWeather : null;
+    globalScene.addModifier(modifier, true, false, false, true);
+    applied++;
+  }
   globalScene.updateModifiers(true);
   return applied;
 }
@@ -8078,11 +8112,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Endless: final boss auto-KO",
     description:
-      "Endless entry test. Starts the real Hell wave-200 final boss and immediately\n"
+      "Endless entry test with a sanitized team from a real completed Hell run.\n"
+      + "All six recorded Pokemon, forms, moves, IVs, natures, abilities, shiny data,\n"
+      + "held items, Blood Pact, and Second Wind are restored as YOUR team. The scenario\n"
+      + "starts the real Hell wave-200 final boss and immediately\n"
       + "applies lethal self-damage through this scenario's consume-once battle callback.\n"
       + "EXPECT: the normal boss faint/victory path completes, then the postgame choice\n"
       + "offers ENDLESS or END RUN. Choosing ENDLESS shows the opening Rifts and continues.\n"
       + "SAFETY: the auto-KO exists only in this dev scenario; normal bosses are untouched.",
+    startingLevels: DEV_HELL_VICTORY_GHOST.party.map(member => member.level),
     setup: () => {
       resetDevOverrides();
       setErDifficulty("hell");
@@ -8090,7 +8128,21 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_WAVE_OVERRIDE: 200,
         STARTING_LEVEL_OVERRIDE: 200,
       });
-      return [makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.SPLASH] })];
+      return usableGhostMembers(DEV_HELL_VICTORY_GHOST)
+        .map(ghostMemberStarter)
+        .filter((starter): starter is Starter => starter !== null);
+    },
+    onPartyReady: () => {
+      const members = usableGhostMembers(DEV_HELL_VICTORY_GHOST);
+      const expectedItems = members.reduce((total, member) => total + (member.heldItems?.length ?? 0), 0);
+      const restoredItems = applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members);
+      const expectedRelics = DEV_HELL_VICTORY_GHOST.relics?.length ?? 0;
+      const restoredRelics = applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST);
+      if (restoredItems !== expectedItems || restoredRelics !== expectedRelics) {
+        throw new Error(
+          `Hell victory loadout was incomplete: items ${restoredItems}/${expectedItems}, relics ${restoredRelics}/${expectedRelics}`,
+        );
+      }
     },
     onBattleStart: () => {
       const boss = globalScene.getEnemyPokemon();
@@ -21544,3 +21596,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
 ];
+
+/**
+ * Scenarios registered in the in-game picker. The historical catalog remains
+ * importable by focused repro tooling, but it is no longer exposed to staff.
+ * Builder and custom-trainer testers are registered separately by index.ts.
+ */
+export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(
+  scenario => scenario.label === "Endless: final boss auto-KO",
+);

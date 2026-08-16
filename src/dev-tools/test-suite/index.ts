@@ -83,6 +83,7 @@ import {
 import {
   buildErCustomTrainerDevScenario,
   buildErCustomTrainerTeamScenario,
+  DEV_MENU_SCENARIOS,
   DEV_SCENARIOS,
   type DevScenario,
   resetDevOverrides,
@@ -350,9 +351,9 @@ function teardownThen(action: (ctx: DevMenuCtx) => void): void {
 /** The next not-yet-passed scenario after `after` (wraps; null if none remain). */
 function nextUnpassedScenario(after: DevScenario | null): DevScenario | null {
   const passed = new Set(combinedPassed());
-  const start = after ? DEV_SCENARIOS.findIndex(s => s.label === after.label) : -1;
-  for (let step = 1; step <= DEV_SCENARIOS.length; step++) {
-    const cand = DEV_SCENARIOS[(start + step) % DEV_SCENARIOS.length];
+  const start = after ? DEV_MENU_SCENARIOS.findIndex(s => s.label === after.label) : -1;
+  for (let step = 1; step <= DEV_MENU_SCENARIOS.length; step++) {
+    const cand = DEV_MENU_SCENARIOS[(start + step) % DEV_MENU_SCENARIOS.length];
     if (cand && cand.label !== after?.label && !passed.has(cand.label)) {
       return cand;
     }
@@ -680,7 +681,7 @@ function clampLabel(label: string): string {
 function openScenarioList(ctx: DevMenuCtx): void {
   // Hide scenarios passed by ANYONE on the team (local + shared remote set).
   const passedSet = new Set(combinedPassed());
-  const remaining = DEV_SCENARIOS.filter(s => !passedSet.has(s.label));
+  const remaining = DEV_MENU_SCENARIOS.filter(s => !passedSet.has(s.label));
   const localPassed = getPassed();
 
   const options = [
@@ -1082,4 +1083,4 @@ registerDevMenu(ctx => {
 });
 
 // biome-ignore lint/suspicious/noConsole: dev-only status line
-console.log(`[dev-tools] loaded — ${DEV_SCENARIOS.length} scenarios + Send Logs button`);
+console.log(`[dev-tools] loaded — ${DEV_MENU_SCENARIOS.length} picker scenarios + Send Logs button`);
