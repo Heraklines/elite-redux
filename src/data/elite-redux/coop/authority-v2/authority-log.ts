@@ -257,6 +257,9 @@ interface AuthorityBoundaryApproval {
   readonly successorMaterialDigest: string;
   readonly successorControlId: string;
   readonly subsumes: readonly number[];
+  /** Frozen full entries make deferred reuse exact apart from authenticated channel-axis readdressing. */
+  readonly predecessorEntry: CoopAuthorityEntry;
+  readonly successorEntry: CoopAuthorityEntry;
   /** Exact retained source images that made the initial canonical subsumes proof succeed. */
   readonly trustedSources: readonly CoopAuthorityEntry[];
 }
@@ -275,13 +278,29 @@ export type AuthorityEntryProofScope =
   | {
       readonly kind: "replica-dense-frontier";
       readonly source: CoopAuthorityEntry;
-      /** Every positive revision at or below this cursor was authenticated and mechanically completed. */
+      /** Exact canonical sources that authorized a boundary, or an empty list for ordinary progression. */
+      readonly trustedSources: readonly CoopAuthorityEntry[];
+      /** Exact bounded authenticated archive handed to the live ledger for this object. */
+      readonly authenticatedSources: readonly CoopAuthorityEntry[];
+      /** The received/control cursor at the instant this scope was issued (diagnostic only). */
       readonly authenticatedThrough: number;
       /** Prevent a retained object reference from reusing this privilege after its log frontier moved. */
       readonly isActive: () => boolean;
     };
 
 const authorityEntryProofScopes = new WeakMap<CoopAuthorityEntry, AuthorityEntryProofScope>();
+interface ReplicaProofState {
+  active: boolean;
+  consumed: boolean;
+  onConsumed?: () => void;
+}
+const replicaProofStates = new WeakMap<AuthorityEntryProofScope, ReplicaProofState>();
+
+interface ReplicaBoundaryProofCapture {
+  readonly candidate: CoopAuthorityEntry;
+  readonly fromRevision: number;
+  readonly sources: Map<number, CoopAuthorityEntry>;
+}
 
 /** Internal live-ledger seam: an unrecognized object identity never inherits another entry's proof. */
 export function authorityEntryProofScopeOf(entry: CoopAuthorityEntry): AuthorityEntryProofScope | null {
@@ -291,8 +310,28 @@ export function authorityEntryProofScopeOf(entry: CoopAuthorityEntry): Authority
 /** Consume the replica's one-shot handoff after the intended live ledger registers the admitted entry. */
 export function consumeReplicaEntryProofScope(entry: CoopAuthorityEntry, scope: AuthorityEntryProofScope): void {
   if (scope.kind === "replica-dense-frontier" && authorityEntryProofScopes.get(entry) === scope) {
+    const state = replicaProofStates.get(scope);
+    if (state == null || !state.active || state.consumed) {
+      return;
+    }
+    state.active = false;
+    state.consumed = true;
     authorityEntryProofScopes.delete(entry);
+    state.onConsumed?.();
   }
+}
+
+/** Revoke a live replica handoff after a failed ledger admission or a channel replacement. */
+export function revokeAuthorityEntryProofScope(entry: CoopAuthorityEntry): void {
+  const scope = authorityEntryProofScopes.get(entry);
+  if (scope?.kind !== "replica-dense-frontier") {
+    return;
+  }
+  const state = replicaProofStates.get(scope);
+  if (state != null) {
+    state.active = false;
+  }
+  authorityEntryProofScopes.delete(entry);
 }
 
 function withAuthorityEntryProofScope<T>(
@@ -400,6 +439,21 @@ export class AuthorityLog implements CoopAuthorityLog {
   private readonly retainedWindow: BoundedRevisionWindow<DeliveryLease>;
   /** REPLICA: separate received, material-applied, and control-installed ordering frontiers. */
   private readonly ledger: AuthorityLedger;
+  /** REPLICA: exact authenticated source provenance, bounded independently of unresolved authority leases. */
+  private readonly replicaAuthenticatedSources = new Map<number, CoopAuthorityEntry>();
+  /** Compact epoch base: older revisions are known superseded/recovered or remain terminal-eligible by range. */
+  private replicaProofEpochStartRevision = 1;
+  /** The last exact mechanically-complete source, kept even when its bounded archive entry is pruned. */
+  private pendingReplicaPredecessor: CoopAuthorityEntry | null = null;
+  /** Tail-refresh capture is observational only: it never advances the ordered ledger. */
+  private boundaryProofCapture: ReplicaBoundaryProofCapture | null = null;
+  private completedBoundaryProof: {
+    readonly candidate: CoopAuthorityEntry;
+    readonly predecessor: CoopAuthorityEntry;
+    readonly trustedSources: readonly CoopAuthorityEntry[];
+    /** Complete bounded tail snapshot; trustedSources alone must not preserve stale pre-refresh history. */
+    readonly capturedSources: readonly CoopAuthorityEntry[];
+  } | null = null;
   /** REPLICA: the one admitted revision that has not yet mechanically completed. */
   private pendingReplicaEntry: CoopAuthorityEntry | null = null;
   /**
@@ -431,6 +485,13 @@ export class AuthorityLog implements CoopAuthorityLog {
     readonly operationId: string;
     readonly control: CoopNextControl;
   } | null = null;
+  /** Exact replica boundary proof retained until its one-shot live-ledger handoff succeeds. */
+  private pendingReplicaBoundaryApproval: {
+    readonly predecessor: CoopAuthorityEntry;
+    readonly trustedSources: readonly CoopAuthorityEntry[];
+  } | null = null;
+  /** The object identity carrying the current live replica proof token, if any. */
+  private replicaProofEntryIdentity: CoopAuthorityEntry | null = null;
   /** Bounded quorum-stage tombstones so a waiter registered after synchronous loopback retirement is sound. */
   private readonly retiredOperationStages = new Map<string, number>();
   private readonly exhaustedRevisionSet = new Set<number>();
@@ -547,6 +608,10 @@ export class AuthorityLog implements CoopAuthorityLog {
     if (this.pendingReplicaEntry != null && authority == null) {
       throw new Error("AuthorityLog.rebindConnection has no bound authority peer for the replica");
     }
+    if (this.replicaAuthenticatedSources.size > 0 && authority == null) {
+      throw new Error("AuthorityLog.rebindConnection has no bound authority peer for replica provenance");
+    }
+    const priorReplicaProofIdentity = this.replicaProofEntryIdentity;
     const reboundReplicaEntry =
       this.pendingReplicaEntry == null || authority == null
         ? this.pendingReplicaEntry
@@ -560,6 +625,39 @@ export class AuthorityLog implements CoopAuthorityLog {
               },
             }),
           );
+    const reboundReplicaAuthenticatedSources = [...this.replicaAuthenticatedSources].map(
+      ([revision, source]) => [
+        revision,
+        this.rebindReplicaSource(source, reboundLocalContext.membershipRevision, authority?.connectionGeneration),
+      ] as const,
+    );
+    const reboundReplicaBoundaryApproval =
+      this.pendingReplicaBoundaryApproval == null
+        ? null
+        : {
+            predecessor: this.rebindReplicaSource(
+              this.pendingReplicaBoundaryApproval.predecessor,
+              reboundLocalContext.membershipRevision,
+              authority?.connectionGeneration,
+            ),
+            trustedSources: Object.freeze(
+              this.pendingReplicaBoundaryApproval.trustedSources.map(source =>
+                this.rebindReplicaSource(
+                  source,
+                  reboundLocalContext.membershipRevision,
+                  authority?.connectionGeneration,
+                )
+              ),
+            ),
+          };
+    const reboundReplicaPredecessor =
+      this.pendingReplicaPredecessor == null
+        ? null
+        : this.rebindReplicaSource(
+            this.pendingReplicaPredecessor,
+            reboundLocalContext.membershipRevision,
+            authority?.connectionGeneration,
+          );
     const reboundLatestCommittedEntry =
       this.latestCommittedEntry == null
         ? null
@@ -572,7 +670,10 @@ export class AuthorityLog implements CoopAuthorityLog {
               cloneEntry({ ...this.pendingAuthorityCommit.entry, context: reboundLocalContext }),
             ),
             ...(this.pendingAuthorityCommit.prepare == null ? {} : { prepare: this.pendingAuthorityCommit.prepare }),
-            boundaryApproval: this.pendingAuthorityCommit.boundaryApproval,
+            boundaryApproval: this.rebindAuthorityBoundaryApproval(
+              this.pendingAuthorityCommit.boundaryApproval,
+              reboundLocalContext,
+            ),
           };
     const reboundLeases: {
       readonly lease: DeliveryLease;
@@ -602,6 +703,18 @@ export class AuthorityLog implements CoopAuthorityLog {
     this.peerBindings = peers;
     this.pendingTailRequestFrom = null;
     this.pendingReplicaEntry = reboundReplicaEntry;
+    this.pendingReplicaPredecessor = reboundReplicaPredecessor;
+    this.boundaryProofCapture = null;
+    this.completedBoundaryProof = null;
+    this.replicaAuthenticatedSources.clear();
+    for (const [revision, source] of reboundReplicaAuthenticatedSources) {
+      this.replicaAuthenticatedSources.set(revision, source);
+    }
+    this.pendingReplicaBoundaryApproval = reboundReplicaBoundaryApproval;
+    if (priorReplicaProofIdentity != null) {
+      revokeAuthorityEntryProofScope(priorReplicaProofIdentity);
+    }
+    this.replicaProofEntryIdentity = null;
     this.latestCommittedEntry = reboundLatestCommittedEntry;
     this.pendingAuthorityCommit = reboundPendingAuthorityCommit;
     for (const rebound of reboundLeases) {
@@ -610,6 +723,15 @@ export class AuthorityLog implements CoopAuthorityLog {
       for (const [seatId, stage] of rebound.peerStages) {
         rebound.lease.peerStages.set(seatId, stage);
       }
+    }
+
+    // Preserve a live token only across the exact log-owned rebound object. A shadow retry will revoke this
+    // private handoff and issue a fresh token for the actual object it passes to the live ledger.
+    if (priorReplicaProofIdentity != null && reboundReplicaEntry != null) {
+      this.installReplicaProofScope(
+        reboundReplicaEntry,
+        reboundReplicaBoundaryApproval?.trustedSources ?? [],
+      );
     }
 
     // Publish only after every live lease and replica cursor observes the new binding. The send carrier may
@@ -1029,6 +1151,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return { kind: "rejected", reason: "authority-sender-mismatch" };
     }
+    if (this.boundaryProofCapture != null) {
+      const captureResult = this.collectBoundaryProofEntry(entry);
+      if (captureResult === "pending") {
+        return { kind: "gap", missingFrom: this.boundaryProofCapture.fromRevision };
+      }
+      if (captureResult === "rejected") {
+        return { kind: "rejected", reason: "boundary-proof-failed" };
+      }
+    }
     switch (this.ledger.classify(entry.revision)) {
       case "duplicate-complete":
         // Mechanical state is complete. The caller republishes the terminal receipt but never re-applies.
@@ -1055,44 +1186,78 @@ export class AuthorityLog implements CoopAuthorityLog {
       }
       default:
         // Exactly the next revision: journal it, but do NOT advance material/control truth yet.
-        if (
-          this.pendingReplicaSuccessorControl != null
-          && (entry.revision !== this.pendingReplicaSuccessorControl.revision + 1
-            || !controlAllowsSuccessorEntry(
-              this.pendingReplicaSuccessorControl.control,
-              this.pendingReplicaSuccessorControl.operationId,
-              entry,
-            ))
-        ) {
+        const predecessorControl = this.pendingReplicaSuccessorControl;
+        const ordinarySuccessorAllowed =
+          predecessorControl == null
+          || (entry.revision === predecessorControl.revision + 1
+            && controlAllowsSuccessorEntry(predecessorControl.control, predecessorControl.operationId, entry));
+        const boundaryApproval = ordinarySuccessorAllowed
+          ? null
+          : this.completedBoundaryProof != null
+            && sameReplicaEntry(this.completedBoundaryProof.candidate, entry)
+            ? this.completedBoundaryProof
+            : null;
+        if (!ordinarySuccessorAllowed && boundaryApproval == null) {
+          if (this.beginBoundaryProofCapture(entry)) {
+            return { kind: "gap", missingFrom: this.boundaryProofCapture?.fromRevision ?? 1 };
+          }
           return { kind: "rejected", reason: "predecessor-control-mismatch" };
         }
+        if (
+          boundaryApproval != null
+          && !this.reconcileReplicaAuthenticatedSources(boundaryApproval.capturedSources, entry.subsumes)
+        ) {
+          this.completedBoundaryProof = null;
+          return { kind: "rejected", reason: "replica-proof-frontier-conflict" };
+        }
+        if (!this.hasReplicaSourceRoom(entry, boundaryApproval != null)) {
+          this.completedBoundaryProof = null;
+          return { kind: "rejected", reason: "replica-proof-capacity" };
+        }
         if (!this.ledger.markReceived(entry.revision)) {
+          this.completedBoundaryProof = null;
           return { kind: "rejected", reason: "replica-ledger-refused-admission" };
         }
+        if (boundaryApproval != null) {
+          // These sources are now covered by the frozen boundary proof. They are no longer needed for a
+          // later boundary, but the frozen approval remains available if live admission refuses this exact
+          // object and the caller retries before material application.
+          for (const revision of entry.subsumes) {
+            this.replicaAuthenticatedSources.delete(revision);
+          }
+          this.pendingReplicaBoundaryApproval = boundaryApproval;
+        } else {
+          this.pendingReplicaBoundaryApproval = null;
+        }
+        this.rememberReplicaSource(entry, boundaryApproval != null);
         this.pendingReplicaSuccessorControl = null;
+        this.pendingReplicaPredecessor = null;
         this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
-        // The live replica ledger receives this same object immediately after admit(). Its local proof need
-        // is the newly admitted revision only; completed predecessors are represented by the dense log cursor.
-        authorityEntryProofScopes.set(
+        this.completedBoundaryProof = null;
+        // The live replica ledger receives this same object immediately after admit(). The scope contains
+        // the exact canonical source list, never a numeric <=cursor assertion.
+        this.installReplicaProofScope(
           entry,
-          Object.freeze({
-            kind: "replica-dense-frontier",
-            source: freezeAuthorityEntry(cloneEntry(entry)),
-            authenticatedThrough: entry.revision - 1,
-            isActive: () => {
-              const pending = this.pendingReplicaEntry;
-              return (
-                !this.disposed
-                && pending?.revision === entry.revision
-                && pending.operationId === entry.operationId
-                && pending.context.membershipRevision === entry.context.membershipRevision
-                && pending.context.connectionGeneration === entry.context.connectionGeneration
-              );
-            },
-          }),
+          boundaryApproval?.trustedSources ?? [],
         );
         return { kind: "admitted" };
     }
+  }
+
+  /** Reissue a one-shot proof only for the exact still-pending rebound object. */
+  reissueReplicaEntryProof(entry: CoopAuthorityEntry): boolean {
+    if (this.disposed || !this.isPendingReplicaEntry(entry)) {
+      return false;
+    }
+    const approval = this.pendingReplicaBoundaryApproval;
+    if (
+      approval != null
+      && !boundarySupersessionAllowsSuccessorEntry(approval.predecessor, entry, approval.trustedSources)
+    ) {
+      return false;
+    }
+    this.installReplicaProofScope(entry, approval?.trustedSources ?? []);
+    return true;
   }
 
   /** Record a mechanical stage only after the real replica operation succeeded. */
@@ -1107,11 +1272,19 @@ export class AuthorityLog implements CoopAuthorityLog {
       advanced = this.ledger.markControlInstalled(entry.revision);
     }
     if (advanced && this.ledger.controlInstalledThrough() >= entry.revision) {
+      this.pendingReplicaPredecessor = freezeAuthorityEntry(cloneEntry(entry));
       this.pendingReplicaSuccessorControl = {
         revision: entry.revision,
         operationId: entry.operationId,
         control: structuredClone(entry.nextControl),
       };
+      if (this.replicaProofEntryIdentity != null) {
+        revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
+      }
+      this.replicaProofEntryIdentity = null;
+      // Pure-shadow admission has no live ledger callback to consume the one-shot scope; mechanical
+      // completion is the terminal point for any deferred boundary approval in that mode.
+      this.pendingReplicaBoundaryApproval = null;
       this.pendingReplicaEntry = null;
       if (this.pendingTailRequestFrom != null && this.ledger.controlInstalledThrough() >= this.pendingTailRequestFrom) {
         this.pendingTailRequestFrom = null;
@@ -1155,6 +1328,19 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     // Replica: fast-forward the applied cursor past any gap the snapshot filled.
     this.ledger.adoptFrontier(revision);
+    if (this.replicaProofEntryIdentity != null) {
+      revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
+    }
+    this.replicaProofEntryIdentity = null;
+    this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaPredecessor = null;
+    this.boundaryProofCapture = null;
+    this.completedBoundaryProof = null;
+    this.pendingReplicaEntry = null;
+    this.replicaAuthenticatedSources.clear();
+    // A high-water starts a new bounded proof epoch. Future boundaries refresh from this known floor.
+    this.replicaProofEpochStartRevision = Math.max(1, revision + 1);
+    this.pendingReplicaSuccessorControl = null;
     if (terminal !== undefined) {
       this.latestCommittedOperationId = terminal.operationId;
       this.latestNextControl = structuredClone(terminal.nextControl);
@@ -1174,9 +1360,6 @@ export class AuthorityLog implements CoopAuthorityLog {
       // Recovery has either proven this reserved revision or installed an irrevocable terminal frontier;
       // never let the stale reservation block a later exact frontier retry.
       this.pendingAuthorityCommit = null;
-    }
-    if (this.pendingReplicaEntry != null && this.pendingReplicaEntry.revision <= revision) {
-      this.pendingReplicaEntry = null;
     }
     // Authority: keep the assignment head at/above the frontier so no revision is ever reused.
     if (revision > this.headRevision) {
@@ -1213,7 +1396,18 @@ export class AuthorityLog implements CoopAuthorityLog {
     ) {
       return false;
     }
+    if (this.replicaProofEntryIdentity != null) {
+      revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
+    }
+    this.replicaProofEntryIdentity = null;
+    this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaPredecessor = null;
+    this.boundaryProofCapture = null;
+    this.completedBoundaryProof = null;
+    this.replicaAuthenticatedSources.clear();
+    this.replicaProofEpochStartRevision = entry.revision;
     this.pendingReplicaEntry = freezeAuthorityEntry(cloneEntry(entry));
+    this.rememberReplicaSource(entry, false);
     this.pendingReplicaSuccessorControl = null;
     this.latestCommittedOperationId = entry.operationId;
     this.latestNextControl = structuredClone(entry.nextControl);
@@ -1237,6 +1431,15 @@ export class AuthorityLog implements CoopAuthorityLog {
     }
     this.retainedWindow.clear();
     this.pendingTailRequestFrom = null;
+    if (this.replicaProofEntryIdentity != null) {
+      revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
+    }
+    this.replicaProofEntryIdentity = null;
+    this.replicaAuthenticatedSources.clear();
+    this.pendingReplicaBoundaryApproval = null;
+    this.pendingReplicaPredecessor = null;
+    this.boundaryProofCapture = null;
+    this.completedBoundaryProof = null;
     this.pendingReplicaEntry = null;
     this.pendingReplicaSuccessorControl = null;
     this.pendingAuthorityCommit = null;
@@ -1283,10 +1486,297 @@ export class AuthorityLog implements CoopAuthorityLog {
         retainedSources.set(source.revision, source);
       }
     }
+
     return Object.freeze({
       kind: "authority-retained",
       retainedSources: Object.freeze([...retainedSources.values()]),
       boundarySources,
+    });
+  }
+
+  /** Start a bounded retained-tail proof refresh without touching the ordered mechanical frontier. */
+  private beginBoundaryProofCapture(candidate: CoopAuthorityEntry): boolean {
+    const pending = this.pendingReplicaSuccessorControl;
+    const predecessor = this.pendingReplicaPredecessor
+      ?? (pending == null ? undefined : this.replicaAuthenticatedSources.get(pending.revision));
+    if (
+      pending == null
+      || predecessor == null
+      || candidate.revision !== pending.revision + 1
+      || !isBoundarySupersessionCandidate(predecessor, candidate)
+    ) {
+      return false;
+    }
+    const fromRevision = Math.max(1, this.replicaProofEpochStartRevision);
+    this.completedBoundaryProof = null;
+    this.boundaryProofCapture = {
+      candidate,
+      fromRevision,
+      // The predecessor may have retired on the authority after its exact control was installed locally;
+      // keep that authenticated frontier image as the seed, then append the currently retained tail.
+      sources: new Map<number, CoopAuthorityEntry>([[predecessor.revision, predecessor]]),
+    };
+    this.requestTailOnce(fromRevision);
+    return true;
+  }
+
+  /** Collect only retained-tail images; the repeated candidate is the exact delimiter that closes capture. */
+  private collectBoundaryProofEntry(entry: CoopAuthorityEntry): "pending" | "completed" | "rejected" {
+    const capture = this.boundaryProofCapture;
+    if (capture == null) {
+      return "completed";
+    }
+    if (entry.revision > capture.candidate.revision) {
+      return "pending";
+    }
+    if (entry.revision < capture.candidate.revision) {
+      if (entry.revision < capture.fromRevision) {
+        return "pending";
+      }
+      const prior = capture.sources.get(entry.revision);
+      if (prior != null) {
+        return sameReplicaEntry(prior, entry) ? "pending" : "rejected";
+      }
+      // The seeded predecessor may have retired before this request, so one exact source can sit outside
+      // the currently retained tail. It is bounded and must be subsumed before the candidate is cached.
+      if (capture.sources.size >= this.retentionCapacity + 1) {
+        this.boundaryProofCapture = null;
+        this.pendingTailRequestFrom = null;
+        return "rejected";
+      }
+      capture.sources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
+      return "pending";
+    }
+    if (!sameReplicaEntry(capture.candidate, entry)) {
+      this.boundaryProofCapture = null;
+      this.pendingTailRequestFrom = null;
+      return "rejected";
+    }
+    const predecessor = this.pendingReplicaPredecessor
+      ?? this.replicaAuthenticatedSources.get(this.pendingReplicaSuccessorControl?.revision ?? -1);
+    const sources = [...capture.sources.values()].sort((left, right) => left.revision - right.revision);
+    const proof = this.evaluateReplicaBoundary(entry, predecessor, sources);
+    this.boundaryProofCapture = null;
+    this.pendingTailRequestFrom = null;
+    if (proof == null) {
+      return "rejected";
+    }
+    this.completedBoundaryProof = {
+      candidate: entry,
+      predecessor: proof.predecessor,
+      trustedSources: proof.trustedSources,
+      capturedSources: Object.freeze(
+        sources.map(source => freezeAuthorityEntry(cloneEntry(source))),
+      ),
+    };
+    return "completed";
+  }
+
+  /** Full canonical boundary predicate over exactly the captured retained frontier. */
+  private evaluateReplicaBoundary(
+    candidate: CoopAuthorityEntry,
+    predecessor: CoopAuthorityEntry | undefined,
+    sources: readonly CoopAuthorityEntry[],
+  ): { readonly predecessor: CoopAuthorityEntry; readonly trustedSources: readonly CoopAuthorityEntry[] } | null {
+    if (
+      predecessor == null
+      || !sameReplicaContext(predecessor, candidate)
+      || !sources.every(source => sameReplicaContext(source, candidate))
+      || !boundarySupersessionAllowsSuccessorEntry(predecessor, candidate, sources)
+    ) {
+      return null;
+    }
+    const trustedSources = candidate.subsumes.map(revision =>
+      sources.find(source => source.revision === revision)
+    );
+    if (trustedSources.some(source => source == null)) {
+      return null;
+    }
+    return {
+      predecessor,
+      trustedSources: Object.freeze(
+        (trustedSources as CoopAuthorityEntry[]).map(source => freezeAuthorityEntry(cloneEntry(source))),
+      ),
+    };
+  }
+
+  /** True while a retained-tail refresh is parked; no live material/control path may release the predecessor. */
+  hasBoundaryProofCapture(): boolean {
+    return this.boundaryProofCapture != null;
+  }
+
+  /** Only the original exact candidate is retained for a hot-rejoin retry during a parked capture. */
+  isBoundaryProofCandidate(entry: CoopAuthorityEntry): boolean {
+    return this.boundaryProofCapture != null && sameReplicaEntry(this.boundaryProofCapture.candidate, entry);
+  }
+
+  /** Simulate bounded source pruning before markReceived mutates the mechanical cursor. */
+  private hasReplicaSourceRoom(candidate: CoopAuthorityEntry, isBoundary: boolean): boolean {
+    const plannedRemoval = new Set<number>(
+      isBoundary ? candidate.subsumes.filter(revision => this.replicaAuthenticatedSources.has(revision)) : [],
+    );
+    let remaining = this.replicaAuthenticatedSources.size - plannedRemoval.size;
+    if (isBoundary && remaining >= this.retentionCapacity) {
+      // A boundary may retire only the exact sources its canonical proof named. Do not evict an unrelated
+      // source just to make room; the next exact tail refresh is the only authority for that omission.
+      return false;
+    }
+    const protectedRevision = this.pendingReplicaSuccessorControl?.revision ?? null;
+    for (const revision of this.replicaAuthenticatedSources.keys()) {
+      if (remaining < this.retentionCapacity) {
+        break;
+      }
+      if (plannedRemoval.has(revision) || revision === protectedRevision) {
+        continue;
+      }
+      plannedRemoval.add(revision);
+      remaining -= 1;
+    }
+    return remaining < this.retentionCapacity;
+  }
+
+  /** Replace, rather than append to, the bounded cache after an authenticated tail delimiter. */
+  private reconcileReplicaAuthenticatedSources(
+    sources: readonly CoopAuthorityEntry[],
+    removableRevisions: readonly number[] = [],
+  ): boolean {
+    const next = new Map<number, CoopAuthorityEntry>();
+    for (const source of sources) {
+      const prior = next.get(source.revision);
+      if (prior != null && !sameReplicaEntry(prior, source)) {
+        return false;
+      }
+      next.set(source.revision, freezeAuthorityEntry(cloneEntry(source)));
+    }
+    const removable = new Set(removableRevisions.filter(revision => next.has(revision)));
+    if (next.size > this.retentionCapacity && next.size - removable.size > this.retentionCapacity) {
+      return false;
+    }
+    this.replicaAuthenticatedSources.clear();
+    for (const [revision, source] of next) {
+      this.replicaAuthenticatedSources.set(revision, source);
+    }
+    return true;
+  }
+
+  /** Apply the same bounded pruning plan used by hasReplicaSourceRoom, preserving exact boundary evidence. */
+  private rememberReplicaSource(entry: CoopAuthorityEntry, isBoundary: boolean): void {
+    const plannedRemoval = new Set<number>(
+      isBoundary ? entry.subsumes.filter(revision => this.replicaAuthenticatedSources.has(revision)) : [],
+    );
+    let remaining = this.replicaAuthenticatedSources.size - plannedRemoval.size;
+    const protectedRevision = this.pendingReplicaSuccessorControl?.revision ?? null;
+    for (const revision of this.replicaAuthenticatedSources.keys()) {
+      if (remaining < this.retentionCapacity) {
+        break;
+      }
+      if (plannedRemoval.has(revision) || revision === protectedRevision) {
+        continue;
+      }
+      plannedRemoval.add(revision);
+      remaining -= 1;
+    }
+    for (const revision of plannedRemoval) {
+      this.replicaAuthenticatedSources.delete(revision);
+    }
+    this.replicaAuthenticatedSources.set(entry.revision, freezeAuthorityEntry(cloneEntry(entry)));
+  }
+
+  /** Issue the only replica bypass capability; scope identity and body stay tied to this exact object. */
+  private installReplicaProofScope(
+    entry: CoopAuthorityEntry,
+    trustedSources: readonly CoopAuthorityEntry[],
+  ): void {
+    if (this.replicaProofEntryIdentity != null && this.replicaProofEntryIdentity !== entry) {
+      revokeAuthorityEntryProofScope(this.replicaProofEntryIdentity);
+    }
+    const source = freezeAuthorityEntry(cloneEntry(entry));
+    const frozenTrustedSources = Object.freeze(
+      trustedSources.map(trusted => freezeAuthorityEntry(cloneEntry(trusted))),
+    );
+    const authenticatedSources = Object.freeze(
+      [...this.replicaAuthenticatedSources.values()]
+        .sort((left, right) => left.revision - right.revision)
+        .map(authenticated => freezeAuthorityEntry(cloneEntry(authenticated))),
+    );
+    const state: ReplicaProofState = { active: true, consumed: false };
+    const scope = Object.freeze({
+      kind: "replica-dense-frontier" as const,
+      source,
+      trustedSources: frozenTrustedSources,
+      authenticatedSources,
+      authenticatedThrough: this.ledger.controlInstalledThrough(),
+      isActive: () =>
+        state.active
+        && !this.disposed
+        && this.replicaProofEntryIdentity === entry
+        && this.isPendingReplicaEntry(entry),
+    });
+    state.onConsumed = () => {
+      if (this.replicaProofEntryIdentity === entry) {
+        this.replicaProofEntryIdentity = null;
+      }
+      const pending = this.pendingReplicaEntry;
+      if (
+        pending != null
+        && sameReplicaEntry(pending, entry)
+        && this.pendingReplicaBoundaryApproval != null
+      ) {
+        // The one-shot handoff has been accepted by the ledger; retire only the sources this boundary proved.
+        for (const revision of entry.subsumes) {
+          this.replicaAuthenticatedSources.delete(revision);
+        }
+        this.replicaProofEpochStartRevision = entry.revision;
+        this.pendingReplicaBoundaryApproval = null;
+      }
+    };
+    replicaProofStates.set(scope, state);
+    authorityEntryProofScopes.set(entry, scope);
+    this.replicaProofEntryIdentity = entry;
+  }
+
+  private rebindReplicaSource(
+    source: CoopAuthorityEntry,
+    membershipRevision: number,
+    authorityConnectionGeneration: number | undefined,
+  ): CoopAuthorityEntry {
+    return freezeAuthorityEntry(
+      cloneEntry({
+        ...source,
+        context: {
+          ...source.context,
+          membershipRevision,
+          ...(authorityConnectionGeneration == null
+            ? {}
+            : { connectionGeneration: authorityConnectionGeneration }),
+        },
+      }),
+    );
+  }
+
+  private rebindAuthorityBoundaryApproval(
+    approval: AuthorityBoundaryApproval | null,
+    context: CoopFrameContextV2,
+  ): AuthorityBoundaryApproval | null {
+    if (approval == null) {
+      return null;
+    }
+    const rebind = (source: CoopAuthorityEntry): CoopAuthorityEntry =>
+      freezeAuthorityEntry(
+        cloneEntry({
+          ...source,
+          context: {
+            ...source.context,
+            membershipRevision: context.membershipRevision,
+            connectionGeneration: context.connectionGeneration,
+          },
+        }),
+      );
+    return Object.freeze({
+      ...approval,
+      predecessorEntry: rebind(approval.predecessorEntry),
+      successorEntry: rebind(approval.successorEntry),
+      trustedSources: Object.freeze(approval.trustedSources.map(rebind)),
     });
   }
 
@@ -1315,6 +1805,8 @@ export class AuthorityLog implements CoopAuthorityLog {
       successorMaterialDigest: candidate.material.digest,
       successorControlId: controlIdOf(candidate.nextControl),
       subsumes: Object.freeze([...candidate.subsumes]),
+      predecessorEntry: freezeAuthorityEntry(cloneEntry(predecessor)),
+      successorEntry: freezeAuthorityEntry(cloneEntry(candidate)),
       trustedSources: Object.freeze(
         (trustedSources as CoopAuthorityEntry[]).map(source => freezeAuthorityEntry(cloneEntry(source))),
       ),
@@ -1348,6 +1840,8 @@ export class AuthorityLog implements CoopAuthorityLog {
       && candidate.material.digest === approval.successorMaterialDigest
       && controlIdOf(candidate.nextControl) === approval.successorControlId
       && sameRevisionList(candidate.subsumes, approval.subsumes)
+      && sameAuthorityEntryExceptChannelAxes(predecessor, approval.predecessorEntry)
+      && sameAuthorityEntryExceptChannelAxes(candidate, approval.successorEntry)
       && sameRevisionList(
         approval.trustedSources.map(source => source.revision),
         approval.subsumes,
@@ -1398,15 +1892,7 @@ export class AuthorityLog implements CoopAuthorityLog {
   /** Exact identity check for the one unfinished replica entry; a conflicting same-revision frame is hostile. */
   private isPendingReplicaEntry(entry: CoopAuthorityEntry): boolean {
     const pending = this.pendingReplicaEntry;
-    return (
-      pending != null
-      && pending.revision === entry.revision
-      && pending.operationId === entry.operationId
-      && pending.kind === entry.kind
-      && pending.material.digest === entry.material.digest
-      && JSON.stringify(pending.nextControl) === JSON.stringify(entry.nextControl)
-      && JSON.stringify(pending.subsumes) === JSON.stringify(entry.subsumes)
-    );
+    return pending != null && sameReplicaEntry(pending, entry);
   }
 
   /** Stop a lease's redelivery loop AND cancel every timer it owns (retirement / subsumption / dispose). */
@@ -1519,6 +2005,67 @@ function cloneEntry(entry: CoopAuthorityEntry): CoopAuthorityEntry {
     nextControl: structuredClone(entry.nextControl),
     subsumes: [...entry.subsumes],
   };
+}
+
+/** Full immutable identity used by pending retries and proof-token liveness checks. */
+function sameReplicaEntry(left: CoopAuthorityEntry, right: CoopAuthorityEntry): boolean {
+  return (
+    left.revision === right.revision
+    && JSON.stringify({
+      context: left.context,
+      operationId: left.operationId,
+      kind: left.kind,
+      material: left.material,
+      nextControl: left.nextControl,
+      subsumes: left.subsumes,
+    })
+      === JSON.stringify({
+        context: right.context,
+        operationId: right.operationId,
+        kind: right.kind,
+        material: right.material,
+        nextControl: right.nextControl,
+        subsumes: right.subsumes,
+      })
+  );
+}
+
+/** Stable and advancing channel axes must agree across every source in one replica proof. */
+function sameReplicaContext(left: CoopAuthorityEntry, right: CoopAuthorityEntry): boolean {
+  return JSON.stringify(left.context) === JSON.stringify(right.context);
+}
+
+/** Rebind may advance only membership/connection axes; every stable/body field remains frozen. */
+function sameAuthorityEntryExceptChannelAxes(left: CoopAuthorityEntry, right: CoopAuthorityEntry): boolean {
+  return (
+    left.revision === right.revision
+    && JSON.stringify({
+      sessionId: left.context.sessionId,
+      runId: left.context.runId,
+      sessionEpoch: left.context.sessionEpoch,
+      seatMapId: left.context.seatMapId,
+      senderSeatId: left.context.senderSeatId,
+      authoritySeatId: left.context.authoritySeatId,
+      operationId: left.operationId,
+      kind: left.kind,
+      material: left.material,
+      nextControl: left.nextControl,
+      subsumes: left.subsumes,
+    })
+      === JSON.stringify({
+        sessionId: right.context.sessionId,
+        runId: right.context.runId,
+        sessionEpoch: right.context.sessionEpoch,
+        seatMapId: right.context.seatMapId,
+        senderSeatId: right.context.senderSeatId,
+        authoritySeatId: right.context.authoritySeatId,
+        operationId: right.operationId,
+        kind: right.kind,
+        material: right.material,
+        nextControl: right.nextControl,
+        subsumes: right.subsumes,
+      })
+  );
 }
 
 /** Compare a retry request with the exact deferred body without treating revision as a new allocation. */

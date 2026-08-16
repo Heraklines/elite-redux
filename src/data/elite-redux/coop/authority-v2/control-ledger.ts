@@ -20,12 +20,12 @@
 import {
   boundarySupersessionAllowsSuccessorEntry,
   type CoopBoundarySupersessionEntry,
-  isBoundarySupersessionCandidate,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   type AuthorityEntryProofScope,
   authorityEntryProofScopeOf,
   consumeReplicaEntryProofScope,
+  revokeAuthorityEntryProofScope,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type { CoopAuthorityEntry, CoopControlInstallResult } from "#data/elite-redux/coop/authority-v2/contract";
 import {
@@ -118,8 +118,19 @@ interface InteractionControlClaim {
   } | null;
 }
 
+interface ControlLedgerSnapshot {
+  readonly entry: CoopAuthorityEntry;
+  readonly claims: Map<string, InteractionControlClaim>;
+  readonly authenticatedSources: Map<number, CoopAuthorityEntry>;
+  readonly activeControlId: string | null;
+}
+
 function controlOf(entry: CoopAuthorityEntry): CoopV2ClaimedControl {
   return entry.nextControl;
+}
+
+function isBoundaryEntry(entry: CoopAuthorityEntry): boolean {
+  return entry.kind === "WAVE_ADVANCE" || entry.kind === "TERMINAL_COMMIT";
 }
 
 function sameRewardSurface(
@@ -142,6 +153,8 @@ export class CoopV2ControlLedger {
   private readonly authenticatedSources = new Map<number, CoopAuthorityEntry>();
   private readonly authenticatedSourceCapacity: number;
   private activeControlId: string | null = null;
+  /** Holds the exact pre-admission state until the paired registerEntry succeeds or rolls it back. */
+  private pendingAdmissionRollback: ControlLedgerSnapshot | null = null;
 
   constructor(authenticatedSourceCapacity = COOP_V2_AUTHENTICATED_SOURCE_CAPACITY) {
     if (!Number.isSafeInteger(authenticatedSourceCapacity) || authenticatedSourceCapacity <= 0) {
@@ -169,6 +182,7 @@ export class CoopV2ControlLedger {
         this.authenticatedSources.set(revision, source);
       }
       this.activeControlId = priorActiveControlId;
+      this.pendingAdmissionRollback = null;
     };
     const proofScope = authorityEntryProofScopeOf(entry);
     const authorityProofScope = proofScope?.kind === "authority-retained" ? proofScope : null;
@@ -206,31 +220,75 @@ export class CoopV2ControlLedger {
    * control address is rejected; identical redelivery is idempotent.
    */
   registerEntry(entry: CoopAuthorityEntry): boolean {
+    let priorAdmission = this.pendingAdmissionRollback;
+    if (priorAdmission != null && priorAdmission.entry !== entry) {
+      this.restoreSnapshot(priorAdmission);
+      this.pendingAdmissionRollback = null;
+      revokeAuthorityEntryProofScope(priorAdmission.entry);
+      priorAdmission = null;
+    }
+    const rollback = priorAdmission ?? {
+      entry,
+      claims: this.cloneClaims(),
+      authenticatedSources: this.cloneAuthenticatedSources(),
+      activeControlId: this.activeControlId,
+    };
+    const fail = (): boolean => {
+      this.restoreSnapshot(rollback);
+      this.pendingAdmissionRollback = null;
+      revokeAuthorityEntryProofScope(entry);
+      return false;
+    };
     const control = controlOf(entry);
     if (
       control.kind === "AWAIT_SUCCESSOR"
       && (control.afterOperationId !== entry.operationId || control.epoch !== entry.context.sessionEpoch)
     ) {
-      return false;
+      return fail();
     }
     const proofScope = authorityEntryProofScopeOf(entry);
+    if (isBoundaryEntry(entry) && !this.hasLiveBoundaryProof(entry, proofScope)) {
+      return fail();
+    }
+    if (priorAdmission == null) {
+      const active =
+        (this.activeControlId == null ? null : this.claims.get(this.activeControlId)) ?? this.latestUnsupersededClaim();
+      if (active != null) {
+        if (entry.revision !== active.revision + 1) {
+          return fail();
+        }
+        const ordinarySuccessorAllowed = controlAllowsSuccessorEntry(active.control, active.sourceOperationId, entry);
+        if (ordinarySuccessorAllowed && active.installed == null) {
+          return fail();
+        }
+        if (
+          !ordinarySuccessorAllowed
+          && (active.sourceEntry == null || !this.allowsBoundarySupersession(active.sourceEntry, entry))
+        ) {
+          return fail();
+        }
+      }
+    }
     if (proofScope?.kind === "authority-retained") {
       const proofSources = this.mergeProofSources(proofScope, entry);
       if (proofSources == null || !this.reconcileAuthenticatedSources(proofSources, entry)) {
-        return false;
+        return fail();
       }
-    } else if (
-      proofScope?.kind === "replica-dense-frontier"
-      && !this.reconcileAuthenticatedSources([proofScope.source], entry)
-    ) {
-      // Replica admission reaches registerEntry only after admitSuccessor consumed the prior control. The
-      // dense proof therefore bounds history to this exact authenticated source without weakening bypass.
-      return false;
+    } else if (proofScope?.kind === "replica-dense-frontier") {
+      if (
+        !proofScope.isActive()
+        || !sameAuthenticatedSource(proofScope.source, entry)
+        || proofScope.source.context.membershipRevision !== entry.context.membershipRevision
+        || proofScope.source.context.connectionGeneration !== entry.context.connectionGeneration
+        || !this.reconcileAuthenticatedSources(proofScope.authenticatedSources, entry)
+      ) {
+        return fail();
+      }
     }
     const authenticatedSource = this.authenticatedSources.get(entry.revision);
     if (!this.canRegisterAuthenticatedSource(authenticatedSource, entry)) {
       // Never evict an older revision: AuthorityLog may still retain it as exact boundary evidence.
-      return false;
+      return fail();
     }
     const controlId = controlIdOf(control);
     const prior = this.claims.get(controlId);
@@ -245,6 +303,7 @@ export class CoopV2ControlLedger {
         if (proofScope != null) {
           consumeReplicaEntryProofScope(entry, proofScope);
         }
+        this.pendingAdmissionRollback = null;
         return true;
       }
       // A modal interaction can temporarily supersede command control and then return to the exact same
@@ -253,7 +312,7 @@ export class CoopV2ControlLedger {
       // older claim with the immediately admitted newer revision. Otherwise a legal
       // Command -> Interaction -> AWAIT_SUCCESSOR -> Command chain is permanently unrepresentable.
       if (!prior.superseded || entry.revision <= prior.revision) {
-        return false;
+        return fail();
       }
     }
     const sourceEntry = structuredClone(entry);
@@ -270,6 +329,7 @@ export class CoopV2ControlLedger {
     if (proofScope != null) {
       consumeReplicaEntryProofScope(entry, proofScope);
     }
+    this.pendingAdmissionRollback = null;
     return true;
   }
 
@@ -294,18 +354,38 @@ export class CoopV2ControlLedger {
    * same successor constraint; this clears the UI lease before the new material/projector is allowed to run.
    */
   admitSuccessor(entry: CoopAuthorityEntry): boolean {
+    if (this.pendingAdmissionRollback != null) {
+      if (this.pendingAdmissionRollback.entry === entry) {
+        if (isBoundaryEntry(entry) && !this.hasLiveBoundaryProof(entry, authorityEntryProofScopeOf(entry))) {
+          revokeAuthorityEntryProofScope(entry);
+          return false;
+        }
+        return true;
+      }
+      const stale = this.pendingAdmissionRollback;
+      this.restoreSnapshot(stale);
+      this.pendingAdmissionRollback = null;
+      revokeAuthorityEntryProofScope(stale.entry);
+    }
+    const proofScope = authorityEntryProofScopeOf(entry);
+    if (isBoundaryEntry(entry) && !this.hasLiveBoundaryProof(entry, proofScope)) {
+      revokeAuthorityEntryProofScope(entry);
+      return false;
+    }
     const active =
       (this.activeControlId == null ? null : this.claims.get(this.activeControlId)) ?? this.latestUnsupersededClaim();
     if (active == null) {
       return true;
     }
     if (entry.revision !== active.revision + 1) {
+      revokeAuthorityEntryProofScope(entry);
       return false;
     }
     const ordinarySuccessorAllowed = controlAllowsSuccessorEntry(active.control, active.sourceOperationId, entry);
     // Ordinary progression consumes a live installed control; an uninstalled predecessor is still a local
     // prepare deferral, not permission to publish the next entry.
     if (ordinarySuccessorAllowed && active.installed == null) {
+      revokeAuthorityEntryProofScope(entry);
       return false;
     }
     // A stale wave/terminal boundary is the deliberate exception to the installed-control prerequisite:
@@ -315,8 +395,15 @@ export class CoopV2ControlLedger {
       !ordinarySuccessorAllowed
       && (active.sourceEntry == null || !this.allowsBoundarySupersession(active.sourceEntry, entry))
     ) {
+      revokeAuthorityEntryProofScope(entry);
       return false;
     }
+    this.pendingAdmissionRollback = {
+      entry,
+      claims: this.cloneClaims(),
+      authenticatedSources: this.cloneAuthenticatedSources(),
+      activeControlId: this.activeControlId,
+    };
     active.superseded = true;
     this.activeControlId = null;
     return true;
@@ -663,11 +750,24 @@ export class CoopV2ControlLedger {
     this.claims.clear();
     this.authenticatedSources.clear();
     this.activeControlId = null;
+    this.pendingAdmissionRollback = null;
   }
 
   /** Bounded proof count exposed for lifecycle/capacity diagnostics without leaking source material. */
   get authenticatedSourceCount(): number {
     return this.authenticatedSources.size;
+  }
+
+  private restoreSnapshot(snapshot: ControlLedgerSnapshot): void {
+    this.claims.clear();
+    for (const [controlId, claim] of snapshot.claims) {
+      this.claims.set(controlId, claim);
+    }
+    this.authenticatedSources.clear();
+    for (const [revision, source] of snapshot.authenticatedSources) {
+      this.authenticatedSources.set(revision, source);
+    }
+    this.activeControlId = snapshot.activeControlId;
   }
 
   private latestUnsupersededClaim(): InteractionControlClaim | null {
@@ -691,26 +791,42 @@ export class CoopV2ControlLedger {
   ): boolean {
     const proofScope = authorityEntryProofScopeOf(successor as CoopAuthorityEntry);
     if (proofScope?.kind === "replica-dense-frontier") {
-      // This privilege is attached by AuthorityLog.admit to this exact object identity only. The dense
-      // cursor proves every named old revision was authenticated; the typed predicate still proves the
-      // active predecessor, terminal finality, exact next revision, and canonical material/control relation.
+      // This privilege is attached by AuthorityLog.admit to this exact object identity only. The log has
+      // supplied the complete retained frontier; numeric cursor bounds are never enough for a bypass.
       return (
         proofScope.isActive()
         && sameAuthenticatedSource(proofScope.source, successor as CoopAuthorityEntry)
         && proofScope.source.context.membershipRevision === successor.context.membershipRevision
         && proofScope.source.context.connectionGeneration === successor.context.connectionGeneration
-        && successor.revision === proofScope.authenticatedThrough + 1
-        && successor.subsumes.every(
-          revision => Number.isSafeInteger(revision) && revision > 0 && revision <= proofScope.authenticatedThrough,
+        && boundarySupersessionAllowsSuccessorEntry(
+          predecessor,
+          successor,
+          proofScope.trustedSources,
         )
-        && isBoundarySupersessionCandidate(predecessor, successor)
       );
     }
-    const trusted = successor.subsumes.map(revision => this.authenticatedSources.get(revision));
-    if (trusted.some(entry => entry == null)) {
+    if (proofScope?.kind !== "authority-retained") {
       return false;
     }
-    return boundarySupersessionAllowsSuccessorEntry(predecessor, successor, trusted as CoopAuthorityEntry[]);
+    const trusted = this.mergeProofSources(proofScope, successor as CoopAuthorityEntry);
+    return trusted != null && boundarySupersessionAllowsSuccessorEntry(predecessor, successor, trusted);
+  }
+
+  /** Boundary kinds are never self-authenticating, including when recovery left no active predecessor claim. */
+  private hasLiveBoundaryProof(
+    entry: CoopAuthorityEntry,
+    proofScope: AuthorityEntryProofScope | null,
+  ): boolean {
+    if (proofScope?.kind === "authority-retained") {
+      return true;
+    }
+    return (
+      proofScope?.kind === "replica-dense-frontier"
+      && proofScope.isActive()
+      && sameAuthenticatedSource(proofScope.source, entry)
+      && proofScope.source.context.membershipRevision === entry.context.membershipRevision
+      && proofScope.source.context.connectionGeneration === entry.context.connectionGeneration
+    );
   }
 
   /** Merge only the exact initially approved boundary list into the current live-retention snapshot. */

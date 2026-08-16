@@ -110,6 +110,7 @@ import {
   type AuthorityCommitDisposition,
   type AuthorityDeliveryExhaustion,
   AuthorityLog,
+  revokeAuthorityEntryProofScope,
   type CoopAuthorityWire,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
@@ -577,6 +578,11 @@ export class CoopAuthorityV2Shadow {
    * here until their ordered frontier closes.
    */
   private readonly pendingReplicaEntries = new Map<number, CoopAuthorityEntry>();
+  /**
+   * Exact revisions whose first live-ledger admission refused. The marker grants exactly one redelivery
+   * retry after the one-shot log token is revoked; a second refusal is semantically impossible and terminal.
+   */
+  private readonly replicaAdmissionRetries = new Set<number>();
   /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
   private readonly replicaEntriesInFlight = new Set<number>();
   /** V2-native phase barriers resolved exclusively from authenticated authority-log receipt quorum. */
@@ -1522,6 +1528,7 @@ export class CoopAuthorityV2Shadow {
     }
     this.shadowState.clear();
     this.pendingReplicaEntries.clear();
+    this.replicaAdmissionRetries.clear();
     this.replicaEntriesInFlight.clear();
     this.ledger.clear();
   }
@@ -1593,6 +1600,14 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     if (result.kind === "gap") {
+      if (this.log.hasBoundaryProofCapture()) {
+        // A boundary refresh is observational only. Keep the exact candidate for a later retry, but never
+        // release/materialize the predecessor or retain every lower tail image in the eager retry map.
+        if (this.log.isBoundaryProofCandidate(entry) && !this.retainPendingReplicaEntry(entry)) {
+          return false;
+        }
+        return false;
+      }
       // Admission has already authenticated the entry (context, ownership, and epoch). Retain the exact
       // gap image so the control-installed predecessor can synchronously re-drive it; releasing the local
       // modal edge must never discard an authenticated future revision.
@@ -1616,8 +1631,19 @@ export class CoopAuthorityV2Shadow {
       this.proposalLeases.observeCommitted(entry.operationId);
     }
     if (result.kind === "admitted") {
-      if (this.liveReplica?.admitEntry?.(this.runtimeContext, entry) === false) {
-        this.reportOwnedReplicaViolation(entry, "entry.control-ledger-admission-refused");
+      const liveAdmission = this.liveReplica?.admitEntry;
+      if (liveAdmission == null) {
+        // Pure shadow application has no live ledger that can consume this capability; do not leave a
+        // caller-reusable privilege in the module WeakMap.
+        revokeAuthorityEntryProofScope(entry);
+      } else if (!liveAdmission.call(this.liveReplica, this.runtimeContext, entry)) {
+        revokeAuthorityEntryProofScope(entry);
+        this.replicaAdmissionRetries.add(entry.revision);
+        // A local capacity refusal must not turn the shared protocol terminal. AuthorityLog still owns the
+        // exact pending image and will redeliver it; only an identity conflict is terminal on this path.
+        if (!this.retainPendingReplicaEntry(entry, false)) {
+          return false;
+        }
         return false;
       }
       this.admitted += 1;
@@ -1626,9 +1652,25 @@ export class CoopAuthorityV2Shadow {
       }
     } else if (
       (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control")
-      && !this.retainPendingReplicaEntry(entry)
     ) {
-      return false;
+      if (this.replicaAdmissionRetries.has(entry.revision)) {
+        if (!this.log.reissueReplicaEntryProof(entry)) {
+          revokeAuthorityEntryProofScope(entry);
+          this.reportOwnedReplicaViolation(entry, "entry.control-ledger-retry-proof-refused");
+          return false;
+        }
+        const liveAdmission = this.liveReplica?.admitEntry;
+        if (liveAdmission == null || !liveAdmission.call(this.liveReplica, this.runtimeContext, entry)) {
+          revokeAuthorityEntryProofScope(entry);
+          this.reportOwnedReplicaViolation(entry, "entry.control-ledger-retry-refused");
+          return false;
+        }
+        this.replicaAdmissionRetries.delete(entry.revision);
+        this.admitted += 1;
+      }
+      if (!this.retainPendingReplicaEntry(entry)) {
+        return false;
+      }
     }
     const resume =
       result.kind === "duplicate-pending-control"
@@ -1679,7 +1721,7 @@ export class CoopAuthorityV2Shadow {
   }
 
   /** Keep a bounded, caller-independent authenticated image for every incomplete replica revision. */
-  private retainPendingReplicaEntry(entry: CoopAuthorityEntry): boolean {
+  private retainPendingReplicaEntry(entry: CoopAuthorityEntry, reportCapacity = true): boolean {
     const prior = this.pendingReplicaEntries.get(entry.revision);
     if (prior != null) {
       if (samePendingReplicaEntry(prior, entry)) {
@@ -1689,7 +1731,9 @@ export class CoopAuthorityV2Shadow {
       return false;
     }
     if (this.pendingReplicaEntries.size >= this.log.diagnostics().retentionCapacity) {
-      this.reportPendingReplicaViolation(entry, `entry.pending-retention-capacity-${entry.revision}`);
+      if (reportCapacity) {
+        this.reportPendingReplicaViolation(entry, `entry.pending-retention-capacity-${entry.revision}`);
+      }
       return false;
     }
     this.pendingReplicaEntries.set(entry.revision, freezeAuthorityEntry(structuredClone(entry)));
