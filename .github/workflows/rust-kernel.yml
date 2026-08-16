@@ -78,6 +78,7 @@ jobs:
             /pnpm-workspace.yaml
             /rust/contracts/m3-contract.toml
             /rust/source-lock.toml
+            /rust/fixtures/m3/m3-audited-production-blobs.json
             /src/
           submodules: false
 
@@ -91,62 +92,115 @@ jobs:
           fi
           base=7357166c19bdb5cf0e32c84b0f74f22e79d80798
           oracle=3b534099919efae827019d4a3f3c4ab0ecd6d67b
+          audited_production_head=66ceee6e095534c59e67f80bbab8fadee1d8c4ba
           git cat-file -e "${base}^{commit}"
           git cat-file -e "${oracle}^{commit}"
+          git cat-file -e "${audited_production_head}^{commit}"
           git merge-base --is-ancestor "$oracle" "$base"
+          git merge-base --is-ancestor "$audited_production_head" "$GITHUB_SHA"
           git merge-base --is-ancestor "$base" "$GITHUB_SHA"
           locked_runtime=(.nvmrc .gitmodules package.json pnpm-lock.yaml pnpm-workspace.yaml src)
           git diff --exit-code "$oracle" "$base" -- "${locked_runtime[@]}"
-          # This is the exact audited production TypeScript delta already
-          # integrated between M2 and the M3 parent. Any additional source
-          # path remains locked to the M2 base and fails this check.
-          integrated_production_ts=(
-            src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts
-            src/data/elite-redux/coop/authority-v2/authority-log.ts
-            src/data/elite-redux/coop/authority-v2/control-ledger.ts
-            src/data/elite-redux/coop/authority-v2/cutover-interaction.ts
-            src/data/elite-redux/coop/authority-v2/cutover-wave.ts
-            src/data/elite-redux/coop/authority-v2/frame-codec.ts
-            src/data/elite-redux/coop/authority-v2/next-control.ts
-            src/data/elite-redux/coop/authority-v2/protocol-validator.ts
-            src/data/elite-redux/coop/authority-v2/shadow.ts
-            src/data/elite-redux/coop/coop-battle-stream.ts
-            src/data/elite-redux/coop/coop-biome-operation.ts
-            src/data/elite-redux/coop/coop-enemy-builder.ts
-            src/data/elite-redux/coop/coop-faint-switch-operation.ts
-            src/data/elite-redux/coop/coop-me-operation.ts
-            src/data/elite-redux/coop/coop-operation-journal.ts
-            src/data/elite-redux/coop/coop-rendezvous.ts
-            src/data/elite-redux/coop/coop-reward-operation.ts
-            src/data/elite-redux/coop/coop-runtime.ts
-            src/data/elite-redux/coop/coop-transport.ts
-            src/data/elite-redux/er-ghost-teams.ts
-            src/field/pokemon.ts
-            src/phases/battle-end-phase.ts
-            src/phases/biome-shop-phase.ts
-            src/phases/command-phase.ts
-            src/phases/coop-guest-faint-switch-phase.ts
-            src/phases/coop-replay-me-phase.ts
-            src/phases/coop-replay-phases.ts
-            src/phases/coop-replay-turn-phase.ts
-            src/phases/er-ability-capsule-phase.ts
-            src/phases/er-crossroads-phase.ts
-            src/phases/er-greater-ability-capsule-phase.ts
-            src/phases/er-greater-ability-randomizer-phase.ts
-            src/phases/er-stormglass-picker-phase.ts
-            src/phases/mystery-encounter-phases.ts
-            src/phases/select-biome-phase.ts
-            src/phases/select-modifier-phase.ts
-            src/phases/switch-phase.ts
-            src/ui/handlers/mystery-encounter-ui-handler.ts
-          )
-          allowed_source_exclusions=()
-          for path in "${integrated_production_ts[@]}"; do
-            allowed_source_exclusions+=(":(exclude)$path")
-          done
-          git diff --exit-code "$base" "$GITHUB_SHA" -- \
-            "${locked_runtime[@]}" rust/source-lock.toml \
-            "${allowed_source_exclusions[@]}"
+          immutable_runtime=(.nvmrc .gitmodules package.json pnpm-lock.yaml pnpm-workspace.yaml rust/source-lock.toml)
+          git diff --exit-code "$base" "$GITHUB_SHA" -- "${immutable_runtime[@]}"
+
+          manifest=rust/fixtures/m3/m3-audited-production-blobs.json
+          test -f "$manifest"
+          git cat-file -e "$GITHUB_SHA:$manifest"
+          manifest_entries="$(python3 - "$manifest" "$base" "$audited_production_head" "$GITHUB_SHA" <<'PY'
+          import json
+          import re
+          import subprocess
+          import sys
+
+          manifest_path, expected_base, expected_audited_head, checkpoint_head = sys.argv[1:]
+
+          def reject_duplicate_keys(pairs):
+              document = {}
+              for key, value in pairs:
+                  if key in document:
+                      raise SystemExit(f"duplicate JSON key: {key}")
+                  document[key] = value
+              return document
+
+          with open(manifest_path, "r", encoding="utf-8") as stream:
+              manifest = json.load(stream, object_pairs_hook=reject_duplicate_keys)
+
+          required_keys = {
+              "schema_version",
+              "manifest_id",
+              "m2_base_sha",
+              "head_sha",
+              "source_root",
+              "path_count",
+              "paths",
+          }
+          if set(manifest) != required_keys:
+              raise SystemExit(
+                  "audited production blob manifest keys are not exact: "
+                  f"missing={sorted(required_keys - set(manifest))} "
+                  f"unexpected={sorted(set(manifest) - required_keys)}"
+              )
+          if type(manifest["schema_version"]) is not int or manifest["schema_version"] != 1:
+              raise SystemExit("audited production blob manifest schema_version must be 1")
+          if manifest["manifest_id"] != "m3-audited-production-blobs-v1":
+              raise SystemExit("audited production blob manifest ID is not exact")
+          hash40 = re.compile(r"[0-9a-f]{40}\Z")
+          if manifest["m2_base_sha"] != expected_base or hash40.fullmatch(manifest["m2_base_sha"]) is None:
+              raise SystemExit("audited production blob manifest M2 base SHA is not exact")
+          if manifest["head_sha"] != expected_audited_head or hash40.fullmatch(manifest["head_sha"]) is None:
+              raise SystemExit("audited production blob manifest head SHA is not exact")
+          if manifest["source_root"] != "src":
+              raise SystemExit("audited production blob manifest source root is not exact")
+          if type(manifest["path_count"]) is not int or manifest["path_count"] != 38:
+              raise SystemExit("audited production blob manifest path count must be 38")
+
+          entries = manifest["paths"]
+          if not isinstance(entries, list) or len(entries) != manifest["path_count"]:
+              raise SystemExit("audited production blob manifest path list count is not exact")
+          path_pattern = re.compile(r"src/[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*\Z")
+          paths = []
+          for entry in entries:
+              if not isinstance(entry, dict) or set(entry) != {"path", "blob_oid"}:
+                  raise SystemExit(f"audited production blob entry keys are not exact: {entry!r}")
+              path = entry["path"]
+              blob_oid = entry["blob_oid"]
+              if not isinstance(path, str) or path_pattern.fullmatch(path) is None:
+                  raise SystemExit(f"unsafe audited production source path: {path!r}")
+              if not isinstance(blob_oid, str) or hash40.fullmatch(blob_oid) is None:
+                  raise SystemExit(f"invalid audited production blob object ID: {blob_oid!r}")
+              paths.append(path)
+          if len(paths) != len(set(paths)):
+              raise SystemExit("audited production blob manifest contains duplicate paths")
+          if paths != sorted(paths):
+              raise SystemExit("audited production blob manifest paths are not sorted")
+
+          actual = subprocess.check_output(
+              ["git", "diff", "--name-only", "--no-renames", expected_base, checkpoint_head, "--", "src"],
+              text=True,
+          ).splitlines()
+          if len(actual) != len(set(actual)) or actual != sorted(actual):
+              raise SystemExit("actual production src diff is not a unique sorted path set")
+          if actual != paths:
+              missing = sorted(set(paths) - set(actual))
+              extra = sorted(set(actual) - set(paths))
+              raise SystemExit(
+                  "actual M2-to-HEAD production src path set differs from the manifest: "
+                  f"missing={missing} extra={extra}"
+              )
+
+          for entry in entries:
+              print(f"{entry['path']}\t{entry['blob_oid']}")
+          PY
+          )"
+          while IFS=$'\t' read -r path expected_blob; do
+            test -n "$path"
+            [[ "$expected_blob" =~ ^[0-9a-f]{40}$ ]]
+            actual_blob="$(git rev-parse "$GITHUB_SHA:$path")"
+            test "$actual_blob" = "$expected_blob"
+            test "$(git cat-file -t "$actual_blob")" = blob
+          done <<< "$manifest_entries"
+          echo "M3 production source manifest matches actual src delta: 38 paths and pinned blobs"
           oracle_gitlinks="$(git ls-tree -r "$oracle" | awk '$1 == "160000"')"
           base_gitlinks="$(git ls-tree -r "$base" | awk '$1 == "160000"')"
           head_gitlinks="$(git ls-tree -r "$GITHUB_SHA" | awk '$1 == "160000"')"
@@ -205,6 +259,7 @@ jobs:
               "m3-capability-manifest.json",
               "m3-oracle-manifest.json",
               "m3-coverage-map.json",
+              "m3-audited-production-blobs.json",
           }
           generated_manifests = {
               "m3-benchmark-manifest.json",
@@ -1870,9 +1925,41 @@ jobs:
             src/data/elite-redux/coop/authority-v2/frame-codec.ts
             src/data/elite-redux/coop/authority-v2/protocol-validator.ts
           )
+          blob_manifest=rust/fixtures/m3/m3-audited-production-blobs.json
+          manifest_entries="$(python3 - "$blob_manifest" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          with Path(sys.argv[1]).open("r", encoding="utf-8") as stream:
+              manifest = json.load(stream)
+          for entry in manifest["paths"]:
+              print(f"{entry['path']}\t{entry['blob_oid']}")
+          PY
+          )"
+          declare -A audited_blob_oids=()
+          while IFS=$'\t' read -r path blob_oid; do
+            test -n "$path"
+            [[ "$blob_oid" =~ ^[0-9a-f]{40}$ ]]
+            if [[ -n "${audited_blob_oids[$path]+present}" ]]; then
+              echo "duplicate audited blob path: $path"
+              exit 1
+            fi
+            audited_blob_oids["$path"]="$blob_oid"
+          done <<< "$manifest_entries"
+          declare -A active_m3_sources_set=()
+          for path in "${active_m3_sources[@]}"; do
+            active_m3_sources_set["$path"]=1
+          done
           for path in "${consumed_sources[@]}"; do
             git cat-file -e "${ORACLE_SHA}:${path}"
-            if [[ " ${active_m3_sources[*]} " != *" $path "* ]]; then
+            if [[ -n "${active_m3_sources_set[$path]+present}" ]]; then
+              expected_blob="${audited_blob_oids[$path]:-}"
+              [[ "$expected_blob" =~ ^[0-9a-f]{40}$ ]]
+              actual_blob="$(git rev-parse "$GITHUB_SHA:$path")"
+              test "$actual_blob" = "$expected_blob"
+              test "$(git cat-file -t "$actual_blob")" = blob
+            else
               git diff --quiet --no-ext-diff "$ORACLE_SHA" -- "$path"
             fi
           done

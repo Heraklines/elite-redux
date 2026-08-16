@@ -1,0 +1,162 @@
+{
+  "schema_version": 1,
+  "manifest_id": "m3-audited-production-blobs-v1",
+  "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
+  "head_sha": "66ceee6e095534c59e67f80bbab8fadee1d8c4ba",
+  "source_root": "src",
+  "path_count": 38,
+  "paths": [
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts",
+      "blob_oid": "9c5f68d6a1801ea8b9d683b771d5de6856ebdb0f"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/authority-log.ts",
+      "blob_oid": "c6e67978c64fc5bc927ddc2108368fd498c877f6"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
+      "blob_oid": "2f2cf8fe378d86db010767d52e1f3dcca9bc3511"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/cutover-interaction.ts",
+      "blob_oid": "1b3d5bc4ebef335cac61f0ebfb3907d4a7040d89"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/cutover-wave.ts",
+      "blob_oid": "f1f46a18faba43f795bbee2541b95ddb6f512988"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/frame-codec.ts",
+      "blob_oid": "ef1ea40caf07af293aa3510314fd378acddde8b0"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/next-control.ts",
+      "blob_oid": "193bf9796de054dd848dfa48ff9c1ac3feb62845"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/protocol-validator.ts",
+      "blob_oid": "5e182987ac3336ff176d440d29a26903ffc1c341"
+    },
+    {
+      "path": "src/data/elite-redux/coop/authority-v2/shadow.ts",
+      "blob_oid": "e9d37a98961afb0eda9ac70a658f0a4d12d937e2"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-battle-stream.ts",
+      "blob_oid": "39a9c97e665c676b63adac058bf9a5e48fea0ade"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-biome-operation.ts",
+      "blob_oid": "88393c7a81221080a1a9ccb97ec050f0b929df7b"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-enemy-builder.ts",
+      "blob_oid": "fca2bf174f0824b76ca2b76fae5cc09a59c01fd5"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-faint-switch-operation.ts",
+      "blob_oid": "cc16773a185056c5047414e34703ef6ec8040872"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-me-operation.ts",
+      "blob_oid": "d0acc78a425024ff6b6150d55e525896ac382042"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-operation-journal.ts",
+      "blob_oid": "99d860bab040e2f4a1c4d46a9876ae7a34c1eee0"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-rendezvous.ts",
+      "blob_oid": "5762083aaac471172d94dad00b1593f003b209db"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-reward-operation.ts",
+      "blob_oid": "7c88e452c32f3ff495d819923570842b0ffaeb60"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-runtime.ts",
+      "blob_oid": "50534e39dc34440c12e12a09a58ed1aa3181bd75"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-transport.ts",
+      "blob_oid": "bc21d4484e687d4d42f40ca3df49ab82ed34e8d0"
+    },
+    {
+      "path": "src/data/elite-redux/er-ghost-teams.ts",
+      "blob_oid": "ccbb8ef7854dd1c4966d77161c08eb7ac42826c8"
+    },
+    {
+      "path": "src/field/pokemon.ts",
+      "blob_oid": "c952fe7f71682aa346daebf4fd91ca6251fc8a24"
+    },
+    {
+      "path": "src/phases/battle-end-phase.ts",
+      "blob_oid": "5a3d814dc81a852a15e27bfd674eb7ef30192abd"
+    },
+    {
+      "path": "src/phases/biome-shop-phase.ts",
+      "blob_oid": "0ca73d03a04c1833c301a9483f4ae989491646c3"
+    },
+    {
+      "path": "src/phases/command-phase.ts",
+      "blob_oid": "be6d53e195f8c8b74d69341e4a03672dbba86056"
+    },
+    {
+      "path": "src/phases/coop-guest-faint-switch-phase.ts",
+      "blob_oid": "5b901c4812acf4448b6c98351df5b5a42e1cd2b4"
+    },
+    {
+      "path": "src/phases/coop-replay-me-phase.ts",
+      "blob_oid": "249fb2dd61cca061e7a1bc1fb2d9f388ada77f35"
+    },
+    {
+      "path": "src/phases/coop-replay-phases.ts",
+      "blob_oid": "648db3725c7534285d7a8cf950f6e1b32c1f991d"
+    },
+    {
+      "path": "src/phases/coop-replay-turn-phase.ts",
+      "blob_oid": "b6c84a613968d5696eaca8e4c059e05b6e4e85c5"
+    },
+    {
+      "path": "src/phases/er-ability-capsule-phase.ts",
+      "blob_oid": "5c01d753b1ffaff0f648b2d04d964b3c7591b385"
+    },
+    {
+      "path": "src/phases/er-crossroads-phase.ts",
+      "blob_oid": "1470ec6da2968c7628e3c019d0914c43994a105a"
+    },
+    {
+      "path": "src/phases/er-greater-ability-capsule-phase.ts",
+      "blob_oid": "7507b52ad3c548fca887c2e28621d106bc92e215"
+    },
+    {
+      "path": "src/phases/er-greater-ability-randomizer-phase.ts",
+      "blob_oid": "7fe0ca850badbb06dd26f5737086937e61ce35ca"
+    },
+    {
+      "path": "src/phases/er-stormglass-picker-phase.ts",
+      "blob_oid": "c61c918dac601f6abc5092e627fbe431f08d3e8b"
+    },
+    {
+      "path": "src/phases/mystery-encounter-phases.ts",
+      "blob_oid": "f9213212b8fc1f9505aaf7ba79050ed947711d3f"
+    },
+    {
+      "path": "src/phases/select-biome-phase.ts",
+      "blob_oid": "40fe8646d57398c7ea1d085a79ef87f442267eab"
+    },
+    {
+      "path": "src/phases/select-modifier-phase.ts",
+      "blob_oid": "d578412482ea95a9251946818cfbccc2e76578ba"
+    },
+    {
+      "path": "src/phases/switch-phase.ts",
+      "blob_oid": "035846c9777fc949bbf04201bbf28db6f20f34c6"
+    },
+    {
+      "path": "src/ui/handlers/mystery-encounter-ui-handler.ts",
+      "blob_oid": "4934c18f49c4580d35dd332b7393a5d19f7edff6"
+    }
+  ]
+}
