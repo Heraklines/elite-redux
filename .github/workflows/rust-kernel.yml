@@ -96,6 +96,7 @@ jobs:
           git cat-file -e "${base}^{commit}"
           git cat-file -e "${oracle}^{commit}"
           git cat-file -e "${audited_production_head}^{commit}"
+          test "$GITHUB_SHA" != "$audited_production_head"
           git merge-base --is-ancestor "$oracle" "$base"
           git merge-base --is-ancestor "$audited_production_head" "$GITHUB_SHA"
           git merge-base --is-ancestor "$base" "$GITHUB_SHA"
@@ -196,9 +197,12 @@ jobs:
           while IFS=$'\t' read -r path expected_blob; do
             test -n "$path"
             [[ "$expected_blob" =~ ^[0-9a-f]{40}$ ]]
-            actual_blob="$(git rev-parse "$GITHUB_SHA:$path")"
-            test "$actual_blob" = "$expected_blob"
-            test "$(git cat-file -t "$actual_blob")" = blob
+            audited_blob="$(git rev-parse "$audited_production_head:$path")"
+            test "$(git cat-file -t "$audited_blob")" = blob
+            test "$audited_blob" = "$expected_blob"
+            checkpoint_blob="$(git rev-parse "$GITHUB_SHA:$path")"
+            test "$(git cat-file -t "$checkpoint_blob")" = blob
+            test "$checkpoint_blob" = "$expected_blob"
           done <<< "$manifest_entries"
           echo "M3 production source manifest matches actual src delta: 38 paths and pinned blobs"
           oracle_gitlinks="$(git ls-tree -r "$oracle" | awk '$1 == "160000"')"
@@ -1854,6 +1858,7 @@ jobs:
         env:
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
           ORACLE_BRANCH: ci/coop/v2-showdown-command-coordinate-20260720
+          AUDITED_PRODUCTION_HEAD: 66ceee6e095534c59e67f80bbab8fadee1d8c4ba
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -1896,6 +1901,8 @@ jobs:
           test "$(git rev-parse "$oracle_ref")" = "$ORACLE_SHA"
           git cat-file -e "${ORACLE_SHA}^{commit}"
           git merge-base --is-ancestor "$ORACLE_SHA" HEAD
+          git cat-file -e "${AUDITED_PRODUCTION_HEAD}^{commit}"
+          git merge-base --is-ancestor "$AUDITED_PRODUCTION_HEAD" "$GITHUB_SHA"
 
           consumed_sources=(
             src/enums/buttons.ts
@@ -1926,13 +1933,23 @@ jobs:
             src/data/elite-redux/coop/authority-v2/protocol-validator.ts
           )
           blob_manifest=rust/fixtures/m3/m3-audited-production-blobs.json
-          manifest_entries="$(python3 - "$blob_manifest" <<'PY'
+          manifest_entries="$(python3 - "$blob_manifest" "$AUDITED_PRODUCTION_HEAD" <<'PY'
           import json
+          import re
           import sys
           from pathlib import Path
 
           with Path(sys.argv[1]).open("r", encoding="utf-8") as stream:
               manifest = json.load(stream)
+          expected_audited_head = sys.argv[2]
+          hash40 = re.compile(r"[0-9a-f]{40}\Z")
+          manifest_head = manifest.get("head_sha")
+          if (
+              not isinstance(manifest_head, str)
+              or hash40.fullmatch(manifest_head) is None
+              or manifest_head != expected_audited_head
+          ):
+              raise SystemExit("active exporter manifest audited production head is not exact")
           for entry in manifest["paths"]:
               print(f"{entry['path']}\t{entry['blob_oid']}")
           PY
@@ -1956,9 +1973,12 @@ jobs:
             if [[ -n "${active_m3_sources_set[$path]+present}" ]]; then
               expected_blob="${audited_blob_oids[$path]:-}"
               [[ "$expected_blob" =~ ^[0-9a-f]{40}$ ]]
-              actual_blob="$(git rev-parse "$GITHUB_SHA:$path")"
-              test "$actual_blob" = "$expected_blob"
-              test "$(git cat-file -t "$actual_blob")" = blob
+              audited_blob="$(git rev-parse "$AUDITED_PRODUCTION_HEAD:$path")"
+              test "$(git cat-file -t "$audited_blob")" = blob
+              test "$audited_blob" = "$expected_blob"
+              checkpoint_blob="$(git rev-parse "$GITHUB_SHA:$path")"
+              test "$(git cat-file -t "$checkpoint_blob")" = blob
+              test "$checkpoint_blob" = "$expected_blob"
             else
               git diff --quiet --no-ext-diff "$ORACLE_SHA" -- "$path"
             fi
