@@ -204,6 +204,10 @@ export class Egg {
     // byte-identical eggs. Solo / authoritative are byte-for-byte unchanged.
     const isCoop = globalScene.gameMode.isCoop;
     const coopSeqOffset = isCoop ? nextCoopEggSeqOffset() : 0;
+    const sameSpeciesSeed =
+      eggOptions?.id == null && eggOptions?.sourceType === EggSourceType.SAME_SPECIES_EGG && eggOptions.species != null
+        ? globalScene.gameData.nextSameSpeciesEggSeed(eggOptions.species)
+        : null;
 
     const generateEggProperties = (eggOptions?: IEggOptions) => {
       //if (eggOptions.tier && eggOptions.species) throw Error("Error egg can't have species and tier as option. only choose one of them.")
@@ -224,7 +228,9 @@ export class Egg {
       // randSeedInt(range, min) share the (range, min) convention.
       this._id =
         eggOptions?.id
-        ?? (isCoop ? randSeedInt(EGG_SEED, EGG_SEED * this._tier) : randInt(EGG_SEED, EGG_SEED * this._tier));
+        ?? (isCoop || sameSpeciesSeed != null
+          ? randSeedInt(EGG_SEED, EGG_SEED * this._tier)
+          : randInt(EGG_SEED, EGG_SEED * this._tier));
 
       this._sourceType = eggOptions?.sourceType ?? undefined;
       this._hatchWaves = eggOptions?.hatchWaves ?? this.getEggTierDefaultHatchWaves();
@@ -256,12 +262,8 @@ export class Egg {
       }
     };
 
-    // CO-OP: derive the property seed deterministically from the SHARED wave seed + the
-    // per-wave egg sequence offset (a seeded randomString drawn under the wave seed), so both
-    // clients seed the property block identically. SOLO / AUTHORITATIVE keep the unseeded
-    // Math.random seed (byte-for-byte unchanged).
-    let seedOverride = randomString(24);
-    if (isCoop) {
+    let seedOverride = sameSpeciesSeed ?? randomString(24);
+    if (isCoop && sameSpeciesSeed == null) {
       globalScene.executeWithSeedOffset(
         () => {
           seedOverride = randomString(24, true);

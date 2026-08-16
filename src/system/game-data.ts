@@ -562,6 +562,7 @@ export class GameData {
   public eggs: Egg[];
   public eggPity: number[];
   public unlockPity: number[];
+  public sameSpeciesEggCounters: Record<number, number>;
   /** ER Shiny Lab: global achievement/challenge availability bitset. */
   public erShinyLabAvailableEffects: number[] = [];
   /** ER Ghost Trainer Editor: the player's authored ghost presentation profile. */
@@ -634,6 +635,7 @@ export class GameData {
     this.eggs = [];
     this.eggPity = [0, 0, 0, 0];
     this.unlockPity = [0, 0, 0, 0];
+    this.sameSpeciesEggCounters = {};
     this.erShinyLabAvailableEffects = [];
     this.ghostProfile = null;
     this.spentAchvPoints = 0;
@@ -666,6 +668,7 @@ export class GameData {
       timestamp: Date.now(),
       eggPity: this.eggPity.slice(0),
       unlockPity: this.unlockPity.slice(0),
+      sameSpeciesEggCounters: { ...this.sameSpeciesEggCounters },
       autoEggRestock: this.autoEggRestock,
       llmDirectorState: this.llmDirectorState,
       showdownAppliedSettlements: this.showdownAppliedSettlements.slice(0),
@@ -678,6 +681,13 @@ export class GameData {
       trainerFx: this.trainerFx,
       erTitles: this.erTitles.slice(0),
     };
+  }
+
+  public nextSameSpeciesEggSeed(speciesId: SpeciesId): string {
+    const savedCounter = this.sameSpeciesEggCounters[speciesId];
+    const counter = Number.isSafeInteger(savedCounter) && savedCounter >= 0 ? savedCounter : 0;
+    this.sameSpeciesEggCounters[speciesId] = counter + 1;
+    return `same-species:${this.trainerId}:${this.secretId}:${speciesId}:${counter}`;
   }
 
   /**
@@ -1428,6 +1438,15 @@ export class GameData {
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];
+    this.sameSpeciesEggCounters = {};
+    if (systemData.sameSpeciesEggCounters && typeof systemData.sameSpeciesEggCounters === "object") {
+      for (const [rawSpeciesId, rawCounter] of Object.entries(systemData.sameSpeciesEggCounters)) {
+        const speciesId = Number(rawSpeciesId);
+        if (Number.isInteger(speciesId) && speciesId > 0 && Number.isSafeInteger(rawCounter) && rawCounter >= 0) {
+          this.sameSpeciesEggCounters[speciesId] = rawCounter;
+        }
+      }
+    }
 
     // Grant the free 2 Legendary eggs once (idempotent; no-op if already given).
     this.grantFreeLegendaryEggsOnce();

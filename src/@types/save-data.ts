@@ -52,6 +52,7 @@ export interface SystemSaveData {
   timestamp: number;
   eggPity: number[];
   unlockPity: number[];
+  sameSpeciesEggCounters?: Record<number, number>;
   /** Optional for back-compat with saves created before the auto-restock feature. */
   autoEggRestock?: AutoEggRestockSettings;
   /** Optional for back-compat with saves created before the LLM Director feature. */
