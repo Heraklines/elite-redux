@@ -32,6 +32,7 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
 import { getActiveCoopV2WaveCutover } from "#data/elite-redux/coop/authority-v2/cutover-wave";
+import { type CoopFrameV2, encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
@@ -52,7 +53,12 @@ import {
   isCoopV2InteractionHumanInputFrozen,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import {
+  type CoopRole,
+  type CoopTransport,
+  createLoopbackPair,
+} from "#data/elite-redux/coop/coop-transport";
+import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import * as waveOp from "#data/elite-redux/coop/coop-wave-operation";
 import {
   markCoopWaveAdvanceContinuationReady,
@@ -88,6 +94,146 @@ const RUN = process.env.ER_SCENARIO === "1";
 
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+class DuoHotRejoinWire implements CoopWireChannel {
+  readyState = "open";
+  bufferedAmount = 0;
+  bufferedAmountLowThreshold = 0;
+  peer: DuoHotRejoinWire | null = null;
+  private messageHandler: ((data: string) => void) | null = null;
+  private openHandler: (() => void) | null = null;
+  private closeHandler: (() => void) | null = null;
+
+  send(data: string): void {
+    if (this.readyState === "open" && this.peer?.readyState === "open") {
+      this.peer.messageHandler?.(data);
+    }
+  }
+
+  close(): void {
+    if (this.readyState === "closed") {
+      return;
+    }
+    this.readyState = "closed";
+    this.closeHandler?.();
+    if (this.peer != null && this.peer.readyState !== "closed") {
+      this.peer.readyState = "closed";
+      this.peer.closeHandler?.();
+    }
+  }
+
+  onMessage(handler: (data: string) => void): void {
+    this.messageHandler = handler;
+  }
+
+  onOpen(handler: () => void): void {
+    this.openHandler = handler;
+  }
+
+  onClose(handler: () => void): void {
+    this.closeHandler = handler;
+  }
+
+  injectRaw(data: string): void {
+    this.messageHandler?.(data);
+  }
+
+  fireOpen(): void {
+    this.openHandler?.();
+  }
+}
+
+function createDuoHotRejoinWires(): { host: DuoHotRejoinWire; guest: DuoHotRejoinWire } {
+  const host = new DuoHotRejoinWire();
+  const guest = new DuoHotRejoinWire();
+  host.peer = guest;
+  guest.peer = host;
+  return { host, guest };
+}
+
+/** Keep WebRTC framing real while deferring V2 delivery into the destination duo context. */
+class DuoHotRejoinTransport extends WebRtcTransport {
+  private readonly deferredV2Frames: unknown[] = [];
+  private readonly unsubscribeV2Frame: () => void;
+  private v2Deferred = false;
+  private deferredV2FrameHandler: ((frame: unknown) => void) | null = null;
+
+  constructor(role: CoopRole, wire: CoopWireChannel) {
+    super(role, wire);
+    this.unsubscribeV2Frame = super.onV2Frame(frame => {
+      const ownedFrame = structuredClone(frame);
+      if (this.v2Deferred || this.deferredV2FrameHandler == null) {
+        this.deferredV2Frames.push(ownedFrame);
+        return;
+      }
+      this.deferredV2FrameHandler(ownedFrame);
+    });
+  }
+
+  override onV2Frame(handler: (frame: unknown) => void): () => void {
+    this.deferredV2FrameHandler = handler;
+    return () => {
+      if (this.deferredV2FrameHandler === handler) {
+        this.deferredV2FrameHandler = null;
+      }
+    };
+  }
+
+  setV2InboundDeferred(enabled: boolean): void {
+    this.v2Deferred = enabled;
+  }
+
+  pumpV2Inbound(limit = Number.POSITIVE_INFINITY): number {
+    if (this.deferredV2FrameHandler == null) {
+      return 0;
+    }
+    let delivered = 0;
+    while (this.deferredV2Frames.length > 0 && delivered < limit) {
+      this.deferredV2FrameHandler(this.deferredV2Frames.shift()!);
+      delivered++;
+    }
+    return delivered;
+  }
+
+  deferredV2FrameCount(): number {
+    return this.deferredV2Frames.length;
+  }
+
+  override close(): void {
+    this.deferredV2Frames.length = 0;
+    this.deferredV2FrameHandler = null;
+    this.unsubscribeV2Frame();
+    super.close();
+  }
+}
+
+interface DuoHotRejoinPair {
+  host: DuoHotRejoinTransport;
+  guest: DuoHotRejoinTransport;
+  readonly initialWires: { host: DuoHotRejoinWire; guest: DuoHotRejoinWire };
+  replaceChannels(): void;
+}
+
+function createDuoHotRejoinPair(): DuoHotRejoinPair {
+  const initialWires = createDuoHotRejoinWires();
+  const host = new DuoHotRejoinTransport("host", initialWires.host);
+  const guest = new DuoHotRejoinTransport("guest", initialWires.guest);
+  let replaced = false;
+  return {
+    host,
+    guest,
+    initialWires,
+    replaceChannels(): void {
+      if (replaced) {
+        return;
+      }
+      replaced = true;
+      const replacement = createDuoHotRejoinWires();
+      guest.replaceChannel(replacement.guest);
+      host.replaceChannel(replacement.host);
+    },
+  };
 }
 
 describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per transition class (Wave-2f)", () => {
@@ -138,13 +284,17 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
   /** Boot the host into a live battle + stand up the duo rig. */
   async function bootDuo(
-    options: { preserveProductionWaveSink?: boolean; startingWave?: number } = {},
+    options: {
+      preserveProductionWaveSink?: boolean;
+      startingWave?: number;
+      pair?: { host: CoopTransport; guest: CoopTransport };
+    } = {},
   ): Promise<DuoRig> {
     if (options.startingWave != null) {
       game.override.startingWave(options.startingWave);
     }
     await game.classicMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.MAGIKARP);
-    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+    const rig = await buildDuo(game, options.pair ?? createLoopbackPair(), setCoopRuntime, toCoop);
     if (options.startingWave != null) {
       expect(rig.hostScene.currentBattle.waveIndex, "the initial V2 command belongs to the tested wave").toBe(
         options.startingWave,
@@ -360,7 +510,16 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
   }, 300_000);
 
   it("parks a real BattleEnd wave, preserves it across hot rejoin, and sends waveEndState exactly once", async () => {
-    const rig = await bootDuo({ startingWave: 3 });
+    const rejoinPair = createDuoHotRejoinPair();
+    const rig = await bootDuo({ startingWave: 3, pair: rejoinPair });
+    const hostGenerationAtBoot = rejoinPair.host.connectionGeneration();
+    const guestGenerationAtBoot = rejoinPair.guest.connectionGeneration();
+    expect(rejoinPair.host.state, "the real host WebRTC transport booted on an open channel").toBe("connected");
+    expect(rejoinPair.guest.state, "the real guest WebRTC transport booted on an open channel").toBe("connected");
+    expect(rig.hostRuntime.localTransport.state).toBe("connected");
+    expect(rig.guestRuntime.localTransport.state).toBe("connected");
+    expect(rig.hostRuntime.localTransport.connectionGeneration?.()).toBe(hostGenerationAtBoot);
+    expect(rig.guestRuntime.localTransport.connectionGeneration?.()).toBe(guestGenerationAtBoot);
     const rawResolved = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveResolved");
     const rawEndState = vi.spyOn(rig.hostRuntime.battleStream, "sendWaveEndState");
     let blockBoundary = true;
@@ -380,17 +539,21 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
 
     const parked = rig.hostRuntime.v2DeferredHostBoundary;
     expect(parked).not.toBeNull();
+    if (parked == null) {
+      logs.flush();
+      return;
+    }
     expect(parked).toMatchObject({
       kind: "wave",
       wave: 3,
       transition: { outcome: "win", wave: 3 },
       compatibility: { kind: "wave-end" },
     });
-    expect(parked?.authoritativeState).toBeDefined();
+    expect(parked.authoritativeState).toBeDefined();
     expect(rawResolved).not.toHaveBeenCalled();
     expect(rawEndState).not.toHaveBeenCalled();
 
-    const parkedState = parked?.authoritativeState;
+    const parkedState = parked.authoritativeState;
     rig.hostScene.currentBattle.turn += 1;
     await withClient(rig.hostCtx, () => {
       broadcastCoopWaveResolved("win");
@@ -402,13 +565,13 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     expect(rawEndState).not.toHaveBeenCalled();
 
     expect(Object.isFrozen(parked)).toBe(true);
-    expect(Object.isFrozen(parked?.entry)).toBe(true);
-    expect(Object.isFrozen(parked?.entry.context)).toBe(true);
-    expect(Object.isFrozen(parked?.entry.material)).toBe(true);
-    expect(Object.isFrozen(parked?.entry.subsumes)).toBe(true);
+    expect(Object.isFrozen(parked.entry)).toBe(true);
+    expect(Object.isFrozen(parked.entry.context)).toBe(true);
+    expect(Object.isFrozen(parked.entry.material)).toBe(true);
+    expect(Object.isFrozen(parked.entry.subsumes)).toBe(true);
 
-    const hostShadow = getCoopV2Shadow(rig.hostRuntime);
-    const guestShadow = getCoopV2Shadow(rig.guestRuntime);
+    const hostShadow = await withClient(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime));
+    const guestShadow = await withClient(rig.guestCtx, () => getCoopV2Shadow(rig.guestRuntime));
     expect(hostShadow).not.toBeNull();
     expect(guestShadow).not.toBeNull();
     if (hostShadow == null || guestShadow == null) {
@@ -417,35 +580,110 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     }
     const hostContext = hostShadow.authenticatedFrameContext;
     const guestContext = guestShadow.authenticatedFrameContext;
-    const reboundMembershipRevision = hostContext.membershipRevision + 1;
-    guestShadow.rebindIdentity({
-      runtimeId: `${guestContext.sessionId}:seat${guestContext.senderSeatId}`,
-      sessionId: guestContext.sessionId,
-      runId: guestContext.runId,
-      epoch: guestContext.sessionEpoch,
-      localSeatId: guestContext.senderSeatId,
-      authoritySeatId: guestContext.authoritySeatId,
-      membershipRevision: reboundMembershipRevision,
-      seatMapId: guestContext.seatMapId,
+    expect(hostContext.connectionGeneration).toBe(hostGenerationAtBoot);
+    expect(guestContext.connectionGeneration).toBe(guestGenerationAtBoot);
+    const { context: staleAuthorityContext, ...staleAuthorityBody } = parked.entry;
+    const staleAuthorityFrame: CoopFrameV2 = {
+      v: 2,
+      t: "authorityEntry",
+      ctx: staleAuthorityContext,
+      body: staleAuthorityBody,
+    };
+    const staleAuthorityWire = encodeFrameV2(staleAuthorityFrame);
+    expect(staleAuthorityFrame.ctx).toBe(parked.entry.context);
+    expect(staleAuthorityFrame.ctx).toEqual(hostContext);
+    const parkedImage = structuredClone(parked);
+    const parkedRevision = parked.revision;
+    const membershipBeforeRejoin = rig.hostRuntime.membership.snapshot();
+    const timersBeforeRejoin = hostShadow.diagnostics().pendingTimers;
+    let replacementCount = 0;
+    const rejoinDriver = async (): Promise<boolean> => {
+      await Promise.resolve();
+      if (replacementCount === 0) {
+        rejoinPair.replaceChannels();
+        replacementCount++;
+      }
+      return true;
+    };
+    rig.hostRuntime.rejoinDriver = rejoinDriver;
+    rig.guestRuntime.rejoinDriver = rejoinDriver;
+
+    let recoveringMembership = membershipBeforeRejoin;
+    await withClient(rig.hostCtx, async () => {
+      rejoinPair.initialWires.host.close();
+      recoveringMembership = rig.hostRuntime.membership.snapshot();
+      for (let turn = 0; turn < 8; turn++) {
+        await Promise.resolve();
+      }
+    });
+    expect(recoveringMembership, "the runtime observed the carrier loss before the async replacement").toMatchObject({
+      state: "recovering",
+      revision: membershipBeforeRejoin.revision + 1,
+      connectionGeneration: membershipBeforeRejoin.connectionGeneration,
+      members: [
+        { seatId: 0, present: true },
+        { seatId: 1, present: false },
+      ],
+    });
+    expect(replacementCount).toBe(1);
+    expect(rejoinPair.initialWires.host.readyState).toBe("closed");
+    expect(rejoinPair.initialWires.guest.readyState).toBe("closed");
+    expect(rejoinPair.host.state).toBe("connected");
+    expect(rejoinPair.guest.state).toBe("connected");
+    expect(rejoinPair.host.connectionGeneration()).toBe(hostGenerationAtBoot + 1);
+    expect(rejoinPair.guest.connectionGeneration()).toBe(guestGenerationAtBoot + 1);
+    expect(rig.hostRuntime.membership.snapshot()).toMatchObject({
+      state: "active",
+      revision: recoveringMembership.revision + 1,
+      connectionGeneration: rejoinPair.host.connectionGeneration(),
+      members: [
+        { seatId: 0, present: true },
+        { seatId: 1, present: true },
+      ],
+    });
+
+    const reboundGuestShadow = await withClient(rig.guestCtx, () => getCoopV2Shadow(rig.guestRuntime));
+    const reboundHostShadow = await withClient(rig.hostCtx, () => getCoopV2Shadow(rig.hostRuntime));
+    const reboundCutover = await withClient(rig.hostCtx, () => getActiveCoopV2WaveCutover());
+    expect(reboundGuestShadow).toBe(guestShadow);
+    expect(reboundHostShadow).toBe(hostShadow);
+    expect(reboundGuestShadow?.authenticatedFrameContext).toEqual({
+      ...guestContext,
       connectionGeneration: guestContext.connectionGeneration + 1,
-      peerBindings: [{ seatId: hostContext.senderSeatId, connectionGeneration: hostContext.connectionGeneration + 1 }],
     });
-    hostShadow.rebindIdentity({
-      runtimeId: `${hostContext.sessionId}:seat${hostContext.senderSeatId}`,
-      sessionId: hostContext.sessionId,
-      runId: hostContext.runId,
-      epoch: hostContext.sessionEpoch,
-      localSeatId: hostContext.senderSeatId,
-      authoritySeatId: hostContext.authoritySeatId,
-      membershipRevision: reboundMembershipRevision,
-      seatMapId: hostContext.seatMapId,
+    expect(reboundHostShadow?.authenticatedFrameContext).toEqual({
+      ...hostContext,
       connectionGeneration: hostContext.connectionGeneration + 1,
-      peerBindings: [{ seatId: guestContext.senderSeatId, connectionGeneration: guestContext.connectionGeneration + 1 }],
     });
+    expect(reboundCutover?.authenticatedFrameContext).toEqual(reboundHostShadow?.authenticatedFrameContext);
+    expect(hostShadow.diagnostics().pendingTimers).toBe(timersBeforeRejoin);
     expect(rig.hostRuntime.v2DeferredHostBoundary).toBe(parked);
-    expect(rig.hostRuntime.v2DeferredHostBoundary?.entry).toBe(parked?.entry);
+    expect(rig.hostRuntime.v2DeferredHostBoundary?.entry).toBe(parked.entry);
+    expect(rig.hostRuntime.v2DeferredHostBoundary).toEqual(parkedImage);
+    expect(parked.revision).toBe(parkedRevision);
+    expect(parked.entry.context).toEqual(hostContext);
+    expect(parked.entry.context).not.toEqual(reboundHostShadow?.authenticatedFrameContext);
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
 
     blockBoundary = false;
+    const guestQueueDepthBeforeStaleEntry = rejoinPair.guest.deferredV2FrameCount();
+    withClientSync(rig.guestCtx, () => {
+      rejoinPair.initialWires.guest.injectRaw(staleAuthorityWire);
+      rejoinPair.initialWires.guest.fireOpen();
+    });
+    expect(
+      rejoinPair.guest.deferredV2FrameCount(),
+      "the superseded guest wire cannot enqueue the old-context authority entry on the live transport",
+    ).toBe(guestQueueDepthBeforeStaleEntry);
+    expect(rejoinPair.guest.state).toBe("connected");
+    expect(
+      rig.hostRuntime.v2DeferredHostBoundary,
+      "the exact old authority entry on the superseded guest receive path cannot release the parked boundary",
+    ).toBe(parked);
+    expect(rawResolved).not.toHaveBeenCalled();
+    expect(rawEndState).not.toHaveBeenCalled();
+
     await withClient(rig.hostCtx, async () => {
       isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);
       await Promise.resolve();
@@ -458,6 +696,18 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       await Promise.resolve();
     });
     expect(rawEndState).toHaveBeenCalledOnce();
+    await withClient(rig.hostCtx, () => broadcastCoopWaveEndState(true));
+    expect(rawResolved).toHaveBeenCalledOnce();
+    expect(rawEndState).toHaveBeenCalledOnce();
+    const guestQueueDepthAfterCommit = rejoinPair.guest.deferredV2FrameCount();
+    withClientSync(rig.guestCtx, () => {
+      rejoinPair.initialWires.guest.injectRaw(staleAuthorityWire);
+      rejoinPair.initialWires.guest.fireOpen();
+    });
+    expect(rejoinPair.guest.deferredV2FrameCount()).toBe(guestQueueDepthAfterCommit);
+    expect(rawResolved).toHaveBeenCalledOnce();
+    expect(rawEndState).toHaveBeenCalledOnce();
+    expect(hostShadow.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
     logs.flush();
   }, 300_000);
 
