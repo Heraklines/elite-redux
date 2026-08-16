@@ -7967,3 +7967,4 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Added anonymized, idempotent ghost performance reporting and exact danger weighting. A save-persistent hidden Nemesis relationship can promote dangerous returning ghosts with equipment, boon, donor, replacement, and segment upgrades without exposing account data or adding a player-facing Nemesis label.
 - Endless state, active Rifts, battle overlays, routes, Nemesis progression, and encounter accounting serialize with the run. Focused state regressions are delegated to GitHub Actions; no local test execution or deployment was performed.
 - Returning Nemeses now scale their saved relic stacks separately from ordinary ghosts: unchanged on the first return, 1.5x on the second and third, and 1.75x from the fourth onward, always bounded by each relic's normal stack cap.
+- Removed internal implementation wording from the player-facing Endless Move Scrambler Rift description.
