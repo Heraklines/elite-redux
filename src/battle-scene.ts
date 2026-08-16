@@ -7,6 +7,7 @@ import {
   BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT,
   MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT,
 } from "#app/constants";
+import { consumePendingDevGhostTeam } from "#app/dev-tools/registry";
 import type { GameMode } from "#app/game-mode";
 import { getGameMode } from "#app/game-mode";
 import { timedEventManager } from "#app/global-event-manager";
@@ -2096,6 +2097,18 @@ export class BattleScene extends SceneBase {
           ?? ((coopAdoptedWaveTrainer ?? this.gameMode.isWaveTrainer(waveIndex))
             ? BattleType.TRAINER
             : BattleType.WILD));
+
+    // Dev-suite only: consume one exact ghost snapshot before normal encounter
+    // selection. The pending value is set by one dev scenario, cleared here,
+    // and absent in every ordinary run.
+    const devGhost = consumePendingDevGhostTeam();
+    if (devGhost !== null) {
+      resolved.battleType = BattleType.TRAINER;
+      const ghostTrainer = this.createGhostTrainer(devGhost);
+      this.field.add(ghostTrainer);
+      resolved.trainer = ghostTrainer;
+      return;
+    }
 
     // ER Elite/Hell: inject extra rival (May/Brendan) encounters between the
     // canonical rival waves. Done BEFORE the mystery-encounter check so the

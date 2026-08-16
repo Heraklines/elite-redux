@@ -24,6 +24,7 @@
 
 import Overrides from "#app/overrides";
 import { speciesStarterCosts } from "#balance/starters";
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { SHOWDOWN_ITEM_POOL } from "#data/elite-redux/showdown/showdown-item-pool";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { makeShowdownTeamPreset, type ShowdownTeamPreset } from "#data/elite-redux/showdown/showdown-team-preset";
@@ -857,6 +858,24 @@ export function consumePendingDevEnemyParty(): DevEnemyMonSpec[] | null {
   const p = pendingDevEnemyParty;
   pendingDevEnemyParty = null;
   return p;
+}
+
+// --- Pending ghost encounter (scenario -> BattleScene) ----------------------
+// A complete snapshot can be staged for one non-fixed battle. BattleScene takes
+// and clears it before normal ghost selection, so it cannot affect a later wave.
+
+let pendingDevGhostTeam: GhostTeamSnapshot | null = null;
+
+/** Stage one exact ghost snapshot for the next dev battle. */
+export function setPendingDevGhostTeam(team: GhostTeamSnapshot): void {
+  pendingDevGhostTeam = team;
+}
+
+/** Take and clear the exact ghost snapshot staged by a dev scenario. */
+export function consumePendingDevGhostTeam(): GhostTeamSnapshot | null {
+  const team = pendingDevGhostTeam;
+  pendingDevGhostTeam = null;
+  return team;
 }
 
 // --- Lazy, env-gated loader --------------------------------------------------

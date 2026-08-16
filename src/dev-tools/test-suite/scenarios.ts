@@ -27,6 +27,7 @@ import {
   setClearMeOverrideAfterFirst,
   setPendingDevCustomTrainerForce,
   setPendingDevEnemyParty,
+  setPendingDevGhostTeam,
 } from "#app/dev-tools/registry";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
@@ -45,6 +46,7 @@ import {
   erCustomTrainerHeldModifierConfigs,
   resolveErCustomTrainerMoveIds,
 } from "#data/elite-redux/er-custom-trainers";
+import { resetErEndlessContinuation, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { DEFAULT_FUN_MODE_CONFIG, getFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
@@ -83,6 +85,7 @@ import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { GameModes } from "#enums/game-modes";
+import { HitResult } from "#enums/hit-result";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
@@ -123,6 +126,7 @@ import { PartyUiMode } from "#ui/party-ui-handler";
 import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { type ErCustomTrainerLaunchPlan, planErCustomTrainerLaunch } from "./custom-trainer-picker";
+import { DEV_HELL_VICTORY_GHOST } from "./fixtures/hell-victory-ghost";
 
 export interface DevScenario {
   /** Short name for the picker list. */
@@ -286,6 +290,7 @@ const DEV_OVERRIDE_DEFAULTS = {
  */
 export function resetDevOverrides(): void {
   Object.assign(O, structuredClone(DEV_OVERRIDE_DEFAULTS));
+  resetErEndlessContinuation();
   // The smarter AI is master-OFF in real play; clear any per-scenario force so
   // only the AI scenarios (which re-enable it below) ever exercise it.
   setErSmartAiTestForced(false);
@@ -7994,6 +7999,81 @@ export const DEV_SCENARIOS: DevScenario[] = [
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.COLOSSEUM,
       });
       return colosseumTestParty();
+    },
+  },
+  // ===========================================================================
+  // Endless continuation — final offer and full recorded Hell ghost
+  // ===========================================================================
+  {
+    label: "Endless: final boss auto-KO",
+    description:
+      "Endless entry test. Starts the real Hell wave-200 final boss and immediately\n"
+      + "applies lethal self-damage through this scenario's consume-once battle callback.\n"
+      + "EXPECT: the normal boss faint/victory path completes, then the postgame choice\n"
+      + "offers ENDLESS or END RUN. Choosing ENDLESS shows the opening Rifts and continues.\n"
+      + "SAFETY: the auto-KO exists only in this dev scenario; normal bosses are untouched.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 200,
+        STARTING_LEVEL_OVERRIDE: 200,
+      });
+      return [makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.SPLASH] })];
+    },
+    onBattleStart: () => {
+      const boss = globalScene.getEnemyPokemon();
+      if (!boss || !globalScene.currentBattle.isClassicFinalBoss) {
+        throw new Error("Endless final-boss scenario did not create the classic finale");
+      }
+      boss.damageAndUpdate(Math.max(1, boss.hp), {
+        result: HitResult.INDIRECT_KO,
+        ignoreSegments: true,
+      });
+    },
+  },
+  {
+    label: "Endless: full Hell ghost",
+    description:
+      "Full Endless ghost showcase at wave 201. The opponent is a sanitized snapshot\n"
+      + "from a real completed Hell run: all six recorded species/forms, moves, IVs,\n"
+      + "abilities, shiny data, 46 held-item entries, Blood Pact, and Second Wind are\n"
+      + "restored. Normal Endless enemy items, wards, boons, and scaling remain additive.\n"
+      + "Open Check Team / battle info and the modifier bars to inspect the complete loadout.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 201,
+        STARTING_LEVEL_OVERRIDE: 200,
+      });
+      return [
+        ...colosseumTestParty(),
+        makeStarter(SpeciesId.GHOLDENGO, {
+          moveset: [MoveId.MAKE_IT_RAIN, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT, MoveId.NASTY_PLOT],
+        }),
+        makeStarter(SpeciesId.DRAGONITE, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.EXTREME_SPEED, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.STONE_EDGE, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    onPartyReady: () => {
+      const restored = restoreErEndlessContinuation({
+        version: 1,
+        enteredAtWave: 200,
+        seed: "dev-hell-victory-showcase",
+        pulse: 0,
+        ghostEncounters: 0,
+        activeRifts: [],
+        ghostHistory: [],
+      });
+      if (!restored) {
+        throw new Error("Could not initialize the Endless showcase state");
+      }
+      setPendingDevGhostTeam(structuredClone(DEV_HELL_VICTORY_GHOST));
     },
   },
   // ===========================================================================
