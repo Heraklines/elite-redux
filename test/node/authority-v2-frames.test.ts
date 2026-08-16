@@ -312,16 +312,8 @@ describe("authority-v2 correlated boundary-tail frame bodies", () => {
   it("rejects malformed proof phases and every invalid source-list/head relation", () => {
     const cases: readonly [string, Record<string, unknown>, string][] = [
       ["bad phase", { phase: "snapshot" }, "body.phase"],
-      [
-        "non-monotonic sources",
-        { sourceRevisions: [1, 3, 2] },
-        "body.sourceRevisions[2]: must be strictly increasing",
-      ],
-      [
-        "duplicate sources",
-        { sourceRevisions: [1, 2, 2] },
-        "body.sourceRevisions[2]: must be strictly increasing",
-      ],
+      ["non-monotonic sources", { sourceRevisions: [1, 3, 2] }, "body.sourceRevisions[2]: must be strictly increasing"],
+      ["duplicate sources", { sourceRevisions: [1, 2, 2] }, "body.sourceRevisions[2]: must be strictly increasing"],
       ["out-of-range source", { sourceRevisions: [1, 2, 4] }, "body.sourceRevisions[2]: outside proof range"],
       ["head behind candidate", { headRevision: 3 }, "body.headRevision: must be at least candidateRevision"],
     ];
@@ -347,10 +339,7 @@ describe("authority-v2 correlated boundary-tail frame bodies", () => {
         ...proofBody,
         candidateRevision: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 3,
         headRevision: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 3,
-        sourceRevisions: Array.from(
-          { length: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 1 },
-          (_value, index) => index + 1,
-        ),
+        sourceRevisions: Array.from({ length: COOP_TAIL_PROOF_MAX_SOURCE_REVISIONS + 1 }, (_value, index) => index + 1),
       },
     });
     expect(overCapacity.kind).toBe("protocol-violation");

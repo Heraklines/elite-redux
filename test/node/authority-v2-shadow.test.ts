@@ -72,10 +72,7 @@ import {
 } from "#data/elite-redux/coop/coop-capabilities";
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import {
-  type CoopAccountIdentityV1,
-  createFreshCoopP33Context,
-} from "#data/elite-redux/coop/coop-session-binding";
+import { type CoopAccountIdentityV1, createFreshCoopP33Context } from "#data/elite-redux/coop/coop-session-binding";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import {
   COOP_PROTOCOL_VERSION,
@@ -83,14 +80,11 @@ import {
   type CoopTransport,
   createLoopbackPair,
 } from "#data/elite-redux/coop/coop-transport";
+import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import {
-  type CoopWireChannel,
-  WebRtcTransport,
-} from "#data/elite-redux/coop/coop-webrtc-transport";
-import {
-  faultableTypes,
   type CoopFaultPair,
   type CoopFaultProfile,
+  faultableTypes,
   wrapCoopFaultPair,
 } from "#test/tools/coop-fault-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -389,11 +383,7 @@ class InjectableWire implements CoopWireChannel {
   }
 }
 
-function takeFrame(
-  queue: CoopFrameV2[],
-  description: string,
-  predicate: (frame: CoopFrameV2) => boolean,
-): CoopFrameV2 {
+function takeFrame(queue: CoopFrameV2[], description: string, predicate: (frame: CoopFrameV2) => boolean): CoopFrameV2 {
   const index = queue.findIndex(predicate);
   if (index < 0) {
     throw new Error(`missing ${description}`);
@@ -1421,7 +1411,8 @@ describe("authority-v2 correlated boundary-tail proof", () => {
     // only retry is the same correlated request rather than an ordinary unbounded tail loop.
     duo.guest.handleInboundFrame(candidateFrame);
     const proofRequests = duo.guestToHost.filter(
-      (frame): frame is Extract<CoopFrameV2, { t: "tailRequest" }> => frame.t === "tailRequest" && frame.body.requestId != null,
+      (frame): frame is Extract<CoopFrameV2, { t: "tailRequest" }> =>
+        frame.t === "tailRequest" && frame.body.requestId != null,
     );
     expect(proofRequests).toHaveLength(2);
     expect(proofRequests[0]?.body).toEqual(firstRequest.body);
@@ -1821,11 +1812,12 @@ describe("authority-v2 correlated boundary-tail proof", () => {
     const authorityMessages: CoopMessage[] = [];
     const authorityFrames: CoopFrameV2[] = [];
     const offMessages = pair.host.onMessage(message => authorityMessages.push(message));
-    const offFrames = pair.host.onV2Frame?.(frame => {
-      if (frame != null && typeof frame === "object" && (frame as { v?: unknown }).v === 2) {
-        authorityFrames.push(structuredClone(frame) as CoopFrameV2);
-      }
-    }) ?? (() => {});
+    const offFrames =
+      pair.host.onV2Frame?.(frame => {
+        if (frame != null && typeof frame === "object" && (frame as { v?: unknown }).v === 2) {
+          authorityFrames.push(structuredClone(frame) as CoopFrameV2);
+        }
+      }) ?? (() => {});
 
     try {
       process.env.COOP_AUTHORITY_V2_TURN = "on";
@@ -2086,9 +2078,9 @@ describe("authority-v2 correlated boundary-tail proof", () => {
     expect(duo.host.rebindIdentity(hostRebound)).toBe(2);
     const reboundEntries = duo.hostToGuest.splice(0);
     expect(reboundEntries.map(frame => (frame.t === "authorityEntry" ? frame.body.revision : -1))).toEqual([1, 2]);
-    expect(
-      reboundEntries.every(frame => frame.t === "authorityEntry" && frame.ctx.connectionGeneration === 1),
-    ).toBe(true);
+    expect(reboundEntries.every(frame => frame.t === "authorityEntry" && frame.ctx.connectionGeneration === 1)).toBe(
+      true,
+    );
     expect(duo.guest.rebindIdentity(guestRebound)).toBe(0);
 
     const freshRequest = takeFrame(
