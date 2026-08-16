@@ -85,6 +85,7 @@ import {
   isCoopOperationJournalActive,
   registerCoopOperationApplier,
   tryJournalCoopCommittedEnvelope,
+  tryJournalCoopCommittedEnvelopeDetailed,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -388,6 +389,8 @@ interface MeOpState {
   readonly authorityPickSteps: Map<number, number>;
   readonly retainedTerminalPayloads: Map<string, CoopMeTerminalPayload>;
   readonly committedTerminalByPinned: Map<number, CoopMeCommittedTerminalCursor>;
+  /** One exact host terminal envelope parked while its Authority V2 predecessor is not installed. */
+  readonly deferredTerminalByPinned: Map<number, CoopMeDeferredTerminalEnvelope>;
   lastAppliedPinned: number;
   readonly pendingOwnerIntentRetries: Map<string, ReturnType<typeof setTimeout>>;
   readonly terminalTransactions: CoopMeTerminalTransactionReceiver;
@@ -405,6 +408,7 @@ registerCoopOpSurfaceState(
     authorityPickSteps: new Map<number, number>(),
     retainedTerminalPayloads: new Map<string, CoopMeTerminalPayload>(),
     committedTerminalByPinned: new Map<number, CoopMeCommittedTerminalCursor>(),
+    deferredTerminalByPinned: new Map<number, CoopMeDeferredTerminalEnvelope>(),
     lastAppliedPinned: -1,
     pendingOwnerIntentRetries: new Map<string, ReturnType<typeof setTimeout>>(),
     terminalTransactions: new CoopMeTerminalTransactionReceiver(),
@@ -482,6 +486,75 @@ export interface CoopMeCommittedTerminalCursor {
   readonly operationId: string;
   readonly terminal: CoopMeTerminalKind;
   readonly step: number;
+}
+
+/**
+ * The exact immutable terminal image retained while Authority V2 waits for its predecessor control. The
+ * host operation has already consumed its revision; only the authority-log redrive remains outstanding.
+ */
+export interface CoopMeDeferredTerminalEnvelope {
+  readonly operationId: string;
+  readonly pinned: number;
+  readonly revision: number;
+  readonly envelope: CoopAuthoritativeEnvelopeV1;
+}
+
+function cloneCoopMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAuthoritativeEnvelopeV1 {
+  return structuredClone(envelope);
+}
+
+function retainCoopMeDeferredTerminal(
+  s: MeOpState,
+  pinned: number,
+  operationId: string,
+  envelope: CoopAuthoritativeEnvelopeV1,
+): boolean {
+  const prior = s.deferredTerminalByPinned.get(pinned);
+  if (prior != null && prior.operationId !== operationId) {
+    coopWarn("me", `ME terminal deferred slot already belongs to ${prior.operationId}; refusing ${operationId}`);
+    return false;
+  }
+  s.deferredTerminalByPinned.set(pinned, {
+    operationId,
+    pinned,
+    revision: envelope.revision,
+    envelope: cloneCoopMeEnvelope(envelope),
+  });
+  return true;
+}
+
+/** Read the exact terminal parked by a predecessor-control deferral. */
+export function captureCoopMeDeferredTerminal(operationId: string): CoopMeDeferredTerminalEnvelope | null {
+  for (const deferred of state().deferredTerminalByPinned.values()) {
+    if (deferred.operationId === operationId) {
+      return {
+        ...deferred,
+        envelope: cloneCoopMeEnvelope(deferred.envelope),
+      };
+    }
+  }
+  return null;
+}
+
+/** Clear one exact deferred terminal after its V2 authority commit and local pump close complete. */
+export function releaseCoopMeDeferredTerminal(operationId: string | null): void {
+  if (operationId == null) {
+    return;
+  }
+  const deferredTerminalByPinned = maybeCoopOpSurfaceState<MeOpState>("me")?.deferredTerminalByPinned;
+  if (deferredTerminalByPinned == null) {
+    return;
+  }
+  for (const [pinned, deferred] of deferredTerminalByPinned) {
+    if (deferred.operationId === operationId) {
+      deferredTerminalByPinned.delete(pinned);
+    }
+  }
+}
+
+/** Clear every parked ME terminal for an ownership/session boundary. */
+export function clearCoopMeDeferredTerminalState(): void {
+  maybeCoopOpSurfaceState<MeOpState>("me")?.deferredTerminalByPinned.clear();
 }
 
 function canonicalMeOutcomeWithoutAuthority(outcome: Extract<CoopInteractionOutcome, { k: "meResync" }>): string {
@@ -602,6 +675,7 @@ export function releaseCoopMeRetainedTerminal(operationId: string | null): void 
     }
   }
   s.committedTerminalByPinned.delete(pinned);
+  s.deferredTerminalByPinned.delete(pinned);
 }
 
 function armOwnerIntentRetry(operationId: string, resend: () => void): void {
@@ -689,6 +763,7 @@ export function resetCoopMeOperationState(): void {
   s.authorityPickSteps.clear();
   s.retainedTerminalPayloads.clear();
   s.committedTerminalByPinned.clear();
+  s.deferredTerminalByPinned.clear();
   s.lastAppliedPinned = -1;
   s.revisionFloor = 0;
   s.terminalTransactions.reset();
@@ -953,18 +1028,40 @@ export interface CoopMeOwnerCommitParams {
   readonly beforeAuthorityCommit?: ((operationId: string) => boolean) | undefined;
 }
 
+export type CoopMeOwnerCommitDisposition =
+  | { readonly kind: "disabled" }
+  | {
+      readonly kind: "committed";
+      readonly operationId: string;
+      /** Present for a host commit; guest-owner proposals have no assigned revision yet. */
+      readonly envelope?: CoopAuthoritativeEnvelopeV1;
+    }
+  | {
+      readonly kind: "deferred";
+      readonly operationId: string;
+      readonly envelope: CoopAuthoritativeEnvelopeV1;
+      readonly revision: number;
+    }
+  | { readonly kind: "failed"; readonly operationId?: string; readonly reason: string };
+
+function failedMeOwnerCommit(reason: string, operationId?: string): CoopMeOwnerCommitDisposition {
+  return operationId == null ? { kind: "failed", reason } : { kind: "failed", operationId, reason };
+}
+
 /**
  * OWNER: mint + (on the authority) COMMIT the typed ME intent through the operation primitive (§1.3).
  * ADDITIVE + dual-run: the phase / pump / quiz-mirror still fires the legacy relay send; this records the
- * authoritative operation. No-op when the flag is OFF. Never throws (the legacy relay is the fallback).
+ * authoritative operation. No-op when the flag is OFF. The compatibility string wrapper below preserves the
+ * historical caller contract; terminal paths use this detailed result so predecessor-control liveness is not
+ * collapsed into a generic null.
  */
-export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | null {
+export function commitMeOwnerIntentDetailed(params: CoopMeOwnerCommitParams): CoopMeOwnerCommitDisposition {
   if (!isCoopMeOperationEnabled()) {
-    return null;
+    return { kind: "disabled" };
   }
   if (params.turn !== COOP_ME_AUTHORITY_TURN) {
     coopWarn("me", `ME op OWNER rejected non-transaction turn ${params.turn}`);
-    return null;
+    return failedMeOwnerCommit(`non-transaction turn ${params.turn}`);
   }
   try {
     const s = state();
@@ -1010,7 +1107,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
       // Browser evidence recorders preserve primitive console arguments. Inline the structured reason so a
       // campaign failure says which field was incomplete instead of flattening the object to `[object Object]`.
       coopWarn("me", `ME_TERMINAL commit rejected: terminal transaction is incomplete ${JSON.stringify(diagnostics)}`);
-      return null;
+      return failedMeOwnerCommit("ME_TERMINAL payload is incomplete");
     }
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);
     // Fail closed at the operation boundary: a guest may only propose an interaction that the pinned
@@ -1023,14 +1120,14 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         "me",
         `ME op OWNER reject wrong local owner kind=${params.kind} pinned=${params.pinned} expectedSeat=${ownerSeat} role=guest`,
       );
-      return null;
+      return failedMeOwnerCommit(`wrong local owner for ${params.kind}`);
     }
     const step = params.step ?? 0;
     if (params.localRole === "host" && params.kind === "ME_PRESENT") {
       const expected = s.ownerPresentationSteps.get(params.pinned) ?? 0;
       if (step !== expected) {
         coopWarn("me", `ME_PRESENT step ${step} did not match pinned ${params.pinned} expected ${expected}`);
-        return null;
+        return failedMeOwnerCommit(`ME_PRESENT step ${step} did not match expected ${expected}`);
       }
     }
     const addr = meOpAddr(params.kind, params.seq, step);
@@ -1042,7 +1139,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
       && params.beforeAuthorityCommit?.(operationId) !== true
     ) {
       coopWarn("me", `ME_TERMINAL ${operationId} had no exact Authority V2 terminal proof`);
-      return null;
+      return failedMeOwnerCommit("no exact Authority V2 terminal proof", operationId);
     }
     let payload = params.payload;
     if (params.localRole === "host" && params.kind === "ME_TERMINAL") {
@@ -1077,7 +1174,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
             );
       if (context == null) {
         coopWarn("me", `ME_PRESENT ${intent.id} had no complete authoritative state image`);
-        return null;
+        return failedMeOwnerCommit("no complete authoritative state image", intent.id);
       }
       const res = host().submit(intent, context, seatValidator(ownerSeat));
       if (res.kind === "committed" || res.kind === "reack") {
@@ -1085,9 +1182,44 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
         // (resend / reconnect replay). An idempotent re-ACK is journaled again as well: this is the
         // recovery path when the operation commit succeeded but its first journal handoff threw.
         // Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
-        if (!tryJournalCoopCommittedEnvelope(res.envelope)) {
-          coopWarn("me", `ME op OWNER ${res.kind} could not be retained id=${intent.id}`);
-          return null;
+        const journalDisposition = tryJournalCoopCommittedEnvelopeDetailed(res.envelope);
+        if (journalDisposition.kind === "deferred") {
+          if (params.kind === "ME_TERMINAL") {
+            const terminalPayload = payload as CoopMeTerminalPayload;
+            const priorTerminal = s.committedTerminalByPinned.get(params.pinned);
+            if (
+              priorTerminal == null
+              || step > priorTerminal.step
+              || (step === priorTerminal.step && priorTerminal.operationId === intent.id)
+            ) {
+              s.committedTerminalByPinned.set(params.pinned, {
+                operationId: intent.id,
+                terminal: terminalPayload.terminal,
+                step,
+              });
+            }
+          }
+          if (
+            params.kind === "ME_TERMINAL"
+            && !retainCoopMeDeferredTerminal(s, params.pinned, intent.id, res.envelope)
+          ) {
+            return failedMeOwnerCommit("conflicting deferred ME terminal envelope", intent.id);
+          }
+          coopLog(
+            "me",
+            `ME op OWNER deferred kind=${params.kind} rev=${res.envelope.revision} id=${intent.id} `
+              + `reason=${journalDisposition.reason}`,
+          );
+          return {
+            kind: "deferred",
+            operationId: intent.id,
+            envelope: cloneCoopMeEnvelope(res.envelope),
+            revision: res.envelope.revision,
+          };
+        }
+        if (journalDisposition.kind === "failed") {
+          coopWarn("me", `ME op OWNER ${res.kind} could not be retained id=${intent.id}: ${journalDisposition.reason}`);
+          return failedMeOwnerCommit(journalDisposition.reason, intent.id);
         }
         if (params.kind === "ME_TERMINAL") {
           const terminalPayload = payload as CoopMeTerminalPayload;
@@ -1103,6 +1235,7 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
               step,
             });
           }
+          s.deferredTerminalByPinned.delete(params.pinned);
         }
         if (params.kind === "ME_PRESENT") {
           s.ownerPresentationSteps.set(params.pinned, step + 1);
@@ -1111,26 +1244,37 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
           "me",
           `ME op OWNER ${res.kind} kind=${params.kind} rev=${res.envelope.revision} id=${intent.id} (Wave-2c)`,
         );
-      } else {
-        coopWarn(
-          "me",
-          `ME op OWNER commit non-committed (${res.kind}) id=${intent.id} - authoritative control holds (Wave-2c)`,
-        );
-        return null;
+        return {
+          kind: "committed",
+          operationId: intent.id,
+          envelope: cloneCoopMeEnvelope(res.envelope),
+        };
       }
-    } else if (params.resend != null) {
+      coopWarn(
+        "me",
+        `ME op OWNER commit non-committed (${res.kind}) id=${intent.id} - authoritative control holds (Wave-2c)`,
+      );
+      return failedMeOwnerCommit(`authority commit ${res.kind}`, intent.id);
+    }
+    if (params.resend != null) {
       armOwnerIntentRetry(intent.id, params.resend);
     }
     // NOTE: the owner does NOT advance lastAppliedPinned - that is a WATCHER-only order (see its field
     // doc). The owner knows its own decision; only an adopted RELAY needs the stale-ordering guard.
-    return intent.id;
+    return { kind: "committed", operationId: intent.id };
   } catch (e) {
     if (isCoopOpRuntimeError(e)) {
       throw e;
     }
     coopWarn("me", "ME op OWNER commit threw (handled - legacy relay is the fallback) (Wave-2c)", e);
-    return null;
+    return failedMeOwnerCommit(e instanceof Error ? e.message : String(e));
   }
+}
+
+/** Compatibility wrapper for legacy ME callers that only need the deterministic operation ID. */
+export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | null {
+  const disposition = commitMeOwnerIntentDetailed(params);
+  return disposition.kind === "committed" ? disposition.operationId : null;
 }
 
 export type CoopMeAuthorityIntentResult =

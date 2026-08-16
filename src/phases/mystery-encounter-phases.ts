@@ -14,13 +14,16 @@ import {
   COOP_ME_AUTHORITY_TURN,
   CoopMeTerminalOutcomeLatch,
   captureCoopMeCommittedTerminalCursor,
+  captureCoopMeDeferredTerminal,
   commitMeAuthorityGuestIntent,
   commitMeAuthorityLocalPick,
   commitMeOwnerIntent,
+  commitMeOwnerIntentDetailed,
   completeCoopMeFinalOutcomeFromRetainedSettlement,
   isCoopMeOperationEnabled,
   isCoopMeOperationJournalActive,
   nextCoopMePresentationStep,
+  releaseCoopMeDeferredTerminal,
   releaseCoopMeRetainedTerminal,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -54,6 +57,7 @@ import {
   getCoopNetcodeMode,
   getCoopRuntime,
   isCoopAuthoritativeGuest,
+  registerCoopMeTerminalRedrive,
   setCoopMeBattleInteractionCounter,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -204,15 +208,23 @@ function coopBeginMePump(): void {
  * ONCE for the whole encounter (its embedded reward shop suppresses its own advance while an ME
  * is active, so this is the single advance).
  */
-function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync" }>): boolean {
+type CoopEndMePumpResult =
+  | { readonly kind: "completed" }
+  | { readonly kind: "deferred"; readonly operationId: string }
+  | { readonly kind: "failed"; readonly reason: string };
+
+function coopEndMePump(
+  outcome?: Extract<CoopInteractionOutcome, { k: "meResync" }>,
+  deferredOperationId?: string,
+): CoopEndMePumpResult {
   if (!globalScene.gameMode.isCoop) {
-    return true;
+    return { kind: "completed" };
   }
   const controller = getCoopController();
   const pump = getCoopMePump();
   if (controller == null || pump == null) {
     coopWarn("me", "coopEndMePump HOLD: shared controller/pump unavailable at the exact ME terminal");
-    return false;
+    return { kind: "failed", reason: "shared controller/pump unavailable" };
   }
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
   const pinned = coopMeInteractionStartValue();
@@ -240,39 +252,59 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     const owningRuntime = getCoopRuntime();
     if (outcome == null) {
       coopWarn("me", "coopEndMePump HOLD: leave terminal has no retained authoritative outcome");
-      return false;
+      return { kind: "failed", reason: "leave terminal has no retained authoritative outcome" };
     }
     const wave = globalScene.currentBattle?.waveIndex ?? -1;
     if (wave < 0 || terminalStep < 0 || terminalStep >= 1_000) {
       coopWarn("me", "coopEndMePump HOLD: leave terminal has no live addressed destination");
-      return false;
+      return { kind: "failed", reason: "leave terminal has no live addressed destination" };
     }
-    const payload = {
-      terminal: "leave",
-      outcome,
-      destination: {
-        kind: "continue",
-        nextWave: wave + 1,
-        // Some game-mode implementations expose an optional/undefined biome edge. The durable terminal
-        // protocol requires a literal boolean so both replicas install the same next control.
-        selectBiome: Boolean(globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()),
-      },
-    } satisfies CoopMeTerminalPayload;
-    terminalOperationId = commitMeOwnerIntent({
-      kind: "ME_TERMINAL",
-      seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
-      pinned: coopMeInteractionStartValue(),
-      step: terminalStep,
-      payload,
-      localRole: "host",
-      wave,
-      turn: COOP_ME_AUTHORITY_TURN,
-      beforeAuthorityCommit: operationId => settleCoopV2InteractionOperation(operationId, owningRuntime),
-    });
-    if (terminalOperationId == null) {
-      coopWarn("me", "coopEndMePump HOLD: exact authoritative leave did not commit");
-      owningRuntime?.durability?.reconnect();
-      return false;
+    if (deferredOperationId == null) {
+      const payload = {
+        terminal: "leave",
+        outcome,
+        destination: {
+          kind: "continue",
+          nextWave: wave + 1,
+          // Some game-mode implementations expose an optional/undefined biome edge. The durable terminal
+          // protocol requires a literal boolean so both replicas install the same next control.
+          selectBiome: Boolean(globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()),
+        },
+      } satisfies CoopMeTerminalPayload;
+      const disposition = commitMeOwnerIntentDetailed({
+        kind: "ME_TERMINAL",
+        seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
+        pinned: coopMeInteractionStartValue(),
+        step: terminalStep,
+        payload,
+        localRole: "host",
+        wave,
+        turn: COOP_ME_AUTHORITY_TURN,
+        beforeAuthorityCommit: operationId => settleCoopV2InteractionOperation(operationId, owningRuntime),
+      });
+      if (disposition.kind === "deferred") {
+        coopWarn(
+          "me",
+          `coopEndMePump HOLD: exact leave deferred id=${disposition.operationId} rev=${disposition.revision}`,
+        );
+        return { kind: "deferred", operationId: disposition.operationId };
+      }
+      if (disposition.kind !== "committed") {
+        const reason = disposition.kind === "failed" ? disposition.reason : "ME operation disabled";
+        coopWarn("me", `coopEndMePump HOLD: exact authoritative leave did not commit (${reason})`);
+        owningRuntime?.durability?.reconnect();
+        return { kind: "failed", reason };
+      }
+      terminalOperationId = disposition.operationId;
+    } else {
+      const deferred = captureCoopMeDeferredTerminal(deferredOperationId);
+      if (deferred == null || deferred.pinned !== pinned) {
+        coopWarn("me", `coopEndMePump HOLD: deferred terminal ${deferredOperationId} is no longer retained`);
+        return { kind: "failed", reason: "deferred terminal is no longer retained" };
+      }
+      // Authority V2 has already committed this exact envelope. Closing the pump now must not submit a
+      // second host operation (or mint a second revision); the retained image is only a local completion key.
+      terminalOperationId = deferred.operationId;
     }
     if (terminalOperationId != null) {
       setCoopMeTerminalControl("leave", undefined, {
@@ -313,15 +345,16 @@ function coopEndMePump(outcome?: Extract<CoopInteractionOutcome, { k: "meResync"
     controller.advanceInteraction(coopMeInteractionStartValue());
   } catch (error) {
     coopWarn("me", "coopEndMePump HOLD: committed terminal could not close/advance locally", error);
-    return false;
+    return { kind: "failed", reason: "committed terminal could not close/advance locally" };
   }
+  releaseCoopMeDeferredTerminal(terminalOperationId);
   releaseCoopMeRetainedTerminal(terminalOperationId);
   releaseCoopRewardResultState(pinned);
   setCoopMeInteractionStart(-1);
   hideCoopControllerTag(); // #817: never outlive the encounter
   // Clear the ME battle handoff key now the encounter is fully over (#633).
   setCoopMeBattleInteractionCounter(-1);
-  return true;
+  return { kind: "completed" };
 }
 
 /**
@@ -1647,6 +1680,8 @@ export class PostMysteryEncounterPhase extends Phase {
   onPostOptionSelect?: OptionPhaseCallback | undefined;
   private terminalCommitAttempts = 0;
   private terminalCommitRetry: ReturnType<typeof setTimeout> | null = null;
+  private deferredTerminalRetryCancel: (() => void) | null = null;
+  private deferredTerminalOperationId: string | null = null;
   private readonly terminalOutcomeLatch = new CoopMeTerminalOutcomeLatch();
 
   constructor() {
@@ -1760,11 +1795,49 @@ export class PostMysteryEncounterPhase extends Phase {
       // Co-op (#633): the encounter is over - close the input pump (owner sends the leave
       // sentinel; host advances the alternation turn once for the whole encounter). Done before
       // queuing the next wave so the watcher's loop ends cleanly. No-op in solo.
-      if (!coopEndMePump(terminalOutcome)) {
+      const terminalResult = coopEndMePump(terminalOutcome, this.deferredTerminalOperationId ?? undefined);
+      if (terminalResult.kind !== "completed") {
+        if (terminalResult.kind === "deferred") {
+          // A predecessor-control deferral is liveness, not a failed terminal. Park the exact operation and
+          // let the owning runtime wake this phase from controlInstalled/settled/surface proof; no timer and
+          // no second ME effect are allowed here.
+          this.deferredTerminalOperationId = terminalResult.operationId;
+          if (this.deferredTerminalRetryCancel == null) {
+            const runtime = getCoopRuntime();
+            const controller = getCoopController();
+            const generation = coopSessionGeneration();
+            const scene = globalScene;
+            const pinned = coopMeInteractionStartValue();
+            const wave = globalScene.currentBattle?.waveIndex ?? -1;
+            const operationId = terminalResult.operationId;
+            const cancel = registerCoopMeTerminalRedrive(runtime, operationId, () => {
+              this.deferredTerminalRetryCancel = null;
+              if (
+                globalScene !== scene
+                || getCoopRuntime() !== runtime
+                || getCoopController() !== controller
+                || coopSessionGeneration() !== generation
+                || coopMeInteractionStartValue() !== pinned
+                || (globalScene.currentBattle?.waveIndex ?? -1) !== wave
+                || globalScene.phaseManager.getCurrentPhase() !== this
+              ) {
+                releaseCoopMeDeferredTerminal(operationId);
+                return;
+              }
+              endPhase();
+            });
+            if (cancel == null) {
+              failCoopSharedSession("Mystery terminal lost its owning runtime while deferred");
+              return;
+            }
+            this.deferredTerminalRetryCancel = cancel;
+          }
+          return;
+        }
         // A terminal commit is the causal authorization for BOTH peers to leave this encounter. Never
         // queue the host's biome/new-wave tail while the guest is correctly holding the old boundary.
-        // Retry the same deterministic ME_TERMINAL id once after reconnect; if it still cannot commit,
-        // stop the binary session rather than manufacture an asymmetric local continuation.
+        // A genuine failed disposition may use the existing single reconnect retry; it is distinct from the
+        // exact predecessor-control deferral handled above.
         this.terminalCommitAttempts++;
         if (this.terminalCommitAttempts <= 1) {
           const runtime = getCoopRuntime();
@@ -1790,7 +1863,7 @@ export class PostMysteryEncounterPhase extends Phase {
           }, 250);
           return;
         }
-        failCoopSharedSession("Mystery terminal could not commit after exact retry");
+        failCoopSharedSession(`Mystery terminal could not commit after exact retry: ${terminalResult.reason}`);
         return;
       }
       this.terminalCommitAttempts = 0;
@@ -1798,6 +1871,9 @@ export class PostMysteryEncounterPhase extends Phase {
         clearTimeout(this.terminalCommitRetry);
         this.terminalCommitRetry = null;
       }
+      this.deferredTerminalRetryCancel?.();
+      this.deferredTerminalRetryCancel = null;
+      this.deferredTerminalOperationId = null;
 
       if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
         globalScene.phaseManager.pushNew("SelectBiomePhase");

@@ -260,6 +260,8 @@ import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle"
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
   COOP_ME_AUTHORITY_TURN,
+  captureCoopMeDeferredTerminal,
+  clearCoopMeDeferredTerminalState,
   commitMeOwnerIntent,
   isCompleteCoopMeTerminalPayload,
   isCoopMeOperationEnabled,
@@ -3357,6 +3359,8 @@ function prepareCoopSharedTerminal(runtime: CoopRuntime, reason: string): boolea
   }
   state.frozen = true;
   state.reason = reason;
+  // A shared terminal owns progression now; no parked ME callback may wake a stale scene afterward.
+  clearCoopMeTerminalRedrive(runtime);
   let prepared = true;
   try {
     runtime.membership.terminate();
@@ -4251,6 +4255,13 @@ export interface CoopRuntime {
   readonly v2InteractionStateApplied: Set<string>;
   /** Result phases that consumed their exact operation and reached the real local terminal. */
   readonly v2SettledInteractionOperations: Set<string>;
+  /** One host-owned ME terminal wake parked until its exact V2 envelope commits. */
+  v2DeferredMeTerminalRedrive: {
+    readonly operationId: string;
+    readonly revision: number;
+    readonly envelope: CoopAuthoritativeEnvelopeV1;
+    readonly resume: () => void;
+  } | null;
   /** Address-exact interaction claims shared by ordinary delivery, authority-local control, and recovery. */
   readonly v2ControlLedger: CoopV2ControlLedger;
   /** Successor that may release a recovered ordered-wait phase only after its immutable material applies. */
@@ -4284,6 +4295,136 @@ export interface CoopRuntime {
 
 let active: CoopRuntime | null = null;
 
+function clearCoopMeTerminalRedrive(runtime: CoopRuntime): void {
+  runtime.v2DeferredMeTerminalRedrive = null;
+  withActiveCoopRuntimeOpState(runtime.opState, clearCoopMeDeferredTerminalState);
+}
+
+/**
+ * Park the one exact host ME terminal wake owned by `runtime`. The callback is invoked only after the same
+ * operation ID is reported committed by that runtime's Authority V2 cutover; it is never used as a timer.
+ */
+export function registerCoopMeTerminalRedrive(
+  runtime: CoopRuntime | null,
+  operationId: string,
+  resume: () => void,
+): (() => void) | null {
+  if (runtime == null || operationId.length === 0) {
+    return null;
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    clearCoopMeTerminalRedrive(runtime);
+    return null;
+  }
+  const parked = runtime.v2DeferredMeTerminalRedrive;
+  if (parked != null && parked.operationId !== operationId) {
+    coopWarn(
+      "v2-interaction",
+      `refusing a second deferred ME terminal wake ${operationId}; ${parked.operationId} is still parked`,
+    );
+    return null;
+  }
+  if (parked != null) {
+    return () => {
+      if (runtime.v2DeferredMeTerminalRedrive === parked) {
+        runtime.v2DeferredMeTerminalRedrive = null;
+      }
+    };
+  }
+  const deferred = withActiveCoopRuntimeOpState(runtime.opState, () => captureCoopMeDeferredTerminal(operationId));
+  if (deferred == null) {
+    coopWarn("v2-interaction", `cannot park ME terminal wake without exact envelope id=${operationId}`);
+    return null;
+  }
+  const record = {
+    operationId,
+    revision: deferred.revision,
+    envelope: deferred.envelope,
+    resume,
+  };
+  runtime.v2DeferredMeTerminalRedrive = record;
+  return () => {
+    if (runtime.v2DeferredMeTerminalRedrive === record) {
+      runtime.v2DeferredMeTerminalRedrive = null;
+    }
+  };
+}
+
+function notifyCoopMeTerminalRedrive(runtime: CoopRuntime, operationId: string): void {
+  const parked = runtime.v2DeferredMeTerminalRedrive;
+  if (parked == null || parked.operationId !== operationId) {
+    return;
+  }
+  // Clear before scheduling so a synchronous/loopback wake cannot run the exact terminal twice.
+  runtime.v2DeferredMeTerminalRedrive = null;
+  queueMicrotask(() => {
+    runWhenCoopRuntimeActive(runtime, () => {
+      try {
+        parked.resume();
+      } catch (error) {
+        coopWarn("v2-interaction", `deferred ME terminal wake threw id=${operationId}`, error);
+      }
+    });
+  });
+}
+
+/** Redrive all retained authority envelopes only from the generic settled proof edge. */
+function retryCoopV2InteractionHostEnvelopes(runtime: CoopRuntime): number {
+  if (runtime.controller.authorityRole !== "authority") {
+    clearCoopMeTerminalRedrive(runtime);
+    return 0;
+  }
+  const cutover = coopV2InteractionCutovers.get(runtime);
+  if (cutover == null) {
+    return 0;
+  }
+  const committed = cutover.retryDeferredHostEnvelopes();
+  if (committed > 0) {
+    coopLog("v2-interaction", `authority redrove ${committed} exact deferred host envelope(s)`);
+  }
+  return committed;
+}
+
+type CoopMeTerminalRedriveEdge = "settled" | "control-installed" | "surface-ready" | "runtime-active";
+
+/** Redrive only the exact ME terminal registered by this owning runtime; other pending classes remain parked. */
+function redriveCoopMeTerminal(runtime: CoopRuntime, edge: CoopMeTerminalRedriveEdge): boolean {
+  const parked = runtime.v2DeferredMeTerminalRedrive;
+  if (parked == null) {
+    return false;
+  }
+  if (runtime.controller.authorityRole !== "authority") {
+    clearCoopMeTerminalRedrive(runtime);
+    return false;
+  }
+  const cutover = coopV2InteractionCutovers.get(runtime);
+  if (cutover == null) {
+    clearCoopMeTerminalRedrive(runtime);
+    failCoopRuntimeSharedSession(runtime, `ME terminal ${parked.operationId} lost its Authority V2 cutover at ${edge}`);
+    return false;
+  }
+  const disposition = cutover.commitHostEnvelopeDetailed("op:me", parked.envelope);
+  if (disposition.kind === "committed") {
+    coopLog(
+      "v2-interaction",
+      `authority redrove exact ME terminal id=${parked.operationId} rev=${parked.revision} edge=${edge}`,
+    );
+    // The commit seam normally notifies this exact operation; keep the explicit call for a pure shadow/live
+    // binding that commits without a live callback. notifyCoopMeTerminalRedrive is idempotent by operation ID.
+    notifyCoopMeTerminalRedrive(runtime, parked.operationId);
+    return true;
+  }
+  if (disposition.kind === "deferred") {
+    return false;
+  }
+  clearCoopMeTerminalRedrive(runtime);
+  failCoopRuntimeSharedSession(
+    runtime,
+    `Authority V2 failed exact ME terminal redrive ${parked.operationId} at ${edge}: ${disposition.reason}`,
+  );
+  return false;
+}
+
 /**
  * Production phase terminal proof for an authoritative interaction result. FIFO injection, a raw proposal,
  * and a queued phase may never call this; only the exact operation consumer calls it after ending/shifting
@@ -4295,7 +4436,19 @@ export function settleCoopV2InteractionOperation(operationId: string, runtime: C
   if (runtime == null || operationId.length === 0) {
     return false;
   }
+  const alreadySettled = runtime.v2SettledInteractionOperations.has(operationId);
   runtime.v2SettledInteractionOperations.add(operationId);
+  // This is the only intentionally generic host-redrive edge, and only on the FIRST settlement proof.
+  // Reward phases publish that first proof before commitRewardAuthoritativeResult/retainEnvelope, so their
+  // current envelope cannot be pending here. Repeated proof callbacks after a deferred reward attempt do not
+  // consume its pending envelope behind the reward phase; a parked ME terminal remains operation-keyed below.
+  if (runtime.v2DeferredMeTerminalRedrive == null) {
+    if (!alreadySettled) {
+      retryCoopV2InteractionHostEnvelopes(runtime);
+    }
+  } else {
+    redriveCoopMeTerminal(runtime, "settled");
+  }
   if (!coopV2InteractionCutovers.has(runtime)) {
     // A mixed-capability peer pair stays on the legacy retained journal. Its live sink deliberately
     // deferred until this exact phase terminal; retry now so the decision cancels owner resends and
@@ -4359,6 +4512,21 @@ const coopV2ControlCutovers = new WeakMap<CoopRuntime, CoopV2ControlCutover>();
  * removing any dependency on the authority's later network-redelivery timer.
  */
 const coopV2CommandProofRetryQueued = new WeakSet<CoopRuntime>();
+/** Coalesce exact interaction control-installed redrives without re-entering the projector stack. */
+const coopV2InteractionRedriveQueued = new WeakSet<CoopRuntime>();
+
+function scheduleCoopV2InteractionHostEnvelopeRetry(runtime: CoopRuntime): void {
+  if (coopV2InteractionRedriveQueued.has(runtime)) {
+    return;
+  }
+  coopV2InteractionRedriveQueued.add(runtime);
+  queueMicrotask(() => {
+    runWhenCoopRuntimeActive(runtime, () => {
+      coopV2InteractionRedriveQueued.delete(runtime);
+      redriveCoopMeTerminal(runtime, "control-installed");
+    });
+  });
+}
 
 function scheduleCoopV2CommandProofRetry(runtime: CoopRuntime): void {
   if (coopV2CommandProofRetryQueued.has(runtime)) {
@@ -5234,6 +5402,7 @@ function projectCoopV2InteractionControl(
       if (waveTransaction != null && waveTransaction.dataApplied) {
         completeCoopV2WaveTransaction(runtime, waveTransaction);
       }
+      scheduleCoopV2InteractionHostEnvelopeRetry(runtime);
     }
     return result;
   }
@@ -5299,6 +5468,7 @@ function projectCoopV2InteractionControl(
     if (waveTransaction != null && waveTransaction.dataApplied) {
       completeCoopV2WaveTransaction(runtime, waveTransaction);
     }
+    scheduleCoopV2InteractionHostEnvelopeRetry(runtime);
   }
   return result;
 }
@@ -5636,6 +5806,9 @@ function buildCoopV2LiveSeams(
         // locally. Record only the idempotency evidence after the log commit itself became durable.
         runtime.opState.materializedOperationKeys.add(`${material.surfaceClass}:${entry.operationId}`);
       }
+      const committedMeTerminal =
+        entry.kind === "INTERACTION_COMMIT"
+        && decodeCoopV2InteractionEnvelope(entry)?.envelope.pendingOperation?.kind === "ME_TERMINAL";
       const projected =
         entry.nextControl.kind === "TERMINAL"
           ? runtime.v2ControlLedger.projectMechanical(entry.nextControl, () => {
@@ -5662,6 +5835,11 @@ function buildCoopV2LiveSeams(
         return;
       }
       if (projected.kind !== "installed" && projected.kind !== "already-installed") {
+        if (committedMeTerminal) {
+          // The exact terminal envelope is committed; its public successor may still be waiting on the
+          // ordinary surface. Wake the parked local ME pump only after this authority commit edge.
+          notifyCoopMeTerminalRedrive(runtime, entry.operationId);
+        }
         return;
       }
       if (entry.nextControl.kind === "COMMAND_FRONTIER") {
@@ -5677,6 +5855,9 @@ function buildCoopV2LiveSeams(
         // nested CONTROL_COMMIT releases any remaining same-address fields after the immutable aggregate
         // frontier has been accepted by the log.
         resumeOneCoopV2DeferredAuthorityCommandStart(runtime, entry.nextControl);
+      }
+      if (committedMeTerminal) {
+        notifyCoopMeTerminalRedrive(runtime, entry.operationId);
       }
     },
     admitEntry: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean => {
@@ -7540,6 +7721,7 @@ function releaseCoopV2DeferredInteractionStarts(
 function disposeCoopV2Shadow(runtime: CoopRuntime): void {
   runtime.v2DeferredCommandStarts.clear();
   runtime.v2DeferredInteractionStarts.clear();
+  clearCoopMeTerminalRedrive(runtime);
   const controlCutover = coopV2ControlCutovers.get(runtime);
   if (controlCutover != null) {
     controlCutover.dispose();
@@ -7685,6 +7867,7 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   setActiveCoopRuntimeOpState(runtime.opState);
   // A receiver may have retained this exact global operation while the sender/no client was ambient. Apply
   // it now, under the destination scene + runtime, before any later client phase can publish a newer tick.
+  redriveCoopMeTerminal(runtime, "runtime-active");
   if (!isCoopV2InteractionCutoverActive(runtime.durability)) {
     runtime.durability?.retryDeferred("op:global");
   }
@@ -11116,6 +11299,7 @@ export function assembleCoopRuntime(
     v2InstalledInteractionTargets: new Set<string>(),
     v2InteractionStateApplied: new Set<string>(),
     v2SettledInteractionOperations: new Set<string>(),
+    v2DeferredMeTerminalRedrive: null,
     v2ControlLedger: new CoopV2ControlLedger(),
     v2RecoveryWaitSuccessorOperationId: null,
     v2RecoveryPreparedControlId: null,
@@ -11194,6 +11378,11 @@ export function assembleCoopRuntime(
     }
     if (!isCoopV2InteractionCutoverActive(durability)) {
       durability?.retryDeferred("op:global");
+    }
+    if (active === runtime) {
+      // A real public surface is the last ME predecessor-control proof edge. Redrive only this runtime's
+      // exact authority cutover; never consult the ambient cutover while a harness client is swapped.
+      redriveCoopMeTerminal(runtime, "surface-ready");
     }
     publishPendingCoopSnapshotProof(runtime);
     return released;
