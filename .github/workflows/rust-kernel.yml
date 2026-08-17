@@ -1858,7 +1858,7 @@ jobs:
         env:
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
           ORACLE_BRANCH: ci/coop/v2-showdown-command-coordinate-20260720
-          AUDITED_PRODUCTION_HEAD: 66ceee6e095534c59e67f80bbab8fadee1d8c4ba
+          AUDITED_PRODUCTION_HEAD: a307f94ef8988ba6496f0b5e97a44a956ee2761a
         run: |
           set -euo pipefail
           python3 - <<'PY'
