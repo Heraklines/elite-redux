@@ -4,11 +4,16 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { consumePendingDevGhostTeam, setPendingDevGhostTeam } from "#app/dev-tools/registry";
+import {
+  consumePendingDevGhostTeam,
+  runPendingDevPartySetup,
+  setPendingDevGhostTeam,
+  setPendingDevPartySetup,
+} from "#app/dev-tools/registry";
 import { DEV_HELL_VICTORY_GHOST } from "#app/dev-tools/test-suite/fixtures/hell-victory-ghost";
 import fs from "node:fs";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 describe("Endless dev scenario fixtures", () => {
   it("keeps the sanitized Hell victory team complete", () => {
@@ -39,6 +44,21 @@ describe("Endless dev scenario fixtures", () => {
     expect(consumePendingDevGhostTeam()).toBeNull();
   });
 
+  it("does not abort run creation when a dev party setup fails", () => {
+    const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
+    setPendingDevPartySetup(() => {
+      throw new Error("legacy fixture entry");
+    });
+
+    expect(runPendingDevPartySetup()).toBe(false);
+    expect(runPendingDevPartySetup()).toBe(true);
+    expect(warning).toHaveBeenCalledWith(
+      "[dev-tools] Party setup failed; continuing with the restored base party",
+      expect.any(Error),
+    );
+    warning.mockRestore();
+  });
+
   it("keeps the final-boss auto-KO scoped to the Hell-team picker scenario", () => {
     const source = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/scenarios.ts"), "utf8");
     const scenarioStart = source.indexOf('label: "Endless: final boss auto-KO"');
@@ -50,6 +70,8 @@ describe("Endless dev scenario fixtures", () => {
     expect(scenario).toContain("usableGhostMembers(DEV_HELL_VICTORY_GHOST)");
     expect(scenario).toContain("applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members)");
     expect(scenario).toContain("applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST)");
+    expect(scenario).toContain("Hell victory legacy loadout restored partially");
+    expect(scenario).not.toContain("Hell victory loadout was incomplete");
     expect(scenario).toContain("globalScene.currentBattle.isClassicFinalBoss");
     expect(scenario).toContain("boss.damageAndUpdate(Math.max(1, boss.hp)");
     expect(source.match(/boss\.damageAndUpdate\(Math\.max\(1, boss\.hp\)/gu)).toHaveLength(1);

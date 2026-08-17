@@ -733,6 +733,21 @@ export function consumePendingDevPartySetup(): (() => void) | null {
   return cb;
 }
 
+/** Run and consume the staged party setup without letting a dev fixture abort run creation. */
+export function runPendingDevPartySetup(): boolean {
+  const setup = consumePendingDevPartySetup();
+  if (!setup) {
+    return true;
+  }
+  try {
+    setup();
+    return true;
+  } catch (error) {
+    console.warn("[dev-tools] Party setup failed; continuing with the restored base party", error);
+    return false;
+  }
+}
+
 // --- Pending custom-trainer force (scenario -> SelectStarterPhase) ----------
 // Resetting a dev scenario rebuilds the title screen, whose cleanup correctly
 // clears any old force. Keep the next force pending until immediately before

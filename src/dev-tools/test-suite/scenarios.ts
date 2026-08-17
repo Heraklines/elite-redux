@@ -8142,8 +8142,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       const expectedRelics = DEV_HELL_VICTORY_GHOST.relics?.length ?? 0;
       const restoredRelics = applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST);
       if (restoredItems !== expectedItems || restoredRelics !== expectedRelics) {
-        throw new Error(
-          `Hell victory loadout was incomplete: items ${restoredItems}/${expectedItems}, relics ${restoredRelics}/${expectedRelics}`,
+        console.warn(
+          `[dev-tools] Hell victory legacy loadout restored partially: items ${restoredItems}/${expectedItems}, relics ${restoredRelics}/${expectedRelics}`,
         );
       }
     },

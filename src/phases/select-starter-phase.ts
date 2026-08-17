@@ -1,7 +1,6 @@
 import { getSessionDataLocalStorageKey } from "#app/account";
 import {
   consumePendingDevCustomTrainerForce,
-  consumePendingDevPartySetup,
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
   getCoopBrowserLongitudinalFixtureStartingLevel,
@@ -9,6 +8,7 @@ import {
   getCoopBrowserPartyRewardFixtureId,
   isCoopBrowserEvolutionFixtureActive,
   isCoopBrowserNavigationFixtureActive,
+  runPendingDevPartySetup,
   shouldPauseCoopBrowserLongitudinalFixtureEvolutions,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -967,7 +967,7 @@ export class SelectStarterPhase extends Phase {
     // Dev scenarios can restore per-mon state that the Starter handoff cannot
     // represent (notably held items). Apply it before newBattle() so the first
     // battle frame and item bars see the final party state.
-    consumePendingDevPartySetup()?.();
+    runPendingDevPartySetup();
     // Showdown 1v1 (B7 item 6): attach each OWN mon's manifest held item to the PLAYER party -
     // the SAME mapping (buildShowdownHeldItem) the opponent's client fields for you, so both
     // sides field a byte-equal held-item set. MEGA_STONE / unset -> no runtime modifier. The
