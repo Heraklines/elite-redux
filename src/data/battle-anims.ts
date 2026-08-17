@@ -1128,7 +1128,7 @@ export abstract class BattleAnim {
               };
               setSpritePriority(frame.priority);
             }
-            const hasGraphicFrame = moveSprite.texture.has(frame.graphicFrame);
+            const hasGraphicFrame = moveSprite.texture.has(String(frame.graphicFrame));
             if (hasGraphicFrame) {
               moveSprite.setFrame(frame.graphicFrame);
             }
@@ -1393,7 +1393,7 @@ export abstract class BattleAnim {
             };
             setSpritePriority(frame.priority);
           }
-          const hasGraphicFrame = moveSprite.texture.has(frame.graphicFrame);
+          const hasGraphicFrame = moveSprite.texture.has(String(frame.graphicFrame));
           if (hasGraphicFrame) {
             moveSprite.setFrame(frame.graphicFrame);
           }
