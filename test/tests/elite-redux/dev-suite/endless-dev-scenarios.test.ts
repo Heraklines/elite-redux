@@ -5,8 +5,10 @@
  */
 
 import {
+  consumePendingDevEndlessOffer,
   consumePendingDevGhostTeam,
   runPendingDevPartySetup,
+  setPendingDevEndlessOffer,
   setPendingDevGhostTeam,
   setPendingDevPartySetup,
 } from "#app/dev-tools/registry";
@@ -44,6 +46,14 @@ describe("Endless dev scenario fixtures", () => {
     expect(consumePendingDevGhostTeam()).toBeNull();
   });
 
+  it("consumes the dev-only Endless offer exactly once", () => {
+    consumePendingDevEndlessOffer();
+    setPendingDevEndlessOffer();
+
+    expect(consumePendingDevEndlessOffer()).toBe(true);
+    expect(consumePendingDevEndlessOffer()).toBe(false);
+  });
+
   it("does not abort run creation when a dev party setup fails", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
     setPendingDevPartySetup(() => {
@@ -73,6 +83,8 @@ describe("Endless dev scenario fixtures", () => {
     expect(nextScenario).toBeGreaterThan(scenarioStart);
     expect(scenario).toContain("usableGhostMembers(DEV_HELL_VICTORY_GHOST)");
     expect(scenario).toContain('setErRunPacing("normal")');
+    expect(scenario).toContain("STARTING_BIOME_OVERRIDE: BiomeId.END");
+    expect(scenario).toContain("setPendingDevEndlessOffer()");
     expect(scenario).toContain("applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members)");
     expect(scenario).toContain("applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST)");
     expect(scenario).toContain("Hell victory legacy loadout restored partially");

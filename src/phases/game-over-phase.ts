@@ -1,5 +1,6 @@
 import { pokerogueApi } from "#api/api";
 import { clientSessionId } from "#app/account";
+import { consumePendingDevEndlessOffer } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
@@ -410,14 +411,14 @@ export class GameOverPhase extends BattlePhase {
 
   private shouldOfferEndlessContinuation(): boolean {
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    return (
-      this.isVictory
-      && !globalScene.gameMode.isEndless
+    const devScenarioOffer = consumePendingDevEndlessOffer();
+    const standardOffer =
+      !globalScene.gameMode.isEndless
       && !globalScene.gameMode.isDaily
       && !globalScene.gameMode.isShowdown
       && !globalScene.gameMode.isCoop
-      && globalScene.gameMode.isWaveFinal(wave)
-    );
+      && globalScene.gameMode.isWaveFinal(wave);
+    return this.isVictory && (devScenarioOffer || standardOffer);
   }
 
   /**

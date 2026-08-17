@@ -42,6 +42,7 @@
 import {
   consumePendingDevBattleSetup,
   consumePendingDevCustomTrainerForce,
+  consumePendingDevEndlessOffer,
   consumePendingDevEnemyParty,
   consumePendingDevGhostTeam,
   consumePendingDevPartySetup,
@@ -993,6 +994,7 @@ registerDevMenu(ctx => {
   consumePendingDevStarterLevels();
   consumePendingDevPartySetup();
   consumePendingDevBattleSetup();
+  consumePendingDevEndlessOffer();
   consumePendingDevShop();
   consumePendingDevEnemyParty();
   consumePendingDevGhostTeam();

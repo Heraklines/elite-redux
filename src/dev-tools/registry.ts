@@ -820,6 +820,25 @@ export function consumePendingDevBattleSetup(): (() => void) | null {
   return cb;
 }
 
+// --- One-shot Endless offer (finale dev scenario -> GameOverPhase) -----------
+// Starting directly on the final wave skips parts of the normal run journey.
+// The dedicated Endless scenario arms this only after verifying that its battle
+// is the real classic finale, then GameOverPhase consumes it exactly once.
+
+let pendingDevEndlessOffer = false;
+
+/** Guarantee the Endless choice after the current dev finale is won. */
+export function setPendingDevEndlessOffer(): void {
+  pendingDevEndlessOffer = true;
+}
+
+/** Take and clear the dev-only Endless choice marker. */
+export function consumePendingDevEndlessOffer(): boolean {
+  const pending = pendingDevEndlessOffer;
+  pendingDevEndlessOffer = false;
+  return pending;
+}
+
 // --- Pending shop items (scenario → first SelectModifierPhase) ----------------
 // Lets a "start in the store, test a specific item" scenario guarantee specific
 // reward options in the NEXT reward/shop screen (e.g. a Rare Candy to evolve a

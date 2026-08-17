@@ -26,6 +26,7 @@ import { TerrainType } from "#app/data/terrain";
 import {
   setClearMeOverrideAfterFirst,
   setPendingDevCustomTrainerForce,
+  setPendingDevEndlessOffer,
   setPendingDevEnemyParty,
   setPendingDevGhostTeam,
 } from "#app/dev-tools/registry";
@@ -8133,6 +8134,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       setOverrides({
         STARTING_WAVE_OVERRIDE: 200,
         STARTING_LEVEL_OVERRIDE: 200,
+        STARTING_BIOME_OVERRIDE: BiomeId.END,
       });
       return usableGhostMembers(DEV_HELL_VICTORY_GHOST)
         .map(ghostMemberStarter)
@@ -8155,6 +8157,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       if (!boss || !globalScene.currentBattle.isClassicFinalBoss) {
         throw new Error("Endless final-boss scenario did not create the classic finale");
       }
+      setPendingDevEndlessOffer();
       boss.damageAndUpdate(Math.max(1, boss.hp), {
         result: HitResult.INDIRECT_KO,
         ignoreSegments: true,
