@@ -742,6 +742,7 @@ describe("Authority V2 interaction control ledger", () => {
       throw new Error("hot rejoin did not issue a fresh correlated boundary request");
     }
     const correlated = freshRequest as ReplicaBoundaryRequest;
+    expect(correlated.requestId).toBe(oldRequest.requestId);
     expect(correlated.context).not.toEqual(oldRequest.context);
     expect(correlated.context).toEqual(nextReplicaContext);
     expect(harness.log.admit(oldEntry)).toEqual({ kind: "rejected", reason: "membership-mismatch" });
