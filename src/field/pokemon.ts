@@ -9007,7 +9007,13 @@ export class PlayerPokemon extends Pokemon {
           globalScene.removeModifier(evotracker);
         }
       }
-      if (!globalScene.gameMode.isDaily || this.metBiome > -1) {
+      // Evolution Shuffle deliberately replaces the real evolution with an unrelated
+      // species/form for this run. Recording that post-image as an account catch leaks
+      // the runtime mon's IVs, shiny tier, form, nature, abilities, and (separately)
+      // Black-Shiny ownership into a line the player never acquired. Keep the shuffled
+      // result on the run Pokemon, but do not treat it as permanent dex/starter progress.
+      const isFunShuffledEvolution = globalScene.gameMode.isFun && getFunModeConfig().shuffleEvolutions;
+      if ((!globalScene.gameMode.isDaily || this.metBiome > -1) && !isFunShuffledEvolution) {
         globalScene.gameData.updateSpeciesDexIvs(this.species.speciesId, this.ivs);
         globalScene.gameData.setPokemonSeen(this, false);
         coopAllowAccountWrite("own-evolution", () => globalScene.gameData.setPokemonCaught(this, false)).then(() =>
