@@ -7976,3 +7976,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Endless state, active Rifts, battle overlays, routes, Nemesis progression, and encounter accounting serialize with the run. Focused state regressions are delegated to GitHub Actions; no local test execution or deployment was performed.
 - Returning Nemeses now scale their saved relic stacks separately from ordinary ghosts: unchanged on the first return, 1.5x on the second and third, and 1.75x from the fourth onward, always bounded by each relic's normal stack cap.
 - Removed internal implementation wording from the player-facing Endless Move Scrambler Rift description.
+
+2026-08-17 - Reward-rate panel visibility correction
+
+- Made the compact Shiny/Candy/Voucher multiplier panel an explicit reward-shop opt-in. Ordinary battle and any future non-shop Luck display now force the panel hidden.
+- The post-battle modifier selection handler is the only runtime caller that opts into the panel.
+- The headless game UI harness rendered both `modifier-select-reward-rates` and `battle-command`: the panel is present in the reward shop and absent from the battle command screen. Both captures passed.
+- Nothing was deployed to staging or production.

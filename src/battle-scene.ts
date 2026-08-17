@@ -3370,7 +3370,7 @@ export class BattleScene extends SceneBase {
    * Displays the current luck value.
    * @param duration The time for this label to fade in, if it is not already visible.
    */
-  updateAndShowText(duration: number): void {
+  updateAndShowText(duration: number, showRewardRates = false): void {
     const labels = [this.luckLabelText, this.luckText];
     for (const label of labels) {
       label.setAlpha(0);
@@ -3383,14 +3383,16 @@ export class BattleScene extends SceneBase {
       this.luckText.setTint(...RAINBOW_TINT);
     }
     this.luckLabelText.setX(this.scaledCanvas.width - 2 - (this.luckText.displayWidth + 2));
-    // The reward-rate panel shadows Luck; refresh from the authoritative
-    // breakdown and follow the same fade so they read as one unit.
-    if (this.rewardRatePanel) {
+    // Reward rates belong exclusively to the post-battle reward shop. Keep
+    // this opt-in so future Luck displays cannot leak the panel into battle.
+    if (this.rewardRatePanel && showRewardRates) {
       this.rewardRatePanel.refreshFromGame();
       this.rewardRatePanel.setVisible(true).setAlpha(0);
+    } else {
+      this.rewardRatePanel?.setVisible(false).setAlpha(0);
     }
     this.tweens.add({
-      targets: this.rewardRatePanel ? [...labels, this.rewardRatePanel] : labels,
+      targets: this.rewardRatePanel && showRewardRates ? [...labels, this.rewardRatePanel] : labels,
       duration,
       alpha: 1,
       onComplete: () => {
