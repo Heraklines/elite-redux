@@ -157,7 +157,7 @@ describe("Classic Sprint pacing", () => {
     expect(getErBiomeLength()).toBeNull();
   });
 
-  it("awards deterministic fractional trainer voucher credit", () => {
+  it("keeps legacy fractional voucher credit readable for old saves only", () => {
     setErRunPacing("sprint");
     resetErSprintVoucherCredit();
     expect(addErSprintTrainerVoucherCredit("ace")).toBe(0);

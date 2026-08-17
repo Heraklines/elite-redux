@@ -66,7 +66,6 @@ import {
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import {
-  getErEndlessRateBonus,
   getErEndlessSaveData,
   isErEndlessContinuationActive,
   restoreErEndlessContinuation,
@@ -85,17 +84,17 @@ import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifier
 import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-redux/er-redux-dex-redirect";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
-import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
+import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   getErRunPacing,
-  getErSprintVoucherCredit,
   restoreErSprintVoucherCredit,
   setErRunPacing,
 } from "#data/elite-redux/er-run-pacing";
-import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { getErTrainingCacheSaveData, restoreErTrainingCacheState } from "#data/elite-redux/er-training-cache";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
 import {
   getMoodyModeSaveData,
@@ -2012,7 +2011,8 @@ export class GameData {
       erDifficulty: getErDifficulty(),
       erRunPacing: getErRunPacing(),
       erEndlessState: getErEndlessSaveData(),
-      erSprintVoucherCredit: getErSprintVoucherCredit(),
+      erRewardEconomyVersion: 1,
+      erTrainingCache: getErTrainingCacheSaveData(),
       funModeConfig: globalScene.gameMode.isFun ? { ...getFunModeConfig() } : undefined,
       moodyModeState: globalScene.gameMode.isFun && getFunModeConfig().moodyMode ? getMoodyModeSaveData() : undefined,
       // ER: persist the set of trainers already fought this run, so reloading
@@ -5228,6 +5228,7 @@ export class GameData {
     setErRunPacing(fromSession.erRunPacing ?? "normal");
     restoreErEndlessContinuation(fromSession.erEndlessState);
     restoreErSprintVoucherCredit(fromSession.erSprintVoucherCredit);
+    restoreErTrainingCacheState(fromSession.erTrainingCache, fromSession.waveIndex);
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreGenericTrainerTracking(fromSession.erLastGenericTrainerType);
     restoreErCustomTrainerTracking(fromSession.erUsedCustomTrainerKeys, fromSession.erUsedCustomTrainerWindows);
@@ -7159,8 +7160,13 @@ export class GameData {
       if (!hasPrevolution && (!globalScene.gameMode.isDaily || hasNewAttr || fromEgg)) {
         // TODO: remove `?? 0`, `pokemon.variant` shouldn't be able to be nullish
         const shinyBonus = pokemon.isShiny() ? 5 * Math.pow(2, pokemon.variant ?? 0) : 1;
-        const eggOrBossBonus = fromEgg || pokemon.isBoss() ? 2 : 1;
-        this.addStarterCandy(species.speciesId, shinyBonus * eggOrBossBonus, fromEgg);
+        // Preserve the old integer egg payouts after retiring the global x1.35
+        // multiplier: ordinary/T1/T2/T3 eggs awarded 3/14/27/54 candy.
+        const eggCandyByShinyBonus: Readonly<Record<number, number>> = { 1: 3, 5: 14, 10: 27, 20: 54, 40: 108 };
+        const candy = fromEgg
+          ? (eggCandyByShinyBonus[shinyBonus] ?? shinyBonus * 3)
+          : shinyBonus * (pokemon.isBoss() ? 2 : 1);
+        this.addStarterCandy(species.speciesId, candy, fromEgg);
       }
     }
 
@@ -7248,7 +7254,7 @@ export class GameData {
    *   does NOT inherit the run's challenge-favour multiplier (see below).
    * @returns Whether the candy count was incremented
    */
-  public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false): boolean {
+  public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false, showCandyBar = true): boolean {
     // ER: route a custom MEGA form id to its base so the candy lands on the base
     // bucket AND the candy bar (which does a raw starterData[id] read) is handed
     // an id whose bucket getStarterDataEntry just guaranteed.
@@ -7260,29 +7266,10 @@ export class GameData {
       return false;
     }
 
-    // Elite Redux candy buffs: a flat ~35% across-the-board boost, plus the
-    // current run's challenge-favour candy multiplier (same curve as shiny, up
-    // to 3×). A positive gain never rounds down to 0.
-    //
-    // The favour multiplier is a RUN-scoped reward for handicapping yourself in
-    // a challenge run, so it only applies to candy earned IN the run (catches,
-    // bosses, classic wins, friendship). Egg-hatch candy comes from eggs that
-    // were stockpiled outside the run, so it must NOT inherit the favour bonus —
-    // otherwise hatching a backlog of eggs during a trivial high-favour challenge
-    // would farm triple candy. Egg hatches still keep the always-on flat 35%.
+    // Run candy uses the same integer depth/Favour/Endless total displayed by
+    // the reward-rate panel. Eggs and ordinary Fun Mode remain unscaled.
     if (count > 0 && (!globalScene.gameMode.isFun || isErEndlessContinuationActive())) {
-      const favourMultiplier = fromEgg ? 1 : getRunCandyMultiplier();
-      // #402: the lower difficulties' dedicated perk is CANDY (Youngster 2x,
-      // Ace 1.5x). Run-scoped like favour, so egg-hatch backlogs are excluded.
-      const difficultyMultiplier = fromEgg ? 1 : getErDifficultyCandyMultiplier();
-      const endlessBonus =
-        !fromEgg && isErEndlessContinuationActive()
-          ? getErEndlessRateBonus(globalScene.currentBattle?.waveIndex ?? 0)
-          : 0;
-      count = Math.max(
-        1,
-        Math.round(count * ER_CANDY_GAIN_MULTIPLIER * (favourMultiplier * difficultyMultiplier + endlessBonus)),
-      );
+      count *= fromEgg ? 1 : getCurrentErRewardRates().totalCandy;
     }
 
     // The ROOT id, not speciesId: the candy bar does a raw starterData[id] read, and
@@ -7291,7 +7278,9 @@ export class GameData {
     // crashes the bar (`candyCount` of undefined) whenever that id has no bucket of
     // its own - the wave-won achievement candy-grant black-screen class - and would
     // display the wrong count even when it doesn't crash.
-    globalScene.candyBar.showStarterSpeciesCandy(this.getRootStarterSpeciesId(baseId), count);
+    if (showCandyBar) {
+      globalScene.candyBar.showStarterSpeciesCandy(this.getRootStarterSpeciesId(baseId), count);
+    }
     starterEntry.candyCount = Math.min(candyCount + count, MAX_STARTER_CANDY_COUNT);
 
     return true;

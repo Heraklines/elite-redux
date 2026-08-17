@@ -35,6 +35,7 @@ import {
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
+import { recordErTrainingCacheWave } from "#data/elite-redux/er-training-cache";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
 import { endMoodyFormationBattle } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { notifyMoodyRuntimeBattleEnd } from "#data/elite-redux/moody/moody-runtime-field-engine";
@@ -241,6 +242,7 @@ export class BattleEndPhase extends BattlePhase {
       erAdvanceCommunityItemCharges();
       // ER Booster Energy: a spent charge recharges after 10 won waves.
       erAdvanceTacticalRecharges();
+      this.settleTrainingCache();
     }
 
     // Endless graceful end
@@ -315,11 +317,23 @@ export class BattleEndPhase extends BattlePhase {
     // Preserve it once on the guest while every shared mechanical mutation remains host-authoritative.
     if (!this.retainedLocalStatsRecorded) {
       this.recordLocalBattleStats();
+      if (this.isVictory) {
+        this.settleTrainingCache();
+      }
       this.retainedLocalStatsRecorded = true;
     }
     coopLog("progression", `GUEST retained WAVE_ADVANCE BattleEnd release wave=${this.retainedSourceWave}`);
     this.end();
     this.retainedBoundaryReleased = true;
+  }
+
+  private settleTrainingCache(): void {
+    const awards = recordErTrainingCacheWave(this.retainedSourceWave);
+    if (awards.length === 0) {
+      return;
+    }
+    const lines = awards.map(award => `${award.pokemonName} +${award.candy}`).join("\n");
+    globalScene.phaseManager.unshiftNew("MessagePhase", `HELL TRAINING CACHE\n\n${lines}`, null, true);
   }
 
   private recordLocalBattleStats(): void {

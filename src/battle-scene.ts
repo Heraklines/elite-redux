@@ -20,6 +20,7 @@ import type { Phase } from "#app/phase";
 import { PhaseManager } from "#app/phase-manager";
 import { FieldSpritePipeline } from "#app/pipelines/field-sprite";
 import { InvertPostFX } from "#app/pipelines/invert";
+import { RewardRateAuraPipeline } from "#app/pipelines/reward-rate-aura-pipeline";
 import { SpritePipeline } from "#app/pipelines/sprite";
 import { SceneBase } from "#app/scene-base";
 import { TurnCommandManager } from "#app/turn-command-manager";
@@ -78,7 +79,6 @@ import {
   getErEndlessCycleWave,
   getErEndlessEquivalentDepth,
   getErEndlessNemesisRelicBudgetMultiplier,
-  getErEndlessRateBonus,
   hasErEndlessRift,
   isErEndlessContinuationActive,
   isErEndlessCycleFinale,
@@ -114,19 +114,13 @@ import {
   resetErEnemyRelicBattleState,
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
-import {
-  getErDifficulty,
-  getErDifficultyCandyMultiplier,
-  getErDifficultyShinyMultiplier,
-  isErVanillaDifficulty,
-} from "#data/elite-redux/er-run-difficulty";
+import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   getErMysteryEncounterTarget,
   getErProgressionWave,
   isErChapterStartWave,
   isErSprintMode,
 } from "#data/elite-redux/er-run-pacing";
-import { getRunCandyMultiplier, getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
@@ -283,6 +277,7 @@ import { getDebugOverlay } from "#ui/llm-director-debug-overlay";
 import { PartyExpBar } from "#ui/party-exp-bar";
 import { PokeballTray } from "#ui/pokeball-tray";
 import { PokemonInfoContainer } from "#ui/pokemon-info-container";
+import { RewardRatePanel } from "#ui/reward-rate-panel";
 import { addTextObject, getTextColor, RAINBOW_TINT } from "#ui/text";
 import { TimeOfDayWidget } from "#ui/time-of-day-widget";
 import { UI } from "#ui/ui";
@@ -528,6 +523,8 @@ export class BattleScene extends SceneBase {
   private scoreText: Phaser.GameObjects.Text;
   private luckLabelText: Phaser.GameObjects.Text;
   private luckText: Phaser.GameObjects.Text;
+  /** Compact Shiny/Candy/Voucher rate panel pinned under Luck during rewards. */
+  public rewardRatePanel: RewardRatePanel;
   private modifierBar: ModifierBar;
   private enemyModifierBar: ModifierBar;
   public arenaFlyout: ArenaFlyout;
@@ -719,6 +716,11 @@ export class BattleScene extends SceneBase {
     this.renderer.pipelines.add("Sprite", this.spritePipeline);
     this.fieldSpritePipeline = new FieldSpritePipeline(this.game);
     this.renderer.pipelines.add("FieldSprite", this.fieldSpritePipeline);
+    // Reward-rate panel rows share one aura pipeline; Canvas clients skip it
+    // entirely and the panel falls back to static grade tints.
+    if (this.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
+      this.renderer.pipelines.add("RewardRateAura", new RewardRateAuraPipeline(this.game));
+    }
 
     this.launchBattle();
   }
@@ -893,6 +895,8 @@ export class BattleScene extends SceneBase {
       .setOrigin(1, 0.5)
       .setVisible(false);
 
+    this.rewardRatePanel = new RewardRatePanel(this, this.scaledCanvas.width - 46, 0);
+
     this.arenaFlyout = new ArenaFlyout();
     // ER: a standalone time-of-day icon pinned top-left, shown only while the
     // day/night tint is off (the screen no longer darkens to signal night).
@@ -924,6 +928,7 @@ export class BattleScene extends SceneBase {
         this.scoreText,
         this.luckText,
         this.luckLabelText,
+        this.rewardRatePanel,
         this.arenaFlyout,
         this.timeOfDayCornerWidget,
         this.pokemonInfoContainer,
@@ -3314,15 +3319,13 @@ export class BattleScene extends SceneBase {
     const biomeString: string = getBiomeName(this.arena.biomeId);
     this.fieldUI.moveAbove(this.biomeWaveText, this.luckText);
     const endless = isErEndlessContinuationActive();
-    const endlessBonus = endless ? getErEndlessRateBonus(this.currentBattle.waveIndex) : 0;
     const heading = endless
       ? `${biomeString} - C${getErEndlessCycle(this.currentBattle.waveIndex)}:${getErEndlessCycleWave(this.currentBattle.waveIndex)}`
       : `${biomeString} - ${this.currentBattle.waveIndex}`;
-    const rateLine = endless
-      ? `ENDLESS RATES  Shiny x${getErDifficultyShinyMultiplier() * getRunShinyMultiplier() + endlessBonus}  Candy x${getErDifficultyCandyMultiplier() * getRunCandyMultiplier() + endlessBonus}  Vouchers x${1 + endlessBonus}`
-      : "";
+    // Reward rates moved to the compact reward-rate panel; keep this to the heading.
+    this.rewardRatePanel?.refreshFromGame();
     this.biomeWaveText
-      .setText(rateLine ? `${heading}\n${rateLine}` : heading)
+      .setText(heading)
       .setColor(isBoss ? "#f89890" : "#ffffff")
       .setShadowColor(isBoss ? "#984038" : "#636363")
       .setVisible(true);
@@ -3380,8 +3383,14 @@ export class BattleScene extends SceneBase {
       this.luckText.setTint(...RAINBOW_TINT);
     }
     this.luckLabelText.setX(this.scaledCanvas.width - 2 - (this.luckText.displayWidth + 2));
+    // The reward-rate panel shadows Luck; refresh from the authoritative
+    // breakdown and follow the same fade so they read as one unit.
+    if (this.rewardRatePanel) {
+      this.rewardRatePanel.refreshFromGame();
+      this.rewardRatePanel.setVisible(true).setAlpha(0);
+    }
     this.tweens.add({
-      targets: labels,
+      targets: this.rewardRatePanel ? [...labels, this.rewardRatePanel] : labels,
       duration,
       alpha: 1,
       onComplete: () => {
@@ -3397,14 +3406,19 @@ export class BattleScene extends SceneBase {
       return;
     }
     const labels = [this.luckLabelText, this.luckText];
+    const targets: Phaser.GameObjects.GameObject[] = [...labels];
+    if (this.rewardRatePanel) {
+      targets.push(this.rewardRatePanel);
+    }
     this.tweens.add({
-      targets: labels,
+      targets,
       duration,
       alpha: 0,
       onComplete: () => {
         for (const label of labels) {
           label.setVisible(false);
         }
+        this.rewardRatePanel?.setVisible(false);
       },
     });
   }
@@ -3417,11 +3431,15 @@ export class BattleScene extends SceneBase {
         + (enemyModifierCount ? (enemyModifierCount <= 12 ? 15 : 24) : 0)
         + biomeWaveTextHeight / 2,
     );
-    this.moneyText.setY(this.biomeWaveText.y + (isErEndlessContinuationActive() ? 18 : 10));
+    this.moneyText.setY(this.biomeWaveText.y + 10);
     this.scoreText.setY(this.moneyText.y + 10);
     [this.luckLabelText, this.luckText].map(l =>
       l.setY((this.scoreText.visible ? this.scoreText : this.moneyText).y + 10),
     );
+    this.rewardRatePanel?.anchorUnderLuck(this.luckText);
+    if (this.rewardRatePanel?.visible) {
+      this.rewardRatePanel.refreshFromGame();
+    }
     const offsetY = (this.scoreText.visible ? this.scoreText : this.moneyText).y + 15;
     this.partyExpBar.setY(offsetY);
     this.candyBar.setY(offsetY + 15);

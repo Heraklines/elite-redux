@@ -53,6 +53,7 @@ import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { resetErTrainingCacheState } from "#data/elite-redux/er-training-cache";
 import {
   type ErRunPacing,
   resetErSprintVoucherCredit,
@@ -7585,6 +7586,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               setErDifficulty(difficulty);
               setErRunPacing(supportsErSprintPacing(globalScene.gameMode.modeId) ? pacing : "normal");
               resetErSprintVoucherCredit();
+              resetErTrainingCacheState();
               // Co-op (#633): the HOST publishes the authoritative run config
               // (difficulty + challenges) so the guest mirrors it - the run stays
               // coherent (both players get the same difficulty + challenge set).

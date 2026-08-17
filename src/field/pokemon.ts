@@ -121,7 +121,6 @@ import { erTryApplyGem } from "#data/elite-redux/er-elemental-gems";
 import {
   getErEndlessEnemyAvalancheCount,
   getErEndlessPlayerAvalancheCount,
-  getErEndlessRateBonus,
   hasErEndlessRift,
   isErEndlessContinuationActive,
   isErEndlessRaidWave,
@@ -188,9 +187,8 @@ import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
 import {
   erYoungsterFreeInnateSlots,
   getErDifficulty,
-  getErDifficultyShinyMultiplier,
 } from "#data/elite-redux/er-run-difficulty";
-import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import {
@@ -4689,15 +4687,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (this.isPlayer() || !this.hasTrainer()) {
         // Apply shiny modifiers only to Player or wild mons
         globalScene.applyModifiers(ShinyRateBoosterModifier, true, shinyThreshold);
-        // ER: challenge "Favour" raises shiny odds (up to 3x) on a challenge run.
-        shinyThreshold.value *= getRunShinyMultiplier();
-        // ER (#368/#402): WILD shiny odds scale with run difficulty (Elite 1.5x,
-        // Hell 2x) and stack with the boosts above (challenge-capped at 6x).
+        // ER: wild run rewards use the single integer depth/Favour/Endless resolver.
         if (this.isEnemy() && !this.hasTrainer()) {
-          shinyThreshold.value *= getErDifficultyShinyMultiplier();
-        }
-        if (isErEndlessContinuationActive()) {
-          shinyThreshold.value += BASE_SHINY_CHANCE * getErEndlessRateBonus(globalScene.currentBattle.waveIndex);
+          shinyThreshold.value *= getCurrentErRewardRates().totalShiny;
         }
       }
     } else {

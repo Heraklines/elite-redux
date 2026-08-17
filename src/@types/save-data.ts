@@ -3,6 +3,7 @@ import type { Tutorial } from "#app/tutorial";
 import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import type { ErEndlessSaveData } from "#data/elite-redux/er-endless-continuation";
+import type { ErTrainingCacheSaveData } from "#data/elite-redux/er-training-cache";
 import type { FunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -174,6 +175,10 @@ export interface SessionSaveData {
   erEndlessState?: ErEndlessSaveData;
   /** Fractional account-voucher progress used only by Classic Sprint. */
   erSprintVoucherCredit?: number;
+  /** Integer depth-scaled reward economy marker. */
+  erRewardEconomyVersion?: 1;
+  /** Hell's per-segment party-presence ledger and claimed cache milestones. */
+  erTrainingCache?: ErTrainingCacheSaveData;
   /** Fun Mode randomizer toggles. Absent on every non-Fun and legacy save. */
   funModeConfig?: FunModeConfig;
   /** Moody Mode's run-local boon, curse, progression, and threat ledger. */
