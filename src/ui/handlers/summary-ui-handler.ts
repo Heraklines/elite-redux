@@ -17,7 +17,7 @@ import {
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
 import { ensureErSpriteAnim, playErPokemonSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
-import { getFunAbilityAvalancheCount, getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
@@ -2210,12 +2210,17 @@ export class SummaryUiHandler extends UiHandler {
       });
     }
 
-    if (!viewOnly && globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
-      const avalancheCount = getFunAbilityAvalancheCount(globalScene.currentBattle?.waveIndex ?? 1);
-      for (let index = 0; index < avalancheCount; index++) {
-        const ability = innateAbilities[3 + index];
-        if (ability && ability.id !== AbilityId.NONE) {
-          rows.push({ label: `Ability ${index + 5}`, ability, avalanche: true });
+    if (!viewOnly) {
+      const avalancheIds = mon.getAvalancheAbilityIds();
+      let avalancheNumber = 5;
+      for (const ability of innateAbilities.slice(3)) {
+        if (
+          ability
+          && ability.id !== AbilityId.NONE
+          && avalancheIds.has(ability.id)
+          && !rows.some(row => row.ability.id === ability.id)
+        ) {
+          rows.push({ label: `Ability ${avalancheNumber++}`, ability, avalanche: true });
         }
       }
     }

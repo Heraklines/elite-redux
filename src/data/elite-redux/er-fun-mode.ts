@@ -56,6 +56,8 @@ export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
 
 let currentConfig: FunModeConfig = { ...DEFAULT_FUN_MODE_CONFIG };
 let cachedAbilityPool: AbilityId[] | null = null;
+const ENDLESS_AVALANCHE_CACHE_LIMIT = 4096;
+const endlessAvalancheCache = new Map<string, readonly AbilityId[]>();
 let cachedMovePool: MoveId[] | null = null;
 
 export function getFunModeConfig(): Readonly<FunModeConfig> {
@@ -201,14 +203,27 @@ export function getEndlessAbilityAvalancheIds(
   excludedIds: readonly AbilityId[] = [],
   battleSalt = 0,
 ): AbilityId[] {
+  const normalizedCount = Math.max(0, Math.floor(count));
+  if (normalizedCount === 0) {
+    return [];
+  }
   const excluded = new Set(excludedIds);
+  const cacheKey = `${pokemonId}:${normalizedCount}:${battleSalt}:${[...excluded].sort((a, b) => a - b).join(",")}`;
+  const cached = endlessAvalancheCache.get(cacheKey);
+  if (cached != null) {
+    return [...cached];
+  }
   const available = abilityPool().filter(abilityId => !excluded.has(abilityId));
   const selected: AbilityId[] = [];
-  for (let slot = 0; slot < count && available.length > 0; slot++) {
+  for (let slot = 0; slot < normalizedCount && available.length > 0; slot++) {
     const index = deterministicIndex(pokemonId ^ battleSalt, 0xe11d + slot, available.length);
     selected.push(available.splice(index, 1)[0]);
   }
-  return selected;
+  if (endlessAvalancheCache.size >= ENDLESS_AVALANCHE_CACHE_LIMIT) {
+    endlessAvalancheCache.clear();
+  }
+  endlessAvalancheCache.set(cacheKey, selected);
+  return [...selected];
 }
 
 const FUN_TYPES: readonly PokemonType[] = [

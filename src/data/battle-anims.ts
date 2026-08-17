@@ -1128,7 +1128,10 @@ export abstract class BattleAnim {
               };
               setSpritePriority(frame.priority);
             }
-            moveSprite.setFrame(frame.graphicFrame);
+            const hasGraphicFrame = moveSprite.texture.has(frame.graphicFrame);
+            if (hasGraphicFrame) {
+              moveSprite.setFrame(frame.graphicFrame);
+            }
             //console.log(AnimFocus[frame.focus]);
 
             const graphicFrameData = frameData.get(frame.target)!.get(graphicIndex)!; // TODO: are those bangs correct?
@@ -1137,7 +1140,7 @@ export abstract class BattleAnim {
             moveSprite.setScale(graphicFrameData.scaleX, graphicFrameData.scaleY);
 
             moveSprite.setAlpha(frame.opacity / 255);
-            moveSprite.setVisible(frame.visible);
+            moveSprite.setVisible(frame.visible && hasGraphicFrame);
             moveSprite.setBlendMode(
               frame.blendType === AnimBlendType.NORMAL
                 ? Phaser.BlendModes.NORMAL
@@ -1390,7 +1393,10 @@ export abstract class BattleAnim {
             };
             setSpritePriority(frame.priority);
           }
-          moveSprite.setFrame(frame.graphicFrame);
+          const hasGraphicFrame = moveSprite.texture.has(frame.graphicFrame);
+          if (hasGraphicFrame) {
+            moveSprite.setFrame(frame.graphicFrame);
+          }
 
           const graphicFrameData = frameData.get(frame.target)?.get(graphicIndex);
           if (graphicFrameData) {
@@ -1399,7 +1405,7 @@ export abstract class BattleAnim {
             moveSprite.setScale(graphicFrameData.scaleX, graphicFrameData.scaleY);
 
             moveSprite.setAlpha(frame.opacity / 255);
-            moveSprite.setVisible(frame.visible);
+            moveSprite.setVisible(frame.visible && hasGraphicFrame);
             moveSprite.setBlendMode(
               frame.blendType === AnimBlendType.NORMAL
                 ? Phaser.BlendModes.NORMAL

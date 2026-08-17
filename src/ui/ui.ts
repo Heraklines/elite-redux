@@ -66,6 +66,7 @@ import { EggGachaUiHandler } from "#ui/egg-gacha-ui-handler";
 import { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
 import { EggListUiHandler } from "#ui/egg-list-ui-handler";
 import { EggSummaryUiHandler } from "#ui/egg-summary-ui-handler";
+import { EndlessRiftLedgerUiHandler } from "#ui/endless-rift-ledger-ui-handler";
 import { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
 import { ErChallengeTextInputUiHandler } from "#ui/er-challenge-text-input-ui-handler";
 import { ErMapPickerUiHandler } from "#ui/er-map-picker-ui-handler";
@@ -165,6 +166,7 @@ const transitionModes = [
   UiMode.CHALLENGE_SELECT,
   UiMode.FUN_MODE_SELECT,
   UiMode.FUN_ABILITY_REVIEW,
+  UiMode.ENDLESS_RIFT_LEDGER,
   UiMode.RUN_HISTORY,
   // Moody Mode screens are full-screen reward/ledger surfaces: fade in/out like the
   // other full-screen transition modes.
@@ -341,6 +343,7 @@ export class UI extends Phaser.GameObjects.Container {
       new ShowdownSyncCommandUiHandler(),
       new FunModeSelectUiHandler(),
       new FunAbilityReviewUiHandler(),
+      new EndlessRiftLedgerUiHandler(),
       new MoodyBoonSelectUiHandler(),
       new MoodyLedgerUiHandler(),
       new MoodyCurseSelectUiHandler(),

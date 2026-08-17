@@ -228,6 +228,9 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // serialized command crosses the Showdown relay. It is never part of a shared co-op interaction.
   [UiMode.SHOWDOWN_SYNC_COMMAND]: "local-only",
 
+  // Endless Rift Ledger is a read-only projection of already-serialized run state.
+  [UiMode.ENDLESS_RIFT_LEDGER]: "local-only",
+
   // Fun Mode "Moody Mode" screens. REVIEW (conservative): the post-boss boon DRAFT is a shared-run
   // reward surface (like MODIFIER_SELECT) and the co-op owner/watcher wiring is not part of this
   // bounded UI task - classify "local-only" so the staging tripwire still fires if it leaks into a

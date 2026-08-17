@@ -27,7 +27,6 @@ import {
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
 import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
-import { getFunAbilityAvalancheCount, getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { shouldHideMoodyEnemyInformation } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -719,13 +718,11 @@ export class BattleInfoOverlay {
       rows.push({ label, abilityId: ability.id, locked });
     }
 
-    if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
-      const avalancheCount = getFunAbilityAvalancheCount(globalScene.currentBattle?.waveIndex ?? 1);
-      for (let index = 0; index < avalancheCount; index++) {
-        const ability = innates[3 + index];
-        if (ability?.id) {
-          rows.push({ label: `Ability ${index + 5}`, abilityId: ability.id, locked: false });
-        }
+    const avalancheIds = mon.getAvalancheAbilityIds();
+    let avalancheNumber = 5;
+    for (const ability of innates.slice(3)) {
+      if (ability?.id && avalancheIds.has(ability.id) && !rows.some(row => row.abilityId === ability.id)) {
+        rows.push({ label: `Ability ${avalancheNumber++}`, abilityId: ability.id, locked: false });
       }
     }
 

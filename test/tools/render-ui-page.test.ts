@@ -36,6 +36,7 @@ import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import { ErGemModifier, erGemItemType } from "#data/elite-redux/er-elemental-gems";
+import { restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { DEFAULT_FUN_MODE_CONFIG, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
@@ -1876,6 +1877,28 @@ const RECIPES: Record<string, Recipe> = {
       return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
     },
     steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN],
+    diffTolerance: 40000,
+  },
+  "endless-rift-ledger": {
+    mode: UiMode.ENDLESS_RIFT_LEDGER,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+      restoreErEndlessContinuation({
+        version: 1,
+        enteredAtWave: 200,
+        seed: "rift-ledger-render",
+        pulse: 8,
+        ghostEncounters: 3,
+        activeRifts: [
+          { id: "ability-echo", pulsesRemaining: 2, acquiredAtDepth: 5 },
+          { id: "healing-lock", pulsesRemaining: 3, acquiredAtDepth: 10 },
+          { id: "parallel-lives", pulsesRemaining: 1, acquiredAtDepth: 15 },
+        ],
+        ghostHistory: [],
+      });
+      game.scene.currentBattle.waveIndex = 220;
+      return [];
+    },
     diffTolerance: 40000,
   },
   // Production IV-chart repro: HP=0 and Defense=0 sit on either side of Attack=31.

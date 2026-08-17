@@ -19,6 +19,7 @@ import {
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
   DEFAULT_FUN_MODE_CONFIG,
+  getEndlessAbilityAvalancheIds,
   getFunAbilityAvalancheCount,
   getFunAbilityAvalancheIds,
   getFunEvolutionTarget,
@@ -263,6 +264,17 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
     for (const abilityId of wave100) {
       expect(allAbilities[abilityId].unimplemented).toBe(false);
     }
+  });
+
+  it("caches Endless Avalanche selections without exposing mutable cache state", () => {
+    const excluded = [allAbilities[1].id, allAbilities[2].id];
+    const first = getEndlessAbilityAvalancheIds(0xa11a0002, 12, excluded, 99);
+    expect(first).toHaveLength(12);
+    expect(new Set(first).size).toBe(12);
+    expect(first.some(abilityId => excluded.includes(abilityId))).toBe(false);
+
+    first.pop();
+    expect(getEndlessAbilityAvalancheIds(0xa11a0002, 12, [...excluded].reverse(), 99)).toHaveLength(12);
   });
 
   it("retains learn levels while excluding unavailable moves", () => {

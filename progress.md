@@ -7987,3 +7987,10 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - The post-battle modifier selection handler is the only runtime caller that opts into the panel.
 - The headless game UI harness rendered both `modifier-select-reward-rates` and `battle-command`: the panel is present in the reward shop and absent from the battle command screen. Both captures passed.
 - Nothing was deployed to staging or production.
+
+2026-08-17 - Endless Avalanche visibility, Rift Ledger, and triple presentation hot paths
+
+- Endless keeps its asymmetric guaranteed Ability Avalanche curve: enemies begin with one extra ability immediately after continuation starts while players begin at zero, then each side follows its existing independent depth curve. Battle Info and Summary now classify the actual runtime-added Avalanche ability IDs, so Moody extras, transforms, and black-shiny gifts cannot shift or hide the rows; the existing focus-and-scroll controls expose abilities beyond the four base slots.
+- Added a read-only Rift Ledger to the Endless pause menu. It lists every active pressure/mutation Rift, pulses remaining, acquisition depth, hostility, and the full effect description with list scrolling and paged details. The view reads the already-serialized Endless state and is classified local-only for co-op.
+- The submitted Endless triple log shows AI decisions completing in roughly 20 ms, but repeated Avalanche pool reconstruction plus 119 missing cry/animation-frame warnings during spread presentation. Endless Avalanche selection is now bounded-cached and returns defensive copies; missing cry and animation frames are skipped before Phaser warning/render work. Battle calculations and AI choices are unchanged.
+- Added remote-runner coverage for the opening enemy/player Avalanche asymmetry, cached deterministic selections, Rift display metadata, and a real Rift Ledger render recipe. Local repository tests remain intentionally unrun per maintainer instruction. Browser smoke boot completed; full interaction and visual signoff, GitHub runners, integration, and staging deploy remain pending. Production remains untouched.

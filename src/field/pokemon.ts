@@ -433,6 +433,7 @@ export function withPokemonActiveAbilitySourceCache<T>(read: () => T): T {
 }
 
 let activeAbilitySourceCache: ActiveAbilitySourceCache | null = null;
+const funAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
 const endlessAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
 
 export abstract class Pokemon extends Phaser.GameObjects.Container {
@@ -2987,6 +2988,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
       const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
+      const avalancheIds = new Set<AbilityId>();
       for (const avalancheId of getFunAbilityAvalancheIds(
         this.id,
         globalScene.currentBattle?.waveIndex ?? 1,
@@ -2995,8 +2997,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         const avalancheAbility = allAbilities[avalancheId];
         if (avalancheAbility && !slots.some(ability => ability?.id === avalancheAbility.id)) {
           slots.push(avalancheAbility);
+          avalancheIds.add(avalancheId);
         }
       }
+      funAvalancheAbilityIds.set(this, avalancheIds);
+    } else {
+      funAvalancheAbilityIds.delete(this);
     }
     if (isErEndlessContinuationActive()) {
       const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
@@ -3232,6 +3238,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public isEndlessAvalancheAbility(abilityId: AbilityId): boolean {
     this.getPassiveAbilities();
     return endlessAvalancheAbilityIds.get(this)?.has(abilityId) === true;
+  }
+
+  /** Runtime-added Ability Avalanche sources from Fun Mode or Endless. */
+  public getAvalancheAbilityIds(): ReadonlySet<AbilityId> {
+    this.getPassiveAbilities();
+    return new Set([...(funAvalancheAbilityIds.get(this) ?? []), ...(endlessAvalancheAbilityIds.get(this) ?? [])]);
   }
 
   /**
@@ -7096,6 +7108,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     const key = this.species.getCryKey(this.formIndex);
+    if (!globalScene.cache.audio.exists(key)) {
+      callback();
+      return;
+    }
     const crySoundConfig = { rate: 0.85, detune: 0 };
     if (this.isPlayer()) {
       // If fainting is permanent, emphasize impact

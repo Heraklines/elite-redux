@@ -92,6 +92,8 @@ export enum UiMode {
   FUN_MODE_SELECT,
   /** Fun Mode: one-time party ability review and reroll before wave 1. */
   FUN_ABILITY_REVIEW,
+  /** Endless: read-only list and detail view for every currently active Rift. */
+  ENDLESS_RIFT_LEDGER,
   /** Fun Mode "Moody Mode": the post-boss 3-boon draft (pick one, target it, commit). */
   MOODY_BOON_SELECT,
   /** Fun Mode "Moody Mode": the five-tab ledger of the run's acquired boons and curses. */

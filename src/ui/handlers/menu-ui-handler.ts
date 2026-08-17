@@ -4,6 +4,7 @@ import { globalScene } from "#app/global-scene";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { submitBugReport } from "#data/elite-redux/er-bug-report";
+import { isErEndlessContinuationActive } from "#data/elite-redux/er-endless-continuation";
 import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
 import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
@@ -38,6 +39,7 @@ enum MenuOptions {
   LOG_OUT,
   MOODY_LEDGER,
   MOODY_ENEMY,
+  ENDLESS_RIFT_LEDGER,
   // Showdown 1v1 (D4): concede the duel. Appended LAST so excluding it (every non-showdown context)
   // never shifts another option's index, keeping the processInput adjustedCursor mapping intact.
   FORFEIT,
@@ -103,6 +105,7 @@ export class MenuUiHandler extends MessageUiHandler {
         options: [MenuOptions.MOODY_LEDGER, MenuOptions.MOODY_ENEMY],
       },
       { condition: getMoodyEnemyBoonLoadout() == null, options: [MenuOptions.MOODY_ENEMY] },
+      { condition: !isErEndlessContinuationActive(), options: [MenuOptions.ENDLESS_RIFT_LEDGER] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -170,6 +173,7 @@ export class MenuUiHandler extends MessageUiHandler {
         options: [MenuOptions.MOODY_LEDGER, MenuOptions.MOODY_ENEMY],
       },
       { condition: getMoodyEnemyBoonLoadout() == null, options: [MenuOptions.MOODY_ENEMY] },
+      { condition: !isErEndlessContinuationActive(), options: [MenuOptions.ENDLESS_RIFT_LEDGER] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -187,7 +191,9 @@ export class MenuUiHandler extends MessageUiHandler {
               ? "Moody Ledger"
               : o === MenuOptions.MOODY_ENEMY
                 ? "Enemy Mood"
-                : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
+                : o === MenuOptions.ENDLESS_RIFT_LEDGER
+                  ? "Rift Ledger"
+                  : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
         )
         .join("\n"),
       TextStyle.WINDOW,
@@ -689,6 +695,11 @@ export class MenuUiHandler extends MessageUiHandler {
           ui.playSelect();
           return true;
         }
+      }
+      if (this.menuOptions[this.cursor] === MenuOptions.ENDLESS_RIFT_LEDGER) {
+        ui.setOverlayMode(UiMode.ENDLESS_RIFT_LEDGER);
+        ui.playSelect();
+        return true;
       }
       let adjustedCursor = this.cursor;
       const excludedMenu = this.excludedMenus().find(e => e.condition);

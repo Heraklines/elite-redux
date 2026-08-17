@@ -1082,6 +1082,9 @@ export abstract class PokemonSpeciesForm {
 
   cry(soundConfig?: Phaser.Types.Sound.SoundConfig, ignorePlay?: boolean): AnySound | null {
     const cryKey = this.getCryKey(this.formIndex);
+    if (!globalScene.cache.audio.exists(cryKey)) {
+      return null;
+    }
     let cry: AnySound | null = globalScene.sound.get(cryKey) as AnySound;
     if (cry?.pendingRemove) {
       cry = null;

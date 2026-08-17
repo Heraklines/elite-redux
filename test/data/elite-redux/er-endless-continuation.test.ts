@@ -16,6 +16,7 @@ import {
   getErEndlessPlayerAvalancheCount,
   getErEndlessRateBonus,
   getErEndlessReturningNemesisId,
+  getErEndlessRiftDefinition,
   getErEndlessSaveData,
   initializeErEndlessContinuation,
   isErEndlessCycleFinale,
@@ -40,6 +41,12 @@ describe("Elite Redux Endless continuation", () => {
     const initial = initializeErEndlessContinuation(200, "seed");
     expect(initial).toHaveLength(2);
     expect(new Set(initial.map(rift => rift.id)).size).toBe(2);
+    for (const rift of initial) {
+      const definition = getErEndlessRiftDefinition(rift.id);
+      expect(definition?.name).toBeTruthy();
+      expect(definition?.description).toBeTruthy();
+      expect(rift.pulsesRemaining).toBeGreaterThan(0);
+    }
   });
 
   it("maps Normal and Sprint runs onto the same equivalent-depth cadence", () => {
@@ -70,6 +77,8 @@ describe("Elite Redux Endless continuation", () => {
 
   it("scales player and enemy Avalanche independently with hard caps", () => {
     initializeErEndlessContinuation(200, "avalanche");
+    expect(getErEndlessEnemyAvalancheCount(201)).toBe(1);
+    expect(getErEndlessPlayerAvalancheCount(201)).toBe(0);
     expect(getErEndlessEnemyAvalancheCount(300)).toBe(11);
     expect(getErEndlessPlayerAvalancheCount(300)).toBe(5);
     expect(getErEndlessEnemyAvalancheCount(5000)).toBe(100);
