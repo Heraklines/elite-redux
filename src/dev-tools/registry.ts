@@ -839,6 +839,30 @@ export function consumePendingDevPostCommandSetup(): (() => void) | null {
   return cb;
 }
 
+// --- Encounter persistence bypass (scenario -> EncounterPhase) --------------
+// Staging normally persists a new encounter before presenting it. Large dev
+// fixtures can be rejected by the cloud save API even though the battle itself
+// is valid, which makes EncounterPhase reset to the title before it renders.
+// Keep this opt-in and clear it on return to title so ordinary runs retain the
+// existing save gate while the throwaway scenario can continue into Endless.
+
+let devEncounterPersistenceBypassActive = false;
+
+/** Skip pre-presentation saves for the active throwaway dev-scenario run. */
+export function setDevEncounterPersistenceBypass(): void {
+  devEncounterPersistenceBypassActive = true;
+}
+
+/** Whether the active throwaway dev-scenario run bypasses encounter persistence. */
+export function isDevEncounterPersistenceBypassActive(): boolean {
+  return devEncounterPersistenceBypassActive;
+}
+
+/** Clear the bypass when the title screen is rebuilt. */
+export function clearDevEncounterPersistenceBypass(): void {
+  devEncounterPersistenceBypassActive = false;
+}
+
 // --- One-shot Endless offer (finale dev scenario -> GameOverPhase) -----------
 // Starting directly on the final wave skips parts of the normal run journey.
 // The dedicated Endless scenario arms this only after verifying that its battle

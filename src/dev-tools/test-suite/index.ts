@@ -40,6 +40,7 @@
  */
 
 import {
+  clearDevEncounterPersistenceBypass,
   consumePendingDevBattleSetup,
   consumePendingDevCustomTrainerForce,
   consumePendingDevEndlessOffer,
@@ -52,6 +53,7 @@ import {
   consumePendingDevStarters,
   type DevMenuCtx,
   registerDevMenu,
+  setDevEncounterPersistenceBypass,
   setPendingDevBattleSetup,
   setPendingDevPartySetup,
   setPendingDevPostCommandSetup,
@@ -649,6 +651,9 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
     if (scenario.onFirstTurnCommitted) {
       setPendingDevPostCommandSetup(scenario.onFirstTurnCommitted);
     }
+    if (scenario.bypassEncounterPersistence) {
+      setDevEncounterPersistenceBypass();
+    }
     if (scenario.shopItems && scenario.shopItems.length > 0) {
       // Guarantee these reward options in the first shop after the opening battle
       // ("start in the store, test a specific item").
@@ -999,6 +1004,7 @@ registerDevMenu(ctx => {
   consumePendingDevStarterLevels();
   consumePendingDevPartySetup();
   consumePendingDevPostCommandSetup();
+  clearDevEncounterPersistenceBypass();
   consumePendingDevBattleSetup();
   consumePendingDevEndlessOffer();
   consumePendingDevShop();

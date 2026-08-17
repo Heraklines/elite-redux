@@ -155,6 +155,8 @@ export interface DevScenario {
   onBattleStart?: () => void;
   /** Optional: runs ONCE after the first turn's player and enemy commands are committed. */
   onFirstTurnCommitted?: () => void;
+  /** Optional: skip encounter cloud-save gates for the lifetime of a throwaway dev fixture. */
+  bypassEncounterPersistence?: boolean;
   /**
    * Optional: guarantee these reward options in the FIRST shop after the opening
    * battle ("start in the store, test a specific item"). Each is a
@@ -8129,6 +8131,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "offers ENDLESS or END RUN. Choosing ENDLESS shows the opening Rifts and continues.\n"
       + "SAFETY: the auto-KO exists only in this dev scenario; normal bosses are untouched.",
     startingLevels: DEV_HELL_VICTORY_GHOST.party.map(member => member.level),
+    bypassEncounterPersistence: true,
     setup: () => {
       resetDevOverrides();
       setErRunPacing("normal");

@@ -1,7 +1,11 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { Battle } from "#app/battle";
 import { PLAYER_PARTY_MAX_SIZE, WEIGHT_INCREMENT_ON_SPAWN_MISS } from "#app/constants";
-import { consumePendingDevEnemyParty, type DevEnemyMonSpec } from "#app/dev-tools/registry";
+import {
+  consumePendingDevEnemyParty,
+  type DevEnemyMonSpec,
+  isDevEncounterPersistenceBypassActive,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
@@ -1661,6 +1665,15 @@ export class EncounterPhase extends BattlePhase {
                   // and boot the encounter directly. The guest already boots from the host's launch
                   // snapshot (the `this.loaded` branch above), so only the host reaches here.
                   this.broadcastCoopLaunchSnapshot();
+                  globalScene.disableMenu = false;
+                  this.enterEncounterPresentation();
+                  globalScene.resetSeed();
+                } else if (isDevEncounterPersistenceBypassActive()) {
+                  // A throwaway dev fixture can carry a deliberately huge restored
+                  // party that the staging save API rejects. Present that one battle
+                  // without persistence instead of treating the fixture as a broken
+                  // account save and resetting to the title. The marker is scoped
+                  // to this dev run and unavailable to normal runs.
                   globalScene.disableMenu = false;
                   this.enterEncounterPresentation();
                   globalScene.resetSeed();

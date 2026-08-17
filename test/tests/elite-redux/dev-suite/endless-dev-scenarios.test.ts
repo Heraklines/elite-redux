@@ -5,9 +5,12 @@
  */
 
 import {
+  clearDevEncounterPersistenceBypass,
   consumePendingDevEndlessOffer,
   consumePendingDevGhostTeam,
+  isDevEncounterPersistenceBypassActive,
   runPendingDevPartySetup,
+  setDevEncounterPersistenceBypass,
   setPendingDevEndlessOffer,
   setPendingDevGhostTeam,
   setPendingDevPartySetup,
@@ -54,6 +57,16 @@ describe("Endless dev scenario fixtures", () => {
     expect(consumePendingDevEndlessOffer()).toBe(false);
   });
 
+  it("keeps the dev-only encounter persistence bypass scoped until title cleanup", () => {
+    clearDevEncounterPersistenceBypass();
+    setDevEncounterPersistenceBypass();
+
+    expect(isDevEncounterPersistenceBypassActive()).toBe(true);
+    expect(isDevEncounterPersistenceBypassActive()).toBe(true);
+    clearDevEncounterPersistenceBypass();
+    expect(isDevEncounterPersistenceBypassActive()).toBe(false);
+  });
+
   it("does not abort run creation when a dev party setup fails", () => {
     const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
     setPendingDevPartySetup(() => {
@@ -92,12 +105,26 @@ describe("Endless dev scenario fixtures", () => {
     expect(scenario).not.toContain("Hell victory loadout was incomplete");
     expect(scenario).toContain("globalScene.currentBattle.isClassicFinalBoss");
     expect(scenario).toContain("onFirstTurnCommitted: () =>");
+    expect(scenario).toContain("bypassEncounterPersistence: true");
     expect(scenario).not.toContain("onBattleStart: () =>");
     expect(scenario).toContain("boss.damageAndUpdate(Math.max(1, boss.hp)");
     expect(source.match(/boss\.damageAndUpdate\(Math\.max\(1, boss\.hp\)/gu)).toHaveLength(1);
     expect(source).toContain(
       'export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(\n  scenario => scenario.label === "Endless: final boss auto-KO",',
     );
+  });
+
+  it("presents the throwaway staging encounter without entering the cloud-save failure path", () => {
+    const launcher = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/index.ts"), "utf8");
+    const encounter = fs.readFileSync(path.join(process.cwd(), "src/phases/encounter-phase.ts"), "utf8");
+    const bypassBranch = encounter.indexOf("isDevEncounterPersistenceBypassActive()");
+    const saveBranch = encounter.indexOf("globalScene.gameData\n                    .saveAll", bypassBranch);
+
+    expect(launcher).toContain("setDevEncounterPersistenceBypass()");
+    expect(launcher).toContain("clearDevEncounterPersistenceBypass()");
+    expect(bypassBranch).toBeGreaterThan(-1);
+    expect(saveBranch).toBeGreaterThan(bypassBranch);
+    expect(encounter.slice(bypassBranch, saveBranch)).toContain("this.enterEncounterPresentation()");
   });
 
   it("waits for the first committed move before triggering the scenario KO", () => {
