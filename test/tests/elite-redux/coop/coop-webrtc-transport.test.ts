@@ -8,6 +8,7 @@
 // verified headlessly against a mock data channel (no live ICE). Also proves the
 // CoopSessionController runs unchanged over WebRtcTransport (transport-agnostic).
 
+import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -550,6 +551,71 @@ describe("hot rejoin (#805): replaceChannel swaps a fresh wire into the LIVE tra
     expect(guestGot.filter(t => t === "waveResolved").length).toBe(1);
     hostWireA.close();
     expect(host.state).toBe("connected");
+  });
+
+  it("fences stale Authority V2 across P33 replacement while preserving the legacy durable FIFO", () => {
+    setCoopDurabilityEnabled(true);
+    const oldWire = new MockWire();
+    const transport = new WebRtcTransport("host", oldWire);
+    const v2Frame = (generation: number, fromRevision: number): CoopFrameV2 => ({
+      v: 2,
+      t: "tailRequest",
+      ctx: {
+        sessionId: "transport-p33-rebind",
+        runId: TEST_RUN_ID,
+        sessionEpoch: 7,
+        seatMapId: "transport-seat-map",
+        membershipRevision: generation + 1,
+        senderSeatId: 0,
+        authoritySeatId: 0,
+        connectionGeneration: generation,
+      },
+      body: { fromRevision },
+    });
+    const deliveredV2: unknown[] = [];
+    transport.onV2Frame(frame => deliveredV2.push(frame));
+
+    // Hold one connected-path logical pair behind backpressure, then add one dark-queue pair. The P33 fence
+    // must remove only both old-context V2 frames and preserve legacy order across the two queue layers.
+    oldWire.bufferedAmount = COOP_WIRE_BUFFER_HIGH_BYTES;
+    transport.send({ t: "waveResolved", wave: 10, outcome: "win" });
+    transport.send(v2Frame(0, 10));
+    oldWire.close();
+    transport.send({ t: "waveResolved", wave: 11, outcome: "capture" });
+    transport.send(v2Frame(0, 11));
+    transport.fenceAuthorityV2Rebind();
+    transport.send(v2Frame(0, 12));
+    transport.send({ t: "waveResolved", wave: 12, outcome: "flee" });
+
+    const replacementWire = new MockWire();
+    transport.replaceChannel(replacementWire);
+    expect(
+      replacementWire.sent.map(frame => JSON.parse(frame) as CoopMessage),
+      "replacement flush retains every legacy durable frame in its original cross-queue order",
+    ).toEqual([
+      { t: "waveResolved", wave: 10, outcome: "win" },
+      { t: "waveResolved", wave: 11, outcome: "capture" },
+      { t: "waveResolved", wave: 12, outcome: "flee" },
+    ]);
+
+    // Both a superseded-wire callback and an old-context frame on the fresh carrier remain inert while the
+    // authenticated binding is unready; neither reaches the still-old shadow receiver or terminalizes here.
+    oldWire.injectRaw(JSON.stringify(v2Frame(0, 13)));
+    replacementWire.injectRaw(JSON.stringify(v2Frame(0, 14)));
+    expect(deliveredV2).toEqual([]);
+
+    const replacementFrame = v2Frame(1, 15);
+    expect(
+      transport.completeAuthorityV2Rebind(() => {
+        transport.send(replacementFrame);
+        expect(replacementWire.sent).toHaveLength(3);
+        return true;
+      }),
+    ).toBe(true);
+    expect(replacementWire.sent.map(frame => JSON.parse(frame) as CoopMessage).at(-1)).toEqual(replacementFrame);
+
+    replacementWire.injectRaw(JSON.stringify(replacementFrame));
+    expect(deliveredV2).toEqual([replacementFrame]);
   });
 });
 

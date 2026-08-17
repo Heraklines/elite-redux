@@ -2169,6 +2169,18 @@ export interface CoopTransport {
    * deferral was never enabled.
    */
   pumpV2Inbound?(limit?: number): number;
+  /**
+   * Authenticated P33 hot-rejoin seam. Synchronously fence Authority V2 before the controller invalidates its
+   * accepted binding generation. Concrete transports discard only stale V2 backlog and suppress V2 traffic
+   * until the replacement binding has been installed; legacy traffic remains unaffected.
+   */
+  fenceAuthorityV2Rebind?(): void;
+  /**
+   * Atomically install the replacement Authority V2 identity while the transport remains fenced. V2 frames
+   * emitted by `rebind` are held until it returns true, then released on the current carrier before this call
+   * returns. A false return or throw restores the fence and discards that tentative redelivery.
+   */
+  completeAuthorityV2Rebind?(rebind: () => boolean): boolean;
   /** Tear down the connection. */
   close(): void;
   /**

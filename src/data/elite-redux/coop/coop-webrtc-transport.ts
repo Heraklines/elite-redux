@@ -97,6 +97,12 @@ interface CoopLogicalOutbound {
   attempt: { generation: number; id: string; frames: string[]; index: number } | null;
 }
 
+type CoopAuthorityV2RebindState = "open" | "fenced" | "rebinding";
+
+function isAuthorityV2Frame(msg: CoopMessage): boolean {
+  return (msg as { v?: unknown }).v === 2;
+}
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   for (let offset = 0; offset < bytes.length; offset += 8_192) {
@@ -166,6 +172,12 @@ export class WebRtcTransport implements CoopTransport {
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
   /** Co-op AUTHORITY V2: per-instance inbound handler for `v === 2` frames (see {@link CoopTransport.onV2Frame}). */
   private v2FrameHandler: ((frame: unknown) => void) | null = null;
+  /** Authenticated P33 hot-rejoin fence; generic replaceChannel calls leave this permanently `open`. */
+  private authorityV2RebindState: CoopAuthorityV2RebindState = "open";
+  /** New-context V2 redelivery emitted synchronously by the retained shadow while its rebind transaction runs. */
+  private readonly authorityV2RebindOutbound: CoopMessage[] = [];
+  private authorityV2RebindOutboundBytes = 0;
+  private authorityV2RebindBufferFailed = false;
   /**
    * #857 keepalive: cancel handle for the running ping timer AND the browser resume listeners (null until
    * {@linkcode startKeepalive}). Calling it stops the timer and unregisters every event listener - teardown
@@ -333,6 +345,111 @@ export class WebRtcTransport implements CoopTransport {
       this.flushOutboundQueue();
       this.drainLogicalOutbound();
     }
+  }
+
+  /**
+   * Fence Authority V2 for an authenticated P33 generation rotation. Old-context V2 is recoverable from the
+   * retained AuthorityLog, so discard it from both outbound layers; preserve every legacy durable frame and
+   * its relative FIFO position. Generic (non-P33) channel replacement never calls this seam.
+   */
+  fenceAuthorityV2Rebind(): void {
+    this.authorityV2RebindState = "fenced";
+    this.authorityV2RebindOutbound.length = 0;
+    this.authorityV2RebindOutboundBytes = 0;
+    this.authorityV2RebindBufferFailed = false;
+    const darkDiscarded = this.outboundQueue?.discard(isAuthorityV2Frame) ?? 0;
+    let logicalDiscarded = 0;
+    let retainedBytes = 0;
+    let writeIndex = 0;
+    for (const logical of this.logicalOutbound) {
+      if (isAuthorityV2Frame(logical.msg)) {
+        logicalDiscarded++;
+        continue;
+      }
+      this.logicalOutbound[writeIndex++] = logical;
+      retainedBytes += logical.byteLength;
+    }
+    this.logicalOutbound.length = writeIndex;
+    this.logicalOutboundBytes = retainedBytes;
+    coopLog(
+      "webrtc",
+      `Authority V2 rebind FENCED role=${this.role} gen=${this.wireGeneration} `
+        + `discardedDark=${darkDiscarded} discardedLogical=${logicalDiscarded}`,
+    );
+  }
+
+  /**
+   * Run the retained-shadow identity transaction while V2 stays fenced. Its synchronous new-context sends
+   * collect in a private buffer; only a fully successful rebind opens the seam and flushes those frames.
+   */
+  completeAuthorityV2Rebind(rebind: () => boolean): boolean {
+    if (this.authorityV2RebindState === "open") {
+      return rebind();
+    }
+    this.authorityV2RebindState = "rebinding";
+    this.authorityV2RebindOutbound.length = 0;
+    this.authorityV2RebindOutboundBytes = 0;
+    this.authorityV2RebindBufferFailed = false;
+    let rebound = false;
+    try {
+      rebound = rebind();
+    } catch (error) {
+      this.restoreAuthorityV2RebindFence();
+      throw error;
+    }
+    if (!rebound || this.authorityV2RebindBufferFailed) {
+      this.restoreAuthorityV2RebindFence();
+      return false;
+    }
+    const redelivery = this.authorityV2RebindOutbound.splice(0, this.authorityV2RebindOutbound.length);
+    this.authorityV2RebindOutboundBytes = 0;
+    this.authorityV2RebindState = "open";
+    for (const frame of redelivery) {
+      this.sendNow(frame);
+    }
+    coopLog(
+      "webrtc",
+      `Authority V2 rebind OPEN role=${this.role} gen=${this.wireGeneration} redelivered=${redelivery.length}`,
+    );
+    return true;
+  }
+
+  private restoreAuthorityV2RebindFence(): void {
+    this.authorityV2RebindState = "fenced";
+    this.authorityV2RebindOutbound.length = 0;
+    this.authorityV2RebindOutboundBytes = 0;
+    this.authorityV2RebindBufferFailed = false;
+  }
+
+  private bufferAuthorityV2RebindFrame(msg: CoopMessage): void {
+    const snapshot = structuredClone(msg);
+    const byteLength = new TextEncoder().encode(JSON.stringify(snapshot)).byteLength;
+    if (
+      byteLength > COOP_WIRE_MAX_REASSEMBLED_BYTES
+      || this.authorityV2RebindOutbound.length >= COOP_LOGICAL_QUEUE_MAX_COUNT
+      || this.authorityV2RebindOutboundBytes + byteLength > COOP_LOGICAL_QUEUE_MAX_BYTES
+    ) {
+      this.authorityV2RebindBufferFailed = true;
+      coopWarn(
+        "webrtc",
+        `Authority V2 rebind BUFFER REFUSED role=${this.role} gen=${this.wireGeneration} bytes=${byteLength}`,
+      );
+      return;
+    }
+    this.authorityV2RebindOutbound.push(snapshot);
+    this.authorityV2RebindOutboundBytes += byteLength;
+  }
+
+  private interceptAuthorityV2RebindSend(msg: CoopMessage): boolean {
+    if (!isAuthorityV2Frame(msg) || this.authorityV2RebindState === "open") {
+      return false;
+    }
+    if (this.authorityV2RebindState === "rebinding") {
+      this.bufferAuthorityV2RebindFrame(msg);
+    } else {
+      coopLog("webrtc", `Authority V2 send SUPPRESSED role=${this.role} gen=${this.wireGeneration}`);
+    }
+    return true;
   }
 
   get state(): CoopConnectionState {
@@ -519,6 +636,9 @@ export class WebRtcTransport implements CoopTransport {
   }
 
   private sendNow(msg: CoopMessage): void {
+    if (this.interceptAuthorityV2RebindSend(msg)) {
+      return;
+    }
     if (this._state !== "connected" || this.wire.readyState !== "open") {
       // W2b durability (§4.3): instead of dropping a DURABLE frame silently (the review-finding-3 hazard),
       // ENQUEUE it and flush FIFO on the next `open`. Cosmetic/internal frames are shed (§4.1). Keepalive
@@ -555,6 +675,9 @@ export class WebRtcTransport implements CoopTransport {
    * uncaught out of every caller). A failed send is logged; the channel's close event drives the rejoin.
    */
   private transmit(msg: CoopMessage): void {
+    if (this.interceptAuthorityV2RebindSend(msg)) {
+      return;
+    }
     const json = JSON.stringify(msg);
     const byteLength = new TextEncoder().encode(json).byteLength;
     if (isCoopDebug()) {
@@ -641,6 +764,11 @@ export class WebRtcTransport implements CoopTransport {
     try {
       while (this.logicalOutbound.length > 0) {
         const logical = this.logicalOutbound[0];
+        if (isAuthorityV2Frame(logical.msg) && this.authorityV2RebindState !== "open") {
+          this.logicalOutbound.shift();
+          this.logicalOutboundBytes -= logical.byteLength;
+          continue;
+        }
         if (logical.attempt == null || logical.attempt.generation !== this.wireGeneration) {
           logical.attempt = this.buildLogicalAttempt(logical);
           if (logical.attempt == null) {
@@ -670,6 +798,14 @@ export class WebRtcTransport implements CoopTransport {
             return;
           }
           attempt.index++;
+          // A synchronous mock carrier can re-enter the P33 invalidation callback from wire.send(). The
+          // callback removes this stale V2 logical item; never shift the following legacy survivor in its place.
+          if (this.logicalOutbound[0] !== logical) {
+            break;
+          }
+        }
+        if (this.logicalOutbound[0] !== logical) {
+          continue;
         }
         this.logicalOutbound.shift();
         this.logicalOutboundBytes -= logical.byteLength;
@@ -844,6 +980,10 @@ export class WebRtcTransport implements CoopTransport {
     this.earlyRx.length = 0;
     this.logicalOutbound.length = 0;
     this.logicalOutboundBytes = 0;
+    this.authorityV2RebindState = "open";
+    this.authorityV2RebindOutbound.length = 0;
+    this.authorityV2RebindOutboundBytes = 0;
+    this.authorityV2RebindBufferFailed = false;
     this.blockedSendGeneration = null;
     this.logicalRecoveryGeneration = null;
     this.disconnectedGeneration = null;
@@ -895,6 +1035,13 @@ export class WebRtcTransport implements CoopTransport {
     // malformed v2 frame is classified, not smuggled downstream. A v2 frame is only ever emitted when
     // BOTH peers negotiated authority.v2shadow, so this path is dead when the capability is off.
     if (parsed != null && typeof parsed === "object" && (parsed as { v?: unknown }).v === 2) {
+      if (this.authorityV2RebindState !== "open") {
+        coopLog(
+          "webrtc",
+          `Authority V2 inbound FENCED role=${this.role} gen=${this.wireGeneration} state=${this.authorityV2RebindState}`,
+        );
+        return;
+      }
       // A concrete endpoint may only route into ITS instance receiver. Borrowing a
       // realm-global handler can feed another same-process endpoint the frame.
       if (this.v2FrameHandler == null) {

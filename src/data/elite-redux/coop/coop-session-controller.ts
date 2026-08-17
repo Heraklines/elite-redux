@@ -233,6 +233,11 @@ export interface CoopSessionOptions {
    * first capability callback already has a frame context.
    */
   onAuthenticatedBindingReady?: (() => void) | undefined;
+  /**
+   * Invoked synchronously when an accepted P33 hot rejoin invalidates the prior binding generation. Runtime
+   * transport fencing happens here, before the caller can replace the channel or any queued frame can flush.
+   */
+  onAuthenticatedBindingInvalidated?: (() => void) | undefined;
   /** Publishes the host-negotiated operation epoch into every surface adapter. */
   onEpochNegotiated?: ((epoch: number) => void) | undefined;
   /** Production launch requires a matching functional data fingerprint before `bothReady` can open. */
@@ -294,6 +299,7 @@ export class CoopSessionController {
   /** #896 W2e-R2: the callback invoked with the frozen effective set each time it is (re)negotiated. */
   private readonly onCapabilitiesNegotiated: ((negotiated: ReadonlySet<string>) => void) | undefined;
   private readonly onAuthenticatedBindingReady: (() => void) | undefined;
+  private readonly onAuthenticatedBindingInvalidated: (() => void) | undefined;
   private readonly onEpochNegotiated: ((epoch: number) => void) | undefined;
   private readonly requireFunctionalFingerprint: boolean;
   private readonly partnerInteractionRecoveryMaxAttempts: number;
@@ -511,6 +517,7 @@ export class CoopSessionController {
     this.requiredCapabilities = [...(opts.requiredCapabilities ?? [])];
     this.onCapabilitiesNegotiated = opts.onCapabilitiesNegotiated;
     this.onAuthenticatedBindingReady = opts.onAuthenticatedBindingReady;
+    this.onAuthenticatedBindingInvalidated = opts.onAuthenticatedBindingInvalidated;
     this.onEpochNegotiated = opts.onEpochNegotiated;
     this.requireFunctionalFingerprint = opts.requireFunctionalFingerprint ?? false;
     this.partnerInteractionRecoveryMaxAttempts = opts.partnerInteractionRecoveryMaxAttempts ?? 3;
@@ -752,9 +759,12 @@ export class CoopSessionController {
       coopWarn("launch", "REFUSE P33 hot rejoin because authenticated binding axes changed");
       return false;
     }
+    // A fresh channel must prove the retained binding again. Authority replays it; replica re-ACKs it.
+    // Fence the concrete V2 carrier synchronously BEFORE changing these axes. The caller replaces the channel
+    // only after adoptP33Rejoin returns, so no old-context queued frame can escape through that fresh carrier.
+    this.onAuthenticatedBindingInvalidated?.();
     this.p33Context = structuredClone(next);
     this.p33MembershipRevisionValue++;
-    // A fresh channel must prove the retained binding again. Authority replays it; replica re-ACKs it.
     this.p33BindingReady = false;
     this.p33BindingRejected = false;
     this.p33PeerHelloAccepted = false;

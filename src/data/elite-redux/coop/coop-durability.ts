@@ -253,6 +253,28 @@ export class CoopOutboundQueue {
     }
   }
 
+  /**
+   * Discard only queued frames selected by `predicate`, preserving the relative order and immutable snapshots
+   * of every survivor. This does not alter the collapse/resync latch: selective invalidation has not lost any
+   * retained legacy authority, while a prior bounds collapse still owes its ordinary reconnect resync.
+   */
+  discard(predicate: (msg: CoopMessage) => boolean): number {
+    let discarded = 0;
+    let retainedBytes = 0;
+    let writeIndex = 0;
+    for (const frame of this.frames) {
+      if (predicate(frame.msg)) {
+        discarded++;
+        continue;
+      }
+      this.frames[writeIndex++] = frame;
+      retainedBytes += frame.bytes;
+    }
+    this.frames.length = writeIndex;
+    this.bytes = retainedBytes;
+    return discarded;
+  }
+
   /** Number of frames currently queued (backpressure depth, surfaced in the health line). */
   size(): number {
     return this.frames.length;

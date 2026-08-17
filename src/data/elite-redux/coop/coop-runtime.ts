@@ -88,11 +88,11 @@ import {
 } from "#data/elite-redux/coop/authority-v2/cutover-turn";
 import {
   CoopV2WaveCutover,
+  type CoopV2WaveTerminalCommitDisposition,
   clearActiveCoopV2WaveCutover,
   isCoopV2WaveCutoverActive,
   isCoopV2WaveEnabled,
   setActiveCoopV2WaveCutover,
-  type CoopV2WaveTerminalCommitDisposition,
 } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import {
   type CoopV2InteractionProjectionPlan,
@@ -262,6 +262,7 @@ import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle"
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
   COOP_ME_AUTHORITY_TURN,
+  type CoopMeOwnerCommitDisposition,
   captureCoopMeDeferredTerminal,
   clearCoopMeDeferredTerminalState,
   commitMeOwnerIntentDetailed,
@@ -272,7 +273,6 @@ import {
   releaseCoopMeDeferredTerminal,
   resetCoopMeOperationState,
   setCoopMeOperationRevisionFloor,
-  type CoopMeOwnerCommitDisposition,
   // biome-ignore lint/suspicious/noImportCycles: The runtime composition root coordinates ME operation callbacks that re-enter the runtime.
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
@@ -4609,7 +4609,11 @@ function continueCoopMeTerminalCommit(
     withActiveCoopRuntimeOpState(runtime.opState, clearCoopMeDeferredTerminalState);
   };
   const dispositionRevision =
-    disposition.kind === "deferred" ? disposition.revision : disposition.kind === "committed" ? disposition.envelope?.revision : undefined;
+    disposition.kind === "deferred"
+      ? disposition.revision
+      : disposition.kind === "committed"
+        ? disposition.envelope?.revision
+        : undefined;
   const dispositionEnvelope =
     disposition.kind === "deferred" || disposition.kind === "committed" ? disposition.envelope : undefined;
   const dispositionIdentityValid =
@@ -4622,10 +4626,7 @@ function continueCoopMeTerminalCommit(
     && dispositionEnvelope?.revision === dispositionRevision
     && dispositionEnvelope?.pendingOperation?.id === disposition.operationId
     && dispositionEnvelope?.pendingOperation?.kind === "ME_TERMINAL";
-  if (
-    (disposition.kind === "committed" || disposition.kind === "deferred")
-    && !dispositionIdentityValid
-  ) {
+  if ((disposition.kind === "committed" || disposition.kind === "deferred") && !dispositionIdentityValid) {
     failContinuation("commit disposition identity changed before local completion");
     return "failed";
   }
@@ -4688,9 +4689,8 @@ function continueCoopMeTerminalCommit(
 
   let deferred: ReturnType<typeof captureCoopMeDeferredTerminal>;
   try {
-    deferred = withActiveCoopRuntimeOpState(
-      runtime.opState,
-      () => captureCoopMeDeferredTerminal(disposition.operationId),
+    deferred = withActiveCoopRuntimeOpState(runtime.opState, () =>
+      captureCoopMeDeferredTerminal(disposition.operationId),
     );
   } catch (error) {
     coopWarn("me", `Mystery ${fence.label} deferred envelope capture threw`, error);
@@ -4857,10 +4857,7 @@ function freezeCoopV2HostBoundaryValue<T>(value: T): T {
   return value;
 }
 
-function sameCoopV2HostBoundaryTransition(
-  left: CoopWaveAdvancePayload,
-  right: CoopWaveAdvancePayload,
-): boolean {
+function sameCoopV2HostBoundaryTransition(left: CoopWaveAdvancePayload, right: CoopWaveAdvancePayload): boolean {
   try {
     const { settledStateTick: _leftTick, ...leftIdentity } = left;
     const { settledStateTick: _rightTick, ...rightIdentity } = right;
@@ -4891,10 +4888,7 @@ function clearCoopV2DeferredHostBoundary(runtime: CoopRuntime): void {
   }
 }
 
-function scheduleCoopV2DeferredHostBoundaryRetry(
-  runtime: CoopRuntime,
-  edge: CoopV2HostBoundaryRedriveEdge,
-): void {
+function scheduleCoopV2DeferredHostBoundaryRetry(runtime: CoopRuntime, edge: CoopV2HostBoundaryRedriveEdge): void {
   if (runtime.v2DeferredHostBoundary == null) {
     return;
   }
@@ -7606,11 +7600,7 @@ function enterCoopV2BiomeInteractionControlBoundary(
   spec: CoopV2BiomeInteractionOpenSpec,
 ): CoopV2InteractionBoundaryVerdict {
   const runtime = active;
-  if (
-    runtime == null
-    || !coopV2ControlCutovers.has(runtime)
-    || !coopV2InteractionCutovers.has(runtime)
-  ) {
+  if (runtime == null || !coopV2ControlCutovers.has(runtime) || !coopV2InteractionCutovers.has(runtime)) {
     return "ready";
   }
   if (
@@ -7646,11 +7636,7 @@ function enterCoopV2BiomeInteractionControlBoundary(
   const current = runtime.v2ControlLedger.latestControl;
   // A retained, address-equal materialized control is already authenticated and may be resumed without a
   // mutable battle cursor. Authority creation below still requires the live source battle and exact capture.
-  if (
-    current != null
-    && controlsEqual(current, control)
-    && runtime.v2ControlLedger.isMaterialApplied(current)
-  ) {
+  if (current != null && controlsEqual(current, control) && runtime.v2ControlLedger.isMaterialApplied(current)) {
     return "ready";
   }
   if (runtime.controller.authorityRole !== "authority") {
@@ -10361,10 +10347,7 @@ function retireCoopPendingHostWaveTransition(wave: number): void {
   pendingHostWaveTransitions.delete(wave);
 }
 
-function recordCoopCommittedHostWaveBoundary(
-  wave: number,
-  transition: CoopWaveAdvancePayload,
-): boolean {
+function recordCoopCommittedHostWaveBoundary(wave: number, transition: CoopWaveAdvancePayload): boolean {
   const pending = pendingHostWaveTransitions.get(wave);
   if (pending != null && !sameCoopV2HostBoundaryTransition(pending, transition)) {
     coopWarn("v2-wave", `refused to retire a different staged host transition wave=${wave}`);
@@ -10865,11 +10848,10 @@ export function sealCoopAutomaticVictoryBoundary(identity: CoopAutomaticVictoryS
   }
   const parked = runtime.v2DeferredHostBoundary;
   if (parked != null) {
-    if (
-      parked.wave !== identity.wave
-      || !sameCoopV2HostBoundaryTransition(parked.transition, pending.transition)
-    ) {
-      failCoopSharedSession(`The automatic victory seal for wave ${identity.wave} conflicted with its parked boundary.`);
+    if (parked.wave !== identity.wave || !sameCoopV2HostBoundaryTransition(parked.transition, pending.transition)) {
+      failCoopSharedSession(
+        `The automatic victory seal for wave ${identity.wave} conflicted with its parked boundary.`,
+      );
       return false;
     }
     // The exact state was already captured and retained by the first deferred attempt. Leave the seal and
@@ -11972,12 +11954,42 @@ export function assembleCoopRuntime(
     authorityV2Epoch = epoch;
     withActiveCoopRuntimeOpState(opState, () => applyCoopOperationEpoch(epoch, waveOperationBinding));
   };
-  const installAuthorityV2 = (): void => {
+  const authorityV2Expected = (): boolean =>
+    coopV2ShadowHarnesses.has(runtime)
+    || isCoopCapabilityNegotiated(COOP_CAP_AUTHORITY_V2_SHADOW)
+    || isCoopV2TurnNegotiated()
+    || isCoopV2ReplacementNegotiated()
+    || isCoopV2WaveNegotiated()
+    || isCoopV2InteractionNegotiated()
+    || isCoopV2RecoveryNegotiated();
+  const installAuthorityV2 = (): CoopAuthorityV2Shadow | null => {
     try {
-      getCoopV2Shadow(runtime);
+      return getCoopV2Shadow(runtime);
     } catch (error) {
       coopWarn("v2-shadow", "eager harness build on session lifecycle threw", error);
+      return null;
     }
+  };
+  const completeAuthenticatedAuthorityV2Rebind = (): void => {
+    const rebind = (): boolean => installAuthorityV2() != null || !authorityV2Expected();
+    const completed = transport.completeAuthorityV2Rebind?.(rebind) ?? rebind();
+    if (completed || !authorityV2Expected() || isCoopSharedTerminalFrozen(runtime)) {
+      return;
+    }
+    // Binding-ready is the first point where a replacement identity must be complete. A null identity or a
+    // failed retained-log rebind is no longer the expected invalidation gap: keep the transport fenced and
+    // preserve the existing shared-terminal failure contract rather than exposing an old V2 receiver.
+    const point = readCoopBattlePoint();
+    failCoopRuntimeSharedSession(
+      runtime,
+      "Authority V2 could not adopt the authenticated replacement channel without changing its session axes.",
+      {
+        boundary: "recovery",
+        reasonCode: "binding-mismatch",
+        wave: point.wave,
+        turn: point.turn,
+      },
+    );
   };
   const controller = new CoopSessionController(transport, {
     username: opts.username,
@@ -11997,11 +12009,18 @@ export function assembleCoopRuntime(
     // turn commit - otherwise a lazy first-tap build would leave wave-1 turns on legacy authority (a window
     // of dual authority the frozen cutover rule forbids). A pure no-op when neither v2 capability negotiated
     // (getCoopV2Shadow returns null); guarded so a build failure never unwinds the negotiation callback.
-    onCapabilitiesNegotiated: installAuthorityV2,
+    onCapabilitiesNegotiated: () => {
+      installAuthorityV2();
+    },
+    // P33 adoption runs before replaceChannel. Fence the concrete carrier synchronously at that exact
+    // invalidation edge so neither a dark-queue flush nor a late old-wire receive can reach the retained log.
+    onAuthenticatedBindingInvalidated: () => transport.fenceAuthorityV2Rebind?.(),
     // Public P33 negotiation fires before its authenticated frame axes exist. Retry at the exact later edge
     // where p33MembershipSnapshot/p33FrameContext become usable, so the replica installs its inbound V2
-    // receiver before the authority can publish the first retained entry.
-    onAuthenticatedBindingReady: installAuthorityV2,
+    // receiver before the authority can publish the first retained entry. The concrete WebRTC seam holds any
+    // synchronous AuthorityLog redelivery until getCoopV2Shadow has completed the identity transaction, then
+    // opens and flushes it in this same JS call stack.
+    onAuthenticatedBindingReady: completeAuthenticatedAuthorityV2Rebind,
     onPartnerInteractionRecoveryExhausted: failure => {
       const point = readCoopBattlePoint();
       failCoopRuntimeSharedSession(
