@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { erShatteredPsycheEndBattle } from "#data/elite-redux/abilities/shattered-psyche";
 import {
   recoverUsedPokeballsAfterBattle,
   snapshotBattleMoneyGainMultiplier,
@@ -183,6 +184,11 @@ export class BattleEndPhase extends BattlePhase {
     // covering the reward shop after the battle has definitively ended.
     globalScene.pbTray.hide();
     globalScene.pbTrayEnemy.hide();
+
+    // Shattered Psyche is a temporary battle state, not a real faint/fusion.
+    // Restore both constituents before rewards, party eligibility checks, and
+    // the next encounter can observe the party.
+    erShatteredPsycheEndBattle();
 
     // Turn-settlement phases intentionally survive the first victory cleanup.
     // Some of them can materialize a stale TurnInit/Command tail only after the

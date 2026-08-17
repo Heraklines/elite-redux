@@ -83,7 +83,10 @@ import {
   erOmniformOriginalIdentity,
   resolveOmniformUnlockOwnerIdentity,
 } from "#data/elite-redux/abilities/omniform-registry";
-import { erShatteredPsycheOnLeaveField } from "#data/elite-redux/abilities/shattered-psyche";
+import {
+  erShatteredPsycheIsAbsorbed,
+  erShatteredPsycheOnLeaveField,
+} from "#data/elite-redux/abilities/shattered-psyche";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import {
@@ -833,7 +836,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns Whether this Pokemon is allowed to partake in battle.
    */
   public isAllowedInBattle(): boolean {
-    return !this.isFainted() && this.isAllowedInChallenge();
+    return !this.isFainted() && !erShatteredPsycheIsAbsorbed(this) && this.isAllowedInChallenge();
   }
 
   /**
