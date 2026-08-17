@@ -16,9 +16,12 @@ export const REWARD_RATE_PANEL_WIDTH = 44;
 export const REWARD_RATE_PANEL_HEIGHT = 21.5;
 const ROW_HEIGHT = 6.5;
 const ROW_TOP = 1;
-const ICON_X = 1.5;
-const LABEL_X = 7;
-const VALUE_X = 42;
+const ICON_X = 3.5;
+const ICON_SIZE = 4.5;
+const LABEL_X = 6.5;
+const VALUE_X = 42.5;
+const TEXT_Y_OFFSET = 1.05;
+const TEXT_SIZE = "24px";
 const ROW_TEXTURE_KEY = "er-reward-rate-row";
 const FALLBACK_ROW_TEXTURE_KEY = "__WHITE";
 
@@ -26,39 +29,6 @@ const ROW_LABELS: Readonly<Record<ErRewardRateKind, string>> = Object.freeze({
   shiny: "Shiny",
   candy: "Candy",
   voucher: "Voucher",
-});
-
-const GLYPHS: Readonly<Record<ErRewardRateKind, readonly [number, number][]>> = Object.freeze({
-  shiny: [
-    [1.5, 0],
-    [1.5, 1],
-    [0, 1.5],
-    [1, 1.5],
-    [1.5, 1.5],
-    [2, 1.5],
-    [3, 1.5],
-    [1.5, 2],
-    [1.5, 3],
-  ],
-  candy: [
-    [1, 0],
-    [2, 0],
-    [0, 1],
-    [3, 1],
-    [0, 2],
-    [3, 2],
-    [1, 3],
-    [2, 3],
-  ],
-  voucher: [
-    [1, 0],
-    [2, 0],
-    [0.5, 1],
-    [2.5, 1],
-    [1, 2],
-    [2, 2],
-    [1.5, 3],
-  ],
 });
 
 const GLYPH_COLORS: Readonly<Record<ErRewardRateKind, number>> = Object.freeze({
@@ -136,15 +106,18 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
         .setOrigin(0, 0)
         .setDisplaySize(REWARD_RATE_PANEL_WIDTH - 1, ROW_HEIGHT);
 
-      const glyph = scene.add.graphics().fillStyle(GLYPH_COLORS[kind], 1);
-      for (const [gx, gy] of GLYPHS[kind]) {
-        glyph.fillRect(ICON_X + gx, rowY + 1 + gy, 0.75, 0.75);
-      }
+      const icon =
+        kind === "shiny"
+          ? scene.add.image(ICON_X, rowY + ROW_HEIGHT / 2, "shiny_star_small")
+          : scene.add.image(ICON_X, rowY + ROW_HEIGHT / 2, "items", kind === "candy" ? "candy" : "coupon");
+      icon.setOrigin(0.5).setDisplaySize(ICON_SIZE, ICON_SIZE);
 
-      const label = addTextObject(LABEL_X, rowY + 0.6, ROW_LABELS[kind], TextStyle.PARTY, { fontSize: "30px" })
+      const label = addTextObject(LABEL_X, rowY + TEXT_Y_OFFSET, ROW_LABELS[kind], TextStyle.PARTY, {
+        fontSize: TEXT_SIZE,
+      })
         .setOrigin(0, 0)
         .setShadow(0, 0, "#00000000");
-      const value = addTextObject(VALUE_X, rowY + 0.6, "", TextStyle.PARTY, { fontSize: "30px" })
+      const value = addTextObject(VALUE_X, rowY + TEXT_Y_OFFSET, "", TextStyle.PARTY, { fontSize: TEXT_SIZE })
         .setOrigin(1, 0)
         .setShadow(0, 0, "#00000000");
 
@@ -172,7 +145,7 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
         .on("pointerdown", () => this.showRowTooltip(kind))
         .on("pointerout", () => globalScene.ui?.hideTooltip());
 
-      this.add([background, ...corners, innerRim, glyph, label, value, hitArea]);
+      this.add([background, ...corners, innerRim, icon, label, value, hitArea]);
       this.rows.push({ kind, background, label, value, corners, innerRim });
     }
   }
