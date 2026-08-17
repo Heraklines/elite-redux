@@ -85,6 +85,7 @@ describe("Endless dev scenario fixtures", () => {
     expect(scenario).toContain('setErRunPacing("normal")');
     expect(scenario).toContain("STARTING_BIOME_OVERRIDE: BiomeId.END");
     expect(scenario).toContain("setPendingDevEndlessOffer()");
+    expect(scenario).toContain("boss.customPokemonData.erBlackShiny = true");
     expect(scenario).toContain("applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members)");
     expect(scenario).toContain("applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST)");
     expect(scenario).toContain("Hell victory legacy loadout restored partially");
@@ -95,5 +96,15 @@ describe("Endless dev scenario fixtures", () => {
     expect(source).toContain(
       'export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(\n  scenario => scenario.label === "Endless: final boss auto-KO",',
     );
+  });
+
+  it("routes the synthetic victory directly to the Endless prompt", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "src/phases/game-over-phase.ts"), "utf8");
+    const devRoute = source.indexOf("if (this.isVictory && consumePendingDevEndlessOffer())");
+    const cloudClear = source.indexOf("pokerogueApi.savedata.session");
+
+    expect(devRoute).toBeGreaterThan(-1);
+    expect(cloudClear).toBeGreaterThan(devRoute);
+    expect(source.slice(devRoute, cloudClear)).toContain('pushNew("EndlessOfferPhase")');
   });
 });

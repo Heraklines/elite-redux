@@ -8158,10 +8158,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
         throw new Error("Endless final-boss scenario did not create the classic finale");
       }
       setPendingDevEndlessOffer();
+
+      // Hell's first finale stage deliberately clamps lethal damage to 1 HP. This
+      // scenario skips the fight, so mark the already-Primal boss as its final
+      // black stage first. The normal FaintPhase still owns the KO and victory.
+      boss.customPokemonData.erBlackShiny = true;
       boss.damageAndUpdate(Math.max(1, boss.hp), {
         result: HitResult.INDIRECT_KO,
         ignoreSegments: true,
       });
+      globalScene.phaseManager.unshiftNew("MessagePhase", `${boss.getNameToRender()}'s power collapses inward!`, 750);
     },
   },
   {

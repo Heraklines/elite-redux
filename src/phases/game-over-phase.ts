@@ -89,6 +89,18 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
 
+    // Dev-only finale harnesses run on a throwaway slot that may not exist on the
+    // save API. Do not send that synthetic clear through `newclear`: a rejected
+    // request reloads the page before the Endless prompt can open. The marker is
+    // armed only by the dedicated final-boss scenario after it validates the real
+    // classic finale, and is consumed here exactly once.
+    if (this.isVictory && consumePendingDevEndlessOffer()) {
+      globalScene.phaseManager.clearPhaseQueue();
+      globalScene.phaseManager.pushNew("EndlessOfferPhase");
+      this.end();
+      return;
+    }
+
     globalScene.phaseManager.hideAbilityBar();
 
     // Failsafe if players somehow skip floor 200 in classic mode
@@ -411,14 +423,13 @@ export class GameOverPhase extends BattlePhase {
 
   private shouldOfferEndlessContinuation(): boolean {
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const devScenarioOffer = consumePendingDevEndlessOffer();
     const standardOffer =
       !globalScene.gameMode.isEndless
       && !globalScene.gameMode.isDaily
       && !globalScene.gameMode.isShowdown
       && !globalScene.gameMode.isCoop
       && globalScene.gameMode.isWaveFinal(wave);
-    return this.isVictory && (devScenarioOffer || standardOffer);
+    return this.isVictory && standardOffer;
   }
 
   /**
