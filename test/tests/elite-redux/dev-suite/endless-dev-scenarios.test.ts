@@ -61,13 +61,18 @@ describe("Endless dev scenario fixtures", () => {
 
   it("keeps the final-boss auto-KO scoped to the Hell-team picker scenario", () => {
     const source = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/scenarios.ts"), "utf8");
+    const resetStart = source.indexOf("export function resetDevOverrides()");
+    const resetEnd = source.indexOf("function setOverrides", resetStart);
     const scenarioStart = source.indexOf('label: "Endless: final boss auto-KO"');
     const nextScenario = source.indexOf('label: "Endless: full Hell ghost"', scenarioStart);
     const scenario = source.slice(scenarioStart, nextScenario);
 
+    expect(resetStart).toBeGreaterThan(-1);
+    expect(source.slice(resetStart, resetEnd)).toContain("resetErRunPacing()");
     expect(scenarioStart).toBeGreaterThan(-1);
     expect(nextScenario).toBeGreaterThan(scenarioStart);
     expect(scenario).toContain("usableGhostMembers(DEV_HELL_VICTORY_GHOST)");
+    expect(scenario).toContain('setErRunPacing("normal")');
     expect(scenario).toContain("applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members)");
     expect(scenario).toContain("applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST)");
     expect(scenario).toContain("Hell victory legacy loadout restored partially");

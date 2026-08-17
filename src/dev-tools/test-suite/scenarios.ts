@@ -64,6 +64,7 @@ import {
   setErDifficulty,
   setErDifficulty as setErDifficultyForScenario,
 } from "#data/elite-redux/er-run-difficulty";
+import { resetErRunPacing, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import {
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   encodeErShinyLabLoadout,
@@ -296,6 +297,7 @@ const DEV_OVERRIDE_DEFAULTS = {
  */
 export function resetDevOverrides(): void {
   Object.assign(O, structuredClone(DEV_OVERRIDE_DEFAULTS));
+  resetErRunPacing();
   resetErEndlessContinuation();
   // The smarter AI is master-OFF in real play; clear any per-scenario force so
   // only the AI scenarios (which re-enable it below) ever exercise it.
@@ -8126,6 +8128,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
     startingLevels: DEV_HELL_VICTORY_GHOST.party.map(member => member.level),
     setup: () => {
       resetDevOverrides();
+      setErRunPacing("normal");
       setErDifficulty("hell");
       setOverrides({
         STARTING_WAVE_OVERRIDE: 200,
