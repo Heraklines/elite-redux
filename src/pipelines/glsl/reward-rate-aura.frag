@@ -40,11 +40,19 @@ vec3 wheelColor(float t) {
     return clamp(p - 1.0, 0.0, 1.0);
 }
 
-// Narrow band around the row's semantic hue (Ember / Crimson / Prismatic+).
+// Narrow band around the row's semantic hue.
 vec3 hueBand(float hue, float t) {
-    float h = fract((hue + sin(t * 1.88496) * 9.0) / 360.0); // ±9° wobble, ~3.3 s
+    float h = fract((hue + sin(t * 1.25664) * 9.0) / 360.0);
     vec3 p = abs(fract(vec3(h) + vec3(0.0, 0.6667, 0.3333)) * 6.0 - 3.0);
     return 0.35 + 0.65 * clamp(p - 1.0, 0.0, 1.0);
+}
+
+float gradeBand(float grade, float target) {
+    return step(target - 0.5, grade) * (1.0 - step(target + 0.5, grade));
+}
+
+float pointGlow(vec2 uv, vec2 center, float radius) {
+    return 1.0 - smoothstep(0.0, radius, distance(uv, center));
 }
 
 void main(void) {
@@ -55,42 +63,77 @@ void main(void) {
         discard;
     }
 
-    float t = mix(time, 0.0, uReducedMotion);
+    float motion = 1.0 - uReducedMotion;
+    float t = time * motion;
     vec2 uv = outTexCoord;
-    float rateRatio = clamp(uRate / max(uRateCap, 1.0), 0.0, 1.0);
+    float normalizedRate = clamp((uRate - 1.0) / max(uRateCap - 1.0, 1.0), 0.0, 1.0);
     float grade = uVisualGrade;
+    vec3 semantic = hueBand(uSemanticHue, t + uPhaseOffset);
+    vec3 rainbow = wheelColor(fract(t / 5.0 + uv.x * 0.16 + uPhaseOffset * 0.11));
+    vec3 highColor = mix(semantic, rainbow, 0.62);
 
-    // Near-black fill at alpha .78 — glyphs are alpha-holes so the artwork shows through.
+    // The panel frame supplies the stable silhouette; row fills stay translucent.
     vec3 col = mix(vec3(0.043, 0.039, 0.067), vec3(0.078, 0.071, 0.114), uv.y);
 
-    // Grade aura: edge falloff stops before v = 0/1 so separator pixels stay pure.
+    // Static edge strength increases with the integer magnitude.
     float edge = pow(abs(uv.x - 0.5) * 2.0, 3.5);
-    float auraStrength = (0.04 + rateRatio * 0.10) * step(2.0, grade);
-    float pulse = 1.0 + 0.06 * sin(t * 2.0 + uPhaseOffset);
-    float isLuminous = 1.0 - min(abs(grade - 9.0), 1.0); // 1.0 only at grade 9
-    float isEclipse = step(10.5, grade);                 // 1.0 only at grade 11 (x50 cap)
-    vec3 semantic = hueBand(uSemanticHue, t + uPhaseOffset);
-    vec3 auraColor = mix(semantic, wheelColor(fract(t / 5.0 + uPhaseOffset * 0.11)), isLuminous);
-    col = mix(col, auraColor, edge * auraStrength * pulse);
+    float staticAura = step(2.0, grade) * (0.035 + normalizedRate * 0.115);
+    col = mix(col, semantic, edge * staticAura);
 
-    // Corner accents (grade >= 6, x10+): corner glow, separate from the edge aura.
-    float cornerFn = pow(length(max(abs(uv - 0.5) * 2.0 - vec2(0.55, 0.20), vec2(0.0))) * 1.6, 3.0);
-    float cornerGlow = (1.0 - clamp(cornerFn, 0.0, 1.0)) * step(6.0, grade);
-    col = mix(col, auraColor, cornerGlow * 0.14);
+    // x4-5: a restrained four-second sheen.
+    float sheenPhase = fract(uv.x - t * 0.25 + uPhaseOffset * 0.07);
+    float sheen = smoothstep(0.90, 0.98, sheenPhase) * (1.0 - smoothstep(0.98, 1.0, sheenPhase));
+    col += semantic * sheen * gradeBand(grade, 4.0) * 0.055;
 
-    // Luminous (grade 9): slow traveling sparkle, max mix alpha .06 (≤60ms perceptual).
-    float sparkBand = smoothstep(0.965, 1.0, fract(uv.x * 3.0 - t * 0.14 + uPhaseOffset * 0.17));
-    col = mix(col, auraColor, sparkBand * isLuminous * 0.06);
+    // x6-9: at most a .06 alpha pulse plus one slow mote.
+    float pulse = (0.5 + 0.5 * sin(t * 1.25664 + uPhaseOffset)) * gradeBand(grade, 5.0);
+    col = mix(col, semantic, pulse * 0.06);
+    vec2 moteCenter = vec2(fract(t * 0.055 + uPhaseOffset * 0.13), 0.28 + 0.30 * sin(t * 0.7 + uPhaseOffset));
+    col += semantic * pointGlow(uv, moteCenter, 0.045) * gradeBand(grade, 5.0) * 0.10;
 
-    // Stellar (grade 10, x40-49): cool sheen drifting across the row (frozen under reduced motion).
-    float sheenX = fract(uv.x - t * 0.045 + uPhaseOffset * 0.05);
-    float sheen = smoothstep(0.94, 1.0, sheenX) * (1.0 - min(abs(grade - 10.0), 1.0));
-    col += vec3(0.20, 0.30, 0.42) * sheen;
+    // x10-14: moving edge highlight and two sparse sparks.
+    float movingEdge = smoothstep(0.93, 1.0, fract(uv.x - t * 0.12 + uPhaseOffset * 0.09)) * edge;
+    float emberBand = gradeBand(grade, 6.0);
+    col += semantic * movingEdge * emberBand * 0.12;
+    col += semantic * pointGlow(uv, vec2(fract(t * 0.07 + uPhaseOffset), 0.22), 0.035) * emberBand * 0.12;
+    col += semantic * pointGlow(uv, vec2(fract(0.65 - t * 0.05 + uPhaseOffset), 0.78), 0.035) * emberBand * 0.12;
 
-    // Eclipse (grade 11, x50): dark core + violet rim.
-    vec3 eclipseRim = vec3(0.455, 0.408, 0.973); // #7468f8
-    col = mix(col, vec3(0.031, 0.027, 0.059), isEclipse * 0.85);
-    col = mix(col, eclipseRim, isEclipse * edge * 0.16);
+    // x15-19: stronger edge bloom with a slow energy flow.
+    float crimsonBand = gradeBand(grade, 7.0);
+    float energy = 0.5 + 0.5 * sin(uv.x * 12.566 + t * 0.9 + uPhaseOffset);
+    col = mix(col, semantic, edge * crimsonBand * (0.10 + energy * 0.08));
 
-    gl_FragColor = vec4(col * outTint.rgb, tex.a * outTint.a);
+    // x20-29: dual-colour edge with a one-logical-pixel-equivalent fringe.
+    float magentaBand = gradeBand(grade, 8.0);
+    vec3 companion = wheelColor(fract(uSemanticHue / 360.0 + 0.12));
+    float leftEdge = pow(1.0 - uv.x, 5.0);
+    float rightEdge = pow(uv.x, 5.0);
+    col = mix(col, semantic, leftEdge * magentaBand * 0.16);
+    col = mix(col, companion, rightEdge * magentaBand * 0.16);
+
+    // x30-49: semantic-prismatic blend, slow rainbow sweep, sparse star motes.
+    float prismaticBand = step(8.5, grade) * (1.0 - step(10.5, grade));
+    float sweep = 0.5 + 0.5 * sin(uv.x * 6.283 + t * 1.25664 + uPhaseOffset);
+    col = mix(col, highColor, edge * prismaticBand * (0.10 + sweep * 0.08));
+    float stars = pointGlow(uv, vec2(fract(t * 0.035 + uPhaseOffset), 0.24), 0.028)
+        + pointGlow(uv, vec2(fract(0.72 - t * 0.025 + uPhaseOffset), 0.76), 0.028);
+    col += highColor * stars * prismaticBand * 0.13;
+
+    // x40-49: white-hot edge and a cool aurora fringe; the panel adds its double rim.
+    float stellarBand = gradeBand(grade, 10.0);
+    col = mix(col, vec3(0.94, 0.98, 1.0), edge * stellarBand * 0.20);
+    col += highColor * (0.5 + 0.5 * sin(uv.x * 9.425 - t * 0.8)) * edge * stellarBand * 0.10;
+
+    // x50: dark core, white-gold/prismatic rim, and four slow corner sparks.
+    float capBand = gradeBand(grade, 11.0);
+    col = mix(col, vec3(0.025, 0.020, 0.052), capBand * 0.88);
+    vec3 capRim = mix(vec3(1.0, 0.88, 0.46), highColor, 0.52);
+    col = mix(col, capRim, edge * capBand * 0.26);
+    float capSparks = pointGlow(uv, vec2(0.03, 0.12), 0.05)
+        + pointGlow(uv, vec2(0.97, 0.12), 0.05)
+        + pointGlow(uv, vec2(0.03, 0.88), 0.05)
+        + pointGlow(uv, vec2(0.97, 0.88), 0.05);
+    col += capRim * capSparks * capBand * (0.08 + 0.04 * sin(t * 1.0 + uPhaseOffset));
+
+    gl_FragColor = vec4(col * outTint.rgb, tex.a * outTint.a * 0.78);
 }
