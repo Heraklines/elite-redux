@@ -31,9 +31,9 @@ use er_protocol::{
     RecoveryAction, RecoveryBundleValidation, RecoveryFrontierStagingOutcome, RecoveryLiveState,
     RecoveryMaterialOutcome, RecoveryPhase, RecoveryTransaction, RecoveryTransactionSnapshotBridge,
     RecoveryValidationContext, ReplicaAction, ReplicaAdmission, ReplicaMechanicalStage,
-    SchedulerCommand, StagedPeerRebindSnapshotV2, ValidatedFrame, ValidatedFrameBody,
-    build_battle_terminal_commit_draft, control_id_of, frame_contexts_compatible,
-    validate_battle_terminal_commit, validate_recovery_bundle,
+    ReplicaTailProofDisposition, SchedulerCommand, StagedPeerRebindSnapshotV2, ValidatedFrame,
+    ValidatedFrameBody, build_battle_terminal_commit_draft, control_id_of,
+    frame_contexts_compatible, validate_battle_terminal_commit, validate_recovery_bundle,
 };
 use er_state::digest::MechanicalStateDigest;
 use er_state::format::human_seats;
@@ -53,7 +53,7 @@ use er_types::{
     FRAME_PROTOCOL_VERSION, FrameContext, FrameType, InputTimerCommand, KernelEffect, KernelInput,
     LiveResourceSnapshot, NetworkFrame, ProposalMessage, RawFrame, RecoveryAppliedProof,
     RecoveryBundle, RecoveryBundleBody, RecoveryFenceState, RecoveryRequestBody, Revision, SeatId,
-    TailRequestBody, TerminalState, TimerId, TransportState,
+    TailProofBody, TailRequestBody, TerminalState, TimerId, TransportState,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::json;
@@ -3108,7 +3108,9 @@ impl BattleTransaction {
             ValidatedFrameBody::TailRequest(body) => {
                 self.receive_tail_request(endpoint, context, body)
             }
-            ValidatedFrameBody::TailProof(_) => Ok(()),
+            ValidatedFrameBody::TailProof(body) => {
+                self.receive_tail_proof(endpoint, context, body)
+            }
             ValidatedFrameBody::RecoveryRequest(body) => {
                 self.receive_recovery_request(endpoint, context, body)
             }
@@ -3224,6 +3226,29 @@ impl BattleTransaction {
         context: FrameContext,
         body: TailRequestBody,
     ) -> Result<(), BattleKernelError> {
+        if body.request_id.is_some() {
+            let actions = match &mut self.staged.protocol {
+                BattleProtocolState::Authority {
+                    context: authority_context,
+                    peer_bindings,
+                    log,
+                    ..
+                } => {
+                    if !authority_accepts_peer_frame(
+                        authority_context,
+                        peer_bindings,
+                        endpoint,
+                        &context,
+                    ) {
+                        return Ok(());
+                    }
+                    Arc::make_mut(log).handle_tail_proof_request(context, body)
+                }
+                BattleProtocolState::Replica { .. } => return Ok(()),
+            };
+            map_authority_actions(&mut self.effects, actions)?;
+            return Ok(());
+        }
         let (from, entries) = match &self.staged.protocol {
             BattleProtocolState::Authority {
                 context: authority_context,
@@ -3253,6 +3278,55 @@ impl BattleTransaction {
             self.effects.push(KernelEffect::SendFrame { from, frame });
         }
         Ok(())
+    }
+
+    fn receive_tail_proof(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: TailProofBody,
+    ) -> Result<(), BattleKernelError> {
+        let disposition = match &mut self.staged.protocol {
+            BattleProtocolState::Replica {
+                context: local_context,
+                authority_seat,
+                authority_generation,
+                replica,
+                ..
+            } => {
+                if !replica_accepts_authority_frame(
+                    local_context,
+                    *authority_seat,
+                    *authority_generation,
+                    endpoint,
+                    &context,
+                ) {
+                    return Ok(());
+                }
+                replica.accept_tail_proof(&context, &body)
+            }
+            BattleProtocolState::Authority { .. } => return Ok(()),
+        };
+        match disposition {
+            ReplicaTailProofDisposition::Ignored { .. }
+            | ReplicaTailProofDisposition::Pending => Ok(()),
+            ReplicaTailProofDisposition::Rejected { reason } => {
+                self.enter_terminal(format!("tail proof rejected: {reason}"))?;
+                Ok(())
+            }
+            ReplicaTailProofDisposition::Completed { step } => match &step.admission {
+                ReplicaAdmission::Rejected { reason } => {
+                    self.enter_terminal(format!("tail proof candidate rejected: {reason:?}"))?;
+                    Ok(())
+                }
+                ReplicaAdmission::Duplicate {
+                    resume: er_protocol::ReplicaResume::ControlInstalled,
+                } => self.map_replica_actions_with_probe_mode(step.actions, true),
+                ReplicaAdmission::Admitted { .. }
+                | ReplicaAdmission::Duplicate { .. }
+                | ReplicaAdmission::Gap { .. } => self.map_replica_actions(step.actions),
+            },
+        }
     }
 
     fn receive_recovery_request(
@@ -4331,6 +4405,14 @@ impl BattleTransaction {
                         frame,
                     });
                 }
+                ReplicaAction::RequestTailProof { context, request } => {
+                    let frame = crate::kernel::correlated_tail_request_frame(&context, request)
+                        .map_err(|reason| BattleKernelError::Protocol { reason })?;
+                    self.effects.push(KernelEffect::SendFrame {
+                        from: context.sender_seat_id,
+                        frame,
+                    });
+                }
                 ReplicaAction::EnterTerminal { reason } => {
                     return Err(BattleKernelError::TerminalRequired { reason });
                 }
@@ -5281,6 +5363,14 @@ fn map_authority_actions(
             }
             AuthorityLogAction::Scheduler { command } => {
                 map_scheduler_command(effects, command);
+            }
+            AuthorityLogAction::TailProof { context, body, .. } => {
+                let frame = crate::kernel::tail_proof_frame(&context, body)
+                    .map_err(|reason| BattleKernelError::Protocol { reason })?;
+                effects.push(KernelEffect::SendFrame {
+                    from: context.sender_seat_id,
+                    frame,
+                });
             }
         }
     }

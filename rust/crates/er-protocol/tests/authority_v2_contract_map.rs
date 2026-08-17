@@ -143,7 +143,7 @@ const EXPECTED_SOURCE_CONTRACTS: &[ExpectedSourceContract] = &[
     ExpectedSourceContract {
         id: "frame-v2",
         symbol: "CoopFrameV2",
-        source: "src/data/elite-redux/coop/authority-v2/frame-codec.ts:113",
+        source: "src/data/elite-redux/coop/authority-v2/frame-codec.ts:146",
         target_layer: "rust_types",
         fixture_id: "frames",
         semantic_class: "wire-envelope",

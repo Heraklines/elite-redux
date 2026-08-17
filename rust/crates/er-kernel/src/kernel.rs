@@ -13,8 +13,9 @@ use er_protocol::{
     ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager, ProposalLeaseSpec,
     ProposalLeaseStart, RecoveryAction, RecoveryFrontierStagingOutcome, RecoveryLiveState,
     RecoveryMaterialOutcome, RecoveryTransaction, RecoveryTransactionConfig, ReplicaAction,
-    ReplicaAdmission, ReplicaResume, ScheduledTimer, SchedulerCommand, ValidatedFrame,
-    ValidatedFrameBody, control_id_of, frame_contexts_compatible,
+    ReplicaAdmission, ReplicaResume, ReplicaTailProofDisposition, ScheduledTimer,
+    SchedulerCommand, ValidatedFrame, ValidatedFrameBody, control_id_of,
+    frame_contexts_compatible,
 };
 use er_state::digest::MechanicalStateDigest;
 use er_types::{
@@ -26,8 +27,8 @@ use er_types::{
     NextControl, OperationId, PresentationEvent, PresentationEventId, PresentationOutcome,
     ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle, RecoveryBundleBody,
     RecoveryPhase, RecoveryRequestBody, ReplacementMenu, Revision, SafeU53, SeatId,
-    TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState, TimeClass, TimerId,
-    TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
+    TailProofBody, TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState, TimeClass,
+    TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use serde_json::{Value, json};
@@ -1202,6 +1203,15 @@ impl GameKernel {
                     }),
                     Err(reason) => effects.extend(self.enter_terminal(reason)),
                 },
+                AuthorityLogAction::TailProof { context, body, .. } => {
+                    match tail_proof_frame(&context, body) {
+                        Ok(frame) => effects.push(KernelEffect::SendFrame {
+                            from: context.sender_seat_id,
+                            frame,
+                        }),
+                        Err(reason) => effects.extend(self.enter_terminal(reason)),
+                    }
+                }
             }
         }
         self.sync_live_resources();
@@ -1335,6 +1345,15 @@ impl GameKernel {
                     }),
                     Err(reason) => effects.extend(self.enter_terminal(reason)),
                 },
+                ReplicaAction::RequestTailProof { context, request } => {
+                    match correlated_tail_request_frame(&context, request) {
+                        Ok(frame) => effects.push(KernelEffect::SendFrame {
+                            from: context.sender_seat_id,
+                            frame,
+                        }),
+                        Err(reason) => effects.extend(self.enter_terminal(reason)),
+                    }
+                }
                 ReplicaAction::EnterTerminal { reason } => {
                     effects.extend(self.enter_terminal(reason));
                 }
@@ -1654,7 +1673,9 @@ impl GameKernel {
             ValidatedFrameBody::TailRequest(body) => {
                 self.dispatch_tail_request(endpoint, context, body)
             }
-            ValidatedFrameBody::TailProof(_) => Ok(Vec::new()),
+            ValidatedFrameBody::TailProof(body) => {
+                self.dispatch_tail_proof(endpoint, context, body)
+            }
             ValidatedFrameBody::RecoveryRequest(body) => {
                 self.dispatch_recovery_request(endpoint, context, body)
             }
@@ -1770,11 +1791,15 @@ impl GameKernel {
         context: FrameContext,
         body: er_types::TailRequestBody,
     ) -> Result<Vec<KernelEffect>, KernelError> {
-        let Some(ProtocolState::Authority(authority)) = self.protocol.as_ref() else {
+        let Some(ProtocolState::Authority(authority)) = self.protocol.as_mut() else {
             return Ok(Vec::new());
         };
         if !authority_accepts_peer_frame(authority, endpoint, &context) {
             return Ok(Vec::new());
+        }
+        if body.request_id.is_some() {
+            let actions = authority.log.handle_tail_proof_request(context, body);
+            return Ok(self.map_authority_actions(actions));
         }
         let captured = match previous_revision(body.from_revision) {
             Some(captured) => captured,
@@ -1794,6 +1819,49 @@ impl GameKernel {
             })
             .collect();
         Ok(effects)
+    }
+
+    fn dispatch_tail_proof(
+        &mut self,
+        endpoint: SeatId,
+        context: FrameContext,
+        body: TailProofBody,
+    ) -> Result<Vec<KernelEffect>, KernelError> {
+        let disposition = {
+            let Some(ProtocolState::Replica(replica)) = self.protocol.as_mut() else {
+                return Ok(Vec::new());
+            };
+            if !replica_accepts_authority_frame(replica, endpoint, &context) {
+                return Ok(Vec::new());
+            }
+            replica.replica.accept_tail_proof(&context, &body)
+        };
+        match disposition {
+            ReplicaTailProofDisposition::Ignored { .. }
+            | ReplicaTailProofDisposition::Pending => Ok(Vec::new()),
+            ReplicaTailProofDisposition::Rejected { reason } => {
+                Ok(self.enter_terminal(format!("tail proof rejected: {reason}")))
+            }
+            ReplicaTailProofDisposition::Completed { step } => {
+                let duplicate_complete_probe = matches!(
+                    &step.admission,
+                    ReplicaAdmission::Duplicate {
+                        resume: ReplicaResume::ControlInstalled,
+                    }
+                );
+                match &step.admission {
+                    ReplicaAdmission::Rejected { reason } => Ok(self.enter_terminal(format!(
+                        "tail proof candidate rejected: {reason:?}"
+                    ))),
+                    ReplicaAdmission::Admitted { .. }
+                    | ReplicaAdmission::Duplicate { .. }
+                    | ReplicaAdmission::Gap { .. } => self.map_replica_actions_with_probe_mode(
+                        step.actions,
+                        duplicate_complete_probe,
+                    ),
+                }
+            }
+        }
     }
 
     fn dispatch_recovery_request(
@@ -3530,16 +3598,36 @@ pub(crate) fn tail_request_frame(
     context: &FrameContext,
     missing_from: Revision,
 ) -> Result<NetworkFrame, String> {
-    network_frame(
+    correlated_tail_request_frame(
         context,
-        FrameType::TailRequest,
-        serde_json::to_value(TailRequestBody {
+        TailRequestBody {
             from_revision: missing_from,
             request_id: None,
             candidate_revision: None,
             candidate_operation_id: None,
-        })
-        .map_err(|error| error.to_string())?,
+        },
+    )
+}
+
+pub(crate) fn correlated_tail_request_frame(
+    context: &FrameContext,
+    body: TailRequestBody,
+) -> Result<NetworkFrame, String> {
+    network_frame(
+        context,
+        FrameType::TailRequest,
+        serde_json::to_value(body).map_err(|error| error.to_string())?,
+    )
+}
+
+pub(crate) fn tail_proof_frame(
+    context: &FrameContext,
+    body: TailProofBody,
+) -> Result<NetworkFrame, String> {
+    network_frame(
+        context,
+        FrameType::TailProof,
+        serde_json::to_value(body).map_err(|error| error.to_string())?,
     )
 }
 

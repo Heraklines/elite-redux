@@ -246,7 +246,7 @@ fn assert_typed_body_values(frame_type: &str, body: &ValidatedFrameBody) {
                 body.candidate_operation_id.as_ref(),
             ) {
                 assert_eq!(request_id.as_str(), "request");
-                assert_eq!(candidate_revision.get(), 2);
+                assert_eq!(candidate_revision.get().get(), 2);
                 assert_eq!(candidate_operation_id.as_str(), "candidate");
             } else {
                 assert!(body.request_id.is_none());
@@ -267,7 +267,7 @@ fn assert_typed_body_values(frame_type: &str, body: &ValidatedFrameBody) {
             assert_eq!(
                 body.source_revisions
                     .iter()
-                    .map(|value| value.get())
+                    .map(|value| value.get().get())
                     .collect::<Vec<_>>(),
                 vec![1]
             );

@@ -13,7 +13,8 @@ use er_types::battle_ids::{CanonicalHexBytes, CanonicalU64Decimal};
 use er_types::{
     AuthorityEntry, AuthorityEntryKind, AuthorityFrontier, ConnectionGeneration, FrameContext,
     OperationId, ProposalMessage, RecoveryBundle, RecoveryFenceState, RecoveryPhase, Revision,
-    SafeU53, SeatId, TimeClass, TimerId, TimerOwner, TransportState,
+    SafeU53, SeatId, TAIL_PROOF_MAX_SOURCE_REVISIONS, TailProofPhase, TimeClass, TimerId,
+    TimerOwner, TransportState,
 };
 use serde::{Deserialize, Deserializer, Serialize, de::DeserializeOwned};
 use thiserror::Error;
@@ -223,7 +224,113 @@ pub struct AuthorityLogSnapshotV2 {
     pub retired_operation_order: Vec<OperationId>,
     pub capacity_refusals: SafeU53,
     pub send_failures: SafeU53,
+    #[serde(default, skip_serializing_if = "TailProofAuthoritySnapshotV2::is_empty")]
+    pub tail_proof: TailProofAuthoritySnapshotV2,
     pub disposed: bool,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TailProofPeerHighWaterSnapshotV2 {
+    pub seat: SeatId,
+    pub sequence: SafeU53,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TailProofAuthorityResponseSnapshotV2 {
+    pub requester_seat: SeatId,
+    pub sequence: SafeU53,
+    pub request_context: FrameContext,
+    pub authority_context: FrameContext,
+    pub manifest: er_types::TailProofBody,
+    pub sources: Vec<OpaqueAuthorityEntrySnapshotV2>,
+    pub complete: er_types::TailProofBody,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TailProofAuthoritySnapshotV2 {
+    pub retired_sources: Vec<OpaqueAuthorityEntrySnapshotV2>,
+    pub responses: Vec<TailProofAuthorityResponseSnapshotV2>,
+    pub request_high_water: Vec<TailProofPeerHighWaterSnapshotV2>,
+}
+
+impl TailProofAuthoritySnapshotV2 {
+    pub fn is_empty(&self) -> bool {
+        self.retired_sources.is_empty()
+            && self.responses.is_empty()
+            && self.request_high_water.is_empty()
+    }
+
+    fn validate(&self, capacity: SafeU53) -> Result<(), SnapshotError> {
+        let capacity = usize::try_from(capacity.get()).unwrap_or(usize::MAX);
+        if self.retired_sources.len() > capacity
+            || self.responses.len() > capacity
+            || self.retired_sources.len() > TAIL_PROOF_MAX_SOURCE_REVISIONS
+        {
+            return Err(invalid(
+                "authority_log.tail_proof",
+                "retired source or response count exceeds retention capacity",
+            ));
+        }
+        validate_sorted_unique(
+            &self
+                .retired_sources
+                .iter()
+                .map(|source| source.identity.revision)
+                .collect::<Vec<_>>(),
+            "authority_log.tail_proof.retired_sources",
+        )?;
+        for source in &self.retired_sources {
+            source.validate()?;
+        }
+        validate_sorted_unique(
+            &self
+                .request_high_water
+                .iter()
+                .map(|value| value.seat)
+                .collect::<Vec<_>>(),
+            "authority_log.tail_proof.request_high_water",
+        )?;
+        if self
+            .request_high_water
+            .iter()
+            .any(|value| value.sequence == SafeU53::ZERO)
+        {
+            return Err(invalid(
+                "authority_log.tail_proof.request_high_water",
+                "request sequence high-water values must be positive",
+            ));
+        }
+        validate_sorted_unique(
+            &self
+                .responses
+                .iter()
+                .map(|response| {
+                    (response.requester_seat, response.manifest.request_id.clone())
+                })
+                .collect::<Vec<_>>(),
+            "authority_log.tail_proof.responses",
+        )?;
+        for response in &self.responses {
+            if response.sequence == SafeU53::ZERO
+                || response.manifest.phase != TailProofPhase::Manifest
+                || response.complete.phase != TailProofPhase::Complete
+                || response.sources.len() > capacity
+                || response.sources.len() > TAIL_PROOF_MAX_SOURCE_REVISIONS
+            {
+                return Err(invalid(
+                    "authority_log.tail_proof.responses",
+                    "response phase, sequence, or source capacity is invalid",
+                ));
+            }
+            for source in &response.sources {
+                source.validate()?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -262,7 +369,77 @@ pub struct AuthorityReplicaSnapshotV2 {
     pub installed_controls: Vec<InstalledControlSnapshotV2>,
     #[serde(deserialize_with = "deserialize_required_nullable")]
     pub recovery_proof: Option<AuthorityEntryIdentitySnapshotV2>,
+    #[serde(default, skip_serializing_if = "TailProofReplicaSnapshotV2::is_empty")]
+    pub tail_proof: TailProofReplicaSnapshotV2,
     pub disposed: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TailProofReplicaCaptureSnapshotV2 {
+    pub candidate: OpaqueAuthorityEntrySnapshotV2,
+    pub predecessor_identity: AuthorityEntryIdentitySnapshotV2,
+    pub from_revision: Revision,
+    pub request_id: OperationId,
+    pub request_context: FrameContext,
+    pub authority_context: FrameContext,
+    #[serde(deserialize_with = "deserialize_required_nullable")]
+    pub manifest: Option<er_types::TailProofBody>,
+    pub sources: Vec<OpaqueAuthorityEntrySnapshotV2>,
+}
+
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TailProofReplicaSnapshotV2 {
+    pub request_sequence: SafeU53,
+    #[serde(deserialize_with = "deserialize_required_nullable")]
+    pub capture: Option<TailProofReplicaCaptureSnapshotV2>,
+    #[serde(deserialize_with = "deserialize_required_nullable")]
+    pub admission_candidate: Option<OpaqueAuthorityEntrySnapshotV2>,
+}
+
+impl TailProofReplicaSnapshotV2 {
+    pub fn is_empty(&self) -> bool {
+        self.request_sequence == SafeU53::ZERO
+            && self.capture.is_none()
+            && self.admission_candidate.is_none()
+    }
+
+    fn validate(&self) -> Result<(), SnapshotError> {
+        if self.capture.is_some() && self.admission_candidate.is_some() {
+            return Err(invalid(
+                "authority_replica.tail_proof",
+                "capture and one-shot admission cannot coexist",
+            ));
+        }
+        if self.admission_candidate.is_some() {
+            return Err(invalid(
+                "authority_replica.tail_proof.admission_candidate",
+                "one-shot admission state is call-stack-local and cannot cross a snapshot boundary",
+            ));
+        }
+        if let Some(capture) = &self.capture {
+            capture.candidate.validate()?;
+            capture.predecessor_identity.validate()?;
+            if capture.manifest.as_ref().is_some_and(|manifest| {
+                manifest.phase != TailProofPhase::Manifest
+                    || manifest.source_revisions.len() > TAIL_PROOF_MAX_SOURCE_REVISIONS
+            }) || capture.sources.len() > TAIL_PROOF_MAX_SOURCE_REVISIONS
+            {
+                return Err(invalid(
+                    "authority_replica.tail_proof.capture",
+                    "capture manifest or source capacity is invalid",
+                ));
+            }
+            for source in &capture.sources {
+                source.validate()?;
+            }
+        }
+        if let Some(candidate) = &self.admission_candidate {
+            candidate.validate()?;
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -728,11 +905,13 @@ impl AuthorityLogSnapshotV2 {
                 "a bound-peer lease cannot retire at the unbound None stage",
             ));
         }
+        self.tail_proof.validate(self.retain_capacity)?;
         if self.disposed
             && (!self.retained.is_empty()
                 || self.latest_committed.is_some()
                 || !self.retired_operation_stages.is_empty()
-                || !self.retired_operation_order.is_empty())
+                || !self.retired_operation_order.is_empty()
+                || !self.tail_proof.is_empty())
         {
             return Err(invalid(
                 "authority_log",
@@ -768,6 +947,7 @@ impl AuthorityReplicaSnapshotV2 {
         if let Some(proof) = &self.recovery_proof {
             proof.validate()?;
         }
+        self.tail_proof.validate()?;
         if !(self.frontier.control <= self.frontier.material
             && self.frontier.material <= self.frontier.received)
         {
@@ -780,7 +960,8 @@ impl AuthorityReplicaSnapshotV2 {
             && (self.pending.is_some()
                 || self.requested_tail_from.is_some()
                 || !self.installed_controls.is_empty()
-                || self.recovery_proof.is_some())
+                || self.recovery_proof.is_some()
+                || !self.tail_proof.is_empty())
         {
             return Err(invalid(
                 "authority_replica",

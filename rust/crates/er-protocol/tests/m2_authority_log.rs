@@ -136,6 +136,7 @@ fn scheduled_timer_id(actions: &[AuthorityLogAction]) -> Option<TimerId> {
             command: SchedulerCommand::Schedule { timer },
         } => Some(timer.timer_id),
         AuthorityLogAction::Deliver { .. }
+        | AuthorityLogAction::TailProof { .. }
         | AuthorityLogAction::Scheduler {
             command:
                 SchedulerCommand::Cancel { .. }
@@ -150,7 +151,7 @@ fn scheduler_commands(actions: &[AuthorityLogAction]) -> Vec<&SchedulerCommand> 
         .iter()
         .filter_map(|action| match action {
             AuthorityLogAction::Scheduler { command } => Some(command),
-            AuthorityLogAction::Deliver { .. } => None,
+            AuthorityLogAction::Deliver { .. } | AuthorityLogAction::TailProof { .. } => None,
         })
         .collect()
 }

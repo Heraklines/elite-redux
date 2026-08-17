@@ -8,13 +8,16 @@ use er_types::{
     ControlProjectionOutcome, FrameContext, InteractionControlAddress, InteractionSuccessor,
     Material, MaterialApplicationOutcome, NextControl, OperationId, RecoveredFrontierTerminal,
     ReplacementControl, ReplacementControlAddress, Revision, SafeU53, SeatId,
-    SharedInteractionControl, TerminalControl, validate_authority_material_digest,
-    validate_authority_operation_id,
+    SharedInteractionControl, TAIL_PROOF_MAX_SOURCE_REVISIONS, TailProofBody, TailRequestBody,
+    TerminalControl, validate_authority_material_digest, validate_authority_operation_id,
 };
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use thiserror::Error;
 
+use crate::tail_proof::{
+    TailProofEntryCapture, TailProofFrameDisposition, TailProofReplicaState,
+};
 use crate::{SuccessorValidator, control_id_of};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -61,6 +64,7 @@ pub enum ReplicaRejectReason {
     AuthoritySenderMismatch,
     RevisionIdentityConflict,
     PredecessorControlMismatch,
+    TailProofRejected,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -83,6 +87,10 @@ pub enum ReplicaAction {
         context: FrameContext,
         missing_from: Revision,
     },
+    RequestTailProof {
+        context: FrameContext,
+        request: TailRequestBody,
+    },
     EnterTerminal {
         reason: String,
     },
@@ -102,6 +110,14 @@ pub enum ReplicaAdmission {
 pub struct ReplicaStep {
     pub admission: ReplicaAdmission,
     pub actions: Vec<ReplicaAction>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ReplicaTailProofDisposition {
+    Ignored { reason: String },
+    Pending,
+    Completed { step: ReplicaStep },
+    Rejected { reason: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -145,6 +161,7 @@ pub struct AuthorityReplica {
     requested_tail_from: Option<Revision>,
     installed_controls: BTreeMap<Revision, InstalledControl>,
     recovery_proof: Option<RecoveryFrontierProof>,
+    tail_proof: TailProofReplicaState,
     disposed: bool,
 }
 
@@ -315,6 +332,7 @@ impl AuthorityReplica {
             requested_tail_from: None,
             installed_controls: BTreeMap::new(),
             recovery_proof: None,
+            tail_proof: TailProofReplicaState::default(),
             disposed: false,
         })
     }
@@ -350,6 +368,32 @@ impl AuthorityReplica {
         }
         if let Some(reason) = self.context_rejection(&entry) {
             return rejected_step(reason);
+        }
+
+        match self
+            .tail_proof
+            .capture_entry(&entry, tail_proof_capacity())
+        {
+            TailProofEntryCapture::Inactive => {}
+            TailProofEntryCapture::Parked {
+                missing_from,
+                redrive_request,
+            } => {
+                let actions = redrive_request
+                    .into_iter()
+                    .map(|request| ReplicaAction::RequestTailProof {
+                        context: self.receipt_context.clone(),
+                        request,
+                    })
+                    .collect();
+                return ReplicaStep {
+                    admission: ReplicaAdmission::Gap { missing_from },
+                    actions,
+                };
+            }
+            TailProofEntryCapture::Rejected { .. } => {
+                return rejected_step(ReplicaRejectReason::TailProofRejected);
+            }
         }
 
         match self.classify(entry.revision) {
@@ -398,15 +442,38 @@ impl AuthorityReplica {
             }
             ReplicaClassification::Next => {
                 if self.frontier.control != Revision::ZERO {
-                    let Some(predecessor) = self.installed_controls.get(&self.frontier.control)
+                    let Some((ordinary_successor, predecessor)) = self
+                        .installed_controls
+                        .get(&self.frontier.control)
+                        .map(|predecessor| {
+                            (
+                                SuccessorValidator::new().allows(
+                                    &predecessor.identity.next_control,
+                                    &predecessor.identity.operation_id,
+                                    &entry,
+                                ),
+                                predecessor.identity.to_probe_entry(),
+                            )
+                        })
                     else {
                         return rejected_step(ReplicaRejectReason::PredecessorControlMismatch);
                     };
-                    if !SuccessorValidator::new().allows(
-                        &predecessor.identity.next_control,
-                        &predecessor.identity.operation_id,
-                        &entry,
-                    ) {
+                    let proven_boundary = self.tail_proof.consume_admission(&entry);
+                    if !ordinary_successor && !proven_boundary {
+                        if let Some(request) = self.tail_proof.begin(
+                            &entry,
+                            &predecessor,
+                            &self.receipt_context,
+                        ) {
+                            let missing_from = request.from_revision;
+                            return ReplicaStep {
+                                admission: ReplicaAdmission::Gap { missing_from },
+                                actions: vec![ReplicaAction::RequestTailProof {
+                                    context: self.receipt_context.clone(),
+                                    request,
+                                }],
+                            };
+                        }
                         return rejected_step(ReplicaRejectReason::PredecessorControlMismatch);
                     }
                 }
@@ -435,6 +502,47 @@ impl AuthorityReplica {
                 ReplicaStep {
                     admission: ReplicaAdmission::Gap { missing_from },
                     actions,
+                }
+            }
+        }
+    }
+
+    pub fn accept_tail_proof(
+        &mut self,
+        authority_context: &FrameContext,
+        body: &TailProofBody,
+    ) -> ReplicaTailProofDisposition {
+        if self.disposed {
+            return ReplicaTailProofDisposition::Ignored {
+                reason: "disposed".to_owned(),
+            };
+        }
+        let request_context = self.receipt_context.clone();
+        match self.tail_proof.accept_frame(
+            &request_context,
+            authority_context,
+            body,
+            tail_proof_capacity(),
+        ) {
+            TailProofFrameDisposition::Ignored { reason } => {
+                ReplicaTailProofDisposition::Ignored { reason }
+            }
+            TailProofFrameDisposition::Pending => ReplicaTailProofDisposition::Pending,
+            TailProofFrameDisposition::Rejected { reason } => {
+                ReplicaTailProofDisposition::Rejected { reason }
+            }
+            TailProofFrameDisposition::Ready { candidate } => {
+                let step = self.admit(candidate);
+                if matches!(
+                    &step.admission,
+                    ReplicaAdmission::Admitted { .. } | ReplicaAdmission::Duplicate { .. }
+                ) {
+                    ReplicaTailProofDisposition::Completed { step }
+                } else {
+                    self.tail_proof.fail();
+                    ReplicaTailProofDisposition::Rejected {
+                        reason: "tail proof candidate redrive was not admitted".to_owned(),
+                    }
                 }
             }
         }
@@ -776,6 +884,7 @@ impl AuthorityReplica {
         self.recovery_proof = Some(RecoveryFrontierProof {
             identity: entry_identity,
         });
+        self.tail_proof.fail();
         self.pending = Some(PendingReplicaEntry {
             entry: entry.clone(),
             stage: PendingStage::MaterialApplied,
@@ -836,6 +945,7 @@ impl AuthorityReplica {
             proof.identity.context = rebound_entry_context;
         }
         self.requested_tail_from = None;
+        self.tail_proof.rebind();
         Ok(())
     }
 
@@ -893,6 +1003,7 @@ impl AuthorityReplica {
         self.requested_tail_from = None;
         self.installed_controls.clear();
         self.recovery_proof = None;
+        self.tail_proof.clear();
     }
 
     fn ensure_live(&self) -> Result<(), AuthorityReplicaError> {
@@ -1137,6 +1248,13 @@ fn revision_value(revision: Revision) -> u64 {
     revision.into_inner().get()
 }
 
+fn tail_proof_capacity() -> SafeU53 {
+    u64::try_from(TAIL_PROOF_MAX_SOURCE_REVISIONS)
+        .ok()
+        .and_then(|value| SafeU53::new(value).ok())
+        .unwrap_or(SafeU53::MAX)
+}
+
 fn next_revision(revision: Revision) -> Option<Revision> {
     let next = revision_value(revision).checked_add(1)?;
     let safe = SafeU53::new(next).ok()?;
@@ -1250,6 +1368,7 @@ impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
                 .recovery_proof
                 .as_ref()
                 .map(|proof| identity_snapshot_from_identity(&proof.identity)),
+            tail_proof: self.tail_proof.snapshot_v2()?,
             disposed: self.disposed,
         };
         snapshot.validate()?;
@@ -1267,6 +1386,17 @@ impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
     ) -> Result<Self, crate::snapshot::SnapshotError> {
         snapshot.validate()?;
         validate_replica_snapshot_config(&snapshot)?;
+        let authority_context = authority_entry_context(
+            &snapshot.receipt_context,
+            snapshot.authority_seat,
+            snapshot.authority_generation,
+        );
+        let tail_proof = TailProofReplicaState::from_snapshot_v2(
+            &snapshot.tail_proof,
+            &snapshot.receipt_context,
+            &authority_context,
+            tail_proof_capacity(),
+        )?;
 
         let pending = snapshot
             .pending
@@ -1347,6 +1477,7 @@ impl crate::snapshot::AuthorityReplicaSnapshotBridge for AuthorityReplica {
             requested_tail_from: snapshot.requested_tail_from,
             installed_controls,
             recovery_proof: recovery_proof.map(|identity| RecoveryFrontierProof { identity }),
+            tail_proof,
             disposed: snapshot.disposed,
         })
     }
@@ -1380,6 +1511,28 @@ fn validate_replica_snapshot_state(
             "authority_replica.frontier",
             "control <= material <= received must hold",
         ));
+    }
+    if let Some(capture) = snapshot.tail_proof.capture.as_ref() {
+        let predecessor_revision = capture.predecessor_identity.revision;
+        let Some(installed) = installed_controls
+            .and_then(|controls| controls.get(&predecessor_revision))
+        else {
+            return Err(snapshot_invalid(
+                "authority_replica.tail_proof.capture.predecessor_identity",
+                "tail proof capture predecessor is not an installed control",
+            ));
+        };
+        if snapshot.frontier.received != predecessor_revision
+            || snapshot.frontier.material != predecessor_revision
+            || snapshot.frontier.control != predecessor_revision
+            || identity_snapshot_from_identity(&installed.identity)
+                != capture.predecessor_identity
+        {
+            return Err(snapshot_invalid(
+                "authority_replica.tail_proof.capture.predecessor_identity",
+                "tail proof capture does not match the exact complete replica predecessor",
+            ));
+        }
     }
 
     let expected_context = authority_entry_context(

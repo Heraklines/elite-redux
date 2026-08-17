@@ -23,6 +23,7 @@ use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_ui::{
     BattleMenu, BattlePresentationEvent, BattlePresentationKind, BattleUiProjection,
 };
+use er_types::TailProofBody;
 use wasm_bindgen::prelude::*;
 
 /// Version of the evidence-only M3 schema registry.
@@ -57,6 +58,7 @@ pub const M3_SCHEMA_TYPES: &[&str] = &[
     "RunRngState",
     "ScriptedEnemyBattleCommandV1",
     "ScriptedEnemyPolicyV1",
+    "TailProofBody",
 ];
 
 /// A failure at the shared typed JSON boundary.
@@ -306,6 +308,7 @@ pub fn round_trip_m3_schema_json(schema: &str, input: &str) -> Result<String, M3
             ScriptedEnemyPolicyV1,
             ScriptedEnemyPolicyV1::validate
         ),
+        "TailProofBody" => round_trip_typed!("TailProofBody", input, TailProofBody),
         _ => Err(M3SchemaError::UnknownSchema {
             schema: schema.to_owned(),
         }),

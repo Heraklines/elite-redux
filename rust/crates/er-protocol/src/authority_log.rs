@@ -7,8 +7,8 @@ use er_types::battle_ids::{CanonicalHexBytes, CanonicalU64Decimal};
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AuthorityRecoverySlice,
     ConnectionGeneration, FrameContext, Material, NextControl, OperationId, Revision, SafeU53,
-    SeatId, TimeClass, TimerId, TimerOwner, validate_authority_material_digest,
-    validate_authority_operation_id,
+    SeatId, TailProofBody, TailRequestBody, TimeClass, TimerId, TimerOwner,
+    validate_authority_material_digest, validate_authority_operation_id,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -20,7 +20,12 @@ use crate::snapshot::{
     RetiredOperationStageSnapshotV2, SnapshotError,
 };
 use crate::successor::{control_allows_successor_entry, control_id_of, is_valid_next_control};
-use crate::{KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError};
+use crate::tail_proof::{
+    TailProofAuthorityEmission, TailProofAuthorityState, boundary_supersession_allows,
+};
+use crate::{
+    KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError, frame_contexts_compatible,
+};
 
 pub const DEFAULT_RETAIN_CAPACITY: u64 = 512;
 pub const DEFAULT_DELIVERY_INITIAL_MS: u64 = 250;
@@ -81,6 +86,11 @@ pub enum AuthorityLogAction {
     },
     Scheduler {
         command: SchedulerCommand,
+    },
+    TailProof {
+        to: SeatId,
+        context: FrameContext,
+        body: TailProofBody,
     },
 }
 
@@ -151,6 +161,8 @@ pub struct AuthorityLogDiagnostics {
     pub peer_stages: BTreeMap<Revision, BTreeMap<SeatId, AckStage>>,
     pub capacity_refusals: SafeU53,
     pub send_failures: SafeU53,
+    pub retired_tail_proof_sources: SafeU53,
+    pub tail_proof_responses: SafeU53,
     pub disposed: bool,
 }
 
@@ -223,6 +235,7 @@ pub struct AuthorityLog {
     retired_operation_order: VecDeque<OperationId>,
     capacity_refusals: SafeU53,
     send_failures: SafeU53,
+    tail_proof: TailProofAuthorityState,
     disposed: bool,
 }
 
@@ -273,6 +286,7 @@ impl AuthorityLog {
             retired_operation_order: VecDeque::new(),
             capacity_refusals: SafeU53::ZERO,
             send_failures: SafeU53::ZERO,
+            tail_proof: TailProofAuthorityState::default(),
             disposed: false,
         })
     }
@@ -778,6 +792,70 @@ impl AuthorityLog {
         })
     }
 
+    /// Answer one authenticated correlated boundary-proof request.
+    ///
+    /// Ordinary tail requests deliberately remain on [`Self::recovery_slice`].
+    /// The correlated tuple is all-or-none, sequence-fenced per peer, and a
+    /// successful response is frozen until its exact candidate retires.
+    pub fn handle_tail_proof_request(
+        &mut self,
+        context: FrameContext,
+        request: TailRequestBody,
+    ) -> Vec<AuthorityLogAction> {
+        if self.disposed
+            || !matches!(
+                (
+                    request.request_id.as_ref(),
+                    request.candidate_revision,
+                    request.candidate_operation_id.as_ref(),
+                ),
+                (Some(_), Some(_), Some(_))
+            )
+        {
+            return Vec::new();
+        }
+        let Some(generation) = self.peer_bindings.get(&context.sender_seat_id) else {
+            return Vec::new();
+        };
+        if context.sender_seat_id == self.local_context.sender_seat_id
+            || context.sender_seat_id == context.authority_seat_id
+            || context.authority_seat_id != self.local_context.authority_seat_id
+            || context.connection_generation != *generation
+            || !frame_contexts_compatible(&context, &self.local_context)
+        {
+            return Vec::new();
+        }
+
+        let candidate = request
+            .candidate_revision
+            .and_then(|revision| self.retained.get(&revision))
+            .map(|lease| lease.entry.as_ref().clone());
+        let live_sources = self.retained();
+        let authority_context = self.local_context.clone();
+        let to = context.sender_seat_id;
+        self.tail_proof
+            .handle_request(
+                &context,
+                &authority_context,
+                &request,
+                candidate.as_ref(),
+                &live_sources,
+                self.head_revision,
+                self.retain_capacity,
+            )
+            .into_iter()
+            .map(|emission| match emission {
+                TailProofAuthorityEmission::Proof { context, body } => {
+                    AuthorityLogAction::TailProof { to, context, body }
+                }
+                TailProofAuthorityEmission::Source { entry } => AuthorityLogAction::Deliver {
+                    to,
+                    entry: Box::new(entry),
+                },
+            })
+            .collect()
+    }
+
     pub fn rebind_connection(
         &mut self,
         local_context: FrameContext,
@@ -869,8 +947,9 @@ impl AuthorityLog {
         if let Some(rebound_head) = rebound_head {
             self.latest_committed = Some(rebound_head);
         } else if let Some(latest) = self.latest_committed.as_mut() {
-            Arc::make_mut(latest).context = local_context;
+            Arc::make_mut(latest).context = local_context.clone();
         }
+        self.tail_proof.rebind(&local_context);
 
         let mut actions = Vec::new();
         for lease in self.retained.values() {
@@ -925,6 +1004,8 @@ impl AuthorityLog {
             peer_stages,
             capacity_refusals: self.capacity_refusals,
             send_failures: self.send_failures,
+            retired_tail_proof_sources: safe_count(self.tail_proof.retired_source_count()),
+            tail_proof_responses: safe_count(self.tail_proof.response_count()),
             disposed: self.disposed,
         }
     }
@@ -958,6 +1039,7 @@ impl AuthorityLog {
         self.head_revision = Revision::ZERO;
         self.retired_operation_stages.clear();
         self.retired_operation_order.clear();
+        self.tail_proof.clear();
         actions
     }
 
@@ -967,11 +1049,14 @@ impl AuthorityLog {
             if matches!(previous.next_control, NextControl::Terminal(_)) {
                 return Err(AuthorityLogError::TerminalPredecessor);
             }
-            if !control_allows_successor_entry(
+            let ordinary_successor = control_allows_successor_entry(
                 &previous.next_control,
                 &previous.operation_id,
                 entry,
-            ) {
+            );
+            let boundary_successor = !ordinary_successor
+                && boundary_supersession_allows(previous, entry, &self.retained());
+            if !ordinary_successor && !boundary_successor {
                 return Err(AuthorityLogError::SuccessorRejected);
             }
         }
@@ -1082,6 +1167,19 @@ impl AuthorityLog {
         actions: &mut Vec<AuthorityLogAction>,
         scheduler: &mut KernelScheduler,
     ) -> bool {
+        let Some(entry) = self
+            .retained
+            .get(&revision)
+            .map(|lease| lease.entry.as_ref().clone())
+        else {
+            return false;
+        };
+        if !self
+            .tail_proof
+            .archive_retired(&entry, self.retain_capacity)
+        {
+            return false;
+        }
         let Some(lease) = self.retained.remove(&revision) else {
             return false;
         };
@@ -1097,6 +1195,7 @@ impl AuthorityLog {
         {
             actions.push(AuthorityLogAction::Scheduler { command });
         }
+        self.tail_proof.release_candidate(revision);
         true
     }
 
@@ -1263,6 +1362,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             retired_operation_order: self.retired_operation_order.iter().cloned().collect(),
             capacity_refusals: self.capacity_refusals,
             send_failures: self.send_failures,
+            tail_proof: self.tail_proof.snapshot_v2()?,
             disposed: self.disposed,
         };
         snapshot.validate()?;
@@ -1321,6 +1421,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             retired_operation_order,
             capacity_refusals,
             send_failures,
+            tail_proof,
             disposed,
         } = snapshot;
 
@@ -1413,6 +1514,7 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
             retired_operation_order: VecDeque::from(retired_operation_order),
             capacity_refusals,
             send_failures,
+            tail_proof: TailProofAuthorityState::default(),
             disposed,
         };
 
@@ -1557,6 +1659,20 @@ impl AuthorityLogSnapshotBridge for AuthorityLog {
                 },
             );
         }
+
+        let live_entries = restored
+            .retained
+            .iter()
+            .map(|(revision, lease)| (*revision, lease.entry.as_ref().clone()))
+            .collect::<BTreeMap<_, _>>();
+        restored.tail_proof = TailProofAuthorityState::from_snapshot_v2(
+            &tail_proof,
+            &restored.local_context,
+            &restored.peer_bindings,
+            restored.retain_capacity,
+            restored.head_revision,
+            &live_entries,
+        )?;
 
         cross_check_authority_timers(&restored, scheduler)?;
         Ok(restored)
@@ -1855,6 +1971,13 @@ fn increment_counter(counter: &mut SafeU53) {
     if let Some(next) = next_safe(Some(*counter)) {
         *counter = next;
     }
+}
+
+fn safe_count(value: usize) -> SafeU53 {
+    u64::try_from(value)
+        .ok()
+        .and_then(|value| SafeU53::new(value).ok())
+        .unwrap_or(SafeU53::MAX)
 }
 
 fn next_backoff_delay(current: SafeU53, policy: BackoffPolicy) -> SafeU53 {

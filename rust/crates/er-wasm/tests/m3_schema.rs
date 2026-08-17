@@ -207,6 +207,17 @@ fn assert_valid_schema_vectors() -> Result<(), Box<dyn Error>> {
         &mut covered,
     )?;
 
+    let tail_proof = serde_json::json!({
+        "phase": "manifest",
+        "requestId": "authority-v2:m3-schema:seat1:boundary-proof:1",
+        "fromRevision": 1,
+        "candidateRevision": 3,
+        "candidateOperationId": "terminal-3",
+        "headRevision": 3,
+        "sourceRevisions": [1, 2]
+    });
+    assert_schema_value("TailProofBody", &tail_proof, &mut covered)?;
+
     let pack = selected_content_pack()?;
     let pack_json = canonicalize(&pack)?;
     assert_eq!(

@@ -10,6 +10,7 @@ pub mod replica;
 pub mod scheduler;
 pub mod snapshot;
 pub mod successor;
+pub mod tail_proof;
 pub mod validation;
 
 pub use authority_log::*;
@@ -22,6 +23,7 @@ pub use replica::*;
 pub use scheduler::*;
 pub use snapshot::*;
 pub use successor::*;
+pub use tail_proof::*;
 pub use validation::*;
 
 pub use er_types::{
