@@ -87,7 +87,7 @@ describe("Endless dev scenario fixtures", () => {
     const resetStart = source.indexOf("export function resetDevOverrides()");
     const resetEnd = source.indexOf("function setOverrides", resetStart);
     const scenarioStart = source.indexOf('label: "Endless: final boss auto-KO"');
-    const nextScenario = source.indexOf('label: "Endless: full Hell ghost"', scenarioStart);
+    const nextScenario = source.indexOf('label: "Endless: deep Hell ghost (wave 401)"', scenarioStart);
     const scenario = source.slice(scenarioStart, nextScenario);
 
     expect(resetStart).toBeGreaterThan(-1);
@@ -109,9 +109,26 @@ describe("Endless dev scenario fixtures", () => {
     expect(scenario).not.toContain("onBattleStart: () =>");
     expect(scenario).toContain("boss.damageAndUpdate(Math.max(1, boss.hp)");
     expect(source.match(/boss\.damageAndUpdate\(Math\.max\(1, boss\.hp\)/gu)).toHaveLength(1);
-    expect(source).toContain(
-      'export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(\n  scenario => scenario.label === "Endless: final boss auto-KO",',
-    );
+    expect(source).toContain('"Endless: final boss auto-KO"');
+    expect(source).toContain('"Endless: deep Hell ghost (wave 401)"');
+    expect(source).toContain("DEV_MENU_SCENARIO_LABELS.has(scenario.label)");
+  });
+
+  it("exposes a deep Endless fixture with Avalanche and active Rifts", () => {
+    const source = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/scenarios.ts"), "utf8");
+    const scenarioStart = source.indexOf('label: "Endless: deep Hell ghost (wave 401)"');
+    const nextScenario = source.indexOf("// Final boss — Primal Cascoon two-phase fight", scenarioStart);
+    const scenario = source.slice(scenarioStart, nextScenario);
+
+    expect(scenarioStart).toBeGreaterThan(-1);
+    expect(nextScenario).toBeGreaterThan(scenarioStart);
+    expect(scenario).toContain("STARTING_WAVE_OVERRIDE: 401");
+    expect(scenario).toContain("enteredAtWave: 200");
+    expect(scenario).toContain('{ id: "inverse-rift"');
+    expect(scenario).toContain('{ id: "weather-carousel"');
+    expect(scenario).toContain('{ id: "avalanche-reroll"');
+    expect(scenario).toContain('{ id: "overheal-barrier"');
+    expect(scenario).toContain("setPendingDevGhostTeam(structuredClone(DEV_HELL_VICTORY_GHOST))");
   });
 
   it("presents the throwaway staging encounter without entering the cloud-save failure path", () => {

@@ -8176,18 +8176,21 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "Endless: full Hell ghost",
+    label: "Endless: deep Hell ghost (wave 401)",
     description:
-      "Full Endless ghost showcase at wave 201. The opponent is a sanitized snapshot\n"
-      + "from a real completed Hell run: all six recorded species/forms, moves, IVs,\n"
-      + "abilities, shiny data, 46 held-item entries, Blood Pact, and Second Wind are\n"
-      + "restored. Normal Endless enemy items, wards, boons, and scaling remain additive.\n"
+      "Deep Endless ghost showcase at wave 401 (equivalent depth 201). The player has\n"
+      + "10 added Avalanche abilities, every enemy has 21, and four Rifts are already\n"
+      + "active so the Avalanche pages and Rift Ledger can be inspected immediately.\n"
+      + "The opponent is a sanitized snapshot from a real completed Hell run: all six\n"
+      + "recorded species/forms, moves, IVs, abilities, shiny data, 46 held-item entries,\n"
+      + "Blood Pact, and Second Wind are restored. Normal Endless enemy items, wards,\n"
+      + "boons, and scaling remain additive.\n"
       + "Open Check Team / battle info and the modifier bars to inspect the complete loadout.",
     setup: () => {
       resetDevOverrides();
       setErDifficulty("hell");
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 201,
+        STARTING_WAVE_OVERRIDE: 401,
         STARTING_LEVEL_OVERRIDE: 200,
       });
       return [
@@ -8208,9 +8211,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
         version: 1,
         enteredAtWave: 200,
         seed: "dev-hell-victory-showcase",
-        pulse: 0,
-        ghostEncounters: 0,
-        activeRifts: [],
+        pulse: 40,
+        ghostEncounters: 20,
+        activeRifts: [
+          { id: "inverse-rift", pulsesRemaining: 2, acquiredAtDepth: 200 },
+          { id: "weather-carousel", pulsesRemaining: 3, acquiredAtDepth: 200 },
+          { id: "avalanche-reroll", pulsesRemaining: 3, acquiredAtDepth: 200 },
+          { id: "overheal-barrier", pulsesRemaining: 4, acquiredAtDepth: 200 },
+        ],
         ghostHistory: [],
       });
       if (!restored) {
@@ -21622,6 +21630,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
  * importable by focused repro tooling, but it is no longer exposed to staff.
  * Builder and custom-trainer testers are registered separately by index.ts.
  */
-export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(
-  scenario => scenario.label === "Endless: final boss auto-KO",
+const DEV_MENU_SCENARIO_LABELS = new Set(["Endless: final boss auto-KO", "Endless: deep Hell ghost (wave 401)"]);
+
+export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(scenario =>
+  DEV_MENU_SCENARIO_LABELS.has(scenario.label),
 );
