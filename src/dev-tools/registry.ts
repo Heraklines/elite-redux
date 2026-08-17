@@ -820,6 +820,25 @@ export function consumePendingDevBattleSetup(): (() => void) | null {
   return cb;
 }
 
+// --- Pending post-command setup (scenario -> first TurnStartPhase) ----------
+// Unlike pendingBattleSetup, this fires only after the player and enemy commands
+// have been committed. It lets a dev scenario react to a real first move choice
+// without changing ordinary battle resolution.
+
+let pendingPostCommandSetup: (() => void) | null = null;
+
+/** Stage a callback to run once after the first turn's commands are committed. */
+export function setPendingDevPostCommandSetup(setup: () => void): void {
+  pendingPostCommandSetup = setup;
+}
+
+/** Take and clear the staged post-command callback. */
+export function consumePendingDevPostCommandSetup(): (() => void) | null {
+  const cb = pendingPostCommandSetup;
+  pendingPostCommandSetup = null;
+  return cb;
+}
+
 // --- One-shot Endless offer (finale dev scenario -> GameOverPhase) -----------
 // Starting directly on the final wave skips parts of the normal run journey.
 // The dedicated Endless scenario arms this only after verifying that its battle

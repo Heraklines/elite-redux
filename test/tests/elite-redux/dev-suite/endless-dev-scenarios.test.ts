@@ -91,10 +91,26 @@ describe("Endless dev scenario fixtures", () => {
     expect(scenario).toContain("Hell victory legacy loadout restored partially");
     expect(scenario).not.toContain("Hell victory loadout was incomplete");
     expect(scenario).toContain("globalScene.currentBattle.isClassicFinalBoss");
+    expect(scenario).toContain("onFirstTurnCommitted: () =>");
+    expect(scenario).not.toContain("onBattleStart: () =>");
     expect(scenario).toContain("boss.damageAndUpdate(Math.max(1, boss.hp)");
     expect(source.match(/boss\.damageAndUpdate\(Math\.max\(1, boss\.hp\)/gu)).toHaveLength(1);
     expect(source).toContain(
       'export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(\n  scenario => scenario.label === "Endless: final boss auto-KO",',
+    );
+  });
+
+  it("waits for the first committed move before triggering the scenario KO", () => {
+    const registry = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/registry.ts"), "utf8");
+    const launcher = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/index.ts"), "utf8");
+    const turnStart = fs.readFileSync(path.join(process.cwd(), "src/phases/turn-start-phase.ts"), "utf8");
+
+    expect(registry).toContain("setPendingDevPostCommandSetup");
+    expect(registry).toContain("consumePendingDevPostCommandSetup");
+    expect(launcher).toContain("setPendingDevPostCommandSetup(scenario.onFirstTurnCommitted)");
+    expect(turnStart).toContain("const devPostCommandSetup = consumePendingDevPostCommandSetup()");
+    expect(turnStart.indexOf("const devPostCommandSetup = consumePendingDevPostCommandSetup()")).toBeLessThan(
+      turnStart.indexOf("const field = globalScene.getField()"),
     );
   });
 

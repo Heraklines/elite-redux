@@ -46,6 +46,7 @@ import {
   consumePendingDevEnemyParty,
   consumePendingDevGhostTeam,
   consumePendingDevPartySetup,
+  consumePendingDevPostCommandSetup,
   consumePendingDevShop,
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
@@ -53,6 +54,7 @@ import {
   registerDevMenu,
   setPendingDevBattleSetup,
   setPendingDevPartySetup,
+  setPendingDevPostCommandSetup,
   setPendingDevShop,
   setPendingDevStarterLevels,
   setPendingDevStarters,
@@ -644,6 +646,9 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
     if (scenario.onBattleStart) {
       setPendingDevBattleSetup(scenario.onBattleStart);
     }
+    if (scenario.onFirstTurnCommitted) {
+      setPendingDevPostCommandSetup(scenario.onFirstTurnCommitted);
+    }
     if (scenario.shopItems && scenario.shopItems.length > 0) {
       // Guarantee these reward options in the first shop after the opening battle
       // ("start in the store, test a specific item").
@@ -993,6 +998,7 @@ registerDevMenu(ctx => {
   consumePendingDevStarters();
   consumePendingDevStarterLevels();
   consumePendingDevPartySetup();
+  consumePendingDevPostCommandSetup();
   consumePendingDevBattleSetup();
   consumePendingDevEndlessOffer();
   consumePendingDevShop();

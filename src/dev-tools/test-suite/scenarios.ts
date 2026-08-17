@@ -153,6 +153,8 @@ export interface DevScenario {
   onPartyReady?: () => void;
   /** Optional: runs ONCE on the first turn, after both sides are summoned. */
   onBattleStart?: () => void;
+  /** Optional: runs ONCE after the first turn's player and enemy commands are committed. */
+  onFirstTurnCommitted?: () => void;
   /**
    * Optional: guarantee these reward options in the FIRST shop after the opening
    * battle ("start in the store, test a specific item"). Each is a
@@ -8121,8 +8123,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "Endless entry test with a sanitized team from a real completed Hell run.\n"
       + "All six recorded Pokemon, forms, moves, IVs, natures, abilities, shiny data,\n"
       + "held items, Blood Pact, and Second Wind are restored as YOUR team. The scenario\n"
-      + "starts the real Hell wave-200 final boss and immediately\n"
-      + "applies lethal self-damage through this scenario's consume-once battle callback.\n"
+      + "starts a visible, playable Hell wave-200 Primal Cascoon battle. Select a move\n"
+      + "on turn one; after that command is accepted, Cascoon applies lethal self-damage.\n"
       + "EXPECT: the normal boss faint/victory path completes, then the postgame choice\n"
       + "offers ENDLESS or END RUN. Choosing ENDLESS shows the opening Rifts and continues.\n"
       + "SAFETY: the auto-KO exists only in this dev scenario; normal bosses are untouched.",
@@ -8152,7 +8154,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
         );
       }
     },
-    onBattleStart: () => {
+    onFirstTurnCommitted: () => {
       const boss = globalScene.getEnemyPokemon();
       if (!boss || !globalScene.currentBattle.isClassicFinalBoss) {
         throw new Error("Endless final-boss scenario did not create the classic finale");
