@@ -92,7 +92,7 @@ jobs:
           fi
           base=7357166c19bdb5cf0e32c84b0f74f22e79d80798
           oracle=3b534099919efae827019d4a3f3c4ab0ecd6d67b
-          audited_production_head=66ceee6e095534c59e67f80bbab8fadee1d8c4ba
+          audited_production_head=a307f94ef8988ba6496f0b5e97a44a956ee2761a
           git cat-file -e "${base}^{commit}"
           git cat-file -e "${oracle}^{commit}"
           git cat-file -e "${audited_production_head}^{commit}"
@@ -153,8 +153,8 @@ jobs:
               raise SystemExit("audited production blob manifest head SHA is not exact")
           if manifest["source_root"] != "src":
               raise SystemExit("audited production blob manifest source root is not exact")
-          if type(manifest["path_count"]) is not int or manifest["path_count"] != 38:
-              raise SystemExit("audited production blob manifest path count must be 38")
+          if type(manifest["path_count"]) is not int or manifest["path_count"] != 41:
+              raise SystemExit("audited production blob manifest path count must be 41")
 
           entries = manifest["paths"]
           if not isinstance(entries, list) or len(entries) != manifest["path_count"]:
@@ -204,7 +204,7 @@ jobs:
             test "$(git cat-file -t "$checkpoint_blob")" = blob
             test "$checkpoint_blob" = "$expected_blob"
           done <<< "$manifest_entries"
-          echo "M3 production source manifest matches actual src delta: 38 paths and pinned blobs"
+          echo "M3 production source manifest matches actual src delta: 41 paths and pinned blobs"
           oracle_gitlinks="$(git ls-tree -r "$oracle" | awk '$1 == "160000"')"
           base_gitlinks="$(git ls-tree -r "$base" | awk '$1 == "160000"')"
           head_gitlinks="$(git ls-tree -r "$GITHUB_SHA" | awk '$1 == "160000"')"

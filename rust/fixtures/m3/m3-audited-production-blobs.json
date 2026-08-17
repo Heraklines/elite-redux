@@ -2,9 +2,9 @@
   "schema_version": 1,
   "manifest_id": "m3-audited-production-blobs-v1",
   "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
-  "head_sha": "66ceee6e095534c59e67f80bbab8fadee1d8c4ba",
+  "head_sha": "a307f94ef8988ba6496f0b5e97a44a956ee2761a",
   "source_root": "src",
-  "path_count": 38,
+  "path_count": 41,
   "paths": [
     {
       "path": "src/data/elite-redux/coop/authority-v2/adapters/wave-terminal.ts",
@@ -51,6 +51,10 @@
       "blob_oid": "88393c7a81221080a1a9ccb97ec050f0b929df7b"
     },
     {
+      "path": "src/data/elite-redux/coop/coop-durability.ts",
+      "blob_oid": "6b632fb26db056ac3c135a97fa5796eedca0547d"
+    },
+    {
       "path": "src/data/elite-redux/coop/coop-enemy-builder.ts",
       "blob_oid": "fca2bf174f0824b76ca2b76fae5cc09a59c01fd5"
     },
@@ -76,11 +80,19 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-runtime.ts",
-      "blob_oid": "50534e39dc34440c12e12a09a58ed1aa3181bd75"
+      "blob_oid": "3e3d53080ed626573a2431e1764ba350473d02d7"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-session-controller.ts",
+      "blob_oid": "3b9c2b7844b60e141e53ac5c8a695cf1e9da6a9a"
     },
     {
       "path": "src/data/elite-redux/coop/coop-transport.ts",
-      "blob_oid": "bc21d4484e687d4d42f40ca3df49ab82ed34e8d0"
+      "blob_oid": "a694588870970359a04462f5ca207f08907a3cf8"
+    },
+    {
+      "path": "src/data/elite-redux/coop/coop-webrtc-transport.ts",
+      "blob_oid": "111481aafe0ca3a63bac3ed50022f81da7533418"
     },
     {
       "path": "src/data/elite-redux/er-ghost-teams.ts",
