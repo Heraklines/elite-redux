@@ -124,6 +124,16 @@ impl TailProofAuthorityState {
         if candidate_revision <= request.from_revision {
             return Vec::new();
         }
+        let Some(candidate) = candidate else {
+            return Vec::new();
+        };
+        if candidate.revision != candidate_revision
+            || candidate.operation_id != *candidate_operation_id
+            || candidate.context != *authority_context
+            || canonical_tail_proof_floor(candidate) != Some(request.from_revision)
+        {
+            return Vec::new();
+        }
         let Some(sequence) = parse_request_sequence(request_context, request_id) else {
             return Vec::new();
         };
@@ -141,15 +151,6 @@ impl TailProofAuthorityState {
             };
         }
 
-        let Some(candidate) = candidate else {
-            return Vec::new();
-        };
-        if candidate.revision != candidate_revision
-            || candidate.operation_id != *candidate_operation_id
-            || candidate.context != *authority_context
-        {
-            return Vec::new();
-        }
         let Some(sources) = self.capture_sources(
             request.from_revision,
             candidate_revision,
@@ -224,7 +225,9 @@ impl TailProofAuthorityState {
         if let Some(prior) = self.retired_sources.get(&entry.revision) {
             return prior == entry;
         }
-        let capacity = usize::try_from(capacity.get()).unwrap_or(usize::MAX);
+        let capacity = usize::try_from(capacity.get())
+            .unwrap_or(usize::MAX)
+            .min(TAIL_PROOF_MAX_SOURCE_REVISIONS);
         while self.retired_sources.len() >= capacity {
             let Some(oldest) = self.retired_sources.keys().next().copied() else {
                 break;
@@ -415,6 +418,8 @@ impl TailProofAuthorityState {
                 .and_then(|revision| sources.iter().find(|entry| entry.revision == revision));
             if candidate.operation_id != response.manifest.candidate_operation_id
                 || candidate.context != *authority_context
+                || canonical_tail_proof_floor(candidate)
+                    != Some(response.manifest.from_revision)
                 || response.manifest.head_revision > head_revision
                 || predecessor.is_none_or(|predecessor| {
                     !boundary_supersession_allows(predecessor, candidate, &sources)
@@ -534,11 +539,7 @@ impl TailProofReplicaState {
         {
             return None;
         }
-        let from_revision = candidate
-            .subsumes
-            .iter()
-            .copied()
-            .fold(predecessor.revision, std::cmp::min);
+        let from_revision = canonical_tail_proof_floor(candidate)?;
         let sequence = next_safe(self.request_sequence)?;
         let request_id = canonical_request_id(request_context, sequence)?;
         self.request_sequence = sequence;
@@ -830,12 +831,7 @@ impl TailProofReplicaState {
                     || candidate.context != *authority_context
                     || capture.predecessor_identity.context != *authority_context
                     || capture.request_sequence(snapshot.request_sequence).is_none()
-                    || capture.from_revision
-                        != candidate
-                            .subsumes
-                            .iter()
-                            .copied()
-                            .fold(capture.predecessor_identity.revision, std::cmp::min)
+                    || canonical_tail_proof_floor(&candidate) != Some(capture.from_revision)
                     || next_revision(capture.predecessor_identity.revision)
                         != Some(candidate.revision)
                     || !structurally_valid_boundary(&candidate)
@@ -1243,6 +1239,17 @@ fn previous_revision(value: Revision) -> Option<Revision> {
     (value > 0)
         .then(|| SafeU53::new(value - 1).ok().map(Revision::new))
         .flatten()
+}
+
+fn canonical_tail_proof_floor(candidate: &AuthorityEntry) -> Option<Revision> {
+    let predecessor = previous_revision(candidate.revision)?;
+    Some(
+        candidate
+            .subsumes
+            .iter()
+            .copied()
+            .fold(predecessor, std::cmp::min),
+    )
 }
 
 fn safe_one() -> SafeU53 {
