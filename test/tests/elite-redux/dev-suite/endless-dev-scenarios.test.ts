@@ -107,4 +107,14 @@ describe("Endless dev scenario fixtures", () => {
     expect(cloudClear).toBeGreaterThan(devRoute);
     expect(source.slice(devRoute, cloudClear)).toContain('pushNew("EndlessOfferPhase")');
   });
+
+  it("clears the offer UI and permits encounters beyond the original finale", () => {
+    const offer = fs.readFileSync(path.join(process.cwd(), "src/phases/endless-offer-phase.ts"), "utf8");
+    const encounter = fs.readFileSync(path.join(process.cwd(), "src/phases/encounter-phase.ts"), "utf8");
+
+    expect(offer.match(/globalScene\.ui\.setMode\(UiMode\.MESSAGE\)/gu)).toHaveLength(2);
+    expect(encounter).toContain(
+      "globalScene.gameMode.isClassic\n      && !isErEndlessContinuationActive()\n      && globalScene.currentBattle.waveIndex >",
+    );
+  });
 });

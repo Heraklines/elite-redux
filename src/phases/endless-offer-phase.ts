@@ -17,10 +17,12 @@ export class EndlessOfferPhase extends Phase {
       globalScene.ui.setMode(
         UiMode.CONFIRM,
         () => {
+          globalScene.ui.setMode(UiMode.MESSAGE);
           globalScene.phaseManager.unshiftNew("EndlessContinuationPhase", this.endCardPhase);
           this.end();
         },
         () => {
+          globalScene.ui.setMode(UiMode.MESSAGE);
           globalScene.phaseManager.unshiftNew("PostGameOverPhase", globalScene.sessionSlotId, this.endCardPhase);
           this.end();
         },
