@@ -53,7 +53,6 @@ import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { resetErTrainingCacheState } from "#data/elite-redux/er-training-cache";
 import {
   type ErRunPacing,
   resetErSprintVoucherCredit,
@@ -75,6 +74,7 @@ import {
   renderErShinyLabLook,
 } from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { resetErTrainingCacheState } from "#data/elite-redux/er-training-cache";
 import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";

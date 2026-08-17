@@ -29,11 +29,10 @@ import { erRecordAchievementTrainerVictory } from "#data/elite-redux/er-achievem
 import { getErRewardRatesAtWave } from "#data/elite-redux/er-reward-rates";
 import { BiomeId } from "#enums/biome-id";
 import { TrainerType } from "#enums/trainer-type";
-import { VoucherType } from "#enums/voucher-type";
 import { AddVoucherModifierType } from "#modifiers/modifier-type";
 import { BattlePhase } from "#phases/battle-phase";
 import { achvs } from "#system/achv";
-import { vouchers } from "#system/voucher";
+import { VoucherType, vouchers } from "#system/voucher";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedItem } from "#utils/common";
 import i18next from "i18next";

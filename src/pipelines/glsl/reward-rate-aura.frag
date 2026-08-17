@@ -1,4 +1,6 @@
 /*
+ * SPDX-FileCopyrightText: 2026 Pagefault Games
+ *
  * SPDX-License-Identifier: AGPL-3.0-only
  *
  * Reward-rate row aura — renders each panel row's near-black fill, semantic

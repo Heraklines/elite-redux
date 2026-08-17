@@ -86,11 +86,7 @@ import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-re
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
 import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import {
-  getErRunPacing,
-  restoreErSprintVoucherCredit,
-  setErRunPacing,
-} from "#data/elite-redux/er-run-pacing";
+import { getErRunPacing, restoreErSprintVoucherCredit, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";

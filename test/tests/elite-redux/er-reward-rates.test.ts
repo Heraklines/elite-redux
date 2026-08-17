@@ -1,8 +1,8 @@
 import {
+  type ErRewardRateContext,
   getErIntegerFavourMultiplier,
   getErRewardTier,
   resolveErRewardRates,
-  type ErRewardRateContext,
 } from "#data/elite-redux/er-reward-rates";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { ErRunPacing } from "#data/elite-redux/er-run-pacing";
@@ -35,8 +35,9 @@ describe("ER integer depth reward rates", () => {
   });
 
   it("uses the nearest integer Favour progression and respects both caps", () => {
-    expect([0, 4, 5, 14, 15, 24, 25, 34, 35].map(value => getErIntegerFavourMultiplier(value, 5)))
-      .toEqual([1, 1, 2, 2, 3, 3, 4, 4, 5]);
+    expect([0, 4, 5, 14, 15, 24, 25, 34, 35].map(value => getErIntegerFavourMultiplier(value, 5))).toEqual([
+      1, 1, 2, 2, 3, 3, 4, 4, 5,
+    ]);
     expect(getErIntegerFavourMultiplier(60, 3)).toBe(3);
     expect(getErIntegerFavourMultiplier(60, 5)).toBe(5);
   });
@@ -48,15 +49,17 @@ describe("ER integer depth reward rates", () => {
           for (let favourPoints = 0; favourPoints <= 60; favourPoints++) {
             for (const favourCap of [3, 5] as const) {
               for (const endlessEquivalentDepth of [0, 49, 50, 499, 2500]) {
-                const rates = resolveErRewardRates(context({
-                  difficulty,
-                  pacing,
-                  runWave: (tier - 1) * (pacing === "sprint" ? 10 : 20) + 1,
-                  favourPoints,
-                  favourCap,
-                  endlessActive: endlessEquivalentDepth > 0,
-                  endlessEquivalentDepth,
-                }));
+                const rates = resolveErRewardRates(
+                  context({
+                    difficulty,
+                    pacing,
+                    runWave: (tier - 1) * (pacing === "sprint" ? 10 : 20) + 1,
+                    favourPoints,
+                    favourCap,
+                    endlessActive: endlessEquivalentDepth > 0,
+                    endlessEquivalentDepth,
+                  }),
+                );
                 for (const value of [rates.totalShiny, rates.totalCandy, rates.totalVoucher]) {
                   expect(Number.isSafeInteger(value)).toBe(true);
                   expect(value).toBeGreaterThanOrEqual(0);
@@ -79,13 +82,15 @@ describe("ER integer depth reward rates", () => {
   });
 
   it("holds Tier X in Endless and adds rather than multiplies its depth bonus", () => {
-    const rates = resolveErRewardRates(context({
-      difficulty: "hell",
-      runWave: 12,
-      favourPoints: 20,
-      endlessActive: true,
-      endlessEquivalentDepth: 150,
-    }));
+    const rates = resolveErRewardRates(
+      context({
+        difficulty: "hell",
+        runWave: 12,
+        favourPoints: 20,
+        endlessActive: true,
+        endlessEquivalentDepth: 150,
+      }),
+    );
     expect(rates.tier).toBe(10);
     expect(rates.baseVoucher).toBe(11);
     expect(rates.endlessBonus).toBe(3);

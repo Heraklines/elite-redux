@@ -40,9 +40,9 @@ import { DEFAULT_FUN_MODE_CONFIG, setFunModeConfig } from "#data/elite-redux/er-
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
-import type { ErRewardRateBreakdown } from "#data/elite-redux/er-reward-rates";
 import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
+import type { ErRewardRateBreakdown } from "#data/elite-redux/er-reward-rates";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
@@ -114,10 +114,10 @@ import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { RewardRatePanel } from "#ui/reward-rate-panel";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
-import { addTextObject } from "#ui/text";
 import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
 import { buildShowdownTeamMenuDemoConfig } from "#ui/showdown-team-menu-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
+import { addTextObject } from "#ui/text";
 import { buildTournamentBracketDemoConfig } from "#ui/tournament-bracket-ui-handler";
 import { buildTournamentListDemoConfig } from "#ui/tournament-list-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";

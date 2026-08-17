@@ -23,19 +23,13 @@ const rates: ErRewardRateBreakdown = {
 
 describe("ER reward-rate panel visuals", () => {
   it("formats every supported fixed-column boundary", () => {
-    expect([0, 1, 9, 10, 49, 50].map(formatErRewardRate)).toEqual([
-      "—",
-      "×1",
-      "×9",
-      "×10",
-      "×49",
-      "×50",
-    ]);
+    expect([0, 1, 9, 10, 49, 50].map(formatErRewardRate)).toEqual(["—", "×1", "×9", "×10", "×49", "×50"]);
   });
 
   it("assigns the accessibility frame treatments at their exact thresholds", () => {
-    expect([0, 1, 2, 3, 4, 6, 10, 15, 20, 30, 40, 50].map(value => getErRewardRateGrade(value).level))
-      .toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect([0, 1, 2, 3, 4, 6, 10, 15, 20, 30, 40, 50].map(value => getErRewardRateGrade(value).level)).toEqual([
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ]);
   });
 
   it("uses the authoritative breakdown and excludes Favour from vouchers", () => {

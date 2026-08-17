@@ -184,11 +184,8 @@ import {
   erTwinLinkMultiplier,
 } from "#data/elite-redux/er-relics";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
-import {
-  erYoungsterFreeInnateSlots,
-  getErDifficulty,
-} from "#data/elite-redux/er-run-difficulty";
 import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
+import { erYoungsterFreeInnateSlots, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import {

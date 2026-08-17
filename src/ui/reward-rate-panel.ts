@@ -211,9 +211,7 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
       }
 
       const showCorners = total >= 30;
-      row.corners.forEach(corner =>
-        corner.setVisible(showCorners).setFillStyle(grade.color, total === 50 ? 1 : 0.75),
-      );
+      row.corners.forEach(corner => corner.setVisible(showCorners).setFillStyle(grade.color, total === 50 ? 1 : 0.75));
       row.innerRim.setVisible(total >= 40).setStrokeStyle(0.35, grade.color, total === 50 ? 1 : 0.85);
     }
   }
