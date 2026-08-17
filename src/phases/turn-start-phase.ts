@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
+import { consumePendingDevPostCommandSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { erShatteredPsycheMaybeFuse } from "#data/elite-redux/abilities/shattered-psyche";
@@ -251,6 +252,18 @@ export class TurnStartPhase extends FieldPhase {
     // - once turnCommands are fully populated (both CommandPhase and
     // EnemyCommandPhase have run) but before the move phases are queued.
     erShatteredPsycheMaybeFuse();
+
+    // Dev scenarios may need to react only after a real first-turn choice was
+    // committed. The callback is consume-once and absent in normal play.
+    const devPostCommandSetup = consumePendingDevPostCommandSetup();
+    if (devPostCommandSetup) {
+      try {
+        devPostCommandSetup();
+      } catch (err) {
+        // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+        console.warn("[dev-tools] post-command setup threw:", err);
+      }
+    }
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();
