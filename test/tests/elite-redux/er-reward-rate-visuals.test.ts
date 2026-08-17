@@ -35,11 +35,11 @@ describe("ER reward-rate panel visuals", () => {
   it("uses the authoritative breakdown and excludes Favour from vouchers", () => {
     expect(getErRewardRateRowTooltip("shiny", rates)).toEqual({
       title: "Shiny ×24",
-      content: "Hell depth: ×8\nFavour: ×3\nEndless: +0\nTotal: ×24",
+      content: "Hell depth rate: ×8\nFavour: ×3\nEndless: +0\nTotal: ×24",
     });
     expect(getErRewardRateRowTooltip("voucher", rates)).toEqual({
       title: "Voucher ×11",
-      content: "Hell depth: ×11\nFavour: not applied\nEndless: +0\nTotal: ×11",
+      content: "Hell depth rate: ×11\nFavour: not applied\nEndless: +0\nTotal: ×11",
     });
   });
 });

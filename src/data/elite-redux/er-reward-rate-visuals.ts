@@ -94,7 +94,7 @@ export function getErRewardRateRowTooltip(
 
   const title = `${ROW_LABELS[kind]} ${formatErRewardRate(total)}`;
   const lines = [
-    `${DIFFICULTY_LABELS[rates.difficulty]} depth: ×${base}`,
+    `${DIFFICULTY_LABELS[rates.difficulty]} depth rate: ×${base}`,
     appliesFavour ? `Favour: ×${rates.favourMultiplier}` : "Favour: not applied",
     `Endless: +${rates.endlessBonus}`,
     `Total: ${formatErRewardRate(total)}`,
