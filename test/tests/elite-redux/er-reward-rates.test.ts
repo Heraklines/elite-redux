@@ -4,12 +4,41 @@ import {
   getErRewardTier,
   resolveErRewardRates,
 } from "#data/elite-redux/er-reward-rates";
-import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { ErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { describe, expect, it } from "vitest";
 
-const difficulties: readonly ErDifficulty[] = ["youngster", "ace", "elite", "hell"];
+type RewardDifficulty = "youngster" | "ace" | "elite" | "hell";
+
+const difficulties: readonly RewardDifficulty[] = ["youngster", "ace", "elite", "hell"];
 const pacingModes: readonly ErRunPacing[] = ["normal", "sprint"];
+
+const expectedShiny = {
+  youngster: [1, 1, 1, 1, 1, 1, 1, 1, 2, 2],
+  ace: [1, 1, 1, 1, 1, 1, 1, 2, 3, 4],
+  elite: [1, 1, 1, 2, 2, 3, 4, 4, 5, 6],
+  hell: [1, 1, 1, 2, 3, 4, 5, 6, 7, 8],
+} as const;
+
+const expectedCandy = {
+  youngster: [2, 2, 2, 2, 3, 3, 4, 5, 6, 8],
+  ace: [1, 1, 1, 2, 2, 3, 4, 4, 6, 7],
+  elite: [1, 1, 1, 1, 1, 1, 2, 3, 4, 5],
+  hell: [1, 2, 3, 4, 6, 6, 8, 10, 10, 11],
+} as const;
+
+const expectedNormalVoucher = {
+  youngster: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ace: [1, 1, 1, 1, 1, 2, 2, 2, 2, 2],
+  elite: [1, 1, 1, 2, 3, 4, 5, 5, 7, 8],
+  hell: [1, 1, 2, 4, 5, 6, 8, 9, 10, 11],
+} as const;
+
+const expectedSprintVoucher = {
+  youngster: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  ace: [0, 0, 0, 1, 1, 1, 1, 1, 1, 1],
+  elite: [1, 1, 1, 1, 1, 2, 2, 2, 3, 3],
+  hell: [1, 1, 1, 2, 2, 3, 3, 4, 5, 5],
+} as const;
 
 function context(overrides: Partial<ErRewardRateContext> = {}): ErRewardRateContext {
   return {
@@ -32,6 +61,28 @@ describe("ER integer depth reward rates", () => {
     }
     expect(getErRewardTier(9999, "normal")).toBe(10);
     expect(getErRewardTier(9999, "sprint")).toBe(10);
+  });
+
+  it.each(difficulties)("uses the exact ten-tier %s base tables", difficulty => {
+    const normal = Array.from({ length: 10 }, (_, tier) =>
+      resolveErRewardRates(context({ difficulty, pacing: "normal", runWave: tier * 20 + 1 })),
+    );
+    const sprint = Array.from({ length: 10 }, (_, tier) =>
+      resolveErRewardRates(context({ difficulty, pacing: "sprint", runWave: tier * 10 + 1 })),
+    );
+
+    expect(normal.map(rate => rate.baseShiny)).toEqual(expectedShiny[difficulty]);
+    expect(normal.map(rate => rate.baseCandy)).toEqual(expectedCandy[difficulty]);
+    expect(normal.map(rate => rate.baseVoucher)).toEqual(expectedNormalVoucher[difficulty]);
+    expect(sprint.map(rate => rate.baseVoucher)).toEqual(expectedSprintVoucher[difficulty]);
+  });
+
+  it("reduces the first 25 Hell trainer victories through wave 50 to 30 vouchers", () => {
+    const earlyHellVouchers = Array.from({ length: 25 }, (_, trainer) =>
+      resolveErRewardRates(context({ difficulty: "hell", pacing: "normal", runWave: (trainer + 1) * 2 })),
+    ).reduce((total, rate) => total + rate.totalVoucher, 0);
+
+    expect(earlyHellVouchers).toBe(30);
   });
 
   it("uses the nearest integer Favour progression and respects both caps", () => {
