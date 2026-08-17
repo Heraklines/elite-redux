@@ -40,6 +40,7 @@ import { DEFAULT_FUN_MODE_CONFIG, setFunModeConfig } from "#data/elite-redux/er-
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
+import type { ErRewardRateBreakdown } from "#data/elite-redux/er-reward-rates";
 import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -78,6 +79,7 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
@@ -110,7 +112,9 @@ import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { buildIvChartData, StatsContainer } from "#ui/containers/stats-container";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
+import { RewardRatePanel } from "#ui/reward-rate-panel";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+import { addTextObject } from "#ui/text";
 import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
 import { buildShowdownTeamMenuDemoConfig } from "#ui/showdown-team-menu-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
@@ -2360,6 +2364,63 @@ const RECIPES: Record<string, Recipe> = {
       // golden) whose presence/position varies with the shared texture cache across the
       // batch. Leaving it at its default keeps the 4 revealed tiles clean + deterministic.
       ui.setActiveHandler?.(handler);
+    },
+    diffTolerance: 2000,
+  },
+  "modifier-select-reward-rates": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      return [];
+    },
+    render: (game, ctx) => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const options = [
+        new ModifierTypeOption(modifierTypes.POTION(), 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+        new ModifierTypeOption(modifierTypes.ETHER(), 0),
+        new ModifierTypeOption(modifierTypes.REVIVE(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      ui.setActiveHandler?.(handler);
+
+      const rates: ErRewardRateBreakdown = {
+        difficulty: "hell",
+        equivalentWave: 200,
+        tier: 10,
+        baseShiny: 8,
+        baseCandy: 11,
+        baseVoucher: 11,
+        favourMultiplier: 3,
+        endlessBonus: 0,
+        totalCap: 50,
+        totalShiny: 24,
+        totalCandy: 33,
+        totalVoucher: 11,
+      };
+      const hud = ctx.scene.add.container(0, 0).setScale(6);
+      const luckValue = addTextObject(318, 17, "B+", TextStyle.PARTY, { fontSize: "36px" }).setOrigin(1, 0.5);
+      const luckLabel = addTextObject(316 - luckValue.displayWidth, 17, "Luck:", TextStyle.PARTY, {
+        fontSize: "36px",
+      }).setOrigin(1, 0.5);
+      luckValue.setTint(0xf8d84a);
+      const panel = new RewardRatePanel(ctx.scene, 274, 23.5);
+      panel.refreshFromGame(rates);
+      panel.setVisible(true).setAlpha(1);
+      hud.add([luckLabel, luckValue, panel]);
+      ctx.fieldRoot.add(hud);
     },
     diffTolerance: 2000,
   },

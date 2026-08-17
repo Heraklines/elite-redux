@@ -20,6 +20,7 @@ const ICON_X = 1.5;
 const LABEL_X = 7;
 const VALUE_X = 42;
 const ROW_TEXTURE_KEY = "er-reward-rate-row";
+const FALLBACK_ROW_TEXTURE_KEY = "__WHITE";
 
 const ROW_LABELS: Readonly<Record<ErRewardRateKind, string>> = Object.freeze({
   shiny: "Shiny",
@@ -79,6 +80,7 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
   private readonly rows: RewardRateRow[] = [];
   private readonly reducedMotion: boolean;
   private readonly webGl: boolean;
+  private readonly rowTextureKey: string;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -87,14 +89,20 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
       typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
     this.webGl = scene.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer;
 
-    this.ensureRowTexture(scene);
+    this.rowTextureKey = this.ensureRowTexture(scene);
     this.buildFrame(scene);
     this.buildRows(scene);
   }
 
-  private ensureRowTexture(scene: Phaser.Scene): void {
+  private ensureRowTexture(scene: Phaser.Scene): string {
     if (scene.textures.exists(ROW_TEXTURE_KEY)) {
-      return;
+      return ROW_TEXTURE_KEY;
+    }
+    // Headless/dev scenes intentionally expose only the minimal texture API.
+    // Phaser's built-in white texture still gives those scenes a readable
+    // static row while browser scenes create the dedicated 2x2 backing quad.
+    if (typeof scene.textures.createCanvas !== "function") {
+      return FALLBACK_ROW_TEXTURE_KEY;
     }
     const texture = scene.textures.createCanvas(ROW_TEXTURE_KEY, 2, 2);
     if (!texture) {
@@ -104,6 +112,7 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
     context.fillStyle = "#ffffff";
     context.fillRect(0, 0, 2, 2);
     texture.refresh();
+    return ROW_TEXTURE_KEY;
   }
 
   private buildFrame(scene: Phaser.Scene): void {
@@ -123,7 +132,7 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
       const kind = ER_REWARD_RATE_ROWS[index];
       const rowY = ROW_TOP + index * ROW_HEIGHT;
       const background = scene.add
-        .image(0.5, rowY, ROW_TEXTURE_KEY)
+        .image(0.5, rowY, this.rowTextureKey)
         .setOrigin(0, 0)
         .setDisplaySize(REWARD_RATE_PANEL_WIDTH - 1, ROW_HEIGHT);
 
@@ -170,7 +179,9 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
 
   anchorUnderLuck(luckText: Phaser.GameObjects.Text): void {
     this.setX(globalScene.scaledCanvas.width - REWARD_RATE_PANEL_WIDTH - 2);
-    this.setY(luckText.getBottomCenter().y + 1.5);
+    const height = Number(luckText.displayHeight ?? luckText.height ?? 0);
+    const originY = Number(luckText.originY ?? 0.5);
+    this.setY(luckText.y + height * (1 - originY) + 1.5);
   }
 
   refreshFromGame(rates: ErRewardRateBreakdown = getCurrentErRewardRates()): void {
@@ -193,7 +204,10 @@ export class RewardRatePanel extends Phaser.GameObjects.Container {
         };
         row.background.setPipeline("RewardRateAura");
       } else {
-        row.background.setTint(grade.color).setAlpha(0.38);
+        // Canvas keeps the same semantic grade without washing out the
+        // near-black panel beneath it. Higher-grade shape treatments remain
+        // visible through corners and the optional inner rim.
+        row.background.setTint(grade.color).setAlpha(total === 0 ? 0.08 : 0.16);
       }
 
       const showCorners = total >= 30;
