@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import type { EntryHazardTag, SuppressAbilitiesTag } from "#data/arena-tag";
 import { type BattlerTag, CritBoostTag } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
+import { markDamageNullified } from "#data/damage-nullification";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
@@ -5020,6 +5021,15 @@ export class PostSummonFogRestoreDisguiseAbAttr extends PostSummonAbAttr {
     this.bustedFormIndex = bustedFormIndex;
   }
 
+  /**
+   * This is a genuine switch-in rider, not an ability entry effect. Replaying it
+   * after Disguise changes into its busted form would immediately restore the
+   * disguise while fog remains active, allowing every hit to be blocked.
+   */
+  override shouldActivateOnFormChange(): boolean {
+    return false;
+  }
+
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.formIndex === this.bustedFormIndex && isFogWeather(globalScene.arena.weatherType);
   }
@@ -6805,6 +6815,7 @@ export class FormBlockDamageAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
     }
 
     damage.value = 0;
+    markDamageNullified(damage);
     if (this.recoil > 0) {
       pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() * this.recoil), {
         result: HitResult.INDIRECT,

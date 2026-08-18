@@ -318,6 +318,13 @@ export function applyMoodyDamageCalculation(
   damage: number,
   simulated: boolean,
 ): number {
+  // A prior damage-stage effect may deliberately nullify the hit (Disguise,
+  // Gallantry, Cheating Death, barriers, etc.). Never resurrect that explicit
+  // zero through the Moody multiplier path's minimum-one clamp.
+  if (damage <= 0) {
+    return 0;
+  }
+
   const moveHistory = source.getMoveHistory();
   const effects = queryMoodySceneEffects({
     actor: source,

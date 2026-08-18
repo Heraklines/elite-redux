@@ -1,4 +1,4 @@
-import type { PreAttackModifyDamageAbAttrParams } from "#abilities/ab-attrs";
+import type { PreDefendModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import {
   applyAbAttrs,
@@ -55,6 +55,7 @@ import {
 } from "#data/battler-tags";
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { isDamageNullified } from "#data/damage-nullification";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { erBadSpliceOnLeaveField } from "#data/elite-redux/abilities/bad-splice";
 import { erFaultCurrentOnLeaveField, erOverloadedSelfLocked } from "#data/elite-redux/abilities/charge-stack";
@@ -6071,7 +6072,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage.value = toDmgValue(damage.value * 1.3);
     }
 
-    const abAttrParams: PreAttackModifyDamageAbAttrParams = {
+    const abAttrParams: PreDefendModifyDamageAbAttrParams = {
       pokemon: this,
       opponent: source,
       move,
@@ -6119,8 +6120,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage.value = Math.min(damage.value, opponentDamageBoostSuppressionCeiling);
     }
 
-    damage.value = applyMoodyDamageCalculation(source, this, move, damage.value, simulated);
-    damage.value = applyErEndlessCalculatedDamage(source, this, move, damage.value);
+    if (isDamageNullified(damage)) {
+      damage.value = 0;
+    } else {
+      damage.value = applyMoodyDamageCalculation(source, this, move, damage.value, simulated);
+      damage.value = applyErEndlessCalculatedDamage(source, this, move, damage.value);
+    }
 
     // debug message for when damage is applied
     if (!simulated) {
