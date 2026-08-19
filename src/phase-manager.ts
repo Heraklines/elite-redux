@@ -16,6 +16,7 @@ import { coopMeHandoffBattleStarted, coopMeInProgress } from "#data/elite-redux/
 import type { CoopMutationLedger, CoopMutationToken } from "#data/elite-redux/coop/coop-mutation-ledger";
 import { coopRendererGateNeutralizes } from "#data/elite-redux/coop/coop-renderer-gate";
 import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
+import type { AbilityId } from "#enums/ability-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import type { Pokemon } from "#field/pokemon";
 import { AddEnemyBuffModifierPhase } from "#phases/add-enemy-buff-modifier-phase";
@@ -995,7 +996,22 @@ export class PhaseManager {
    *   sources. Defaults to slot 0 for legacy callers. Ignored when `passive` is
    *   `false` or `show` is `false` (hide doesn't read the slot).
    */
-  public queueAbilityDisplay(pokemon: Pokemon, passive: boolean, show: boolean, passiveSlot = 0): void {
+  public queueAbilityDisplay(
+    pokemon: Pokemon,
+    passive: boolean,
+    show: boolean,
+    passiveSlot = 0,
+    resolvedAbilityId?: AbilityId,
+  ): void {
+    // In ordinary solo play, disabling banners must remove their scheduling cost,
+    // not merely hide the tween after hundreds of Show/Hide phases were queued.
+    // Networked modes retain phases because those are ordered replay boundaries.
+    if (!globalScene.showAbilityFlyouts && !globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown) {
+      if (show) {
+        pokemon.revealAbility(passive, passiveSlot, resolvedAbilityId);
+      }
+      return;
+    }
     this.unshiftPhase(
       show ? new ShowAbilityPhase(pokemon.getBattlerIndex(), passive, passiveSlot) : new HideAbilityPhase(),
     );

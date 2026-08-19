@@ -64,6 +64,14 @@ export class Ability {
   }
   public readonly attrs: readonly AbAttr[];
   public readonly conditions: readonly AbAttrCondition[];
+  private readonly attrsByType = new Map<
+    AbAttrString,
+    {
+      source: readonly AbAttr[];
+      sourceLength: number;
+      matches: readonly AbAttr[];
+    }
+  >();
 
   /**
    * Elite Redux: when ER rewrites a vanilla ability's mechanics, the i18n
@@ -201,11 +209,7 @@ export class Ability {
    * @returns true if the ability has attribute `attrType`
    */
   hasAttr<T extends AbAttrString>(attrType: T): boolean {
-    const targetAttr = AbilityAttrs[attrType];
-    if (!targetAttr) {
-      return false;
-    }
-    return this.attrs.some(attr => attr instanceof targetAttr);
+    return this.getAttrs(attrType).length > 0;
   }
 
   /**
@@ -218,8 +222,14 @@ export class Ability {
     if (!targetAttr) {
       return [];
     }
+    const cached = this.attrsByType.get(attrType);
+    if (cached?.source === this.attrs && cached.sourceLength === this.attrs.length) {
+      return cached.matches as AbAttrMap[T][];
+    }
     // TODO: figure out how to remove the `as AbAttrMap[T][]` cast
-    return this.attrs.filter((a): a is AbAttrMap[T] => a instanceof targetAttr) as AbAttrMap[T][];
+    const matches = this.attrs.filter((a): a is AbAttrMap[T] => a instanceof targetAttr) as AbAttrMap[T][];
+    this.attrsByType.set(attrType, { source: this.attrs, sourceLength: this.attrs.length, matches });
+    return matches;
   }
 }
 

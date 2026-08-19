@@ -794,11 +794,12 @@ export function canApplyErEndlessAvalancheTrigger(
   pokemon: Pokemon,
   abilityId: number,
   discrete: boolean,
+  resolvedAsEndlessAvalanche?: boolean,
 ): boolean {
   if (
     !discrete
     || !hasErEndlessRift("trigger-burnout")
-    || !pokemon.isEndlessAvalancheAbility(abilityId)
+    || !(resolvedAsEndlessAvalanche ?? pokemon.isEndlessAvalancheAbility(abilityId))
   ) {
     return true;
   }
@@ -820,8 +821,9 @@ export function recordErEndlessAvalancheTrigger(
   abilityId: number,
   attrName: string,
   discrete: boolean,
+  resolvedAsEndlessAvalanche?: boolean,
 ): boolean {
-  if (!pokemon.isEndlessAvalancheAbility(abilityId)) {
+  if (!(resolvedAsEndlessAvalanche ?? pokemon.isEndlessAvalancheAbility(abilityId))) {
     return false;
   }
   const current = runtime();

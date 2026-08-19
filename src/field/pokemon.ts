@@ -406,6 +406,8 @@ export interface PokemonAbilitySource {
   readonly ability: Ability;
   readonly passive: boolean;
   readonly passiveSlot?: number;
+  /** Whether this source was added by post-clear Endless Ability Avalanche. */
+  readonly endlessAvalanche?: boolean;
 }
 
 type ActiveAbilitySourceCache = WeakMap<Pokemon, Map<boolean, readonly PokemonAbilitySource[]>>;
@@ -436,6 +438,7 @@ export function withPokemonActiveAbilitySourceCache<T>(read: () => T): T {
 let activeAbilitySourceCache: ActiveAbilitySourceCache | null = null;
 const funAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
 const endlessAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
+const endlessAvalancheAbilityIndexes = new WeakMap<Pokemon, Map<AbilityId, number>>();
 
 export abstract class Pokemon extends Phaser.GameObjects.Container {
   /**
@@ -2974,21 +2977,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+    const presentIds = new Set(slots.flatMap(ability => (ability ? [ability.id] : [])));
+    const appendUniqueAbility = (ability: Ability | null | undefined): boolean => {
+      if (!ability || presentIds.has(ability.id)) {
+        return false;
+      }
+      slots.push(ability);
+      presentIds.add(ability.id);
+      return true;
+    };
     const legacyTemporaryPassiveId = this.summonData.passiveAbility;
     if (legacyTemporaryPassiveId != null) {
       const temporary = allAbilities[legacyTemporaryPassiveId];
-      if (temporary != null && !slots.some(ability => ability?.id === temporary.id)) {
-        slots.push(temporary);
-      }
+      appendUniqueAbility(temporary);
     }
     for (const abilityId of getMoodyCoordinatorExtraAbilityIds(this.id)) {
-      const temporary = allAbilities[abilityId];
-      if (temporary != null && !slots.some(ability => ability?.id === temporary.id)) {
-        slots.push(temporary);
-      }
+      appendUniqueAbility(allAbilities[abilityId]);
     }
     if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
-      const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
+      const excludedIds = [this.getAbility().id, ...presentIds];
       const avalancheIds = new Set<AbilityId>();
       for (const avalancheId of getFunAbilityAvalancheIds(
         this.id,
@@ -2996,8 +3003,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         excludedIds,
       )) {
         const avalancheAbility = allAbilities[avalancheId];
-        if (avalancheAbility && !slots.some(ability => ability?.id === avalancheAbility.id)) {
-          slots.push(avalancheAbility);
+        if (appendUniqueAbility(avalancheAbility)) {
           avalancheIds.add(avalancheId);
         }
       }
@@ -3006,30 +3012,30 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       funAvalancheAbilityIds.delete(this);
     }
     if (isErEndlessContinuationActive()) {
-      const excludedIds = [this.getAbility().id, ...slots.flatMap(ability => (ability ? [ability.id] : []))];
+      const excludedIds = [this.getAbility().id, ...presentIds];
       const wave = globalScene.currentBattle?.waveIndex ?? 1;
       const count = this.isPlayer() ? getErEndlessPlayerAvalancheCount(wave) : getErEndlessEnemyAvalancheCount(wave);
       const avalancheIds = new Set<AbilityId>();
+      const avalancheIndexes = new Map<AbilityId, number>();
       const battleSalt = hasErEndlessRift("avalanche-reroll") ? Math.imul(wave, 0x45d9f3b) : 0;
       for (const avalancheId of getEndlessAbilityAvalancheIds(this.id, count, excludedIds, battleSalt)) {
         const avalancheAbility = allAbilities[avalancheId];
-        if (avalancheAbility && !slots.some(ability => ability?.id === avalancheAbility.id)) {
-          slots.push(avalancheAbility);
+        if (appendUniqueAbility(avalancheAbility)) {
+          avalancheIndexes.set(avalancheId, avalancheIndexes.size);
           avalancheIds.add(avalancheId);
         }
       }
       endlessAvalancheAbilityIds.set(this, avalancheIds);
+      endlessAvalancheAbilityIndexes.set(this, avalancheIndexes);
     } else {
       endlessAvalancheAbilityIds.delete(this);
+      endlessAvalancheAbilityIndexes.delete(this);
     }
     // ER Black Shinies (#349): append the active GIFT abilities — this mon's
     // own gift plus any on-field black-shiny ally's gift. Flowing them through
     // the passive list makes combat + every abilities screen pick them up.
     for (const giftId of getErSharedGiftAbilityIdsFor(this)) {
-      const gift = allAbilities[giftId];
-      if (gift && !slots.some(a => a?.id === gift.id)) {
-        slots.push(gift);
-      }
+      appendUniqueAbility(allAbilities[giftId]);
     }
     return slots;
   }
@@ -3043,23 +3049,26 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const sources: PokemonAbilitySource[] = [];
     const seenIds = new Set<AbilityId>();
     const active = this.getAbility(ignoreOverride);
-    if (!activeOnly || this.canApplyAbility(false, 0, ignoreFaint, ignoreMentalPollution)) {
+    if (!activeOnly || this.canApplyAbilitySource(active, false, 0, ignoreFaint, ignoreMentalPollution)) {
       seenIds.add(active.id);
       sources.push({ ability: active, passive: false });
     }
 
     const passiveAbilities = this.getPassiveAbilities();
+    const endlessIds = endlessAvalancheAbilityIds.get(this);
+    const endlessIndexes = endlessAvalancheAbilityIndexes.get(this);
+    const rotatingAvalanche = hasErEndlessRift("rotating-avalanche");
+    const activeAvalancheGroup = Math.max(0, (globalScene.currentBattle?.turn ?? 1) - 1) % 4;
     const enemySlotLimit = getEnemyPassiveSlotLimit(this);
     for (let slot = 0; slot < passiveAbilities.length; slot++) {
       const ability = passiveAbilities[slot];
       if (!ability) {
         continue;
       }
-      if (hasErEndlessRift("rotating-avalanche") && endlessAvalancheAbilityIds.get(this)?.has(ability.id)) {
-        const avalancheIds = [...endlessAvalancheAbilityIds.get(this)!];
-        const avalancheIndex = avalancheIds.indexOf(ability.id);
-        const activeGroup = Math.max(0, (globalScene.currentBattle?.turn ?? 1) - 1) % 4;
-        if (avalancheIndex % 4 !== activeGroup) {
+      const isEndlessAvalanche = endlessIds?.has(ability.id) === true;
+      if (rotatingAvalanche && isEndlessAvalanche) {
+        const avalancheIndex = endlessIndexes?.get(ability.id) ?? -1;
+        if (avalancheIndex < 0 || avalancheIndex % 4 !== activeAvalancheGroup) {
           continue;
         }
       }
@@ -3068,14 +3077,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (!isAlwaysOnExtraSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
         continue;
       }
-      if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint, ignoreMentalPollution)) {
+      if (activeOnly && !this.canApplyAbilitySource(ability, true, slot, ignoreFaint, ignoreMentalPollution)) {
         continue;
       }
       if (seenIds.has(ability.id)) {
         continue;
       }
       seenIds.add(ability.id);
-      sources.push({ ability, passive: true, passiveSlot: slot });
+      sources.push({ ability, passive: true, passiveSlot: slot, endlessAvalanche: isEndlessAvalanche });
     }
 
     return sources;
@@ -3301,12 +3310,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /** Mark the Pokémon's ability as revealed. */
-  public revealAbility(passive = false, passiveSlot = 0): void {
+  public revealAbility(passive = false, passiveSlot = 0, resolvedAbilityId?: AbilityId): void {
     this.waveData.abilityRevealed = true;
-    const ability = passive ? this.getPassiveAbilities()[passiveSlot] : this.getAbility();
-    if (ability) {
+    const abilityId =
+      resolvedAbilityId ?? (passive ? this.getPassiveAbilities()[passiveSlot]?.id : this.getAbility().id);
+    if (abilityId != null) {
       const source = passive ? (passiveSlot >= 3 ? "gift" : "innate") : "active";
-      this.waveData.revealedAbilityKeys.add(`${source}:${passive ? passiveSlot : -1}:${ability.id}`);
+      this.waveData.revealedAbilityKeys.add(`${source}:${passive ? passiveSlot : -1}:${abilityId}`);
     }
   }
 
@@ -3544,6 +3554,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ability) {
       return false;
     }
+    return this.canApplyAbilitySource(ability, passive, passiveSlot, ignoreFaint, ignoreMentalPollution);
+  }
+
+  /** Apply the normal eligibility gates to an ability already resolved by the caller. */
+  public canApplyAbilitySource(
+    ability: Ability,
+    passive: boolean,
+    passiveSlot: number,
+    ignoreFaint: boolean,
+    ignoreMentalPollution: boolean,
+  ): boolean {
     // ER Giratina's Bargain - Curiosity (#544): a slot the player LOCKED via the
     // Curiosity gamble is dead for the rest of the run. The ER ability-slot index
     // is 0 for the active ability and `passiveSlot + 1` for an innate slot
@@ -3742,9 +3763,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * requested suppression, and ability conditions remain authoritative.
    */
   private hasActiveMentalPollution(): boolean {
-    return this.collectAbilitySources(false, true, false, true).some(source =>
-      source.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
+    const source = this.collectAbilitySources(false, false).find(candidate =>
+      candidate.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
     );
+    return source
+      ? this.canApplyAbilitySource(source.ability, source.passive, source.passiveSlot ?? 0, false, true)
+      : false;
   }
 
   /** Return post-summon priorities for every currently active ability source. */
