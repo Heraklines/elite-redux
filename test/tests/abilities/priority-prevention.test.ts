@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { allMoves } from "#app/data/data-lists";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
@@ -16,6 +18,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 describe.each([
   { abilityId: AbilityId.DAZZLING, abilityName: "Dazzling" },
   { abilityId: AbilityId.QUEENLY_MAJESTY, abilityName: "Queenly Majesty" },
+  { abilityId: AbilityId.ARMOR_TAIL, abilityName: "Armor Tail" },
 ])("Ability - $abilityName", ({ abilityId }) => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
@@ -46,6 +49,22 @@ describe.each([
     await game.toEndOfTurn();
 
     expect(game.field.getPlayerPokemon()).toHaveUsedMove({ move: MoveId.QUICK_ATTACK, result: MoveResult.FAIL });
+  });
+
+  it("should block opposing spread moves made priority by an ability", async () => {
+    game.override.ability(ER_ID_MAP.abilities[351] as AbilityId).moveset(MoveId.ERUPTION);
+    await game.classicMode.startBattle(ER_ID_MAP.species[2137] as SpeciesId);
+
+    const megaTyphlosion = game.field.getPlayerPokemon();
+    const opponent = game.field.getEnemyPokemon();
+    expect(allMoves[MoveId.ERUPTION].isMultiTarget()).toBe(true);
+    expect(allMoves[MoveId.ERUPTION].getPriority(megaTyphlosion)).toBe(1);
+
+    game.move.use(MoveId.ERUPTION);
+    await game.toEndOfTurn();
+
+    expect(megaTyphlosion).toHaveUsedMove({ move: MoveId.ERUPTION, result: MoveResult.FAIL });
+    expect(opponent).toHaveFullHp();
   });
 
   describe("Doubles Interactions", () => {
