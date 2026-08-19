@@ -5,6 +5,8 @@ import {
   canUseErEndlessGhost,
   finalizeErEndlessGhostEncounter,
   getErEndlessActiveRifts,
+  getErEndlessBonusBoonBudget,
+  getErEndlessBonusRiftSlots,
   getErEndlessBonusSegmentBudget,
   getErEndlessCycle,
   getErEndlessCycleWave,
@@ -72,19 +74,35 @@ describe("Elite Redux Endless continuation", () => {
     expect(getErEndlessRaidBossSegments(7)).toBe(14);
   });
 
-  it("adds one cumulative enemy health segment every 15 Normal or 7 Sprint Endless waves", () => {
+  it("distributes each three pressure milestones across boons, segments, and Rift slots", () => {
     setErRunPacing("normal");
-    initializeErEndlessContinuation(200, "normal-bars");
+    initializeErEndlessContinuation(200, "mixed-pressure");
+    expect(getErEndlessBonusBoonBudget(214)).toBe(0);
     expect(getErEndlessBonusSegmentBudget(214)).toBe(0);
-    expect(getErEndlessBonusSegmentBudget(215)).toBe(1);
-    expect(getErEndlessBonusSegmentBudget(230)).toBe(2);
+    expect(getErEndlessBonusRiftSlots(214)).toBe(0);
+    expect(
+      getErEndlessBonusBoonBudget(215) + getErEndlessBonusSegmentBudget(215) + getErEndlessBonusRiftSlots(215) / 2,
+    ).toBe(1);
+    expect(
+      getErEndlessBonusBoonBudget(230) + getErEndlessBonusSegmentBudget(230) + getErEndlessBonusRiftSlots(230) / 2,
+    ).toBe(2);
+    expect(getErEndlessBonusBoonBudget(245)).toBe(1);
+    expect(getErEndlessBonusSegmentBudget(245)).toBe(1);
+    expect(getErEndlessBonusRiftSlots(245)).toBe(2);
 
     resetErEndlessContinuation();
     setErRunPacing("sprint");
-    initializeErEndlessContinuation(100, "sprint-bars");
-    expect(getErEndlessBonusSegmentBudget(106)).toBe(0);
-    expect(getErEndlessBonusSegmentBudget(107)).toBe(1);
-    expect(getErEndlessBonusSegmentBudget(114)).toBe(2);
+    initializeErEndlessContinuation(100, "mixed-pressure");
+    expect(getErEndlessBonusBoonBudget(121)).toBe(1);
+    expect(getErEndlessBonusSegmentBudget(121)).toBe(1);
+    expect(getErEndlessBonusRiftSlots(121)).toBe(2);
+  });
+
+  it("uses mixed-pressure Rift milestones to raise the active Rift target", () => {
+    setErRunPacing("normal");
+    initializeErEndlessContinuation(200, "mixed-pressure-rifts");
+    pulseErEndlessRifts(245);
+    expect(getErEndlessActiveRifts()).toHaveLength(4);
   });
 
   it("loops its world display and marks each 200-depth finale", () => {

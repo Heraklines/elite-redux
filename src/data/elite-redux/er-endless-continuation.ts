@@ -318,9 +318,69 @@ export function getErEndlessEquivalentDepth(runWave: number): number {
   return getErEndlessActualWave(runWave) * getErRunPacingProfile().progressionScale;
 }
 
+export interface ErEndlessPressureBonuses {
+  boonBudget: number;
+  segmentBudget: number;
+  riftSlots: number;
+}
+
+const PRESSURE_ORDERS = [
+  ["boon", "segment", "rifts"],
+  ["boon", "rifts", "segment"],
+  ["segment", "boon", "rifts"],
+  ["segment", "rifts", "boon"],
+  ["rifts", "boon", "segment"],
+  ["rifts", "segment", "boon"],
+] as const;
+
+/**
+ * Every 15 Normal or 7 Sprint waves adds one enemy-pressure package. Each
+ * seed-randomized group of three contains one boon, one segment, and two Rift
+ * slots, preventing health-only streaks while remaining stable across reloads.
+ */
+export function getErEndlessPressureBonuses(runWave: number): ErEndlessPressureBonuses {
+  if (state == null) {
+    return { boonBudget: 0, segmentBudget: 0, riftSlots: 0 };
+  }
+  const milestones = Math.floor(getErEndlessActualWave(runWave) / (isErSprintRun() ? 7 : 15));
+  const completeGroups = Math.floor(milestones / 3);
+  const bonuses: ErEndlessPressureBonuses = {
+    boonBudget: completeGroups,
+    segmentBudget: completeGroups,
+    riftSlots: completeGroups * 2,
+  };
+  const remainder = milestones % 3;
+  if (remainder === 0) {
+    return bonuses;
+  }
+  const order = PRESSURE_ORDERS[hash32(`${state.seed}:pressure:${completeGroups}`) % PRESSURE_ORDERS.length];
+  for (let index = 0; index < remainder; index++) {
+    switch (order[index]) {
+      case "boon":
+        bonuses.boonBudget++;
+        break;
+      case "segment":
+        bonuses.segmentBudget++;
+        break;
+      case "rifts":
+        bonuses.riftSlots += 2;
+        break;
+    }
+  }
+  return bonuses;
+}
+
+export function getErEndlessBonusBoonBudget(runWave: number): number {
+  return getErEndlessPressureBonuses(runWave).boonBudget;
+}
+
 /** Cumulative extra health bars distributed across every Endless enemy party. */
 export function getErEndlessBonusSegmentBudget(runWave: number): number {
-  return Math.floor(getErEndlessActualWave(runWave) / (isErSprintRun() ? 7 : 15));
+  return getErEndlessPressureBonuses(runWave).segmentBudget;
+}
+
+export function getErEndlessBonusRiftSlots(runWave: number): number {
+  return getErEndlessPressureBonuses(runWave).riftSlots;
 }
 
 export function getErEndlessCycle(runWave: number): number {
@@ -529,7 +589,10 @@ export function pulseErEndlessRifts(runWave: number): ErEndlessActiveRift[] {
   if (first) {
     added.push(first);
   }
-  const target = Math.min(8, 2 + Math.floor(getErEndlessEquivalentDepth(runWave) / 100));
+  const target = Math.min(
+    8,
+    2 + Math.floor(getErEndlessEquivalentDepth(runWave) / 100) + getErEndlessBonusRiftSlots(runWave),
+  );
   while (state.activeRifts.length < target) {
     const next = addRift(undefined, !state.activeRifts.some(rift => RIFT_BY_ID.get(rift.id)?.hostile), runWave);
     if (!next) {

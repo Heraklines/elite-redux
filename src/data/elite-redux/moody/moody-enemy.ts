@@ -1,5 +1,9 @@
 import { globalScene } from "#app/global-scene";
-import { getErEndlessEquivalentDepth, getErEndlessState } from "#data/elite-redux/er-endless-continuation";
+import {
+  getErEndlessBonusBoonBudget,
+  getErEndlessEquivalentDepth,
+  getErEndlessState,
+} from "#data/elite-redux/er-endless-continuation";
 import {
   MOODY_PASSIVE_PARTIAL_BOON_IDS,
   MOODY_PASSIVE_SUPPORTED_BOON_IDS,
@@ -263,6 +267,7 @@ export function generateEndlessEnemyBoonLoadout(
   }
   const depth = getErEndlessEquivalentDepth(waveIndex);
   const referencePower = Math.max(2, getMoodyBoonBudget() + 2 + Math.floor(depth / 20));
+  const pressureBoonBudget = getErEndlessBonusBoonBudget(waveIndex);
   const stringSeed = [...endless.seed].reduce(
     (hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619),
     2166136261,
@@ -273,7 +278,10 @@ export function generateEndlessEnemyBoonLoadout(
   return generateEnemyBoonLoadout(
     party,
     waveIndex,
-    Math.max(1, Math.round(referencePower * multiplier * nemesisMultiplier) + (nemesisRank >= 1 ? 1 : 0)),
+    Math.max(
+      1,
+      Math.round(referencePower * multiplier * nemesisMultiplier) + (nemesisRank >= 1 ? 1 : 0) + pressureBoonBudget,
+    ),
     stringSeed,
     counterBiased || nemesisRank >= 1 ? (nemesisRank >= 2 ? 4 : 2) : undefined,
   );
