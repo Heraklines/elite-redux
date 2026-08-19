@@ -65,6 +65,19 @@ export function getFunModeConfig(): Readonly<FunModeConfig> {
   return currentConfig;
 }
 
+/**
+ * Whether a directly caught wild Pokemon should grant permanent collection
+ * progress while Fun Mode is active.
+ *
+ * Random Pokemon catches are rental-like: they may join the current party and
+ * still award candy, but cannot unlock their species, forms, abilities, natures,
+ * or shiny tiers in starter select. Item Chaos applies the same restriction only
+ * to shiny catches so it cannot be used as a permanent shiny-farming modifier.
+ */
+export function shouldGrantFunCaptureProgress(isShiny: boolean): boolean {
+  return !currentConfig.randomizePokemon && !(currentConfig.itemChaos && isShiny);
+}
+
 export function setFunModeConfig(config: FunModeConfig): void {
   currentConfig = {
     difficulty: config.difficulty === "hell" ? "hell" : "youngster",

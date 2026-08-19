@@ -29,7 +29,7 @@ const OPTIONS: readonly { key: FunModeOptionKey; label: string; description: str
     key: "randomizePokemon",
     label: "Pokemon",
     description:
-      "Every newly generated enemy Pokemon is replaced from the full species pool. Biome pools and BST limits do not apply.",
+      "Every newly generated enemy Pokemon is replaced from the full species pool. Biome pools and BST limits do not apply. Catches can join this run and award candy, but do not unlock starter-select data.",
   },
   {
     key: "randomizeTypes",
@@ -70,7 +70,7 @@ const OPTIONS: readonly { key: FunModeOptionKey; label: string; description: str
     key: "itemChaos",
     label: "Item Chaos",
     description:
-      "Every eligible reward tier and every eligible item inside it have equal odds. Normal rarity weights and luck upgrades are ignored.",
+      "Every eligible reward tier and every eligible item inside it have equal odds. Normal rarity weights and luck upgrades are ignored. Caught shinies can join this run and award candy, but do not unlock starter-select data.",
   },
   {
     key: "weatherRoulette",

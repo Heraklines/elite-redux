@@ -35,6 +35,7 @@ import {
   rollFunTerrain,
   rollFunWeather,
   setFunModeConfig,
+  shouldGrantFunCaptureProgress,
 } from "#data/elite-redux/er-fun-mode";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { CustomPokemonData } from "#data/pokemon/pokemon-data";
@@ -195,6 +196,20 @@ describe("Fun Mode configuration", () => {
       abilityAvalanche: false,
       moodyMode: false,
     });
+  });
+
+  it("suppresses permanent capture progress for randomized species and Item Chaos shinies", () => {
+    setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, randomizePokemon: true });
+    expect(shouldGrantFunCaptureProgress(false)).toBe(false);
+    expect(shouldGrantFunCaptureProgress(true)).toBe(false);
+
+    setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, itemChaos: true });
+    expect(shouldGrantFunCaptureProgress(false)).toBe(true);
+    expect(shouldGrantFunCaptureProgress(true)).toBe(false);
+
+    setFunModeConfig(DEFAULT_FUN_MODE_CONFIG);
+    expect(shouldGrantFunCaptureProgress(false)).toBe(true);
+    expect(shouldGrantFunCaptureProgress(true)).toBe(true);
   });
 });
 

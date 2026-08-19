@@ -6972,6 +6972,9 @@ export class GameData {
    * @param incrementCount
    * @param fromEgg
    * @param showMessage
+   * @param grantPermanentProgress Whether this acquisition may update persistent
+   * starter-select/dex unlocks. When false, the Pokemon still awards its normal
+   * catch candy but does not alter collection data.
    * @returns `true` if Pokemon catch unlocked a new starter, `false` if Pokemon catch did not unlock a starter
    */
   // TODO: This return value is exclusively used inside Weird Dream (which manually displays the "new starter unlocked" message),
@@ -6982,6 +6985,7 @@ export class GameData {
     incrementCount = true,
     fromEgg = false,
     showMessage = true,
+    grantPermanentProgress = true,
   ): Promise<boolean> {
     // #807 B (default-deny account writes): during a CO-OP session, caught-registration only
     // proceeds from explicitly allowlisted scopes (own catch, scoped share apply, own adopt
@@ -6997,6 +7001,19 @@ export class GameData {
     // Spearow's location" hijack. The run mon itself is untouched.
     const reduxCounterpartId = getErReduxCounterpartId(pokemon.species.speciesId, pokemon.getFormKey());
     const dexSpecies = reduxCounterpartId === undefined ? pokemon.species : getPokemonSpecies(reduxCounterpartId);
+
+    // Fun Mode's Random Pokemon catches, and shiny catches while Item Chaos is
+    // enabled, are usable for the current run but are not permanent collection
+    // unlocks. Preserve the ordinary catch-candy payout without touching dex,
+    // starter, or aggregate collection counters.
+    if (!grantPermanentProgress) {
+      if (incrementCount) {
+        const shinyBonus = pokemon.isShiny() ? 5 * Math.pow(2, pokemon.variant ?? 0) : 1;
+        const candy = shinyBonus * (pokemon.isBoss() ? 2 : 1);
+        this.addStarterCandy(dexSpecies.getRootSpeciesId(), candy);
+      }
+      return false;
+    }
 
     // If incrementCount === false (not a catch scenario), only update the pokemon's dex data if the Pokemon has already been marked as caught in dex
     // Prevents form changes, nature changes, etc. from unintentionally updating the dex data of a "rental" pokemon

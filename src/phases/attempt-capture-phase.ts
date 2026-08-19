@@ -18,6 +18,7 @@ import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementCatch, erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
+import { shouldGrantFunCaptureProgress } from "#data/elite-redux/er-fun-mode";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import {
   commitMoodyCoordinatorCaptureSuccess,
@@ -418,7 +419,9 @@ export class AttemptCapturePhase extends PokemonPhase {
           pokemon.hideInfo(),
           // #807 B: the local player's OWN catch is an allowlisted account write.
           coopAllowAccountWrite("own-catch", async () => {
-            await globalScene.gameData.setPokemonCaught(pokemon);
+            const grantPermanentProgress =
+              !globalScene.gameMode.isFun || shouldGrantFunCaptureProgress(pokemon.isShiny());
+            await globalScene.gameData.setPokemonCaught(pokemon, true, false, true, grantPermanentProgress);
             await commitMoodyCoordinatorCaptureSuccess(pokemon);
           }),
         ]).then(() => {
