@@ -1,0 +1,22 @@
+url:      https://elite-redux-staging.pages.dev/?utm_source=chatgpt.com
+build:    github:9aba5ed0a6a4ce87c7212774432fcfb94cfbd523:run-32230097599.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   1920x1080 @1x  devmem:8 GB
+boot:     boot-start@0ms
+lastSess: crashed after boot-start
+mode:     ?  wave:?
+seed:     ?
+party:    
+enemy:    
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:9aba5ed0a6a4ce87c7212774432fcfb94cfbd523:run-32230097599.1","source":"github","sha":"9aba5ed0a6a4ce87c7212774432fcfb94cfbd523","workflow":{"provider":"github-actions","runId":"32230097599","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[12:47:09.291] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[12:47:10.855] LOG: [ER] build {"version":1,"id":"github:9aba5ed0a6a4ce87c7212774432fcfb94cfbd523:run-32230097599.1","source":"github","sha":"9aba5ed0a6a4ce87c7212774432fcfb94cfbd523","workflow":{"provider":"github-actions","runId":"32230097599","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[12:47:10.912] LOG: [dev-tools] loaded — 2 picker scenarios + Send Logs button
+
+----- REPLAY TRACE (JSON) -----
+(none)
