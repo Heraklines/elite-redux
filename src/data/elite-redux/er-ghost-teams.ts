@@ -70,9 +70,10 @@ import {
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
-import { modifierTypes } from "#data/data-lists";
+import { allAbilities, modifierTypes } from "#data/data-lists";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
+import { AbilityId } from "#enums/ability-id";
 import type { Nature } from "#enums/nature";
 import { BaseStatModifier, ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
@@ -105,6 +106,13 @@ export interface GhostMember {
   variant: number;
   passive: boolean;
   moves: number[];
+  /**
+   * Run-scoped Ability Randomizer overrides for active + innate slots 1-3.
+   * `-1` means that slot still uses its species/form-derived ability.
+   */
+  abilityOverrides?: [number, number, number, number] | undefined;
+  /** Whether the stored overrides remain active on form-derived Mega/G-max forms. */
+  abilityOverridesForm?: boolean | undefined;
   /** ER Black Shiny: t4 identity is distinct from the ordinary red/t3 variant. */
   erBlackShiny?: boolean | undefined;
   /** The owner's three curated GIFT choices, preserved without rerolling. */
@@ -130,6 +138,11 @@ export interface GhostMember {
 
 /** JSON-safe CustomPokemonData fields carried by a reconstructed ghost member. */
 export interface ErGhostMemberCustomData {
+  ability: AbilityId | -1;
+  passive: AbilityId | -1;
+  passive2: AbilityId | -1;
+  passive3: AbilityId | -1;
+  abilityOverridesForm: boolean;
   erBlackShiny: boolean;
   erGiftAbilities: number[];
   erGiftIndex: number;
@@ -138,12 +151,33 @@ export interface ErGhostMemberCustomData {
   erShinyLabSuppressLocal: true;
 }
 
+function sanitizeGhostAbilityOverride(value: unknown): AbilityId | -1 {
+  return Number.isSafeInteger(value)
+      && (value as number) > AbilityId.NONE
+      && allAbilities[value as number]?.id === value
+    ? value as AbilityId
+    : -1;
+}
+
+function getSanitizedGhostAbilityOverrides(member: GhostMember): [AbilityId | -1, AbilityId | -1, AbilityId | -1, AbilityId | -1] {
+  const values = Array.isArray(member.abilityOverrides) ? member.abilityOverrides : [];
+  return [
+    sanitizeGhostAbilityOverride(values[0]),
+    sanitizeGhostAbilityOverride(values[1]),
+    sanitizeGhostAbilityOverride(values[2]),
+    sanitizeGhostAbilityOverride(values[3]),
+  ];
+}
+
 /**
- * Sanitize the cosmetic/black-shiny state of an untrusted cross-player member.
- * Black is accepted only with the same shiny+variant invariant used locally;
- * GIFT ids are restricted to the approved pool and never rerolled for ghosts.
+ * Sanitize the persistent custom state of an untrusted cross-player member.
+ * Ability overrides must resolve to live abilities. Black is accepted only with
+ * the same shiny+variant invariant used locally; GIFT ids are restricted to the
+ * approved pool and never rerolled for ghosts.
  */
 export function getErGhostMemberCustomData(member: GhostMember): ErGhostMemberCustomData {
+  const [ability, passive, passive2, passive3] = getSanitizedGhostAbilityOverrides(member);
+  const hasAbilityOverride = ability !== -1 || passive !== -1 || passive2 !== -1 || passive3 !== -1;
   const erBlackShiny = member.erBlackShiny === true && member.shiny === true && member.variant === 2;
   const erGiftAbilities = erBlackShiny && Array.isArray(member.erGiftAbilities)
     ? [...new Set(member.erGiftAbilities)]
@@ -160,6 +194,11 @@ export function getErGhostMemberCustomData(member: GhostMember): ErGhostMemberCu
     : undefined;
 
   return {
+    ability,
+    passive,
+    passive2,
+    passive3,
+    abilityOverridesForm: hasAbilityOverride && member.abilityOverridesForm === true,
     erBlackShiny,
     erGiftAbilities,
     erGiftIndex,
@@ -662,6 +701,13 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
   const erGiftIndex = erGiftAbilities.length > 0
     ? Math.max(0, Math.min(erGiftAbilities.length - 1, requestedGiftIndex))
     : 0;
+  const abilityOverrides = [
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.ability),
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.passive),
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.passive2),
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.passive3),
+  ] as [AbilityId | -1, AbilityId | -1, AbilityId | -1, AbilityId | -1];
+  const hasAbilityOverride = abilityOverrides.some(abilityId => abilityId !== -1);
   return {
     speciesId: p?.species?.speciesId ?? 0,
     formIndex: p?.formIndex ?? 0,
@@ -674,6 +720,10 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     variant: p?.variant ?? 0,
     passive: !!p?.passive,
     moves,
+    ...(hasAbilityOverride ? {
+      abilityOverrides,
+      abilityOverridesForm: p?.customPokemonData?.abilityOverridesForm === true,
+    } : {}),
     ...(erBlackShiny ? { erBlackShiny: true } : {}),
     ...(erGiftAbilities.length > 0 ? { erGiftAbilities, erGiftIndex } : {}),
     ...(heldItems.length > 0 ? { heldItems } : {}),
@@ -990,20 +1040,24 @@ function ghostUploaderKey(snapshot: GhostTeamSnapshot): string {
 /** Stable semantic team hash: cosmetic variants do not make an otherwise identical team new. */
 export function ghostTeamFingerprint(snapshot: GhostTeamSnapshot): string {
   const semanticParty = snapshot.party
-    .map(member =>
-      JSON.stringify([
+    .map(member => {
+      const abilityOverrides = getSanitizedGhostAbilityOverrides(member);
+      const hasAbilityOverride = abilityOverrides.some(abilityId => abilityId !== -1);
+      return JSON.stringify([
         member.speciesId,
         member.formIndex,
         member.abilityIndex,
         member.nature,
         member.passive,
+        abilityOverrides,
+        hasAbilityOverride && member.abilityOverridesForm === true,
         Array.isArray(member.ivs) ? member.ivs : [],
         Array.isArray(member.moves) ? member.moves.slice().sort((a, b) => a - b) : [],
         Array.isArray(member.heldItems)
           ? member.heldItems.slice().sort((a, b) => String(a[0]).localeCompare(String(b[0])))
           : [],
-      ]),
-    )
+      ]);
+    })
     .sort();
   const value = JSON.stringify(semanticParty);
   let a = 0x811c9dc5;
