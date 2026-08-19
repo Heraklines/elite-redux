@@ -532,6 +532,30 @@ export class ErCustomSpecies extends PokemonSpecies {
     // gated by spriteOnly — so ER custom shiny tiers render correctly.
     return super.loadAssets(female, formIndex, shiny, variant, startLoad, back, true);
   }
+
+  override async loadNonSpriteAssets(formIndex?: number): Promise<void> {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      return getPokemonSpecies(alias).loadNonSpriteAssets(0);
+    }
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (slug) {
+      const iconKey = `er_icon__${slug}`;
+      if (!globalScene.textures.exists(iconKey)) {
+        globalScene.loadPokemonAtlas(
+          iconKey,
+          ErCustomSpecies.getIconAtlasSourcePath(this.speciesId) ?? `elite-redux/${slug}/icon`,
+        );
+      }
+    }
+    const cryFile = ErCustomSpecies._cryUrls.get(this.speciesId);
+    if (cryFile) {
+      const cryKey = this.getCryKey(formIndex);
+      if (!globalScene.cache.audio.exists(cryKey)) {
+        globalScene.load.audio(cryKey, cryFile);
+      }
+    }
+  }
 }
 
 /**
