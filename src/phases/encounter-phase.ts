@@ -65,6 +65,7 @@ import {
   hasErEndlessRift,
   isErEndlessContinuationActive,
   isErEndlessRaidWave,
+  scaleErEndlessEncounterPressureBudget,
 } from "#data/elite-redux/er-endless-continuation";
 import { applyErEndlessBattleStart, prepareErEndlessBattleRuntime } from "#data/elite-redux/er-endless-rift-runtime";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -1437,7 +1438,14 @@ export class EncounterPhase extends BattlePhase {
           runtime.graveReturnAvailable = true;
         }
       }
-      const segmentBudget = getErEndlessBonusSegmentBudget(battle.waveIndex);
+      const bossBattle =
+        battle.trainer?.config.isBoss === true
+        || globalScene.gameMode.isBoss(battle.waveIndex)
+        || battle.enemyParty.some(pokemon => pokemon.isBoss());
+      const segmentBudget = scaleErEndlessEncounterPressureBudget(
+        getErEndlessBonusSegmentBudget(battle.waveIndex),
+        bossBattle,
+      );
       const ranked = [...battle.enemyParty].toSorted((left, right) => {
         const threat = (pokemon: EnemyPokemon) =>
           pokemon.getSpeciesForm().baseTotal

@@ -1,5 +1,10 @@
 import { globalScene } from "#app/global-scene";
-import { getErEndlessEquivalentDepth, getErEndlessState } from "#data/elite-redux/er-endless-continuation";
+import {
+  getErEndlessBonusBoonBudget,
+  getErEndlessEquivalentDepth,
+  getErEndlessState,
+  scaleErEndlessEncounterPressureBudget,
+} from "#data/elite-redux/er-endless-continuation";
 import {
   MOODY_PASSIVE_PARTIAL_BOON_IDS,
   MOODY_PASSIVE_SUPPORTED_BOON_IDS,
@@ -256,6 +261,7 @@ export function generateEndlessEnemyBoonLoadout(
   waveIndex: number,
   counterBiased = false,
   nemesisRank = 0,
+  bossBattle = false,
 ): MoodyEnemyBoonLoadout {
   const endless = getErEndlessState();
   if (endless == null) {
@@ -263,6 +269,7 @@ export function generateEndlessEnemyBoonLoadout(
   }
   const depth = getErEndlessEquivalentDepth(waveIndex);
   const referencePower = Math.max(2, getMoodyBoonBudget() + 2 + Math.floor(depth / 20));
+  const pressureBoonBudget = getErEndlessBonusBoonBudget(waveIndex);
   const stringSeed = [...endless.seed].reduce(
     (hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619),
     2166136261,
@@ -270,10 +277,14 @@ export function generateEndlessEnemyBoonLoadout(
   const multiplier = 1 + (mix32(stringSeed ^ waveIndex ^ 0x6d2b79f5) % 3) * 0.25;
   const nemesisMultiplier =
     nemesisRank >= 4 ? Math.min(2, 1.5 + (nemesisRank - 2) * 0.125) : nemesisRank >= 2 ? 1.5 : 1;
+  const boonBudget = Math.max(
+    1,
+    Math.round(referencePower * multiplier * nemesisMultiplier) + (nemesisRank >= 1 ? 1 : 0) + pressureBoonBudget,
+  );
   return generateEnemyBoonLoadout(
     party,
     waveIndex,
-    Math.max(1, Math.round(referencePower * multiplier * nemesisMultiplier) + (nemesisRank >= 1 ? 1 : 0)),
+    scaleErEndlessEncounterPressureBudget(boonBudget, bossBattle),
     stringSeed,
     counterBiased || nemesisRank >= 1 ? (nemesisRank >= 2 ? 4 : 2) : undefined,
   );

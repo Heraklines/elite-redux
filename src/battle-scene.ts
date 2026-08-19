@@ -4526,6 +4526,9 @@ export class BattleScene extends SceneBase {
             this.currentBattle.waveIndex,
             snapshot?.endlessEchoStage === 3,
             snapshot?.endlessNemesisRank ?? 0,
+            this.currentBattle.trainer?.config.isBoss === true
+              || this.gameMode.isBoss(this.currentBattle.waveIndex)
+              || this.getEnemyParty().some(pokemon => pokemon.isBoss()),
           ),
         );
       } else if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
