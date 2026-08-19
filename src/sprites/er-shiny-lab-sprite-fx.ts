@@ -87,14 +87,33 @@ interface ApplySpriteFxOptions {
 
 interface RenderedTextureApplyOptions {
   keyPrefix: string;
-  sourceWidth: number;
-  sourceHeight: number;
+  sourceBoxX: number;
+  sourceBoxY: number;
+  sourceBoxWidth: number;
+  sourceBoxHeight: number;
   sourceOriginX: number;
   sourceOriginY: number;
   cacheKey?: string;
 }
 
-type CachedSourcePixels = ErShinyLabSourcePixels & { frame: Phaser.Textures.Frame };
+type CachedSourcePixels = ErShinyLabSourcePixels & {
+  frame: Phaser.Textures.Frame;
+  sourceBoxX: number;
+  sourceBoxY: number;
+  sourceBoxWidth: number;
+  sourceBoxHeight: number;
+};
+
+export interface SourceFrameGeometry {
+  width: number;
+  height: number;
+  drawX: number;
+  drawY: number;
+  sourceBoxX: number;
+  sourceBoxY: number;
+  sourceBoxWidth: number;
+  sourceBoxHeight: number;
+}
 
 interface RenderTextureCacheEntry {
   textureKey: string;
@@ -225,9 +244,43 @@ function sourcePixelCacheKey(source: ErShinyLabSpriteSourceRef, frame: Phaser.Te
     frame.cutHeight,
     frame.width,
     frame.height,
+    frame.realWidth,
+    frame.realHeight,
     frame.x,
     frame.y,
   ].join("|");
+}
+
+export function getErShinyLabSourceFrameGeometry(frame: {
+  cutWidth?: number;
+  cutHeight?: number;
+  width?: number;
+  height?: number;
+  realWidth?: number;
+  realHeight?: number;
+  x?: number;
+  y?: number;
+}): SourceFrameGeometry {
+  const cutWidth = Math.max(0, Math.floor(frame.cutWidth ?? frame.width ?? 0));
+  const cutHeight = Math.max(0, Math.floor(frame.cutHeight ?? frame.height ?? 0));
+  const frameX = Math.floor(frame.x ?? 0);
+  const frameY = Math.floor(frame.y ?? 0);
+  const sourceBoxWidth = Math.max(0, Math.floor(frame.realWidth ?? frame.width ?? cutWidth));
+  const sourceBoxHeight = Math.max(0, Math.floor(frame.realHeight ?? frame.height ?? cutHeight));
+  const minX = Math.min(0, frameX);
+  const minY = Math.min(0, frameY);
+  const maxX = Math.max(sourceBoxWidth, frameX + cutWidth);
+  const maxY = Math.max(sourceBoxHeight, frameY + cutHeight);
+  return {
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+    drawX: frameX - minX,
+    drawY: frameY - minY,
+    sourceBoxX: -minX,
+    sourceBoxY: -minY,
+    sourceBoxWidth,
+    sourceBoxHeight,
+  };
 }
 
 function cacheSourcePixels(cacheKey: string, pixels: CachedSourcePixels): void {
@@ -251,9 +304,7 @@ function renderTextureCacheKey(
   return `${erShinyLabSpriteFxStateKey(source, look)}|pad=${pad}|t=${finiteTime.toFixed(2)}`;
 }
 
-export function readErShinyLabSpriteSourcePixels(
-  source: ErShinyLabSpriteSourceRef,
-): (ErShinyLabSourcePixels & { frame: Phaser.Textures.Frame }) | null {
+export function readErShinyLabSpriteSourcePixels(source: ErShinyLabSpriteSourceRef): CachedSourcePixels | null {
   try {
     if (typeof document === "undefined" || !globalScene.textures.exists(source.key)) {
       return null;
@@ -274,10 +325,8 @@ export function readErShinyLabSpriteSourcePixels(
 
     const cutWidth = Math.floor(frame.cutWidth ?? frame.width ?? image.width ?? 0);
     const cutHeight = Math.floor(frame.cutHeight ?? frame.height ?? image.height ?? 0);
-    const drawX = Math.floor(frame.x ?? 0);
-    const drawY = Math.floor(frame.y ?? 0);
-    const width = Math.max(Math.floor(frame.width ?? cutWidth), drawX + cutWidth, cutWidth);
-    const height = Math.max(Math.floor(frame.height ?? cutHeight), drawY + cutHeight, cutHeight);
+    const geometry = getErShinyLabSourceFrameGeometry(frame);
+    const { width, height, drawX, drawY } = geometry;
     if (width <= 0 || height <= 0) {
       return null;
     }
@@ -291,7 +340,16 @@ export function readErShinyLabSpriteSourcePixels(
     }
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(image, frame.cutX ?? 0, frame.cutY ?? 0, cutWidth, cutHeight, drawX, drawY, cutWidth, cutHeight);
-    const pixels = { width, height, data: ctx.getImageData(0, 0, width, height).data, frame };
+    const pixels = {
+      width,
+      height,
+      data: ctx.getImageData(0, 0, width, height).data,
+      frame,
+      sourceBoxX: geometry.sourceBoxX,
+      sourceBoxY: geometry.sourceBoxY,
+      sourceBoxWidth: geometry.sourceBoxWidth,
+      sourceBoxHeight: geometry.sourceBoxHeight,
+    };
     cacheSourcePixels(cacheKey, pixels);
     return pixels;
   } catch {
@@ -384,8 +442,10 @@ function applyRenderedTextureToSprite(
   if (!key) {
     return null;
   }
-  const originX = (rendered.padding + options.sourceOriginX * options.sourceWidth) / rendered.width;
-  const originY = (rendered.padding + options.sourceOriginY * options.sourceHeight) / rendered.height;
+  const originX =
+    (rendered.padding + options.sourceBoxX + options.sourceOriginX * options.sourceBoxWidth) / rendered.width;
+  const originY =
+    (rendered.padding + options.sourceBoxY + options.sourceOriginY * options.sourceBoxHeight) / rendered.height;
   sprite.setTexture(key).setOrigin(originX, originY);
   return key;
 }
@@ -582,7 +642,10 @@ export function erShinyLabSpriteFxStateKey(
   ].join("|");
 }
 
-export function getErShinyLabBattleFxFrameMs(battlerCount: number): number {
+export function getErShinyLabBattleFxFrameMs(battlerCount: number, preserveSourceAnimation = false): number {
+  if (preserveSourceAnimation) {
+    return 100;
+  }
   if (battlerCount >= 3) {
     return 500;
   }
@@ -770,8 +833,10 @@ export function applyErShinyLabSpriteFxTexture(
   const sourceOriginY = data.sourceOriginY ?? sprite.originY;
   const key = applyRenderedTextureToSprite(sprite, rendered, {
     keyPrefix: options.keyPrefix,
-    sourceWidth: sourcePixels.width,
-    sourceHeight: sourcePixels.height,
+    sourceBoxX: sourcePixels.sourceBoxX,
+    sourceBoxY: sourcePixels.sourceBoxY,
+    sourceBoxWidth: sourcePixels.sourceBoxWidth,
+    sourceBoxHeight: sourcePixels.sourceBoxHeight,
     sourceOriginX,
     sourceOriginY,
     cacheKey: renderTextureCacheKey(source, look, renderPad, options.time ?? 0),
@@ -852,8 +917,10 @@ export class ErShinyLabSpriteFxOverlay {
     const oldKey = this.key;
     const key = applyRenderedTextureToSprite(this.sprite, rendered, {
       keyPrefix: this.keyPrefix,
-      sourceWidth: sourcePixels.width,
-      sourceHeight: sourcePixels.height,
+      sourceBoxX: sourcePixels.sourceBoxX,
+      sourceBoxY: sourcePixels.sourceBoxY,
+      sourceBoxWidth: sourcePixels.sourceBoxWidth,
+      sourceBoxHeight: sourcePixels.sourceBoxHeight,
       sourceOriginX: this.baseSprite.originX,
       sourceOriginY: this.baseSprite.originY,
       cacheKey: state,

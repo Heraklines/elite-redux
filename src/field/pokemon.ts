@@ -1764,9 +1764,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (this.erShinyLabFxTimer) {
       return;
     }
-    const frameMs = getErShinyLabBattleFxFrameMs(globalScene.currentBattle?.getBattlerCount() ?? 1);
+    const sourceFrameMs = getErShinyLabBattleFxFrameMs(
+      globalScene.currentBattle?.getBattlerCount() ?? 1,
+      isErBlackShiny(this),
+    );
     this.erShinyLabFxTimer = globalScene.time.addEvent({
-      delay: fixedInt(frameMs),
+      delay: fixedInt(sourceFrameMs),
       loop: true,
       callback: () => {
         if (!this.active || !this.visible || !this.isOnField()) {
@@ -1819,8 +1822,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       ...getErShinyLabPokemonBattleSource(this, this.isPlayer(), undefined, look),
       frame: this.getSprite().frame?.name,
     };
-    const frameMs = getErShinyLabBattleFxFrameMs(globalScene.currentBattle?.getBattlerCount() ?? 1);
-    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime(frameMs, 4_000))) {
+    const effectFrameMs = getErShinyLabBattleFxFrameMs(globalScene.currentBattle?.getBattlerCount() ?? 1);
+    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime(effectFrameMs, 4_000))) {
       this.erShinyLabFxOverlay.copyTextureTo(this.tintSprite);
       this.getSprite().setVisible(false);
       this.startErShinyLabBattleFxTimer();

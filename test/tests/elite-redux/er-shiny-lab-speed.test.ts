@@ -1,6 +1,10 @@
 import { ER_SHINY_LAB_DEFAULT_PARAMS } from "#data/elite-redux/er-shiny-lab-effects";
 import { renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
-import { getErShinyLabBattleFxFrameMs, getErShinyLabBattleFxInitialDelayMs } from "#sprites/er-shiny-lab-sprite-fx";
+import {
+  getErShinyLabBattleFxFrameMs,
+  getErShinyLabBattleFxInitialDelayMs,
+  getErShinyLabSourceFrameGeometry,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import { describe, expect, it } from "vitest";
 
 function source() {
@@ -53,5 +57,60 @@ describe("ER Shiny Lab battle render pacing", () => {
     expect(getErShinyLabBattleFxFrameMs(1)).toBe(125);
     expect(getErShinyLabBattleFxFrameMs(2)).toBe(250);
     expect(getErShinyLabBattleFxFrameMs(3)).toBe(500);
+  });
+
+  it("keeps authored Black Shiny animation frames at their native 10 FPS in every format", () => {
+    expect(getErShinyLabBattleFxFrameMs(1, true)).toBe(100);
+    expect(getErShinyLabBattleFxFrameMs(2, true)).toBe(100);
+    expect(getErShinyLabBattleFxFrameMs(3, true)).toBe(100);
+  });
+
+  it("preserves a padded Black atlas frame's negative trim and original anchor box", () => {
+    const geometry = getErShinyLabSourceFrameGeometry({
+      cutWidth: 114,
+      cutHeight: 106,
+      width: 114,
+      height: 106,
+      realWidth: 82,
+      realHeight: 80,
+      x: -16,
+      y: -10,
+    });
+
+    expect(geometry).toEqual({
+      width: 114,
+      height: 106,
+      drawX: 0,
+      drawY: 0,
+      sourceBoxX: 16,
+      sourceBoxY: 10,
+      sourceBoxWidth: 82,
+      sourceBoxHeight: 80,
+    });
+    expect(geometry.sourceBoxY + geometry.sourceBoxHeight).toBe(90);
+  });
+
+  it("leaves ordinary positive-trim atlas geometry unchanged", () => {
+    expect(
+      getErShinyLabSourceFrameGeometry({
+        cutWidth: 74,
+        cutHeight: 77,
+        width: 74,
+        height: 77,
+        realWidth: 82,
+        realHeight: 80,
+        x: 0,
+        y: 3,
+      }),
+    ).toEqual({
+      width: 82,
+      height: 80,
+      drawX: 0,
+      drawY: 3,
+      sourceBoxX: 0,
+      sourceBoxY: 0,
+      sourceBoxWidth: 82,
+      sourceBoxHeight: 80,
+    });
   });
 });
