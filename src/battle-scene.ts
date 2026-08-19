@@ -3050,9 +3050,7 @@ export class BattleScene extends SceneBase {
       return 0;
     }
 
-    if (isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex)) {
-      return getErEndlessRaidBossSegments(waveIndex);
-    }
+    const isEndlessRaid = isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex);
 
     if (this.gameMode.isDaily && this.gameMode.isWaveFinal(waveIndex)) {
       if (this.gameMode.dailyConfig?.boss?.segments != null) {
@@ -3065,6 +3063,7 @@ export class BattleScene extends SceneBase {
     const mysteryGauntletBoss = erGauntletActive() && erGauntletWaveKind(waveIndex) === "boss";
     if (
       forceBoss
+      || isEndlessRaid
       || mysteryGauntletBoss
       || (species && (species.subLegendary || species.legendary || species.mythical))
     ) {
@@ -3111,7 +3110,7 @@ export class BattleScene extends SceneBase {
       this.executeWithSeedOffset(() => {
         bars = minBars + randSeedInt(Math.max(1, maxBars - minBars + 1));
       }, waveIndex << 3);
-      return bars;
+      return isEndlessRaid ? getErEndlessRaidBossSegments(bars) : bars;
     }
 
     let ret = 2;
@@ -3124,7 +3123,7 @@ export class BattleScene extends SceneBase {
     }
     ret += Math.floor(waveIndex / 250);
 
-    return ret;
+    return isEndlessRaid ? getErEndlessRaidBossSegments(ret) : ret;
   }
 
   trySpreadPokerus(): void {

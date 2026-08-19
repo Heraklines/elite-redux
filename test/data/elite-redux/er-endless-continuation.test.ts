@@ -56,7 +56,6 @@ describe("Elite Redux Endless continuation", () => {
     initializeErEndlessContinuation(200, "normal");
     expect(getErEndlessEquivalentDepth(250)).toBe(50);
     expect(isErEndlessRaidWave(250)).toBe(true);
-    expect(getErEndlessRaidBossSegments(250)).toBe(12);
     expect(getErEndlessRateBonus(250)).toBe(1);
 
     resetErEndlessContinuation();
@@ -64,8 +63,13 @@ describe("Elite Redux Endless continuation", () => {
     initializeErEndlessContinuation(100, "sprint");
     expect(getErEndlessEquivalentDepth(125)).toBe(50);
     expect(isErEndlessRaidWave(125)).toBe(true);
-    expect(getErEndlessRaidBossSegments(125)).toBe(12);
     expect(getErEndlessRateBonus(125)).toBe(1);
+  });
+
+  it("doubles the ordinary wild boss segment count for Endless raids", () => {
+    expect(getErEndlessRaidBossSegments(2)).toBe(4);
+    expect(getErEndlessRaidBossSegments(5)).toBe(10);
+    expect(getErEndlessRaidBossSegments(7)).toBe(14);
   });
 
   it("adds one cumulative enemy health segment every 15 Normal or 7 Sprint Endless waves", () => {

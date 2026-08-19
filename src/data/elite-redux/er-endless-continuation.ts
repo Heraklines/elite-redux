@@ -342,13 +342,9 @@ export function isErEndlessRaidWave(runWave: number): boolean {
   return depth > 0 && depth % ER_ENDLESS_RAID_EQUIVALENT_INTERVAL === 0;
 }
 
-/** Every Endless raid slot is a full boss, with twice the former solo-boss segment budget. */
-export function getErEndlessRaidBossSegments(runWave: number): number {
-  return 2 * (
-    6
-    + Math.floor(getErEndlessEquivalentDepth(runWave) / 100)
-    + (isErEndlessCycleFinale(runWave) ? 2 : 0)
-  );
+/** Every Endless raid slot has twice the segments of an ordinary wild boss at that wave. */
+export function getErEndlessRaidBossSegments(wildBossSegments: number): number {
+  return Math.max(2, Math.floor(wildBossSegments)) * 2;
 }
 
 export function isErEndlessCycleFinale(runWave: number): boolean {
