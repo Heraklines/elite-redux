@@ -84,7 +84,10 @@ CREATE TABLE IF NOT EXISTS runs (
   -- ER Ghost Trainer Editor: the uploader's authored presentation (sprite/name/
   -- title/dialogue/FX) JSON blob, applied by the encountering client. Nullable +
   -- additive (existing DBs get it via the lazy ALTER in ensureRunStatColumns).
-  presentation        TEXT
+  presentation        TEXT,
+  -- ER (relics): the run's active relics at capture. This is nullable for old
+  -- clients and is added lazily to existing DBs by ensureRunStatColumns.
+  relics              TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
 -- Ghost-pool fetch (handleRunSample) walks the (wave, rowid) keyset over EVERY
