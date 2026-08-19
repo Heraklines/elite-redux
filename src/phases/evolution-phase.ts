@@ -22,6 +22,7 @@ import { notifyMoodyCoordinatorPokemonEvolved } from "#data/elite-redux/moody/mo
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { LearnMoveType } from "#enums/learn-move-type";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import { PokemonData } from "#system/pokemon-data";
@@ -30,7 +31,32 @@ import type { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { fixedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { fadeOutSoundIfActive } from "#utils/sound-fade";
+import { toPascalCase } from "#utils/strings";
 import i18next from "i18next";
+
+/**
+ * Human-readable target for a candidate evolution. Regional evolutions such as
+ * Typhlosion/Hisuian Typhlosion use separate species ids but share the same base
+ * `name`, so the plain species name makes a branched choice ambiguous. Prefer
+ * the localized expanded species/form name while remaining safe for ER custom
+ * species ids that are not represented in the vanilla SpeciesId enum.
+ */
+export function getEvolutionChoiceLabel(evolution: SpeciesFormEvolution): string {
+  const species = getPokemonSpecies(evolution.speciesId);
+  const enumSpeciesName = SpeciesId[evolution.speciesId];
+  const speciesName =
+    evolution.speciesId >= 2000 && typeof enumSpeciesName === "string"
+      ? species.getExpandedSpeciesName()
+      : species.name;
+
+  if (!evolution.evoFormKey) {
+    return speciesName;
+  }
+
+  const formIndex = species.forms.findIndex(form => form.formKey === evolution.evoFormKey);
+  const displayedFormName = formIndex >= 0 ? species.getFormNameToDisplay(formIndex, true) : "";
+  return displayedFormName || `${speciesName} (${toPascalCase(evolution.evoFormKey)})`;
+}
 
 /**
  * Only the replica renderer needs a signed structural bridge while a terminal reward evolution settles.
@@ -238,12 +264,6 @@ export class EvolutionPhase extends Phase {
     return this.scene.ui.setModeForceTransition(UiMode.EVOLUTION_SCENE);
   }
 
-  /** Human-readable target for a candidate evolution (species name, plus form key when set). */
-  private getEvolutionChoiceLabel(evolution: SpeciesFormEvolution): string {
-    const name = getPokemonSpecies(evolution.speciesId).name;
-    return evolution.evoFormKey ? `${name} (${evolution.evoFormKey})` : name;
-  }
-
   /**
    * Present the player with every currently-valid evolution and resolve with the
    * one they pick, or `null` if they back out (decline to evolve).
@@ -251,7 +271,7 @@ export class EvolutionPhase extends Phase {
   private promptEvolutionChoice(): Promise<SpeciesFormEvolution | null> {
     return new Promise(resolve => {
       const options: OptionSelectItem[] = this.evolutionChoices.map(evo => ({
-        label: this.getEvolutionChoiceLabel(evo),
+        label: getEvolutionChoiceLabel(evo),
         handler: () => {
           this.scene.ui.revertMode();
           resolve(evo);

@@ -33,11 +33,13 @@ import { modifierTypes } from "#data/data-lists";
 import {
   type GhostMember,
   type GhostTeamSnapshot,
+  getErGhostMemberCustomData,
   markTrainerAsGhost,
   sampleGhostSnapshots,
 } from "#data/elite-redux/er-ghost-teams";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { Gender } from "#data/gender";
+import { CustomPokemonData } from "#data/pokemon-data";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { ModifierTier } from "#enums/modifier-tier";
@@ -170,6 +172,7 @@ function toEnemyConfig(member: GhostMember, level: number): EnemyPokemonConfig {
   cfg.shiny = member.shiny;
   cfg.variant = member.variant as Variant;
   cfg.passive = member.passive;
+  cfg.customPokemonData = new CustomPokemonData(getErGhostMemberCustomData(member));
   return cfg;
 }
 

@@ -45,6 +45,7 @@ import {
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
+import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies";
 import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
@@ -104,6 +105,12 @@ export interface GhostMember {
   variant: number;
   passive: boolean;
   moves: number[];
+  /** ER Black Shiny: t4 identity is distinct from the ordinary red/t3 variant. */
+  erBlackShiny?: boolean | undefined;
+  /** The owner's three curated GIFT choices, preserved without rerolling. */
+  erGiftAbilities?: number[] | undefined;
+  /** Active entry in {@linkcode erGiftAbilities}. */
+  erGiftIndex?: number | undefined;
   /** ER (Graveyard ME): the items this member was holding, as
    * [modifierTypeId, stackCount, generatedTypeArgs?] tuples. Omitted when none / for legacy
    * snapshots captured before item recording (those fall back to a random
@@ -119,6 +126,47 @@ export interface GhostMember {
    * name for other players (e.g. "Glittering Rayquaza"). Omitted when unnamed.
    */
   erShinyLabName?: string | undefined;
+}
+
+/** JSON-safe CustomPokemonData fields carried by a reconstructed ghost member. */
+export interface ErGhostMemberCustomData {
+  erBlackShiny: boolean;
+  erGiftAbilities: number[];
+  erGiftIndex: number;
+  erShinyLab?: ErShinyLabSavedLook | undefined;
+  erShinyLabName?: string | undefined;
+  erShinyLabSuppressLocal: true;
+}
+
+/**
+ * Sanitize the cosmetic/black-shiny state of an untrusted cross-player member.
+ * Black is accepted only with the same shiny+variant invariant used locally;
+ * GIFT ids are restricted to the approved pool and never rerolled for ghosts.
+ */
+export function getErGhostMemberCustomData(member: GhostMember): ErGhostMemberCustomData {
+  const erBlackShiny = member.erBlackShiny === true && member.shiny === true && member.variant === 2;
+  const erGiftAbilities = erBlackShiny && Array.isArray(member.erGiftAbilities)
+    ? [...new Set(member.erGiftAbilities)]
+      .filter(id => Number.isInteger(id) && ER_BLACK_SHINY_ABILITY_POOL.includes(id))
+      .slice(0, 3)
+    : [];
+  const requestedGiftIndex = Number.isInteger(member.erGiftIndex) ? member.erGiftIndex! : 0;
+  const erGiftIndex = erGiftAbilities.length > 0
+    ? Math.max(0, Math.min(erGiftAbilities.length - 1, requestedGiftIndex))
+    : 0;
+  const erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
+  const erShinyLabName = erShinyLab
+    ? sanitizeErShinyLabPresetName(member.erShinyLabName) || undefined
+    : undefined;
+
+  return {
+    erBlackShiny,
+    erGiftAbilities,
+    erGiftIndex,
+    erShinyLab,
+    erShinyLabName,
+    erShinyLabSuppressLocal: true,
+  };
 }
 
 export interface GhostTeamSnapshot {
@@ -602,6 +650,18 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
   const heldItems = serializeHeldItems(p, isPlayer);
   const erShinyLab = serializeShinyLabLook(p);
   const erShinyLabName = serializeShinyLabName(p);
+  const erBlackShiny = p?.customPokemonData?.erBlackShiny === true && p?.shiny === true && p?.variant === 2;
+  const erGiftAbilities = erBlackShiny && Array.isArray(p?.customPokemonData?.erGiftAbilities)
+    ? [...new Set<number>(p.customPokemonData.erGiftAbilities)]
+      .filter(id => Number.isInteger(id) && ER_BLACK_SHINY_ABILITY_POOL.includes(id))
+      .slice(0, 3)
+    : [];
+  const requestedGiftIndex = Number.isInteger(p?.customPokemonData?.erGiftIndex)
+    ? p.customPokemonData.erGiftIndex
+    : 0;
+  const erGiftIndex = erGiftAbilities.length > 0
+    ? Math.max(0, Math.min(erGiftAbilities.length - 1, requestedGiftIndex))
+    : 0;
   return {
     speciesId: p?.species?.speciesId ?? 0,
     formIndex: p?.formIndex ?? 0,
@@ -614,6 +674,8 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     variant: p?.variant ?? 0,
     passive: !!p?.passive,
     moves,
+    ...(erBlackShiny ? { erBlackShiny: true } : {}),
+    ...(erGiftAbilities.length > 0 ? { erGiftAbilities, erGiftIndex } : {}),
     ...(heldItems.length > 0 ? { heldItems } : {}),
     ...(erShinyLab ? { erShinyLab } : {}),
     ...(erShinyLabName ? { erShinyLabName } : {}),
@@ -2136,10 +2198,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     enemy.shiny = member.shiny;
     enemy.variant = member.variant as Variant;
     enemy.passive = member.passive;
-    enemy.customPokemonData.erShinyLabSuppressLocal = true;
-    enemy.customPokemonData.erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
-    enemy.customPokemonData.erShinyLabName =
-      member.shiny && member.erShinyLab ? sanitizeErShinyLabPresetName(member.erShinyLabName) || undefined : undefined;
+    Object.assign(enemy.customPokemonData, getErGhostMemberCustomData(member));
     if (member.moves.length > 0 && speciesMatchesStored) {
       const moves = member.moves.map(id => new PokemonMove(id));
       enemy.moveset = moves;

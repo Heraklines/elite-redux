@@ -17,7 +17,9 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { SpeciesEvolution } from "#balance/pokemon-evolutions";
 import { SpeciesId } from "#enums/species-id";
+import { getEvolutionChoiceLabel } from "#phases/evolution-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -70,5 +72,21 @@ describe.skipIf(!RUN)("ER branched-evolution choice", () => {
     const karp = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.MAGIKARP), 5);
     expect(karp.getValidEvolutions()).toHaveLength(0);
     expect(karp.getEvolution()).toBeNull();
+  });
+
+  it("gives separate regional species readable, distinct evolution labels", async () => {
+    await game.classicMode.startBattle([SpeciesId.CYNDAQUIL]);
+
+    const typhlosion = getEvolutionChoiceLabel(new SpeciesEvolution(SpeciesId.TYPHLOSION, 36, null, null));
+    const hisuiTyphlosion = getEvolutionChoiceLabel(new SpeciesEvolution(SpeciesId.HISUI_TYPHLOSION, 36, null, null));
+    const samurott = getEvolutionChoiceLabel(new SpeciesEvolution(SpeciesId.SAMUROTT, 36, null, null));
+    const hisuiSamurott = getEvolutionChoiceLabel(new SpeciesEvolution(SpeciesId.HISUI_SAMUROTT, 36, null, null));
+
+    expect(typhlosion).toBe("Typhlosion");
+    expect(hisuiTyphlosion).toContain("Hisuian");
+    expect(hisuiTyphlosion).not.toBe(typhlosion);
+    expect(samurott).toBe("Samurott");
+    expect(hisuiSamurott).toContain("Hisuian");
+    expect(hisuiSamurott).not.toBe(samurott);
   });
 });

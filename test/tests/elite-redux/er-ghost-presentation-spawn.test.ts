@@ -20,10 +20,13 @@
 // reliable spawn. ER_SCENARIO=1 gated.
 // =============================================================================
 
+import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import {
+  captureGhostTeam,
   type GhostTeamSnapshot,
   hasErGhostOverride,
+  resetErGhostRunState,
   setPrefetchedGhostTeamsForTests,
 } from "#data/elite-redux/er-ghost-teams";
 import { AbilityId } from "#enums/ability-id";
@@ -85,11 +88,13 @@ describe.skipIf(!RUN)("ER Ghost Trainer Editor - authored presentation surfaces 
   });
 
   beforeEach(() => {
+    resetErGhostRunState();
     game = new GameManager(phaserGame);
     game.override.battleStyle("single").startingWave(5).startingLevel(10).ability(AbilityId.BALL_FETCH);
   });
 
   afterEach(() => {
+    resetErGhostRunState();
     setPrefetchedGhostTeamsForTests([]);
     for (const c of game.scene.gameMode?.challenges ?? []) {
       c.value = 0;
@@ -133,5 +138,54 @@ describe.skipIf(!RUN)("ER Ghost Trainer Editor - authored presentation surfaces 
     expect(defeat).toContain("Snorlax"); // {lead} -> Snorlax
     expect(defeat).toContain("was never enough");
     expect(defeat).not.toMatch(/\{(player|lead|ace|slayer)\}/);
+  });
+
+  it("captures black-shiny identity and the owner's selected GIFT", async () => {
+    const giftAbilities = ER_BLACK_SHINY_ABILITY_POOL.slice(0, 3);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const source = game.scene.getPlayerParty()[0];
+    source.shiny = true;
+    source.variant = 2;
+    source.customPokemonData.erBlackShiny = true;
+    source.customPokemonData.erGiftAbilities = [...giftAbilities];
+    source.customPokemonData.erGiftIndex = 1;
+
+    const captured = captureGhostTeam(false);
+    expect(captured?.party[0]).toMatchObject({
+      shiny: true,
+      variant: 2,
+      erBlackShiny: true,
+      erGiftAbilities: giftAbilities,
+      erGiftIndex: 1,
+    });
+  });
+
+  it("reconstructs black-shiny identity and the owner's selected GIFT", async () => {
+    const giftAbilities = ER_BLACK_SHINY_ABILITY_POOL.slice(0, 3);
+    const blackSnapshot: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "ghost-black-shiny-1",
+      party: [
+        {
+          ...SNAPSHOT.party[0],
+          shiny: true,
+          variant: 2,
+          erBlackShiny: true,
+          erGiftAbilities: [...giftAbilities],
+          erGiftIndex: 1,
+        },
+      ],
+    };
+    setPrefetchedGhostTeamsForTests([blackSnapshot]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.MAGIKARP);
+
+    const reconstructed = game.scene.getEnemyParty()[0];
+    expect(reconstructed.shiny).toBe(true);
+    expect(reconstructed.variant).toBe(2);
+    expect(reconstructed.customPokemonData.erBlackShiny).toBe(true);
+    expect(reconstructed.customPokemonData.erGiftAbilities).toEqual(giftAbilities);
+    expect(reconstructed.customPokemonData.erGiftIndex).toBe(1);
+    expect(reconstructed.getLuck()).toBe(5);
   });
 });

@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
+import { SpeciesEvolution } from "#balance/pokemon-evolutions";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
@@ -92,6 +93,7 @@ import {
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { getEvolutionChoiceLabel } from "#phases/evolution-phase";
 import { playErTransformMorph } from "#sprites/er-form-transform-fx";
 import { achvs } from "#system/achv";
 import { VoucherType } from "#system/voucher";
@@ -182,6 +184,8 @@ interface Recipe {
    */
   steps?: Button[];
   expectThrow?: boolean;
+  /** Render/assert a diagnostic page without creating a committed pixel baseline. */
+  skipGolden?: boolean;
   /**
    * Stepped-animation mode: capture this many successive LIVE frames (no freeze) as
    * `<page>-frameNN.png` after the page is built + input fired. Turns the still into a
@@ -2259,6 +2263,30 @@ const RECIPES: Record<string, Recipe> = {
     // (ACTION -> setStormglassWeather) is exercised by er-stormglass-picker.test.ts.
     steps: [Button.DOWN],
   },
+  // Exact regional evolution picker. Its geometry assertion uses the real
+  // canvas-backed text metrics (the ordinary headless UI mocks report width 0).
+  "evolution-regional-choice": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: () => [
+      {
+        options: [
+          new SpeciesEvolution(SpeciesId.TYPHLOSION, 36, null, null),
+          new SpeciesEvolution(SpeciesId.HISUI_TYPHLOSION, 36, null, null),
+          new SpeciesEvolution(SpeciesId.SAMUROTT, 36, null, null),
+          new SpeciesEvolution(SpeciesId.HISUI_SAMUROTT, 36, null, null),
+        ].map(evolution => ({
+          label: getEvolutionChoiceLabel(evolution),
+          handler: () => true,
+        })),
+      },
+    ],
+    afterShow: handler => {
+      expect(handler.optionSelectText.displayWidth).toBeGreaterThan(0);
+      expect(handler.optionSelectBg.width).toBeGreaterThanOrEqual(handler.optionSelectText.displayWidth + 24);
+    },
+    steps: [Button.DOWN],
+    skipGolden: true,
+  },
   // The ER Ability Capsule top-level choice (maintainer request). ErAbilityCapsulePhase
   // shows this OPTION_SELECT first: "Change ability" (cycle) / "Unlock an innate for the
   // run" / Cancel. The golden render confirms both option labels render legibly; DOWN walks
@@ -3143,7 +3171,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
 
     // --- Golden-image regression gate -------------------------------------------------
     // Skip the SIMULATE_MISSING variant and crash-repro recipes (not stable baselines).
-    if (!SIMULATE_MISSING && !recipe.expectThrow && !recipe.captureActive) {
+    if (!SIMULATE_MISSING && !recipe.expectThrow && !recipe.captureActive && !recipe.skipGolden) {
       const baseline = join(BASELINE_DIR, `${PAGE}.png`);
       if (UPDATE_BASELINE || !existsSync(baseline)) {
         mkdirSync(BASELINE_DIR, { recursive: true });
