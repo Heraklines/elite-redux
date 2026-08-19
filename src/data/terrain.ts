@@ -3,7 +3,7 @@ import type { BattlerIndex } from "#enums/battler-index";
 import { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
-import { isFieldTargeted, isSpreadMove } from "#moves/move-utils";
+import { isFieldTargeted } from "#moves/move-utils";
 import type { RGBArray } from "#types/sprite-types";
 import i18next from "i18next";
 
@@ -112,7 +112,6 @@ export class Terrain {
         // Cf https://bulbapedia.bulbagarden.net/wiki/Psychic_Terrain_(move)#Generation_VII
         return (
           !isFieldTargeted(move)
-          && !isSpreadMove(move)
           && move.getPriority(user) > 0
           && user.getOpponents(true).some(o => targets.includes(o.getBattlerIndex()) && o.isGrounded())
         );
