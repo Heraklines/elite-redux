@@ -32,7 +32,7 @@ import { CustomPokemonData } from "#data/pokemon/pokemon-data";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -258,6 +258,7 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
     afterEach(() => {
       O.ER_BLACK_SHINY_ENEMY_OVERRIDE = null;
       O.ER_BLACK_SHINY_PLAYER_OVERRIDE = null;
+      vi.restoreAllMocks();
     });
 
     it("forces the enemy black at GENERATION - black atlas resolves before the first frame", async () => {
@@ -305,6 +306,23 @@ describe.skipIf(!RUN)("ER Black Shinies (#349)", () => {
       expect(player.variant).toBe(2);
       expect(player.getSpriteAtlasPath()).toMatch(/^black\//);
       expect(isErBlackShiny(game.scene.getEnemyPokemon()!)).toBe(false);
+    });
+
+    it("loads Black Shiny non-sprite assets without decoding the hidden red atlas", async () => {
+      O.ER_BLACK_SHINY_PLAYER_OVERRIDE = SpeciesId.SNORLAX;
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+      const player = game.scene.getPlayerPokemon()!;
+      const speciesForm = player.getSpeciesForm(false, false);
+      const ordinaryAtlasLoad = vi.spyOn(speciesForm, "loadAssets").mockResolvedValue();
+      const nonSpriteLoad = vi.spyOn(speciesForm, "loadNonSpriteAssets").mockResolvedValue();
+
+      await player.loadAssets();
+
+      expect(nonSpriteLoad).toHaveBeenCalledWith(player.formIndex);
+      expect(ordinaryAtlasLoad).not.toHaveBeenCalled();
+      expect(player.getBattleSpriteAtlasPath(false)).toMatch(/^black\//);
+      expect(player.getBattleSpriteAtlasPath(true)).toMatch(/^black\//);
     });
   });
 });

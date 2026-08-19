@@ -341,6 +341,7 @@ import { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
   getErShinyLabBattleFxFrameMs,
+  getErShinyLabBattleFxInitialDelayMs,
   getErShinyLabNamePrefixForPokemon,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpriteFxLookForPokemon,
@@ -556,6 +557,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   private tintSprite: Phaser.GameObjects.Sprite | null = null;
   private erShinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
   private erShinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
+  private erShinyLabFxPendingRefresh: Phaser.Time.TimerEvent | null = null;
 
   /**
    * The set of all TMs that have been used on this Pokémon
@@ -1045,13 +1047,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     // Load the assets for the species form
     const formIndex = useIllusion ? illusion!.formIndex : this.formIndex;
+    const hasAuthoredBlackAtlas =
+      isErBlackShiny(this) && this.getBattleSpriteAtlasPath(false, ignoreOverride).startsWith("black/");
+    const speciesForm = this.getSpeciesForm(false, useIllusion);
     loadPromises.push(
-      this.getSpeciesForm(false, useIllusion).loadAssets(
-        this.getGender(useIllusion) === Gender.FEMALE,
-        formIndex,
-        this.isShiny(useIllusion),
-        this.getVariant(useIllusion),
-      ),
+      hasAuthoredBlackAtlas
+        ? speciesForm.loadNonSpriteAssets(formIndex)
+        : speciesForm.loadAssets(
+            this.getGender(useIllusion) === Gender.FEMALE,
+            formIndex,
+            this.isShiny(useIllusion),
+            this.getVariant(useIllusion),
+          ),
     );
 
     // Showdown 1v1 (C5): the versus GUEST's OWN team (authoritatively ENEMY instances) renders BACK
@@ -1727,8 +1734,30 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   playAnim(): void {
     if (this.tryPlaySprite(this.getSprite(), this.getTintSprite(), this.getBattleSpriteKey())) {
-      this.refreshErShinyLabBattleFx();
+      this.scheduleErShinyLabBattleFxRefresh();
     }
+  }
+
+  private scheduleErShinyLabBattleFxRefresh(): void {
+    const look = getErShinyLabSpriteFxLookForPokemon(this);
+    if (!hasErShinyLabExactSpriteFx(look)) {
+      this.refreshErShinyLabBattleFx();
+      return;
+    }
+    this.erShinyLabFxPendingRefresh?.remove();
+    const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 1;
+    const delay = getErShinyLabBattleFxInitialDelayMs(battlerCount, this.getBattlerIndex());
+    if (delay <= 0) {
+      this.erShinyLabFxPendingRefresh = null;
+      this.refreshErShinyLabBattleFx();
+      return;
+    }
+    this.erShinyLabFxPendingRefresh = globalScene.time.delayedCall(fixedInt(delay), () => {
+      this.erShinyLabFxPendingRefresh = null;
+      if (this.active && this.visible && this.isOnField()) {
+        this.refreshErShinyLabBattleFx();
+      }
+    });
   }
 
   private startErShinyLabBattleFxTimer(): void {
@@ -1751,6 +1780,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   private stopErShinyLabBattleFxTimer(): void {
     this.erShinyLabFxTimer?.remove();
     this.erShinyLabFxTimer = null;
+    this.erShinyLabFxPendingRefresh?.remove();
+    this.erShinyLabFxPendingRefresh = null;
   }
 
   private restoreErShinyLabTintSprite(): void {

@@ -103,6 +103,7 @@ interface RenderTextureCacheEntry {
 }
 
 const ER_SHINY_LAB_RENDER_TEXTURE_CACHE_MAX = 240;
+const ER_SHINY_LAB_SOURCE_PIXEL_CACHE_MAX = 192;
 const sourcePixelCache = new Map<string, CachedSourcePixels>();
 const renderTextureCache = new Map<string, RenderTextureCacheEntry>();
 const renderTextureKeyToCacheKey = new Map<string, string>();
@@ -229,6 +230,17 @@ function sourcePixelCacheKey(source: ErShinyLabSpriteSourceRef, frame: Phaser.Te
   ].join("|");
 }
 
+function cacheSourcePixels(cacheKey: string, pixels: CachedSourcePixels): void {
+  sourcePixelCache.set(cacheKey, pixels);
+  while (sourcePixelCache.size > ER_SHINY_LAB_SOURCE_PIXEL_CACHE_MAX) {
+    const oldestKey = sourcePixelCache.keys().next().value;
+    if (oldestKey === undefined) {
+      return;
+    }
+    sourcePixelCache.delete(oldestKey);
+  }
+}
+
 function renderTextureCacheKey(
   source: ErShinyLabSpriteSourceRef,
   look: ErShinyLabSpriteFxLook,
@@ -255,6 +267,8 @@ export function readErShinyLabSpriteSourcePixels(
     const cacheKey = sourcePixelCacheKey(source, frame);
     const cached = sourcePixelCache.get(cacheKey);
     if (cached) {
+      sourcePixelCache.delete(cacheKey);
+      sourcePixelCache.set(cacheKey, cached);
       return cached;
     }
 
@@ -278,7 +292,7 @@ export function readErShinyLabSpriteSourcePixels(
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(image, frame.cutX ?? 0, frame.cutY ?? 0, cutWidth, cutHeight, drawX, drawY, cutWidth, cutHeight);
     const pixels = { width, height, data: ctx.getImageData(0, 0, width, height).data, frame };
-    sourcePixelCache.set(cacheKey, pixels);
+    cacheSourcePixels(cacheKey, pixels);
     return pixels;
   } catch {
     return null;
@@ -576,6 +590,16 @@ export function getErShinyLabBattleFxFrameMs(battlerCount: number): number {
     return 250;
   }
   return 125;
+}
+
+/** Spread CPU-rendered overlays across frames when both triple sides summon together. */
+export function getErShinyLabBattleFxInitialDelayMs(battlerCount: number, battlerIndex: number): number {
+  if (battlerCount < 3) {
+    return 0;
+  }
+  const activeSlots = battlerCount * 2;
+  const slot = ((Math.floor(battlerIndex) % activeSlots) + activeSlots) % activeSlots;
+  return slot * 24;
 }
 
 export function getErShinyLabSpriteFxTime(frameMs = 100, loopMs = 0): number {
