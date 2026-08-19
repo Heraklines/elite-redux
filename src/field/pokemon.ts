@@ -3026,7 +3026,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       );
       if (
         canonicalIds.length !== this.customPokemonData.erEndlessAvalancheAbilities.length
-        || canonicalIds.some((abilityId, index) => abilityId !== this.customPokemonData.erEndlessAvalancheAbilities[index])
+        || canonicalIds.some(
+          (abilityId, index) => abilityId !== this.customPokemonData.erEndlessAvalancheAbilities[index],
+        )
       ) {
         this.customPokemonData.erEndlessAvalancheAbilities = canonicalIds;
       }

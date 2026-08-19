@@ -2900,7 +2900,7 @@ async function handleRunSample(
     }
   }
   const chosen = chosenCandidates.map(candidate => candidate.rid);
-  let results: RunSampleRow[] = [];
+  const results: RunSampleRow[] = [];
   for (let offset = 0; offset < chosen.length; offset += 90) {
     const chunk = chosen.slice(offset, offset + 90);
     const placeholders = chunk.map((_, i) => `?${i + 1}`).join(", ");

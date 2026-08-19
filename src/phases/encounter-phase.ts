@@ -58,6 +58,7 @@ import type {
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
+import { pickErEndlessRaidBoss } from "#data/elite-redux/er-endless-bosses";
 import {
   consumeErEndlessRift,
   getErEndlessBonusSegmentBudget,
@@ -65,7 +66,6 @@ import {
   isErEndlessContinuationActive,
   isErEndlessRaidWave,
 } from "#data/elite-redux/er-endless-continuation";
-import { pickErEndlessRaidBoss } from "#data/elite-redux/er-endless-bosses";
 import { applyErEndlessBattleStart, prepareErEndlessBattleRuntime } from "#data/elite-redux/er-endless-rift-runtime";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { rollFunTerrain, rollFunWeather } from "#data/elite-redux/er-fun-mode";
@@ -1337,10 +1337,7 @@ export class EncounterPhase extends BattlePhase {
             raidBoss.calculateStats();
             raidBoss.hp = raidBoss.getMaxHp();
             raidBoss.updateScale();
-            raidBoss.setBoss(
-              true,
-              globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies, true),
-            );
+            raidBoss.setBoss(true, globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies, true));
           }
           applyMoodyCoordinatorWildEncounter(battle.enemyParty[e]);
           if (globalScene.currentBattle.isClassicFinalBoss) {
@@ -1432,9 +1429,8 @@ export class EncounterPhase extends BattlePhase {
     });
 
     if (isErEndlessContinuationActive()) {
-      const endlessGhostSnapshot = battle.trainer && hasErGhostOverride(battle.trainer)
-        ? getErGhostSnapshot(battle.trainer)
-        : null;
+      const endlessGhostSnapshot =
+        battle.trainer && hasErGhostOverride(battle.trainer) ? getErGhostSnapshot(battle.trainer) : null;
       if (endlessGhostSnapshot && hasErEndlessRift("grave-return")) {
         const runtime = prepareErEndlessBattleRuntime();
         if (runtime) {

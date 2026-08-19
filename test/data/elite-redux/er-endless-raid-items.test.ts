@@ -44,17 +44,21 @@ function snapshot(id: string, party: GhostMember[]): GhostTeamSnapshot {
 
 describe("Elite Redux Endless raid ghost item loadouts", () => {
   it("prefers one real ghost member carrying at least ten saved stacks", () => {
-    const loadout = selectErEndlessBossHeldItems([
-      snapshot("large-member", [member([["LEFTOVERS", 11]])]),
-      snapshot("spread-team", [member([["WIDE_LENS", 6]]), member([["SHELL_BELL", 5]])]),
-    ], "fixed");
-    expect(loadout).toEqual([["LEFTOVERS", 11, undefined]]);
+    const loadout = selectErEndlessBossHeldItems(
+      [
+        snapshot("large-member", [member([["LEFTOVERS", 11]])]),
+        snapshot("spread-team", [member([["WIDE_LENS", 6]]), member([["SHELL_BELL", 5]])]),
+      ],
+      "fixed",
+    );
+    expect(loadout).toEqual([["LEFTOVERS", 11]]);
   });
 
   it("falls back to a victorious team's combined ten-stack inventory", () => {
-    const loadout = selectErEndlessBossHeldItems([
-      snapshot("spread-team", [member([["WIDE_LENS", 6]]), member([["SHELL_BELL", 5]])]),
-    ], "fixed");
+    const loadout = selectErEndlessBossHeldItems(
+      [snapshot("spread-team", [member([["WIDE_LENS", 6]]), member([["SHELL_BELL", 5]])])],
+      "fixed",
+    );
     expect(loadout.reduce((sum, [, stack]) => sum + stack, 0)).toBe(11);
     expect(loadout.map(([typeId]) => typeId)).toEqual(["WIDE_LENS", "SHELL_BELL"]);
   });

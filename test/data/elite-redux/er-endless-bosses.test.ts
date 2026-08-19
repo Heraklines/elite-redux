@@ -6,10 +6,7 @@
 
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
-import {
-  getErEndlessRaidBossPool,
-  resetErEndlessRaidBossPoolForTests,
-} from "#data/elite-redux/er-endless-bosses";
+import { getErEndlessRaidBossPool, resetErEndlessRaidBossPoolForTests } from "#data/elite-redux/er-endless-bosses";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -22,17 +19,13 @@ describe("Elite Redux Endless raid boss pool", () => {
     expect(pool.length).toBeGreaterThan(1);
     expect(pool.length).toBeLessThanOrEqual(20);
     for (const candidate of pool) {
-      if (candidate.species.speciesId !== ErSpeciesId.CASCOON_PRIMAL) {
+      if (Number(candidate.species.speciesId) !== ErSpeciesId.CASCOON_PRIMAL) {
         const root = candidate.species.getRootSpeciesId(true);
         expect(starterCosts[root]).toBeGreaterThanOrEqual(10);
         const strongestLineTotal = allSpecies
           .filter(species => species.getRootSpeciesId(true) === root)
           .reduce(
-            (best, species) => Math.max(
-              best,
-              species.baseTotal,
-              ...species.forms.map(form => form.baseTotal),
-            ),
+            (best, species) => Math.max(best, species.baseTotal, ...species.forms.map(form => form.baseTotal)),
             0,
           );
         expect(candidate.baseTotal).toBe(strongestLineTotal);
@@ -45,8 +38,8 @@ describe("Elite Redux Endless raid boss pool", () => {
 
   it("keeps Primal Cascoon and always uses Mega Moltres Ex", () => {
     const pool = getErEndlessRaidBossPool();
-    expect(pool.some(candidate => candidate.species.speciesId === ErSpeciesId.CASCOON_PRIMAL)).toBe(true);
-    const moltresEx = pool.find(candidate => candidate.species.speciesId === ErSpeciesId.MOLTRES_EX);
+    expect(pool.some(candidate => Number(candidate.species.speciesId) === ErSpeciesId.CASCOON_PRIMAL)).toBe(true);
+    const moltresEx = pool.find(candidate => Number(candidate.species.speciesId) === ErSpeciesId.MOLTRES_EX);
     expect(moltresEx).toBeDefined();
     expect(moltresEx?.species.forms[moltresEx.formIndex]?.formKey).toMatch(/mega/i);
   });

@@ -4476,12 +4476,7 @@ export class BattleScene extends SceneBase {
     const relicBudgetMultiplier = getErEndlessNemesisRelicBudgetMultiplier(snapshot.endlessNemesisRank ?? 0);
 
     for (let i = 0; i < party.length; i++) {
-      this.addErHeldItemLoadout(
-        party[i],
-        snapshot.party[i]?.heldItems ?? [],
-        `${snapshot.id}:ghost-held-item`,
-        i,
-      );
+      this.addErHeldItemLoadout(party[i], snapshot.party[i]?.heldItems ?? [], `${snapshot.id}:ghost-held-item`, i);
     }
 
     for (const [rawKind, rawStack, rawWeather] of snapshot.relics ?? []) {
@@ -4522,9 +4517,10 @@ export class BattleScene extends SceneBase {
     return new Promise(resolve => {
       this.clearErEnemyRelics();
       if (isErEndlessContinuationActive()) {
-        const snapshot = this.currentBattle.trainer && hasErGhostOverride(this.currentBattle.trainer)
-          ? getErGhostSnapshot(this.currentBattle.trainer)
-          : null;
+        const snapshot =
+          this.currentBattle.trainer && hasErGhostOverride(this.currentBattle.trainer)
+            ? getErGhostSnapshot(this.currentBattle.trainer)
+            : null;
         setMoodyEnemyBoonLoadout(
           generateEndlessEnemyBoonLoadout(
             this.getEnemyParty(),

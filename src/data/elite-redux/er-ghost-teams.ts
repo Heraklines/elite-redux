@@ -448,11 +448,9 @@ export function selectErEndlessBossHeldItems(
     .filter(items => heldItemStackTotal(items) >= minimumStacks);
   const candidates = memberLoadouts.length > 0 ? memberLoadouts : teamLoadouts;
   const selected = candidates[stableGhostItemIndex(selectionKey, candidates.length)] ?? [];
-  return selected.map(([typeId, stack, args]) => [
-    typeId,
-    stack,
-    Array.isArray(args) ? structuredClone(args) : undefined,
-  ]);
+  return selected.map(([typeId, stack, args]): ErGhostHeldItem =>
+    Array.isArray(args) ? [typeId, stack, structuredClone(args)] : [typeId, stack]
+  );
 }
 
 /** Saved ghost loadout for one Endless raid party slot. */
