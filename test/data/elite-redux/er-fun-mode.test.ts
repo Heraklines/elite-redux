@@ -19,6 +19,7 @@ import {
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
   DEFAULT_FUN_MODE_CONFIG,
+  extendEndlessAbilityAvalancheIds,
   getEndlessAbilityAvalancheIds,
   getFunAbilityAvalancheCount,
   getFunAbilityAvalancheIds,
@@ -275,6 +276,29 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
 
     first.pop();
     expect(getEndlessAbilityAvalancheIds(0xa11a0002, 12, [...excluded].reverse(), 99)).toHaveLength(12);
+  });
+
+  it("appends newly earned Endless Avalanche abilities without rerolling existing slots", () => {
+    const initialExcluded = [allAbilities[1].id, allAbilities[2].id];
+    const first = extendEndlessAbilityAvalancheIds(0xa11a0003, 3, [], initialExcluded);
+    const changedBattleExclusions = [allAbilities[3].id, allAbilities[4].id, allAbilities[5].id];
+    const later = extendEndlessAbilityAvalancheIds(0xa11a0003, 5, first, changedBattleExclusions, 99);
+
+    expect(first).toHaveLength(3);
+    expect(later).toHaveLength(5);
+    expect(later.slice(0, first.length)).toEqual(first);
+    expect(new Set(later).size).toBe(later.length);
+    expect(extendEndlessAbilityAvalancheIds(0xa11a0003, 5, later, [], 12345)).toEqual(later);
+  });
+
+  it("serializes each Pokemon's canonical Endless Avalanche sequence", () => {
+    const original = new CustomPokemonData();
+    original.erEndlessAvalancheAbilities = [allAbilities[1].id, allAbilities[2].id];
+
+    const restored = new CustomPokemonData(JSON.parse(JSON.stringify(original)));
+    expect(restored.erEndlessAvalancheAbilities).toEqual(original.erEndlessAvalancheAbilities);
+    restored.erEndlessAvalancheAbilities.pop();
+    expect(original.erEndlessAvalancheAbilities).toHaveLength(2);
   });
 
   it("retains learn levels while excluding unavailable moves", () => {

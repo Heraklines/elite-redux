@@ -60,11 +60,12 @@ import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievem
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import {
   consumeErEndlessRift,
-  getErEndlessEquivalentDepth,
+  getErEndlessBonusSegmentBudget,
   hasErEndlessRift,
   isErEndlessContinuationActive,
   isErEndlessRaidWave,
 } from "#data/elite-redux/er-endless-continuation";
+import { pickErEndlessRaidBoss } from "#data/elite-redux/er-endless-bosses";
 import { applyErEndlessBattleStart, prepareErEndlessBattleRuntime } from "#data/elite-redux/er-endless-rift-runtime";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { rollFunTerrain, rollFunWeather } from "#data/elite-redux/er-fun-mode";
@@ -97,7 +98,6 @@ import {
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
-import { ErSpeciesId } from "#enums/er-species-id";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -1287,19 +1287,19 @@ export class EncounterPhase extends BattlePhase {
         } else {
           let enemySpecies = globalScene.randomSpecies(battle.waveIndex, level, true);
           const endlessRaid = isErEndlessRaidWave(battle.waveIndex);
+          let endlessRaidFormIndex = 0;
           if (endlessRaid) {
-            const raidMinions = [
-              SpeciesId.DUSTOX,
-              SpeciesId.BEAUTIFLY,
-              SpeciesId.BEEDRILL,
-              SpeciesId.VESPIQUEN,
-              SpeciesId.VOLCARONA,
-              SpeciesId.SCIZOR,
-            ] as const;
-            enemySpecies =
-              e === 0
-                ? getPokemonSpecies(ErSpeciesId.CASCOON_PRIMAL as SpeciesId)
-                : getPokemonSpecies(raidMinions[(e - 1) % raidMinions.length]);
+            let roll = 0;
+            globalScene.executeWithSeedOffset(
+              () => {
+                roll = randSeedInt(0x7fffffff);
+              },
+              e,
+              `er-endless-raid-boss:${battle.waveIndex}`,
+            );
+            const bossChoice = pickErEndlessRaidBoss(roll);
+            enemySpecies = bossChoice.species;
+            endlessRaidFormIndex = bossChoice.formIndex;
           }
           // Elite Redux: on Elite/Hell the classic final boss (Eternatus) is
           // replaced by a two-phase Cascoon → Primal Cascoon encounter.
@@ -1311,6 +1311,7 @@ export class EncounterPhase extends BattlePhase {
           // If player has golden bug net, rolls 10% chance to replace non-boss wave wild species from the golden bug net bug pool
           if (
             globalScene.findModifier(m => m instanceof BoostBugSpawnModifier)
+            && !endlessRaid
             && !globalScene.gameMode.isBoss(battle.waveIndex)
             && globalScene.arena.biomeId !== BiomeId.END
             && randSeedInt(10) === 0
@@ -1321,18 +1322,25 @@ export class EncounterPhase extends BattlePhase {
             enemySpecies,
             level,
             TrainerSlot.NONE,
-            endlessRaid ? e === 0 : !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
+            endlessRaid || !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
           );
           if (endlessRaid) {
-            if (e === 0) {
-              battle.enemyParty[e].setBoss(
-                true,
-                globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies, true),
-              );
+            const raidBoss = battle.enemyParty[e];
+            raidBoss.formIndex = Math.min(endlessRaidFormIndex, Math.max(0, raidBoss.species.forms.length - 1));
+            const abilityCount = raidBoss.getSpeciesForm().getAbilityCount();
+            raidBoss.abilityIndex = Math.min(raidBoss.abilityIndex, Math.max(0, abilityCount - 1));
+            raidBoss.generateAndPopulateMoveset();
+            if (isErFinalBossSpecies(raidBoss.species.speciesId)) {
               battle.enemyParty[e].moveset = CASCOON_ANGELS_WRATH_MOVES.map(([, moveId]) => new PokemonMove(moveId));
-            } else {
-              battle.enemyParty[e].setBoss(true, 1 + Math.floor(getErEndlessEquivalentDepth(battle.waveIndex) / 400));
             }
+            raidBoss.generateName();
+            raidBoss.calculateStats();
+            raidBoss.hp = raidBoss.getMaxHp();
+            raidBoss.updateScale();
+            raidBoss.setBoss(
+              true,
+              globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies, true),
+            );
           }
           applyMoodyCoordinatorWildEncounter(battle.enemyParty[e]);
           if (globalScene.currentBattle.isClassicFinalBoss) {
@@ -1423,54 +1431,63 @@ export class EncounterPhase extends BattlePhase {
       return true;
     });
 
-    if (isErEndlessContinuationActive() && battle.trainer && hasErGhostOverride(battle.trainer)) {
-      if (hasErEndlessRift("grave-return")) {
+    if (isErEndlessContinuationActive()) {
+      const endlessGhostSnapshot = battle.trainer && hasErGhostOverride(battle.trainer)
+        ? getErGhostSnapshot(battle.trainer)
+        : null;
+      if (endlessGhostSnapshot && hasErEndlessRift("grave-return")) {
         const runtime = prepareErEndlessBattleRuntime();
         if (runtime) {
           runtime.graveReturnAvailable = true;
         }
       }
-      const depth = getErEndlessEquivalentDepth(battle.waveIndex);
-      let segmentBudget = 1 + Math.floor(depth / 50);
+      const segmentBudget = getErEndlessBonusSegmentBudget(battle.waveIndex);
       const ranked = [...battle.enemyParty].toSorted((left, right) => {
         const threat = (pokemon: EnemyPokemon) =>
           pokemon.getSpeciesForm().baseTotal
           + pokemon.getMoveset().reduce((sum, move) => sum + Math.max(0, move.getMove().power), 0);
         return threat(right) - threat(left);
       });
-      const endlessGhostSnapshot = getErGhostSnapshot(battle.trainer);
       const echoStage = endlessGhostSnapshot?.endlessEchoStage;
       const nemesisRank = endlessGhostSnapshot?.endlessNemesisRank ?? 0;
-      if (nemesisRank >= 1) {
-        segmentBudget += 2;
-      }
       const echoSegmentIds = new Set(
         echoStage === 2 || echoStage === 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : [],
       );
       const nemesisSegmentIds = new Set(nemesisRank >= 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : []);
       const allocations = new Map<number, number>();
-      for (let index = 0; segmentBudget > 0 && ranked.length > 0; index++, segmentBudget--) {
-        const pokemon = ranked[index % ranked.length];
+      for (let index = 0; index < segmentBudget && battle.enemyParty.length > 0; index++) {
+        let partyIndex = 0;
+        globalScene.executeWithSeedOffset(
+          () => {
+            partyIndex = randSeedInt(battle.enemyParty.length);
+          },
+          index,
+          `er-endless-segments:${battle.waveIndex}`,
+        );
+        const pokemon = battle.enemyParty[partyIndex];
         allocations.set(pokemon.id, (allocations.get(pokemon.id) ?? 0) + 1);
       }
       for (const pokemon of battle.enemyParty) {
         const extra =
           (allocations.get(pokemon.id) ?? 0)
-          + (hasErEndlessRift("segment-bloom") ? 1 : 0)
+          + (endlessGhostSnapshot && hasErEndlessRift("segment-bloom") ? 1 : 0)
           + (echoSegmentIds.has(pokemon.id) ? 1 : 0)
-          + (nemesisSegmentIds.has(pokemon.id) ? 1 : 0);
+          + (nemesisSegmentIds.has(pokemon.id) ? 1 : 0)
+          + (nemesisRank >= 1 && pokemon === ranked[0] ? 2 : 0);
         if (extra > 0) {
-          pokemon.setBoss(true, 1 + extra);
+          pokemon.setBoss(true, (pokemon.isBoss() ? Math.max(1, pokemon.bossSegments) : 1) + extra);
         }
       }
-      for (const id of [
-        "seventh-shadow",
-        "full-procession",
-        "counter-draft",
-        "segment-bloom",
-        "grave-return",
-      ] as const) {
-        consumeErEndlessRift(id);
+      if (endlessGhostSnapshot) {
+        for (const id of [
+          "seventh-shadow",
+          "full-procession",
+          "counter-draft",
+          "segment-bloom",
+          "grave-return",
+        ] as const) {
+          consumeErEndlessRift(id);
+        }
       }
     }
 
@@ -1525,7 +1542,8 @@ export class EncounterPhase extends BattlePhase {
       const overridedBossSegments = Overrides.ENEMY_HEALTH_SEGMENTS_OVERRIDE > 1;
       // for double battles, reduce the health segments for boss Pokemon unless there is an override
       if (
-        !isErEndlessRaidWave(battle.waveIndex)
+        !isErEndlessContinuationActive()
+        && !isErEndlessRaidWave(battle.waveIndex)
         && !overridedBossSegments
         && battle.enemyParty.filter(p => p.isBoss()).length > 1
       ) {

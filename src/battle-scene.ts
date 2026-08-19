@@ -79,9 +79,9 @@ import {
   getErEndlessCycleWave,
   getErEndlessEquivalentDepth,
   getErEndlessNemesisRelicBudgetMultiplier,
+  getErEndlessRaidBossSegments,
   hasErEndlessRift,
   isErEndlessContinuationActive,
-  isErEndlessCycleFinale,
   isErEndlessRaidWave,
 } from "#data/elite-redux/er-endless-continuation";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
@@ -92,6 +92,7 @@ import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redu
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
   applyGhostTrainerPresentation,
+  getErEndlessBossHeldItems,
   getErGhostSnapshot,
   getErGhostSnapshotSpecies,
   ghostWavesForCurrentRun,
@@ -114,6 +115,7 @@ import {
   resetErEnemyRelicBattleState,
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
+import { grantErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   getErMysteryEncounterTarget,
@@ -123,7 +125,7 @@ import {
 } from "#data/elite-redux/er-run-pacing";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
-import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
+import { ErWardStoneModifier, grantErWardStone } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import {
@@ -3049,7 +3051,7 @@ export class BattleScene extends SceneBase {
     }
 
     if (isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex)) {
-      return 6 + Math.floor(getErEndlessEquivalentDepth(waveIndex) / 100) + (isErEndlessCycleFinale(waveIndex) ? 2 : 0);
+      return getErEndlessRaidBossSegments(waveIndex);
     }
 
     if (this.gameMode.isDaily && this.gameMode.isWaveFinal(waveIndex)) {
@@ -4425,6 +4427,44 @@ export class BattleScene extends SceneBase {
     });
   }
 
+  private addErHeldItemLoadout(
+    enemy: EnemyPokemon,
+    heldItems: readonly [string, number, unknown[]?][],
+    seedKey: string,
+    seedOffset = 0,
+    protectInventory = false,
+  ): void {
+    for (const [itemIndex, [typeId, rawStack, generatedTypeArgs]] of heldItems.entries()) {
+      const factory = getModifierDataTypeFactory(typeId);
+      let type: ModifierType | null | undefined = factory?.();
+      if (type instanceof ModifierTypeGenerator) {
+        const generator = type;
+        this.executeWithSeedOffset(
+          () => {
+            type = generator.generateType([enemy], Array.isArray(generatedTypeArgs) ? generatedTypeArgs : undefined);
+          },
+          this.currentBattle.waveIndex + seedOffset * 100 + itemIndex,
+          seedKey,
+        );
+      }
+      if (!(type instanceof PokemonHeldItemModifierType)) {
+        console.warn(`[ghost] skipped unknown held-item modifier ${typeId}`);
+        continue;
+      }
+      type.id = typeId;
+      const modifier = type.newModifier(enemy);
+      const stack = Math.floor(Number(rawStack));
+      if (!(modifier instanceof PokemonHeldItemModifier) || !Number.isFinite(stack) || stack <= 0) {
+        continue;
+      }
+      modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+      if (protectInventory) {
+        modifier.isTransferable = false;
+      }
+      void this.addEnemyModifier(modifier, true, true);
+    }
+  }
+
   /** Add a ghost snapshot's inventory after normal enemy generation. */
   private addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void {
     const trainer = this.currentBattle.trainer;
@@ -4436,34 +4476,12 @@ export class BattleScene extends SceneBase {
     const relicBudgetMultiplier = getErEndlessNemesisRelicBudgetMultiplier(snapshot.endlessNemesisRank ?? 0);
 
     for (let i = 0; i < party.length; i++) {
-      const enemy = party[i];
-      const member = snapshot.party[i];
-      for (const [itemIndex, [typeId, rawStack, generatedTypeArgs]] of (member?.heldItems ?? []).entries()) {
-        const factory = getModifierDataTypeFactory(typeId);
-        let type: ModifierType | null | undefined = factory?.();
-        if (type instanceof ModifierTypeGenerator) {
-          const generator = type;
-          this.executeWithSeedOffset(
-            () => {
-              type = generator.generateType([enemy], Array.isArray(generatedTypeArgs) ? generatedTypeArgs : undefined);
-            },
-            this.currentBattle.waveIndex + i * 100 + itemIndex,
-            `${snapshot.id}:ghost-held-item`,
-          );
-        }
-        if (!(type instanceof PokemonHeldItemModifierType)) {
-          console.warn(`[ghost] skipped unknown held-item modifier ${typeId}`);
-          continue;
-        }
-        type.id = typeId;
-        const modifier = type.newModifier(enemy);
-        const stack = Math.floor(Number(rawStack));
-        if (!(modifier instanceof PokemonHeldItemModifier) || !Number.isFinite(stack) || stack <= 0) {
-          continue;
-        }
-        modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
-        void this.addEnemyModifier(modifier, true, true);
-      }
+      this.addErHeldItemLoadout(
+        party[i],
+        snapshot.party[i]?.heldItems ?? [],
+        `${snapshot.id}:ghost-held-item`,
+        i,
+      );
     }
 
     for (const [rawKind, rawStack, rawWeather] of snapshot.relics ?? []) {
@@ -4488,14 +4506,25 @@ export class BattleScene extends SceneBase {
     }
   }
 
+  /** Enemy relics are battle-scoped and have no Pokemon owner to self-prune against. */
+  private clearErEnemyRelics(): void {
+    const relics = this.enemyModifiers.filter(modifier => modifier instanceof ErRelicModifier);
+    for (const relic of relics) {
+      this.enemyModifiers.splice(this.enemyModifiers.indexOf(relic), 1);
+    }
+    resetErEnemyRelicBattleState();
+    if (relics.length > 0) {
+      this.updateModifiers(false, true);
+    }
+  }
+
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
-      if (
-        isErEndlessContinuationActive()
-        && this.currentBattle.trainer
-        && hasErGhostOverride(this.currentBattle.trainer)
-      ) {
-        const snapshot = getErGhostSnapshot(this.currentBattle.trainer);
+      this.clearErEnemyRelics();
+      if (isErEndlessContinuationActive()) {
+        const snapshot = this.currentBattle.trainer && hasErGhostOverride(this.currentBattle.trainer)
+          ? getErGhostSnapshot(this.currentBattle.trainer)
+          : null;
         setMoodyEnemyBoonLoadout(
           generateEndlessEnemyBoonLoadout(
             this.getEnemyParty(),
@@ -4623,6 +4652,26 @@ export class BattleScene extends SceneBase {
       // ER: layer the soft ER → PokeRogue held-item conversion on top of the
       // baseline roll for any ER-roster trainer mons in the party.
       applyErTrainerHeldItems(party);
+      if (isErEndlessContinuationActive() && isErEndlessRaidWave(this.currentBattle.waveIndex)) {
+        for (let index = 0; index < party.length; index++) {
+          const enemy = party[index];
+          const existingWard = this.enemyModifiers.find(
+            modifier => modifier instanceof ErWardStoneModifier && modifier.pokemonId === enemy.id,
+          );
+          if (existingWard instanceof ErWardStoneModifier && existingWard.tier !== "prime") {
+            this.enemyModifiers.splice(this.enemyModifiers.indexOf(existingWard), 1);
+          }
+          grantErWardStone(enemy, "prime");
+          grantErResistBerries(enemy);
+          this.addErHeldItemLoadout(
+            enemy,
+            getErEndlessBossHeldItems(this.currentBattle.waveIndex, index),
+            `er-endless-raid-held-items:${this.currentBattle.waveIndex}:${index}`,
+            index,
+            true,
+          );
+        }
+      }
       // Ghost snapshots are additive: preserve every generated item, ward,
       // boss layer above, then restore the inventory captured with the team.
       this.addErGhostSnapshotInventory(party);

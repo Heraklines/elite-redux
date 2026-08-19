@@ -2471,18 +2471,18 @@ async function attachGhostPerformance(env: Env, teams: Record<string, unknown>[]
   }
   await ensureGhostPerformanceTables(env);
   const ids = teams.map(team => String(team.id ?? "")).filter(Boolean);
-  const placeholders = ids.map((_, index) => `?${index + 1}`).join(", ");
-  const performance =
-    ids.length === 0
-      ? []
-      : ((
-          await env.DB.prepare(
-            `SELECT source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum
-           FROM ghost_run_performance WHERE source_run_id IN (${placeholders})`,
-          )
-            .bind(...ids)
-            .all<GhostPerformanceRow>()
-        ).results ?? []);
+  const performance: GhostPerformanceRow[] = [];
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const chunk = ids.slice(offset, offset + 90);
+    const placeholders = chunk.map((_, index) => `?${index + 1}`).join(", ");
+    const rows = await env.DB.prepare(
+      `SELECT source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum
+         FROM ghost_run_performance WHERE source_run_id IN (${placeholders})`,
+    )
+      .bind(...chunk)
+      .all<GhostPerformanceRow>();
+    performance.push(...(rows.results ?? []));
+  }
   const topRows =
     (
       await env.DB.prepare(
@@ -2714,6 +2714,7 @@ function runSampleRowToGhost(row: RunSampleRow, fallbackDifficulty = ""): Record
  * tag. No classic run exceeds 200, so this never drops a legitimate team.
  */
 export const GHOST_SAMPLE_MAX_WAVE = 200;
+const GHOST_SAMPLE_MAX_COUNT = 240;
 /** Modes that must never seed the ghost pool (endless/daily contamination). */
 const NON_GHOST_MODES_SQL = "'endless', 'spliced_endless', 'daily'";
 
@@ -2813,7 +2814,7 @@ async function handleRunSample(
 ): Promise<Response> {
   const difficulty = url.searchParams.get("difficulty") ?? "";
   const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
-  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 8;
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), GHOST_SAMPLE_MAX_COUNT) : 8;
   // Only sample runs that reached at least `minWave` — a run that ended at wave W
   // must never be fielded as a ghost trainer past wave W (its team is only proven
   // viable up to where it died).
@@ -2900,12 +2901,13 @@ async function handleRunSample(
   }
   const chosen = chosenCandidates.map(candidate => candidate.rid);
   let results: RunSampleRow[] = [];
-  if (chosen.length > 0) {
-    const placeholders = chosen.map((_, i) => `?${i + 1}`).join(", ");
+  for (let offset = 0; offset < chosen.length; offset += 90) {
+    const chunk = chosen.slice(offset, offset + 90);
+    const placeholders = chunk.map((_, i) => `?${i + 1}`).join(", ");
     const fetched = await env.DB.prepare(`SELECT ${cols} FROM runs WHERE rowid IN (${placeholders})`)
-      .bind(...chosen)
+      .bind(...chunk)
       .all<RunSampleRow>();
-    results = fetched.results ?? [];
+    results.push(...(fetched.results ?? []));
   }
   const teams = await attachGhostPerformance(
     env,

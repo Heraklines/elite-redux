@@ -318,6 +318,11 @@ export function getErEndlessEquivalentDepth(runWave: number): number {
   return getErEndlessActualWave(runWave) * getErRunPacingProfile().progressionScale;
 }
 
+/** Cumulative extra health bars distributed across every Endless enemy party. */
+export function getErEndlessBonusSegmentBudget(runWave: number): number {
+  return Math.floor(getErEndlessActualWave(runWave) / (isErSprintRun() ? 7 : 15));
+}
+
 export function getErEndlessCycle(runWave: number): number {
   const depth = getErEndlessEquivalentDepth(runWave);
   return depth === 0 ? 1 : Math.floor((depth - 1) / ER_ENDLESS_CYCLE_EQUIVALENT_WAVES) + 1;
@@ -335,6 +340,15 @@ export function getErEndlessRateBonus(runWave: number): number {
 export function isErEndlessRaidWave(runWave: number): boolean {
   const depth = getErEndlessEquivalentDepth(runWave);
   return depth > 0 && depth % ER_ENDLESS_RAID_EQUIVALENT_INTERVAL === 0;
+}
+
+/** Every Endless raid slot is a full boss, with twice the former solo-boss segment budget. */
+export function getErEndlessRaidBossSegments(runWave: number): number {
+  return 2 * (
+    6
+    + Math.floor(getErEndlessEquivalentDepth(runWave) / 100)
+    + (isErEndlessCycleFinale(runWave) ? 2 : 0)
+  );
 }
 
 export function isErEndlessCycleFinale(runWave: number): boolean {

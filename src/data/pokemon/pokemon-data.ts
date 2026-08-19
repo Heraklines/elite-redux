@@ -168,6 +168,12 @@ export class CustomPokemonData {
   public erFunMegaStone?: FormChangeItem | undefined;
   /** True when the Mega is a stat-delta pseudo form rather than a sprite/form change. */
   public erFunPseudoMega = false;
+  /**
+   * Canonical post-clear Endless Ability Avalanche rolls for this Pokemon.
+   * The list is append-only as new slots unlock, so encounter-only effects
+   * cannot reroll abilities that the Pokemon already earned.
+   */
+  public erEndlessAvalancheAbilities: AbilityId[] = [];
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -196,6 +202,9 @@ export class CustomPokemonData {
     this.erOmniformMovesets = data?.erOmniformMovesets ?? undefined;
     this.erFunMegaStone = data?.erFunMegaStone ?? undefined;
     this.erFunPseudoMega = data?.erFunPseudoMega ?? false;
+    this.erEndlessAvalancheAbilities = Array.isArray(data?.erEndlessAvalancheAbilities)
+      ? [...data.erEndlessAvalancheAbilities]
+      : [];
   }
 }
 

@@ -314,6 +314,13 @@ describe("er-save-api — ghost sample considers ALL eligible runs (de-restricti
     }
   });
 
+  it("returns a broad Endless batch instead of silently capping the pool at 20", async () => {
+    vi.spyOn(Math, "random").mockImplementation(mulberry32(0xe11d1e55));
+    const teams = await callSample(80);
+    expect(teams).toHaveLength(80);
+    expect(new Set(teams).size).toBe(80);
+  });
+
   it("inventory-qualified samples require held items and include relics when present", async () => {
     const rows = sqlite
       .prepare("SELECT id FROM runs WHERE user_id != ? AND wave >= ? AND wave <= 200 LIMIT 3")

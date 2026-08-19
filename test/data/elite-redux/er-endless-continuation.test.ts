@@ -5,6 +5,7 @@ import {
   canUseErEndlessGhost,
   finalizeErEndlessGhostEncounter,
   getErEndlessActiveRifts,
+  getErEndlessBonusSegmentBudget,
   getErEndlessCycle,
   getErEndlessCycleWave,
   getErEndlessEnemyAvalancheCount,
@@ -15,6 +16,7 @@ import {
   getErEndlessNemesisRelicBudgetMultiplier,
   getErEndlessPlayerAvalancheCount,
   getErEndlessRateBonus,
+  getErEndlessRaidBossSegments,
   getErEndlessReturningNemesisId,
   getErEndlessRiftDefinition,
   getErEndlessSaveData,
@@ -54,6 +56,7 @@ describe("Elite Redux Endless continuation", () => {
     initializeErEndlessContinuation(200, "normal");
     expect(getErEndlessEquivalentDepth(250)).toBe(50);
     expect(isErEndlessRaidWave(250)).toBe(true);
+    expect(getErEndlessRaidBossSegments(250)).toBe(12);
     expect(getErEndlessRateBonus(250)).toBe(1);
 
     resetErEndlessContinuation();
@@ -61,7 +64,23 @@ describe("Elite Redux Endless continuation", () => {
     initializeErEndlessContinuation(100, "sprint");
     expect(getErEndlessEquivalentDepth(125)).toBe(50);
     expect(isErEndlessRaidWave(125)).toBe(true);
+    expect(getErEndlessRaidBossSegments(125)).toBe(12);
     expect(getErEndlessRateBonus(125)).toBe(1);
+  });
+
+  it("adds one cumulative enemy health segment every 15 Normal or 7 Sprint Endless waves", () => {
+    setErRunPacing("normal");
+    initializeErEndlessContinuation(200, "normal-bars");
+    expect(getErEndlessBonusSegmentBudget(214)).toBe(0);
+    expect(getErEndlessBonusSegmentBudget(215)).toBe(1);
+    expect(getErEndlessBonusSegmentBudget(230)).toBe(2);
+
+    resetErEndlessContinuation();
+    setErRunPacing("sprint");
+    initializeErEndlessContinuation(100, "sprint-bars");
+    expect(getErEndlessBonusSegmentBudget(106)).toBe(0);
+    expect(getErEndlessBonusSegmentBudget(107)).toBe(1);
+    expect(getErEndlessBonusSegmentBudget(114)).toBe(2);
   });
 
   it("loops its world display and marks each 200-depth finale", () => {

@@ -276,6 +276,9 @@ const MAX_PARTY = 6;
 const LOCAL_STORE_CAP = 100;
 /** Cross-player samples retained for network-loss fallback. */
 const SHARED_CACHE_CAP = 240;
+const ENDLESS_GHOST_SAMPLE_SIZE = 240;
+const ENDLESS_GHOST_REFILL_INTERVAL = 40;
+const ENDLESS_GHOST_POOL_CAP = 600;
 /** Preferred source-run proximity; +40 is used only when this band is empty. */
 const GHOST_PRIMARY_WAVE_WINDOW = 20;
 /** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
@@ -402,6 +405,62 @@ export function hasErGhostSavedItems(snapshot: GhostTeamSnapshot): boolean {
     (member.heldItems ?? []).some(
       ([typeId, stack]) => typeof typeId === "string" && typeId.length > 0 && Number.isFinite(stack) && stack > 0,
     ),
+  );
+}
+
+type ErGhostHeldItem = [string, number, unknown[]?];
+
+function heldItemStackTotal(items: readonly ErGhostHeldItem[]): number {
+  return items.reduce((sum, [, rawStack]) => {
+    const stack = Math.floor(Number(rawStack));
+    return sum + (Number.isFinite(stack) && stack > 0 ? stack : 0);
+  }, 0);
+}
+
+function stableGhostItemIndex(key: string, length: number): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index++) {
+    hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  return length > 0 ? hash % length : 0;
+}
+
+/**
+ * Pick a large real ghost inventory for an Endless raid boss. Individual
+ * 10-stack members are preferred; a qualifying team's combined inventory is
+ * the fallback for old snapshots that spread their items across all six mons.
+ */
+export function selectErEndlessBossHeldItems(
+  snapshots: readonly GhostTeamSnapshot[],
+  selectionKey: string,
+  minimumStacks = 10,
+): ErGhostHeldItem[] {
+  const legalVictories = snapshots.filter(
+    snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot),
+  );
+  const memberLoadouts = legalVictories.flatMap(snapshot =>
+    snapshot.party
+      .map(member => member.heldItems ?? [])
+      .filter(items => heldItemStackTotal(items) >= minimumStacks),
+  );
+  const teamLoadouts = legalVictories
+    .map(snapshot => snapshot.party.flatMap(member => member.heldItems ?? []))
+    .filter(items => heldItemStackTotal(items) >= minimumStacks);
+  const candidates = memberLoadouts.length > 0 ? memberLoadouts : teamLoadouts;
+  const selected = candidates[stableGhostItemIndex(selectionKey, candidates.length)] ?? [];
+  return selected.map(([typeId, stack, args]) => [
+    typeId,
+    stack,
+    Array.isArray(args) ? structuredClone(args) : undefined,
+  ]);
+}
+
+/** Saved ghost loadout for one Endless raid party slot. */
+export function getErEndlessBossHeldItems(waveIndex: number, partyIndex: number): ErGhostHeldItem[] {
+  seedGhostPoolFromSharedCache();
+  return selectErEndlessBossHeldItems(
+    prefetched ?? [],
+    `${globalScene.seed}:${waveIndex}:${partyIndex}:endless-raid-items`,
   );
 }
 
@@ -1023,6 +1082,9 @@ export function recordGhostTeamOnGameOver(isVictory: boolean): void {
 // -----------------------------------------------------------------------------
 let prefetched: GhostTeamSnapshot[] | null = null;
 let prefetchStarted = false;
+let endlessGhostPoolFetch: Promise<void> | null = null;
+let endlessGhostPoolRetryAfter = 0;
+let endlessGhostPicksSinceRefill = 0;
 const usedGhostIds = new Set<string>();
 const usedGhostUploaders = new Set<string>();
 const usedGhostTeamFingerprints = new Set<string>();
@@ -1087,6 +1149,46 @@ function mergeGhostPool(teams: GhostTeamSnapshot[], persist = false): void {
     return true;
   });
   onGhostPoolPublished?.(prefetched);
+}
+
+function requestErEndlessGhostPool(): Promise<void> {
+  if (coopGhostFetchSuppressed?.()) {
+    prefetchStarted = true;
+    return Promise.resolve();
+  }
+  if ((prefetched?.length ?? 0) >= ENDLESS_GHOST_POOL_CAP || endlessGhostPoolRetryAfter > Date.now()) {
+    return Promise.resolve();
+  }
+  if (endlessGhostPoolFetch) {
+    return endlessGhostPoolFetch;
+  }
+  prefetchStarted = true;
+  endlessGhostPoolFetch = fetchGhostTeams(
+    getErDifficulty(),
+    ENDLESS_GHOST_SAMPLE_SIZE,
+    0,
+    200,
+    true,
+    true,
+  )
+    .then(teams => {
+      if (teams.length === 0) {
+        endlessGhostPoolRetryAfter = Date.now() + 15_000;
+        return;
+      }
+      endlessGhostPoolRetryAfter = 0;
+      const remaining = Math.max(0, ENDLESS_GHOST_POOL_CAP - (prefetched?.length ?? 0));
+      mergeGhostPool(teams.slice(0, remaining), true);
+    })
+    .catch(error => {
+      endlessGhostPoolRetryAfter = Date.now() + 15_000;
+      // biome-ignore lint/suspicious/noConsole: included in Send Logs diagnostics.
+      console.warn("[er-ghost] Endless pool refresh failed:", error);
+    })
+    .finally(() => {
+      endlessGhostPoolFetch = null;
+    });
+  return endlessGhostPoolFetch;
 }
 
 function seedGhostPoolFromSharedCache(): void {
@@ -1253,9 +1355,7 @@ export async function prepareErEndlessGhostPool(): Promise<void> {
     snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot),
   );
   mergeGhostPool(local);
-  const shared = await fetchGhostTeams(getErDifficulty(), 20, 0, 200, true, true);
-  mergeGhostPool(shared, true);
-  prefetchStarted = true;
+  await requestErEndlessGhostPool();
 }
 
 /**
@@ -1309,8 +1409,9 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   seedGhostPoolFromSharedCache();
 
   if (isErEndlessContinuationActive()) {
-    prefetchStarted = true;
-    void fetchGhostTeams(getErDifficulty(), 20, 0, 200, true, true).then(teams => mergeGhostPool(teams, true));
+    if (!prefetchStarted || endlessGhostPoolRetryAfter > 0) {
+      void requestErEndlessGhostPool();
+    }
     if (hasErEndlessRift("parallel-lives") || hasErEndlessRift("echo-hunt")) {
       const source = (prefetched ?? []).find(snapshot =>
         snapshot.isVictory
@@ -1455,7 +1556,7 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
   if (isErEndlessContinuationActive()) {
     const depth = getErEndlessEquivalentDepth(waveIndex);
     const weights = pool.map(snapshot =>
-      1 + Math.min(1, depth / 500) * 20 * Math.max(0, Math.min(1, snapshot.endlessPerformance?.dangerScore ?? 0)),
+      1 + Math.min(1, depth / 500) * 2 * Math.max(0, Math.min(1, snapshot.endlessPerformance?.dangerScore ?? 0)),
     );
     const total = weights.reduce((sum, weight) => sum + weight, 0);
     let roll = (h / 0x1_0000_0000) * total;
@@ -1629,6 +1730,11 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     const uploader = ghostUploaderKey(next);
     const fingerprint = ghostTeamFingerprint(next);
     recordErEndlessGhost(next.id, uploader, fingerprint);
+    endlessGhostPicksSinceRefill++;
+    if (endlessGhostPicksSinceRefill >= ENDLESS_GHOST_REFILL_INTERVAL) {
+      endlessGhostPicksSinceRefill = 0;
+      void requestErEndlessGhostPool();
+    }
     const echoStage = route?.riftId === "echo-hunt"
       ? (Math.min(3, route.encounterIndex + 1) as 1 | 2 | 3)
       : undefined;
@@ -1739,6 +1845,9 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
 export function resetErGhostRunState(): void {
   prefetched = null;
   prefetchStarted = false;
+  endlessGhostPoolFetch = null;
+  endlessGhostPoolRetryAfter = 0;
+  endlessGhostPicksSinceRefill = 0;
   usedGhostIds.clear();
   usedGhostUploaders.clear();
   usedGhostTeamFingerprints.clear();
@@ -1769,6 +1878,9 @@ export function getErGhostRepeatLedger(): ErGhostRepeatLedgerSaveData {
 export function restoreErGhostRepeatLedger(data: ErGhostRepeatLedgerSaveData | undefined): void {
   prefetched = null;
   prefetchStarted = false;
+  endlessGhostPoolFetch = null;
+  endlessGhostPoolRetryAfter = 0;
+  endlessGhostPicksSinceRefill = 0;
   ghostByWave.clear();
   requestedGhostBands.clear();
   ghostBandRetryAfter.clear();

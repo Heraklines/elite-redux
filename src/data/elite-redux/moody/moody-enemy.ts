@@ -250,7 +250,7 @@ function generateEnemyBoonLoadout(
   return { waveIndex, boons };
 }
 
-/** Endless ghosts inherit the player's boon power, then gain depth-scaled power. */
+/** Endless enemies inherit the player's boon power, then gain depth-scaled power. */
 export function generateEndlessEnemyBoonLoadout(
   party: readonly Pokemon[],
   waveIndex: number,
@@ -262,15 +262,12 @@ export function generateEndlessEnemyBoonLoadout(
     return { waveIndex, boons: [] };
   }
   const depth = getErEndlessEquivalentDepth(waveIndex);
-  const referencePower = getMoodyBoonBudget() + Math.floor(depth / 25);
-  if (referencePower <= 0) {
-    return { waveIndex, boons: [] };
-  }
+  const referencePower = Math.max(2, getMoodyBoonBudget() + 2 + Math.floor(depth / 20));
   const stringSeed = [...endless.seed].reduce(
     (hash, char) => Math.imul(hash ^ char.charCodeAt(0), 16777619),
     2166136261,
   );
-  const multiplier = 1 + (mix32(stringSeed ^ waveIndex ^ 0x6d2b79f5) & 1);
+  const multiplier = 1 + (mix32(stringSeed ^ waveIndex ^ 0x6d2b79f5) % 3) * 0.25;
   const nemesisMultiplier =
     nemesisRank >= 4 ? Math.min(2, 1.5 + (nemesisRank - 2) * 0.125) : nemesisRank >= 2 ? 1.5 : 1;
   return generateEnemyBoonLoadout(

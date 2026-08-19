@@ -236,6 +236,37 @@ export function getEndlessAbilityAvalancheIds(
   return [...selected];
 }
 
+/**
+ * Extend a Pokemon's saved Endless Avalanche sequence without changing any
+ * ability it earned on an earlier wave. Battle-only exclusions affect only new
+ * slots; they never become part of the identity of an existing roll.
+ */
+export function extendEndlessAbilityAvalancheIds(
+  pokemonId: number,
+  count: number,
+  existingIds: readonly AbilityId[],
+  excludedIds: readonly AbilityId[] = [],
+  newSlotSalt = 0,
+): AbilityId[] {
+  const normalizedCount = Math.max(0, Math.floor(count));
+  const eligible = new Set(abilityPool());
+  const selected = existingIds.filter(
+    (abilityId, index) => eligible.has(abilityId) && existingIds.indexOf(abilityId) === index,
+  );
+  if (selected.length >= normalizedCount) {
+    return selected;
+  }
+  const excluded = new Set([...excludedIds, ...selected]);
+  const available = abilityPool().filter(abilityId => !excluded.has(abilityId));
+  for (let slot = selected.length; slot < normalizedCount && available.length > 0; slot++) {
+    const index = deterministicIndex(pokemonId ^ newSlotSalt, 0xe11d + slot, available.length);
+    const abilityId = available.splice(index, 1)[0];
+    selected.push(abilityId);
+    excluded.add(abilityId);
+  }
+  return selected;
+}
+
 const FUN_TYPES: readonly PokemonType[] = [
   PokemonType.NORMAL,
   PokemonType.FIGHTING,

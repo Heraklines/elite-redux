@@ -168,6 +168,7 @@ import {
   shuffleFunStats,
 } from "#data/elite-redux/er-fun-mega-mode";
 import {
+  extendEndlessAbilityAvalancheIds,
   getEndlessAbilityAvalancheIds,
   getFunAbilityAvalancheIds,
   getFunEvolutionTarget,
@@ -3017,8 +3018,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const count = this.isPlayer() ? getErEndlessPlayerAvalancheCount(wave) : getErEndlessEnemyAvalancheCount(wave);
       const avalancheIds = new Set<AbilityId>();
       const avalancheIndexes = new Map<AbilityId, number>();
-      const battleSalt = hasErEndlessRift("avalanche-reroll") ? Math.imul(wave, 0x45d9f3b) : 0;
-      for (const avalancheId of getEndlessAbilityAvalancheIds(this.id, count, excludedIds, battleSalt)) {
+      const canonicalIds = extendEndlessAbilityAvalancheIds(
+        this.id,
+        count,
+        this.customPokemonData.erEndlessAvalancheAbilities,
+        excludedIds,
+      );
+      if (
+        canonicalIds.length !== this.customPokemonData.erEndlessAvalancheAbilities.length
+        || canonicalIds.some((abilityId, index) => abilityId !== this.customPokemonData.erEndlessAvalancheAbilities[index])
+      ) {
+        this.customPokemonData.erEndlessAvalancheAbilities = canonicalIds;
+      }
+      const activeIds = hasErEndlessRift("avalanche-reroll")
+        ? getEndlessAbilityAvalancheIds(this.id, count, excludedIds, Math.imul(wave, 0x45d9f3b))
+        : canonicalIds.slice(0, count);
+      for (const avalancheId of activeIds) {
         const avalancheAbility = allAbilities[avalancheId];
         if (appendUniqueAbility(avalancheAbility)) {
           avalancheIndexes.set(avalancheId, avalancheIndexes.size);
