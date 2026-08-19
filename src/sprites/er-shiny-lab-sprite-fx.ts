@@ -276,8 +276,8 @@ export function getErShinyLabSourceFrameGeometry(frame: {
     height: Math.max(0, maxY - minY),
     drawX: frameX - minX,
     drawY: frameY - minY,
-    sourceBoxX: -minX,
-    sourceBoxY: -minY,
+    sourceBoxX: minX === 0 ? 0 : -minX,
+    sourceBoxY: minY === 0 ? 0 : -minY,
     sourceBoxWidth,
     sourceBoxHeight,
   };
