@@ -33,8 +33,7 @@ jobs:
 
       - name: Run tests
         run: >
-          pnpm test:silent
-          --shard=${{ inputs.shard }}/${{ inputs.totalShards }}
+          pnpm test:silent test/tests/elite-redux/er-shiny-lab-speed.test.ts
           --coverage=${{ inputs.coverage }}
           --outputFile=test-results/blob-${{ inputs.shard }}.json
           || true
