@@ -113,6 +113,7 @@ import {
   assembleCoopRuntime,
   type CoopRuntime,
   clearCoopRuntime,
+  enterCoopV2CommandControlBoundary,
   establishCoopV2CommandControlFrontier,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
@@ -2088,6 +2089,19 @@ export function materializeMirroredGuestInputTurn(
     const firstFieldIndex = commandFieldIndices[0];
     if (firstFieldIndex == null) {
       throw new Error("mirrored guest command fields unexpectedly omitted their first entry");
+    }
+    const playerField = scene.getPlayerField();
+    for (const fieldIndex of commandFieldIndices) {
+      const pokemon = playerField[fieldIndex];
+      if (pokemon == null || !pokemon.isActive()) {
+        throw new Error(`cannot pre-register mirrored guest CommandPhase for inactive field ${fieldIndex}`);
+      }
+      const verdict = enterCoopV2CommandControlBoundary(fieldIndex, pokemon.id, () => undefined);
+      if (verdict !== "deferred" && verdict !== "ready") {
+        throw new Error(
+          `mirrored guest CommandPhase ${fieldIndex}:${pokemon.id} could not claim its V2 boundary (${verdict})`,
+        );
+      }
     }
     const firstCommand = scene.phaseManager.create("CommandPhase", firstFieldIndex);
     if (!scene.phaseManager.replaceWithCoopAuthoritativePhase(current, firstCommand)) {

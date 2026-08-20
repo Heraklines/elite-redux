@@ -1240,10 +1240,11 @@ export class CoopAuthorityV2Shadow {
               break;
             case "rejected": {
               // Semantic proof rejection is terminal, not a recoverable tail gap. Authority redelivery may
-              // replay the same malformed completion many times; one request can publish only one terminal.
-              const requestId = frame.body.requestId;
-              if (!this.reportedBoundaryProofSourceRejections.has(requestId)) {
-                this.reportedBoundaryProofSourceRejections.add(requestId);
+              // allocate new request IDs for the same rejected candidate, so deduplicate by candidate
+              // identity and reason rather than transport attempt.
+              const rejectionKey = `candidate:${frame.body.candidateRevision}:${frame.body.candidateOperationId}:${disposition.reason}`;
+              if (!this.reportedBoundaryProofSourceRejections.has(rejectionKey)) {
+                this.reportedBoundaryProofSourceRejections.add(rejectionKey);
                 reportProtocolViolation(
                   {
                     kind: "protocol-violation",
