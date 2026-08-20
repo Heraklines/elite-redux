@@ -296,6 +296,7 @@ export class CoopV2ControlLedger {
       return fail();
     }
     const controlId = controlIdOf(control);
+    const prior = this.claims.get(controlId);
     if (prior != null) {
       const duplicate =
         prior.revision === entry.revision
