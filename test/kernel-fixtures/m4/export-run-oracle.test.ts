@@ -583,14 +583,6 @@ describe("M4A fresh run oracle export", () => {
       generated.set("rng-vectors-v1.json", captureRngVectors());
     }
 
-    const progression = await collectLiveCapture(
-      "progression/nacli-medium-slow-level-17-v1",
-      captureProgression,
-      gaps,
-    );
-    if (progression != null) {
-      generated.set("progression/nacli-medium-slow-level-17-v1.json", progression);
-    }
 
     const rewardMarket = await collectLiveCapture(
       "rewards/regular-reroll-lock-v1+markets/town-wave-10-v1",
@@ -620,6 +612,14 @@ describe("M4A fresh run oracle export", () => {
       }
     }
 
+    const progression = await collectLiveCapture(
+      "progression/nacli-medium-slow-level-17-v1",
+      captureProgression,
+      gaps,
+    );
+    if (progression != null) {
+      generated.set("progression/nacli-medium-slow-level-17-v1.json", progression);
+    }
     const biomeEncounter = await collectLiveCapture(
       "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
       captureBiomeEncounter,
