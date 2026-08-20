@@ -1902,7 +1902,7 @@ export async function driveClientPhaseQueueTo(
      */
     startedPhases?: WeakSet<Phase>;
     /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
-    pumpPeer?: (() => Promise<void>) | null;
+    pumpPeer?: () => Promise<void>;
     /** Drive an explicitly-recognized public prompt while the current phase remains blocked on human input. */
     drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
   } = {},
@@ -1913,9 +1913,8 @@ export async function driveClientPhaseQueueTo(
   const peerCtx = peerContextByScene.get(scene);
   const startedPeerPhases = new WeakSet<Phase>();
   const startedPhases = options.startedPhases ?? new WeakSet<Phase>();
-  const pumpPeer = options.pumpPeer === null
-    ? undefined
-    : options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases));
+  const pumpPeer =
+    options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases));
 
   for (let step = 0; step < maxPhases; step++) {
     await drainLoopback();
@@ -2076,107 +2075,57 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
   scene.phaseManager.shiftPhase();
 }
 /**
- * Resolve the LOCAL command phases from the already-materialized canonical battle geometry.
+ * Resolve the LOCAL command phases from the host-stated Authority V2 frontier.
  *
- * A direct mirror must create the real local consumer before it pumps the retained CONTROL_COMMIT. Reading
- * an unapplied control ledger here reverses that ordering: the control cannot apply until CommandPhase
- * registers its exact claim, while the claim cannot be created because the control is not in the ledger yet.
- * Active field membership and the canonical seat tags are therefore the only inputs to bootstrap selection.
- * Stage-one final-boss co-op intentionally returns no guest field because its guest-owned mon is still on
- * the bench; no synthetic consumer is created for that real no-command state.
+ * A mirrored engine must not infer ownership from a player-field position: Showdown guests render the
+ * reflected host enemy team locally, while the authoritative frontier addresses those same Pokémon at the
+ * canonical enemy offset. Resolve by authenticated seat + Pokémon identity, then verify the canonical
+ * coordinate before driving the real queued phase.
  */
 function resolveCanonicalLocalCommandFields(
   scene: BattleScene,
   localRuntime: CoopRuntime,
+  controlRuntime: CoopRuntime,
   label: string,
 ): number[] {
   const battle = scene.currentBattle;
+  const control = controlRuntime.v2ControlLedger.latestControl;
   if (battle == null) {
     throw new Error(`${label} cannot resolve local command targets: scene has no current battle shell`);
   }
-  const localRole = localRuntime.controller.role;
-  return scene.getPlayerField().flatMap((pokemon, fieldIndex) => {
-    if (pokemon == null || !pokemon.isActive()) {
-      return [];
-    }
-    // Showdown's mirrored local player field is the guest's complete reflected team. Classic co-op instead
-    // uses the canonical per-party ownership tags, so a benched partner cannot become a fake command.
-    if (!localRuntime.controller.isVersusSession() && pokemon.coopOwner !== localRole) {
-      return [];
-    }
-    return [fieldIndex];
-  });
-}
-
-/**
- * Validate the control that was actually applied after the consumer-first bootstrap.
- *
- * Selection uses only materialized geometry; this second step is where the authenticated applied frontier
- * is checked. Keep the seat, Pokemon identity, and canonical coordinate assertions loud so a wrong retained
- * control cannot be mistaken for a successful bootstrap.
- */
-function assertAppliedCanonicalLocalCommandFields(
-  scene: BattleScene,
-  localRuntime: CoopRuntime,
-  appliedRuntime: CoopRuntime,
-  expectedLocalFieldIndices: readonly number[],
-  label: string,
-): void {
-  const battle = scene.currentBattle;
-  if (battle == null) {
-    throw new Error(`${label} cannot validate applied command targets: scene has no current battle shell`);
-  }
-  const control = appliedRuntime.v2ControlLedger.latestControl;
-  if (
-    control?.kind !== "COMMAND_FRONTIER"
-    || control.wave !== battle.waveIndex
-    || control.turn !== battle.turn
-    || !appliedRuntime.v2ControlLedger.isMaterialApplied(control)
-  ) {
+  if (control?.kind !== "COMMAND_FRONTIER") {
     throw new Error(
-      `${label} did not apply its command frontier at ${battle.waveIndex}:${battle.turn} `
-        + `(control=${control?.kind ?? "missing"} `
-        + `${control == null ? "" : `${control.wave}:${control.turn}`})`,
+      `${label} cannot resolve local command targets: Authority V2 frontier is `
+        + `${control?.kind ?? "missing"} at ${battle.waveIndex}:${battle.turn}`,
+    );
+  }
+  if (control.wave !== battle.waveIndex || control.turn !== battle.turn) {
+    throw new Error(
+      `${label} cannot resolve local command targets: frontier address `
+        + `${control.wave}:${control.turn} != scene ${battle.waveIndex}:${battle.turn}`,
     );
   }
   const localCommands = commandTargetsOwnedBySeat(control, localRuntime.controller.localSeatId);
-  if (localCommands.length !== expectedLocalFieldIndices.length) {
-    throw new Error(
-      `${label} applied ${localCommands.length} local command targets, expected `
-        + `${expectedLocalFieldIndices.length} from canonical geometry`,
-    );
-  }
   const playerField = scene.getPlayerField();
-  const expectedPokemonIds = new Set(
-    expectedLocalFieldIndices.map(fieldIndex => {
-      const pokemon = playerField[fieldIndex];
-      if (pokemon == null || !pokemon.isActive()) {
-        throw new Error(`${label} canonical local field=${fieldIndex} lost its active Pokemon before control apply`);
-      }
-      return pokemon.id;
-    }),
-  );
-  for (const command of localCommands) {
-    if (!expectedPokemonIds.has(command.pokemonId) || command.ownerSeatId !== localRuntime.controller.localSeatId) {
-      throw new Error(
-        `${label} applied command target pokemon=${command.pokemonId} seat=${command.ownerSeatId}; `
-          + `expected seat=${localRuntime.controller.localSeatId} ids=[${[...expectedPokemonIds].join(",")}]`,
-      );
-    }
+  return localCommands.map(command => {
     const localFieldIndex = playerField.findIndex(pokemon => pokemon?.id === command.pokemonId);
     if (localFieldIndex < 0) {
-      throw new Error(`${label} applied command target pokemon=${command.pokemonId} is absent from mirrored player field`);
+      throw new Error(
+        `${label} cannot resolve local command target pokemon=${command.pokemonId} seat=${command.ownerSeatId} `
+          + "from mirrored player field",
+      );
     }
     const canonicalFieldIndex = localRuntime.controller.isVersusSession()
       ? battle.arrangement.enemyOffset + localFieldIndex
       : localFieldIndex;
     if (command.fieldIndex !== canonicalFieldIndex) {
       throw new Error(
-        `${label} applied command target pokemon=${command.pokemonId} resolved to local field=${localFieldIndex} `
+        `${label} local command target pokemon=${command.pokemonId} resolved to local field=${localFieldIndex} `
           + `but canonical field=${command.fieldIndex} (expected=${canonicalFieldIndex})`,
       );
     }
-  }
+    return localFieldIndex;
+  });
 }
 
 /**
@@ -2192,16 +2141,17 @@ function assertAppliedCanonicalLocalCommandFields(
 async function materializeMirroredShowdownGuestCommandFrontier(
   scene: BattleScene,
   localRuntime: CoopRuntime,
-  afterFirstConsumer: () => Promise<void>,
+  controlRuntime: CoopRuntime,
 ): Promise<Phase> {
   materializeMirroredGuestInputTurn(scene);
   const localFieldIndices = resolveCanonicalLocalCommandFields(
     scene,
     localRuntime,
+    controlRuntime,
     "mirrored Showdown guest",
   );
   if (localFieldIndices.length === 0) {
-    throw new Error("mirrored Showdown guest has no active local command target in canonical geometry");
+    throw new Error("mirrored Showdown guest has no Authority V2 command target for its local seat");
   }
   const battle = scene.currentBattle;
   if (battle == null) {
@@ -2214,27 +2164,10 @@ async function materializeMirroredShowdownGuestCommandFrontier(
       matches: phase =>
         phase.phaseName === "CommandPhase"
         && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === fieldIndex,
-      // The host must not be started as a reciprocal peer here: its CommandPhase is the producer of the
-      // retained control we are deliberately waiting to pump after this consumer claims its address.
-      pumpPeer: null,
     });
     command.start();
     await drainLoopback();
-    if (scene.phaseManager.getCurrentPhase() !== command) {
-      throw new Error(
-        `initial Showdown guest command consumer for field=${fieldIndex} was not retained `
-          + `(phase=${scene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
-      );
-    }
-    // The first command is the ordering fence. The callback starts the host producer and pumps its retained
-    // control only after this real guest CommandPhase has registered its address-exact claim.
-    if (position === 0) {
-      await afterFirstConsumer();
-    }
-    if (
-      scene.phaseManager.getCurrentPhase() !== command
-      || scene.ui.getMode() !== UiMode.COMMAND
-    ) {
+    if (scene.phaseManager.getCurrentPhase() !== command || scene.ui.getMode() !== UiMode.COMMAND) {
       throw new Error(
         `initial Showdown guest command control field=${fieldIndex} was not publicly actionable `
           + `(phase=${scene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, `
@@ -2259,6 +2192,7 @@ async function materializeMirroredShowdownGuestCommandFrontier(
   }
   return finalCommand;
 }
+
 /**
  * Drain retained-operation follow-ups under each destination's complete client context.
  *
@@ -2982,17 +2916,21 @@ export async function buildDuo(
     await drainLoopback();
   });
   // `buildDuo` is handed an already-open solo host input phase, while production negotiates before battle
-  // construction. The guest consumer must be real and parked BEFORE the host adopts that phase: adopting
-  // first commits CONTROL_COMMIT, so the retained command-open is pumped while the guest still has only its
-  // inert boot prefix. Stage-one final-boss co-op has no guest-owned active actor; in that case the canonical
-  // geometry returns no consumer and no synthetic one is fabricated.
-  const hostHasOpenCommand = hostScene.phaseManager.getCurrentPhase()?.phaseName === "CommandPhase";
-  if (hostHasOpenCommand) {
-    let guestCommandFields: number[] = [];
+  // construction. Adopt only that exact live phase, then materialize the guest's omitted real TurnInit ->
+  // Command chain. Starting the guest-owned CommandPhase supplies the replica's address-exact proof; restarting
+  // the already-open host phase once supplies the reciprocal pacing arrival it could not emit before a runtime
+  // existed. This leaves both synthetic browsers at the same actionable public boundary production reaches.
+  const adoptedPrePairCommand = await withClient(hostCtx, () => adoptAlreadyOpenHostCommandBoundary(hostScene));
+  if (adoptedPrePairCommand) {
     await withClient(guestCtx, async () => {
-      guestCommandFields = resolveCanonicalLocalCommandFields(
+      await drainLoopback();
+      // The initial guest command is selected from the host-stated frontier, not from the launch layout.
+      // This matters when a battle starts with only the host seat materialized (classic final-boss stage
+      // one): an absent guest-owned command is a real control state, not a missing field to fabricate.
+      const guestCommandFields = resolveCanonicalLocalCommandFields(
         guestScene,
         guestRuntime,
+        hostRuntime,
         "initial co-op guest",
       );
       if (guestCommandFields.length > 1) {
@@ -3008,67 +2946,24 @@ export async function buildDuo(
           matches: phase =>
             phase.phaseName === "CommandPhase"
             && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === guestFieldIndex,
-          // The host's currently-open CommandPhase is the producer of the retained control. Do not start it
-          // as a reciprocal pump until this guest CommandPhase has registered its exact consumer claim.
-          pumpPeer: null,
         });
         guestOwnCommand.start();
         await drainLoopback();
-        if (guestScene.phaseManager.getCurrentPhase() !== guestOwnCommand) {
-          throw new Error(
-            `initial co-op guest command consumer for field=${guestFieldIndex} was not retained `
-              + `(phase=${guestScene.phaseManager.getCurrentPhase()?.phaseName ?? "none"})`,
-          );
+        const guestBattle = guestScene.currentBattle;
+        if (guestBattle == null) {
+          throw new Error("initial co-op guest command lost its battle shell after the real phase started");
         }
+        markRealGuestCommandBoundary(guestScene, guestBattle.waveIndex, guestBattle.turn);
       }
     });
-
-    const adoptedPrePairCommand = await withClient(hostCtx, () => adoptAlreadyOpenHostCommandBoundary(hostScene));
-    if (!adoptedPrePairCommand) {
-      throw new Error("initial co-op host CommandPhase disappeared before consumer-first adoption");
-    }
     await withClient(hostCtx, async () => {
       await drainLoopback();
       // The phase opened before rendezvous/runtime wiring existed. Re-enter exactly this verified phase once,
       // matching the production start edge rather than fabricating an arrival from the harness.
-      const phase = hostScene.phaseManager.getCurrentPhase();
-      if (phase?.phaseName !== "CommandPhase") {
-        throw new Error(`initial co-op host command adoption lost its phase: ${phase?.phaseName ?? "none"}`);
-      }
-      phase.start();
+      hostScene.phaseManager.getCurrentPhase().start();
       await drainLoopback();
     });
-    // Only now is it legal to pump the retained command-open. Its consumer was registered by the real guest
-    // CommandPhase above, and the applied frontier is checked by identity/seat/coordinate below. A stage-one
-    // final-boss guest has no local command by construction, so it deliberately has no consumer or identity
-    // proof to validate.
     await pumpDuoDestinations(rig, 2);
-    if (guestCommandFields.length > 0) {
-      await withClient(guestCtx, () => {
-        assertAppliedCanonicalLocalCommandFields(
-          guestScene,
-          guestRuntime,
-          guestRuntime,
-          guestCommandFields,
-          "initial co-op guest",
-        );
-        const current = guestScene.phaseManager.getCurrentPhase();
-        if (
-          current?.phaseName !== "CommandPhase"
-          || (guestScene.ui.getMode() !== UiMode.COMMAND && guestScene.ui.getMode() !== UiMode.FIGHT)
-        ) {
-          throw new Error(
-            `initial co-op guest command field=${guestCommandFields[0]} was not publicly actionable `
-              + `(phase=${current?.phaseName ?? "none"}, ui=${UiMode[guestScene.ui.getMode()] ?? guestScene.ui.getMode()})`,
-          );
-        }
-        const guestBattle = guestScene.currentBattle;
-        if (guestBattle == null) {
-          throw new Error("initial co-op guest command lost its battle shell after control applied");
-        }
-        markRealGuestCommandBoundary(guestScene, guestBattle.waveIndex, guestBattle.turn);
-      });
-    }
   }
   installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);
@@ -5702,7 +5597,6 @@ export async function buildShowdownDuo(
   // from the already-settled immutable host state before re-entering the parked CommandPhase. The prefix is
   // intentionally empty: summon presentation happened before pairing and must not be guessed after the fact;
   // real ability/weather/terrain event identity is covered by the public two-browser launch journey.
-  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
   if (netcodeMode === "authoritative") {
     await withClient(hostCtx, async () => {
       const battle = hostScene.currentBattle;
@@ -5720,6 +5614,7 @@ export async function buildShowdownDuo(
       );
       beginCoopRecording(battle.turn, `${hostRuntime.controller.sessionEpoch}:${battle.waveIndex}`);
       await drainLoopback();
+      await hostGame.phaseInterceptor.to("CommandPhase");
     });
   } else {
     // Building the synthetic flipped scene constructs a second set of battlers in this one process and
@@ -5727,36 +5622,20 @@ export async function buildShowdownDuo(
     guestCtx.rndState = hostCtx.rndState;
   }
 
-  // The direct mirror omitted the guest browser's real Encounter -> TurnInit path. Start its first real
-  // CommandPhase before the host re-enters CommandPhase and authors CONTROL_COMMIT. The callback is the
-  // sole retained-control pump, so no unapplied command-open can race ahead of the exact guest consumer.
+  const rig = { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
+  // The direct mirror omitted the guest browser's real Encounter -> TurnInit path. Materialize only that
+  // missing edge and start the actual local-player CommandPhase. Besides opening the public input surface,
+  // this supplies the guest seat's address-exact Authority V2 control proof. The old rig answered the
+  // guest's command exclusively through ShowdownCommandRelay while its scene remained on Login/Title;
+  // TURN_COMMIT then correctly stayed behind the unproved CONTROL_COMMIT forever, manufacturing a replay
+  // hang that no real paired browser should be able to bypass. Real-launch tests subsequently replace this
+  // mirrored state and phase queue with the serialized launch snapshot, exactly like a fresh browser boot.
   await withClient(guestCtx, async () => {
     await drainLoopback();
-    await materializeMirroredShowdownGuestCommandFrontier(
-      guestScene,
-      guestRuntime,
-      async () => {
-        if (netcodeMode === "authoritative") {
-          await withClient(hostCtx, async () => {
-            await hostGame.phaseInterceptor.to("CommandPhase");
-            await drainLoopback();
-          });
-          await pumpDuoDestinations(rig, 2);
-        }
-      },
-    );
+    await materializeMirroredShowdownGuestCommandFrontier(guestScene, guestRuntime, hostRuntime);
     const guestBattle = guestScene.currentBattle;
     if (guestBattle == null) {
       throw new Error("mirrored Showdown guest command bootstrap lost its battle shell");
-    }
-    if (netcodeMode === "authoritative") {
-      assertAppliedCanonicalLocalCommandFields(
-        guestScene,
-        guestRuntime,
-        guestRuntime,
-        resolveCanonicalLocalCommandFields(guestScene, guestRuntime, "mirrored Showdown guest"),
-        "mirrored Showdown guest",
-      );
     }
     markRealGuestCommandBoundary(guestScene, guestBattle.waveIndex, guestBattle.turn);
   });
