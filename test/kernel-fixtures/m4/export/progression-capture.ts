@@ -379,9 +379,13 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
       captureMenuInput(trace, game!, Button.ACTION);
       captureMenuInput(trace, game!, Button.CANCEL);
     });
-    game.move.select(MoveId.POUND);
+    // Commit Pound through the live command UI before forcing the established harness faint. Killing the
+    // enemy while CommandPhase is still open leaves the command prompt parked forever because production
+    // target resolution sees an already-fainted field. `null` is intentional: this single-target move has
+    // no SelectTargetPhase, so do not enqueue the helper's optional target prompt.
+    game.move.select(MoveId.POUND, 0, null);
+    await game.phaseInterceptor.to("TurnStartPhase", false);
     await game.killPokemon(enemy);
-    await game.phaseInterceptor.to("LearnMoveBatchPhase");
     game.doSelectModifier();
     await game.phaseInterceptor.to("BattleEndPhase");
     const after = readPartySnapshot(game, pokemon);
