@@ -20,7 +20,7 @@ use crate::run_v2::{ProgressionTask, RunStateValidationError};
 
 const MAX_PARTY_SIZE: usize = 6;
 
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum StateValidationErrorV2 {
     #[error("GameStateV2 schema version must be {expected}, got {actual}")]
     GameSchemaVersionMismatch { expected: u32, actual: u32 },
