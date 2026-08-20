@@ -310,9 +310,16 @@ function rngView(rng: RngCapture): AnyRecord {
   };
 }
 
-function requireGlobalRoutingSeams(): void {
+function requireGlobalRoutingSeams(game: GameManager): void {
   const scene = globalScene as AnyRecord | undefined;
-  if (scene == null || typeof scene.findModifiers !== "function") {
+  if (scene == null || game.scene !== scene) {
+    gap(
+      "ROUTE_SOURCE_UNOBSERVABLE",
+      ROUTE_SOURCE,
+      "the route helper did not receive the live GameManager scene used by global routing",
+    );
+  }
+  if (typeof scene.findModifiers !== "function") {
     gap(
       "ROUTE_SOURCE_UNOBSERVABLE",
       ROUTE_SOURCE,
@@ -324,7 +331,7 @@ function requireGlobalRoutingSeams(): void {
   }
 }
 
-function captureStructureAndRoute(): AnyRecord {
+function captureStructureAndRoute(game: GameManager): AnyRecord {
   resetErBiomeStructure();
   resetErRouting();
   const before = stateView();
@@ -361,7 +368,7 @@ function captureStructureAndRoute(): AnyRecord {
     gap("CROSSROADS_LEAVE_UNOBSERVABLE", "src/data/elite-redux/er-biome-structure.ts:setErLeaveBiomeNow", "Leave did not force the next boundary");
   }
 
-  requireGlobalRoutingSeams();
+  requireGlobalRoutingSeams(game);
   const routeCapture = withRngCapture("route", () => rollErNextBiomeNodes(BiomeId.TOWN, null, RUN_SEED, 11));
   const nodes = routeCapture.value;
   const selectedIndex = nodes.findIndex(node => node.biome === BiomeId.PLAINS);
@@ -533,7 +540,7 @@ function battleRngView(battle: AnyRecord): AnyRecord {
   };
 }
 
-async function captureLiveEncounter(): Promise<AnyRecord> {
+async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: AnyRecord }> {
   const PhaserGame = Phaser.Game;
   if (typeof PhaserGame !== "function") {
     gap("OBSERVATION_SEAM_MISSING", "Phaser.Game", "headless game constructor is unavailable");
@@ -558,6 +565,7 @@ async function captureLiveEncounter(): Promise<AnyRecord> {
     const ui = game.scene.ui as AnyRecord;
     ui.shouldSkipDialogue = () => true;
     await game.runToTitle();
+    const biome = captureStructureAndRoute(game);
     const starters = built.scenario.setup();
     game.scene.gameMode = getGameMode(GameModes.CLASSIC);
     game.scene.phaseManager.pushNew("EncounterPhase", false);
@@ -621,7 +629,10 @@ async function captureLiveEncounter(): Promise<AnyRecord> {
         },
       };
     });
-    return { ...captured.value, rng_before: captured.rng.before, rng_draws: captured.rng.draws, rng_after: captured.rng.after };
+    return {
+      biome,
+      encounter: { ...captured.value, rng_before: captured.rng.before, rng_draws: captured.rng.draws, rng_after: captured.rng.after },
+    };
   } catch (error) {
     if (error instanceof M4CaptureGap) {
       throw error;
@@ -649,7 +660,9 @@ async function captureLiveEncounter(): Promise<AnyRecord> {
 }
 
 export async function captureBiomeEncounter(): Promise<Record<string, JsonValue>> {
-  const biome = captureStructureAndRoute();
-  const encounter = await captureLiveEncounter();
-  return { biome: json(biome, "biome") as JsonValue, encounter: json(encounter, "encounter") as JsonValue };
+  const captured = await captureLiveEncounter();
+  return {
+    biome: json(captured.biome, "biome") as JsonValue,
+    encounter: json(captured.encounter, "encounter") as JsonValue,
+  };
 }
