@@ -1417,9 +1417,8 @@ describe("authority-v2 correlated boundary-tail proof", () => {
       (frame): frame is Extract<CoopFrameV2, { t: "tailRequest" }> =>
         frame.t === "tailRequest" && frame.body.requestId != null,
     );
-    expect(proofRequests).toHaveLength(2);
+    expect(proofRequests).toHaveLength(1);
     expect(proofRequests[0]?.body).toEqual(firstRequest.body);
-    expect(proofRequests[1]?.body).toEqual(firstRequest.body);
     expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, shadowStateSize: 1 });
     expect(duo.appliedRevisions).toEqual([1]);
 

@@ -590,7 +590,7 @@ export class CoopAuthorityV2Shadow {
   private readonly replicaAdmissionRetries = new Set<number>();
   /** Revisions that exhausted their one permitted live-admission retry; later duplicates are inert. */
   private readonly replicaAdmissionExhausted = new Set<number>();
-  /** Exact proof request IDs whose source rejection already entered the shared protocol terminal. */
+  /** Exact proof request IDs whose source or proof-frame rejection already entered the shared terminal. */
   private readonly reportedBoundaryProofSourceRejections = new Set<string>();
   /** Re-entrant delivery guard: applying material may synchronously emit a receipt and redeliver this revision. */
   private readonly replicaEntriesInFlight = new Set<number>();
@@ -1238,18 +1238,23 @@ export class CoopAuthorityV2Shadow {
               // A duplicate/lost-frame replay may be pending; only an exact complete disposition can
               // release the parked candidate. An inactive/old proof is inert by design.
               break;
-            case "rejected":
-              // Semantic proof rejection is terminal, not a recoverable tail gap: otherwise a malformed
-              // proof could park the candidate forever without the shared protocol terminal.
-              reportProtocolViolation(
-                {
-                  kind: "protocol-violation",
-                  frameType: "tailProof",
-                  issues: [disposition.reason],
-                },
-                this.onProtocolViolation,
-              );
+            case "rejected": {
+              // Semantic proof rejection is terminal, not a recoverable tail gap. Authority redelivery may
+              // replay the same malformed completion many times; one request can publish only one terminal.
+              const requestId = frame.body.requestId;
+              if (!this.reportedBoundaryProofSourceRejections.has(requestId)) {
+                this.reportedBoundaryProofSourceRejections.add(requestId);
+                reportProtocolViolation(
+                  {
+                    kind: "protocol-violation",
+                    frameType: "tailProof",
+                    issues: [disposition.reason],
+                  },
+                  this.onProtocolViolation,
+                );
+              }
               break;
+            }
             case "completed": {
               const candidate = disposition.candidate;
               const pending = this.pendingReplicaEntries.get(candidate.revision);

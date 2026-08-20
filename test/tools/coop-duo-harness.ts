@@ -2044,15 +2044,17 @@ export function markRealGuestCommandBoundary(scene: BattleScene, wave: number, t
 }
 
 /**
- * Replace the directly-constructed guest scene's inert boot TitlePhase with the production guest input tail.
+ * Replace the directly-constructed guest scene's inert boot phase with its real command input tail.
  *
  * A real browser reaches wave one through NewBattle -> Encounter -> TurnInit. `buildDuo` intentionally mirrors
- * the already-live host battle instead, so those boot phases never ran. Depending on renderer timing, the
- * inert prefix can stop on Login, SelectGender, or Title, followed only by more of that same boot prefix.
- * Materialize exactly the omitted TurnInit boundary through the real phase manager; TurnInit then creates the
- * actual per-slot CommandPhases and renderer TurnStart tail. Any queued gameplay phase still fails closed.
+ * the already-live host battle instead, so those boot phases never ran. When the host has already stated the
+ * exact local command fields, install those real CommandPhase objects directly before transport delivery;
+ * otherwise materialize the omitted TurnInit boundary and let production derive the phases.
  */
-export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
+export function materializeMirroredGuestInputTurn(
+  scene: BattleScene,
+  commandFieldIndices: readonly number[] = [],
+): void {
   const current = scene.phaseManager.getCurrentPhase();
   const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
   const proven = realGuestCommandBoundaries.get(scene);
@@ -2075,6 +2077,29 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
     throw new Error(
       `cannot materialize mirrored guest input from ${current?.phaseName ?? "none"}; queued=[${queued.join(",")}]`,
     );
+  }
+  if (commandFieldIndices.length > 0) {
+    if (
+      commandFieldIndices.some(fieldIndex => !Number.isSafeInteger(fieldIndex) || fieldIndex < 0)
+      || new Set(commandFieldIndices).size !== commandFieldIndices.length
+    ) {
+      throw new Error(`cannot materialize invalid mirrored guest command fields [${commandFieldIndices.join(",")}]`);
+    }
+    const firstFieldIndex = commandFieldIndices[0];
+    if (firstFieldIndex == null) {
+      throw new Error("mirrored guest command fields unexpectedly omitted their first entry");
+    }
+    const firstCommand = scene.phaseManager.create("CommandPhase", firstFieldIndex);
+    if (!scene.phaseManager.replaceWithCoopAuthoritativePhase(current, firstCommand)) {
+      throw new Error(
+        `cannot replace mirrored guest boot phase ${current.phaseName} with CommandPhase ${firstFieldIndex}`,
+      );
+    }
+    for (const fieldIndex of commandFieldIndices.slice(1)) {
+      scene.phaseManager.pushPhase(scene.phaseManager.create("CommandPhase", fieldIndex));
+    }
+    scene.phaseManager.pushPhase(scene.phaseManager.create("TurnStartPhase"));
+    return;
   }
   const turnInit = scene.phaseManager.create("TurnInitPhase");
   if (!scene.phaseManager.replaceWithCoopAuthoritativePhase(current, turnInit)) {
@@ -2157,7 +2182,6 @@ async function materializeMirroredShowdownGuestCommandFrontier(
   localRuntime: CoopRuntime,
   controlRuntime: CoopRuntime,
 ): Promise<Phase> {
-  materializeMirroredGuestInputTurn(scene);
   const localFieldIndices = resolveCanonicalLocalCommandFields(
     scene,
     localRuntime,
@@ -2167,6 +2191,7 @@ async function materializeMirroredShowdownGuestCommandFrontier(
   if (localFieldIndices.length === 0) {
     throw new Error("mirrored Showdown guest has no Authority V2 command target for its local seat");
   }
+  materializeMirroredGuestInputTurn(scene, localFieldIndices);
   const battle = scene.currentBattle;
   if (battle == null) {
     throw new Error("mirrored Showdown guest lost its battle shell after resolving local command targets");
@@ -2957,10 +2982,9 @@ export async function buildDuo(
       }
       if (guestCommandFields.length === 1) {
         guestFieldIndex = guestCommandFields[0];
-        materializeMirroredGuestInputTurn(guestScene);
-        // TurnInit first parks at the host-owned field-0 CommandPhase. Start that exact consumer before
-        // draining the already-authored command-open; the host phase can then supply its command and release
-        // the queue to the guest-owned field without a material race or detached phase.
+        materializeMirroredGuestInputTurn(guestScene, [guestFieldIndex]);
+        // Install and start the exact guest-owned CommandPhase before draining the already-authored
+        // command-open. This direct mirror omits the remote host-owned phase that a real guest never renders.
         firstGuestCommand = await driveClientPhaseQueueTo(guestScene, "initial replica CommandPhase", {
           matches: phase => phase.phaseName === "CommandPhase",
           deferInitialDrainUntilPhaseStart: true,
