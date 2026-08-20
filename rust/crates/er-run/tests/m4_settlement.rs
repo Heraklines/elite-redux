@@ -54,7 +54,6 @@ fn turn(value: u64) -> Result<TurnIndex, Box<dyn Error>> {
     Ok(TurnIndex::new(safe(value)?)?)
 }
 
-
 fn hash() -> String {
     format!("blake3-v1:{}", "0".repeat(64))
 }
