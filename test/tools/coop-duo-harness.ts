@@ -3538,9 +3538,9 @@ export async function driveGuestReplayTurn(
     // restore this guest context and deliver the response. This is scheduling,
     // never a synthetic authority or direct state mutation.
     if (guestScene.phaseManager.getCurrentPhase() === cur && peerCtx != null) {
-      if (options.pumpHostVictoryTail === true) {
-        // The stall is the host parked UNSTARTED at its victory tail; start it (bounded) so the seal stream
-        // the replay AWAITs is emitted. Falls back to a plain drain once the tail is inert (peer is guest).
+      if (options.pumpHostVictoryTail === true || cur.phaseName === "CoopFinalizeTurnPhase") {
+        // A finalize parked on a WAVE/TERMINAL successor needs the host's bounded victory tail to author
+        // that next ordered entry. Non-victory peers are inert under pumpHostVictoryTail and only drain.
         await pumpHostVictoryTail(peerCtx, startedHostTailPhases);
       } else {
         await withClient(peerCtx, () => drainLoopback());

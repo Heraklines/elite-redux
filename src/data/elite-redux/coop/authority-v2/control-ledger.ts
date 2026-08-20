@@ -717,7 +717,7 @@ export class CoopV2ControlLedger {
   /** Exact immutable entry behind one unsuperseded control, used by ordinary and recovery projection. */
   sourceEntryOf(control: CoopV2ClaimedControl): CoopAuthorityEntry | null {
     const claim = this.claims.get(controlIdOf(control));
-    return claim != null && !claim.superseded && controlsEqual(claim.control, control)
+    return claim != null && claim.sourceEntry != null && !claim.superseded && controlsEqual(claim.control, control)
       ? structuredClone(claim.sourceEntry)
       : null;
   }
@@ -727,6 +727,7 @@ export class CoopV2ControlLedger {
     const claim = this.claims.get(controlIdOf(entry.nextControl));
     return (
       claim != null
+      && claim.sourceEntry != null
       && !claim.superseded
       && controlsEqual(claim.control, entry.nextControl)
       && sameAuthenticatedSource(claim.sourceEntry, entry)
