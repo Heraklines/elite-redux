@@ -146,6 +146,8 @@ pub enum CapabilityManifestError {
     ReplicaGenerationAllowed,
     #[error("capability manifest permits production TypeScript changes")]
     ProductionTypescriptChangesAllowed,
+    #[error("invalid selected ID {kind}={value}: {detail}")]
+    InvalidSelectedId { kind: &'static str, value: u64, detail: String },
     #[error("capability manifest has duplicate {kind} entry {value}")]
     DuplicateEntry { kind: &'static str, value: String },
     #[error("capability manifest has no supported {kind}")]
@@ -231,7 +233,7 @@ impl RunCapabilityManifest {
         false
     }
 
-    pub fn selected() -> Self {
+    pub fn selected() -> Result<Self, CapabilityManifestError> {
         selected_run_capability_manifest()
     }
 }
@@ -257,25 +259,24 @@ where
     Ok(())
 }
  
-/// Returns the selected M4 capability manifest without filesystem or fixture
-/// access. The values mirror `rust/fixtures/m4/m4-capability-manifest.json`.
-pub fn selected_run_capability_manifest() -> RunCapabilityManifest {
+pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, CapabilityManifestError> {
     let modifier_ids = [1_u64, 2, 3, 4, 5, 6, 7, 100, 101, 102, 103, 200, 201, 202, 300, 301, 400, 401]
         .into_iter()
-        .map(|value| ModifierId::try_from_u64(value).unwrap_or(ModifierId::ZERO))
-        .collect();
+        .map(|value| ModifierId::try_from_u64(value).map_err(|error| CapabilityManifestError::InvalidSelectedId { kind: "modifier", value, detail: error.to_string() }))
+        .collect::<Result<Vec<_>, _>>()?;
     let biome_ids = [0_u64, 1, 2, 4, 9, 50]
         .into_iter()
-        .map(|value| BiomeId::try_from_u64(value).unwrap_or(BiomeId::ZERO))
-        .collect();
-    RunCapabilityManifest {
+        .map(|value| BiomeId::try_from_u64(value).map_err(|error| CapabilityManifestError::InvalidSelectedId { kind: "biome", value, detail: error.to_string() }))
+        .collect::<Result<Vec<_>, _>>()?;
+    let supported_modes = [0_u64, 1]
+        .into_iter()
+        .map(|value| GameModeId::try_from_u64(value).map_err(|error| CapabilityManifestError::InvalidSelectedId { kind: "mode", value, detail: error.to_string() }))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(RunCapabilityManifest {
         schema_version: RUN_CAPABILITY_MANIFEST_VERSION,
         oracle_game_sha: RUN_ORACLE_GAME_SHA.to_owned(),
         fail_closed: true,
-        supported_modes: vec![
-            GameModeId::try_from_u64(0).unwrap_or(GameModeId::ZERO),
-            GameModeId::try_from_u64(1).unwrap_or(GameModeId::ZERO),
-        ],
+        supported_modes,
         supported_growth_rates: vec![GrowthRateId::new(3)],
         supported_natures: vec![NatureId::new(0), NatureId::new(3), NatureId::new(10), NatureId::new(15)],
         modifier_registry_keys: vec![
@@ -335,5 +336,5 @@ pub fn selected_run_capability_manifest() -> RunCapabilityManifest {
         ],
         replica_generation_forbidden: true,
         production_typescript_changes_forbidden: true,
-    }
+    })
 }

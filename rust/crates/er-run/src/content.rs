@@ -65,7 +65,6 @@ pub struct NatureDefinition {
 pub struct LevelMoveDefinition {
     pub level: u16,
     pub move_id: MoveId,
-    pub key: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -82,10 +81,13 @@ pub struct SpeciesProgressionDefinition {
     pub key: String,
     pub growth_rate: GrowthRateId,
     pub base_experience: u16,
+    pub parity_level_before: u16,
+    pub parity_level_after: u16,
     pub level_moves: Vec<LevelMoveDefinition>,
+    pub current_moves: [MoveId; 4],
     pub evolutions: Vec<EvolutionDefinition>,
-}
 
+}
 /// Closed target kinds for the selected modifier definitions.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -177,8 +179,8 @@ pub struct MarketRuleSet {
 pub enum RunContentError {
     #[error("run-content schema version is {actual}, expected {expected}")]
     SchemaVersionMismatch { expected: u32, actual: u32 },
-    #[error("run-content oracle SHA is {actual}, expected {expected}")]
-    OracleGameShaMismatch { expected: &'static str, actual: String },
+    #[error("M4 run-content oracle SHA is {actual}, expected {expected}")]
+    M4OracleGameShaMismatch { expected: &'static str, actual: String },
     #[error("run-content hash is invalid: {0}")]
     InvalidHash(String),
     #[error("run-content hash mismatch: stored {expected}, recomputed {actual}")]
@@ -189,6 +191,8 @@ pub enum RunContentError {
     BattleOracleGameShaMismatch { expected: &'static str, actual: String },
     #[error("captured battle move {id} is absent from the bound content pack")]
     MissingCapturedBattleMove { id: MoveId },
+    #[error("invalid selected ID {kind}={value}: {detail}")]
+    InvalidSelectedId { kind: &'static str, value: u64, detail: String },
     #[error("duplicate {kind}: {value}")]
     Duplicate { kind: &'static str, value: String },
     #[error("invalid {kind}: {detail}")]
@@ -206,7 +210,8 @@ pub enum RunContentError {
 #[serde(deny_unknown_fields)]
 pub struct RunContentPack {
     pub schema_version: u32,
-    pub oracle_game_sha: String,
+    pub m4_oracle_sha: String,
+    pub battle_oracle_sha: String,
     pub battle_content_hash: ContentPackHash,
     pub run_content_hash: RunContentPackHash,
     pub growth_rates: Vec<Option<GrowthRateDefinition>>,
@@ -228,7 +233,8 @@ impl<'de> Deserialize<'de> for RunContentPack {
         #[serde(deny_unknown_fields)]
         struct Wire {
             schema_version: u32,
-            oracle_game_sha: String,
+            m4_oracle_sha: String,
+            battle_oracle_sha: String,
             battle_content_hash: ContentPackHash,
             run_content_hash: RunContentPackHash,
             growth_rates: Vec<Option<GrowthRateDefinition>>,
@@ -244,7 +250,8 @@ impl<'de> Deserialize<'de> for RunContentPack {
         let wire = Wire::deserialize(deserializer)?;
         let pack = Self {
             schema_version: wire.schema_version,
-            oracle_game_sha: wire.oracle_game_sha,
+            m4_oracle_sha: wire.m4_oracle_sha,
+            battle_oracle_sha: wire.battle_oracle_sha,
             battle_content_hash: wire.battle_content_hash,
             run_content_hash: wire.run_content_hash,
             growth_rates: wire.growth_rates,
@@ -266,7 +273,8 @@ impl RunContentPack {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         schema_version: u32,
-        oracle_game_sha: String,
+        m4_oracle_sha: String,
+        battle_oracle_sha: String,
         battle_content_hash: ContentPackHash,
         growth_rates: Vec<Option<GrowthRateDefinition>>,
         natures: Vec<Option<NatureDefinition>>,
@@ -279,11 +287,11 @@ impl RunContentPack {
         capability_manifest: RunCapabilityManifest,
     ) -> Result<Self, RunContentError> {
         let run_content_hash = hash_for_parts(
-            schema_version, &oracle_game_sha, &battle_content_hash, &growth_rates, &natures,
-            &species_progression, &modifiers, &biomes, &encounter_plans, &reward_rules,
-            &market_rules, &capability_manifest,
+            schema_version, &m4_oracle_sha, &battle_oracle_sha, &battle_content_hash,
+            &growth_rates, &natures, &species_progression, &modifiers, &biomes,
+            &encounter_plans, &reward_rules, &market_rules, &capability_manifest,
         )?;
-        let pack = Self { schema_version, oracle_game_sha, battle_content_hash, run_content_hash,
+        let pack = Self { schema_version, m4_oracle_sha, battle_oracle_sha, battle_content_hash, run_content_hash,
             growth_rates, natures, species_progression, modifiers, biomes, encounter_plans,
             reward_rules, market_rules, capability_manifest };
         pack.validate()?;
@@ -294,8 +302,11 @@ impl RunContentPack {
         if self.schema_version != RUN_CONTENT_PACK_SCHEMA_VERSION {
             return Err(RunContentError::SchemaVersionMismatch { expected: RUN_CONTENT_PACK_SCHEMA_VERSION, actual: self.schema_version });
         }
-        if self.oracle_game_sha != RUN_ORACLE_GAME_SHA {
-            return Err(RunContentError::OracleGameShaMismatch { expected: RUN_ORACLE_GAME_SHA, actual: self.oracle_game_sha.clone() });
+        if self.m4_oracle_sha != RUN_ORACLE_GAME_SHA {
+            return Err(RunContentError::M4OracleGameShaMismatch { expected: RUN_ORACLE_GAME_SHA, actual: self.m4_oracle_sha.clone() });
+        }
+        if self.battle_oracle_sha != BATTLE_ORACLE_GAME_SHA {
+            return Err(RunContentError::BattleOracleGameShaMismatch { expected: BATTLE_ORACLE_GAME_SHA, actual: self.battle_oracle_sha.clone() });
         }
         self.capability_manifest.validate().map_err(RunContentError::Capability)?;
         validate_growth_rates(&self.growth_rates)?;
@@ -312,17 +323,9 @@ impl RunContentPack {
         Ok(())
     }
 
-    pub fn recompute_hash(&self) -> Result<RunContentPackHash, RunContentError> {
-        hash_for_parts(
-            self.schema_version, &self.oracle_game_sha, &self.battle_content_hash, &self.growth_rates,
-            &self.natures, &self.species_progression, &self.modifiers, &self.biomes,
-            &self.encounter_plans, &self.reward_rules, &self.market_rules, &self.capability_manifest,
-        )
-    }
-
     /// Binds run content to the complete selected battle pack. The battle
-    /// oracle SHA and the five captured progression moves are checked before a
-    /// hash match is accepted.
+    /// oracle SHA and the nine captured progression moves are checked before
+    /// a hash match is accepted.
     pub fn validate_for_battle_content(&self, battle_content: &er_content::pack::ContentPack) -> Result<(), RunContentError> {
         if battle_content.oracle_game_sha != BATTLE_ORACLE_GAME_SHA {
             return Err(RunContentError::BattleOracleGameShaMismatch { expected: BATTLE_ORACLE_GAME_SHA, actual: battle_content.oracle_game_sha.clone() });
@@ -330,7 +333,7 @@ impl RunContentPack {
         if self.battle_content_hash != battle_content.hash {
             return Err(RunContentError::BattleContentHashMismatch { expected: battle_content.hash.clone(), actual: self.battle_content_hash.clone() });
         }
-        for id in captured_progression_move_ids() {
+        for id in captured_progression_move_ids()? {
             if !battle_content.moves.iter().any(|definition| definition.id == id) {
                 return Err(RunContentError::MissingCapturedBattleMove { id });
             }
@@ -355,7 +358,8 @@ impl RunContentPack {
 #[derive(Serialize)]
 struct RunContentHashView<'a> {
     schema_version: u32,
-    oracle_game_sha: &'a str,
+    m4_oracle_sha: &'a str,
+    battle_oracle_sha: &'a str,
     battle_content_hash: &'a ContentPackHash,
     growth_rates: &'a [Option<GrowthRateDefinition>],
     natures: &'a [Option<NatureDefinition>],
@@ -370,16 +374,16 @@ struct RunContentHashView<'a> {
 
 #[allow(clippy::too_many_arguments)]
 fn hash_for_parts(
-    schema_version: u32, oracle_game_sha: &str, battle_content_hash: &ContentPackHash,
-    growth_rates: &[Option<GrowthRateDefinition>], natures: &[Option<NatureDefinition>],
-    species_progression: &[Option<SpeciesProgressionDefinition>], modifiers: &[Option<ModifierDefinition>],
-    biomes: &[Option<BiomeDefinition>], encounter_plans: &[EncounterPlanDefinition],
-    reward_rules: &RewardRuleSet, market_rules: &MarketRuleSet,
-    capability_manifest: &RunCapabilityManifest,
+    schema_version: u32, m4_oracle_sha: &str, battle_oracle_sha: &str,
+    battle_content_hash: &ContentPackHash, growth_rates: &[Option<GrowthRateDefinition>],
+    natures: &[Option<NatureDefinition>], species_progression: &[Option<SpeciesProgressionDefinition>],
+    modifiers: &[Option<ModifierDefinition>], biomes: &[Option<BiomeDefinition>],
+    encounter_plans: &[EncounterPlanDefinition], reward_rules: &RewardRuleSet,
+    market_rules: &MarketRuleSet, capability_manifest: &RunCapabilityManifest,
 ) -> Result<RunContentPackHash, RunContentError> {
-    let view = RunContentHashView { schema_version, oracle_game_sha, battle_content_hash,
-        growth_rates, natures, species_progression, modifiers, biomes, encounter_plans,
-        reward_rules, market_rules, capability_manifest };
+    let view = RunContentHashView { schema_version, m4_oracle_sha, battle_oracle_sha,
+        battle_content_hash, growth_rates, natures, species_progression, modifiers, biomes,
+        encounter_plans, reward_rules, market_rules, capability_manifest };
     let canonical = canonical_bytes(&view).map_err(RunContentError::Canonical)?;
     let mut hasher = blake3::Hasher::new();
     hasher.update(RUN_CONTENT_HASH_DOMAIN.as_bytes());
@@ -389,10 +393,11 @@ fn hash_for_parts(
     RunContentPackHash::new(format!("blake3-v1:{digest}"))
         .map_err(|error| RunContentError::InvalidHash(error.to_string()))
 }
-
-fn captured_progression_move_ids() -> [MoveId; 5] {
-    [move_id(33), move_id(39), move_id(55), move_id(110), move_id(229)]
-
+fn captured_progression_move_ids() -> Result<[MoveId; 9], RunContentError> {
+    Ok([
+        move_id(34)?, move_id(45)?, move_id(72)?, move_id(74)?, move_id(124)?,
+        move_id(230)?, move_id(331)?, move_id(447)?, move_id(520)?,
+    ])
 }
 fn validate_growth_rates(values: &[Option<GrowthRateDefinition>]) -> Result<(), RunContentError> {
     let mut seen = BTreeSet::new();
@@ -427,14 +432,22 @@ fn validate_species(values: &[Option<SpeciesProgressionDefinition>], capabilitie
         if u64::from(definition.species_id) != index as u64 {
             return Err(invalid("species progression", "numeric vector hole does not match ID"));
         }
-        if definition.key.is_empty() || definition.base_experience == 0 { return Err(invalid("species progression", "empty key or zero base experience")); }
+        if definition.key.is_empty() || definition.base_experience == 0 || definition.parity_level_before == 0 || definition.parity_level_after <= definition.parity_level_before {
+            return Err(invalid("species progression", "invalid key, base experience, or parity level range"));
+        }
         if !seen.insert(definition.species_id.to_string()) { return Err(duplicate("species ID", definition.species_id.to_string())); }
         if !capabilities.supported_growth_rates.contains(&definition.growth_rate) { return Err(unsupported("growth rate", definition.growth_rate.to_string())); }
         let mut prior_level = 0;
+        let mut move_ids = BTreeSet::new();
         for move_definition in &definition.level_moves {
-            if move_definition.level == 0 || move_definition.level < prior_level || move_definition.key.is_empty() { return Err(invalid("level move", "unordered level, zero level, or empty key")); }
+            if move_definition.level == 0 || move_definition.level < prior_level || move_definition.level != definition.parity_level_after {
+                return Err(invalid("level move", "unordered level, zero level, or move outside parity level"));
+            }
+            if !move_ids.insert(move_definition.move_id.to_string()) { return Err(duplicate("level move ID", move_definition.move_id.to_string())); }
             prior_level = move_definition.level;
         }
+        let mut current_ids = BTreeSet::new();
+        for move_id in &definition.current_moves { if !current_ids.insert(move_id.to_string()) { return Err(duplicate("current move ID", move_id.to_string())); } }
         for evolution in &definition.evolutions { if evolution.minimum_level == 0 { return Err(invalid("evolution", "zero minimum level")); } }
     }
     Ok(())
@@ -527,47 +540,51 @@ pub fn selected_run_content_pack(
     battle_content_hash: ContentPackHash,
 ) -> Result<RunContentPack, RunContentError> {
     let mut growth_rates = vec![None; 4];
-    growth_rates[3] = Some(GrowthRateDefinition {
-        id: GrowthRateId::new(3),
-        key: "MEDIUM_SLOW".to_owned(),
-        kind: GrowthRateKind::MediumSlow,
-    });
+    growth_rates[3] = Some(GrowthRateDefinition { id: GrowthRateId::new(3), key: "MEDIUM_SLOW".to_owned(), kind: GrowthRateKind::MediumSlow });
     let mut natures = vec![None; 16];
     natures[0] = Some(NatureDefinition { id: NatureId::new(0), key: "HARDY".to_owned(), raised_stat: None, lowered_stat: None });
     natures[3] = Some(NatureDefinition { id: NatureId::new(3), key: "ADAMANT".to_owned(), raised_stat: Some(NatureStat::Attack), lowered_stat: Some(NatureStat::SpecialAttack) });
     natures[10] = Some(NatureDefinition { id: NatureId::new(10), key: "TIMID".to_owned(), raised_stat: Some(NatureStat::Speed), lowered_stat: Some(NatureStat::Attack) });
     natures[15] = Some(NatureDefinition { id: NatureId::new(15), key: "MODEST".to_owned(), raised_stat: Some(NatureStat::SpecialAttack), lowered_stat: Some(NatureStat::Attack) });
 
-    let mut species_progression = vec![None; 8];
-    species_progression[7] = Some(SpeciesProgressionDefinition {
-        species_id: species_id(7),
-        key: "SQUIRTLE".to_owned(),
+    let mut species_progression = vec![None; 2];
+    species_progression[1] = Some(SpeciesProgressionDefinition {
+        species_id: species_id(1)?,
+        parity_level_before: 16,
+        parity_level_after: 17,
+        key: "BULBASAUR".to_owned(),
         growth_rate: GrowthRateId::new(3),
-        base_experience: 66,
-        level_moves: vec![LevelMoveDefinition { level: 9, move_id: move_id(229), key: "RAPID_SPIN".to_owned() }],
+        base_experience: 64,
+        level_moves: vec![
+            LevelMoveDefinition { level: 17, move_id: move_id(34)? },
+            LevelMoveDefinition { level: 17, move_id: move_id(447)? },
+            LevelMoveDefinition { level: 17, move_id: move_id(520)? },
+            LevelMoveDefinition { level: 17, move_id: move_id(72)? },
+            LevelMoveDefinition { level: 17, move_id: move_id(124)? },
+            LevelMoveDefinition { level: 17, move_id: move_id(230)? },
+        ],
+        current_moves: [move_id(331)?, move_id(45)?, move_id(74)?, move_id(77)?],
         evolutions: Vec::new(),
     });
 
     let mut modifier_slots = vec![None; 402];
-    for definition in selected_modifier_definitions() {
+    for definition in selected_modifier_definitions()? {
         let index = u64::from(definition.id) as usize;
-        if index >= modifier_slots.len() {
-            return Err(invalid("modifier", "selected ID outside numeric hole vector"));
-        }
+        if index >= modifier_slots.len() { return Err(invalid("modifier", "selected ID outside numeric hole vector")); }
         modifier_slots[index] = Some(definition);
     }
     let mut biomes = vec![None; 51];
-    biomes[0] = Some(BiomeDefinition { id: biome_id(0), key: "TOWN".to_owned(), base_routes: vec![biome_id(1)] });
-    biomes[1] = Some(BiomeDefinition { id: biome_id(1), key: "PLAINS".to_owned(), base_routes: vec![biome_id(2), biome_id(4), biome_id(9)] });
-    biomes[2] = Some(BiomeDefinition { id: biome_id(2), key: "GRASS".to_owned(), base_routes: Vec::new() });
-    biomes[4] = Some(BiomeDefinition { id: biome_id(4), key: "METROPOLIS".to_owned(), base_routes: Vec::new() });
-    biomes[9] = Some(BiomeDefinition { id: biome_id(9), key: "LAKE".to_owned(), base_routes: Vec::new() });
-    biomes[50] = Some(BiomeDefinition { id: biome_id(50), key: "END".to_owned(), base_routes: Vec::new() });
+    biomes[0] = Some(BiomeDefinition { id: biome_id(0)?, key: "TOWN".to_owned(), base_routes: vec![biome_id(1)?] });
+    biomes[1] = Some(BiomeDefinition { id: biome_id(1)?, key: "PLAINS".to_owned(), base_routes: vec![biome_id(2)?, biome_id(4)?, biome_id(9)?] });
+    biomes[2] = Some(BiomeDefinition { id: biome_id(2)?, key: "GRASS".to_owned(), base_routes: Vec::new() });
+    biomes[4] = Some(BiomeDefinition { id: biome_id(4)?, key: "METROPOLIS".to_owned(), base_routes: Vec::new() });
+    biomes[9] = Some(BiomeDefinition { id: biome_id(9)?, key: "LAKE".to_owned(), base_routes: Vec::new() });
+    biomes[50] = Some(BiomeDefinition { id: biome_id(50)?, key: "END".to_owned(), base_routes: Vec::new() });
     let reward_rules = RewardRuleSet {
         supports_reroll: true,
         supports_locks: true,
-        reroll_base_cost: money(250),
-        lock_cost_tiers: vec![money(50), money(125), money(300), money(750), money(2000)],
+        reroll_base_cost: money(250)?,
+        lock_cost_tiers: vec![money(50)?, money(125)?, money(300)?, money(750)?, money(2000)?],
         selected_modifier_keys: vec!["LOCK_CAPSULE".to_owned(), "POTION".to_owned(), "NUGGET".to_owned(), "RARE_CANDY".to_owned()],
     };
     let market_rules = MarketRuleSet {
@@ -577,8 +594,8 @@ pub fn selected_run_content_pack(
         selected_modifier_keys: vec!["POKEBALL".to_owned(), "GREAT_BALL".to_owned()],
     };
     let encounter_plans = vec![EncounterPlanDefinition {
-        id: encounter_id(1),
-        biome_id: biome_id(1),
+        id: encounter_id(1)?,
+        biome_id: biome_id(1)?,
         source: EncounterPlanSource::OracleCaptureRequired,
         generation_mode: EncounterGenerationMode::StaticCapturedVector,
         enemy_policy: EnemyPolicy::ScriptedEnemyPolicyV1,
@@ -587,6 +604,7 @@ pub fn selected_run_content_pack(
     RunContentPack::new(
         RUN_CONTENT_PACK_SCHEMA_VERSION,
         RUN_ORACLE_GAME_SHA.to_owned(),
+        BATTLE_ORACLE_GAME_SHA.to_owned(),
         battle_content_hash,
         growth_rates,
         natures,
@@ -596,38 +614,44 @@ pub fn selected_run_content_pack(
         encounter_plans,
         reward_rules,
         market_rules,
-        crate::capability::selected_run_capability_manifest(),
+        crate::capability::selected_run_capability_manifest().map_err(RunContentError::Capability)?,
     )
 }
 
-fn selected_modifier_definitions() -> Vec<ModifierDefinition> {
-    vec![
-        modifier(1, "AMULET_COIN", ModifierTier::Ultra, 5, ModifierTargetKind::Run, ModifierEffectSpec::MoneyMultiplier { percent: 20 }),
-        modifier(2, "CANDY_JAR", ModifierTier::Ultra, 99, ModifierTargetKind::Run, ModifierEffectSpec::LevelIncrementBooster { levels_per_stack: 1 }),
-        modifier(3, "EXP_CHARM", ModifierTier::Ultra, 99, ModifierTargetKind::Run, ModifierEffectSpec::ExperienceMultiplier { percent: 25 }),
-        modifier(4, "SUPER_EXP_CHARM", ModifierTier::Rogue, 30, ModifierTargetKind::Run, ModifierEffectSpec::ExperienceMultiplier { percent: 60 }),
-        modifier(5, "GOLDEN_EXP_CHARM", ModifierTier::Master, 10, ModifierTargetKind::Run, ModifierEffectSpec::ExperienceMultiplier { percent: 100 }),
-        modifier(6, "HEALING_CHARM", ModifierTier::Master, 5, ModifierTargetKind::Run, ModifierEffectSpec::HealingMultiplier { percent: 110 }),
-        modifier(7, "LOCK_CAPSULE", ModifierTier::Rogue, 1, ModifierTargetKind::Run, ModifierEffectSpec::LockCapsule),
-        modifier(100, "POTION", ModifierTier::Common, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 20, percent: 10 }),
-        modifier(101, "SUPER_POTION", ModifierTier::Common, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 50, percent: 25 }),
-        modifier(102, "HYPER_POTION", ModifierTier::Great, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 200, percent: 50 }),
-        modifier(103, "MAX_POTION", ModifierTier::Great, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 0, percent: 100 }),
-        modifier(200, "NUGGET", ModifierTier::Great, 1, ModifierTargetKind::Run, ModifierEffectSpec::MoneyReward { multiplier_milli: 1000 }),
-        modifier(201, "BIG_NUGGET", ModifierTier::Ultra, 1, ModifierTargetKind::Run, ModifierEffectSpec::MoneyReward { multiplier_milli: 2500 }),
-        modifier(202, "RELIC_GOLD", ModifierTier::Rogue, 1, ModifierTargetKind::Run, ModifierEffectSpec::MoneyReward { multiplier_milli: 10000 }),
-        modifier(300, "RARE_CANDY", ModifierTier::Common, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::LevelIncrement { levels: 1 }),
-        modifier(301, "RARER_CANDY", ModifierTier::Ultra, 1, ModifierTargetKind::WholeParty, ModifierEffectSpec::LevelIncrement { levels: 1 }),
-        modifier(400, "POKEBALL", ModifierTier::Common, 1, ModifierTargetKind::Inventory, ModifierEffectSpec::InventoryItem { key: "POKEBALL".to_owned() }),
-        modifier(401, "GREAT_BALL", ModifierTier::Great, 1, ModifierTargetKind::Inventory, ModifierEffectSpec::InventoryItem { key: "GREAT_BALL".to_owned() }),
-    ]
+fn selected_modifier_definitions() -> Result<Vec<ModifierDefinition>, RunContentError> {
+    Ok(vec![
+        modifier(1, "AMULET_COIN", ModifierTier::Ultra, 5, ModifierTargetKind::Run, ModifierEffectSpec::MoneyMultiplier { percent: 20 })?,
+        modifier(2, "CANDY_JAR", ModifierTier::Ultra, 99, ModifierTargetKind::Run, ModifierEffectSpec::LevelIncrementBooster { levels_per_stack: 1 })?,
+        modifier(3, "EXP_CHARM", ModifierTier::Ultra, 99, ModifierTargetKind::Run, ModifierEffectSpec::ExperienceMultiplier { percent: 25 })?,
+        modifier(4, "SUPER_EXP_CHARM", ModifierTier::Rogue, 30, ModifierTargetKind::Run, ModifierEffectSpec::ExperienceMultiplier { percent: 60 })?,
+        modifier(5, "GOLDEN_EXP_CHARM", ModifierTier::Master, 10, ModifierTargetKind::Run, ModifierEffectSpec::ExperienceMultiplier { percent: 100 })?,
+        modifier(6, "HEALING_CHARM", ModifierTier::Master, 5, ModifierTargetKind::Run, ModifierEffectSpec::HealingMultiplier { percent: 110 })?,
+        modifier(7, "LOCK_CAPSULE", ModifierTier::Rogue, 1, ModifierTargetKind::Run, ModifierEffectSpec::LockCapsule)?,
+        modifier(100, "POTION", ModifierTier::Common, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 20, percent: 10 })?,
+        modifier(101, "SUPER_POTION", ModifierTier::Common, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 50, percent: 25 })?,
+        modifier(102, "HYPER_POTION", ModifierTier::Great, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 200, percent: 50 })?,
+        modifier(103, "MAX_POTION", ModifierTier::Great, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::HpRestore { points: 0, percent: 100 })?,
+        modifier(200, "NUGGET", ModifierTier::Great, 1, ModifierTargetKind::Run, ModifierEffectSpec::MoneyReward { multiplier_milli: 1000 })?,
+        modifier(201, "BIG_NUGGET", ModifierTier::Ultra, 1, ModifierTargetKind::Run, ModifierEffectSpec::MoneyReward { multiplier_milli: 2500 })?,
+        modifier(202, "RELIC_GOLD", ModifierTier::Rogue, 1, ModifierTargetKind::Run, ModifierEffectSpec::MoneyReward { multiplier_milli: 10000 })?,
+        modifier(300, "RARE_CANDY", ModifierTier::Common, 1, ModifierTargetKind::OnePokemon, ModifierEffectSpec::LevelIncrement { levels: 1 })?,
+        modifier(301, "RARER_CANDY", ModifierTier::Ultra, 1, ModifierTargetKind::WholeParty, ModifierEffectSpec::LevelIncrement { levels: 1 })?,
+        modifier(400, "POKEBALL", ModifierTier::Common, 1, ModifierTargetKind::Inventory, ModifierEffectSpec::InventoryItem { key: "POKEBALL".to_owned() })?,
+        modifier(401, "GREAT_BALL", ModifierTier::Great, 1, ModifierTargetKind::Inventory, ModifierEffectSpec::InventoryItem { key: "GREAT_BALL".to_owned() })?,
+    ])
 }
 
-fn modifier(id: u64, key: &str, tier: ModifierTier, maximum_stack: u16, target: ModifierTargetKind, effect: ModifierEffectSpec) -> ModifierDefinition {
-    ModifierDefinition { id: ModifierId::try_from_u64(id).unwrap_or(ModifierId::ZERO), oracle_registry_key: key.to_owned(), tier, maximum_stack, target, effect }
+fn modifier(id: u64, key: &str, tier: ModifierTier, maximum_stack: u16, target: ModifierTargetKind, effect: ModifierEffectSpec) -> Result<ModifierDefinition, RunContentError> {
+    Ok(ModifierDefinition { id: modifier_id(id)?, oracle_registry_key: key.to_owned(), tier, maximum_stack, target, effect })
 }
-fn species_id(value: u64) -> SpeciesId { SpeciesId::try_from_u64(value).unwrap_or(SpeciesId::ZERO) }
-fn move_id(value: u64) -> MoveId { MoveId::try_from_u64(value).unwrap_or(MoveId::ZERO) }
-fn biome_id(value: u64) -> BiomeId { BiomeId::try_from_u64(value).unwrap_or(BiomeId::ZERO) }
-fn encounter_id(value: u64) -> EncounterId { EncounterId::try_from_u64(value).unwrap_or(EncounterId::ZERO) }
-fn money(value: u64) -> Money { Money::new(er_types::SafeU53::new(value).unwrap_or(er_types::SafeU53::ZERO)) }
+fn selected_id(kind: &'static str, value: u64, error: impl ToString) -> RunContentError {
+    RunContentError::InvalidSelectedId { kind, value, detail: error.to_string() }
+}
+fn modifier_id(value: u64) -> Result<ModifierId, RunContentError> { ModifierId::try_from_u64(value).map_err(|error| selected_id("modifier", value, error)) }
+fn species_id(value: u64) -> Result<SpeciesId, RunContentError> { SpeciesId::try_from_u64(value).map_err(|error| selected_id("species", value, error)) }
+fn move_id(value: u64) -> Result<MoveId, RunContentError> { MoveId::try_from_u64(value).map_err(|error| selected_id("move", value, error)) }
+fn biome_id(value: u64) -> Result<BiomeId, RunContentError> { BiomeId::try_from_u64(value).map_err(|error| selected_id("biome", value, error)) }
+fn encounter_id(value: u64) -> Result<EncounterId, RunContentError> { EncounterId::try_from_u64(value).map_err(|error| selected_id("encounter", value, error)) }
+fn money(value: u64) -> Result<Money, RunContentError> {
+    er_types::SafeU53::new(value).map(Money::new).map_err(|error| selected_id("money", value, error))
+}

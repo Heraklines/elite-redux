@@ -1,45 +1,57 @@
-use er_types::battle_ids::ContentPackHash;
-use er_types::run_ids::ModifierId;
+use std::error::Error;
+
 use er_run::capability::{selected_run_capability_manifest, CapabilityManifestError};
 use er_run::content::{selected_run_content_pack, RunContentError, RUN_CONTENT_HASH_DOMAIN};
+use er_types::battle_ids::ContentPackHash;
+use er_types::run_ids::ModifierId;
 
-fn battle_hash() -> ContentPackHash {
-    ContentPackHash::new(format!("blake3-v1:{}", "0".repeat(64))).expect("test hash is valid")
+fn battle_hash() -> Result<ContentPackHash, Box<dyn Error>> {
+    Ok(ContentPackHash::new(format!("blake3-v1:{}", "0".repeat(64)))?)
 }
 
 #[test]
-fn selected_pack_is_typed_and_retains_numeric_holes() {
-    let pack = selected_run_content_pack(battle_hash()).expect("selected content constants are valid");
-    assert_eq!(pack.oracle_game_sha, "45c89493e7edec9c4da247a98cd7858b1f015c09");
+fn selected_pack_is_typed_and_retains_numeric_holes() -> Result<(), Box<dyn Error>> {
+    let pack = selected_run_content_pack(battle_hash()?)?;
+    assert_eq!(pack.m4_oracle_sha, "45c89493e7edec9c4da247a98cd7858b1f015c09");
+    assert_eq!(pack.battle_oracle_sha, "3b534099919efae827019d4a3f3c4ab0ecd6d67b");
     assert!(pack.growth_rates[0].is_none());
     assert_eq!(pack.growth_rates[3].as_ref().map(|value| value.key.as_str()), Some("MEDIUM_SLOW"));
     assert!(pack.modifiers[8].is_none());
+    let progression = pack.species_progression[1].as_ref().ok_or("Bulbasaur progression missing")?;
+    assert_eq!((progression.parity_level_before, progression.parity_level_after), (16, 17));
+    assert_eq!(progression.base_experience, 64);
+    assert_eq!(progression.level_moves.len(), 6);
+    assert_eq!(progression.current_moves.iter().map(ToString::to_string).collect::<Vec<_>>(), vec!["331", "45", "74", "77"]);
     assert_eq!(pack.modifier_by_registry_key("LOCK_CAPSULE").map(|value| value.id.to_string()), Some("7".to_owned()));
     assert!(!pack.market_rules.supports_reroll);
     assert!(!RUN_CONTENT_HASH_DOMAIN.is_empty());
+    Ok(())
 }
 
 #[test]
-fn selected_manifest_is_fail_closed_and_prohibits_replica_generation() {
-    let manifest = selected_run_capability_manifest();
-    manifest.validate().expect("selected capability manifest is valid");
+fn selected_manifest_is_fail_closed_and_prohibits_replica_generation() -> Result<(), Box<dyn Error>> {
+    let manifest = selected_run_capability_manifest()?;
+    manifest.validate()?;
     assert!(manifest.replica_generation_forbidden);
     assert!(!manifest.replica_may_generate());
+    Ok(())
 }
 
 #[test]
-fn duplicate_modifier_key_fails_before_hash_acceptance() {
-    let pack = selected_run_content_pack(battle_hash()).expect("selected content constants are valid");
+fn duplicate_modifier_key_fails_before_hash_acceptance() -> Result<(), Box<dyn Error>> {
+    let pack = selected_run_content_pack(battle_hash()?)?;
     let mut changed = pack.clone();
-    let mut duplicate = changed.modifiers[1].clone().expect("selected ID 1 exists");
-    duplicate.id = ModifierId::try_from_u64(2).expect("test ID is safe");
+    let Some(mut duplicate) = changed.modifiers[1].clone() else { return Err("selected ID 1 missing".into()) };
+    duplicate.id = ModifierId::try_from_u64(2)?;
     changed.modifiers[2] = Some(duplicate);
     assert!(matches!(changed.validate(), Err(RunContentError::Duplicate { kind: "modifier registry key", .. })));
+    Ok(())
 }
 
 #[test]
-fn biome_market_cannot_gain_reward_shop_capabilities() {
-    let mut manifest = selected_run_capability_manifest();
+fn biome_market_cannot_gain_reward_shop_capabilities() -> Result<(), Box<dyn Error>> {
+    let mut manifest = selected_run_capability_manifest()?;
     manifest.biome_market_actions.clear();
     assert!(matches!(manifest.validate(), Err(CapabilityManifestError::EmptySupported { kind: "biome market action" })));
+    Ok(())
 }
