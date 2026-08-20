@@ -276,30 +276,27 @@ fn battle_game_config(content: &ContentPack) -> TestResult<BattleGameConfig> {
     let battle_id = BattleId::new(safe(1));
     let wave = WaveIndex::new(safe(1))?;
     let turn = TurnIndex::new(safe(1))?;
-    let next_turn = TurnIndex::new(safe(2))?;
     let mut scripted = Vec::new();
-    for (turn_offset, turn) in [turn, next_turn].into_iter().enumerate() {
-        for position in 0_u8..2 {
-            let enemy_slot = FieldSlot::new(BattleSide::Enemy, position)?;
-            let player_slot = FieldSlot::new(BattleSide::Player, position)?;
-            let actor = pokemon_id(3 + u64::from(position));
-            let cursor = safe(u64::try_from(turn_offset)? * 2 + u64::from(position));
-            let command = BattleCommand::fight(
-                actor,
-                MoveSlotIndex::ZERO,
-                BattleTargetSelection::selected(vec![player_slot])?,
-            )?;
-            scripted.push(ScriptedEnemyBattleCommandV1::new(
-                scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, cursor)?,
-                battle_id,
-                wave,
-                turn,
-                cursor,
-                actor,
-                enemy_slot,
-                command,
-            )?);
-        }
+    for position in 0_u8..2 {
+        let enemy_slot = FieldSlot::new(BattleSide::Enemy, position)?;
+        let player_slot = FieldSlot::new(BattleSide::Player, position)?;
+        let actor = pokemon_id(3 + u64::from(position));
+        let cursor = safe(u64::from(position));
+        let command = BattleCommand::fight(
+            actor,
+            MoveSlotIndex::ZERO,
+            BattleTargetSelection::selected(vec![player_slot])?,
+        )?;
+        scripted.push(ScriptedEnemyBattleCommandV1::new(
+            scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, cursor)?,
+            battle_id,
+            wave,
+            turn,
+            cursor,
+            actor,
+            enemy_slot,
+            command,
+        )?);
     }
     let run_state = GameState::new(
         content.hash.clone(),
@@ -616,7 +613,7 @@ fn battle_kernel_routes_correlated_proof_through_real_material_and_fails_closed(
     for _ in 0..2 {
         guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::Enter)?);
     }
-    guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::ArrowDown)?);
+    guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::ArrowRight)?);
     guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::Enter)?);
     let proposals = guest_command_effects
         .iter()

@@ -2540,7 +2540,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+          filter: blob:none
           submodules: false
 
       - name: Detect Rust workspace contract
@@ -2773,7 +2774,8 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: ${{ matrix.target == 'api-bypass-audit' && 0 || 1 }}
+          filter: blob:none
           submodules: false
 
       - name: Install the repository-pinned Rust toolchain
