@@ -198,22 +198,31 @@ export function successorWaitAllows(
   // #automatic victory deferral: a faint whose wave is WON the SAME turn (sourceTurn N) settles its
   // WAVE_ADVANCE at settlementTurn N+1.
   //
-  // The bounded N-or-N+1 rule for WAVE_ADVANCE/TERMINAL_COMMIT is a narrow same-wave settlement bypass for
-  // the validated TURN/REPLACEMENT waits. Both a victory and a game-over may follow those waits, while a
-  // single-direction wait (e.g. only WAVE_ADVANCE) remains an exact prediction and arbitrary N+2 drift stays
-  // fail-closed.
+  // The ordinary turn-boundary wait has one exact, canonical five-kind shape. The replacement terminal
+  // wait has its own documented three-kind shape and grants only the deferred automatic-victory
+  // WAVE_ADVANCE edge. Keep these shapes closed: an arbitrary wait that merely happens to mention a
+  // boundary kind must not inherit the N-or-N+1 settlement bypass.
   const controlOnly = wait.allowedKinds.length === 1 && wait.allowedKinds[0] === "CONTROL_COMMIT";
-  const canonicalBroadSettlementKinds = [
+  const turnBoundaryKinds = [
     "CONTROL_COMMIT",
     "REPLACEMENT_COMMIT",
     "INTERACTION_COMMIT",
     "WAVE_ADVANCE",
     "TERMINAL_COMMIT",
   ] as const;
-  const settlementBoundaryWait =
+  const replacementTerminalKinds = [
+    "INTERACTION_COMMIT",
+    "WAVE_ADVANCE",
+    "TERMINAL_COMMIT",
+  ] as const;
+  const turnBoundaryWait =
     !wait.allowNextWaveStart
-    && wait.allowedKinds.length === canonicalBroadSettlementKinds.length
-    && canonicalBroadSettlementKinds.every(kind => wait.allowedKinds.includes(kind));
+    && wait.allowedKinds.length === turnBoundaryKinds.length
+    && turnBoundaryKinds.every(kind => wait.allowedKinds.includes(kind));
+  const replacementTerminalWait =
+    !wait.allowNextWaveStart
+    && wait.allowedKinds.length === replacementTerminalKinds.length
+    && replacementTerminalKinds.every(kind => wait.allowedKinds.includes(kind));
   if (address.wave === wait.wave + 1) {
     // Battle-open control and settled wave/terminal material are authored at turn 1. A mystery encounter
     // is the one mechanical surface that legitimately opens before that battle turn exists: its complete
@@ -236,7 +245,10 @@ export function successorWaitAllows(
       wait.allowedKinds.includes("TURN_COMMIT"),
     );
   }
-  if (settlementBoundaryWait && (nextKind === "WAVE_ADVANCE" || nextKind === "TERMINAL_COMMIT")) {
+  if (
+    (turnBoundaryWait && (nextKind === "WAVE_ADVANCE" || nextKind === "TERMINAL_COMMIT"))
+    || (replacementTerminalWait && nextKind === "WAVE_ADVANCE")
+  ) {
     return address.turn === wait.turn || address.turn === wait.turn + 1;
   }
   return address.turn === wait.turn;

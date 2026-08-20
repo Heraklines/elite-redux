@@ -586,10 +586,17 @@ describe("Authority V2 interaction control ledger", () => {
               },
               subsumes: [1, 2, 3],
             });
+      // A direct WAVE/TERMINAL boundary has no authority-retained proof capability. The live ledger must
+      // refuse it before the AuthorityLog supplies the exact retained source scope.
+      const directBoundary: CoopAuthorityEntry = { ...boundaryInput, revision: 4 };
+      expect(authorityEntryProofScopeOf(directBoundary)).toBeNull();
+      expect(ledger.admitSuccessor(directBoundary)).toBe(false);
+      expect(ledger.authenticatedSourceCount).toBe(1);
 
       // AuthorityLog admission supplies the exact retained proof; an unscoped direct ledger call is not
       // allowed to self-authenticate this boundary anymore.
       const boundary = log.commit(boundaryInput, prepareAndInstall);
+
       expect(boundary.revision).toBe(4);
       expect(ledger.authenticatedSourceCount).toBe(1);
       expect(ledger.sourceEntryOf(boundary.nextControl)).toMatchObject({

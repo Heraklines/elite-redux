@@ -2561,10 +2561,8 @@ describe("authority-v2 log", () => {
   it("admits the deferred automatic-victory advance from a replacement terminal successor wait", () => {
     // A guest faint-replacement whose wave is WON the SAME turn defers its WAVE_ADVANCE to the settlement
     // turn N+1 (browser journey 29846903494: "automatic victory settlement deferred sourceTurn=1
-    // settlementTurn=2"). The replacement's terminal successor authorizes a COMPLETE settlement boundary
-    // (both WAVE_ADVANCE and TERMINAL_COMMIT may follow), so - exactly like the turn-boundary wait - it must
-    // accept that settlement at turn N or N+1. Without this the won-wave WAVE_ADVANCE fails closed after the
-    // replacement (RC/.../o2/f1/s1) and terminates the shared session.
+    // settlementTurn=2"). The replacement terminal wait grants this one documented WAVE_ADVANCE edge at
+    // turn N or N+1; unrelated successor kinds and arbitrary N+2 drift remain fail-closed.
     const terminalReplacementKinds = ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const;
     const settlement = (operationId: string, turn: number) => ({
       ...entryInput(operationId, {
@@ -2809,16 +2807,24 @@ describe("authority-v2 log", () => {
     expect(scheduler.liveCount()).toBe(0);
   });
 
-  it("publishes nothing and burns no revision when authority-local successor reservation fails", () => {
+  it("defers a refused authority-local reservation without burning a revision or publishing", () => {
     const log = makeLog(scheduler, sent);
     const prepared: number[] = [];
+    let reservationReady = false;
+    const reserve = (entry: CoopAuthorityEntry): (() => void) | null => {
+      prepared.push(entry.revision);
+      return reservationReady ? () => {} : null;
+    };
 
-    expect(() =>
-      log.commit(entryInput("op-refused-local"), entry => {
-        prepared.push(entry.revision);
-        return null;
-      }),
-    ).toThrow("authority-local successor reservation refused");
+    const deferred = log.commitDetailed(entryInput("op-refused-local"), reserve);
+    expect(deferred).toMatchObject({
+      kind: "deferred",
+      reason: "predecessor-control-not-installed",
+    });
+    if (deferred.kind !== "deferred") {
+      return;
+    }
+    expect(deferred.entry.revision).toBe(1);
     expect(prepared).toEqual([1]);
     expect(delivered(sent)).toEqual([]);
     expect(log.retained()).toEqual([]);
@@ -2828,9 +2834,15 @@ describe("authority-v2 log", () => {
       activeDeliveryTimers: 0,
     });
 
-    const committed = log.commit(entryInput("op-after-refusal"), () => () => {});
-    expect(committed.revision).toBe(1);
-    expect(delivered(sent).map(entry => entry.operationId)).toEqual(["op-after-refusal"]);
+    reservationReady = true;
+    const committed = log.retryDeferredCommit(deferred.entry.operationId);
+    expect(committed.kind).toBe("committed");
+    if (committed.kind !== "committed") {
+      return;
+    }
+    expect(committed.entry.revision).toBe(1);
+    expect(prepared).toEqual([1, 1]);
+    expect(delivered(sent).map(entry => entry.operationId)).toEqual(["op-refused-local"]);
   });
 
   it("keeps a committed entry retryable when the carrier throws synchronously", () => {
