@@ -269,6 +269,16 @@ function outcomeSummary(rows, dimensionIndex) {
   );
 }
 
+function runOutcomeSummary(rows) {
+  const summary = outcomeSummary(rows, 0);
+  for (const row of Object.values(summary)) {
+    const wins = Number(row.outcomes.victory ?? 0);
+    const wipes = Number(row.outcomes["player-wiped"] ?? 0);
+    row.resolvedWinRate = wins + wipes > 0 ? wins / (wins + wipes) : null;
+  }
+  return summary;
+}
+
 function behaviorSummary(tables) {
   const summarize = (rows, labelIndex, positive) => {
     const groups = new Map();
@@ -311,6 +321,7 @@ function waveRisk(rows) {
       const resolved = wins + defeats;
       return {
         difficulty: row.dimensions[0],
+        gameMode: row.dimensions[1],
         waveBand: row.dimensions[2],
         battleType: row.dimensions[3],
         format: row.dimensions[4],
@@ -367,7 +378,7 @@ export function mergeCombatGameplayAnalytics(
   const baselines = battleBaselines(tables.battleOutcome ?? []);
   const insights = {
     battleOutcomesByDifficulty: outcomeSummary(tables.battleOutcome ?? [], 0),
-    runOutcomesByDifficulty: outcomeSummary(tables.runOutcome ?? [], 0),
+    runOutcomesByDifficulty: runOutcomeSummary(tables.runOutcome ?? []),
     behaviorByDifficulty: behaviorSummary(tables),
     highestRiskBattleCohorts: waveRisk(tables.battleOutcome ?? []),
     associations: {
@@ -388,7 +399,8 @@ export function mergeCombatGameplayAnalytics(
       minimumObservationsPerPublishedCohort: minObservations,
       minimumApproximateSourcesPerPublishedCohort: minSources,
       sourceSketchesIncluded: includeSketches,
-      associationWarning: "Observed associations are not causal balance estimates.",
+      associationWarning:
+        "Observed associations are not causal balance estimates and are not adjusted for wave/encounter context.",
     },
     metadata,
     counts,
@@ -438,7 +450,7 @@ export function gameplayAnalyticsMarkdown(report) {
     `- Episodes observed: ${Number(report.counts.episodes ?? 0).toLocaleString()}`,
     `- Human combat decisions: ${Number(report.counts.decisions ?? 0).toLocaleString()}`,
     `- Battle terminals: ${Number(report.counts.battleTerminals ?? 0).toLocaleString()}`,
-    `- Approximate distinct sources: ${report.approximateSources.toLocaleString()}`,
+    `- Approximate distinct source partitions: ${report.approximateSources.toLocaleString()}`,
     "",
     "## Outcomes",
     "",
@@ -446,6 +458,12 @@ export function gameplayAnalyticsMarkdown(report) {
   for (const [difficulty, row] of Object.entries(report.insights.battleOutcomesByDifficulty)) {
     lines.push(
       `- **${difficulty}:** ${row.observations.toLocaleString()} terminal battles; resolved win rate ${percent(row.resolvedWinRate)}; outcomes ${JSON.stringify(row.outcomes)}`,
+    );
+  }
+  lines.push("", "### Completed runs", "");
+  for (const [difficulty, row] of Object.entries(report.insights.runOutcomesByDifficulty)) {
+    lines.push(
+      `- **${difficulty}:** ${row.observations.toLocaleString()} run terminals; win rate excluding abandonment ${percent(row.resolvedWinRate)}; outcomes ${JSON.stringify(row.outcomes)}`,
     );
   }
   lines.push("", "## Player behavior", "");
@@ -463,12 +481,12 @@ export function gameplayAnalyticsMarkdown(report) {
   lines.push("", "## Highest-risk cohorts", "");
   for (const row of report.insights.highestRiskBattleCohorts.slice(0, 12)) {
     lines.push(
-      `- ${row.difficulty}, waves ${row.waveBand}, ${row.battleType}/${row.format}/${row.boss}: ${percent(row.defeatRate)} defeats across ${row.battles.toLocaleString()} resolved battles`,
+      `- ${row.difficulty}/${row.gameMode}, waves ${row.waveBand}, ${row.battleType}/${row.format}/${row.boss}: ${percent(row.defeatRate)} defeats across ${row.battles.toLocaleString()} resolved battles`,
     );
   }
   lines.push("", "## Observed balance associations", "");
   lines.push(
-    "These are support-filtered correlations with battle outcomes, not proof that an entity causes wins or losses.",
+    "These are support-filtered correlations with battle outcomes, not proof that an entity causes wins or losses. They are not yet adjusted for wave or encounter context.",
     "",
   );
   renderAssociations(lines, "Species/forms", report.insights.associations.species);
@@ -481,6 +499,9 @@ export function gameplayAnalyticsMarkdown(report) {
   lines.push(`- Incomplete episodes: ${Number(report.counts.incompleteEpisodes ?? 0).toLocaleString()}`);
   lines.push(
     `- Battles with no joinable decisions: ${Number(report.counts.battlesWithoutDecisions ?? 0).toLocaleString()}`,
+  );
+  lines.push(
+    "- Source partitions are stable accounts for logged-in users, but per-browser-session identities for guests.",
   );
   lines.push(
     "- Date-prefix parallelism can split a run crossing UTC midnight; those joins remain incomplete rather than being guessed.",

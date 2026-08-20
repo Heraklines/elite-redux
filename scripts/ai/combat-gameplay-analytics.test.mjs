@@ -119,4 +119,6 @@ test("entity rankings use dictionary names and supported battle exposures", () =
   assert.equal(merged.insights.associations.species.hell.positive[0].name, "Winner");
   assert.equal(merged.insights.associations.species.hell.negative[0].name, "Loser");
   assert.equal(merged.insights.battleOutcomesByDifficulty.hell.resolvedWinRate, 0.5);
+  assert.equal(merged.insights.runOutcomesByDifficulty.hell.resolvedWinRate, 0.5);
+  assert.equal(merged.insights.highestRiskBattleCohorts[0].gameMode, "classic");
 });

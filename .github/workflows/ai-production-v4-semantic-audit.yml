@@ -33,12 +33,17 @@ on:
         description: Last UTC object-prefix date (blank uses current UTC date)
         required: false
         default: ""
+      analysis_merge_run_id:
+        description: Existing successful analysis run whose shard artifacts should be re-merged without rescanning
+        required: false
+        default: ""
       validation_decisions:
         description: Source-disjoint validation decisions (256 full gate; 64 fast inference recheck)
         required: false
         default: "256"
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -228,7 +233,7 @@ jobs:
           if-no-files-found: error
 
   gameplay-analysis-shards:
-    if: github.repository == 'Heraklines/elite-redux' && inputs.run_gameplay_analysis
+    if: github.repository == 'Heraklines/elite-redux' && inputs.run_gameplay_analysis && inputs.analysis_merge_run_id == ''
     name: Reduce production gameplay data (shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
     timeout-minutes: 330
@@ -311,7 +316,11 @@ jobs:
           if-no-files-found: error
 
   gameplay-analysis-report:
-    if: github.repository == 'Heraklines/elite-redux' && inputs.run_gameplay_analysis
+    if: >-
+      always() &&
+      github.repository == 'Heraklines/elite-redux' &&
+      inputs.run_gameplay_analysis &&
+      (inputs.analysis_merge_run_id != '' || needs.gameplay-analysis-shards.result == 'success')
     name: Merge privacy-thresholded gameplay insights
     needs: gameplay-analysis-shards
     runs-on: ubuntu-latest
@@ -327,6 +336,8 @@ jobs:
           pattern: gameplay-analytics-shard-*
           path: ${{ runner.temp }}/gameplay-analytics-shards
           merge-multiple: true
+          run-id: ${{ inputs.analysis_merge_run_id || github.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Resolve exact data dictionaries used by the corpus
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
