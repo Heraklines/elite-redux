@@ -140,3 +140,56 @@ jobs:
           path: rust/Cargo.lock
           if-no-files-found: error
           retention-days: 7
+
+  m4-oracle-probe:
+    name: M4 oracle fresh-process probe
+    needs:
+      - m4-source-lock
+      - m4-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact oracle candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install repository-pinned pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install pinned BLAKE3 verifier
+        run: cargo install b3sum --version 1.8.6 --locked
+
+      - name: Install immutable dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Export exact M4 oracle vectors twice
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M4_ORACLE_GAP_REPORT: ${{ github.workspace }}/artifacts/m4-oracle-gaps.json
+        run: |
+          mkdir -p artifacts
+          node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m4-oracle-output"
+
+      - name: Upload oracle output or typed gaps
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-oracle-probe
+          path: |
+            artifacts/m4-oracle-gaps.json
+            ${{ runner.temp }}/m4-oracle-output
+          if-no-files-found: warn
+          retention-days: 14

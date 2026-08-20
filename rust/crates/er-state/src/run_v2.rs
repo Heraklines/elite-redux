@@ -275,7 +275,7 @@ pub struct RunStateV2 {
     pub counters: RunCounters,
 }
 
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum RunStateValidationError {
     #[error("RunStateV2 schema version must be {expected}, got {actual}")]
     SchemaVersionMismatch { expected: u32, actual: u32 },
@@ -317,6 +317,7 @@ impl RunStateV2 {
             return Err(RunStateValidationError::ZeroNextBattleId);
         }
         self.run_rng
+            .rdg
             .validate()
             .map_err(RunStateValidationError::RunRng)?;
         if self.progression.schema_version != PROGRESSION_QUEUE_SCHEMA_VERSION {

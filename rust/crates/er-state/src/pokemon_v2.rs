@@ -14,9 +14,11 @@ use er_types::battle_model::{
 use er_types::run_ids::{Experience, GrowthRateId, NatureId};
 
 use crate::pokemon::{
-    MOVE_SLOT_COUNT, PokemonStateError, validate_ability_loadout, validate_m3_ability_loadout,
-    validate_m3_status_state, validate_m3_typing, validate_move_slot_metadata,
-    validate_stat_stages, validate_status_state, validate_typing,
+    AbilityLoadoutValidationError, MOVE_SLOT_COUNT, PokemonStateError,
+    StatStagesValidationError, StatusValidationError, TypingValidationError,
+    validate_ability_loadout, validate_m3_ability_loadout, validate_m3_status_state,
+    validate_m3_typing, validate_move_slot_metadata, validate_stat_stages,
+    validate_status_state, validate_typing,
 };
 
 pub const POKEMON_STATE_SCHEMA_VERSION_V2: u32 = 2;
@@ -202,6 +204,14 @@ pub enum PokemonStateV2Error {
     M3(#[from] PokemonStateError),
     #[error("progression state is invalid: {0}")]
     Progression(#[from] PokemonProgressionValidationError),
+    #[error("typing is invalid: {0}")]
+    Typing(#[from] TypingValidationError),
+    #[error("status is invalid: {0}")]
+    Status(#[from] StatusValidationError),
+    #[error("stat stages are invalid: {0}")]
+    StatStages(#[from] StatStagesValidationError),
+    #[error("ability loadout is invalid: {0}")]
+    AbilityLoadout(#[from] AbilityLoadoutValidationError),
 }
 
 impl PokemonStateV2 {

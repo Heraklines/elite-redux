@@ -60,6 +60,7 @@ pub struct BattleSettlementState {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BattleStateV2 {
+    pub schema_version: u32,
     pub battle_id: BattleId,
     pub wave: WaveIndex,
     pub wave_seed: String,
@@ -81,7 +82,7 @@ pub struct BattleStateV2 {
     pub outcome: BattleOutcome,
 }
 
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum BattleStateV2Error {
     #[error("BattleStateV2 schema version must be {expected}, got {actual}")]
     SchemaVersionMismatch { expected: u32, actual: u32 },

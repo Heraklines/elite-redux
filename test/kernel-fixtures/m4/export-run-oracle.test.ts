@@ -8,7 +8,6 @@
  * M3 JSON byte stream.
  */
 
-import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -19,6 +18,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { captureBiomeEncounter } from "./export/biome-encounter-capture";
 import { captureMigrationCompanions } from "./export/migration-companion-capture";
 import { captureProgression } from "./export/progression-capture";
+import { captureRunContent } from "./export/run-content-capture";
 import { captureRewardMarket } from "./export/reward-market-capture";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -425,57 +425,7 @@ function captureRngVectors(): JsonObject {
   return { artifact_id: "rng-vectors-v1", schema_version: 1, m3_parity_oracle_sha: M3_PARITY_ORACLE_SHA, m4_oracle_sha: M4_ORACLE_SHA, vectors };
 }
 
-function m4MoveDefinitions(vector: string): JsonValue[] {
-  const moveIds = [34, 45, 72, 74, 124, 230, 331, 447, 520];
-  const definitions: JsonValue[] = [];
-  for (const id of moveIds) {
-    const move = allMoves.find(entry => Number((entry as AnyRecord).id) === id) as AnyRecord | undefined;
-    if (move == null) {
-      fail(vector, "CONTENT_REGISTRY_UNINITIALIZED", "src/init/init.ts:initializeGame", `post-initialization MoveId ${id} is absent`);
-    }
-    const definition = {
-      id,
-      type: move.type,
-      category: move.category,
-      power: move.power,
-      accuracy: move.accuracy,
-      pp: move.pp,
-      chance: move.chance,
-      priority: move.priority,
-      target: move.moveTarget,
-      flags: (move as AnyRecord).flags,
-      attribute_kinds: Array.isArray(move.attrs) ? move.attrs.map((attr: AnyRecord) => attr.constructor?.name ?? "") : [],
-    };
-    if ((definition.flags === undefined) || definition.attribute_kinds.some(kind => typeof kind !== "string")) {
-      fail(vector, "POST_INITIALIZATION_MOVE_UNOBSERVABLE", "src/data/moves/move.ts:Move", `MoveId ${id} lacks complete initialized fields`);
-    }
-    definitions.push(definition);
-  }
-  return definitions;
-}
 
-function pinnedContentProbe(vector: string): void {
-  const species = allSpecies.find(entry => Number((entry as AnyRecord).speciesId) === 1);
-  const town = allBiomes.get(0);
-  const plains = allBiomes.get(1);
-  if (species == null || town == null || plains == null) {
-    fail(vector, "CONTENT_REGISTRY_UNINITIALIZED", "src/init/init.ts:initializeGame", "pinned species/biome records are not live");
-  }
-  m4MoveDefinitions(vector);
-  if (allAbilities.length === 0 || Object.keys(modifierTypes).length === 0) {
-    fail(vector, "CONTENT_REGISTRY_INCOMPLETE", "src/init/init.ts:initializeGame", "ability/modifier registries are not live");
-  }
-}
-
-function captureRunContent(): never {
-  pinnedContentProbe("run-content-pack-v1");
-  fail(
-    "run-content-pack-v1",
-    "RUN_CONTENT_CALLBACK_UNOBSERVABLE",
-    "src/modifier/modifier-type.ts:regenerateModifierPoolThresholds",
-    "complete run content requires callback/generator behavior and an oracle-owned run-content hash; declarations alone are insufficient",
-  );
-}
 
 
 function captureComposedSegment(): never {
@@ -594,7 +544,29 @@ describe("M4A fresh run oracle export", () => {
     const generated = new Map<string, JsonObject>();
 
     generated.set("rng-vectors-v1.json", captureRngVectors());
-    collectGap(captureRunContent, gaps);
+    const contentPacks = await collectLiveCapture("content-packs", captureRunContent, gaps);
+    if (contentPacks != null) {
+      if (
+        contentPacks.battle_content_pack == null
+        || typeof contentPacks.battle_content_pack !== "object"
+        || Array.isArray(contentPacks.battle_content_pack)
+        || contentPacks.run_content_pack == null
+        || typeof contentPacks.run_content_pack !== "object"
+        || Array.isArray(contentPacks.run_content_pack)
+      ) {
+        gaps.push(
+          new OracleGap(
+            "content-packs",
+            "CAPTURE_SHAPE_INVALID",
+            "test/kernel-fixtures/m4/export/run-content-capture.ts:captureRunContent",
+            "helper did not return separate battle and run content packs",
+          ),
+        );
+      } else {
+        generated.set("battle-content-pack-v1.json", contentPacks.battle_content_pack as JsonObject);
+        generated.set("run-content-pack-v1.json", contentPacks.run_content_pack as JsonObject);
+      }
+    }
 
     const progression = await collectLiveCapture(
       "progression/nacli-medium-slow-level-17-v1",
@@ -690,8 +662,8 @@ describe("M4A fresh run oracle export", () => {
       throw new Error(gaps.map(gap => gap.message).join("\n"));
     }
 
-    const battlePack = readJson("rust/fixtures/m3/oracle/content-pack-v1.json");
-    const battleHash = String(battlePack.content_pack?.hash ?? "");
+    const battlePack = generated.get("battle-content-pack-v1.json") as AnyRecord | undefined;
+    const battleHash = String(battlePack?.hash ?? "");
     const runPack = generated.get("run-content-pack-v1.json") as AnyRecord | undefined;
     const runHash = String(runPack?.run_content_hash ?? "");
     const sharedProvenance = provenance(battleHash, runHash);
@@ -700,6 +672,7 @@ describe("M4A fresh run oracle export", () => {
       if (
         path === "rng-vectors-v1.json"
         || path === "run-content-pack-v1.json"
+        || path === "battle-content-pack-v1.json"
         || path.startsWith("migration/")
       ) {
         writeCanonical(resolve(root, path), value);
