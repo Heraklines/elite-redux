@@ -17,6 +17,7 @@ import { createInterface } from "node:readline";
 import { gunzipSync, gzipSync } from "node:zlib";
 import lzString from "lz-string";
 import { createCombatContractV4Audit, mergeCombatContractV4AuditReports } from "./combat-contract-v4-audit.mjs";
+import { createCombatGameplayAnalytics } from "./combat-gameplay-analytics.mjs";
 
 const { decompressFromBase64 } = lzString;
 const DEFAULT_EXPORT_URL = "https://er-ai-telemetry-export.heraklines.workers.dev/v1/export";
@@ -34,6 +35,8 @@ function parseArgs(argv) {
     shards: DEFAULT_AUDIT_SHARDS,
     privatePolicyOutput: null,
     privateEpisodeOutput: null,
+    gameplayAnalysisOutput: null,
+    prefix: "",
   };
   const remaining = [...argv];
   while (remaining.length > 0) {
@@ -51,6 +54,10 @@ function parseArgs(argv) {
       args.privatePolicyOutput = resolve(value);
     } else if (name === "--private-episode-out" && value) {
       args.privateEpisodeOutput = resolve(value);
+    } else if (name === "--gameplay-analysis-out" && value) {
+      args.gameplayAnalysisOutput = resolve(value);
+    } else if (name === "--prefix" && value != null) {
+      args.prefix = value;
     } else {
       throw new Error(`invalid argument: ${name ?? "<missing>"}`);
     }
@@ -135,10 +142,13 @@ function decodeRow(row) {
   }
 }
 
-function buildPageUrl(exportUrl, cursor) {
+function buildPageUrl(exportUrl, cursor, prefix) {
   const url = new URL(exportUrl);
   url.searchParams.set("contractVersion", "4");
   url.searchParams.set("limit", String(PAGE_SIZE));
+  if (prefix) {
+    url.searchParams.set("prefix", prefix);
+  }
   if (cursor) {
     url.searchParams.set("cursor", cursor);
   }
@@ -188,7 +198,7 @@ async function auditShard(path, crossShardRepeatedSessions, onEpisodeFinished) {
 }
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Pagination, ephemeral sharding, and bounded error accounting share one lifecycle.
-async function streamAudit(
+async function streamAudit({
   exportUrl,
   token,
   maxInvalidObjects,
@@ -196,7 +206,9 @@ async function streamAudit(
   shardCount,
   privatePolicyOutput,
   privateEpisodeOutput,
-) {
+  gameplayAnalytics,
+  prefix,
+}) {
   const scratch = scratchDirectory();
   const spool = openShardSpool(scratch, shardCount);
   let privatePolicyDescriptor = null;
@@ -229,7 +241,7 @@ async function streamAudit(
   try {
     try {
       do {
-        const { response, rows } = await fetchPage(buildPageUrl(exportUrl, state.cursor), token);
+        const { response, rows } = await fetchPage(buildPageUrl(exportUrl, state.cursor, prefix), token);
         const selected = numericHeader(response, "x-er-selected-objects");
         if (rows.length !== selected) {
           throw new Error(`telemetry export selected ${selected} objects but returned ${rows.length}`);
@@ -293,6 +305,7 @@ async function streamAudit(
     }
     const reports = [];
     const writePrivateOutputs = episode => {
+      gameplayAnalytics?.ingestEpisode(episode);
       const { split, decisions, result } = episode;
       if (privateEpisodeDescriptor != null) {
         writeSync(privateEpisodeDescriptor, gzipSync(`${JSON.stringify(episode)}\n`));
@@ -334,6 +347,7 @@ async function streamAudit(
       policyDiagnosticDecisionsWritten,
       privateEpisodesWritten,
       truncatedByObjectLimit: state.truncatedByObjectLimit === true,
+      prefix,
     });
     report.corpus.repeatedPayloads += crossShardRepeatedPayloads;
     return report;
@@ -451,18 +465,38 @@ async function main() {
   }
   validatePrivateOutput(args.privatePolicyOutput, args.output, "private policy output");
   validatePrivateOutput(args.privateEpisodeOutput, args.output, "private episode output", ".gz");
-  const report = await streamAudit(
+  validatePrivateOutput(args.gameplayAnalysisOutput, args.output, "gameplay analysis output", ".json");
+  const gameplayAnalytics = args.gameplayAnalysisOutput == null ? null : createCombatGameplayAnalytics();
+  const report = await streamAudit({
     exportUrl,
     token,
-    args.maxInvalidObjects,
-    args.maxSelectedObjects,
-    args.shards,
-    args.privatePolicyOutput,
-    args.privateEpisodeOutput,
-  );
+    maxInvalidObjects: args.maxInvalidObjects,
+    maxSelectedObjects: args.maxSelectedObjects,
+    shardCount: args.shards,
+    privatePolicyOutput: args.privatePolicyOutput,
+    privateEpisodeOutput: args.privateEpisodeOutput,
+    gameplayAnalytics,
+    prefix: args.prefix,
+  });
   mkdirSync(args.output, { recursive: true });
   writeFileSync(`${args.output}/production-v4-semantic-audit.json`, `${JSON.stringify(report, null, 2)}\n`);
   writeFileSync(`${args.output}/production-v4-semantic-audit.md`, markdownReport(report));
+  if (args.gameplayAnalysisOutput != null) {
+    mkdirSync(dirname(args.gameplayAnalysisOutput), { recursive: true });
+    writeFileSync(
+      args.gameplayAnalysisOutput,
+      `${JSON.stringify(
+        gameplayAnalytics.finish({
+          prefix: args.prefix,
+          listedObjects: report.corpus.listedObjects,
+          selectedObjects: report.corpus.selectedObjects,
+          compressedBytes: report.corpus.compressedBytes,
+        }),
+        null,
+        2,
+      )}\n`,
+    );
+  }
   console.log(markdownReport(report));
 }
 
