@@ -3,6 +3,9 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
+import { globalScene } from "#app/global-scene";
 import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { initializeGame } from "#init/init";
@@ -10,6 +13,7 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveTarget } from "#enums/move-target";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { GameModes } from "#enums/game-modes";
 import { ModifierTier } from "#enums/modifier-tier";
 import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
@@ -498,11 +502,42 @@ function battleAbilities(slice: AnyRecord): JsonValue[] {
     const entry = requireRecord(raw, `ability_definitions[${index}]`);
     const id = safeInteger(entry.id, `ability_definitions[${index}].id`);
     const source = sourceAbility(id, `ability_definitions[${index}]`);
+
     return { id, effect: abilityEffect(source, id), capability: { kind: "SUPPORTED" } };
   });
 }
+/**
+ * The production multiplier applies active challenges through globalScene, so
+ * observing its chart requires the same live scene context as a battle.
+ */
+function ensureLiveTypeChartScene(): void {
+  let scene: BattleScene;
+  try {
+    scene = new BattleScene();
+    scene.gameMode = getGameMode(GameModes.CLASSIC);
+  } catch (error) {
+    gap(
+      "TYPE_CHART_UNOBSERVABLE",
+      "src/battle-scene.ts:BattleScene.gameMode",
+      `failed to initialize the live Classic scene: ${String(error)}`,
+    );
+  }
+  if (
+    globalScene !== scene
+    || globalScene.gameMode !== scene.gameMode
+    || globalScene.gameMode.modeId !== GameModes.CLASSIC
+    || !Array.isArray(globalScene.gameMode.challenges)
+  ) {
+    gap(
+      "TYPE_CHART_UNOBSERVABLE",
+      "src/battle-scene.ts:BattleScene.gameMode",
+      "the live scene does not expose an initialized Classic game mode",
+    );
+  }
+}
 
 function battleTypeChart(slice: AnyRecord): JsonObject {
+  ensureLiveTypeChartScene();
   const chart = requireRecord(slice.type_chart, "type_chart");
   const entries = requireArray(chart.non_neutral_entries, "type_chart.non_neutral_entries").map((raw, index) => {
     const entry = requireRecord(raw, `type_chart.non_neutral_entries[${index}]`);
