@@ -8,10 +8,8 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use crate::battle_ids::CanonicalHexBytes;
-use crate::{
-    KernelEffect, KernelInput, LiveResourceSnapshot, MenuInstanceId, OperationId, Revision, SafeU53,
-};
+use crate::battle_ids::{CanonicalHexBytes, MenuInstanceId};
+use crate::{KernelEffect, KernelInput, LiveResourceSnapshot, OperationId, Revision, SafeU53};
 
 fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
