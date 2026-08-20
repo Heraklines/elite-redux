@@ -864,6 +864,16 @@ function registerReplacementPrompt(game: GameManager): void {
 
 async function admitPlayerCommands(game: GameManager, id: string): Promise<void> {
   const field = game.scene.getPlayerField(false);
+  const select = (mon: Pokemon, battlerIndex: number): void => {
+    const move = mon.getMoveset()[0];
+    if (move == null) {
+      gap("COMMAND_UNOBSERVABLE", M3_CASE_SEAM, `player field ${String(battlerIndex)} has no move`);
+    }
+    // Queue the production command and target prompts exactly as the M3
+    // exporter does.  The subsequent EnemyCommandPhase request then runs this
+    // live CommandPhase through its ordinary UI boundary.
+    game.move.select(move.moveId, battlerIndex as BattlerIndex);
+  };
   if (id === "pp-unusable-rejected") {
     const lead = field[0];
     const exhausted = lead?.getMoveset()[0];
@@ -898,22 +908,22 @@ async function admitPlayerCommands(game: GameManager, id: string): Promise<void>
     return;
   }
   if (id === "voluntary-switch") {
+    // In a double battle party slots 0 and 1 are active; queue the observed
+    // bench switch before the partner's production move command.
     game.doSwitchPokemon(2);
     if (field[1] != null && !field[1].isFainted()) {
-      const move = field[1].getMoveset()[0];
-      if (move == null) gap("COMMAND_UNOBSERVABLE", M3_CASE_SEAM, "voluntary-switch partner has no move");
-      game.move.select(move.moveId, BattlerIndex.PLAYER_2);
+      select(field[1], BattlerIndex.PLAYER_2);
     }
-    return;
-  }
-  for (const [index, mon] of field.entries()) {
-    if (mon != null && !mon.isFainted()) {
-      const move = mon.getMoveset()[0];
-      if (move == null) gap("COMMAND_UNOBSERVABLE", M3_CASE_SEAM, `player field ${String(index)} has no move`);
-      game.move.select(move.moveId, index === 0 ? BattlerIndex.PLAYER : BattlerIndex.PLAYER_2);
+  } else {
+    if (field[0] != null && !field[0].isFainted()) {
+      select(field[0], BattlerIndex.PLAYER);
+    }
+    if (field[1] != null && !field[1].isFainted()) {
+      select(field[1], BattlerIndex.PLAYER_2);
     }
   }
 }
+
 
 async function admitEnemyCommands(game: GameManager): Promise<void> {
   const enemy = game.scene.getEnemyField(false);
@@ -969,10 +979,10 @@ async function captureCase(
       enemyIdentity.byPokemon,
       canonical.sourceBattleId,
     );
+    await admitPlayerCommands(game, id);
     if (id === "forced-replacement" || id === "same-side-simultaneous-faint" || id === "mixed-side-simultaneous-faint") {
       registerReplacementPrompt(game);
     }
-    await admitPlayerCommands(game, id);
     await admitEnemyCommands(game);
     const settledBoundary = await game.phaseInterceptor.toFirst(["TurnEndPhase", "VictoryPhase", "GameOverPhase"]);
     if (settledBoundary === "TurnEndPhase") await game.toEndOfTurn();
