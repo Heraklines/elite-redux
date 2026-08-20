@@ -14,13 +14,13 @@ from __future__ import annotations
 
 import argparse
 import colorsys
-from collections import deque
+from collections import Counter, deque
 from pathlib import Path
 
 from PIL import Image
 
 
-SPRITE_SIZE = (96, 96)
+SPRITE_SIZE = (64, 64)
 ICON_FRAME_SIZE = (32, 32)
 
 
@@ -122,6 +122,55 @@ SOURCES: dict[str, dict[str, object]] = {
         "front": GDRIVE / rel("1ecVQReZzT98di7ETvBlD__sdm5PUY9dw/Mega Xatu.png"),
         "back": GDRIVE / rel("1He7s8tPBG_skxm250nv6wrLY-jyof0Qn/xatu mega back mine.png"),
     },
+    # 2026 pitch-expansion sources. The existing 70026 Egoelk slug is
+    # deliberately replaced in place; no second egoelk_pitch directory.
+    "egoelk": {
+        "front": GDRIVE / rel("1T4hRMcHxirnKk80U1M_BjFV8V5Oq1zLK/(stantler) Egoelk.png"),
+        "back": GDRIVE / rel("1twCPEWTQn4lk3qEVdWB-0MZQ6jmGHeIe/(stantler) EgoelkB.png"),
+    },
+    "mishamanus": {
+        "front": GDRIVE / rel("1hril7J9wLZW9jK7B_EKlsYTxlRFyQlVX/429_1f.png"),
+        "back": GDRIVE / rel("1cMSVItYR4atMk3KaUDoa7IIf7UpxXemH/429_1b.png"),
+    },
+    "iron_stream": {
+        "front": GDRIVE / rel("1zqusY_jILwg-OAkRllZtBgt3SDpwagZs/iron_stream_by_imoicon_dl1iki5.png"),
+        "back": GDRIVE / rel("13JOYO_D4nGVd5EBE2qTLNIIxPCIoBjmP/iron stream back.png"),
+        "icon": GDRIVE / rel("1GPQDiGL7_hvq29ausVYQO9E-3FQkX3xk/iron stream icon.png"),
+    },
+    "slabberigus": {
+        "front": GDRIVE / rel("1P4Dt-2lfgzfoH1GCXEay4XuTIR0jkmIe/slabberigus.png"),
+        "back": GDRIVE / rel("1-el96lkNzHjqtxBCnLqxeITOl1-I0lR4/slabberigus1.png"),
+        "icon": GDRIVE / rel("17wrRORriqqBZy84xycX_oQzBivmxHgLH/slabberigusicon.png"),
+    },
+    "tagela": {
+        "front": GDRIVE / rel("1M61fDsH2hr1j3Kkd1drLU5pgTY--5g5U/TANGELA.png"),
+        "back": GDRIVE / rel("1G97_nx9QWeSxEBSnbYGdEPrhddSG75oH/TANGELA BACK.png"),
+    },
+    "intangrowth": {
+        "front": GDRIVE / rel("11JOBGSlEiYGXzSNy66laq9OIl8PPYRBU/TANGROWTH.png"),
+        "back": GDRIVE / rel("1hX_ILAkrNEI_874eEgbjJPaYEA0pWEIc/TANGROWTH BACK.png"),
+    },
+    "calyrex_chariot_mega": {
+        "front": GDRIVE / rel("1tnbGcB1dUCVJWde1I-_CQVAIXU_WiAQP/calyrexfront.png"),
+        "back": GDRIVE / rel("1EPTa86vbMZPH1dGQjfY0yqxdsd4EUhS-/calyrexback.png"),
+    },
+    "barbaracle_mega_y": {
+        "front": GDRIVE / rel("1ZzqLcQJ9MeVHdWwdHVk-bQe2d1CM-T7b/Mega Barbaracle.png"),
+        "back": GDRIVE / rel("16TlxPoEMRs8WPm2zoYWiVlb90Hv8STd-/Mega Barbaracle_back.png"),
+    },
+    "uxie_corrupted": {
+        "front": GDRIVE / rel("1x3ojztqzcQM0Am_kG6zODSkYpCYOsvJm/480_1f.png"),
+        "back": GDRIVE / rel("11FtS4LC7ICN-ARf9OAWg1evzCfY43q59/480_1b.png"),
+    },
+    # Accepted renamed convergent Dusknoir line. Drawclops keeps its
+    # existing back/icon assets; Dustnoir keeps its existing icon.
+    "drawclops": {
+        "front": GDRIVE / rel("1zMTuSDyN9lgVCKjHbp2nBLyeD1GLBrQK/171.png"),
+    },
+    "dustnoir": {
+        "front": GDRIVE / rel("1u_BPsGlR1BvPGSyGNSKNhVfKO1dWi1vJ/172 (1).png"),
+        "back": GDRIVE / rel("1ixzvopYc9IyfMXvINQJ5-XzBktnYkYHS/172.png"),
+    },
 }
 
 
@@ -150,13 +199,80 @@ SHEETS: dict[str, dict[str, object]] = {
         "icon": GDRIVE / rel("1V50CpkyqoLA5DCIAlosYPrYGUnwMcQlC/dkmezld-133f0e99-04fe-444d-8be2-f68c4a088c32.png"),
         "layout": "single_large",
     },
+    "falinks_convergent": {
+        "front": GDRIVE / rel("1V-iMfLZzIcWcMj4MiJtSl_55WeoLQfqI/FALINKS_1.png"),
+        "layout": "view_pair",
+    },
+    "hypno_mega": {
+        "front": GDRIVE / rel("1ipfViOooxeiYVROsl4DmON9kpejEqwsy/HYPNO_1.png"),
+        "layout": "view_pair",
+    },
+    "raichu_alolan_mega_male": {
+        "front": GDRIVE / rel("12sTZsyn5TJtyOsZYLCAsRispOCn4tkEx/image_by_lennybitao_dmo3ert.png"),
+        "layout": "view_pair",
+    },
+    "raichu_alolan_mega_female": {
+        "front": GDRIVE / rel("1LyNF5wGwu8l8daogFzHoOYdRC6hFgNxP/image_by_lennybitao_dmo3e0q.png"),
+        "layout": "view_pair",
+    },
+    "lilligant_verdant": {
+        "front": GDRIVE / rel("1mI_44Vv7qZZI6js4HFQDJDkNisWYaVix/verdan_lilligant___moon_priestess_by_kfweagz_dmjs9lf-fullview.png"),
+        "layout": "lilligant_panel",
+    },
+    "lilligant_verdant_mega": {
+        "front": GDRIVE / rel("1mI_44Vv7qZZI6js4HFQDJDkNisWYaVix/verdan_lilligant___moon_priestess_by_kfweagz_dmjs9lf-fullview.png"),
+        "layout": "lilligant_panel",
+    },
 }
+
+
+def remove_border_background(image: Image.Image) -> Image.Image:
+    """Drop a solid/checker backdrop without touching immutable sources."""
+    image = image.convert("RGBA")
+    pixels = image.load()
+    width, height = image.size
+    border: list[tuple[int, int, int]] = []
+    for x in range(width):
+        for y in (0, height - 1):
+            r, g, b, a = pixels[x, y]
+            if a:
+                border.append((r, g, b))
+    for y in range(height):
+        for x in (0, width - 1):
+            r, g, b, a = pixels[x, y]
+            if a:
+                border.append((r, g, b))
+    if not border:
+        return image
+    background = Counter(border).most_common(1)[0][0]
+    queue: deque[tuple[int, int]] = deque()
+    seen: set[tuple[int, int]] = set()
+
+    def is_background(x: int, y: int) -> bool:
+        r, g, b, a = pixels[x, y]
+        if not a:
+            return False
+        return sum((channel - base) ** 2 for channel, base in zip((r, g, b), background)) <= 52**2
+
+    for x in range(width):
+        queue.extend(((x, 0), (x, height - 1)))
+    for y in range(height):
+        queue.extend(((0, y), (width - 1, y)))
+    while queue:
+        x, y = queue.popleft()
+        if (x, y) in seen or not (0 <= x < width and 0 <= y < height) or not is_background(x, y):
+            continue
+        seen.add((x, y))
+        r, g, b, _ = pixels[x, y]
+        pixels[x, y] = (r, g, b, 0)
+        queue.extend(((x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)))
+    return image
 
 
 def open_rgba(path: Path) -> Image.Image:
     if not path.is_file():
         raise FileNotFoundError(path)
-    return Image.open(path).convert("RGBA")
+    return remove_border_background(Image.open(path).convert("RGBA"))
 
 
 def alpha_bbox(image: Image.Image) -> tuple[int, int, int, int] | None:
@@ -248,8 +364,11 @@ def normalize_icon(image: Image.Image) -> Image.Image:
     elif height == width * 2:
         frames = [image.crop((0, 0, width, width)), image.crop((0, width, width, height))]
     elif width >= 2 * height:
-        half = width // 2
-        frames = [image.crop((0, 0, half, height)), image.crop((half, 0, width, height))]
+        frame_width = height if width % height == 0 else width // 2
+        frames = [
+            image.crop((index * frame_width, 0, min((index + 1) * frame_width, width), height))
+            for index in range(min(2, width // frame_width))
+        ]
     else:
         frames = [image, image.copy()]
 
@@ -272,19 +391,37 @@ def derived_icon(front: Image.Image) -> Image.Image:
 def save_species(output_root: Path, slug: str, images: dict[str, Image.Image], icon: Image.Image | None = None) -> None:
     directory = output_root / slug
     directory.mkdir(parents=True, exist_ok=True)
+    if "front" not in images:
+        raise ValueError(f"{slug}: approved front source is missing")
     front = normalize_sprite(images["front"])
-    back = normalize_sprite(images["back"])
-    shiny = normalize_sprite(images.get("shiny", hue_shift(front)))
-    shiny_back = normalize_sprite(images.get("shiny_back", hue_shift(back)))
-    front.save(directory / "front.png")
-    back.save(directory / "back.png")
-    shiny.save(directory / "shiny.png")
-    shiny_back.save(directory / "shiny-back.png")
-    if icon is not None:
-        normalize_icon(icon).save(directory / "icon.png")
+    has_back_source = "back" in images
+    back_path = directory / "back.png"
+    if has_back_source:
+        back = normalize_sprite(images["back"])
+    elif back_path.is_file():
+        back = Image.open(back_path).convert("RGBA")
     else:
-        derived_icon(front).save(directory / "icon.png")
-
+        raise FileNotFoundError(f"{slug}: approved back source and retained back output are both missing")
+    shiny = normalize_sprite(images.get("shiny", hue_shift(front)))
+    shiny_2 = normalize_sprite(images.get("shiny_2", hue_shift(shiny, 120.0)))
+    shiny_3 = normalize_sprite(images.get("shiny_3", hue_shift(shiny, 240.0)))
+    front.save(directory / "front.png")
+    shiny.save(directory / "shiny.png")
+    shiny_2.save(directory / "shiny-2.png")
+    shiny_3.save(directory / "shiny-3.png")
+    if has_back_source:
+        shiny_back = normalize_sprite(images.get("shiny_back", hue_shift(back)))
+        shiny_back_2 = normalize_sprite(images.get("shiny_back_2", hue_shift(shiny_back, 120.0)))
+        shiny_back_3 = normalize_sprite(images.get("shiny_back_3", hue_shift(shiny_back, 240.0)))
+        back.save(back_path)
+        shiny_back.save(directory / "shiny-back.png")
+        shiny_back_2.save(directory / "shiny-back-2.png")
+        shiny_back_3.save(directory / "shiny-back-3.png")
+    icon_path = directory / "icon.png"
+    if icon is not None:
+        normalize_icon(icon).save(icon_path)
+    elif not icon_path.is_file():
+        derived_icon(front).save(icon_path)
 
 def load_regular(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, Image.Image], Image.Image | None]:
     if "sheet" in spec:
@@ -296,10 +433,9 @@ def load_regular(library_root: Path, spec: dict[str, object]) -> tuple[dict[str,
             "back": sheet.crop((half, 0, sheet.width, content_bottom)),
         }
     else:
-        images = {
-            "front": open_rgba(library_root / spec["front"]),
-            "back": open_rgba(library_root / spec["back"]),
-        }
+        images = {"front": open_rgba(library_root / spec["front"])}
+        if "back" in spec:
+            images["back"] = open_rgba(library_root / spec["back"])
     if "shiny" in spec:
         images["shiny"] = open_rgba(library_root / spec["shiny"])
     if "shiny_back" in spec:
@@ -323,10 +459,19 @@ def crop_zangoose(image: Image.Image) -> tuple[Image.Image, Image.Image, Image.I
         image.crop((0, y_mid, x_mid, image.height)),
         image.crop((x_mid, y_mid, x_mid * 2, image.height)),
     )
-
-
 def load_sheet(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, Image.Image], Image.Image | None]:
     layout = spec["layout"]
+    if layout == "view_pair":
+        front, back = crop_horizontal_pair(open_rgba(library_root / spec["front"]))
+        return {"front": front, "back": back}, None
+    if layout == "lilligant_panel":
+        sheet = open_rgba(library_root / spec["front"])
+        return {
+            "front": sheet.crop((12, 3, 139, 157)),
+            "back": sheet.crop((15, 166, 138, 315)),
+            "shiny": sheet.crop((172, 3, 298, 157)),
+            "shiny_back": sheet.crop((175, 166, 298, 315)),
+        }, None
     if layout == "horizontal_pair":
         front, shiny = crop_horizontal_pair(open_rgba(library_root / spec["front"]))
         back, shiny_back = crop_horizontal_pair(open_rgba(library_root / spec["back"]))
@@ -350,24 +495,33 @@ def load_sheet(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, I
         icon, _ = crop_horizontal_pair(icon_sheet)
         return images, icon
     raise ValueError(f"Unknown sheet layout: {layout}")
-
-
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--library-root", type=Path, required=True)
     parser.add_argument("--assets-root", type=Path, required=True)
+    parser.add_argument(
+        "--slugs",
+        help="Comma-separated approved output slugs; omit only for the legacy full import.",
+    )
     args = parser.parse_args()
     output_root = args.assets_root / "images" / "pokemon" / "elite-redux"
+    selected = {slug.strip() for slug in args.slugs.split(",")} if args.slugs else None
 
     for slug, spec in SOURCES.items():
+        if selected is not None and slug not in selected:
+            continue
         images, icon = load_regular(args.library_root, spec)
         save_species(output_root, slug, images, icon)
         print(f"imported {slug}")
     for slug, spec in SHEETS.items():
+        if selected is not None and slug not in selected:
+            continue
         images, icon = load_sheet(args.library_root, spec)
         save_species(output_root, slug, images, icon)
         print(f"imported {slug}")
 
+    if selected is not None and "power_plant_live_current" not in selected:
+        return
     # Live Current occupies the lower two panels of Power Plant's source sheet.
     power_spec = SHEETS["power_plant"]
     power_sheet = open_rgba(args.library_root / power_spec["front"])

@@ -40,17 +40,22 @@ import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import {
+  ER_BODHISATTVA_ABILITY_ID,
   ER_CRUSHING_ANTLERS_ABILITY_ID,
   ER_CRYOGENESIS_ABILITY_ID,
   ER_DAYDREAMER_ABILITY_ID,
   ER_DIRTY_SNOWBALL_ABILITY_ID,
+  ER_EBB_AND_FLOW_ABILITY_ID,
   ER_FLUTTERING_SPIRIT_ABILITY_ID,
   ER_FREE_SPIRIT_ABILITY_ID,
   ER_IN_THE_CLOUDS_ABILITY_ID,
   ER_MAGISTRATE_ABILITY_ID,
+  ER_MOONARCH_ABILITY_ID,
   ER_NUCLEUS_ABILITY_ID,
+  ER_PAPER_TALISMAN_ABILITY_ID,
   ER_PHOTOVOLTAIC_ABILITY_ID,
   ER_SOLAR_PANEL_ABILITY_ID,
+  ER_SPIRITUAL_SABER_ABILITY_ID,
   ER_SWORDS_NATURE_ABILITY_ID,
   ER_THICK_SKULLED_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
@@ -196,6 +201,10 @@ const LETS_ROLL = 5031;
 const LIQUIFIED = 5049;
 const EMANATE_FAKEMON = 5190;
 const SOLAR_POWER = AbilityId.SOLAR_POWER;
+const BLADES_ESSENCE = 5242;
+const AEGIS_WARD = 5697;
+const HAND_BARNACLES = 5668;
+const BRAIN_OVER_BRAWN = 6080;
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -455,6 +464,30 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     description: "Stainless Steel + Omniform.",
     constituents: [STAINLESS_STEEL, OMNIFORM],
   },
+  [ER_SPIRITUAL_SABER_ABILITY_ID]: {
+    id: ER_SPIRITUAL_SABER_ABILITY_ID,
+    name: "Spiritual Saber",
+    description: "Blade's Essence + Keen Edge moves make no contact.",
+    constituents: [BLADES_ESSENCE],
+  },
+  [ER_PAPER_TALISMAN_ABILITY_ID]: {
+    id: ER_PAPER_TALISMAN_ABILITY_ID,
+    name: "Paper Talisman",
+    description: "Fluffy + Aegis Ward.",
+    constituents: [FLUFFY, AEGIS_WARD],
+  },
+  [ER_EBB_AND_FLOW_ABILITY_ID]: {
+    id: ER_EBB_AND_FLOW_ABILITY_ID,
+    name: "Ebb and Flow",
+    description: "Tidal Rush + High Tide.",
+    constituents: [5281, 5233],
+  },
+  [ER_MOONARCH_ABILITY_ID]: {
+    id: ER_MOONARCH_ABILITY_ID,
+    name: "Moonarch",
+    description: "Queenly Majesty + Moon Spirit.",
+    constituents: [AbilityId.QUEENLY_MAJESTY, 5209],
+  },
   // -----------------------------------------------------------------------
   // Type-nativization (Pass A) composite replacements (5955-5962). Each is the
   // union of its two constituents' attrs, resolved by the same wire pass.
@@ -506,6 +539,12 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Free Climb",
     description: "Unburden + Mountaineer.",
     constituents: [AbilityId.UNBURDEN, MOUNTAINEER],
+  },
+  [ER_BODHISATTVA_ABILITY_ID]: {
+    id: ER_BODHISATTVA_ABILITY_ID,
+    name: "Bodhisattva",
+    description: "Hand Barnacles + Brain Over Brawn.",
+    constituents: [HAND_BARNACLES, BRAIN_OVER_BRAWN],
   },
 };
 
@@ -562,10 +601,11 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     if (!ability) {
       continue;
     }
-    const preservedBespokeAttrs =
-      def.id === ER_PHOTOVOLTAIC_ABILITY_ID
-        ? ability.attrs.filter(attr => attr.constructor.name === "PhotovoltaicTypeAbAttr")
-        : [];
+    const preservedBespokeAttrs = ability.attrs.filter(
+      attr =>
+        (def.id === ER_PHOTOVOLTAIC_ABILITY_ID && attr.constructor.name === "PhotovoltaicTypeAbAttr")
+        || (def.id === ER_SPIRITUAL_SABER_ABILITY_ID && attr.constructor.name === "SpiritualSaberNoContactAbAttr"),
+    );
     const collected: AbAttr[] = [];
     for (const constituentId of def.constituents) {
       const attrs = resolveConstituentAttrs(constituentId);

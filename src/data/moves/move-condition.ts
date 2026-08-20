@@ -1,10 +1,11 @@
+import { isComatoseLike } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
-import { AbilityId } from "#enums/ability-id";
+import type { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { Command } from "#enums/command";
@@ -326,8 +327,8 @@ export const gravityUseRestriction = new MoveRestriction(
 
 export const targetSleptOrComatoseCondition = new MoveCondition(
   (_user: Pokemon, target: Pokemon, _move: Move) =>
-    target.status?.effect === StatusEffect.SLEEP || target.hasAbility(AbilityId.COMATOSE),
+    target.status?.effect === StatusEffect.SLEEP || isComatoseLike(target),
 );
 export const userSleptOrComatoseCondition = new MoveCondition(
-  user => user.status?.effect === StatusEffect.SLEEP || user.hasAbility(AbilityId.COMATOSE),
+  user => user.status?.effect === StatusEffect.SLEEP || isComatoseLike(user),
 );

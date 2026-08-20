@@ -4277,7 +4277,7 @@ export class BattleScene extends SceneBase {
         this.removeModifier(itemModifier, true);
       }
       if (itemLost) {
-        applyAbAttrs("PostItemLostAbAttr", { pokemon: source });
+        applyAbAttrs("PostItemLostAbAttr", { pokemon: source, opponent: target });
       }
       if (!ignoreUpdate) {
         this.updateModifiers(false, instant);
@@ -4336,13 +4336,13 @@ export class BattleScene extends SceneBase {
           if (target.isPlayer()) {
             this.addModifier(newItemModifier, ignoreUpdate, playSound, false, instant);
             if (source && itemLost) {
-              applyAbAttrs("PostItemLostAbAttr", { pokemon: source });
+              applyAbAttrs("PostItemLostAbAttr", { pokemon: source, opponent: target });
             }
             return true;
           }
           this.addEnemyModifier(newItemModifier, ignoreUpdate, instant);
           if (source && itemLost) {
-            applyAbAttrs("PostItemLostAbAttr", { pokemon: source });
+            applyAbAttrs("PostItemLostAbAttr", { pokemon: source, opponent: target });
           }
           return true;
         }

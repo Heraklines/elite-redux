@@ -253,6 +253,38 @@ export class SerializableBattlerTag extends BattlerTag {
    */
   private declare __SerializableBattlerTag: never;
 }
+/** Slab's Curse's PP-drain curse; deliberately distinct from ordinary CURSED. */
+export class SlabCurseTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_SLAB_CURSE;
+  public ppLoss: number;
+  public moveLimit: number;
+
+  constructor(sourceId: number, ppLoss: number, moveLimit = 0) {
+    super(BattlerTagType.ER_SLAB_CURSE, BattlerTagLapseType.TURN_END, 0, MoveId.CURSE, sourceId, true);
+    this.ppLoss = ppLoss;
+    this.moveLimit = moveLimit;
+  }
+
+  public override loadTag<const T extends this>(
+    source: BaseBattlerTag & Pick<T, "tagType" | "ppLoss" | "moveLimit">,
+  ): void {
+    super.loadTag(source);
+    this.ppLoss = source.ppLoss;
+    this.moveLimit = source.moveLimit ?? 0;
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    if (lapseType === BattlerTagLapseType.CUSTOM) {
+      return super.lapse(pokemon, lapseType);
+    }
+    const moves = pokemon.getMoveset().slice(0, this.moveLimit > 0 ? this.moveLimit : undefined);
+    for (const move of moves) {
+      move.usePp(this.ppLoss);
+    }
+    // Keep the curse until at least one selected move reaches zero PP.
+    return !moves.some(move => move.isOutOfPp());
+  }
+}
 
 /**
  * Interface for a generic serializable battler tag, i.e. one that does not have a
@@ -5011,6 +5043,8 @@ export function getBattlerTag(
       return new SaltCuredTag(sourceId);
     case BattlerTagType.CURSED:
       return new CursedTag(sourceId);
+    case BattlerTagType.ER_SLAB_CURSE:
+      return new SlabCurseTag(sourceId, turnCount);
     case BattlerTagType.CHARGED:
       return new TypeBoostTag(tagType, sourceMove, PokemonType.ELECTRIC, 2, true);
     case BattlerTagType.FLOATING:
@@ -5224,6 +5258,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.DOUBLE_SHOCKED]: RemovedTypeTag;
   [BattlerTagType.SALT_CURED]: SaltCuredTag;
   [BattlerTagType.CURSED]: CursedTag;
+  [BattlerTagType.ER_SLAB_CURSE]: SlabCurseTag;
   [BattlerTagType.CHARGED]: TypeBoostTag;
   [BattlerTagType.FLOATING]: FloatingTag;
   [BattlerTagType.MINIMIZED]: MinimizeTag;

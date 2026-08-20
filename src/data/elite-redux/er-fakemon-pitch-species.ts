@@ -16,6 +16,7 @@ import { EggTier } from "#enums/egg-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import { AbilityId } from "#enums/ability-id";
 
 /** Append-only species ids for the Discord fakemon-pitch roster (2026-08). */
 export const ER_TREMBURR_SPECIES_ID = 70033;
@@ -37,10 +38,20 @@ export const ER_RAPIDASH_REDUX_SPECIES_ID = 70048;
 export const ER_VOLTRIEVER_SPECIES_ID = 70049;
 export const ER_WAILBORE_SPECIES_ID = 70050;
 
+/** New standalone 70051-70057 pitch species ids. Existing 70020+ newcomers stay canonical. */
+export const ER_MISHAMANUS_SPECIES_ID = 70051;
+export const ER_FALINKS_CONVERGENT_SPECIES_ID = 70052;
+export const ER_IRON_STREAM_SPECIES_ID = 70053;
+export const ER_SLABBERIGUS_SPECIES_ID = 70054;
+export const ER_TAGELA_SPECIES_ID = 70055;
+export const ER_INTANGROWTH_SPECIES_ID = 70056;
+export const ER_LILLIGANT_VERDANT_SPECIES_ID = 70057;
+
 interface PitchSpeciesDef {
   readonly id: number;
   readonly name: string;
   readonly slug: string;
+  readonly editorConst?: string;
   readonly types: readonly [PokemonType, ...PokemonType[]];
   readonly stats: readonly [number, number, number, number, number, number];
   readonly actives: readonly [number, number, number];
@@ -339,7 +350,124 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
     starterCost: 5,
     eggMoveSource: SpeciesId.WAILMER,
   },
+  {
+    id: ER_MISHAMANUS_SPECIES_ID,
+    name: "Mishamanus",
+    slug: "mishamanus",
+    editorConst: "SPECIES_MISHAMANUS",
+    types: [PokemonType.GHOST, PokemonType.FAIRY],
+    stats: [75, 60, 60, 120, 120, 120],
+    actives: [5325, 5224, 6052],
+    innates: [AbilityId.LEVITATE, AbilityId.SHADOW_TAG, 6053],
+    weight: 4.4,
+    catchRate: 45,
+    evolvesFrom: SpeciesId.MISMAGIUS,
+    evolveLevel: 55,
+    learnsetSource: SpeciesId.MISMAGIUS,
+  },
+  {
+    id: ER_FALINKS_CONVERGENT_SPECIES_ID,
+    name: "Falinks Convergent",
+    slug: "falinks_convergent",
+    editorConst: "SPECIES_FALINKS_CONVERGENT",
+    types: [PokemonType.PSYCHIC, PokemonType.FIGHTING],
+    stats: [65, 70, 60, 100, 100, 75],
+    actives: [5158, 5620, AbilityId.FRIEND_GUARD],
+    innates: [5452, 5190, 5085],
+    weight: 62,
+    catchRate: 45,
+    learnsetSource: SpeciesId.FALINKS,
+    eggTier: EggTier.RARE,
+    starterCost: 4,
+    eggMoveSource: SpeciesId.FALINKS,
+  },
+  {
+    id: ER_IRON_STREAM_SPECIES_ID,
+    name: "Iron Stream",
+    slug: "iron_stream",
+    editorConst: "SPECIES_IRON_STREAM",
+    types: [PokemonType.WATER, PokemonType.PSYCHIC],
+    stats: [86, 66, 90, 124, 96, 128],
+    actives: [6079, 5159, 5224],
+    innates: [AbilityId.QUARK_DRIVE, 6064, 6065],
+    weight: 125,
+    catchRate: 10,
+    learnsetSource: SpeciesId.IRON_LEAVES,
+    eggTier: EggTier.EPIC,
+    starterCost: 6,
+    eggMoveSource: SpeciesId.IRON_LEAVES,
+  },
+  {
+    id: ER_SLABBERIGUS_SPECIES_ID,
+    name: "Slabberigus",
+    slug: "slabberigus",
+    editorConst: "SPECIES_SLABBERIGUS",
+    types: [PokemonType.ROCK, PokemonType.GHOST],
+    stats: [88, 65, 105, 50, 145, 30],
+    actives: [5306, AbilityId.SHADOW_SHIELD, 5024],
+    innates: [6066, 6067, 5697],
+    weight: 76.5,
+    catchRate: 90,
+    evolvesFrom: SpeciesId.YAMASK,
+    evolveLevel: 24,
+    learnsetSource: SpeciesId.COFAGRIGUS,
+  },
+  {
+    id: ER_TAGELA_SPECIES_ID,
+    name: "Tagela",
+    slug: "tagela",
+    editorConst: "SPECIES_TAGELA",
+    types: [PokemonType.GHOST, PokemonType.PSYCHIC],
+    stats: [65, 55, 115, 100, 40, 60],
+    actives: [6068, 5070, 5367],
+    innates: [5283, 6069, 6070],
+    weight: 35,
+    catchRate: 45,
+    learnsetSource: SpeciesId.TANGELA,
+    eggTier: EggTier.COMMON,
+    starterCost: 3,
+    eggMoveSource: SpeciesId.TANGELA,
+  },
+  {
+    id: ER_INTANGROWTH_SPECIES_ID,
+    name: "Intangrowth",
+    slug: "intangrowth",
+    editorConst: "SPECIES_INTANGROWTH",
+    types: [PokemonType.GHOST, PokemonType.PSYCHIC],
+    stats: [100, 100, 50, 110, 125, 50],
+    actives: [6068, 5070, 5367],
+    innates: [5283, 6069, 6070],
+    weight: 128.6,
+    catchRate: 30,
+    evolvesFrom: ER_TAGELA_SPECIES_ID,
+    evolveLevel: 26,
+    learnsetSource: SpeciesId.TANGROWTH,
+  },
+  {
+    id: ER_LILLIGANT_VERDANT_SPECIES_ID,
+    name: "Lilligant Verdant",
+    slug: "lilligant_verdant",
+    editorConst: "SPECIES_LILLIGANT_VERDANT",
+    types: [PokemonType.WATER, PokemonType.FAIRY],
+    stats: [90, 50, 80, 110, 90, 80],
+    actives: [6071, 5298, 5281],
+    innates: [5596, 5233, AbilityId.QUEENLY_MAJESTY],
+    weight: 16.3,
+    catchRate: 75,
+    evolvesFrom: SpeciesId.PETILIL,
+    evolveLevel: 20,
+    learnsetSource: SpeciesId.LILLIGANT,
+  },
 ];
+
+/** Stable editor source mapping for the hand-authored 70051-70057 entries. */
+export const ER_FAKEMON_PITCH_EDITOR_SPECIES = Object.freeze(
+  Object.fromEntries(
+    ER_FAKEMON_PITCH_SPECIES.flatMap(def =>
+      def.editorConst === undefined ? [] : [[def.editorConst, { id: def.id, slug: def.slug }]],
+    ),
+  ),
+) as Readonly<Record<string, Readonly<{ id: number; slug: string }>>>;
 
 export interface InjectErFakemonPitchSpeciesResult {
   registered: number;

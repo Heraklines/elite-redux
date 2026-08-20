@@ -29,3 +29,10 @@ export class EntryHazardImmunityAbAttr extends AbAttr {
     super(false);
   }
 }
+
+/** Marker attr for abilities that block only grounded entry hazards. */
+export class GroundedEntryHazardImmunityAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+}

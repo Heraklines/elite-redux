@@ -30,7 +30,8 @@ export type RoomArenaTagType =
   | ArenaTagType.TRICK_ROOM
   | ArenaTagType.INVERSE_ROOM
   | ArenaTagType.MAGIC_ROOM
-  | ArenaTagType.WONDER_ROOM;
+  | ArenaTagType.WONDER_ROOM
+  | ArenaTagType.SWIRLY_ROOM;
 
 /** Subset of {@linkcode ArenaTagType}s that are **not** able to persist across turns, and should therefore not be serialized in {@linkcode SessionSaveData}. */
 export type NonSerializableArenaTagType = ArenaTagType.NONE | TurnProtectArenaTagType | ArenaTagType.ION_DELUGE;

@@ -180,7 +180,7 @@ export class HitMultiplierAbAttr extends AddSecondStrikeAbAttr {
     if (filter.type !== undefined && pokemon.getMoveType(move) !== filter.type) {
       return false;
     }
-    if (filter.flag !== undefined && !move.hasFlag(filter.flag)) {
+    if (filter.flag !== undefined && !move.doesFlagEffectApply({ flag: filter.flag, user: pokemon })) {
       return false;
     }
     return true;

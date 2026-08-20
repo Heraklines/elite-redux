@@ -4,14 +4,28 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { speciesEggMoves } from "#balance/moves/egg-moves";
+import { starterPassiveAbilities } from "#balance/passives";
+import { pokemonEvolutions } from "#balance/pokemon-evolutions";
+import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { speciesStarterCosts } from "#balance/starters";
+import { tmSpecies } from "#balance/tm-species-map";
+import { speciesTmMoves } from "#balance/tms";
 import { allAbilities } from "#data/data-lists";
 import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
-import { ER_FAKEMON_PITCH_SPECIES, ER_POWER_PLANT_SPECIES_ID } from "#data/elite-redux/er-fakemon-pitch-species";
+import {
+  ER_FAKEMON_PITCH_EDITOR_SPECIES,
+  ER_FAKEMON_PITCH_SPECIES,
+  ER_POWER_PLANT_SPECIES_ID,
+} from "#data/elite-redux/er-fakemon-pitch-species";
 import { getEliteReduxCustomIconLoads } from "#data/elite-redux/er-ios-icon-preload";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger, SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
+import { AbilityId } from "#enums/ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -27,15 +41,224 @@ const MEGA_FORMS = [
   [SpeciesId.ZANGOOSE, "mega", FormChangeItem.ZANGOOSEITE, "zangoose_mega"],
 ] as const;
 
+const STANDALONE_CONTRACT = [
+  {
+    id: 70051,
+    name: "Mishamanus",
+    slug: "mishamanus",
+    speciesConst: "SPECIES_MISHAMANUS",
+    types: [PokemonType.GHOST, PokemonType.FAIRY],
+    stats: [75, 60, 60, 120, 120, 120],
+    actives: [5325, 5224, 6052],
+    innates: [AbilityId.LEVITATE, AbilityId.SHADOW_TAG, 6053],
+    weight: 4.4,
+    evolvesFrom: SpeciesId.MISMAGIUS,
+    evolveLevel: 55,
+    learnsetSource: SpeciesId.MISMAGIUS,
+  },
+  {
+    id: 70052,
+    name: "Falinks Convergent",
+    slug: "falinks_convergent",
+    speciesConst: "SPECIES_FALINKS_CONVERGENT",
+    types: [PokemonType.PSYCHIC, PokemonType.FIGHTING],
+    stats: [65, 70, 60, 100, 100, 75],
+    actives: [5158, 5620, AbilityId.FRIEND_GUARD],
+    innates: [5452, 5190, 5085],
+    weight: 62,
+    learnsetSource: SpeciesId.FALINKS,
+    eggTier: 1,
+    starterCost: 4,
+    eggMoveSource: SpeciesId.FALINKS,
+  },
+  {
+    id: 70053,
+    name: "Iron Stream",
+    slug: "iron_stream",
+    speciesConst: "SPECIES_IRON_STREAM",
+    types: [PokemonType.WATER, PokemonType.PSYCHIC],
+    stats: [86, 66, 90, 124, 96, 128],
+    actives: [6079, 5159, 5224],
+    innates: [AbilityId.QUARK_DRIVE, 6064, 6065],
+    weight: 125,
+    learnsetSource: SpeciesId.IRON_LEAVES,
+    eggTier: 2,
+    starterCost: 6,
+    eggMoveSource: SpeciesId.IRON_LEAVES,
+  },
+  {
+    id: 70054,
+    name: "Slabberigus",
+    slug: "slabberigus",
+    speciesConst: "SPECIES_SLABBERIGUS",
+    types: [PokemonType.ROCK, PokemonType.GHOST],
+    stats: [88, 65, 105, 50, 145, 30],
+    actives: [5306, AbilityId.SHADOW_SHIELD, 5024],
+    innates: [6066, 6067, 5697],
+    weight: 76.5,
+    evolvesFrom: SpeciesId.YAMASK,
+    evolveLevel: 24,
+    learnsetSource: SpeciesId.COFAGRIGUS,
+  },
+  {
+    id: 70055,
+    name: "Tagela",
+    slug: "tagela",
+    speciesConst: "SPECIES_TAGELA",
+    types: [PokemonType.GHOST, PokemonType.PSYCHIC],
+    stats: [65, 55, 115, 100, 40, 60],
+    actives: [6068, 5070, 5367],
+    innates: [5283, 6069, 6070],
+    weight: 35,
+    learnsetSource: SpeciesId.TANGELA,
+    eggTier: 0,
+    starterCost: 3,
+    eggMoveSource: SpeciesId.TANGELA,
+  },
+  {
+    id: 70056,
+    name: "Intangrowth",
+    slug: "intangrowth",
+    speciesConst: "SPECIES_INTANGROWTH",
+    types: [PokemonType.GHOST, PokemonType.PSYCHIC],
+    stats: [100, 100, 50, 110, 125, 50],
+    actives: [6068, 5070, 5367],
+    innates: [5283, 6069, 6070],
+    weight: 128.6,
+    evolvesFrom: 70055,
+    learnsetSource: SpeciesId.TANGROWTH,
+  },
+  {
+    id: 70057,
+    name: "Lilligant Verdant",
+    slug: "lilligant_verdant",
+    speciesConst: "SPECIES_LILLIGANT_VERDANT",
+    types: [PokemonType.WATER, PokemonType.FAIRY],
+    stats: [90, 50, 80, 110, 90, 80],
+    actives: [6071, 5298, 5281],
+    innates: [5596, 5233, AbilityId.QUEENLY_MAJESTY],
+    weight: 16.3,
+    evolvesFrom: SpeciesId.PETILIL,
+    evolveLevel: 20,
+    learnsetSource: SpeciesId.LILLIGANT,
+  },
+] as const;
 describe("Discord fakemon-pitch roster", () => {
   it("registers every custom species with its complete six-ability kit", () => {
-    expect(ER_FAKEMON_PITCH_SPECIES).toHaveLength(18);
+    expect(ER_FAKEMON_PITCH_SPECIES).toHaveLength(25);
     for (const def of ER_FAKEMON_PITCH_SPECIES) {
       const species = getPokemonSpecies(def.id as SpeciesId);
+
       expect(species.speciesId).toBe(def.id);
       expect(species.name).toBe(def.name);
       for (const abilityId of [...def.actives, ...def.innates]) {
         expect(allAbilities[abilityId], `${def.name} ability ${abilityId}`).toBeDefined();
+      }
+    }
+  });
+
+  it("matches the seven 70051-70057 standalone contract records", () => {
+    for (const expected of STANDALONE_CONTRACT) {
+      const actual = ER_FAKEMON_PITCH_SPECIES.find(def => def.id === expected.id);
+      expect(actual, `missing ${expected.id}`).toBeDefined();
+      expect(actual).toMatchObject(expected);
+      expect(actual?.types).toEqual(expected.types);
+      expect(actual?.stats).toEqual(expected.stats);
+      expect(actual?.actives).toEqual(expected.actives);
+      expect(actual?.innates).toEqual(expected.innates);
+    }
+
+    expect(ER_FAKEMON_PITCH_EDITOR_SPECIES).toEqual(
+      Object.fromEntries(STANDALONE_CONTRACT.map(({ speciesConst, id, slug }) => [speciesConst, { id, slug }])),
+    );
+  });
+
+  it("adds pitch evolution branches without replacing vanilla edges", () => {
+    const edges = (sourceId: number) =>
+      ((pokemonEvolutions as Record<number, readonly { speciesId: number; level: number }[]>)[sourceId] ?? []).map(
+        edge => [edge.speciesId, edge.level],
+      );
+
+    expect(edges(SpeciesId.DUSKULL)).toEqual(
+      expect.arrayContaining([
+        [SpeciesId.DUSCLOPS, 37],
+        [70020, 36],
+      ]),
+    );
+    expect(edges(70020)).toEqual([[70021, 45]]);
+    expect(edges(SpeciesId.DUSCLOPS)).toEqual(expect.arrayContaining([[SpeciesId.DUSKNOIR, 1]]));
+    expect(edges(SpeciesId.STANTLER)).toEqual(
+      expect.arrayContaining([
+        [SpeciesId.WYRDEER, 25],
+        [70026, 31],
+      ]),
+    );
+    expect(edges(SpeciesId.PETILIL)).toEqual(
+      expect.arrayContaining([
+        [SpeciesId.HISUI_LILLIGANT, 1],
+        [SpeciesId.LILLIGANT, 1],
+        [70057, 20],
+      ]),
+    );
+    expect(edges(SpeciesId.MISMAGIUS)).toEqual(expect.arrayContaining([[70051, 55]]));
+    expect(edges(SpeciesId.YAMASK)).toEqual(expect.arrayContaining([[70054, 24]]));
+    expect(edges(70055)).toEqual([[70056, 26]]);
+  });
+
+  it("keeps the edited Drawclops/Dustnoir Dawnnoir kit", () => {
+    for (const speciesId of [70020, 70021]) {
+      const species = getPokemonSpecies(speciesId as SpeciesId);
+      expect([species.ability1, species.ability2, species.abilityHidden]).toEqual([97, 5102, 5123]);
+      expect(starterPassiveAbilities[species.speciesId]).toEqual({ 0: 192, 1: 5996, 2: 163 });
+    }
+  });
+
+  it("makes standalone convergents obtainable with source egg tiers and costs", () => {
+    expect(speciesEggTiers[70052]).toBe(speciesEggTiers[SpeciesId.FALINKS]);
+    expect(speciesStarterCosts[70052]).toBe(speciesStarterCosts[SpeciesId.FALINKS]);
+
+    expect(speciesEggTiers[70053]).toBe(speciesEggTiers[SpeciesId.IRON_LEAVES]);
+    expect(speciesStarterCosts[70053]).toBe(speciesStarterCosts[SpeciesId.IRON_LEAVES]);
+    expect(speciesEggTiers[70055]).toBe(speciesEggTiers[SpeciesId.TANGELA]);
+    expect(speciesStarterCosts[70055]).toBe(speciesStarterCosts[SpeciesId.TANGELA]);
+  });
+
+  it("applies standalone learnsets, egg moves, and bidirectional TM wiring", () => {
+    const standalone = ER_FAKEMON_PITCH_SPECIES.filter(def => def.id >= 70051 && def.id <= 70057);
+    expect(standalone).toHaveLength(7);
+
+    const levelMoves = pokemonSpeciesLevelMoves as Record<number, [number, number][]>;
+    const eggMoves = speciesEggMoves as Record<number, number[]>;
+    const tmMoves = speciesTmMoves as Record<number, (number | [unknown, number])[]>;
+    const reverseTmMoves = tmSpecies as Record<number, (number | readonly unknown[])[]>;
+
+    for (const def of standalone) {
+      const expectedLevelMoves = [...(levelMoves[def.learnsetSource] ?? [])].map(
+        ([level, move]) => [level, move] as [number, number],
+      );
+      for (const [level, move] of def.learnsetAdditions ?? []) {
+        if (!expectedLevelMoves.some(([, existingMove]) => existingMove === move)) {
+          expectedLevelMoves.push([level, move]);
+        }
+      }
+      expectedLevelMoves.sort((a, b) => a[0] - b[0]);
+      expect(levelMoves[def.id]).toEqual(expectedLevelMoves);
+
+      if (def.eggMoveSource !== undefined) {
+        expect(eggMoves[def.id]).toEqual(eggMoves[def.eggMoveSource]);
+      }
+
+      const expectedTmMoves = [
+        ...new Set([
+          ...(tmMoves[def.learnsetSource] ?? []).map(entry => (Array.isArray(entry) ? entry[1] : entry)),
+          ...(def.learnsetAdditions ?? []).map(([, move]) => move),
+        ]),
+      ];
+      expect(tmMoves[def.id]).toEqual(expectedTmMoves);
+      for (const move of expectedTmMoves) {
+        expect((reverseTmMoves[move] ?? []).some(entry => !Array.isArray(entry) && Number(entry) === def.id)).toBe(
+          true,
+        );
       }
     }
   });
@@ -79,7 +302,7 @@ describe("Discord fakemon-pitch roster", () => {
       ...MEGA_FORMS.map(([, , , slug]) => slug),
       "power_plant_live_current",
     ];
-    expect(new Set(slugs).size).toBe(26);
+    expect(new Set(slugs).size).toBe(33);
     for (const slug of slugs) {
       expect(erBlackSpritePathFromBase(`elite-redux/${slug}/front`)).toBe(`black/elite-redux/${slug}/front`);
       expect(erBlackSpritePathFromBase(`elite-redux/${slug}/back`)).toBe(`black/elite-redux/${slug}/back`);
@@ -87,7 +310,7 @@ describe("Discord fakemon-pitch roster", () => {
   });
 
   it("registers every pitch-specific ability definition", () => {
-    expect(ER_FAKEMON_PITCH_ABILITIES).toHaveLength(48);
+    expect(ER_FAKEMON_PITCH_ABILITIES).toHaveLength(75);
     for (const ability of ER_FAKEMON_PITCH_ABILITIES) {
       expect(allAbilities[ability.pokerogueId]?.name).toBe(ability.draft.name);
     }

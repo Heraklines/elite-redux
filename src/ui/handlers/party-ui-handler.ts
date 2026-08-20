@@ -2666,7 +2666,27 @@ export class PartyUiHandler extends MessageUiHandler {
       // ULTRANECROZIUM_Z is active and deactivating it should be the only option
       return ultraNecrozmaModifiers;
     }
-    if (formChangeItemModifiers.find(m => m.active)) {
+    const activeCalyriteModifiers = formChangeItemModifiers.filter(
+      m => m.active && m.formChangeItem === FormChangeItem.CALYRITE,
+    );
+    if (activeCalyriteModifiers.length > 0) {
+      // CALYRITE is active; keep both Reins toggles hidden until Chariot is reverted.
+      return activeCalyriteModifiers;
+    }
+    const activeCalyrexRider = formChangeItemModifiers.some(
+      m =>
+        m.active
+        && (m.formChangeItem === FormChangeItem.ICY_REINS_OF_UNITY
+          || m.formChangeItem === FormChangeItem.SHADOW_REINS_OF_UNITY),
+    );
+    if (activeCalyrexRider) {
+      formChangeItemModifiers = formChangeItemModifiers.filter(
+        m =>
+          m.active
+          || m.formChangeItem === FormChangeItem.CALYRITE
+          || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z,
+      );
+    } else if (formChangeItemModifiers.find(m => m.active)) {
       // a form is currently active. the user has to disable the form or activate ULTRANECROZIUM_Z
       formChangeItemModifiers = formChangeItemModifiers.filter(
         m => m.active || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z,

@@ -101,7 +101,10 @@ export class StatChangeOnAttackAbAttr extends PostAttackAbAttr {
     if (!this.selfTarget && (target == null || pokemon === target)) {
       return false;
     }
-    if (this.flag !== undefined && !move.hasFlag(this.flag)) {
+    if (
+      this.flag !== undefined
+      && !move.doesFlagEffectApply({ flag: this.flag, user: pokemon, target: target ?? undefined })
+    ) {
       return false;
     }
     if (this.moveType !== undefined && move.type !== this.moveType) {

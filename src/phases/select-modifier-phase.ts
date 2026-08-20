@@ -3529,7 +3529,24 @@ export class SelectModifierPhase extends BattlePhase {
     if (ultraNecrozmaModifiers.length > 0) {
       return ultraNecrozmaModifiers;
     }
-    if (mods.find(m => m.active)) {
+    const activeCalyriteModifiers = mods.filter(m => m.active && m.formChangeItem === FormChangeItem.CALYRITE);
+    if (activeCalyriteModifiers.length > 0) {
+      return activeCalyriteModifiers;
+    }
+    const activeCalyrexRider = mods.some(
+      m =>
+        m.active
+        && (m.formChangeItem === FormChangeItem.ICY_REINS_OF_UNITY
+          || m.formChangeItem === FormChangeItem.SHADOW_REINS_OF_UNITY),
+    );
+    if (activeCalyrexRider) {
+      mods = mods.filter(
+        m =>
+          m.active
+          || m.formChangeItem === FormChangeItem.CALYRITE
+          || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z,
+      );
+    } else if (mods.find(m => m.active)) {
       mods = mods.filter(m => m.active || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z);
     } else if (mon.species.speciesId === SpeciesId.NECROZMA) {
       mods = mods.filter(m => m.formChangeItem !== FormChangeItem.ULTRANECROZIUM_Z);

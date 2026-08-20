@@ -173,3 +173,18 @@ export class WishTag extends PositionalTag implements WishArgs {
     return !!target && !target.isFainted();
   }
 }
+
+/** Persistent slot marker installed by Electrodynamics. */
+export class ElectrodynamicsPositionTag extends PositionalTag {
+  public override readonly tagType = PositionalTagType.ELECTRODYNAMICS_POSITION;
+
+  constructor({ turnCount, targetIndex }: PositionalTagBaseArgs) {
+    super({ turnCount, targetIndex });
+  }
+
+  public override trigger(): void {}
+
+  public override shouldTrigger(): boolean {
+    return false;
+  }
+}
