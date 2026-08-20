@@ -6389,7 +6389,10 @@ function buildCoopV2LiveSeams(
         }
         if (entry.kind === "CONTROL_COMMIT") {
           const material = decodeControlOpenEntry(entry);
-          if (material == null || !runtime.v2ControlLedger.registerEntry(entry)) {
+          if (
+            material == null
+            || (!runtime.v2ControlLedger.matchesRegisteredEntry(entry) && !runtime.v2ControlLedger.registerEntry(entry))
+          ) {
             return false;
           }
           const receiverScene = runtimeSceneBindings.get(runtime);
