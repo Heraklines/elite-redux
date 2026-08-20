@@ -3,9 +3,13 @@
  *
  * This helper deliberately owns a small copy of the M3 scenario construction
  * and replay boundary.  The values in the returned catalog are read from the
- * live Pokemon instances made by that boundary; no M3 JSON is an input.
+ * live Pokemon instances made by that boundary; the source battle ID is read
+ * from the already-captured canonical M3 fixture state.
  */
 
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { BattleScene } from "#app/battle-scene";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import { getGameMode } from "#app/game-mode";
@@ -67,6 +71,29 @@ type CompanionCaseRecord = JsonObject & {
   player_stable_order: number[];
   enemy_stable_order: number[];
 };
+type DefeatedEnemyRecord = {
+  pokemon: number;
+  owner_seat: null;
+};
+type BattleCompanionRecord = JsonObject & {
+  fixture_id: string;
+  state_side: "INITIAL" | "FINAL";
+  participation: {
+    player_participants: number[];
+    defeated_enemies: DefeatedEnemyRecord[];
+  };
+  settlement: {
+    source_battle_id: number;
+    settled: false;
+    scattered_money: number;
+    wave_reward_evidence: [];
+  };
+};
+type CanonicalFixtureEvidence = {
+  sourceBattleId: number;
+  initial: AnyRecord;
+  final: AnyRecord;
+};
 
 const CASE_IDS = [
   "physical-hit",
@@ -110,6 +137,10 @@ const CASE_IDS = [
 ] as const;
 
 const M3_CASE_SEAM = "test/kernel-fixtures/m3/export-battle-oracle.test.ts:scenarioFor/launchScenario/exportCase";
+const M3_CANONICAL_FIXTURE_ROOT = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../rust/fixtures/m3/oracle/battle-cases",
+);
 const REORDERED_CASES: Record<string, true> = {
   "voluntary-switch": true,
   "forced-replacement": true,
@@ -161,6 +192,54 @@ function jsonReady(value: unknown, path = "$", seen = new Set<object>()): JsonVa
   }
   seen.delete(value);
   return result;
+}
+
+function canonicalFixtureEvidence(fixtureId: string): CanonicalFixtureEvidence {
+  const fixturePath = resolve(M3_CANONICAL_FIXTURE_ROOT, `${fixtureId}.json`);
+  let fixture: AnyRecord;
+  try {
+    fixture = JSON.parse(readFileSync(fixturePath, "utf8")) as AnyRecord;
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    gap("CANONICAL_STATE_UNOBSERVABLE", fixturePath, `M3 fixture read failed: ${detail}`);
+  }
+  const readCanonical = (stateSide: "INITIAL" | "FINAL"): AnyRecord => {
+    const stateKey = stateSide === "INITIAL" ? "initial_state" : "expected_final_state";
+    const state = fixture[stateKey];
+    const canonical = state != null && typeof state === "object" && !Array.isArray(state)
+      ? (state as AnyRecord).canonical
+      : undefined;
+    if (canonical == null || typeof canonical !== "object" || Array.isArray(canonical)) {
+      gap("CANONICAL_STATE_UNOBSERVABLE", fixturePath, `${stateKey}.canonical is not an object`);
+    }
+    const battle = (canonical as AnyRecord).battle;
+    if (battle == null || typeof battle !== "object" || Array.isArray(battle)) {
+      gap("CANONICAL_STATE_UNOBSERVABLE", fixturePath, `${stateKey}.canonical.battle is not an object`);
+    }
+    if (Object.prototype.hasOwnProperty.call(battle, "settlement")
+      || Object.prototype.hasOwnProperty.call(battle, "wave_reward_evidence")) {
+      gap(
+        "CANONICAL_STATE_UNOBSERVABLE",
+        fixturePath,
+        `${stateKey}.canonical.battle unexpectedly contains wave-reward settlement evidence`,
+      );
+    }
+    return canonical as AnyRecord;
+  };
+  const initial = readCanonical("INITIAL");
+  const final = readCanonical("FINAL");
+  const initialBattle = initial.battle as AnyRecord;
+  const finalBattle = final.battle as AnyRecord;
+  const sourceBattleId = safeInteger(initialBattle.battle_id, `${fixtureId}.initial_state.canonical.battle.battle_id`);
+  const finalBattleId = safeInteger(finalBattle.battle_id, `${fixtureId}.expected_final_state.canonical.battle.battle_id`);
+  if (sourceBattleId <= 0 || finalBattleId <= 0 || sourceBattleId !== finalBattleId) {
+    gap(
+      "CANONICAL_STATE_UNOBSERVABLE",
+      fixturePath,
+      `${fixtureId} initial/final canonical battle IDs disagree`,
+    );
+  }
+  return { sourceBattleId, initial, final };
 }
 
 function scenarioFor(id: string): ScenarioSpec {
@@ -650,6 +729,100 @@ function captureCompanions(
   return [...capture(player, "PLAYER", playerIds), ...capture(enemy, "ENEMY", enemyIds)];
 }
 
+function captureBattleCompanion(
+  game: GameManager,
+  fixtureId: string,
+  stateSide: "INITIAL" | "FINAL",
+  player: readonly Pokemon[],
+  enemy: readonly Pokemon[],
+  playerIds: WeakMap<object, StableIdentity>,
+  enemyIds: WeakMap<object, StableIdentity>,
+  sourceBattleId: number,
+): BattleCompanionRecord {
+  const battle = game.scene.currentBattle as AnyRecord;
+  const playerByLiveId = new Map<number, Pokemon>();
+  for (const mon of player) {
+    const liveId = safeInteger(mon.id, `${fixtureId}.${stateSide}.PLAYER.id`);
+    if (playerByLiveId.has(liveId)) {
+      gap("CANONICAL_STATE_UNOBSERVABLE", M3_CASE_SEAM, `${fixtureId} has duplicate live player id ${String(liveId)}`);
+    }
+    playerByLiveId.set(liveId, mon);
+  }
+  const participantSource = battle.playerParticipantIds;
+  if (!(participantSource instanceof Set)) {
+    gap("CANONICAL_STATE_UNOBSERVABLE", "src/battle.ts:Battle.playerParticipantIds", `${fixtureId} ${stateSide} participants are not a live Set`);
+  }
+  const playerParticipants: number[] = [];
+  const participantIds = new Set<number>();
+  for (const rawLiveId of participantSource as Set<unknown>) {
+    const liveId = safeInteger(rawLiveId, `${fixtureId}.${stateSide}.participation.player_participants`);
+    const mon = playerByLiveId.get(liveId);
+    if (mon == null) {
+      gap(
+        "CANONICAL_STATE_UNOBSERVABLE",
+        "src/battle.ts:Battle.playerParticipantIds",
+        `${fixtureId} ${stateSide} participant ${String(liveId)} is not in the live player roster`,
+      );
+    }
+    const identity = playerIds.get(mon);
+    if (identity == null) {
+      gap("CANONICAL_STATE_UNOBSERVABLE", M3_CASE_SEAM, `${fixtureId} ${stateSide} participant has no stable identity`);
+    }
+    if (participantIds.has(identity.pokemonId)) {
+      gap("CANONICAL_STATE_UNOBSERVABLE", "src/battle.ts:Battle.playerParticipantIds", `${fixtureId} has duplicate participant identity`);
+    }
+    participantIds.add(identity.pokemonId);
+    playerParticipants.push(identity.pokemonId);
+  }
+  const faintSource = battle.enemyFaintsHistory;
+  if (!Array.isArray(faintSource)) {
+    gap("CANONICAL_STATE_UNOBSERVABLE", "src/battle.ts:Battle.enemyFaintsHistory", `${fixtureId} ${stateSide} enemy faint history is not an array`);
+  }
+  const defeatedEnemies: DefeatedEnemyRecord[] = [];
+  const defeatedIds = new Set<number>();
+  for (const [index, entry] of (faintSource as unknown[]).entries()) {
+    const fainted = entry != null && typeof entry === "object" ? (entry as AnyRecord).pokemon : undefined;
+    if (fainted == null || typeof fainted !== "object") {
+      gap(
+        "CANONICAL_STATE_UNOBSERVABLE",
+        "src/battle.ts:Battle.enemyFaintsHistory",
+        `${fixtureId} ${stateSide} enemy faint ${String(index)} has no live Pokemon`,
+      );
+    }
+    const identity = enemyIds.get(fainted);
+    if (identity == null) {
+      gap(
+        "CANONICAL_STATE_UNOBSERVABLE",
+        "src/battle.ts:Battle.enemyFaintsHistory",
+        `${fixtureId} ${stateSide} enemy faint ${String(index)} has no stable identity`,
+      );
+    }
+    if (defeatedIds.has(identity.pokemonId)) {
+      gap("CANONICAL_STATE_UNOBSERVABLE", "src/battle.ts:Battle.enemyFaintsHistory", `${fixtureId} repeats defeated enemy identity`);
+    }
+    defeatedIds.add(identity.pokemonId);
+    defeatedEnemies.push({ pokemon: identity.pokemonId, owner_seat: null });
+  }
+  const scatteredMoney = safeInteger(battle.moneyScattered, `${fixtureId}.${stateSide}.settlement.scattered_money`);
+  if (scatteredMoney < 0) {
+    gap("CANONICAL_STATE_UNOBSERVABLE", "src/battle.ts:Battle.moneyScattered", `${fixtureId} has negative scattered money`);
+  }
+  return {
+    fixture_id: fixtureId,
+    state_side: stateSide,
+    participation: {
+      player_participants: playerParticipants,
+      defeated_enemies: defeatedEnemies,
+    },
+    settlement: {
+      source_battle_id: sourceBattleId,
+      settled: false,
+      scattered_money: scatteredMoney,
+      wave_reward_evidence: [],
+    },
+  };
+}
+
 function fillFixtureIds(companions: CompanionRecord[], fixtureId: string): void {
   for (const companion of companions) companion.fixture_id = fixtureId;
 }
@@ -766,7 +939,15 @@ function releaseGame(game: GameManager): void {
 async function captureCase(
   id: string,
   phaserGame: Phaser.Game,
-): Promise<{ initial: CompanionRecord[]; final: CompanionRecord[]; playerOrder: number[]; enemyOrder: number[] }> {
+): Promise<{
+  initial: CompanionRecord[];
+  final: CompanionRecord[];
+  initialBattle: BattleCompanionRecord;
+  finalBattle: BattleCompanionRecord;
+  playerOrder: number[];
+  enemyOrder: number[];
+}> {
+  const canonical = canonicalFixtureEvidence(id);
   const spec = scenarioFor(id);
   const game = await launchScenario(spec, phaserGame);
   try {
@@ -778,6 +959,16 @@ async function captureCase(
     const enemyIdentity = identities(enemyInitial, nextId);
     const initial = captureCompanions(game, "INITIAL", playerInitial, enemyInitial, playerIdentity.byPokemon, enemyIdentity.byPokemon);
     fillFixtureIds(initial, id);
+    const initialBattle = captureBattleCompanion(
+      game,
+      id,
+      "INITIAL",
+      playerInitial,
+      enemyInitial,
+      playerIdentity.byPokemon,
+      enemyIdentity.byPokemon,
+      canonical.sourceBattleId,
+    );
     if (id === "forced-replacement" || id === "same-side-simultaneous-faint" || id === "mixed-side-simultaneous-faint") {
       registerReplacementPrompt(game);
     }
@@ -790,6 +981,16 @@ async function captureCase(
     const enemyFinal = game.scene.getEnemyParty().slice();
     const final = captureCompanions(game, "FINAL", playerFinal, enemyFinal, playerIdentity.byPokemon, enemyIdentity.byPokemon);
     fillFixtureIds(final, id);
+    const finalBattle = captureBattleCompanion(
+      game,
+      id,
+      "FINAL",
+      playerFinal,
+      enemyFinal,
+      playerIdentity.byPokemon,
+      enemyIdentity.byPokemon,
+      canonical.sourceBattleId,
+    );
     const playerOrder = playerInitial.map(mon => playerIdentity.byPokemon.get(mon)!.pokemonId);
     const enemyOrder = enemyInitial.map(mon => enemyIdentity.byPokemon.get(mon)!.pokemonId);
     const expectedFinal = id === "mixed-side-simultaneous-faint" ? [2, 1] : id === "voluntary-switch" || id === "forced-replacement" ? [3, 2, 1] : playerOrder;
@@ -797,7 +998,7 @@ async function captureCase(
     if (REORDERED_CASES[id] === true && JSON.stringify(observedFinal) !== JSON.stringify(expectedFinal)) {
       gap("CANONICAL_STATE_UNOBSERVABLE", M3_CASE_SEAM, `${id} did not expose the expected live reordered roster`);
     }
-    return { initial, final, playerOrder, enemyOrder };
+    return { initial, final, initialBattle, finalBattle, playerOrder, enemyOrder };
   } finally {
     releaseGame(game);
   }
@@ -818,11 +1019,13 @@ export async function captureMigrationCompanions(): Promise<Record<string, JsonV
     gap("LIVE_M3_COMPANIONS_UNOBSERVABLE", "phaser:Phaser.Game", `live M3 Phaser construction failed: ${detail}`);
   }
   const companions: CompanionRecord[] = [];
+  const battleCompanions: BattleCompanionRecord[] = [];
   const cases: CompanionCaseRecord[] = [];
   try {
     for (const fixtureId of CASE_IDS) {
       const captured = await captureCase(fixtureId, phaserGame);
       companions.push(...captured.initial, ...captured.final);
+      battleCompanions.push(captured.initialBattle, captured.finalBattle);
       cases.push({
         fixture_id: fixtureId,
         initial_companion_count: captured.initial.length,
@@ -844,6 +1047,12 @@ export async function captureMigrationCompanions(): Promise<Record<string, JsonV
     const partyOrder = (left.party_side === "PLAYER" ? 0 : 1) - (right.party_side === "PLAYER" ? 0 : 1);
     if (partyOrder !== 0) return partyOrder;
     return left.stable_roster_index - right.stable_roster_index;
+  });
+  battleCompanions.sort((left, right) => {
+    const fixtureOrder = CASE_IDS.findIndex(id => id === left.fixture_id)
+      - CASE_IDS.findIndex(id => id === right.fixture_id);
+    if (fixtureOrder !== 0) return fixtureOrder;
+    return (left.state_side === "INITIAL" ? 0 : 1) - (right.state_side === "INITIAL" ? 0 : 1);
   });
   if (cases.length !== 38) {
     gap("LIVE_M3_COMPANIONS_UNOBSERVABLE", M3_CASE_SEAM, `expected 38 live cases, captured ${cases.length}`);
@@ -877,11 +1086,34 @@ export async function captureMigrationCompanions(): Promise<Record<string, JsonV
     }
     companionKeys.add(key);
   }
+  if (battleCompanions.length !== cases.length * 2) {
+    gap(
+      "LIVE_M3_COMPANIONS_UNOBSERVABLE",
+      M3_CASE_SEAM,
+      `battle companion cardinality ${battleCompanions.length} does not equal initial/final case cardinality ${cases.length * 2}`,
+    );
+  }
+  const battleCompanionKeys = new Set<string>();
+  for (const battleCompanion of battleCompanions) {
+    const key = `${battleCompanion.fixture_id}:${battleCompanion.state_side}`;
+    if (battleCompanionKeys.has(key)) {
+      gap("LIVE_M3_COMPANIONS_UNOBSERVABLE", M3_CASE_SEAM, `duplicate battle companion key ${key}`);
+    }
+    battleCompanionKeys.add(key);
+    if (
+      battleCompanion.settlement.settled !== false
+      || !Array.isArray(battleCompanion.settlement.wave_reward_evidence)
+      || battleCompanion.settlement.wave_reward_evidence.length !== 0
+    ) {
+      gap("LIVE_M3_COMPANIONS_UNOBSERVABLE", M3_CASE_SEAM, `battle companion ${key} has invalid settlement evidence`);
+    }
+  }
   return jsonReady({
     artifact_id: "m3-to-m4-companions-v1",
     schema_version: 1,
     case_count: cases.length,
     companions,
+    battle_companions: battleCompanions,
     cases,
   }) as Record<string, JsonValue>;
 }
