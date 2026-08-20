@@ -154,6 +154,7 @@ function recordingLiveReplica(sink: { last: CoopAuthorityEntry | null; applies: 
   return {
     ownsEntry: entry => entry.kind === "TURN_COMMIT",
     ownsControl: () => false,
+    admitEntry: () => true,
     applyMaterial: (_ctx: CoopRuntimeContext, entry: CoopAuthorityEntry): boolean => {
       sink.applies += 1;
       sink.last = entry;
@@ -329,6 +330,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const guestLive: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => {
         applies += 1;
         return applies > 1 ? true : "deferred";
@@ -365,6 +367,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const guestLive: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => false,
       projectControl: () => null,
     };
@@ -387,6 +390,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const guestLive: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => "deferred",
       projectControl: () => null,
     };
@@ -410,6 +414,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const guestLive: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "REPLACEMENT_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       releaseBlockedPredecessor: (_ctx, entry) => {
         if (entry.kind !== "REPLACEMENT_COMMIT") {
           return null;
@@ -483,6 +488,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const guestLive: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial: () => {
         applies += 1;
         return true;
@@ -521,6 +527,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     const guestLive: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial: () => {
         applies += 1;
         return true;

@@ -293,6 +293,7 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     const live: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial(_ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null; // only TURN is cut over on the guest.
@@ -336,6 +337,7 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     const live: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial(_ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;
@@ -397,6 +399,7 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     const live: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial: () => null,
       projectControl: () => null,
     };
@@ -414,6 +417,7 @@ describe("authority-v2 turn cutover - guest LIVE replica routing", () => {
     const live: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial: () => true,
       projectControl: () => null,
     };
@@ -441,6 +445,7 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
     const live: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
+      admitEntry: () => true,
       applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;
@@ -475,6 +480,7 @@ describe("authority-v2 turn cutover - replica context binding + authority self-a
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: control => control.kind === "COMMAND_FRONTIER",
       prepareAuthorityEntry: () => () => {},
+      admitEntry: () => true,
       applyMaterial(ctx, entry: CoopAuthorityEntry): boolean | null {
         if (entry.kind !== "TURN_COMMIT") {
           return null;

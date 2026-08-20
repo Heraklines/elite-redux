@@ -333,6 +333,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const hostLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
       ownsControl: () => false,
+      admitEntry: () => true,
       prepareAuthorityEntry: (_ctx, entry) => {
         if (entry.kind === "WAVE_ADVANCE") {
           return boundaryReservationReady ? () => {} : null;
@@ -350,6 +351,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const guestLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => predecessorMaterialReady ? true : "deferred",
       projectControl: () => null,
     };
@@ -426,6 +428,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const hostLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TERMINAL_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       prepareAuthorityEntry: (_ctx, entry) => {
         if (entry.kind === "TERMINAL_COMMIT") {
           return terminalReservationReady ? () => {} : null;
@@ -443,6 +446,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const guestLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => predecessorMaterialReady ? true : "deferred",
       projectControl: () => null,
     };
@@ -530,6 +534,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const hostLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
       ownsControl: () => false,
+      admitEntry: () => true,
       prepareAuthorityEntry: (_ctx, entry) =>
         entry.kind === "WAVE_ADVANCE" ? (boundaryReservationReady ? () => {} : null) : () => {},
       authorityEntryCommitted: (_ctx, entry) => {
@@ -543,6 +548,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const guestLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => predecessorMaterialReady ? true : "deferred",
       projectControl: () => null,
     };
@@ -610,6 +616,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const hostLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "WAVE_ADVANCE",
       ownsControl: () => false,
+      admitEntry: () => true,
       prepareAuthorityEntry: (_ctx, entry) =>
         entry.kind === "WAVE_ADVANCE" ? (boundaryReservationReady ? () => {} : null) : () => {},
       authorityEntryCommitted: (_ctx, entry) => {
@@ -623,6 +630,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const guestLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => predecessorMaterialReady ? true : "deferred",
       projectControl: () => null,
     };
@@ -707,6 +715,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const hostLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TERMINAL_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       prepareAuthorityEntry: (_ctx, entry) =>
         entry.kind === "TERMINAL_COMMIT" ? (terminalReservationReady ? () => {} : null) : () => {},
       authorityEntryCommitted: (_ctx, entry) => {
@@ -720,6 +729,7 @@ describe("authority-v2 wave/terminal host commits", () => {
     const guestLiveReplica: CoopV2LiveReplicaSeams = {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
+      admitEntry: () => true,
       applyMaterial: () => predecessorMaterialReady ? true : "deferred",
       projectControl: () => null,
     };

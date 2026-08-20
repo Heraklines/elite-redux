@@ -43,6 +43,7 @@ import type {
 } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
+import { CoopV2InteractionControlLedger } from "#data/elite-redux/coop/authority-v2/interaction-control-ledger";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   type CoopSchedulerClock,
@@ -407,6 +408,7 @@ function makeManualBoundaryDuo(guestTransport: CoopTransport = STUB_TRANSPORT): 
     send: frame => hostToGuest.push(cloneFrame(frame)),
     scheduler: createCoopScheduler(clock),
   });
+  const liveLedger = new CoopV2InteractionControlLedger();
   guest = new CoopAuthorityV2Shadow({
     identity: identity(1),
     scene: STUB_SCENE,
@@ -417,6 +419,7 @@ function makeManualBoundaryDuo(guestTransport: CoopTransport = STUB_TRANSPORT): 
     liveReplica: {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
       ownsControl: () => true,
+      admitEntry: (_ctx, entry) => liveLedger.admitAndRegisterEntry(entry),
       applyMaterial: (_ctx, entry) => {
         appliedRevisions.push(entry.revision);
         return true;
@@ -460,6 +463,7 @@ function makeSynchronousBoundaryDuo(): {
     send: frame => guest.handleInboundFrame(frame),
     scheduler: createCoopScheduler(clock),
   });
+  const liveLedger = new CoopV2InteractionControlLedger();
   guest = new CoopAuthorityV2Shadow({
     identity: identity(1),
     scene: STUB_SCENE,
@@ -474,6 +478,7 @@ function makeSynchronousBoundaryDuo(): {
     liveReplica: {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
       ownsControl: () => true,
+      admitEntry: (_ctx, entry) => liveLedger.admitAndRegisterEntry(entry),
       applyMaterial: (_ctx, entry) => {
         appliedRevisions.push(entry.revision);
         return true;
@@ -619,6 +624,7 @@ function makeFaultBoundaryDuo(profile: CoopFaultProfile): FaultBoundaryDuo {
     send: frame => pair.host.send(frame),
     scheduler: createCoopScheduler(clock),
   });
+  const liveLedger = new CoopV2InteractionControlLedger();
   guest = new CoopAuthorityV2Shadow({
     identity: identity(1),
     scene: STUB_SCENE,
@@ -635,6 +641,7 @@ function makeFaultBoundaryDuo(profile: CoopFaultProfile): FaultBoundaryDuo {
     liveReplica: {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
       ownsControl: () => true,
+      admitEntry: (_ctx, entry) => liveLedger.admitAndRegisterEntry(entry),
       applyMaterial: (_ctx, entry) => {
         appliedRevisions.push(entry.revision);
         return true;
@@ -1072,6 +1079,7 @@ describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
       liveReplica: {
         ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "INTERACTION_COMMIT",
         ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        admitEntry: () => true,
         applyMaterial: (_ctx, entry) => {
           appliedRevisions.push(entry.revision);
           return true;
@@ -1144,6 +1152,7 @@ describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
       liveReplica: {
         ownsEntry: entry => entry.kind === "TURN_COMMIT",
         ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        admitEntry: () => true,
         applyMaterial: () => {
           materialMutations += 1;
           return true;
@@ -1226,6 +1235,7 @@ describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
       liveReplica: {
         ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "INTERACTION_COMMIT",
         ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        admitEntry: () => true,
         applyMaterial: (_ctx, entry) => {
           appliedRevisions.push(entry.revision);
           return true;
@@ -1356,6 +1366,7 @@ describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
       liveReplica: {
         ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "INTERACTION_COMMIT",
         ownsControl: control => control.kind === "AWAIT_SUCCESSOR",
+        admitEntry: () => true,
         applyMaterial: () => true,
         projectControl: () => ({ kind: "deferred", reason: "leave both revisions pending for disposal" }),
       },
