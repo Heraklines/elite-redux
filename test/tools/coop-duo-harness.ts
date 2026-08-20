@@ -70,6 +70,7 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { commandTargetsOwnedBySeat } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopSchedulerClock, CoopTimerHandle } from "#data/elite-redux/coop/authority-v2/scheduler";
 import { setCoopSchedulerClockForTesting } from "#data/elite-redux/coop/authority-v2/scheduler";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
@@ -1112,16 +1113,20 @@ export function mirrorHostBattleToGuest(
 
   // 3. Assemble a matching Battle with the enemy party rebuilt under the guest scene.
   const hostBattle = hostScene.currentBattle;
-  guestScene.currentBattle = new Battle(hostScene.gameMode, {
+  if (hostBattle == null) {
+    throw new Error("headless mirror cannot reconstruct guest battle: host battle shell is missing");
+  }
+  const guestBattle = new Battle(hostScene.gameMode, {
     waveIndex: hostBattle.waveIndex,
     battleType: hostBattle.battleType as never,
     trainer: hostBattle.trainer ?? undefined,
     double: hostBattle.double,
   });
+  guestScene.currentBattle = guestBattle;
   // Production captures this immutable source-wave context when it applies the authoritative encounter
   // descriptor. This direct test mirror bypasses EncounterPhase, so mirror that same seam explicitly.
-  captureCoopTrainerVictoryBoundary(guestScene, guestScene.currentBattle);
-  guestScene.currentBattle.turn = hostBattle.turn;
+  captureCoopTrainerVictoryBoundary(guestScene, guestBattle);
+  guestBattle.turn = hostBattle.turn;
   const enemyParty: EnemyPokemon[] = [];
   // Versus flip: the guest's local ENEMY party is the host's PLAYER party (the opponent). Co-op: the
   // host's own enemy party.
@@ -1174,17 +1179,17 @@ export function mirrorHostBattleToGuest(
     enemy.hp = Math.max(0, Math.min(authoritativeHp, authoritativeMaxHp));
     enemyParty.push(enemy);
   }
-  guestScene.currentBattle.enemyParty = enemyParty;
-  guestScene.currentBattle.setFormat(hostBattle.format);
+  guestBattle.enemyParty = enemyParty;
+  guestBattle.setFormat(hostBattle.format);
   // Production's encounter-authority ingress initializes a fresh command substrate immediately after
   // adopting the host's format (see applyCoopEncounterAuthority). A bare Battle constructor intentionally
   // leaves these maps unset until the normal new-battle increment, so this direct launch mirror must model
   // that ingress invariant explicitly. Without it, the first REAL guest CommandPhase reaches
   // `turnCommands[fieldIndex]` with an undefined map; the old detached replay helper accidentally hid this
   // because it never drove the production TurnInit -> Command queue.
-  const commandSlots = guestScene.currentBattle.arrangement.activeIndices();
-  guestScene.currentBattle.turnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
-  guestScene.currentBattle.preTurnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+  const commandSlots = guestBattle.arrangement.activeIndices();
+  guestBattle.turnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
+  guestBattle.preTurnCommands = Object.fromEntries(commandSlots.map(index => [index, null]));
 
   // 4. Put both leads of each side ON the guest field (isActive() reads field membership via
   //    globalScene.field.getIndex). The Pokemon is itself a Phaser Container, so field.add works.
@@ -2065,8 +2070,63 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
     );
   }
   scene.phaseManager.clearPhaseQueue();
+
   scene.phaseManager.unshiftPhase(scene.phaseManager.create("TurnInitPhase"));
   scene.phaseManager.shiftPhase();
+}
+/**
+ * Resolve the LOCAL command phases from the host-stated Authority V2 frontier.
+ *
+ * A mirrored engine must not infer ownership from a player-field position: Showdown guests render the
+ * reflected host enemy team locally, while the authoritative frontier addresses those same Pokémon at the
+ * canonical enemy offset. Resolve by authenticated seat + Pokémon identity, then verify the canonical
+ * coordinate before driving the real queued phase.
+ */
+function resolveCanonicalLocalCommandFields(
+  scene: BattleScene,
+  localRuntime: CoopRuntime,
+  controlRuntime: CoopRuntime,
+  label: string,
+): number[] {
+  const battle = scene.currentBattle;
+  const control = controlRuntime.v2ControlLedger.latestControl;
+  if (battle == null) {
+    throw new Error(`${label} cannot resolve local command targets: scene has no current battle shell`);
+  }
+  if (control?.kind !== "COMMAND_FRONTIER") {
+    throw new Error(
+      `${label} cannot resolve local command targets: Authority V2 frontier is `
+        + `${control?.kind ?? "missing"} at ${battle.waveIndex}:${battle.turn}`,
+    );
+  }
+  if (control.wave !== battle.waveIndex || control.turn !== battle.turn) {
+    throw new Error(
+      `${label} cannot resolve local command targets: frontier address `
+        + `${control.wave}:${control.turn} != scene ${battle.waveIndex}:${battle.turn}`,
+    );
+  }
+  const localCommands = commandTargetsOwnedBySeat(control, localRuntime.controller.localSeatId);
+  const playerField = scene.getPlayerField();
+  return localCommands.map(command => {
+    const localFieldIndex = playerField.findIndex(pokemon => pokemon?.id === command.pokemonId);
+    if (localFieldIndex < 0) {
+      throw new Error(
+        `${label} cannot resolve local command target pokemon=${command.pokemonId} seat=${command.ownerSeatId} `
+          + `from mirrored player field`,
+      );
+    }
+    const canonicalFieldIndex =
+      localRuntime.controller.isVersusSession()
+        ? battle.arrangement.enemyOffset + localFieldIndex
+        : localFieldIndex;
+    if (command.fieldIndex !== canonicalFieldIndex) {
+      throw new Error(
+        `${label} local command target pokemon=${command.pokemonId} resolved to local field=${localFieldIndex} `
+          + `but canonical field=${command.fieldIndex} (expected=${canonicalFieldIndex})`,
+      );
+    }
+    return localFieldIndex;
+  });
 }
 
 /**
@@ -2079,15 +2139,24 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
  * surfaces with inert local skips and leave the final real CommandPhase actionable. Production never calls
  * this helper; a real browser supplies the same progression by choosing each command through its UI.
  */
-async function materializeMirroredShowdownGuestCommandFrontier(scene: BattleScene): Promise<Phase> {
+async function materializeMirroredShowdownGuestCommandFrontier(
+  scene: BattleScene,
+  localRuntime: CoopRuntime,
+  controlRuntime: CoopRuntime,
+): Promise<Phase> {
   materializeMirroredGuestInputTurn(scene);
-  const localFieldIndices = scene
-    .getPlayerField()
-    .map((pokemon, fieldIndex) => ({ pokemon, fieldIndex }))
-    .filter(({ pokemon }) => pokemon.isActive())
-    .map(({ fieldIndex }) => fieldIndex);
+  const localFieldIndices = resolveCanonicalLocalCommandFields(
+    scene,
+    localRuntime,
+    controlRuntime,
+    "mirrored Showdown guest",
+  );
   if (localFieldIndices.length === 0) {
-    throw new Error("mirrored Showdown guest has no active local command targets");
+    throw new Error("mirrored Showdown guest has no Authority V2 command target for its local seat");
+  }
+  const battle = scene.currentBattle;
+  if (battle == null) {
+    throw new Error("mirrored Showdown guest lost its battle shell after resolving local command targets");
   }
 
   let finalCommand: Phase | null = null;
@@ -2138,6 +2207,42 @@ export async function pumpDuoDestinations(rig: DuoRig, rounds = 2): Promise<void
     await withClient(rig.guestCtx, () => drainLoopback());
   }
 }
+/**
+ * Wait for both in-process browser realms to materialize their battle shell before a boundary driver reads
+ * arrangement/turn state. A retained transition may briefly leave one renderer between Battle instances;
+ * treating that as an ordinary null dereference hides the causal queue state and turns a convergence failure
+ * into an opaque TypeError.
+ */
+export async function awaitDuoBattleShells(
+  rig: DuoRig,
+  label: string,
+  options: { timeoutMs?: number } = {},
+): Promise<{ host: Battle; guest: Battle }> {
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    await pumpDuoDestinations(rig, 1);
+    const host = rig.hostScene.currentBattle;
+    const guest = rig.guestScene.currentBattle;
+    if (host != null && guest != null) {
+      return { host, guest };
+    }
+    if (Date.now() >= deadline) {
+      const phaseState = (scene: BattleScene): string => {
+        const current = scene.phaseManager.getCurrentPhase();
+        const queued = scene.phaseManager.getQueuedPhaseNames?.() ?? [];
+        return `${current?.phaseName ?? "none"} queued=[${queued.join(",")}]`;
+      };
+      throw new Error(
+        `${label} did not materialize both battle shells within ${timeoutMs}ms `
+          + `(host=${host == null ? "missing" : "present"} ${phaseState(rig.hostScene)}; `
+          + `guest=${guest == null ? "missing" : "present"} ${phaseState(rig.guestScene)})`,
+      );
+    }
+    await Promise.resolve();
+  }
+}
+
 
 /**
  * Settle one asynchronous two-engine crossing while alternately installing each browser's complete
@@ -2821,19 +2926,36 @@ export async function buildDuo(
   if (adoptedPrePairCommand) {
     await withClient(guestCtx, async () => {
       await drainLoopback();
-      // Classic final-boss stage one has one real player actor even in co-op; the guest-owned party mon
-      // remains on the bench until phase two. Production therefore exposes no guest CommandPhase and the
-      // harness must not fabricate one merely to satisfy its ordinary doubles bootstrap.
-      if (guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX] != null) {
+      // The initial guest command is selected from the host-stated frontier, not from the launch layout.
+      // This matters when a battle starts with only the host seat materialized (classic final-boss stage
+      // one): an absent guest-owned command is a real control state, not a missing field to fabricate.
+      const guestCommandFields = resolveCanonicalLocalCommandFields(
+        guestScene,
+        guestRuntime,
+        hostRuntime,
+        "initial co-op guest",
+      );
+      if (guestCommandFields.length > 1) {
+        throw new Error(
+          `initial co-op guest has ${guestCommandFields.length} local command targets; `
+            + "the direct-mirror bootstrap exposes one actionable guest surface",
+        );
+      }
+      if (guestCommandFields.length === 1) {
         materializeMirroredGuestInputTurn(guestScene);
+        const guestFieldIndex = guestCommandFields[0];
         const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial guest-owned CommandPhase", {
           matches: phase =>
             phase.phaseName === "CommandPhase"
-            && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === COOP_GUEST_FIELD_INDEX,
+            && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === guestFieldIndex,
         });
         guestOwnCommand.start();
         await drainLoopback();
-        markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
+        const guestBattle = guestScene.currentBattle;
+        if (guestBattle == null) {
+          throw new Error("initial co-op guest command lost its battle shell after the real phase started");
+        }
+        markRealGuestCommandBoundary(guestScene, guestBattle.waveIndex, guestBattle.turn);
       }
     });
     await withClient(hostCtx, async () => {
@@ -5516,8 +5638,12 @@ export async function buildShowdownDuo(
   // mirrored state and phase queue with the serialized launch snapshot, exactly like a fresh browser boot.
   await withClient(guestCtx, async () => {
     await drainLoopback();
-    await materializeMirroredShowdownGuestCommandFrontier(guestScene);
-    markRealGuestCommandBoundary(guestScene, guestScene.currentBattle.waveIndex, guestScene.currentBattle.turn);
+    await materializeMirroredShowdownGuestCommandFrontier(guestScene, guestRuntime, hostRuntime);
+    const guestBattle = guestScene.currentBattle;
+    if (guestBattle == null) {
+      throw new Error("mirrored Showdown guest command bootstrap lost its battle shell");
+    }
+    markRealGuestCommandBoundary(guestScene, guestBattle.waveIndex, guestBattle.turn);
   });
   // Deliver the controlInstalled receipt and its acknowledgement under each destination's complete context.
   // Two rounds close both directions without allowing the shared-process fixture to borrow the other scene.

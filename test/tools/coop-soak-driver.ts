@@ -139,6 +139,7 @@ import {
 import { TheBargainPhase } from "#phases/the-bargain-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import {
+  awaitDuoBattleShells,
   awaitRewardShopPhaseExit,
   beginRewardShopWatch,
   buildDuo,
@@ -1527,6 +1528,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // Stand up the two-engine rig over one loopback pair (host owns EVEN interaction counters, guest ODD).
   const pair = createLoopbackPair();
   const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+  const initialBattleShells = await awaitDuoBattleShells(rig, "co-op soak startup");
   let previousBiome = rig.hostScene.arena.biomeId;
   let biomeTransitions = 0;
   // #843: tag party-slot co-op ownership (host EVEN slots, guest ODD) so a player faint has a legal
@@ -2123,8 +2125,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     beforeHostCross?: () => void,
     restartAlreadyOpenHost = false,
   ): Promise<void> => {
+    const openingShells = await awaitDuoBattleShells(rig, `command boundary ${wave}:${turn}`);
     const point = `cmd:${wave}:${turn}`;
-    const transitionSourceWave = rig.hostScene.currentBattle.waveIndex;
+    const transitionSourceWave = openingShells.host.waveIndex;
     type BiomeBoundarySeam = {
       readonly phaseName: "SelectBiomePhase";
       requireCoopSourceWave(): number;
@@ -2195,13 +2198,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let guestCrossroadsProjected = false;
       let guestBiomeSourceWave: number | null = null;
       let committedBiomeOperationId: string | null = null;
-      let hostBiomeProjected = false;
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
-      const hostArrangement = rig.hostScene.currentBattle.arrangement;
-      const guestArrangement = rig.guestScene.currentBattle.arrangement;
+      const boundaryShells = await awaitDuoBattleShells(rig, `command boundary ${wave}:${turn} geometry`);
+      const hostBattle = boundaryShells.host;
+      const guestBattle = boundaryShells.guest;
+      const hostArrangement = hostBattle.arrangement;
+      const guestArrangement = guestBattle.arrangement;
       const finalBossStageOne =
-        rig.hostScene.currentBattle.isClassicFinalBoss
-        && rig.guestScene.currentBattle.isClassicFinalBoss
+        hostBattle.isClassicFinalBoss
+        && guestBattle.isClassicFinalBoss
         && hostArrangement.playerCapacity === 1
         && hostArrangement.enemyCapacity === 1
         && guestArrangement.playerCapacity === 1
@@ -2528,9 +2533,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       // resolution that cannot exist yet (the former god-a/god-c wave-200 false softlock). A real second
       // browser simply watches this turn. Preserve that exact behavior: verify both engines agree on the
       // single geometry, leave the replay pump untouched, and let playWave start it only after host action.
-      const hostPlayerCapacity = rig.hostScene.currentBattle.arrangement.playerCapacity;
+      const hostPlayerCapacity = hostArrangement.playerCapacity;
       if (finalBossStageOne) {
-        const guestPlayerCapacity = rig.guestScene.currentBattle.arrangement.playerCapacity;
+        const guestPlayerCapacity = guestArrangement.playerCapacity;
         const hostPlayerField = rig.hostScene.getPlayerField();
         const guestPlayerField = rig.guestScene.getPlayerField();
         if (
@@ -4629,11 +4634,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // The host's wave-one CommandPhase and the direct guest mirror both predate the live co-op runtime. Replace
   // only the guest's inert boot phase with its omitted TurnInit tail, then cross the same public reciprocal
   // command boundary used by every later turn. This removes the sole synthetic-only first-turn exception.
-  if (rig.hostScene.currentBattle.battleType !== BattleType.MYSTERY_ENCOUNTER) {
+  if (initialBattleShells.host.battleType !== BattleType.MYSTERY_ENCOUNTER) {
     await withClient(rig.guestCtx, () => materializeMirroredGuestInputTurn(rig.guestScene));
     await crossCommandBoundaryWithReplayGuest(
-      rig.hostScene.currentBattle.waveIndex,
-      rig.hostScene.currentBattle.turn,
+      initialBattleShells.host.waveIndex,
+      initialBattleShells.host.turn,
       undefined,
       true,
     );
