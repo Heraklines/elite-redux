@@ -48,17 +48,17 @@ SOURCES: dict[str, dict[str, object]] = {
         "icon": GDRIVE / rel("1am6oA-UQHamDLuQ9uCmeN6PcrlYDR3mf/CONKELDUR MENU.png"),
     },
     "dippowdown": {
-        "front": GDRIVE / rel("1LylV-54X6pOquINRg7dXsIf71JPyZ4K8/HIPPOWDON_1.png"),
-        "back": GDRIVE / rel("1vYe0g2iVIkuZSUbW_fI1gq3v9G8Km3q4/HIPPOWDON_1.png"),
+        "front": GDRIVE / rel("1vYe0g2iVIkuZSUbW_fI1gq3v9G8Km3q4/HIPPOWDON_1.png"),
+        "back": GDRIVE / rel("1LylV-54X6pOquINRg7dXsIf71JPyZ4K8/HIPPOWDON_1.png"),
         "icon": GDRIVE / rel("1kT3dGFl3YzSYYUzeTf_T8eNQ-TSj7cNE/HIPPOWDON_1.png"),
     },
     "justyke": {
-        "front": GDRIVE / rel("1L-iTu3y9H67Hl5H0OyFUzFeRVoKuUTgJ/justyke (1).png"),
-        "back": GDRIVE / rel("1c3CuW4vswPe6-QGPhHtU88w9i358eO1j/justyke.png"),
+        "front": GDRIVE / rel("1c3CuW4vswPe6-QGPhHtU88w9i358eO1j/justyke.png"),
+        "back": GDRIVE / rel("1L-iTu3y9H67Hl5H0OyFUzFeRVoKuUTgJ/justyke (1).png"),
     },
     "equilibra": {
-        "front": GDRIVE / rel("1F1SyAnwqHAsAgWnb-UpgRRW0u9uAuQho/equilibra (1).png"),
-        "back": GDRIVE / rel("1H4ypUuiCrcdv75RiBPUQ4gVeH92cAXQe/equilibra.png"),
+        "front": GDRIVE / rel("1H4ypUuiCrcdv75RiBPUQ4gVeH92cAXQe/equilibra.png"),
+        "back": GDRIVE / rel("1F1SyAnwqHAsAgWnb-UpgRRW0u9uAuQho/equilibra (1).png"),
     },
     "ledian_mega": {
         "front": GDRIVE / rel("1sxz2SZruE9uWp8h_RDCzcJU_hQJJXz9G/ledian mega.webp"),
@@ -110,8 +110,8 @@ SOURCES: dict[str, dict[str, object]] = {
         "icon": GDRIVE / rel("19jYFSHLk3LTPGmU4utvguOk0hjWCruFt/RAPIDASH (1).png"),
     },
     "voltriever": {
-        "front": GDRIVE / rel("1X1c6-3O-OgONazCF_Z7WQpDA7Sb2HAP0/cyberdog (1).png"),
-        "back": GDRIVE / rel("1t7hnHR2YfJ3rTWx1g4vFlJT2Dh4Hd1pP/cyberdog.png"),
+        "front": GDRIVE / rel("1t7hnHR2YfJ3rTWx1g4vFlJT2Dh4Hd1pP/cyberdog.png"),
+        "back": GDRIVE / rel("1X1c6-3O-OgONazCF_Z7WQpDA7Sb2HAP0/cyberdog (1).png"),
     },
     "wailbore": {
         "front": GDRIVE / rel("1wmTtmMTwfBBfX3XnL-UR4z6gHoiSU8od/WAILORD_1.png"),

@@ -8,6 +8,7 @@ import { allAbilities } from "#data/data-lists";
 import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
 import { ER_FAKEMON_PITCH_SPECIES, ER_POWER_PLANT_SPECIES_ID } from "#data/elite-redux/er-fakemon-pitch-species";
+import { getEliteReduxCustomIconLoads } from "#data/elite-redux/er-ios-icon-preload";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger, SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { FormChangeItem } from "#enums/form-change-item";
@@ -36,6 +37,18 @@ describe("Discord fakemon-pitch roster", () => {
       for (const abilityId of [...def.actives, ...def.innates]) {
         expect(allAbilities[abilityId], `${def.name} ability ${abilityId}`).toBeDefined();
       }
+    }
+  });
+
+  it("preloads every pitch species icon atlas exactly once", () => {
+    const pitchSlugs = ER_FAKEMON_PITCH_SPECIES.map(def => def.slug);
+    const pitchLoads = getEliteReduxCustomIconLoads().filter(load => pitchSlugs.includes(load.slug));
+
+    expect(pitchLoads).toHaveLength(pitchSlugs.length);
+    expect(new Set(pitchLoads.map(load => load.slug))).toEqual(new Set(pitchSlugs));
+    for (const slug of pitchSlugs) {
+      const matchingLoads = pitchLoads.filter(load => load.slug === slug);
+      expect(matchingLoads).toEqual([{ key: `er_icon__${slug}`, slug, file: "icon" }]);
     }
   });
 
