@@ -7,11 +7,11 @@
   "allowedFiles": [
     ".github/coop-task-ownership/m3-representatives-20260820.json",
     "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
-    "test/tools/coop-duo-harness.ts",
     "test/tests/elite-redux/coop/coop-battle-control.test.ts",
     "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",
     "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
     "test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts",
-    "test/tests/elite-redux/showdown/showdown-preset-duo.test.ts"
+    "test/tests/elite-redux/showdown/showdown-preset-duo.test.ts",
+    "test/tools/coop-duo-harness.ts"
   ]
 }
