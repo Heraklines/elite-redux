@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
-import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { allBiomes } from "#data/data-lists";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   adoptBiomeWatcherChoice,
@@ -196,8 +196,7 @@ export class SelectBiomePhase extends BattlePhase {
   ) {
     super();
     this.coopBiomeOperationBinding =
-      coopBiomeOperationBinding
-      ?? (this.coopOwningRuntime == null ? null : captureCoopBiomeOperationBinding());
+      coopBiomeOperationBinding ?? (this.coopOwningRuntime == null ? null : captureCoopBiomeOperationBinding());
     if (coopSourceTurn != null && (!Number.isSafeInteger(coopSourceTurn) || coopSourceTurn < 0)) {
       throw new Error(`[coop-op] SelectBiomePhase received invalid source turn ${coopSourceTurn}`);
     }
@@ -807,14 +806,15 @@ export class SelectBiomePhase extends BattlePhase {
     const binding = this.requireCoopBiomeOperationBinding();
     const address = { sourceWave: wave, interactivePinned: pinned } as const;
     const retained = getCoopBiomeTransitionCommitReceipt(address, binding);
-    const wait = retained == null
-      ? await awaitCoopBiomeTransitionCommitReceiptWithOrphanBackstop(
-          address,
-          binding,
-          this.coopOwningRuntime?.controller ?? null,
-          pinned,
-        )
-      : { receipt: retained, orphaned: false };
+    const wait =
+      retained == null
+        ? await awaitCoopBiomeTransitionCommitReceiptWithOrphanBackstop(
+            address,
+            binding,
+            this.coopOwningRuntime?.controller ?? null,
+            pinned,
+          )
+        : { receipt: retained, orphaned: false };
     if (!this.boundaryStillLive(generation, wave)) {
       return;
     }
@@ -1055,10 +1055,7 @@ export class SelectBiomePhase extends BattlePhase {
         return;
       }
       const interactionReady = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
-      if (
-        !interactionReady
-        && isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability)
-      ) {
+      if (!interactionReady && isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability)) {
         return;
       }
       notifyCoopWaveContinuationSurfaceReady(wave);

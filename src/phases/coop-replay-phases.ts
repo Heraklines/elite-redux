@@ -1039,16 +1039,16 @@ export class CoopSwitchReplayPhase extends Phase {
         return;
       }
       const party: readonly Pokemon[] = player ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
-      if (this.presentation.actor.pokemonId !== this.presentation.pokemonId
-        || (player ? "player" : "enemy") !== this.presentation.actor.side) {
+      if (
+        this.presentation.actor.pokemonId !== this.presentation.pokemonId
+        || (player ? "player" : "enemy") !== this.presentation.actor.side
+      ) {
         coopWarn("replay", `switch presentation actor/address mismatch bi=${this.presentation.bi}`);
         finish({ kind: "failed", reason: "switch-actor-address-mismatch", actorFingerprint });
         return;
       }
       const matchingActors = party.filter(mon => mon?.id === this.presentation.pokemonId);
-      const exactSlot = matchingActors.length === 1
-        ? party.indexOf(matchingActors[0])
-        : -1;
+      const exactSlot = matchingActors.length === 1 ? party.indexOf(matchingActors[0]) : -1;
       const partySlot = exactSlot;
       const candidate = partySlot < 0 ? undefined : party[partySlot];
       if (

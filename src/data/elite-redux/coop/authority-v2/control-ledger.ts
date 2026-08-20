@@ -279,16 +279,15 @@ export class CoopV2ControlLedger {
       if (proofSources == null || !this.reconcileAuthenticatedSources(proofSources, entry)) {
         return fail();
       }
-    } else if (proofScope?.kind === "replica-dense-frontier") {
-      if (
-        !proofScope.isActive()
+    } else if (
+      proofScope?.kind === "replica-dense-frontier"
+      && (!proofScope.isActive()
         || !sameAuthenticatedSource(proofScope.source, entry)
         || proofScope.source.context.membershipRevision !== entry.context.membershipRevision
         || proofScope.source.context.connectionGeneration !== entry.context.connectionGeneration
-        || !this.reconcileAuthenticatedSources(proofScope.authenticatedSources, entry)
-      ) {
-        return fail();
-      }
+        || !this.reconcileAuthenticatedSources(proofScope.authenticatedSources, entry))
+    ) {
+      return fail();
     }
     const authenticatedSource = this.authenticatedSources.get(entry.revision);
     if (!this.canRegisterAuthenticatedSource(authenticatedSource, entry)) {
@@ -834,11 +833,7 @@ export class CoopV2ControlLedger {
         && sameAuthenticatedSource(proofScope.source, successor as CoopAuthorityEntry)
         && proofScope.source.context.membershipRevision === successor.context.membershipRevision
         && proofScope.source.context.connectionGeneration === successor.context.connectionGeneration
-        && boundarySupersessionAllowsSuccessorEntry(
-          predecessor,
-          successor,
-          proofScope.trustedSources,
-        )
+        && boundarySupersessionAllowsSuccessorEntry(predecessor, successor, proofScope.trustedSources)
       );
     }
     if (proofScope?.kind !== "authority-retained") {
@@ -849,10 +844,7 @@ export class CoopV2ControlLedger {
   }
 
   /** Boundary kinds are never self-authenticating, including when recovery left no active predecessor claim. */
-  private hasLiveBoundaryProof(
-    entry: CoopAuthorityEntry,
-    proofScope: AuthorityEntryProofScope | null,
-  ): boolean {
+  private hasLiveBoundaryProof(entry: CoopAuthorityEntry, proofScope: AuthorityEntryProofScope | null): boolean {
     if (proofScope?.kind === "authority-retained") {
       return true;
     }

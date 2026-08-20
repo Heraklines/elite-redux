@@ -2112,13 +2112,12 @@ function resolveCanonicalLocalCommandFields(
     if (localFieldIndex < 0) {
       throw new Error(
         `${label} cannot resolve local command target pokemon=${command.pokemonId} seat=${command.ownerSeatId} `
-          + `from mirrored player field`,
+          + "from mirrored player field",
       );
     }
-    const canonicalFieldIndex =
-      localRuntime.controller.isVersusSession()
-        ? battle.arrangement.enemyOffset + localFieldIndex
-        : localFieldIndex;
+    const canonicalFieldIndex = localRuntime.controller.isVersusSession()
+      ? battle.arrangement.enemyOffset + localFieldIndex
+      : localFieldIndex;
     if (command.fieldIndex !== canonicalFieldIndex) {
       throw new Error(
         `${label} local command target pokemon=${command.pokemonId} resolved to local field=${localFieldIndex} `
@@ -2242,7 +2241,6 @@ export async function awaitDuoBattleShells(
     await Promise.resolve();
   }
 }
-
 
 /**
  * Settle one asynchronous two-engine crossing while alternately installing each browser's complete
@@ -4235,10 +4233,8 @@ export async function driveHostPartyRewardOwner(
     }
     // Headless rigs may not build the fusion preview panel. In that case the first ACTION opens the real
     // transfer options and the second ACTION selects SPLICE; neither branch invokes a private callback.
-    if (!fusionPreviewWasActive) {
-      if (!globalScene.ui.processInput(Button.ACTION)) {
-        throw new Error(`party reward UI could not confirm splice partner ${option} at interaction ${pinned}`);
-      }
+    if (!fusionPreviewWasActive && !globalScene.ui.processInput(Button.ACTION)) {
+      throw new Error(`party reward UI could not confirm splice partner ${option} at interaction ${pinned}`);
     }
   } else {
     // Ordinary PokemonModifierType rewards expose APPLY as the first option. The optional legacy `option`
@@ -5146,9 +5142,7 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
   const party = scene.getPlayerParty();
   const previousParty = [...party];
   const previousById = new Map(previousParty.map(mon => [mon.id, mon]));
-  const previousFieldIds = new Set(
-    previousParty.filter(mon => scene.field.getIndex(mon) >= 0).map(mon => mon.id),
-  );
+  const previousFieldIds = new Set(previousParty.filter(mon => scene.field.getIndex(mon) >= 0).map(mon => mon.id));
   const restoredParty: PlayerPokemon[] = [];
   for (const [index, raw] of checkpoint.party.entries()) {
     const checkpointMoves = (raw.moveset ?? []).map(move => PokemonMove.loadMove(move));
@@ -5169,10 +5163,10 @@ function restoreCoopReplayCheckpoint(scene: BattleScene, checkpoint: NonNullable
     const previous = previousById.get(mon.id);
     const previousIdentity = previous as (PlayerPokemon & { coopOwnerSeatId?: number }) | undefined;
     mon.coopOwner = data.coopOwner ?? previous?.coopOwner ?? (index % 2 === 0 ? "host" : "guest");
-    if (previousIdentity?.coopOwnerSeatId != null) {
-      (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = previousIdentity.coopOwnerSeatId;
-    } else {
+    if (previousIdentity?.coopOwnerSeatId == null) {
       (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = mon.coopOwner === "host" ? 0 : 1;
+    } else {
+      (mon as PlayerPokemon & { coopOwnerSeatId?: number }).coopOwnerSeatId = previousIdentity.coopOwnerSeatId;
     }
     mon.calculateStats();
     // Test overrides may replace a constructor's moveset; the checkpoint is authoritative.

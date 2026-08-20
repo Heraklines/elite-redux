@@ -864,14 +864,14 @@ export class MysteryEncounterPhase extends Phase {
     const ownerRuntime = getCoopRuntime();
     const ownerController = getCoopController();
     const ownerGeneration = coopSessionGeneration();
-    const ownerPhase = this;
+
     const ownerStillLive = (): boolean =>
       ownerScene === globalScene
       && ownerBattle === globalScene.currentBattle
       && ownerRuntime === getCoopRuntime()
       && ownerController === getCoopController()
       && ownerGeneration === coopSessionGeneration()
-      && globalScene.phaseManager.getCurrentPhase() === ownerPhase;
+      && globalScene.phaseManager.getCurrentPhase() === this;
 
     if (option.onPreOptionPhase) {
       globalScene.executeWithSeedOffset(async () => {
@@ -930,14 +930,7 @@ export class MysteryEncounterPhase extends Phase {
 
         i++;
         if (title) {
-          scene.ui.showDialogue(
-            text ?? "",
-            title,
-            null,
-            nextAction,
-            0,
-            i === 1 ? this.FIRST_DIALOGUE_PROMPT_DELAY : 0,
-          );
+          scene.ui.showDialogue(text ?? "", title, null, nextAction, 0, i === 1 ? this.FIRST_DIALOGUE_PROMPT_DELAY : 0);
         } else {
           scene.ui.showText(text ?? "", null, nextAction, i === 1 ? this.FIRST_DIALOGUE_PROMPT_DELAY : 0, true);
         }
@@ -1649,13 +1642,9 @@ export class MysteryEncounterRewardsPhase extends Phase {
         },
       );
       if (!battleSettlementRetained) {
-        commitCoopMeNoBattleRewardSettlementAfterPreparation(
-          this.meSettlementPlan,
-          continueAfterSettlement,
-          () => {
-            settlementDeferred = true;
-          },
-        );
+        commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan, continueAfterSettlement, () => {
+          settlementDeferred = true;
+        });
       }
     }
     if (settlementDeferred) {

@@ -1085,10 +1085,11 @@ export class CoopV2InteractionCutover {
     }
     const operationId = envelope.pendingOperation?.id;
     const pending = operationId == null ? undefined : this.pendingEnvelopes.get(operationId);
-    if (pending != null) {
-      if (pending.surfaceClass !== surfaceClass || JSON.stringify(pending.envelope) !== JSON.stringify(envelope)) {
-        return { kind: "failed", reason: "a different envelope reused a deferred operation id" };
-      }
+    if (
+      pending != null
+      && (pending.surfaceClass !== surfaceClass || JSON.stringify(pending.envelope) !== JSON.stringify(envelope))
+    ) {
+      return { kind: "failed", reason: "a different envelope reused a deferred operation id" };
     }
     const entry =
       pending == null
@@ -1215,7 +1216,7 @@ export function getCoopV2InteractionCutover(
   if (durability === undefined) {
     return activeCutover;
   }
-  return durability === null ? null : cutoverByDurability.get(durability) ?? null;
+  return durability === null ? null : (cutoverByDurability.get(durability) ?? null);
 }
 
 export function isCoopV2InteractionCutoverActive(durability?: CoopDurabilityManager | null): boolean {
@@ -1258,9 +1259,7 @@ export function commitCoopV2InteractionEnvelope(
 
 type CoopAuthorityEntryBody = Omit<CoopAuthorityEntry, "revision">;
 
-function stripAuthorityRevision(
-  entry: CoopAuthorityEntry | CoopAuthorityEntryBody,
-): CoopAuthorityEntryBody {
+function stripAuthorityRevision(entry: CoopAuthorityEntry | CoopAuthorityEntryBody): CoopAuthorityEntryBody {
   if (!("revision" in entry)) {
     return entry;
   }

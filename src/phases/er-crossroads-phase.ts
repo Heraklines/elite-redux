@@ -171,8 +171,7 @@ export class ErCrossroadsPhase extends Phase {
   ) {
     super();
     this.coopBiomeOperationBinding =
-      coopBiomeOperationBinding
-      ?? (this.coopOwningRuntime == null ? null : captureCoopBiomeOperationBinding());
+      coopBiomeOperationBinding ?? (this.coopOwningRuntime == null ? null : captureCoopBiomeOperationBinding());
     if (sourceWave != null && (!Number.isSafeInteger(sourceWave) || sourceWave < 0)) {
       throw new Error(`[coop-op] Crossroads received invalid source wave ${sourceWave}`);
     }
@@ -552,10 +551,7 @@ export class ErCrossroadsPhase extends Phase {
         return;
       }
       const interactionReady = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
-      if (
-        !interactionReady
-        && isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability)
-      ) {
+      if (!interactionReady && isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability)) {
         return;
       }
       // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from

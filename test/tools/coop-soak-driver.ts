@@ -2198,6 +2198,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       let guestCrossroadsProjected = false;
       let guestBiomeSourceWave: number | null = null;
       let committedBiomeOperationId: string | null = null;
+      let hostBiomeProjected = false;
       let guestBiomeBoundary: BiomeBoundarySeam | null = null;
       const boundaryShells = await awaitDuoBattleShells(rig, `command boundary ${wave}:${turn} geometry`);
       const hostBattle = boundaryShells.host;

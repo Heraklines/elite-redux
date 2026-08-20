@@ -303,15 +303,15 @@ export class CoopReplayMePhase extends Phase {
     const runtime = this.boundRuntime;
     const controller = this.boundController;
     const generation = this.boundGeneration;
-    const phase = this;
+
     const ownerStillLive = (): boolean =>
       scene === globalScene
       && scene.currentBattle === battle
       && runtime === getCoopRuntime()
       && controller === getCoopController()
       && generation === coopSessionGeneration()
-      && activeCoopReplayMePhase === phase
-      && scene.phaseManager.getCurrentPhase() === phase
+      && activeCoopReplayMePhase === this
+      && scene.phaseManager.getCurrentPhase() === this
       && coopMeInteractionStartValue() === this.interactionCounter;
     return scene.ui.setModeBoundedWhen(mode, 2_000, ownerStillLive, ...args);
   }
@@ -338,11 +338,7 @@ export class CoopReplayMePhase extends Phase {
     }
     // Retain the settled retry for implementations where the UI handler becomes actionable asynchronously.
     void opening.then(opened => {
-      if (
-        opened !== "superseded"
-        && this.boundaryStillLive()
-        && this.coopV2ControlOperationId === operationId
-      ) {
+      if (opened !== "superseded" && this.boundaryStillLive() && this.coopV2ControlOperationId === operationId) {
         // The replay selector is already bound to the exact retained presentation. Its one-second
         // guard is only click-through protection for ordinary solo openings; release it here so a
         // verified replay generation cannot wait on a cosmetic timer.
