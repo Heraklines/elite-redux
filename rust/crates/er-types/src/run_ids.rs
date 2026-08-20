@@ -233,4 +233,3 @@ macro_rules! digest_string {
 
 digest_string!(RunContentPackHash, RunContentPackHashError);
 digest_string!(SurfaceDigest, SurfaceDigestError);
-

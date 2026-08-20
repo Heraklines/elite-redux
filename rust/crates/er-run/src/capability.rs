@@ -258,7 +258,7 @@ where
     }
     Ok(())
 }
- 
+
 pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, CapabilityManifestError> {
     let modifier_ids = [1_u64, 2, 3, 4, 5, 6, 7, 100, 101, 102, 103, 200, 201, 202, 300, 301, 400, 401]
         .into_iter()
