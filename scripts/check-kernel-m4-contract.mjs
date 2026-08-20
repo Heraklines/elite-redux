@@ -156,6 +156,11 @@ assert(slice.segment.start_wave === 9 && slice.segment.end_wave === 11, "slice w
 assert(slice.segment.initial_biome.id === 0 && slice.segment.selected_biome.id === 1, "slice biome choice mismatch");
 assert(slice.segment.driver === "raw-physical-keys-only", "slice driver must be raw keys");
 assert(slice.segment.natural_single_seed_claim === false, "composed slice may not claim a natural seed");
+assert(
+  JSON.stringify(slice.segment.required_control_order) ===
+    '["BATTLE","MOVE_LEARN","REWARD_SHOP","BATTLE","BIOME_MARKET","CROSSROADS","BIOME_SELECT","BATTLE"]',
+  "composed slice control order must preserve the wave-9 reward, wave-10 market/Crossroads, and wave-11 battle spine",
+);
 assert(slice.progression.species.id === 932, "parity progression species must be Nacli 932");
 assert(slice.progression.growth_rate.id === 3, "parity progression growth must be Medium Slow 3");
 assert(slice.progression.parity_level_before === 16 && slice.progression.parity_level_after === 17, "parity progression must cross 16 to 17");

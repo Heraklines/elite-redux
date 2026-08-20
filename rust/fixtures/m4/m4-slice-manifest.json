@@ -15,8 +15,9 @@
       "BATTLE",
       "MOVE_LEARN",
       "REWARD_SHOP",
-      "CROSSROADS",
+      "BATTLE",
       "BIOME_MARKET",
+      "CROSSROADS",
       "BIOME_SELECT",
       "BATTLE"
     ],
