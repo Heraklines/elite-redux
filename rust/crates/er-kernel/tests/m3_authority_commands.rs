@@ -2118,7 +2118,7 @@ fn authority_local_material_binding_covers_every_reused_field_and_endpoint_guard
     for retained_endpoint_guard in [
         "validate_material_header(",
         "validate_turn_identity(material)?",
-        "reconcile_turn_frontier(current_state, material, content)?",
+        "current_state != &transition.before_state",
         "validate_endpoint_allocators(",
         "prepared.bind_authority_local_turn(",
     ] {

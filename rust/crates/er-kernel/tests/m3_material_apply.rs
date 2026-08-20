@@ -989,7 +989,7 @@ fn digest_evidence_presentation_and_state_tampering_are_fail_closed() {
     for retained_endpoint_guard in [
         "validate_material_header(",
         "validate_turn_identity(material)?",
-        "reconcile_turn_frontier(current_state, material, content)?",
+        "current_state != &transition.before_state",
         "validate_endpoint_allocators(",
         "prepared.bind_authority_local_turn(",
     ] {

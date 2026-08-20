@@ -437,9 +437,13 @@ fn bind_reducer_issued_turn_material<'a>(
         return Err(BattleMaterialApplyError::InvalidEvidence);
     }
 
-    // These are endpoint-local checks, not resolver work.  Preserve them so
-    // a local state/allocator frontier cannot be accepted by the proof path.
-    reconcile_turn_frontier(current_state, material, content)?;
+    // The authority adapter prepared this transition from the exact complete
+    // runtime state, and the field-for-field checks above bound decoded
+    // before_state to that transition.  Exact equality is therefore stricter
+    // and substantially cheaper than replica frontier reconciliation.
+    if current_state != &transition.before_state {
+        return Err(BattleMaterialApplyError::LocalBeforeStateMismatch);
+    }
     validate_endpoint_allocators(
         menu_allocators,
         local_seat,
