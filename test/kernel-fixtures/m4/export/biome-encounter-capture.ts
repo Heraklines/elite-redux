@@ -34,6 +34,7 @@ import { GameModes } from "#enums/game-modes";
 import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
+import { BattleScene } from "#app/battle-scene";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import Phaser from "phaser";
@@ -98,6 +99,17 @@ let activeRngCapture: {
 
 function gap(code: string, sourceSeam: string, detail: string): never {
   throw new M4CaptureGap(code, sourceSeam, detail);
+}
+
+function observeSource<T>(code: string, sourceSeam: string, run: () => T): T {
+  try {
+    return run();
+  } catch (error) {
+    if (error instanceof M4CaptureGap) {
+      throw error;
+    }
+    gap(code, sourceSeam, error instanceof Error ? error.message : String(error));
+  }
 }
 
 function finite(value: unknown, path: string): number {
@@ -319,11 +331,18 @@ function requireGlobalRoutingSeams(game: GameManager): void {
       "the route helper did not receive the live GameManager scene used by global routing",
     );
   }
-  if (typeof scene.findModifiers !== "function") {
+  if (typeof scene.findModifiers !== "function" || !Array.isArray(scene.modifiers)) {
     gap(
       "ROUTE_SOURCE_UNOBSERVABLE",
       ROUTE_SOURCE,
-      "the live global scene does not expose the modifier-owned visibility seam",
+      "the live global scene does not expose initialized player modifiers for route visibility",
+    );
+  }
+  if (typeof scene.getPlayerParty !== "function" || !Array.isArray(scene.getPlayerParty())) {
+    gap(
+      "ROUTE_SOURCE_UNOBSERVABLE",
+      ROUTE_SOURCE,
+      "the live global scene does not expose an initialized player party for route visibility",
     );
   }
   if (!allBiomes.has(BiomeId.TOWN) || !allBiomes.has(BiomeId.PLAINS)) {
@@ -335,7 +354,9 @@ function captureStructureAndRoute(game: GameManager): AnyRecord {
   resetErBiomeStructure();
   resetErRouting();
   const before = stateView();
-  const structureCapture = withRngCapture("structure", () => planErBiomeStructure(1, RUN_SEED));
+  const structureCapture = observeSource("STRUCTURE_CALLBACK_UNOBSERVABLE", STRUCTURE_SOURCE, () =>
+    withRngCapture("structure", () => planErBiomeStructure(1, RUN_SEED)),
+  );
   const plan = structureCapture.value;
   if (plan.length !== 25 || plan.startWave !== 1) {
     gap(
@@ -368,8 +389,10 @@ function captureStructureAndRoute(game: GameManager): AnyRecord {
     gap("CROSSROADS_LEAVE_UNOBSERVABLE", "src/data/elite-redux/er-biome-structure.ts:setErLeaveBiomeNow", "Leave did not force the next boundary");
   }
 
-  requireGlobalRoutingSeams(game);
-  const routeCapture = withRngCapture("route", () => rollErNextBiomeNodes(BiomeId.TOWN, null, RUN_SEED, 11));
+  observeSource("ROUTE_CONTEXT_UNOBSERVABLE", ROUTE_SOURCE, () => requireGlobalRoutingSeams(game));
+  const routeCapture = observeSource("ROUTE_CALLBACK_UNOBSERVABLE", ROUTE_SOURCE, () =>
+    withRngCapture("route", () => rollErNextBiomeNodes(BiomeId.TOWN, null, RUN_SEED, 11)),
+  );
   const nodes = routeCapture.value;
   const selectedIndex = nodes.findIndex(node => node.biome === BiomeId.PLAINS);
   if (selectedIndex < 0) {
@@ -551,7 +574,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
   const boot = Promise.withResolvers<void>();
   setTimeout(boot.resolve, 0);
   await boot.promise;
-  const originalBattleSeed = (Object.getPrototypeOf(globalScene) as AnyRecord).randBattleSeedInt;
+  const originalBattleSeed = BattleScene.prototype.randBattleSeedInt;
   let game: GameManager | null = null;
   try {
     const scenarioSpec = {
@@ -643,11 +666,8 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       error instanceof Error ? error.message : String(error),
     );
   } finally {
-    if (game != null) {
-      const proto = Object.getPrototypeOf(globalScene) as AnyRecord;
-      if (originalBattleSeed !== undefined) {
-        proto.randBattleSeedInt = originalBattleSeed;
-      }
+    if (originalBattleSeed !== undefined) {
+      BattleScene.prototype.randBattleSeedInt = originalBattleSeed;
     }
     clearInterval(PromptHandler.runInterval);
     PromptHandler.runInterval = undefined;
