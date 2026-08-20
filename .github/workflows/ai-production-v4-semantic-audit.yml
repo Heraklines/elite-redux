@@ -304,8 +304,8 @@ jobs:
             --input "$RUNNER_TEMP/daily" \
             --out "$RUNNER_TEMP/shard-output/shard-${{ matrix.shard }}.json" \
             --markdown-out "$RUNNER_TEMP/shard-output/shard-${{ matrix.shard }}.md" \
-            --min-observations 25 \
-            --min-sources 3 \
+            --min-observations 5 \
+            --min-sources 2 \
             --include-sketches
           rm -rf "$RUNNER_TEMP/daily" "$RUNNER_TEMP/audits"
       - uses: actions/upload-artifact@v4
