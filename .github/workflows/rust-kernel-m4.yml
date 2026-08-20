@@ -114,15 +114,28 @@ jobs:
           restore-keys: |
             m4-foundation-${{ runner.os }}-${{ runner.arch }}-
 
-      - name: Check formatting and locked workspace
+      - name: Check formatting and workspace
         working-directory: rust
         run: |
           cargo fmt --all -- --check
-          cargo check --workspace --all-targets --locked
+          cargo check --workspace --all-targets
 
       - name: Run focused M4 foundation contracts
         working-directory: rust
         run: |
-          cargo test --locked -p er-types --test m4_types
-          cargo test --locked -p er-state --test m4_state_v2
-          cargo test --locked -p er-run --test m4_content
+          cargo test -p er-types --test m4_types
+          cargo test -p er-state --test m4_state_v2
+          cargo test -p er-run --test m4_content
+
+      - name: Require committed lockfile
+        working-directory: rust
+        run: git diff --exit-code -- Cargo.lock
+
+      - name: Upload generated lockfile evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-foundation-cargo-lock
+          path: rust/Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
