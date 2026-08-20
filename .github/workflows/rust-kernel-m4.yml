@@ -101,6 +101,7 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /rust/
+            /test/kernel-fixtures/
           submodules: false
 
       - name: Cache Rust foundation artifacts

@@ -7,7 +7,7 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use thiserror::Error;
 
-use crate::battle_ids::{MoveId, MoveSlotIndex};
+use crate::battle_ids::{MoveId, MoveSlotIndex, PokemonId};
 use crate::run_ids::{BiomeId, Money, RouteNodeId, RunOfferId, RunStockId};
 
 /// The complete run lifecycle vocabulary. There is no implicit or fallback
