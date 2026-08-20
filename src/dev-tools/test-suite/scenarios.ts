@@ -49,7 +49,6 @@ import {
 } from "#data/elite-redux/er-custom-trainers";
 import { resetErEndlessContinuation, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
-import { DEFAULT_FUN_MODE_CONFIG, getFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import {
   ER_CONKAPITATOR_SPECIES_ID,
   ER_DIPPOWDOWN_SPECIES_ID,
@@ -70,6 +69,7 @@ import {
   ER_VOLTRIEVER_SPECIES_ID,
   ER_WAILBORE_SPECIES_ID,
 } from "#data/elite-redux/er-fakemon-pitch-species";
+import { DEFAULT_FUN_MODE_CONFIG, getFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
