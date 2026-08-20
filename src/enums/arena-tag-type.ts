@@ -37,6 +37,8 @@ export enum ArenaTagType {
    * it is active ends it. Field-wide.
    */
   WONDER_ROOM = "WONDER_ROOM",
+  /** Mega Barbaracle Y — swaps Physical/Special move categories for 5 turns. */
+  SWIRLY_ROOM = "SWIRLY_ROOM",
   GRAVITY = "GRAVITY",
   REFLECT = "REFLECT",
   LIGHT_SCREEN = "LIGHT_SCREEN",

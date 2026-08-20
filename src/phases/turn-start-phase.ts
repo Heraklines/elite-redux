@@ -3,6 +3,7 @@ import type { TurnCommand } from "#app/battle";
 import { consumePendingDevPostCommandSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import { spatialMagicResolveTurnCommands } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { erShatteredPsycheMaybeFuse } from "#data/elite-redux/abilities/shattered-psyche";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import {
@@ -264,6 +265,7 @@ export class TurnStartPhase extends FieldPhase {
         console.warn("[dev-tools] post-command setup threw:", err);
       }
     }
+    spatialMagicResolveTurnCommands();
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();

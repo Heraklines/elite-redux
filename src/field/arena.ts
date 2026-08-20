@@ -9,6 +9,7 @@ import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
 import { getBiomeBgmLoopPoint } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import { isRaichuTerrainMoveCancelled } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
   getEncounterSpeciesWeightMultiplier,
   isToxicTerrainProtected,
@@ -774,7 +775,10 @@ export class Arena {
   }
 
   public isMoveTerrainCancelled(user: Pokemon, targets: BattlerIndex[], move: Move): boolean {
-    return !!this.terrain && this.terrain.isMoveTerrainCancelled(user, targets, move);
+    return (
+      isRaichuTerrainMoveCancelled(user, targets, move)
+      || (!!this.terrain && this.terrain.isMoveTerrainCancelled(user, targets, move))
+    );
   }
 
   // #endregion

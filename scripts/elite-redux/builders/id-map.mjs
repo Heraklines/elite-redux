@@ -176,27 +176,33 @@ export async function loadEnumValues(enumFilename, minSize) {
 
 /**
  * Build an ID map for one entity category. For each entry, the normalized
- * name is looked up in `vanillaMap`; on miss the entry's name is run
- * through `aliasFn` to produce alternative candidate keys (used to bridge
- * ER↔pokerogue naming asymmetries — e.g. ER's `RAICHU_ALOLAN` resolves to
- * pokerogue's `ALOLA_RAICHU`). On every-candidate miss, a fresh custom ID
- * is assigned starting at `customStart` and incremented monotonically.
+ * name is looked up in `vanillaMap`; on miss the entry's name is run through
+ * `aliasFn` to produce alternative candidate keys (used to bridge ER↔pokerogue
+ * naming asymmetries). On every-candidate miss, a fresh custom ID is assigned
+ * starting at `customStart` and incremented monotonically, skipping every
+ * inclusive range in `reservedRanges`.
  *
  * @param {Iterable<{id: number, name: string}>} entries
- * @param {Map<string, number>} vanillaMap - normalized name → pokerogue numeric value
+ * @param {Map<string, number>} vanillaMap - normalized name → vanilla numeric value
  * @param {number} customStart - first ID to assign for ER customs
  * @param {(name: string) => string[]} [aliasFn] optional alias generator
- *   that receives the entry's (SPECIES_-stripped) name and returns
- *   normalized alternative keys to try. Default: no aliases.
+ * @param {ReadonlyArray<readonly [number, number]>} [reservedRanges] inclusive custom-ID ranges to skip
  * @returns {{ map: Record<number, number>, vanillaCount: number, customCount: number, aliasHits: number }}
  */
-export function buildIdMapForCategory(entries, vanillaMap, customStart, aliasFn) {
+export function buildIdMapForCategory(entries, vanillaMap, customStart, aliasFn, reservedRanges = []) {
   /** @type {Record<number, number>} */
   const map = {};
   let nextCustom = customStart;
   let vanillaCount = 0;
   let customCount = 0;
   let aliasHits = 0;
+  const nextAvailableCustomId = () => {
+    while (reservedRanges.some(([min, max]) => nextCustom >= min && nextCustom <= max)) {
+      const containingRange = reservedRanges.find(([min, max]) => nextCustom >= min && nextCustom <= max);
+      nextCustom = containingRange[1] + 1;
+    }
+    return nextCustom++;
+  };
   for (const e of entries) {
     // Special-case: ER's id=0 ability is "-------" (sentinel), id=-1 species is
     // SPECIES_NONE, id=0 move is MOVE_NONE. Map directly to pokerogue's NONE
@@ -221,7 +227,7 @@ export function buildIdMapForCategory(entries, vanillaMap, customStart, aliasFn)
       }
     }
     if (vanillaId === undefined) {
-      map[e.id] = nextCustom++;
+      map[e.id] = nextAvailableCustomId();
       customCount++;
     } else {
       map[e.id] = vanillaId;
@@ -306,8 +312,10 @@ export async function build({ dump, outDir, flags }) {
     CUSTOM_ID_START.species,
     regionalSpeciesAliases,
   );
-  const abilitiesResult = buildIdMapForCategory(abilityEntries, abilitiesEnum, CUSTOM_ID_START.abilities);
-  const movesResult = buildIdMapForCategory(moveForLookup, movesEnum, CUSTOM_ID_START.moves);
+  const abilitiesResult = buildIdMapForCategory(abilityEntries, abilitiesEnum, CUSTOM_ID_START.abilities, undefined, [
+    [5900, 6999],
+  ]);
+  const movesResult = buildIdMapForCategory(moveForLookup, movesEnum, CUSTOM_ID_START.moves, undefined, [[6000, 6999]]);
   const trainerResult = buildTrainerClassMap(tclassNames, trainerTypesEnum, TRAINER_CLASS_ALIASES);
 
   const idMap = {

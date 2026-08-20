@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
+import { sleepingInBlocksMove } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { erLibraryRecordFoeMove } from "#data/elite-redux/abilities/library";
 import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
 import {
@@ -320,8 +321,8 @@ export class MovePhase extends PokemonPhase {
     // A big if statement will handle the checks (that each have side effects!) in the correct order
     return (
       this.checkSleep()
+      || this.checkSleepingIn()
       || this.checkBurnFatigue()
-      || this.checkFreeze()
       || this.checkPP()
       || this.checkValidity()
       || this.checkTagCancel(BattlerTagType.TRUANT)
@@ -399,6 +400,14 @@ export class MovePhase extends PokemonPhase {
     const cancel = !bypassSleepHolder.value;
     this.triggerStatus(StatusEffect.SLEEP, cancel);
     return cancel;
+  }
+
+  protected checkSleepingIn(): boolean {
+    if (!sleepingInBlocksMove(this.pokemon, this.move.getMove())) {
+      return false;
+    }
+    this.showFailedText();
+    return true;
   }
 
   protected checkBurnFatigue(): boolean {

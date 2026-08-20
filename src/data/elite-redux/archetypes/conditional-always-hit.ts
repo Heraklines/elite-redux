@@ -77,8 +77,8 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
 
   override apply(_params: AbAttrBaseParams): void {}
 
-  private matchesMove(move: Move): boolean {
-    if (this.opts.flag !== undefined && !move.hasFlag(this.opts.flag)) {
+  private matchesMove(move: Move, user: Pokemon): boolean {
+    if (this.opts.flag !== undefined && !move.doesFlagEffectApply({ flag: this.opts.flag, user })) {
       return false;
     }
     if (this.opts.categories !== undefined && !this.opts.categories.includes(move.category)) {
@@ -105,11 +105,8 @@ export class ConditionalAlwaysHitAbAttr extends AbAttr {
     return !this.opts.targetTrapped || !!target.getTag(TrappedTag);
   }
 
-  /**
-   * Returns true if the configured predicate matches the move/user/target.
-   */
   public matches(move: Move, user: Pokemon, target: Pokemon): boolean {
-    return this.matchesMove(move) && this.matchesWeather() && this.matchesTarget(move, user, target);
+    return this.matchesMove(move, user) && this.matchesWeather() && this.matchesTarget(move, user, target);
   }
 }
 

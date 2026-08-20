@@ -9,6 +9,7 @@ import type {
   AiMovegenMoveStatsAbAttrParams,
   PreAttackModifyPowerAbAttrParams,
 } from "#abilities/ab-attrs";
+import { isComatoseLike } from "#abilities/ab-attrs";
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
@@ -31,6 +32,11 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  ER_REAP_AND_SOW_ABILITY_ID,
+  ER_SLEEPING_IN_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { recordMagneticFluxRecipient } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
   applyFoulHarvestDrainBonus,
   applyVaporBodyAccuracy,
@@ -181,6 +187,14 @@ import { inSpeedOrder } from "#utils/speed-order-generator";
 import { toCamelCase, toTitleCase } from "#utils/strings";
 import type { ValueHolder } from "#utils/value-holder";
 import i18next from "i18next";
+
+type MoveFlagInjector = {
+  injects: (flag: MoveFlags, move: Move) => boolean;
+};
+
+function isMoveFlagInjector(attr: unknown): attr is MoveFlagInjector {
+  return typeof attr === "object" && attr !== null && "injects" in attr && typeof attr.injects === "function";
+}
 
 // TODO: Make these (and all condition functions actually)
 // take interfaces instead of plain parameters
@@ -981,7 +995,6 @@ export abstract class Move implements Localizable {
     target?: Pokemon | undefined;
     isFollowUp?: boolean | undefined;
   }): boolean {
-    // special cases below, eg: if the move flag is MAKES_CONTACT, and the user pokemon has an ability that ignores contact (like "Long Reach"), then overrides and move does not make contact
     switch (flag) {
       case MoveFlags.MAKES_CONTACT:
         if (user.hasAbilityWithAttr("IgnoreContactAbAttr") || this.hitsSubstitute(user, target)) {
@@ -990,6 +1003,21 @@ export abstract class Move implements Localizable {
         // ER Punching Glove: the holder's punching moves make no contact.
         if (erPunchingGloveStripsContact(user, this)) {
           return false;
+        }
+        if (
+          this.doesFlagEffectApply({ flag: MoveFlags.SLICING_MOVE, user, target })
+          && user.getAllActiveAbilityAttrs().some(attr => attr?.constructor?.name === "SpiritualSaberNoContactAbAttr")
+        ) {
+          return false;
+        }
+        // Manifest turns otherwise non-contact moves into contact. The
+        // Long Reach / Punching Glove exits above are forced non-contact and
+        // therefore retain precedence.
+        if (
+          user.getAllActiveAbilityAttrs().some(attr => attr?.constructor?.name === "ManifestContactAbAttr")
+          && !this.hasFlag(MoveFlags.MAKES_CONTACT)
+        ) {
+          return true;
         }
         break;
       case MoveFlags.IGNORE_ABILITIES:
@@ -1058,14 +1086,21 @@ export abstract class Move implements Localizable {
         }
         const injectAttrs = user.getAllActiveAbilityAttrs();
         for (const attr of injectAttrs) {
-          if (
-            attr?.constructor?.name === "MoveFlagInjectionAbAttr"
-            && (attr as unknown as { injects: (f: MoveFlags, m: Move) => boolean }).injects(flag, this)
-          ) {
+          if (isMoveFlagInjector(attr) && attr.injects(flag, this)) {
             return true;
           }
         }
         break;
+      }
+      default:
+        break;
+    }
+
+    if (user && !this.hasFlag(flag)) {
+      for (const attr of user.getAllActiveAbilityAttrs()) {
+        if (isMoveFlagInjector(attr) && attr.injects(flag, this)) {
+          return true;
+        }
       }
     }
 
@@ -3546,7 +3581,10 @@ export class StatusEffectAttr extends MoveEffectAttr {
     }
 
     const quiet = move.category !== MoveCategory.STATUS;
-
+    if (this.effect === StatusEffect.SLEEP && user.hasAbility(ER_SLEEPING_IN_ABILITY_ID as unknown as AbilityId)) {
+      const sleeper = this.selfTarget ? user : target;
+      return sleeper.addTag(BattlerTagType.DROWSY, 2, MoveId.YAWN, user.id);
+    }
     // Pass the move's category so a status-move-only immunity bypass (ER Mycelium
     // Might) fires only for STATUS moves, not a damaging move's secondary status.
     return target.trySetStatus(this.effect, user, undefined, null, false, quiet, undefined, false, move.category);
@@ -3631,8 +3669,7 @@ export class PsychoShiftEffectAttr extends MoveEffectAttr {
    * @returns - Whether the effect was successfully applied to the target.
    */
   apply(user: Pokemon, target: Pokemon, _move: Move, _args: any[]): boolean {
-    const statusToApply =
-      user.status?.effect ?? (user.hasAbility(AbilityId.COMATOSE) ? StatusEffect.SLEEP : StatusEffect.NONE);
+    const statusToApply = user.status?.effect ?? (isComatoseLike(user) ? StatusEffect.SLEEP : StatusEffect.NONE);
 
     // Bang is justified as condition func returns early if no status is found
     if (!target.trySetStatus(statusToApply, user)) {
@@ -3654,15 +3691,13 @@ export class PsychoShiftEffectAttr extends MoveEffectAttr {
         return false;
       }
 
-      const statusToApply =
-        user.status?.effect ?? (user.hasAbility(AbilityId.COMATOSE) ? StatusEffect.SLEEP : StatusEffect.NONE);
+      const statusToApply = user.status?.effect ?? (isComatoseLike(user) ? StatusEffect.SLEEP : StatusEffect.NONE);
       return !!statusToApply && target.canSetStatus(statusToApply, false, false, user);
     };
   }
 
   getTargetBenefitScore(user: Pokemon, target: Pokemon, _move: Move): number {
-    const statusToApply =
-      user.status?.effect ?? (user.hasAbility(AbilityId.COMATOSE) ? StatusEffect.SLEEP : StatusEffect.NONE);
+    const statusToApply = user.status?.effect ?? (isComatoseLike(user) ? StatusEffect.SLEEP : StatusEffect.NONE);
 
     // TODO: Give this a positive user benefit score
     return !target.status?.effect && statusToApply && target.canSetStatus(statusToApply, true, false, user) ? -10 : 0;
@@ -3934,7 +3969,7 @@ export class RemoveHeldItemAttr extends MoveEffectAttr {
       ];
 
     // Decrease item amount and update icon
-    target.loseHeldItem(removedItem);
+    target.loseHeldItem(removedItem, true, user);
     globalScene.updateModifiers(target.isPlayer());
 
     if (this.berriesOnly) {
@@ -4044,7 +4079,7 @@ export class EatBerryAttr extends MoveEffectAttr {
 
   reduceBerryModifier(target: Pokemon) {
     if (this.chosenBerry) {
-      target.loseHeldItem(this.chosenBerry);
+      target.loseHeldItem(this.chosenBerry, false);
     }
     globalScene.updateModifiers(target.isPlayer());
   }
@@ -4060,7 +4095,7 @@ export class EatBerryAttr extends MoveEffectAttr {
   protected eatBerry(consumer: Pokemon, berryOwner: Pokemon = consumer, updateHarvest = consumer === berryOwner) {
     // consumer eats berry, owner triggers unburden and similar effects
     getBerryEffectFunc(this.chosenBerry.berryType)(consumer);
-    applyAbAttrs("PostItemLostAbAttr", { pokemon: berryOwner });
+    applyAbAttrs("PostItemLostAbAttr", { pokemon: berryOwner, opponent: consumer });
     applyAbAttrs("HealFromBerryUseAbAttr", { pokemon: consumer });
     consumer.recordEatenBerry(this.chosenBerry.berryType, updateHarvest);
   }
@@ -4440,7 +4475,6 @@ export class StealEatBerryAttr extends EatBerryAttr {
 
     // pick a random berry and eat it
     this.chosenBerry = heldBerries[user.randBattleSeedInt(heldBerries.length)];
-    applyAbAttrs("PostItemLostAbAttr", { pokemon: target });
     const message = i18next.t("battle:stealEatBerry", {
       pokemonName: user.name,
       targetName: target.name,
@@ -4712,10 +4746,16 @@ export class InstantChargeAttr extends MoveAttr {
  * Per ER_COMPOSITE_PARTS these are the only two composites that contain Chloroplast.
  */
 export function userActsInSun(user: Pokemon | null | undefined): boolean {
+  const grassyReapAndSow =
+    globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
+    && globalScene
+      .getField(true)
+      .some(fieldPokemon => fieldPokemon.hasAbility(ER_REAP_AND_SOW_ABILITY_ID as unknown as AbilityId));
   if (
     user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)
     || user?.hasAbility(ErAbilityId.SOLAR_FLARE as unknown as AbilityId)
     || user?.hasAbility(ErAbilityId.BIG_LEAVES as unknown as AbilityId)
+    || grassyReapAndSow
   ) {
     return true;
   }
@@ -5086,6 +5126,17 @@ export class StatStageChangeAttr extends MoveEffectAttr {
       ret += levels * 4 + (levels > 0 ? -2 : 2);
     }
     return ret;
+  }
+}
+
+/** Magnetic Flux records only targets whose defensive stat change succeeded. */
+export class MagneticFluxStatStageChangeAttr extends StatStageChangeAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args?: any[]): boolean {
+    const applied = super.apply(user, target, move, args);
+    if (applied && move.id === MoveId.MAGNETIC_FLUX) {
+      recordMagneticFluxRecipient(user, target);
+    }
+    return applied;
   }
 }
 
@@ -12895,9 +12946,7 @@ export function initMoves() {
       .triageMove()
       .reflectable(),
     new AttackMove(MoveId.HEX, PokemonType.GHOST, MoveCategory.SPECIAL, 65, 100, 10, -1, 0, 5) //
-      .attr(MovePowerMultiplierAttr, (_user, target, _move) =>
-        target.status || target.hasAbility(AbilityId.COMATOSE) ? 2 : 1,
-      ),
+      .attr(MovePowerMultiplierAttr, (_user, target, _move) => (target.status || isComatoseLike(target) ? 2 : 1)),
     new ChargingAttackMove(MoveId.SKY_DROP, PokemonType.FLYING, MoveCategory.PHYSICAL, 60, 100, 10, -1, 0, 5)
       .chargeText(i18next.t("moveTriggers:tookTargetIntoSky", { pokemonName: "{USER}", targetName: "{TARGET}" }))
       // Turn 1: the user becomes semi-invulnerable (FLYING) and takes the target
@@ -13269,7 +13318,7 @@ export function initMoves() {
       .chargeText(i18next.t("moveTriggers:isChargingPower", { pokemonName: "{USER}" }))
       .attr(StatStageChangeAttr, [Stat.SPATK, Stat.SPDEF, Stat.SPD], 2, true),
     new StatusMove(MoveId.MAGNETIC_FLUX, PokemonType.ELECTRIC, -1, 20, -1, 0, 6)
-      .attr(StatStageChangeAttr, [Stat.DEF, Stat.SPDEF], 1, false, {
+      .attr(MagneticFluxStatStageChangeAttr, [Stat.DEF, Stat.SPDEF], 1, false, {
         condition: (_user, target, _move) => !![AbilityId.PLUS, AbilityId.MINUS].find(a => target.hasAbility(a, false)),
       })
       .ignoresSubstitute()

@@ -53,11 +53,17 @@ import {
   TarShotTag,
   TypeImmuneTag,
 } from "#data/battler-tags";
+import { getBerryEffectFunc } from "#data/berry";
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { isDamageNullified } from "#data/damage-nullification";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { erBadSpliceOnLeaveField } from "#data/elite-redux/abilities/bad-splice";
+import {
+  hasMultiHeadedAttr,
+  isSwirlyRoomActive,
+  resolveSwirlyRoomCategory,
+} from "#data/elite-redux/abilities/barbaracle-mechanics";
 import { erFaultCurrentOnLeaveField, erOverloadedSelfLocked } from "#data/elite-redux/abilities/charge-stack";
 import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
 import {
@@ -65,6 +71,13 @@ import {
   dualTypePrimeSecondType,
   dualTypeStabBonus,
 } from "#data/elite-redux/abilities/dual-type-move";
+import {
+  ER_ELECTRODYNAMICS_ABILITY_ID,
+  ER_SERFDOM_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+// biome-ignore lint/suspicious/noImportCycles: Battle hooks must run at the universal damage/typing chokepoints.
+import { applyBoobyTrapHealing } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
+import { isElectrodynamicsPosition, isRaichuTerrainGrounded } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
@@ -2070,7 +2083,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   getMoveCategory(target: Pokemon, move: Move): MoveCategory {
     const moveCategory = new NumberHolder(move.category);
     applyMoveAttrs("VariableMoveCategoryAttr", this, target, move, moveCategory);
-    return moveCategory.value;
+    return resolveSwirlyRoomCategory(moveCategory.value as MoveCategory, isSwirlyRoomActive());
   }
 
   /**
@@ -3909,12 +3922,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
     return (
-      !!this.getTag(GroundedTag)
-      || (!this.isOfType(PokemonType.FLYING, true, true)
-        && !this.hasAbility(AbilityId.LEVITATE) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
-        && !this.hasAbilityWithAttr("FloatAbAttr")
-        && !this.getTag(BattlerTagType.FLOATING)
-        && !this.getTag(SemiInvulnerableTag))
+      !isElectrodynamicsPosition(this)
+      && (!!this.getTag(GroundedTag)
+        || (!this.isOfType(PokemonType.FLYING, true, true)
+          && !this.hasAbility(AbilityId.LEVITATE) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
+          && !this.hasAbilityWithAttr("FloatAbAttr")
+          && !this.getTag(BattlerTagType.FLOATING)
+          && !this.getTag(SemiInvulnerableTag)))
     );
   }
 
@@ -4209,6 +4223,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // (the engine's ground immunity below only covers Flying types + Levitate; the
     // balloon must grant it directly). Iron Ball wins if both are held (isGrounded
     // is then true, so this is skipped).
+    if (moveType === PokemonType.GROUND && isElectrodynamicsPosition(this)) {
+      return 0;
+    }
     if (moveType === PokemonType.GROUND && !this.isGrounded() && erTacticalAirBalloonUngrounds(this)) {
       return 0;
     }
@@ -4286,6 +4303,31 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // ER Desert Spirit: in sand, Ground moves hit airborne (0x → 1x).
         if (attr?.constructor?.name === "WeatherGroundAirborneAbAttr") {
           (attr as unknown as { fire: (mt: PokemonType, h: NumberHolder) => void }).fire(moveType, multi);
+        }
+        if (move && attr?.constructor?.name === "MiracleBladeTypeChartAbAttr") {
+          (
+            attr as unknown as {
+              fire: (
+                m: Move,
+                defenderTypes: readonly PokemonType[],
+                h: NumberHolder,
+                mt?: PokemonType,
+                u?: Pokemon | null,
+              ) => void;
+            }
+          ).fire(move, types, multi, moveType, source);
+        }
+        if (move && typeof (attr as { getSecondaryMoveType?: unknown }).getSecondaryMoveType === "function") {
+          const secondary = (
+            attr as unknown as { getSecondaryMoveType: (m: Move) => PokemonType | undefined }
+          ).getSecondaryMoveType(move);
+          if (secondary !== undefined) {
+            multi.value *= this.getAttackTypeEffectiveness(secondary, {
+              source,
+              ignoreSourceAbility: true,
+              simulated,
+            });
+          }
         }
       }
 
@@ -5716,9 +5758,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ignoreSourceAbility) {
       for (const attr of source.getAllActiveAbilityAttrs()) {
         if (attr?.constructor?.name === "MoveCategoryOverrideAbAttr") {
-          const overridden = (attr as unknown as { resolveCategory: (m: Move) => MoveCategory | null }).resolveCategory(
-            move,
-          );
+          const overridden = (
+            attr as unknown as { resolveCategory: (m: Move, u: Pokemon) => MoveCategory | null }
+          ).resolveCategory(move, source);
           if (overridden != null) {
             variableCategory.value = overridden;
           }
@@ -5740,6 +5782,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         variableCategory.value = MoveCategory.SPECIAL;
       }
     }
+    variableCategory.value = resolveSwirlyRoomCategory(variableCategory.value as MoveCategory, isSwirlyRoomActive());
     const moveCategory = variableCategory.value as MoveCategory;
 
     /** The move's type after type-changing effects are applied */
@@ -5762,7 +5805,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     /** Combined damage multiplier from field effects such as weather, terrain, etc. */
     const arenaAttackTypeMultiplier = new NumberHolder(
-      globalScene.arena.getAttackTypeMultiplier(moveType, source.isGrounded()),
+      globalScene.arena.getAttackTypeMultiplier(
+        moveType,
+        isRaichuTerrainGrounded(source, globalScene.arena.terrainType),
+      ),
     );
     applyMoveAttrs("IgnoreWeatherTypeDebuffAttr", source, this, move, arenaAttackTypeMultiplier);
     // ER Utility Umbrella (held by the attacker): the holder ignores the sun's /
@@ -5897,7 +5943,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // full damage on every strike, so without this Multi-Headed hit 2-3× at 100%.
     // Scoped to Multi-Headed holders only — Multi-Lens, Parental Bond and ordinary
     // multi-hit moves are untouched.
-    if (source.hasAbility(ErAbilityId.MULTI_HEADED as unknown as AbilityId)) {
+    if (hasMultiHeadedAttr(source.getAllActiveAbilityAttrs())) {
       const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
       if (strikeIndex > 0) {
         multiStrikeEnhancementMultiplier.value *= source.turnData.hitCount <= 2 ? 0.25 : strikeIndex === 1 ? 0.2 : 0.15;
@@ -6515,6 +6561,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      */
     if (!source || source.turnData.hitCount <= 1) {
       applyAbAttrs("PostDamageAbAttr", { pokemon: this, damage, source });
+    }
+    if (damage > 0) {
+      applyBoobyTrapHealing(this, damage);
     }
     return damage;
   }
@@ -7545,7 +7594,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         isImmune = !ignoreTypeImmunity && this.isOfType(PokemonType.ELECTRIC);
         break;
       case StatusEffect.SLEEP:
-        isImmune = this.isGrounded() && globalScene.arena.terrainType === TerrainType.ELECTRIC;
+        isImmune =
+          (globalScene.arena.terrainType === TerrainType.ELECTRIC
+            && isRaichuTerrainGrounded(this, TerrainType.ELECTRIC))
+          || (this.hasAbility(ER_ELECTRODYNAMICS_ABILITY_ID as AbilityId) && isElectrodynamicsPosition(this));
         reason = TerrainType.ELECTRIC;
         break;
       case StatusEffect.FREEZE: {
@@ -7967,10 +8019,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // the fresh summonData, the way vanilla status (which lives outside summonData)
     // persists. A fainted mon keeps no status, so only carry it while alive.
     const bleedTag = this.isFainted() ? undefined : this.getTag(BattlerTagType.ER_BLEED);
+    const slabCurseTag = this.isFainted() ? undefined : this.getTag(BattlerTagType.ER_SLAB_CURSE);
     this.summonData = new PokemonSummonData();
     this.tempSummonData = new PokemonTempSummonData();
     if (bleedTag) {
       this.summonData.tags.push(bleedTag);
+    }
+    if (slabCurseTag) {
+      this.summonData.tags.push(slabCurseTag);
     }
     this.updateInfo();
   }
@@ -8611,7 +8667,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Should be `false` for all item loss occurring outside of battle (MEs, etc.).
    * @returns Whether the item was removed successfully.
    */
-  public loseHeldItem(heldItem: PokemonHeldItemModifier, forBattle = true): boolean {
+  public loseHeldItem(heldItem: PokemonHeldItemModifier, forBattle = true, opponent?: Pokemon): boolean {
     // TODO: What does a -1 pokemon id mean?
     if (heldItem.pokemonId !== -1 && heldItem.pokemonId !== this.id) {
       return false;
@@ -8622,7 +8678,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       globalScene.removeModifier(heldItem, this.isEnemy());
     }
     if (forBattle) {
-      applyAbAttrs("PostItemLostAbAttr", { pokemon: this });
+      applyAbAttrs("PostItemLostAbAttr", { pokemon: this, ...(opponent === undefined ? {} : { opponent }) });
       // ER Fetch (er move 969) consumed-item ledger: record a NON-BERRY,
       // re-grantable held item that was just lost IN BATTLE (knocked off,
       // a consumed one-time item like White/Power Herb, etc.) so Fetch can
@@ -8673,14 +8729,37 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Only tracks things that proc _every_ time a berry is eaten.
    * @param berryType - The type of berry being eaten.
    * @param updateHarvest - Whether to track the berry for harvest; default `true`.
+   * @param notifyCommensality - Whether adjacent Serfdom allies also eat the berry.
+   * @param trackForCudChew - Whether to track this consumption for turn-end berry replay.
    */
-  public recordEatenBerry(berryType: BerryType, updateHarvest = true) {
+  public recordEatenBerry(
+    berryType: BerryType,
+    updateHarvest = true,
+    notifyCommensality = true,
+    trackForCudChew = true,
+  ) {
     this.battleData.hasEatenBerry = true;
     if (updateHarvest) {
       // Only track for harvest if we actually consumed the berry
       this.battleData.berriesEaten.push(berryType);
     }
-    this.turnData.berriesEaten.push(berryType);
+    if (trackForCudChew) {
+      this.turnData.berriesEaten.push(berryType);
+    }
+
+    if (!notifyCommensality) {
+      return;
+    }
+    for (const ally of this.getAdjacentAllies()) {
+      if (
+        !ally.isActive(true)
+        || !ally.getActiveAbilitySources().some(source => source.ability.id === (ER_SERFDOM_ABILITY_ID as AbilityId))
+      ) {
+        continue;
+      }
+      getBerryEffectFunc(berryType)(ally);
+      ally.recordEatenBerry(berryType, false, false, false);
+    }
   }
 
   /**

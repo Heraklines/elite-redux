@@ -183,10 +183,10 @@ describe.skipIf(!RUN)("ER newcomer patch — full integration sweep", () => {
     partnerEvolution.destroy();
   });
 
-  // --- Mega / primal newcomer FORMS (12) -----------------------------------
+  // --- Mega / primal newcomer FORMS (27) -----------------------------------
   it("mega/primal forms: exist on base, inherit base TM compat, kit resolves", () => {
     for (const def of ER_NEWCOMER_FORMS) {
-      const base = getPokemonSpecies(def.baseSpecies);
+      const base = getPokemonSpecies(def.baseSpecies as SpeciesId);
       expect(base, `base for ${def.formKey}`).toBeDefined();
       const formIndex = base.forms.findIndex(f => f.formKey === def.formKey);
       expect(formIndex, `${def.baseSpecies}:${def.formKey} form injected`).toBeGreaterThanOrEqual(0);

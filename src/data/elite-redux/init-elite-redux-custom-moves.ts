@@ -49,6 +49,7 @@ import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { dispatchMoveArchetype, PitfallTrapAndAlwaysHitAttr } from "#data/elite-redux/move-archetype-dispatcher";
 import {
+  AddArenaTagAttr,
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
   AddTypeAttr,
@@ -111,6 +112,7 @@ import i18next from "i18next";
  * Mirrors the value in `scripts/elite-redux/builders/id-map.mjs` and
  * `er-move-id-enum.mjs`.
  */
+const RESERVED_MANUAL_MOVE_BAND = { min: 6000, max: 6999 } as const;
 const VANILLA_ID_CUTOFF = 5000;
 
 /** Aggregated result of a single `initEliteReduxCustomMoves()` run. */
@@ -411,6 +413,19 @@ class ErCustomSelfStatusMove extends SelfStatusMove {
   }
 }
 
+function buildSwirlyRoomMove(): Move {
+  ErCustomStatusMove.registerDraft(
+    MoveId.SWIRLY_ROOM,
+    "Swirly Room",
+    "Swaps the category of Physical and Special moves for 5 turns.",
+    "Swaps the category of Physical and Special moves for 5 turns.",
+  );
+  return new ErCustomStatusMove(MoveId.SWIRLY_ROOM, PokemonType.PSYCHIC, -1, 5, -1, 0, 9)
+    .attr(AddArenaTagAttr, ArenaTagType.SWIRLY_ROOM, 5)
+    .ignoresProtect()
+    .target(MoveTarget.BOTH_SIDES);
+}
+
 /** Count the number of set bits in a (non-negative integer) bitmask. */
 function popcount(mask: number): number {
   // The ER MoveFlags enum has < 32 bits, so a simple Brian-Kernighan loop is fine.
@@ -460,6 +475,13 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     if (pokerogueId === undefined) {
       continue;
     }
+    if (
+      pokerogueId >= RESERVED_MANUAL_MOVE_BAND.min
+      && pokerogueId <= RESERVED_MANUAL_MOVE_BAND.max
+      && pokerogueId !== MoveId.SWIRLY_ROOM
+    ) {
+      continue;
+    }
     if (pokerogueId < VANILLA_ID_CUTOFF) {
       // Vanilla — already in allMoves from initMoves().
       continue;
@@ -488,6 +510,17 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     }
   }
 
+  if (existingIds.has(MoveId.SWIRLY_ROOM)) {
+    result.customsAlreadyPresent++;
+  } else {
+    try {
+      (allMoves as Move[])[MoveId.SWIRLY_ROOM] = buildSwirlyRoomMove();
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Failed to construct manual move "Swirly Room": ${msg}`);
+    }
+  }
   return result;
 }
 

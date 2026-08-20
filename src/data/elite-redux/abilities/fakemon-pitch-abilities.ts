@@ -55,6 +55,35 @@ export const ER_THIRD_EYE_ABILITY_ID = 6048;
 export const ER_METALLOSIS_ABILITY_ID = 6049;
 export const ER_CONTAMINATED_ABILITY_ID = 6050;
 export const ER_DECAY_ABILITY_ID = 6051;
+export const ER_SPATIAL_MAGIC_ABILITY_ID = 6052;
+export const ER_STELLARIZE_ABILITY_ID = 6053;
+export const ER_REAP_AND_SOW_ABILITY_ID = 6054;
+export const ER_SERFDOM_ABILITY_ID = 6055;
+export const ER_SLEEPING_IN_ABILITY_ID = 6056;
+export const ER_HONK_SHOO_ABILITY_ID = 6057;
+export const ER_SOMNILOQUY_ABILITY_ID = 6058;
+export const ER_DEMODULATOR_ABILITY_ID = 6059;
+export const ER_MODULATOR_ABILITY_ID = 6060;
+export const ER_SURGES_UP_ABILITY_ID = 6061;
+export const ER_ELECTRODYNAMICS_ABILITY_ID = 6062;
+export const ER_PSIONIC_ABILITY_ID = 6063;
+export const ER_MIRACLE_BLADE_ABILITY_ID = 6064;
+export const ER_SPIRITUAL_SABER_ABILITY_ID = 6065;
+export const ER_SLABS_CURSE_ABILITY_ID = 6066;
+export const ER_BOOBY_TRAP_ABILITY_ID = 6067;
+export const ER_MANIFEST_ABILITY_ID = 6068;
+export const ER_PAPER_TALISMAN_ABILITY_ID = 6069;
+export const ER_OFUDA_ABILITY_ID = 6070;
+export const ER_LOW_TIDE_ABILITY_ID = 6071;
+export const ER_SEA_SPECTER_ABILITY_ID = 6072;
+export const ER_EBB_AND_FLOW_ABILITY_ID = 6073;
+export const ER_MOONARCH_ABILITY_ID = 6074;
+export const ER_SWIRLIFY_ABILITY_ID = 6075;
+export const ER_BODHISATTVA_ABILITY_ID = 6076;
+export const ER_MAGIC_TOUCH_ABILITY_ID = 6077;
+export const ER_CELESTIAL_JELLY_ABILITY_ID = 6078;
+export const ER_RAPIER_ABILITY_ID = 6079;
+export const ER_BRAIN_OVER_BRAWN_ABILITY_ID = 6080;
 
 export interface FakemonPitchAbilityDefinition {
   readonly draft: ErAbilityDraft;
@@ -213,5 +242,110 @@ export const ER_FAKEMON_PITCH_ABILITIES: readonly FakemonPitchAbilityDefinition[
     ER_DECAY_ABILITY_ID,
     "Decay",
     "On entry, becomes permanently poisoned for the battle. This poison remains visible and enables Poison-based effects but does not harm this Pokemon.",
+  ),
+  ability(
+    ER_SPATIAL_MAGIC_ABILITY_ID,
+    "Spatial Magic",
+    "If this Pokemon would be knocked out this turn by a direct hit, both Pokemon switch before either side attacks.",
+  ),
+  ability(
+    ER_STELLARIZE_ABILITY_ID,
+    "Stellarize",
+    "Normal moves become Stellar and gain STAB. If already STAB, Stellar moves deal 1.5x damage against Terastallized, G-Max, and Mega Pokemon.",
+  ),
+  ability(
+    ER_REAP_AND_SOW_ABILITY_ID,
+    "Reap and Sow",
+    "Grassy Surge; abilities and moves benefit as though Sun were active. Only works in Grassy Terrain.",
+  ),
+  ability(ER_SERFDOM_ABILITY_ID, "Serfdom", "Harvest + Commensality."),
+  ability(
+    ER_SLEEPING_IN_ABILITY_ID,
+    "Sleeping In",
+    "All sleep-inducing moves have the accuracy and one-turn delay of Yawn; sleep-inducing moves cannot be used twice in a row and sleep only lasts one turn.",
+  ),
+  ability(ER_HONK_SHOO_ABILITY_ID, "Honk Shoo", "Comatose + Sweet Dreams."),
+  ability(ER_SOMNILOQUY_ABILITY_ID, "Somniloquy", "Uses Sleep Talk at the end of every 2nd turn."),
+  ability(
+    ER_DEMODULATOR_ABILITY_ID,
+    "Demodulator",
+    "While Electric Terrain is active, this Pokemon's Attack and Defense are multiplied by 1.5x. Allies receive the same boost, or 2x if they are boosted by Magnet Rise, Magnetic Flux, Plus, or Minus.",
+  ),
+  ability(
+    ER_MODULATOR_ABILITY_ID,
+    "Modulator",
+    "While Electric Terrain is active, this Pokemon's Special Attack and Special Defense are multiplied by 1.5x. Allies receive the same boost, or 2x if they are boosted by Magnet Rise, Magnetic Flux, Plus, or Minus.",
+  ),
+  ability(
+    ER_SURGES_UP_ABILITY_ID,
+    "Surges Up",
+    "Electro Surge plus Surge Surfer: this Pokemon's Speed is doubled while any terrain is active.",
+  ),
+  ability(
+    ER_ELECTRODYNAMICS_ABILITY_ID,
+    "Electrodynamics",
+    "This Pokemon and every replacement in its field position are immune to Ground moves and grounded hazards. Normal moves become Electric with a 1.2x power boost unless another -ate ability takes priority.",
+  ),
+  ability(
+    ER_PSIONIC_ABILITY_ID,
+    "Psionic",
+    "Electric and Psychic moves act as though their matching terrains were active, including terrain power, priority, and grounded effects, without changing the field terrain.",
+  ),
+  ability(
+    ER_MIRACLE_BLADE_ABILITY_ID,
+    "Miracle Blade",
+    "Keen Edge moves are always super-effective against Dark types, even when the move is Psychic-type.",
+  ),
+  ability(ER_SPIRITUAL_SABER_ABILITY_ID, "Spiritual Saber", "Blade's Essence plus Keen Edge moves make no contact."),
+  ability(
+    ER_SLABS_CURSE_ABILITY_ID,
+    "Slab's Curse",
+    "When a foe knocks out the user with a direct attack, all of its moves lose 2 PP every turn until 1 of their moves is reduced to 0 then dissipates. Switching does not lift the curse, and in a double/triple battle, the foe's allies receive the same curse but lose 1 PP per turn.",
+  ),
+  ability(
+    ER_BOOBY_TRAP_ABILITY_ID,
+    "Booby Trap",
+    "Once per entry, the first Pokemon to directly attack the user is inflicted with Curse. Any foes cursed by this Pokemon give half of their lost HP to this Pokemon. If an item is stolen or removed, this also inflicts Curse on the attacker.",
+  ),
+  ability(
+    ER_MANIFEST_ABILITY_ID,
+    "Manifest",
+    "All non-contact moves become contact while this Pokemon is present, unless an item or ability forces non-contact; ie Long Reach, Punching Glove, etc.",
+  ),
+  ability(ER_PAPER_TALISMAN_ABILITY_ID, "Paper Talisman", "Fluffy + Aegis Ward."),
+  ability(
+    ER_OFUDA_ABILITY_ID,
+    "Ofuda",
+    "Moves against this Pokemon have a 30% chance to inflict Curse on the attacker regardless of contact.",
+  ),
+  ability(
+    ER_LOW_TIDE_ABILITY_ID,
+    "Low Tide",
+    "Draws in and is immune to Water moves; if hit by Water, summons a 50 BP Surf.",
+  ),
+  ability(ER_SEA_SPECTER_ABILITY_ID, "Sea Specter", "Ghost and Water moves trigger each other."),
+  ability(ER_EBB_AND_FLOW_ABILITY_ID, "Ebb and Flow", "Tidal Rush + High Tide."),
+  ability(ER_MOONARCH_ABILITY_ID, "Moonarch", "Queenly Majesty + Moon Spirit."),
+  ability(
+    ER_CELESTIAL_JELLY_ABILITY_ID,
+    "Celestial Jelly",
+    "Once per battle, revives at 25% HP in Misty Terrain or Rain.",
+  ),
+  ability(ER_SWIRLIFY_ABILITY_ID, "Swirlify", "Summons Swirly Room for 3 turns on entry."),
+  ability(ER_BODHISATTVA_ABILITY_ID, "Bodhisattva", "Hand Barnacles + Brain Over Brawn."),
+  ability(
+    ER_MAGIC_TOUCH_ABILITY_ID,
+    "Magic Touch",
+    "Contact moves use Special Attack without changing their damage category.",
+  ),
+  ability(
+    ER_RAPIER_ABILITY_ID,
+    "Rapier",
+    "Horn moves count as Keen Edge moves and Keen Edge moves count as Horn moves.",
+  ),
+  ability(
+    ER_BRAIN_OVER_BRAWN_ABILITY_ID,
+    "Brain Over Brawn",
+    "Fighting-type moves become Psychic-type and receive a 1.2x power boost.",
   ),
 ];

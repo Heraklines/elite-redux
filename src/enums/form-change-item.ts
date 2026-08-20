@@ -383,4 +383,11 @@ export enum FormChangeItem {
   REUNICLUSITE_X,
   XATUNITE,
   ZANGOOSEITE,
+  // Source-backed fakemon-pitch forms (2026-08). Append-only for save compatibility.
+  CALYRITE,
+  HYPNITE,
+  ALORAICHUNITE,
+  BARBARACITE_Y,
+  LILLIGANITE_VERDANT,
+  DISTORTED_CHAIN,
 }

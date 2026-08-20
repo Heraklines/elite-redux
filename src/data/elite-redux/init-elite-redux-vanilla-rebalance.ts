@@ -68,6 +68,7 @@ import {
   getWeatherCondition,
   HealFromBerryUseAbAttr,
   IgnoreTypeStatusEffectImmunityAbAttr,
+  isComatoseLike,
   MoveImmunityAbAttr,
   MovePowerBoostAbAttr,
   MoveTypeChangeAbAttr,
@@ -2454,7 +2455,7 @@ class ErBadDreamsAbAttr extends PostTurnHurtIfSleepingAbAttr {
     }
     const pokemon = params.pokemon;
     for (const opp of pokemon.getOpponentsGenerator()) {
-      const isAsleep = opp.status?.effect === StatusEffect.SLEEP || opp.hasAbility(AbilityId.COMATOSE);
+      const isAsleep = opp.status?.effect === StatusEffect.SLEEP || isComatoseLike(opp);
       if (!isAsleep || opp.switchOutStatus) {
         continue;
       }

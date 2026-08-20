@@ -48,7 +48,7 @@ export async function build({ dump, outDir, flags }) {
     name: (m.NAME ?? m.name ?? "").replace(/^MOVE_/, ""),
   }));
 
-  const { map } = buildIdMapForCategory(movesForLookup, movesEnum, CUSTOM_ID_START);
+  const { map } = buildIdMapForCategory(movesForLookup, movesEnum, CUSTOM_ID_START, undefined, [[6000, 6999]]);
 
   /** @type {Array<[string, number]>} */
   const customEntries = [];

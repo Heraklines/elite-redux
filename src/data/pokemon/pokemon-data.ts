@@ -273,6 +273,8 @@ interface SerializedPokemonSummonData {
   illusion?: SerializedIllusionData | undefined;
   berriesEatenLast: BerryType[];
   moveHistory: TurnMove[];
+  erPerpetualMotionStreak?: number;
+  erPerpetualMotionPending?: boolean;
 }
 
 /**
@@ -302,6 +304,10 @@ export class PokemonSummonData {
   public erTimedAbilitySuppressions: TimedAbilitySuppression[] = [];
   /** Reusable once-per-entry markers for ability mechanics. */
   public erAbilityProvenance: string[] = [];
+  /** Number of consecutive successful Perpetual Motion hits for this summon. */
+  public erPerpetualMotionStreak = 0;
+  /** Whether the current automatic Perpetual Motion cast is awaiting resolution. */
+  public erPerpetualMotionPending = false;
   /** Imposter transformed this summon, so copied damaging moves retain its 1.3x rider. */
   public erImposterCopiedAttackBoost = false;
   /**

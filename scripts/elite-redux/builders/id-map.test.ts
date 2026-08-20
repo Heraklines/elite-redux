@@ -91,6 +91,19 @@ describe("id-map transformer (pure)", () => {
     expect(r.vanillaCount).toBe(2);
     expect(r.customCount).toBe(2);
   });
+  it("skips reserved hand-authored runtime bands for generated moves and abilities", () => {
+    const vanilla = new Map<string, number>();
+    const entries = [
+      { id: 1, name: "First" },
+      { id: 2, name: "Second" },
+    ];
+    const abilities = buildIdMapForCategory(entries, vanilla, 5899, undefined, [[5900, 6999]]);
+    const moves = buildIdMapForCategory(entries, vanilla, 5999, undefined, [[6000, 6999]]);
+    expect(abilities.map[1]).toBe(5899);
+    expect(abilities.map[2]).toBe(7000);
+    expect(moves.map[1]).toBe(5999);
+    expect(moves.map[2]).toBe(7000);
+  });
 });
 
 describe("regionalSpeciesAliases (pure)", () => {

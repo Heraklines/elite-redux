@@ -5,13 +5,85 @@
 
 import { isDevEncounterPersistenceBypassActive, loadDevTools } from "#app/dev-tools/registry";
 import Overrides from "#app/overrides";
+import {
+  ER_CONKAPITATOR_SPECIES_ID,
+  ER_DIPPOWDOWN_SPECIES_ID,
+  ER_FALINKS_CONVERGENT_SPECIES_ID,
+  ER_GURDURUR_SPECIES_ID,
+  ER_INTANGROWTH_SPECIES_ID,
+  ER_IRON_STREAM_SPECIES_ID,
+  ER_LILLIGANT_VERDANT_SPECIES_ID,
+  ER_MISHAMANUS_SPECIES_ID,
+  ER_SLABBERIGUS_SPECIES_ID,
+  ER_TAGELA_SPECIES_ID,
+  ER_TREMBURR_SPECIES_ID,
+} from "#data/elite-redux/er-fakemon-pitch-species";
+import {
+  ER_DRAWCLOPS_SPECIES_ID,
+  ER_DUSTNOIR_SPECIES_ID,
+  ER_EGOELK_SPECIES_ID,
+} from "#data/elite-redux/er-newcomer-species";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
-const SCENARIO_LABELS = Array.from({ length: 5 }, (_, index) => `Roster: new Pokemon ${index + 1}/5`);
+const SCENARIO_LABELS = Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`);
+
+type ExpectedShowcasePokemon = Readonly<{
+  speciesId: number;
+  formIndex: number;
+  formKey: string;
+}>;
+
+type ExpectedShowcase = Readonly<{
+  player: readonly ExpectedShowcasePokemon[];
+  enemy: ExpectedShowcasePokemon;
+}>;
+
+const expectedPokemon = (speciesId: number, formIndex = 0, formKey = ""): ExpectedShowcasePokemon => ({
+  speciesId,
+  formIndex,
+  formKey,
+});
+
+const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
+  "Roster: new Pokemon 6/8": {
+    player: [
+      expectedPokemon(ER_MISHAMANUS_SPECIES_ID),
+      expectedPokemon(ER_FALINKS_CONVERGENT_SPECIES_ID),
+      expectedPokemon(ER_IRON_STREAM_SPECIES_ID),
+      expectedPokemon(ER_SLABBERIGUS_SPECIES_ID),
+      expectedPokemon(ER_EGOELK_SPECIES_ID),
+      expectedPokemon(ER_DRAWCLOPS_SPECIES_ID),
+    ],
+    enemy: expectedPokemon(ER_DUSTNOIR_SPECIES_ID),
+  },
+  "Roster: new Pokemon 7/8": {
+    player: [
+      expectedPokemon(ER_TAGELA_SPECIES_ID),
+      expectedPokemon(ER_INTANGROWTH_SPECIES_ID),
+      expectedPokemon(SpeciesId.CALYREX, 3, "mega"),
+      expectedPokemon(SpeciesId.HYPNO, 1, "mega"),
+      expectedPokemon(SpeciesId.ALOLA_RAICHU, 1, "mega-male"),
+      expectedPokemon(SpeciesId.ALOLA_RAICHU, 2, "mega-female"),
+    ],
+    enemy: expectedPokemon(ER_LILLIGANT_VERDANT_SPECIES_ID),
+  },
+  "Roster: new Pokemon 8/8": {
+    player: [
+      expectedPokemon(SpeciesId.BARBARACLE, 1, "mega-y"),
+      expectedPokemon(ER_LILLIGANT_VERDANT_SPECIES_ID, 1, "mega"),
+      expectedPokemon(SpeciesId.UXIE, 1, "primal"),
+      expectedPokemon(ER_TREMBURR_SPECIES_ID),
+      expectedPokemon(ER_GURDURUR_SPECIES_ID),
+      expectedPokemon(ER_CONKAPITATOR_SPECIES_ID),
+    ],
+    enemy: expectedPokemon(ER_DIPPOWDOWN_SPECIES_ID),
+  },
+};
 
 type DevHarnessWindow = Window & {
   __erLaunchDevScenarioByLabel?: (label: string) => boolean;
@@ -57,6 +129,11 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     await loadDevTools();
   });
+  it("keeps eight showcase labels unique and contiguous", () => {
+    expect(SCENARIO_LABELS).toEqual(Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`));
+    expect(new Set(SCENARIO_LABELS).size).toBe(8);
+    expect(Object.keys(EXPECTED_SHOWCASES)).toEqual(SCENARIO_LABELS.slice(5));
+  });
 
   for (const label of SCENARIO_LABELS) {
     it(`${label} launches through the in-game dev picker rail`, async () => {
@@ -79,6 +156,20 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
       expect(game.scene.getPlayerParty().every(pokemon => pokemon.level === 100)).toBe(true);
       expect(game.scene.getPlayerParty().every(pokemon => pokemon.getMoveset().length > 0)).toBe(true);
       expect(game.scene.getEnemyParty().length).toBeGreaterThan(0);
+      const expected = EXPECTED_SHOWCASES[label];
+      if (expected) {
+        const identity = (pokemon: {
+          species: { speciesId: number };
+          formIndex: number;
+          getFormKey: () => string;
+        }) => ({
+          speciesId: pokemon.species.speciesId,
+          formIndex: pokemon.formIndex,
+          formKey: pokemon.getFormKey(),
+        });
+        expect(game.scene.getPlayerParty().map(identity)).toEqual(expected.player);
+        expect(game.scene.getEnemyParty().map(identity)).toEqual([expected.enemy]);
+      }
     }, 180_000);
   }
 });

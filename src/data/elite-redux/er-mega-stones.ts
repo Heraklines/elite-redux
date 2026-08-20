@@ -270,7 +270,7 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["LUXRAYITE_Y", "lucarionite"],
   ["YVELTALITE_Z", "lucarionite"],
   ["METAGROSSITE_BOND", "lucarionite"],
-  // Discord fakemon-pitch roster stones (placeholder atlas frame until bespoke stones land).
+  // Discord fakemon-pitch source-backed forms (append-only enum entries).
   ["CRYOGONALITE", "glalitite"],
   ["JIRACHITE", "lucarionite"],
   ["LEDIANITE", "beedrillite"],
@@ -278,6 +278,12 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["REUNICLUSITE_X", "alakazite"],
   ["XATUNITE", "pidgeotite"],
   ["ZANGOOSEITE", "lucarionite"],
+  ["CALYRITE", "lucarionite"],
+  ["HYPNITE", "lucarionite"],
+  ["ALORAICHUNITE", "lucarionite"],
+  ["BARBARACITE_Y", "lucarionite"],
+  ["LILLIGANITE_VERDANT", "lucarionite"],
+  ["DISTORTED_CHAIN", "lucarionite"],
 ];
 
 type FcRecord = Record<string, number>;

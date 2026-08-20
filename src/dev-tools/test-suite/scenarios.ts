@@ -54,18 +54,25 @@ import {
   ER_CONKAPITATOR_SPECIES_ID,
   ER_DIPPOWDOWN_SPECIES_ID,
   ER_EQUILIBRA_SPECIES_ID,
+  ER_FALINKS_CONVERGENT_SPECIES_ID,
   ER_GURDURUR_SPECIES_ID,
+  ER_INTANGROWTH_SPECIES_ID,
+  ER_IRON_STREAM_SPECIES_ID,
   ER_JUSTYKE_SPECIES_ID,
   ER_LICKILICKING_SPECIES_ID,
+  ER_LILLIGANT_VERDANT_SPECIES_ID,
   ER_MANGLING_BLADE_SPECIES_ID,
+  ER_MISHAMANUS_SPECIES_ID,
   ER_OCTILLERY_REDUX_SPECIES_ID,
   ER_PENTASNUG_SPECIES_ID,
   ER_PONYTA_REDUX_SPECIES_ID,
   ER_POWER_PLANT_SPECIES_ID,
   ER_PYROTHON_SPECIES_ID,
   ER_RAPIDASH_REDUX_SPECIES_ID,
+  ER_SLABBERIGUS_SPECIES_ID,
   ER_SNUGLETT_SPECIES_ID,
   ER_SNUGTRIO_SPECIES_ID,
+  ER_TAGELA_SPECIES_ID,
   ER_TREMBURR_SPECIES_ID,
   ER_VOLTRIEVER_SPECIES_ID,
   ER_WAILBORE_SPECIES_ID,
@@ -75,6 +82,8 @@ import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#da
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import {
+  ER_DRAWCLOPS_SPECIES_ID,
+  ER_DUSTNOIR_SPECIES_ID,
   ER_EGOELK_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_TITANEON_SPECIES_ID,
@@ -206,7 +215,7 @@ function makeStarter(speciesId: SpeciesId, opts: StarterOpts = {}): Starter {
     shiny: opts.shiny ?? false,
     variant: opts.variant ?? 0,
     formIndex: opts.formIndex ?? 0,
-    female: opts.female,
+    ...(opts.female === undefined ? {} : { female: opts.female }),
     abilityIndex: opts.abilityIndex ?? 0,
     passive: false,
     nature: opts.nature ?? Nature.HARDY,
@@ -2027,11 +2036,18 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
 interface FakemonPitchShowcaseMember {
   readonly speciesId: SpeciesId;
   readonly formKey?: string;
+  readonly female?: boolean;
+  readonly moveset?: MoveId[];
 }
 
-const pitchSpecies = (speciesId: number, formKey?: string): FakemonPitchShowcaseMember => ({
+const pitchSpecies = (
+  speciesId: number,
+  formKey?: string,
+  options: Pick<FakemonPitchShowcaseMember, "female" | "moveset"> = {},
+): FakemonPitchShowcaseMember => ({
   speciesId: erSpecies(speciesId),
   ...(formKey ? { formKey } : {}),
+  ...options,
 });
 
 function fakemonPitchMoveset(speciesId: SpeciesId): StarterMoveset {
@@ -2047,7 +2063,8 @@ function fakemonPitchMoveset(speciesId: SpeciesId): StarterMoveset {
 const fakemonPitchStarter = (member: FakemonPitchShowcaseMember): Starter =>
   makeStarter(member.speciesId, {
     formIndex: member.formKey ? formIndexByKey(member.speciesId, member.formKey) : 0,
-    moveset: fakemonPitchMoveset(member.speciesId),
+    ...(member.female === undefined ? {} : { female: member.female }),
+    moveset: member.moveset ?? fakemonPitchMoveset(member.speciesId),
   });
 
 function fakemonPitchShowcaseScenario(
@@ -2057,9 +2074,9 @@ function fakemonPitchShowcaseScenario(
   names: string,
 ): DevScenario {
   return {
-    label: `Roster: new Pokemon ${number}/5`,
+    label: `Roster: new Pokemon ${number}/8`,
     description:
-      `New fakemon-pitch roster showcase ${number}/5.\n`
+      `New fakemon-pitch roster showcase ${number}/8.\n`
       + `PLAYER: ${names}.\n`
       + "DO: open Check Team and battle info, then inspect sprites, forms, typings, moves, and abilities.\n"
       + "EXPECT: all six player slots and the opponent use additions from the new roster.",
@@ -2151,6 +2168,45 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
     ],
     pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
     "Mega Xatu, Mega Zangoose, Conkapitator, Pentasnug, Live Current, Mangling Blade",
+  ),
+  fakemonPitchShowcaseScenario(
+    6,
+    [
+      pitchSpecies(ER_MISHAMANUS_SPECIES_ID),
+      pitchSpecies(ER_FALINKS_CONVERGENT_SPECIES_ID),
+      pitchSpecies(ER_IRON_STREAM_SPECIES_ID),
+      pitchSpecies(ER_SLABBERIGUS_SPECIES_ID),
+      pitchSpecies(ER_EGOELK_SPECIES_ID),
+      pitchSpecies(ER_DRAWCLOPS_SPECIES_ID),
+    ],
+    pitchSpecies(ER_DUSTNOIR_SPECIES_ID),
+    "Mishamanus, Falinks Convergent, Iron Stream, Slabberigus, Egoelk, Drawclops",
+  ),
+  fakemonPitchShowcaseScenario(
+    7,
+    [
+      pitchSpecies(ER_TAGELA_SPECIES_ID),
+      pitchSpecies(ER_INTANGROWTH_SPECIES_ID),
+      pitchSpecies(SpeciesId.CALYREX, "mega"),
+      pitchSpecies(SpeciesId.HYPNO, "mega"),
+      pitchSpecies(SpeciesId.ALOLA_RAICHU, "mega-male", { female: false }),
+      pitchSpecies(SpeciesId.ALOLA_RAICHU, "mega-female", { female: true }),
+    ],
+    pitchSpecies(ER_LILLIGANT_VERDANT_SPECIES_ID),
+    "Tagela, Intangrowth, Calyrex Chariot Mega, Mega Hypno, Mega Alolan Raichu Male, Mega Alolan Raichu Female",
+  ),
+  fakemonPitchShowcaseScenario(
+    8,
+    [
+      pitchSpecies(SpeciesId.BARBARACLE, "mega-y", { moveset: [MoveId.SWIRLY_ROOM] }),
+      pitchSpecies(ER_LILLIGANT_VERDANT_SPECIES_ID, "mega"),
+      pitchSpecies(SpeciesId.UXIE, "primal"),
+      pitchSpecies(ER_TREMBURR_SPECIES_ID),
+      pitchSpecies(ER_GURDURUR_SPECIES_ID),
+      pitchSpecies(ER_CONKAPITATOR_SPECIES_ID),
+    ],
+    pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
+    "Mega Barbaracle Y, Mega Lilligant Verdant, Corrupted Uxie, Tremburr, Gurdurur, Conkapitator",
   ),
 ];
 
@@ -21783,11 +21839,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
  * Builder and custom-trainer testers are registered separately by index.ts.
  */
 const DEV_MENU_SCENARIO_LABELS = new Set([
-  "Roster: new Pokemon 1/5",
-  "Roster: new Pokemon 2/5",
-  "Roster: new Pokemon 3/5",
-  "Roster: new Pokemon 4/5",
-  "Roster: new Pokemon 5/5",
+  "Roster: new Pokemon 1/8",
+  "Roster: new Pokemon 2/8",
+  "Roster: new Pokemon 3/8",
+  "Roster: new Pokemon 4/8",
+  "Roster: new Pokemon 5/8",
+  "Roster: new Pokemon 6/8",
+  "Roster: new Pokemon 7/8",
+  "Roster: new Pokemon 8/8",
   "Endless: final boss auto-KO",
   "Endless: deep Hell ghost (wave 401)",
 ]);
