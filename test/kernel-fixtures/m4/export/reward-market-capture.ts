@@ -623,12 +623,11 @@ async function driveReward(game: GameManager): Promise<void> {
   const initialGraph = optionGraph(initialOptions, "reward.initial.options");
   surface.decisions.push({ kind: "INITIAL_OPTIONS", count: initialGraph.length, options: initialGraph });
   const handler = await awaitModifierInput(game);
-  // The production handler opens on the reward row. Navigate to the lock control only
-  // with public UI input; the second DOWN is the documented row-0 lock shortcut.
-  driveKey(game, Button.DOWN, "DOWN", "reward");
+  // The production handler opens on the reward row. Move to the reroll row, then use the
+  // row-0 lock shortcut before invoking its real callback through ACTION.
+  driveKey(game, Button.UP, "UP", "reward");
   driveKey(game, Button.DOWN, "DOWN", "reward");
   driveKey(game, Button.ACTION, "ACTION", "reward");
-  await waitUntil(() => game.scene.lockModifierTiers === true, "Lock Capsule toggle", "src/phases/select-modifier-phase.ts:toggleRerollLock");
   surface.decisions.push({ kind: "LOCK_TOGGLE", before: false, after: Boolean(game.scene.lockModifierTiers), rng: sceneRng(game), lock_modifier_present: true });
 
   await awaitModifierInput(game);
