@@ -12,7 +12,7 @@ use crate::species::{
 use er_canonical::{CanonicalError, content_digest};
 use er_types::battle_ids::{AbilityId, ArenaConditionId, ContentPackHash, MoveId};
 use er_types::battle_model::{
-    BattleStat, CapabilityStatus, CapabilitySubject, EffectChance, MoveAccuracy, MoveCategory,
+    CapabilityStatus, CapabilitySubject, EffectChance, MoveAccuracy, MoveCategory,
     MoveEffectDefinition, MoveFlag, MovePower, MoveTarget, PokemonType, SingleTypeMultiplier,
     StatusKind, TerrainKind, WeatherKind,
 };
@@ -683,6 +683,8 @@ fn validate_pack_fields(
             },
         ));
     }
+    validate_selected_species(species).map_err(ContentPackError::Species)?;
+    validate_selected_abilities(abilities).map_err(ContentPackError::Abilities)?;
     match oracle {
         ContentOracle::M3 => {
             validate_selected_moves(moves).map_err(ContentPackError::Moves)?;

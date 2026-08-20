@@ -54,9 +54,6 @@ fn turn(value: u64) -> Result<TurnIndex, Box<dyn Error>> {
     Ok(TurnIndex::new(safe(value)?)?)
 }
 
-fn seat(value: u64) -> Result<SeatId, Box<dyn Error>> {
-    Ok(SeatId::new(safe(value)?))
-}
 
 fn hash() -> String {
     format!("blake3-v1:{}", "0".repeat(64))
@@ -135,9 +132,9 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
     let wave = wave(1)?;
     let source_battle_id = battle_id(1)?;
     let turn = turn(1)?;
-    let seat_one = seat(1)?;
-    let player_one = pokemon(1, Some(seat_one), false)?;
-    let player_two = pokemon(2, Some(seat_one), true)?;
+    let seat_zero = SeatId::ZERO;
+    let player_one = pokemon(1, Some(seat_zero), false)?;
+    let player_two = pokemon(2, Some(seat_zero), true)?;
     let enemy_one = pokemon(101, None, true)?;
     let enemy_two = pokemon(102, None, true)?;
     let run_rng = RunRngState {
@@ -151,7 +148,7 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
         wave_seed: "wave-seed".to_owned(),
         turn,
         format: format.clone(),
-        authority_seat: seat_one,
+        authority_seat: seat_zero,
         enemy_party: vec![enemy_one, enemy_two],
         field: FieldState::empty_for_format(&format)?,
         weather: WeatherState {
