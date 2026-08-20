@@ -628,6 +628,7 @@ async function driveReward(game: GameManager): Promise<void> {
   driveKey(game, Button.UP, "UP", "reward");
   driveKey(game, Button.DOWN, "DOWN", "reward");
   driveKey(game, Button.ACTION, "ACTION", "reward");
+  await waitUntil(() => game.scene.lockModifierTiers === true, "Lock Capsule toggle", "src/phases/select-modifier-phase.ts:toggleRerollLock");
   surface.decisions.push({ kind: "LOCK_TOGGLE", before: false, after: Boolean(game.scene.lockModifierTiers), rng: sceneRng(game), lock_modifier_present: true });
 
   await awaitModifierInput(game);
