@@ -2,7 +2,7 @@
   "schema_version": 1,
   "manifest_id": "m3-audited-production-blobs-v1",
   "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
-  "head_sha": "a307f94ef8988ba6496f0b5e97a44a956ee2761a",
+  "head_sha": "4c772970f08be911178a35f7d1618a3b4556416a",
   "source_root": "src",
   "path_count": 41,
   "paths": [
@@ -16,15 +16,15 @@
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
-      "blob_oid": "2f2cf8fe378d86db010767d52e1f3dcca9bc3511"
+      "blob_oid": "a2e47599e389a7d1b04a94589261f2adf7710cc0"
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/cutover-interaction.ts",
-      "blob_oid": "1b3d5bc4ebef335cac61f0ebfb3907d4a7040d89"
+      "blob_oid": "adb4814951a990e5c0d7ccaa97e52ea0d1a1c252"
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/cutover-wave.ts",
-      "blob_oid": "f1f46a18faba43f795bbee2541b95ddb6f512988"
+      "blob_oid": "c0dec95d778cd43b656d7248b60116ad252670f2"
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/frame-codec.ts",
@@ -80,7 +80,7 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-runtime.ts",
-      "blob_oid": "3e3d53080ed626573a2431e1764ba350473d02d7"
+      "blob_oid": "679cce69edc0f380ec43862d7e56e7e1a1ce5d09"
     },
     {
       "path": "src/data/elite-redux/coop/coop-session-controller.ts",
@@ -120,11 +120,11 @@
     },
     {
       "path": "src/phases/coop-replay-me-phase.ts",
-      "blob_oid": "249fb2dd61cca061e7a1bc1fb2d9f388ada77f35"
+      "blob_oid": "1116b3129ff131fc1ea2fe5ab5166a0f9396b89c"
     },
     {
       "path": "src/phases/coop-replay-phases.ts",
-      "blob_oid": "648db3725c7534285d7a8cf950f6e1b32c1f991d"
+      "blob_oid": "c6fd1348bcc20174670b87efe2b3d939325f8d7a"
     },
     {
       "path": "src/phases/coop-replay-turn-phase.ts",
@@ -136,7 +136,7 @@
     },
     {
       "path": "src/phases/er-crossroads-phase.ts",
-      "blob_oid": "1470ec6da2968c7628e3c019d0914c43994a105a"
+      "blob_oid": "039661055893c242b33ca251059f8fd17dd41368"
     },
     {
       "path": "src/phases/er-greater-ability-capsule-phase.ts",
@@ -152,11 +152,11 @@
     },
     {
       "path": "src/phases/mystery-encounter-phases.ts",
-      "blob_oid": "f9213212b8fc1f9505aaf7ba79050ed947711d3f"
+      "blob_oid": "face4f846f96647636b67e1c32ca70b508384809"
     },
     {
       "path": "src/phases/select-biome-phase.ts",
-      "blob_oid": "40fe8646d57398c7ea1d085a79ef87f442267eab"
+      "blob_oid": "5e6c3a473989cb45a8955ab9b0437135cf1e599f"
     },
     {
       "path": "src/phases/select-modifier-phase.ts",
@@ -168,7 +168,7 @@
     },
     {
       "path": "src/ui/handlers/mystery-encounter-ui-handler.ts",
-      "blob_oid": "4934c18f49c4580d35dd332b7393a5d19f7edff6"
+      "blob_oid": "a6dc08d39a0e1bb675c46396c2a4c4973085c212"
     }
   ]
 }
