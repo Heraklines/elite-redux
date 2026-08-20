@@ -804,6 +804,9 @@ export async function captureMigrationCompanions(): Promise<Record<string, JsonV
   let phaserGame: Phaser.Game;
   try {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    const boot = Promise.withResolvers<void>();
+    setTimeout(boot.resolve, 0);
+    await boot.promise;
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     gap("LIVE_M3_COMPANIONS_UNOBSERVABLE", "phaser:Phaser.Game", `live M3 Phaser construction failed: ${detail}`);

@@ -338,6 +338,10 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
   try {
     priorBattleRng = BattleScene.prototype.randBattleSeedInt;
     overrides.LEVEL_CAP_OVERRIDE = LEVEL_CAP_OVERRIDE;
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    const boot = Promise.withResolvers<void>();
+    setTimeout(boot.resolve, 0);
+    await boot.promise;
     game = await launchProgressionScenario(phaserGame);
     const pokemon = assertScenarioState(game);
     const levelThreshold = getLevelTotalExp(FINAL_LEVEL, GrowthRate.MEDIUM_SLOW);

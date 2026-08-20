@@ -541,6 +541,9 @@ async function captureLiveEncounter(): Promise<AnyRecord> {
   resetErBiomeStructure();
   resetErRouting();
   const phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
+  const boot = Promise.withResolvers<void>();
+  setTimeout(boot.resolve, 0);
+  await boot.promise;
   const originalBattleSeed = (Object.getPrototypeOf(globalScene) as AnyRecord).randBattleSeedInt;
   let game: GameManager | null = null;
   try {

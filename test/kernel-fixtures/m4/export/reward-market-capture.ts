@@ -470,7 +470,11 @@ function ensurePhaserGame(): Phaser.Game {
 }
 
 async function launchGame(wave: number, seed: string): Promise<GameManager> {
-  const manager = new GameManager(ensurePhaserGame());
+  const gameInstance = ensurePhaserGame();
+  const boot = Promise.withResolvers<void>();
+  setTimeout(boot.resolve, 0);
+  await boot.promise;
+  const manager = new GameManager(gameInstance);
   if (productionRandBattleSeedInt == null) {
     productionRandBattleSeedInt = BattleScene.prototype.randBattleSeedInt as AnyRecord["randBattleSeedInt"];
   }
