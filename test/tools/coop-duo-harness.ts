@@ -1913,9 +1913,10 @@ export async function driveClientPhaseQueueTo(
   const peerCtx = peerContextByScene.get(scene);
   const startedPeerPhases = new WeakSet<Phase>();
   const startedPhases = options.startedPhases ?? new WeakSet<Phase>();
-  const pumpPeer = options.pumpPeer === null
-    ? undefined
-    : options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases));
+  const pumpPeer =
+    options.pumpPeer === null
+      ? undefined
+      : (options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases)));
 
   for (let step = 0; step < maxPhases; step++) {
     await drainLoopback();
@@ -2085,11 +2086,7 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
  * Stage-one final-boss co-op intentionally returns no guest field because its guest-owned mon is still on
  * the bench; no synthetic consumer is created for that real no-command state.
  */
-function resolveCanonicalLocalCommandFields(
-  scene: BattleScene,
-  localRuntime: CoopRuntime,
-  label: string,
-): number[] {
+function resolveCanonicalLocalCommandFields(scene: BattleScene, localRuntime: CoopRuntime, label: string): number[] {
   const battle = scene.currentBattle;
   if (battle == null) {
     throw new Error(`${label} cannot resolve local command targets: scene has no current battle shell`);
@@ -2165,7 +2162,9 @@ function assertAppliedCanonicalLocalCommandFields(
     }
     const localFieldIndex = playerField.findIndex(pokemon => pokemon?.id === command.pokemonId);
     if (localFieldIndex < 0) {
-      throw new Error(`${label} applied command target pokemon=${command.pokemonId} is absent from mirrored player field`);
+      throw new Error(
+        `${label} applied command target pokemon=${command.pokemonId} is absent from mirrored player field`,
+      );
     }
     const canonicalFieldIndex = localRuntime.controller.isVersusSession()
       ? battle.arrangement.enemyOffset + localFieldIndex
@@ -2195,11 +2194,7 @@ async function materializeMirroredShowdownGuestCommandFrontier(
   afterFirstConsumer: () => Promise<void>,
 ): Promise<Phase> {
   materializeMirroredGuestInputTurn(scene);
-  const localFieldIndices = resolveCanonicalLocalCommandFields(
-    scene,
-    localRuntime,
-    "mirrored Showdown guest",
-  );
+  const localFieldIndices = resolveCanonicalLocalCommandFields(scene, localRuntime, "mirrored Showdown guest");
   if (localFieldIndices.length === 0) {
     throw new Error("mirrored Showdown guest has no active local command target in canonical geometry");
   }
@@ -2231,10 +2226,7 @@ async function materializeMirroredShowdownGuestCommandFrontier(
     if (position === 0) {
       await afterFirstConsumer();
     }
-    if (
-      scene.phaseManager.getCurrentPhase() !== command
-      || scene.ui.getMode() !== UiMode.COMMAND
-    ) {
+    if (scene.phaseManager.getCurrentPhase() !== command || scene.ui.getMode() !== UiMode.COMMAND) {
       throw new Error(
         `initial Showdown guest command control field=${fieldIndex} was not publicly actionable `
           + `(phase=${scene.phaseManager.getCurrentPhase()?.phaseName ?? "none"}, `
@@ -2990,11 +2982,7 @@ export async function buildDuo(
   if (hostHasOpenCommand) {
     let guestCommandFields: number[] = [];
     await withClient(guestCtx, async () => {
-      guestCommandFields = resolveCanonicalLocalCommandFields(
-        guestScene,
-        guestRuntime,
-        "initial co-op guest",
-      );
+      guestCommandFields = resolveCanonicalLocalCommandFields(guestScene, guestRuntime, "initial co-op guest");
       if (guestCommandFields.length > 1) {
         throw new Error(
           `initial co-op guest has ${guestCommandFields.length} local command targets; `
@@ -5732,19 +5720,15 @@ export async function buildShowdownDuo(
   // sole retained-control pump, so no unapplied command-open can race ahead of the exact guest consumer.
   await withClient(guestCtx, async () => {
     await drainLoopback();
-    await materializeMirroredShowdownGuestCommandFrontier(
-      guestScene,
-      guestRuntime,
-      async () => {
-        if (netcodeMode === "authoritative") {
-          await withClient(hostCtx, async () => {
-            await hostGame.phaseInterceptor.to("CommandPhase");
-            await drainLoopback();
-          });
-          await pumpDuoDestinations(rig, 2);
-        }
-      },
-    );
+    await materializeMirroredShowdownGuestCommandFrontier(guestScene, guestRuntime, async () => {
+      if (netcodeMode === "authoritative") {
+        await withClient(hostCtx, async () => {
+          await hostGame.phaseInterceptor.to("CommandPhase");
+          await drainLoopback();
+        });
+        await pumpDuoDestinations(rig, 2);
+      }
+    });
     const guestBattle = guestScene.currentBattle;
     if (guestBattle == null) {
       throw new Error("mirrored Showdown guest command bootstrap lost its battle shell");
