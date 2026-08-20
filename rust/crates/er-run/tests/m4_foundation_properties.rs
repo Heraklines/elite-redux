@@ -134,7 +134,7 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
     let wave = wave(1)?;
     let source_battle_id = battle_id(1)?;
     let turn = turn(1)?;
-    let seat = SeatId::ZERO;
+    let seat = SeatId::new(safe(1)?);
     let format = BattleFormat::single();
     let battle = BattleStateV2 {
         schema_version: BATTLE_STATE_SCHEMA_VERSION_V2,

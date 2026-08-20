@@ -158,7 +158,7 @@ fn valid_state() -> Result<GameStateV2, Box<dyn Error>> {
     let wave = wave(1)?;
     let source_battle_id = battle_id(1)?;
     let turn = turn(1)?;
-    let seat = SeatId::ZERO;
+    let seat = SeatId::new(safe(1)?);
     let run_rng = RunRngState {
         rdg: PhaserRdg::from_seed("foundation-properties").state(),
     };
@@ -459,7 +459,7 @@ fn migration_input() -> Result<GameStateV1, Box<dyn Error>> {
     let format = BattleFormat::single();
     let turn = turn(1)?;
     let wave = wave(2)?;
-    let seat = SeatId::ZERO;
+    let seat = SeatId::new(safe(1)?);
     let first = v1_pokemon(17, Some(seat))?;
     let second = v1_pokemon(19, Some(seat))?;
     let enemy = v1_pokemon(18, None)?;
@@ -618,8 +618,8 @@ fn migration_preserves_stable_identity_and_orders_roster_by_stable_index() -> Re
     let context = migration_context(
         &input,
         vec![
-            companion(17, BattleSide::Player, 0, 1, Some(SeatId::ZERO))?,
-            companion(19, BattleSide::Player, 1, 0, Some(SeatId::ZERO))?,
+            companion(17, BattleSide::Player, 0, 1, Some(SeatId::new(safe(1)?)))?,
+            companion(19, BattleSide::Player, 1, 0, Some(SeatId::new(safe(1)?)))?,
             companion(18, BattleSide::Enemy, 0, 0, None)?,
         ],
     )?;
@@ -636,8 +636,14 @@ fn migration_preserves_stable_identity_and_orders_roster_by_stable_index() -> Re
     );
     assert_eq!(migrated.player_party[0].progression.experience.get().get(), 19);
     assert_eq!(migrated.player_party[1].progression.experience.get().get(), 17);
-    assert_eq!(migrated.player_party[0].owner_seat, Some(SeatId::ZERO));
-    assert_eq!(migrated.player_party[1].owner_seat, Some(SeatId::ZERO));
+    assert_eq!(
+        migrated.player_party[0].owner_seat,
+        Some(SeatId::new(safe(1)?))
+    );
+    assert_eq!(
+        migrated.player_party[1].owner_seat,
+        Some(SeatId::new(safe(1)?))
+    );
     assert_eq!(migrated.battle.as_ref().ok_or("missing migrated battle")?.enemy_party[0].id, pokemon_id(18)?);
     Ok(())
 }
@@ -649,8 +655,8 @@ fn rejected_migration_never_mutates_the_v1_input() -> Result<(), Box<dyn Error>>
     let context = migration_context(
         &input,
         vec![
-            companion(17, BattleSide::Player, 0, 1, Some(SeatId::ZERO))?,
-            companion(19, BattleSide::Player, 0, 0, Some(SeatId::ZERO))?,
+            companion(17, BattleSide::Player, 0, 1, Some(SeatId::new(safe(1)?)))?,
+            companion(19, BattleSide::Player, 0, 0, Some(SeatId::new(safe(1)?)))?,
             companion(18, BattleSide::Enemy, 0, 0, None)?,
         ],
     )?;

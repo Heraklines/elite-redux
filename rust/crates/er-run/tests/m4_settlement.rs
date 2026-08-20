@@ -131,9 +131,9 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
     let wave = wave(1)?;
     let source_battle_id = battle_id(1)?;
     let turn = turn(1)?;
-    let seat_zero = SeatId::ZERO;
-    let player_one = pokemon(1, Some(seat_zero), false)?;
-    let player_two = pokemon(2, Some(seat_zero), true)?;
+    let seat_one = SeatId::new(safe(1)?);
+    let player_one = pokemon(1, Some(seat_one), false)?;
+    let player_two = pokemon(2, Some(seat_one), true)?;
     let enemy_one = pokemon(101, None, true)?;
     let enemy_two = pokemon(102, None, true)?;
     let run_rng = RunRngState {
@@ -147,7 +147,7 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
         wave_seed: "wave-seed".to_owned(),
         turn,
         format: format.clone(),
-        authority_seat: seat_zero,
+        authority_seat: seat_one,
         enemy_party: vec![enemy_one, enemy_two],
         field: FieldState::empty_for_format(&format)?,
         weather: WeatherState {
