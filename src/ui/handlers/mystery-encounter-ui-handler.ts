@@ -142,7 +142,9 @@ export class MysteryEncounterUiHandler extends UiHandler {
     }
     if (this.blockInput) {
       setTimeout(() => {
-        this.unblockInput(surfaceGeneration);
+        if (surfaceGeneration === this.surfaceGeneration) {
+          this.unblockInput();
+        }
       }, 1000);
     }
     this.displayOptionTooltip();
@@ -197,9 +199,9 @@ export class MysteryEncounterUiHandler extends UiHandler {
               }
               const nextGeneration = this.surfaceGeneration;
               setTimeout(() => {
-                if (ownerStillLive()) {
+                if (ownerStillLive() && nextGeneration === this.surfaceGeneration) {
                   this.setCursor(this.viewPartyIndex);
-                  this.unblockInput(nextGeneration);
+                  this.unblockInput();
                 }
               }, 300);
             });
@@ -361,14 +363,15 @@ export class MysteryEncounterUiHandler extends UiHandler {
    * When ME UI first displays, the option buttons will be disabled temporarily to prevent player accidentally clicking through hastily
    * This method is automatically called after a short delay but can also be called manually
    */
-  unblockInput(surfaceGeneration = this.surfaceGeneration) {
-    if (surfaceGeneration !== this.surfaceGeneration) {
-      return;
-    }
+  unblockInput() {
     if (this.blockInput) {
       this.blockInput = false;
       for (let i = 0; i < this.optionsContainer.length - 1; i++) {
-        const optionMode = this.encounterOptions[i].optionMode;
+        const option = this.encounterOptions[i];
+        if (option == null) {
+          continue;
+        }
+        const optionMode = option.optionMode;
         if (
           !this.optionsMeetsReqs[i]
           && (optionMode === MysteryEncounterOptionMode.DISABLED_OR_DEFAULT
@@ -378,15 +381,18 @@ export class MysteryEncounterUiHandler extends UiHandler {
         }
         (this.optionsContainer.getAt(i) as Phaser.GameObjects.Text).setAlpha(1);
       }
-      // The selector is installed while its one-second click-through guard is still active. The V2
-      // projector therefore cannot prove executable control from either of the phase's initial readiness
-      // probes. Publish the actual false -> true actionability edge or ME_PRESENT remains uninstalled and
-      // every later ME_PICK is correctly held behind it as a revision gap.
     }
-    // Readiness is an idempotent edge, but it must be emitted for every exact actionable
-    // generation, including a replay surface that was already cosmetically unblocked.
-    if (this.active && !this.blockInput) {
-      notifyCoopV2InteractionSurfaceReady(getCoopRuntime(), globalScene.phaseManager.getCurrentPhase());
+    // A delayed release can fire after the phase or handler has been replaced. Recheck the
+    // live UI boundary before asking Authority V2 to publish controlInstalled.
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (
+      this.active
+      && !this.blockInput
+      && phase != null
+      && globalScene.ui.getMode() === UiMode.MYSTERY_ENCOUNTER
+      && globalScene.ui.getHandler() === this
+    ) {
+      notifyCoopV2InteractionSurfaceReady();
     }
   }
 

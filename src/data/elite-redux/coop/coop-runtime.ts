@@ -4151,6 +4151,9 @@ interface CoopV2DeferredHostBoundary {
   readonly compatibility: CoopV2DeferredHostBoundaryCompatibility;
 }
 
+type CoopV2WaveBoundaryEntry = CoopAuthorityEntry & { readonly kind: "WAVE_ADVANCE" };
+type CoopV2TerminalBoundaryEntry = CoopAuthorityEntry & { readonly kind: "TERMINAL_COMMIT" };
+
 /**
  * Exact command generations constructed while the correlated recovery fence owns the phase tree.
  *
@@ -4531,6 +4534,11 @@ function redriveCoopMeTerminal(runtime: CoopRuntime, edge: CoopMeTerminalRedrive
     return true;
   }
   if (disposition.kind === "deferred") {
+    return false;
+  }
+  if (disposition.kind === "not-cutover") {
+    clearCoopMeTerminalRedrive(runtime);
+    failCoopRuntimeSharedSession(runtime, `ME terminal ${parked.operationId} lost its Authority V2 cutover at ${edge}`);
     return false;
   }
   clearCoopMeTerminalRedrive(runtime);
@@ -10408,7 +10416,7 @@ function commitCoopV2SettledWaveAdvance(
     }
     const disposition = cutover.commitHostTerminalDetailed(input);
     if (disposition.kind === "deferred") {
-      const entry = disposition.entry;
+      const entry = disposition.entry as CoopV2TerminalBoundaryEntry;
       const record: CoopV2DeferredHostBoundary = freezeCoopV2HostBoundaryValue({
         kind: "terminal",
         operationId: entry.operationId,
@@ -10509,7 +10517,7 @@ function commitCoopV2SettledWaveAdvance(
   }
   const disposition = cutover.commitHostWaveDetailed(input);
   if (disposition.kind === "deferred") {
-    const entry = disposition.entry;
+    const entry = disposition.entry as CoopV2WaveBoundaryEntry;
     const record: CoopV2DeferredHostBoundary = freezeCoopV2HostBoundaryValue({
       kind: "wave",
       operationId: entry.operationId,

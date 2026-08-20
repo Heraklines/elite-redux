@@ -47,7 +47,11 @@ import {
   runWhenCoopRuntimeActive,
   settleCoopV2InteractionOperation,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_BIOME_PICK_CHOICE_KINDS,
+  COOP_BIOME_PICK_SEQ_BASE,
+  COOP_CROSSROADS_SEQ_BASE,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import {
@@ -1049,8 +1053,22 @@ export class SelectBiomePhase extends BattlePhase {
         }, 10);
         return;
       }
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
+      const interactionReady = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
+      if (!interactionReady) {
+        return;
+      }
       notifyCoopWaveContinuationSurfaceReady(wave);
+      if (this.coopChained && this.coopAdvancePinned >= 0) {
+        releaseCoopBiomeCommitReceipt(
+          coopBiomeOperationId(
+            "CROSSROADS_PICK",
+            COOP_CROSSROADS_SEQ_BASE + this.coopAdvancePinned,
+            this.coopAdvancePinned,
+            this.requireCoopBiomeOperationBinding(),
+          ),
+          this.requireCoopBiomeOperationBinding(),
+        );
+      }
     };
     if (this.coopOwningRuntime == null) {
       publish();

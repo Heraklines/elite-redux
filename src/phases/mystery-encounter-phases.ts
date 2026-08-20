@@ -947,11 +947,7 @@ export class MysteryEncounterPhase extends Phase {
       // late mode transition clear the freshly-installed prompt/action callback: the selected line was
       // visible but ACTION returned false forever (live Hot Spring / other simple ME softlock). Finish
       // the handler transition first, then publish the dialogue and its continuation.
-      void scene.ui.setMode(UiMode.MESSAGE).then(() => {
-        if (ownerStillLive()) {
-          showNextDialogue();
-        }
-      });
+      void scene.ui.setMode(UiMode.MESSAGE).then(showNextDialogue);
     } else {
       endDialogueAndContinueEncounter();
     }

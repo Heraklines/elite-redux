@@ -550,7 +550,10 @@ export class ErCrossroadsPhase extends Phase {
         }, 10);
         return;
       }
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
+      const interactionReady = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
+      if (!interactionReady) {
+        return;
+      }
       // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from
       // the real, active picker keeps the retained WAVE_ADVANCE journal closed until a player can act;
       // merely queuing this phase is deliberately insufficient.
@@ -681,11 +684,10 @@ export class ErCrossroadsPhase extends Phase {
         return;
       }
       this.clearCrossroadsCommitRecovery();
+      // The watcher must cross the same actionable-handler edge as the owner before either the
+      // interaction control or the retained wave continuation can be retired.
       getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
-      notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
-      // The watcher is a real public continuation too. Only the authoritative guest runtime can consume
-      // this notification, so owner parity cannot leave the retained wave waiting on the wrong renderer.
-      this.notifyCoopContinuationSurfaceReady();
+      this.publishCoopOwnerSurfaceWhenActionable(generation, wave);
     } catch {
       /* cosmetic - the awaited relay still drives the authoritative apply below */
     }
@@ -849,7 +851,7 @@ export class ErCrossroadsPhase extends Phase {
       decision.adopt && decision.requiresAuthorityCommit === true,
       decision.adopt && decision.authoritativeProjection === true,
     );
-    if (committed && applied) {
+    if (committed && applied && !moveOn) {
       releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     }
   }
@@ -876,7 +878,7 @@ export class ErCrossroadsPhase extends Phase {
       return;
     }
     this.coopCommitPending = false;
-    if (this.coopApply(pinned, moveOn, operationId, false, true)) {
+    if (this.coopApply(pinned, moveOn, operationId, false, true) && !moveOn) {
       releaseCoopBiomeCommitReceipt(operationId, this.requireCoopBiomeOperationBinding());
     }
   }

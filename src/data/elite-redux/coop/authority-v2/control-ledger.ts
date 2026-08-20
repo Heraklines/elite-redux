@@ -296,13 +296,16 @@ export class CoopV2ControlLedger {
       return fail();
     }
     const controlId = controlIdOf(control);
-    const prior = this.claims.get(controlId);
     if (prior != null) {
       const duplicate =
         prior.revision === entry.revision
         && prior.sourceOperationId === entry.operationId
         && controlsEqual(prior.control, control);
       if (duplicate) {
+        if (prior.superseded) {
+          // A redelivery of an old address must not reopen a superseded lease generation.
+          return fail();
+        }
         // Refresh only the authenticated channel axes after hot rejoin; mechanical identity was checked above.
         this.authenticatedSources.set(entry.revision, structuredClone(entry));
         if (proofScope != null) {
