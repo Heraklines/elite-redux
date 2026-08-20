@@ -31,6 +31,7 @@ import {
 } from "#data/elite-redux/er-biome-routing";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
+import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
@@ -590,12 +591,20 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
     await game.runToTitle();
     const biome = captureStructureAndRoute(game);
     const starters = built.scenario.setup();
-    game.scene.gameMode = getGameMode(GameModes.CLASSIC);
-    game.scene.phaseManager.pushNew("EncounterPhase", false);
-    game.scene.setSeed(RUN_SEED);
-    game.scene.resetSeed();
-    new SelectStarterPhase().initBattle(starters, true);
-    built.postLaunch();
+    game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+      game!.scene.gameMode = getGameMode(GameModes.CLASSIC);
+      const starterPhase = new SelectStarterPhase();
+      const scenarioSeed = RUN_SEED;
+      // Match the production launch frontier through the supported harness controls:
+      // pin the run seed before the requested Plains arena is materialized, then set wave and biome.
+      game!.override
+        .seed(scenarioSeed)
+        .startingWave(11)
+        .startingBiome(BiomeId.PLAINS);
+      game!.scene.phaseManager.pushNew("EncounterPhase", false);
+      starterPhase.initBattle(starters, true);
+      built.postLaunch();
+    });
 
     const captured = await withAsyncRngCapture("encounter", async () => {
       await game!.phaseInterceptor.to("CommandPhase", false);
