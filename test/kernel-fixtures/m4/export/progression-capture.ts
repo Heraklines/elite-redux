@@ -1,0 +1,487 @@
+import { BattleScene } from "#app/battle-scene";
+import { getLevelTotalExp, GrowthRate } from "#data/exp";
+import { getGameMode } from "#app/game-mode";
+import Overrides from "#app/overrides";
+import { PhaseManager } from "#app/phase-manager";
+import { ExpNotification } from "#enums/exp-notification";
+import { GameModes } from "#enums/game-modes";
+import { UiMode } from "#enums/ui-mode";
+import { Pokemon } from "#field/pokemon";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { EncounterPhase } from "#phases/encounter-phase";
+import { GameManager } from "#test/framework/game-manager";
+import { PromptHandler } from "#test/helpers/prompt-handler";
+import { Button } from "#enums/buttons";
+import Phaser from "phaser";
+import { vi } from "vitest";
+
+export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
+export type JsonObject = { [key: string]: JsonValue };
+
+type AnyRecord = Record<string, any>;
+
+type CaptureTrace = {
+  readonly applyPartyExp: AnyRecord[];
+  readonly addExp: AnyRecord[];
+  readonly levelUp: AnyRecord[];
+  readonly moveBatch: AnyRecord[];
+  readonly setMove: AnyRecord[];
+  readonly menuInputs: AnyRecord[];
+};
+
+/** A source seam that the test-only exporter could not drive or observe. */
+export class M4CaptureGap extends Error {
+  public readonly code: string;
+  public readonly sourceSeam: string;
+
+  constructor(code: string, sourceSeam: string, detail: string) {
+    super(`${code} at ${sourceSeam}: ${detail}`);
+    this.name = "M4CaptureGap";
+    this.code = code;
+    this.sourceSeam = sourceSeam;
+  }
+}
+
+const SPECIES_ID = 1;
+const INITIAL_LEVEL = 16;
+const FINAL_LEVEL = 17;
+const LEVEL_CAP_OVERRIDE = 17;
+const INITIAL_MOVES = [331, 45, 74, 77] as const;
+const RAW_CANDIDATES = [34, 447, 520, 72, 124, 230] as const;
+const LEARNED_MOVE = 34;
+const LEARNED_SLOT = 0;
+
+function gap(code: string, sourceSeam: string, detail: string): never {
+  throw new M4CaptureGap(code, sourceSeam, detail);
+}
+
+function finite(value: unknown, path: string): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    gap("NON_FINITE_LIVE_VALUE", sourceFor(path), `${path} is not a finite number`);
+  }
+  return value;
+}
+
+function sourceFor(path: string): string {
+  if (path.includes("applyPartyExp")) {
+    return "src/battle-scene.ts:applyPartyExp";
+  }
+  if (path.includes("addExp")) {
+    return "src/field/pokemon.ts:addExp";
+  }
+  if (path.includes("candidate") || path.includes("move")) {
+    return "src/phases/level-up-phase.ts -> src/phases/learn-move-batch-phase.ts";
+  }
+  return "test/kernel-fixtures/m4/export/progression-capture.ts:live snapshot";
+}
+
+function requireArray(value: unknown, path: string): readonly unknown[] {
+  if (!Array.isArray(value)) {
+    gap("LIVE_VALUE_MISSING", sourceFor(path), `${path} is not an array`);
+  }
+  return value;
+}
+
+function requireExactNumbers(value: unknown, expected: readonly number[], path: string): number[] {
+  const values = requireArray(value, path).map((entry, index) => finite(entry, `${path}[${index}]`));
+  if (values.length !== expected.length || values.some((entry, index) => entry !== expected[index])) {
+    gap("LIVE_VECTOR_MISMATCH", sourceFor(path), `${path}=${JSON.stringify(values)} expected ${JSON.stringify(expected)}`);
+  }
+  return values;
+}
+
+function jsonSafe(value: unknown, path = "$"): JsonValue {
+  if (value === null || typeof value === "boolean" || typeof value === "string") {
+    return value as JsonValue;
+  }
+  if (typeof value === "number") {
+    finite(value, path);
+    return Object.is(value, -0) ? 0 : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => jsonSafe(entry, `${path}[${index}]`));
+  }
+  if (typeof value === "object") {
+    const output: JsonObject = {};
+    for (const key of Object.keys(value)) {
+      const entry = (value as AnyRecord)[key];
+      if (entry === undefined) {
+        gap("UNDEFINED_LIVE_VALUE", sourceFor(path), `${path}.${key} is undefined`);
+      }
+      output[key] = jsonSafe(entry, `${path}.${key}`);
+    }
+    return output;
+  }
+  gap("UNSUPPORTED_LIVE_VALUE", sourceFor(path), `${path} has unsupported type ${typeof value}`);
+}
+
+function moveSnapshot(pokemon: Pokemon): JsonValue[] {
+  return pokemon.getMoveset(true).map(move => ({
+    move_id: finite(move.moveId, "moves.move_id"),
+    pp_used: finite(move.ppUsed, "moves.pp_used"),
+    pp_up: finite(move.ppUp, "moves.pp_up"),
+  }));
+}
+
+function statusSnapshot(pokemon: Pokemon): JsonValue {
+  if (pokemon.status == null) {
+    return null;
+  }
+  return {
+    effect: finite(pokemon.status.effect, "status.effect"),
+    toxic_turn_count: finite(pokemon.status.toxicTurnCount, "status.toxic_turn_count"),
+    sleep_turns_remaining: pokemon.status.sleepTurnsRemaining == null ? null : finite(pokemon.status.sleepTurnsRemaining, "status.sleep_turns_remaining"),
+  };
+}
+
+function pokemonSnapshot(pokemon: Pokemon, partySlot: number): JsonObject {
+  const stats = requireArray(pokemon.stats, "pokemon.stats").map((entry, index) =>
+    finite(entry, `pokemon.stats[${index}]`),
+  );
+  const ivs = requireArray(pokemon.ivs, "pokemon.ivs").map((entry, index) => finite(entry, `pokemon.ivs[${index}]`));
+  if (stats.length !== 6 || ivs.length !== 6) {
+    gap("LIVE_PROGRESSION_STATS_INCOMPLETE", "src/field/pokemon.ts:Pokemon constructor/calculateStats", "stats and IVs must have six live entries");
+  }
+  const nature = finite(pokemon.nature, "pokemon.nature");
+  const effectiveNature = finite(pokemon.getNature(), "pokemon.getNature");
+  const owner = Object.hasOwn(pokemon, "coopOwner") ? ((pokemon as AnyRecord).coopOwner ?? null) : null;
+  return {
+    id: finite(pokemon.id, "pokemon.id"),
+    party_slot: partySlot,
+    owner,
+    species_id: finite(pokemon.species.speciesId, "pokemon.species.speciesId"),
+    form_index: finite(pokemon.formIndex, "pokemon.formIndex"),
+    level: finite(pokemon.level, "pokemon.level"),
+    experience: finite(pokemon.exp, "pokemon.exp"),
+    level_experience: finite(pokemon.levelExp, "pokemon.levelExp"),
+    growth_rate: finite(pokemon.species.growthRate, "pokemon.species.growthRate"),
+    ivs,
+    nature,
+    effective_nature: effectiveNature,
+    friendship: finite(pokemon.friendship, "pokemon.friendship"),
+    stats,
+    hp: finite(pokemon.hp, "pokemon.hp"),
+    max_hp: finite(pokemon.getMaxHp(), "pokemon.maxHp"),
+    status: statusSnapshot(pokemon),
+    stat_stages: requireArray(pokemon.getStatStages(), "pokemon.stat_stages").map((entry, index) =>
+      finite(entry, `pokemon.stat_stages[${index}]`),
+    ),
+    pause_evolutions: pokemon.pauseEvolutions,
+    moves: moveSnapshot(pokemon),
+  };
+}
+
+function readPartySnapshot(game: GameManager, pokemon: Pokemon): JsonObject {
+  const party = game.scene.getPlayerParty();
+  const partySlot = party.indexOf(pokemon as (typeof party)[number]);
+  if (partySlot < 0) {
+    gap("PLAYER_POKEMON_NOT_IN_PARTY", "src/field/pokemon.ts:PlayerPokemon", "progression target is not in the live player party");
+  }
+  return pokemonSnapshot(pokemon, partySlot);
+}
+
+function installTrace(game: GameManager, trace: CaptureTrace): () => void {
+  const battleSceneProto = BattleScene.prototype as AnyRecord;
+  const pokemonProto = Pokemon.prototype as AnyRecord;
+  const phaseManagerProto = PhaseManager.prototype as AnyRecord;
+  const originalApply = battleSceneProto.applyPartyExp;
+  const originalAddExp = pokemonProto.addExp;
+  const originalSetMove = pokemonProto.setMove;
+  const originalUnshiftNew = phaseManagerProto.unshiftNew;
+  if (
+    typeof originalApply !== "function"
+    || typeof originalAddExp !== "function"
+    || typeof originalSetMove !== "function"
+    || typeof originalUnshiftNew !== "function"
+  ) {
+    gap("PROGRESSION_SEAM_MISSING", "src/battle-scene.ts:applyPartyExp -> src/phases/exp-phase.ts", "one or more live observation methods are unavailable");
+  }
+
+  battleSceneProto.applyPartyExp = function (this: BattleScene, ...args: unknown[]): unknown {
+    const participantIds = args[3] instanceof Set ? [...(args[3] as Set<unknown>)] : [...this.currentBattle.playerParticipantIds];
+    const before = this.getPlayerParty().map((entry, index) => pokemonSnapshot(entry, index));
+    const result = originalApply.apply(this, args);
+    const after = this.getPlayerParty().map((entry, index) => pokemonSnapshot(entry, index));
+    trace.applyPartyExp.push({
+      exp_value: finite(args[0], "applyPartyExp.expValue"),
+      pokemon_defeated: args[1] === true,
+      use_wave_index_multiplier: args[2] === true,
+      participant_ids: participantIds.map((entry, index) => finite(entry, `applyPartyExp.participantIds[${index}]`)),
+      before,
+      after,
+    });
+    return result;
+  };
+
+  pokemonProto.addExp = function (this: Pokemon, ...args: unknown[]): unknown {
+    const before = { level: finite(this.level, "addExp.before.level"), experience: finite(this.exp, "addExp.before.exp") };
+    const result = originalAddExp.apply(this, args);
+    const after = { level: finite(this.level, "addExp.after.level"), experience: finite(this.exp, "addExp.after.exp") };
+    trace.addExp.push({
+      pokemon_id: finite(this.id, "addExp.pokemonId"),
+      exp: finite(args[0], "addExp.exp"),
+      ignore_level_cap: args[1] === true,
+      before,
+      after,
+    });
+    return result;
+  };
+
+  pokemonProto.setMove = function (this: Pokemon, ...args: unknown[]): unknown {
+    const moveIndex = finite(args[0], "setMove.moveIndex");
+    const moveId = finite(args[1], "setMove.moveId");
+    const before = this.getMoveset(true).map(move => move.moveId);
+    const result = originalSetMove.apply(this, args);
+    const after = this.getMoveset(true).map(move => move.moveId);
+    trace.setMove.push({
+      pokemon_id: finite(this.id, "setMove.pokemonId"),
+      move_index: moveIndex,
+      move_id: moveId,
+      before,
+      after,
+    });
+    return result;
+  };
+
+  phaseManagerProto.unshiftNew = function (this: PhaseManager, phaseName: string, ...args: unknown[]): unknown {
+    if (phaseName === "LevelUpPhase") {
+      trace.levelUp.push({ phase: phaseName, args });
+    } else if (phaseName === "LearnMoveBatchPhase") {
+      trace.moveBatch.push({ phase: phaseName, args });
+    }
+    return originalUnshiftNew.apply(this, [phaseName, ...args]);
+  };
+
+  return () => {
+    battleSceneProto.applyPartyExp = originalApply;
+    pokemonProto.addExp = originalAddExp;
+    pokemonProto.setMove = originalSetMove;
+    phaseManagerProto.unshiftNew = originalUnshiftNew;
+  };
+}
+
+async function launchProgressionScenario(phaserGame: Phaser.Game): Promise<GameManager> {
+  const spec: ScenarioSpec = {
+    v: 1,
+    name: "M4 progression Bulbasaur level 16 to 17",
+    run: { wave: 9, level: INITIAL_LEVEL, money: 1000, seed: "m4-progression-bulbasaur-16-17" },
+    party: [{ species: SPECIES_ID, moves: [...INITIAL_MOVES] }],
+    enemy: { kind: "wild", wild: { species: 52, moves: [33, 39, 45, 77] } },
+  };
+  const game = new GameManager(phaserGame);
+  const { scenario, postLaunch } = buildDevScenario(spec);
+  game.override.criticalHits(null);
+  vi.spyOn(game.scene.ui, "shouldSkipDialogue").mockReturnValue(true);
+  const starters = scenario.setup();
+  game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+    game.scene.gameMode = getGameMode(GameModes.CLASSIC);
+    const starterPhase = new SelectStarterPhase();
+    game.scene.phaseManager.pushNew("EncounterPhase", false);
+    const scenarioSeed = spec.run?.seed?.trim();
+    if (scenarioSeed) {
+      game.scene.setSeed(scenarioSeed);
+      game.scene.resetSeed();
+    }
+    starterPhase.initBattle(starters, true);
+    postLaunch();
+  });
+  await game.phaseInterceptor.to("EncounterPhase");
+  await game.phaseInterceptor.to("CommandPhase");
+  scenario.onBattleStart?.();
+  game.scene.expParty = ExpNotification.SKIP;
+  return game;
+}
+
+function assertScenarioState(game: GameManager): Pokemon {
+  const battle = game.scene.currentBattle as AnyRecord | undefined;
+  const pokemon = game.scene.getPlayerParty()[0];
+  if (!battle || battle.waveIndex !== 9 || battle.battleType !== 0) {
+    gap("LIVE_SOURCE_BATTLE_UNAVAILABLE", "src/app/dev-tools/test-suite/scenario-spec.ts -> src/phases/encounter-phase.ts", "the live setup did not produce a Classic wild wave-9 battle");
+  }
+  if (!pokemon) {
+    gap("LIVE_PLAYER_PARTY_UNAVAILABLE", "src/phases/select-starter-phase.ts:initBattle", "the live player party is empty");
+  }
+  if (pokemon.species.speciesId !== SPECIES_ID || pokemon.level !== INITIAL_LEVEL) {
+    gap("LIVE_PROGRESSION_TARGET_MISMATCH", "src/phases/select-starter-phase.ts:initBattle", `expected Bulbasaur level ${INITIAL_LEVEL}`);
+  }
+  if (pokemon.species.growthRate !== 3) {
+    gap("LIVE_GROWTH_RATE_MISMATCH", "src/data/pokemon-species.ts:Bulbasaur", `expected Medium Slow growth rate 3, got ${pokemon.species.growthRate}`);
+  }
+  requireExactNumbers(pokemon.getMoveset(true).map(move => move.moveId), INITIAL_MOVES, "initial moves");
+  return pokemon;
+}
+
+function captureMenuInput(trace: CaptureTrace, game: GameManager, button: Button): void {
+  trace.menuInputs.push({
+    button,
+    phase: game.scene.phaseManager.getCurrentPhase().phaseName,
+    mode: game.scene.ui.getMode(),
+  });
+  (game.scene.ui.getHandler() as AnyRecord).processInput(button);
+}
+
+export async function captureProgression(): Promise<Record<string, JsonValue>> {
+  let phaserGame: Phaser.Game | undefined;
+  let game: GameManager | undefined;
+  let restoreTrace: (() => void) | undefined;
+  let priorBattleRng: BattleScene["randBattleSeedInt"] | undefined;
+  const trace: CaptureTrace = {
+    applyPartyExp: [],
+    addExp: [],
+    levelUp: [],
+    moveBatch: [],
+    setMove: [],
+    menuInputs: [],
+  };
+  const overrides = Overrides as unknown as { LEVEL_CAP_OVERRIDE: number };
+  const priorCap = overrides.LEVEL_CAP_OVERRIDE;
+  try {
+    priorBattleRng = BattleScene.prototype.randBattleSeedInt;
+    overrides.LEVEL_CAP_OVERRIDE = LEVEL_CAP_OVERRIDE;
+    game = await launchProgressionScenario(phaserGame);
+    const pokemon = assertScenarioState(game);
+    const levelThreshold = getLevelTotalExp(FINAL_LEVEL, GrowthRate.MEDIUM_SLOW);
+    if (!Number.isSafeInteger(levelThreshold) || levelThreshold <= 0) {
+      gap("LIVE_EXP_THRESHOLD_UNOBSERVABLE", "src/data/exp.ts:getLevelTotalExp", `invalid level-${FINAL_LEVEL} Medium Slow threshold ${levelThreshold}`);
+    }
+    pokemon.exp = levelThreshold - 1;
+    if (pokemon.exp !== levelThreshold - 1) {
+      gap("LIVE_INITIAL_EXP_SETUP_FAILED", "src/field/pokemon.ts:exp", "the canonical progression setup could not pin the pre-threshold EXP");
+    }
+    const seededInitialExp = pokemon.exp;
+    const pokemonAfterExpSetup = assertScenarioState(game);
+    if (pokemonAfterExpSetup !== pokemon) {
+      gap("LIVE_PROGRESSION_TARGET_CHANGED", "src/field/pokemon.ts:PlayerPokemon", "the canonical EXP setup replaced the live progression target");
+    }
+    // the scenario's explicit move-learning input and prevents EvolutionPhase from adding another source.
+    pokemon.pauseEvolutions = true;
+    const before = readPartySnapshot(game, pokemon);
+    const moneyBefore = finite(game.scene.money, "money.before");
+    const battle = game.scene.currentBattle;
+    const enemy = battle.enemyParty[0];
+    if (!enemy) {
+      gap("LIVE_ENEMY_UNAVAILABLE", "src/battle.ts:enemyParty", "wave-9 source battle has no live enemy");
+    }
+    const participantIds = [...battle.playerParticipantIds];
+    if (!participantIds.includes(pokemon.id)) {
+      gap("PARTICIPATION_TARGET_MISSING", "src/battle.ts:playerParticipantIds", "the live target was not admitted as a battle participant");
+    }
+    const enemyExpValue = finite(enemy.getExpValue(), "enemy.getExpValue");
+    restoreTrace = installTrace(game, trace);
+    game.onNextPrompt("LearnMoveBatchPhase", UiMode.LEARN_MOVE_BATCH, () => {
+      captureMenuInput(trace, game!, Button.ACTION);
+      captureMenuInput(trace, game!, Button.ACTION);
+      captureMenuInput(trace, game!, Button.CANCEL);
+    });
+    await game.killPokemon(enemy);
+    await game.phaseInterceptor.to("LearnMoveBatchPhase");
+    game.doSelectModifier();
+    await game.phaseInterceptor.to("BattleEndPhase");
+    const after = readPartySnapshot(game, pokemon);
+    const battleAfter = game.scene.currentBattle;
+    const moneyAfter = finite(game.scene.money, "money.after");
+    const candidateArgs = trace.moveBatch[0]?.args;
+    const candidateIds = candidateArgs?.[1];
+    requireExactNumbers(candidateIds, RAW_CANDIDATES, "LearnMoveBatchPhase.candidateMoveIds");
+    if (trace.levelUp.length !== 1) {
+      gap("LEVEL_UP_PHASE_UNOBSERVED", "src/phases/level-up-phase.ts:LevelUpPhase.end", `expected one LevelUpPhase, observed ${trace.levelUp.length}`);
+    }
+    if (trace.applyPartyExp.length !== 1) {
+      gap("EXP_SETTLEMENT_UNOBSERVED", "src/battle-scene.ts:applyPartyExp", `expected one source-battle award, observed ${trace.applyPartyExp.length}`);
+    }
+    const addExp = trace.addExp.filter(entry => entry.pokemon_id === pokemon.id);
+    if (addExp.length !== 1) {
+      gap("EXP_PHASE_UNOBSERVED", "src/phases/exp-phase.ts:Pokemon.addExp", `expected one target addExp, observed ${addExp.length}`);
+    }
+    if (trace.setMove.length !== 1 || trace.setMove[0]?.move_index !== LEARNED_SLOT || trace.setMove[0]?.move_id !== LEARNED_MOVE) {
+      gap("MOVE_REPLACEMENT_UNOBSERVED", "src/field/pokemon.ts:setMove", "the live batch panel did not replace Body Slam into slot 0");
+    }
+    const afterMoves = after.moves;
+    if (!Array.isArray(afterMoves)) {
+      gap("LIVE_VALUE_MISSING", "src/field/pokemon.ts:Pokemon.moveset", "final move snapshot is not an array");
+    }
+    requireExactNumbers(afterMoves.map(entry => (entry as AnyRecord).move_id), [LEARNED_MOVE, 45, 74, 77], "after moves");
+    if (before.level !== INITIAL_LEVEL || after.level !== FINAL_LEVEL) {
+      gap("LEVEL_TRANSITION_MISMATCH", "src/field/pokemon.ts:addExp -> src/phases/level-up-phase.ts", `expected ${INITIAL_LEVEL}->${FINAL_LEVEL}, observed ${before.level}->${after.level}`);
+    }
+    return jsonSafe({
+      artifact_id: "progression/bulbasaur-medium-slow-level-17-v1",
+      oracle_input: {
+        mode: "CLASSIC",
+        battle_kind: "WILD",
+        wave: finite(battle.waveIndex, "battle.waveIndex"),
+        level_cap_override: LEVEL_CAP_OVERRIDE,
+        cap_source: "Overrides.LEVEL_CAP_OVERRIDE",
+        growth_rate: 3,
+        growth_rate_name: "MEDIUM_SLOW",
+        level_threshold: levelThreshold,
+        seeded_initial_experience: seededInitialExp,
+        threshold_formula: "getLevelTotalExp(17, GrowthRate.MEDIUM_SLOW)",
+        pause_evolutions: true,
+      },
+      initial: {
+        canonical: before,
+        money: moneyBefore,
+        participant_ids: participantIds.map((entry, index) => finite(entry, `participant_ids[${index}]`)),
+        threshold_before_level: levelThreshold,
+        seeded_experience: seededInitialExp,
+      },
+      settlement: {
+        source_enemy: {
+          id: finite(enemy.id, "enemy.id"),
+          species_id: finite(enemy.species.speciesId, "enemy.species.speciesId"),
+          level: finite(enemy.level, "enemy.level"),
+          exp_value: enemyExpValue,
+          fainted: enemy.isFainted(),
+        },
+        apply_party_exp: trace.applyPartyExp[0],
+        exp_phase: addExp[0],
+        defeated_enemy_count: finite(battleAfter.enemyFaints, "battle.enemyFaints"),
+        money: { before: moneyBefore, after: moneyAfter, delta: moneyAfter - moneyBefore },
+      },
+      progression: {
+        last_level: INITIAL_LEVEL,
+        level: FINAL_LEVEL,
+        raw_candidates: candidateIds,
+        learnable_candidates: candidateIds,
+        menu_inputs: trace.menuInputs,
+        assignments: [{ move_id: LEARNED_MOVE, slot: LEARNED_SLOT }],
+        replacement_slot: LEARNED_SLOT,
+      },
+      final: {
+        canonical: after,
+        money: moneyAfter,
+      },
+      observations: {
+        level_up: trace.levelUp,
+        move_batch: trace.moveBatch,
+        set_move: trace.setMove,
+        add_exp: trace.addExp,
+      },
+    }) as Record<string, JsonValue>;
+  } catch (error) {
+    if (error instanceof M4CaptureGap) {
+      throw error;
+    }
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    throw new M4CaptureGap(
+      "LIVE_PROGRESSION_SETUP_FAILED",
+      "test/kernel-fixtures/m4/export/progression-capture.ts:captureProgression",
+      detail,
+    );
+  } finally {
+    restoreTrace?.();
+    if (priorBattleRng != null) {
+      BattleScene.prototype.randBattleSeedInt = priorBattleRng;
+    }
+    overrides.LEVEL_CAP_OVERRIDE = priorCap;
+    if (game) {
+      game.promptHandler.clearPrompts();
+    }
+    if (PromptHandler.runInterval != null) {
+      clearInterval(PromptHandler.runInterval);
+      PromptHandler.runInterval = undefined;
+    }
+    phaserGame?.destroy(true);
+  }
+}
