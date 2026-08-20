@@ -316,6 +316,7 @@ async function launch(phaserGame: Phaser.Game): Promise<GameManager> {
     name: "M4 composed wave 9 through 11",
     notes: "Explicit composed fixture address; not a natural single-seed claim.",
     run: { wave: 9, biome: BiomeId.TOWN, level: 16, money: 1000000, seed: SEED, difficulty: "ace" },
+    party: [{ species: SpeciesId.NACLI, moves: [1, 52, 77, 78], nature: 0 }],
     enemy: { kind: "wild", wild: { species: SpeciesId.PIDGEY, moves: [MoveId.SPLASH] } },
     items: { modifiers: [{ name: "LOCK_CAPSULE" }] },
     start: { enemyHpPct: 1 },
