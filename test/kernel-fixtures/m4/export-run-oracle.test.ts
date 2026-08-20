@@ -427,14 +427,13 @@ function exactFrontier(value: unknown, path: string, sharedProvenance: JsonObjec
   if (
     rngRecord.run == null || typeof rngRecord.run !== "object" || Array.isArray(rngRecord.run)
     || !Object.hasOwn(rngRecord, "seed_offset")
-    || rngRecord.battle == null || typeof rngRecord.battle !== "object" || Array.isArray(rngRecord.battle)
+    || !Object.hasOwn(rngRecord, "battle")
+    || (rngRecord.battle !== null && (typeof rngRecord.battle !== "object" || Array.isArray(rngRecord.battle)))
   ) {
-    fail(path, "RNG_FRONTIER_INCOMPLETE", "Phaser.Math.RND+BattleScene.battleSeedState", "run, seed_offset, and battle RNG state are all required");
+    fail(path, "RNG_FRONTIER_INCOMPLETE", "Phaser.Math.RND+BattleScene.battleSeedState", "run, seed_offset, and nullable battle RNG state are all required");
   }
-  for (const [key, child] of Object.entries(rngRecord)) {
-    if (key !== "seed_offset" && (child == null || typeof child !== "object" || Array.isArray(child) || Object.keys(child).length === 0)) {
-      fail(path, "RNG_FRONTIER_INCOMPLETE", "Phaser.Math.RND+BattleScene.battleSeedState", `${key} RNG state is empty`);
-    }
+  if (Object.keys(rngRecord.run).length === 0 || (rngRecord.battle !== null && Object.keys(rngRecord.battle).length === 0)) {
+    fail(path, "RNG_FRONTIER_INCOMPLETE", "Phaser.Math.RND+BattleScene.battleSeedState", "present RNG state is empty");
   }
   return {
     canonical: canonicalValue(canonical, `${path}.canonical`) as JsonObject,

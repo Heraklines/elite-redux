@@ -87,10 +87,10 @@ function canonicalState(game: GameManager, fail: FrontierFailure): JsonObject {
       wave_seed: String(scene.waveSeed),
       rng_seed_override: String(scene.rngSeedOverride ?? ""),
       rng_offset: finite(scene.rngOffset, "runtime.rng_offset", fail),
-      wave: finite(battle?.waveIndex, "runtime.wave", fail),
-      turn: finite(battle?.turn, "runtime.turn", fail),
-      battle_type: finite(battle?.battleType, "runtime.battle_type", fail),
-      battle_seed: String(battle?.battleSeed ?? ""),
+      wave: battle == null ? null : finite(battle.waveIndex, "runtime.wave", fail),
+      turn: battle == null ? null : finite(battle.turn, "runtime.turn", fail),
+      battle_type: battle == null ? null : finite(battle.battleType, "runtime.battle_type", fail),
+      battle_seed: battle == null ? null : String(battle.battleSeed),
       biome: finite((scene.arena as AnyRecord)?.biomeId, "runtime.biome", fail),
       phase: String(scene.phaseManager.getCurrentPhase()?.phaseName ?? ""),
       queued_phases: queuedPhases(game, fail),
@@ -112,8 +112,7 @@ export function captureOracleFrontier(
   }
   const scene = game.scene as AnyRecord;
   const battle = scene.currentBattle as AnyRecord | undefined;
-  if (battle == null) fail("RNG_FRONTIER_UNOBSERVABLE", "src/battle-scene.ts:currentBattle", "current battle is absent at an oracle frontier");
-  const saved = battle.battleSeedState;
+  const saved = battle?.battleSeedState;
   return {
     canonical: canonicalState(game, fail),
     battle_content_hash: battleContentHash,
@@ -123,11 +122,13 @@ export function captureOracleFrontier(
       seed_offset: scene.rngOffset === 0 && scene.rngSeedOverride === ""
         ? null
         : { wave_seed: String(scene.rngSeedOverride || scene.waveSeed || scene.seed), offset: finite(scene.rngOffset, "scene.rngOffset", fail) },
-      battle: {
-        battle_seed: String(battle.battleSeed),
-        turn: finite(battle.turn, "battle.turn", fail),
-        saved_substream: saved == null ? null : rngState(saved, "battle.saved_substream", fail),
-      },
+      battle: battle == null
+        ? null
+        : {
+            battle_seed: String(battle.battleSeed),
+            turn: finite(battle.turn, "battle.turn", fail),
+            saved_substream: saved == null ? null : rngState(saved, "battle.saved_substream", fail),
+          },
     },
   };
 }
