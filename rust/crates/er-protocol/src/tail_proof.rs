@@ -57,7 +57,7 @@ pub enum TailProofFrameDisposition {
     },
     Pending,
     Ready {
-        candidate: AuthorityEntry,
+        candidate: Box<AuthorityEntry>,
     },
     Rejected {
         reason: String,
@@ -103,17 +103,30 @@ pub(crate) struct TailProofAuthorityState {
     request_high_water: BTreeMap<SeatId, SafeU53>,
 }
 
+pub(crate) struct TailProofRequestContext<'a> {
+    pub(crate) request_context: &'a FrameContext,
+    pub(crate) authority_context: &'a FrameContext,
+    pub(crate) request: &'a TailRequestBody,
+    pub(crate) candidate: Option<&'a AuthorityEntry>,
+    pub(crate) live_sources: &'a [AuthorityEntry],
+    pub(crate) head_revision: Revision,
+    pub(crate) capacity: SafeU53,
+}
+
 impl TailProofAuthorityState {
     pub(crate) fn handle_request(
         &mut self,
-        request_context: &FrameContext,
-        authority_context: &FrameContext,
-        request: &TailRequestBody,
-        candidate: Option<&AuthorityEntry>,
-        live_sources: &[AuthorityEntry],
-        head_revision: Revision,
-        capacity: SafeU53,
+        context: TailProofRequestContext<'_>,
     ) -> Vec<TailProofAuthorityEmission> {
+        let TailProofRequestContext {
+            request_context,
+            authority_context,
+            request,
+            candidate,
+            live_sources,
+            head_revision,
+            capacity,
+        } = context;
         let (Some(request_id), Some(candidate_revision), Some(candidate_operation_id)) = (
             request.request_id.as_ref(),
             request.candidate_revision,
@@ -727,7 +740,9 @@ impl TailProofReplicaState {
         let candidate = capture.candidate.clone();
         self.capture = None;
         self.admission_candidate = Some(candidate.clone());
-        TailProofFrameDisposition::Ready { candidate }
+        TailProofFrameDisposition::Ready {
+            candidate: Box::new(candidate),
+        }
     }
 
     pub(crate) fn consume_admission(&mut self, candidate: &AuthorityEntry) -> bool {

@@ -532,7 +532,7 @@ impl AuthorityReplica {
                 ReplicaTailProofDisposition::Rejected { reason }
             }
             TailProofFrameDisposition::Ready { candidate } => {
-                let step = self.admit(candidate);
+                let step = self.admit(*candidate);
                 if matches!(
                     &step.admission,
                     ReplicaAdmission::Admitted { .. } | ReplicaAdmission::Duplicate { .. }

@@ -21,7 +21,8 @@ use crate::snapshot::{
 };
 use crate::successor::{control_allows_successor_entry, control_id_of, is_valid_next_control};
 use crate::tail_proof::{
-    TailProofAuthorityEmission, TailProofAuthorityState, boundary_supersession_allows,
+    TailProofAuthorityEmission, TailProofAuthorityState, TailProofRequestContext,
+    boundary_supersession_allows,
 };
 use crate::{
     KernelScheduler, ScheduledTimer, SchedulerCommand, SchedulerError, frame_contexts_compatible,
@@ -834,15 +835,15 @@ impl AuthorityLog {
         let authority_context = self.local_context.clone();
         let to = context.sender_seat_id;
         self.tail_proof
-            .handle_request(
-                &context,
-                &authority_context,
-                &request,
-                candidate.as_ref(),
-                &live_sources,
-                self.head_revision,
-                self.retain_capacity,
-            )
+            .handle_request(TailProofRequestContext {
+                request_context: &context,
+                authority_context: &authority_context,
+                request: &request,
+                candidate: candidate.as_ref(),
+                live_sources: &live_sources,
+                head_revision: self.head_revision,
+                capacity: self.retain_capacity,
+            })
             .into_iter()
             .map(|emission| match emission {
                 TailProofAuthorityEmission::Proof { context, body } => {
