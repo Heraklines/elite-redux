@@ -802,7 +802,7 @@ async function driveReward(game: GameManager): Promise<void> {
   await waitUntil(
     () => game.scene.phaseManager.getCurrentPhase() !== oldPhase,
     "queued reward reroll successor",
-    "src/phase-manager.ts:PhaseManager.shiftPhase",
+    "src/app/phase-manager.ts:PhaseManager.shiftPhase",
     20_000,
     rerollState,
   );
