@@ -1,0 +1,634 @@
+/*
+ * M4A test-only oracle exporter.
+ *
+ * This module is deliberately a capture harness, not a mechanics implementation.
+ * It observes the pinned TypeScript runtime and refuses publication when a
+ * required value is behind a callback, renderer, asset, or unavailable live
+ * fixture seam. No fixture is synthesized from a contract manifest or from an
+ * M3 JSON byte stream.
+ */
+
+import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
+import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import Phaser from "phaser";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = resolve(HERE, "../../..");
+const BATTLE_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+const SAFE_U53_MAX = 9_007_199_254_740_991;
+const REQUIRED_OUTPUT_ROOT = process.env.M4_ORACLE_OUTPUT_ROOT;
+const REQUIRED_EXPORTER_SHA = process.env.M4_ORACLE_EXPORTER_SHA;
+
+interface JsonObject {
+  [key: string]: JsonValue;
+}
+type JsonValue = null | boolean | number | string | JsonValue[] | JsonObject;
+type AnyRecord = Record<string, any>;
+
+interface RngState {
+  state_string: string;
+  s0_bits: string;
+  s1_bits: string;
+  s2_bits: string;
+  carry: number;
+}
+
+interface RngDraw {
+  sequence: number;
+  stream: "RUN" | "SEED_OFFSET";
+  reason: string;
+  public_api: string;
+  callsite_id: string;
+  arguments: JsonValue;
+  result: JsonValue;
+  consumed: boolean;
+  before_state: RngState;
+  after_state: RngState;
+}
+
+interface RngTrace {
+  fixture_id: string;
+  draws: RngDraw[];
+  state_changes: AnyRecord[];
+  next_sequence: number;
+}
+
+class OracleGap extends Error {
+  readonly code: string;
+  readonly source_seam: string;
+  readonly vector: string;
+
+  constructor(vector: string, code: string, sourceSeam: string, detail: string) {
+    super(`M4_ORACLE_GAP:${code}:${sourceSeam}: ${detail}`);
+    this.name = "OracleGap";
+    this.vector = vector;
+    this.code = code;
+    this.source_seam = sourceSeam;
+  }
+}
+
+const RNG_REASON_BY_SOURCE: readonly [string, string][] = [
+  ["src/data/elite-redux/er-biome-structure.ts", "BIOME_LENGTH"],
+  ["src/data/elite-redux/er-biome-routing.ts", "ROUTE_EXTRA"],
+  ["src/modifier/modifier-type.ts", "REWARD_POOL"],
+  ["src/phases/select-modifier-phase.ts", "REWARD_REROLL"],
+  ["src/phases/biome-shop-phase.ts", "MARKET_STOCK"],
+  ["src/field/arena.ts", "ENCOUNTER_SELECTION"],
+  ["src/phases/encounter-phase.ts", "ENCOUNTER_MATERIALIZATION"],
+  ["src/battle-scene.ts", "ENCOUNTER_MATERIALIZATION"],
+  ["src/battle.ts", "ENCOUNTER_MATERIALIZATION"],
+  ["src/field/pokemon.ts", "GROWTH_STATS"],
+];
+
+const RNG_METHODS = [
+  "integerInRange",
+  "integer",
+  "frac",
+  "realInRange",
+  "pick",
+  "shuffle",
+  "sow",
+  "state",
+  "angle",
+  "between",
+  "normal",
+  "weightedPick",
+  "sign",
+] as const;
+
+type RngMethod = (typeof RNG_METHODS)[number];
+
+let activeRngTrace: RngTrace | null = null;
+let rngStateReadInProgress = false;
+const restoreRngHooks: (() => void)[] = [];
+
+function fail(vector: string, code: string, sourceSeam: string, detail: string): never {
+  throw new OracleGap(vector, code, sourceSeam, detail);
+}
+
+function assertFinite(value: unknown, path: string): asserts value is number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error(`NONFINITE_ORACLE_VALUE:${path}`);
+  }
+}
+
+function canonicalValue(value: unknown, path = "$"): JsonValue {
+  if (value === null || typeof value === "boolean" || typeof value === "string") {
+    return value as JsonValue;
+  }
+  if (typeof value === "number") {
+    assertFinite(value, path);
+    return Object.is(value, -0) ? 0 : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry, index) => {
+      if (entry === undefined) {
+        throw new Error(`UNDEFINED_ORACLE_VALUE:${path}[${index}]`);
+      }
+      return canonicalValue(entry, `${path}[${index}]`);
+    });
+  }
+  if (typeof value === "object") {
+    const output: JsonObject = {};
+    for (const key of Object.keys(value).sort()) {
+      const entry = (value as AnyRecord)[key];
+      if (entry === undefined) {
+        throw new Error(`UNDEFINED_ORACLE_VALUE:${path}.${key}`);
+      }
+      output[key] = canonicalValue(entry, `${path}.${key}`);
+    }
+    return output;
+  }
+  throw new Error(`UNSUPPORTED_ORACLE_VALUE:${path}`);
+}
+
+function canonicalBytes(value: unknown): Buffer {
+  return Buffer.from(`${JSON.stringify(canonicalValue(value))}\n`, "utf8");
+}
+
+function writeCanonical(path: string, value: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, canonicalBytes(value));
+}
+
+function readJson(relativePath: string): AnyRecord {
+  return JSON.parse(readFileSync(resolve(REPO_ROOT, relativePath), "utf8")) as AnyRecord;
+}
+
+function git(...args: string[]): string {
+  return execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8" }).trim();
+}
+
+function f64Bits(value: number): string {
+  const bytes = new ArrayBuffer(8);
+  new DataView(bytes).setFloat64(0, value, false);
+  return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function rawRngState(rng: Phaser.Math.RandomDataGenerator): RngState {
+  rngStateReadInProgress = true;
+  let state: string;
+  try {
+    state = rng.state();
+  } finally {
+    rngStateReadInProgress = false;
+  }
+  const parts = state.split(",");
+  if (parts.length !== 5 || parts[0] !== "!rnd") {
+    throw new Error(`RNG_STATE_UNOBSERVABLE:${state}`);
+  }
+  const carry = Number(parts[1]);
+  const values = parts.slice(2).map(Number);
+  if (
+    !Number.isSafeInteger(carry)
+    || carry < 0
+    || carry > 0xffffffff
+    || values.some(value => !Number.isFinite(value) || value < 0 || value >= 1)
+  ) {
+    throw new Error(`RNG_STATE_UNOBSERVABLE:${state}`);
+  }
+  return {
+    state_string: state,
+    s0_bits: f64Bits(values[0]),
+    s1_bits: f64Bits(values[1]),
+    s2_bits: f64Bits(values[2]),
+    carry,
+  };
+}
+
+function stackCallsites(stack: string): string[] {
+  const callsites: string[] = [];
+  for (const line of stack.split("\n")) {
+    const match = line.match(/((?:src|test|scripts)[\\/][^()\s]+?\.ts):\d+(?::\d+)?/u);
+    if (match != null) {
+      const path = match[1].replaceAll("\\", "/");
+      if (!callsites.includes(path)) {
+        callsites.push(path);
+      }
+    }
+  }
+  return callsites;
+}
+
+function callsiteAndReason(stack: string): { callsite: string; reason: string } {
+  const callsites = stackCallsites(stack);
+  for (const [source, reason] of RNG_REASON_BY_SOURCE) {
+    const callsite = callsites.find(candidate => candidate.startsWith(source));
+    if (callsite != null) {
+      return { callsite, reason };
+    }
+  }
+  fail(
+    activeRngTrace?.fixture_id ?? "rng",
+    "UNMAPPED_RNG_REASON",
+    callsites.find(callsite => callsite.startsWith("src/")) ?? "unknown-callsite",
+    `Phaser RNG call has no exporter-owned closed reason; stack=${callsites.join("|")}`,
+  );
+}
+
+function jsonResult(value: unknown, path: string): JsonValue {
+  if (typeof value === "number") {
+    assertFinite(value, path);
+    return value;
+  }
+  if (typeof value === "string" || value === null || typeof value === "boolean") {
+    return value;
+  }
+  throw new Error(`RNG_RESULT_UNOBSERVABLE:${path}`);
+}
+
+function installRngObservation(): void {
+  const random = Phaser.Math.RND as AnyRecord;
+  for (const methodName of RNG_METHODS) {
+    const original = random[methodName] as ((...args: any[]) => any) | undefined;
+    if (typeof original !== "function") {
+      fail("instrumentation", "OBSERVATION_SEAM_MISSING", `Phaser.Math.RND.${methodName}`, "method is not callable");
+    }
+    random[methodName] = function (this: AnyRecord, ...args: any[]): any {
+      if (activeRngTrace == null || rngStateReadInProgress) {
+        return original.apply(this, args);
+      }
+      const before = rawRngState(Phaser.Math.RND);
+      const stack = new Error(`M4 Phaser RNG ${methodName}`).stack ?? "";
+      const previousSequence = activeRngTrace.next_sequence;
+      const result = original.apply(this, args);
+      const after = rawRngState(Phaser.Math.RND);
+      const changed = before.state_string !== after.state_string;
+      const isBoundary = methodName === "sow" || methodName === "state";
+      if (isBoundary) {
+        if (changed) {
+          activeRngTrace.state_changes.push({
+            kind: methodName === "sow" ? "SEED_RESET" : "STATE_SET",
+            sequence: previousSequence,
+            before,
+            after,
+          });
+        }
+        return result;
+      }
+      const { callsite, reason } = callsiteAndReason(stack);
+      activeRngTrace.draws.push({
+        sequence: activeRngTrace.next_sequence++,
+        stream: "RUN",
+        reason,
+        public_api: methodName.toUpperCase(),
+        callsite_id: callsite,
+        arguments: canonicalValue(args),
+        result: jsonResult(result, `${activeRngTrace.fixture_id}/${methodName}`),
+        consumed: changed,
+        before_state: before,
+        after_state: after,
+      });
+      return result;
+    };
+    restoreRngHooks.push(() => {
+      random[methodName] = original;
+    });
+  }
+}
+
+function beginRngTrace(fixtureId: string): RngTrace {
+  if (activeRngTrace != null) {
+    throw new Error(`RNG_TRACE_NESTED:${fixtureId}`);
+  }
+  const trace: RngTrace = { fixture_id: fixtureId, draws: [], state_changes: [], next_sequence: 0 };
+  activeRngTrace = trace;
+  return trace;
+}
+
+function endRngTrace(trace: RngTrace): RngTrace {
+  if (activeRngTrace !== trace) {
+    throw new Error(`RNG_TRACE_FRONTIER_MISMATCH:${trace.fixture_id}`);
+  }
+  activeRngTrace = null;
+  return trace;
+}
+
+function provenance(battleContentHash: string, runContentHash: string): JsonObject {
+  if (process.platform !== "linux" || process.arch !== "x64") {
+    fail("provenance", "ORACLE_RUNTIME", "process", `${process.platform}/${process.arch} is not hosted linux/x64`);
+  }
+  if (process.env.LC_ALL !== "C" || process.env.LANG !== "C" || process.env.TZ !== "UTC") {
+    fail("provenance", "ORACLE_RUNTIME", "environment", "locale/timezone must be C/UTC");
+  }
+  if (typeof REQUIRED_EXPORTER_SHA !== "string" || !/^[0-9a-f]{40}$/u.test(REQUIRED_EXPORTER_SHA)) {
+    fail("provenance", "EXPORT_CONFIGURATION", "M4_ORACLE_EXPORTER_SHA", "exact exporter commit SHA is required");
+  }
+  if (!/^blake3-v1:[0-9a-f]{64}$/u.test(battleContentHash) || !/^blake3-v1:[0-9a-f]{64}$/u.test(runContentHash)) {
+    fail("provenance", "CONTENT_HASH_UNOBSERVABLE", "src/init/init.ts:initializeGame", "content hashes are not exact canonical values");
+  }
+  return {
+    oracle_game_sha: M4_ORACLE_SHA,
+    battle_oracle_sha: BATTLE_ORACLE_SHA,
+    m4_oracle_sha: M4_ORACLE_SHA,
+    oracle_tree_sha: git("rev-parse", `${M4_ORACLE_SHA}^{tree}`),
+    exporter_commit_sha: REQUIRED_EXPORTER_SHA,
+    node_version: process.version,
+    phaser_version: readJson("node_modules/phaser/package.json").version,
+    os: "linux",
+    arch: "x64",
+    locale: "C",
+    timezone: "UTC",
+    battle_content_hash: battleContentHash,
+    run_content_hash: runContentHash,
+  };
+}
+
+function strictEnvelope(
+  fixtureId: string,
+  evidence: {
+    provenance: JsonObject;
+    initial: JsonObject;
+    decisions: JsonValue[];
+    rng_draws: JsonValue[];
+    ordered_transitions: JsonValue[];
+    mutations: JsonValue[];
+    presentation: JsonValue[];
+    final: JsonObject;
+    next_control: JsonObject;
+    raw_key_tape?: JsonValue[];
+  },
+): JsonObject {
+  return {
+    schema_version: 1,
+    fixture_id: fixtureId,
+    provenance: evidence.provenance,
+    initial: evidence.initial,
+    decisions: evidence.decisions,
+    rng_draws: evidence.rng_draws,
+    ordered_transitions: evidence.ordered_transitions,
+    mutations: evidence.mutations,
+    presentation: evidence.presentation,
+    final: evidence.final,
+    next_control: evidence.next_control,
+    ...(evidence.raw_key_tape === undefined ? {} : { raw_key_tape: evidence.raw_key_tape }),
+    gaps: [],
+  };
+}
+
+function captureRngVectors(): JsonObject {
+  const seeds = ["m4-rng-seed-a", "m4-rng-seed-b", "m4-rng-seed-c", "m4-rng-seed-d"];
+  const vectors: JsonValue[] = [];
+  for (const seed of seeds) {
+    const rng = new Phaser.Math.RandomDataGenerator([seed]);
+    for (let index = 0; index < 250; index++) {
+      const before = rawRngState(rng);
+      const operation = index % 5;
+      let api: string;
+      let result: unknown;
+      let minimum = 0;
+      let cardinality = 1;
+      if (operation === 0) {
+        api = "INTEGER";
+        result = rng.integer();
+        cardinality = 0x100000000;
+      } else if (operation === 1) {
+        api = "FRAC";
+        result = rng.frac();
+      } else if (operation === 2) {
+        api = "REAL_IN_RANGE";
+        minimum = -3;
+        cardinality = 17;
+        result = rng.realInRange(-3, 14);
+      } else if (operation === 3) {
+        api = "INTEGER_IN_RANGE";
+        minimum = index % 7;
+        cardinality = 1 + (index % 13);
+        result = rng.integerInRange(minimum, minimum + cardinality - 1);
+      } else {
+        api = "PICK";
+        result = rng.pick(["zero", "one", "two", "three", "four"]);
+        cardinality = 5;
+      }
+      const after = rawRngState(rng);
+      vectors.push({
+        sequence: vectors.length,
+        seed,
+        operation: api,
+        minimum,
+        cardinality,
+        result: jsonResult(result, `${seed}/${index}/${api}`),
+        before,
+        after,
+      });
+    }
+  }
+  return { artifact_id: "rng-vectors-v1", schema_version: 1, battle_oracle_sha: BATTLE_ORACLE_SHA, m4_oracle_sha: M4_ORACLE_SHA, vectors };
+}
+
+function m4MoveDefinitions(vector: string): JsonValue[] {
+  const moveIds = [33, 39, 55, 110, 229];
+  const definitions: JsonValue[] = [];
+  for (const id of moveIds) {
+    const move = allMoves.find(entry => Number((entry as AnyRecord).id) === id) as AnyRecord | undefined;
+    if (move == null) {
+      fail(vector, "CONTENT_REGISTRY_UNINITIALIZED", "src/init/init.ts:initializeGame", `post-initialization MoveId ${id} is absent`);
+    }
+    const definition = {
+      id,
+      type: move.type,
+      category: move.category,
+      power: move.power,
+      accuracy: move.accuracy,
+      pp: move.pp,
+      chance: move.chance,
+      priority: move.priority,
+      target: move.moveTarget,
+      flags: (move as AnyRecord).flags,
+      attribute_kinds: Array.isArray(move.attrs) ? move.attrs.map((attr: AnyRecord) => attr.constructor?.name ?? "") : [],
+    };
+    if ((definition.flags === undefined) || definition.attribute_kinds.some(kind => typeof kind !== "string")) {
+      fail(vector, "POST_INITIALIZATION_MOVE_UNOBSERVABLE", "src/data/moves/move.ts:Move", `MoveId ${id} lacks complete initialized fields`);
+    }
+    definitions.push(definition);
+  }
+  return definitions;
+}
+
+function pinnedContentProbe(vector: string): void {
+  const species = allSpecies.find(entry => Number((entry as AnyRecord).speciesId) === 7);
+  const town = allBiomes.get(0);
+  const plains = allBiomes.get(1);
+  if (species == null || town == null || plains == null) {
+    fail(vector, "CONTENT_REGISTRY_UNINITIALIZED", "src/init/init.ts:initializeGame", "pinned species/biome records are not live");
+  }
+  m4MoveDefinitions(vector);
+  if (allAbilities.length === 0 || Object.keys(modifierTypes).length === 0) {
+    fail(vector, "CONTENT_REGISTRY_INCOMPLETE", "src/init/init.ts:initializeGame", "ability/modifier registries are not live");
+  }
+}
+
+function captureRunContent(): never {
+  pinnedContentProbe("run-content-pack-v1");
+  fail(
+    "run-content-pack-v1",
+    "RUN_CONTENT_CALLBACK_UNOBSERVABLE",
+    "src/modifier/modifier-type.ts:regenerateModifierPoolThresholds",
+    "complete run content requires callback/generator behavior and an oracle-owned run-content hash; declarations alone are insufficient",
+  );
+}
+
+function captureProgression(): never {
+  pinnedContentProbe("progression/bulbasaur-medium-slow-level-17-v1");
+  fail(
+    "progression/bulbasaur-medium-slow-level-17-v1",
+    "LIVE_PROGRESSION_STATE_UNOBSERVABLE",
+    "src/battle-scene.ts:applyPartyExp -> src/phases/exp-phase.ts",
+    "no live source battle exposes the required exact EXP, IV, nature, ownership, participation, stat, and move-learning frontier without callback-owned setup",
+  );
+}
+
+function captureReward(): never {
+  pinnedContentProbe("rewards/regular-reroll-lock-v1");
+  fail(
+    "rewards/regular-reroll-lock-v1",
+    "REWARD_POOL_CALLBACK_UNOBSERVABLE",
+    "src/phases/select-modifier-phase.ts:start -> src/modifier/modifier-type.ts:generateType",
+    "threshold regeneration and generator callbacks consume the live party/UI state before option identities can be recorded",
+  );
+}
+
+function captureMarket(): never {
+  pinnedContentProbe("markets/town-wave-10-v1");
+  fail(
+    "markets/town-wave-10-v1",
+    "MARKET_STOCK_CALLBACK_UNOBSERVABLE",
+    "src/phases/biome-shop-phase.ts:start",
+    "Town stock requires a live wave-10 BattleScene, modifier ownership, and callback-driven UI/persistence completion",
+  );
+}
+
+function captureBiome(): never {
+  pinnedContentProbe("biomes/town-crossroads-route-v1");
+  fail(
+    "biomes/town-crossroads-route-v1",
+    "ROUTE_RNG_FRONTIER_UNOBSERVABLE",
+    "src/data/elite-redux/er-biome-routing.ts:rollErNextBiomeNodes",
+    "the required solo ambient Phaser frontier and pending Town route carrier are not exposed by a live fixture setup",
+  );
+}
+
+function captureEncounter(): never {
+  pinnedContentProbe("encounters/plains-wave-11-captured-v1");
+  fail(
+    "encounters/plains-wave-11-captured-v1",
+    "POST_INITIALIZATION_ENCOUNTER_UNOBSERVABLE",
+    "src/phases/encounter-phase.ts:generateEncounter",
+    "ordinary species/loadout callbacks, asset completion, weather/terrain, and scripted command ownership require a complete post-initialization live vector",
+  );
+}
+
+function captureMigrationCompanions(): never {
+  fail(
+    "migration/m3-to-m4-companions-v1",
+    "LIVE_M3_COMPANIONS_UNOBSERVABLE",
+    "test/kernel-fixtures/m3/export-battle-oracle.test.ts:exportCase (non-exported live setup)",
+    "companions must come from live TypeScript fixture construction/replay for all 38 initial/final player and enemy states; M3 JSON bytes do not contain exact progression fields and cannot be synthesized",
+  );
+}
+
+function captureComposedSegment(): never {
+  fail(
+    "run-segments/classic-composed-wave-9-through-11-v1",
+    "COMPOSED_JOIN_FRONTIERS_UNOBSERVABLE",
+    "test/kernel-fixtures/m4/export-run-oracle.test.ts:independent vector joins",
+    "the raw-key segment cannot be published until every independently captured vector has identical canonical state, content hash, and RNG frontier",
+  );
+}
+
+function outputRoot(): string {
+  if (typeof REQUIRED_OUTPUT_ROOT !== "string" || REQUIRED_OUTPUT_ROOT.length === 0) {
+    throw new Error("EXPORT_CONFIGURATION:M4_ORACLE_OUTPUT_ROOT is required");
+  }
+  return REQUIRED_OUTPUT_ROOT;
+}
+
+function collectGap(capture: () => never, gaps: OracleGap[]): void {
+  try {
+    capture();
+  } catch (error) {
+    if (error instanceof OracleGap) {
+      gaps.push(error);
+      return;
+    }
+    throw error;
+  }
+}
+
+describe("M4A fresh run oracle export", () => {
+  beforeAll(() => {
+    if (process.env.M4_ORACLE_SHA !== M4_ORACLE_SHA) {
+      throw new Error("EXPORT_CONFIGURATION:the exporter did not pin the exact M4 oracle SHA");
+    }
+    if (process.platform !== "linux" || process.arch !== "x64") {
+      throw new Error(`ORACLE_RUNTIME:expected hosted linux/x64, got ${process.platform}/${process.arch}`);
+    }
+    installRngObservation();
+  });
+
+  afterAll(() => {
+    activeRngTrace = null;
+    for (const restore of restoreRngHooks.splice(0).reverse()) {
+      restore();
+    }
+  });
+
+  it("captures every required vector or fails closed with typed gaps", () => {
+    const gaps: OracleGap[] = [];
+    const generated = new Map<string, JsonObject>();
+
+    // These independent Phaser vectors are executable evidence, not a
+    // replacement for run-boundary draws. They remain unpublished when any
+    // required causal vector has a gap.
+    generated.set("rng-vectors-v1.json", captureRngVectors());
+
+    collectGap(captureRunContent, gaps);
+    collectGap(captureProgression, gaps);
+    collectGap(captureReward, gaps);
+    collectGap(captureMarket, gaps);
+    collectGap(captureBiome, gaps);
+    collectGap(captureEncounter, gaps);
+    collectGap(captureMigrationCompanions, gaps);
+    collectGap(captureComposedSegment, gaps);
+
+    if (gaps.length > 0) {
+      const reportPath = process.env.M4_ORACLE_GAP_REPORT;
+      if (typeof reportPath === "string" && reportPath.length > 0) {
+        writeCanonical(reportPath, {
+          schema_version: 1,
+          battle_oracle_sha: BATTLE_ORACLE_SHA,
+          m4_oracle_sha: M4_ORACLE_SHA,
+          gaps: gaps.map(gap => ({ vector: gap.vector, code: gap.code, source_seam: gap.source_seam, message: gap.message })),
+        });
+      }
+      throw new Error(gaps.map(gap => gap.message).join("\n"));
+    }
+
+    const battlePack = readJson("rust/fixtures/m3/oracle/content-pack-v1.json");
+    const battleHash = String(battlePack.content_pack?.hash ?? "");
+    const runHash = String(generated.get("run-content-pack-v1.json")?.provenance?.run_content_hash ?? "");
+    const sharedProvenance = provenance(battleHash, runHash);
+    const root = outputRoot();
+    for (const [path, value] of generated) {
+      const fixture = strictEnvelope(path.replace(/\.json$/u, ""), {
+        provenance: sharedProvenance,
+        initial: { canonical: value, rng: { draws: [] } },
+        decisions: [],
+        rng_draws: [],
+        ordered_transitions: [],
+        mutations: [],
+        presentation: [],
+        final: { canonical: value, rng: { draws: [] } },
+        next_control: { kind: "UNOBSERVED" },
+      });
+      writeCanonical(resolve(root, path), fixture);
+    }
+    expect(generated.size).toBeGreaterThan(0);
+  }, 2_700_000);
+});
