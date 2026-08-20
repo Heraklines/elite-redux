@@ -197,6 +197,14 @@ export class CoopV2ControlLedger {
         restore();
         return null;
       }
+      if (authorityProofScope?.boundarySources != null) {
+        // Initial admission already proved this exact canonical list. Once the boundary reservation succeeds,
+        // those sources are represented by its frozen approval and the new boundary source remains live.
+        for (const revision of entry.subsumes) {
+          this.authenticatedSources.delete(revision);
+        }
+        this.authenticatedSources.set(entry.revision, structuredClone(entry));
+      }
     } catch (error) {
       restore();
       revokeAuthorityEntryProofScope(entry);

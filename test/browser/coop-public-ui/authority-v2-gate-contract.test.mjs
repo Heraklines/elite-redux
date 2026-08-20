@@ -360,15 +360,17 @@ test("the real command proof edge eagerly completes V2 and the duo fixture creat
   const build = duoHarness.slice(buildStart, buildEnd);
   const adoptsHost = build.indexOf("adoptAlreadyOpenHostCommandBoundary");
   const materializesGuest = build.indexOf("materializeMirroredGuestInputTurn");
+  const startsReplica = build.indexOf("firstGuestCommand.start()");
+  const restartsHost = build.indexOf("hostScene.phaseManager.getCurrentPhase().start()");
   const startsGuest = build.indexOf("guestOwnCommand.start()");
   const marksGuest = build.indexOf("markRealGuestCommandBoundary");
-  const restartsHost = build.indexOf("hostScene.phaseManager.getCurrentPhase().start()");
   assert.ok(adoptsHost >= 0, "the already-real host control is adopted");
   assert.ok(
     materializesGuest > adoptsHost
-      && startsGuest > materializesGuest
-      && marksGuest > startsGuest
-      && restartsHost > marksGuest,
+      && startsReplica > materializesGuest
+      && restartsHost > startsReplica
+      && startsGuest > restartsHost
+      && marksGuest > startsGuest,
     "the synthetic second browser crosses the same TurnInit/Command/proof/pacing order as production",
   );
 });

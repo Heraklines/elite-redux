@@ -522,7 +522,7 @@ describe("Authority V2 interaction control ledger", () => {
     expect(ledger.admitSuccessor(interactionResultEntry(2, "result-1", "REWARD"))).toBe(true);
   });
 
-  it("keeps superseded source revisions authenticated when a reusable control address is subsumed at a boundary", () => {
+  it("reconciles subsumed source revisions into the authenticated boundary source", () => {
     for (const boundaryKind of ["wave", "terminal"] as const) {
       const ledger = new CoopV2InteractionControlLedger();
       const log = new AuthorityLog({
@@ -600,7 +600,7 @@ describe("Authority V2 interaction control ledger", () => {
       const boundary = log.commit(boundaryInput, prepareAndInstall);
 
       expect(boundary.revision).toBe(4);
-      expect(ledger.authenticatedSourceCount).toBe(4);
+      expect(ledger.authenticatedSourceCount).toBe(1);
       expect(ledger.sourceEntryOf(boundary.nextControl)).toMatchObject({
         revision: boundary.revision,
         operationId: boundary.operationId,

@@ -2076,10 +2076,12 @@ export function materializeMirroredGuestInputTurn(scene: BattleScene): void {
       `cannot materialize mirrored guest input from ${current?.phaseName ?? "none"}; queued=[${queued.join(",")}]`,
     );
   }
-  scene.phaseManager.clearPhaseQueue();
-
-  scene.phaseManager.unshiftPhase(scene.phaseManager.create("TurnInitPhase"));
-  scene.phaseManager.shiftPhase();
+  const turnInit = scene.phaseManager.create("TurnInitPhase");
+  if (!scene.phaseManager.replaceWithCoopAuthoritativePhase(current, turnInit)) {
+    throw new Error(
+      `cannot replace mirrored guest boot phase ${current.phaseName} with its authoritative TurnInit boundary`,
+    );
+  }
 }
 /**
  * Resolve the LOCAL command phases from the host-stated Authority V2 frontier.
@@ -2935,6 +2937,8 @@ export async function buildDuo(
   // existed. This leaves both synthetic browsers at the same actionable public boundary production reaches.
   const adoptedPrePairCommand = await withClient(hostCtx, () => adoptAlreadyOpenHostCommandBoundary(hostScene));
   if (adoptedPrePairCommand) {
+    let guestFieldIndex: number | null = null;
+    let firstGuestCommand: Phase | null = null;
     await withClient(guestCtx, async () => {
       // The initial guest command is selected from the host-stated frontier, not from the launch layout.
       // This matters when a battle starts with only the host seat materialized (classic final-boss stage
@@ -2952,31 +2956,55 @@ export async function buildDuo(
         );
       }
       if (guestCommandFields.length === 1) {
+        guestFieldIndex = guestCommandFields[0];
         materializeMirroredGuestInputTurn(guestScene);
-        const guestFieldIndex = guestCommandFields[0];
-        const guestOwnCommand = await driveClientPhaseQueueTo(guestScene, "initial guest-owned CommandPhase", {
-          matches: phase =>
-            phase.phaseName === "CommandPhase"
-            && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === guestFieldIndex,
+        // TurnInit first parks at the host-owned field-0 CommandPhase. Start that exact consumer before
+        // draining the already-authored command-open; the host phase can then supply its command and release
+        // the queue to the guest-owned field without a material race or detached phase.
+        firstGuestCommand = await driveClientPhaseQueueTo(guestScene, "initial replica CommandPhase", {
+          matches: phase => phase.phaseName === "CommandPhase",
           deferInitialDrainUntilPhaseStart: true,
         });
-        guestOwnCommand.start();
+        firstGuestCommand.start();
         await drainLoopback();
+      }
+    });
+    await withClient(hostCtx, async () => {
+      // The phase opened before rendezvous/runtime wiring existed. Re-enter exactly this verified phase once
+      // after the replica's first real CommandPhase consumer exists, so field 0 can release field 1.
+      hostScene.phaseManager.getCurrentPhase().start();
+      await drainLoopback();
+    });
+    await pumpDuoDestinations(rig, 2);
+    if (guestFieldIndex != null) {
+      const targetGuestFieldIndex = guestFieldIndex;
+      await withClient(guestCtx, async () => {
+        const firstFieldIndex =
+          firstGuestCommand?.phaseName === "CommandPhase"
+            ? (firstGuestCommand as Phase & { getFieldIndex(): number }).getFieldIndex()
+            : -1;
+        const guestOwnCommand =
+          firstFieldIndex === targetGuestFieldIndex
+            ? firstGuestCommand
+            : await driveClientPhaseQueueTo(guestScene, "initial guest-owned CommandPhase", {
+                matches: phase =>
+                  phase.phaseName === "CommandPhase"
+                  && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === targetGuestFieldIndex,
+              });
+        if (guestOwnCommand == null) {
+          throw new Error(`initial co-op guest command field ${targetGuestFieldIndex} was not materialized`);
+        }
+        if (guestOwnCommand !== firstGuestCommand) {
+          guestOwnCommand.start();
+          await drainLoopback();
+        }
         const guestBattle = guestScene.currentBattle;
         if (guestBattle == null) {
           throw new Error("initial co-op guest command lost its battle shell after the real phase started");
         }
         markRealGuestCommandBoundary(guestScene, guestBattle.waveIndex, guestBattle.turn);
-      }
-    });
-    await withClient(hostCtx, async () => {
-      await drainLoopback();
-      // The phase opened before rendezvous/runtime wiring existed. Re-enter exactly this verified phase once,
-      // matching the production start edge rather than fabricating an arrival from the harness.
-      hostScene.phaseManager.getCurrentPhase().start();
-      await drainLoopback();
-    });
-    await pumpDuoDestinations(rig, 2);
+      });
+    }
   }
   installDuoCtxOwnershipPins(rig, hostGame);
   liveDuoRigs.add(rig);

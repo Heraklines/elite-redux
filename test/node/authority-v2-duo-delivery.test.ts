@@ -507,7 +507,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     duo.flush("guest");
     expect(applies).toBe(1);
     expect(projections).toBe(1);
-    expect(duo.guest.diagnostics().applied).toBe(0);
+    expect(duo.guest.diagnostics().applied).toBe(1);
 
     clock.advance(1_000);
     await flushLoopback();
@@ -546,7 +546,7 @@ describe("authority-v2 duo delivery wire (cutover-turn iter-4)", () => {
     duo.flush("guest");
     expect(applies).toBe(1);
     expect(projections).toBe(1);
-    expect(duo.guest.diagnostics().applied).toBe(0);
+    expect(duo.guest.diagnostics().applied).toBe(1);
 
     // A public UI can open and accept input before the authority's 250ms redelivery lease. The real engine
     // hook retries the admitted entry synchronously, resumes at materialApplied, and signs controlInstalled

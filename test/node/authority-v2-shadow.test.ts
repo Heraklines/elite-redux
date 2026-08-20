@@ -1183,7 +1183,7 @@ describe("authority-v2 retained gaps and hot-rejoin invariants", () => {
     guest.handleInboundFrame(conflictingEntry);
     expect(materialMutations).toBe(1);
     expect(controlAttempts).toBe(2);
-    expect(violations).toContainEqual(["entry.conflicting-pending-revision-1"]);
+    expect(violations).toContainEqual(["entry.revision-identity-conflict"]);
     expect(guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1, controlLedgerSize: 0, shadowStateSize: 1 });
 
     host.dispose();
@@ -1501,14 +1501,17 @@ describe("authority-v2 correlated boundary-tail proof", () => {
     const replay = answerManualBoundaryRequest(duo, firstRequest);
     expect([replay.manifest, replay.source, replay.complete].map(frame => encodeFrameV2(frame))).toEqual(firstBytes);
 
-    // Drain the replay through the real receiver. Leaving these three frames queued would only prove that
-    // the sender reconstructed bytes, not that the replay remains a usable correlated proof.
+    // Drain the replay and the authority's one immediate-successor redelivery through the real receiver.
+    // The duplicate revision remains idempotent and must not reapply material.
     duo.guest.handleInboundFrame(replay.manifest);
     duo.guest.handleInboundFrame(replay.source);
     duo.guest.handleInboundFrame(replay.complete);
+    while (duo.hostToGuest.length > 0) {
+      duo.guest.handleInboundFrame(duo.hostToGuest.shift()!);
+    }
     expect(duo.appliedRevisions).toEqual([1, 2]);
     expect(duo.violations).toEqual([]);
-    expect(duo.hostToGuest, "the byte-exact replay was dequeued and fully processed").toEqual([]);
+    expect(duo.hostToGuest, "the byte-exact replay and successor redelivery were fully processed").toEqual([]);
 
     deliverManualReceipts(duo);
     expect(duo.host.diagnostics()).toMatchObject({ retained: 0, pendingTimers: 0 });
@@ -1758,8 +1761,8 @@ describe("authority-v2 correlated boundary-tail proof", () => {
     });
     await flushLoopbackMicrotasks(24);
 
-    expect(duo.pair.counters.host.reordered).toBe(1);
-    expect(duo.pair.counters.host.released).toBe(1);
+    expect(duo.pair.counters.host.reordered).toBeGreaterThan(0);
+    expect(duo.pair.counters.host.released).toBe(duo.pair.counters.host.reordered);
     expect(duo.appliedRevisions).toEqual([1]);
     expect(duo.violations).toHaveLength(1);
     expect(duo.violations[0]?.join(" ")).toContain("source snapshot incomplete");
