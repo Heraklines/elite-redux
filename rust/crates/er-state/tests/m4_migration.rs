@@ -1,18 +1,18 @@
 use std::error::Error;
 
 use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_state::battle_v2::{BattleParticipationState, BattleSettlementState, BattleRngState};
 use er_state::battle::{BattleId, BattleOutcome, BattleSide, BattleState, FaintOccurrenceId};
+use er_state::battle_v2::{BattleParticipationState, BattleRngState, BattleSettlementState};
 use er_state::conditions::{
     ArenaConditionState, GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind,
     WeatherState,
 };
-use er_state::field::{FieldState, FieldSlotState};
+use er_state::field::{FieldSlotState, FieldState};
 use er_state::format::BattleFormat;
 use er_state::migration::{
-    migrate_m3_game_state, M3BattleCompanion, M3PokemonCompanion, M3PokemonCompanionKey,
-    M3ToM4MigrationContext, MigrationError, MigrationStateSide, M3_PARITY_ORACLE_SHA,
-    M4_ORACLE_SHA,
+    M3_PARITY_ORACLE_SHA, M3BattleCompanion, M3PokemonCompanion, M3PokemonCompanionKey,
+    M3ToM4MigrationContext, M4_ORACLE_SHA, MigrationError, MigrationStateSide,
+    migrate_m3_game_state,
 };
 use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, PokemonType, PokemonTyping,
@@ -20,12 +20,13 @@ use er_state::pokemon::{
 };
 use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
 use er_state::run_v2::{
-    BiomeId, BiomeRuntimeState, GameRunId, Money, ProgressionQueue, RunCounters, RunOutcome,
-    RunStage, RunSurfaceId, RunTaskId, RunInteractionSequence, RunStateV2,
+    BiomeId, BiomeRuntimeState, GameRunId, Money, ProgressionQueue, RunCounters,
+    RunInteractionSequence, RunOutcome, RunStage, RunStateV2, RunSurfaceId, RunTaskId,
 };
 use er_state::snapshot::GameState;
-use er_types::battle_ids::{ContentPackHash, FieldSlot, GameModeId, MoveId, SpeciesId, PokemonId,
-    WaveIndex, TurnIndex};
+use er_types::battle_ids::{
+    ContentPackHash, FieldSlot, GameModeId, MoveId, PokemonId, SpeciesId, TurnIndex, WaveIndex,
+};
 use er_types::{SafeU53, SeatId};
 
 fn safe(value: u64) -> SafeU53 {
@@ -36,7 +37,10 @@ fn safe(value: u64) -> SafeU53 {
 }
 
 fn hash(fill: char) -> Result<ContentPackHash, Box<dyn Error>> {
-    Ok(ContentPackHash::new(format!("blake3-v1:{}", fill.to_string().repeat(64)))?)
+    Ok(ContentPackHash::new(format!(
+        "blake3-v1:{}",
+        fill.to_string().repeat(64)
+    ))?)
 }
 
 fn run_rng() -> RunRngState {
@@ -213,9 +217,10 @@ fn context(
         m3_parity_oracle_sha: M3_PARITY_ORACLE_SHA.to_owned(),
         m4_oracle_sha: M4_ORACLE_SHA.to_owned(),
         battle_content_hash: input.content_hash.clone(),
-        run_content_hash: er_types::run_ids::RunContentPackHash::new(
-            format!("blake3-v1:{}", "b".repeat(64)),
-        )?,
+        run_content_hash: er_types::run_ids::RunContentPackHash::new(format!(
+            "blake3-v1:{}",
+            "b".repeat(64)
+        ))?,
         run: RunStateV2 {
             schema_version: 1,
             run_id: GameRunId::new(safe(1)),
@@ -253,7 +258,6 @@ fn context(
     })
 }
 
-
 #[test]
 fn migration_copies_typed_progression_and_battle_evidence() -> Result<(), Box<dyn Error>> {
     let input = sample_input()?;
@@ -265,7 +269,10 @@ fn migration_copies_typed_progression_and_battle_evidence() -> Result<(), Box<dy
         ],
     )?;
     let migrated = migrate_m3_game_state(&input, &context)?;
-    assert_eq!(migrated.player_party[0].progression.experience.get().get(), 1234);
+    assert_eq!(
+        migrated.player_party[0].progression.experience.get().get(),
+        1234
+    );
     assert_eq!(migrated.player_party[0].progression.ivs[0].get(), 31);
     let Some(battle) = migrated.battle.as_ref() else {
         return Err("migration dropped battle".into());
@@ -283,7 +290,13 @@ fn missing_companion_rejects_without_mutating_m3_input() -> Result<(), Box<dyn E
     let before = input.clone();
     let context = context(
         &input,
-        vec![companion(17, BattleSide::Player, 0, 0, Some(SeatId::new(safe(1))))?],
+        vec![companion(
+            17,
+            BattleSide::Player,
+            0,
+            0,
+            Some(SeatId::new(safe(1))),
+        )?],
     )?;
     assert_eq!(
         migrate_m3_game_state(&input, &context),

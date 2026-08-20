@@ -1,14 +1,13 @@
 use std::error::Error;
 
 use er_canonical::content_digest;
+use er_content::pack::m4_moves::{
+    SELECTED_M4_MOVE_IDS, body_slam_34, selected_m4_move_definitions, validate_selected_m4_moves,
+};
 use er_content::pack::{
     CapabilityManifest, ContentPack, ContentPackError, M4_ORACLE_GAME_SHA, ORACLE_GAME_SHA,
     SELECTED_SCHEMA_VERSION, selected_capability_manifest, selected_content_pack,
     selected_m4_content_pack,
-};
-use er_content::pack::m4_moves::{
-    SELECTED_M4_MOVE_IDS, body_slam_34, selected_m4_move_definitions,
-    validate_selected_m4_moves,
 };
 use er_types::battle_ids::{ContentPackHash, MoveId};
 use er_types::battle_model::{
@@ -191,15 +190,18 @@ fn m4_constructor_and_deserializer_reject_cross_oracle_inputs() -> Result<(), Bo
 }
 
 #[test]
-fn m4_capability_manifest_stays_exact_and_m3_constructor_stays_strict() -> Result<(), Box<dyn Error>> {
+fn m4_capability_manifest_stays_exact_and_m3_constructor_stays_strict() -> Result<(), Box<dyn Error>>
+{
     let m4 = selected_m4_content_pack()?;
     m4.capability_manifest.validate()?;
     assert_eq!(m4.capability_manifest.oracle_game_sha, M4_ORACLE_GAME_SHA);
-    assert!(CapabilityManifest::new(
-        SELECTED_SCHEMA_VERSION,
-        M4_ORACLE_GAME_SHA.to_owned(),
-        m4.capability_manifest.entries.clone(),
-    )
-    .is_err());
+    assert!(
+        CapabilityManifest::new(
+            SELECTED_SCHEMA_VERSION,
+            M4_ORACLE_GAME_SHA.to_owned(),
+            m4.capability_manifest.entries.clone(),
+        )
+        .is_err()
+    );
     Ok(())
 }

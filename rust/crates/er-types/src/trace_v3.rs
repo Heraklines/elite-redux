@@ -9,7 +9,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 use crate::battle_ids::CanonicalHexBytes;
-use crate::{KernelEffect, KernelInput, LiveResourceSnapshot, MenuInstanceId, OperationId, Revision, SafeU53};
+use crate::{
+    KernelEffect, KernelInput, LiveResourceSnapshot, MenuInstanceId, OperationId, Revision, SafeU53,
+};
 
 fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
 where
@@ -139,7 +141,10 @@ fn valid_digest(value: &str) -> bool {
     let Some(hex) = value.strip_prefix("blake3-v1:") else {
         return false;
     };
-    hex.len() == 64 && hex.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    hex.len() == 64
+        && hex
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 impl TraceSnapshotEnvelopeV3 {
@@ -147,7 +152,10 @@ impl TraceSnapshotEnvelopeV3 {
         if self.schema_version != KERNEL_TRACE_SCHEMA_VERSION_V3 {
             return Err(invalid(
                 format!("{path}.schema_version"),
-                format!("expected {KERNEL_TRACE_SCHEMA_VERSION_V3}, got {}", self.schema_version),
+                format!(
+                    "expected {KERNEL_TRACE_SCHEMA_VERSION_V3}, got {}",
+                    self.schema_version
+                ),
             ));
         }
         if self.canonical_snapshot.as_str().is_empty()
@@ -185,7 +193,11 @@ impl RngAuditDeltaV3 {
                 ));
             }
         }
-        if self.draws.windows(2).any(|pair| pair[0].sequence >= pair[1].sequence) {
+        if self
+            .draws
+            .windows(2)
+            .any(|pair| pair[0].sequence >= pair[1].sequence)
+        {
             return Err(invalid(
                 format!("{path}.draws"),
                 "RNG draws must be strictly increasing",
@@ -207,7 +219,8 @@ impl KernelTraceEventV3 {
                 "all stored digests must be blake3-v1 lowercase hexadecimal digests",
             ));
         }
-        self.rng_audit_delta.validate(&format!("{path}.rng_audit_delta"))?;
+        self.rng_audit_delta
+            .validate(&format!("{path}.rng_audit_delta"))?;
         if let Some(failure) = &self.failure {
             if failure.subsystem.is_empty()
                 || failure.path.is_empty()
@@ -239,7 +252,10 @@ impl KernelTraceV3 {
         if self.schema_version != KERNEL_TRACE_SCHEMA_VERSION_V3 {
             return Err(invalid(
                 "schema_version",
-                format!("expected {KERNEL_TRACE_SCHEMA_VERSION_V3}, got {}", self.schema_version),
+                format!(
+                    "expected {KERNEL_TRACE_SCHEMA_VERSION_V3}, got {}",
+                    self.schema_version
+                ),
             ));
         }
         self.initial.validate("initial")?;

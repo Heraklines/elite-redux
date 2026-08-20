@@ -5,11 +5,8 @@
 //! state, and a typed prepared transaction that can retain an encounter plan
 //! before that plan is folded into material.
 
-use std::sync::Arc;
 use er_content::pack::ContentPack;
-use er_game::snapshot::{
-    CommandAdmissionLedgerSnapshotV1, SeatControlHistorySnapshotV1,
-};
+use er_game::snapshot::{CommandAdmissionLedgerSnapshotV1, SeatControlHistorySnapshotV1};
 use er_state::game_v2::GameStateV2;
 use er_state::run_v2::{EncounterPlan, ProgressionQueue, RunCounters, RunSurfaceState};
 use er_types::battle_command::ScriptedEnemyPolicyV1;
@@ -19,6 +16,7 @@ use er_types::battle_ui::{BattleUiProjection, PresentationPlanDigest};
 use er_types::run_ids::{RunContentPackHash, SurfaceDigest};
 use er_types::{OperationId, TerminalState};
 use serde::{Deserialize, Deserializer, Serialize};
+use std::sync::Arc;
 use thiserror::Error;
 
 use crate::snapshot::{
@@ -200,7 +198,10 @@ fn validate_hex(value: &CanonicalHexBytes, path: &str) -> Result<(), SnapshotErr
             .bytes()
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
     {
-        return Err(invalid(path, "canonical bytes must be non-empty lowercase hexadecimal"));
+        return Err(invalid(
+            path,
+            "canonical bytes must be non-empty lowercase hexadecimal",
+        ));
     }
     Ok(())
 }
@@ -209,8 +210,15 @@ fn validate_digest(value: &str, path: &str) -> Result<(), SnapshotError> {
     let Some(hex) = value.strip_prefix("blake3-v1:") else {
         return Err(invalid(path, "digest must start with blake3-v1:"));
     };
-    if hex.len() != 64 || !hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')) {
-        return Err(invalid(path, "digest must contain 64 lowercase hexadecimal digits"));
+    if hex.len() != 64
+        || !hex
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(invalid(
+            path,
+            "digest must contain 64 lowercase hexadecimal digits",
+        ));
     }
     Ok(())
 }
@@ -239,7 +247,10 @@ impl GameRuntimeSnapshotV3 {
         if self.schema_version != GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3 {
             return Err(invalid(
                 "game.schema_version",
-                format!("expected {GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3}, got {}", self.schema_version),
+                format!(
+                    "expected {GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3}, got {}",
+                    self.schema_version
+                ),
             ));
         }
         self.state
@@ -277,9 +288,9 @@ impl GameRuntimeSnapshotV3 {
             ));
         }
         for (index, history) in self.control_history.iter().enumerate() {
-            history
-                .validate()
-                .map_err(|error| invalid(format!("game.control_history[{index}]"), error.to_string()))?;
+            history.validate().map_err(|error| {
+                invalid(format!("game.control_history[{index}]"), error.to_string())
+            })?;
         }
         self.command_admission
             .validate()
@@ -288,9 +299,9 @@ impl GameRuntimeSnapshotV3 {
             .validate()
             .map_err(|error| invalid("game.scripted_enemy_policy", error.to_string()))?;
         for (index, allocator) in self.menu_allocators.iter().enumerate() {
-            allocator
-                .validate()
-                .map_err(|error| invalid(format!("game.menu_allocators[{index}]"), error.to_string()))?;
+            allocator.validate().map_err(|error| {
+                invalid(format!("game.menu_allocators[{index}]"), error.to_string())
+            })?;
         }
         if self.current_control.menu_allocators != self.menu_allocators {
             return Err(invalid(
@@ -307,11 +318,17 @@ impl PreparedTransactionSnapshotV3 {
         if self.schema_version != PREPARED_TRANSACTION_SNAPSHOT_SCHEMA_VERSION_V3 {
             return Err(invalid(
                 "prepared_transaction.schema_version",
-                format!("expected {PREPARED_TRANSACTION_SNAPSHOT_SCHEMA_VERSION_V3}, got {}", self.schema_version),
+                format!(
+                    "expected {PREPARED_TRANSACTION_SNAPSHOT_SCHEMA_VERSION_V3}, got {}",
+                    self.schema_version
+                ),
             ));
         }
         if self.operation_id.as_str().is_empty() {
-            return Err(invalid("prepared_transaction.operation_id", "operation ID must not be empty"));
+            return Err(invalid(
+                "prepared_transaction.operation_id",
+                "operation ID must not be empty",
+            ));
         }
         self.before_state
             .validate()
@@ -322,14 +339,20 @@ impl PreparedTransactionSnapshotV3 {
         self.before_control
             .validate()
             .map_err(|error| invalid("prepared_transaction.before_control", error.to_string()))?;
-        self.candidate_control
-            .validate()
-            .map_err(|error| invalid("prepared_transaction.candidate_control", error.to_string()))?;
-        validate_hex(&self.canonical_material, "prepared_transaction.canonical_material")?;
+        self.candidate_control.validate().map_err(|error| {
+            invalid("prepared_transaction.candidate_control", error.to_string())
+        })?;
+        validate_hex(
+            &self.canonical_material,
+            "prepared_transaction.canonical_material",
+        )?;
         for (index, allocator) in self.menu_allocators.iter().enumerate() {
-            allocator
-                .validate()
-                .map_err(|error| invalid(format!("prepared_transaction.menu_allocators[{index}]"), error.to_string()))?;
+            allocator.validate().map_err(|error| {
+                invalid(
+                    format!("prepared_transaction.menu_allocators[{index}]"),
+                    error.to_string(),
+                )
+            })?;
         }
         if let Some(plan) = &self.encounter_plan {
             if plan.enemy_species.is_empty() {
@@ -356,7 +379,10 @@ impl RestorableKernelSnapshotV3 {
         if self.schema_version != RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3 {
             return Err(invalid(
                 "schema_version",
-                format!("expected {RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3}, got {}", self.schema_version),
+                format!(
+                    "expected {RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3}, got {}",
+                    self.schema_version
+                ),
             ));
         }
         if self.content_hash != self.game.state.battle_content_hash {
@@ -389,7 +415,11 @@ impl RestorableKernelSnapshotV3 {
             .map_err(|error| invalid("ui", error.to_string()))?;
         validate_digest_type(&self.mechanical_digest, "mechanical_digest")?;
         validate_digest_type(&self.kernel_determinism_digest, "kernel_determinism_digest")?;
-        if !self.presentation_plan_digest.as_str().starts_with("blake3-v1:") {
+        if !self
+            .presentation_plan_digest
+            .as_str()
+            .starts_with("blake3-v1:")
+        {
             return Err(invalid(
                 "presentation_plan_digest",
                 "presentation digest must start with blake3-v1:",
@@ -398,7 +428,11 @@ impl RestorableKernelSnapshotV3 {
         if let Some(surface_digest) = &self.surface_digest {
             validate_digest(surface_digest.as_str(), "surface_digest")?;
         }
-        let expected_surface_digest = self.game.active_surface.as_ref().map(|surface| surface.header().surface_digest.clone());
+        let expected_surface_digest = self
+            .game
+            .active_surface
+            .as_ref()
+            .map(|surface| surface.header().surface_digest.clone());
         if self.surface_digest != expected_surface_digest {
             return Err(invalid(
                 "surface_digest",
@@ -433,10 +467,7 @@ impl RestorableKernelSnapshotV3 {
         self.validate()
     }
 
-    pub fn recapture_equal(
-        expected: &Self,
-        recaptured: &Self,
-    ) -> Result<(), SnapshotError> {
+    pub fn recapture_equal(expected: &Self, recaptured: &Self) -> Result<(), SnapshotError> {
         expected.validate()?;
         recaptured.validate()?;
         if expected != recaptured {

@@ -10,11 +10,11 @@ use std::collections::BTreeSet;
 
 use er_state::battle_v2::{BattleStateV2, DefeatedEnemyRecord, WaveRewardEvidence};
 use er_state::game_v2::GameStateV2;
+use er_types::SeatId;
 use er_types::battle_ids::{BattleId, PokemonId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
 use er_types::run_ids::Money;
 use er_types::run_model::{RunOutcome, RunStage};
-use er_types::SeatId;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -101,7 +101,10 @@ pub fn prepare_battle_settlement(
     before: &GameStateV2,
     input: &BattleSettlementInput,
 ) -> Result<PreparedBattleSettlement, SettlementError> {
-    let battle = before.battle.as_ref().ok_or(SettlementError::MissingBattle)?;
+    let battle = before
+        .battle
+        .as_ref()
+        .ok_or(SettlementError::MissingBattle)?;
 
     preflight_state(before, battle, input)?;
 
@@ -161,7 +164,9 @@ fn preflight_state(
     battle: &BattleStateV2,
     input: &BattleSettlementInput,
 ) -> Result<(), SettlementError> {
-    state.validate().map_err(|_| SettlementError::InvalidState)?;
+    state
+        .validate()
+        .map_err(|_| SettlementError::InvalidState)?;
 
     if battle.settlement.settled {
         return Err(SettlementError::AlreadySettled);
@@ -272,7 +277,12 @@ fn validate_party_graph(
             .player_party
             .iter()
             .find(|value| value.id == occurrence.pokemon)
-            .or_else(|| battle.enemy_party.iter().find(|value| value.id == occurrence.pokemon));
+            .or_else(|| {
+                battle
+                    .enemy_party
+                    .iter()
+                    .find(|value| value.id == occurrence.pokemon)
+            });
         let Some(record) = record else {
             return Err(SettlementError::InvalidState);
         };
@@ -288,7 +298,6 @@ fn is_human_owner(battle: &BattleStateV2, owner: SeatId) -> Result<bool, Settlem
         .map(|seats| seats.contains(&owner))
         .map_err(|_| SettlementError::InvalidState)
 }
-
 
 fn validate_participation(
     state: &GameStateV2,
@@ -318,7 +327,11 @@ fn validate_defeated_enemies(battle: &BattleStateV2) -> Result<(), SettlementErr
         if record.owner_seat.is_some() {
             return Err(SettlementError::DefeatedEnemyOwnerMismatch);
         }
-        let Some(enemy) = battle.enemy_party.iter().find(|value| value.id == record.pokemon) else {
+        let Some(enemy) = battle
+            .enemy_party
+            .iter()
+            .find(|value| value.id == record.pokemon)
+        else {
             return Err(SettlementError::UnknownDefeatedEnemy);
         };
         if !enemy.fainted {

@@ -50,8 +50,6 @@ fn content_oracle(oracle_game_sha: &str) -> Option<ContentOracle> {
     }
 }
 
-
-
 /// The frozen selected-content schema version.
 pub const SELECTED_SCHEMA_VERSION: u32 = 1;
 
@@ -690,8 +688,7 @@ fn validate_pack_fields(
             validate_selected_moves(moves).map_err(ContentPackError::Moves)?;
         }
         ContentOracle::M4 => {
-            m4_moves::validate_selected_m4_moves(moves)
-                .map_err(ContentPackError::M4Moves)?;
+            m4_moves::validate_selected_m4_moves(moves).map_err(ContentPackError::M4Moves)?;
         }
     }
     type_chart.validate().map_err(ContentPackError::TypeChart)?;
@@ -918,11 +915,7 @@ fn canonical_m4_capability_entries() -> Vec<CapabilityEntry> {
         CapabilitySubject::Move(move_id(34)),
         supported(),
         &["physical-hit", "paralysis-application"],
-        &[
-            "always-hit",
-            "paralysis-full-stop",
-            "paralysis-speed-order",
-        ],
+        &["always-hit", "paralysis-full-stop", "paralysis-speed-order"],
     );
     let m3_entries = canonical_capability_entries();
     let mut entries = Vec::with_capacity(m3_entries.len() + 1);

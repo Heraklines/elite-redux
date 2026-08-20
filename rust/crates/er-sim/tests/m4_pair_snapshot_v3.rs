@@ -1,12 +1,12 @@
+use er_sim::PairEndpoint;
 use er_sim::snapshot::{
     PacketDispositionV2, PacketReorderStateV2, QueuedPacketSnapshotV2, RestorablePacketKindV2,
 };
 use er_sim::snapshot_v3::validate_packet_body_v3;
-use er_sim::PairEndpoint;
 use er_types::battle_ids::CanonicalHexBytes;
 use er_types::{ConnectionGeneration, SafeU53};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test values are safe")
@@ -16,8 +16,7 @@ fn round_trip<T>(value: &T) -> T
 where
     T: Serialize + DeserializeOwned,
 {
-    serde_json::from_slice(&serde_json::to_vec(value).expect("serialize"))
-        .expect("deserialize")
+    serde_json::from_slice(&serde_json::to_vec(value).expect("serialize")).expect("deserialize")
 }
 
 #[test]

@@ -2,34 +2,35 @@ use std::error::Error;
 
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_run::settlement::{
-    BattleSettlementInput, SettlementError, prepare_battle_settlement,
-};
+use er_run::settlement::{BattleSettlementInput, SettlementError, prepare_battle_settlement};
 use er_state::battle_v2::{
-    BattleParticipationState, BattleSettlementState, BattleStateV2, DefeatedEnemyRecord,
-    WaveRewardEvidence, BATTLE_STATE_SCHEMA_VERSION_V2,
+    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState, BattleStateV2,
+    DefeatedEnemyRecord, WaveRewardEvidence,
 };
 use er_state::field::FieldState;
 use er_state::game_v2::{GAME_STATE_SCHEMA_VERSION_V2, GameStateV2};
 use er_state::pokemon_v2::{
-    Iv, PermanentStatBonuses, PokemonProgressionState, PokemonStateV2,
-    POKEMON_STATE_SCHEMA_VERSION_V2,
+    Iv, POKEMON_STATE_SCHEMA_VERSION_V2, PermanentStatBonuses, PokemonProgressionState,
+    PokemonStateV2,
 };
 use er_state::run_v2::{
-    BiomeRuntimeState, ProgressionQueue, RunCounters, RunStateV2, PROGRESSION_QUEUE_SCHEMA_VERSION,
-    RUN_STATE_SCHEMA_VERSION,
+    BiomeRuntimeState, PROGRESSION_QUEUE_SCHEMA_VERSION, ProgressionQueue,
+    RUN_STATE_SCHEMA_VERSION, RunCounters, RunStateV2,
 };
+use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{
-    AbilityId, BattleFormat, BattleId, ContentPackHash, FaintOccurrenceId, GameModeId,
-    PokemonId, SpeciesId, TurnIndex, WaveIndex,
+    AbilityId, BattleFormat, BattleId, ContentPackHash, FaintOccurrenceId, GameModeId, PokemonId,
+    SpeciesId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{
-    AbilityLoadout, BattleStats, BattleOutcome, GlobalAbilitySuppressionState, PokemonType,
+    AbilityLoadout, BattleOutcome, BattleStats, GlobalAbilitySuppressionState, PokemonType,
     PokemonTyping, StatStages, StatusKind, StatusState, TerrainKind, TerrainState, WeatherKind,
     WeatherState,
 };
-use er_types::battle_command::CommandCollectionState;
-use er_types::run_ids::{BiomeId, Experience, GameRunId, GrowthRateId, Money, RunContentPackHash, RunInteractionSequence, RunSurfaceId, RunTaskId};
+use er_types::run_ids::{
+    BiomeId, Experience, GameRunId, GrowthRateId, Money, RunContentPackHash,
+    RunInteractionSequence, RunSurfaceId, RunTaskId,
+};
 use er_types::run_model::{RunOutcome, RunStage};
 use er_types::{SafeU53, SeatId};
 
@@ -245,7 +246,10 @@ fn settlement_freezes_order_prunes_fainted_and_preserves_rng() -> Result<(), Box
     let prepared = prepare_battle_settlement(&before, &input)?;
 
     assert_eq!(before, before_snapshot);
-    assert_eq!(prepared.evidence.retained_participants, vec![pokemon_id(1)?]);
+    assert_eq!(
+        prepared.evidence.retained_participants,
+        vec![pokemon_id(1)?]
+    );
     assert_eq!(
         prepared.evidence.defeated_enemies,
         before
@@ -261,11 +265,27 @@ fn settlement_freezes_order_prunes_fainted_and_preserves_rng() -> Result<(), Box
     assert!(prepared.evidence.rng_unchanged);
     assert_eq!(prepared.after_state.run.run_rng, before.run.run_rng);
     assert_eq!(
-        prepared.after_state.battle.as_ref().ok_or("battle missing")?.battle_rng,
+        prepared
+            .after_state
+            .battle
+            .as_ref()
+            .ok_or("battle missing")?
+            .battle_rng,
         before.battle.as_ref().ok_or("battle missing")?.battle_rng
     );
-    assert_eq!(prepared.after_state.run.stage, RunStage::AwaitingWaveAdvance);
-    assert!(prepared.after_state.battle.as_ref().ok_or("battle missing")?.settlement.settled);
+    assert_eq!(
+        prepared.after_state.run.stage,
+        RunStage::AwaitingWaveAdvance
+    );
+    assert!(
+        prepared
+            .after_state
+            .battle
+            .as_ref()
+            .ok_or("battle missing")?
+            .settlement
+            .settled
+    );
     assert_eq!(prepared.after_state.run.wave, before.run.wave);
     assert_eq!(prepared.after_state.run.progression, before.run.progression);
     Ok(())
@@ -331,7 +351,8 @@ fn settlement_rejects_duplicate_participants_and_enemies() -> Result<(), Box<dyn
 }
 
 #[test]
-fn settlement_rejects_inconsistent_outcomes_and_repeated_boundaries() -> Result<(), Box<dyn Error>> {
+fn settlement_rejects_inconsistent_outcomes_and_repeated_boundaries() -> Result<(), Box<dyn Error>>
+{
     let mut inconsistent = state()?;
     inconsistent
         .battle
@@ -374,7 +395,8 @@ fn settlement_rejects_inconsistent_outcomes_and_repeated_boundaries() -> Result<
 }
 
 #[test]
-fn settlement_rejects_unknown_participants_and_living_defeated_enemies() -> Result<(), Box<dyn Error>> {
+fn settlement_rejects_unknown_participants_and_living_defeated_enemies()
+-> Result<(), Box<dyn Error>> {
     let mut unknown = state()?;
     unknown
         .battle

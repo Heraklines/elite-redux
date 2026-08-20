@@ -1,9 +1,9 @@
+use super::m4_moves::selected_m4_move_definitions;
 use super::{
     CapabilityManifest, ContentPack, ContentPackError, M4_ORACLE_GAME_SHA, SELECTED_SCHEMA_VERSION,
     canonical_m4_capability_entries, selected_type_chart,
 };
 use crate::abilities::ability_definitions;
-use super::m4_moves::selected_m4_move_definitions;
 use crate::species::species_definitions;
 
 /// Returns the exact schema-1 M4 battle ContentPack.

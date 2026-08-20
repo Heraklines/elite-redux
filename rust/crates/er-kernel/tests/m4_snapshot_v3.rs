@@ -4,13 +4,13 @@ use er_kernel::snapshot::{
 };
 use er_state::run_v2::{CrossroadsSurfaceState, RunSurfaceState, SurfaceHeader};
 use er_types::battle_ids::{MenuInstanceId, WaveIndex};
-use er_types::run_ids::{RunInteractionSequence, RunSurfaceId, SurfaceDigest};
 use er_types::battle_ui::PresentationPlanDigest;
+use er_types::run_ids::{RunInteractionSequence, RunSurfaceId, SurfaceDigest};
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{LogicalMenu, LogicalMenuOption};
 use er_types::{GameButton, InputFocus, OperationId, PhysicalKey, SafeU53, SeatId};
-use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde::de::DeserializeOwned;
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("test values are safe")
@@ -20,8 +20,7 @@ fn round_trip<T>(value: &T) -> T
 where
     T: Serialize + DeserializeOwned,
 {
-    serde_json::from_slice(&serde_json::to_vec(value).expect("serialize"))
-        .expect("deserialize")
+    serde_json::from_slice(&serde_json::to_vec(value).expect("serialize")).expect("deserialize")
 }
 
 #[test]

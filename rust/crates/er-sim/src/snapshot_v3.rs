@@ -41,9 +41,16 @@ impl PairDeterminismDigestV2 {
     pub fn new(value: impl Into<String>) -> Result<Self, SnapshotError> {
         let value = value.into();
         let Some(hex) = value.strip_prefix("blake3-v1:") else {
-            return Err(invalid("pair_determinism_digest", "digest must start with blake3-v1:"));
+            return Err(invalid(
+                "pair_determinism_digest",
+                "digest must start with blake3-v1:",
+            ));
         };
-        if hex.len() != 64 || !hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')) {
+        if hex.len() != 64
+            || !hex
+                .bytes()
+                .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+        {
             return Err(invalid(
                 "pair_determinism_digest",
                 "digest must contain 64 lowercase hexadecimal digits",
@@ -112,8 +119,15 @@ fn validate_digest(value: &str, path: &str) -> Result<(), SnapshotError> {
     let Some(hex) = value.strip_prefix("blake3-v1:") else {
         return Err(invalid(path, "digest must start with blake3-v1:"));
     };
-    if hex.len() != 64 || !hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f')) {
-        return Err(invalid(path, "digest must contain 64 lowercase hexadecimal digits"));
+    if hex.len() != 64
+        || !hex
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
+    {
+        return Err(invalid(
+            path,
+            "digest must contain 64 lowercase hexadecimal digits",
+        ));
     }
     Ok(())
 }
@@ -126,7 +140,10 @@ fn validate_packet_body(body: &CanonicalHexBytes, path: &str) -> Result<(), Snap
             .bytes()
             .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
     {
-        return Err(invalid(path, "queued packet body must retain non-empty canonical bytes"));
+        return Err(invalid(
+            path,
+            "queued packet body must retain non-empty canonical bytes",
+        ));
     }
     Ok(())
 }
@@ -136,7 +153,10 @@ impl RestorablePairSnapshotV3 {
         if self.schema_version != RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION_V3 {
             return Err(invalid(
                 "schema_version",
-                format!("expected {RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION_V3}, got {}", self.schema_version),
+                format!(
+                    "expected {RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION_V3}, got {}",
+                    self.schema_version
+                ),
             ));
         }
         if self.replay_seed.is_empty() {
@@ -203,7 +223,10 @@ impl RestorablePairSnapshotV3 {
         self.fault_rng_state
             .validate()
             .map_err(|error| invalid("fault_rng_state", error.to_string()))?;
-        validate_digest(self.pair_determinism_digest.as_str(), "pair_determinism_digest")?;
+        validate_digest(
+            self.pair_determinism_digest.as_str(),
+            "pair_determinism_digest",
+        )?;
 
         let host_link = self
             .network
@@ -223,8 +246,20 @@ impl RestorablePairSnapshotV3 {
                 "one shared transport generation is required",
             ));
         }
-        if self.host.protocol.frame_context.context.connection_generation != host_link.generation
-            || self.guest.protocol.frame_context.context.connection_generation != guest_link.generation
+        if self
+            .host
+            .protocol
+            .frame_context
+            .context
+            .connection_generation
+            != host_link.generation
+            || self
+                .guest
+                .protocol
+                .frame_context
+                .context
+                .connection_generation
+                != guest_link.generation
         {
             return Err(invalid(
                 "network.links.generation",
@@ -262,10 +297,16 @@ impl RestorablePairSnapshotV3 {
             let path = format!("network.packets[{index}]");
             validate_packet_body(&packet.body, &format!("{path}.body"))?;
             if packet.source == packet.destination {
-                return Err(invalid(format!("{path}.source"), "packet source and destination must differ"));
+                return Err(invalid(
+                    format!("{path}.source"),
+                    "packet source and destination must differ",
+                ));
             }
             if packet.enqueued_at_ms > self.virtual_time_ms {
-                return Err(invalid(format!("{path}.enqueued_at_ms"), "packet cannot be enqueued after virtual time"));
+                return Err(invalid(
+                    format!("{path}.enqueued_at_ms"),
+                    "packet cannot be enqueued after virtual time",
+                ));
             }
             let ready = packet.delivery_deadline_ms <= self.virtual_time_ms;
             if matches!(packet.disposition, PacketDispositionV2::Ready) != ready {
@@ -293,7 +334,10 @@ impl RestorablePairSnapshotV3 {
             }
         }
         let mut scheduler_timer_count = 0_usize;
-        for (path, endpoint) in [("host.scheduler", &self.host), ("guest.scheduler", &self.guest)] {
+        for (path, endpoint) in [
+            ("host.scheduler", &self.host),
+            ("guest.scheduler", &self.guest),
+        ] {
             for timer in &endpoint.scheduler.timers {
                 scheduler_timer_count += 1;
                 let registration = &timer.registration;
@@ -305,9 +349,12 @@ impl RestorablePairSnapshotV3 {
                         clock_timer.endpoint == registration.endpoint
                             && clock_timer.timer_id == registration.timer_id
                     })
-                    .ok_or_else(|| invalid(path, "scheduler timer has no pair-clock registration"))?;
+                    .ok_or_else(|| {
+                        invalid(path, "scheduler timer has no pair-clock registration")
+                    })?;
                 let expected_paused = endpoint.scheduler.pauses.iter().any(|pause| {
-                    pause.endpoint == registration.endpoint && pause.time_class == registration.time_class
+                    pause.endpoint == registration.endpoint
+                        && pause.time_class == registration.time_class
                 });
                 if clock_timer.time_class != registration.time_class
                     || clock_timer.remaining_active_ms != timer.remaining_active_ms
@@ -371,9 +418,7 @@ pub fn require_recapture_equality_v3(
 }
 
 /// Retain a packet body in a focused, pure helper used by capture adapters.
-pub fn validate_packet_body_v3(
-    body: &CanonicalHexBytes,
-) -> Result<(), SnapshotError> {
+pub fn validate_packet_body_v3(body: &CanonicalHexBytes) -> Result<(), SnapshotError> {
     validate_packet_body(body, "packet.body")
 }
 

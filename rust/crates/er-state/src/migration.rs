@@ -13,13 +13,12 @@ use er_types::battle_ids::{BattleId, BattleSide, ContentPackHash, PokemonId};
 use er_types::run_ids::{Experience, GrowthRateId, NatureId, RunContentPackHash};
 
 use crate::battle_v2::{
-    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState,
-    BattleStateV2,
+    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState, BattleStateV2,
 };
 use crate::game_v2::{GAME_STATE_SCHEMA_VERSION_V2, GameStateV2};
 use crate::pokemon::PokemonState as PokemonStateV1;
 use crate::pokemon_v2::{
-    Iv, PermanentStatBonuses, POKEMON_STATE_SCHEMA_VERSION_V2, PokemonProgressionState,
+    Iv, POKEMON_STATE_SCHEMA_VERSION_V2, PermanentStatBonuses, PokemonProgressionState,
     PokemonStateV2,
 };
 use crate::run_v2::RunStateV2;
@@ -114,7 +113,10 @@ pub fn migrate_m3_game_state(
 ) -> Result<GameStateV2, MigrationError> {
     validate_provenance(input, context)?;
     input.validate().map_err(|_| MigrationError::InvalidV1)?;
-    context.run.validate().map_err(|_| MigrationError::InvalidV2)?;
+    context
+        .run
+        .validate()
+        .map_err(|_| MigrationError::InvalidV2)?;
 
     if context.run.wave != input.wave
         || context.run.next_battle_id != input.next_battle_id
@@ -125,10 +127,15 @@ pub fn migrate_m3_game_state(
 
     let (player_party, battle) = match input.battle.as_ref() {
         Some(source_battle) => {
-            let battle_evidence = context.battle.as_ref().ok_or(MigrationError::MissingCompanion)?;
+            let battle_evidence = context
+                .battle
+                .as_ref()
+                .ok_or(MigrationError::MissingCompanion)?;
             validate_battle_companion(battle_evidence, context, source_battle.battle_id)?;
-            let player_party = migrate_party(&source_battle.player_party, BattleSide::Player, context)?;
-            let enemy_party = migrate_party(&source_battle.enemy_party, BattleSide::Enemy, context)?;
+            let player_party =
+                migrate_party(&source_battle.player_party, BattleSide::Player, context)?;
+            let enemy_party =
+                migrate_party(&source_battle.enemy_party, BattleSide::Enemy, context)?;
             let battle = BattleStateV2 {
                 schema_version: BATTLE_STATE_SCHEMA_VERSION_V2,
                 battle_id: source_battle.battle_id,
@@ -174,11 +181,18 @@ pub fn migrate_m3_game_state(
     Ok(output)
 }
 
-fn validate_provenance(input: &GameStateV1, context: &M3ToM4MigrationContext) -> Result<(), MigrationError> {
-    if input.schema_version != crate::snapshot::GAME_STATE_SCHEMA_VERSION || context.fixture_id.is_empty() {
+fn validate_provenance(
+    input: &GameStateV1,
+    context: &M3ToM4MigrationContext,
+) -> Result<(), MigrationError> {
+    if input.schema_version != crate::snapshot::GAME_STATE_SCHEMA_VERSION
+        || context.fixture_id.is_empty()
+    {
         return Err(MigrationError::WrongSchema);
     }
-    if context.m3_parity_oracle_sha != M3_PARITY_ORACLE_SHA || context.m4_oracle_sha != M4_ORACLE_SHA {
+    if context.m3_parity_oracle_sha != M3_PARITY_ORACLE_SHA
+        || context.m4_oracle_sha != M4_ORACLE_SHA
+    {
         return Err(MigrationError::WrongOracle);
     }
     if input.content_hash != context.battle_content_hash {
@@ -187,7 +201,9 @@ fn validate_provenance(input: &GameStateV1, context: &M3ToM4MigrationContext) ->
 
     let mut keys = BTreeSet::new();
     for companion in &context.companions {
-        if companion.key.fixture_id != context.fixture_id || companion.key.state_side != context.state_side {
+        if companion.key.fixture_id != context.fixture_id
+            || companion.key.state_side != context.state_side
+        {
             return Err(MigrationError::UnknownCompanion);
         }
         if !keys.insert(companion.key.clone()) {
@@ -226,7 +242,10 @@ fn migrate_party(
         if companion.key.party_side != party_side {
             continue;
         }
-        if companions_by_key.insert(companion.key.pokemon_id, companion).is_some() {
+        if companions_by_key
+            .insert(companion.key.pokemon_id, companion)
+            .is_some()
+        {
             return Err(MigrationError::DuplicateCompanion);
         }
     }
@@ -235,17 +254,22 @@ fn migrate_party(
     let mut stable_indexes = BTreeSet::new();
     let mut records = Vec::with_capacity(source.len());
     for (source_index, pokemon) in source.iter().enumerate() {
-        let source_index = u8::try_from(source_index).map_err(|_| MigrationError::PartyOrderConflict)?;
+        let source_index =
+            u8::try_from(source_index).map_err(|_| MigrationError::PartyOrderConflict)?;
         let Some(companion) = companions_by_key.get(&pokemon.id) else {
             return Err(MigrationError::MissingCompanion);
         };
         if companion.source_party_index != source_index {
             return Err(MigrationError::PartyOrderConflict);
         }
-        if !source_indexes.insert(companion.source_party_index) || !stable_indexes.insert(companion.stable_roster_index) {
+        if !source_indexes.insert(companion.source_party_index)
+            || !stable_indexes.insert(companion.stable_roster_index)
+        {
             return Err(MigrationError::PartyOrderConflict);
         }
-        if pokemon.owner_seat != companion.owner_seat || (party_side == BattleSide::Enemy && companion.owner_seat.is_some()) {
+        if pokemon.owner_seat != companion.owner_seat
+            || (party_side == BattleSide::Enemy && companion.owner_seat.is_some())
+        {
             return Err(MigrationError::OwnerConflict);
         }
         records.push((companion.stable_roster_index, pokemon, companion));
@@ -262,10 +286,16 @@ fn migrate_party(
         }
     }
 
-    records.into_iter().map(|(_, pokemon, companion)| migrate_pokemon(pokemon, companion)).collect()
+    records
+        .into_iter()
+        .map(|(_, pokemon, companion)| migrate_pokemon(pokemon, companion))
+        .collect()
 }
 
-fn migrate_pokemon(source: &PokemonStateV1, companion: &M3PokemonCompanion) -> Result<PokemonStateV2, MigrationError> {
+fn migrate_pokemon(
+    source: &PokemonStateV1,
+    companion: &M3PokemonCompanion,
+) -> Result<PokemonStateV2, MigrationError> {
     let pokemon = PokemonStateV2 {
         schema_version: POKEMON_STATE_SCHEMA_VERSION_V2,
         id: source.id,
