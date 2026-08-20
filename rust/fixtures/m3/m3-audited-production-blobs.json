@@ -2,7 +2,7 @@
   "schema_version": 1,
   "manifest_id": "m3-audited-production-blobs-v1",
   "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
-  "head_sha": "573f36aa1a063cea00f4df649065df915737a3bc",
+  "head_sha": "7cc3ac876ac5ba5249664a8038ca60966e4744ff",
   "source_root": "src",
   "path_count": 41,
   "paths": [
@@ -16,7 +16,7 @@
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
-      "blob_oid": "be7f277e04724f473c31c70163e344c0c1413a8b"
+      "blob_oid": "a2e47599e389a7d1b04a94589261f2adf7710cc0"
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/cutover-interaction.ts",

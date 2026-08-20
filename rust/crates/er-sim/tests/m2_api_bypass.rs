@@ -23,7 +23,7 @@ const TEST_MAP_SOURCE: &str = include_str!("../../../fixtures/v1/authority-v2-te
 
 const ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const M3_BASE_SHA: &str = "7357166c19bdb5cf0e32c84b0f74f22e79d80798";
-const AUDITED_PRODUCTION_HEAD: &str = "573f36aa1a063cea00f4df649065df915737a3bc";
+const AUDITED_PRODUCTION_HEAD: &str = "7cc3ac876ac5ba5249664a8038ca60966e4744ff";
 const AUDITED_PRODUCTION_BLOBS: &str =
     include_str!("../../../fixtures/m3/m3-audited-production-blobs.json");
 
