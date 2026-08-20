@@ -511,7 +511,11 @@ export async function captureComposedSegment(): Promise<JsonObject> {
     if (error instanceof M4CaptureGap) {
       throw error;
     }
-    gap("COMPOSED_LIVE_SCENARIO_FAILED", "test/kernel-fixtures/m4/export/composed-capture.ts:GameManager", error instanceof Error ? error.message : String(error));
+    gap(
+      "COMPOSED_LIVE_SCENARIO_FAILED",
+      "test/kernel-fixtures/m4/export/composed-capture.ts:GameManager",
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
+    );
   } finally {
     rngTrace?.restore();
     clearInterval(PromptHandler.runInterval);

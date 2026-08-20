@@ -1018,19 +1018,10 @@ async function captureMarket(seed: string): Promise<RecordValue> {
     activeCapture = context;
     liveGame.move.select(MoveId.SPLASH);
     await liveGame.doKillOpponents();
-    await waitUntil(
-      () => liveGame.scene.phaseManager.getCurrentPhase() instanceof BiomeShopPhase,
-      "wave-10 Town market phase",
-      "src/phases/biome-shop-phase.ts:BiomeShopPhase",
-      20_000,
-      () => {
-        const current = liveGame.scene.phaseManager.getCurrentPhase() as AnyRecord | null;
-        return {
-          phase: String(current?.phaseName ?? current?.constructor?.name ?? ""),
-          mode: String(liveGame.scene.ui.getMode()),
-        };
-      },
-    );
+    // BiomeShopPhase intentionally inherits phaseName "SelectModifierPhase".
+    // Drive the public phase boundary by that production identity, then prove
+    // the concrete subclass before observing its generated stock.
+    await liveGame.phaseInterceptor.to("SelectModifierPhase");
     const marketPhase = liveGame.scene.phaseManager.getCurrentPhase();
     if (!(marketPhase instanceof BiomeShopPhase)) {
       gap(
