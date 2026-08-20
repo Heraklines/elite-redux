@@ -41,8 +41,8 @@ export interface CoopWaveAuthorityInputsV2 {
   readonly harnessPresent: boolean;
 }
 
-type CoopWaveAdvanceEntry = Extract<CoopAuthorityEntry, { kind: "WAVE_ADVANCE" }>;
-type CoopTerminalCommitEntry = Extract<CoopAuthorityEntry, { kind: "TERMINAL_COMMIT" }>;
+type CoopWaveAdvanceEntry = CoopAuthorityEntry & { readonly kind: "WAVE_ADVANCE" };
+type CoopTerminalCommitEntry = CoopAuthorityEntry & { readonly kind: "TERMINAL_COMMIT" };
 
 /** Typed result for a WAVE_ADVANCE authority commit, including an exact deferred image. */
 export type CoopV2WaveCommitDisposition =

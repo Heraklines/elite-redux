@@ -1038,7 +1038,7 @@ export class CoopSwitchReplayPhase extends Phase {
         finish({ kind: "failed", reason: "switch-battler-address-unmapped", actorFingerprint });
         return;
       }
-      const party = player ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+      const party: readonly Pokemon[] = player ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
       if (this.presentation.actor.pokemonId !== this.presentation.pokemonId
         || (player ? "player" : "enemy") !== this.presentation.actor.side) {
         coopWarn("replay", `switch presentation actor/address mismatch bi=${this.presentation.bi}`);

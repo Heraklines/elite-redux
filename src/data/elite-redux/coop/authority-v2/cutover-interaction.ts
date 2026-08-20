@@ -1256,7 +1256,14 @@ export function commitCoopV2InteractionEnvelope(
   return commitCoopV2InteractionEnvelopeDetailed(surfaceClass, envelope, durability).kind;
 }
 
-function stripAuthorityRevision(entry: CoopAuthorityEntry): Omit<CoopAuthorityEntry, "revision"> {
+type CoopAuthorityEntryBody = Omit<CoopAuthorityEntry, "revision">;
+
+function stripAuthorityRevision(
+  entry: CoopAuthorityEntry | CoopAuthorityEntryBody,
+): CoopAuthorityEntryBody {
+  if (!("revision" in entry)) {
+    return entry;
+  }
   const { revision: _revision, ...body } = entry;
   return body;
 }
