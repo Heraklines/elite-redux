@@ -30,7 +30,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import type { CoopAuthorityEntry } from "#data/elite-redux/coop/authority-v2/contract";
 import { getActiveCoopV2WaveCutover } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { type CoopFrameV2, encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { validateInboundFrame } from "#data/elite-redux/coop/authority-v2/protocol-validator";
@@ -1294,7 +1293,10 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       logs.flush();
       return;
     }
-    const changedEntry: CoopAuthorityEntry = {
+    if (parked.entry.kind !== "WAVE_ADVANCE" && parked.entry.kind !== "TERMINAL_COMMIT") {
+      throw new Error(`deferred wave boundary retained unexpected ${parked.entry.kind} entry`);
+    }
+    const changedEntry = {
       ...parked.entry,
       context: {
         ...parked.entry.context,

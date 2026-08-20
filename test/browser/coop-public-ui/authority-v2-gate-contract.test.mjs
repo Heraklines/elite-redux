@@ -558,7 +558,10 @@ test("Mystery projection construction cannot recursively attest an unopened hand
   assert.match(readiness, /openModeBounded\(UiMode\.MYSTERY_ENCOUNTER/u);
   assert.match(readiness, /boundaryStillLive\(\)/u);
   const openingIndex = readiness.indexOf("const opening = this.openModeBounded(");
-  const immediateProofIndex = readiness.indexOf("notifyCoopV2InteractionSurfaceReady(this.boundRuntime)", openingIndex);
+  const immediateProofIndex = readiness.indexOf(
+    "notifyCoopV2InteractionSurfaceReady(this.boundRuntime, this)",
+    openingIndex,
+  );
   const settledRetryIndex = readiness.indexOf("void opening.then(", immediateProofIndex);
   assert.ok(openingIndex >= 0, "the Mystery surface starts opening before it can attest control");
   assert.ok(
@@ -567,7 +570,7 @@ test("Mystery projection construction cannot recursively attest an unopened hand
   );
   assert.match(
     readiness,
-    /void opening\.then\([\s\S]*notifyCoopV2InteractionSurfaceReady\(this\.boundRuntime\)/u,
+    /void opening\.then\([\s\S]*notifyCoopV2InteractionSurfaceReady\(this\.boundRuntime, this\)/u,
     "an asynchronously actionable Mystery handler retains its settled proof retry",
   );
 });
@@ -946,7 +949,7 @@ test("Crossroads result envelopes retain the exact V2 control turn instead of a 
   assert.ok(ownerReadyEnd > ownerReadyStart, "Crossroads owner actionability proof has a bounded source block");
   const ownerReady = crossroadsPhase.slice(ownerReadyStart, ownerReadyEnd);
   const actionableCheck = ownerReady.indexOf("handler.isCoopV2InputActionable?.() === true");
-  const controlProof = ownerReady.indexOf("notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime)");
+  const controlProof = ownerReady.indexOf("notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this)");
   assert.ok(actionableCheck >= 0, "Crossroads checks the exact option handler's input-delay state");
   assert.ok(
     controlProof > actionableCheck,
@@ -1423,7 +1426,7 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   assert.ok(readyEnd > readyStart, "SelectBiome public-control proof has a bounded source block");
   const ready = selectBiomePhase.slice(readyStart, readyEnd);
   const actionableCheck = ready.indexOf("handler.isCoopV2InputActionable?.() === true");
-  const interactionProof = ready.indexOf("notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime)");
+  const interactionProof = ready.indexOf("notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this)");
   const continuationProof = ready.indexOf("notifyCoopWaveContinuationSurfaceReady(wave)");
   assert.ok(actionableCheck >= 0, "SelectBiome checks the exact World Map handler");
   assert.ok(
