@@ -2969,6 +2969,27 @@ export async function buildDuo(
       "initial-coop",
     );
   });
+  const refreshInitialCoopConsumers = (): void => {
+    preRegisterMirroredCommandConsumers(
+      guestScene,
+      guestRuntime,
+      guestScene
+        .getPlayerField()
+        .flatMap((pokemon, fieldIndex) => (pokemon?.isActive() && pokemon.coopOwner === "guest" ? [fieldIndex] : [])),
+      "initial-coop",
+    );
+  };
+  guestCtx.pumpInbound = (): number => {
+    let delivered = 0;
+    for (;;) {
+      refreshInitialCoopConsumers();
+      const next = runtimePair.flush("guest", 1);
+      if (next === 0) {
+        return delivered;
+      }
+      delivered += next;
+    }
+  };
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
   // Connect both controllers over the live loopback (exchange hello / runConfig).
@@ -2981,16 +3002,7 @@ export async function buildDuo(
     setCoopRuntimeFn(guestRuntime);
     guestRuntime.controller.connect();
   });
-  await withClient(guestCtx, () => {
-    preRegisterMirroredCommandConsumers(
-      guestScene,
-      guestRuntime,
-      guestScene
-        .getPlayerField()
-        .flatMap((pokemon, fieldIndex) => (pokemon?.isActive() && pokemon.coopOwner === "guest" ? [fieldIndex] : [])),
-      "initial-coop",
-    );
-  });
+  await withClient(guestCtx, () => refreshInitialCoopConsumers());
   await withClient(hostCtx, () => drainLoopback());
   await withClient(guestCtx, () => drainLoopback());
 
@@ -5702,6 +5714,27 @@ export async function buildShowdownDuo(
       "initial-showdown",
     );
   });
+  const refreshInitialShowdownConsumers = (): void => {
+    preRegisterMirroredCommandConsumers(
+      guestScene,
+      guestRuntime,
+      guestScene.getPlayerField().flatMap((pokemon, fieldIndex) => (pokemon?.isActive() ? [fieldIndex] : [])),
+      "initial-showdown",
+    );
+  };
+  guestCtx.pumpInbound = (): number => {
+    let delivered = 0;
+    for (;;) {
+      refreshInitialShowdownConsumers();
+      const scheduled = scheduledPair.flush?.("guest", 1) ?? 0;
+      refreshInitialShowdownConsumers();
+      const deferredV2 = pair.guest.pumpV2Inbound?.(1) ?? 0;
+      if (scheduled + deferredV2 === 0) {
+        return delivered;
+      }
+      delivered += scheduled + deferredV2;
+    }
+  };
 
   // The enemy-command relays: the HOST awaits the guest's command; the guest peer answers / ships it.
   const hostRelay = new ShowdownCommandRelay(pair.host);
@@ -5723,15 +5756,8 @@ export async function buildShowdownDuo(
     hostRuntime.controller.connect();
     setCoopRuntimeFn(guestRuntime);
     guestRuntime.controller.connect();
-    await withClient(guestCtx, () => {
-      preRegisterMirroredCommandConsumers(
-        guestScene,
-        guestRuntime,
-        guestScene.getPlayerField().flatMap((pokemon, fieldIndex) => (pokemon?.isActive() ? [fieldIndex] : [])),
-        "initial-showdown",
-      );
-    });
-    await drainLoopback();
+    await withClient(guestCtx, () => refreshInitialShowdownConsumers());
+    await withClient(guestCtx, () => drainLoopback());
   }
 
   // Production installs both versus runtimes before Encounter/Summon. These older direct-mirror fixtures
