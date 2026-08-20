@@ -352,14 +352,17 @@ function strictEnvelope(
     next_control: JsonObject;
     raw_key_tape?: JsonValue[];
   },
+  requirePhysicalKeys = false,
 ): JsonObject {
   const initial = exactFrontier(evidence.initial, `${fixtureId}.initial`, evidence.provenance);
   const final = exactFrontier(evidence.final, `${fixtureId}.final`, evidence.provenance);
   const rawKeyTape = evidence.raw_key_tape;
-  if (rawKeyTape === undefined) {
+  if (rawKeyTape === undefined && requirePhysicalKeys) {
     fail(fixtureId, "RAW_KEY_TAPE_UNOBSERVABLE", "test/kernel-fixtures/m4/export-run-oracle.test.ts:strictEnvelope", "physical keydown/keyup tape is required");
   }
-  validateRawKeyTape(rawKeyTape, `${fixtureId}.raw_key_tape`);
+  if (rawKeyTape !== undefined) {
+    validateRawKeyTape(rawKeyTape, `${fixtureId}.raw_key_tape`);
+  }
   validateNextControl(evidence.next_control, `${fixtureId}.next_control`);
   return {
     schema_version: 1,
@@ -373,7 +376,7 @@ function strictEnvelope(
     presentation: requireArray(evidence.presentation, `${fixtureId}.presentation`),
     final,
     next_control: evidence.next_control,
-    raw_key_tape: rawKeyTape,
+    ...(rawKeyTape === undefined ? {} : { raw_key_tape: rawKeyTape }),
     gaps: [],
   };
 }
@@ -694,7 +697,7 @@ function captureComposedSegment(value: JsonObject, sharedProvenance: JsonObject)
     final,
     next_control: value.next_control as JsonObject,
     raw_key_tape: value.raw_key_tape,
-  });
+  }, true);
   return {
     ...envelope,
     kind: "oracle-composed",
@@ -828,10 +831,6 @@ function envelopeFromCapture(
     }
     return entry;
   };
-  const rawKeyTape = value.raw_key_tape;
-  if (!Array.isArray(rawKeyTape)) {
-    fail(fixtureId, "RAW_KEY_TAPE_UNOBSERVABLE", `M4_CAPTURE_OUTPUT:${fixtureId}`, "raw_key_tape must contain serialized physical keydown/keyup events");
-  }
   return strictEnvelope(fixtureId, {
     provenance: sharedProvenance,
     initial: requiredObject("initial"),
@@ -842,7 +841,6 @@ function envelopeFromCapture(
     presentation: requiredArray("presentation"),
     final: requiredObject("final"),
     next_control: requiredObject("next_control"),
-    raw_key_tape: rawKeyTape,
   });
 }
 

@@ -8,6 +8,7 @@
  * Button or phase helper is used as an action.
  */
 
+import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import { getGameMode } from "#app/game-mode";
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
 import { GameModes } from "#enums/game-modes";

@@ -255,6 +255,46 @@ function activeSurface(surface: Surface): SurfaceCapture | null {
   return ensureSurface(activeCapture, surface);
 }
 
+function captureMarketStart(
+  context: CaptureContext,
+  phaseValue: BiomeShopPhase,
+  generationBefore: RecordValue | null,
+): void {
+  const surface = ensureSurface(context, "market");
+  if (observedMarketPhase === phaseValue && surface.initial != null) {
+    return;
+  }
+  const phase = phaseValue as AnyRecord;
+  const options = phase.shopOptions;
+  const quantities = phase.qtys;
+  if (!Array.isArray(options) || !Array.isArray(quantities)) {
+    gap(
+      "MARKET_STOCK_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase.buildStock",
+      "shopOptions/qtys were not initialized",
+    );
+  }
+  observedMarketPhase = phaseValue;
+  observedMarketOptions = options;
+  surface.round += 1;
+  const after = phaseGraph(context.game, phase, "market", options, quantities);
+  surface.generationBefore = generationBefore ?? undefined;
+  surface.generationAfter = after;
+  surface.initial = { canonical: after, rng: sceneRng(context.game) };
+  surface.orderedTransitions.push({
+    sequence: surface.orderedTransitions.length,
+    event: "START",
+    phase: "BiomeShopPhase",
+    round: surface.round,
+  });
+  surface.presentation.push({
+    mode: String(context.game.scene.ui.getMode()),
+    phase: "BiomeShopPhase",
+    displayed_index: 0,
+    stock: jsonValue(quantities),
+  });
+}
+
 function installObservationHooks(): void {
   if (installed) {
     return;
@@ -359,26 +399,14 @@ function installObservationHooks(): void {
 
   const originalMarketStart = BiomeShopPhase.prototype.start;
   (BiomeShopPhase.prototype as AnyRecord).start = function (this: BiomeShopPhase): unknown {
-    const surface = activeSurface("market");
     const context = activeCapture;
-    const before = surface == null || context == null ? null : phaseGraph(context.game, this as AnyRecord, "market", [], []);
+    const before =
+      context == null || activeSurface("market") == null
+        ? null
+        : phaseGraph(context.game, this as AnyRecord, "market", [], []);
     const result = originalMarketStart.call(this);
-    if (surface != null && context != null) {
-      observedMarketPhase = this;
-      const phase = this as AnyRecord;
-      const options = phase.shopOptions;
-      const quantities = phase.qtys;
-      if (!Array.isArray(options) || !Array.isArray(quantities)) {
-        gap("MARKET_STOCK_UNOBSERVABLE", "src/phases/biome-shop-phase.ts:BiomeShopPhase.buildStock", "shopOptions/qtys were not initialized");
-      }
-      observedMarketOptions = options;
-      surface.round += 1;
-      const after = phaseGraph(context.game, phase, "market", options, quantities);
-      surface.generationBefore = before ?? undefined;
-      surface.generationAfter = after;
-      surface.initial = { canonical: after, rng: sceneRng(context.game) };
-      surface.orderedTransitions.push({ sequence: surface.orderedTransitions.length, event: "START", phase: "BiomeShopPhase", round: surface.round });
-      surface.presentation.push({ mode: String(context.game.scene.ui.getMode()), phase: "BiomeShopPhase", displayed_index: 0, stock: jsonValue(quantities) });
+    if (context != null && activeSurface("market") != null) {
+      captureMarketStart(context, this, before);
     }
     return result;
   };
@@ -990,7 +1018,28 @@ async function captureMarket(seed: string): Promise<RecordValue> {
     activeCapture = context;
     liveGame.move.select(MoveId.SPLASH);
     await liveGame.doKillOpponents();
-    await awaitMarketPhase(liveGame);
+    await waitUntil(
+      () => liveGame.scene.phaseManager.getCurrentPhase() instanceof BiomeShopPhase,
+      "wave-10 Town market phase",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase",
+      20_000,
+      () => {
+        const current = liveGame.scene.phaseManager.getCurrentPhase() as AnyRecord | null;
+        return {
+          phase: String(current?.phaseName ?? current?.constructor?.name ?? ""),
+          mode: String(liveGame.scene.ui.getMode()),
+        };
+      },
+    );
+    const marketPhase = liveGame.scene.phaseManager.getCurrentPhase();
+    if (!(marketPhase instanceof BiomeShopPhase)) {
+      gap(
+        "MARKET_PHASE_UNOBSERVABLE",
+        "src/phases/biome-shop-phase.ts:BiomeShopPhase",
+        "current production phase is not BiomeShopPhase",
+      );
+    }
+    captureMarketStart(context, marketPhase, null);
     await driveMarket(liveGame);
     const evidence = validateSurface(context.market, "markets/town-wave-10-v1");
     return evidence;
