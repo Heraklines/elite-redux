@@ -102,6 +102,7 @@ jobs:
           sparse-checkout: |
             /rust/
             /test/kernel-fixtures/
+            /schemas/kernel/
           submodules: false
 
       - name: Cache Rust foundation artifacts
@@ -168,8 +169,21 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      - name: Cache pinned BLAKE3 verifier
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m4-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
       - name: Install pinned BLAKE3 verifier
-        run: cargo install b3sum --version 1.8.6 --locked
+        run: |
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
 
       - name: Install immutable dependencies
         run: pnpm install --frozen-lockfile

@@ -722,6 +722,7 @@ function validateSurface(surface: SurfaceCapture | undefined, vector: string): R
 
 async function captureReward(seed: string): Promise<{ game: GameManager; evidence: RecordValue }> {
   const game = await launchGame(9, seed);
+  installObservationHooks();
   addLockCapsule(game);
   const context: CaptureContext = { game, surface: "reward", reward: emptySurface() };
   activeCapture = context;
@@ -754,7 +755,6 @@ async function captureMarket(seed: string): Promise<RecordValue> {
 
 /** Capture regular wave-9 reward and Town wave-10 market from real production phases. */
 export async function captureRewardMarket(): Promise<Record<string, JsonValue>> {
-  installObservationHooks();
   try {
     let reward: { game: GameManager; evidence: RecordValue } | null = null;
     let rewardGap: M4CaptureGap | null = null;
