@@ -535,7 +535,82 @@ function driveKey(game: GameManager, button: Button, key: string, surface: Surfa
   }
   const modeBefore = String(game.scene.ui.getMode());
   const result = game.scene.ui.processInput(button);
-  trace.rawKeyTape.push({ sequence: trace.rawKeyTape.length, key, mode_before: modeBefore, mode_after: String(game.scene.ui.getMode()), accepted: Boolean(result) });
+  const handler = game.scene.ui.getHandler() as AnyRecord | null;
+  const handlerState: RecordValue = {};
+  if (surface === "reward" && handler instanceof ModifierSelectUiHandler) {
+    const cursor = (handler as AnyRecord).cursor;
+    const rowCursor = (handler as AnyRecord).rowCursor;
+    if (!Number.isSafeInteger(cursor) || !Number.isSafeInteger(rowCursor)) {
+      gap(
+        "REWARD_UI_CURSOR_UNOBSERVABLE",
+        "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+        `handler cursor state after ${key} is not an integer`,
+      );
+    }
+    handlerState.cursor = cursor;
+    handlerState.row_cursor = rowCursor;
+  } else if (surface === "market" && handler instanceof BiomeShopUiHandler) {
+    const cursor = (handler as AnyRecord).cursor;
+    if (!Number.isSafeInteger(cursor)) {
+      gap(
+        "MARKET_UI_CURSOR_UNOBSERVABLE",
+        "src/ui/handlers/biome-shop-ui-handler.ts:processInput",
+        `handler cursor after ${key} is not an integer`,
+      );
+    }
+    handlerState.cursor = cursor;
+  }
+  trace.rawKeyTape.push({
+    sequence: trace.rawKeyTape.length,
+    key,
+    mode_before: modeBefore,
+    mode_after: String(game.scene.ui.getMode()),
+    accepted: Boolean(result),
+    ...(Object.keys(handlerState).length === 0 ? {} : { handler: handlerState }),
+  });
+}
+
+type ModifierCursorState = {
+  rowCursor: number;
+  cursor: number;
+};
+
+function rewardCursorState(game: GameManager, vector: string): ModifierCursorState {
+  const handler = game.scene.ui.getHandler();
+  if (!(handler instanceof ModifierSelectUiHandler)) {
+    gap(
+      "REWARD_UI_CURSOR_UNOBSERVABLE",
+      "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+      `${vector} did not expose ModifierSelectUiHandler`,
+    );
+  }
+  const cursor = (handler as AnyRecord).cursor;
+  const rowCursor = (handler as AnyRecord).rowCursor;
+  if (!Number.isSafeInteger(cursor) || !Number.isSafeInteger(rowCursor)) {
+    gap(
+      "REWARD_UI_CURSOR_UNOBSERVABLE",
+      "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+      `${vector} handler cursor state is not an integer`,
+    );
+  }
+  return { rowCursor, cursor };
+}
+
+function driveRewardNavigation(game: GameManager, button: Button, key: string, vector: string): ModifierCursorState {
+  const surface = activeSurface("reward");
+  if (surface == null) {
+    gap("REWARD_TRACE_UNOBSERVABLE", "test/kernel-fixtures/m4/export/reward-market-capture.ts:driveReward", "reward trace is absent");
+  }
+  driveKey(game, button, key, "reward");
+  const state = rewardCursorState(game, vector);
+  surface.presentation.push({
+    mode: String(game.scene.ui.getMode()),
+    phase: "ModifierSelectUiHandler",
+    input: key,
+    row_cursor: state.rowCursor,
+    cursor: state.cursor,
+  });
+  return state;
 }
 
 async function awaitModifierInput(game: GameManager): Promise<ModifierSelectUiHandler> {
@@ -622,21 +697,80 @@ async function driveReward(game: GameManager): Promise<void> {
   const initialOptions = phaseOptions(phase as AnyRecord, false);
   const initialGraph = optionGraph(initialOptions, "reward.initial.options");
   surface.decisions.push({ kind: "INITIAL_OPTIONS", count: initialGraph.length, options: initialGraph });
-  const handler = await awaitModifierInput(game);
-  // The production handler opens on the reward row. Move to the reroll row, then use the
-  // row-0 lock shortcut before invoking its real callback through ACTION.
-  driveKey(game, Button.UP, "UP", "reward");
-  driveKey(game, Button.DOWN, "DOWN", "reward");
+  await awaitModifierInput(game);
+  const initialCursor = rewardCursorState(game, "initial reward presentation");
+  surface.presentation.push({
+    mode: String(game.scene.ui.getMode()),
+    phase: "ModifierSelectUiHandler",
+    input: "INITIAL",
+    row_cursor: initialCursor.rowCursor,
+    cursor: initialCursor.cursor,
+  });
+  if (initialCursor.rowCursor !== 1 || initialCursor.cursor !== 0) {
+    gap(
+      "REWARD_UI_CURSOR_UNEXPECTED",
+      "src/ui/handlers/modifier-select-ui-handler.ts:setRowCursor",
+      `reward opened at row ${String(initialCursor.rowCursor)} cursor ${String(initialCursor.cursor)}, expected rewards row cursor 0`,
+    );
+  }
+  const lockBefore = Boolean(game.scene.lockModifierTiers);
+  if (lockBefore) {
+    gap("REWARD_LOCK_STATE_UNEXPECTED", "src/battle-scene.ts:BattleScene.lockModifierTiers", "lockModifierTiers was already true before the UI lock action");
+  }
+
+  const rewardRowCursor = driveRewardNavigation(game, Button.DOWN, "DOWN", "move from rewards row to action row");
+  if (rewardRowCursor.rowCursor !== 0 || rewardRowCursor.cursor !== 0) {
+    gap(
+      "REWARD_UI_CURSOR_UNEXPECTED",
+      "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+      `first DOWN reached row ${String(rewardRowCursor.rowCursor)} cursor ${String(rewardRowCursor.cursor)}, expected action row cursor 0`,
+    );
+  }
+  const lockCursor = driveRewardNavigation(game, Button.DOWN, "DOWN", "move from reroll to lock action");
+  if (lockCursor.rowCursor !== 0 || lockCursor.cursor !== 3) {
+    gap(
+      "REWARD_UI_CURSOR_UNEXPECTED",
+      "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+      `second DOWN reached row ${String(lockCursor.rowCursor)} cursor ${String(lockCursor.cursor)}, expected lock cursor 3`,
+    );
+  }
   driveKey(game, Button.ACTION, "ACTION", "reward");
   await waitUntil(() => game.scene.lockModifierTiers === true, "Lock Capsule toggle", "src/phases/select-modifier-phase.ts:toggleRerollLock");
-  surface.decisions.push({ kind: "LOCK_TOGGLE", before: false, after: Boolean(game.scene.lockModifierTiers), rng: sceneRng(game), lock_modifier_present: true });
+  surface.decisions.push({ kind: "LOCK_TOGGLE", before: lockBefore, after: Boolean(game.scene.lockModifierTiers), cursor: lockCursor.cursor, row_cursor: lockCursor.rowCursor, rng: sceneRng(game), lock_modifier_present: true });
 
   await awaitModifierInput(game);
-  driveKey(game, Button.RIGHT, "RIGHT", "reward");
-  driveKey(game, Button.RIGHT, "RIGHT", "reward");
+  let rerollCursor = rewardCursorState(game, "after lock toggle");
+  if (rerollCursor.rowCursor !== 0 || rerollCursor.cursor !== 3) {
+    gap(
+      "REWARD_UI_CURSOR_UNEXPECTED",
+      "src/ui/handlers/modifier-select-ui-handler.ts:setCursor",
+      `lock action left row ${String(rerollCursor.rowCursor)} cursor ${String(rerollCursor.cursor)}, expected lock cursor 3`,
+    );
+  }
+  for (let navigation = 0; navigation < 4 && rerollCursor.cursor !== 0; navigation++) {
+    if (rerollCursor.rowCursor !== 0) {
+      gap(
+        "REWARD_UI_CURSOR_UNEXPECTED",
+        "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+        `reroll navigation left action row at row ${String(rerollCursor.rowCursor)}`,
+      );
+    }
+    rerollCursor = driveRewardNavigation(game, Button.RIGHT, "RIGHT", `move to reroll action ${String(navigation + 1)}`);
+  }
+  if (rerollCursor.rowCursor !== 0 || rerollCursor.cursor !== 0) {
+    gap(
+      "REWARD_UI_CURSOR_UNEXPECTED",
+      "src/ui/handlers/modifier-select-ui-handler.ts:processInput",
+      `reroll navigation ended at row ${String(rerollCursor.rowCursor)} cursor ${String(rerollCursor.cursor)}, expected reroll cursor 0`,
+    );
+  }
+  surface.decisions.push({ kind: "REROLL_NAVIGATION", row_cursor: rerollCursor.rowCursor, cursor: rerollCursor.cursor });
   driveKey(game, Button.ACTION, "ACTION", "reward");
   await waitUntil(() => surface.round >= 2 && game.scene.reroll === false, "one reward reroll", "src/phases/select-modifier-phase.ts:rerollModifiers");
   const rerolled = awaitRewardPhase(game);
+  if (rerolled === phase) {
+    gap("REWARD_REROLL_SUCCESSOR_UNOBSERVABLE", "src/phases/select-modifier-phase.ts:rerollModifiers", "reroll did not start a successor SelectModifierPhase");
+  }
   const targetIndex = findTargetedReward(rerolled);
   if (targetIndex < 0) {
     gap("REWARD_TARGET_OPTION_UNOBSERVABLE", "src/phases/select-modifier-phase.ts:getModifierTypeOptions", "the live reroll contained no PokemonModifierType target option");
@@ -658,11 +792,6 @@ async function driveReward(game: GameManager): Promise<void> {
   driveKey(game, Button.ACTION, "ACTION", "reward");
   await waitUntil(() => surface.final != null, "targeted reward application", "src/phases/select-modifier-phase.ts:applyModifier");
   surface.presentation.push({ mode: String(game.scene.ui.getMode()), phase: String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? ""), selected_index: targetIndex });
-  // Keep the local reference live so a production handler seam cannot be silently
-  // replaced by a synthetic option graph between the selection and callback.
-  if (handler == null) {
-    gap("REWARD_UI_UNOBSERVABLE", "src/ui/handlers/modifier-select-ui-handler.ts:show", "reward handler disappeared");
-  }
 }
 
 async function driveMarket(game: GameManager): Promise<void> {
