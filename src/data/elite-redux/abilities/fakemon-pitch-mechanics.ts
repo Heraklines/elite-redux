@@ -25,6 +25,7 @@ import {
   type PostMoveInteractionAbAttrParams,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { CritDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
@@ -176,6 +177,55 @@ export class PhotovoltaicTypeAbAttr extends PostSummonAbAttr {
   override apply({ pokemon }: AbAttrBaseParams): void {
     const current = pokemon.summonData.types.length > 0 ? pokemon.summonData.types : [...pokemon.getTypes()];
     pokemon.summonData.types = current.includes(PokemonType.ELECTRIC) ? current : [...current, PokemonType.ELECTRIC];
+  }
+}
+
+const LIVE_CURRENT_FORM_KEY = "live-current";
+
+function isLiveCurrent(pokemon: Pokemon): boolean {
+  return pokemon.species.forms[pokemon.formIndex]?.formKey === LIVE_CURRENT_FORM_KEY;
+}
+
+function isPhoenixFoliageType(type: PokemonType): boolean {
+  return type === PokemonType.FIRE || type === PokemonType.ELECTRIC;
+}
+
+function triggerLiveCurrent(pokemon: Pokemon): void {
+  if (!isLiveCurrent(pokemon)) {
+    globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger);
+  }
+}
+
+class PhoenixFoliageUseFormChangeAbAttr extends PostAttackAbAttr {
+  constructor() {
+    super((_user, _target, _move) => true, true);
+  }
+
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.pokemon.isFainted()
+      && !isLiveCurrent(params.pokemon)
+      && params.pokemon.turnData.hitsLeft <= 1
+      && isPhoenixFoliageType(params.pokemon.getMoveType(params.move));
+  }
+
+  override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (!params.simulated) {
+      triggerLiveCurrent(params.pokemon);
+    }
+  }
+}
+
+class PhoenixFoliageHitFormChangeAbAttr extends PostDefendAbAttr {
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return !params.pokemon.isFainted()
+      && !isLiveCurrent(params.pokemon)
+      && isPhoenixFoliageType(params.opponent.getMoveType(params.move));
+  }
+
+  override apply(params: PostMoveInteractionAbAttrParams): void {
+    if (!params.simulated) {
+      triggerLiveCurrent(params.pokemon);
+    }
   }
 }
 
@@ -529,6 +579,8 @@ export function wireFakemonPitchAbility(
       break;
     case ER_PHOENIX_FOLIAGE_ABILITY_ID:
       builder.attr(StatusEffectImmunityAbAttr, StatusEffect.PARALYSIS);
+      builder.attr(PhoenixFoliageUseFormChangeAbAttr);
+      builder.attr(PhoenixFoliageHitFormChangeAbAttr);
       break;
     case ER_PHOTOVOLTAIC_ABILITY_ID:
       builder.attr(PhotovoltaicTypeAbAttr);

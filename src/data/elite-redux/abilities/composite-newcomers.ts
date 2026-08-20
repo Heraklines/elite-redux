@@ -255,8 +255,8 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
   [ER_CRUSHING_ANTLERS_ABILITY_ID]: {
     id: ER_CRUSHING_ANTLERS_ABILITY_ID,
     name: "Crushing Antlers",
-    description: "Hunter's Horn. Rapier is pending a defined mechanic.",
-    constituents: [HUNTERS_HORN],
+    description: "Hunter's Horn + Rapier: horn and Keen Edge moves receive both abilities' effects.",
+    constituents: [HUNTERS_HORN, KEEN_EDGE],
   },
   [ER_DIRTY_SNOWBALL_ABILITY_ID]: {
     id: ER_DIRTY_SNOWBALL_ABILITY_ID,

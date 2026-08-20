@@ -35,7 +35,10 @@ import {
 } from "#data/elite-redux/er-form-sprite-redirect";
 import { PokemonForm } from "#data/pokemon-species";
 import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
-import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
+import {
+  SpeciesFormChangeItemTrigger,
+  SpeciesFormChangeManualTrigger,
+} from "#data/pokemon-forms/form-change-triggers";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import type { LevelMoves } from "#types/pokemon-level-moves";
 import { AbilityId } from "#enums/ability-id";
@@ -58,6 +61,30 @@ import {
   ER_TITAN_ABILITY_ID,
   ER_BRAIN_FOOD_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
+import {
+  ER_ASTRAL_PROJECT_ABILITY_ID,
+  ER_CONTAMINATED_ABILITY_ID,
+  ER_CRYOGENESIS_ABILITY_ID,
+  ER_DAYDREAMER_ABILITY_ID,
+  ER_DECAY_ABILITY_ID,
+  ER_EULOGY_ABILITY_ID,
+  ER_FLUTTERING_SPIRIT_ABILITY_ID,
+  ER_FREE_SPIRIT_ABILITY_ID,
+  ER_HEAD_FIRST_ABILITY_ID,
+  ER_IRRADIATED_FIST_ABILITY_ID,
+  ER_METALLOSIS_ABILITY_ID,
+  ER_NUCLEUS_ABILITY_ID,
+  ER_ORACLE_ABILITY_ID,
+  ER_PENTA_PUNCH_ABILITY_ID,
+  ER_PHOTOVOLTAIC_ABILITY_ID,
+  ER_PROPHETIC_ABILITY_ID,
+  ER_SOUTHERN_CROSS_PUNCH_ABILITY_ID,
+  ER_SPLIT_MIND_ABILITY_ID,
+  ER_STARCROSSED_ABILITY_ID,
+  ER_THIRD_EYE_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { ER_FORMLESS_FIST_ABILITY_ID } from "#data/elite-redux/abilities/type-nativization-abilities";
+import { ER_POWER_PLANT_SPECIES_ID } from "#data/elite-redux/er-fakemon-pitch-species";
 
 /** ER-custom / newcomer ability ids are real `allAbilities` keys; narrow the type. */
 const ab = (id: number): AbilityId => id as AbilityId;
@@ -145,6 +172,8 @@ export interface NewcomerFormDef {
   readonly innates: readonly [AbilityId, AbilityId, AbilityId];
   /** Mega stone / primal orb that triggers the form (a FormChangeItem enum value). */
   readonly item?: FormChangeItem;
+  /** Register a one-way manual battle-form edge instead of an item edge. */
+  readonly manualTrigger?: boolean;
   readonly preFormKeys?: readonly string[];
   readonly isStarterSelectable?: boolean;
   readonly replaceExisting?: boolean;
@@ -455,6 +484,96 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     innates: [ab(FIGHTING_SPIRIT), ab(TWO_FACED_UNLEASHED), ab(BRUTE_FORCE)],
     item: FormChangeItem.LUXRAYITE_Y,
   },
+  // ===================== DISCORD FAKEMON PITCH ROSTER (2026-08) =====================
+  {
+    baseSpecies: SpeciesId.CRYOGONAL,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "cryogonal_mega",
+    types: [PokemonType.ICE],
+    stats: [80, 50, 90, 115, 175, 105],
+    actives: [ab(5100), ab(5187), ab(5007)],
+    innates: [ab(5086), ab(5680), ab(ER_CRYOGENESIS_ABILITY_ID)],
+    item: FormChangeItem.CRYOGONALITE,
+  },
+  {
+    baseSpecies: SpeciesId.JIRACHI,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "jirachi_mega",
+    types: [PokemonType.STEEL, PokemonType.PSYCHIC],
+    stats: [100, 125, 125, 125, 125, 100],
+    actives: [ab(ER_PROPHETIC_ABILITY_ID), AbilityId.REGENERATOR, ab(5025)],
+    innates: [ab(5560), ab(ER_DAYDREAMER_ABILITY_ID), ab(ER_FREE_SPIRIT_ABILITY_ID)],
+    item: FormChangeItem.JIRACHITE,
+  },
+  {
+    baseSpecies: SpeciesId.LEDIAN,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "ledian_mega",
+    types: [PokemonType.BUG, PokemonType.FIGHTING],
+    stats: [55, 135, 80, 65, 130, 125],
+    actives: [AbilityId.MOXIE, ab(ER_PENTA_PUNCH_ABILITY_ID), ab(ER_SOUTHERN_CROSS_PUNCH_ABILITY_ID)],
+    innates: [ab(ER_STARCROSSED_ABILITY_ID), ab(ER_ASTRAL_PROJECT_ABILITY_ID), ab(ER_FLUTTERING_SPIRIT_ABILITY_ID)],
+    item: FormChangeItem.LEDIANITE,
+  },
+  {
+    baseSpecies: SpeciesId.RAMPARDOS,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "rampardos_mega",
+    types: [PokemonType.ROCK, PokemonType.DARK],
+    stats: [97, 185, 105, 65, 80, 83],
+    actives: [ab(5101), AbilityId.ANGER_POINT, ab(ER_HEAD_FIRST_ABILITY_ID)],
+    innates: [AbilityId.NEUROFORCE, ab(5459), AbilityId.MOLD_BREAKER],
+    item: FormChangeItem.RAMPARDOSITE,
+  },
+  {
+    baseSpecies: SpeciesId.REUNICLUS,
+    formKey: "mega-x",
+    formName: "Mega X",
+    slug: "reuniclus_mega_x",
+    types: [PokemonType.PSYCHIC],
+    stats: [110, 125, 92, 60, 110, 143],
+    actives: [ab(ER_IRRADIATED_FIST_ABILITY_ID), ab(ER_IRRADIATED_FIST_ABILITY_ID), ab(ER_IRRADIATED_FIST_ABILITY_ID)],
+    innates: [ab(5724), ab(ER_NUCLEUS_ABILITY_ID), ab(ER_FORMLESS_FIST_ABILITY_ID)],
+    item: FormChangeItem.REUNICLUSITE_X,
+  },
+  {
+    baseSpecies: SpeciesId.XATU,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "xatu_mega",
+    types: [PokemonType.PSYCHIC, PokemonType.FLYING],
+    stats: [82, 100, 110, 130, 110, 111],
+    actives: [ab(ER_SPLIT_MIND_ABILITY_ID), ab(5043), ab(ER_EULOGY_ABILITY_ID)],
+    innates: [ab(ER_ORACLE_ABILITY_ID), ab(ER_THIRD_EYE_ABILITY_ID), AbilityId.KEEN_EYE],
+    item: FormChangeItem.XATUNITE,
+  },
+  {
+    baseSpecies: SpeciesId.ZANGOOSE,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "zangoose_mega",
+    types: [PokemonType.NORMAL, PokemonType.STEEL, PokemonType.POISON],
+    stats: [73, 115, 115, 60, 115, 115],
+    actives: [AbilityId.TOXIC_BOOST, AbilityId.TOXIC_BOOST, AbilityId.TOXIC_BOOST],
+    innates: [ab(ER_METALLOSIS_ABILITY_ID), ab(ER_CONTAMINATED_ABILITY_ID), ab(ER_DECAY_ABILITY_ID)],
+    item: FormChangeItem.ZANGOOSEITE,
+  },
+  // Power Plant's Live Current is a battle form, not a separate obtainable species.
+  {
+    baseSpecies: ER_POWER_PLANT_SPECIES_ID as SpeciesId,
+    formKey: "live-current",
+    formName: "Live Current",
+    slug: "power_plant_live_current",
+    types: [PokemonType.GRASS, PokemonType.FIRE, PokemonType.ELECTRIC],
+    stats: [120, 40, 80, 130, 80, 120],
+    actives: [AbilityId.FLASH_FIRE, ab(5350), ab(5197)],
+    innates: [AbilityId.QUARK_DRIVE, ab(ER_PHOTOVOLTAIC_ABILITY_ID), ab(5363)],
+    manualTrigger: true,
+  },
 ];
 
 /**
@@ -543,7 +662,7 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
  * form key so the mega is offered whatever form the base is currently in.
  */
 function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerFormsResult): void {
-  if (def.item === undefined) {
+  if (def.item === undefined && !def.manualTrigger) {
     return;
   }
   if (!pokemonFormChanges[def.baseSpecies]) {
@@ -559,7 +678,10 @@ function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerForm
     if (list.some(fc => fc.preFormKey === preKey && fc.formKey === def.formKey)) {
       continue;
     }
-    list.push(new SpeciesFormChange(def.baseSpecies, preKey, def.formKey, new SpeciesFormChangeItemTrigger(def.item)));
+    const trigger = def.manualTrigger
+      ? new SpeciesFormChangeManualTrigger()
+      : new SpeciesFormChangeItemTrigger(def.item!);
+    list.push(new SpeciesFormChange(def.baseSpecies, preKey, def.formKey, trigger));
     result.edgesRegistered++;
   }
 }

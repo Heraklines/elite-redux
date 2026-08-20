@@ -20,7 +20,7 @@
 import { readdirSync, existsSync, statSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-const ER_SPRITES_DIR = "assets/images/pokemon/elite-redux";
+const DEFAULT_ER_SPRITES_DIR = "assets/images/pokemon/elite-redux";
 
 /** Read a PNG header to extract (width, height). PNG dimensions live at bytes 16-24. */
 function pngSize(path) {
@@ -79,13 +79,15 @@ function makeAtlasJson(pngPath) {
 }
 
 function main() {
-  if (!existsSync(ER_SPRITES_DIR)) {
-    console.error(`Not found: ${ER_SPRITES_DIR}`);
+  const rootArg = process.argv.find(arg => arg.startsWith("--asset-root="));
+  const spritesDir = rootArg ? rootArg.slice("--asset-root=".length) : DEFAULT_ER_SPRITES_DIR;
+  if (!existsSync(spritesDir)) {
+    console.error(`Not found: ${spritesDir}`);
     process.exit(1);
   }
 
-  const slugs = readdirSync(ER_SPRITES_DIR).filter(d => {
-    const p = join(ER_SPRITES_DIR, d);
+  const slugs = readdirSync(spritesDir).filter(d => {
+    const p = join(spritesDir, d);
     try {
       return statSync(p).isDirectory();
     } catch {
@@ -98,7 +100,7 @@ function main() {
   let written = 0;
   let skipped = 0;
   for (const slug of slugs) {
-    const dir = join(ER_SPRITES_DIR, slug);
+    const dir = join(spritesDir, slug);
     const pngs = readdirSync(dir).filter(f => f.endsWith(".png"));
     for (const png of pngs) {
       const pngPath = join(dir, png);
