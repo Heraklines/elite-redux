@@ -4,21 +4,27 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { BattleScene } from "#app/battle-scene";
-import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
 import { buildExoticShopStock } from "#data/elite-redux/er-exotic-shop";
 import { modifierPool } from "#modifiers/modifier-pools";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { initializeGame } from "#init/init";
+import { BattleStyle } from "#enums/battle-style";
+import { BiomeId } from "#enums/biome-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
 import { ModifierTier } from "#enums/modifier-tier";
 import { PokemonType } from "#enums/pokemon-type";
+import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { GameManager } from "#test/framework/game-manager";
+import { PromptHandler } from "#test/helpers/prompt-handler";
+import Phaser from "phaser";
 import { getTypeDamageMultiplier } from "#data/type";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -521,33 +527,75 @@ function battleAbilities(slice: AnyRecord): JsonValue[] {
   });
 }
 /**
- * The production multiplier applies active challenges through globalScene, so
- * observing its chart requires the same live scene context as a battle.
+ * Both the production multiplier and exotic shop pricing read globalScene, so
+ * those observations must share a real initialized Classic battle frontier.
  */
-function ensureLiveTypeChartScene(): void {
-  let scene: BattleScene;
+let livePhaserGame: Phaser.Game | null = null;
+let liveGame: GameManager | null = null;
+let priorBattleRng: BattleScene["randBattleSeedInt"] | null = null;
+
+async function launchLiveClassicBattle(): Promise<void> {
   try {
-    scene = new BattleScene();
-    scene.gameMode = getGameMode(GameModes.CLASSIC);
+    priorBattleRng = BattleScene.prototype.randBattleSeedInt;
+    if (priorBattleRng == null) {
+      gap("TYPE_CHART_UNOBSERVABLE", "src/battle-scene.ts:BattleScene.randBattleSeedInt", "production battle RNG method is unavailable");
+    }
+    livePhaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
+    liveGame = new GameManager(livePhaserGame);
+    (BattleScene.prototype as AnyRecord).randBattleSeedInt = priorBattleRng;
+    liveGame.override
+      .battleStyle(BattleStyle.SET)
+      .moveset(MoveId.SPLASH)
+      .enemyMoveset(MoveId.SPLASH)
+      .startingBiome(BiomeId.TOWN)
+      .startingWave(1)
+      .seed("m4-content-exotic-stock");
+    await liveGame.classicMode.startBattle(SpeciesId.SQUIRTLE);
   } catch (error) {
+    if (error instanceof M4CaptureGap) {
+      throw error;
+    }
     gap(
       "TYPE_CHART_UNOBSERVABLE",
-      "src/battle-scene.ts:BattleScene.gameMode",
+      "test/framework/game-manager.ts:GameManager.classicMode.startBattle",
       `failed to initialize the live Classic scene: ${String(error)}`,
     );
   }
+}
+
+function ensureLiveTypeChartScene(): void {
+  const scene = globalScene;
   if (
-    globalScene !== scene
-    || globalScene.gameMode !== scene.gameMode
-    || globalScene.gameMode.modeId !== GameModes.CLASSIC
-    || !Array.isArray(globalScene.gameMode.challenges)
+    liveGame == null
+    || scene == null
+    || liveGame.scene !== scene
+    || scene.gameMode?.modeId !== GameModes.CLASSIC
+    || !Array.isArray(scene.gameMode?.challenges)
+    || scene.currentBattle == null
+    || !Number.isInteger(scene.currentBattle.waveIndex)
   ) {
     gap(
       "TYPE_CHART_UNOBSERVABLE",
-      "src/battle-scene.ts:BattleScene.gameMode",
-      "the live scene does not expose an initialized Classic game mode",
+      "test/framework/game-manager.ts:GameManager.classicMode.startBattle",
+      "the live scene does not expose an initialized Classic battle with a wave index",
     );
   }
+}
+
+function teardownLiveClassicBattle(): void {
+  liveGame?.promptHandler.clearPrompts();
+  if (priorBattleRng != null) {
+    BattleScene.prototype.randBattleSeedInt = priorBattleRng;
+    priorBattleRng = null;
+  }
+  if (PromptHandler.runInterval != null) {
+    clearInterval(PromptHandler.runInterval);
+    PromptHandler.runInterval = undefined;
+  }
+  livePhaserGame?.destroy(true);
+  liveGame = null;
+  livePhaserGame = null;
 }
 
 function battleTypeChart(slice: AnyRecord): JsonObject {
@@ -997,27 +1045,32 @@ function buildRunPack(slice: AnyRecord, battleHash: string): JsonObject {
 
 /** Capture the M4 battle ContentPack and its domain-separated RunContentPack. */
 export async function captureRunContent(): Promise<Record<string, JsonValue>> {
-  ensureLiveRegistries();
-  const slice = readJson("rust/fixtures/m4/m4-slice-manifest.json");
-  exact(requireString(slice.m4_oracle_sha, "m4_slice.m4_oracle_sha"), M4_ORACLE_SHA, "m4_slice.m4_oracle_sha");
-  const battleSlice = readJson("rust/fixtures/m3/m3-slice-manifest.json");
-  const capability = readJson("rust/fixtures/m3/m3-capability-manifest.json");
-  const species = battleSpecies(battleSlice);
-  const moves = battleMoves(battleSlice);
-  const abilities = battleAbilities(battleSlice);
-  const typeChart = battleTypeChart(battleSlice);
-  const capabilityManifest = battleCapability(capability, moves, abilities);
-  const battleWithoutHash: JsonObject = {
-    schema_version: 1,
-    oracle_game_sha: M4_ORACLE_SHA,
-    species,
-    moves,
-    abilities,
-    type_chart: typeChart,
-    capability_manifest: capabilityManifest,
-  };
-  const battleHash = hashContent(battleWithoutHash);
-  const runPack = buildRunPack(slice, battleHash);
-  const battlePack: JsonObject = { ...battleWithoutHash, hash: `blake3-v1:${battleHash}` };
-  return { battle_content_pack: battlePack, run_content_pack: runPack };
+  try {
+    ensureLiveRegistries();
+    await launchLiveClassicBattle();
+    const slice = readJson("rust/fixtures/m4/m4-slice-manifest.json");
+    exact(requireString(slice.m4_oracle_sha, "m4_slice.m4_oracle_sha"), M4_ORACLE_SHA, "m4_slice.m4_oracle_sha");
+    const battleSlice = readJson("rust/fixtures/m3/m3-slice-manifest.json");
+    const capability = readJson("rust/fixtures/m3/m3-capability-manifest.json");
+    const species = battleSpecies(battleSlice);
+    const moves = battleMoves(battleSlice);
+    const abilities = battleAbilities(battleSlice);
+    const typeChart = battleTypeChart(battleSlice);
+    const capabilityManifest = battleCapability(capability, moves, abilities);
+    const battleWithoutHash: JsonObject = {
+      schema_version: 1,
+      oracle_game_sha: M4_ORACLE_SHA,
+      species,
+      moves,
+      abilities,
+      type_chart: typeChart,
+      capability_manifest: capabilityManifest,
+    };
+    const battleHash = hashContent(battleWithoutHash);
+    const runPack = buildRunPack(slice, battleHash);
+    const battlePack: JsonObject = { ...battleWithoutHash, hash: `blake3-v1:${battleHash}` };
+    return { battle_content_pack: battlePack, run_content_pack: runPack };
+  } finally {
+    teardownLiveClassicBattle();
+  }
 }
