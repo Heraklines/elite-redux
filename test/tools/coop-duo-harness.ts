@@ -2122,6 +2122,40 @@ export function materializeMirroredGuestInputTurn(
     );
   }
 }
+
+/**
+ * Pre-register exact direct-mirror command consumers before handshake delivery can publish command-open.
+ *
+ * Production creates these claims from real CommandPhase starts after pairing. The direct mirror pairs around
+ * an already-open host phase, so the retained control can cross during hello/runConfig delivery. Seed only
+ * active, canonical local fields; the real phases installed below immediately consume the applied frontier.
+ */
+function preRegisterMirroredCommandConsumers(
+  scene: BattleScene,
+  runtime: CoopRuntime,
+  fieldIndices: readonly number[],
+  label: string,
+): void {
+  const battle = scene.currentBattle;
+  if (battle == null) {
+    throw new Error(`${label} cannot pre-register commands without a battle shell`);
+  }
+  for (const fieldIndex of fieldIndices) {
+    const pokemon = scene.getPlayerField()[fieldIndex];
+    if (pokemon == null || !pokemon.isActive()) {
+      throw new Error(`${label} cannot pre-register inactive command field ${fieldIndex}`);
+    }
+    const key = `direct-mirror:${label}:${battle.waveIndex}:${battle.turn}:${fieldIndex}:${pokemon.id}`;
+    runtime.v2DeferredCommandStarts.set(key, {
+      epoch: runtime.controller.sessionEpoch,
+      wave: battle.waveIndex,
+      turn: battle.turn,
+      fieldIndex,
+      pokemonId: pokemon.id,
+      resume: () => undefined,
+    });
+  }
+}
 /**
  * Resolve the LOCAL command phases from the host-stated Authority V2 frontier.
  *
@@ -2928,6 +2962,12 @@ export async function buildDuo(
     if (gf[1] != null) {
       gf[1].coopOwner = "guest";
     }
+    preRegisterMirroredCommandConsumers(
+      guestScene,
+      guestRuntime,
+      gf.flatMap((pokemon, fieldIndex) => (pokemon?.isActive() && pokemon.coopOwner === "guest" ? [fieldIndex] : [])),
+      "initial-coop",
+    );
   });
   registerRetainedWaveBoundaryBridge(hostGame, hostScene, guestScene, hostCtx);
 
@@ -2940,6 +2980,16 @@ export async function buildDuo(
   withClientSync(guestCtx, () => {
     setCoopRuntimeFn(guestRuntime);
     guestRuntime.controller.connect();
+  });
+  await withClient(guestCtx, () => {
+    preRegisterMirroredCommandConsumers(
+      guestScene,
+      guestRuntime,
+      guestScene
+        .getPlayerField()
+        .flatMap((pokemon, fieldIndex) => (pokemon?.isActive() && pokemon.coopOwner === "guest" ? [fieldIndex] : [])),
+      "initial-coop",
+    );
   });
   await withClient(hostCtx, () => drainLoopback());
   await withClient(guestCtx, () => drainLoopback());
@@ -5645,6 +5695,12 @@ export async function buildShowdownDuo(
       guestEnemyModifiers.push(m);
     }
     guestScene.updateModifiers(false);
+    preRegisterMirroredCommandConsumers(
+      guestScene,
+      guestRuntime,
+      guestScene.getPlayerField().flatMap((pokemon, fieldIndex) => (pokemon?.isActive() ? [fieldIndex] : [])),
+      "initial-showdown",
+    );
   });
 
   // The enemy-command relays: the HOST awaits the guest's command; the guest peer answers / ships it.
@@ -5667,6 +5723,14 @@ export async function buildShowdownDuo(
     hostRuntime.controller.connect();
     setCoopRuntimeFn(guestRuntime);
     guestRuntime.controller.connect();
+    await withClient(guestCtx, () => {
+      preRegisterMirroredCommandConsumers(
+        guestScene,
+        guestRuntime,
+        guestScene.getPlayerField().flatMap((pokemon, fieldIndex) => (pokemon?.isActive() ? [fieldIndex] : [])),
+        "initial-showdown",
+      );
+    });
     await drainLoopback();
   }
 
