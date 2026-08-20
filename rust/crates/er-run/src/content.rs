@@ -6,8 +6,8 @@
 
 use crate::capability::{
     CapabilityManifestError, EncounterSource, EnemyPolicy, MarketCapabilityAction,
-    RUN_CAPABILITY_MANIFEST_VERSION, RUN_ORACLE_GAME_SHA, RewardCapabilityAction, RouteRngDomain,
-    RunCapabilityManifest, RunCapabilityStatus,
+    RUN_ORACLE_GAME_SHA, RewardCapabilityAction, RouteRngDomain, RunCapabilityManifest,
+    RunCapabilityStatus,
 };
 use crate::rng_audit::RunRngDraw;
 use er_canonical::{CanonicalError, canonical_bytes};
@@ -374,6 +374,24 @@ impl RunContentPack {
             });
         }
         Ok(())
+    }
+
+    pub fn recompute_hash(&self) -> Result<RunContentPackHash, RunContentError> {
+        hash_for_parts(
+            self.schema_version,
+            &self.m4_oracle_sha,
+            &self.m3_parity_oracle_sha,
+            &self.battle_content_hash,
+            &self.growth_rates,
+            &self.natures,
+            &self.species_progression,
+            &self.modifiers,
+            &self.biomes,
+            &self.encounter_plans,
+            &self.reward_rules,
+            &self.market_rules,
+            &self.capability_manifest,
+        )
     }
 
     /// Binds run content to the complete selected battle pack. The M4
@@ -799,7 +817,6 @@ pub type RewardActionCapability = RewardCapabilityAction;
 pub type MarketActionCapability = MarketCapabilityAction;
 pub type RouteDomainCapability = RouteRngDomain;
 pub type ContentEncounterSource = EncounterSource;
-pub const _: u32 = RUN_CAPABILITY_MANIFEST_VERSION;
 /// Constructs the selected run pack from typed constants. No fixture or
 /// filesystem read occurs at runtime; the caller supplies the battle-pack identity.
 pub fn selected_run_content_pack(

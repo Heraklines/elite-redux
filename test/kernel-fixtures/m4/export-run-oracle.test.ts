@@ -529,7 +529,6 @@ describe("M4A fresh run oracle export", () => {
     if (process.platform !== "linux" || process.arch !== "x64") {
       throw new Error(`ORACLE_RUNTIME:expected hosted linux/x64, got ${process.platform}/${process.arch}`);
     }
-    installRngObservation();
   });
 
   afterAll(() => {
@@ -543,7 +542,6 @@ describe("M4A fresh run oracle export", () => {
     const gaps: OracleGap[] = [];
     const generated = new Map<string, JsonObject>();
 
-    generated.set("rng-vectors-v1.json", captureRngVectors());
     const contentPacks = await collectLiveCapture("content-packs", captureRunContent, gaps);
     if (contentPacks != null) {
       if (
@@ -566,6 +564,20 @@ describe("M4A fresh run oracle export", () => {
         generated.set("battle-content-pack-v1.json", contentPacks.battle_content_pack as JsonObject);
         generated.set("run-content-pack-v1.json", contentPacks.run_content_pack as JsonObject);
       }
+    }
+
+    if (Phaser.Math.RND == null) {
+      gaps.push(
+        new OracleGap(
+          "instrumentation",
+          "GLOBAL_RNG_UNINITIALIZED",
+          "src/init/init.ts:initializeGame",
+          "content initialization did not install Phaser.Math.RND",
+        ),
+      );
+    } else {
+      installRngObservation();
+      generated.set("rng-vectors-v1.json", captureRngVectors());
     }
 
     const progression = await collectLiveCapture(
