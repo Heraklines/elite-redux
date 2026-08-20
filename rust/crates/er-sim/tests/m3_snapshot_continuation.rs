@@ -3474,8 +3474,7 @@ mod live_coop_production {
         Ok(())
     }
 
-    #[test]
-    fn hosted_m3_native_wasm_continuation_suite_emits_artifacts() -> TestResult {
+    fn hosted_m3_native_wasm_continuation_suite_emits_artifacts_on_sized_thread() -> TestResult {
         let content = selected_content_pack_for_continuation()?;
         let suite = build_hosted_continuation_suite(Arc::clone(&content))?;
         assert_eq!(
@@ -3568,5 +3567,20 @@ mod live_coop_production {
 
         emit_hosted_continuation_artifacts(&suite_json, &report_json)?;
         Ok(())
+    }
+
+    #[test]
+    fn hosted_m3_native_wasm_continuation_suite_emits_artifacts() -> TestResult {
+        let result = std::thread::Builder::new()
+            .name("m3-continuation-harness".to_owned())
+            .stack_size(16 * 1024 * 1024)
+            .spawn(|| {
+                hosted_m3_native_wasm_continuation_suite_emits_artifacts_on_sized_thread()
+                    .map_err(|error| error.to_string())
+            })
+            .map_err(|error| format!("spawn sized M3 continuation harness thread: {error}"))?
+            .join()
+            .map_err(|_| "sized M3 continuation harness thread panicked".to_owned())?;
+        result.map_err(|error| -> Box<dyn Error> { error.into() })
     }
 }
