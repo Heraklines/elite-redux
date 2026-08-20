@@ -1097,8 +1097,9 @@ fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
                 blob.status.success(),
                 format!("resolve {label} audited production blob {path} failed"),
             )?;
-            let actual_blob = String::from_utf8(blob.stdout)
-                .map_err(|error| format!("{label} audited production blob was not UTF-8: {error}"))?;
+            let actual_blob = String::from_utf8(blob.stdout).map_err(|error| {
+                format!("{label} audited production blob was not UTF-8: {error}")
+            })?;
             require(
                 actual_blob.trim() == expected_blob,
                 format!(
@@ -1129,7 +1130,10 @@ fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
 }
 
 fn is_lower_hex_40(value: &str) -> bool {
-    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+    value.len() == 40
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
 }
 
 fn is_safe_audited_production_path(path: &str) -> bool {
