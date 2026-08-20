@@ -7,9 +7,6 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use serde::{Deserialize, Deserializer, Serialize};
-use thiserror::Error;
-
 use er_types::battle_ids::CanonicalHexBytes;
 use er_types::{SafeU53, TimeClass, TransportState};
 

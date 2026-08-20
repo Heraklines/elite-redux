@@ -87,7 +87,7 @@ fn active_run_surface_retains_menu_identity_and_surface_digest() {
             menu,
             surface_digest: digest.clone(),
         },
-        source_wave: WaveIndex::new(safe(8)),
+        source_wave: WaveIndex::new(safe(8)).expect("wave"),
     });
     let restored = round_trip(&surface);
     restored.validate().expect("surface validates");
