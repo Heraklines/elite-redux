@@ -322,7 +322,6 @@ fn validate_stage_with_battle(state: &GameStateV2) -> Result<(), StateValidation
             if run.active_surface.is_some()
                 || !run.progression.tasks.is_empty()
                 || battle.settlement.settled
-                || !matches!(battle.outcome, BattleOutcome::Ongoing)
                 || !matches!(run.outcome, RunOutcome::InProgress)
             {
                 return Err(StateValidationErrorV2::StageInvariant);
@@ -335,7 +334,7 @@ fn validate_stage_with_battle(state: &GameStateV2) -> Result<(), StateValidation
                     battle.outcome,
                     BattleOutcome::Victory | BattleOutcome::Defeat
                 )
-                || battle.settlement.settled
+                || !battle.settlement.settled
                 || !matches!(run.outcome, RunOutcome::InProgress)
             {
                 return Err(StateValidationErrorV2::StageInvariant);

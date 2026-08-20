@@ -7,6 +7,7 @@ pub mod digest;
 pub mod field;
 pub mod format;
 pub mod game_v2;
+pub mod migration;
 pub mod pokemon;
 pub mod pokemon_v2;
 pub mod run_v2;

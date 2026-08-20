@@ -113,6 +113,10 @@ for (const branch of [
   "wrk/rk-m4a-oracle-biome",
   "wrk/rk-m4a-oracle-migration",
   "wrk/rk-m4a-oracle-content",
+  "wrk/rk-m4a-snapshot",
+  "wrk/rk-m4a-settlement",
+  "wrk/rk-m4a-battle-content",
+  "wrk/rk-m4a-oracle-isolation",
 ]) {
   assert(ownership.includes(`branch = "${branch}"`), `m4-ownership.toml: missing active isolated branch ${branch}`);
 }
@@ -125,6 +129,10 @@ for (const path of [
   "test/kernel-fixtures/m4/export/biome-encounter-capture.ts",
   "test/kernel-fixtures/m4/export/migration-companion-capture.ts",
   "test/kernel-fixtures/m4/export/run-content-capture.ts",
+  "rust/crates/er-types/src/trace_v3.rs",
+  "rust/crates/er-run/src/settlement.rs",
+  "rust/crates/er-content/src/m4_pack.rs",
+  "test/kernel-fixtures/m4/export-helper-runner.test.ts",
 ]) {
   assert(ownership.includes(`"${path}"`), `m4-ownership.toml: missing active owned path ${path}`);
 }

@@ -169,7 +169,7 @@ pub struct RunCounters {
 | Stage | Required | Forbidden | Successors |
 |---|---|---|---|
 | `Battle` | `battle=Some`, no surface, empty progression | settled battle | `AwaitingWaveAdvance`, `Complete` |
-| `AwaitingWaveAdvance` | terminal source battle, unsettled boundary | active surface | `Progression`, `Surface`, `Battle`, `Complete` |
+| `AwaitingWaveAdvance` | terminal source battle with `settlement.settled=true` | active surface or progression | `Progression`, `Surface`, `Battle`, `Complete` |
 | `Progression` | no battle/surface, nonempty queue | unsupported active task | `Progression`, `Surface`, `Battle`, `Complete` |
 | `Surface` | exactly one active surface, no battle | empty closed surface | `Surface`, `Progression`, `Battle`, `Complete` |
 | `Complete` | terminal outcome, no battle/surface/progression | actionable control | none |
@@ -448,10 +448,11 @@ A prepared transaction may be captured only after complete deterministic prepara
 
 ```rust
 pub struct M3PokemonCompanionKey { pub fixture_id:String, pub state_side:MigrationStateSide, pub party_side:BattleSide, pub pokemon_id:PokemonId }
-pub struct M3PokemonCompanion { pub key:M3PokemonCompanionKey, pub roster_index:u8, pub owner_seat:Option<SeatId>, pub experience:Experience, pub growth_rate:GrowthRateId, pub ivs:[Iv;6], pub nature:NatureId, pub effective_nature:NatureId, pub friendship:u16, pub permanent_bonuses:PermanentStatBonuses, pub pause_evolutions:bool }
-pub struct M3ToM4MigrationContext { pub m3_oracle_sha:String, pub m4_oracle_sha:String, pub battle_content_hash:ContentPackHash, pub run_content_hash:RunContentPackHash, pub run:RunState, pub companions:Vec<M3PokemonCompanion> }
+pub struct M3PokemonCompanion { pub key:M3PokemonCompanionKey, pub source_party_index:u8, pub stable_roster_index:u8, pub owner_seat:Option<SeatId>, pub experience:Experience, pub growth_rate:GrowthRateId, pub ivs:[Iv;6], pub nature:NatureId, pub effective_nature:NatureId, pub friendship:u16, pub permanent_bonuses:PermanentStatBonuses, pub pause_evolutions:bool }
+pub struct M3BattleCompanion { pub fixture_id:String, pub state_side:MigrationStateSide, pub participation:BattleParticipationState, pub settlement:BattleSettlementState }
+pub struct M3ToM4MigrationContext { pub m3_parity_oracle_sha:String, pub m4_oracle_sha:String, pub battle_content_hash:ContentPackHash, pub run_content_hash:RunContentPackHash, pub run:RunStateV2, pub fixture_id:String, pub state_side:MigrationStateSide, pub companions:Vec<M3PokemonCompanion>, pub battle:Option<M3BattleCompanion> }
 pub enum MigrationError { WrongSchema, WrongOracle, ContentIdentity, MissingCompanion, DuplicateCompanion, UnknownCompanion, PartyOrderConflict, OwnerConflict, InvalidV1, InvalidV2 }
-pub fn migrate_m3_game_state(input:&GameStateV1, context:&M3ToM4MigrationContext, content:&GameContentBundle) -> Result<GameState,MigrationError>;
+pub fn migrate_m3_game_state(input:&GameStateV1, context:&M3ToM4MigrationContext) -> Result<GameStateV2,MigrationError>;
 ```
 
 Every player and enemy Pokémon in initial and final fixture states has exactly one companion keyed by stable ID and party side. The three M3 reordered-party cases use explicit stable roster indices from the companion, not array order or legacy party-index maps. Migration consumes zero RNG, performs no stat/EXP reconstruction, publishes no effect, and validates the complete V2 graph.

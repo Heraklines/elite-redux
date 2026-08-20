@@ -8,6 +8,7 @@
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import Phaser from "phaser";
 import { describe, it } from "vitest";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
@@ -95,6 +96,9 @@ function typedGap(error: unknown, kind: CaptureKind): JsonValue {
 }
 
 async function runCapture(kind: CaptureKind, output: string): Promise<void> {
+  if (Phaser.Math.RND == null) {
+    (Phaser.Math as unknown as Record<string, unknown>).RND = new Phaser.Math.RandomDataGenerator();
+  }
   try {
     const selected = CAPTURES[kind];
     // The selected kind is runtime configuration; static imports would load every Phaser/GameManager helper.

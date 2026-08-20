@@ -128,6 +128,11 @@ jobs:
           cargo test -p er-types --test m4_types
           cargo test -p er-state --test m4_state_v2
           cargo test -p er-run --test m4_content
+          cargo test -p er-content --test m4_pack
+          cargo test -p er-state --test m4_migration
+          cargo test -p er-run --test m4_settlement
+          cargo test -p er-kernel --test m4_snapshot_v3
+          cargo test -p er-sim --test m4_pair_snapshot_v3
 
       - name: Require committed lockfile
         working-directory: rust

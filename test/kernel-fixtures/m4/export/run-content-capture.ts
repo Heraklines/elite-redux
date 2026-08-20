@@ -344,6 +344,16 @@ function moveEffects(move: AnyRecord, id: number, path: string): JsonValue[] {
       effects.push({ kind: "CHANGE_STAT_STAGE", value: { stat: "ATTACK", delta: safeInteger(attr.stages, `${path}.attrs.${constructorName}.stages`) } });
       continue;
     }
+    if (constructorName === "HealStatusEffectAttr") {
+      if (!moveFlags(move, path).includes("THAWS_USER_FREEZE")) {
+        gap(
+          "CONTENT_CANONICAL_VALUE",
+          "src/data/moves/move.ts:HealStatusEffectAttr",
+          `${path} has a status-heal attribute without the canonical thaw flag`,
+        );
+      }
+      continue;
+    }
     if (constructorName === "AlwaysHitMinimizeAttr" || constructorName === "HitsTagForDoubleDamageAttr") {
       continue;
     }

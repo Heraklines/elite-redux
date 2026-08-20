@@ -1,4 +1,5 @@
 import { BattleScene } from "#app/battle-scene";
+import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
 import { getGameMode } from "#app/game-mode";
 import Overrides from "#app/overrides";

@@ -4,8 +4,10 @@ pub mod capability;
 pub mod content;
 pub mod error;
 pub mod rng_audit;
+pub mod settlement;
 
 pub use capability::*;
 pub use content::*;
 pub use error::*;
 pub use rng_audit::*;
+pub use settlement::*;

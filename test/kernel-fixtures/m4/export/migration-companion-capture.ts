@@ -17,6 +17,7 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { StatusEffect } from "#enums/status-effect";
+import { PokemonData } from "#system/pokemon-data";
 import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { CommandPhase } from "#phases/command-phase";
@@ -617,9 +618,17 @@ function captureCompanions(
       if (ivs.some(iv => iv < 0 || iv > 31)) {
         gap("CANONICAL_STATE_UNOBSERVABLE", M3_CASE_SEAM, `${stateSide} ${side} Pokemon ${identity.pokemonId} has an invalid IV`);
       }
-      const pauseEvolutions = (mon as AnyRecord).pauseEvolutions;
+      const livePauseEvolutions = (mon as AnyRecord).pauseEvolutions;
+      const serializedPauseEvolutions = new PokemonData(mon).pauseEvolutions;
+      const pauseEvolutions = typeof livePauseEvolutions === "boolean"
+        ? livePauseEvolutions
+        : serializedPauseEvolutions;
       if (typeof pauseEvolutions !== "boolean") {
-        gap("CANONICAL_STATE_UNOBSERVABLE", M3_CASE_SEAM, `${stateSide} ${side} Pokemon ${identity.pokemonId} lacks pauseEvolutions`);
+        gap(
+          "CANONICAL_STATE_UNOBSERVABLE",
+          "src/system/pokemon-data.ts:PokemonData.pauseEvolutions",
+          `${stateSide} ${side} Pokemon ${identity.pokemonId} lacks canonical pauseEvolutions`,
+        );
       }
       const nature = safeInteger(mon.nature, `${stateSide}.${side}[${sourcePartyIndex}].nature`);
       const effectiveNature = safeInteger(mon.getNature(), `${stateSide}.${side}[${sourcePartyIndex}].effective_nature`);

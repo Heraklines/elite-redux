@@ -127,13 +127,18 @@ pub fn prepare_battle_settlement(
     let wave = battle.wave;
 
     let mut after_state = before.clone();
-    let after_battle = after_state
-        .battle
-        .as_mut()
-        .ok_or(SettlementError::MissingBattle)?;
-    after_battle.participation.player_participants = retained_participants.clone();
-    after_battle.settlement.settled = true;
+    {
+        let after_battle = after_state
+            .battle
+            .as_mut()
+            .ok_or(SettlementError::MissingBattle)?;
+        after_battle.participation.player_participants = retained_participants.clone();
+        after_battle.settlement.settled = true;
+    }
     after_state.run.stage = RunStage::AwaitingWaveAdvance;
+    after_state
+        .validate()
+        .map_err(|_| SettlementError::InvalidState)?;
 
     let evidence = BattleSettlementEvidence {
         source_battle_id,
@@ -156,14 +161,7 @@ fn preflight_state(
     battle: &BattleStateV2,
     input: &BattleSettlementInput,
 ) -> Result<(), SettlementError> {
-    // Validate all nested mechanical records without invoking the stricter
-    // stage validator: a terminal Battle is the intentional settlement
-    // boundary represented by this function.
-    state.run.validate().map_err(|_| SettlementError::InvalidState)?;
-    battle.validate().map_err(|_| SettlementError::InvalidState)?;
-    for pokemon in &state.player_party {
-        pokemon.validate().map_err(|_| SettlementError::InvalidState)?;
-    }
+    state.validate().map_err(|_| SettlementError::InvalidState)?;
 
     if battle.settlement.settled {
         return Err(SettlementError::AlreadySettled);
@@ -251,16 +249,16 @@ fn validate_party_graph(
         let Some(pokemon) = field_slot.occupant else {
             continue;
         };
-        let (record, expected_owner) = match field_slot.slot.side {
-            er_types::battle_ids::BattleSide::Player => (
-                state.player_party.iter().find(|value| value.id == pokemon),
-                Some(owner_for_player_position(field_slot.slot.position)),
-            ),
-            er_types::battle_ids::BattleSide::Enemy => (
-                battle.enemy_party.iter().find(|value| value.id == pokemon),
-                None,
-            ),
+        let record = match field_slot.slot.side {
+            er_types::battle_ids::BattleSide::Player => {
+                state.player_party.iter().find(|value| value.id == pokemon)
+            }
+            er_types::battle_ids::BattleSide::Enemy => {
+                battle.enemy_party.iter().find(|value| value.id == pokemon)
+            }
         };
+        let expected_owner = er_state::format::owner_seat_for(&battle.format, field_slot.slot)
+            .map_err(|_| SettlementError::InvalidState)?;
         let Some(record) = record else {
             return Err(SettlementError::InvalidState);
         };
@@ -291,15 +289,6 @@ fn is_human_owner(battle: &BattleStateV2, owner: SeatId) -> Result<bool, Settlem
         .map_err(|_| SettlementError::InvalidState)
 }
 
-fn owner_for_player_position(position: u8) -> SeatId {
-    // M4's supported battle formats assign player positions 0 and 1 to seats
-    // 1 and 2 respectively.  `human_seats` has already rejected every other
-    // topology before this helper is reached.
-    match er_types::SafeU53::new(u64::from(position) + 1) {
-        Ok(value) => SeatId::new(value),
-        Err(_) => SeatId::ZERO,
-    }
-}
 
 fn validate_participation(
     state: &GameStateV2,

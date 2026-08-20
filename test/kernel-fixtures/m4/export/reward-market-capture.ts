@@ -61,6 +61,8 @@ let installed = false;
 const restoreHooks: (() => void)[] = [];
 let productionRandBattleSeedInt: AnyRecord["randBattleSeedInt"] | null = null;
 let phaserGame: Phaser.Game | null = null;
+let observedRewardPhase: SelectModifierPhase | null = null;
+let observedMarketPhase: BiomeShopPhase | null = null;
 
 const SEED_PREFIX = "m4a-reward-market-capture";
 const MAX_SEED_ATTEMPTS = 48;
@@ -329,6 +331,7 @@ function installObservationHooks(): void {
     const before = surface == null || context == null ? null : phaseGraph(context.game, this as AnyRecord, "reward", []);
     const result = originalRewardStart.call(this);
     if (surface != null && context != null) {
+      observedRewardPhase = this;
       const options = (this as AnyRecord).typeOptions;
       if (!Array.isArray(options)) {
         gap("REWARD_OPTIONS_UNOBSERVABLE", "src/phases/select-modifier-phase.ts:SelectModifierPhase.start", "typeOptions was not initialized");
@@ -358,6 +361,7 @@ function installObservationHooks(): void {
     const before = surface == null || context == null ? null : phaseGraph(context.game, this as AnyRecord, "market", [], []);
     const result = originalMarketStart.call(this);
     if (surface != null && context != null) {
+      observedMarketPhase = this;
       const phase = this as AnyRecord;
       const options = phase.shopOptions;
       const quantities = phase.qtys;
@@ -451,6 +455,8 @@ function restoreObservationHooks(): void {
     restore();
   }
   installed = false;
+  observedRewardPhase = null;
+  observedMarketPhase = null;
 }
 
 async function waitUntil(predicate: () => boolean, vector: string, sourceSeam: string, timeoutMs = 20_000): Promise<void> {
@@ -544,25 +550,36 @@ async function awaitMarketInput(game: GameManager): Promise<BiomeShopUiHandler> 
   return game.scene.ui.getHandler() as BiomeShopUiHandler;
 }
 
-async function awaitRewardPhase(game: GameManager): Promise<SelectModifierPhase> {
+async function awaitRewardPhase(_game: GameManager): Promise<SelectModifierPhase> {
   await waitUntil(
-    () => {
-      const phase = game.scene.phaseManager.getCurrentPhase();
-      return phase instanceof SelectModifierPhase && !(phase instanceof BiomeShopPhase) && activeCapture?.reward?.initial != null;
-    },
+    () => observedRewardPhase != null && activeCapture?.reward?.initial != null,
     "wave-9 reward generation",
     "src/phases/select-modifier-phase.ts:start",
   );
-  return game.scene.phaseManager.getCurrentPhase() as SelectModifierPhase;
+  if (observedRewardPhase == null) {
+    gap(
+      "REWARD_PHASE_UNOBSERVABLE",
+      "src/phases/select-modifier-phase.ts:start",
+      "observed reward phase disappeared",
+    );
+  }
+  return observedRewardPhase;
 }
 
-async function awaitMarketPhase(game: GameManager): Promise<BiomeShopPhase> {
+async function awaitMarketPhase(_game: GameManager): Promise<BiomeShopPhase> {
   await waitUntil(
-    () => game.scene.phaseManager.getCurrentPhase() instanceof BiomeShopPhase && activeCapture?.market?.initial != null,
+    () => observedMarketPhase != null && activeCapture?.market?.initial != null,
     "wave-10 Town market generation",
     "src/phases/biome-shop-phase.ts:start",
   );
-  return game.scene.phaseManager.getCurrentPhase() as BiomeShopPhase;
+  if (observedMarketPhase == null) {
+    gap(
+      "MARKET_PHASE_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:start",
+      "observed market phase disappeared",
+    );
+  }
+  return observedMarketPhase;
 }
 
 function phaseOptions(phase: AnyRecord, market: boolean): AnyRecord[] {

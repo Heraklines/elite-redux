@@ -5,6 +5,7 @@ pub mod network;
 pub mod pair;
 pub mod presenter;
 pub mod snapshot;
+pub mod snapshot_v3;
 pub mod storage;
 
 pub use clock::*;

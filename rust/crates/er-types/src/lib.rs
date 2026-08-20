@@ -12,6 +12,7 @@ pub mod protocol;
 pub mod run_ids;
 pub mod run_model;
 pub mod trace;
+pub mod trace_v3;
 pub mod ui;
 pub mod ui_menu;
 
@@ -29,6 +30,7 @@ pub use run_model::{
     ModifierTierError, RewardAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
 };
 pub use trace::*;
+pub use trace_v3::*;
 pub use ui::*;
 pub use ui_menu::{
     LogicalMenu, LogicalMenuError, LogicalMenuOption, LogicalMenuOptionError, MenuNavigation,

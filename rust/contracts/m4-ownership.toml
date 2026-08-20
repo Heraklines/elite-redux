@@ -152,6 +152,34 @@ paths = ["test/kernel-fixtures/m4/export/run-content-capture.ts"]
 deliverable = "M4 battle and run content packs with exact independent hashes"
 
 [[lanes]]
+id = "M4A-14"
+generation = "M4A"
+branch = "wrk/rk-m4a-snapshot"
+paths = ["rust/crates/er-types/src/trace_v3.rs", "rust/crates/er-kernel/src/snapshot_v3.rs", "rust/crates/er-sim/src/snapshot_v3.rs", "rust/crates/er-kernel/tests/m4_snapshot_v3.rs", "rust/crates/er-sim/tests/m4_pair_snapshot_v3.rs"]
+deliverable = "Strict V3 endpoint, pair, and trace roots with full-owner validation"
+
+[[lanes]]
+id = "M4A-15"
+generation = "M4A"
+branch = "wrk/rk-m4a-settlement"
+paths = ["rust/crates/er-run/src/settlement.rs", "rust/crates/er-run/tests/m4_settlement.rs"]
+deliverable = "Pure typed battle participation and one-time settlement preparation"
+
+[[lanes]]
+id = "M4A-RI"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-isolation"
+paths = ["scripts/export-kernel-m4-oracle.mjs", "test/kernel-fixtures/m4/export-run-oracle.test.ts", "test/kernel-fixtures/m4/export-helper-runner.test.ts"]
+deliverable = "Sequential integration-owner repair isolating each oracle capture in its own fresh process"
+
+[[lanes]]
+id = "M4A-16"
+generation = "M4A"
+branch = "wrk/rk-m4a-battle-content"
+paths = ["rust/crates/er-content/src/pack.rs", "rust/crates/er-content/src/m4_moves.rs", "rust/crates/er-content/src/m4_pack.rs", "rust/crates/er-content/tests/m4_pack.rs"]
+deliverable = "M4-oracle battle pack preserving M3 closure and adding exact Body Slam"
+
+[[lanes]]
 id = "M4B-01"
 generation = "M4B"
 branch = "wrk/rk-m4b-01-run-runtime"

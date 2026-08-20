@@ -8,6 +8,7 @@ mod battle_ui;
 pub mod input_router;
 pub mod kernel;
 pub mod snapshot;
+pub mod snapshot_v3;
 pub mod ui_reducer;
 
 pub use battle_kernel::BattleInitializationError;
