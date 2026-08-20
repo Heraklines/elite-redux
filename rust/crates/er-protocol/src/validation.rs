@@ -1529,7 +1529,10 @@ fn tail_proof_body_issues(value: Option<&Value>, marker: Option<&str>) -> Vec<St
     };
 
     let mut issues = Vec::new();
-    if !matches!(body.get("phase").and_then(Value::as_str), Some("manifest" | "complete")) {
+    if !matches!(
+        body.get("phase").and_then(Value::as_str),
+        Some("manifest" | "complete")
+    ) {
         issues.push("phase".to_owned());
     }
     if !is_non_empty_string(body.get("requestId")) {

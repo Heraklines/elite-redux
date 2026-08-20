@@ -866,7 +866,10 @@ fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
         .map_err(|error| format!("resolve M3 production audit checkpoint: {error}"))?;
     require(
         head.status.success(),
-        format!("resolve M3 production audit checkpoint failed with {}", head.status),
+        format!(
+            "resolve M3 production audit checkpoint failed with {}",
+            head.status
+        ),
     )?;
     let checkpoint = String::from_utf8(head.stdout)
         .map_err(|error| format!("M3 production audit checkpoint was not UTF-8: {error}"))?;
@@ -960,10 +963,7 @@ fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
         format!("audited production blob manifest keys are not exact: {manifest_keys:?}"),
     )?;
     require(
-        manifest
-            .get("schema_version")
-            .and_then(Value::as_u64)
-            == Some(1),
+        manifest.get("schema_version").and_then(Value::as_u64) == Some(1),
         "audited production blob manifest schema_version must be 1".to_owned(),
     )?;
     require(
@@ -1059,7 +1059,10 @@ fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
         .map_err(|error| format!("run M3 production source path audit: {error}"))?;
     require(
         actual_diff.status.success(),
-        format!("M3 production source path audit failed with {}", actual_diff.status),
+        format!(
+            "M3 production source path audit failed with {}",
+            actual_diff.status
+        ),
     )?;
     let actual = String::from_utf8(actual_diff.stdout)
         .map_err(|error| format!("M3 production source path audit was not UTF-8: {error}"))?
@@ -1113,16 +1116,14 @@ fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
                 .output()
                 .map_err(|error| format!("probe {label} blob type for {path}: {error}"))?;
             require(
-                kind.status.success()
-                    && String::from_utf8_lossy(&kind.stdout).trim() == "blob",
+                kind.status.success() && String::from_utf8_lossy(&kind.stdout).trim() == "blob",
                 format!("{label} object for {path} is not a blob"),
             )?;
         }
     }
 
     require(
-        gitlink_entries(&root, ORACLE_GAME_SHA)?
-            == gitlink_entries(&root, M3_BASE_SHA)?
+        gitlink_entries(&root, ORACLE_GAME_SHA)? == gitlink_entries(&root, M3_BASE_SHA)?
             && gitlink_entries(&root, M3_BASE_SHA)? == gitlink_entries(&root, checkpoint)?,
         "production gitlinks changed across the frozen oracle/base/checkpoint chain".to_owned(),
     )?;

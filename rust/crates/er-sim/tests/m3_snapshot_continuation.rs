@@ -552,6 +552,7 @@ mod live_local_production {
 
 mod live_coop_production {
     use std::collections::{BTreeMap, BTreeSet};
+    use std::error::Error;
     use std::sync::Arc;
 
     use er_canonical::{canonicalize, content_digest};

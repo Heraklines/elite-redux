@@ -224,7 +224,10 @@ pub struct AuthorityLogSnapshotV2 {
     pub retired_operation_order: Vec<OperationId>,
     pub capacity_refusals: SafeU53,
     pub send_failures: SafeU53,
-    #[serde(default, skip_serializing_if = "TailProofAuthoritySnapshotV2::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "TailProofAuthoritySnapshotV2::is_empty"
+    )]
     pub tail_proof: TailProofAuthoritySnapshotV2,
     pub disposed: bool,
 }
@@ -308,7 +311,10 @@ impl TailProofAuthoritySnapshotV2 {
                 .responses
                 .iter()
                 .map(|response| {
-                    (response.requester_seat, response.manifest.request_id.clone())
+                    (
+                        response.requester_seat,
+                        response.manifest.request_id.clone(),
+                    )
                 })
                 .collect::<Vec<_>>(),
             "authority_log.tail_proof.responses",

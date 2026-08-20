@@ -52,16 +52,10 @@ pub enum TailProofEntryCapture {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum TailProofFrameDisposition {
-    Ignored {
-        reason: String,
-    },
+    Ignored { reason: String },
     Pending,
-    Ready {
-        candidate: Box<AuthorityEntry>,
-    },
-    Rejected {
-        reason: String,
-    },
+    Ready { candidate: Box<AuthorityEntry> },
+    Rejected { reason: String },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -230,11 +224,7 @@ impl TailProofAuthorityState {
         emissions
     }
 
-    pub(crate) fn archive_retired(
-        &mut self,
-        entry: &AuthorityEntry,
-        capacity: SafeU53,
-    ) -> bool {
+    pub(crate) fn archive_retired(&mut self, entry: &AuthorityEntry, capacity: SafeU53) -> bool {
         if let Some(prior) = self.retired_sources.get(&entry.revision) {
             return prior == entry;
         }
@@ -345,10 +335,7 @@ impl TailProofAuthorityState {
 
         let mut retired_sources = BTreeMap::new();
         for source in &snapshot.retired_sources {
-            let entry = decode_entry_snapshot(
-                source,
-                "authority_log.tail_proof.retired_sources",
-            )?;
+            let entry = decode_entry_snapshot(source, "authority_log.tail_proof.retired_sources")?;
             if entry.context != *authority_context
                 || retired_sources.insert(entry.revision, entry).is_some()
             {
@@ -392,10 +379,8 @@ impl TailProofAuthorityState {
                 || response.complete.phase != TailProofPhase::Complete
                 || !same_proof_metadata(&response.manifest, &response.complete)
                 || !valid_tail_proof_body(&response.manifest, capacity)
-                || parse_request_sequence(
-                    &response.request_context,
-                    &response.manifest.request_id,
-                ) != Some(response.sequence)
+                || parse_request_sequence(&response.request_context, &response.manifest.request_id)
+                    != Some(response.sequence)
                 || request_high_water
                     .get(&response.requester_seat)
                     .is_none_or(|high_water| response.sequence > *high_water)
@@ -412,8 +397,13 @@ impl TailProofAuthorityState {
                     decode_entry_snapshot(source, "authority_log.tail_proof.responses.sources")
                 })
                 .collect::<Result<Vec<_>, _>>()?;
-            if sources.iter().any(|entry| entry.context != *authority_context)
-                || sources.iter().map(|entry| entry.revision).collect::<Vec<_>>()
+            if sources
+                .iter()
+                .any(|entry| entry.context != *authority_context)
+                || sources
+                    .iter()
+                    .map(|entry| entry.revision)
+                    .collect::<Vec<_>>()
                     != response.manifest.source_revisions
             {
                 return Err(snapshot_invalid(
@@ -431,8 +421,7 @@ impl TailProofAuthorityState {
                 .and_then(|revision| sources.iter().find(|entry| entry.revision == revision));
             if candidate.operation_id != response.manifest.candidate_operation_id
                 || candidate.context != *authority_context
-                || canonical_tail_proof_floor(candidate)
-                    != Some(response.manifest.from_revision)
+                || canonical_tail_proof_floor(candidate) != Some(response.manifest.from_revision)
                 || response.manifest.head_revision > head_revision
                 || predecessor.is_none_or(|predecessor| {
                     !boundary_supersession_allows(predecessor, candidate, &sources)
@@ -443,7 +432,10 @@ impl TailProofAuthorityState {
                     "frozen response conflicts with its live candidate or exact source proof",
                 ));
             }
-            let key = (response.requester_seat, response.manifest.request_id.clone());
+            let key = (
+                response.requester_seat,
+                response.manifest.request_id.clone(),
+            );
             if responses
                 .insert(
                     key,
@@ -845,7 +837,9 @@ impl TailProofReplicaState {
                     || capture.authority_context != *authority_context
                     || candidate.context != *authority_context
                     || capture.predecessor_identity.context != *authority_context
-                    || capture.request_sequence(snapshot.request_sequence).is_none()
+                    || capture
+                        .request_sequence(snapshot.request_sequence)
+                        .is_none()
                     || canonical_tail_proof_floor(&candidate) != Some(capture.from_revision)
                     || next_revision(capture.predecessor_identity.revision)
                         != Some(candidate.revision)
@@ -1044,7 +1038,10 @@ fn structurally_valid_boundary(entry: &AuthorityEntry) -> bool {
             let valid_material = payload.get("kind").and_then(Value::as_str)
                 == Some("wave-advance")
                 && next_wave > wave
-                && payload.get("biomeChange").and_then(Value::as_bool).is_some()
+                && payload
+                    .get("biomeChange")
+                    .and_then(Value::as_bool)
+                    .is_some()
                 && payload.get("eggLapse").and_then(Value::as_bool).is_some()
                 && matches!(
                     payload.get("outcome").and_then(Value::as_str),
@@ -1339,15 +1336,24 @@ fn entry_matches_identity(
 fn decode_hex(bytes: &CanonicalHexBytes, path: &str) -> Result<Vec<u8>, SnapshotError> {
     let raw = bytes.as_str().as_bytes();
     if !raw.len().is_multiple_of(2) {
-        return Err(snapshot_canonical(path, "canonical payload has odd hex length"));
+        return Err(snapshot_canonical(
+            path,
+            "canonical payload has odd hex length",
+        ));
     }
     let mut decoded = Vec::with_capacity(raw.len() / 2);
     for pair in raw.chunks_exact(2) {
         let Some(high) = hex_digit(pair[0]) else {
-            return Err(snapshot_canonical(path, "canonical payload contains invalid hex"));
+            return Err(snapshot_canonical(
+                path,
+                "canonical payload contains invalid hex",
+            ));
         };
         let Some(low) = hex_digit(pair[1]) else {
-            return Err(snapshot_canonical(path, "canonical payload contains invalid hex"));
+            return Err(snapshot_canonical(
+                path,
+                "canonical payload contains invalid hex",
+            ));
         };
         decoded.push((high << 4) | low);
     }

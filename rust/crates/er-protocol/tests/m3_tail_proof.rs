@@ -6,8 +6,8 @@ use er_protocol::{
     AuthorityLogSnapshotBridge, AuthorityReplica, AuthorityReplicaConfig,
     AuthorityReplicaSnapshotBridge, BackoffPolicy, BattleTerminalMaterialV1,
     BattleTerminalReasonV1, KernelScheduler, PeerBinding, ReplicaAction, ReplicaAdmission,
-    ReplicaMechanicalStage, ReplicaTailProofDisposition,
-    build_battle_terminal_commit_draft, control_id_of,
+    ReplicaMechanicalStage, ReplicaTailProofDisposition, build_battle_terminal_commit_draft,
+    control_id_of,
 };
 use er_types::{
     AckStage, AuthorityEntry, AuthorityEntryKind, AuthorityReceipt, AwaitSuccessorControl,
@@ -248,7 +248,10 @@ fn response_parts(
             body: manifest,
             ..
         },
-        AuthorityLogAction::Deliver { to: source_to, entry },
+        AuthorityLogAction::Deliver {
+            to: source_to,
+            entry,
+        },
         AuthorityLogAction::TailProof {
             to: complete_to,
             body: complete,
@@ -258,7 +261,10 @@ fn response_parts(
     else {
         return Err(format!("unexpected tail proof response order: {actions:?}").into());
     };
-    assert_eq!((*manifest_to, *source_to, *complete_to), (seat(1), seat(1), seat(1)));
+    assert_eq!(
+        (*manifest_to, *source_to, *complete_to),
+        (seat(1), seat(1), seat(1))
+    );
     assert_eq!(manifest.phase, TailProofPhase::Manifest);
     assert_eq!(complete.phase, TailProofPhase::Complete);
     Ok((manifest.clone(), entry.as_ref().clone(), complete.clone()))
@@ -308,7 +314,10 @@ fn authority_freezes_manifest_sources_complete_and_replays_exact_id() -> TestRes
     assert_eq!(emitted_source, source);
     assert_eq!(manifest.source_revisions, vec![source.revision]);
     assert_eq!(manifest.head_revision, candidate.revision);
-    assert_eq!(manifest.request_id, request.request_id.clone().ok_or("request id")?);
+    assert_eq!(
+        manifest.request_id,
+        request.request_id.clone().ok_or("request id")?
+    );
     assert_eq!(manifest.from_revision, request.from_revision);
     assert_eq!(complete.source_revisions, manifest.source_revisions);
     assert_eq!(log.diagnostics().tail_proof_responses, safe(1));
@@ -406,10 +415,7 @@ fn authority_requires_the_exact_canonical_wave_floor_live_and_on_restore() -> Te
     noncanonical.from_revision = old_wave.revision;
 
     let mut restored_scheduler = scheduler.clone();
-    let mut restored = AuthorityLog::from_snapshot_v2(
-        log.snapshot_v2()?,
-        &mut restored_scheduler,
-    )?;
+    let mut restored = AuthorityLog::from_snapshot_v2(log.snapshot_v2()?, &mut restored_scheduler)?;
     assert!(
         restored
             .handle_tail_proof_request(context(1, 0, 1, 1)?, noncanonical.clone())
@@ -473,12 +479,7 @@ fn retired_tail_proof_archive_is_bounded_when_log_capacity_exceeds_wire_limit() 
                         digest: format!("archive-turn-{index}-digest"),
                         payload: json!({"kind": "turn", "wave": 1, "turn": 1}),
                     },
-                    next_control: await_turn_successor_at(
-                        operation_id,
-                        next_operation_id,
-                        1,
-                        1,
-                    ),
+                    next_control: await_turn_successor_at(operation_id, next_operation_id, 1, 1),
                     subsumes: Vec::new(),
                 },
                 &mut scheduler,
@@ -690,7 +691,10 @@ fn replica_rejects_listed_sources_delivered_out_of_manifest_order() -> TestResul
         Some(AuthorityLogAction::Deliver { entry, .. }) => entry.as_ref().clone(),
         _ => return Err("ordered proof did not contain its second source".into()),
     };
-    assert_eq!(manifest.source_revisions, vec![first.revision, second.revision]);
+    assert_eq!(
+        manifest.source_revisions,
+        vec![first.revision, second.revision]
+    );
     assert_eq!(second_source, second);
     assert_eq!(
         replica.accept_tail_proof(&candidate.context, &manifest),

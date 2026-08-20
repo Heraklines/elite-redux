@@ -15,6 +15,7 @@ use er_state::battle::BattleState;
 use er_state::pokemon::PokemonState;
 use er_state::snapshot::GameState;
 use er_state::validation::validate_battle_state;
+use er_types::TailProofBody;
 use er_types::battle_command::{
     BattleCommand, BattleCommandOffer, BattleCommandProposalV1, BattleReplacementProposalV1,
     CommandCollectionState, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
@@ -23,7 +24,6 @@ use er_types::battle_control::{BattleControl, BattleControlPlan};
 use er_types::battle_ui::{
     BattleMenu, BattlePresentationEvent, BattlePresentationKind, BattleUiProjection,
 };
-use er_types::TailProofBody;
 use wasm_bindgen::prelude::*;
 
 /// Version of the evidence-only M3 schema registry.

@@ -290,13 +290,7 @@ fn battle_game_config(content: &ContentPack) -> TestResult<BattleGameConfig> {
                 BattleTargetSelection::selected(vec![player_slot])?,
             )?;
             scripted.push(ScriptedEnemyBattleCommandV1::new(
-                scripted_enemy_command_operation_id(
-                    battle_id,
-                    wave,
-                    turn,
-                    enemy_slot,
-                    cursor,
-                )?,
+                scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, cursor)?,
                 battle_id,
                 wave,
                 turn,
@@ -440,7 +434,10 @@ fn settle_battle_presentations(
 ) -> TestResult<Vec<KernelEffect>> {
     let mut effects = Vec::new();
     for _ in 0..64 {
-        let pending = kernel.snapshot_v2()?.pending_presentations.pending_barrier_ids;
+        let pending = kernel
+            .snapshot_v2()?
+            .pending_presentations
+            .pending_barrier_ids;
         if pending.is_empty() {
             return Ok(effects);
         }
@@ -556,9 +553,7 @@ fn generic_kernel_routes_correlated_tail_request_and_tail_proof_completion() -> 
     let request_frame = parked
         .iter()
         .find_map(|effect| match effect {
-            KernelEffect::SendFrame { frame, .. }
-                if frame.frame_type == FrameType::TailRequest =>
-            {
+            KernelEffect::SendFrame { frame, .. } if frame.frame_type == FrameType::TailRequest => {
                 Some(frame)
             }
             _ => None,
@@ -619,22 +614,10 @@ fn battle_kernel_routes_correlated_proof_through_real_material_and_fails_closed(
     }
     let mut guest_command_effects = Vec::new();
     for _ in 0..2 {
-        guest_command_effects.extend(raw_press(
-            &mut replica,
-            seat(2),
-            PhysicalKey::Enter,
-        )?);
+        guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::Enter)?);
     }
-    guest_command_effects.extend(raw_press(
-        &mut replica,
-        seat(2),
-        PhysicalKey::ArrowDown,
-    )?);
-    guest_command_effects.extend(raw_press(
-        &mut replica,
-        seat(2),
-        PhysicalKey::Enter,
-    )?);
+    guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::ArrowDown)?);
+    guest_command_effects.extend(raw_press(&mut replica, seat(2), PhysicalKey::Enter)?);
     let proposals = guest_command_effects
         .iter()
         .filter_map(|effect| match effect {
@@ -663,7 +646,10 @@ fn battle_kernel_routes_correlated_proof_through_real_material_and_fails_closed(
     }
     let source_frame = source_frame.ok_or("Battle authority did not publish its TURN entry")?;
     let source = entry_from_frame(&source_frame)?;
-    assert!(matches!(source.next_control, NextControl::AwaitSuccessor(_)));
+    assert!(matches!(
+        source.next_control,
+        NextControl::AwaitSuccessor(_)
+    ));
 
     let before_source = battle_mechanics(&replica)?;
     let mut replica_receipt_effects = route_frame(&mut replica, seat(2), &source_frame)?;
@@ -687,9 +673,11 @@ fn battle_kernel_routes_correlated_proof_through_real_material_and_fails_closed(
             .cloned()
             .ok_or("TURN material omitted next_control")?
     );
-    assert!(!replica_receipt_effects
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert!(
+        !replica_receipt_effects
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
 
     settle_battle_presentations(&mut authority, seat(1))?;
     replica_receipt_effects.extend(settle_battle_presentations(&mut replica, seat(2))?);
@@ -724,9 +712,11 @@ fn battle_kernel_routes_correlated_proof_through_real_material_and_fails_closed(
         Arc::clone(&content),
     )?;
     let parked = route_frame(&mut replica, seat(2), &candidate_frame)?;
-    assert!(!parked
-        .iter()
-        .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. })));
+    assert!(
+        !parked
+            .iter()
+            .any(|effect| matches!(effect, KernelEffect::EnterSharedTerminal { .. }))
+    );
     let requests = sent_frames(&parked, FrameType::TailRequest);
     let [request_frame] = requests.as_slice() else {
         return Err(format!(
@@ -812,8 +802,7 @@ fn battle_kernel_routes_correlated_proof_through_real_material_and_fails_closed(
         "malformed Battle completion did not fail closed: {failed:?}"
     );
     assert!(
-        route_frame(&mut malformed_replica, seat(2), &response_frames[2])?
-            .is_empty(),
+        route_frame(&mut malformed_replica, seat(2), &response_frames[2])?.is_empty(),
         "terminalized Battle replica accepted productive follow-up work"
     );
     Ok(())

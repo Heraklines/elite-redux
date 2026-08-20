@@ -13,9 +13,8 @@ use er_protocol::{
     ProposalLeaseAction, ProposalLeaseConfig, ProposalLeaseManager, ProposalLeaseSpec,
     ProposalLeaseStart, RecoveryAction, RecoveryFrontierStagingOutcome, RecoveryLiveState,
     RecoveryMaterialOutcome, RecoveryTransaction, RecoveryTransactionConfig, ReplicaAction,
-    ReplicaAdmission, ReplicaResume, ReplicaTailProofDisposition, ScheduledTimer,
-    SchedulerCommand, ValidatedFrame, ValidatedFrameBody, control_id_of,
-    frame_contexts_compatible,
+    ReplicaAdmission, ReplicaResume, ReplicaTailProofDisposition, ScheduledTimer, SchedulerCommand,
+    ValidatedFrame, ValidatedFrameBody, control_id_of, frame_contexts_compatible,
 };
 use er_state::digest::MechanicalStateDigest;
 use er_types::{
@@ -26,9 +25,9 @@ use er_types::{
     MaterialApplicationOutcome, MenuGeneration, MenuOption, MenuOptionId, MenuState, NetworkFrame,
     NextControl, OperationId, PresentationEvent, PresentationEventId, PresentationOutcome,
     ProposalMessage, RawFrame, RecoveryAppliedProof, RecoveryBundle, RecoveryBundleBody,
-    RecoveryPhase, RecoveryRequestBody, ReplacementMenu, Revision, SafeU53, SeatId,
-    TailProofBody, TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState, TimeClass,
-    TimerId, TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
+    RecoveryPhase, RecoveryRequestBody, ReplacementMenu, Revision, SafeU53, SeatId, TailProofBody,
+    TailRequestBody, TerminalFrameBody, TerminalMenu, TerminalState, TimeClass, TimerId,
+    TimerOwner, TransportState, UiIntent, UiState, WaitingMenu,
 };
 pub use er_types::{KernelEffect, KernelInput, KernelSnapshot, LiveResourceSnapshot};
 use serde_json::{Value, json};
@@ -1837,8 +1836,9 @@ impl GameKernel {
             replica.replica.accept_tail_proof(&context, &body)
         };
         match disposition {
-            ReplicaTailProofDisposition::Ignored { .. }
-            | ReplicaTailProofDisposition::Pending => Ok(Vec::new()),
+            ReplicaTailProofDisposition::Ignored { .. } | ReplicaTailProofDisposition::Pending => {
+                Ok(Vec::new())
+            }
             ReplicaTailProofDisposition::Rejected { reason } => {
                 Ok(self.enter_terminal(format!("tail proof rejected: {reason}")))
             }
@@ -1850,9 +1850,10 @@ impl GameKernel {
                     }
                 );
                 match &step.admission {
-                    ReplicaAdmission::Rejected { reason } => Ok(self.enter_terminal(format!(
-                        "tail proof candidate rejected: {reason:?}"
-                    ))),
+                    ReplicaAdmission::Rejected { reason } => {
+                        Ok(self
+                            .enter_terminal(format!("tail proof candidate rejected: {reason:?}")))
+                    }
                     ReplicaAdmission::Admitted { .. }
                     | ReplicaAdmission::Duplicate { .. }
                     | ReplicaAdmission::Gap { .. } => self.map_replica_actions_with_probe_mode(

@@ -3108,9 +3108,7 @@ impl BattleTransaction {
             ValidatedFrameBody::TailRequest(body) => {
                 self.receive_tail_request(endpoint, context, body)
             }
-            ValidatedFrameBody::TailProof(body) => {
-                self.receive_tail_proof(endpoint, context, body)
-            }
+            ValidatedFrameBody::TailProof(body) => self.receive_tail_proof(endpoint, context, body),
             ValidatedFrameBody::RecoveryRequest(body) => {
                 self.receive_recovery_request(endpoint, context, body)
             }
@@ -3308,8 +3306,9 @@ impl BattleTransaction {
             BattleProtocolState::Authority { .. } => return Ok(()),
         };
         match disposition {
-            ReplicaTailProofDisposition::Ignored { .. }
-            | ReplicaTailProofDisposition::Pending => Ok(()),
+            ReplicaTailProofDisposition::Ignored { .. } | ReplicaTailProofDisposition::Pending => {
+                Ok(())
+            }
             ReplicaTailProofDisposition::Rejected { reason } => {
                 self.enter_terminal(format!("tail proof rejected: {reason}"))?;
                 Ok(())

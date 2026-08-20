@@ -15,9 +15,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use thiserror::Error;
 
-use crate::tail_proof::{
-    TailProofEntryCapture, TailProofFrameDisposition, TailProofReplicaState,
-};
+use crate::tail_proof::{TailProofEntryCapture, TailProofFrameDisposition, TailProofReplicaState};
 use crate::{SuccessorValidator, control_id_of};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -370,10 +368,7 @@ impl AuthorityReplica {
             return rejected_step(reason);
         }
 
-        match self
-            .tail_proof
-            .capture_entry(&entry, tail_proof_capacity())
-        {
+        match self.tail_proof.capture_entry(&entry, tail_proof_capacity()) {
             TailProofEntryCapture::Inactive => {}
             TailProofEntryCapture::Parked {
                 missing_from,
@@ -460,11 +455,10 @@ impl AuthorityReplica {
                     };
                     let proven_boundary = self.tail_proof.consume_admission(&entry);
                     if !ordinary_successor && !proven_boundary {
-                        if let Some(request) = self.tail_proof.begin(
-                            &entry,
-                            &predecessor,
-                            &self.receipt_context,
-                        ) {
+                        if let Some(request) =
+                            self.tail_proof
+                                .begin(&entry, &predecessor, &self.receipt_context)
+                        {
                             let missing_from = request.from_revision;
                             return ReplicaStep {
                                 admission: ReplicaAdmission::Gap { missing_from },
@@ -1514,8 +1508,8 @@ fn validate_replica_snapshot_state(
     }
     if let Some(capture) = snapshot.tail_proof.capture.as_ref() {
         let predecessor_revision = capture.predecessor_identity.revision;
-        let Some(installed) = installed_controls
-            .and_then(|controls| controls.get(&predecessor_revision))
+        let Some(installed) =
+            installed_controls.and_then(|controls| controls.get(&predecessor_revision))
         else {
             return Err(snapshot_invalid(
                 "authority_replica.tail_proof.capture.predecessor_identity",
@@ -1525,8 +1519,7 @@ fn validate_replica_snapshot_state(
         if snapshot.frontier.received != predecessor_revision
             || snapshot.frontier.material != predecessor_revision
             || snapshot.frontier.control != predecessor_revision
-            || identity_snapshot_from_identity(&installed.identity)
-                != capture.predecessor_identity
+            || identity_snapshot_from_identity(&installed.identity) != capture.predecessor_identity
         {
             return Err(snapshot_invalid(
                 "authority_replica.tail_proof.capture.predecessor_identity",
