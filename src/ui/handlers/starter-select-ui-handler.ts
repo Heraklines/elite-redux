@@ -7637,11 +7637,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // ER: pick a run difficulty (Youngster / Ace / Elite / Hell)
             // before launching. Hovering a mode shows what it does (#368) in
             // the message box under the option list.
-            const sprintAvailable =
-              import.meta.env.DEV
-              || (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
             const choosePacing = (difficulty: ErDifficulty) => {
-              if (!supportsErSprintPacing(globalScene.gameMode.modeId) || !sprintAvailable) {
+              if (!supportsErSprintPacing(globalScene.gameMode.modeId)) {
                 startRun(difficulty, "normal");
                 return;
               }
