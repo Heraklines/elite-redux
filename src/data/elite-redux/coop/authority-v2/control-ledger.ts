@@ -722,6 +722,17 @@ export class CoopV2ControlLedger {
       : null;
   }
 
+  /** Whether live admission already registered this exact immutable entry before its materializer runs. */
+  matchesRegisteredEntry(entry: CoopAuthorityEntry): boolean {
+    const claim = this.claims.get(controlIdOf(entry.nextControl));
+    return (
+      claim != null
+      && !claim.superseded
+      && controlsEqual(claim.control, entry.nextControl)
+      && sameAuthenticatedSource(claim.sourceEntry, entry)
+    );
+  }
+
   /** Whether the exact unsuperseded control's immutable material has really applied. */
   isMaterialApplied(control: CoopV2ClaimedControl): boolean {
     const claim = this.claims.get(controlIdOf(control));
