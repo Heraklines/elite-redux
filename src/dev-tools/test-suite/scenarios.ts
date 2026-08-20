@@ -50,6 +50,26 @@ import {
 import { resetErEndlessContinuation, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { DEFAULT_FUN_MODE_CONFIG, getFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import {
+  ER_CONKAPITATOR_SPECIES_ID,
+  ER_DIPPOWDOWN_SPECIES_ID,
+  ER_EQUILIBRA_SPECIES_ID,
+  ER_GURDURUR_SPECIES_ID,
+  ER_JUSTYKE_SPECIES_ID,
+  ER_LICKILICKING_SPECIES_ID,
+  ER_MANGLING_BLADE_SPECIES_ID,
+  ER_OCTILLERY_REDUX_SPECIES_ID,
+  ER_PENTASNUG_SPECIES_ID,
+  ER_PONYTA_REDUX_SPECIES_ID,
+  ER_POWER_PLANT_SPECIES_ID,
+  ER_PYROTHON_SPECIES_ID,
+  ER_RAPIDASH_REDUX_SPECIES_ID,
+  ER_SNUGLETT_SPECIES_ID,
+  ER_SNUGTRIO_SPECIES_ID,
+  ER_TREMBURR_SPECIES_ID,
+  ER_VOLTRIEVER_SPECIES_ID,
+  ER_WAILBORE_SPECIES_ID,
+} from "#data/elite-redux/er-fakemon-pitch-species";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -2003,8 +2023,120 @@ const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
   },
 ];
 
+interface FakemonPitchShowcaseMember {
+  readonly speciesId: SpeciesId;
+  readonly formKey?: string;
+}
+
+const pitchSpecies = (speciesId: number, formKey?: string): FakemonPitchShowcaseMember => ({
+  speciesId: erSpecies(speciesId),
+  ...(formKey ? { formKey } : {}),
+});
+
+const fakemonPitchStarter = (member: FakemonPitchShowcaseMember): Starter =>
+  makeStarter(member.speciesId, {
+    formIndex: member.formKey ? formIndexByKey(member.speciesId, member.formKey) : 0,
+  });
+
+function fakemonPitchShowcaseScenario(
+  number: number,
+  members: readonly FakemonPitchShowcaseMember[],
+  enemy: FakemonPitchShowcaseMember,
+  names: string,
+): DevScenario {
+  return {
+    label: `Roster: new Pokemon ${number}/5`,
+    description:
+      `New fakemon-pitch roster showcase ${number}/5.\n`
+      + `PLAYER: ${names}.\n`
+      + "DO: open Check Team and battle info, then inspect sprites, forms, typings, moves, and abilities.\n"
+      + "EXPECT: all six player slots and the opponent use additions from the new roster.",
+    setup: () => {
+      resetDevOverrides();
+      const enemyFormIndex = enemy.formKey ? formIndexByKey(enemy.speciesId, enemy.formKey) : 0;
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 31,
+        STARTING_LEVEL_OVERRIDE: 70,
+        ENEMY_SPECIES_OVERRIDE: enemy.speciesId,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_FORM_OVERRIDES: enemy.formKey ? { [enemy.speciesId]: enemyFormIndex } : {},
+      });
+      return members.map(fakemonPitchStarter);
+    },
+  };
+}
+
+const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
+  fakemonPitchShowcaseScenario(
+    1,
+    [
+      pitchSpecies(ER_TREMBURR_SPECIES_ID),
+      pitchSpecies(ER_GURDURUR_SPECIES_ID),
+      pitchSpecies(ER_CONKAPITATOR_SPECIES_ID),
+      pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
+      pitchSpecies(ER_JUSTYKE_SPECIES_ID),
+      pitchSpecies(ER_EQUILIBRA_SPECIES_ID),
+    ],
+    pitchSpecies(ER_WAILBORE_SPECIES_ID),
+    "Tremburr, Gurdurur, Conkapitator, Dippowdown, Justyke, Equilibra",
+  ),
+  fakemonPitchShowcaseScenario(
+    2,
+    [
+      pitchSpecies(ER_LICKILICKING_SPECIES_ID),
+      pitchSpecies(ER_MANGLING_BLADE_SPECIES_ID),
+      pitchSpecies(ER_OCTILLERY_REDUX_SPECIES_ID),
+      pitchSpecies(ER_SNUGLETT_SPECIES_ID),
+      pitchSpecies(ER_SNUGTRIO_SPECIES_ID),
+      pitchSpecies(ER_PENTASNUG_SPECIES_ID),
+    ],
+    pitchSpecies(ER_VOLTRIEVER_SPECIES_ID),
+    "Lickilicking, Mangling Blade, Octillery Redux, Snuglett, Snugtrio, Pentasnug",
+  ),
+  fakemonPitchShowcaseScenario(
+    3,
+    [
+      pitchSpecies(ER_POWER_PLANT_SPECIES_ID),
+      pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
+      pitchSpecies(ER_PYROTHON_SPECIES_ID),
+      pitchSpecies(ER_PONYTA_REDUX_SPECIES_ID),
+      pitchSpecies(ER_RAPIDASH_REDUX_SPECIES_ID),
+      pitchSpecies(ER_VOLTRIEVER_SPECIES_ID),
+    ],
+    pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
+    "Power Plant, Live Current, Pyrothon, Ponyta Redux, Rapidash Redux, Voltriever",
+  ),
+  fakemonPitchShowcaseScenario(
+    4,
+    [
+      pitchSpecies(ER_WAILBORE_SPECIES_ID),
+      pitchSpecies(SpeciesId.CRYOGONAL, "mega"),
+      pitchSpecies(SpeciesId.JIRACHI, "mega"),
+      pitchSpecies(SpeciesId.LEDIAN, "mega"),
+      pitchSpecies(SpeciesId.RAMPARDOS, "mega"),
+      pitchSpecies(SpeciesId.REUNICLUS, "mega-x"),
+    ],
+    pitchSpecies(ER_MANGLING_BLADE_SPECIES_ID),
+    "Wailbore, Mega Cryogonal, Mega Jirachi, Mega Ledian, Mega Rampardos, Mega Reuniclus X",
+  ),
+  fakemonPitchShowcaseScenario(
+    5,
+    [
+      pitchSpecies(SpeciesId.XATU, "mega"),
+      pitchSpecies(SpeciesId.ZANGOOSE, "mega"),
+      pitchSpecies(ER_CONKAPITATOR_SPECIES_ID),
+      pitchSpecies(ER_PENTASNUG_SPECIES_ID),
+      pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
+      pitchSpecies(ER_MANGLING_BLADE_SPECIES_ID),
+    ],
+    pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
+    "Mega Xatu, Mega Zangoose, Conkapitator, Pentasnug, Live Current, Mangling Blade",
+  ),
+];
+
 export const DEV_SCENARIOS: DevScenario[] = [
   ...MOODY_UI_HARNESS_SCENARIOS,
+  ...FAKEMON_PITCH_SHOWCASE_SCENARIOS,
   {
     label: "UI: Moody boss draft",
     description:
@@ -21630,7 +21762,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
  * importable by focused repro tooling, but it is no longer exposed to staff.
  * Builder and custom-trainer testers are registered separately by index.ts.
  */
-const DEV_MENU_SCENARIO_LABELS = new Set(["Endless: final boss auto-KO", "Endless: deep Hell ghost (wave 401)"]);
+const DEV_MENU_SCENARIO_LABELS = new Set([
+  "Roster: new Pokemon 1/5",
+  "Roster: new Pokemon 2/5",
+  "Roster: new Pokemon 3/5",
+  "Roster: new Pokemon 4/5",
+  "Roster: new Pokemon 5/5",
+  "Endless: final boss auto-KO",
+  "Endless: deep Hell ghost (wave 401)",
+]);
 
 export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(scenario =>
   DEV_MENU_SCENARIO_LABELS.has(scenario.label),
