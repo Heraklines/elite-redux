@@ -203,4 +203,3 @@ fn m4_capability_manifest_stays_exact_and_m3_constructor_stays_strict() -> Resul
     .is_err());
     Ok(())
 }
-

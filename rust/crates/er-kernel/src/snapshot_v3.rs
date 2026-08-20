@@ -471,4 +471,3 @@ pub fn validate_snapshot_v3_for_content(
 ) -> Result<(), SnapshotError> {
     snapshot.validate_for_content(content.as_ref())
 }
-
