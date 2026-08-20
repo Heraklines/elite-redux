@@ -224,10 +224,13 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
     })
 }
 
-fn input(source_battle_id: u64, wave: u64) -> Result<BattleSettlementInput, Box<dyn Error>> {
+fn input(
+    source_battle_id: u64,
+    wave_value: u64,
+) -> Result<BattleSettlementInput, Box<dyn Error>> {
     Ok(BattleSettlementInput {
         source_battle_id: battle_id(source_battle_id)?,
-        wave: wave(wave)?,
+        wave: wave(wave_value)?,
     })
 }
 
