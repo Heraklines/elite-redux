@@ -1,0 +1,87 @@
+name: Rust Kernel M4 Gate
+
+on:
+  push:
+    branches:
+      - "arch/rust-kernel-m4"
+      - "wrk/rk-m4-*"
+    paths:
+      - ".github/workflows/rust-kernel-m4.yml"
+      - "docs/plans/rust-kernel/m4-*.md"
+      - "rust/**"
+      - "scripts/check-kernel-m4-contract.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m4/**"
+      - "src/**"
+  pull_request:
+    paths:
+      - ".github/workflows/rust-kernel-m4.yml"
+      - "docs/plans/rust-kernel/m4-*.md"
+      - "rust/**"
+      - "scripts/check-kernel-m4-contract.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m4/**"
+      - "src/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m4-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  M3_BASE_SHA: 45c89493e7edec9c4da247a98cd7858b1f015c09
+
+jobs:
+  m4-source-lock:
+    name: M4 source lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Preserve M3 production TypeScript and source lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${M3_BASE_SHA}^{commit}"
+          git merge-base --is-ancestor "$M3_BASE_SHA" "$GITHUB_SHA"
+          git diff --exit-code "$M3_BASE_SHA" "$GITHUB_SHA" -- rust/source-lock.toml src
+          git diff --check "$M3_BASE_SHA" "$GITHUB_SHA"
+
+  m4-contract-freeze:
+    name: M4 contract freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out contract surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /.github/workflows/rust-kernel-m4.yml
+            /rust/contracts/
+            /rust/fixtures/m4/
+            /scripts/check-kernel-m4-contract.mjs
+          submodules: false
+
+      - name: Validate exact G12 contracts and manifests
+        env:
+          M4_ATTESTATION_PATH: artifacts/m4-g12-attestation.json
+        run: node scripts/check-kernel-m4-contract.mjs
+
+      - name: Upload G12 attestation
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-g12-attestation
+          path: artifacts/m4-g12-attestation.json
+          if-no-files-found: error
+          retention-days: 30
