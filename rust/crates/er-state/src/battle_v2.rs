@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 pub use er_rng::battle::BattleRngState;
+use er_types::SeatId;
 use er_types::battle_command::CommandCollectionState;
 pub use er_types::battle_ids::{
     BattleFormat, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, MoveSlotIndex, PartyIndex,
@@ -13,13 +14,11 @@ pub use er_types::battle_model::{
     ArenaConditionState, BattleOutcome, FaintOccurrence, GlobalAbilitySuppressionState,
     TerrainState, WeatherState,
 };
-use er_types::SeatId;
 
 use crate::field::FieldState;
 use crate::pokemon_v2::PokemonStateV2;
 
 pub const BATTLE_STATE_SCHEMA_VERSION_V2: u32 = 2;
-
 
 /// The final participation evidence frozen at the wave boundary.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -123,7 +122,9 @@ impl BattleStateV2 {
                 rng: self.battle_rng.turn,
             });
         }
-        self.battle_rng.validate().map_err(BattleStateV2Error::BattleRng)?;
+        self.battle_rng
+            .validate()
+            .map_err(BattleStateV2Error::BattleRng)?;
         crate::format::validate_m3_supported(&self.format)?;
         self.field.validate_for_format(&self.format)?;
         crate::conditions::validate_m3_conditions(
@@ -152,17 +153,18 @@ pub struct BattleWorldStateV2<'a> {
     pub battle: &'a BattleStateV2,
 }
 
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ResolvedBattleWorldV2 {
     pub player_party: Vec<PokemonStateV2>,
     pub battle: BattleStateV2,
 }
 
-
 impl<'a> BattleWorldStateV2<'a> {
     pub fn new(player_party: &'a [PokemonStateV2], battle: &'a BattleStateV2) -> Self {
-        Self { player_party, battle }
+        Self {
+            player_party,
+            battle,
+        }
     }
 
     pub fn resolve(&self) -> ResolvedBattleWorldV2 {

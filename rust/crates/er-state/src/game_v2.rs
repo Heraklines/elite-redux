@@ -11,7 +11,7 @@ use er_types::run_ids::RunContentPackHash;
 use crate::battle_v2::{BattleStateV2, BattleWorldStateV2};
 use crate::pokemon_v2::PokemonStateV2;
 use crate::run_v2::RunStateV2;
-use crate::validation_v2::{validate_game_state_v2, StateValidationErrorV2};
+use crate::validation_v2::{StateValidationErrorV2, validate_game_state_v2};
 
 pub const GAME_STATE_SCHEMA_VERSION_V2: u32 = 2;
 
@@ -42,7 +42,10 @@ impl GameStateV2 {
         self.player_party.get(usize::from(index.get()))
     }
 
-    pub fn player_by_id(&self, pokemon: er_types::battle_ids::PokemonId) -> Option<&PokemonStateV2> {
+    pub fn player_by_id(
+        &self,
+        pokemon: er_types::battle_ids::PokemonId,
+    ) -> Option<&PokemonStateV2> {
         self.player_party.iter().find(|value| value.id == pokemon)
     }
 }

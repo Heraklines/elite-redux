@@ -1,9 +1,8 @@
 use er_types::battle_ids::{MenuInstanceId, MoveId, PokemonId};
-use er_types::ids::{MenuOptionId, SafeU53, SeatId, JS_MAX_SAFE_INTEGER};
+use er_types::ids::{JS_MAX_SAFE_INTEGER, MenuOptionId, SafeU53, SeatId};
 use er_types::run_ids::{
-    BiomeId, Experience, GameRunId, GrowthRateId, Money, ModifierId, NatureId,
-    RunContentPackHash, RunInteractionSequence, RunOfferId, RunStockId, RunSurfaceId, RunTaskId,
-    SurfaceDigest,
+    BiomeId, Experience, GameRunId, GrowthRateId, ModifierId, Money, NatureId, RunContentPackHash,
+    RunInteractionSequence, RunOfferId, RunStockId, RunSurfaceId, RunTaskId, SurfaceDigest,
 };
 use er_types::run_model::{
     BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
@@ -11,8 +10,8 @@ use er_types::run_model::{
 };
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{
-    LogicalMenu, LogicalMenuError, LogicalMenuOption, LogicalMenuOptionError,
-    MenuNavigationEdge, NavigationDirection,
+    LogicalMenu, LogicalMenuError, LogicalMenuOption, LogicalMenuOptionError, MenuNavigationEdge,
+    NavigationDirection,
 };
 use serde_json::json;
 
@@ -83,7 +82,10 @@ fn run_hashes_are_strict_blake3_v1_values() {
 #[test]
 fn modifier_tier_and_closed_surface_enums_reject_unknown_wire_values() {
     assert_eq!(serde_json::to_string(&ModifierTier::Common).unwrap(), "0");
-    assert_eq!(serde_json::from_str::<ModifierTier>("4").unwrap(), ModifierTier::Master);
+    assert_eq!(
+        serde_json::from_str::<ModifierTier>("4").unwrap(),
+        ModifierTier::Master
+    );
     assert!(serde_json::from_str::<ModifierTier>("5").is_err());
     assert!(serde_json::from_str::<ModifierTier>("\"COMMON\"").is_err());
 
@@ -94,8 +96,16 @@ fn modifier_tier_and_closed_surface_enums_reject_unknown_wire_values() {
     assert!(serde_json::from_str::<RunStage>("\"UNKNOWN\"").is_err());
     assert!(serde_json::from_str::<RunOutcome>("\"UNKNOWN\"").is_err());
     let action = RunSurfaceAction::Reward(RewardAction::Reroll);
-    assert_eq!(serde_json::to_value(action).unwrap(), json!({"kind":"REWARD","payload":{"kind":"REROLL"}}));
-    assert!(serde_json::from_value::<RunSurfaceAction>(json!({"kind":"BIOME_MARKET","payload":{"kind":"REROLL"}})).is_err());
+    assert_eq!(
+        serde_json::to_value(action).unwrap(),
+        json!({"kind":"REWARD","payload":{"kind":"REROLL"}})
+    );
+    assert!(
+        serde_json::from_value::<RunSurfaceAction>(
+            json!({"kind":"BIOME_MARKET","payload":{"kind":"REROLL"}})
+        )
+        .is_err()
+    );
     let _ = (
         BiomeMarketAction::Leave,
         BiomeSelectAction {
@@ -103,18 +113,16 @@ fn modifier_tier_and_closed_surface_enums_reject_unknown_wire_values() {
             biome: BiomeId::new(safe(2)),
         },
         CrossroadsAction::Stay,
-        LearnMoveDecision::Candidate { move_id: MoveId::new(safe(229)) },
+        LearnMoveDecision::Candidate {
+            move_id: MoveId::new(safe(229)),
+        },
         PokemonId::new(safe(7)),
     );
 }
 
 #[test]
 fn logical_menu_rejects_duplicate_options_duplicate_edges_and_bad_selection() {
-    let duplicate_option = menu(
-        "a",
-        vec![option("a", true), option("a", false)],
-        Vec::new(),
-    );
+    let duplicate_option = menu("a", vec![option("a", true), option("a", false)], Vec::new());
     assert_eq!(duplicate_option, Err(LogicalMenuError::DuplicateOption));
 
     let edge = MenuNavigationEdge::new(
@@ -166,8 +174,12 @@ fn logical_menu_canonicalizes_option_and_edge_order_without_using_layout() {
         NavigationDirection::Up,
         MenuOptionId::new("b").unwrap(),
     );
-    let value = menu("a", vec![option("b", true), option("a", false)], vec![right, up])
-        .expect("menu canonicalization");
+    let value = menu(
+        "a",
+        vec![option("b", true), option("a", false)],
+        vec![right, up],
+    )
+    .expect("menu canonicalization");
     assert_eq!(value.options[0].option_id.as_str(), "a");
     assert_eq!(value.navigation[0].from.as_str(), "a");
     assert!(!value.is_enabled(&MenuOptionId::new("a").unwrap()));

@@ -61,7 +61,11 @@ pub enum UnsupportedReasonCode {
 
 /// Result of classifying one run-content capability.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "status", content = "reason")]
+#[serde(
+    rename_all = "SCREAMING_SNAKE_CASE",
+    tag = "status",
+    content = "reason"
+)]
 pub enum RunCapabilityStatus {
     Supported,
     Unsupported(UnsupportedReasonCode),
@@ -139,7 +143,10 @@ pub enum CapabilityManifestError {
     #[error("capability manifest schema version is {actual}, expected {expected}")]
     SchemaVersionMismatch { expected: u32, actual: u32 },
     #[error("capability manifest oracle SHA is {actual}, expected {expected}")]
-    OracleGameShaMismatch { expected: &'static str, actual: String },
+    OracleGameShaMismatch {
+        expected: &'static str,
+        actual: String,
+    },
     #[error("capability manifest must be fail-closed")]
     NotFailClosed,
     #[error("capability manifest must prohibit replica generation")]
@@ -147,7 +154,11 @@ pub enum CapabilityManifestError {
     #[error("capability manifest permits production TypeScript changes")]
     ProductionTypescriptChangesAllowed,
     #[error("invalid selected ID {kind}={value}: {detail}")]
-    InvalidSelectedId { kind: &'static str, value: u64, detail: String },
+    InvalidSelectedId {
+        kind: &'static str,
+        value: u64,
+        detail: String,
+    },
     #[error("capability manifest has duplicate {kind} entry {value}")]
     DuplicateEntry { kind: &'static str, value: String },
     #[error("capability manifest has no supported {kind}")]
@@ -189,10 +200,22 @@ impl RunCapabilityManifest {
         ensure_nonempty("encounter source", self.encounter_sources.len())?;
         ensure_nonempty("enemy policy", self.enemy_policies.len())?;
         ensure_unique("mode", self.supported_modes.iter().map(ToString::to_string))?;
-        ensure_unique("growth rate", self.supported_growth_rates.iter().map(ToString::to_string))?;
-        ensure_unique("nature", self.supported_natures.iter().map(ToString::to_string))?;
-        ensure_unique("modifier registry key", self.modifier_registry_keys.iter().cloned())?;
-        ensure_unique("modifier ID", self.supported_modifier_ids.iter().map(ToString::to_string))?;
+        ensure_unique(
+            "growth rate",
+            self.supported_growth_rates.iter().map(ToString::to_string),
+        )?;
+        ensure_unique(
+            "nature",
+            self.supported_natures.iter().map(ToString::to_string),
+        )?;
+        ensure_unique(
+            "modifier registry key",
+            self.modifier_registry_keys.iter().cloned(),
+        )?;
+        ensure_unique(
+            "modifier ID",
+            self.supported_modifier_ids.iter().map(ToString::to_string),
+        )?;
         ensure_unique("biome", self.biome_ids.iter().map(ToString::to_string))?;
         Ok(())
     }
@@ -214,7 +237,9 @@ impl RunCapabilityManifest {
     }
 
     pub fn classify_modifier(&self, id: ModifierId, key: &str) -> RunCapabilityStatus {
-        if self.supported_modifier_ids.contains(&id) && self.modifier_registry_keys.iter().any(|entry| entry == key) {
+        if self.supported_modifier_ids.contains(&id)
+            && self.modifier_registry_keys.iter().any(|entry| entry == key)
+        {
             RunCapabilityStatus::Supported
         } else {
             RunCapabilityStatus::Unsupported(UnsupportedReasonCode::UnsupportedContent)
@@ -259,18 +284,45 @@ where
     Ok(())
 }
 
-pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, CapabilityManifestError> {
-    let modifier_ids = [1_u64, 2, 3, 4, 5, 6, 7, 100, 101, 102, 103, 200, 201, 202, 300, 301, 400, 401]
-        .into_iter()
-        .map(|value| ModifierId::try_from_u64(value).map_err(|error| CapabilityManifestError::InvalidSelectedId { kind: "modifier", value, detail: error.to_string() }))
-        .collect::<Result<Vec<_>, _>>()?;
+pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, CapabilityManifestError>
+{
+    let modifier_ids = [
+        1_u64, 2, 3, 4, 5, 6, 7, 100, 101, 102, 103, 200, 201, 202, 300, 301, 400, 401,
+    ]
+    .into_iter()
+    .map(|value| {
+        ModifierId::try_from_u64(value).map_err(|error| {
+            CapabilityManifestError::InvalidSelectedId {
+                kind: "modifier",
+                value,
+                detail: error.to_string(),
+            }
+        })
+    })
+    .collect::<Result<Vec<_>, _>>()?;
     let biome_ids = [0_u64, 1, 2, 4, 9, 50]
         .into_iter()
-        .map(|value| BiomeId::try_from_u64(value).map_err(|error| CapabilityManifestError::InvalidSelectedId { kind: "biome", value, detail: error.to_string() }))
+        .map(|value| {
+            BiomeId::try_from_u64(value).map_err(|error| {
+                CapabilityManifestError::InvalidSelectedId {
+                    kind: "biome",
+                    value,
+                    detail: error.to_string(),
+                }
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
     let supported_modes = [0_u64, 1]
         .into_iter()
-        .map(|value| GameModeId::try_from_u64(value).map_err(|error| CapabilityManifestError::InvalidSelectedId { kind: "mode", value, detail: error.to_string() }))
+        .map(|value| {
+            GameModeId::try_from_u64(value).map_err(|error| {
+                CapabilityManifestError::InvalidSelectedId {
+                    kind: "mode",
+                    value,
+                    detail: error.to_string(),
+                }
+            })
+        })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(RunCapabilityManifest {
         schema_version: RUN_CAPABILITY_MANIFEST_VERSION,
@@ -278,7 +330,12 @@ pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, Capab
         fail_closed: true,
         supported_modes,
         supported_growth_rates: vec![GrowthRateId::new(3)],
-        supported_natures: vec![NatureId::new(0), NatureId::new(3), NatureId::new(10), NatureId::new(15)],
+        supported_natures: vec![
+            NatureId::new(0),
+            NatureId::new(3),
+            NatureId::new(10),
+            NatureId::new(15),
+        ],
         modifier_registry_keys: vec![
             "AMULET_COIN".to_owned(),
             "CANDY_JAR".to_owned(),
@@ -314,8 +371,14 @@ pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, Capab
             MarketCapabilityAction::Leave,
         ],
         biome_ids,
-        route_rng_domains: vec![RouteRngDomain::AuthorityAddressed, RouteRngDomain::ExactAmbientState],
-        encounter_sources: vec![EncounterSource::StaticCapturedVector, EncounterSource::StaticFixedVector],
+        route_rng_domains: vec![
+            RouteRngDomain::AuthorityAddressed,
+            RouteRngDomain::ExactAmbientState,
+        ],
+        encounter_sources: vec![
+            EncounterSource::StaticCapturedVector,
+            EncounterSource::StaticFixedVector,
+        ],
         enemy_policies: vec![EnemyPolicy::ScriptedEnemyPolicyV1],
         unsupported: vec![
             UnsupportedReasonCode::EvolutionExecution,

@@ -9,11 +9,11 @@ pub mod battle_ui;
 pub mod ids;
 pub mod input;
 pub mod protocol;
-pub mod trace;
 pub mod run_ids;
 pub mod run_model;
-pub mod ui_menu;
+pub mod trace;
 pub mod ui;
+pub mod ui_menu;
 
 pub use authority::*;
 pub use ids::*;
@@ -28,12 +28,12 @@ pub use run_model::{
     BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
     ModifierTierError, RewardAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
 };
+pub use trace::*;
+pub use ui::*;
 pub use ui_menu::{
     LogicalMenu, LogicalMenuError, LogicalMenuOption, LogicalMenuOptionError, MenuNavigation,
     MenuNavigationEdge, MenuNavigationError, MenuOptionLayout, NavigationDirection,
 };
-pub use trace::*;
-pub use ui::*;
 
 #[cfg(test)]
 mod tests {

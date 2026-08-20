@@ -6,15 +6,17 @@
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
-use er_types::battle_ids::{PokemonId, SpeciesId};
-use er_types::battle_model::{AbilityLoadout, BattleStats, MoveSlotState, PokemonTyping, StatStages, StatusState};
-use er_types::run_ids::{Experience, GrowthRateId, NatureId};
 use er_types::SeatId;
+use er_types::battle_ids::{PokemonId, SpeciesId};
+use er_types::battle_model::{
+    AbilityLoadout, BattleStats, MoveSlotState, PokemonTyping, StatStages, StatusState,
+};
+use er_types::run_ids::{Experience, GrowthRateId, NatureId};
 
 use crate::pokemon::{
-    validate_ability_loadout, validate_move_slot_metadata, validate_m3_ability_loadout,
-    validate_m3_status_state, validate_m3_typing, validate_stat_stages, validate_status_state,
-    validate_typing, PokemonStateError, MOVE_SLOT_COUNT,
+    MOVE_SLOT_COUNT, PokemonStateError, validate_ability_loadout, validate_m3_ability_loadout,
+    validate_m3_status_state, validate_m3_typing, validate_move_slot_metadata,
+    validate_stat_stages, validate_status_state, validate_typing,
 };
 
 pub const POKEMON_STATE_SCHEMA_VERSION_V2: u32 = 2;
@@ -66,7 +68,6 @@ pub struct PermanentStatBonuses {
     pub speed: u32,
 }
 
-
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PokemonProgressionState {
@@ -98,9 +99,11 @@ impl PokemonProgressionState {
             });
         }
         if !matches!(self.effective_nature.get(), 0 | 3 | 10 | 15) {
-            return Err(PokemonProgressionValidationError::UnsupportedEffectiveNature {
-                value: self.effective_nature.get(),
-            });
+            return Err(
+                PokemonProgressionValidationError::UnsupportedEffectiveNature {
+                    value: self.effective_nature.get(),
+                },
+            );
         }
         Ok(())
     }
@@ -225,22 +228,28 @@ impl PokemonStateV2 {
             return Err(PokemonStateV2Error::M3(PokemonStateError::ZeroMaxHp));
         }
         if self.hp > self.max_hp {
-            return Err(PokemonStateV2Error::M3(PokemonStateError::HpExceedsMaximum {
-                hp: self.hp,
-                max_hp: self.max_hp,
-            }));
+            return Err(PokemonStateV2Error::M3(
+                PokemonStateError::HpExceedsMaximum {
+                    hp: self.hp,
+                    max_hp: self.max_hp,
+                },
+            ));
         }
         if self.fainted != (self.hp == 0) {
-            return Err(PokemonStateV2Error::M3(PokemonStateError::FaintedMismatch {
-                hp: self.hp,
-                fainted: self.fainted,
-            }));
+            return Err(PokemonStateV2Error::M3(
+                PokemonStateError::FaintedMismatch {
+                    hp: self.hp,
+                    fainted: self.fainted,
+                },
+            ));
         }
         if self.stats.hp != self.max_hp {
-            return Err(PokemonStateV2Error::M3(PokemonStateError::StatsHpMismatch {
-                stats_hp: self.stats.hp,
-                max_hp: self.max_hp,
-            }));
+            return Err(PokemonStateV2Error::M3(
+                PokemonStateError::StatsHpMismatch {
+                    stats_hp: self.stats.hp,
+                    max_hp: self.max_hp,
+                },
+            ));
         }
         for (slot, move_slot) in self.moves.iter().enumerate() {
             if let Some(move_slot) = move_slot {

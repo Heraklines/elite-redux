@@ -6,19 +6,17 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use er_rng::phaser::RunRngState;
+use er_types::SeatId;
 use er_types::battle_ids::{BattleId, MoveId, PokemonId, SpeciesId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
 use er_types::ids::OperationId;
 use er_types::run_ids::Experience;
 pub use er_types::run_model::{ModifierTier, RunOutcome, RunStage, RunSurfaceKind};
-use er_types::SeatId;
-
 
 pub const RUN_STATE_SCHEMA_VERSION: u32 = 1;
 pub const PROGRESSION_QUEUE_SCHEMA_VERSION: u32 = 1;
 pub const PROGRESSION_TASK_SCHEMA_VERSION: u32 = 1;
 pub const RUN_SURFACE_STATE_SCHEMA_VERSION: u32 = 1;
-
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -318,12 +316,16 @@ impl RunStateV2 {
         if self.next_battle_id == BattleId::ZERO {
             return Err(RunStateValidationError::ZeroNextBattleId);
         }
-        self.run_rng.validate().map_err(RunStateValidationError::RunRng)?;
+        self.run_rng
+            .validate()
+            .map_err(RunStateValidationError::RunRng)?;
         if self.progression.schema_version != PROGRESSION_QUEUE_SCHEMA_VERSION {
-            return Err(RunStateValidationError::ProgressionQueueSchemaVersionMismatch {
-                expected: PROGRESSION_QUEUE_SCHEMA_VERSION,
-                actual: self.progression.schema_version,
-            });
+            return Err(
+                RunStateValidationError::ProgressionQueueSchemaVersionMismatch {
+                    expected: PROGRESSION_QUEUE_SCHEMA_VERSION,
+                    actual: self.progression.schema_version,
+                },
+            );
         }
         if let Some(index) = self.progression.active_index {
             if usize::try_from(index).map_or(true, |index| index >= self.progression.tasks.len()) {
@@ -336,10 +338,12 @@ impl RunStateV2 {
         let mut task_ids = BTreeSet::new();
         for envelope in &self.progression.tasks {
             if envelope.schema_version != PROGRESSION_TASK_SCHEMA_VERSION {
-                return Err(RunStateValidationError::ProgressionTaskSchemaVersionMismatch {
-                    expected: PROGRESSION_TASK_SCHEMA_VERSION,
-                    actual: envelope.schema_version,
-                });
+                return Err(
+                    RunStateValidationError::ProgressionTaskSchemaVersionMismatch {
+                        expected: PROGRESSION_TASK_SCHEMA_VERSION,
+                        actual: envelope.schema_version,
+                    },
+                );
             }
             if !task_ids.insert(envelope.task_id) {
                 return Err(RunStateValidationError::DuplicateTaskId);
@@ -362,12 +366,13 @@ pub fn battle_outcome_is_terminal(outcome: BattleOutcome) -> bool {
     !matches!(outcome, BattleOutcome::Ongoing)
 }
 
-
 // Re-export action leaves from the contract-owned type module. These names are
 // intentionally not reconstructed in er-state.
-pub use er_types::run_model::{BiomeMarketAction, CrossroadsAction, RewardAction, RunSurfaceAction};
-pub use er_types::ui_menu::LogicalMenu;
 pub use er_types::run_ids::{
     BiomeId, EncounterId, GameRunId, ModifierId, Money, RouteNodeId, RunContentPackHash,
     RunInteractionSequence, RunOfferId, RunStockId, RunSurfaceId, RunTaskId, SurfaceDigest,
 };
+pub use er_types::run_model::{
+    BiomeMarketAction, CrossroadsAction, RewardAction, RunSurfaceAction,
+};
+pub use er_types::ui_menu::LogicalMenu;

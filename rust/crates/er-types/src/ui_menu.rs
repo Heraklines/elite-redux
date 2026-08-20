@@ -32,12 +32,12 @@ pub struct MenuNavigationEdge {
 }
 
 impl MenuNavigationEdge {
-    pub const fn new(
-        from: MenuOptionId,
-        direction: NavigationDirection,
-        to: MenuOptionId,
-    ) -> Self {
-        Self { from, direction, to }
+    pub const fn new(from: MenuOptionId, direction: NavigationDirection, to: MenuOptionId) -> Self {
+        Self {
+            from,
+            direction,
+            to,
+        }
     }
 }
 
@@ -191,8 +191,7 @@ impl<'de> Deserialize<'de> for LogicalMenuOption {
         }
 
         let value = LogicalMenuOptionWire::deserialize(deserializer)?;
-        Self::new(value.option_id, value.enabled, value.layout)
-            .map_err(serde::de::Error::custom)
+        Self::new(value.option_id, value.enabled, value.layout).map_err(serde::de::Error::custom)
     }
 }
 

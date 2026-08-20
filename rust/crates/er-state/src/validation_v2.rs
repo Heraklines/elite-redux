@@ -14,7 +14,7 @@ use thiserror::Error;
 use crate::battle_v2::{BattleStateV2, BattleStateV2Error};
 use crate::field::FieldStateError;
 use crate::format::FormatTopologyError;
-use crate::game_v2::{GameStateV2, GAME_STATE_SCHEMA_VERSION_V2};
+use crate::game_v2::{GAME_STATE_SCHEMA_VERSION_V2, GameStateV2};
 use crate::pokemon_v2::{PokemonStateV2, PokemonStateV2Error};
 use crate::run_v2::{ProgressionTask, RunStateValidationError};
 
@@ -90,7 +90,9 @@ pub enum StateValidationErrorV2 {
     #[error("defeated enemy evidence gives Pokémon {pokemon:?} a human owner")]
     DefeatedEnemyOwner { pokemon: PokemonId },
     #[error("faint occurrence {id:?} has invalid cross-owner references")]
-    FaintOwnerMismatch { id: er_types::battle_ids::FaintOccurrenceId },
+    FaintOwnerMismatch {
+        id: er_types::battle_ids::FaintOccurrenceId,
+    },
     #[error("run stage contradicts complete nested state")]
     StageInvariant,
 }
@@ -116,10 +118,14 @@ pub fn validate_game_state_v2(state: &GameStateV2) -> Result<(), StateValidation
             .validate()
             .map_err(|source| StateValidationErrorV2::PlayerPokemon { index, source })?;
         if !all_ids.insert(pokemon.id) {
-            return Err(StateValidationErrorV2::DuplicatePokemonId { pokemon: pokemon.id });
+            return Err(StateValidationErrorV2::DuplicatePokemonId {
+                pokemon: pokemon.id,
+            });
         }
         if pokemon.owner_seat.is_none() {
-            return Err(StateValidationErrorV2::PlayerMissingOwner { pokemon: pokemon.id });
+            return Err(StateValidationErrorV2::PlayerMissingOwner {
+                pokemon: pokemon.id,
+            });
         }
     }
 
@@ -168,7 +174,9 @@ fn validate_battle(
     }
     for pokemon in &state.player_party {
         let Some(owner) = pokemon.owner_seat else {
-            return Err(StateValidationErrorV2::PlayerMissingOwner { pokemon: pokemon.id });
+            return Err(StateValidationErrorV2::PlayerMissingOwner {
+                pokemon: pokemon.id,
+            });
         };
         if !human_seats.contains(&owner) {
             return Err(StateValidationErrorV2::InvalidPlayerOwner {
@@ -186,7 +194,9 @@ fn validate_battle(
             });
         }
         if !all_ids.insert(pokemon.id) {
-            return Err(StateValidationErrorV2::DuplicatePokemonId { pokemon: pokemon.id });
+            return Err(StateValidationErrorV2::DuplicatePokemonId {
+                pokemon: pokemon.id,
+            });
         }
     }
 
@@ -194,10 +204,15 @@ fn validate_battle(
         let Some(pokemon_id) = field_slot.occupant else {
             continue;
         };
-        let in_player = state.player_party.iter().find(|pokemon| pokemon.id == pokemon_id);
-        let in_enemy = battle.enemy_party.iter().find(|pokemon| pokemon.id == pokemon_id);
-        let expected_owner =
-            crate::format::owner_seat_for(&battle.format, field_slot.slot)?;
+        let in_player = state
+            .player_party
+            .iter()
+            .find(|pokemon| pokemon.id == pokemon_id);
+        let in_enemy = battle
+            .enemy_party
+            .iter()
+            .find(|pokemon| pokemon.id == pokemon_id);
+        let expected_owner = crate::format::owner_seat_for(&battle.format, field_slot.slot)?;
         let actual_owner = match field_slot.slot.side {
             BattleSide::Player => in_player.and_then(|pokemon| pokemon.owner_seat),
             BattleSide::Enemy => in_enemy.and_then(|pokemon| pokemon.owner_seat),
@@ -239,7 +254,11 @@ fn validate_battle(
                 pokemon: record.pokemon,
             });
         }
-        let Some(enemy) = battle.enemy_party.iter().find(|value| value.id == record.pokemon) else {
+        let Some(enemy) = battle
+            .enemy_party
+            .iter()
+            .find(|value| value.id == record.pokemon)
+        else {
             return Err(StateValidationErrorV2::UnknownDefeatedEnemy {
                 pokemon: record.pokemon,
             });
@@ -277,7 +296,12 @@ fn validate_faint_owners(
             .player_party
             .iter()
             .find(|pokemon| pokemon.id == occurrence.pokemon)
-            .or_else(|| battle.enemy_party.iter().find(|pokemon| pokemon.id == occurrence.pokemon))
+            .or_else(|| {
+                battle
+                    .enemy_party
+                    .iter()
+                    .find(|pokemon| pokemon.id == occurrence.pokemon)
+            })
         else {
             return Err(StateValidationErrorV2::FaintOwnerMismatch { id: occurrence.id });
         };
@@ -307,7 +331,10 @@ fn validate_stage_with_battle(state: &GameStateV2) -> Result<(), StateValidation
         RunStage::AwaitingWaveAdvance => {
             if run.active_surface.is_some()
                 || !run.progression.tasks.is_empty()
-                || !matches!(battle.outcome, BattleOutcome::Victory | BattleOutcome::Defeat)
+                || !matches!(
+                    battle.outcome,
+                    BattleOutcome::Victory | BattleOutcome::Defeat
+                )
                 || battle.settlement.settled
                 || !matches!(run.outcome, RunOutcome::InProgress)
             {
@@ -362,16 +389,16 @@ fn validate_stage_without_battle(state: &GameStateV2) -> Result<(), StateValidat
     Ok(())
 }
 
-pub fn validate_pokemon_graph_v2(
-    party: &[PokemonStateV2],
-) -> Result<(), StateValidationErrorV2> {
+pub fn validate_pokemon_graph_v2(party: &[PokemonStateV2]) -> Result<(), StateValidationErrorV2> {
     let mut ids = BTreeSet::new();
     for (index, pokemon) in party.iter().enumerate() {
         pokemon
             .validate()
             .map_err(|source| StateValidationErrorV2::PlayerPokemon { index, source })?;
         if !ids.insert(pokemon.id) {
-            return Err(StateValidationErrorV2::DuplicatePokemonId { pokemon: pokemon.id });
+            return Err(StateValidationErrorV2::DuplicatePokemonId {
+                pokemon: pokemon.id,
+            });
         }
     }
     Ok(())
@@ -381,11 +408,17 @@ pub fn validate_v2_faint_occurrence(
     occurrence: &FaintOccurrence,
     battle: &BattleStateV2,
 ) -> Result<(), StateValidationErrorV2> {
-    let exists = battle.enemy_party.iter().any(|pokemon| pokemon.id == occurrence.pokemon);
+    let exists = battle
+        .enemy_party
+        .iter()
+        .any(|pokemon| pokemon.id == occurrence.pokemon);
     if !exists {
         return Err(StateValidationErrorV2::FaintOwnerMismatch { id: occurrence.id });
     }
-    if !matches!(occurrence.replacement, ReplacementProgress::NotRequired | ReplacementProgress::Applied) {
+    if !matches!(
+        occurrence.replacement,
+        ReplacementProgress::NotRequired | ReplacementProgress::Applied
+    ) {
         return Ok(());
     }
     Ok(())
