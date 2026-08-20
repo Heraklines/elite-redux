@@ -54,7 +54,6 @@ import {
   ER_SWORDS_NATURE_ABILITY_ID,
   ER_THICK_SKULLED_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
-import { PhotovoltaicTypeAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import {
   ER_DRAGONFRUIT_ABILITY_ID,
   ER_FREE_CLIMB_ABILITY_ID,
@@ -563,6 +562,10 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     if (!ability) {
       continue;
     }
+    const preservedBespokeAttrs =
+      def.id === ER_PHOTOVOLTAIC_ABILITY_ID
+        ? ability.attrs.filter(attr => attr.constructor.name === "PhotovoltaicTypeAbAttr")
+        : [];
     const collected: AbAttr[] = [];
     for (const constituentId of def.constituents) {
       const attrs = resolveConstituentAttrs(constituentId);
@@ -582,8 +585,8 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     for (const attr of collected) {
       attrs.push(attr);
     }
-    if (def.id === ER_PHOTOVOLTAIC_ABILITY_ID) {
-      attrs.push(new PhotovoltaicTypeAbAttr());
+    for (const attr of preservedBespokeAttrs) {
+      attrs.push(attr);
     }
     // A part with a PostFaint attr only fires if the ability bypasses the faint
     // gate. None of the newcomer constituents carry PostFaint attrs today, so no
