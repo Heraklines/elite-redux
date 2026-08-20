@@ -33,6 +33,7 @@ import {
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allMoves, modifierTypes } from "#data/data-lists";
 import { ER_CRACKED_VESSEL_ABILITY_ID } from "#data/elite-redux/abilities/newcomer-signature-abilities";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
@@ -2033,9 +2034,20 @@ const pitchSpecies = (speciesId: number, formKey?: string): FakemonPitchShowcase
   ...(formKey ? { formKey } : {}),
 });
 
+function fakemonPitchMoveset(speciesId: SpeciesId): StarterMoveset {
+  const levelMoves = (pokemonSpeciesLevelMoves as Record<number, Array<[number, MoveId]>>)[speciesId] ?? [];
+  const uniqueMoves = [...new Set(levelMoves.filter(([level]) => level <= 100).map(([, move]) => move))];
+  const selected = uniqueMoves.slice(-4);
+  if (selected.length === 0) {
+    selected.push(MoveId.TACKLE, MoveId.PROTECT);
+  }
+  return selected as StarterMoveset;
+}
+
 const fakemonPitchStarter = (member: FakemonPitchShowcaseMember): Starter =>
   makeStarter(member.speciesId, {
     formIndex: member.formKey ? formIndexByKey(member.speciesId, member.formKey) : 0,
+    moveset: fakemonPitchMoveset(member.speciesId),
   });
 
 function fakemonPitchShowcaseScenario(
@@ -2055,10 +2067,14 @@ function fakemonPitchShowcaseScenario(
       resetDevOverrides();
       const enemyFormIndex = enemy.formKey ? formIndexByKey(enemy.speciesId, enemy.formKey) : 0;
       setOverrides({
-        STARTING_WAVE_OVERRIDE: 31,
-        STARTING_LEVEL_OVERRIDE: 70,
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        BATTLE_STYLE_OVERRIDE: "single",
+        BATTLE_TYPE_OVERRIDE: BattleType.WILD,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
         ENEMY_SPECIES_OVERRIDE: enemy.speciesId,
-        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
         ENEMY_FORM_OVERRIDES: enemy.formKey ? { [enemy.speciesId]: enemyFormIndex } : {},
       });
       return members.map(fakemonPitchStarter);
