@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+// Focused validation marker: M3 direct-mirror command consumer.
 
 // Production-path T2: two real engine clients cross an ordinary battle through its retained reward
 // boundary, consume a naturally-carried Mystery encounter through public UI, cross the complete retained

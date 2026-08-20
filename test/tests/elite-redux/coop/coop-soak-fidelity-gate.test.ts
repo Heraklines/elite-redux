@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+// Focused validation marker: M3 direct-mirror command consumer.
 
 // =============================================================================
 // GATING PRODUCTION-FIDELITY CO-OP SOAK (#897, reconciling #891). This is the GATING sibling of the

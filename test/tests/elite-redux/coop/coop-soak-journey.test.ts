@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+// Focused validation marker: M3 direct-mirror command consumer.
 
 // Production-shaped continuous journey campaign: many distinct mystery-event archetypes are forced into
 // one run, ownership alternates naturally, normal battles continue between them, and real biome changes are

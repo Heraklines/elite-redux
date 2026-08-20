@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+// Focused validation marker: M3 direct-mirror command consumer.
 
 // =============================================================================
 // Showdown Team Menu (Phase D) - the PRE-BUILT PRESET entry, proven end-to-end on TWO engines.

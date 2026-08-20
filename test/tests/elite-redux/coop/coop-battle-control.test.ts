@@ -2,6 +2,7 @@
  * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
  * SPDX-License-Identifier: AGPL-3.0-only
  */
+// Focused validation marker: M3 direct-mirror command consumer.
 
 // =============================================================================
 // Co-op BATTLE CONTROL (#633, P2). In the forced-double co-op battle each player

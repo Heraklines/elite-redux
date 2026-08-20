@@ -1,0 +1,15 @@
+{
+  "taskId": "m3-representatives-20260820",
+  "version": 1,
+  "branch": "ci/coop/m3-representatives-20260820",
+  "trainRef": "arch/rust-kernel-m3",
+  "baseSha": "06628ef64d5b24bd5c9680a55dd9284d0be0995d",
+  "allowedFiles": [
+    ".github/coop-task-ownership/m3-representatives-20260820.json",
+    "test/tests/elite-redux/coop/coop-battle-control.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-fidelity-gate.test.ts",
+    "test/tests/elite-redux/coop/coop-soak-journey.test.ts",
+    "test/tests/elite-redux/coop/coop-transition-t2-mystery.test.ts",
+    "test/tests/elite-redux/showdown/showdown-preset-duo.test.ts"
+  ]
+}
