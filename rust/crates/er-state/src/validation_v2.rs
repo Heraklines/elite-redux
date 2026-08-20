@@ -34,7 +34,7 @@ pub enum StateValidationErrorV2 {
     Field(#[from] FieldStateError),
     #[error("player party has {actual} records; maximum is {maximum}")]
     PlayerPartyTooLarge { actual: usize, maximum: usize },
-    #[error("enemy party has {actual} records; battle format capacity is {maximum}")]
+    #[error("enemy party has {actual} records; maximum party size is {maximum}")]
     EnemyPartyTooLarge { actual: usize, maximum: usize },
     #[error("battle outcome does not agree with living party state")]
     BattleOutcomeMismatch,
@@ -166,10 +166,10 @@ fn validate_battle(
             seat: battle.authority_seat,
         });
     }
-    if battle.enemy_party.len() > usize::from(battle.format.enemy_capacity) {
+    if battle.enemy_party.len() > MAX_PARTY_SIZE {
         return Err(StateValidationErrorV2::EnemyPartyTooLarge {
             actual: battle.enemy_party.len(),
-            maximum: usize::from(battle.format.enemy_capacity),
+            maximum: MAX_PARTY_SIZE,
         });
     }
     for pokemon in &state.player_party {
