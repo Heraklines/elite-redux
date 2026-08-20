@@ -7,6 +7,7 @@
 
 use er_content::pack::ContentPack;
 use er_game::snapshot::{CommandAdmissionLedgerSnapshotV1, SeatControlHistorySnapshotV1};
+use er_protocol::ProtocolRuntimeSnapshotV2;
 use er_state::game_v2::GameStateV2;
 use er_state::run_v2::{EncounterPlan, ProgressionQueue, RunCounters, RunSurfaceState};
 use er_types::battle_command::ScriptedEnemyPolicyV1;
@@ -21,7 +22,7 @@ use thiserror::Error;
 
 use crate::snapshot::{
     BattleKernelRuntimeIdentitySnapshotV1, InputRouterSnapshotV2, KernelSchedulerSnapshotV2,
-    PendingPresentationsSnapshotV1, ProtocolRuntimeSnapshotV2, RngDraw,
+    PendingPresentationsSnapshotV1, RngDraw,
 };
 
 pub const RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3: u32 = 3;
@@ -363,12 +364,12 @@ impl PreparedTransactionSnapshotV3 {
             }
         }
         for (index, draw) in self.rng_audit.iter().enumerate() {
-            if draw.stream.is_empty() || draw.callsite.is_empty() || draw.reason.is_empty() {
-                return Err(invalid(
+            draw.validate().map_err(|error| {
+                invalid(
                     format!("prepared_transaction.rng_audit[{index}]"),
-                    "RNG audit entries must retain stream, callsite, and reason",
-                ));
-            }
+                    error.to_string(),
+                )
+            })?;
         }
         Ok(())
     }
