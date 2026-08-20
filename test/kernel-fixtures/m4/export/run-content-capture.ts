@@ -7,6 +7,7 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
+import { modifierPool } from "#modifiers/modifier-pools";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { initializeGame } from "#init/init";
 import { MoveCategory } from "#enums/move-category";
@@ -89,6 +90,9 @@ function sourceFor(path: string): string {
   }
   if (path.startsWith("type_chart")) {
     return "src/data/type.ts:getTypeDamageMultiplier";
+  }
+  if (path.startsWith("modifierPool")) {
+    return "src/modifier/init-modifier-pools.ts:WeightedModifierType";
   }
   if (path.startsWith("modifiers")) {
     return "src/modifier/modifier-type.ts:modifierTypeInitObj";
@@ -230,12 +234,18 @@ function ensureLiveRegistries(): void {
   const speciesIds = selectedSpecies.map(entry => safeInteger(requireRecord(entry, "species_definitions[]").id, "species.id"));
   const moveIds = selectedMoves.map(entry => safeInteger(requireRecord(entry, "move_definitions[]").id, "moves.id"));
   const abilityIds = selectedAbilities.map(entry => safeInteger(requireRecord(entry, "ability_definitions[]").id, "abilities.id"));
+  const modifierPoolInitialized =
+    Array.isArray((modifierPool as AnyRecord)[ModifierTier.COMMON])
+    && (modifierPool as AnyRecord)[ModifierTier.COMMON].length > 0
+    && Array.isArray((modifierPool as AnyRecord)[ModifierTier.MASTER])
+    && (modifierPool as AnyRecord)[ModifierTier.MASTER].length > 0;
   const initialized =
     speciesIds.every(id => allSpecies.some(entry => Number((entry as AnyRecord).speciesId) === id))
     && [...moveIds, 34].every(id => allMoves.some(entry => Number((entry as AnyRecord).id) === id))
     && abilityIds.every(id => allAbilities.some(entry => Number((entry as AnyRecord).id) === id))
     && [0, 1, 2, 4, 9, 50].every(id => allBiomes.has(id as never))
-    && ["AMULET_COIN", "CANDY_JAR", "POTION", "POKEBALL"].every(key => typeof (modifierTypes as AnyRecord)[key] === "function");
+    && ["AMULET_COIN", "CANDY_JAR", "POTION", "POKEBALL"].every(key => typeof (modifierTypes as AnyRecord)[key] === "function")
+    && modifierPoolInitialized;
   if (!initialized) {
     try {
       initializeGame();
@@ -624,7 +634,69 @@ const MODIFIERS: readonly AnyRecord[] = [
   { id: 401, key: "GREAT_BALL", tier: "GREAT", maximum_stack: 1, target: "INVENTORY", effect: { kind: "INVENTORY_ITEM", key: "GREAT_BALL" }, constructor: "AddPokeballModifierType" },
 ];
 
-function validateModifierSource(definition: AnyRecord): void {
+type ModifierPoolObservation = {
+  tierValue: number;
+  tierName: string;
+};
+
+function observeModifierPool(definition: AnyRecord): ModifierPoolObservation {
+  const pool = modifierPool as AnyRecord;
+  for (const tierValue of Object.values(ModifierTier)) {
+    if (typeof tierValue !== "number") {
+      continue;
+    }
+    const rawEntries = pool[tierValue];
+    if (rawEntries == null) {
+      continue;
+    }
+    const entries = requireArray(rawEntries, `modifierPool[${tierValue}]`);
+    for (const [index, rawEntry] of entries.entries()) {
+      const weighted = requireRecord(rawEntry, `modifierPool[${tierValue}][${index}]`);
+      const modifierType = requireRecord(
+        weighted.modifierType,
+        `modifierPool[${tierValue}][${index}].modifierType`,
+      );
+      if (modifierType.id !== definition.key) {
+        continue;
+      }
+      const weight = weighted.weight;
+      if (typeof weight !== "number" && typeof weight !== "function") {
+        gap(
+          "MODIFIER_POOL_SOURCE_UNOBSERVABLE",
+          "src/modifier/init-modifier-pools.ts:WeightedModifierType",
+          `${definition.key} has no weight capability`,
+        );
+      }
+      if (typeof weight === "number") {
+        finite(weight, `modifierPool[${tierValue}][${index}].weight`);
+      }
+      const maxWeight = weighted.maxWeight;
+      if (typeof maxWeight !== "number" && typeof maxWeight !== "function") {
+        gap(
+          "MODIFIER_POOL_SOURCE_UNOBSERVABLE",
+          "src/modifier/init-modifier-pools.ts:WeightedModifierType",
+          `${definition.key} has no max-weight capability`,
+        );
+      }
+      if (typeof maxWeight === "number") {
+        finite(maxWeight, `modifierPool[${tierValue}][${index}].maxWeight`);
+      }
+      const tierName = enumName(
+        ModifierTier as unknown as AnyRecord,
+        tierValue,
+        `modifierPool[${tierValue}].tier`,
+      );
+      return { tierValue, tierName };
+    }
+  }
+  gap(
+    "MODIFIER_TIER_UNOBSERVABLE",
+    "src/modifier/init-modifier-pools.ts:modifierPool",
+    `${definition.key} has no player reward-pool entry`,
+  );
+}
+
+function validateModifierSource(definition: AnyRecord): ModifierPoolObservation {
   const factory = (modifierTypes as AnyRecord)[definition.key];
   if (typeof factory !== "function") {
     gap("MODIFIER_REGISTRY_UNINITIALIZED", "src/modifier/modifier-type.ts:initModifierTypes", `${definition.key} is absent`);
@@ -643,9 +715,10 @@ function validateModifierSource(definition: AnyRecord): void {
   exact(type.id, definition.key, `modifiers.${definition.key}.id`);
   const constructorName = requireString(type.constructor?.name, `modifiers.${definition.key}.constructor.name`);
   exact(constructorName, definition.constructor, `modifiers.${definition.key}.constructor.name`);
-  const tierName = type.tier == null ? "" : enumName(ModifierTier as unknown as AnyRecord, type.tier, `modifiers.${definition.key}.tier`);
+  const poolObservation = observeModifierPool(definition);
+  const tierName = poolObservation.tierName;
   if (tierName !== definition.tier) {
-    gap("MODIFIER_SOURCE_MISMATCH", "src/modifier/init-modifier-pools.ts:ModifierTier", `${definition.key} tier ${tierName} expected ${definition.tier}`);
+    gap("MODIFIER_SOURCE_MISMATCH", "src/modifier/init-modifier-pools.ts:modifierPool", `${definition.key} tier ${tierName} expected ${definition.tier}`);
   }
   if (typeof type.newModifier !== "function") {
     gap("MODIFIER_SOURCE_UNOBSERVABLE", "src/modifier/modifier-type.ts:ModifierType.newModifier", `${definition.key} cannot construct its effect`);
@@ -677,6 +750,7 @@ function validateModifierSource(definition: AnyRecord): void {
     const multiplier = safeInteger((type as AnyRecord).moneyMultiplier * 1000, `modifiers.${definition.key}.multiplier`);
     exact(multiplier, effect.multiplier_milli, `modifiers.${definition.key}.multiplier_milli`);
   }
+  return poolObservation;
 }
 
 function selectedModifiers(slice: AnyRecord): JsonValue[] {
@@ -684,19 +758,28 @@ function selectedModifiers(slice: AnyRecord): JsonValue[] {
   if (selected.length !== MODIFIERS.length) {
     gap("RUN_CONTENT_DEFINITION_MISMATCH", "rust/crates/er-run/src/content.rs:selected_modifier_definitions", "modifier count differs from Rust closure");
   }
+  const observations: Record<string, ModifierPoolObservation> = {};
   for (const definition of MODIFIERS) {
     const entry = selected.find(raw => requireRecord(raw, "modifier_ids[]").key === definition.key);
     if (entry == null || safeInteger(requireRecord(entry, "modifier_ids[]").id, `modifier.${definition.key}.id`) !== definition.id) {
       gap("RUN_CONTENT_DEFINITION_MISMATCH", "rust/fixtures/m4/m4-slice-manifest.json:modifier_ids", `${definition.key} ID differs from Rust closure`);
     }
-    validateModifierSource(definition);
+    observations[definition.key] = validateModifierSource(definition);
   }
   const slots: JsonValue[] = Array.from({ length: 402 }, () => null);
   for (const definition of MODIFIERS) {
+    const observation = observations[definition.key];
+    if (observation == null) {
+      gap(
+        "MODIFIER_TIER_UNOBSERVABLE",
+        "src/modifier/init-modifier-pools.ts:modifierPool",
+        `${definition.key} validation did not produce a pool observation`,
+      );
+    }
     slots[definition.id] = {
       id: definition.id,
       oracle_registry_key: definition.key,
-      tier: definition.tier,
+      tier: observation.tierName,
       maximum_stack: definition.maximum_stack,
       target: definition.target,
       effect: definition.effect,
