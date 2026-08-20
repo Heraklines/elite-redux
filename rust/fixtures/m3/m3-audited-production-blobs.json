@@ -2,7 +2,7 @@
   "schema_version": 1,
   "manifest_id": "m3-audited-production-blobs-v1",
   "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
-  "head_sha": "7cc3ac876ac5ba5249664a8038ca60966e4744ff",
+  "head_sha": "6469af1c7c039055d29f7f5e05da1057f7e06468",
   "source_root": "src",
   "path_count": 41,
   "paths": [
@@ -40,7 +40,7 @@
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/shadow.ts",
-      "blob_oid": "c32f6fffd23859cc79bb6ce0e03c67d2b36d9ab2"
+      "blob_oid": "92c4d1eee4bfcfce5c293626f5bc3c396535cd52"
     },
     {
       "path": "src/data/elite-redux/coop/coop-battle-stream.ts",
