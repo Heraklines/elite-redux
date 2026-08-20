@@ -68,14 +68,14 @@ import {
   OverloadedPowerAbAttr,
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
+import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { wireFakemonPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import {
   ER_SUGAR_RUSH_ABILITY_ID,
   ER_UPCYCLE_ABILITY_ID,
   holderHasUpcycle,
   isErFoodPokemon,
 } from "#data/elite-redux/abilities/food-based";
-import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
-import { wireFakemonPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { ER_GENESIS_SUPERNOVA_ABILITY_ID, GenesisSupernovaAbAttr } from "#data/elite-redux/abilities/genesis-supernova";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";

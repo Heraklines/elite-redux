@@ -106,7 +106,6 @@ import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-autho
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
-import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
 import {
   erRecordAchievementDamageAndUpdate,
   erRecordAchievementFusion,
@@ -214,6 +213,7 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
+import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
 import {
   absorbMoodyFormationBarrier,
   applyMoodyFormationLethalClamp,
@@ -2611,7 +2611,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public getMaxMoveCount(): number {
     const permanentSlots = this.customPokemonData?.bonusMoveSlots ?? 0;
-    const pentaPunchSlot = this.hasAbilityWithAttr("PentaPunchMarkerAbAttr") ? 1 : 0;
+    const pentaPunchSlot = this.getAllActiveAbilityAttrs().some(
+      attr => attr.constructor.name === "PentaPunchMarkerAbAttr",
+    )
+      ? 1
+      : 0;
     return 4 + Math.max(permanentSlots, pentaPunchSlot);
   }
 
@@ -3689,11 +3693,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
     if (
       this.getMoveset().some(move => move.getMove().type === PokemonType.DARK)
-      && globalScene.getField(true).some(holder =>
-        holder !== this
-        && !holder.isFainted()
-        && holder.getAbilitySources().some(source =>
-          source.ability.id === FAKEMON_PITCH_RUNTIME_ABILITY_IDS.DEADLY_SENTENCING))
+      && globalScene
+        .getField(true)
+        .some(
+          holder =>
+            holder !== this
+            && !holder.isFainted()
+            && holder
+              .getAbilitySources()
+              .some(source => source.ability.id === (FAKEMON_PITCH_RUNTIME_ABILITY_IDS.DEADLY_SENTENCING as AbilityId)),
+        )
     ) {
       return false;
     }
@@ -6081,8 +6090,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     );
     if (
       this.status?.effect === StatusEffect.BURN
-      && globalScene.getField(true).some(holder =>
-        !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId))
+      && globalScene
+        .getField(true)
+        .some(
+          holder =>
+            !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId),
+        )
     ) {
       damage.value = toDmgValue(damage.value * (4 / 3));
     }

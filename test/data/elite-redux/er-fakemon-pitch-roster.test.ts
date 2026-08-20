@@ -4,18 +4,12 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { allAbilities } from "#data/ability";
+import { allAbilities } from "#data/data-lists";
 import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { erBlackSpritePathFromBase } from "#data/elite-redux/er-black-sprite-manifest";
-import {
-  ER_FAKEMON_PITCH_SPECIES,
-  ER_POWER_PLANT_SPECIES_ID,
-} from "#data/elite-redux/er-fakemon-pitch-species";
+import { ER_FAKEMON_PITCH_SPECIES, ER_POWER_PLANT_SPECIES_ID } from "#data/elite-redux/er-fakemon-pitch-species";
 import { pokemonFormChanges } from "#data/pokemon-forms";
-import {
-  SpeciesFormChangeItemTrigger,
-  SpeciesFormChangeManualTrigger,
-} from "#data/pokemon-forms/form-change-triggers";
+import { SpeciesFormChangeItemTrigger, SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { FormChangeItem } from "#enums/form-change-item";
 import { SpeciesId } from "#enums/species-id";
 import "#test/framework/game-manager";
@@ -48,8 +42,8 @@ describe("Discord fakemon-pitch roster", () => {
   it("registers every Mega form and its item-trigger edge", () => {
     for (const [speciesId, formKey, item, slug] of MEGA_FORMS) {
       expect(getPokemonSpecies(speciesId).forms.some(form => form.formKey === formKey)).toBe(true);
-      const edge = (pokemonFormChanges[speciesId] ?? []).find(change =>
-        change.formKey === formKey && change.trigger.hasTriggerType(SpeciesFormChangeItemTrigger),
+      const edge = (pokemonFormChanges[speciesId] ?? []).find(
+        change => change.formKey === formKey && change.trigger.hasTriggerType(SpeciesFormChangeItemTrigger),
       );
       expect(edge, `${slug} form-change edge`).toBeDefined();
       expect((edge!.findTrigger(SpeciesFormChangeItemTrigger) as SpeciesFormChangeItemTrigger).item).toBe(item);
@@ -59,9 +53,11 @@ describe("Discord fakemon-pitch roster", () => {
   it("registers Live Current as Power Plant's one-way manual battle form", () => {
     const speciesId = ER_POWER_PLANT_SPECIES_ID as SpeciesId;
     expect(getPokemonSpecies(speciesId).forms.some(form => form.formKey === "live-current")).toBe(true);
-    expect((pokemonFormChanges[speciesId] ?? []).some(change =>
-      change.formKey === "live-current" && change.trigger.hasTriggerType(SpeciesFormChangeManualTrigger),
-    )).toBe(true);
+    expect(
+      (pokemonFormChanges[speciesId] ?? []).some(
+        change => change.formKey === "live-current" && change.trigger.hasTriggerType(SpeciesFormChangeManualTrigger),
+      ),
+    ).toBe(true);
   });
 
   it("has generated front and back T4 paths for every published sprite slug", () => {

@@ -4596,6 +4596,10 @@ export class ErBlindJusticeTag extends MoveRestrictionBattlerTag {
   override isMoveRestricted(move: MoveId): boolean {
     return move === this.sourceMove;
   }
+
+  override selectionDeniedText(_pokemon: Pokemon, move: MoveId): string {
+    return i18next.t("battle:moveDisabled", { moveName: allMoves[move].name });
+  }
 }
 
 /** Switch-lapsing marker used by Confectious and the shared Food registry. */

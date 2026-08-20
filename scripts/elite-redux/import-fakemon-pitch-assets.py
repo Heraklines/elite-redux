@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Normalize the approved fakemon-pitch art into ER asset directories.
 
 This importer intentionally keeps source selection explicit. The originals stay in

@@ -7,47 +7,46 @@
 import {
   type AbAttr,
   type AbAttrBaseParams,
-  ChangeMovePriorityAbAttr,
   BlockStatusDamageAbAttr,
+  ChangeMovePriorityAbAttr,
+  type ModifyMoveEffectChanceAbAttrParams,
   MoveEffectChanceMultiplierAbAttr,
   MovePowerBoostAbAttr,
   PostAttackAbAttr,
   PostDefendAbAttr,
   PostFaintAbAttr,
   type PostFaintAbAttrParams,
+  type PostMoveInteractionAbAttrParams,
   PostSummonAbAttr,
   PostTurnAbAttr,
+  type PreAttackModifyPowerAbAttrParams,
   ReceivedMoveDamageMultiplierAbAttr,
   StatusEffectImmunityAbAttr,
   VariableMovePowerAbAttr,
-  type PreAttackModifyPowerAbAttrParams,
-  type ModifyMoveEffectChanceAbAttrParams,
-  type PostMoveInteractionAbAttrParams,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
-import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
-import { CritDamageMultiplierAbAttr } from "#data/elite-redux/archetypes/crit-mod";
-import { CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
-import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
-import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
-import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
-import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
+import { CritDamageMultiplierAbAttr, CritStageBonusAbAttr } from "#data/elite-redux/archetypes/crit-mod";
 import {
   ConsumeFirstFlaggedMovePriorityAbAttr,
   FirstFlaggedMovePriorityAbAttr,
 } from "#data/elite-redux/archetypes/first-move-priority";
-import { MoveCategory } from "#enums/move-category";
-import { MoveFlags } from "#enums/move-flags";
-import { MoveId } from "#enums/move-id";
-import { MoveUseMode } from "#enums/move-use-mode";
-import { MoveTarget } from "#enums/move-target";
-import { ErMoveId } from "#enums/er-move-id";
-import { PokemonType } from "#enums/pokemon-type";
+import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+import { PostSummonScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-summon-scripted-move";
+import { PostTurnScriptedMoveAbAttr } from "#data/elite-redux/archetypes/post-turn-scripted-move";
+import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
+import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { ErMoveId } from "#enums/er-move-id";
+import { MoveCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
+import { MoveTarget } from "#enums/move-target";
+import { MoveUseMode } from "#enums/move-use-mode";
+import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
@@ -79,8 +78,8 @@ import {
   ER_PHOENIX_FOLIAGE_ABILITY_ID,
   ER_PHOTOVOLTAIC_ABILITY_ID,
   ER_POWER_GRINDER_ABILITY_ID,
-  ER_SPLASH_DAMAGE_ABILITY_ID,
   ER_SNOWBALL_FIGHT_ABILITY_ID,
+  ER_SPLASH_DAMAGE_ABILITY_ID,
   ER_SPLIT_MIND_ABILITY_ID,
   ER_STARCROSSED_ABILITY_ID,
   ER_THIRD_EYE_ABILITY_ID,
@@ -92,8 +91,10 @@ export class AstralProjectStarMarkerAbAttr extends PostSummonAbAttr {
 }
 
 function isStarMove(user: Pokemon, move: Move): boolean {
-  return move.hasFlag(MoveFlags.LUNAR_MOVE)
-    || user.getAllActiveAbilityAttrs().some(attr => attr instanceof AstralProjectStarMarkerAbAttr);
+  return (
+    move.hasFlag(MoveFlags.LUNAR_MOVE)
+    || user.getAllActiveAbilityAttrs().some(attr => attr instanceof AstralProjectStarMarkerAbAttr)
+  );
 }
 
 class StarHitMultiplierAbAttr extends HitMultiplierAbAttr {
@@ -122,7 +123,7 @@ class HydromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
   }
 
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    return super.canApply(params) && params.move.hasAttr("ErDrenchAttr");
+    return super.canApply(params) && params.move.attrs.some(attr => attr.constructor.name === "ErDrenchAttr");
   }
 }
 
@@ -132,8 +133,12 @@ class ElectromancyEffectChanceAbAttr extends MoveEffectChanceMultiplierAbAttr {
   }
 
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
-    return super.canApply(params)
-      && params.move.getAttrs<"StatusEffectAttr">("StatusEffectAttr").some(attr => attr.effect === StatusEffect.PARALYSIS);
+    return (
+      super.canApply(params)
+      && params.move
+        .getAttrs<"StatusEffectAttr">("StatusEffectAttr")
+        .some(attr => attr.effect === StatusEffect.PARALYSIS)
+    );
   }
 }
 
@@ -202,10 +207,12 @@ class PhoenixFoliageUseFormChangeAbAttr extends PostAttackAbAttr {
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return !params.pokemon.isFainted()
+    return (
+      !params.pokemon.isFainted()
       && !isLiveCurrent(params.pokemon)
       && params.pokemon.turnData.hitsLeft <= 1
-      && isPhoenixFoliageType(params.pokemon.getMoveType(params.move));
+      && isPhoenixFoliageType(params.pokemon.getMoveType(params.move))
+    );
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -217,9 +224,11 @@ class PhoenixFoliageUseFormChangeAbAttr extends PostAttackAbAttr {
 
 class PhoenixFoliageHitFormChangeAbAttr extends PostDefendAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return !params.pokemon.isFainted()
+    return (
+      !params.pokemon.isFainted()
       && !isLiveCurrent(params.pokemon)
-      && isPhoenixFoliageType(params.opponent.getMoveType(params.move));
+      && isPhoenixFoliageType(params.opponent.getMoveType(params.move))
+    );
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -246,12 +255,14 @@ class MoxibustionAbAttr extends PostAttackAbAttr {
 class HijackAbAttr extends PostAttackAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, opponent, move, damage } = params;
-    return super.canApply(params)
+    return (
+      super.canApply(params)
       && damage > 0
       && pokemon.getMoveType(move) === PokemonType.ELECTRIC
       && opponent.status?.effect === StatusEffect.PARALYSIS
       && !opponent.summonData.erCommandedUsedThisSwitchIn
-      && !opponent.getTag(BattlerTagType.ER_COMMANDED);
+      && !opponent.getTag(BattlerTagType.ER_COMMANDED)
+    );
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -276,10 +287,12 @@ class ThirdEyeAbAttr extends PostSummonAbAttr {
 
 class MetallosisPoisonAbAttr extends PostAttackAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params)
+    return (
+      super.canApply(params)
       && params.damage > 0
       && !!params.opponent.turnData.attacksReceived[0]?.critical
-      && params.opponent.canSetStatus(StatusEffect.POISON, true, false, params.pokemon);
+      && params.opponent.canSetStatus(StatusEffect.POISON, true, false, params.pokemon)
+    );
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -309,7 +322,8 @@ class BlindJusticeAbAttr extends PostTurnAbAttr {
     if (simulated) {
       return;
     }
-    const candidates = globalScene.getField(true)
+    const candidates = globalScene
+      .getField(true)
       .filter(target => target !== pokemon && !target.isFainted() && !target.getTag(BattlerTagType.ER_BLIND_JUSTICE))
       .map(target => ({
         target,
@@ -363,11 +377,13 @@ class ConfectiousDefendAbAttr extends PostDefendAbAttr {
 
 class IrradiatedFistAbAttr extends PostAttackAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params)
+    return (
+      super.canApply(params)
       && params.damage > 0
       && params.move.hasFlag(MoveFlags.PUNCHING_MOVE)
       && params.pokemon.randBattleSeedInt(100) < 50
-      && params.opponent.canSetStatus(StatusEffect.TOXIC, true, false, params.pokemon);
+      && params.opponent.canSetStatus(StatusEffect.TOXIC, true, false, params.pokemon)
+    );
   }
 
   override apply({ pokemon, opponent, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -398,14 +414,20 @@ class ContaminatedHitMultiplierAbAttr extends HitMultiplierAbAttr {
   }
 
   override canApply(params: Parameters<HitMultiplierAbAttr["canApply"]>[0]): boolean {
-    return super.canApply(params)
-      && globalScene.getField(true).some(target => target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC);
+    return (
+      super.canApply(params)
+      && globalScene
+        .getField(true)
+        .some(target => target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC)
+    );
   }
 
   override apply(params: Parameters<HitMultiplierAbAttr["apply"]>[0]): void {
-    const poisoned = globalScene.getField(true)
-      .filter(target => target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC)
-      .length;
+    const poisoned = globalScene
+      .getField(true)
+      .filter(
+        target => target.status?.effect === StatusEffect.POISON || target.status?.effect === StatusEffect.TOXIC,
+      ).length;
     params.hitCount.value += Math.min(globalScene.getField(true).length, poisoned);
   }
 }
@@ -424,7 +446,11 @@ class DecayEntryAbAttr extends PostSummonAbAttr {
 
 class DecayRestoreAbAttr extends PostTurnAbAttr {
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    if (!simulated && pokemon.getTag(BattlerTagType.ER_DECAY_POISON) && pokemon.status?.effect !== StatusEffect.POISON) {
+    if (
+      !simulated
+      && pokemon.getTag(BattlerTagType.ER_DECAY_POISON)
+      && pokemon.status?.effect !== StatusEffect.POISON
+    ) {
       pokemon.trySetStatus(StatusEffect.POISON, pokemon);
     }
   }
@@ -461,8 +487,9 @@ class OracleEntryAbAttr extends PostSummonAbAttr {
       return;
     }
     pokemon.battleData.erAbilityProvenance.push("oracle:first-entry");
-    pokemon.summonData.erAbilityProvenance = pokemon.summonData.erAbilityProvenance
-      .filter(entry => !entry.startsWith("oracle:guard:"));
+    pokemon.summonData.erAbilityProvenance = pokemon.summonData.erAbilityProvenance.filter(
+      entry => !entry.startsWith("oracle:guard:"),
+    );
     pokemon.summonData.erAbilityProvenance.push("oracle:guard:3");
   }
 }
@@ -490,12 +517,14 @@ function oracleGuardActive(pokemon: Pokemon): boolean {
 
 class SplashDamageAbAttr extends PostAttackAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    return super.canApply(params)
+    return (
+      super.canApply(params)
       && params.damage > 0
       && params.move.category !== MoveCategory.STATUS
       && [MoveTarget.NEAR_ENEMY, MoveTarget.OTHER, MoveTarget.NEAR_OTHER].includes(params.move.moveTarget)
       && !params.pokemon.turnData.erAbilityProvenance.includes("splash-damage:guard")
-      && params.opponent.getAdjacentAllies().some(ally => !ally.isFainted());
+      && params.opponent.getAdjacentAllies().some(ally => !ally.isFainted())
+    );
   }
 
   override apply({ pokemon, opponent, move, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -564,8 +593,12 @@ export function wireFakemonPitchAbility(
       break;
     case ER_ASTRAL_PROJECT_ABILITY_ID:
       builder.attr(AstralProjectStarMarkerAbAttr);
-      builder.attr(ReceivedMoveDamageMultiplierAbAttr, (_target: Pokemon, user: Pokemon, move: Move) =>
-        [PokemonType.PSYCHIC, PokemonType.DARK].includes(user.getMoveType(move)), 0.5);
+      builder.attr(
+        ReceivedMoveDamageMultiplierAbAttr,
+        (_target: Pokemon, user: Pokemon, move: Move) =>
+          [PokemonType.PSYCHIC, PokemonType.DARK].includes(user.getMoveType(move)),
+        0.5,
+      );
       break;
     case ER_PERPETUAL_MOTION_ABILITY_ID:
       builder.attr(PostTurnScriptedMoveAbAttr, { moveId: MoveId.ROLLOUT, power: 20 });
@@ -614,16 +647,29 @@ export function wireFakemonPitchAbility(
       builder.attr(HitMultiplierPowerAbAttr, { multiplier: 0.7, filter: { flag: MoveFlags.BITING_MOVE } });
       break;
     case ER_ELECTRIFIED_ABILITY_ID:
-      builder.attr(ReceivedMoveDamageMultiplierAbAttr, (target: Pokemon, user: Pokemon, move: Move) =>
-        !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target }), 0.5);
-      builder.attr(ReceivedMoveDamageMultiplierAbAttr, (_target: Pokemon, user: Pokemon, move: Move) =>
-        user.getMoveType(move) === PokemonType.ELECTRIC, 2);
+      builder.attr(
+        ReceivedMoveDamageMultiplierAbAttr,
+        (target: Pokemon, user: Pokemon, move: Move) =>
+          !move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target }),
+        0.5,
+      );
+      builder.attr(
+        ReceivedMoveDamageMultiplierAbAttr,
+        (_target: Pokemon, user: Pokemon, move: Move) => user.getMoveType(move) === PokemonType.ELECTRIC,
+        2,
+      );
       break;
     case ER_POWER_GRINDER_ABILITY_ID:
-      builder.attr(MovePowerBoostAbAttr, (_user: Pokemon, target: Pokemon | null) =>
-        !!target && target.isOfType(PokemonType.STEEL), 1.5);
-      builder.attr(ReceivedMoveDamageMultiplierAbAttr, (_target: Pokemon, user: Pokemon) =>
-        user.isOfType(PokemonType.STEEL), 0.5);
+      builder.attr(
+        MovePowerBoostAbAttr,
+        (_user: Pokemon, target: Pokemon | null) => !!target && target.isOfType(PokemonType.STEEL),
+        1.5,
+      );
+      builder.attr(
+        ReceivedMoveDamageMultiplierAbAttr,
+        (_target: Pokemon, user: Pokemon) => user.isOfType(PokemonType.STEEL),
+        0.5,
+      );
       break;
     case ER_AUGUR_ABILITY_ID:
       builder.attr(StatDebuffOnFlagAttackAbAttr, { flag: MoveFlags.DRILL_BASED, stat: Stat.DEF, stages: -1 });

@@ -402,8 +402,11 @@ export class MovePhase extends PokemonPhase {
   }
 
   protected checkBurnFatigue(): boolean {
-    const hasBurnFatigueAura = globalScene.getField(true).some(holder =>
-      !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId));
+    const hasBurnFatigueAura = globalScene
+      .getField(true)
+      .some(
+        holder => !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId),
+      );
     if (
       this.useMode === MoveUseMode.INDIRECT
       || this.pokemon.status?.effect !== StatusEffect.BURN

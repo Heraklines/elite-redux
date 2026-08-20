@@ -40,20 +40,8 @@ import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import {
-  ER_DRAGONFRUIT_ABILITY_ID,
-  ER_FREE_CLIMB_ABILITY_ID,
-  ER_GRIEVOUS_SPEAR_ABILITY_ID,
-  ER_GRIM_JAB_ABILITY_ID,
-  ER_KOMODO_NATIVIZE_ABILITY_ID,
-  ER_OMINOUS_SHROUD_ABILITY_ID,
-  ER_SAVAGE_SPEAR_ABILITY_ID,
-  ER_SPECTACLE_ABILITY_ID,
-  ER_VOLTRON_ABILITY_ID,
-  ER_WATERBORNE_ABILITY_ID,
-} from "#data/elite-redux/abilities/type-nativization-abilities";
-import {
-  ER_CRYOGENESIS_ABILITY_ID,
   ER_CRUSHING_ANTLERS_ABILITY_ID,
+  ER_CRYOGENESIS_ABILITY_ID,
   ER_DAYDREAMER_ABILITY_ID,
   ER_DIRTY_SNOWBALL_ABILITY_ID,
   ER_FLUTTERING_SPIRIT_ABILITY_ID,
@@ -67,6 +55,18 @@ import {
   ER_THICK_SKULLED_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { PhotovoltaicTypeAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
+import {
+  ER_DRAGONFRUIT_ABILITY_ID,
+  ER_FREE_CLIMB_ABILITY_ID,
+  ER_GRIEVOUS_SPEAR_ABILITY_ID,
+  ER_GRIM_JAB_ABILITY_ID,
+  ER_KOMODO_NATIVIZE_ABILITY_ID,
+  ER_OMINOUS_SHROUD_ABILITY_ID,
+  ER_SAVAGE_SPEAR_ABILITY_ID,
+  ER_SPECTACLE_ABILITY_ID,
+  ER_VOLTRON_ABILITY_ID,
+  ER_WATERBORNE_ABILITY_ID,
+} from "#data/elite-redux/abilities/type-nativization-abilities";
 import { AbilityId } from "#enums/ability-id";
 
 // ---------------------------------------------------------------------------
