@@ -1465,7 +1465,16 @@ test("superseded control addresses can reopen without weakening live-address con
   assert.notEqual(registerStart, -1, "the global ledger exposes its registration boundary");
   assert.ok(registerEnd > registerStart, "the registration boundary has a bounded source block");
   const register = controlLedger.slice(registerStart, registerEnd);
-  assert.match(register, /if \(!prior\.superseded \|\| entry\.revision <= prior\.revision\) \{\s*return false;/u);
+  assert.match(
+    register,
+    /if \(!prior\.superseded \|\| entry\.revision <= prior\.revision\) \{\s*return fail\(\);/u,
+    "only a strictly newer revision may reopen a superseded address",
+  );
+  assert.match(
+    register,
+    /if \(duplicate\) \{\s*if \(prior\.superseded\) \{[\s\S]*?return fail\(\);[\s\S]*?\}\s*\/\/ Refresh only[\s\S]*?this\.authenticatedSources\.set/u,
+    "a superseded duplicate fails transactionally before refreshing authenticated evidence",
+  );
   assert.ok(
     register.indexOf("if (duplicate)") < register.indexOf("if (!prior.superseded"),
     "identical redelivery stays idempotent before a newer lease generation is considered",
