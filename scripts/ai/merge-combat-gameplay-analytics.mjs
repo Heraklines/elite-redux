@@ -143,6 +143,11 @@ function loadDictionaries(directory, hashes) {
   );
 }
 
+function itemLabel(dictionary, value) {
+  const name = dictionary?.items?.[value]?.name;
+  return name && name !== "null.name" ? name : `Item ${value} [unresolved${name ? `: ${name}` : ""}]`;
+}
+
 function entityLabelFromParts(kind, dictionaryHash, value, extra, dictionaries) {
   const dictionary = dictionaries[dictionaryHash];
   if (kind === "species") {
@@ -157,7 +162,7 @@ function entityLabelFromParts(kind, dictionaryHash, value, extra, dictionaries) 
     return extra ? `${name} [${extra}]` : name;
   }
   if (kind === "item") {
-    return dictionary?.items?.[value]?.name ?? `Item ${value}`;
+    return itemLabel(dictionary, value);
   }
   return `${kind} ${value}`;
 }
@@ -284,6 +289,76 @@ function contextAdjustedRows(rows, baselines, labeler) {
   });
 }
 
+function runContextKey(dimensions) {
+  return JSON.stringify(dimensions.slice(0, 2));
+}
+
+function runContextBaselines(rows) {
+  const baselines = new Map();
+  for (const row of rows) {
+    const key = runContextKey(row.dimensions);
+    const target = baselines.get(key) ?? { victory: 0, wiped: 0, total: 0 };
+    target.victory += Number(row.outcomes?.victory ?? 0);
+    target.wiped += Number(row.outcomes?.["player-wiped"] ?? 0);
+    target.total = target.victory + target.wiped;
+    baselines.set(key, target);
+  }
+  return baselines;
+}
+
+function runAdjustedRows(rows, baselines, labeler) {
+  const groups = new Map();
+  for (const row of rows) {
+    const baseline = baselines.get(runContextKey(row.dimensions));
+    const wins = Number(row.outcomes?.victory ?? 0);
+    const losses = Number(row.outcomes?.["player-wiped"] ?? 0);
+    const total = wins + losses;
+    if (baseline == null || baseline.total === 0 || total === 0) {
+      continue;
+    }
+    const difficulty = String(row.dimensions[0] ?? "unknown");
+    const labelled = normalizedLabel(labeler(row.dimensions));
+    const key = JSON.stringify([difficulty, labelled.label]);
+    const target = groups.get(key) ?? {
+      difficulty,
+      name: labelled.label,
+      components: labelled.components,
+      runExposures: 0,
+      wins: 0,
+      losses: 0,
+      expectedWins: 0,
+      variance: 0,
+      approximateSources: 0,
+      sourceSketch: emptySourceSketch(),
+    };
+    const expectedRate = baseline.victory / baseline.total;
+    target.runExposures += total;
+    target.wins += wins;
+    target.losses += losses;
+    target.expectedWins += total * expectedRate;
+    target.variance += total * expectedRate * (1 - expectedRate);
+    if (row.sourceSketch) {
+      mergeSourceSketch(target.sourceSketch, decodeSourceSketch(row.sourceSketch));
+      target.approximateSources = estimateSourceSketch(target.sourceSketch);
+    } else {
+      target.approximateSources = Math.max(target.approximateSources, Number(row.approximateSources ?? 0));
+    }
+    groups.set(key, target);
+  }
+  return [...groups.values()].map(({ sourceSketch: _sourceSketch, ...row }) => {
+    const rawAdjustedLift = (row.wins - row.expectedWins) / row.runExposures;
+    return {
+      ...row,
+      observedWinRate: row.wins / row.runExposures,
+      expectedWinRate: row.expectedWins / row.runExposures,
+      rawAdjustedLift,
+      adjustedLift: rawAdjustedLift * (row.runExposures / (row.runExposures + 50)),
+      zScore: (row.wins - row.expectedWins) / Math.sqrt(Math.max(row.variance, 1)),
+      confidence95: wilson(row.wins, row.runExposures),
+    };
+  });
+}
+
 function adjustedRanking(rows, { minBattles = 100, minSources = 10, limit = 10 } = {}) {
   const byDifficulty = {};
   for (const row of rows) {
@@ -303,6 +378,31 @@ function adjustedRanking(rows, { minBattles = 100, minSources = 10, limit = 10 }
           positive: sorted.slice(0, limit),
           negative: sorted.slice(-limit).reverse(),
           popular: [...values].sort((left, right) => right.battleExposures - left.battleExposures).slice(0, limit),
+        },
+      ];
+    }),
+  );
+}
+
+function runAdjustedRanking(rows, { minRuns = 25, minSources = 5, limit = 10 } = {}) {
+  const byDifficulty = {};
+  for (const row of rows) {
+    if (row.runExposures < minRuns || row.approximateSources < minSources) {
+      continue;
+    }
+    const values = byDifficulty[row.difficulty] ?? [];
+    values.push(row);
+    byDifficulty[row.difficulty] = values;
+  }
+  return Object.fromEntries(
+    Object.entries(byDifficulty).map(([difficulty, values]) => {
+      const sorted = values.sort((left, right) => right.adjustedLift - left.adjustedLift);
+      return [
+        difficulty,
+        {
+          positive: sorted.slice(0, limit),
+          negative: sorted.slice(-limit).reverse(),
+          popular: [...values].sort((left, right) => right.runExposures - left.runExposures).slice(0, limit),
         },
       ];
     }),
@@ -341,6 +441,46 @@ function matchupLabel(dimensions, dictionaries) {
   return { label: `${self} vs ${opponent}`, components: [self, opponent] };
 }
 
+const WEATHER_NAMES = [
+  "none",
+  "sunny",
+  "rain",
+  "sandstorm",
+  "hail",
+  "snow",
+  "fog",
+  "heavy-rain",
+  "harsh-sun",
+  "strong-winds",
+  "tempest-storm",
+  "snowy-wrath",
+  "eerie-fog",
+];
+const TERRAIN_NAMES = ["none", "misty", "electric", "grassy", "psychic", "toxic"];
+
+function fieldStateLabel(dimensions) {
+  const kind = String(dimensions[6]);
+  const rawEffect = String(dimensions[7]);
+  const numeric = Number(rawEffect);
+  const effect =
+    kind === "weather" && Number.isInteger(numeric)
+      ? (WEATHER_NAMES[numeric] ?? rawEffect)
+      : kind === "terrain" && Number.isInteger(numeric)
+        ? (TERRAIN_NAMES[numeric] ?? rawEffect)
+        : rawEffect;
+  return `${kind} ${effect} [${dimensions[8]}]`;
+}
+
+function runEntityLabel(dimensions, dictionaries) {
+  return entityLabelFromParts(dimensions[2], dimensions[3], dimensions[4], dimensions[5], dictionaries);
+}
+
+function runSpeciesPairLabel(dimensions, dictionaries) {
+  const left = speciesLabel(dimensions[2], dimensions[3], dimensions[4], dictionaries);
+  const right = speciesLabel(dimensions[2], dimensions[5], dimensions[6], dictionaries);
+  return { label: `${left} + ${right}`, components: [left, right] };
+}
+
 function interactionRanking(rows, individualRows, options = {}) {
   const individual = new Map(individualRows.map(row => [`${row.difficulty}\0${row.name}`, row.rawAdjustedLift]));
   const enriched = rows.map(row => {
@@ -356,6 +496,23 @@ function interactionRanking(rows, individualRows, options = {}) {
     };
   });
   return adjustedRanking(enriched, options);
+}
+
+function runInteractionRanking(rows, individualRows, options = {}) {
+  const individual = new Map(individualRows.map(row => [`${row.difficulty}\0${row.name}`, row.rawAdjustedLift]));
+  const enriched = rows.map(row => {
+    const componentLift = row.components.reduce(
+      (sum, component) => sum + Number(individual.get(`${row.difficulty}\0${component}`) ?? 0),
+      0,
+    );
+    const rawInteractionLift = row.rawAdjustedLift - componentLift;
+    return {
+      ...row,
+      rawInteractionLift,
+      adjustedLift: rawInteractionLift * (row.runExposures / (row.runExposures + 100)),
+    };
+  });
+  return runAdjustedRanking(enriched, options);
 }
 
 function aggregateImmediateMoveResults(rows, dictionaries) {
@@ -742,16 +899,34 @@ export function mergeCombatGameplayAnalytics(
     contextualBaselines,
     dimensions => `${dimensions[6]}: ${dimensions[7]}`,
   );
-  const fieldRows = contextAdjustedRows(
-    analysisTables.fieldContext ?? [],
-    contextualBaselines,
-    dimensions => `${dimensions[6]} ${dimensions[7]} [${dimensions[8]}]`,
-  );
+  const fieldRows = contextAdjustedRows(analysisTables.fieldContext ?? [], contextualBaselines, fieldStateLabel);
   const strategyRows = contextAdjustedRows(analysisTables.strategyContext ?? [], contextualBaselines, dimensions =>
     String(dimensions[6]),
   );
   const moveTacticRows = contextAdjustedRows(analysisTables.moveTactic ?? [], contextualBaselines, dimensions =>
     String(dimensions[6]),
+  );
+  const completedRunBaselines = runContextBaselines(analysisTables.runOutcome ?? []);
+  const runEntityRowsByKind = Object.fromEntries(
+    ["species", "ability", "item", "roster-move", "chosen-move"].map(kind => [
+      kind,
+      runAdjustedRows(
+        (analysisTables.runEntity ?? []).filter(row => row.dimensions[2] === kind),
+        completedRunBaselines,
+        dimensions => runEntityLabel(dimensions, dictionaries),
+      ),
+    ]),
+  );
+  const runSpeciesPairRows = runAdjustedRows(analysisTables.runSpeciesPair ?? [], completedRunBaselines, dimensions =>
+    runSpeciesPairLabel(dimensions, dictionaries),
+  );
+  const runTeamShapeRows = runAdjustedRows(
+    analysisTables.runTeamShape ?? [],
+    completedRunBaselines,
+    dimensions => `${dimensions[2]}: ${dimensions[3]}`,
+  );
+  const runStrategyRows = runAdjustedRows(analysisTables.runStrategy ?? [], completedRunBaselines, dimensions =>
+    String(dimensions[2]),
   );
   const insights = {
     battleOutcomesByDifficulty: outcomeSummary(analysisTables.battleOutcome ?? [], 0),
@@ -762,6 +937,16 @@ export function mergeCombatGameplayAnalytics(
     lossPrecursors: lossPrecursorSummary(analysisTables.lossPrecursor ?? []),
     highestRiskBattleCohorts: waveRisk(analysisTables.battleOutcome ?? []),
     runProgression: runProgressSummary(analysisTables.runProgress ?? []),
+    completedRunPatterns: {
+      species: runAdjustedRanking(runEntityRowsByKind.species),
+      abilities: runAdjustedRanking(runEntityRowsByKind.ability),
+      items: runAdjustedRanking(runEntityRowsByKind.item),
+      rosterMoves: runAdjustedRanking(runEntityRowsByKind["roster-move"]),
+      chosenMoves: runAdjustedRanking(runEntityRowsByKind["chosen-move"]),
+      teamCores: runInteractionRanking(runSpeciesPairRows, runEntityRowsByKind.species),
+      teamShapes: runAdjustedRanking(runTeamShapeRows),
+      strategies: runAdjustedRanking(runStrategyRows),
+    },
     contextAdjusted: {
       species: adjustedRanking(entityRowsByKind.species),
       abilities: adjustedRanking(entityRowsByKind.ability),
@@ -870,6 +1055,50 @@ function renderAdjusted(
         `- **${difficulty}, most exposed:** ${groups.popular
           .slice(0, 6)
           .map(row => `${row.name} (${row.battleExposures.toLocaleString()})`)
+          .join("; ")}`,
+      );
+    }
+  }
+  lines.push("");
+}
+
+function completedRunRowText(row, metric = "adjustedLift") {
+  return `${row.name} (${signedPercent(row[metric])}, observed ${percent(row.observedWinRate)} vs ${percent(row.expectedWinRate)}, ${row.runExposures.toLocaleString()} completed runs)`;
+}
+
+function renderCompletedRunAdjusted(
+  lines,
+  title,
+  rowsByDifficulty,
+  { metric = "adjustedLift", positive = "above run context", negative = "below run context" } = {},
+) {
+  lines.push(`### ${title}`, "");
+  if (Object.keys(rowsByDifficulty).length === 0) {
+    lines.push("No cohort cleared the 25-completed-run / 5-source publication gate.", "");
+    return;
+  }
+  for (const [difficulty, groups] of Object.entries(rowsByDifficulty)) {
+    lines.push(
+      `- **${difficulty}, ${positive}:** ${
+        groups.positive
+          .slice(0, 8)
+          .map(row => completedRunRowText(row, metric))
+          .join("; ") || "none"
+      }`,
+    );
+    lines.push(
+      `- **${difficulty}, ${negative}:** ${
+        groups.negative
+          .slice(0, 8)
+          .map(row => completedRunRowText(row, metric))
+          .join("; ") || "none"
+      }`,
+    );
+    if (groups.popular?.length > 0) {
+      lines.push(
+        `- **${difficulty}, most represented:** ${groups.popular
+          .slice(0, 8)
+          .map(row => `${row.name} (${row.runExposures.toLocaleString()})`)
           .join("; ")}`,
       );
     }
@@ -1033,6 +1262,23 @@ export function gameplayAnalyticsMarkdown(report) {
       `- **${label}:** most wipe terminals at ${wipes.map(row => `${row.finalWaveBand} (${Number(row.outcomes["player-wiped"]).toLocaleString()})`).join("; ") || "none"}`,
     );
   }
+  lines.push("", "## Completed-run composition", "");
+  lines.push(
+    "These tables compare victory and player-wipe endpoints within the same difficulty and game mode. The roster snapshot comes from the final recorded decision. Abandonments and hard-quarantined episodes are excluded; associations are still observational.",
+    "",
+  );
+  const completedRuns = report.insights.completedRunPatterns;
+  renderCompletedRunAdjusted(lines, "Final-roster species/forms", completedRuns.species);
+  renderCompletedRunAdjusted(lines, "Final-roster abilities and innates", completedRuns.abilities);
+  renderCompletedRunAdjusted(lines, "Final-roster held items", completedRuns.items);
+  renderCompletedRunAdjusted(lines, "Final-roster moves", completedRuns.rosterMoves);
+  renderCompletedRunAdjusted(lines, "Moves selected during the run", completedRuns.chosenMoves);
+  renderCompletedRunAdjusted(lines, "Final-roster species pairs", completedRuns.teamCores, {
+    positive: "positive interaction",
+    negative: "negative interaction",
+  });
+  renderCompletedRunAdjusted(lines, "Final team shape", completedRuns.teamShapes);
+  renderCompletedRunAdjusted(lines, "Full-run decision profile", completedRuns.strategies);
   lines.push("", "## Context-adjusted combat patterns", "");
   lines.push(
     "Each ranking compares a cohort against battles at the same difficulty, game mode, wave band, encounter type, format, and boss state. Positive or negative percentage points are shrunk context-adjusted associations, not causal balance estimates.",
@@ -1076,7 +1322,16 @@ export function gameplayAnalyticsMarkdown(report) {
   renderCategorical(lines, "Final three-action sequences before losses", report.insights.lossSequences);
   lines.push("## Quality notes", "");
   lines.push(`- Hard-quarantined episodes: ${Number(report.counts.hardQuarantinedEpisodes ?? 0).toLocaleString()}`);
+  lines.push(
+    `- Decisions excluded with hard-quarantined episodes: ${Number(report.counts.hardQuarantinedDecisionsExcluded ?? 0).toLocaleString()}`,
+  );
+  lines.push(
+    `- Battle terminals excluded with hard-quarantined episodes: ${Number(report.counts.hardQuarantinedBattleTerminalsExcluded ?? 0).toLocaleString()}`,
+  );
   lines.push(`- Incomplete episodes: ${Number(report.counts.incompleteEpisodes ?? 0).toLocaleString()}`);
+  lines.push(
+    `- Run terminals excluded for incomplete outcome joins: ${Number(report.counts.incompleteRunTerminalsExcluded ?? 0).toLocaleString()}`,
+  );
   lines.push(
     `- Battles with no joinable decisions: ${Number(report.counts.battlesWithoutDecisions ?? 0).toLocaleString()}`,
   );

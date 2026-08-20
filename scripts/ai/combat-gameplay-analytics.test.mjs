@@ -102,8 +102,28 @@ test("streaming analytics retains only aggregate source sketches", () => {
   assert.equal(report.approximateSources, 1);
   assert.equal(report.tables.speciesRoster.length, 2);
   assert.equal(report.tables.speciesPairContext.length, 1);
+  assert.equal(report.tables.runEntity.length > 0, true);
+  assert.equal(report.tables.runSpeciesPair.length, 1);
   assert.ok(!JSON.stringify(report).includes("source-1"));
   assert.ok(!JSON.stringify(report).includes("episode-1"));
+});
+
+test("hard-quarantined episodes are counted for quality but excluded from gameplay analysis", () => {
+  const analytics = createCombatGameplayAnalytics();
+  const quarantined = episode("bad", "victory", 1, "bad-source");
+  quarantined.result.hardQuarantined = true;
+  quarantined.result.completedOutcomeEligible = false;
+  analytics.ingestEpisode(quarantined);
+  analytics.ingestEpisode(episode("good", "defeat", 2, "good-source"));
+  const report = analytics.finish();
+  assert.equal(report.counts.episodes, 2);
+  assert.equal(report.counts.hardQuarantinedEpisodes, 1);
+  assert.equal(report.counts.hardQuarantinedDecisionsExcluded, 1);
+  assert.equal(report.counts.analysisEligibleEpisodes, 1);
+  assert.equal(report.tables.battleOutcome.length, 1);
+  assert.deepEqual(report.tables.battleOutcome[0].outcomes, { defeat: 1 });
+  assert.equal(report.tables.runOutcome.length, 1);
+  assert.deepEqual(report.tables.runOutcome[0].outcomes, { "player-wiped": 1 });
 });
 
 test("merge suppresses cohorts below both support gates", () => {
@@ -158,10 +178,16 @@ test("entity rankings use dictionary names and supported battle exposures", () =
   const adjustedWinner = merged.insights.contextAdjusted.species.hell.positive.find(row => row.name === "Winner");
   assert.ok(adjustedWinner?.adjustedLift > 0);
   assert.ok(merged.insights.contextAdjusted.teamCores.hell.positive.length > 0);
+  const completedRunWinner = merged.insights.completedRunPatterns.species.hell.positive.find(
+    row => row.name === "Winner",
+  );
+  assert.ok(completedRunWinner?.adjustedLift > 0);
+  assert.ok(merged.insights.completedRunPatterns.teamCores.hell.positive.length > 0);
   assert.equal(merged.insights.immediateMoveResults.hell.mostUsed[0].name, "Test Move");
   assert.ok(merged.insights.damageOpportunity.hell.some(row => row.label === "top-damage"));
   const markdown = gameplayAnalyticsMarkdown(merged);
   assert.match(markdown, /Context-adjusted combat patterns/u);
   assert.match(markdown, /Resolved move outcomes/u);
   assert.match(markdown, /Species \+ item combinations/u);
+  assert.match(markdown, /Completed-run composition/u);
 });

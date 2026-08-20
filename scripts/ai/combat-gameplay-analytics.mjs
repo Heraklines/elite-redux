@@ -420,6 +420,170 @@ function battleStrategyLabels(decisions) {
   return uniqueValues(labels.length > 0 ? labels : ["mixed"]);
 }
 
+function rateBand(value, low, high) {
+  if (!finite(value)) {
+    return "unknown";
+  }
+  if (value < low) {
+    return "low";
+  }
+  if (value < high) {
+    return "medium";
+  }
+  return "high";
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Ordered labels encode mutually exclusive action quality.
+function damageOpportunityLabel(decision, chosen) {
+  const bestDamage = Math.max(0, ...(decision.candidates ?? []).map(expectedDamage));
+  const chosenDamage = expectedDamage(chosen);
+  let opportunity = "no-damage-option";
+  if (bestDamage > 0) {
+    if (chosen.kind === "switch") {
+      opportunity = "switch-over-damage";
+    } else if (chosen.kind !== "move" || Number(moveObservation(decision, chosen)?.power ?? 0) <= 0) {
+      opportunity = "status-over-damage";
+    } else if (chosenMoveQuality(decision, chosen).immune && chosenDamage < bestDamage) {
+      opportunity = "immune-with-alternative";
+    } else if (chosenDamage >= bestDamage * 0.9) {
+      opportunity = "top-damage";
+    } else if (chosenDamage < bestDamage * 0.25) {
+      opportunity = "very-low-damage";
+    } else {
+      opportunity = "lower-damage";
+    }
+  }
+  return { opportunity, chosenDamage, bestDamage };
+}
+
+function runStrategyLabels(decisions) {
+  const counts = {
+    decisions: 0,
+    switches: 0,
+    moves: 0,
+    status: 0,
+    topDamage: 0,
+    lowDamage: 0,
+    tera: 0,
+    spread: 0,
+    priority: 0,
+  };
+  for (const decision of decisions) {
+    const chosen = chosenCandidate(decision);
+    if (chosen == null) {
+      continue;
+    }
+    counts.decisions++;
+    if (chosen.kind === "switch") {
+      counts.switches++;
+    }
+    if (chosen.kind !== "move") {
+      continue;
+    }
+    counts.moves++;
+    const move = moveObservation(decision, chosen);
+    counts.status += Number(Number(move?.power ?? 0) <= 0);
+    counts.tera += Number(chosen.tera === true);
+    counts.spread += Number((chosen.targets ?? []).length > 1);
+    counts.priority += Number(Number(chosen.derived?.effectivePriority ?? move?.priority ?? 0) > 0);
+    const { opportunity } = damageOpportunityLabel(decision, chosen);
+    counts.topDamage += Number(opportunity === "top-damage");
+    counts.lowDamage += Number(opportunity === "very-low-damage" || opportunity === "immune-with-alternative");
+  }
+  const decisionDenominator = Math.max(counts.decisions, 1);
+  const moveDenominator = Math.max(counts.moves, 1);
+  return [
+    `switch-rate:${rateBand(counts.switches / decisionDenominator, 0.02, 0.08)}`,
+    `status-rate:${rateBand(counts.status / moveDenominator, 0.05, 0.15)}`,
+    `top-damage-rate:${rateBand(counts.topDamage / decisionDenominator, 0.5, 0.7)}`,
+    `very-low-damage-rate:${rateBand(counts.lowDamage / decisionDenominator, 0.005, 0.02)}`,
+    `spread-rate:${rateBand(counts.spread / moveDenominator, 0.02, 0.1)}`,
+    `priority-rate:${rateBand(counts.priority / moveDenominator, 0.03, 0.12)}`,
+    counts.tera > 0 ? "tera-used" : "no-tera",
+  ];
+}
+
+// biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One terminal snapshot feeds several orthogonal run aggregates.
+function addCompletedRunExposures(tables, decisions, terminal, difficulty, gameMode, sourceId) {
+  if (!["victory", "player-wiped"].includes(terminal?.outcome) || decisions.length === 0) {
+    return;
+  }
+  const finalDecision = decisions.at(-1);
+  const observation = finalDecision?.observation ?? {};
+  const party = observation.selfParty ?? [];
+  const dictionaryHash = finalDecision?.dictionaryHash ?? "unknown";
+  const outcome = terminal.outcome;
+  const context = [difficulty, gameMode];
+  const species = uniqueValues(party.map(monIdentity)).sort();
+
+  const addEntity = (kind, value, extra = "") => {
+    tables.runEntity.add([...context, kind, dictionaryHash, String(value), String(extra ?? "")], sourceId, { outcome });
+  };
+  for (const identity of species) {
+    const [speciesId, form] = identity.split(":");
+    addEntity("species", speciesId, form);
+  }
+  for (const identity of uniqueValues(
+    party.flatMap(mon => activeAbilities(mon).map(ability => `${ability.abilityId}:${ability.source}`)),
+  )) {
+    const separator = identity.lastIndexOf(":");
+    addEntity("ability", identity.slice(0, separator), identity.slice(separator + 1));
+  }
+  for (const itemId of uniqueValues(party.flatMap(mon => activeItems(mon).map(item => item.itemId)))) {
+    addEntity("item", itemId);
+  }
+  for (const moveId of uniqueValues(party.flatMap(mon => (mon.moves ?? []).map(move => move.moveId)))) {
+    addEntity("roster-move", moveId);
+  }
+  for (const moveId of uniqueValues(
+    decisions.map(decision => {
+      const chosen = chosenCandidate(decision);
+      return chosen?.kind === "move" ? chosen.moveId : null;
+    }),
+  )) {
+    addEntity("chosen-move", moveId);
+  }
+  for (let left = 0; left < species.length; left++) {
+    for (let right = left + 1; right < species.length; right++) {
+      const [leftSpecies, leftForm] = species[left].split(":");
+      const [rightSpecies, rightForm] = species[right].split(":");
+      tables.runSpeciesPair.add(
+        [...context, dictionaryHash, leftSpecies, leftForm, rightSpecies, rightForm],
+        sourceId,
+        { outcome },
+      );
+    }
+  }
+
+  const nativeTypes = party.flatMap(mon => mon.nativeTypes ?? mon.types ?? []);
+  const typeCounts = new Map();
+  for (const type of nativeTypes) {
+    typeCounts.set(type, (typeCounts.get(type) ?? 0) + 1);
+  }
+  const maxTypeShare = party.length > 0 ? Math.max(0, ...typeCounts.values()) / party.length : 0;
+  const rosterMoves = party.flatMap(mon => mon.moves ?? []);
+  const statusShare =
+    rosterMoves.length > 0 ? rosterMoves.filter(move => Number(move.power ?? 0) <= 0).length / rosterMoves.length : 0;
+  const itemRows = party.flatMap(activeItems);
+  const itemStacks = itemRows.reduce(
+    (sum, item) => sum + Math.max(Number(item.stackCount ?? 0), Number(item.virtualStackCount ?? 0)),
+    0,
+  );
+  for (const [feature, value] of [
+    ["party-size", String(party.length)],
+    ["type-diversity", String(new Set(nativeTypes).size)],
+    ["shared-type-concentration", ratioBand(maxTypeShare)],
+    ["status-move-share", ratioBand(statusShare)],
+    ["held-item-count", String(itemRows.length)],
+    ["held-item-stacks", String(itemStacks)],
+  ]) {
+    tables.runTeamShape.add([...context, feature, value], sourceId, { outcome });
+  }
+  for (const label of runStrategyLabels(decisions)) {
+    tables.runStrategy.add([...context, label], sourceId, { outcome });
+  }
+}
+
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: One battle pass prevents outcome and exposure double-counting.
 function addDeepBattleExposures(tables, decisions, terminal, difficulty, gameMode, sourceId) {
   const first = decisions[0];
@@ -604,6 +768,10 @@ function createTables() {
       "damageOpportunity",
       "lossSequence",
       "runProgress",
+      "runEntity",
+      "runSpeciesPair",
+      "runTeamShape",
+      "runStrategy",
     ].map(name => [name, new MetricTable(name)]),
   );
 }
@@ -621,6 +789,11 @@ export function createCombatGameplayAnalytics() {
     battlesWithDecisions: 0,
     battlesWithoutDecisions: 0,
     runTerminals: 0,
+    analysisEligibleEpisodes: 0,
+    completedRunAnalysisEpisodes: 0,
+    hardQuarantinedDecisionsExcluded: 0,
+    hardQuarantinedBattleTerminalsExcluded: 0,
+    incompleteRunTerminalsExcluded: 0,
   };
   const dictionaryHashes = new Set();
 
@@ -638,7 +811,24 @@ export function createCombatGameplayAnalytics() {
 
     const runTerminals = episode.runTerminals ?? [];
     counts.runTerminals += runTerminals.length;
-    for (const terminal of runTerminals) {
+    const decisions = orderedDecisions(episode.decisions ?? []);
+    counts.decisions += decisions.length;
+    const battleTerminals = episode.battleTerminals ?? [];
+    counts.battleTerminals += new Set(battleTerminals.map(terminal => terminal.battleId)).size;
+    if (result.hardQuarantined === true) {
+      counts.hardQuarantinedDecisionsExcluded += decisions.length;
+      counts.hardQuarantinedBattleTerminalsExcluded += battleTerminals.length;
+      return;
+    }
+    counts.analysisEligibleEpisodes++;
+    for (const decision of decisions) {
+      if (decision.dictionaryHash) {
+        dictionaryHashes.add(decision.dictionaryHash);
+      }
+    }
+    if (result.completedOutcomeEligible === true && runTerminals.length === 1) {
+      counts.completedRunAnalysisEpisodes++;
+      const terminal = runTerminals[0];
       tables.runOutcome.add([difficulty, gameMode, waveBand(Number(terminal.finalWave ?? 0))], sourceId, {
         outcome: terminal.outcome,
         sums: { wavesCleared: Number(terminal.wavesCleared ?? 0) },
@@ -647,14 +837,9 @@ export function createCombatGameplayAnalytics() {
         outcome: terminal.outcome,
         sums: { wavesCleared: Number(terminal.wavesCleared ?? 0) },
       });
-    }
-
-    const decisions = orderedDecisions(episode.decisions ?? []);
-    counts.decisions += decisions.length;
-    for (const decision of decisions) {
-      if (decision.dictionaryHash) {
-        dictionaryHashes.add(decision.dictionaryHash);
-      }
+      addCompletedRunExposures(tables, decisions, terminal, difficulty, gameMode, sourceId);
+    } else {
+      counts.incompleteRunTerminalsExcluded += runTerminals.length;
     }
     const decisionsByBattle = new Map();
     const decisionsByJointAction = new Map();
@@ -672,8 +857,7 @@ export function createCombatGameplayAnalytics() {
     }
     const transitions = new Map((episode.transitions ?? []).map(transition => [transition.jointActionId, transition]));
 
-    const terminals = new Map((episode.battleTerminals ?? []).map(terminal => [terminal.battleId, terminal]));
-    counts.battleTerminals += terminals.size;
+    const terminals = new Map(battleTerminals.map(terminal => [terminal.battleId, terminal]));
     for (const [id, terminal] of terminals) {
       if (!BATTLE_OUTCOMES.has(terminal.outcome)) {
         continue;
@@ -820,24 +1004,7 @@ export function createCombatGameplayAnalytics() {
         }
       }
 
-      const bestDamage = Math.max(0, ...(decision.candidates ?? []).map(expectedDamage));
-      const chosenDamage = expectedDamage(chosen);
-      let opportunity = "no-damage-option";
-      if (bestDamage > 0) {
-        if (chosen.kind === "switch") {
-          opportunity = "switch-over-damage";
-        } else if (chosen.kind !== "move" || Number(moveObservation(decision, chosen)?.power ?? 0) <= 0) {
-          opportunity = "status-over-damage";
-        } else if (chosenMoveQuality(decision, chosen).immune && chosenDamage < bestDamage) {
-          opportunity = "immune-with-alternative";
-        } else if (chosenDamage >= bestDamage * 0.9) {
-          opportunity = "top-damage";
-        } else if (chosenDamage < bestDamage * 0.25) {
-          opportunity = "very-low-damage";
-        } else {
-          opportunity = "lower-damage";
-        }
-      }
+      const { opportunity, chosenDamage, bestDamage } = damageOpportunityLabel(decision, chosen);
       tables.damageOpportunity.add([...context, opportunity], sourceId, {
         outcome,
         sums: {
