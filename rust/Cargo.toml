@@ -5,6 +5,7 @@ members = [
     "crates/er-rng",
     "crates/er-content",
     "crates/er-state",
+    "crates/er-run",
     "crates/er-battle",
     "crates/er-game",
     "crates/er-kernel",

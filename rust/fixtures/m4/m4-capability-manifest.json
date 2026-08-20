@@ -1,8 +1,10 @@
 {
   "schema_version": 1,
-  "oracle_game_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "policy": "FAIL_CLOSED",
   "supported": {
+    "modifier_tiers": [0, 1, 2, 3, 4],
     "modes": ["CLASSIC_SOLO", "CLASSIC_COOP_DOUBLE"],
     "growth_rates": [{ "id": 3, "key": "MEDIUM_SLOW" }],
     "natures": [

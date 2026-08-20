@@ -42,12 +42,12 @@ export class M4CaptureGap extends Error {
   }
 }
 
-const SPECIES_ID = 1;
+const SPECIES_ID = 932;
 const INITIAL_LEVEL = 16;
 const FINAL_LEVEL = 17;
 const LEVEL_CAP_OVERRIDE = 17;
-const INITIAL_MOVES = [331, 45, 74, 77] as const;
-const RAW_CANDIDATES = [34, 447, 520, 72, 124, 230] as const;
+const INITIAL_MOVES = [1, 52, 77, 78] as const;
+const RAW_CANDIDATES = [34] as const;
 const LEARNED_MOVE = 34;
 const LEARNED_SLOT = 0;
 
@@ -263,8 +263,8 @@ function installTrace(game: GameManager, trace: CaptureTrace): () => void {
 async function launchProgressionScenario(phaserGame: Phaser.Game): Promise<GameManager> {
   const spec: ScenarioSpec = {
     v: 1,
-    name: "M4 progression Bulbasaur level 16 to 17",
-    run: { wave: 9, level: INITIAL_LEVEL, money: 1000, seed: "m4-progression-bulbasaur-16-17" },
+    name: "M4 progression Nacli level 16 to 17",
+    run: { wave: 9, level: INITIAL_LEVEL, money: 1000, seed: "m4-progression-nacli-16-17" },
     party: [{ species: SPECIES_ID, moves: [...INITIAL_MOVES] }],
     enemy: { kind: "wild", wild: { species: 52, moves: [33, 39, 45, 77] } },
   };
@@ -302,10 +302,10 @@ function assertScenarioState(game: GameManager): Pokemon {
     gap("LIVE_PLAYER_PARTY_UNAVAILABLE", "src/phases/select-starter-phase.ts:initBattle", "the live player party is empty");
   }
   if (pokemon.species.speciesId !== SPECIES_ID || pokemon.level !== INITIAL_LEVEL) {
-    gap("LIVE_PROGRESSION_TARGET_MISMATCH", "src/phases/select-starter-phase.ts:initBattle", `expected Bulbasaur level ${INITIAL_LEVEL}`);
+    gap("LIVE_PROGRESSION_TARGET_MISMATCH", "src/phases/select-starter-phase.ts:initBattle", `expected Nacli level ${INITIAL_LEVEL}`);
   }
   if (pokemon.species.growthRate !== 3) {
-    gap("LIVE_GROWTH_RATE_MISMATCH", "src/data/pokemon-species.ts:Bulbasaur", `expected Medium Slow growth rate 3, got ${pokemon.species.growthRate}`);
+    gap("LIVE_GROWTH_RATE_MISMATCH", "src/data/pokemon-species.ts:Nacli", `expected Medium Slow growth rate 3, got ${pokemon.species.growthRate}`);
   }
   requireExactNumbers(pokemon.getMoveset(true).map(move => move.moveId), INITIAL_MOVES, "initial moves");
   return pokemon;
@@ -353,8 +353,8 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
     if (pokemonAfterExpSetup !== pokemon) {
       gap("LIVE_PROGRESSION_TARGET_CHANGED", "src/field/pokemon.ts:PlayerPokemon", "the canonical EXP setup replaced the live progression target");
     }
-    // the scenario's explicit move-learning input and prevents EvolutionPhase from adding another source.
-    pokemon.pauseEvolutions = true;
+    // Nacli does not evolve at level 17; preserve the live source value rather than forcing a pause.
+    pokemon.pauseEvolutions = false;
     const before = readPartySnapshot(game, pokemon);
     const moneyBefore = finite(game.scene.money, "money.before");
     const battle = game.scene.currentBattle;
@@ -400,15 +400,16 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
     if (!Array.isArray(afterMoves)) {
       gap("LIVE_VALUE_MISSING", "src/field/pokemon.ts:Pokemon.moveset", "final move snapshot is not an array");
     }
-    requireExactNumbers(afterMoves.map(entry => (entry as AnyRecord).move_id), [LEARNED_MOVE, 45, 74, 77], "after moves");
+    requireExactNumbers(afterMoves.map(entry => (entry as AnyRecord).move_id), [LEARNED_MOVE, 52, 77, 78], "after moves");
     if (before.level !== INITIAL_LEVEL || after.level !== FINAL_LEVEL) {
       gap("LEVEL_TRANSITION_MISMATCH", "src/field/pokemon.ts:addExp -> src/phases/level-up-phase.ts", `expected ${INITIAL_LEVEL}->${FINAL_LEVEL}, observed ${before.level}->${after.level}`);
     }
     return jsonSafe({
-      artifact_id: "progression/bulbasaur-medium-slow-level-17-v1",
+      artifact_id: "progression/nacli-medium-slow-level-17-v1",
       oracle_input: {
         mode: "CLASSIC",
         battle_kind: "WILD",
+        species_id: SPECIES_ID,
         wave: finite(battle.waveIndex, "battle.waveIndex"),
         level_cap_override: LEVEL_CAP_OVERRIDE,
         cap_source: "Overrides.LEVEL_CAP_OVERRIDE",
@@ -417,7 +418,8 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
         level_threshold: levelThreshold,
         seeded_initial_experience: seededInitialExp,
         threshold_formula: "getLevelTotalExp(17, GrowthRate.MEDIUM_SLOW)",
-        pause_evolutions: true,
+        initial_moves_source: "explicit composed fixture state, not natural learnset",
+        pause_evolutions: false,
       },
       initial: {
         canonical: before,

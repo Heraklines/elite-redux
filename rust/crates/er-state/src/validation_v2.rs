@@ -118,7 +118,7 @@ pub fn validate_game_state_v2(state: &GameStateV2) -> Result<(), StateValidation
         if !all_ids.insert(pokemon.id) {
             return Err(StateValidationErrorV2::DuplicatePokemonId { pokemon: pokemon.id });
         }
-        if pokemon.owner_seat.is_none() || pokemon.owner_seat == Some(SeatId::ZERO) {
+        if pokemon.owner_seat.is_none() {
             return Err(StateValidationErrorV2::PlayerMissingOwner { pokemon: pokemon.id });
         }
     }
@@ -290,7 +290,9 @@ fn validate_faint_owners(
 
 fn validate_stage_with_battle(state: &GameStateV2) -> Result<(), StateValidationErrorV2> {
     let run = &state.run;
-    let battle = state.battle.as_ref().expect("checked by caller");
+    let Some(battle) = state.battle.as_ref() else {
+        return Err(StateValidationErrorV2::StageInvariant);
+    };
     match run.stage {
         RunStage::Battle => {
             if run.active_surface.is_some()

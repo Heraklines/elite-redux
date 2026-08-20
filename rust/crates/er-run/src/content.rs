@@ -23,7 +23,7 @@ use thiserror::Error;
 pub const RUN_CONTENT_PACK_SCHEMA_VERSION: u32 = 1;
 pub const RUN_CONTENT_HASH_VERSION: u32 = 1;
 pub const RUN_CONTENT_HASH_DOMAIN: &str = "pokerogue-redux/m4/run-content/v1";
-pub const BATTLE_ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+pub const M3_PARITY_ORACLE_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 
 /// Closed growth-rate formula kinds admitted by the selected slice.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -187,8 +187,8 @@ pub enum RunContentError {
     HashMismatch { expected: RunContentPackHash, actual: RunContentPackHash },
     #[error("run-content battle hash mismatch: expected {expected}, actual {actual}")]
     BattleContentHashMismatch { expected: ContentPackHash, actual: ContentPackHash },
-    #[error("battle content uses oracle SHA {actual}, expected {expected}")]
-    BattleOracleGameShaMismatch { expected: &'static str, actual: String },
+    #[error("M3 parity content uses oracle SHA {actual}, expected {expected}")]
+    M3ParityOracleGameShaMismatch { expected: &'static str, actual: String },
     #[error("captured battle move {id} is absent from the bound content pack")]
     MissingCapturedBattleMove { id: MoveId },
     #[error("invalid selected ID {kind}={value}: {detail}")]
@@ -211,7 +211,7 @@ pub enum RunContentError {
 pub struct RunContentPack {
     pub schema_version: u32,
     pub m4_oracle_sha: String,
-    pub battle_oracle_sha: String,
+    pub m3_parity_oracle_sha: String,
     pub battle_content_hash: ContentPackHash,
     pub run_content_hash: RunContentPackHash,
     pub growth_rates: Vec<Option<GrowthRateDefinition>>,
@@ -234,7 +234,7 @@ impl<'de> Deserialize<'de> for RunContentPack {
         struct Wire {
             schema_version: u32,
             m4_oracle_sha: String,
-            battle_oracle_sha: String,
+            m3_parity_oracle_sha: String,
             battle_content_hash: ContentPackHash,
             run_content_hash: RunContentPackHash,
             growth_rates: Vec<Option<GrowthRateDefinition>>,
@@ -251,7 +251,7 @@ impl<'de> Deserialize<'de> for RunContentPack {
         let pack = Self {
             schema_version: wire.schema_version,
             m4_oracle_sha: wire.m4_oracle_sha,
-            battle_oracle_sha: wire.battle_oracle_sha,
+            m3_parity_oracle_sha: wire.m3_parity_oracle_sha,
             battle_content_hash: wire.battle_content_hash,
             run_content_hash: wire.run_content_hash,
             growth_rates: wire.growth_rates,
@@ -274,7 +274,7 @@ impl RunContentPack {
     pub fn new(
         schema_version: u32,
         m4_oracle_sha: String,
-        battle_oracle_sha: String,
+        m3_parity_oracle_sha: String,
         battle_content_hash: ContentPackHash,
         growth_rates: Vec<Option<GrowthRateDefinition>>,
         natures: Vec<Option<NatureDefinition>>,
@@ -287,11 +287,11 @@ impl RunContentPack {
         capability_manifest: RunCapabilityManifest,
     ) -> Result<Self, RunContentError> {
         let run_content_hash = hash_for_parts(
-            schema_version, &m4_oracle_sha, &battle_oracle_sha, &battle_content_hash,
+            schema_version, &m4_oracle_sha, &m3_parity_oracle_sha, &battle_content_hash,
             &growth_rates, &natures, &species_progression, &modifiers, &biomes,
             &encounter_plans, &reward_rules, &market_rules, &capability_manifest,
         )?;
-        let pack = Self { schema_version, m4_oracle_sha, battle_oracle_sha, battle_content_hash, run_content_hash,
+        let pack = Self { schema_version, m4_oracle_sha, m3_parity_oracle_sha, battle_content_hash, run_content_hash,
             growth_rates, natures, species_progression, modifiers, biomes, encounter_plans,
             reward_rules, market_rules, capability_manifest };
         pack.validate()?;
@@ -305,8 +305,8 @@ impl RunContentPack {
         if self.m4_oracle_sha != RUN_ORACLE_GAME_SHA {
             return Err(RunContentError::M4OracleGameShaMismatch { expected: RUN_ORACLE_GAME_SHA, actual: self.m4_oracle_sha.clone() });
         }
-        if self.battle_oracle_sha != BATTLE_ORACLE_GAME_SHA {
-            return Err(RunContentError::BattleOracleGameShaMismatch { expected: BATTLE_ORACLE_GAME_SHA, actual: self.battle_oracle_sha.clone() });
+        if self.m3_parity_oracle_sha != M3_PARITY_ORACLE_SHA {
+            return Err(RunContentError::M3ParityOracleGameShaMismatch { expected: M3_PARITY_ORACLE_SHA, actual: self.m3_parity_oracle_sha.clone() });
         }
         self.capability_manifest.validate().map_err(RunContentError::Capability)?;
         validate_growth_rates(&self.growth_rates)?;
@@ -323,12 +323,12 @@ impl RunContentPack {
         Ok(())
     }
 
-    /// Binds run content to the complete selected battle pack. The battle
-    /// oracle SHA and the nine captured progression moves are checked before
-    /// a hash match is accepted.
+    /// Binds run content to the complete selected battle pack. The M4
+    /// oracle SHA and the captured Body Slam move are checked before a hash
+    /// match is accepted.
     pub fn validate_for_battle_content(&self, battle_content: &er_content::pack::ContentPack) -> Result<(), RunContentError> {
-        if battle_content.oracle_game_sha != BATTLE_ORACLE_GAME_SHA {
-            return Err(RunContentError::BattleOracleGameShaMismatch { expected: BATTLE_ORACLE_GAME_SHA, actual: battle_content.oracle_game_sha.clone() });
+        if battle_content.oracle_game_sha != RUN_ORACLE_GAME_SHA {
+            return Err(RunContentError::M4OracleGameShaMismatch { expected: RUN_ORACLE_GAME_SHA, actual: battle_content.oracle_game_sha.clone() });
         }
         if self.battle_content_hash != battle_content.hash {
             return Err(RunContentError::BattleContentHashMismatch { expected: battle_content.hash.clone(), actual: self.battle_content_hash.clone() });
@@ -359,7 +359,7 @@ impl RunContentPack {
 struct RunContentHashView<'a> {
     schema_version: u32,
     m4_oracle_sha: &'a str,
-    battle_oracle_sha: &'a str,
+    m3_parity_oracle_sha: &'a str,
     battle_content_hash: &'a ContentPackHash,
     growth_rates: &'a [Option<GrowthRateDefinition>],
     natures: &'a [Option<NatureDefinition>],
@@ -374,14 +374,14 @@ struct RunContentHashView<'a> {
 
 #[allow(clippy::too_many_arguments)]
 fn hash_for_parts(
-    schema_version: u32, m4_oracle_sha: &str, battle_oracle_sha: &str,
+    schema_version: u32, m4_oracle_sha: &str, m3_parity_oracle_sha: &str,
     battle_content_hash: &ContentPackHash, growth_rates: &[Option<GrowthRateDefinition>],
     natures: &[Option<NatureDefinition>], species_progression: &[Option<SpeciesProgressionDefinition>],
     modifiers: &[Option<ModifierDefinition>], biomes: &[Option<BiomeDefinition>],
     encounter_plans: &[EncounterPlanDefinition], reward_rules: &RewardRuleSet,
     market_rules: &MarketRuleSet, capability_manifest: &RunCapabilityManifest,
 ) -> Result<RunContentPackHash, RunContentError> {
-    let view = RunContentHashView { schema_version, m4_oracle_sha, battle_oracle_sha,
+    let view = RunContentHashView { schema_version, m4_oracle_sha, m3_parity_oracle_sha,
         battle_content_hash, growth_rates, natures, species_progression, modifiers, biomes,
         encounter_plans, reward_rules, market_rules, capability_manifest };
     let canonical = canonical_bytes(&view).map_err(RunContentError::Canonical)?;
@@ -393,11 +393,8 @@ fn hash_for_parts(
     RunContentPackHash::new(format!("blake3-v1:{digest}"))
         .map_err(|error| RunContentError::InvalidHash(error.to_string()))
 }
-fn captured_progression_move_ids() -> Result<[MoveId; 9], RunContentError> {
-    Ok([
-        move_id(34)?, move_id(45)?, move_id(72)?, move_id(74)?, move_id(124)?,
-        move_id(230)?, move_id(331)?, move_id(447)?, move_id(520)?,
-    ])
+fn captured_progression_move_ids() -> Result<[MoveId; 1], RunContentError> {
+    Ok([move_id(34)?])
 }
 fn validate_growth_rates(values: &[Option<GrowthRateDefinition>]) -> Result<(), RunContentError> {
     let mut seen = BTreeSet::new();
@@ -547,24 +544,17 @@ pub fn selected_run_content_pack(
     natures[10] = Some(NatureDefinition { id: NatureId::new(10), key: "TIMID".to_owned(), raised_stat: Some(NatureStat::Speed), lowered_stat: Some(NatureStat::Attack) });
     natures[15] = Some(NatureDefinition { id: NatureId::new(15), key: "MODEST".to_owned(), raised_stat: Some(NatureStat::SpecialAttack), lowered_stat: Some(NatureStat::Attack) });
 
-    let mut species_progression = vec![None; 2];
-    species_progression[1] = Some(SpeciesProgressionDefinition {
-        species_id: species_id(1)?,
+    let mut species_progression = vec![None; 933];
+    species_progression[932] = Some(SpeciesProgressionDefinition {
+        species_id: species_id(932)?,
         parity_level_before: 16,
         parity_level_after: 17,
-        key: "BULBASAUR".to_owned(),
+        key: "NACLI".to_owned(),
         growth_rate: GrowthRateId::new(3),
-        base_experience: 64,
-        level_moves: vec![
-            LevelMoveDefinition { level: 17, move_id: move_id(34)? },
-            LevelMoveDefinition { level: 17, move_id: move_id(447)? },
-            LevelMoveDefinition { level: 17, move_id: move_id(520)? },
-            LevelMoveDefinition { level: 17, move_id: move_id(72)? },
-            LevelMoveDefinition { level: 17, move_id: move_id(124)? },
-            LevelMoveDefinition { level: 17, move_id: move_id(230)? },
-        ],
-        current_moves: [move_id(331)?, move_id(45)?, move_id(74)?, move_id(77)?],
-        evolutions: Vec::new(),
+        base_experience: 56,
+        level_moves: vec![LevelMoveDefinition { level: 17, move_id: move_id(34)? }],
+        current_moves: [move_id(1)?, move_id(52)?, move_id(77)?, move_id(78)?],
+        evolutions: vec![EvolutionDefinition { target_species_id: species_id(933)?, minimum_level: 23 }],
     });
 
     let mut modifier_slots = vec![None; 402];
@@ -604,7 +594,7 @@ pub fn selected_run_content_pack(
     RunContentPack::new(
         RUN_CONTENT_PACK_SCHEMA_VERSION,
         RUN_ORACLE_GAME_SHA.to_owned(),
-        BATTLE_ORACLE_GAME_SHA.to_owned(),
+        M3_PARITY_ORACLE_SHA.to_owned(),
         battle_content_hash,
         growth_rates,
         natures,

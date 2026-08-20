@@ -7,7 +7,7 @@ Every authoritative run transition is represented by a typed material, canonical
 All materials contain:
 
 - schema version and closed material kind;
-- M4 oracle SHA;
+- M4 oracle SHA for current run and battle content plus immutable M3 parity oracle SHA;
 - battle-content and run-content hashes;
 - run, wave, interaction, and source identities appropriate to the kind;
 - mechanical before and after digests;
@@ -34,6 +34,8 @@ All materials contain:
 
 `RunInteractionMaterialV1` commits one progression or surface action. Continuing shop purchases advance the per-surface action ordinal but do not close the surface. Terminal reward, learn, Crossroads, market leave, and biome-selection actions close or replace their exact surface according to the frozen control transition.
 
+Encounter generation and `BattleStartV2` are folded into the same `WaveAdvanceMaterialV1` or terminal `RunInteractionMaterialV1` that closes the preceding boundary. Its `after_state` is already `RunStage::Battle`; no separate battle-start material, operation, or Authority revision exists.
+
 `RunTerminalMaterialV1` records run victory or defeat and installs `GameControl::Complete`.
 
 ## Identity and idempotence
@@ -58,12 +60,12 @@ A proposal fingerprint includes the complete operation ID, run ID, wave, owner s
 ## Apply protocol
 
 1. Canonical-decode and reject noncanonical bytes.
-2. Validate kind, schema, oracle SHA, and both content hashes.
-3. Validate the exact authority-log predecessor and operation identity.
-4. Compare material before digest with the live mechanical frontier.
-5. Validate the complete before and after states independently.
-6. Replay the ordered mutation evidence against the before state and require exact after-state equality.
-7. Validate RNG before/after state and audit continuity without drawing.
+2. Validate kind, schema, M4 content oracle SHA, M3 parity oracle SHA, and both content hashes.
+3. Validate material `before_state`, recompute its mechanical digest, and require exact equality with material `before_digest`. Failure is invalid authority material.
+4. Validate material `after_state`, recompute its mechanical digest, and require exact equality with material `after_digest`.
+5. Replay ordered mutations against material `before_state`, validate RNG before/after state and audit continuity without drawing, and require exact material `after_state`.
+6. Validate the exact authority-log predecessor and operation identity.
+7. Compare the already self-validated material `before_digest` with the endpoint-local mechanical frontier. Only this mismatch is correlated recovery.
 8. Validate next control, allocator, interaction counters, and surface digest.
 9. Replace the complete staged game state atomically.
 10. Queue presentation and install logical control under the presentation barrier.

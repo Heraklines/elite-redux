@@ -2,22 +2,23 @@
 
 ## Immutable source
 
-All M4 fixtures are exported from exact TypeScript SHA `45c89493e7edec9c4da247a98cd7858b1f015c09`. Production TypeScript and `rust/source-lock.toml` are read-only. Test-only instrumentation may observe production code but cannot patch its behavior.
+All M4 run and battle-content fixtures are exported from exact TypeScript SHA `45c89493e7edec9c4da247a98cd7858b1f015c09` and record it as `m4_oracle_sha`. They separately record `m3_parity_oracle_sha = 3b534099919efae827019d4a3f3c4ab0ecd6d67b` only to preserve M3 differential provenance. The M4 battle pack is re-exported from the M4 oracle and binds its own new hash. Production TypeScript and `rust/source-lock.toml` are read-only. Test-only instrumentation may observe production code but cannot patch its behavior.
 
 ## Export outputs
 
 The exporter publishes, at minimum:
 
 ```text
-rust/fixtures/m4/oracle-manifest.json
-rust/fixtures/m4/run-content-pack-v1.json
-rust/fixtures/m4/rng-vectors-v1.json
-rust/fixtures/m4/run-segments/*.json
-rust/fixtures/m4/progression/*.json
-rust/fixtures/m4/rewards/*.json
-rust/fixtures/m4/markets/*.json
-rust/fixtures/m4/biomes/*.json
-rust/fixtures/m4/encounters/*.json
+rust/fixtures/m4/oracle/battle-content-pack-v1.json
+rust/fixtures/m4/oracle/run-content-pack-v1.json
+rust/fixtures/m4/oracle/rng-vectors-v1.json
+rust/fixtures/m4/oracle/run-segments/*.json
+rust/fixtures/m4/oracle/progression/*.json
+rust/fixtures/m4/oracle/rewards/*.json
+rust/fixtures/m4/oracle/markets/*.json
+rust/fixtures/m4/oracle/biomes/*.json
+rust/fixtures/m4/oracle/encounters/*.json
+rust/fixtures/m4/oracle/migration/*.json
 ```
 
 Each fixture contains exact provenance, initial canonical state and every RNG state, raw semantic decisions as observed input to TypeScript, ordered RNG calls, ordered action/transition evidence, mutations, presentation, final canonical state, final RNG state, and next logical surface/control. Unsupported or unobservable values are explicit gaps; they are never fabricated.

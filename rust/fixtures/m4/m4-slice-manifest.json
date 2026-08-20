@@ -2,7 +2,8 @@
   "schema_version": 1,
   "project": "PokéRogue Redux",
   "m3_base_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
-  "oracle_game_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "segment": {
     "id": "classic-composed-wave-9-through-11-v1",
     "kind": "oracle-composed-canonical-state-and-captured-vectors",
@@ -23,26 +24,31 @@
     "natural_single_seed_claim": false
   },
   "battle_content": {
-    "species_ids": [1, 7, 19, 23, 50, 52],
-    "move_ids": [1, 52, 77, 78, 351, 589],
+    "species_ids": [1, 7, 19, 23, 50, 52, 932],
+    "move_ids": [1, 34, 52, 77, 78, 351, 589],
     "ability_ids": [0, 22, 25],
-    "source_manifest": "../m3/m3-slice-manifest.json"
+    "m3_source_manifest": "../m3/m3-slice-manifest.json",
+    "m4_additional_move_ids": [34],
+    "m4_additional_content_source": "M4_ORACLE_EXPORTED_POST_INITIALIZATION_DEFINITIONS"
   },
   "progression": {
-    "species": { "id": 7, "key": "SQUIRTLE" },
+    "species": { "id": 932, "key": "NACLI" },
     "growth_rate": { "id": 3, "key": "MEDIUM_SLOW" },
     "nature_ids": [0, 3, 10, 15],
     "selected_parity_nature": { "id": 0, "key": "HARDY" },
     "iv_order": ["HP", "ATK", "DEF", "SPATK", "SPDEF", "SPD"],
     "iv_range": { "minimum": 0, "maximum": 31 },
     "level_move_candidates": [
-      { "level": 9, "id": 229, "key": "RAPID_SPIN" }
+      { "level": 17, "id": 34, "key": "BODY_SLAM" }
     ],
-    "parity_level_before": 8,
-    "parity_level_after": 9,
-    "parity_initial_moves": [33, 39, 55, 110],
-    "parity_replacement_move": { "slot": 0, "before_move_id": 33, "after_move_id": 229 },
-    "level_cap_source": "CLASSIC_WAVE_9_DEFAULT",
+    "parity_level_before": 16,
+    "parity_level_after": 17,
+    "parity_initial_moves": [1, 52, 77, 78],
+    "parity_replacement_move": { "slot": 0, "before_move_id": 1, "after_move_id": 34 },
+    "level_cap_source": "TEST_ONLY_LEVEL_CAP_OVERRIDE_17",
+    "pause_evolutions": false,
+    "evolution_level": 23,
+    "initial_moves_source": "ORACLE_COMPOSED_SUPPORTED_BATTLE_LOADOUT",
     "evolution_execution": "UNSUPPORTED_FAIL_CLOSED"
   },
   "modifier_ids": [

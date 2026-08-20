@@ -40,7 +40,7 @@ M4 authority may generate only selected static links and captured options. Repli
 pub struct EncounterPlan {
     pub schema_version: u32,
     pub encounter_id: EncounterId,
-    pub run_id: RunId,
+    pub run_id: GameRunId,
     pub wave: WaveIndex,
     pub biome: BiomeId,
     pub format: BattleFormat,

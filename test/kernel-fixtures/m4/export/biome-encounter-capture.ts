@@ -184,6 +184,7 @@ function installRngCapture(stream: "structure" | "route" | "encounter"): RngCapt
   if (prototype == null) {
     gap("OBSERVATION_SEAM_MISSING", "Phaser.Math.RandomDataGenerator.prototype", "constructor prototype is unavailable");
   }
+  const target = stream === "encounter" ? (Phaser.Math.RND as unknown as AnyRecord) : prototype;
   const methodNames = ["integerInRange", "integer", "frac", "realInRange", "pick", "shuffle", "weightedPick", "sign"];
   const restore: (() => void)[] = [];
   const capture: RngCapture = {
@@ -195,11 +196,11 @@ function installRngCapture(stream: "structure" | "route" | "encounter"): RngCapt
   const context = { capture, generator: null, stream, depth: 0, nextSequence: 0 };
   activeRngCapture = context;
   for (const methodName of methodNames) {
-    const original = prototype[methodName] as ((...args: any[]) => any) | undefined;
+    const original = target[methodName] as ((...args: any[]) => any) | undefined;
     if (typeof original !== "function") {
       continue;
     }
-    prototype[methodName] = function (this: AnyRecord, ...args: any[]): any {
+    target[methodName] = function (this: AnyRecord, ...args: any[]): any {
       if (activeRngCapture !== context) {
         return original.apply(this, args);
       }
@@ -233,7 +234,7 @@ function installRngCapture(stream: "structure" | "route" | "encounter"): RngCapt
       return result;
     };
     restore.push(() => {
-      prototype[methodName] = original;
+      target[methodName] = original;
     });
   }
   (context as AnyRecord).restore = () => {

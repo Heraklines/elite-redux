@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "oracle_game_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "required_axes": {
     "state_v2": ["SOLE_PLAYER_PARTY", "ENEMY_ONLY_BATTLE_PARTY", "RUN_STAGE_INVARIANTS", "PROGRESSION_FIELDS", "MIGRATION_ZERO_RNG"],
     "progression": ["PARTICIPATION", "EXP", "LEVEL", "PERMANENT_STATS", "MOVE_LEARN", "MOVE_REPLACE", "MOVE_DECLINE", "EVOLUTION_FAIL_CLOSED"],

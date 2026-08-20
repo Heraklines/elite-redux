@@ -646,16 +646,33 @@ async function driveMarket(game: GameManager): Promise<void> {
   if (!Number.isSafeInteger(cursor)) {
     gap("MARKET_UI_CURSOR_UNOBSERVABLE", "src/ui/handlers/biome-shop-ui-handler.ts:setCursor", "market displayed index is not an integer");
   }
-  const key = (button: Button): string => button === Button.DOWN ? "DOWN" : button === Button.RIGHT ? "RIGHT" : "LEFT";
+  const key = (button: Button): string => {
+    switch (button) {
+      case Button.DOWN:
+        return "DOWN";
+      case Button.UP:
+        return "UP";
+      case Button.RIGHT:
+        return "RIGHT";
+      default:
+        return "LEFT";
+    }
+  };
   let current = cursor;
-  while (current < index) {
-    const button = current + 4 < options.length ? Button.DOWN : Button.RIGHT;
-    driveKey(game, button, key(button), "market");
+  while (Math.floor(current / 4) < Math.floor(index / 4)) {
+    driveKey(game, Button.DOWN, "DOWN", "market");
     current = Number((handler as AnyRecord).cursor ?? current);
   }
-  while (current > index) {
-    const button = current - 4 >= 0 ? Button.UP : Button.LEFT;
-    driveKey(game, button, key(button), "market");
+  while (Math.floor(current / 4) > Math.floor(index / 4)) {
+    driveKey(game, Button.UP, "UP", "market");
+    current = Number((handler as AnyRecord).cursor ?? current);
+  }
+  while (current % 4 < index % 4) {
+    driveKey(game, Button.RIGHT, "RIGHT", "market");
+    current = Number((handler as AnyRecord).cursor ?? current);
+  }
+  while (current % 4 > index % 4) {
+    driveKey(game, Button.LEFT, "LEFT", "market");
     current = Number((handler as AnyRecord).cursor ?? current);
   }
   const displayedIndex = Number((handler as AnyRecord).cursor ?? -1);

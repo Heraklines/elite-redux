@@ -4,7 +4,7 @@
 
 M4 implements only the growth, nature, species, and move-learning entries named by `rust/fixtures/m4/m4-slice-manifest.json`. Unsupported IDs fail during run initialization or progression preflight. No unknown value is normalized to the selected value.
 
-The composed parity progression baseline is Squirtle (`SpeciesId(7)`), Medium Slow (`GrowthRateId(3)`), level 8→9, learning Rapid Spin (`MoveId(229)`) under the default Classic wave-9 cap. The exact six-entry IV array and selected nature are exporter-owned state. The broader content pack may preserve unsupported IDs as typed data but cannot execute them.
+The composed parity progression baseline is Nacli (`SpeciesId(932)`), Medium Slow (`GrowthRateId(3)`), level 16→17 under explicitly captured test-only `LEVEL_CAP_OVERRIDE=17`. Nacli's post-initialization level-17 list contains only Body Slam (`MoveId(34)`) and its evolution threshold is 23. The composed initial battle loadout is `[1,52,77,78]`; raw input replaces slot 0, producing `[34,52,77,78]`. The exact EXP, six-entry IV array, nature, stats, owner, and initial-loadout provenance are exporter-owned state. The override and loadout are fixture inputs, not a natural Classic wave-9 claim.
 
 ## Canonical state
 

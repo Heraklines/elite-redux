@@ -178,6 +178,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-run"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "er-canonical",
+ "er-content",
+ "er-rng",
+ "er-state",
+ "er-types",
+ "proptest",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
 name = "er-sim"
 version = "0.1.0"
 dependencies = [

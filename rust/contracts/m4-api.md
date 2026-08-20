@@ -21,12 +21,14 @@ All inherited M3 proposal, RNG, menu, turn-coordinate, battle-content, manifest,
 The following are opaque validated newtypes, not aliases to primitives:
 
 ```rust
-RunId(SafeU53); RunInteractionSequence(SafeU53); RunTaskId(SafeU53);
+GameRunId(SafeU53); RunInteractionSequence(SafeU53); RunTaskId(SafeU53);
 RunSurfaceId(SafeU53); RunOfferId(SafeU53); RunStockId(SafeU53);
 RouteNodeId(SafeU53); EncounterId(SafeU53); ModifierId(SafeU53);
 GrowthRateId(u8); NatureId(u8); Experience(SafeU53); Money(SafeU53);
 RunContentPackHash(String); SurfaceDigest(String);
 ```
+
+Existing `er_types::ids::RunId` remains the opaque string protocol-context identity used by M2/M3 Authority V2 and is unchanged. `GameRunId` is the numeric canonical M4 game-state identity. They are distinct domains and never alias or convert implicitly.
 
 Existing `BattleId`, `PokemonId`, `MoveId`, `AbilityId`, `PartyIndex`, `WaveIndex`, `TurnIndex`, `SeatId`, `ControlId`, `MenuInstanceId`, and `OperationId` remain the exact M3 types.
 
@@ -114,7 +116,7 @@ pub struct BattleSettlementState {
 ```rust
 pub struct RunState {
     pub schema_version: u32,
-    pub run_id: RunId,
+    pub run_id: GameRunId,
     pub seed: String,
     pub wave: WaveIndex,
     pub next_battle_id: BattleId,
@@ -125,12 +127,11 @@ pub struct RunState {
     pub modifiers: Vec<RunModifierInstance>,
     pub progression: ProgressionQueue,
     pub active_surface: Option<RunSurfaceState>,
-    pub prepared_encounter: Option<EncounterPlan>,
     pub biome: BiomeRuntimeState,
     pub counters: RunCounters,
 }
 
-pub enum RunStage { Battle, AwaitingWaveAdvance, Progression, Surface, EncounterPrepared, Complete }
+pub enum RunStage { Battle, AwaitingWaveAdvance, Progression, Surface, Complete }
 pub enum RunOutcome { InProgress, Victory, Defeat }
 
 pub struct ProgressionQueue {
@@ -167,12 +168,11 @@ pub struct RunCounters {
 
 | Stage | Required | Forbidden | Successors |
 |---|---|---|---|
-| `Battle` | `battle=Some`, no surface/encounter, empty progression | settled battle | `AwaitingWaveAdvance`, `Complete` |
-| `AwaitingWaveAdvance` | terminal source battle, unsettled boundary | active surface/encounter | `Progression`, `Surface`, `EncounterPrepared`, `Complete` |
-| `Progression` | no battle/surface/encounter, nonempty queue | unsupported active task | `Progression`, `Surface`, `EncounterPrepared`, `Complete` |
-| `Surface` | exactly one active surface, no battle/encounter | empty closed surface | `Surface`, `Progression`, `EncounterPrepared`, `Complete` |
-| `EncounterPrepared` | one validated encounter, no battle/surface/progression | callback content | `Battle` |
-| `Complete` | terminal outcome, no battle/surface/encounter/progression | actionable control | none |
+| `Battle` | `battle=Some`, no surface, empty progression | settled battle | `AwaitingWaveAdvance`, `Complete` |
+| `AwaitingWaveAdvance` | terminal source battle, unsettled boundary | active surface | `Progression`, `Surface`, `Battle`, `Complete` |
+| `Progression` | no battle/surface, nonempty queue | unsupported active task | `Progression`, `Surface`, `Battle`, `Complete` |
+| `Surface` | exactly one active surface, no battle | empty closed surface | `Surface`, `Progression`, `Battle`, `Complete` |
+| `Complete` | terminal outcome, no battle/surface/progression | actionable control | none |
 
 Every transition validates the complete before state and complete candidate after state. It never repairs a contradictory stage.
 
@@ -202,7 +202,8 @@ pub struct GameContentBundle {
 
 pub struct RunContentPack {
     pub schema_version: u32,
-    pub oracle_game_sha: String,
+    pub m4_oracle_sha: String,
+    pub m3_parity_oracle_sha: String,
     pub battle_content_hash: ContentPackHash,
     pub run_content_hash: RunContentPackHash,
     pub growth_rates: Vec<Option<GrowthRateDefinition>>,
@@ -259,12 +260,7 @@ pub fn prepare_encounter(
     before: &GameState,
     request: &EncounterRequest,
     content: &GameContentBundle,
-) -> Result<PreparedRunTransition, RunError>;
-
-pub fn start_prepared_battle(
-    before: &GameState,
-    content: &GameContentBundle,
-) -> Result<PreparedRunTransition, RunError>;
+) -> Result<EncounterPlan, RunError>;
 
 pub fn finish_run(
     before: &GameState,
@@ -369,12 +365,12 @@ Wave is retained material/control state for interactions; it is not an extra fie
 
 ```rust
 pub struct M4MaterialHeader {
-    pub oracle_game_sha: String,
+    pub m4_oracle_sha: String,
+    pub m3_parity_oracle_sha: String,
     pub battle_content_hash: ContentPackHash,
     pub run_content_hash: RunContentPackHash,
     pub operation_id: OperationId,
-    pub revision: Revision,
-    pub run_id: RunId,
+    pub run_id: GameRunId,
     pub wave: WaveIndex,
     pub before_digest: MechanicalStateDigest,
     pub after_digest: MechanicalStateDigest,
@@ -408,7 +404,7 @@ All roots use `#[serde(deny_unknown_fields)]`; enums use explicit screaming-snak
 
 All M4 mechanical/kernel/pair/surface/run-content digests are `blake3-v1:<64 lowercase hex>` over domain bytes, one zero separator byte, then canonical JSON bytes.
 
-- `pokerogue-redux/m4/mechanical/v2`: complete validated `GameState` V2, including run state, player party, battle, every mechanics RNG state, admitted command/progression state, active surface, encounter plan, counters, and outcome. It excludes logical `GameControlPlan`, UI, input, scheduler, protocol, network, renderer, and the stored `surface_digest` field to avoid self-reference.
+- `pokerogue-redux/m4/mechanical/v2`: complete validated `GameState` V2, including run state, player party, battle, every mechanics RNG state, admitted command/progression state, active surface, counters, and outcome. Transaction-local encounter plans are excluded until folded into the material `after_state` as a complete battle. Logical `GameControlPlan`, UI, input, scheduler, protocol, network, renderer, and the stored `surface_digest` field are excluded.
 - `pokerogue-redux/m4/kernel-determinism/v2`: complete V3 endpoint snapshot with append-only diagnostics and stored digest fields omitted.
 - `pokerogue-redux/m4/pair-determinism/v2`: complete V3 pair snapshot with append-only diagnostics and stored digest fields omitted.
 - `pokerogue-redux/m4/surface/v1`: canonical `RunSurfaceState` with its `surface_digest` field omitted; includes owner, operation identity, ordinal, options/stock, prices, locks/sold/target state, and logical menu graph.
@@ -425,7 +421,7 @@ pub enum InternalEvent {
     BattleResolved(PreparedBattleTransition), BattleSettled(BattleSettlementInput),
     RunPrepared(PreparedRunTransition), ProgressionAction(ProgressionDecision),
     SurfaceOpened(OpenSurfaceRequest), SurfaceAction(RunSurfaceAction),
-    EncounterPrepared(EncounterPlan), BattleStartPrepared(BattleStartV2),
+    EncounterPrepared(EncounterPlan),
     AuthorityEntryReady(PreparedAuthorityEntry), MaterialInstalled(Revision),
     ControlInstalled(Revision), TerminalPrepared(RunOutcome),
 }
@@ -453,7 +449,7 @@ A prepared transaction may be captured only after complete deterministic prepara
 ```rust
 pub struct M3PokemonCompanionKey { pub fixture_id:String, pub state_side:MigrationStateSide, pub party_side:BattleSide, pub pokemon_id:PokemonId }
 pub struct M3PokemonCompanion { pub key:M3PokemonCompanionKey, pub roster_index:u8, pub owner_seat:Option<SeatId>, pub experience:Experience, pub growth_rate:GrowthRateId, pub ivs:[Iv;6], pub nature:NatureId, pub effective_nature:NatureId, pub friendship:u16, pub permanent_bonuses:PermanentStatBonuses, pub pause_evolutions:bool }
-pub struct M3ToM4MigrationContext { pub oracle_game_sha:String, pub battle_content_hash:ContentPackHash, pub run_content_hash:RunContentPackHash, pub run:RunState, pub companions:Vec<M3PokemonCompanion> }
+pub struct M3ToM4MigrationContext { pub m3_oracle_sha:String, pub m4_oracle_sha:String, pub battle_content_hash:ContentPackHash, pub run_content_hash:RunContentPackHash, pub run:RunState, pub companions:Vec<M3PokemonCompanion> }
 pub enum MigrationError { WrongSchema, WrongOracle, ContentIdentity, MissingCompanion, DuplicateCompanion, UnknownCompanion, PartyOrderConflict, OwnerConflict, InvalidV1, InvalidV2 }
 pub fn migrate_m3_game_state(input:&GameStateV1, context:&M3ToM4MigrationContext, content:&GameContentBundle) -> Result<GameState,MigrationError>;
 ```
@@ -464,7 +460,7 @@ Every player and enemy Pokémon in initial and final fixture states has exactly 
 
 The representative segment starts from the oracle-exported wave-9 canonical state and consumes only oracle-captured reward, progression, market, route, encounter, and RNG vectors whose joins have identical canonical state, content hash, and RNG frontier. The driver uses only physical keydown/keyup, focus/blur, virtual time, network faults, presentation outcomes, and storage outcomes. Direct semantic intents, proposals, material application, progression decisions, surface actions, battle creation, or wave advance are forbidden.
 
-The selected move-learning crossing is Squirtle species 7, level 8→9, Rapid Spin move 229, replacing slot 0 in `[33,39,55,110]`. The segment is explicitly composed and makes no natural single-seed claim.
+The selected move-learning crossing is Nacli species 932, level 16→17, under test-only `LEVEL_CAP_OVERRIDE=17`. Its post-initialization ER level-17 list contains only Body Slam 34. The composed initial battle loadout is `[1,52,77,78]`; raw input selects Body Slam and replaces slot 0, producing `[34,52,77,78]`. Nacli evolves at level 23, so no evolution candidate is reachable at this boundary. The segment is explicitly composed and makes no natural single-seed, natural-loadout, or default-cap claim.
 
 ## Production boundary
 

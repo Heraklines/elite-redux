@@ -13,15 +13,18 @@ fn battle_hash() -> Result<ContentPackHash, Box<dyn Error>> {
 fn selected_pack_is_typed_and_retains_numeric_holes() -> Result<(), Box<dyn Error>> {
     let pack = selected_run_content_pack(battle_hash()?)?;
     assert_eq!(pack.m4_oracle_sha, "45c89493e7edec9c4da247a98cd7858b1f015c09");
-    assert_eq!(pack.battle_oracle_sha, "3b534099919efae827019d4a3f3c4ab0ecd6d67b");
+    assert_eq!(pack.m3_parity_oracle_sha, "3b534099919efae827019d4a3f3c4ab0ecd6d67b");
     assert!(pack.growth_rates[0].is_none());
     assert_eq!(pack.growth_rates[3].as_ref().map(|value| value.key.as_str()), Some("MEDIUM_SLOW"));
     assert!(pack.modifiers[8].is_none());
-    let progression = pack.species_progression[1].as_ref().ok_or("Bulbasaur progression missing")?;
+    assert!(pack.species_progression[1].is_none());
+    let progression = pack.species_progression[932].as_ref().ok_or("Nacli progression missing")?;
     assert_eq!((progression.parity_level_before, progression.parity_level_after), (16, 17));
-    assert_eq!(progression.base_experience, 64);
-    assert_eq!(progression.level_moves.len(), 6);
-    assert_eq!(progression.current_moves.iter().map(ToString::to_string).collect::<Vec<_>>(), vec!["331", "45", "74", "77"]);
+    assert_eq!(progression.base_experience, 56);
+    assert_eq!(progression.level_moves.len(), 1);
+    assert_eq!(progression.level_moves[0].move_id.to_string(), "34");
+    assert_eq!(progression.evolutions[0].minimum_level, 23);
+    assert_eq!(progression.current_moves.iter().map(ToString::to_string).collect::<Vec<_>>(), vec!["1", "52", "77", "78"]);
     assert_eq!(pack.modifier_by_registry_key("LOCK_CAPSULE").map(|value| value.id.to_string()), Some("7".to_owned()));
     assert!(!pack.market_rules.supports_reroll);
     assert!(!RUN_CONTENT_HASH_DOMAIN.is_empty());

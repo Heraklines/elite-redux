@@ -1,5 +1,6 @@
 m3_base_sha = "45c89493e7edec9c4da247a98cd7858b1f015c09"
 m4_oracle_sha = "45c89493e7edec9c4da247a98cd7858b1f015c09"
+m3_parity_oracle_sha = "3b534099919efae827019d4a3f3c4ab0ecd6d67b"
 oracle_protocol_version = "er-coop-47"
 inherits_contract = "rust/contracts/m3-contract.toml"
 inheritance_policy = "all M3 keys remain exact unless explicitly overridden below"

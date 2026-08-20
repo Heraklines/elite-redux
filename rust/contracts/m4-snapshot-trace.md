@@ -12,8 +12,8 @@ V3 contains every deterministic owner required to resume without inference:
 - complete UI state, control plan, allocator state, and presentation barriers;
 - scheduler IDs, registered timers, remaining durations, owners, addresses, reasons, time classes, and pause reasons;
 - protocol log, frontiers, retained entries, receipts, admissions, leases, recovery transaction/fence, and connection generations;
-- `GameState` V2, progression queue, active run surface, encounter plan, battle, all RNG states/audits, and counters;
-- prepared but unpublished atomic transaction, if one exists at an allowed capture boundary;
+- `GameState` V2, progression queue, active run surface, battle, all RNG states/audits, and counters;
+- prepared but unpublished atomic transaction, including a transaction-local encounter plan when capture occurs after generation and before it is folded into material;
 - pending presentations and terminal state.
 
 A snapshot contains no callbacks, threads, wall-clock instants, filesystem handles, network handles, browser objects, or renderer objects.
@@ -65,4 +65,4 @@ Renderer geometry, localized strings, and transient animation pixels are exclude
 
 ## Teardown
 
-Every restored or uninterrupted campaign must end with zero timers, waits, proposals, deliveries, retained entries, controls, menus, pending presentations, progression tasks, active surfaces, encounter plans, battle collectors, replacement queues, recovery owners, network packets, presenter work, and storage work.
+Every restored or uninterrupted campaign must end with zero timers, waits, proposals, deliveries, retained entries, controls, menus, pending presentations, progression tasks, active surfaces, prepared encounter transactions, battle collectors, replacement queues, recovery owners, network packets, presenter work, and storage work.

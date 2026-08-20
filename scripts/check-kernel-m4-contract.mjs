@@ -76,6 +76,7 @@ const contract = parseFlatToml(contractTexts.get("m4-contract.toml"), "m4-contra
 const exactContract = {
   m3_base_sha: expectedSha,
   m4_oracle_sha: expectedSha,
+  m3_parity_oracle_sha: "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   game_state_schema_version: 2,
   battle_state_schema_version: 2,
   pokemon_state_schema_version: 2,
@@ -101,6 +102,33 @@ for (const [key, expected] of Object.entries(exactContract)) {
   assert(contract.get(key) === expected, `m4-contract.toml: ${key} must equal ${JSON.stringify(expected)}`);
 }
 
+const ownership = contractTexts.get("m4-ownership.toml");
+for (const branch of [
+  "wrk/rk-m4a-01-types",
+  "wrk/rk-m4a-state",
+  "wrk/rk-m4a-run-content",
+  "wrk/rk-m4a-oracle",
+  "wrk/rk-m4a-oracle-progression",
+  "wrk/rk-m4a-oracle-rewards",
+  "wrk/rk-m4a-oracle-biome",
+  "wrk/rk-m4a-oracle-migration",
+  "wrk/rk-m4a-oracle-content",
+]) {
+  assert(ownership.includes(`branch = "${branch}"`), `m4-ownership.toml: missing active isolated branch ${branch}`);
+}
+for (const path of [
+  "rust/crates/er-state/src/game_v2.rs",
+  "rust/crates/er-run/src/rng_audit.rs",
+  "scripts/export-kernel-m4-oracle.mjs",
+  "test/kernel-fixtures/m4/export/progression-capture.ts",
+  "test/kernel-fixtures/m4/export/reward-market-capture.ts",
+  "test/kernel-fixtures/m4/export/biome-encounter-capture.ts",
+  "test/kernel-fixtures/m4/export/migration-companion-capture.ts",
+  "test/kernel-fixtures/m4/export/run-content-capture.ts",
+]) {
+  assert(ownership.includes(`"${path}"`), `m4-ownership.toml: missing active owned path ${path}`);
+}
+
 const manifests = new Map();
 for (const name of manifestNames) {
   const source = await text(`rust/fixtures/m4/${name}`);
@@ -111,16 +139,25 @@ for (const name of manifestNames) {
 }
 
 const slice = manifests.get("m4-slice-manifest.json");
-assert(slice.m3_base_sha === expectedSha && slice.oracle_game_sha === expectedSha, "slice provenance mismatch");
+assert(slice.m3_base_sha === expectedSha, "slice M3 base mismatch");
+for (const [name, manifest] of manifests) {
+  assert(manifest.m4_oracle_sha === expectedSha, `${name}: M4 oracle SHA mismatch`);
+  assert(manifest.m3_parity_oracle_sha === "3b534099919efae827019d4a3f3c4ab0ecd6d67b", `${name}: M3 parity oracle SHA mismatch`);
+}
 assert(slice.segment.start_wave === 9 && slice.segment.end_wave === 11, "slice wave range mismatch");
 assert(slice.segment.initial_biome.id === 0 && slice.segment.selected_biome.id === 1, "slice biome choice mismatch");
 assert(slice.segment.driver === "raw-physical-keys-only", "slice driver must be raw keys");
 assert(slice.segment.natural_single_seed_claim === false, "composed slice may not claim a natural seed");
-assert(slice.progression.species.id === 7, "parity progression species must be Squirtle 7");
+assert(slice.progression.species.id === 932, "parity progression species must be Nacli 932");
 assert(slice.progression.growth_rate.id === 3, "parity progression growth must be Medium Slow 3");
-assert(slice.progression.parity_level_before === 8 && slice.progression.parity_level_after === 9, "parity progression must cross 8 to 9");
-assert(slice.progression.level_move_candidates.length === 1 && slice.progression.level_move_candidates[0].id === 229, "parity move must be Rapid Spin 229");
-assert(JSON.stringify(slice.progression.parity_initial_moves) === "[33,39,55,110]", "parity initial moves mismatch");
+assert(slice.progression.parity_level_before === 16 && slice.progression.parity_level_after === 17, "parity progression must cross 16 to 17");
+assert(JSON.stringify(slice.progression.level_move_candidates.map(entry => entry.id)) === "[34]", "parity move candidates mismatch");
+assert(JSON.stringify(slice.progression.parity_initial_moves) === "[1,52,77,78]", "parity initial moves mismatch");
+assert(slice.progression.level_cap_source === "TEST_ONLY_LEVEL_CAP_OVERRIDE_17", "parity level-cap override mismatch");
+assert(slice.progression.pause_evolutions === false && slice.progression.evolution_level === 23, "parity evolution boundary mismatch");
+assert(slice.progression.initial_moves_source === "ORACLE_COMPOSED_SUPPORTED_BATTLE_LOADOUT", "parity loadout source mismatch");
+assert(slice.battle_content.move_ids.includes(34), "battle content omits Body Slam 34");
+assert(JSON.stringify(slice.battle_content.m4_additional_move_ids) === "[34]", "M4 additional battle move closure must contain only Body Slam 34");
 assert(slice.regular_reward_shop.supports_reroll === true && slice.regular_reward_shop.supports_locks === true, "regular shop must own reroll and locks");
 assert(slice.biome_market.supports_reroll === false && slice.biome_market.supports_locks === false, "biome market must not expose reroll or locks");
 assert(slice.encounter_candidates.length === 1 && slice.encounter_candidates[0].source === "ORACLE_CAPTURE_REQUIRED", "parity encounter must remain an explicit captured-vector prerequisite");

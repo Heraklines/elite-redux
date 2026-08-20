@@ -49,23 +49,9 @@ deliverable = "Strong run IDs, closed run enums, and shared logical-menu graph t
 [[lanes]]
 id = "M4A-02"
 generation = "M4A"
-branch = "wrk/rk-m4a-02-pokemon"
-paths = ["rust/crates/er-state/src/pokemon.rs", "rust/crates/er-state/tests/m4_pokemon.rs"]
-deliverable = "PokemonState V2 progression fields and invariants"
-
-[[lanes]]
-id = "M4A-03"
-generation = "M4A"
-branch = "wrk/rk-m4a-03-game-state"
-paths = ["rust/crates/er-state/src/game.rs", "rust/crates/er-state/src/run.rs", "rust/crates/er-state/tests/m4_game_state.rs"]
-deliverable = "GameState V2 sole player-party ownership and RunState"
-
-[[lanes]]
-id = "M4A-04"
-generation = "M4A"
-branch = "wrk/rk-m4a-04-battle-state"
-paths = ["rust/crates/er-state/src/battle.rs", "rust/crates/er-state/src/world.rs", "rust/crates/er-state/tests/m4_battle_world.rs"]
-deliverable = "BattleState V2 enemy-only ownership and BattleWorld access"
+branch = "wrk/rk-m4a-state"
+paths = ["rust/crates/er-state/src/game_v2.rs", "rust/crates/er-state/src/run_v2.rs", "rust/crates/er-state/src/pokemon_v2.rs", "rust/crates/er-state/src/battle_v2.rs", "rust/crates/er-state/src/world_v2.rs", "rust/crates/er-state/src/validation_v2.rs", "rust/crates/er-state/tests/m4_state_v2.rs"]
+deliverable = "Versioned GameState, RunState, PokemonState, BattleState, world ownership, and validation migration targets"
 
 [[lanes]]
 id = "M4A-05"
@@ -77,9 +63,9 @@ deliverable = "Typed zero-RNG M3-to-M4 migration with exact companion data"
 [[lanes]]
 id = "M4A-06"
 generation = "M4A"
-branch = "wrk/rk-m4a-06-run-content"
-paths = ["rust/crates/er-run/src/content.rs", "rust/crates/er-run/src/capability.rs", "rust/crates/er-run/tests/m4_content.rs"]
-deliverable = "Immutable run content pack, hashes, and fail-closed capabilities"
+branch = "wrk/rk-m4a-run-content"
+paths = ["rust/crates/er-run/src/content.rs", "rust/crates/er-run/src/capability.rs", "rust/crates/er-run/src/rng_audit.rs", "rust/crates/er-run/src/error.rs", "rust/crates/er-run/tests/m4_content.rs"]
+deliverable = "Immutable run content pack, hashes, RNG audit records, and fail-closed capabilities"
 
 [[lanes]]
 id = "M4A-07"
@@ -119,9 +105,51 @@ deliverable = "Biome structure, route vectors, static encounter plans, and Battl
 [[lanes]]
 id = "M4A-12"
 generation = "M4A"
-branch = "wrk/rk-m4a-12-foundation-tests"
-paths = ["rust/crates/er-testkit/src/m4_fixture.rs", "rust/crates/er-testkit/tests/m4_foundation.rs", "scripts/export-kernel-m4-oracle.mjs", "test/kernel-fixtures/m4/**", "rust/fixtures/m4/oracle/**"]
-deliverable = "Fresh-process fixtures, loader, schema, property, and differential foundation tests"
+branch = "wrk/rk-m4a-oracle"
+paths = ["scripts/export-kernel-m4-oracle.mjs", "test/kernel-fixtures/m4/**", "rust/fixtures/m4/oracle/**"]
+deliverable = "Fresh-process TypeScript oracle exporter, migration companions, and causal M4 fixtures"
+
+[[lanes]]
+id = "M4A-13"
+generation = "M4A"
+branch = "wrk/rk-m4a-13-foundation-tests"
+paths = ["rust/crates/er-testkit/src/m4_fixture.rs", "rust/crates/er-testkit/tests/m4_foundation.rs"]
+deliverable = "Cross-crate fixture loader, schema, property, and differential foundation tests"
+
+[[lanes]]
+id = "M4A-12P"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-progression"
+paths = ["test/kernel-fixtures/m4/export/progression-capture.ts"]
+deliverable = "Live wave-nine progression and move-learning oracle capture"
+
+[[lanes]]
+id = "M4A-12R"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-rewards"
+paths = ["test/kernel-fixtures/m4/export/reward-market-capture.ts"]
+deliverable = "Live regular reward and Town market oracle capture"
+
+[[lanes]]
+id = "M4A-12B"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-biome"
+paths = ["test/kernel-fixtures/m4/export/biome-encounter-capture.ts"]
+deliverable = "Live biome, route, and encounter oracle capture"
+
+[[lanes]]
+id = "M4A-12M"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-migration"
+paths = ["test/kernel-fixtures/m4/export/migration-companion-capture.ts"]
+deliverable = "Live M3-to-M4 progression companion oracle capture"
+
+[[lanes]]
+id = "M4A-12C"
+generation = "M4A"
+branch = "wrk/rk-m4a-oracle-content"
+paths = ["test/kernel-fixtures/m4/export/run-content-capture.ts"]
+deliverable = "M4 battle and run content packs with exact independent hashes"
 
 [[lanes]]
 id = "M4B-01"

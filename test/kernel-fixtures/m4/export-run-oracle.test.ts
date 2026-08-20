@@ -16,10 +16,14 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Phaser from "phaser";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { captureBiomeEncounter } from "./export/biome-encounter-capture";
+import { captureMigrationCompanions } from "./export/migration-companion-capture";
+import { captureProgression } from "./export/progression-capture";
+import { captureRewardMarket } from "./export/reward-market-capture";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
-const BATTLE_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const M3_PARITY_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 const M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
 const SAFE_U53_MAX = 9_007_199_254_740_991;
 const REQUIRED_OUTPUT_ROOT = process.env.M4_ORACLE_OUTPUT_ROOT;
@@ -324,8 +328,7 @@ function provenance(battleContentHash: string, runContentHash: string): JsonObje
     fail("provenance", "CONTENT_HASH_UNOBSERVABLE", "src/init/init.ts:initializeGame", "content hashes are not exact canonical values");
   }
   return {
-    oracle_game_sha: M4_ORACLE_SHA,
-    battle_oracle_sha: BATTLE_ORACLE_SHA,
+    m3_parity_oracle_sha: M3_PARITY_ORACLE_SHA,
     m4_oracle_sha: M4_ORACLE_SHA,
     oracle_tree_sha: git("rev-parse", `${M4_ORACLE_SHA}^{tree}`),
     exporter_commit_sha: REQUIRED_EXPORTER_SHA,
@@ -419,11 +422,11 @@ function captureRngVectors(): JsonObject {
       });
     }
   }
-  return { artifact_id: "rng-vectors-v1", schema_version: 1, battle_oracle_sha: BATTLE_ORACLE_SHA, m4_oracle_sha: M4_ORACLE_SHA, vectors };
+  return { artifact_id: "rng-vectors-v1", schema_version: 1, m3_parity_oracle_sha: M3_PARITY_ORACLE_SHA, m4_oracle_sha: M4_ORACLE_SHA, vectors };
 }
 
 function m4MoveDefinitions(vector: string): JsonValue[] {
-  const moveIds = [33, 39, 55, 110, 229];
+  const moveIds = [34, 45, 72, 74, 124, 230, 331, 447, 520];
   const definitions: JsonValue[] = [];
   for (const id of moveIds) {
     const move = allMoves.find(entry => Number((entry as AnyRecord).id) === id) as AnyRecord | undefined;
@@ -452,7 +455,7 @@ function m4MoveDefinitions(vector: string): JsonValue[] {
 }
 
 function pinnedContentProbe(vector: string): void {
-  const species = allSpecies.find(entry => Number((entry as AnyRecord).speciesId) === 7);
+  const species = allSpecies.find(entry => Number((entry as AnyRecord).speciesId) === 1);
   const town = allBiomes.get(0);
   const plains = allBiomes.get(1);
   if (species == null || town == null || plains == null) {
@@ -474,64 +477,6 @@ function captureRunContent(): never {
   );
 }
 
-function captureProgression(): never {
-  pinnedContentProbe("progression/bulbasaur-medium-slow-level-17-v1");
-  fail(
-    "progression/bulbasaur-medium-slow-level-17-v1",
-    "LIVE_PROGRESSION_STATE_UNOBSERVABLE",
-    "src/battle-scene.ts:applyPartyExp -> src/phases/exp-phase.ts",
-    "no live source battle exposes the required exact EXP, IV, nature, ownership, participation, stat, and move-learning frontier without callback-owned setup",
-  );
-}
-
-function captureReward(): never {
-  pinnedContentProbe("rewards/regular-reroll-lock-v1");
-  fail(
-    "rewards/regular-reroll-lock-v1",
-    "REWARD_POOL_CALLBACK_UNOBSERVABLE",
-    "src/phases/select-modifier-phase.ts:start -> src/modifier/modifier-type.ts:generateType",
-    "threshold regeneration and generator callbacks consume the live party/UI state before option identities can be recorded",
-  );
-}
-
-function captureMarket(): never {
-  pinnedContentProbe("markets/town-wave-10-v1");
-  fail(
-    "markets/town-wave-10-v1",
-    "MARKET_STOCK_CALLBACK_UNOBSERVABLE",
-    "src/phases/biome-shop-phase.ts:start",
-    "Town stock requires a live wave-10 BattleScene, modifier ownership, and callback-driven UI/persistence completion",
-  );
-}
-
-function captureBiome(): never {
-  pinnedContentProbe("biomes/town-crossroads-route-v1");
-  fail(
-    "biomes/town-crossroads-route-v1",
-    "ROUTE_RNG_FRONTIER_UNOBSERVABLE",
-    "src/data/elite-redux/er-biome-routing.ts:rollErNextBiomeNodes",
-    "the required solo ambient Phaser frontier and pending Town route carrier are not exposed by a live fixture setup",
-  );
-}
-
-function captureEncounter(): never {
-  pinnedContentProbe("encounters/plains-wave-11-captured-v1");
-  fail(
-    "encounters/plains-wave-11-captured-v1",
-    "POST_INITIALIZATION_ENCOUNTER_UNOBSERVABLE",
-    "src/phases/encounter-phase.ts:generateEncounter",
-    "ordinary species/loadout callbacks, asset completion, weather/terrain, and scripted command ownership require a complete post-initialization live vector",
-  );
-}
-
-function captureMigrationCompanions(): never {
-  fail(
-    "migration/m3-to-m4-companions-v1",
-    "LIVE_M3_COMPANIONS_UNOBSERVABLE",
-    "test/kernel-fixtures/m3/export-battle-oracle.test.ts:exportCase (non-exported live setup)",
-    "companions must come from live TypeScript fixture construction/replay for all 38 initial/final player and enemy states; M3 JSON bytes do not contain exact progression fields and cannot be synthesized",
-  );
-}
 
 function captureComposedSegment(): never {
   fail(
@@ -561,6 +506,71 @@ function collectGap(capture: () => never, gaps: OracleGap[]): void {
   }
 }
 
+async function collectLiveCapture(
+  vector: string,
+  capture: () => Promise<Record<string, unknown>>,
+  gaps: OracleGap[],
+): Promise<JsonObject | null> {
+  try {
+    return canonicalValue(await capture(), vector) as JsonObject;
+  } catch (error) {
+    if (
+      error instanceof Error
+      && typeof (error as AnyRecord).code === "string"
+      && typeof (error as AnyRecord).sourceSeam === "string"
+    ) {
+      gaps.push(
+        new OracleGap(
+          vector,
+          String((error as AnyRecord).code),
+          String((error as AnyRecord).sourceSeam),
+          error.message,
+        ),
+      );
+      return null;
+    }
+    throw error;
+  }
+}
+
+function envelopeFromCapture(
+  fixtureId: string,
+  value: JsonObject,
+  sharedProvenance: JsonObject,
+): JsonObject {
+  const initial = value.initial;
+  const final = value.final;
+  const decisions = value.decisions;
+  const transitions = value.ordered_transitions;
+  const observations = value.observations;
+  const rawKeyTape = value.raw_key_tape
+    ?? ((value.progression as JsonObject | undefined)?.menu_inputs);
+  return strictEnvelope(fixtureId, {
+    provenance: sharedProvenance,
+    initial: initial != null && typeof initial === "object" && !Array.isArray(initial)
+      ? initial as JsonObject
+      : { canonical: value, rng: { draws: [] } },
+    decisions: Array.isArray(decisions)
+      ? decisions
+      : value.progression == null ? [] : [value.progression],
+    rng_draws: Array.isArray(value.rng_draws) ? value.rng_draws : [],
+    ordered_transitions: Array.isArray(transitions)
+      ? transitions
+      : observations == null ? [] : [observations],
+    mutations: Array.isArray(value.mutations) ? value.mutations : [],
+    presentation: Array.isArray(value.presentation) ? value.presentation : [],
+    final: final != null && typeof final === "object" && !Array.isArray(final)
+      ? final as JsonObject
+      : { canonical: value, rng: { draws: [] } },
+    next_control: value.next_control != null
+      && typeof value.next_control === "object"
+      && !Array.isArray(value.next_control)
+      ? value.next_control as JsonObject
+      : { kind: "CAPTURED_BOUNDARY" },
+    ...(Array.isArray(rawKeyTape) ? { raw_key_tape: rawKeyTape } : {}),
+  });
+}
+
 describe("M4A fresh run oracle export", () => {
   beforeAll(() => {
     if (process.env.M4_ORACLE_SHA !== M4_ORACLE_SHA) {
@@ -579,22 +589,87 @@ describe("M4A fresh run oracle export", () => {
     }
   });
 
-  it("captures every required vector or fails closed with typed gaps", () => {
+  it("captures every required vector or fails closed with typed gaps", async () => {
     const gaps: OracleGap[] = [];
     const generated = new Map<string, JsonObject>();
 
-    // These independent Phaser vectors are executable evidence, not a
-    // replacement for run-boundary draws. They remain unpublished when any
-    // required causal vector has a gap.
     generated.set("rng-vectors-v1.json", captureRngVectors());
-
     collectGap(captureRunContent, gaps);
-    collectGap(captureProgression, gaps);
-    collectGap(captureReward, gaps);
-    collectGap(captureMarket, gaps);
-    collectGap(captureBiome, gaps);
-    collectGap(captureEncounter, gaps);
-    collectGap(captureMigrationCompanions, gaps);
+
+    const progression = await collectLiveCapture(
+      "progression/nacli-medium-slow-level-17-v1",
+      captureProgression,
+      gaps,
+    );
+    if (progression != null) {
+      generated.set("progression/nacli-medium-slow-level-17-v1.json", progression);
+    }
+
+    const rewardMarket = await collectLiveCapture(
+      "rewards/regular-reroll-lock-v1+markets/town-wave-10-v1",
+      captureRewardMarket,
+      gaps,
+    );
+    if (rewardMarket != null) {
+      if (
+        rewardMarket.reward == null
+        || typeof rewardMarket.reward !== "object"
+        || Array.isArray(rewardMarket.reward)
+        || rewardMarket.market == null
+        || typeof rewardMarket.market !== "object"
+        || Array.isArray(rewardMarket.market)
+      ) {
+        gaps.push(
+          new OracleGap(
+            "rewards/regular-reroll-lock-v1+markets/town-wave-10-v1",
+            "CAPTURE_SHAPE_INVALID",
+            "test/kernel-fixtures/m4/export/reward-market-capture.ts:captureRewardMarket",
+            "helper did not return separate reward and market records",
+          ),
+        );
+      } else {
+        generated.set("rewards/regular-reroll-lock-v1.json", rewardMarket.reward as JsonObject);
+        generated.set("markets/town-wave-10-v1.json", rewardMarket.market as JsonObject);
+      }
+    }
+
+    const biomeEncounter = await collectLiveCapture(
+      "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
+      captureBiomeEncounter,
+      gaps,
+    );
+    if (biomeEncounter != null) {
+      if (
+        biomeEncounter.biome == null
+        || typeof biomeEncounter.biome !== "object"
+        || Array.isArray(biomeEncounter.biome)
+        || biomeEncounter.encounter == null
+        || typeof biomeEncounter.encounter !== "object"
+        || Array.isArray(biomeEncounter.encounter)
+      ) {
+        gaps.push(
+          new OracleGap(
+            "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
+            "CAPTURE_SHAPE_INVALID",
+            "test/kernel-fixtures/m4/export/biome-encounter-capture.ts:captureBiomeEncounter",
+            "helper did not return separate biome and encounter records",
+          ),
+        );
+      } else {
+        generated.set("biomes/town-crossroads-route-v1.json", biomeEncounter.biome as JsonObject);
+        generated.set("encounters/plains-wave-11-captured-v1.json", biomeEncounter.encounter as JsonObject);
+      }
+    }
+
+    const migration = await collectLiveCapture(
+      "migration/m3-to-m4-companions-v1",
+      captureMigrationCompanions,
+      gaps,
+    );
+    if (migration != null) {
+      generated.set("migration/m3-to-m4-companions-v1.json", migration);
+    }
+
     collectGap(captureComposedSegment, gaps);
 
     if (gaps.length > 0) {
@@ -602,9 +677,14 @@ describe("M4A fresh run oracle export", () => {
       if (typeof reportPath === "string" && reportPath.length > 0) {
         writeCanonical(reportPath, {
           schema_version: 1,
-          battle_oracle_sha: BATTLE_ORACLE_SHA,
+          m3_parity_oracle_sha: M3_PARITY_ORACLE_SHA,
           m4_oracle_sha: M4_ORACLE_SHA,
-          gaps: gaps.map(gap => ({ vector: gap.vector, code: gap.code, source_seam: gap.source_seam, message: gap.message })),
+          gaps: gaps.map(gap => ({
+            vector: gap.vector,
+            code: gap.code,
+            source_seam: gap.source_seam,
+            message: gap.message,
+          })),
         });
       }
       throw new Error(gaps.map(gap => gap.message).join("\n"));
@@ -612,22 +692,23 @@ describe("M4A fresh run oracle export", () => {
 
     const battlePack = readJson("rust/fixtures/m3/oracle/content-pack-v1.json");
     const battleHash = String(battlePack.content_pack?.hash ?? "");
-    const runHash = String(generated.get("run-content-pack-v1.json")?.provenance?.run_content_hash ?? "");
+    const runPack = generated.get("run-content-pack-v1.json") as AnyRecord | undefined;
+    const runHash = String(runPack?.run_content_hash ?? "");
     const sharedProvenance = provenance(battleHash, runHash);
     const root = outputRoot();
     for (const [path, value] of generated) {
-      const fixture = strictEnvelope(path.replace(/\.json$/u, ""), {
-        provenance: sharedProvenance,
-        initial: { canonical: value, rng: { draws: [] } },
-        decisions: [],
-        rng_draws: [],
-        ordered_transitions: [],
-        mutations: [],
-        presentation: [],
-        final: { canonical: value, rng: { draws: [] } },
-        next_control: { kind: "UNOBSERVED" },
-      });
-      writeCanonical(resolve(root, path), fixture);
+      if (
+        path === "rng-vectors-v1.json"
+        || path === "run-content-pack-v1.json"
+        || path.startsWith("migration/")
+      ) {
+        writeCanonical(resolve(root, path), value);
+      } else {
+        writeCanonical(
+          resolve(root, path),
+          envelopeFromCapture(path.replace(/\.json$/u, ""), value, sharedProvenance),
+        );
+      }
     }
     expect(generated.size).toBeGreaterThan(0);
   }, 2_700_000);

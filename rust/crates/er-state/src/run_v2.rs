@@ -9,11 +9,10 @@ use er_rng::phaser::RunRngState;
 use er_types::battle_ids::{BattleId, MoveId, PokemonId, SpeciesId, WaveIndex};
 use er_types::battle_model::BattleOutcome;
 use er_types::ids::OperationId;
-use er_types::run_ids::{Experience, GrowthRateId, NatureId};
+use er_types::run_ids::Experience;
 pub use er_types::run_model::{ModifierTier, RunOutcome, RunStage, RunSurfaceKind};
 use er_types::SeatId;
 
-use crate::pokemon_v2::{Iv, PermanentStatBonuses};
 
 pub const RUN_STATE_SCHEMA_VERSION: u32 = 1;
 pub const PROGRESSION_QUEUE_SCHEMA_VERSION: u32 = 1;
@@ -363,16 +362,6 @@ pub fn battle_outcome_is_terminal(outcome: BattleOutcome) -> bool {
     !matches!(outcome, BattleOutcome::Ongoing)
 }
 
-pub fn validate_experience_and_growth(
-    _experience: Experience,
-    _growth_rate: GrowthRateId,
-    _nature: NatureId,
-    _effective_nature: NatureId,
-    _ivs: &[Iv; 6],
-    _bonuses: &PermanentStatBonuses,
-) -> Result<(), RunStateValidationError> {
-    Ok(())
-}
 
 // Re-export action leaves from the contract-owned type module. These names are
 // intentionally not reconstructed in er-state.

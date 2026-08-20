@@ -66,14 +66,6 @@ pub struct PermanentStatBonuses {
     pub speed: u32,
 }
 
-impl PermanentStatBonuses {
-
-    pub const fn validate(&self) -> Result<(), PokemonProgressionValidationError> {
-        // The representation is deliberately integer-only. Overflow is
-        // checked by the progression transition when bonuses are applied.
-        Ok(())
-    }
-}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -95,7 +87,21 @@ impl PokemonProgressionState {
                 return Err(PokemonProgressionValidationError::InvalidIv { value: iv.get() });
             }
         }
-        self.permanent_bonuses.validate()?;
+        if self.growth_rate.get() != 3 {
+            return Err(PokemonProgressionValidationError::UnsupportedGrowthRate {
+                value: self.growth_rate.get(),
+            });
+        }
+        if !matches!(self.nature.get(), 0 | 3 | 10 | 15) {
+            return Err(PokemonProgressionValidationError::UnsupportedNature {
+                value: self.nature.get(),
+            });
+        }
+        if !matches!(self.effective_nature.get(), 0 | 3 | 10 | 15) {
+            return Err(PokemonProgressionValidationError::UnsupportedEffectiveNature {
+                value: self.effective_nature.get(),
+            });
+        }
         Ok(())
     }
 }
@@ -104,6 +110,12 @@ impl PokemonProgressionState {
 pub enum PokemonProgressionValidationError {
     #[error("IV {value} is outside 0..=31")]
     InvalidIv { value: u8 },
+    #[error("growth rate {value} is outside the selected M4 capability")]
+    UnsupportedGrowthRate { value: u8 },
+    #[error("nature {value} is outside the selected M4 capability")]
+    UnsupportedNature { value: u8 },
+    #[error("effective nature {value} is outside the selected M4 capability")]
+    UnsupportedEffectiveNature { value: u8 },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]

@@ -113,8 +113,11 @@ function exporterSha() {
 
 function expectedInventory() {
   const manifest = JSON.parse(readFileSync(resolve(REPO_ROOT, MANIFEST_PATH), "utf8"));
-  if (manifest.oracle_game_sha !== ORACLE_SHA) {
-    fail(`M4 manifest oracle_game_sha is not ${ORACLE_SHA}`);
+  if (manifest.m4_oracle_sha !== ORACLE_SHA) {
+    fail(`M4 manifest m4_oracle_sha is not ${ORACLE_SHA}`);
+  }
+  if (manifest.m3_parity_oracle_sha !== "3b534099919efae827019d4a3f3c4ab0ecd6d67b") {
+    fail("M4 manifest m3_parity_oracle_sha is not the frozen M3 parity oracle");
   }
   if (!Array.isArray(manifest.required_outputs) || manifest.required_outputs.length === 0) {
     fail("M4 manifest has no required_outputs");

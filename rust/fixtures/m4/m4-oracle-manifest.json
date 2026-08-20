@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "oracle_game_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "contract_state": "G12_FROZEN_EXPORT_REQUIRED_BEFORE_M4B",
   "exporter": {
     "script": "scripts/export-kernel-m4-oracle.mjs",
@@ -10,10 +11,11 @@
     "production_typescript_read_only": true
   },
   "required_outputs": [
+    "rust/fixtures/m4/oracle/battle-content-pack-v1.json",
     "rust/fixtures/m4/oracle/run-content-pack-v1.json",
     "rust/fixtures/m4/oracle/rng-vectors-v1.json",
     "rust/fixtures/m4/oracle/run-segments/classic-composed-wave-9-through-11-v1.json",
-    "rust/fixtures/m4/oracle/progression/bulbasaur-medium-slow-level-17-v1.json",
+    "rust/fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json",
     "rust/fixtures/m4/oracle/rewards/regular-reroll-lock-v1.json",
     "rust/fixtures/m4/oracle/markets/town-wave-10-v1.json",
     "rust/fixtures/m4/oracle/biomes/town-crossroads-route-v1.json",

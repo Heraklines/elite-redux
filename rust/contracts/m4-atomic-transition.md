@@ -4,7 +4,7 @@ One external `KernelInput` enters the deterministic FIFO and runs internal work 
 
 ## Transaction owner
 
-`RunKernelTransaction` clones game, protocol, scheduler, UI, input router, terminal, and pending effects. Pure `er-run` work executes only against the clone.
+`RunKernelTransaction` clones game, protocol, scheduler, UI, input router, terminal, pending presentations and barriers, and pending effects. Pure `er-run` work executes only against the clone.
 
 ## Commit order
 
@@ -31,7 +31,7 @@ The hosted atomicity suite injects at progression preparation, modifier applicat
 
 ## Internal events
 
-M4 adds typed internal events for battle settlement, wave advance, progression, surface open/action, encounter preparation, and BattleStartV2. Internal events never cross the simulator/browser boundary and never contain callbacks.
+M4 adds typed internal events for battle settlement, wave advance, progression, surface open/action, and encounter preparation. Encounter generation plus `BattleStartV2` is folded into the same prepared run transition and Authority material that closes the predecessor boundary; it never receives a second revision. Internal events never cross the simulator/browser boundary and never contain callbacks.
 
 ## FIFO dispatch
 
@@ -47,9 +47,8 @@ The exact event payloads are declared in `m4-api.md`. Dispatch order is:
 | `ProgressionAction` | `er-run::apply_progression_decision` | `RunPrepared` | none |
 | `SurfaceOpened` | `er-run::open_run_surface` | `RunPrepared` | none |
 | `SurfaceAction` | `er-run::apply_surface_action` | `RunPrepared` | none |
-| `EncounterPrepared` | game runtime | `BattleStartPrepared` | none |
-| `BattleStartPrepared` | transaction coordinator | `AuthorityEntryReady` | WAVE/INTERACTION predecessor as frozen by evidence |
-| `RunPrepared` | transaction coordinator | `AuthorityEntryReady` | WAVE/INTERACTION/TERMINAL selected by evidence |
+| `EncounterPrepared` | game runtime | `RunPrepared` with complete `BattleStateV2` | none |
+| `RunPrepared` | transaction coordinator | `AuthorityEntryReady` | WAVE/INTERACTION/TERMINAL selected by evidence; the after-state may already be `RunStage::Battle` |
 | `AuthorityEntryReady` | common canonical codec/applier | `MaterialInstalled` | exact prepared kind |
 | `MaterialInstalled` | protocol/control coordinator | `ControlInstalled` | none |
 | `ControlInstalled` | presentation coordinator | external effects only | none |

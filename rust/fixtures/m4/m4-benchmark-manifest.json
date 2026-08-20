@@ -1,5 +1,7 @@
 {
   "schema_version": 1,
+  "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
+  "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
   "runner_class": "github-hosted-standard-linux-x64",
   "profile": "release",
   "workloads": [

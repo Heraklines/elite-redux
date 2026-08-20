@@ -10,12 +10,28 @@ pub mod ids;
 pub mod input;
 pub mod protocol;
 pub mod trace;
+pub mod run_ids;
+pub mod run_model;
+pub mod ui_menu;
 pub mod ui;
 
 pub use authority::*;
 pub use ids::*;
 pub use input::*;
 pub use protocol::*;
+pub use run_ids::{
+    BiomeId, EncounterId, Experience, GameRunId, GrowthRateId, ModifierId, Money, NatureId,
+    RouteNodeId, RunContentPackHash, RunContentPackHashError, RunInteractionSequence, RunOfferId,
+    RunStockId, RunSurfaceId, RunTaskId, SurfaceDigest, SurfaceDigestError,
+};
+pub use run_model::{
+    BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
+    ModifierTierError, RewardAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
+};
+pub use ui_menu::{
+    LogicalMenu, LogicalMenuError, LogicalMenuOption, LogicalMenuOptionError, MenuNavigation,
+    MenuNavigationEdge, MenuNavigationError, MenuOptionLayout, NavigationDirection,
+};
 pub use trace::*;
 pub use ui::*;
 
