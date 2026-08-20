@@ -2,7 +2,7 @@
   "schema_version": 1,
   "manifest_id": "m3-audited-production-blobs-v1",
   "m2_base_sha": "7357166c19bdb5cf0e32c84b0f74f22e79d80798",
-  "head_sha": "ad1d8f01c65cedae4091e9ea5a2978620c25145b",
+  "head_sha": "91196e1ea5a0e119fe9a307fc1ae1d55f61964d9",
   "source_root": "src",
   "path_count": 41,
   "paths": [
@@ -16,7 +16,7 @@
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
-      "blob_oid": "a2e47599e389a7d1b04a94589261f2adf7710cc0"
+      "blob_oid": "4513ecc61c0d08087b479d41bab075976983360a"
     },
     {
       "path": "src/data/elite-redux/coop/authority-v2/cutover-interaction.ts",
@@ -80,7 +80,7 @@
     },
     {
       "path": "src/data/elite-redux/coop/coop-runtime.ts",
-      "blob_oid": "679cce69edc0f380ec43862d7e56e7e1a1ce5d09"
+      "blob_oid": "0875810c3e68bd0989a27973cf1d5629f2e810d6"
     },
     {
       "path": "src/data/elite-redux/coop/coop-session-controller.ts",
