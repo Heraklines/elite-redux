@@ -51,6 +51,22 @@ import {
   ER_VOLTRON_ABILITY_ID,
   ER_WATERBORNE_ABILITY_ID,
 } from "#data/elite-redux/abilities/type-nativization-abilities";
+import {
+  ER_CRYOGENESIS_ABILITY_ID,
+  ER_CRUSHING_ANTLERS_ABILITY_ID,
+  ER_DAYDREAMER_ABILITY_ID,
+  ER_DIRTY_SNOWBALL_ABILITY_ID,
+  ER_FLUTTERING_SPIRIT_ABILITY_ID,
+  ER_FREE_SPIRIT_ABILITY_ID,
+  ER_IN_THE_CLOUDS_ABILITY_ID,
+  ER_MAGISTRATE_ABILITY_ID,
+  ER_NUCLEUS_ABILITY_ID,
+  ER_PHOTOVOLTAIC_ABILITY_ID,
+  ER_SOLAR_PANEL_ABILITY_ID,
+  ER_SWORDS_NATURE_ABILITY_ID,
+  ER_THICK_SKULLED_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { PhotovoltaicTypeAbAttr } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { AbilityId } from "#enums/ability-id";
 
 // ---------------------------------------------------------------------------
@@ -167,6 +183,20 @@ const DRACONIZE = 5149; // ER custom (Normal moves become Dragon, Dragon empower
 const ENVENOM = 5553; // ER custom (poison-on-attack)
 const FOGGY_EYE = 5666; // ER custom
 const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
+const PERMAFROST = 5055;
+const FREEZING_POINT = 5222;
+const EQUINOX = 5160;
+const OVERRULE = 5516;
+const DREAM_WHIMSY = 5413;
+const WISHMAKER = 5226;
+const AERODYNAMICS = 5020;
+const SWORD_OF_RUIN = AbilityId.SWORD_OF_RUIN;
+const HUNTERS_HORN = 5195;
+const ROCKY_PAYLOAD = 276;
+const LETS_ROLL = 5031;
+const LIQUIFIED = 5049;
+const EMANATE_FAKEMON = 5190;
+const SOLAR_POWER = AbilityId.SOLAR_POWER;
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -174,6 +204,84 @@ const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
  * (attrs) and `getErCompositeDetailedDescription` (constituent detail text).
  */
 export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>> = {
+  [ER_CRYOGENESIS_ABILITY_ID]: {
+    id: ER_CRYOGENESIS_ABILITY_ID,
+    name: "Cryogenesis",
+    description: "Permafrost + Freezing Point.",
+    constituents: [PERMAFROST, FREEZING_POINT],
+  },
+  [ER_MAGISTRATE_ABILITY_ID]: {
+    id: ER_MAGISTRATE_ABILITY_ID,
+    name: "Magistrate",
+    description: "Equinox + Overrule.",
+    constituents: [EQUINOX, OVERRULE],
+  },
+  [ER_DAYDREAMER_ABILITY_ID]: {
+    id: ER_DAYDREAMER_ABILITY_ID,
+    name: "Daydreamer",
+    description: "Dream Whimsy + Wishmaker.",
+    constituents: [DREAM_WHIMSY, WISHMAKER],
+  },
+  [ER_FREE_SPIRIT_ABILITY_ID]: {
+    id: ER_FREE_SPIRIT_ABILITY_ID,
+    name: "Free Spirit",
+    description: "Serene Grace + Levitate.",
+    constituents: [AbilityId.SERENE_GRACE, AbilityId.LEVITATE],
+  },
+  [ER_FLUTTERING_SPIRIT_ABILITY_ID]: {
+    id: ER_FLUTTERING_SPIRIT_ABILITY_ID,
+    name: "Fluttering Spirit",
+    description: "Aerilate + Aerodynamics.",
+    constituents: [AbilityId.AERILATE, AERODYNAMICS],
+  },
+  [ER_IN_THE_CLOUDS_ABILITY_ID]: {
+    id: ER_IN_THE_CLOUDS_ABILITY_ID,
+    name: "In the Clouds",
+    description: "Unaware + Cloud Nine.",
+    constituents: [AbilityId.UNAWARE, AbilityId.CLOUD_NINE],
+  },
+  [ER_THICK_SKULLED_ABILITY_ID]: {
+    id: ER_THICK_SKULLED_ABILITY_ID,
+    name: "Thick Skulled",
+    description: "Rock Head + Thick Fat.",
+    constituents: [AbilityId.ROCK_HEAD, AbilityId.THICK_FAT],
+  },
+  [ER_SWORDS_NATURE_ABILITY_ID]: {
+    id: ER_SWORDS_NATURE_ABILITY_ID,
+    name: "Sword's Nature",
+    description: "Sword of Ruin + Keen Edge.",
+    constituents: [SWORD_OF_RUIN, KEEN_EDGE],
+  },
+  [ER_CRUSHING_ANTLERS_ABILITY_ID]: {
+    id: ER_CRUSHING_ANTLERS_ABILITY_ID,
+    name: "Crushing Antlers",
+    description: "Hunter's Horn. Rapier is pending a defined mechanic.",
+    constituents: [HUNTERS_HORN],
+  },
+  [ER_DIRTY_SNOWBALL_ABILITY_ID]: {
+    id: ER_DIRTY_SNOWBALL_ABILITY_ID,
+    name: "Dirty Snowball",
+    description: "Rocky Payload + Let's Roll.",
+    constituents: [ROCKY_PAYLOAD, LETS_ROLL],
+  },
+  [ER_SOLAR_PANEL_ABILITY_ID]: {
+    id: ER_SOLAR_PANEL_ABILITY_ID,
+    name: "Solar Panel",
+    description: "Drought + Steelworker.",
+    constituents: [AbilityId.DROUGHT, AbilityId.STEELWORKER],
+  },
+  [ER_PHOTOVOLTAIC_ABILITY_ID]: {
+    id: ER_PHOTOVOLTAIC_ABILITY_ID,
+    name: "Photovoltaic",
+    description: "Solar Power + Electric type graft.",
+    constituents: [SOLAR_POWER],
+  },
+  [ER_NUCLEUS_ABILITY_ID]: {
+    id: ER_NUCLEUS_ABILITY_ID,
+    name: "Nucleus",
+    description: "Liquified + Emanate.",
+    constituents: [LIQUIFIED, EMANATE_FAKEMON],
+  },
   [ER_GLYCOLYSIS_ABILITY_ID]: {
     id: ER_GLYCOLYSIS_ABILITY_ID,
     name: "Glycolysis",
@@ -473,6 +581,9 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     attrs.length = 0;
     for (const attr of collected) {
       attrs.push(attr);
+    }
+    if (def.id === ER_PHOTOVOLTAIC_ABILITY_ID) {
+      attrs.push(new PhotovoltaicTypeAbAttr());
     }
     // A part with a PostFaint attr only fires if the ability bypasses the faint
     // gate. None of the newcomer constituents carry PostFaint attrs today, so no

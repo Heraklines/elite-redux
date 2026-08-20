@@ -20,6 +20,7 @@ import {
 } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { type BattleStat, getStatKey, getStatStageChangeDescriptionKey, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
@@ -105,6 +106,9 @@ export class StatStageChangePhase extends PokemonPhase {
     // A queued post-KO stat change can outlive its battler when NewBattlePhase
     // replaces the defeated field. Treat that stale phase as already resolved.
     if (pokemon == null) {
+      return this.end();
+    }
+    if (this.stages > 0 && pokemon.getTag(BattlerTagType.ER_IRRADIATED_LOCK)) {
       return this.end();
     }
     let opponentPokemon: Pokemon | undefined;

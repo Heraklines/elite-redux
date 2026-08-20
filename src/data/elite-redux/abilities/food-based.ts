@@ -6,6 +6,7 @@
 
 import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import type { AbilityId } from "#enums/ability-id";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -77,6 +78,9 @@ const FOOD_CUSTOM_EXACT_NAMES: ReadonlySet<string> = new Set(["Amphybuzz", "Mawi
 
 /** Central Food tag used by Sugar Rush and future food-aware mechanics. */
 export function isErFoodPokemon(pokemon: Pokemon): boolean {
+  if (pokemon.getTag(BattlerTagType.ER_CONFECTED)) {
+    return true;
+  }
   const speciesId = pokemon.species.speciesId;
   const formKey = pokemon.getFormKey().toLowerCase();
   const speciesName = enSpeciesName(pokemon.species);

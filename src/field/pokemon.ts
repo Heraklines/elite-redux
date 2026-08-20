@@ -106,6 +106,7 @@ import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-autho
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
 import {
   erRecordAchievementDamageAndUpdate,
   erRecordAchievementFusion,
@@ -2609,7 +2610,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * and the fight/summary UIs in place of a hardcoded `4`.
    */
   public getMaxMoveCount(): number {
-    return 4 + (this.customPokemonData?.bonusMoveSlots ?? 0);
+    const permanentSlots = this.customPokemonData?.bonusMoveSlots ?? 0;
+    const pentaPunchSlot = this.hasAbilityWithAttr("PentaPunchMarkerAbAttr") ? 1 : 0;
+    return 4 + Math.max(permanentSlots, pentaPunchSlot);
   }
 
   /**
@@ -3682,6 +3685,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
     if (isSuppressedByRequestedFieldAbility(this, ability.id)) {
+      return false;
+    }
+    if (
+      this.getMoveset().some(move => move.getMove().type === PokemonType.DARK)
+      && globalScene.getField(true).some(holder =>
+        holder !== this
+        && !holder.isFainted()
+        && holder.getAbilitySources().some(source =>
+          source.ability.id === FAKEMON_PITCH_RUNTIME_ABILITY_IDS.DEADLY_SENTENCING))
+    ) {
       return false;
     }
     if (this.isTransformed() && ability.hasAttr("NoTransformAbilityAbAttr")) {
@@ -6066,6 +6079,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * erRelicDefenderMultiplier
         * erLibraryMultiplier,
     );
+    if (
+      this.status?.effect === StatusEffect.BURN
+      && globalScene.getField(true).some(holder =>
+        !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId))
+    ) {
+      damage.value = toDmgValue(damage.value * (4 / 3));
+    }
     damage.value = toDmgValue(damage.value * getRequestedFieldDamageMultiplier(source, this, move));
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage

@@ -74,6 +74,8 @@ import {
   holderHasUpcycle,
   isErFoodPokemon,
 } from "#data/elite-redux/abilities/food-based";
+import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { wireFakemonPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { ER_GENESIS_SUPERNOVA_ABILITY_ID, GenesisSupernovaAbAttr } from "#data/elite-redux/abilities/genesis-supernova";
 import { ER_HEARTBREAK_ABILITY_ID, HeartbreakAbAttr } from "#data/elite-redux/abilities/heartbreak";
 import { ER_HYDRAPEX_ABILITY_ID, HydrapexAbAttr } from "#data/elite-redux/abilities/hydrapex";
@@ -721,6 +723,11 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
   // Newcomer BATCH 2 — signature abilities (codex batch, ids 5971-5994, real
   // mechanics attached in buildCustomAbility via wireNewcomerSignatureAbility).
   manualDrafts.push(...ER_NEWCOMER_SIGNATURE_ABILITIES);
+  // Permission-cleared fakemon pitch ability batch (6004-6051). Composite
+  // definitions are repeated below and skipped by existingIds after this first
+  // registration; their final constituent attrs are still populated by the
+  // post-init manual-composite pass.
+  manualDrafts.push(...ER_FAKEMON_PITCH_ABILITIES);
   // Newcomer BATCH 2 — the TWO residual parked placeholders (Meteor Mass,
   // Inverse Room) the codex batch does not define. Named + battle-inert so each
   // mon carries the correctly-named slot; flagged for the designer.
@@ -1065,6 +1072,7 @@ function buildCustomAbility(
   // Newcomer BATCH 2 signature abilities (codex batch, 5971-5994): attach the
   // real mechanics for whichever id matches (no-op for non-signature ids).
   wireNewcomerSignatureAbility(builder, pokerogueId);
+  wireFakemonPitchAbility(builder, pokerogueId);
 
   if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {
     builder.attr(ClosedCircuitAbAttr);

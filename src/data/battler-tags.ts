@@ -4585,6 +4585,82 @@ export class ErQuashedTag extends SerializableBattlerTag {
   }
 }
 
+/** One-turn deterministic move lock applied by Blind Justice. */
+export class ErBlindJusticeTag extends MoveRestrictionBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_BLIND_JUSTICE;
+
+  constructor(moveId: MoveId = MoveId.NONE, sourceId = 0) {
+    super(BattlerTagType.ER_BLIND_JUSTICE, BattlerTagLapseType.TURN_END, 1, moveId, sourceId);
+  }
+
+  override isMoveRestricted(move: MoveId): boolean {
+    return move === this.sourceMove;
+  }
+}
+
+/** Switch-lapsing marker used by Confectious and the shared Food registry. */
+export class ErConfectedTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_CONFECTED;
+
+  constructor(sourceId = 0) {
+    super(BattlerTagType.ER_CONFECTED, BattlerTagLapseType.CUSTOM, 1, MoveId.NONE, sourceId);
+  }
+}
+
+/** Tracks Toxic created by Irradiated Fist until it is cured or the target switches. */
+export class ErIrradiatedToxicTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_IRRADIATED_TOXIC;
+
+  constructor(sourceId = 0) {
+    super(BattlerTagType.ER_IRRADIATED_TOXIC, BattlerTagLapseType.TURN_END, 1, MoveId.NONE, sourceId);
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    if (lapseType !== BattlerTagLapseType.TURN_END || pokemon.status?.effect === StatusEffect.TOXIC) {
+      return true;
+    }
+    for (const stat of EFFECTIVE_STATS) {
+      if (pokemon.getStatStage(stat) > 0) {
+        pokemon.setStatStage(stat, 0);
+      }
+    }
+    pokemon.addTag(BattlerTagType.ER_IRRADIATED_LOCK, 0, MoveId.NONE, this.sourceId);
+    return false;
+  }
+}
+
+/** Prevents positive stat-stage changes until the target switches. */
+export class ErIrradiatedLockTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_IRRADIATED_LOCK;
+
+  constructor(sourceId = 0) {
+    super(BattlerTagType.ER_IRRADIATED_LOCK, BattlerTagLapseType.CUSTOM, 1, MoveId.NONE, sourceId);
+  }
+}
+
+/** Pure-Electric switch-lapsing state applied by Cyberkinetic. */
+export class ErBreachedTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_BREACHED;
+
+  constructor(sourceId = 0) {
+    super(BattlerTagType.ER_BREACHED, BattlerTagLapseType.CUSTOM, 1, MoveId.NONE, sourceId);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    pokemon.summonData.types = [PokemonType.ELECTRIC];
+  }
+}
+
+/** Serializable ownership marker for Decay's harmless, persistent poison. */
+export class ErDecayPoisonTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_DECAY_POISON;
+
+  constructor(sourceId = 0) {
+    super(BattlerTagType.ER_DECAY_POISON, BattlerTagLapseType.CUSTOM, 1, MoveId.NONE, sourceId);
+  }
+}
+
 /**
  * ER Ghastly Echo (dex 848) "empower the switch-in": granted to the Pokemon sent
  * out after Ghastly Echo's user force-switches itself out. While present the
@@ -5018,6 +5094,18 @@ export function getBattlerTag(
       return new ErEnrageTag();
     case BattlerTagType.ER_QUASHED:
       return new ErQuashedTag(turnCount || 5);
+    case BattlerTagType.ER_BLIND_JUSTICE:
+      return new ErBlindJusticeTag(sourceMove, sourceId);
+    case BattlerTagType.ER_CONFECTED:
+      return new ErConfectedTag(sourceId);
+    case BattlerTagType.ER_IRRADIATED_TOXIC:
+      return new ErIrradiatedToxicTag(sourceId);
+    case BattlerTagType.ER_IRRADIATED_LOCK:
+      return new ErIrradiatedLockTag(sourceId);
+    case BattlerTagType.ER_BREACHED:
+      return new ErBreachedTag(sourceId);
+    case BattlerTagType.ER_DECAY_POISON:
+      return new ErDecayPoisonTag(sourceId);
     case BattlerTagType.ER_EMPOWERED_SWITCH_IN:
       return new ErEmpoweredSwitchInTag();
     case BattlerTagType.ER_COMMANDED:
@@ -5177,6 +5265,12 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_DRENCHED]: ErDrenchedTag;
   [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
   [BattlerTagType.ER_QUASHED]: ErQuashedTag;
+  [BattlerTagType.ER_BLIND_JUSTICE]: ErBlindJusticeTag;
+  [BattlerTagType.ER_CONFECTED]: ErConfectedTag;
+  [BattlerTagType.ER_IRRADIATED_TOXIC]: ErIrradiatedToxicTag;
+  [BattlerTagType.ER_IRRADIATED_LOCK]: ErIrradiatedLockTag;
+  [BattlerTagType.ER_BREACHED]: ErBreachedTag;
+  [BattlerTagType.ER_DECAY_POISON]: ErDecayPoisonTag;
   [BattlerTagType.ER_EMPOWERED_SWITCH_IN]: ErEmpoweredSwitchInTag;
   [BattlerTagType.ER_COMMANDED]: ErCommandedTag;
   [BattlerTagType.ER_SAFE_PASSAGE]: ErSafePassageTag;

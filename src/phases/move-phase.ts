@@ -13,6 +13,7 @@ import {
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { consumeErEndlessMoveCost } from "#data/elite-redux/er-endless-rift-runtime";
+import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
 import {
   notifyMoodyFormationMoveAttempt,
   notifyMoodyFormationMoveResolved,
@@ -319,6 +320,7 @@ export class MovePhase extends PokemonPhase {
     // A big if statement will handle the checks (that each have side effects!) in the correct order
     return (
       this.checkSleep()
+      || this.checkBurnFatigue()
       || this.checkFreeze()
       || this.checkPP()
       || this.checkValidity()
@@ -397,6 +399,21 @@ export class MovePhase extends PokemonPhase {
     const cancel = !bypassSleepHolder.value;
     this.triggerStatus(StatusEffect.SLEEP, cancel);
     return cancel;
+  }
+
+  protected checkBurnFatigue(): boolean {
+    const hasBurnFatigueAura = globalScene.getField(true).some(holder =>
+      !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId));
+    if (
+      this.useMode === MoveUseMode.INDIRECT
+      || this.pokemon.status?.effect !== StatusEffect.BURN
+      || !hasBurnFatigueAura
+      || this.pokemon.randBattleSeedInt(3) !== 0
+    ) {
+      return false;
+    }
+    globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(this.pokemon)} is overcome by burn fatigue!`);
+    return true;
   }
 
   /**

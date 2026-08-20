@@ -504,6 +504,8 @@ export class PokemonTempSummonData {
  * Resets at the start of a new battle (but not on switch).
  */
 export class PokemonBattleData {
+  /** Serializable once-per-battle latches for custom ability mechanics. */
+  public erAbilityProvenance: string[] = [];
   /** Counter tracking direct hits this Pokemon has received during this battle; used for {@linkcode MoveId.RAGE_FIST} */
   public hitCount = 0;
   /** Whether this Pokemon has eaten a berry this battle; used for {@linkcode MoveId.BELCH} */
@@ -553,6 +555,7 @@ export class PokemonBattleData {
       this.rudeAwakeningTriggered = source.rudeAwakeningTriggered ?? false;
       this.cowardProtectUsed = source.cowardProtectUsed ?? false;
       this.lostItems = source.lostItems ?? [];
+      this.erAbilityProvenance = source.erAbilityProvenance ?? [];
     }
   }
 }

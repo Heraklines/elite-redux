@@ -220,4 +220,11 @@ export enum BattlerTagType {
    * Attack (via a separate StatMultiplier) plus the move lock, per the 2.65 dex.
    */
   ER_SAGE_POWER_LOCK = "ER_SAGE_POWER_LOCK",
+  /** Fakemon pitch ability states. All lapse naturally when summonData resets on switch. */
+  ER_BLIND_JUSTICE = "ER_BLIND_JUSTICE",
+  ER_CONFECTED = "ER_CONFECTED",
+  ER_IRRADIATED_TOXIC = "ER_IRRADIATED_TOXIC",
+  ER_IRRADIATED_LOCK = "ER_IRRADIATED_LOCK",
+  ER_BREACHED = "ER_BREACHED",
+  ER_DECAY_POISON = "ER_DECAY_POISON",
 }
