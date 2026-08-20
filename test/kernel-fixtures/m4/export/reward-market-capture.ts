@@ -63,6 +63,8 @@ let productionRandBattleSeedInt: AnyRecord["randBattleSeedInt"] | null = null;
 let phaserGame: Phaser.Game | null = null;
 let observedRewardPhase: SelectModifierPhase | null = null;
 let observedMarketPhase: BiomeShopPhase | null = null;
+let observedRewardOptions: AnyRecord[] = [];
+let observedMarketOptions: AnyRecord[] = [];
 
 const SEED_PREFIX = "m4a-reward-market-capture";
 const MAX_SEED_ATTEMPTS = 48;
@@ -336,6 +338,7 @@ function installObservationHooks(): void {
       if (!Array.isArray(options)) {
         gap("REWARD_OPTIONS_UNOBSERVABLE", "src/phases/select-modifier-phase.ts:SelectModifierPhase.start", "typeOptions was not initialized");
       }
+      observedRewardOptions = options;
       surface.round += 1;
       const after = phaseGraph(context.game, this as AnyRecord, "reward", options);
       surface.generationBefore = before ?? undefined;
@@ -368,6 +371,7 @@ function installObservationHooks(): void {
       if (!Array.isArray(options) || !Array.isArray(quantities)) {
         gap("MARKET_STOCK_UNOBSERVABLE", "src/phases/biome-shop-phase.ts:BiomeShopPhase.buildStock", "shopOptions/qtys were not initialized");
       }
+      observedMarketOptions = options;
       surface.round += 1;
       const after = phaseGraph(context.game, phase, "market", options, quantities);
       surface.generationBefore = before ?? undefined;
@@ -457,6 +461,8 @@ function restoreObservationHooks(): void {
   installed = false;
   observedRewardPhase = null;
   observedMarketPhase = null;
+  observedRewardOptions = [];
+  observedMarketOptions = [];
 }
 
 async function waitUntil(predicate: () => boolean, vector: string, sourceSeam: string, timeoutMs = 20_000): Promise<void> {
@@ -582,10 +588,16 @@ async function awaitMarketPhase(_game: GameManager): Promise<BiomeShopPhase> {
   return observedMarketPhase;
 }
 
-function phaseOptions(phase: AnyRecord, market: boolean): AnyRecord[] {
-  const options = market ? phase.shopOptions : phase.typeOptions;
-  if (!Array.isArray(options)) {
-    gap("OPTION_GRAPH_UNOBSERVABLE", market ? "src/phases/biome-shop-phase.ts:BiomeShopPhase.shopOptions" : "src/phases/select-modifier-phase.ts:SelectModifierPhase.typeOptions", "phase option graph is absent");
+function phaseOptions(_phase: AnyRecord, market: boolean): AnyRecord[] {
+  const options = market ? observedMarketOptions : observedRewardOptions;
+  if (options.length === 0) {
+    gap(
+      "OPTION_GRAPH_UNOBSERVABLE",
+      market
+        ? "src/phases/biome-shop-phase.ts:BiomeShopPhase.shopOptions"
+        : "src/phases/select-modifier-phase.ts:SelectModifierPhase.typeOptions",
+      "phase option graph is absent",
+    );
   }
   return options;
 }

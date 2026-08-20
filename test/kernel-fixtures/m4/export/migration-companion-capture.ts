@@ -552,26 +552,23 @@ function ownerSeat(game: GameManager, mon: Pokemon, partyIndex: number, side: "P
   return role === "host" ? 1 : 2;
 }
 function permanentBonuses(game: GameManager, mon: Pokemon, side: "PLAYER" | "ENEMY"): { [key: string]: JsonValue } {
+  const permanentClassNames = new Set([
+    "BaseStatModifier",
+    "PokemonBaseStatTotalModifier",
+    "PokemonBaseStatFlatModifier",
+    "PokemonIncrementingStatModifier",
+  ]);
   const liveModifiers = game.scene.findModifiers(
-    modifier => (modifier as AnyRecord).pokemonId === mon.id,
+    modifier =>
+      (modifier as AnyRecord).pokemonId === mon.id
+      && permanentClassNames.has((modifier as AnyRecord).constructor?.name),
     side === "PLAYER",
   );
-  const evidence = liveModifiers.map(modifier => {
-    const modifierRecord = modifier as AnyRecord;
-    return {
-      modifier_type_id: safeInteger(modifierRecord.type?.id, "permanent bonus modifier type"),
-      stack_count: safeInteger(modifierRecord.stackCount, "permanent bonus stack count"),
-    };
-  });
-  // M3 deliberately launches without held modifiers. Do not assume that
-  // absence: the query above is the live proof of the all-zero map. A future
-  // fixture that introduces a modifier must be wired here rather than silently
-  // losing its progression companion.
-  if (evidence.length !== 0) {
+  if (liveModifiers.length !== 0) {
     gap(
       "LIVE_M3_COMPANIONS_UNOBSERVABLE",
       "src/battle-scene.ts:findModifiers",
-      "non-empty permanent bonus set lacks an exact M3 projection",
+      "non-empty permanent stat bonus set lacks an exact M3 projection",
     );
   }
   return { hp: 0, attack: 0, defense: 0, special_attack: 0, special_defense: 0, speed: 0 };

@@ -6,6 +6,7 @@ import Overrides from "#app/overrides";
 import { PhaseManager } from "#app/phase-manager";
 import { ExpNotification } from "#enums/exp-notification";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
@@ -378,6 +379,7 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
       captureMenuInput(trace, game!, Button.ACTION);
       captureMenuInput(trace, game!, Button.CANCEL);
     });
+    game.move.select(MoveId.POUND);
     await game.killPokemon(enemy);
     await game.phaseInterceptor.to("LearnMoveBatchPhase");
     game.doSelectModifier();

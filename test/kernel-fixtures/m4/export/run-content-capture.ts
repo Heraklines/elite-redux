@@ -345,11 +345,11 @@ function moveEffects(move: AnyRecord, id: number, path: string): JsonValue[] {
       continue;
     }
     if (constructorName === "HealStatusEffectAttr") {
-      if (!moveFlags(move, path).includes("THAWS_USER_FREEZE")) {
+      if (typeName(move.type, `${path}.type`) !== "FIRE") {
         gap(
           "CONTENT_CANONICAL_VALUE",
           "src/data/moves/move.ts:HealStatusEffectAttr",
-          `${path} has a status-heal attribute without the canonical thaw flag`,
+          `${path} has a status-heal attribute outside the Fire-type thaw contract`,
         );
       }
       continue;
