@@ -6,6 +6,8 @@
   "baseSha": "0b3630c0508518a69bda7e8d340fe286c30b0248",
   "allowedFiles": [
     ".github/coop-task-ownership/m3-harness-focus-20260820.json",
+    "src/data/elite-redux/coop/authority-v2/control-ledger.ts",
+    "src/data/elite-redux/coop/coop-runtime.ts",
     "test/tools/coop-duo-harness.ts"
   ]
 }
