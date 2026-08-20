@@ -110,8 +110,8 @@ import {
   type AuthorityCommitDisposition,
   type AuthorityDeliveryExhaustion,
   AuthorityLog,
-  revokeAuthorityEntryProofScope,
   type CoopAuthorityWire,
+  revokeAuthorityEntryProofScope,
 } from "#data/elite-redux/coop/authority-v2/authority-log";
 import type {
   CoopAuthoritativeMaterial,
@@ -1472,9 +1472,11 @@ export class CoopAuthorityV2Shadow {
       || identity.peerBindings.length !== priorPeerBindings.length
       || identity.peerBindings.some((peer, index) => {
         const priorPeer = priorPeerBindings[index];
-        return priorPeer == null
+        return (
+          priorPeer == null
           || peer.seatId !== priorPeer.seatId
-          || peer.connectionGeneration !== priorPeer.connectionGeneration;
+          || peer.connectionGeneration !== priorPeer.connectionGeneration
+        );
       });
     const nextRuntimeContext = Object.freeze({
       ...this.ctx,
@@ -1736,9 +1738,7 @@ export class CoopAuthorityV2Shadow {
       if (!this.retainPendingReplicaEntry(entry)) {
         return false;
       }
-    } else if (
-      (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control")
-    ) {
+    } else if (result.kind === "duplicate-pending-material" || result.kind === "duplicate-pending-control") {
       if (this.replicaAdmissionRetries.has(entry.revision)) {
         // Quarantine before reissue/callback: every failure path below is terminal and later duplicates are
         // inert, including a callback that mutates external state and then throws.
@@ -1777,6 +1777,11 @@ export class CoopAuthorityV2Shadow {
           : "admitted";
     const outcome = applyEntry(this.runtimeContext, entry, this.replicaDeps, resume);
     this.logReplicaApply(entry, resume, outcome);
+    if (resume === "admitted" && (outcome.kind === "controlDeferred" || outcome.kind === "applied")) {
+      // Count the first successful material stage exactly once. A deferred control is still a material
+      // application; its later control-only retry resumes at materialApplied and must not increment again.
+      this.applied += 1;
+    }
     if (outcome.kind === "materialRejected" || outcome.kind === "controlRejected") {
       this.reportOwnedReplicaViolation(entry, `${outcome.kind}.${outcome.reason}`);
     }
@@ -1785,9 +1790,6 @@ export class CoopAuthorityV2Shadow {
     }
     this.pendingReplicaEntries.delete(entry.revision);
     const newlyApplied = result.kind !== "duplicate-complete";
-    if (newlyApplied) {
-      this.applied += 1;
-    }
     // A predecessor's controlInstalled receipt advances the only ordered frontier that can admit a
     // retained gap. Re-drive the exact next revision immediately, without waiting for another transport
     // delivery or a later external retry hook.

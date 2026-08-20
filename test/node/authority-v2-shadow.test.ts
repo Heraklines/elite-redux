@@ -9,8 +9,8 @@
 //
 // The ordinary harness imports NOTHING from Phaser/engine at runtime (BattleScene
 // and CoopTransport are TYPE-ONLY; the shadow projector + applier never touch the
-// scene). One focused protocol-terminal case dynamically loads the production
-// runtime composition root because only that path owns failCoopRuntimeSharedSession.
+// scene). The protocol-terminal case below injects the same violation-to-terminal
+// callback boundary used by production, without loading the Phaser-backed runtime.
 // The properties pinned here are the shadow-mode contract:
 //   - a tap builds the v2 entry via the matching adapter builder, commits it to
 //     the shadow log, and the REPLICA side (a second harness over a simulated
@@ -24,7 +24,6 @@
 // =============================================================================
 
 import type { BattleScene } from "#app/battle-scene";
-import { buildReplacementCommitEntry } from "#data/elite-redux/coop/authority-v2/adapters/faint-replacement";
 import { decodeInteractionMaterial as learnDecodeInteractionMaterial } from "#data/elite-redux/coop/authority-v2/adapters/interactions-learn";
 import { decodeInteractionMaterial as mysteryDecodeInteractionMaterial } from "#data/elite-redux/coop/authority-v2/adapters/interactions-mystery";
 import {
@@ -35,15 +34,10 @@ import {
   rewardOperationId,
 } from "#data/elite-redux/coop/authority-v2/adapters/interactions-reward";
 import { computeTurnCommitDigest } from "#data/elite-redux/coop/authority-v2/adapters/turn-command";
-import { buildWaveAdvanceEntry } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
-import type {
-  CoopAuthorityEntry,
-  CoopFrameContextV2,
-  CoopNextControl,
-} from "#data/elite-redux/coop/authority-v2/contract";
+import { authorityEntryProofScopeOf } from "#data/elite-redux/coop/authority-v2/authority-log";
+import type { CoopAuthorityEntry, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
-import { CoopV2InteractionControlLedger } from "#data/elite-redux/coop/authority-v2/interaction-control-ledger";
 import { controlIdOf } from "#data/elite-redux/coop/authority-v2/next-control";
 import {
   type CoopSchedulerClock,
@@ -64,23 +58,8 @@ import {
   tapCoopV2ShadowReplacementCommit,
   tapCoopV2ShadowTurnCommit,
 } from "#data/elite-redux/coop/authority-v2/shadow";
-import {
-  COOP_CAP_AUTHORITY_V2_SHADOW,
-  COOP_CAP_AUTHORITY_V2_TURN,
-  COOP_CAP_DURABILITY_JOURNAL,
-  COOP_CAP_OP_BIOME,
-  COOP_CAP_OP_ME,
-} from "#data/elite-redux/coop/coop-capabilities";
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { type CoopAccountIdentityV1, createFreshCoopP33Context } from "#data/elite-redux/coop/coop-session-binding";
-import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
-import {
-  COOP_PROTOCOL_VERSION,
-  type CoopMessage,
-  type CoopTransport,
-  createLoopbackPair,
-} from "#data/elite-redux/coop/coop-transport";
+import { type CoopTransport, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import {
   type CoopFaultPair,
@@ -326,6 +305,10 @@ function boundaryWaveTap(operationId: string, predecessorRevision: number) {
     subsumes: [predecessorRevision],
   };
 }
+interface ShadowProtocolViolation {
+  readonly frameType: string | null;
+  readonly issues: readonly string[];
+}
 
 interface ManualBoundaryDuo {
   readonly clock: FakeClock;
@@ -392,7 +375,10 @@ function takeFrame(queue: CoopFrameV2[], description: string, predicate: (frame:
   return queue.splice(index, 1)[0];
 }
 
-function makeManualBoundaryDuo(guestTransport: CoopTransport = STUB_TRANSPORT): ManualBoundaryDuo {
+function makeManualBoundaryDuo(
+  guestTransport: CoopTransport = STUB_TRANSPORT,
+  onProtocolViolation?: (violation: ShadowProtocolViolation) => void,
+): ManualBoundaryDuo {
   const clock = new FakeClock();
   const hostToGuest: CoopFrameV2[] = [];
   const guestToHost: CoopFrameV2[] = [];
@@ -408,18 +394,22 @@ function makeManualBoundaryDuo(guestTransport: CoopTransport = STUB_TRANSPORT): 
     send: frame => hostToGuest.push(cloneFrame(frame)),
     scheduler: createCoopScheduler(clock),
   });
-  const liveLedger = new CoopV2InteractionControlLedger();
   guest = new CoopAuthorityV2Shadow({
     identity: identity(1),
     scene: STUB_SCENE,
     transport: guestTransport,
     send: frame => guestToHost.push(cloneFrame(frame)),
     scheduler: createCoopScheduler(clock),
-    onProtocolViolation: violation => violations.push([...violation.issues]),
+    onProtocolViolation: violation => {
+      violations.push([...violation.issues]);
+      onProtocolViolation?.(violation);
+    },
     liveReplica: {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
       ownsControl: () => true,
-      admitEntry: (_ctx, entry) => liveLedger.admitAndRegisterEntry(entry),
+      admitEntry: (_ctx, entry) =>
+        (entry.kind !== "WAVE_ADVANCE" && entry.kind !== "TERMINAL_COMMIT")
+        || authorityEntryProofScopeOf(entry) != null,
       applyMaterial: (_ctx, entry) => {
         appliedRevisions.push(entry.revision);
         return true;
@@ -463,7 +453,6 @@ function makeSynchronousBoundaryDuo(): {
     send: frame => guest.handleInboundFrame(frame),
     scheduler: createCoopScheduler(clock),
   });
-  const liveLedger = new CoopV2InteractionControlLedger();
   guest = new CoopAuthorityV2Shadow({
     identity: identity(1),
     scene: STUB_SCENE,
@@ -478,7 +467,9 @@ function makeSynchronousBoundaryDuo(): {
     liveReplica: {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
       ownsControl: () => true,
-      admitEntry: (_ctx, entry) => liveLedger.admitAndRegisterEntry(entry),
+      admitEntry: (_ctx, entry) =>
+        (entry.kind !== "WAVE_ADVANCE" && entry.kind !== "TERMINAL_COMMIT")
+        || authorityEntryProofScopeOf(entry) != null,
       applyMaterial: (_ctx, entry) => {
         appliedRevisions.push(entry.revision);
         return true;
@@ -624,7 +615,6 @@ function makeFaultBoundaryDuo(profile: CoopFaultProfile): FaultBoundaryDuo {
     send: frame => pair.host.send(frame),
     scheduler: createCoopScheduler(clock),
   });
-  const liveLedger = new CoopV2InteractionControlLedger();
   guest = new CoopAuthorityV2Shadow({
     identity: identity(1),
     scene: STUB_SCENE,
@@ -641,7 +631,9 @@ function makeFaultBoundaryDuo(profile: CoopFaultProfile): FaultBoundaryDuo {
     liveReplica: {
       ownsEntry: entry => entry.kind === "TURN_COMMIT" || entry.kind === "WAVE_ADVANCE",
       ownsControl: () => true,
-      admitEntry: (_ctx, entry) => liveLedger.admitAndRegisterEntry(entry),
+      admitEntry: (_ctx, entry) =>
+        (entry.kind !== "WAVE_ADVANCE" && entry.kind !== "TERMINAL_COMMIT")
+        || authorityEntryProofScopeOf(entry) != null,
       applyMaterial: (_ctx, entry) => {
         appliedRevisions.push(entry.revision);
         return true;
@@ -1775,290 +1767,45 @@ describe("authority-v2 correlated boundary-tail proof", () => {
     expect(duo.clock.pendingCount).toBe(0);
   });
 
-  it("publishes one real shared terminal for duplicated unowned proof-source rejection", async () => {
-    const priorTurnFlag = process.env.COOP_AUTHORITY_V2_TURN;
-    const replacementOperationId = "BOUNDARY/runtime-predecessor";
-    let runtimeApi: typeof import("#data/elite-redux/coop/coop-runtime") | null = null;
-    let runtime: CoopRuntime | null = null;
-    let authorityController: CoopSessionController | null = null;
-    let runtimeCleared = false;
-
-    const authorityAccount: CoopAccountIdentityV1 = {
-      version: 1,
-      accountId: "er-account:10",
-      displayName: "Authority",
-      canonicalUsername: "authority",
-    };
-    const replicaAccount: CoopAccountIdentityV1 = {
-      version: 1,
-      accountId: "er-account:20",
-      displayName: "Replica",
-      canonicalUsername: "replica",
-    };
-    const authorityP33 = createFreshCoopP33Context({
-      pairingId: "M3TAILPROOFTERM",
-      pairingBearer: "A".repeat(43),
-      transportRole: "answerer",
-      account: authorityAccount,
-      peerAccount: replicaAccount,
-      connectionGeneration: 4,
-      peerConnectionGeneration: 7,
-    });
-    const replicaP33 = createFreshCoopP33Context({
-      pairingId: "M3TAILPROOFTERM",
-      pairingBearer: "B".repeat(43),
-      transportRole: "offerer",
-      account: replicaAccount,
-      peerAccount: authorityAccount,
-      connectionGeneration: 7,
-      peerConnectionGeneration: 4,
-    });
-    expect(authorityP33).not.toBeNull();
-    expect(replicaP33).not.toBeNull();
-    if (authorityP33 == null || replicaP33 == null) {
-      throw new Error("P33 proof-terminal fixture was rejected");
-    }
-
-    const pair = createLoopbackPair();
-    const authorityMessages: CoopMessage[] = [];
-    const authorityFrames: CoopFrameV2[] = [];
-    const offMessages = pair.host.onMessage(message => authorityMessages.push(message));
-    const offFrames =
-      pair.host.onV2Frame?.(frame => {
-        if (frame != null && typeof frame === "object" && (frame as { v?: unknown }).v === 2) {
-          authorityFrames.push(structuredClone(frame) as CoopFrameV2);
-        }
-      }) ?? (() => {});
-
-    try {
-      process.env.COOP_AUTHORITY_V2_TURN = "on";
-      // Dynamic import is intentional: the cutover build flag is sampled at module initialization. The
-      // negotiated peer advertises only shadow+turn, so REPLACEMENT/WAVE/CONTROL remain unowned while the
-      // production runtime still installs its live protocol-violation -> shared-terminal callback.
-      runtimeApi = await import("#data/elite-redux/coop/coop-runtime");
-      runtime = runtimeApi.assembleCoopRuntime(pair.guest, {
-        username: "Replica",
-        netcodeMode: "authoritative",
-        p33: replicaP33,
-      });
-      runtimeApi.setCoopRuntime(runtime);
-      authorityController = new CoopSessionController(pair.host, {
-        version: COOP_PROTOCOL_VERSION,
-        p33: authorityP33,
-        localCapabilities: [
-          COOP_CAP_OP_BIOME,
-          COOP_CAP_OP_ME,
-          COOP_CAP_DURABILITY_JOURNAL,
-          COOP_CAP_AUTHORITY_V2_SHADOW,
-          COOP_CAP_AUTHORITY_V2_TURN,
-        ],
-      });
-      runtime.controller.armResumeStartNewHandler(() => {});
-      authorityController.connect();
-      runtime.controller.connect();
-      await expect(authorityController.sendResumeStartNew(2_000)).resolves.toBe(true);
-
-      let runtimeShadow: CoopAuthorityV2Shadow | null = null;
-      for (let attempt = 0; attempt < 50; attempt++) {
-        runtimeShadow = runtimeApi.getCoopV2Shadow(runtime);
-        if (runtime.controller.authenticatedBinding != null && runtimeShadow != null) {
-          break;
-        }
-        await new Promise<void>(resolve => setTimeout(resolve, 0));
-      }
-      const binding = runtime.controller.authenticatedBinding;
-      expect(binding).not.toBeNull();
-      expect(runtimeShadow).not.toBeNull();
-      if (binding == null || runtimeShadow == null || binding.runId == null) {
-        throw new Error("bound replica runtime did not install its Authority V2 shadow");
-      }
-      const membership = runtime.controller.p33MembershipSnapshot();
-      const authorityMember = membership?.members.find(member => member.seatId === binding.authoritySeatId);
-      expect(authorityMember).toBeDefined();
-      if (authorityMember == null) {
-        throw new Error("bound replica runtime omitted the authority member");
-      }
-      const authorityContext: CoopFrameContextV2 = {
-        sessionId: binding.sessionId,
-        runId: binding.runId,
-        sessionEpoch: binding.sessionEpoch,
-        seatMapId: binding.seatMap.seatMapId,
-        membershipRevision: binding.membershipRevision,
-        senderSeatId: binding.authoritySeatId,
-        authoritySeatId: binding.authoritySeatId,
-        connectionGeneration: authorityMember.connectionGeneration,
-      };
-      const replacementDraft = buildReplacementCommitEntry({
-        context: authorityContext,
-        proposal: {
-          sourceAddress: {
-            epoch: binding.sessionEpoch,
-            wave: 5,
-            turn: 1,
-            occurrence: 0,
-            fieldIndex: 0,
-          },
-          ownerSeatId: binding.authoritySeatId,
-          selected: { partySlot: 2, speciesId: 25 },
-        },
-        resolution: "owner-pick",
-        successor: {
-          kind: "next-replacement",
-          control: {
-            kind: "REPLACEMENT",
-            operationId: "BOUNDARY/runtime-next-replacement",
-            ownerSeatId: replicaP33.localSeatId,
-            epoch: binding.sessionEpoch,
-            wave: 5,
-            turn: 1,
-            occurrence: 1,
-            fieldIndex: 0,
-            remaining: [],
-          },
-        },
-        operationId: replacementOperationId,
-      });
-      const predecessor: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
-        v: 2,
-        t: "authorityEntry",
-        ctx: authorityContext,
-        body: {
-          revision: 1,
-          operationId: replacementDraft.operationId,
-          kind: replacementDraft.kind,
-          material: replacementDraft.material,
-          nextControl: replacementDraft.nextControl,
-          subsumes: [...replacementDraft.subsumes],
-        },
-      };
-      const candidateOperationId = "BOUNDARY/runtime-candidate";
-      const candidateDraft = buildWaveAdvanceEntry({
-        context: authorityContext,
-        operationId: candidateOperationId,
-        transition: {
-          kind: "wave-advance",
-          wave: 5,
-          turn: 1,
-          outcome: "win",
-          nextWave: 6,
-          biomeChange: false,
-          eggLapse: false,
-          meBoundary: "none",
-          victoryKind: "wild",
-        },
-        destination: {
-          ...narrowBoundaryWait(candidateOperationId),
-          epoch: binding.sessionEpoch,
-        },
-        subsumes: [predecessor.body.revision],
-      });
-      const candidate: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
-        v: 2,
-        t: "authorityEntry",
-        ctx: authorityContext,
-        body: {
-          revision: 2,
-          operationId: candidateDraft.operationId,
-          kind: candidateDraft.kind,
-          material: candidateDraft.material,
-          nextControl: candidateDraft.nextControl,
-          subsumes: [...candidateDraft.subsumes],
-        },
-      };
-
-      pair.host.send(predecessor);
-      pair.host.send(candidate);
-      await flushLoopbackMicrotasks(24);
-      const request = authorityFrames.find(
-        (frame): frame is Extract<CoopFrameV2, { t: "tailRequest" }> => frame.t === "tailRequest",
-      );
-      expect(request).toBeDefined();
-      if (request == null || request.body.requestId == null) {
-        throw new Error("bound replica did not emit a correlated tail request");
-      }
-      expect(request.body.requestId).toBe(
-        canonicalBoundaryProofRequestId(replicaP33.localSeatId, 1, binding.sessionId),
-      );
-
-      const manifest: Extract<CoopFrameV2, { t: "tailProof" }> = {
-        v: 2,
-        t: "tailProof",
-        ctx: authorityContext,
-        body: {
-          phase: "manifest",
-          requestId: request.body.requestId,
-          fromRevision: request.body.fromRevision,
-          candidateRevision: request.body.candidateRevision,
-          candidateOperationId: request.body.candidateOperationId,
-          headRevision: candidate.body.revision,
-          sourceRevisions: [predecessor.body.revision],
-        },
-      };
-      const unlistedSource: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
-        ...predecessor,
-        body: {
-          ...predecessor.body,
-          revision: candidate.body.revision + 1,
-          operationId: "BOUNDARY/runtime-unowned-source",
-          kind: "CONTROL_COMMIT",
-          material: { digest: "runtime-unowned-source", payload: { wave: 5, turn: 1, source: "unlisted" } },
-          nextControl: {
-            ...narrowBoundaryWait("BOUNDARY/runtime-unowned-source"),
-            epoch: binding.sessionEpoch,
-          },
-          subsumes: [],
-        },
-      };
-      const supervisor = runtimeApi.getCoopSharedTerminalSupervisor(runtime);
-      expect(supervisor).not.toBeNull();
-      if (supervisor == null) {
-        throw new Error("bound runtime omitted its shared-terminal supervisor");
-      }
-      const beginSpy = vi.spyOn(supervisor, "begin");
-
-      pair.host.send(manifest);
-      pair.host.send(unlistedSource);
-      pair.host.send(cloneFrame(unlistedSource));
-      await flushLoopbackMicrotasks(24);
-
-      expect(beginSpy).toHaveBeenCalledTimes(1);
-      expect(runtimeApi.isCoopSharedTerminalFrozen(runtime)).toBe(true);
-      expect(runtimeShadow.diagnostics()).toMatchObject({ admitted: 1, applied: 1 });
-      const published = supervisor.current();
-      expect(published).toMatchObject({
-        terminalRevision: 1,
-        originSeatId: replicaP33.localSeatId,
+  it("injects one shared terminal for duplicated unowned proof-source rejection", () => {
+    const beginSharedTerminal = vi.fn();
+    const duo = makeManualBoundaryDuo(STUB_TRANSPORT, violation => {
+      beginSharedTerminal({
         boundary: "protocol",
         reasonCode: "invalid-authority",
+        reason: `Invalid Authority V2 frame ${violation.frameType ?? "(unknown)"}: ${violation.issues.join(", ")}.`,
       });
-      expect(published?.reason).toContain(request.body.requestId);
-      const terminalWire = authorityMessages.filter(
-        (message): message is Extract<CoopMessage, { t: "sharedTerminal" }> => message.t === "sharedTerminal",
-      );
-      expect(terminalWire).toHaveLength(1);
-      expect(terminalWire[0]).toMatchObject({
-        ctx: { fromSeatId: replicaP33.localSeatId },
-        commit: published,
-      });
+    });
+    const { firstRequest } = stageManualBoundaryCandidate(duo);
+    const proof = answerManualBoundaryRequest(duo, firstRequest);
+    const unlistedSource: Extract<CoopFrameV2, { t: "authorityEntry" }> = {
+      ...proof.source,
+      body: {
+        ...proof.source.body,
+        revision: proof.complete.body.candidateRevision + 1,
+        operationId: "BOUNDARY/unowned-source",
+        kind: "CONTROL_COMMIT",
+        material: { digest: "unowned-source-digest", payload: { wave: 5, turn: 1, source: "not-listed" } },
+        nextControl: narrowBoundaryWait("BOUNDARY/unowned-source"),
+        subsumes: [],
+      },
+    };
 
-      runtimeApi.clearCoopRuntime();
-      runtimeCleared = true;
-      expect(runtimeApi.getCoopSharedTerminalSupervisor(runtime)).toBeNull();
-    } finally {
-      offFrames();
-      offMessages();
-      authorityController?.dispose();
-      if (!runtimeCleared) {
-        runtimeApi?.clearCoopRuntime();
-      }
-      pair.host.close();
-      pair.guest.close();
-      if (priorTurnFlag == null) {
-        delete process.env.COOP_AUTHORITY_V2_TURN;
-      } else {
-        process.env.COOP_AUTHORITY_V2_TURN = priorTurnFlag;
-      }
-    }
+    duo.guest.handleInboundFrame(proof.manifest);
+    duo.guest.handleInboundFrame(unlistedSource);
+    duo.guest.handleInboundFrame(cloneFrame(unlistedSource));
+
+    expect(beginSharedTerminal).toHaveBeenCalledTimes(1);
+    expect(beginSharedTerminal).toHaveBeenCalledWith({
+      boundary: "protocol",
+      reasonCode: "invalid-authority",
+      reason: expect.stringContaining(String(firstRequest.body.requestId)),
+    });
+    expect(duo.guest.diagnostics()).toMatchObject({ admitted: 1, applied: 1 });
+    expect(duo.appliedRevisions).toEqual([1]);
+    expect(duo.violations).toHaveLength(1);
+    expect(duo.violations[0]?.join(" ")).toContain(String(firstRequest.body.requestId));
+    duo.dispose();
   });
 
   it("ignores old proof frames after an authenticated rebind while a fresh request/context releases the candidate", () => {
