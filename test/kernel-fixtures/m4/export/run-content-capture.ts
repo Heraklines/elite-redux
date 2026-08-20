@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, fileURLToPath, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
