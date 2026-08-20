@@ -92,7 +92,7 @@ jobs:
           fi
           base=7357166c19bdb5cf0e32c84b0f74f22e79d80798
           oracle=3b534099919efae827019d4a3f3c4ab0ecd6d67b
-          audited_production_head=4c772970f08be911178a35f7d1618a3b4556416a
+          audited_production_head=2bb5d04a62cbf443f2a82322f941d4720f896a85
           git cat-file -e "${base}^{commit}"
           git cat-file -e "${oracle}^{commit}"
           git cat-file -e "${audited_production_head}^{commit}"
@@ -1858,7 +1858,7 @@ jobs:
         env:
           ORACLE_SHA: 3b534099919efae827019d4a3f3c4ab0ecd6d67b
           ORACLE_BRANCH: ci/coop/v2-showdown-command-coordinate-20260720
-          AUDITED_PRODUCTION_HEAD: 4c772970f08be911178a35f7d1618a3b4556416a
+          AUDITED_PRODUCTION_HEAD: 2bb5d04a62cbf443f2a82322f941d4720f896a85
         run: |
           set -euo pipefail
           python3 - <<'PY'
