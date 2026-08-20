@@ -4,7 +4,7 @@
 //! presenter, storage, clock, and fault representations; only the endpoint
 //! root is upgraded to the M4 GameStateV2 endpoint and V3 validation boundary.
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use er_types::battle_ids::CanonicalHexBytes;
@@ -21,14 +21,6 @@ use crate::snapshot::{
 
 pub const RESTORABLE_PAIR_SNAPSHOT_SCHEMA_VERSION_V3: u32 = 3;
 pub const PAIR_DETERMINISM_DIGEST_SCHEMA_VERSION_V2: u32 = 2;
-
-fn deserialize_required_nullable<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Option::<T>::deserialize(deserializer)
-}
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(transparent)]
