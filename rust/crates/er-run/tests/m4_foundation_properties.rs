@@ -3,22 +3,20 @@ use std::error::Error;
 use er_canonical::canonical_bytes;
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_run::settlement::{
-    prepare_battle_settlement, BattleSettlementInput, SettlementError,
-};
+use er_run::settlement::{BattleSettlementInput, SettlementError, prepare_battle_settlement};
 use er_state::battle_v2::{
-    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState,
-    BattleStateV2, DefeatedEnemyRecord, WaveRewardEvidence,
+    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState, BattleStateV2,
+    DefeatedEnemyRecord, WaveRewardEvidence,
 };
 use er_state::field::FieldState;
-use er_state::game_v2::{GameStateV2, GAME_STATE_SCHEMA_VERSION_V2};
+use er_state::game_v2::{GAME_STATE_SCHEMA_VERSION_V2, GameStateV2};
 use er_state::pokemon_v2::{
-    Iv, PermanentStatBonuses, PokemonProgressionState, PokemonStateV2,
-    POKEMON_STATE_SCHEMA_VERSION_V2,
+    Iv, POKEMON_STATE_SCHEMA_VERSION_V2, PermanentStatBonuses, PokemonProgressionState,
+    PokemonStateV2,
 };
 use er_state::run_v2::{
-    BiomeRuntimeState, ProgressionQueue, RunCounters, RunStateV2, PROGRESSION_QUEUE_SCHEMA_VERSION,
-    RUN_STATE_SCHEMA_VERSION,
+    BiomeRuntimeState, PROGRESSION_QUEUE_SCHEMA_VERSION, ProgressionQueue,
+    RUN_STATE_SCHEMA_VERSION, RunCounters, RunStateV2,
 };
 use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{
@@ -250,13 +248,15 @@ fn settlement_is_exactly_once_and_freezes_terminal_stage_evidence() -> Result<()
         prepared.after_state.run.stage,
         RunStage::AwaitingWaveAdvance
     );
-    assert!(prepared
-        .after_state
-        .battle
-        .as_ref()
-        .ok_or("missing after battle")?
-        .settlement
-        .settled);
+    assert!(
+        prepared
+            .after_state
+            .battle
+            .as_ref()
+            .ok_or("missing after battle")?
+            .settlement
+            .settled
+    );
     prepared.after_state.validate()?;
 
     assert_eq!(
@@ -267,7 +267,8 @@ fn settlement_is_exactly_once_and_freezes_terminal_stage_evidence() -> Result<()
 }
 
 #[test]
-fn rejected_settlement_never_mutates_input_and_same_input_is_deterministic() -> Result<(), Box<dyn Error>> {
+fn rejected_settlement_never_mutates_input_and_same_input_is_deterministic()
+-> Result<(), Box<dyn Error>> {
     let before = state()?;
     let snapshot = before.clone();
     let wrong_source = input(99, 1)?;

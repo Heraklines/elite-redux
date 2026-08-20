@@ -8,8 +8,8 @@ use er_state::battle::{
     FaintOccurrenceId as FaintOccurrenceIdV1,
 };
 use er_state::battle_v2::{
-    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState,
-    BattleStateV2, DefeatedEnemyRecord,
+    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState, BattleStateV2,
+    DefeatedEnemyRecord,
 };
 use er_state::conditions::{
     ArenaConditionState, GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind,
@@ -17,10 +17,10 @@ use er_state::conditions::{
 };
 use er_state::field::{FieldSlotState, FieldState};
 use er_state::format::BattleFormat;
-use er_state::game_v2::{GameStateV2, GAME_STATE_SCHEMA_VERSION_V2};
+use er_state::game_v2::{GAME_STATE_SCHEMA_VERSION_V2, GameStateV2};
 use er_state::migration::{
-    migrate_m3_game_state, M3BattleCompanion, M3PokemonCompanion, M3PokemonCompanionKey,
-    M3ToM4MigrationContext, MigrationStateSide, M3_PARITY_ORACLE_SHA, M4_ORACLE_SHA,
+    M3_PARITY_ORACLE_SHA, M3BattleCompanion, M3PokemonCompanion, M3PokemonCompanionKey,
+    M3ToM4MigrationContext, M4_ORACLE_SHA, MigrationStateSide, migrate_m3_game_state,
 };
 use er_state::pokemon::{
     AbilityLoadout as AbilityLoadoutV1, BattleStats as BattleStatsV1,
@@ -29,13 +29,13 @@ use er_state::pokemon::{
     StatusState as StatusStateV1,
 };
 use er_state::pokemon_v2::{
-    Iv, PermanentStatBonuses, PokemonProgressionState, PokemonStateV2,
-    POKEMON_STATE_SCHEMA_VERSION_V2,
+    Iv, POKEMON_STATE_SCHEMA_VERSION_V2, PermanentStatBonuses, PokemonProgressionState,
+    PokemonStateV2,
 };
 use er_state::run_v2::{
-    BiomeId, BiomeRuntimeState, GameRunId, Money, ProgressionQueue, RunCounters,
-    RunInteractionSequence, RunModifierInstance, RunOutcome, RunStage, RunStateV2, RunSurfaceId,
-    RunTaskId, RUN_STATE_SCHEMA_VERSION,
+    BiomeId, BiomeRuntimeState, GameRunId, Money, ProgressionQueue, RUN_STATE_SCHEMA_VERSION,
+    RunCounters, RunInteractionSequence, RunModifierInstance, RunOutcome, RunStage, RunStateV2,
+    RunSurfaceId, RunTaskId,
 };
 use er_state::snapshot::GameState as GameStateV1;
 use er_types::battle_command::CommandCollectionState;
@@ -246,7 +246,8 @@ fn valid_state() -> Result<GameStateV2, Box<dyn Error>> {
 }
 
 #[test]
-fn valid_state_round_trips_and_validates_without_reordering_owned_vectors() -> Result<(), Box<dyn Error>> {
+fn valid_state_round_trips_and_validates_without_reordering_owned_vectors()
+-> Result<(), Box<dyn Error>> {
     for reverse_roster in [false, true] {
         let mut state = valid_state()?;
         if reverse_roster {
@@ -439,12 +440,17 @@ fn v1_pokemon(id: u64, owner: Option<SeatId>) -> Result<PokemonStateV1, Box<dyn 
             accuracy: 0,
             evasion: 0,
         },
-        [Some(MoveSlotStateV1 {
-            move_id: MoveId::new(safe(1)?),
-            pp_used: 0,
-            pp_ups: 0,
-            max_pp_override: None,
-        }), None, None, None],
+        [
+            Some(MoveSlotStateV1 {
+                move_id: MoveId::new(safe(1)?),
+                pp_used: 0,
+                pp_ups: 0,
+                max_pp_override: None,
+            }),
+            None,
+            None,
+            None,
+        ],
         AbilityLoadoutV1 {
             active: er_state::pokemon::AbilityId::new(safe(0)?),
             passives: [None, None, None],
@@ -466,14 +472,8 @@ fn migration_input() -> Result<GameStateV1, Box<dyn Error>> {
     let field = FieldState::new_for_format(
         &format,
         vec![
-            FieldSlotState::new(
-                FieldSlot::new(BattleSide::Player, 0)?,
-                Some(first.id),
-            ),
-            FieldSlotState::new(
-                FieldSlot::new(BattleSide::Enemy, 0)?,
-                Some(enemy.id),
-            ),
+            FieldSlotState::new(FieldSlot::new(BattleSide::Player, 0)?, Some(first.id)),
+            FieldSlotState::new(FieldSlot::new(BattleSide::Enemy, 0)?, Some(enemy.id)),
         ],
     )?;
     let battle = BattleState {
@@ -613,7 +613,8 @@ fn migration_context(
 }
 
 #[test]
-fn migration_preserves_stable_identity_and_orders_roster_by_stable_index() -> Result<(), Box<dyn Error>> {
+fn migration_preserves_stable_identity_and_orders_roster_by_stable_index()
+-> Result<(), Box<dyn Error>> {
     let input = migration_input()?;
     let context = migration_context(
         &input,
@@ -634,8 +635,14 @@ fn migration_preserves_stable_identity_and_orders_roster_by_stable_index() -> Re
             .collect::<Vec<_>>(),
         vec![pokemon_id(19)?, pokemon_id(17)?]
     );
-    assert_eq!(migrated.player_party[0].progression.experience.get().get(), 19);
-    assert_eq!(migrated.player_party[1].progression.experience.get().get(), 17);
+    assert_eq!(
+        migrated.player_party[0].progression.experience.get().get(),
+        19
+    );
+    assert_eq!(
+        migrated.player_party[1].progression.experience.get().get(),
+        17
+    );
     assert_eq!(
         migrated.player_party[0].owner_seat,
         Some(SeatId::new(safe(1)?))
@@ -644,7 +651,15 @@ fn migration_preserves_stable_identity_and_orders_roster_by_stable_index() -> Re
         migrated.player_party[1].owner_seat,
         Some(SeatId::new(safe(1)?))
     );
-    assert_eq!(migrated.battle.as_ref().ok_or("missing migrated battle")?.enemy_party[0].id, pokemon_id(18)?);
+    assert_eq!(
+        migrated
+            .battle
+            .as_ref()
+            .ok_or("missing migrated battle")?
+            .enemy_party[0]
+            .id,
+        pokemon_id(18)?
+    );
     Ok(())
 }
 
