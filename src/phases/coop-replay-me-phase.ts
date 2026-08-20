@@ -319,21 +319,8 @@ export class CoopReplayMePhase extends Phase {
   /** Open the exact Mystery handler, then publish readiness only for this still-live addressed generation. */
   private openV2MysterySurface(): void {
     const scene = globalScene;
-    const battle = scene.currentBattle;
-    const runtime = this.boundRuntime;
-    const controller = this.boundController;
-    const generation = this.boundGeneration;
     const operationId = this.coopV2ControlOperationId;
-    const ownerStillLive = (): boolean =>
-      scene === globalScene
-      && scene.currentBattle === battle
-      && runtime === getCoopRuntime()
-      && controller === getCoopController()
-      && generation === coopSessionGeneration()
-      && activeCoopReplayMePhase === this
-      && scene.phaseManager.getCurrentPhase() === this
-      && coopMeInteractionStartValue() === this.interactionCounter;
-    if (!ownerStillLive() || operationId == null) {
+    if (!this.boundaryStillLive() || operationId == null) {
       return;
     }
     // setMode does not call show again when the mode is unchanged and the old handler is still
@@ -346,18 +333,22 @@ export class CoopReplayMePhase extends Phase {
     // setModeBoundedWhen may install the handler synchronously. Publish in that same call stack so a public
     // input cannot commit the next entry before this presentation records controlInstalled. The notifier is
     // fail-closed: it proves the exact phase, operation id, mode, handler, and actionability before advancing.
-    if (ownerStillLive() && this.coopV2ControlOperationId === operationId) {
-      notifyCoopV2InteractionSurfaceReady(runtime, this);
+    if (this.boundaryStillLive() && this.coopV2ControlOperationId === operationId) {
+      notifyCoopV2InteractionSurfaceReady(this.boundRuntime, this);
     }
     // Retain the settled retry for implementations where the UI handler becomes actionable asynchronously.
     void opening.then(opened => {
-      if (opened !== "superseded" && ownerStillLive() && this.coopV2ControlOperationId === operationId) {
+      if (
+        opened !== "superseded"
+        && this.boundaryStillLive()
+        && this.coopV2ControlOperationId === operationId
+      ) {
         // The replay selector is already bound to the exact retained presentation. Its one-second
         // guard is only click-through protection for ordinary solo openings; release it here so a
         // verified replay generation cannot wait on a cosmetic timer.
         const boundHandler = scene.ui.handlers[UiMode.MYSTERY_ENCOUNTER] as MysteryEncounterUiHandler | undefined;
         boundHandler?.unblockInput();
-        notifyCoopV2InteractionSurfaceReady(runtime, this);
+        notifyCoopV2InteractionSurfaceReady(this.boundRuntime, this);
       }
     });
   }

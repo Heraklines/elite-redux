@@ -36,6 +36,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   adoptBiomeWatcherChoice,
   armCoopBiomeIntentResend,
@@ -551,7 +552,10 @@ export class ErCrossroadsPhase extends Phase {
         return;
       }
       const interactionReady = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
-      if (!interactionReady) {
+      if (
+        !interactionReady
+        && isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability)
+      ) {
         return;
       }
       // Crossroads can be the first actionable surface after the every-ten-wave market. Publishing from

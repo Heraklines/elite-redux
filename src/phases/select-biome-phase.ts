@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import { allBiomes } from "#data/data-lists";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
@@ -1054,7 +1055,10 @@ export class SelectBiomePhase extends BattlePhase {
         return;
       }
       const interactionReady = notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime, this);
-      if (!interactionReady) {
+      if (
+        !interactionReady
+        && isCoopV2InteractionCutoverActive(this.coopOwningRuntime?.durability)
+      ) {
         return;
       }
       notifyCoopWaveContinuationSurfaceReady(wave);
