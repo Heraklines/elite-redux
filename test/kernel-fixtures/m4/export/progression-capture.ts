@@ -6,6 +6,7 @@ import Overrides from "#app/overrides";
 import { PhaseManager } from "#app/phase-manager";
 import { ExpNotification } from "#enums/exp-notification";
 import { GameModes } from "#enums/game-modes";
+import { BattlerIndex } from "#enums/battler-index";
 import { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
@@ -374,17 +375,21 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
     }
     const enemyExpValue = finite(enemy.getExpValue(), "enemy.getExpValue");
     restoreTrace = installTrace(game, trace);
+    // launchProgressionScenario leaves the production command surface open. Re-observe that exact live
+    // CommandPhase before queuing the lead command; PromptHandler is FIFO, so registering a later
+    // LearnMoveBatchPhase prompt first would strand these CommandPhase callbacks behind it.
+    await game.phaseInterceptor.to("CommandPhase", false);
+    // Match the proven M3 exporter: select the move for the live PLAYER battler through MoveHelper, and
+    // suppress its optional target callback because this single-target source battle has no target phase.
+    game.move.select(MoveId.POUND, BattlerIndex.PLAYER, null);
+    await game.phaseInterceptor.to("TurnStartPhase", false);
+    // Queue the progression prompt only after the command callbacks have been admitted and the turn-start
+    // boundary is live. This preserves production phase ordering and avoids a parked CommandPhase.
     game.onNextPrompt("LearnMoveBatchPhase", UiMode.LEARN_MOVE_BATCH, () => {
       captureMenuInput(trace, game!, Button.ACTION);
       captureMenuInput(trace, game!, Button.ACTION);
       captureMenuInput(trace, game!, Button.CANCEL);
     });
-    // Commit Pound through the live command UI before forcing the established harness faint. Killing the
-    // enemy while CommandPhase is still open leaves the command prompt parked forever because production
-    // target resolution sees an already-fainted field. `null` is intentional: this single-target move has
-    // no SelectTargetPhase, so do not enqueue the helper's optional target prompt.
-    game.move.select(MoveId.POUND, 0, null);
-    await game.phaseInterceptor.to("TurnStartPhase", false);
     await game.killPokemon(enemy);
     game.doSelectModifier();
     await game.phaseInterceptor.to("BattleEndPhase");
