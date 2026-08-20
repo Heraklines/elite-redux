@@ -7,6 +7,7 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { allAbilities, allBiomes, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
+import { buildExoticShopStock } from "#data/elite-redux/er-exotic-shop";
 import { modifierPool } from "#modifiers/modifier-pools";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { initializeGame } from "#init/init";
@@ -93,6 +94,9 @@ function sourceFor(path: string): string {
   }
   if (path.startsWith("modifierPool")) {
     return "src/modifier/init-modifier-pools.ts:WeightedModifierType";
+  }
+  if (path.startsWith("exoticShopStock")) {
+    return "src/data/elite-redux/er-exotic-shop.ts:buildExoticShopStock";
   }
   if (path.startsWith("modifiers")) {
     return "src/modifier/modifier-type.ts:modifierTypeInitObj";
@@ -613,12 +617,14 @@ function battleCapability(capability: AnyRecord, moves: readonly JsonValue[], ab
   return { schema_version: 1, oracle_game_sha: M4_ORACLE_SHA, entries };
 }
 
-const MODIFIERS: readonly AnyRecord[] = [
+type ModifierDefinition = AnyRecord & { tier: string | null };
+
+const MODIFIERS: readonly ModifierDefinition[] = [
   { id: 1, key: "AMULET_COIN", tier: "ULTRA", maximum_stack: 5, target: "RUN", effect: { kind: "MONEY_MULTIPLIER", percent: 20 }, constructor: "ModifierType" },
   { id: 2, key: "CANDY_JAR", tier: "ULTRA", maximum_stack: 99, target: "RUN", effect: { kind: "LEVEL_INCREMENT_BOOSTER", levels_per_stack: 1 }, constructor: "ModifierType" },
   { id: 3, key: "EXP_CHARM", tier: "ULTRA", maximum_stack: 99, target: "RUN", effect: { kind: "EXPERIENCE_MULTIPLIER", percent: 25 }, constructor: "ExpBoosterModifierType" },
   { id: 4, key: "SUPER_EXP_CHARM", tier: "ROGUE", maximum_stack: 30, target: "RUN", effect: { kind: "EXPERIENCE_MULTIPLIER", percent: 60 }, constructor: "ExpBoosterModifierType" },
-  { id: 5, key: "GOLDEN_EXP_CHARM", tier: "MASTER", maximum_stack: 10, target: "RUN", effect: { kind: "EXPERIENCE_MULTIPLIER", percent: 100 }, constructor: "ExpBoosterModifierType" },
+  { id: 5, key: "GOLDEN_EXP_CHARM", tier: null, maximum_stack: 10, target: "RUN", effect: { kind: "EXPERIENCE_MULTIPLIER", percent: 100 }, constructor: "ExpBoosterModifierType" },
   { id: 6, key: "HEALING_CHARM", tier: "MASTER", maximum_stack: 5, target: "RUN", effect: { kind: "HEALING_MULTIPLIER", percent: 110 }, constructor: "ModifierType" },
   { id: 7, key: "LOCK_CAPSULE", tier: "ROGUE", maximum_stack: 1, target: "RUN", effect: { kind: "LOCK_CAPSULE" }, constructor: "ModifierType" },
   { id: 100, key: "POTION", tier: "COMMON", maximum_stack: 1, target: "ONE_POKEMON", effect: { kind: "HP_RESTORE", points: 20, percent: 10 }, constructor: "PokemonHpRestoreModifierType" },
@@ -634,12 +640,76 @@ const MODIFIERS: readonly AnyRecord[] = [
   { id: 401, key: "GREAT_BALL", tier: "GREAT", maximum_stack: 1, target: "INVENTORY", effect: { kind: "INVENTORY_ITEM", key: "GREAT_BALL" }, constructor: "AddPokeballModifierType" },
 ];
 
+type ModifierAcquisitionSource = "PLAYER_REWARD_POOL" | "EXOTIC_SHOP";
+
 type ModifierPoolObservation = {
-  tierValue: number;
-  tierName: string;
+  tierValue: number | null;
+  tierName: string | null;
+  acquisitionSource: ModifierAcquisitionSource;
 };
 
-function observeModifierPool(definition: AnyRecord): ModifierPoolObservation {
+const GOLDEN_EXP_CHARM = "GOLDEN_EXP_CHARM";
+const MODIFIER_POOL_SOURCE = "src/modifier/init-modifier-pools.ts:modifierPool";
+const EXOTIC_SHOP_SOURCE = "src/data/elite-redux/er-exotic-shop.ts:buildExoticShopStock";
+
+/**
+ * The exotic stock options are generated from modifier factories without the
+ * ordinary pool identity fix-up. Match the returned type by its production
+ * identity fields and constructed effect, while accepting an explicitly
+ * populated id when the production seam supplies one.
+ */
+function isSameModifierType(candidate: AnyRecord, expected: AnyRecord, path: string): boolean {
+  if (candidate.id === GOLDEN_EXP_CHARM) {
+    return true;
+  }
+  if (
+    candidate.constructor?.name !== expected.constructor?.name
+    || candidate.localeKey !== expected.localeKey
+    || candidate.iconImage !== expected.iconImage
+    || typeof candidate.newModifier !== "function"
+    || typeof expected.newModifier !== "function"
+  ) {
+    return false;
+  }
+  try {
+    const candidateModifier = requireRecord(candidate.newModifier({ id: 0 }), `${path}.newModifier`);
+    const expectedModifier = requireRecord(expected.newModifier({ id: 0 }), `${path}.expectedModifier`);
+    const candidateArgs = requireArray(candidateModifier.getArgs?.(), `${path}.modifier.getArgs`);
+    const expectedArgs = requireArray(expectedModifier.getArgs?.(), `${path}.expectedModifier.getArgs`);
+    return candidateArgs.length === expectedArgs.length && candidateArgs.every((value, index) => value === expectedArgs[index]);
+  } catch {
+    return false;
+  }
+}
+
+function observeGoldenExoticStock(definition: AnyRecord, expectedType: AnyRecord): ModifierPoolObservation {
+  let rawStock: readonly unknown[];
+  try {
+    ensureLiveTypeChartScene();
+    rawStock = buildExoticShopStock();
+  } catch (error) {
+    if (error instanceof M4CaptureGap) {
+      throw error;
+    }
+    gap("MODIFIER_EXOTIC_STOCK_UNOBSERVABLE", EXOTIC_SHOP_SOURCE, `${definition.key}: ${String(error)}`);
+  }
+  const stock = requireArray(rawStock, "exoticShopStock");
+  const present = stock.some((rawEntry, index) => {
+    const option = requireRecord(rawEntry, `exoticShopStock[${index}]`);
+    const candidate = requireRecord(option.type, `exoticShopStock[${index}].type`);
+    return isSameModifierType(candidate, expectedType, `exoticShopStock[${index}].type`);
+  });
+  if (!present) {
+    gap(
+      "MODIFIER_EXOTIC_STOCK_UNOBSERVABLE",
+      EXOTIC_SHOP_SOURCE,
+      `${definition.key} is absent from production exotic shop stock`,
+    );
+  }
+  return { tierValue: null, tierName: null, acquisitionSource: "EXOTIC_SHOP" };
+}
+
+function observeModifierPool(definition: AnyRecord, expectedType: AnyRecord): ModifierPoolObservation {
   const pool = modifierPool as AnyRecord;
   for (const tierValue of Object.values(ModifierTier)) {
     if (typeof tierValue !== "number") {
@@ -658,6 +728,13 @@ function observeModifierPool(definition: AnyRecord): ModifierPoolObservation {
       );
       if (modifierType.id !== definition.key) {
         continue;
+      }
+      if (definition.key === GOLDEN_EXP_CHARM) {
+        gap(
+          "MODIFIER_EXOTIC_POOL_UNEXPECTED",
+          MODIFIER_POOL_SOURCE,
+          `${definition.key} unexpectedly appears in ordinary player reward tier ${tierValue}`,
+        );
       }
       const weight = weighted.weight;
       if (typeof weight !== "number" && typeof weight !== "function") {
@@ -686,12 +763,15 @@ function observeModifierPool(definition: AnyRecord): ModifierPoolObservation {
         tierValue,
         `modifierPool[${tierValue}].tier`,
       );
-      return { tierValue, tierName };
+      return { tierValue, tierName, acquisitionSource: "PLAYER_REWARD_POOL" };
     }
+  }
+  if (definition.key === GOLDEN_EXP_CHARM) {
+    return observeGoldenExoticStock(definition, expectedType);
   }
   gap(
     "MODIFIER_TIER_UNOBSERVABLE",
-    "src/modifier/init-modifier-pools.ts:modifierPool",
+    MODIFIER_POOL_SOURCE,
     `${definition.key} has no player reward-pool entry`,
   );
 }
@@ -715,10 +795,10 @@ function validateModifierSource(definition: AnyRecord): ModifierPoolObservation 
   exact(type.id, definition.key, `modifiers.${definition.key}.id`);
   const constructorName = requireString(type.constructor?.name, `modifiers.${definition.key}.constructor.name`);
   exact(constructorName, definition.constructor, `modifiers.${definition.key}.constructor.name`);
-  const poolObservation = observeModifierPool(definition);
+  const poolObservation = observeModifierPool(definition, type);
   const tierName = poolObservation.tierName;
   if (tierName !== definition.tier) {
-    gap("MODIFIER_SOURCE_MISMATCH", "src/modifier/init-modifier-pools.ts:modifierPool", `${definition.key} tier ${tierName} expected ${definition.tier}`);
+    gap("MODIFIER_SOURCE_MISMATCH", MODIFIER_POOL_SOURCE, `${definition.key} tier ${tierName} expected ${definition.tier}`);
   }
   if (typeof type.newModifier !== "function") {
     gap("MODIFIER_SOURCE_UNOBSERVABLE", "src/modifier/modifier-type.ts:ModifierType.newModifier", `${definition.key} cannot construct its effect`);
