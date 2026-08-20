@@ -761,9 +761,9 @@ fn validate_rules(
 ) -> Result<(), RunContentError> {
     let definitions = modifiers.iter().flatten().collect::<Vec<_>>();
     if reward.selected_modifier_keys.iter().any(|key| {
-        !definitions.iter().any(|definition| {
-            &definition.oracle_registry_key == key && definition.tier.is_some()
-        })
+        !definitions
+            .iter()
+            .any(|definition| &definition.oracle_registry_key == key && definition.tier.is_some())
     }) {
         return Err(invalid(
             "reward rules",
@@ -771,9 +771,9 @@ fn validate_rules(
         ));
     }
     if market.selected_modifier_keys.iter().any(|key| {
-        !definitions.iter().any(|definition| {
-            &definition.oracle_registry_key == key && definition.tier.is_some()
-        })
+        !definitions
+            .iter()
+            .any(|definition| &definition.oracle_registry_key == key && definition.tier.is_some())
     }) {
         return Err(invalid(
             "market rules",
