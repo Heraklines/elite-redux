@@ -8002,3 +8002,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Added a read-only Rift Ledger to the Endless pause menu. It lists every active pressure/mutation Rift, pulses remaining, acquisition depth, hostility, and the full effect description with list scrolling and paged details. The view reads the already-serialized Endless state and is classified local-only for co-op.
 - The submitted Endless triple log shows AI decisions completing in roughly 20 ms, but repeated Avalanche pool reconstruction plus 119 missing cry/animation-frame warnings during spread presentation. Endless Avalanche selection is now bounded-cached and returns defensive copies; missing cry and animation frames are skipped before Phaser warning/render work. Battle calculations and AI choices are unchanged.
 - Added remote-runner coverage for the opening enemy/player Avalanche asymmetry, cached deterministic selections, Rift display metadata, and a real Rift Ledger render recipe. Local repository tests remain intentionally unrun per maintainer instruction. Browser smoke boot completed; full interaction and visual signoff, GitHub runners, integration, and staging deploy remain pending. Production remains untouched.
+
+2026-08-20 - New Pokemon roster scenario launch repair
+
+- Rebased the five roster showcase scenarios on the proven Endless dev-scenario launch contract: explicit pending starter levels, deterministic Youngster/Normal run settings, and encounter persistence bypass for disposable fixtures.
+- Added a focused headless scenario harness that launches each entry through the same `__erLaunchDevScenarioByLabel` hook used by the in-game dev menu and requires the real flow to reach `CommandPhase` with all six level-100 player Pokemon and a live opponent.
+- Verification: all five roster scenarios pass the harness. No browser automation was used. Production and co-op remain untouched.

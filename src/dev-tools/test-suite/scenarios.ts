@@ -2035,7 +2035,7 @@ const pitchSpecies = (speciesId: number, formKey?: string): FakemonPitchShowcase
 });
 
 function fakemonPitchMoveset(speciesId: SpeciesId): StarterMoveset {
-  const levelMoves = (pokemonSpeciesLevelMoves as Record<number, Array<[number, MoveId]>>)[speciesId] ?? [];
+  const levelMoves = (pokemonSpeciesLevelMoves as Record<number, [number, MoveId][]>)[speciesId] ?? [];
   const uniqueMoves = [...new Set(levelMoves.filter(([level]) => level <= 100).map(([, move]) => move))];
   const selected = uniqueMoves.slice(-4);
   if (selected.length === 0) {
@@ -2063,8 +2063,12 @@ function fakemonPitchShowcaseScenario(
       + `PLAYER: ${names}.\n`
       + "DO: open Check Team and battle info, then inspect sprites, forms, typings, moves, and abilities.\n"
       + "EXPECT: all six player slots and the opponent use additions from the new roster.",
+    startingLevels: members.map(() => 100),
+    bypassEncounterPersistence: true,
     setup: () => {
       resetDevOverrides();
+      setErRunPacing("normal");
+      setErDifficulty("youngster");
       const enemyFormIndex = enemy.formKey ? formIndexByKey(enemy.speciesId, enemy.formKey) : 0;
       setOverrides({
         STARTING_WAVE_OVERRIDE: 145,
