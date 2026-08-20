@@ -220,7 +220,7 @@ pub struct RunContentPack {
 pub struct ModifierDefinition {
     pub id: ModifierId,
     pub oracle_registry_key: String,
-    pub tier: ModifierTier,
+    pub tier: Option<ModifierTier>,
     pub maximum_stack: u16,
     pub target: ModifierTargetKind,
     pub effect: ModifierEffectSpec,
@@ -228,6 +228,8 @@ pub struct ModifierDefinition {
 ```
 
 Modifier numeric IDs are M4 contract-owned and must map bijectively to the oracle string keys in `m4-slice-manifest.json`. Content hashing rejects duplicate IDs, duplicate keys, or mismatches. Definitions are closed data; callbacks, scripts, dynamic trait objects, and `serde_json::Value` are forbidden.
+
+`tier: None` means the oracle registry item is not in the ordinary player reward pool. M4 may apply an already-owned such modifier, but reward generation must never synthesize it. `GOLDEN_EXP_CHARM` is the selected exotic-shop-only case.
 
 ## Pure `er-run` API
 

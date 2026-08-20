@@ -117,7 +117,7 @@ pub enum ModifierEffectSpec {
 pub struct ModifierDefinition {
     pub id: ModifierId,
     pub oracle_registry_key: String,
-    pub tier: ModifierTier,
+    pub tier: Option<ModifierTier>,
     pub maximum_stack: u16,
     pub target: ModifierTargetKind,
     pub effect: ModifierEffectSpec,
@@ -761,9 +761,9 @@ fn validate_rules(
 ) -> Result<(), RunContentError> {
     let definitions = modifiers.iter().flatten().collect::<Vec<_>>();
     if reward.selected_modifier_keys.iter().any(|key| {
-        !definitions
-            .iter()
-            .any(|definition| &definition.oracle_registry_key == key)
+        !definitions.iter().any(|definition| {
+            &definition.oracle_registry_key == key && definition.tier.is_some()
+        })
     }) {
         return Err(invalid(
             "reward rules",
@@ -771,9 +771,9 @@ fn validate_rules(
         ));
     }
     if market.selected_modifier_keys.iter().any(|key| {
-        !definitions
-            .iter()
-            .any(|definition| &definition.oracle_registry_key == key)
+        !definitions.iter().any(|definition| {
+            &definition.oracle_registry_key == key && definition.tier.is_some()
+        })
     }) {
         return Err(invalid(
             "market rules",
@@ -1004,7 +1004,7 @@ fn selected_modifier_definitions() -> Result<Vec<ModifierDefinition>, RunContent
         modifier(
             5,
             "GOLDEN_EXP_CHARM",
-            ModifierTier::Master,
+            None,
             10,
             ModifierTargetKind::Run,
             ModifierEffectSpec::ExperienceMultiplier { percent: 100 },
@@ -1141,7 +1141,7 @@ fn selected_modifier_definitions() -> Result<Vec<ModifierDefinition>, RunContent
 fn modifier(
     id: u64,
     key: &str,
-    tier: ModifierTier,
+    tier: impl Into<Option<ModifierTier>>,
     maximum_stack: u16,
     target: ModifierTargetKind,
     effect: ModifierEffectSpec,
@@ -1149,7 +1149,7 @@ fn modifier(
     Ok(ModifierDefinition {
         id: modifier_id(id)?,
         oracle_registry_key: key.to_owned(),
-        tier,
+        tier: tier.into(),
         maximum_stack,
         target,
         effect,

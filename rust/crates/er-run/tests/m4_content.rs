@@ -4,6 +4,7 @@ use er_run::capability::{CapabilityManifestError, selected_run_capability_manife
 use er_run::content::{RUN_CONTENT_HASH_DOMAIN, RunContentError, selected_run_content_pack};
 use er_types::battle_ids::ContentPackHash;
 use er_types::run_ids::ModifierId;
+use er_types::run_model::ModifierTier;
 
 fn battle_hash() -> Result<ContentPackHash, Box<dyn Error>> {
     Ok(ContentPackHash::new(format!(
@@ -58,6 +59,18 @@ fn selected_pack_is_typed_and_retains_numeric_holes() -> Result<(), Box<dyn Erro
         pack.modifier_by_registry_key("LOCK_CAPSULE")
             .map(|value| value.id.to_string()),
         Some("7".to_owned())
+    );
+    assert_eq!(
+        pack.modifier_by_registry_key("GOLDEN_EXP_CHARM")
+            .ok_or("Golden EXP Charm missing")?
+            .tier,
+        None
+    );
+    assert_eq!(
+        pack.modifier_by_registry_key("LOCK_CAPSULE")
+            .ok_or("Lock Capsule missing")?
+            .tier,
+        Some(ModifierTier::Rogue)
     );
     assert!(!pack.market_rules.supports_reroll);
     assert!(!RUN_CONTENT_HASH_DOMAIN.is_empty());
