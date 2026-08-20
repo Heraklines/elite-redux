@@ -2,6 +2,7 @@ import { BattleScene } from "#app/battle-scene";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { BattleStyle } from "#enums/battle-style";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { modifierTypes } from "#data/data-lists";
@@ -484,6 +485,8 @@ async function launchGame(wave: number, seed: string): Promise<GameManager> {
   (BattleScene.prototype as AnyRecord).randBattleSeedInt = productionRandBattleSeedInt;
   manager.override
     .battleStyle(BattleStyle.SET)
+    .moveset(MoveId.SPLASH)
+    .enemyMoveset(MoveId.SPLASH)
     .startingBiome(BiomeId.TOWN)
     .startingWave(wave)
     .seed(`${SEED_PREFIX}-${seed}`);
@@ -735,6 +738,7 @@ async function captureReward(seed: string): Promise<{ game: GameManager; evidenc
   const context: CaptureContext = { game, surface: "reward", reward: emptySurface() };
   activeCapture = context;
   try {
+    game.move.select(MoveId.SPLASH);
     await game.doKillOpponents();
     await driveReward(game);
     return { game, evidence: validateSurface(context.reward, "rewards/regular-reroll-lock-v1") };
@@ -753,6 +757,7 @@ async function captureMarket(seed: string): Promise<RecordValue> {
   const context: CaptureContext = { game, surface: "market", market: emptySurface() };
   activeCapture = context;
   try {
+    game.move.select(MoveId.SPLASH);
     await game.doKillOpponents();
     await driveMarket(game);
     return validateSurface(context.market, "markets/town-wave-10-v1");
