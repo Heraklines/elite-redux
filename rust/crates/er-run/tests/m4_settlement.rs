@@ -133,7 +133,7 @@ fn pokemon(
 
 fn state() -> Result<GameStateV2, Box<dyn Error>> {
     let wave = wave(1)?;
-    let battle_id = battle_id(1)?;
+    let source_battle_id = battle_id(1)?;
     let turn = turn(1)?;
     let seat_one = seat(1)?;
     let player_one = pokemon(1, Some(seat_one), false)?;
@@ -146,7 +146,7 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
     let format = BattleFormat::single();
     let battle = BattleStateV2 {
         schema_version: BATTLE_STATE_SCHEMA_VERSION_V2,
-        battle_id,
+        battle_id: source_battle_id,
         wave,
         wave_seed: "wave-seed".to_owned(),
         turn,
@@ -183,7 +183,7 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
             ],
         },
         settlement: BattleSettlementState {
-            source_battle_id: battle_id,
+            source_battle_id,
             settled: false,
             scattered_money: Money::new(safe(37)?),
             wave_reward_evidence: vec![WaveRewardEvidence {
