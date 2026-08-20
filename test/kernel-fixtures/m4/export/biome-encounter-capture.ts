@@ -35,6 +35,7 @@ import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
 import { GameManager } from "#test/framework/game-manager";
+import { PromptHandler } from "#test/helpers/prompt-handler";
 import Phaser from "phaser";
 
 export class M4CaptureGap extends Error {
@@ -634,6 +635,8 @@ async function captureLiveEncounter(): Promise<AnyRecord> {
         proto.randBattleSeedInt = originalBattleSeed;
       }
     }
+    clearInterval(PromptHandler.runInterval);
+    PromptHandler.runInterval = undefined;
     try {
       phaserGame.destroy(true);
     } catch {

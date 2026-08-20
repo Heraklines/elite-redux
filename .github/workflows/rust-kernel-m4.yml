@@ -169,8 +169,9 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
-      - name: Cache pinned BLAKE3 verifier
-        uses: actions/cache@v5
+      - name: Restore pinned BLAKE3 verifier
+        id: b3sum-cache
+        uses: actions/cache/restore@v5
         with:
           path: |
             ~/.cargo/bin/b3sum
@@ -184,6 +185,16 @@ jobs:
             cargo install b3sum --version 1.8.6 --locked
           fi
           b3sum --version | grep -Fx 'b3sum 1.8.6'
+
+      - name: Save pinned BLAKE3 verifier
+        if: steps.b3sum-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m4-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
 
       - name: Install immutable dependencies
         run: pnpm install --frozen-lockfile

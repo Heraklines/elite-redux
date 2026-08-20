@@ -11,6 +11,7 @@ import { PokemonModifierType } from "#modifiers/modifier-type";
 import { serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import Phaser from "phaser";
 import { GameManager } from "#test/framework/game-manager";
+import { PromptHandler } from "#test/helpers/prompt-handler";
 import { ModifierSelectUiHandler } from "#ui/handlers/modifier-select-ui-handler";
 import { BiomeShopUiHandler } from "#ui/handlers/biome-shop-ui-handler";
 
@@ -471,6 +472,9 @@ function ensurePhaserGame(): Phaser.Game {
 async function launchGame(wave: number, seed: string): Promise<GameManager> {
   const manager = new GameManager(ensurePhaserGame());
   if (productionRandBattleSeedInt == null) {
+    productionRandBattleSeedInt = BattleScene.prototype.randBattleSeedInt as AnyRecord["randBattleSeedInt"];
+  }
+  if (productionRandBattleSeedInt == null) {
     gap("OBSERVATION_SEAM_MISSING", "src/battle-scene.ts:BattleScene.randBattleSeedInt", "production battle RNG method was not captured");
   }
   (BattleScene.prototype as AnyRecord).randBattleSeedInt = productionRandBattleSeedInt;
@@ -780,5 +784,11 @@ export async function captureRewardMarket(): Promise<Record<string, JsonValue>> 
     return { reward: reward.evidence, market };
   } finally {
     restoreObservationHooks();
+    if (PromptHandler.runInterval != null) {
+      clearInterval(PromptHandler.runInterval);
+      PromptHandler.runInterval = undefined;
+    }
+    phaserGame?.destroy(true);
+    phaserGame = null;
   }
 }

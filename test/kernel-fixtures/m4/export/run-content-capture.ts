@@ -701,7 +701,7 @@ function selectedBiomes(slice: AnyRecord): JsonValue[] {
 
 function runCapability(manifest: AnyRecord): JsonObject {
   exact(safeInteger(manifest.schema_version, "m4_capability.schema_version"), 1, "m4_capability.schema_version");
-  exact(requireString(manifest.oracle_game_sha, "m4_capability.oracle_game_sha"), M4_ORACLE_SHA, "m4_capability.oracle_game_sha");
+  exact(requireString(manifest.m4_oracle_sha, "m4_capability.m4_oracle_sha"), M4_ORACLE_SHA, "m4_capability.m4_oracle_sha");
   const supported = requireRecord(manifest.supported, "m4_capability.supported");
   const unsupported = requireArray(manifest.unsupported, "m4_capability.unsupported").map((entry, index) => requireString(requireRecord(entry, `m4_capability.unsupported[${index}]`).code, `m4_capability.unsupported[${index}].code`));
   return {
@@ -791,7 +791,7 @@ function buildRunPack(slice: AnyRecord, battleHash: string): JsonObject {
 export async function captureRunContent(): Promise<Record<string, JsonValue>> {
   ensureLiveRegistries();
   const slice = readJson("rust/fixtures/m4/m4-slice-manifest.json");
-  exact(requireString(slice.oracle_game_sha, "m4_slice.oracle_game_sha"), M4_ORACLE_SHA, "m4_slice.oracle_game_sha");
+  exact(requireString(slice.m4_oracle_sha, "m4_slice.m4_oracle_sha"), M4_ORACLE_SHA, "m4_slice.m4_oracle_sha");
   const battleSlice = readJson("rust/fixtures/m3/m3-slice-manifest.json");
   const capability = readJson("rust/fixtures/m3/m3-capability-manifest.json");
   const species = battleSpecies(battleSlice);

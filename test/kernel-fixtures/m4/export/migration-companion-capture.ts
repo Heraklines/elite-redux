@@ -748,7 +748,7 @@ async function admitEnemyCommands(game: GameManager): Promise<void> {
 }
 
 function releaseGame(game: GameManager): void {
-  if (PromptHandler.runInterval != null) clearInterval(PromptHandler.runInterval);
+  clearInterval(PromptHandler.runInterval);
   PromptHandler.runInterval = undefined;
   game.promptHandler.clearPrompts();
   const ui = game.scene.ui as AnyRecord;

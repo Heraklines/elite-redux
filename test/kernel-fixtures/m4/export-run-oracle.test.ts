@@ -111,6 +111,7 @@ type RngMethod = (typeof RNG_METHODS)[number];
 let activeRngTrace: RngTrace | null = null;
 let rngStateReadInProgress = false;
 const restoreRngHooks: (() => void)[] = [];
+let phaserGame: Phaser.Game | null = null;
 
 function fail(vector: string, code: string, sourceSeam: string, detail: string): never {
   throw new OracleGap(vector, code, sourceSeam, detail);
@@ -529,6 +530,8 @@ describe("M4A fresh run oracle export", () => {
     if (process.platform !== "linux" || process.arch !== "x64") {
       throw new Error(`ORACLE_RUNTIME:expected hosted linux/x64, got ${process.platform}/${process.arch}`);
     }
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    installRngObservation();
   });
 
   afterAll(() => {
@@ -536,6 +539,8 @@ describe("M4A fresh run oracle export", () => {
     for (const restore of restoreRngHooks.splice(0).reverse()) {
       restore();
     }
+    phaserGame?.destroy(true);
+    phaserGame = null;
   });
 
   it("captures every required vector or fails closed with typed gaps", async () => {
@@ -576,7 +581,6 @@ describe("M4A fresh run oracle export", () => {
         ),
       );
     } else {
-      installRngObservation();
       generated.set("rng-vectors-v1.json", captureRngVectors());
     }
 
