@@ -21,9 +21,10 @@ const M2_API: &str = include_str!("../../../contracts/m2-api.md");
 const M2_OWNERSHIP: &str = include_str!("../../../contracts/m2-ownership.toml");
 const TEST_MAP_SOURCE: &str = include_str!("../../../fixtures/v1/authority-v2-test-map.json");
 
-const ORACLE_GAME_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
-const ORACLE_BRANCH: &str = "ci/coop/v2-showdown-command-coordinate-20260720";
-const PRODUCTION_TYPESCRIPT_PATHSPEC: &str = ":(glob)src/**/*.ts";
+const M3_BASE_SHA: &str = "7357166c19bdb5cf0e32c84b0f74f22e79d80798";
+const AUDITED_PRODUCTION_HEAD: &str = "a307f94ef8988ba6496f0b5e97a44a956ee2761a";
+const AUDITED_PRODUCTION_BLOBS: &str =
+    include_str!("../../../fixtures/m3/m3-audited-production-blobs.json");
 
 const SEMANTIC_BYPASS_NAMES: &[&str] = &[
     "select_command",
@@ -842,96 +843,324 @@ fn assert_no_campaign_pair_operation_semantics(code: &str, path: &Path) -> Audit
 }
 
 #[test]
-fn no_production_typescript_path_changed_since_the_oracle() -> AuditResult {
+fn m3_audited_production_surface_matches_frozen_manifest() -> AuditResult {
     let root = repository_root();
-    ensure_oracle_available(&root)?;
+    for commit in [ORACLE_GAME_SHA, M3_BASE_SHA, AUDITED_PRODUCTION_HEAD] {
+        let object = Command::new("git")
+            .current_dir(&root)
+            .args(["cat-file", "-e"])
+            .arg(format!("{commit}^{{commit}}"))
+            .output()
+            .map_err(|error| format!("probe M3 production audit commit {commit}: {error}"))?;
+        require(
+            object.status.success(),
+            format!("M3 production audit commit {commit} is unavailable"),
+        )?;
+    }
 
-    let output = Command::new("git")
+    let head = Command::new("git")
+        .current_dir(&root)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .map_err(|error| format!("resolve M3 production audit checkpoint: {error}"))?;
+    require(
+        head.status.success(),
+        format!("resolve M3 production audit checkpoint failed with {}", head.status),
+    )?;
+    let checkpoint = String::from_utf8(head.stdout)
+        .map_err(|error| format!("M3 production audit checkpoint was not UTF-8: {error}"))?;
+    let checkpoint = checkpoint.trim();
+    require(
+        checkpoint != AUDITED_PRODUCTION_HEAD,
+        "M3 production audit checkpoint must not equal the audited production head".to_owned(),
+    )?;
+
+    for (ancestor, descendant, label) in [
+        (ORACLE_GAME_SHA, M3_BASE_SHA, "oracle-to-M2-base"),
+        (
+            AUDITED_PRODUCTION_HEAD,
+            checkpoint,
+            "audited-production-head-to-checkpoint",
+        ),
+        (M3_BASE_SHA, checkpoint, "M2-base-to-checkpoint"),
+    ] {
+        let relation = Command::new("git")
+            .current_dir(&root)
+            .args(["merge-base", "--is-ancestor", ancestor, descendant])
+            .output()
+            .map_err(|error| format!("check M3 production audit ancestry {label}: {error}"))?;
+        require(
+            relation.status.success(),
+            format!("M3 production audit ancestry failed for {label}"),
+        )?;
+    }
+
+    let locked_runtime = [
+        ".nvmrc",
+        ".gitmodules",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "src",
+    ];
+    let locked_diff = Command::new("git")
+        .current_dir(&root)
+        .args(["diff", "--exit-code", ORACLE_GAME_SHA, M3_BASE_SHA, "--"])
+        .args(locked_runtime)
+        .output()
+        .map_err(|error| format!("run oracle-to-base immutable runtime audit: {error}"))?;
+    require(
+        locked_diff.status.success(),
+        format!(
+            "oracle-to-base immutable runtime surface changed: {}",
+            String::from_utf8_lossy(&locked_diff.stdout)
+        ),
+    )?;
+
+    let immutable_runtime = [
+        ".nvmrc",
+        ".gitmodules",
+        "package.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "rust/source-lock.toml",
+    ];
+    let immutable_diff = Command::new("git")
+        .current_dir(&root)
+        .args(["diff", "--exit-code", M3_BASE_SHA, checkpoint, "--"])
+        .args(immutable_runtime)
+        .output()
+        .map_err(|error| format!("run M3 immutable runtime audit: {error}"))?;
+    require(
+        immutable_diff.status.success(),
+        format!(
+            "M3 immutable runtime surface changed after the frozen base: {}",
+            String::from_utf8_lossy(&immutable_diff.stdout)
+        ),
+    )?;
+
+    let manifest: Value = serde_json::from_str(AUDITED_PRODUCTION_BLOBS)
+        .map_err(|error| format!("audited production blob manifest is not JSON: {error}"))?;
+    let manifest_object = manifest
+        .as_object()
+        .ok_or_else(|| "audited production blob manifest is not an object".to_owned())?;
+    let expected_manifest_keys = BTreeSet::from([
+        "schema_version".to_owned(),
+        "manifest_id".to_owned(),
+        "m2_base_sha".to_owned(),
+        "head_sha".to_owned(),
+        "source_root".to_owned(),
+        "path_count".to_owned(),
+        "paths".to_owned(),
+    ]);
+    let manifest_keys = manifest_object.keys().cloned().collect::<BTreeSet<_>>();
+    require(
+        manifest_keys == expected_manifest_keys,
+        format!("audited production blob manifest keys are not exact: {manifest_keys:?}"),
+    )?;
+    require(
+        manifest
+            .get("schema_version")
+            .and_then(Value::as_u64)
+            == Some(1),
+        "audited production blob manifest schema_version must be 1".to_owned(),
+    )?;
+    require(
+        manifest.get("manifest_id").and_then(Value::as_str)
+            == Some("m3-audited-production-blobs-v1"),
+        "audited production blob manifest ID is not exact".to_owned(),
+    )?;
+    require(
+        manifest.get("m2_base_sha").and_then(Value::as_str) == Some(M3_BASE_SHA),
+        "audited production blob manifest M2 base SHA is not exact".to_owned(),
+    )?;
+    require(
+        manifest.get("head_sha").and_then(Value::as_str) == Some(AUDITED_PRODUCTION_HEAD),
+        "audited production blob manifest head SHA is not exact".to_owned(),
+    )?;
+    require(
+        manifest.get("source_root").and_then(Value::as_str) == Some("src"),
+        "audited production blob manifest source root is not exact".to_owned(),
+    )?;
+    require(
+        manifest.get("path_count").and_then(Value::as_u64) == Some(41),
+        "audited production blob manifest path count must be 41".to_owned(),
+    )?;
+
+    let entries = manifest
+        .get("paths")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "audited production blob manifest paths are not an array".to_owned())?;
+    require(
+        entries.len() == 41,
+        format!(
+            "audited production blob manifest path list count is {}, expected 41",
+            entries.len()
+        ),
+    )?;
+    let expected_entry_keys = BTreeSet::from(["path".to_owned(), "blob_oid".to_owned()]);
+    let mut manifest_entries = Vec::with_capacity(entries.len());
+    for entry in entries {
+        let object = entry
+            .as_object()
+            .ok_or_else(|| format!("audited production blob entry is not an object: {entry}"))?;
+        let keys = object.keys().cloned().collect::<BTreeSet<_>>();
+        require(
+            keys == expected_entry_keys,
+            format!("audited production blob entry keys are not exact: {keys:?}"),
+        )?;
+        let path = object
+            .get("path")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "audited production blob entry path is not a string".to_owned())?;
+        require(
+            is_safe_audited_production_path(path),
+            format!("unsafe audited production source path: {path:?}"),
+        )?;
+        let blob_oid = object
+            .get("blob_oid")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "audited production blob object ID is not a string".to_owned())?;
+        require(
+            is_lower_hex_40(blob_oid),
+            format!("invalid audited production blob object ID: {blob_oid:?}"),
+        )?;
+        manifest_entries.push((path.to_owned(), blob_oid.to_owned()));
+    }
+    let paths = manifest_entries
+        .iter()
+        .map(|(path, _)| path.clone())
+        .collect::<Vec<_>>();
+    let mut unique_paths = paths.clone();
+    unique_paths.sort();
+    unique_paths.dedup();
+    require(
+        unique_paths.len() == paths.len(),
+        "audited production blob manifest contains duplicate paths".to_owned(),
+    )?;
+    require(
+        paths.windows(2).all(|pair| pair[0] < pair[1]),
+        "audited production blob manifest paths are not sorted".to_owned(),
+    )?;
+
+    let actual_diff = Command::new("git")
         .current_dir(&root)
         .args([
             "diff",
             "--name-only",
-            "--no-ext-diff",
-            ORACLE_GAME_SHA,
-            "HEAD",
+            "--no-renames",
+            M3_BASE_SHA,
+            checkpoint,
             "--",
+            "src",
         ])
-        .arg(PRODUCTION_TYPESCRIPT_PATHSPEC)
         .output()
-        .map_err(|error| format!("run oracle TypeScript diff audit: {error}"))?;
+        .map_err(|error| format!("run M3 production source path audit: {error}"))?;
     require(
-        output.status.success(),
-        format!("git oracle TypeScript diff failed with {}", output.status),
+        actual_diff.status.success(),
+        format!("M3 production source path audit failed with {}", actual_diff.status),
     )?;
-    let changed = String::from_utf8(output.stdout)
-        .map_err(|error| format!("git oracle TypeScript diff was not UTF-8: {error}"))?;
+    let actual = String::from_utf8(actual_diff.stdout)
+        .map_err(|error| format!("M3 production source path audit was not UTF-8: {error}"))?
+        .lines()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let mut sorted_actual = actual.clone();
+    sorted_actual.sort();
+    sorted_actual.dedup();
     require(
-        changed.trim().is_empty(),
-        format!("production TypeScript paths changed from oracle:\n{changed}"),
+        sorted_actual.len() == actual.len() && actual.windows(2).all(|pair| pair[0] < pair[1]),
+        "actual production src diff is not a unique sorted path set".to_owned(),
+    )?;
+    require(
+        actual == paths,
+        format!(
+            "actual M2-to-HEAD production src path set differs from the manifest: actual={actual:?} manifest={paths:?}"
+        ),
+    )?;
+
+    for (path, expected_blob) in &manifest_entries {
+        for (commit, label) in [
+            (AUDITED_PRODUCTION_HEAD, "audited production head"),
+            (checkpoint, "M3 checkpoint"),
+        ] {
+            let blob = Command::new("git")
+                .current_dir(&root)
+                .args(["rev-parse"])
+                .arg(format!("{commit}:{path}"))
+                .output()
+                .map_err(|error| {
+                    format!("resolve {label} audited production blob {path}: {error}")
+                })?;
+            require(
+                blob.status.success(),
+                format!("resolve {label} audited production blob {path} failed"),
+            )?;
+            let actual_blob = String::from_utf8(blob.stdout)
+                .map_err(|error| format!("{label} audited production blob was not UTF-8: {error}"))?;
+            require(
+                actual_blob.trim() == expected_blob,
+                format!(
+                    "{label} blob for {path} differs from the frozen manifest: {}",
+                    actual_blob.trim()
+                ),
+            )?;
+            let kind = Command::new("git")
+                .current_dir(&root)
+                .args(["cat-file", "-t", expected_blob])
+                .output()
+                .map_err(|error| format!("probe {label} blob type for {path}: {error}"))?;
+            require(
+                kind.status.success()
+                    && String::from_utf8_lossy(&kind.stdout).trim() == "blob",
+                format!("{label} object for {path} is not a blob"),
+            )?;
+        }
+    }
+
+    require(
+        gitlink_entries(&root, ORACLE_GAME_SHA)?
+            == gitlink_entries(&root, M3_BASE_SHA)?
+            && gitlink_entries(&root, M3_BASE_SHA)? == gitlink_entries(&root, checkpoint)?,
+        "production gitlinks changed across the frozen oracle/base/checkpoint chain".to_owned(),
     )?;
     Ok(())
 }
 
-fn ensure_oracle_available(root: &Path) -> AuditResult {
-    let oracle_object = Command::new("git")
+fn is_lower_hex_40(value: &str) -> bool {
+    value.len() == 40 && value.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}
+
+fn is_safe_audited_production_path(path: &str) -> bool {
+    let Some(relative) = path.strip_prefix("src/") else {
+        return false;
+    };
+    !relative.is_empty()
+        && relative.split('/').all(|component| {
+            !component.is_empty()
+                && component
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
+        })
+}
+
+fn gitlink_entries(root: &Path, commit: &str) -> Result<Vec<String>, String> {
+    let output = Command::new("git")
         .current_dir(root)
-        .args(["cat-file", "-e"])
-        .arg(format!("{ORACLE_GAME_SHA}^{{commit}}"))
+        .args(["ls-tree", "-r", commit])
         .output()
-        .map_err(|error| format!("run oracle object probe: {error}"))?;
-    if !oracle_object.status.success() {
-        let oracle_ref = format!("refs/heads/{ORACLE_BRANCH}:refs/remotes/origin/{ORACLE_BRANCH}");
-        let fetch = Command::new("git")
-            .current_dir(root)
-            .env("GIT_TERMINAL_PROMPT", "0")
-            .args([
-                "fetch",
-                "--no-tags",
-                "--depth=1",
-                "--filter=blob:none",
-                "origin",
-            ])
-            .arg(oracle_ref)
-            .output()
-            .map_err(|error| format!("fetch pinned oracle branch: {error}"))?;
-        require(
-            fetch.status.success(),
-            format!(
-                "fetch pinned oracle branch failed with {}: {}",
-                fetch.status,
-                String::from_utf8_lossy(&fetch.stderr).trim()
-            ),
-        )?;
-
-        let fetched_ref = format!("refs/remotes/origin/{ORACLE_BRANCH}");
-        let reference = Command::new("git")
-            .current_dir(root)
-            .args(["rev-parse"])
-            .arg(&fetched_ref)
-            .output()
-            .map_err(|error| format!("resolve fetched oracle branch: {error}"))?;
-        require(
-            reference.status.success(),
-            format!(
-                "resolve fetched oracle branch failed with {}: {}",
-                reference.status,
-                String::from_utf8_lossy(&reference.stderr).trim()
-            ),
-        )?;
-        let resolved_ref = String::from_utf8(reference.stdout)
-            .map_err(|error| format!("fetched oracle ref was not UTF-8: {error}"))?;
-        require(
-            resolved_ref.trim() == ORACLE_GAME_SHA,
-            format!(
-                "fetched oracle branch {ORACLE_BRANCH} resolved to {}, expected {ORACLE_GAME_SHA}",
-                resolved_ref.trim()
-            ),
-        )?;
-    }
-
-    // The pinned oracle is a tree-comparison target and need not be an ancestor of HEAD.
-    // The exact oracle object was validated above, and `git diff` compares either history.
-    Ok(())
+        .map_err(|error| format!("list gitlinks for {commit}: {error}"))?;
+    require(
+        output.status.success(),
+        format!("list gitlinks for {commit} failed with {}", output.status),
+    )?;
+    let tree = String::from_utf8(output.stdout)
+        .map_err(|error| format!("gitlinks for {commit} were not UTF-8: {error}"))?;
+    Ok(tree
+        .lines()
+        .filter(|line| line.starts_with("160000 "))
+        .map(str::to_owned)
+        .collect())
 }
 
 fn repository_root() -> PathBuf {
