@@ -191,3 +191,21 @@ test("entity rankings use dictionary names and supported battle exposures", () =
   assert.match(markdown, /Species \+ item combinations/u);
   assert.match(markdown, /Completed-run composition/u);
 });
+
+test("completed-run outcomes survive sparse final-wave outcome suppression", () => {
+  const analytics = createCombatGameplayAnalytics();
+  analytics.ingestEpisode(episode("winner", "victory", 1, "winner-source"));
+  analytics.ingestEpisode(episode("loser", "defeat", 2, "loser-source"));
+  const report = analytics.finish();
+
+  // Privacy filtering can suppress a sparse final-wave victory bucket while the
+  // mutually exclusive Tera-use strategy anchors still retain both outcomes.
+  report.tables.runOutcome = report.tables.runOutcome.filter(row => !row.outcomes?.victory);
+  const merged = mergeCombatGameplayAnalytics([report], {
+    minObservations: 1,
+    minSources: 1,
+  });
+
+  assert.equal(merged.insights.runOutcomesByDifficulty.hell.observations, 2);
+  assert.equal(merged.insights.runOutcomesByDifficulty.hell.resolvedWinRate, 0.5);
+});

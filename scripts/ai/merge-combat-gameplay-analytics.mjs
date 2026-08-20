@@ -306,6 +306,10 @@ function runContextBaselines(rows) {
   return baselines;
 }
 
+function completedRunAnchorRows(rows) {
+  return rows.filter(row => ["tera-used", "no-tera"].includes(String(row.dimensions[2] ?? "")));
+}
+
 function runAdjustedRows(rows, baselines, labeler) {
   const groups = new Map();
   for (const row of rows) {
@@ -906,7 +910,10 @@ export function mergeCombatGameplayAnalytics(
   const moveTacticRows = contextAdjustedRows(analysisTables.moveTactic ?? [], contextualBaselines, dimensions =>
     String(dimensions[6]),
   );
-  const completedRunBaselines = runContextBaselines(analysisTables.runOutcome ?? []);
+  // Every analyzed run contributes exactly one mutually exclusive Tera-use row. Unlike
+  // final-wave buckets, these rows retain sparse victories through privacy filtering.
+  const completedRunAnchors = completedRunAnchorRows(analysisTables.runStrategy ?? []);
+  const completedRunBaselines = runContextBaselines(completedRunAnchors);
   const runEntityRowsByKind = Object.fromEntries(
     ["species", "ability", "item", "roster-move", "chosen-move"].map(kind => [
       kind,
@@ -930,7 +937,7 @@ export function mergeCombatGameplayAnalytics(
   );
   const insights = {
     battleOutcomesByDifficulty: outcomeSummary(analysisTables.battleOutcome ?? [], 0),
-    runOutcomesByDifficulty: runOutcomeSummary(analysisTables.runOutcome ?? []),
+    runOutcomesByDifficulty: runOutcomeSummary(completedRunAnchors),
     behaviorByDifficulty: behaviorSummary(analysisTables),
     switchingByHp: switchByHpSummary(analysisTables.switchByHp ?? []),
     teraTiming: teraTimingSummary(analysisTables.teraChoice ?? []),
