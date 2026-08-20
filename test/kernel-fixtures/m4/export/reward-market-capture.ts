@@ -516,6 +516,30 @@ async function launchGame(wave: number, seed: string): Promise<GameManager> {
   return manager;
 }
 
+function releaseGame(game: GameManager | null): void {
+  if (PromptHandler.runInterval != null) {
+    clearInterval(PromptHandler.runInterval);
+    PromptHandler.runInterval = undefined;
+  }
+  if (game == null) {
+    return;
+  }
+  game.promptHandler.clearPrompts();
+  game.scene.phaseManager.clearAllPhases();
+  const ui = game.scene.ui as AnyRecord;
+  const handler = typeof ui.getHandler === "function" ? (ui.getHandler() as AnyRecord | undefined) : undefined;
+  if (typeof handler?.clear === "function") {
+    handler.clear();
+  }
+  if (typeof ui.resetModeChain === "function") {
+    ui.resetModeChain();
+  }
+  const setModeInternal = ui.setModeInternal;
+  if (typeof setModeInternal?.mockRestore === "function") {
+    setModeInternal.mockRestore();
+  }
+}
+
 function addLockCapsule(game: GameManager): void {
   const factory = (modifierTypes as AnyRecord).LOCK_CAPSULE;
   if (typeof factory !== "function") {
@@ -936,47 +960,50 @@ function validateSurface(surface: SurfaceCapture | undefined, vector: string): R
   };
 }
 
-async function captureReward(seed: string): Promise<{ game: GameManager; evidence: RecordValue }> {
-  const game = await launchGame(9, seed);
-  installObservationHooks();
-  addLockCapsule(game);
-  const context: CaptureContext = { game, surface: "reward", reward: emptySurface() };
-  activeCapture = context;
+async function captureReward(seed: string): Promise<RecordValue> {
+  let game: GameManager | null = null;
   try {
-    game.move.select(MoveId.SPLASH);
-    await game.doKillOpponents();
-    await game.phaseInterceptor.to("SelectModifierPhase");
-    await driveReward(game);
-    return { game, evidence: validateSurface(context.reward, "rewards/regular-reroll-lock-v1") };
-  } catch (error) {
-    if (error instanceof M4CaptureGap && error.code === "REWARD_TARGET_OPTION_UNOBSERVABLE") {
-      throw error;
-    }
-    throw error;
+    game = await launchGame(9, seed);
+    const liveGame = game;
+    installObservationHooks();
+    addLockCapsule(liveGame);
+    const context: CaptureContext = { game: liveGame, surface: "reward", reward: emptySurface() };
+    activeCapture = context;
+    liveGame.move.select(MoveId.SPLASH);
+    await liveGame.doKillOpponents();
+    await liveGame.phaseInterceptor.to("SelectModifierPhase");
+    await driveReward(liveGame);
+    const evidence = validateSurface(context.reward, "rewards/regular-reroll-lock-v1");
+    return evidence;
   } finally {
     activeCapture = null;
+    releaseGame(game);
   }
 }
 
 async function captureMarket(seed: string): Promise<RecordValue> {
-  const game = await launchGame(10, seed);
-  const context: CaptureContext = { game, surface: "market", market: emptySurface() };
-  activeCapture = context;
+  let game: GameManager | null = null;
   try {
-    game.move.select(MoveId.SPLASH);
-    await game.doKillOpponents();
-    await game.phaseInterceptor.to("BiomeShopPhase");
-    await driveMarket(game);
-    return validateSurface(context.market, "markets/town-wave-10-v1");
+    game = await launchGame(10, seed);
+    const liveGame = game;
+    const context: CaptureContext = { game: liveGame, surface: "market", market: emptySurface() };
+    activeCapture = context;
+    liveGame.move.select(MoveId.SPLASH);
+    await liveGame.doKillOpponents();
+    await liveGame.phaseInterceptor.to("BiomeShopPhase");
+    await driveMarket(liveGame);
+    const evidence = validateSurface(context.market, "markets/town-wave-10-v1");
+    return evidence;
   } finally {
     activeCapture = null;
+    releaseGame(game);
   }
 }
 
 /** Capture regular wave-9 reward and Town wave-10 market from real production phases. */
 export async function captureRewardMarket(): Promise<Record<string, JsonValue>> {
   try {
-    let reward: { game: GameManager; evidence: RecordValue } | null = null;
+    let reward: RecordValue | null = null;
     let rewardGap: M4CaptureGap | null = null;
     for (let attempt = 0; attempt < MAX_SEED_ATTEMPTS && reward == null; attempt++) {
       try {
@@ -997,13 +1024,10 @@ export async function captureRewardMarket(): Promise<Record<string, JsonValue>> 
       );
     }
     const market = await captureMarket(String(0));
-    return { reward: reward.evidence, market };
+    return { reward, market };
   } finally {
     restoreObservationHooks();
-    if (PromptHandler.runInterval != null) {
-      clearInterval(PromptHandler.runInterval);
-      PromptHandler.runInterval = undefined;
-    }
+    releaseGame(null);
     phaserGame?.destroy(true);
     phaserGame = null;
   }
