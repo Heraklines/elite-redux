@@ -4,7 +4,7 @@
 //! presenter, storage, clock, and fault representations; only the endpoint
 //! root is upgraded to the M4 GameStateV2 endpoint and V3 validation boundary.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 
 use er_types::battle_ids::CanonicalHexBytes;
