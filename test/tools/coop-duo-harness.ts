@@ -2099,13 +2099,18 @@ function resolveCanonicalLocalCommandFields(
         + `${control?.kind ?? "missing"} at ${battle.waveIndex}:${battle.turn}`,
     );
   }
-  if (control.wave !== battle.waveIndex || control.turn !== battle.turn) {
+  const commandControl = control as typeof control & {
+    readonly kind: "COMMAND_FRONTIER";
+    readonly wave: number;
+    readonly turn: number;
+  };
+  if (commandControl.wave !== battle.waveIndex || commandControl.turn !== battle.turn) {
     throw new Error(
       `${label} cannot resolve local command targets: frontier address `
-        + `${control.wave}:${control.turn} != scene ${battle.waveIndex}:${battle.turn}`,
+        + `${commandControl.wave}:${commandControl.turn} != scene ${battle.waveIndex}:${battle.turn}`,
     );
   }
-  const localCommands = commandTargetsOwnedBySeat(control, localRuntime.controller.localSeatId);
+  const localCommands = commandTargetsOwnedBySeat(commandControl, localRuntime.controller.localSeatId);
   const playerField = scene.getPlayerField();
   return localCommands.map(command => {
     const localFieldIndex = playerField.findIndex(pokemon => pokemon?.id === command.pokemonId);
@@ -2923,7 +2928,6 @@ export async function buildDuo(
   const adoptedPrePairCommand = await withClient(hostCtx, () => adoptAlreadyOpenHostCommandBoundary(hostScene));
   if (adoptedPrePairCommand) {
     await withClient(guestCtx, async () => {
-      await drainLoopback();
       // The initial guest command is selected from the host-stated frontier, not from the launch layout.
       // This matters when a battle starts with only the host seat materialized (classic final-boss stage
       // one): an absent guest-owned command is a real control state, not a missing field to fabricate.
@@ -5611,6 +5615,7 @@ export async function buildShowdownDuo(
         battle.battleType,
         authoritativeState,
         captureCoopEncounterAuthority(battle),
+        [],
       );
       beginCoopRecording(battle.turn, `${hostRuntime.controller.sessionEpoch}:${battle.waveIndex}`);
       await drainLoopback();
@@ -5631,7 +5636,6 @@ export async function buildShowdownDuo(
   // hang that no real paired browser should be able to bypass. Real-launch tests subsequently replace this
   // mirrored state and phase queue with the serialized launch snapshot, exactly like a fresh browser boot.
   await withClient(guestCtx, async () => {
-    await drainLoopback();
     await materializeMirroredShowdownGuestCommandFrontier(guestScene, guestRuntime, hostRuntime);
     const guestBattle = guestScene.currentBattle;
     if (guestBattle == null) {

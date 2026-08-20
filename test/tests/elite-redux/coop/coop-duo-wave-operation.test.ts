@@ -1293,17 +1293,31 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
       logs.flush();
       return;
     }
-    if (parked.entry.kind !== "WAVE_ADVANCE" && parked.entry.kind !== "TERMINAL_COMMIT") {
+    const changedEntry =
+      parked.entry.kind === "WAVE_ADVANCE"
+        ? {
+            ...parked.entry,
+            kind: "WAVE_ADVANCE" as const,
+            context: {
+              ...parked.entry.context,
+              connectionGeneration: parked.entry.context.connectionGeneration + 1,
+            },
+            subsumes: [...parked.entry.subsumes, parked.entry.revision],
+          }
+        : parked.entry.kind === "TERMINAL_COMMIT"
+          ? {
+              ...parked.entry,
+              kind: "TERMINAL_COMMIT" as const,
+              context: {
+                ...parked.entry.context,
+                connectionGeneration: parked.entry.context.connectionGeneration + 1,
+              },
+              subsumes: [...parked.entry.subsumes, parked.entry.revision],
+            }
+          : null;
+    if (changedEntry == null) {
       throw new Error(`deferred wave boundary retained unexpected ${parked.entry.kind} entry`);
     }
-    const changedEntry = {
-      ...parked.entry,
-      context: {
-        ...parked.entry.context,
-        connectionGeneration: parked.entry.context.connectionGeneration + 1,
-      },
-      subsumes: [...parked.entry.subsumes, parked.entry.revision],
-    };
     vi.spyOn(cutover, "retryDeferredHostBoundaryDetailed").mockReturnValue({
       kind: "committed",
       entry: changedEntry,
