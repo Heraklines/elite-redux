@@ -11,6 +11,7 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
@@ -18,6 +19,15 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const TEST_PATH = "test/kernel-fixtures/m4/export-run-oracle.test.ts";
+const HELPER_TEST_PATH = "test/kernel-fixtures/m4/export-helper-runner.test.ts";
+const HELPER_OUTPUT_FILES = {
+  content: "content.json",
+  "reward-market": "reward-market.json",
+  progression: "progression.json",
+  "biome-encounter": "biome-encounter.json",
+  migration: "migration.json",
+};
+const HELPER_KINDS = Object.keys(HELPER_OUTPUT_FILES);
 const MANIFEST_PATH = "rust/fixtures/m4/m4-oracle-manifest.json";
 const ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
 
@@ -200,7 +210,18 @@ function verifyCanonicalFiles(root, expected) {
   return actual;
 }
 
-function runVitest(outputRoot, run, exporterCommitSha) {
+function childDiagnostic(result) {
+  if (result.error) {
+    return result.error.message;
+  }
+  const diagnostic = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/u).slice(-300).join("\n").trim();
+  if (result.signal) {
+    return `${diagnostic}\nterminated by ${result.signal}`.trim();
+  }
+  return diagnostic.length > 0 ? diagnostic : `exited with status ${result.status}`;
+}
+
+function runVitest(testPath, environment) {
   const vitestEntry = resolve(REPO_ROOT, "node_modules/vitest/vitest.mjs");
   if (!existsSync(vitestEntry)) {
     fail("node_modules/vitest/vitest.mjs is missing; install the pinned dependencies before exporting");
@@ -213,14 +234,12 @@ function runVitest(outputRoot, run, exporterCommitSha) {
     LANGUAGE: "C",
     LC_NUMERIC: "C",
     TZ: "UTC",
-    M4_ORACLE_OUTPUT_ROOT: outputRoot,
     M4_ORACLE_SHA: ORACLE_SHA,
-    M4_ORACLE_EXPORTER_SHA: exporterCommitSha,
-    M4_ORACLE_PROCESS: String(run),
+    ...environment,
   };
   const result = spawnSync(
     process.execPath,
-    [vitestEntry, "run", TEST_PATH, "--reporter=default", "--pool=forks", "--maxWorkers=1", "--no-file-parallelism"],
+    [vitestEntry, "run", testPath, "--reporter=default", "--pool=forks", "--maxWorkers=1", "--no-file-parallelism"],
     {
       cwd: REPO_ROOT,
       env,
@@ -229,29 +248,80 @@ function runVitest(outputRoot, run, exporterCommitSha) {
       stdio: ["ignore", "pipe", "pipe"],
     },
   );
-  if (result.error) {
-    fail(`Vitest exporter process failed to start: ${result.error.message}`);
-  }
-  if (result.status !== 0) {
-    const diagnostic = `${result.stdout ?? ""}\n${result.stderr ?? ""}`.split(/\r?\n/u).slice(-300).join("\n").trim();
-    if (diagnostic.length > 0) {
-      process.stderr.write(`${diagnostic}\n`);
+  return {
+    ok: result.error == null && result.status === 0 && result.signal == null,
+    status: result.status,
+    signal: result.signal,
+    diagnostic: childDiagnostic(result),
+  };
+}
+
+function writeCanonicalFile(path, value) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, canonicalBytes(value));
+}
+
+function writeProcessGap(outputPath, kind, detail) {
+  writeCanonicalFile(outputPath, {
+    m4_capture_gap: {
+      code: "CAPTURE_PROCESS_FAILED",
+      source_seam: `scripts/export-kernel-m4-oracle.mjs:${kind}`,
+      message: detail,
+    },
+  });
+}
+
+function runPass(outputRoot, rawRoot, run, exporterCommitSha) {
+  mkdirSync(outputRoot, { recursive: true });
+  mkdirSync(rawRoot, { recursive: true });
+  const failures = [];
+  for (const kind of HELPER_KINDS) {
+    const outputPath = resolve(rawRoot, HELPER_OUTPUT_FILES[kind]);
+    const result = runVitest(HELPER_TEST_PATH, {
+      M4_CAPTURE_KIND: kind,
+      M4_CAPTURE_OUTPUT: outputPath,
+      M4_ORACLE_EXPORTER_SHA: exporterCommitSha,
+      M4_ORACLE_PROCESS: String(run),
+    });
+    if (!existsSync(outputPath)) {
+      writeProcessGap(outputPath, kind, result.diagnostic);
     }
-    process.exitCode = result.status ?? 1;
-    throw new Error(`Vitest exporter process failed with status ${result.status}`);
+    if (!result.ok) {
+      failures.push(`helper ${kind}: ${result.diagnostic}`);
+    }
   }
-  if (result.signal) {
-    process.exitCode = 1;
-    throw new Error(`Vitest exporter process terminated by ${result.signal}`);
+  const composition = runVitest(TEST_PATH, {
+    M4_ORACLE_OUTPUT_ROOT: outputRoot,
+    M4_ORACLE_RAW_ROOT: rawRoot,
+    M4_ORACLE_GAP_REPORT: resolve(rawRoot, "gap-report.json"),
+    M4_ORACLE_EXPORTER_SHA: exporterCommitSha,
+    M4_ORACLE_PROCESS: String(run),
+  });
+  if (!composition.ok) {
+    failures.push(`composition pass ${run}: ${composition.diagnostic}`);
   }
+  return failures;
+}
+
+function firstByteDivergence(left, right) {
+  const length = Math.min(left.length, right.length);
+  for (let offset = 0; offset < length; offset += 1) {
+    if (left[offset] !== right[offset]) {
+      return offset;
+    }
+  }
+  return left.length === right.length ? null : length;
 }
 
 function compareTrees(left, right, expected) {
   for (const relativePath of expected) {
     const leftBytes = readFileSync(resolve(left, relativePath));
     const rightBytes = readFileSync(resolve(right, relativePath));
-    if (!leftBytes.equals(rightBytes)) {
-      fail(`fresh-process output differs at ${relativePath}`);
+    const offset = firstByteDivergence(leftBytes, rightBytes);
+    if (offset !== null) {
+      const leftByte = offset < leftBytes.length ? `0x${leftBytes[offset].toString(16).padStart(2, "0")}` : "EOF";
+      const rightByte = offset < rightBytes.length ? `0x${rightBytes[offset].toString(16).padStart(2, "0")}` : "EOF";
+      fail(`fresh-process output differs at ${relativePath}, first byte ${offset}: ${leftByte} != ${rightByte}`);
     }
   }
 }
@@ -264,12 +334,25 @@ const commitSha = exporterSha();
 const tempRoot = mkdtempSync(join(process.env.RUNNER_TEMP ?? process.env.TMPDIR ?? "/tmp", "pokerogue-m4-oracle-"));
 const first = join(tempRoot, "first");
 const second = join(tempRoot, "second");
+const firstRaw = join(tempRoot, "first-raw");
+const secondRaw = join(tempRoot, "second-raw");
 mkdirSync(first);
 mkdirSync(second);
+mkdirSync(firstRaw);
+mkdirSync(secondRaw);
 try {
-  runVitest(first, 1, commitSha);
+  const firstFailures = runPass(first, firstRaw, 1, commitSha);
+  const secondFailures = runPass(second, secondRaw, 2, commitSha);
+  const failures = [...firstFailures, ...secondFailures];
+  if (failures.length > 0) {
+    process.stderr.write(`${failures.join("\n")}\n`);
+    const finalStatus = gitStatus();
+    if (finalStatus !== initialStatus) {
+      fail(`export changed the checkout; initial=${JSON.stringify(initialStatus)} final=${JSON.stringify(finalStatus)}`);
+    }
+    fail(`M4A exporter child process failures:\n${failures.join("\n")}`);
+  }
   verifyCanonicalFiles(first, expected);
-  runVitest(second, 2, commitSha);
   verifyCanonicalFiles(second, expected);
   compareTrees(first, second, expected);
   cpSync(first, outputRoot, { recursive: true });

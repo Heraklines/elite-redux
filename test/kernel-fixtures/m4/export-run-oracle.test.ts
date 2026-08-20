@@ -1,25 +1,20 @@
 /*
  * M4A test-only oracle exporter.
  *
- * This module is deliberately a capture harness, not a mechanics implementation.
- * It observes the pinned TypeScript runtime and refuses publication when a
- * required value is behind a callback, renderer, asset, or unavailable live
- * fixture seam. No fixture is synthesized from a contract manifest or from an
- * M3 JSON byte stream.
+ * This module is deliberately a composition harness, not a mechanics
+ * implementation. It reads canonical raw helper output from isolated Vitest
+ * processes, validates the pinned runtime envelope, and refuses publication
+ * when a required value is behind an unavailable live fixture seam. No
+ * fixture is synthesized from a contract manifest or from an M3 JSON stream.
  */
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Phaser from "phaser";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { captureBiomeEncounter } from "./export/biome-encounter-capture";
-import { captureMigrationCompanions } from "./export/migration-companion-capture";
-import { captureProgression } from "./export/progression-capture";
-import { captureRunContent } from "./export/run-content-capture";
-import { captureRewardMarket } from "./export/reward-market-capture";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
@@ -456,32 +451,6 @@ function collectGap(capture: () => never, gaps: OracleGap[]): void {
   }
 }
 
-async function collectLiveCapture(
-  vector: string,
-  capture: () => Promise<Record<string, unknown>>,
-  gaps: OracleGap[],
-): Promise<JsonObject | null> {
-  try {
-    return canonicalValue(await capture(), vector) as JsonObject;
-  } catch (error) {
-    if (
-      error instanceof Error
-      && typeof (error as AnyRecord).code === "string"
-      && typeof (error as AnyRecord).sourceSeam === "string"
-    ) {
-      gaps.push(
-        new OracleGap(
-          vector,
-          String((error as AnyRecord).code),
-          String((error as AnyRecord).sourceSeam),
-          error.message,
-        ),
-      );
-      return null;
-    }
-    throw error;
-  }
-}
 
 function envelopeFromCapture(
   fixtureId: string,
@@ -521,6 +490,98 @@ function envelopeFromCapture(
   });
 }
 
+const RAW_CAPTURE_FILES = {
+  content: "content.json",
+  "reward-market": "reward-market.json",
+  progression: "progression.json",
+  "biome-encounter": "biome-encounter.json",
+  migration: "migration.json",
+} as const;
+
+type CaptureKind = keyof typeof RAW_CAPTURE_FILES;
+
+function rawRoot(): string {
+  const value = process.env.M4_ORACLE_RAW_ROOT;
+  if (typeof value !== "string" || value.length === 0 || !isAbsolute(value)) {
+    throw new Error("EXPORT_CONFIGURATION:M4_ORACLE_RAW_ROOT must be an absolute directory");
+  }
+  return resolve(value);
+}
+
+function rawCapture(
+  kind: CaptureKind,
+  vector: string,
+  gaps: OracleGap[],
+): JsonObject | null {
+  const path = resolve(rawRoot(), RAW_CAPTURE_FILES[kind]);
+  if (!existsSync(path)) {
+    gaps.push(new OracleGap(vector, "CAPTURE_OUTPUT_MISSING", `M4_CAPTURE_OUTPUT:${kind}`, `raw helper output is missing at ${path}`));
+    return null;
+  }
+  try {
+    const bytes = readFileSync(path);
+    const parsed = JSON.parse(bytes.toString("utf8")) as AnyRecord;
+    if (!bytes.equals(canonicalBytes(parsed))) {
+      gaps.push(new OracleGap(vector, "CAPTURE_OUTPUT_NONCANONICAL", `M4_CAPTURE_OUTPUT:${kind}`, `raw helper output is not canonical at ${path}`));
+      return null;
+    }
+    if (parsed == null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      gaps.push(new OracleGap(vector, "CAPTURE_OUTPUT_SHAPE_INVALID", `M4_CAPTURE_OUTPUT:${kind}`, `raw helper output is not an object at ${path}`));
+      return null;
+    }
+    const gap = parsed.m4_capture_gap;
+    if (gap != null) {
+      if (
+        typeof gap !== "object"
+        || Array.isArray(gap)
+        || typeof (gap as AnyRecord).code !== "string"
+        || typeof (gap as AnyRecord).source_seam !== "string"
+        || typeof (gap as AnyRecord).message !== "string"
+      ) {
+        gaps.push(new OracleGap(vector, "CAPTURE_GAP_INVALID", `M4_CAPTURE_OUTPUT:${kind}`, `typed gap is malformed at ${path}`));
+      } else {
+        gaps.push(
+          new OracleGap(
+            vector,
+            String((gap as AnyRecord).code),
+            String((gap as AnyRecord).source_seam),
+            String((gap as AnyRecord).message),
+          ),
+        );
+      }
+      return null;
+    }
+    return parsed;
+  } catch (error) {
+    gaps.push(
+      new OracleGap(
+        vector,
+        "CAPTURE_OUTPUT_INVALID",
+        `M4_CAPTURE_OUTPUT:${kind}`,
+        error instanceof Error ? error.message : String(error),
+      ),
+    );
+    return null;
+  }
+}
+
+function captureShape(
+  value: JsonObject,
+  vector: string,
+  sourceSeam: string,
+  keys: readonly string[],
+  gaps: OracleGap[],
+): boolean {
+  for (const key of keys) {
+    const entry = value[key];
+    if (entry == null || typeof entry !== "object" || Array.isArray(entry)) {
+      gaps.push(new OracleGap(vector, "CAPTURE_SHAPE_INVALID", sourceSeam, `helper output is missing record ${key}`));
+      return false;
+    }
+  }
+  return true;
+}
+
 describe("M4A fresh run oracle export", () => {
   beforeAll(() => {
     if (process.env.M4_ORACLE_SHA !== M4_ORACLE_SHA) {
@@ -529,130 +590,79 @@ describe("M4A fresh run oracle export", () => {
     if (process.platform !== "linux" || process.arch !== "x64") {
       throw new Error(`ORACLE_RUNTIME:expected hosted linux/x64, got ${process.platform}/${process.arch}`);
     }
-    if (Phaser.Math.RND == null) {
-      (Phaser.Math as AnyRecord).RND = new Phaser.Math.RandomDataGenerator();
-    }
-    installRngObservation();
-  });
 
-  afterAll(() => {
-    activeRngTrace = null;
-    for (const restore of restoreRngHooks.splice(0).reverse()) {
-      restore();
-    }
   });
-
-  it("captures every required vector or fails closed with typed gaps", async () => {
+  it("composes raw helper outputs or fails closed with typed gaps", () => {
     const gaps: OracleGap[] = [];
     const generated = new Map<string, JsonObject>();
 
-    const contentPacks = await collectLiveCapture("content-packs", captureRunContent, gaps);
-    if (contentPacks != null) {
-      if (
-        contentPacks.battle_content_pack == null
-        || typeof contentPacks.battle_content_pack !== "object"
-        || Array.isArray(contentPacks.battle_content_pack)
-        || contentPacks.run_content_pack == null
-        || typeof contentPacks.run_content_pack !== "object"
-        || Array.isArray(contentPacks.run_content_pack)
-      ) {
-        gaps.push(
-          new OracleGap(
-            "content-packs",
-            "CAPTURE_SHAPE_INVALID",
-            "test/kernel-fixtures/m4/export/run-content-capture.ts:captureRunContent",
-            "helper did not return separate battle and run content packs",
-          ),
-        );
-      } else {
-        generated.set("battle-content-pack-v1.json", contentPacks.battle_content_pack as JsonObject);
-        generated.set("run-content-pack-v1.json", contentPacks.run_content_pack as JsonObject);
-      }
+    const contentPacks = rawCapture("content", "content-packs", gaps);
+    if (contentPacks != null && captureShape(
+      contentPacks,
+      "content-packs",
+      "test/kernel-fixtures/m4/export/run-content-capture.ts:captureRunContent",
+      ["battle_content_pack", "run_content_pack"],
+      gaps,
+    )) {
+      generated.set("battle-content-pack-v1.json", contentPacks.battle_content_pack as JsonObject);
+      generated.set("run-content-pack-v1.json", contentPacks.run_content_pack as JsonObject);
     }
 
-    if (Phaser.Math.RND == null) {
+    try {
+      generated.set("rng-vectors-v1.json", captureRngVectors());
+    } catch (error) {
       gaps.push(
         new OracleGap(
-          "instrumentation",
-          "GLOBAL_RNG_UNINITIALIZED",
-          "src/init/init.ts:initializeGame",
-          "content initialization did not install Phaser.Math.RND",
+          "rng-vectors",
+          "RNG_CAPTURE_FAILED",
+          "test/kernel-fixtures/m4/export-run-oracle.test.ts:captureRngVectors",
+          error instanceof Error ? error.message : String(error),
         ),
       );
-    } else {
-      generated.set("rng-vectors-v1.json", captureRngVectors());
     }
 
-
-    const rewardMarket = await collectLiveCapture(
+    const rewardMarket = rawCapture(
+      "reward-market",
       "rewards/regular-reroll-lock-v1+markets/town-wave-10-v1",
-      captureRewardMarket,
       gaps,
     );
-    if (rewardMarket != null) {
-      if (
-        rewardMarket.reward == null
-        || typeof rewardMarket.reward !== "object"
-        || Array.isArray(rewardMarket.reward)
-        || rewardMarket.market == null
-        || typeof rewardMarket.market !== "object"
-        || Array.isArray(rewardMarket.market)
-      ) {
-        gaps.push(
-          new OracleGap(
-            "rewards/regular-reroll-lock-v1+markets/town-wave-10-v1",
-            "CAPTURE_SHAPE_INVALID",
-            "test/kernel-fixtures/m4/export/reward-market-capture.ts:captureRewardMarket",
-            "helper did not return separate reward and market records",
-          ),
-        );
-      } else {
-        generated.set("rewards/regular-reroll-lock-v1.json", rewardMarket.reward as JsonObject);
-        generated.set("markets/town-wave-10-v1.json", rewardMarket.market as JsonObject);
-      }
+    if (rewardMarket != null && captureShape(
+      rewardMarket,
+      "rewards/regular-reroll-lock-v1+markets/town-wave-10-v1",
+      "test/kernel-fixtures/m4/export/reward-market-capture.ts:captureRewardMarket",
+      ["reward", "market"],
+      gaps,
+    )) {
+      generated.set("rewards/regular-reroll-lock-v1.json", rewardMarket.reward as JsonObject);
+      generated.set("markets/town-wave-10-v1.json", rewardMarket.market as JsonObject);
     }
 
-    const progression = await collectLiveCapture(
+    const progression = rawCapture(
+      "progression",
       "progression/nacli-medium-slow-level-17-v1",
-      captureProgression,
       gaps,
     );
     if (progression != null) {
       generated.set("progression/nacli-medium-slow-level-17-v1.json", progression);
     }
-    const biomeEncounter = await collectLiveCapture(
+
+    const biomeEncounter = rawCapture(
+      "biome-encounter",
       "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
-      captureBiomeEncounter,
       gaps,
     );
-    if (biomeEncounter != null) {
-      if (
-        biomeEncounter.biome == null
-        || typeof biomeEncounter.biome !== "object"
-        || Array.isArray(biomeEncounter.biome)
-        || biomeEncounter.encounter == null
-        || typeof biomeEncounter.encounter !== "object"
-        || Array.isArray(biomeEncounter.encounter)
-      ) {
-        gaps.push(
-          new OracleGap(
-            "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
-            "CAPTURE_SHAPE_INVALID",
-            "test/kernel-fixtures/m4/export/biome-encounter-capture.ts:captureBiomeEncounter",
-            "helper did not return separate biome and encounter records",
-          ),
-        );
-      } else {
-        generated.set("biomes/town-crossroads-route-v1.json", biomeEncounter.biome as JsonObject);
-        generated.set("encounters/plains-wave-11-captured-v1.json", biomeEncounter.encounter as JsonObject);
-      }
+    if (biomeEncounter != null && captureShape(
+      biomeEncounter,
+      "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
+      "test/kernel-fixtures/m4/export/biome-encounter-capture.ts:captureBiomeEncounter",
+      ["biome", "encounter"],
+      gaps,
+    )) {
+      generated.set("biomes/town-crossroads-route-v1.json", biomeEncounter.biome as JsonObject);
+      generated.set("encounters/plains-wave-11-captured-v1.json", biomeEncounter.encounter as JsonObject);
     }
 
-    const migration = await collectLiveCapture(
-      "migration/m3-to-m4-companions-v1",
-      captureMigrationCompanions,
-      gaps,
-    );
+    const migration = rawCapture("migration", "migration/m3-to-m4-companions-v1", gaps);
     if (migration != null) {
       generated.set("migration/m3-to-m4-companions-v1.json", migration);
     }
@@ -677,12 +687,13 @@ describe("M4A fresh run oracle export", () => {
       throw new Error(gaps.map(gap => gap.message).join("\n"));
     }
 
-    const battlePack = generated.get("battle-content-pack-v1.json") as AnyRecord | undefined;
+    const battlePack = generated.get("battle-content-pack-v1.json");
     const battleHash = String(battlePack?.hash ?? "");
-    const runPack = generated.get("run-content-pack-v1.json") as AnyRecord | undefined;
+    const runPack = generated.get("run-content-pack-v1.json");
     const runHash = String(runPack?.run_content_hash ?? "");
     const sharedProvenance = provenance(battleHash, runHash);
     const root = outputRoot();
+    mkdirSync(root, { recursive: true });
     for (const [path, value] of generated) {
       if (
         path === "rng-vectors-v1.json"
