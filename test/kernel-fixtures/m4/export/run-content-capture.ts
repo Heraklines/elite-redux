@@ -921,9 +921,9 @@ function selectedBiomes(slice: AnyRecord): JsonValue[] {
   const expected: Record<number, { key: string; routes: number[] }> = {
     0: { key: "TOWN", routes: [1] },
     1: { key: "PLAINS", routes: [2, 4, 9] },
-    2: { key: "GRASS", routes: [] },
-    4: { key: "METROPOLIS", routes: [] },
-    9: { key: "LAKE", routes: [] },
+    2: { key: "GRASS", routes: [3] },
+    4: { key: "METROPOLIS", routes: [30] },
+    9: { key: "LAKE", routes: [8, 7, 26] },
     50: { key: "END", routes: [] },
   };
   const slots: JsonValue[] = Array.from({ length: 51 }, () => null);

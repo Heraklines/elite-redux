@@ -990,7 +990,7 @@ async function captureMarket(seed: string): Promise<RecordValue> {
     activeCapture = context;
     liveGame.move.select(MoveId.SPLASH);
     await liveGame.doKillOpponents();
-    await liveGame.phaseInterceptor.to("BiomeShopPhase");
+    await awaitMarketPhase(liveGame);
     await driveMarket(liveGame);
     const evidence = validateSurface(context.market, "markets/town-wave-10-v1");
     return evidence;

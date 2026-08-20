@@ -898,17 +898,17 @@ pub fn selected_run_content_pack(
     biomes[2] = Some(BiomeDefinition {
         id: biome_id(2)?,
         key: "GRASS".to_owned(),
-        base_routes: Vec::new(),
+        base_routes: vec![biome_id(3)?],
     });
     biomes[4] = Some(BiomeDefinition {
         id: biome_id(4)?,
         key: "METROPOLIS".to_owned(),
-        base_routes: Vec::new(),
+        base_routes: vec![biome_id(30)?],
     });
     biomes[9] = Some(BiomeDefinition {
         id: biome_id(9)?,
         key: "LAKE".to_owned(),
-        base_routes: Vec::new(),
+        base_routes: vec![biome_id(8)?, biome_id(7)?, biome_id(26)?],
     });
     biomes[50] = Some(BiomeDefinition {
         id: biome_id(50)?,

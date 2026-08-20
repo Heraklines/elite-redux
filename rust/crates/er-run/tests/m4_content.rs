@@ -56,6 +56,36 @@ fn selected_pack_is_typed_and_retains_numeric_holes() -> Result<(), Box<dyn Erro
         vec!["1", "52", "77", "78"]
     );
     assert_eq!(
+        pack.biomes[2]
+            .as_ref()
+            .ok_or("Grass biome missing")?
+            .base_routes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["3"]
+    );
+    assert_eq!(
+        pack.biomes[4]
+            .as_ref()
+            .ok_or("Metropolis biome missing")?
+            .base_routes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["30"]
+    );
+    assert_eq!(
+        pack.biomes[9]
+            .as_ref()
+            .ok_or("Lake biome missing")?
+            .base_routes
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        vec!["8", "7", "26"]
+    );
+    assert_eq!(
         pack.modifier_by_registry_key("LOCK_CAPSULE")
             .map(|value| value.id.to_string()),
         Some("7".to_owned())
