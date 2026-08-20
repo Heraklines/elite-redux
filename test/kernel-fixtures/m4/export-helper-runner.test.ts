@@ -13,7 +13,7 @@ import { describe, it } from "vitest";
 
 type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
 type AnyRecord = Record<string, unknown>;
-type CaptureKind = "content" | "reward-market" | "progression" | "biome-encounter" | "migration";
+type CaptureKind = "content" | "reward-market" | "progression" | "biome-encounter" | "migration" | "composed";
 type CaptureModule = { [exportName: string]: unknown };
 
 const CAPTURES: Readonly<Record<CaptureKind, { module: string; exportName: string }>> = {
@@ -22,6 +22,7 @@ const CAPTURES: Readonly<Record<CaptureKind, { module: string; exportName: strin
   progression: { module: "./export/progression-capture", exportName: "captureProgression" },
   "biome-encounter": { module: "./export/biome-encounter-capture", exportName: "captureBiomeEncounter" },
   migration: { module: "./export/migration-companion-capture", exportName: "captureMigrationCompanions" },
+  composed: { module: "./export/composed-capture", exportName: "captureComposedSegment" },
 };
 
 function canonicalValue(value: unknown, path = "$"): JsonValue {

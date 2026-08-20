@@ -26,6 +26,7 @@ const HELPER_OUTPUT_FILES = {
   progression: "progression.json",
   "biome-encounter": "biome-encounter.json",
   migration: "migration.json",
+  composed: "composed.json",
 };
 const HELPER_KINDS = Object.keys(HELPER_OUTPUT_FILES);
 const MANIFEST_PATH = "rust/fixtures/m4/m4-oracle-manifest.json";
@@ -271,6 +272,47 @@ function writeProcessGap(outputPath, kind, detail) {
   });
 }
 
+function contentHashes(rawRoot) {
+  const path = resolve(rawRoot, HELPER_OUTPUT_FILES.content);
+  if (!existsSync(path)) {
+    return { error: "content helper output is missing" };
+  }
+  try {
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    const battle = value?.battle_content_pack?.hash;
+    const run = value?.run_content_pack?.run_content_hash;
+    if (
+      typeof battle !== "string" || !/^blake3-v1:[0-9a-f]{64}$/u.test(battle)
+      || typeof run !== "string" || !/^blake3-v1:[0-9a-f]{64}$/u.test(run)
+    ) {
+      return { error: "content helper did not expose exact battle/run content hashes" };
+    }
+    return { battle, run };
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+function helperEnvironment(kind, rawRoot, failures) {
+  if (kind === "content") {
+    return {};
+  }
+  const hashes = contentHashes(rawRoot);
+  if (hashes.error) {
+    failures.push(`helper ${kind}: ${hashes.error}`);
+    return {
+      M4_ORACLE_BATTLE_CONTENT_HASH: "",
+      M4_ORACLE_RUN_CONTENT_HASH: "",
+      ...(kind === "composed" ? { M4_ORACLE_COMPOSED_FIXTURE_ID: "run-segments/classic-composed-wave-9-through-11-v1" } : {}),
+    };
+  }
+  return {
+    M4_ORACLE_BATTLE_CONTENT_HASH: hashes.battle,
+    M4_ORACLE_RUN_CONTENT_HASH: hashes.run,
+    ...(kind === "composed" ? { M4_ORACLE_COMPOSED_FIXTURE_ID: "run-segments/classic-composed-wave-9-through-11-v1" } : {}),
+  };
+}
+
 function runPass(outputRoot, rawRoot, run, exporterCommitSha) {
   mkdirSync(outputRoot, { recursive: true });
   mkdirSync(rawRoot, { recursive: true });
@@ -282,6 +324,7 @@ function runPass(outputRoot, rawRoot, run, exporterCommitSha) {
       M4_CAPTURE_OUTPUT: outputPath,
       M4_ORACLE_EXPORTER_SHA: exporterCommitSha,
       M4_ORACLE_PROCESS: String(run),
+      ...helperEnvironment(kind, rawRoot, failures),
     });
     if (!existsSync(outputPath)) {
       writeProcessGap(outputPath, kind, result.diagnostic);

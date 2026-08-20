@@ -353,21 +353,152 @@ function strictEnvelope(
     raw_key_tape?: JsonValue[];
   },
 ): JsonObject {
+  const initial = exactFrontier(evidence.initial, `${fixtureId}.initial`, evidence.provenance);
+  const final = exactFrontier(evidence.final, `${fixtureId}.final`, evidence.provenance);
+  const rawKeyTape = evidence.raw_key_tape;
+  if (rawKeyTape === undefined) {
+    fail(fixtureId, "RAW_KEY_TAPE_UNOBSERVABLE", "test/kernel-fixtures/m4/export-run-oracle.test.ts:strictEnvelope", "physical keydown/keyup tape is required");
+  }
+  validateRawKeyTape(rawKeyTape, `${fixtureId}.raw_key_tape`);
+  validateNextControl(evidence.next_control, `${fixtureId}.next_control`);
   return {
     schema_version: 1,
     fixture_id: fixtureId,
     provenance: evidence.provenance,
-    initial: evidence.initial,
-    decisions: evidence.decisions,
-    rng_draws: evidence.rng_draws,
-    ordered_transitions: evidence.ordered_transitions,
-    mutations: evidence.mutations,
-    presentation: evidence.presentation,
-    final: evidence.final,
+    initial,
+    decisions: requireArray(evidence.decisions, `${fixtureId}.decisions`),
+    rng_draws: requireArray(evidence.rng_draws, `${fixtureId}.rng_draws`),
+    ordered_transitions: requireArray(evidence.ordered_transitions, `${fixtureId}.ordered_transitions`),
+    mutations: requireArray(evidence.mutations, `${fixtureId}.mutations`),
+    presentation: requireArray(evidence.presentation, `${fixtureId}.presentation`),
+    final,
     next_control: evidence.next_control,
-    ...(evidence.raw_key_tape === undefined ? {} : { raw_key_tape: evidence.raw_key_tape }),
+    raw_key_tape: rawKeyTape,
     gaps: [],
   };
+}
+
+function requireArray(value: unknown, path: string): JsonValue[] {
+  if (!Array.isArray(value)) {
+    fail(path, "CAPTURE_TRACE_INCOMPLETE", "M4_CAPTURE_OUTPUT", "required observed array is missing");
+  }
+  return value;
+}
+
+function exactFrontier(value: unknown, path: string, sharedProvenance: JsonObject): JsonObject {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    fail(path, "JOIN_FRONTIER_UNOBSERVABLE", "M4_JOIN_FRONTIER", "frontier must be an object");
+  }
+  const frontier = value as AnyRecord;
+  const canonical = frontier.canonical;
+  if (canonical == null || typeof canonical !== "object" || Array.isArray(canonical)) {
+    fail(path, "CANONICAL_STATE_UNOBSERVABLE", "M4_JOIN_FRONTIER.canonical", "complete canonical GameStateV2 projection is missing");
+  }
+  const canonicalRecord = canonical as AnyRecord;
+  if (
+    canonicalRecord.schema_version !== 2
+    || canonicalRecord.kind !== "GAME_STATE_V2"
+    || canonicalRecord.save_data == null
+    || typeof canonicalRecord.save_data !== "object"
+    || canonicalRecord.runtime == null
+    || typeof canonicalRecord.runtime !== "object"
+  ) {
+    fail(path, "CANONICAL_STATE_INCOMPLETE", "GameData.getSessionSaveData+BattleScene.runtime", "frontier is not a complete GameStateV2-equivalent projection");
+  }
+  const battleHash = frontier.battle_content_hash;
+  const runHash = frontier.run_content_hash;
+  if (battleHash !== sharedProvenance.battle_content_hash || runHash !== sharedProvenance.run_content_hash) {
+    fail(path, "CONTENT_HASH_JOIN_MISMATCH", "src/init/init.ts:initializeGame", "frontier content identity differs from the exact published content hashes");
+  }
+  if (
+    typeof battleHash !== "string" || !/^blake3-v1:[0-9a-f]{64}$/u.test(battleHash)
+    || typeof runHash !== "string" || !/^blake3-v1:[0-9a-f]{64}$/u.test(runHash)
+  ) {
+    fail(path, "CONTENT_HASH_UNOBSERVABLE", "src/init/init.ts:initializeGame", "frontier content hashes are not exact canonical hashes");
+  }
+  const rng = frontier.rng;
+  if (rng == null || typeof rng !== "object" || Array.isArray(rng)) {
+    fail(path, "RNG_FRONTIER_UNOBSERVABLE", "Phaser.Math.RND+BattleScene.battleSeedState", "complete RNG frontier is missing");
+  }
+  const rngRecord = rng as AnyRecord;
+  if (
+    rngRecord.run == null || typeof rngRecord.run !== "object" || Array.isArray(rngRecord.run)
+    || !Object.hasOwn(rngRecord, "seed_offset")
+    || rngRecord.battle == null || typeof rngRecord.battle !== "object" || Array.isArray(rngRecord.battle)
+  ) {
+    fail(path, "RNG_FRONTIER_INCOMPLETE", "Phaser.Math.RND+BattleScene.battleSeedState", "run, seed_offset, and battle RNG state are all required");
+  }
+  for (const [key, child] of Object.entries(rngRecord)) {
+    if (key !== "seed_offset" && (child == null || typeof child !== "object" || Array.isArray(child) || Object.keys(child).length === 0)) {
+      fail(path, "RNG_FRONTIER_INCOMPLETE", "Phaser.Math.RND+BattleScene.battleSeedState", `${key} RNG state is empty`);
+    }
+  }
+  return {
+    canonical: canonicalValue(canonical, `${path}.canonical`) as JsonObject,
+    battle_content_hash: battleHash,
+    run_content_hash: runHash,
+    rng: canonicalValue(rng, `${path}.rng`) as JsonObject,
+  };
+}
+
+function validateNextControl(value: unknown, path: string): void {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    fail(path, "NEXT_CONTROL_UNOBSERVABLE", "PhaseManager.currentPhase+queue", "actual successor control is missing");
+  }
+  const record = value as AnyRecord;
+  if (record.kind !== "LIVE_SUCCESSOR" || typeof record.phase !== "string" || record.phase.length === 0 || !Array.isArray(record.queued_phases)) {
+    fail(path, "NEXT_CONTROL_UNOBSERVABLE", "PhaseManager.currentPhase+queue", "next_control is not an observed successor frontier");
+  }
+}
+
+function validateRawKeyTape(value: JsonValue[], path: string): void {
+  const physicalKeyKind: Record<string, true> = {
+    ARROW_UP: true,
+    ARROW_DOWN: true,
+    ARROW_LEFT: true,
+    ARROW_RIGHT: true,
+    ENTER: true,
+    SPACE: true,
+    ESCAPE: true,
+    BACKSPACE: true,
+    KEY_A: true,
+    KEY_B: true,
+    KEY_C: true,
+    KEY_D: true,
+    KEY_E: true,
+    KEY_F: true,
+    KEY_N: true,
+    KEY_R: true,
+    KEY_T: true,
+  };
+  for (let index = 0; index < value.length; index += 2) {
+    const down = value[index];
+    const up = value[index + 1];
+    if (down == null || up == null || typeof down !== "object" || typeof up !== "object" || Array.isArray(down) || Array.isArray(up)) {
+      fail(path, "RAW_KEY_TAPE_INVALID", "InputsController.keyboardKeyDown/keyboardKeyUp", `entry ${index} is not a complete keydown/keyup pair`);
+    }
+    const downRecord = down as AnyRecord;
+    const upRecord = up as AnyRecord;
+    if (downRecord.sequence !== index || upRecord.sequence !== index + 1) {
+      fail(path, "RAW_KEY_TAPE_INVALID", "InputsController.keyboardKeyDown/keyboardKeyUp", `entry ${index} has a non-contiguous sequence`);
+    }
+    const downEvent = downRecord.event as AnyRecord;
+    const upEvent = upRecord.event as AnyRecord;
+    const downData = downEvent?.data as AnyRecord;
+    const upData = upEvent?.data as AnyRecord;
+    const downCode = downData?.code as AnyRecord;
+    if (
+      downEvent?.kind !== "KEY_DOWN"
+      || upEvent?.kind !== "KEY_UP"
+      || downCode == null || typeof downCode.kind !== "string" || physicalKeyKind[downCode.kind] !== true
+      || upCode == null || upCode.kind !== downCode.kind
+      || downData.printable !== (downCode.kind === "SPACE" || downCode.kind.startsWith("KEY_"))
+      || downData.browser_repeat !== false
+      || downData.focus !== "GAME"
+    ) {
+      fail(path, "RAW_KEY_TAPE_INVALID", "InputsController.keyboardKeyDown/keyboardKeyUp", `entry ${index} is not a serde-compatible physical key pair`);
+    }
+  }
 }
 
 function captureRngVectors(): JsonObject {
@@ -420,16 +551,159 @@ function captureRngVectors(): JsonObject {
   return { artifact_id: "rng-vectors-v1", schema_version: 1, m3_parity_oracle_sha: M3_PARITY_ORACLE_SHA, m4_oracle_sha: M4_ORACLE_SHA, vectors };
 }
 
+function firstDifference(left: unknown, right: unknown, path = "$"): string | null {
+  if (Object.is(left, right)) {
+    return null;
+  }
+  if (typeof left !== typeof right || left == null || right == null) {
+    return path;
+  }
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return path;
+    }
+    for (let index = 0; index < left.length; index += 1) {
+      const difference = firstDifference(left[index], right[index], `${path}[${index}]`);
+      if (difference != null) {
+        return difference;
+      }
+    }
+    return null;
+  }
+  if (typeof left === "object" && typeof right === "object") {
+    const leftRecord = left as AnyRecord;
+    const rightRecord = right as AnyRecord;
+    const keysByName: Record<string, true> = {};
+    for (const key of Object.keys(leftRecord)) {
+      keysByName[key] = true;
+    }
+    for (const key of Object.keys(rightRecord)) {
+      keysByName[key] = true;
+    }
+    const keys = Object.keys(keysByName).sort();
+    for (const key of keys) {
+      if (!Object.hasOwn(leftRecord, key) || !Object.hasOwn(rightRecord, key)) {
+        return `${path}.${key}`;
+      }
+      const difference = firstDifference(leftRecord[key], rightRecord[key], `${path}.${key}`);
+      if (difference != null) {
+        return difference;
+      }
+    }
+  }
+  return path;
+}
 
+function assertJoin(
+  left: JsonObject,
+  right: JsonObject,
+  join: string,
+  sharedProvenance: JsonObject,
+): void {
+  const leftFrontier = exactFrontier(left, `${join}.left`, sharedProvenance);
+  const rightFrontier = exactFrontier(right, `${join}.right`, sharedProvenance);
+  for (const dimension of ["battle_content_hash", "run_content_hash"] as const) {
+    if (leftFrontier[dimension] !== rightFrontier[dimension]) {
+      fail(join, "JOIN_DIMENSION_MISMATCH", `M4_JOIN_FRONTIER.${dimension}`, `${dimension} differs at ${join}`);
+    }
+  }
+  const canonicalDifference = firstDifference(leftFrontier.canonical, rightFrontier.canonical, "canonical");
+  if (canonicalDifference != null) {
+    fail(join, "JOIN_CANONICAL_MISMATCH", "M4_JOIN_FRONTIER.canonical", `canonical state differs at ${canonicalDifference}`);
+  }
+  const rngDifference = firstDifference(leftFrontier.rng, rightFrontier.rng, "rng");
+  if (rngDifference != null) {
+    fail(join, "JOIN_RNG_MISMATCH", "M4_JOIN_FRONTIER.rng", `RNG frontier differs at ${rngDifference}`);
+  }
+}
 
-
-function captureComposedSegment(): never {
-  fail(
-    "run-segments/classic-composed-wave-9-through-11-v1",
-    "COMPOSED_JOIN_FRONTIERS_UNOBSERVABLE",
-    "test/kernel-fixtures/m4/export-run-oracle.test.ts:independent vector joins",
-    "the raw-key segment cannot be published until every independently captured vector has identical canonical state, content hash, and RNG frontier",
-  );
+function captureComposedSegment(value: JsonObject, sharedProvenance: JsonObject): JsonObject {
+  const vector = "run-segments/classic-composed-wave-9-through-11-v1";
+  if (value.artifact_id !== "run-segment-composed-v1" || value.schema_version !== 1 || value.kind !== "oracle-composed") {
+    fail(vector, "COMPOSED_CAPTURE_SHAPE_INVALID", "test/kernel-fixtures/m4/export/composed-capture.ts:captureComposedSegment", "dedicated live composed artifact header is invalid");
+  }
+  if (value.natural_single_seed_claim !== false) {
+    fail(vector, "NATURAL_SINGLE_SEED_FORBIDDEN", "test/kernel-fixtures/m4/export/composed-capture.ts:captureComposedSegment", "composed evidence must not claim a natural single seed");
+  }
+  if (
+    value.fixture_address == null
+    || typeof value.fixture_address !== "object"
+    || Array.isArray(value.fixture_address)
+    || value.content_identity == null
+    || typeof value.content_identity !== "object"
+    || Array.isArray(value.content_identity)
+  ) {
+    fail(vector, "COMPOSED_PROVENANCE_INCOMPLETE", "test/kernel-fixtures/m4/export/composed-capture.ts:fixture address", "fixture address and content identity are required");
+  }
+  const contentIdentity = value.content_identity as AnyRecord;
+  if (contentIdentity.battle_content_hash !== sharedProvenance.battle_content_hash || contentIdentity.run_content_hash !== sharedProvenance.run_content_hash) {
+    fail(vector, "CONTENT_HASH_JOIN_MISMATCH", "src/init/init.ts:initializeGame", "composed content identity differs from the exact published hashes");
+  }
+  const expectedControls = ["BATTLE", "MOVE_LEARN", "REWARD_SHOP", "BATTLE", "BIOME_MARKET", "CROSSROADS", "BIOME_SELECT", "BATTLE"];
+  if (JSON.stringify(value.control_order) !== JSON.stringify(expectedControls)) {
+    fail(vector, "CONTROL_ORDER_MISMATCH", "test/kernel-fixtures/m4/export/composed-capture.ts:control transitions", "composed control spine is not the frozen wave-9-through-11 order");
+  }
+  const segments = value.segments;
+  if (!Array.isArray(segments) || segments.length !== 5) {
+    fail(vector, "COMPOSED_SEGMENTS_INCOMPLETE", "test/kernel-fixtures/m4/export/composed-capture.ts:captureComposedSegment", "exactly five live causal segments are required");
+  }
+  const ids = ["progression", "reward", "market", "biome", "encounter"];
+  for (const [index, id] of ids.entries()) {
+    const segment = segments[index];
+    if (segment == null || typeof segment !== "object" || Array.isArray(segment)) {
+      fail(vector, "COMPOSED_SEGMENT_INVALID", "test/kernel-fixtures/m4/export/composed-capture.ts:captureComposedSegment", `${id} segment is not an object`);
+    }
+    const record = segment as JsonObject;
+    if (record.id !== id) {
+      fail(vector, "COMPOSED_SEGMENT_ORDER_INVALID", "test/kernel-fixtures/m4/export/composed-capture.ts:captureComposedSegment", `segment ${index} is not ${id}`);
+    }
+    exactFrontier(record.initial, `${vector}.${id}.initial`, sharedProvenance);
+    exactFrontier(record.final, `${vector}.${id}.final`, sharedProvenance);
+    if (!Array.isArray(record.raw_key_tape)) {
+      fail(vector, "RAW_KEY_TAPE_UNOBSERVABLE", "InputsController.keyboardKeyDown/keyboardKeyUp", `${id} has no physical tape`);
+    }
+    validateRawKeyTape(record.raw_key_tape, `${vector}.${id}.raw_key_tape`);
+  }
+  const joins = ["J1 progression→reward", "J2 reward→market", "J3 market→biome", "J4 biome→encounter"];
+  for (let index = 0; index < joins.length; index += 1) {
+    assertJoin(
+      (segments[index] as JsonObject).final as JsonObject,
+      (segments[index + 1] as JsonObject).initial as JsonObject,
+      joins[index],
+      sharedProvenance,
+    );
+  }
+  const initial = exactFrontier(value.initial, `${vector}.initial`, sharedProvenance);
+  const final = exactFrontier(value.final, `${vector}.final`, sharedProvenance);
+  const firstInitial = (segments[0] as JsonObject).initial as JsonObject;
+  const lastFinal = (segments[4] as JsonObject).final as JsonObject;
+  assertJoin(initial, firstInitial, "J0 composed→progression", sharedProvenance);
+  assertJoin(lastFinal, final, "J5 encounter→composed", sharedProvenance);
+  if (!Array.isArray(value.raw_key_tape)) {
+    fail(vector, "RAW_KEY_TAPE_UNOBSERVABLE", "InputsController.keyboardKeyDown/keyboardKeyUp", "composed physical tape is missing");
+  }
+  validateRawKeyTape(value.raw_key_tape, `${vector}.raw_key_tape`);
+  const envelope = strictEnvelope(vector, {
+    provenance: sharedProvenance,
+    initial,
+    decisions: Array.isArray(value.decisions) ? value.decisions : fail(vector, "COMPOSED_DECISIONS_UNOBSERVABLE", "composed-capture.ts", "decisions are missing"),
+    rng_draws: Array.isArray(value.rng_draws) ? value.rng_draws : fail(vector, "COMPOSED_RNG_DRAWS_UNOBSERVABLE", "composed-capture.ts", "RNG draw trace is missing"),
+    ordered_transitions: Array.isArray(value.ordered_transitions) ? value.ordered_transitions : fail(vector, "COMPOSED_TRANSITIONS_UNOBSERVABLE", "composed-capture.ts", "ordered transitions are missing"),
+    mutations: Array.isArray(value.mutations) ? value.mutations : fail(vector, "COMPOSED_MUTATIONS_UNOBSERVABLE", "composed-capture.ts", "mutation trace is missing"),
+    presentation: Array.isArray(value.presentation) ? value.presentation : fail(vector, "COMPOSED_PRESENTATION_UNOBSERVABLE", "composed-capture.ts", "presentation trace is missing"),
+    final,
+    next_control: value.next_control as JsonObject,
+    raw_key_tape: value.raw_key_tape,
+  });
+  return {
+    ...envelope,
+    kind: "oracle-composed",
+    natural_single_seed_claim: false,
+    fixture_address: value.fixture_address,
+    control_order: value.control_order,
+    segments,
+    content_identity: value.content_identity,
+  };
 }
 
 function outputRoot(): string {
@@ -439,7 +713,7 @@ function outputRoot(): string {
   return REQUIRED_OUTPUT_ROOT;
 }
 
-function collectGap(capture: () => never, gaps: OracleGap[]): void {
+function collectGap(capture: () => unknown, gaps: OracleGap[]): void {
   try {
     capture();
   } catch (error) {
@@ -452,53 +726,7 @@ function collectGap(capture: () => never, gaps: OracleGap[]): void {
 }
 
 
-function envelopeFromCapture(
-  fixtureId: string,
-  value: JsonObject,
-  sharedProvenance: JsonObject,
-): JsonObject {
-  const initial = value.initial;
-  const final = value.final;
-  const decisions = value.decisions;
-  const transitions = value.ordered_transitions;
-  const observations = value.observations;
-  const rawKeyTape = value.raw_key_tape
-    ?? ((value.progression as JsonObject | undefined)?.menu_inputs);
-  return strictEnvelope(fixtureId, {
-    provenance: sharedProvenance,
-    initial: initial != null && typeof initial === "object" && !Array.isArray(initial)
-      ? initial as JsonObject
-      : { canonical: value, rng: { draws: [] } },
-    decisions: Array.isArray(decisions)
-      ? decisions
-      : value.progression == null ? [] : [value.progression],
-    rng_draws: Array.isArray(value.rng_draws) ? value.rng_draws : [],
-    ordered_transitions: Array.isArray(transitions)
-      ? transitions
-      : observations == null ? [] : [observations],
-    mutations: Array.isArray(value.mutations) ? value.mutations : [],
-    presentation: Array.isArray(value.presentation) ? value.presentation : [],
-    final: final != null && typeof final === "object" && !Array.isArray(final)
-      ? final as JsonObject
-      : { canonical: value, rng: { draws: [] } },
-    next_control: value.next_control != null
-      && typeof value.next_control === "object"
-      && !Array.isArray(value.next_control)
-      ? value.next_control as JsonObject
-      : { kind: "CAPTURED_BOUNDARY" },
-    ...(Array.isArray(rawKeyTape) ? { raw_key_tape: rawKeyTape } : {}),
-  });
-}
 
-const RAW_CAPTURE_FILES = {
-  content: "content.json",
-  "reward-market": "reward-market.json",
-  progression: "progression.json",
-  "biome-encounter": "biome-encounter.json",
-  migration: "migration.json",
-} as const;
-
-type CaptureKind = keyof typeof RAW_CAPTURE_FILES;
 
 function rawRoot(): string {
   const value = process.env.M4_ORACLE_RAW_ROOT;
@@ -581,6 +809,53 @@ function captureShape(
   }
   return true;
 }
+function envelopeFromCapture(
+  fixtureId: string,
+  value: JsonObject,
+  sharedProvenance: JsonObject,
+): JsonObject {
+  const requiredObject = (key: string): JsonObject => {
+    const entry = value[key];
+    if (entry == null || typeof entry !== "object" || Array.isArray(entry)) {
+      fail(fixtureId, "CAPTURE_FRONTIER_INCOMPLETE", `M4_CAPTURE_OUTPUT:${fixtureId}`, `${key} is not an observed object`);
+    }
+    return entry as JsonObject;
+  };
+  const requiredArray = (key: string): JsonValue[] => {
+    const entry = value[key];
+    if (!Array.isArray(entry)) {
+      fail(fixtureId, "CAPTURE_TRACE_INCOMPLETE", `M4_CAPTURE_OUTPUT:${fixtureId}`, `${key} is not an observed array`);
+    }
+    return entry;
+  };
+  const rawKeyTape = value.raw_key_tape;
+  if (!Array.isArray(rawKeyTape)) {
+    fail(fixtureId, "RAW_KEY_TAPE_UNOBSERVABLE", `M4_CAPTURE_OUTPUT:${fixtureId}`, "raw_key_tape must contain serialized physical keydown/keyup events");
+  }
+  return strictEnvelope(fixtureId, {
+    provenance: sharedProvenance,
+    initial: requiredObject("initial"),
+    decisions: requiredArray("decisions"),
+    rng_draws: requiredArray("rng_draws"),
+    ordered_transitions: requiredArray("ordered_transitions"),
+    mutations: requiredArray("mutations"),
+    presentation: requiredArray("presentation"),
+    final: requiredObject("final"),
+    next_control: requiredObject("next_control"),
+    raw_key_tape: rawKeyTape,
+  });
+}
+
+const RAW_CAPTURE_FILES = {
+  content: "content.json",
+  "reward-market": "reward-market.json",
+  progression: "progression.json",
+  "biome-encounter": "biome-encounter.json",
+  migration: "migration.json",
+  composed: "composed.json",
+} as const;
+
+type CaptureKind = keyof typeof RAW_CAPTURE_FILES;
 
 describe("M4A fresh run oracle export", () => {
   beforeAll(() => {
@@ -590,12 +865,11 @@ describe("M4A fresh run oracle export", () => {
     if (process.platform !== "linux" || process.arch !== "x64") {
       throw new Error(`ORACLE_RUNTIME:expected hosted linux/x64, got ${process.platform}/${process.arch}`);
     }
-
   });
+
   it("composes raw helper outputs or fails closed with typed gaps", () => {
     const gaps: OracleGap[] = [];
     const generated = new Map<string, JsonObject>();
-
     const contentPacks = rawCapture("content", "content-packs", gaps);
     if (contentPacks != null && captureShape(
       contentPacks,
@@ -637,11 +911,7 @@ describe("M4A fresh run oracle export", () => {
       generated.set("markets/town-wave-10-v1.json", rewardMarket.market as JsonObject);
     }
 
-    const progression = rawCapture(
-      "progression",
-      "progression/nacli-medium-slow-level-17-v1",
-      gaps,
-    );
+    const progression = rawCapture("progression", "progression/nacli-medium-slow-level-17-v1", gaps);
     if (progression != null) {
       generated.set("progression/nacli-medium-slow-level-17-v1.json", progression);
     }
@@ -667,7 +937,55 @@ describe("M4A fresh run oracle export", () => {
       generated.set("migration/m3-to-m4-companions-v1.json", migration);
     }
 
-    collectGap(captureComposedSegment, gaps);
+    const battlePack = generated.get("battle-content-pack-v1.json");
+    const battleHash = String(battlePack?.hash ?? "");
+    const runPack = generated.get("run-content-pack-v1.json");
+    const runHash = String(runPack?.run_content_hash ?? "");
+    let sharedProvenance: JsonObject | null = null;
+    try {
+      sharedProvenance = provenance(battleHash, runHash);
+    } catch (error) {
+      if (error instanceof OracleGap) {
+        gaps.push(error);
+      } else {
+        throw error;
+      }
+    }
+
+    const composed = rawCapture(
+      "composed",
+      "run-segments/classic-composed-wave-9-through-11-v1",
+      gaps,
+    );
+    if (composed != null && sharedProvenance != null) {
+      collectGap(
+        () => generated.set(
+          "run-segments/classic-composed-wave-9-through-11-v1.json",
+          captureComposedSegment(composed, sharedProvenance as JsonObject),
+        ),
+        gaps,
+      );
+    }
+
+    const prepared = new Map<string, JsonObject>();
+    if (sharedProvenance != null) {
+      for (const [path, value] of generated) {
+        if (
+          path === "rng-vectors-v1.json"
+          || path === "run-content-pack-v1.json"
+          || path === "battle-content-pack-v1.json"
+          || path.startsWith("migration/")
+          || path.startsWith("run-segments/")
+        ) {
+          prepared.set(path, value);
+        } else {
+          collectGap(
+            () => prepared.set(path, envelopeFromCapture(path.replace(/\.json$/u, ""), value, sharedProvenance as JsonObject)),
+            gaps,
+          );
+        }
+      }
+    }
 
     if (gaps.length > 0) {
       const reportPath = process.env.M4_ORACLE_GAP_REPORT;
@@ -687,27 +1005,13 @@ describe("M4A fresh run oracle export", () => {
       throw new Error(gaps.map(gap => gap.message).join("\n"));
     }
 
-    const battlePack = generated.get("battle-content-pack-v1.json");
-    const battleHash = String(battlePack?.hash ?? "");
-    const runPack = generated.get("run-content-pack-v1.json");
-    const runHash = String(runPack?.run_content_hash ?? "");
-    const sharedProvenance = provenance(battleHash, runHash);
+    if (sharedProvenance == null) {
+      throw new Error("M4_ORACLE_GAP:PROVENANCE_UNOBSERVABLE");
+    }
     const root = outputRoot();
     mkdirSync(root, { recursive: true });
-    for (const [path, value] of generated) {
-      if (
-        path === "rng-vectors-v1.json"
-        || path === "run-content-pack-v1.json"
-        || path === "battle-content-pack-v1.json"
-        || path.startsWith("migration/")
-      ) {
-        writeCanonical(resolve(root, path), value);
-      } else {
-        writeCanonical(
-          resolve(root, path),
-          envelopeFromCapture(path.replace(/\.json$/u, ""), value, sharedProvenance),
-        );
-      }
+    for (const [path, value] of prepared) {
+      writeCanonical(resolve(root, path), value);
     }
     expect(generated.size).toBeGreaterThan(0);
   }, 2_700_000);
