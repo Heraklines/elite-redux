@@ -9,6 +9,10 @@
  */
 
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
+import {
+  captureOracleFrontier,
+  captureOracleNextControl,
+} from "./oracle-frontier";
 import { getGameMode } from "#app/game-mode";
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
 import { GameModes } from "#enums/game-modes";
@@ -119,109 +123,12 @@ function jsonValue(value: unknown, path = "$", dropUndefined = false): JsonValue
   gap("LIVE_VALUE_UNOBSERVABLE", "test/kernel-fixtures/m4/export/composed-capture.ts", `${path} has unsupported type`);
 }
 
-function stateFromString(state: unknown, path: string): JsonObject {
-  if (typeof state !== "string") {
-    gap("RNG_STATE_UNOBSERVABLE", "Phaser.Math.RandomDataGenerator.state", `${path} is absent`);
-  }
-  const parts = state.split(",");
-  const carry = Number(parts[1]);
-  const values = parts.slice(2).map(Number);
-  if (parts.length !== 5 || parts[0] !== "!rnd" || !Number.isSafeInteger(carry) || carry < 0 || carry > 0xffffffff || values.some(value => !Number.isFinite(value) || value < 0 || value >= 1)) {
-    gap("RNG_STATE_UNOBSERVABLE", "Phaser.Math.RandomDataGenerator.state", `${path} is malformed`);
-  }
-  const bits = values.map(value => {
-    const bytes = new ArrayBuffer(8);
-    new DataView(bytes).setFloat64(0, value, false);
-    return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join("");
-  });
-  return { state_string: state, s0_bits: bits[0], s1_bits: bits[1], s2_bits: bits[2], carry };
-}
-
-function rngFrontier(game: GameManager): JsonObject {
-  const scene = game.scene as AnyRecord;
-  const battle = scene.currentBattle as AnyRecord | undefined;
-  if (battle == null) {
-    gap("RNG_FRONTIER_UNOBSERVABLE", "src/battle-scene.ts:currentBattle", "current battle is absent at a composed frontier");
-  }
-  const saved = battle.battleSeedState;
-  return {
-    run: stateFromString(Phaser.Math.RND.state(), "run"),
-    seed_offset: scene.rngOffset === 0 && scene.rngSeedOverride === ""
-      ? null
-      : { wave_seed: String(scene.rngSeedOverride || scene.waveSeed || scene.seed), offset: finite(scene.rngOffset, "scene.rngOffset") },
-    battle: {
-      battle_seed: String(battle.battleSeed),
-      turn: finite(battle.turn, "battle.turn"),
-      saved_substream: saved == null ? null : stateFromString(saved, "battle.saved_substream"),
-    },
-  };
-}
-
-function queuedPhases(game: GameManager): string[] {
-  const manager = game.scene.phaseManager as AnyRecord;
-  if (typeof manager.getQueuedPhaseNames !== "function") {
-    gap("CONTROL_TRANSITION_UNOBSERVABLE", "src/app/phase-manager.ts:getQueuedPhaseNames", "phase queue cannot be observed");
-  }
-  const queued = manager.getQueuedPhaseNames.call(manager);
-  if (!Array.isArray(queued) || queued.some((name: unknown) => typeof name !== "string" || name.length === 0)) {
-    gap("CONTROL_TRANSITION_UNOBSERVABLE", "src/app/phase-manager.ts:getQueuedPhaseNames", "phase queue is not a string array");
-  }
-  return queued;
-}
-
-function canonicalState(game: GameManager): JsonObject {
-  const gameData = (game.scene as AnyRecord).gameData as AnyRecord;
-  if (typeof gameData?.getSessionSaveData !== "function") {
-    gap("CANONICAL_STATE_UNOBSERVABLE", "src/system/game-data.ts:GameData.getSessionSaveData", "complete session serializer is unavailable");
-  }
-  let saveData: unknown;
-  const dateNow = Date.now;
-  Date.now = () => 0;
-  try {
-    saveData = gameData.getSessionSaveData.call(gameData);
-  } catch (error) {
-    gap("CANONICAL_STATE_UNOBSERVABLE", "src/system/game-data.ts:GameData.getSessionSaveData", error instanceof Error ? error.message : String(error));
-  } finally {
-    Date.now = dateNow;
-  }
-  const scene = game.scene as AnyRecord;
-  const battle = scene.currentBattle as AnyRecord | undefined;
-  return {
-    schema_version: 2,
-    kind: "GAME_STATE_V2",
-    save_data: jsonValue(JSON.parse(JSON.stringify(saveData)), "save_data"),
-    runtime: {
-      seed: String(scene.seed),
-      wave_seed: String(scene.waveSeed),
-      rng_seed_override: String(scene.rngSeedOverride ?? ""),
-      rng_offset: finite(scene.rngOffset, "runtime.rng_offset"),
-      wave: finite(battle?.waveIndex, "runtime.wave"),
-      turn: finite(battle?.turn, "runtime.turn"),
-      battle_type: finite(battle?.battleType, "runtime.battle_type"),
-      battle_seed: String(battle?.battleSeed ?? ""),
-      biome: finite((scene.arena as AnyRecord)?.biomeId, "runtime.biome"),
-      phase: String(scene.phaseManager.getCurrentPhase()?.phaseName ?? ""),
-      queued_phases: queuedPhases(game),
-      ui_mode: String(scene.ui.getMode()),
-      lock_modifier_tiers: Boolean(scene.lockModifierTiers),
-      reroll: Boolean(scene.reroll),
-    },
-  };
-}
-
 function frontier(game: GameManager, battleHash: string, runHash: string): JsonObject {
-  if (!BATTLE_HASH_RE.test(battleHash) || !BATTLE_HASH_RE.test(runHash)) {
-    gap("CONTENT_HASH_UNOBSERVABLE", "src/init/init.ts:initializeGame", "exact content hashes were not passed by the exporter");
-  }
-  return { canonical: canonicalState(game), battle_content_hash: battleHash, run_content_hash: runHash, rng: rngFrontier(game) };
+  return captureOracleFrontier(game, battleHash, runHash, gap);
 }
 
 function nextControl(game: GameManager): JsonObject {
-  const phase = game.scene.phaseManager.getCurrentPhase()?.phaseName;
-  if (typeof phase !== "string" || phase.length === 0) {
-    gap("CONTROL_TRANSITION_UNOBSERVABLE", "src/app/phase-manager.ts:getCurrentPhase", "current successor phase is absent");
-  }
-  return { kind: "LIVE_SUCCESSOR", phase, queued_phases: queuedPhases(game) };
+  return captureOracleNextControl(game, gap);
 }
 
 function press(game: GameManager, keyName: KeyName, tape: RawTapeEntry[], transitions: JsonValue[]): void {
