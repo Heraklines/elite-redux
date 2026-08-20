@@ -164,10 +164,6 @@ fn preflight_state(
     battle: &BattleStateV2,
     input: &BattleSettlementInput,
 ) -> Result<(), SettlementError> {
-    state
-        .validate()
-        .map_err(|_| SettlementError::InvalidState)?;
-
     if battle.settlement.settled {
         return Err(SettlementError::AlreadySettled);
     }
@@ -220,9 +216,15 @@ fn preflight_state(
         }
     }
 
+    // Classify settlement-owned evidence before the complete state check so
+    // callers receive the closed settlement error rather than losing the first
+    // divergent record behind a generic invalid-state boundary.
     validate_party_graph(state, battle)?;
     validate_participation(state, battle)?;
     validate_defeated_enemies(battle)?;
+    state
+        .validate()
+        .map_err(|_| SettlementError::InvalidState)?;
     Ok(())
 }
 
