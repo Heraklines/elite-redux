@@ -60,6 +60,7 @@ import type {
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
 import { sealCoopEntryPresentation } from "#data/elite-redux/coop/coop-turn-recorder";
+import { isErEndlessRaidWave } from "#data/elite-redux/er-endless-continuation";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -358,6 +359,7 @@ export class CommandPhase extends FieldPhase {
     const { currentBattle, arena } = globalScene;
     return (
       arena.biomeId !== BiomeId.END
+      && !isErEndlessRaidWave(currentBattle.waveIndex)
       && (currentBattle.mysteryEncounter?.fleeAllowed ?? true)
       && currentBattle.battleType !== BattleType.TRAINER
       && currentBattle.mysteryEncounter?.encounterMode !== MysteryEncounterMode.TRAINER_BATTLE
@@ -1963,6 +1965,7 @@ export class CommandPhase extends FieldPhase {
    *
    * The player cannot flee if:
    * - The player is in the {@linkcode BiomeId.END | End} biome
+   * - The player is in an Elite Redux Endless raid battle
    * - The player is in a trainer battle
    * - The player is in a mystery encounter that disallows fleeing
    * - The player's pokemon is trapped by an ability or effect
@@ -1971,7 +1974,7 @@ export class CommandPhase extends FieldPhase {
   private handleRunCommand(): boolean {
     const { currentBattle, arena } = globalScene;
     const mysteryEncounterFleeAllowed = currentBattle.mysteryEncounter?.fleeAllowed ?? true;
-    if (arena.biomeId === BiomeId.END || !mysteryEncounterFleeAllowed) {
+    if (arena.biomeId === BiomeId.END || isErEndlessRaidWave(currentBattle.waveIndex) || !mysteryEncounterFleeAllowed) {
       this.queueShowText("battle:noEscapeForce");
       return false;
     }
