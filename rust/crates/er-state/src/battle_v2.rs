@@ -149,6 +149,7 @@ impl BattleStateV2 {
 
 /// Borrowed complete battle world. Player records are never copied into the
 /// battle state and are resolved from the game root at the access boundary.
+#[derive(Debug)]
 pub struct BattleWorldStateV2<'a> {
     pub player_party: &'a [PokemonStateV2],
     pub battle: &'a BattleStateV2,
