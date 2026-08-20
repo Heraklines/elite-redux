@@ -400,8 +400,10 @@ describe("Authority V2 interaction control ledger", () => {
         kind: "WAVE_ADVANCE",
         material: { digest: "digest-wave", payload: { wave: 5, turn: 1 } },
       }),
-    ).toBe(true);
-    expect(ledger.latestControl).toBeNull();
+    ).toBe(false);
+    // WAVE_ADVANCE is a boundary entry. Its typed successor relation is necessary but not sufficient: an
+    // unscoped direct ledger call cannot mint the retained-source proof supplied by AuthorityLog.
+    expect(ledger.latestControl).toEqual(control);
   });
 
   it("owns ordered waits emitted by non-interaction entries and checks an exact successor operation", () => {
@@ -591,14 +593,14 @@ describe("Authority V2 interaction control ledger", () => {
       const directBoundary: CoopAuthorityEntry = { ...boundaryInput, revision: 4 };
       expect(authorityEntryProofScopeOf(directBoundary)).toBeNull();
       expect(ledger.admitSuccessor(directBoundary)).toBe(false);
-      expect(ledger.authenticatedSourceCount).toBe(1);
+      expect(ledger.authenticatedSourceCount).toBe(3);
 
       // AuthorityLog admission supplies the exact retained proof; an unscoped direct ledger call is not
       // allowed to self-authenticate this boundary anymore.
       const boundary = log.commit(boundaryInput, prepareAndInstall);
 
       expect(boundary.revision).toBe(4);
-      expect(ledger.authenticatedSourceCount).toBe(1);
+      expect(ledger.authenticatedSourceCount).toBe(4);
       expect(ledger.sourceEntryOf(boundary.nextControl)).toMatchObject({
         revision: boundary.revision,
         operationId: boundary.operationId,

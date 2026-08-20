@@ -1633,7 +1633,10 @@ describe("authority-v2 log", () => {
 
     duo.guest.handleInboundFrame(duo.boundaryFrame);
     expect(violations).toHaveLength(1);
-    expect(boundaryAdmissionCalls).toBe(0);
+    // The explicit post-terminal redelivery is a distinct reversible live-admission stage. It occurs only
+    // after the proof rejection above; applyMaterial remains fenced because the shared terminal is already
+    // recorded.
+    expect(boundaryAdmissionCalls).toBe(1);
     expect(boundaryMaterialApplications).toBe(0);
     duo.dispose();
   });
