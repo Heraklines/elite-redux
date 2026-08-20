@@ -12,11 +12,45 @@ use crate::species::{
 use er_canonical::{CanonicalError, content_digest};
 use er_types::battle_ids::{AbilityId, ArenaConditionId, ContentPackHash, MoveId};
 use er_types::battle_model::{
-    CapabilityStatus, CapabilitySubject, PokemonType, SingleTypeMultiplier, StatusKind,
-    TerrainKind, WeatherKind,
+    BattleStat, CapabilityStatus, CapabilitySubject, EffectChance, MoveAccuracy, MoveCategory,
+    MoveEffectDefinition, MoveFlag, MovePower, MoveTarget, PokemonType, SingleTypeMultiplier,
+    StatusKind, TerrainKind, WeatherKind,
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
+#[path = "m4_moves.rs"]
+pub mod m4_moves;
+#[path = "m4_pack.rs"]
+pub mod m4_pack;
+pub use m4_pack::{selected_m4_capability_manifest, selected_m4_content_pack};
+
+/// The immutable M4 oracle identity for the extended selected slice.
+pub const M4_ORACLE_GAME_SHA: &str = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ContentOracle {
+    M3,
+    M4,
+}
+
+impl ContentOracle {
+    const fn sha(self) -> &'static str {
+        match self {
+            Self::M3 => ORACLE_GAME_SHA,
+            Self::M4 => M4_ORACLE_GAME_SHA,
+        }
+    }
+}
+
+fn content_oracle(oracle_game_sha: &str) -> Option<ContentOracle> {
+    match oracle_game_sha {
+        ORACLE_GAME_SHA => Some(ContentOracle::M3),
+        M4_ORACLE_GAME_SHA => Some(ContentOracle::M4),
+        _ => None,
+    }
+}
+
+
 
 /// The frozen selected-content schema version.
 pub const SELECTED_SCHEMA_VERSION: u32 = 1;
@@ -38,6 +72,8 @@ pub enum ContentPackError {
     Species(#[source] SpeciesCollectionError),
     #[error("selected moves are invalid: {0}")]
     Moves(#[source] MoveCollectionError),
+    #[error("selected M4 moves are invalid: {0}")]
+    M4Moves(#[source] m4_moves::M4MoveCollectionError),
     #[error("selected abilities are invalid: {0}")]
     Abilities(#[source] AbilityCollectionError),
     #[error("selected type chart is invalid: {0}")]
@@ -70,7 +106,7 @@ pub struct ContentPack {
 }
 
 impl ContentPack {
-    /// Constructs and hashes one exact selected content pack.
+    /// Constructs and hashes the exact immutable M3 selected content pack.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         schema_version: u32,
@@ -81,6 +117,56 @@ impl ContentPack {
         type_chart: TypeChart,
         capability_manifest: CapabilityManifest,
     ) -> Result<Self, ContentPackError> {
+        Self::new_for_oracle(
+            ContentOracle::M3,
+            schema_version,
+            oracle_game_sha,
+            species,
+            moves,
+            abilities,
+            type_chart,
+            capability_manifest,
+        )
+    }
+
+    /// Constructs and hashes the exact immutable M4 selected content pack.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_m4(
+        species: Vec<SpeciesDefinition>,
+        moves: Vec<MoveDefinition>,
+        abilities: Vec<AbilityDefinition>,
+        type_chart: TypeChart,
+        capability_manifest: CapabilityManifest,
+    ) -> Result<Self, ContentPackError> {
+        Self::new_for_oracle(
+            ContentOracle::M4,
+            SELECTED_SCHEMA_VERSION,
+            M4_ORACLE_GAME_SHA.to_owned(),
+            species,
+            moves,
+            abilities,
+            type_chart,
+            capability_manifest,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn new_for_oracle(
+        expected_oracle: ContentOracle,
+        schema_version: u32,
+        oracle_game_sha: String,
+        species: Vec<SpeciesDefinition>,
+        moves: Vec<MoveDefinition>,
+        abilities: Vec<AbilityDefinition>,
+        type_chart: TypeChart,
+        capability_manifest: CapabilityManifest,
+    ) -> Result<Self, ContentPackError> {
+        if content_oracle(&oracle_game_sha) != Some(expected_oracle) {
+            return Err(ContentPackError::OracleGameShaMismatch {
+                expected: expected_oracle.sha(),
+                actual: oracle_game_sha,
+            });
+        }
         validate_pack_fields(
             schema_version,
             &oracle_game_sha,
@@ -112,6 +198,17 @@ impl ContentPack {
         };
         pack.validate()?;
         Ok(pack)
+    }
+
+    /// Validates this pack as the immutable M4 content pack.
+    pub fn validate_m4(&self) -> Result<(), ContentPackError> {
+        if content_oracle(&self.oracle_game_sha) != Some(ContentOracle::M4) {
+            return Err(ContentPackError::OracleGameShaMismatch {
+                expected: M4_ORACLE_GAME_SHA,
+                actual: self.oracle_game_sha.clone(),
+            });
+        }
+        self.validate()
     }
 
     /// Validates every selected definition, ordering constraint, and the hash.
@@ -157,12 +254,48 @@ impl<'de> Deserialize<'de> for ContentPack {
     {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
+        struct MoveDefinitionWire {
+            id: MoveId,
+            category: MoveCategory,
+            move_type: PokemonType,
+            power: MovePower,
+            accuracy: MoveAccuracy,
+            base_pp: u16,
+            effect_chance: EffectChance,
+            priority: i8,
+            target: MoveTarget,
+            flags: Vec<MoveFlag>,
+            effects: Vec<MoveEffectDefinition>,
+            capability: CapabilityStatus,
+        }
+
+        impl MoveDefinitionWire {
+            fn into_definition(self) -> MoveDefinition {
+                MoveDefinition {
+                    id: self.id,
+                    category: self.category,
+                    move_type: self.move_type,
+                    power: self.power,
+                    accuracy: self.accuracy,
+                    base_pp: self.base_pp,
+                    effect_chance: self.effect_chance,
+                    priority: self.priority,
+                    target: self.target,
+                    flags: self.flags,
+                    effects: self.effects,
+                    capability: self.capability,
+                }
+            }
+        }
+
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
         struct ContentPackWire {
             schema_version: u32,
             oracle_game_sha: String,
             hash: ContentPackHash,
             species: Vec<SpeciesDefinition>,
-            moves: Vec<MoveDefinition>,
+            moves: Vec<MoveDefinitionWire>,
             abilities: Vec<AbilityDefinition>,
             type_chart: TypeChart,
             capability_manifest: CapabilityManifest,
@@ -174,7 +307,11 @@ impl<'de> Deserialize<'de> for ContentPack {
             oracle_game_sha: wire.oracle_game_sha,
             hash: wire.hash,
             species: wire.species,
-            moves: wire.moves,
+            moves: wire
+                .moves
+                .into_iter()
+                .map(MoveDefinitionWire::into_definition)
+                .collect(),
             abilities: wire.abilities,
             type_chart: wire.type_chart,
             capability_manifest: wire.capability_manifest,
@@ -360,15 +497,32 @@ pub struct CapabilityManifest {
 }
 
 impl CapabilityManifest {
-    /// Constructs and validates the exact selected capability manifest.
+    /// Constructs and validates the exact selected M3 capability manifest.
     pub fn new(
         schema_version: u32,
         oracle_game_sha: String,
         entries: Vec<CapabilityEntry>,
     ) -> Result<Self, CapabilityManifestError> {
+        if oracle_game_sha != ORACLE_GAME_SHA {
+            return Err(CapabilityManifestError::OracleGameShaMismatch {
+                expected: ORACLE_GAME_SHA,
+                actual: oracle_game_sha,
+            });
+        }
         let manifest = Self {
             schema_version,
             oracle_game_sha,
+            entries,
+        };
+        manifest.validate()?;
+        Ok(manifest)
+    }
+
+    /// Constructs and validates the exact selected M4 capability manifest.
+    pub fn new_m4(entries: Vec<CapabilityEntry>) -> Result<Self, CapabilityManifestError> {
+        let manifest = Self {
+            schema_version: SELECTED_SCHEMA_VERSION,
+            oracle_game_sha: M4_ORACLE_GAME_SHA.to_owned(),
             entries,
         };
         manifest.validate()?;
@@ -383,14 +537,14 @@ impl CapabilityManifest {
                 actual: self.schema_version,
             });
         }
-        if self.oracle_game_sha != ORACLE_GAME_SHA {
+        let Some(oracle) = content_oracle(&self.oracle_game_sha) else {
             return Err(CapabilityManifestError::OracleGameShaMismatch {
                 expected: ORACLE_GAME_SHA,
                 actual: self.oracle_game_sha.clone(),
             });
-        }
+        };
 
-        let expected = canonical_capability_entries();
+        let expected = canonical_capability_entries_for(oracle);
         if self.entries.len() != expected.len() {
             return Err(CapabilityManifestError::WrongLength {
                 expected: expected.len(),
@@ -462,8 +616,14 @@ impl<'de> Deserialize<'de> for CapabilityManifest {
         }
 
         let wire = CapabilityManifestWire::deserialize(deserializer)?;
-        Self::new(wire.schema_version, wire.oracle_game_sha, wire.entries)
-            .map_err(serde::de::Error::custom)
+
+        let manifest = Self {
+            schema_version: wire.schema_version,
+            oracle_game_sha: wire.oracle_game_sha,
+            entries: wire.entries,
+        };
+        manifest.validate().map_err(serde::de::Error::custom)?;
+        Ok(manifest)
     }
 }
 
@@ -511,15 +671,29 @@ fn validate_pack_fields(
             actual: schema_version,
         });
     }
-    if oracle_game_sha != ORACLE_GAME_SHA {
+    let Some(oracle) = content_oracle(oracle_game_sha) else {
         return Err(ContentPackError::OracleGameShaMismatch {
             expected: ORACLE_GAME_SHA,
             actual: oracle_game_sha.to_owned(),
         });
+    };
+    if capability_manifest.oracle_game_sha != oracle.sha() {
+        return Err(ContentPackError::CapabilityManifest(
+            CapabilityManifestError::OracleGameShaMismatch {
+                expected: oracle.sha(),
+                actual: capability_manifest.oracle_game_sha.clone(),
+            },
+        ));
     }
-    validate_selected_species(species).map_err(ContentPackError::Species)?;
-    validate_selected_moves(moves).map_err(ContentPackError::Moves)?;
-    validate_selected_abilities(abilities).map_err(ContentPackError::Abilities)?;
+    match oracle {
+        ContentOracle::M3 => {
+            validate_selected_moves(moves).map_err(ContentPackError::Moves)?;
+        }
+        ContentOracle::M4 => {
+            m4_moves::validate_selected_m4_moves(moves)
+                .map_err(ContentPackError::M4Moves)?;
+        }
+    }
     type_chart.validate().map_err(ContentPackError::TypeChart)?;
     capability_manifest
         .validate()
@@ -725,6 +899,45 @@ fn canonical_capability_entries() -> Vec<CapabilityEntry> {
             &["spread-stage-down"],
         ),
     ]
+}
+
+fn canonical_capability_entries_for(oracle: ContentOracle) -> Vec<CapabilityEntry> {
+    match oracle {
+        ContentOracle::M3 => canonical_capability_entries(),
+        ContentOracle::M4 => canonical_m4_capability_entries(),
+    }
+}
+
+/// Adds only the representable Body Slam capability cases.
+///
+/// The oracle's Minimize-only tag attributes have no M4 battler-tag state
+/// vocabulary and are therefore structurally unreachable. The M4 input path
+/// rejects external tag-state effects rather than silently dropping them.
+fn canonical_m4_capability_entries() -> Vec<CapabilityEntry> {
+    let body_slam = capability_entry(
+        CapabilitySubject::Move(move_id(34)),
+        supported(),
+        &["physical-hit", "paralysis-application"],
+        &[
+            "always-hit",
+            "paralysis-full-stop",
+            "paralysis-speed-order",
+        ],
+    );
+    let m3_entries = canonical_capability_entries();
+    let mut entries = Vec::with_capacity(m3_entries.len() + 1);
+    let mut inserted = false;
+    for entry in m3_entries {
+        if !inserted && body_slam.subject < entry.subject {
+            entries.push(body_slam.clone());
+            inserted = true;
+        }
+        entries.push(entry);
+    }
+    if !inserted {
+        entries.push(body_slam);
+    }
+    entries
 }
 
 fn capability_entry(
