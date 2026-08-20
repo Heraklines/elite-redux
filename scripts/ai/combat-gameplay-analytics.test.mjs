@@ -119,6 +119,16 @@ test("merge suppresses cohorts below both support gates", () => {
   assert.equal("sourceSketch" in merged, false);
 });
 
+test("remote serialization compacts rows that cannot clear corpus support", () => {
+  const analytics = createCombatGameplayAnalytics();
+  analytics.ingestEpisode(episode(1));
+  const report = analytics.finish({}, { minimumTableObservations: 2 });
+  assert.equal(report.counts.episodes, 1);
+  assert.equal(report.metadata.preSerializationMinimumObservations, 2);
+  assert.equal(report.tables.speciesPairContext.length, 0);
+  assert.equal(report.tables.matchupContext.length, 0);
+});
+
 test("entity rankings use dictionary names and supported battle exposures", () => {
   const analytics = createCombatGameplayAnalytics();
   for (let index = 0; index < 120; index++) {

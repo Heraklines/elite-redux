@@ -486,14 +486,15 @@ async function main() {
     writeFileSync(
       args.gameplayAnalysisOutput,
       `${JSON.stringify(
-        gameplayAnalytics.finish({
-          prefix: args.prefix,
-          listedObjects: report.corpus.listedObjects,
-          selectedObjects: report.corpus.selectedObjects,
-          compressedBytes: report.corpus.compressedBytes,
-        }),
-        null,
-        2,
+        gameplayAnalytics.finish(
+          {
+            prefix: args.prefix,
+            listedObjects: report.corpus.listedObjects,
+            selectedObjects: report.corpus.selectedObjects,
+            compressedBytes: report.corpus.compressedBytes,
+          },
+          { minimumTableObservations: 2 },
+        ),
       )}\n`,
     );
   }

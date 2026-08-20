@@ -162,8 +162,9 @@ class MetricTable {
     this.rows.set(key, row);
   }
 
-  serialize() {
+  serialize(minimumObservations = 1) {
     return [...this.rows.values()]
+      .filter(row => row.observations >= minimumObservations)
       .map(row => ({
         dimensions: row.dimensions,
         observations: row.observations,
@@ -848,7 +849,7 @@ export function createCombatGameplayAnalytics() {
     }
   }
 
-  function finish(metadata = {}) {
+  function finish(metadata = {}, { minimumTableObservations = 1 } = {}) {
     return {
       reportVersion: 2,
       contractVersion: 4,
@@ -858,12 +859,14 @@ export function createCombatGameplayAnalytics() {
         rawIdentifiersIncluded: false,
         sourceRepresentation: "4096-bit one-way aggregate cardinality sketch",
       },
-      metadata,
+      metadata: { ...metadata, preSerializationMinimumObservations: minimumTableObservations },
       counts,
       approximateSources: estimateSourceSketch(overallSources),
       sourceSketch: encodeSketch(overallSources),
       dictionaryHashes: [...dictionaryHashes].sort(),
-      tables: Object.fromEntries(Object.entries(tables).map(([name, table]) => [name, table.serialize()])),
+      tables: Object.fromEntries(
+        Object.entries(tables).map(([name, table]) => [name, table.serialize(minimumTableObservations)]),
+      ),
     };
   }
 
