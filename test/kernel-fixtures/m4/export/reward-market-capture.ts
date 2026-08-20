@@ -499,7 +499,7 @@ function addLockCapsule(game: GameManager): void {
   if (typeof factory !== "function") {
     gap("CONTENT_REGISTRY_UNINITIALIZED", "src/data/data-lists.ts:modifierTypes", "LOCK_CAPSULE factory is not registered");
   }
-  const type = factory();
+  const type = factory().withIdFromFunc(factory);
   const modifier = type?.newModifier?.();
   if (modifier == null || modifier.type?.id !== "LOCK_CAPSULE") {
     gap("LOCK_CAPSULE_UNOBSERVABLE", "src/modifier/modifier-type.ts:modifierTypes.LOCK_CAPSULE", "live Lock Capsule modifier could not be constructed");
