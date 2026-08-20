@@ -210,11 +210,7 @@ export function successorWaitAllows(
     "WAVE_ADVANCE",
     "TERMINAL_COMMIT",
   ] as const;
-  const replacementTerminalKinds = [
-    "INTERACTION_COMMIT",
-    "WAVE_ADVANCE",
-    "TERMINAL_COMMIT",
-  ] as const;
+  const replacementTerminalKinds = ["INTERACTION_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"] as const;
   const turnBoundaryWait =
     !wait.allowNextWaveStart
     && wait.allowedKinds.length === turnBoundaryKinds.length

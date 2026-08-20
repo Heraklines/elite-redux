@@ -9,10 +9,15 @@
 
 import type { BattleScene } from "#app/battle-scene";
 import {
-  digestOfMaterial,
   type CoopTerminalMaterialV2,
   type CoopWaveTransitionMaterialV2,
+  digestOfMaterial,
 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
+import type {
+  CoopAuthorityEntry,
+  CoopFrameContextV2,
+  CoopNextControl,
+} from "#data/elite-redux/coop/authority-v2/contract";
 import {
   activeCoopWaveAuthorityModeV2,
   CoopV2WaveCutover,
@@ -28,11 +33,6 @@ import {
 } from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import type { CoopFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
-import type {
-  CoopAuthorityEntry,
-  CoopFrameContextV2,
-  CoopNextControl,
-} from "#data/elite-redux/coop/authority-v2/contract";
 import {
   type CoopSchedulerClock,
   type CoopTimerHandle,
@@ -352,7 +352,7 @@ describe("authority-v2 wave/terminal host commits", () => {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
       admitEntry: () => true,
-      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      applyMaterial: () => (predecessorMaterialReady ? true : "deferred"),
       projectControl: () => null,
     };
     const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
@@ -447,7 +447,7 @@ describe("authority-v2 wave/terminal host commits", () => {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
       admitEntry: () => true,
-      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      applyMaterial: () => (predecessorMaterialReady ? true : "deferred"),
       projectControl: () => null,
     };
     const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
@@ -488,10 +488,9 @@ describe("authority-v2 wave/terminal host commits", () => {
       });
       expect(deferred.context).toEqual(duo.host.authenticatedFrameContext);
       expect(deferred.material.payload).toEqual(TERMINAL_MATERIAL);
-      expect(
-        duo.host.diagnostics().pendingTimers,
-        "parking the terminal does not allocate a second retry timer",
-      ).toBe(predecessorTimers);
+      expect(duo.host.diagnostics().pendingTimers, "parking the terminal does not allocate a second retry timer").toBe(
+        predecessorTimers,
+      );
       expect(duo.host.diagnostics()).toMatchObject({ committed: 1, parityChecks: 0, parityMatches: 0 });
       expect(committedTerminals).toHaveLength(0);
 
@@ -549,7 +548,7 @@ describe("authority-v2 wave/terminal host commits", () => {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
       admitEntry: () => true,
-      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      applyMaterial: () => (predecessorMaterialReady ? true : "deferred"),
       projectControl: () => null,
     };
     const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
@@ -631,7 +630,7 @@ describe("authority-v2 wave/terminal host commits", () => {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
       admitEntry: () => true,
-      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      applyMaterial: () => (predecessorMaterialReady ? true : "deferred"),
       projectControl: () => null,
     };
     const duo = buildDuo({ hostLiveReplica, guestLiveReplica });
@@ -730,7 +729,7 @@ describe("authority-v2 wave/terminal host commits", () => {
       ownsEntry: entry => entry.kind === "TURN_COMMIT",
       ownsControl: () => false,
       admitEntry: () => true,
-      applyMaterial: () => predecessorMaterialReady ? true : "deferred",
+      applyMaterial: () => (predecessorMaterialReady ? true : "deferred"),
       projectControl: () => null,
     };
     const duo = buildDuo({ hostLiveReplica, guestLiveReplica });

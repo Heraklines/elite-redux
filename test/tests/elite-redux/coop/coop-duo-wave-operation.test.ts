@@ -30,7 +30,10 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { getActiveCoopV2WaveCutover } from "#data/elite-redux/coop/authority-v2/cutover-wave";
+import {
+  type CoopV2WaveTerminalCommitDisposition,
+  getActiveCoopV2WaveCutover,
+} from "#data/elite-redux/coop/authority-v2/cutover-wave";
 import { type CoopFrameV2, encodeFrameV2 } from "#data/elite-redux/coop/authority-v2/frame-codec";
 import { validateInboundFrame } from "#data/elite-redux/coop/authority-v2/protocol-validator";
 import { setCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
@@ -1318,10 +1321,11 @@ describe.skipIf(!RUN)("co-op DUO wave-advance via the operation primitive - per 
     if (changedEntry == null) {
       throw new Error(`deferred wave boundary retained unexpected ${parked.entry.kind} entry`);
     }
-    vi.spyOn(cutover, "retryDeferredHostBoundaryDetailed").mockReturnValue({
+    const changedDisposition = {
       kind: "committed",
       entry: changedEntry,
-    });
+    } as CoopV2WaveTerminalCommitDisposition;
+    vi.spyOn(cutover, "retryDeferredHostBoundaryDetailed").mockReturnValue(changedDisposition);
 
     await withClient(rig.hostCtx, async () => {
       isCoopV2InteractionHumanInputFrozen(rig.hostRuntime);

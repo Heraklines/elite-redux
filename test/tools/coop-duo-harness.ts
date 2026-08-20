@@ -1903,6 +1903,11 @@ export async function driveClientPhaseQueueTo(
     startedPhases?: WeakSet<Phase>;
     /** Pump the other browser's scheduled inbox while this client's real phase awaits a reciprocal route. */
     pumpPeer?: () => Promise<void>;
+    /**
+     * Let the current phase register its exact material consumer before the first transport drain.
+     * Direct-mirror bootstraps use this after TurnInit has synchronously parked at CommandPhase.
+     */
+    deferInitialDrainUntilPhaseStart?: boolean;
     /** Drive an explicitly-recognized public prompt while the current phase remains blocked on human input. */
     drivePublicPhaseInput?: (phase: Phase) => boolean | Promise<boolean>;
   } = {},
@@ -1917,7 +1922,9 @@ export async function driveClientPhaseQueueTo(
     options.pumpPeer ?? (peerCtx == null ? undefined : () => pumpReciprocalPeer(peerCtx, startedPeerPhases));
 
   for (let step = 0; step < maxPhases; step++) {
-    await drainLoopback();
+    if (step > 0 || options.deferInitialDrainUntilPhaseStart !== true) {
+      await drainLoopback();
+    }
     const phase = scene.phaseManager.getCurrentPhase();
     if (phase == null) {
       throw new Error(`client phase drive to ${target} lost its current phase at step ${step}`);
@@ -2169,6 +2176,7 @@ async function materializeMirroredShowdownGuestCommandFrontier(
       matches: phase =>
         phase.phaseName === "CommandPhase"
         && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === fieldIndex,
+      deferInitialDrainUntilPhaseStart: position === 0,
     });
     command.start();
     await drainLoopback();
@@ -2950,6 +2958,7 @@ export async function buildDuo(
           matches: phase =>
             phase.phaseName === "CommandPhase"
             && (phase as Phase & { getFieldIndex(): number }).getFieldIndex() === guestFieldIndex,
+          deferInitialDrainUntilPhaseStart: true,
         });
         guestOwnCommand.start();
         await drainLoopback();
