@@ -465,11 +465,18 @@ function restoreObservationHooks(): void {
   observedMarketOptions = [];
 }
 
-async function waitUntil(predicate: () => boolean, vector: string, sourceSeam: string, timeoutMs = 20_000): Promise<void> {
+async function waitUntil(
+  predicate: () => boolean,
+  vector: string,
+  sourceSeam: string,
+  timeoutMs = 20_000,
+  diagnostics?: () => RecordValue,
+): Promise<void> {
   const started = Date.now();
   while (!predicate()) {
     if (Date.now() - started > timeoutMs) {
-      gap("LIVE_CALLBACK_UNOBSERVABLE", sourceSeam, `${vector} did not reach its live callback frontier`);
+      const state = diagnostics == null ? "" : `; state=${JSON.stringify(diagnostics())}`;
+      gap("LIVE_CALLBACK_UNOBSERVABLE", sourceSeam, `${vector} did not reach its live callback frontier${state}`);
     }
     await new Promise(resolve => setTimeout(resolve, 0));
   }
@@ -528,7 +535,7 @@ function addLockCapsule(game: GameManager): void {
   }
 }
 
-function driveKey(game: GameManager, button: Button, key: string, surface: Surface): void {
+function driveKey(game: GameManager, button: Button, key: string, surface: Surface): boolean {
   const trace = activeSurface(surface);
   if (trace == null) {
     gap("RAW_KEY_TAPE_UNOBSERVABLE", "src/ui/ui.ts:Ui.processInput", `no active ${surface} trace for ${key}`);
@@ -560,14 +567,16 @@ function driveKey(game: GameManager, button: Button, key: string, surface: Surfa
     }
     handlerState.cursor = cursor;
   }
+  const accepted = Boolean(result);
   trace.rawKeyTape.push({
     sequence: trace.rawKeyTape.length,
     key,
     mode_before: modeBefore,
     mode_after: String(game.scene.ui.getMode()),
-    accepted: Boolean(result),
+    accepted,
     ...(Object.keys(handlerState).length === 0 ? {} : { handler: handlerState }),
   });
+  return accepted;
 }
 
 type ModifierCursorState = {
@@ -765,10 +774,48 @@ async function driveReward(game: GameManager): Promise<void> {
     );
   }
   surface.decisions.push({ kind: "REROLL_NAVIGATION", row_cursor: rerollCursor.rowCursor, cursor: rerollCursor.cursor });
-  driveKey(game, Button.ACTION, "ACTION", "reward");
-  await waitUntil(() => surface.round >= 2 && game.scene.reroll === false, "one reward reroll", "src/phases/select-modifier-phase.ts:rerollModifiers");
+  const oldPhase = phase;
+  const oldPhaseName = String(oldPhase.phaseName ?? oldPhase.constructor?.name ?? "");
+  const oldMode = String(game.scene.ui.getMode());
+  const oldMoney = game.scene.money;
+  const rerollAccepted = driveKey(game, Button.ACTION, "ACTION", "reward");
+  const rerollState = (): RecordValue => {
+    const currentPhase = game.scene.phaseManager.getCurrentPhase() as AnyRecord | null;
+    const currentMoney = (game.scene as AnyRecord).money;
+    return {
+      accepted: rerollAccepted,
+      old_phase: oldPhaseName,
+      new_phase: String(currentPhase?.phaseName ?? currentPhase?.constructor?.name ?? ""),
+      distinct_phase_object: currentPhase != null && currentPhase !== oldPhase,
+      mode_before: oldMode,
+      mode_now: String(game.scene.ui.getMode()),
+      reroll: Boolean(game.scene.reroll),
+      money_before: typeof oldMoney === "number" && Number.isFinite(oldMoney) ? oldMoney : null,
+      money_now: typeof currentMoney === "number" && Number.isFinite(currentMoney) ? currentMoney : null,
+      surface_round: surface.round,
+    };
+  };
+  // SelectModifierPhase.rerollModifiers queues its successor, then its UiMode.MESSAGE continuation
+  // calls super.end(). The PhaseInterceptor intentionally replaces the manager's private start head,
+  // so let that public end/queue continuation settle before asking the interceptor to run the queued
+  // successor. This exercises the real UI and phase-manager path without calling either private action.
+  await waitUntil(
+    () => game.scene.phaseManager.getCurrentPhase() !== oldPhase,
+    "queued reward reroll successor",
+    "src/phase-manager.ts:PhaseManager.shiftPhase",
+    20_000,
+    rerollState,
+  );
+  await game.phaseInterceptor.to("SelectModifierPhase");
+  await waitUntil(
+    () => surface.round >= 2 && game.scene.reroll === false,
+    "one reward reroll",
+    "src/phases/select-modifier-phase.ts:rerollModifiers",
+    20_000,
+    rerollState,
+  );
   const rerolled = awaitRewardPhase(game);
-  if (rerolled === phase) {
+  if (rerolled === oldPhase) {
     gap("REWARD_REROLL_SUCCESSOR_UNOBSERVABLE", "src/phases/select-modifier-phase.ts:rerollModifiers", "reroll did not start a successor SelectModifierPhase");
   }
   const targetIndex = findTargetedReward(rerolled);
