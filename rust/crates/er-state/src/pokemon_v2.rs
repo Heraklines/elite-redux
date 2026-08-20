@@ -14,11 +14,10 @@ use er_types::battle_model::{
 use er_types::run_ids::{Experience, GrowthRateId, NatureId};
 
 use crate::pokemon::{
-    AbilityLoadoutValidationError, MOVE_SLOT_COUNT, PokemonStateError,
-    StatStagesValidationError, StatusValidationError, TypingValidationError,
-    validate_ability_loadout, validate_m3_ability_loadout, validate_m3_status_state,
-    validate_m3_typing, validate_move_slot_metadata, validate_stat_stages,
-    validate_status_state, validate_typing,
+    AbilityLoadoutValidationError, MOVE_SLOT_COUNT, PokemonStateError, StatStagesValidationError,
+    StatusValidationError, TypingValidationError, validate_ability_loadout,
+    validate_m3_ability_loadout, validate_m3_status_state, validate_m3_typing,
+    validate_move_slot_metadata, validate_stat_stages, validate_status_state, validate_typing,
 };
 
 pub const POKEMON_STATE_SCHEMA_VERSION_V2: u32 = 2;
