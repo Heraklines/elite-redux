@@ -239,9 +239,9 @@ jobs:
     timeout-minutes: 330
     strategy:
       fail-fast: false
-      max-parallel: 8
+      max-parallel: 18
       matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -259,7 +259,7 @@ jobs:
           [[ "$start" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
           if [[ -z "$end" ]]; then end="$(date -u +%F)"; fi
           [[ "$end" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
-          python - "$start" "$end" "${{ matrix.shard }}" 8 > "$RUNNER_TEMP/dates.txt" <<'PY'
+          python - "$start" "$end" "${{ matrix.shard }}" 18 > "$RUNNER_TEMP/dates.txt" <<'PY'
           from datetime import date, timedelta
           import sys
 
