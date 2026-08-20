@@ -740,6 +740,7 @@ async function captureReward(seed: string): Promise<{ game: GameManager; evidenc
   try {
     game.move.select(MoveId.SPLASH);
     await game.doKillOpponents();
+    await game.phaseInterceptor.to("SelectModifierPhase");
     await driveReward(game);
     return { game, evidence: validateSurface(context.reward, "rewards/regular-reroll-lock-v1") };
   } catch (error) {
@@ -759,6 +760,7 @@ async function captureMarket(seed: string): Promise<RecordValue> {
   try {
     game.move.select(MoveId.SPLASH);
     await game.doKillOpponents();
+    await game.phaseInterceptor.to("BiomeShopPhase");
     await driveMarket(game);
     return validateSurface(context.market, "markets/town-wave-10-v1");
   } finally {
