@@ -168,6 +168,7 @@ dependencies = [
  "er-content",
  "er-game",
  "er-protocol",
+ "er-run",
  "er-rng",
  "er-state",
  "er-types",
