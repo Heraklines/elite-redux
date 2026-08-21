@@ -2947,14 +2947,16 @@ function ctrMemberHtml(m, i) {
 function firstAtlasFrame(atlas) {
   const tx = atlas && Array.isArray(atlas.textures) ? atlas.textures[0] : null;
   const fr = tx && Array.isArray(tx.frames) ? tx.frames[0] : null;
-  if (tx && fr && fr.frame && tx.size > 0) {
+  if (tx && fr && fr.frame && tx.size?.w > 0 && tx.size?.h > 0) {
     return { crop: fr.frame, sheet: tx.size };
   }
   // Staff uploads use TexturePacker's hash format while bundled trainer sheets
   // use Phaser's multi-atlas format. Both are valid runtime assets.
   const hashFrames = atlas && atlas.frames && typeof atlas.frames === "object" ? Object.values(atlas.frames) : [];
   const hashFrame = hashFrames.find(frame => frame && frame.frame);
-  return hashFrame && atlas.meta?.size > 0 ? { crop: hashFrame.frame, sheet: atlas.meta.size } : null;
+  return hashFrame && atlas.meta?.size?.w > 0 && atlas.meta?.size?.h > 0
+    ? { crop: hashFrame.frame, sheet: atlas.meta.size }
+    : null;
 }
 
 function fetchPokemonAtlas(slug) {
