@@ -981,7 +981,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
     gap(
       "ENCOUNTER_CALLBACK_UNOBSERVABLE",
       ENCOUNTER_SOURCE,
-      error instanceof Error ? error.message : String(error),
+      error instanceof Error ? (error.stack ?? error.message) : String(error),
     );
   } finally {
     if (originalBattleSeed !== undefined) {

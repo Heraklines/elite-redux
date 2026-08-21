@@ -966,6 +966,7 @@ async function driveMarket(game: GameManager): Promise<void> {
     rounded_price: finiteNumber(options[index]?.cost, "market.purchase.rounded_price"),
     quantity_before: finiteNumber(quantities[index], "market.purchase.quantity_before"),
   });
+  const moneyBeforePurchase = finiteNumber(game.scene.money, "market.purchase.money_before");
   const purchaseAccepted = driveKey(game, Button.ACTION, "ACTION", "market");
   if (!purchaseAccepted) {
     gap(
@@ -975,10 +976,9 @@ async function driveMarket(game: GameManager): Promise<void> {
     );
   }
   await waitUntil(
-    () => {
-      const liveQuantities = (phase as AnyRecord).qtys;
-      return Array.isArray(liveQuantities) && Number(liveQuantities[index]) < Number(quantities[index]);
-    },
+    () =>
+      Number(handler.getStock(index)) < Number(quantities[index])
+      && Number(game.scene.money) < moneyBeforePurchase,
     "market purchase",
     "src/phases/biome-shop-phase.ts:applyModifier",
     20_000,
@@ -987,19 +987,14 @@ async function driveMarket(game: GameManager): Promise<void> {
       displayed_index: Number((handler as AnyRecord).cursor ?? -1),
       mode: String(game.scene.ui.getMode()),
       quantity_before: Number(quantities[index]),
-      quantity_now: Number((phase as AnyRecord).qtys?.[index]),
-      money: Number(game.scene.money),
-      pending_index: Number((phase as AnyRecord).pendingIndex ?? -1),
+      quantity_now: Number(handler.getStock(index)),
+      money_before: moneyBeforePurchase,
+      money_now: Number(game.scene.money),
     }),
   );
-  const liveQuantities = (phase as AnyRecord).qtys;
-  if (!Array.isArray(liveQuantities)) {
-    gap(
-      "MARKET_STOCK_UNOBSERVABLE",
-      "src/phases/biome-shop-phase.ts:BiomeShopPhase.qtys",
-      "live market quantities disappeared after purchase",
-    );
-  }
+  const liveQuantities = options.map((_, stockIndex) =>
+    finiteNumber(handler.getStock(stockIndex), `market.stock.remaining[${stockIndex}]`),
+  );
   surface.decisions.push({ kind: "PURCHASE_COMMITTED", displayed_index: displayedIndex, remaining: jsonValue(liveQuantities) });
   const afterPurchase = await awaitMarketInput(game);
   surface.presentation.push({ mode: String(game.scene.ui.getMode()), phase: "BiomeShopPhase", displayed_index: Number((afterPurchase as AnyRecord).cursor ?? -1), stock: jsonValue(liveQuantities) });
