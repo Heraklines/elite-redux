@@ -38,7 +38,7 @@ import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { captureOracleFrontier, captureOracleNextControl } from "./oracle-frontier";
-import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
+import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import { BattleScene } from "#app/battle-scene";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
@@ -720,6 +720,26 @@ function battleRngView(battle: AnyRecord): AnyRecord {
   };
 }
 
+function releaseGame(game: GameManager | null): void {
+  if (PromptHandler.runInterval != null) {
+    clearInterval(PromptHandler.runInterval);
+    PromptHandler.runInterval = undefined;
+  }
+  if (game == null) {
+    return;
+  }
+  game.promptHandler.clearPrompts();
+  game.scene.phaseManager.clearAllPhases();
+  const ui = game.scene.ui as AnyRecord;
+  const handler = typeof ui.getHandler === "function" ? (ui.getHandler() as AnyRecord | undefined) : undefined;
+  if (typeof handler?.clear === "function") {
+    handler.clear();
+  }
+  if (typeof ui.resetModeChain === "function") {
+    ui.resetModeChain();
+  }
+}
+
 async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: AnyRecord }> {
   const PhaserGame = Phaser.Game;
   if (typeof PhaserGame !== "function") {
@@ -734,19 +754,53 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
   const originalBattleSeed = BattleScene.prototype.randBattleSeedInt;
   let game: GameManager | null = null;
   let encounterInitial: AnyRecord | null = null;
+  let biome: AnyRecord;
   try {
+    const biomeScenarioSpec = {
+      v: 1,
+      name: "M4A captured Town wave 10",
+      notes: "Explicit test vector; not a natural single-seed segment.",
+      party: [{ species: 7, moves: [33, 39, 55, 110], abilitySlot: 0, nature: 0 }],
+      run: { seed: RUN_SEED, wave: 10, biome: BiomeId.TOWN, level: 10, difficulty: "ace" },
+    } satisfies ScenarioSpec;
+    const biomeBuilt = buildDevScenario(biomeScenarioSpec);
+    game = new GameManager(phaserGame);
+    const biomeUi = game.scene.ui as AnyRecord;
+    biomeUi.shouldSkipDialogue = () => true;
+    await game.runToTitle();
+    const biomeStarters = biomeBuilt.scenario.setup();
+    game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+      game!.scene.gameMode = getGameMode(GameModes.CLASSIC);
+      const starterPhase = new SelectStarterPhase();
+      game!.override
+        .seed(RUN_SEED)
+        .startingWave(10)
+        .startingBiome(BiomeId.TOWN);
+      game!.scene.phaseManager.pushNew("EncounterPhase", false);
+      starterPhase.initBattle(biomeStarters, true);
+      biomeBuilt.postLaunch();
+    });
+    await game.phaseInterceptor.to("CommandPhase", false);
+    const biomeBattle = game.scene.currentBattle as AnyRecord | undefined;
+    if (biomeBattle == null || biomeBattle.waveIndex !== 10 || game.scene.arena.biomeId !== BiomeId.TOWN) {
+      gap("BIOME_VECTOR_MISMATCH", ENCOUNTER_SOURCE, "live Classic launch did not materialize wave 10 in Town");
+    }
+    biome = captureStructureAndRoute(game);
+    releaseGame(game);
+    game = null;
+
     const scenarioSpec = {
+      v: 1,
       name: "M4A captured Plains wave 11",
       notes: "Explicit test vector; not a natural single-seed segment.",
       party: [{ species: 7, moves: [33, 39, 55, 110], abilitySlot: 0, nature: 0 }],
       run: { seed: RUN_SEED, wave: 11, biome: BiomeId.PLAINS, level: 10, difficulty: "ace" },
-    } as any;
+    } satisfies ScenarioSpec;
     const built = buildDevScenario(scenarioSpec);
     game = new GameManager(phaserGame);
     const ui = game.scene.ui as AnyRecord;
     ui.shouldSkipDialogue = () => true;
     await game.runToTitle();
-    const biome = captureStructureAndRoute(game);
     const starters = built.scenario.setup();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
       game!.scene.gameMode = getGameMode(GameModes.CLASSIC);
