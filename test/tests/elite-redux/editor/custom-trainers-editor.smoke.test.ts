@@ -170,6 +170,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   // Reset editor state between tests (module state is shared across the file).
+  (q("#search") as HTMLInputElement).value = "";
   ct.ctr.current = {};
   ct.ctr.baseline = {};
   ct.CTR_LIVE = {};
