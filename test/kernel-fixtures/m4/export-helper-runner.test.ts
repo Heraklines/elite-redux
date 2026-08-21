@@ -101,6 +101,9 @@ async function runCapture(kind: CaptureKind, output: string): Promise<void> {
   if (Phaser.Math.RND == null) {
     (Phaser.Math as unknown as Record<string, unknown>).RND = new Phaser.Math.RandomDataGenerator();
   }
+  // Module initialization and GameManager construction consume the ambient
+  // Phaser stream before each scenario installs its run seed.
+  Phaser.Math.RND.sow([`m4-oracle-helper:${kind}`]);
   try {
     const selected = CAPTURES[kind];
     // The selected kind is runtime configuration; static imports would load every Phaser/GameManager helper.
