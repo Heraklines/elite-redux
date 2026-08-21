@@ -8008,3 +8008,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Rebased the five roster showcase scenarios on the proven Endless dev-scenario launch contract: explicit pending starter levels, deterministic Youngster/Normal run settings, and encounter persistence bypass for disposable fixtures.
 - Added a focused headless scenario harness that launches each entry through the same `__erLaunchDevScenarioByLabel` hook used by the in-game dev menu and requires the real flow to reach `CommandPhase` with all six level-100 player Pokemon and a live opponent.
 - Verification: all five roster scenarios pass the harness. No browser automation was used. Production and co-op remain untouched.
+
+2026-08-21 - N-type player battle-info alignment
+
+- Player battle-info compact/expanded transitions now move pooled type tabs 4+ together with the three fixed tabs. Quadruple, sextuple, and later N-type displays therefore retain the existing paired-column overlap instead of leaving extra tabs eight pixels below the health panel.
+- `git diff --check` passes. Staging verification is pending; production remains untouched.

@@ -109,7 +109,7 @@ export class PlayerBattleInfo extends BattleInfo {
     ];
     offsetElements.forEach(el => (el.y += 1.5 * (mini ? -1 : 1)));
 
-    [this.type1Icon, this.type2Icon, this.type3Icon].forEach(el => {
+    [this.type1Icon, this.type2Icon, this.type3Icon, ...this.extraTypeIcons].forEach(el => {
       el.x += 4 * (mini ? 1 : -1);
       el.y += -8 * (mini ? 1 : -1);
     });
