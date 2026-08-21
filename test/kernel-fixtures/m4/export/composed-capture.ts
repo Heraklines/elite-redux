@@ -16,6 +16,7 @@ import {
 import { getGameMode } from "#app/game-mode";
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
 import { GameModes } from "#enums/game-modes";
+import { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -257,6 +258,14 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
     }
     if (phase === "CommandPhase" || phase === "MovePhase" || phase === "SelectTargetPhase" || phase === "SwitchPhase") {
       press(game, "Space", tape, transitions);
+    }
+    if (phase === "EnemyCommandPhase") {
+      await game.move.selectEnemyMove(MoveId.SPLASH, BattlerIndex.PLAYER);
+      transitions.push({
+        kind: "SCRIPTED_ENEMY_COMMAND",
+        move_id: MoveId.SPLASH,
+        target: BattlerIndex.PLAYER,
+      });
     }
     await sleep();
   }

@@ -966,7 +966,14 @@ async function driveMarket(game: GameManager): Promise<void> {
     rounded_price: finiteNumber(options[index]?.cost, "market.purchase.rounded_price"),
     quantity_before: finiteNumber(quantities[index], "market.purchase.quantity_before"),
   });
-  driveKey(game, Button.ACTION, "ACTION", "market");
+  const purchaseAccepted = driveKey(game, Button.ACTION, "ACTION", "market");
+  if (!purchaseAccepted) {
+    gap(
+      "MARKET_PURCHASE_REJECTED",
+      "src/phases/biome-shop-phase.ts:onSelect",
+      `public market action rejected slot ${index}`,
+    );
+  }
   await waitUntil(
     () => {
       const liveQuantities = (phase as AnyRecord).qtys;
@@ -974,6 +981,16 @@ async function driveMarket(game: GameManager): Promise<void> {
     },
     "market purchase",
     "src/phases/biome-shop-phase.ts:applyModifier",
+    20_000,
+    () => ({
+      accepted: purchaseAccepted,
+      displayed_index: Number((handler as AnyRecord).cursor ?? -1),
+      mode: String(game.scene.ui.getMode()),
+      quantity_before: Number(quantities[index]),
+      quantity_now: Number((phase as AnyRecord).qtys?.[index]),
+      money: Number(game.scene.money),
+      pending_index: Number((phase as AnyRecord).pendingIndex ?? -1),
+    }),
   );
   const liveQuantities = (phase as AnyRecord).qtys;
   if (!Array.isArray(liveQuantities)) {
