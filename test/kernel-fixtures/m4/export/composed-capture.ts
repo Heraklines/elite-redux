@@ -275,6 +275,9 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
       if (stop.includes(boundary)) {
         return;
       }
+      if (boundary === "CommandPhase") {
+        await game.phaseInterceptor.to("CommandPhase");
+      }
     }
     await sleep();
   }

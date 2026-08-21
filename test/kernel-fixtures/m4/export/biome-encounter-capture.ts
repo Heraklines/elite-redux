@@ -793,15 +793,6 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       ui.resetModeChain();
     }
 
-    const scenarioSpec = {
-      v: 1,
-      name: "M4A captured Plains wave 11",
-      notes: "Explicit test vector; not a natural single-seed segment.",
-      party: [{ species: 7, moves: [33, 39, 55, 110], abilitySlot: 0, nature: 0 }],
-      run: { seed: RUN_SEED, wave: 11, biome: BiomeId.PLAINS, level: 10, difficulty: "ace" },
-    } satisfies ScenarioSpec;
-    const built = buildDevScenario(scenarioSpec);
-    const starters = built.scenario.setup();
     game.scene.gameMode = getGameMode(GameModes.CLASSIC);
     const starterPhase = new SelectStarterPhase();
     game.override
@@ -810,8 +801,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       .startingBiome(BiomeId.PLAINS);
     encounterInitial = frontier(game);
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    starterPhase.initBattle(starters, true);
-    built.postLaunch();
+    starterPhase.initBattle(biomeStarters, true);
 
     const captured = await withAsyncRngCapture("encounter", async () => {
       await game!.phaseInterceptor.to("CommandPhase", false);
