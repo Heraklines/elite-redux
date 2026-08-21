@@ -385,13 +385,16 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
     gap("REWARD_UI_CURSOR_UNOBSERVABLE", "src/ui/handlers/modifier-select-ui-handler.ts:setRowCursor/setCursor", "rerolled reward did not reach observed reward cursor 0");
   }
   press(game, "Space", tape, transitions);
-  for (let attempt = 0; attempt < 6 && String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "") !== "CommandPhase"; attempt += 1) {
+  await sleep();
+  if (game.scene.ui.getMode() === UiMode.PARTY) {
+    press(game, "Space", tape, transitions);
     await sleep();
-    if (String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "") !== "CommandPhase") {
-      press(game, "Space", tape, transitions);
-    }
   }
-  await waitForInputPhase(game, ["CommandPhase"], "wave-10 command after regular reward");
+  if (game.scene.ui.getMode() === UiMode.MESSAGE) {
+    press(game, "Space", tape, transitions);
+    await sleep();
+  }
+  await game.phaseInterceptor.to("CommandPhase");
 }
 async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
   await waitForInputPhase(game, ["SelectModifierPhase"], "wave-10 Town market");
