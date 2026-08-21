@@ -221,3 +221,62 @@ impl GameControlPlan {
             .expect("validated plan has exactly one owner")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::SafeU53;
+
+    fn seat(value: u64) -> SeatId {
+        SeatId::new(SafeU53::new(value).expect("seat value"))
+    }
+
+    fn menu_instance(value: u64) -> MenuInstanceId {
+        MenuInstanceId::new(SafeU53::new(value).expect("instance value"))
+    }
+
+    #[test]
+    fn plan_requires_one_owner_and_unique_seats() {
+        let control = GameControl::Complete(RunOutcome::Victory);
+        let owner = SeatControlPlan {
+            seat: seat(1),
+            owner: true,
+            control_id: "control-1".to_owned(),
+            menu_instance_id: menu_instance(1),
+            actionable_after: PresentationBarrier::NonBlocking,
+            control: control.clone(),
+        };
+        let watcher = SeatControlPlan {
+            seat: seat(2),
+            owner: false,
+            ..owner.clone()
+        };
+        let plan = GameControlPlan::new(
+            vec![owner, watcher],
+            "control-next".to_owned(),
+            menu_instance(2),
+        )
+        .expect("valid plan");
+        assert_eq!(plan.owner_seat(), seat(1));
+
+        let both_owners = vec![
+            SeatControlPlan {
+                owner: true,
+                ..plan.seats[0].clone()
+            },
+            SeatControlPlan {
+                owner: true,
+                ..plan.seats[1].clone()
+            },
+        ];
+        assert_eq!(
+            GameControlPlan::new(
+                both_owners,
+                "control-next".to_owned(),
+                plan.next_menu_instance_id
+            )
+            .err(),
+            Some(GameControlPlanError::OwnerCount { owners: 2 })
+        );
+    }
+}
