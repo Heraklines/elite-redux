@@ -337,7 +337,7 @@ function runPass(outputRoot, rawRoot, run, exporterCommitSha) {
   const composition = runVitest(TEST_PATH, {
     M4_ORACLE_OUTPUT_ROOT: outputRoot,
     M4_ORACLE_RAW_ROOT: rawRoot,
-    M4_ORACLE_GAP_REPORT: resolve(rawRoot, "gap-report.json"),
+    M4_ORACLE_GAP_REPORT: process.env.M4_ORACLE_GAP_REPORT || resolve(rawRoot, "gap-report.json"),
     M4_ORACLE_EXPORTER_SHA: exporterCommitSha,
     M4_ORACLE_PROCESS: String(run),
   });
@@ -390,6 +390,7 @@ try {
   const failures = [...firstFailures, ...secondFailures];
   if (failures.length > 0) {
     process.stderr.write(`${failures.join("\n")}\n`);
+    cpSync(secondRaw, resolve(outputRoot, "raw-failure"), { recursive: true });
     const finalStatus = gitStatus();
     if (finalStatus !== initialStatus) {
       fail(`export changed the checkout; initial=${JSON.stringify(initialStatus)} final=${JSON.stringify(finalStatus)}`);
