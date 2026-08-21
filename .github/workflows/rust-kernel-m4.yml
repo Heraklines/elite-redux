@@ -164,7 +164,12 @@ jobs:
 
       - name: Require committed lockfile
         working-directory: rust
-        run: git diff --exit-code -- Cargo.lock
+        shell: bash
+        run: |
+          if ! git diff --exit-code -- Cargo.lock; then
+            echo "::error::Cargo.lock drifted from the committed file; diff above"
+            exit 1
+          fi
 
       - name: Upload generated lockfile evidence
         if: always()
