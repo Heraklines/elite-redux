@@ -48,6 +48,9 @@ jobs:
       - name: Validate generated editor data
         run: node scripts/validate-editor-data.mjs editor/data
 
+      - name: Test editor asset uploads and sprite previews
+        run: pnpm exec vitest run test/tests/elite-redux/editor/assets-editor.smoke.test.ts test/node/editor-media-upload.test.ts
+
       - name: Build clean editor deploy directory
         run: |
           rm -rf editor/_deploy

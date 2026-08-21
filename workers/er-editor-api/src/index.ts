@@ -1542,16 +1542,7 @@ async function updateTrainerSpriteCatalog(
       return { ok: false, error: "sprite catalog contains invalid JSON" };
     }
     const key = body.key as string;
-    catalog[key] = {
-      label: (body.label as string).trim(),
-      spriteKey: key,
-      genders: body.genders === true,
-      kind: (body.kind || "other").trim(),
-      tags: body.tags || [],
-      author: (body.author || "").trim(),
-      license: body.license,
-      sourceUrl: (body.sourceUrl || "").trim(),
-    };
+    catalog[key] = trainerSpriteCatalogEntry(body);
     const putRes = await fetch(api, {
       method: "PUT",
       headers: { ...ghHeaders(env), "Content-Type": "application/json" },
@@ -1570,6 +1561,20 @@ async function updateTrainerSpriteCatalog(
     }
   }
   return { ok: false, error: "sprite catalog changed repeatedly; retry the upload" };
+}
+
+function trainerSpriteCatalogEntry(body: TrainerSpriteUploadBody) {
+  const key = body.key as string;
+  return {
+    label: (body.label as string).trim(),
+    spriteKey: key,
+    genders: body.genders === true,
+    kind: (body.kind || "other").trim(),
+    tags: body.tags || [],
+    author: (body.author || "").trim(),
+    license: body.license,
+    sourceUrl: (body.sourceUrl || "").trim(),
+  };
 }
 
 async function handleTrainerSpriteUpload(body: TrainerSpriteUploadBody, env: Env): Promise<Response> {
@@ -1642,7 +1647,17 @@ async function handleTrainerSpriteUpload(body: TrainerSpriteUploadBody, env: Env
       return json({ ok: false, error: deploy.error, assetsCommitted: true, catalogCommitted: true }, 502, env);
     }
   }
-  return json({ ok: true, assetsCommit: assets.commit, catalogCommit: catalog.commit, key }, 200, env);
+  return json(
+    {
+      ok: true,
+      assetsCommit: assets.commit,
+      catalogCommit: catalog.commit,
+      key,
+      entry: { key, ...trainerSpriteCatalogEntry(body) },
+    },
+    200,
+    env,
+  );
 }
 
 const MEDIA_UPLOAD_PART_BYTES = 8 * 1024 * 1024;

@@ -1,0 +1,36 @@
+name: Deploy ER Editor Worker
+
+on:
+  push:
+    branches:
+      - feat/elite-redux-port
+    paths:
+      - "workers/er-editor-api/**"
+      - .github/workflows/deploy-editor-worker.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: er-editor-worker
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'Heraklines/elite-redux'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Test direct media upload Worker
+        run: pnpm exec vitest run test/node/editor-media-upload.test.ts
+
+      - name: Deploy ER Editor Worker
+        run: npx wrangler deploy --config workers/er-editor-api/wrangler.toml

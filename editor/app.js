@@ -2947,10 +2947,14 @@ function ctrMemberHtml(m, i) {
 function firstAtlasFrame(atlas) {
   const tx = atlas && Array.isArray(atlas.textures) ? atlas.textures[0] : null;
   const fr = tx && Array.isArray(tx.frames) ? tx.frames[0] : null;
-  if (!tx || !fr || !fr.frame || tx.size === 0) {
-    return null;
+  if (tx && fr && fr.frame && tx.size > 0) {
+    return { crop: fr.frame, sheet: tx.size };
   }
-  return { crop: fr.frame, sheet: tx.size };
+  // Staff uploads use TexturePacker's hash format while bundled trainer sheets
+  // use Phaser's multi-atlas format. Both are valid runtime assets.
+  const hashFrames = atlas && atlas.frames && typeof atlas.frames === "object" ? Object.values(atlas.frames) : [];
+  const hashFrame = hashFrames.find(frame => frame && frame.frame);
+  return hashFrame && atlas.meta?.size > 0 ? { crop: hashFrame.frame, sheet: atlas.meta.size } : null;
 }
 
 function fetchPokemonAtlas(slug) {
@@ -3035,7 +3039,8 @@ function fetchTrainerAtlas(url) {
 /** Crop one trainer sprite's first frame into `el` via CSS background. Scaled 2x by
  *  default; pass `{ targetH }` to fit a specific pixel height (e.g. the list card). */
 function renderTrainerFrame(file, el, opts) {
-  const url = `${TRAINER_SPRITE_BASE}/${file}.json`;
+  const baseUrl = opts?.baseUrl || TRAINER_SPRITE_BASE;
+  const url = `${baseUrl}/${file}.json`;
   const paint = atlas => {
     if (!el.isConnected) {
       return;
@@ -3050,7 +3055,7 @@ function renderTrainerFrame(file, el, opts) {
     const scale = opts && opts.targetH ? opts.targetH / crop.h : 2;
     el.style.width = `${crop.w * scale}px`;
     el.style.height = `${crop.h * scale}px`;
-    el.style.backgroundImage = `url("${TRAINER_SPRITE_BASE}/${file}.png")`;
+    el.style.backgroundImage = `url("${baseUrl}/${file}.png")`;
     el.style.backgroundSize = `${sheet.w * scale}px ${sheet.h * scale}px`;
     el.style.backgroundPosition = `-${crop.x * scale}px -${crop.y * scale}px`;
     el.style.backgroundRepeat = "no-repeat";
@@ -3102,7 +3107,7 @@ function updateCtrSpritePreview() {
     frame.className = "ctr-sprite-frame";
     box.innerHTML = "";
     box.appendChild(frame);
-    renderTrainerFrame(file, frame);
+    renderTrainerFrame(file, frame, { baseUrl: uploaded.assetBase });
     return;
   }
   const input = document.getElementById("ctr-class");
@@ -3288,6 +3293,10 @@ function ctrCardSpriteFile(t) {
   return entry.genders ? `${entry.sprite}_${t.gender === "f" ? "f" : "m"}` : entry.sprite;
 }
 
+function ctrCardSpriteBase(t) {
+  return trainerSpriteByKey.get(t.trainerSprite || "")?.assetBase || "";
+}
+
 /** One small team-member icon for a list card: the downscaled front sprite (same
  *  slug resolution the fusion preview uses). Weighted slot -> the FIRST possibility.
  *  Empty/unresolvable species -> an empty neutral box (never a broken image). */
@@ -3305,11 +3314,12 @@ function renderCustomTrainers(root) {
       const t = ctr.current[k];
       const dirty = !jsonEq(ctr.current[k], ctr.baseline[k]);
       const spriteFile = ctrCardSpriteFile(t);
+      const spriteBase = ctrCardSpriteBase(t);
       const monIcons = (Array.isArray(t.team) ? t.team : []).map(ctrCardMonIcon).join("");
       return `<button type="button" class="ctr-open${k === ctrSelected ? " on" : ""}${dirty ? " dirty" : ""}" data-ctropen="${esc(k)}">
         <span class="ctr-card-head">${esc(t.name || k)} <small>#${t.id}</small></span>
         <span class="ctr-card-body">
-          <span class="ctr-card-sprite"${spriteFile ? ` data-ctrsprite="${esc(spriteFile)}"` : ""}></span>
+          <span class="ctr-card-sprite"${spriteFile ? ` data-ctrsprite="${esc(spriteFile)}"${spriteBase ? ` data-ctrsprite-base="${esc(spriteBase)}"` : ""}` : ""}></span>
           <span class="ctr-card-team">${monIcons}</span>
         </span>
       </button>`;
@@ -3458,7 +3468,7 @@ function renderCustomTrainers(root) {
   // Paint each list card's trainer sprite (lazy CDN atlas crop, ~44px tall). The
   // per-url in-flight cache means many cards sharing a class fire ONE fetch.
   for (const el of root.querySelectorAll("[data-ctrsprite]")) {
-    renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44 });
+    renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44, baseUrl: el.dataset.ctrspriteBase });
   }
   paintCustomTrainerPokemonFrames(root);
 }
@@ -4036,6 +4046,55 @@ function assetLicenseBadge(value) {
   return `<span class="license ${esc(license)}">${esc(license)}</span>`;
 }
 
+function trainerSpriteFiles(sprite) {
+  const key = sprite.spriteKey || sprite.key;
+  return sprite.genders ? [`${key}_m`, `${key}_f`] : [key];
+}
+
+function upsertTrainerSprite(entry, assetsCommit) {
+  if (!entry || !/^[a-z0-9_]{2,64}$/.test(entry.key || "")) {
+    return;
+  }
+  const sprite = {
+    ...entry,
+    spriteKey: entry.spriteKey || entry.key,
+    ...(assetsCommit
+      ? { assetBase: `https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${assetsCommit}/images/trainer` }
+      : {}),
+  };
+  const existing = TRAINER_SPRITES.findIndex(value => value.key === sprite.key);
+  if (existing >= 0) {
+    TRAINER_SPRITES.splice(existing, 1, sprite);
+  } else {
+    TRAINER_SPRITES.push(sprite);
+  }
+  TRAINER_SPRITES.sort((a, b) => String(a.label || a.key).localeCompare(String(b.label || b.key)));
+  trainerSpriteByKey.set(sprite.key, sprite);
+}
+
+function trainerSpriteCatalogHtml(sprite) {
+  const previews = trainerSpriteFiles(sprite)
+    .map(
+      file =>
+        `<span class="asset-sprite-thumb" data-asset-sprite-preview="${esc(file)}"${sprite.assetBase ? ` data-asset-sprite-base="${esc(sprite.assetBase)}"` : ""}></span>`,
+    )
+    .join("");
+  return `<div class="asset-track asset-sprite-track">
+    <div class="asset-sprite-thumbs">${previews}</div>
+    <div><strong>${esc(sprite.label || sprite.key)} ${assetLicenseBadge(sprite.license)}</strong><small>${esc([sprite.kind, ...(sprite.tags || [])].filter(Boolean).join(" | "))}</small>${sprite.author ? `<small>Artist: ${esc(sprite.author)}</small>` : ""}</div>
+    <button type="button" data-asset-sprite="${esc(sprite.key)}" title="Use this art in Custom Trainers">Use</button>
+  </div>`;
+}
+
+function paintTrainerSpriteCatalog(root) {
+  for (const el of root.querySelectorAll("[data-asset-sprite-preview]")) {
+    renderTrainerFrame(el.dataset.assetSpritePreview, el, {
+      targetH: 54,
+      baseUrl: el.dataset.assetSpriteBase,
+    });
+  }
+}
+
 function renderAssets(root) {
   const tracks = BGM_LIST.map(track => {
     const title = track.title || prettify(track.key);
@@ -4143,10 +4202,11 @@ function renderAssets(root) {
         <button type="button" id="asset-upload-sprite" class="primary">Process and upload</button>
       </div>
       <h2 style="margin-top:18px">Uploaded art</h2>
-      <div class="asset-catalog">${TRAINER_SPRITES.map(sprite => `<div class="asset-track"><div><strong>${esc(sprite.label || sprite.key)} ${assetLicenseBadge(sprite.license)}</strong><small>${esc([sprite.kind, ...(sprite.tags || [])].filter(Boolean).join(" | "))}</small></div><button type="button" data-asset-sprite="${esc(sprite.key)}" title="Open Custom Trainers">Use</button></div>`).join("") || '<span class="dyn">No uploaded trainer art.</span>'}</div>
+      <div class="asset-catalog">${TRAINER_SPRITES.map(trainerSpriteCatalogHtml).join("") || '<span class="dyn">No uploaded trainer art.</span>'}</div>
     </section>
   </div>`;
   paintPreparedTrainerSprites();
+  paintTrainerSpriteCatalog(root);
 }
 
 function paintPreparedTrainerSprites() {
@@ -4486,7 +4546,7 @@ async function uploadMediaFile() {
     await refreshMediaJobs();
   } catch (error) {
     await abortMediaUpload(password, session);
-    setMediaUploadProgress(0, "Upload failed");
+    setMediaUploadProgress(0, `Upload failed: ${error.message || error}`);
     throw error;
   }
 }
@@ -4558,7 +4618,22 @@ async function uploadTrainerSprite() {
   if (!response.ok) {
     throw new Error(result.error || `HTTP ${response.status}`);
   }
-  setStatus(`Trainer sprite ${result.key} uploaded. It appears after the editor refreshes.`);
+  upsertTrainerSprite(
+    result.entry || {
+      key: result.key,
+      spriteKey: result.key,
+      label: body.label,
+      genders: body.genders,
+      kind: body.kind,
+      tags: body.tags,
+      author: body.author,
+      license: body.license,
+      sourceUrl: body.sourceUrl,
+    },
+    result.assetsCommit,
+  );
+  setStatus(`Trainer sprite ${result.key} uploaded and added to the live catalog.`);
+  render();
 }
 
 function onAssetsClick(event) {
@@ -4574,6 +4649,10 @@ function onAssetsClick(event) {
   }
   const use = event.target.closest("[data-asset-sprite]");
   if (use) {
+    const trainer = ctrCur();
+    if (trainer && trainerSpriteByKey.has(use.dataset.assetSprite)) {
+      trainer.trainerSprite = use.dataset.assetSprite;
+    }
     activeTab = "customtrainers";
     document
       .querySelectorAll("nav.tabs button")
