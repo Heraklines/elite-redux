@@ -292,8 +292,8 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
 
 async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
   await waitForInputPhase(game, ["LearnMoveBatchPhase"], "wave-9 move learning");
-  for (let count = 0; count < 8 && String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "") === "LearnMoveBatchPhase"; count += 1) {
-    press(game, count === 0 ? "Space" : "Enter", tape, transitions);
+  for (const key of ["Space", "Space", "Escape"] as const) {
+    press(game, key, tape, transitions);
     await sleep();
   }
   if (String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "") === "LearnMoveBatchPhase") {
