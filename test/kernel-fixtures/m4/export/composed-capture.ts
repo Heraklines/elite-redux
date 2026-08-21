@@ -292,10 +292,26 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
 
 async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
   await waitForInputPhase(game, ["LearnMoveBatchPhase"], "wave-9 move learning");
-  for (const key of ["Space", "Space", "Escape"] as const) {
-    press(game, key, tape, transitions);
-    await sleep();
+  const handler = game.scene.ui.getHandler() as AnyRecord;
+  if (handler?.state !== "pickNew") {
+    gap(
+      "MOVE_LEARN_CONTROL_UNOBSERVABLE",
+      "src/ui/handlers/learn-move-batch-ui-handler.ts:state",
+      `move-learning opened in state ${String(handler?.state)}`,
+    );
   }
+  press(game, "Space", tape, transitions);
+  await waitForLiveCondition(
+    game,
+    () => (game.scene.ui.getHandler() as AnyRecord)?.state === "pickSlot",
+    "move-learning overwrite slot",
+  );
+  press(game, "Space", tape, transitions);
+  await waitForLiveCondition(
+    game,
+    () => game.scene.ui.getMode() !== UiMode.LEARN_MOVE_BATCH,
+    "move-learning assignment completion",
+  );
   await game.phaseInterceptor.to("SelectModifierPhase");
 }
 
