@@ -173,6 +173,15 @@ jobs:
             exit 1
           fi
 
+      - name: Upload lockfile drift evidence
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-lockfile-drift
+          path: rust/lockfile-drift.diff
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Upload generated lockfile evidence
         if: always()
         uses: actions/upload-artifact@v6
