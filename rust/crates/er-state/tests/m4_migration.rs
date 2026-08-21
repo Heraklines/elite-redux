@@ -243,6 +243,12 @@ fn context(
                 biome: BiomeId::new(safe(1)),
                 source_wave: input.wave,
                 route_node: None,
+                previous_biome: None,
+                recent_biomes: [None, None],
+                structure_start_wave: input.wave,
+                structure_length: None,
+                leave_biome_now: false,
+                overstay_anchor_wave: None,
             },
             counters: RunCounters {
                 interaction: RunInteractionSequence::new(safe(0)),

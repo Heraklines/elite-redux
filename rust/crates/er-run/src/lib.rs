@@ -2,12 +2,14 @@
 
 pub mod capability;
 pub mod content;
+pub mod encounter_plan;
 pub mod error;
 pub mod rng_audit;
 pub mod settlement;
 
 pub use capability::*;
 pub use content::*;
+pub use encounter_plan::*;
 pub use error::*;
 pub use rng_audit::*;
 pub use settlement::*;

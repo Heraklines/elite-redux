@@ -9,6 +9,7 @@ publish = false
 er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
+er-run = { path = "../er-run" }
 er-game = { path = "../er-game" }
 er-protocol = { path = "../er-protocol" }
 er-rng = { path = "../er-rng" }

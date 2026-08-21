@@ -4,6 +4,7 @@ pub mod battle;
 pub mod battle_v2;
 pub mod conditions;
 pub mod digest;
+pub mod digest_v2;
 pub mod field;
 pub mod format;
 pub mod game_v2;

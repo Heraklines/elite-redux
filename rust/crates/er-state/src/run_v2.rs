@@ -106,15 +106,18 @@ pub struct BiomeRuntimeState {
     pub biome: BiomeId,
     pub source_wave: WaveIndex,
     pub route_node: Option<RouteNodeId>,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EncounterPlan {
-    pub encounter_id: EncounterId,
-    pub biome: BiomeId,
-    pub wave: WaveIndex,
-    pub enemy_species: Vec<SpeciesId>,
+    /// The previous biome at this entry (route no-loopback exclusion input).
+    pub previous_biome: Option<BiomeId>,
+    /// The two most recently visited biomes before `previous_biome`.
+    pub recent_biomes: [Option<BiomeId>; 2],
+    /// The wave the current biome instance started on (its first battle).
+    pub structure_start_wave: WaveIndex,
+    /// The rolled length of the current biome instance; null = vanilla cadence.
+    pub structure_length: Option<u16>,
+    /// Set by the Crossroads "Move on" choice: the next wave ends the biome.
+    pub leave_biome_now: bool,
+    /// The wave the player deliberately chose to stay past the free window.
+    pub overstay_anchor_wave: Option<WaveIndex>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -132,21 +135,15 @@ pub struct PendingModifierTarget {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct RewardOffer {
-    pub offer_id: RunOfferId,
-    pub modifier_id: ModifierId,
-    pub tier: ModifierTier,
-    pub price: Money,
-    pub sold: bool,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
 pub struct MarketStockEntry {
     pub stock_id: RunStockId,
     pub modifier_id: ModifierId,
     pub tier: ModifierTier,
     pub price: Money,
+    /// Initial offered quantity; never mutated after generation.
+    pub initial_quantity: u16,
+    /// Remaining purchasable quantity; sold state derives from zero.
+    pub remaining_quantity: u16,
     pub sold: bool,
 }
 
@@ -303,6 +300,8 @@ pub enum RunStateValidationError {
     SurfaceSchemaVersionMismatch { expected: u32, actual: u32 },
     #[error("surface kind does not match its variant")]
     SurfaceKindMismatch,
+    #[error("market stock entry {stock_id:?} has inconsistent quantity/sold state")]
+    MarketStockQuantity { stock_id: RunStockId },
 }
 
 impl RunStateV2 {
@@ -358,6 +357,19 @@ impl RunStateV2 {
         }
         if let Some(surface) = &self.active_surface {
             surface.validate()?;
+            if let RunSurfaceState::BiomeMarket(market) = surface {
+                for entry in &market.stock {
+                    let sold_derived = entry.remaining_quantity == 0;
+                    if entry.remaining_quantity > entry.initial_quantity
+                        || entry.initial_quantity == 0
+                        || entry.sold != sold_derived
+                    {
+                        return Err(RunStateValidationError::MarketStockQuantity {
+                            stock_id: entry.stock_id,
+                        });
+                    }
+                }
+            }
         }
         Ok(())
     }

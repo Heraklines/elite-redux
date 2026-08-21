@@ -208,6 +208,12 @@ fn state() -> Result<GameStateV2, Box<dyn Error>> {
                 biome: BiomeIdType::new(safe(1)?),
                 source_wave: wave,
                 route_node: None,
+                previous_biome: None,
+                recent_biomes: [None, None],
+                structure_start_wave: wave,
+                structure_length: None,
+                leave_biome_now: false,
+                overstay_anchor_wave: None,
             },
             counters: RunCounters {
                 interaction: RunInteractionSequence::new(safe(0)?),

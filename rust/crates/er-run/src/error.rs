@@ -2,14 +2,14 @@
 
 use crate::capability::UnsupportedReasonCode;
 use crate::rng_audit::RunRngError;
-use er_state::validation::StateValidationError;
+use er_state::validation_v2::StateValidationErrorV2;
 use thiserror::Error;
 
 /// Errors returned by pure run transitions and content preflight.
 #[derive(Debug, Error)]
 pub enum RunError {
     #[error("invalid state: {0}")]
-    InvalidState(#[source] StateValidationError),
+    InvalidState(#[source] StateValidationErrorV2),
     #[error("invalid run stage")]
     InvalidStage,
     #[error("wrong source battle")]
