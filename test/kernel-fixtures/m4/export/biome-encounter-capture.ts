@@ -839,9 +839,10 @@ export async function captureEncounter(): Promise<Record<string, JsonValue>> {
       game.scene.phaseManager.pushNew("EncounterPhase", false);
       starterPhase.initBattle(starters, true);
       built.postLaunch();
-      encounterInitial = frontier(game);
     });
 
+    await game.phaseInterceptor.to("EncounterPhase", false);
+    encounterInitial = frontier(game);
     const captured = await withAsyncRngCapture("encounter", async () => {
       await game.phaseInterceptor.to("CommandPhase", false);
       const battle = game.scene.currentBattle as AnyRecord | undefined;
