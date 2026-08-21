@@ -52,6 +52,8 @@ type Segment = {
   next_control: JsonObject;
   raw_key_tape: JsonValue[];
 };
+let diagnosticTape: RawTapeEntry[] = [];
+let diagnosticTransitions: JsonValue[] = [];
 
 export class M4CaptureGap extends Error {
   public readonly code: string;
@@ -589,6 +591,8 @@ export async function captureComposedSegment(): Promise<JsonObject> {
     }
     const tape: RawTapeEntry[] = [];
     const transitions: JsonValue[] = [];
+    diagnosticTape = tape;
+    diagnosticTransitions = transitions;
     const segments: Segment[] = [];
     let rngCursor = 0;
     const takeRngDraws = (): JsonValue[] => {
@@ -660,7 +664,7 @@ export async function captureComposedSegment(): Promise<JsonObject> {
     gap(
       "COMPOSED_LIVE_SCENARIO_FAILED",
       "test/kernel-fixtures/m4/export/composed-capture.ts:GameManager",
-      error instanceof Error ? (error.stack ?? error.message) : String(error),
+      `${error instanceof Error ? (error.stack ?? error.message) : String(error)}; recent_tape=${JSON.stringify(diagnosticTape.slice(-12))}; recent_transitions=${JSON.stringify(diagnosticTransitions.slice(-12))}`,
     );
   } finally {
     overrides.LEVEL_CAP_OVERRIDE = priorLevelCapOverride;
