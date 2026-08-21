@@ -353,6 +353,19 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
     },
     "regular reward reroll successor",
   );
+  await game.phaseInterceptor.to("SelectModifierPhase");
+  await waitForLiveCondition(
+    game,
+    () => {
+      const handler = game.scene.ui.getHandler() as AnyRecord;
+      return (
+        handler?.awaitingActionInput === true
+        && Number.isSafeInteger(handler.cursor)
+        && Number.isSafeInteger(handler.rowCursor)
+      );
+    },
+    "rerolled reward input readiness",
+  );
 
   const rerollHandler = game.scene.ui.getHandler() as AnyRecord;
   rowCursor = Number(rerollHandler?.rowCursor);
