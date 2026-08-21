@@ -24,7 +24,8 @@ const HELPER_OUTPUT_FILES = {
   content: "content.json",
   "reward-market": "reward-market.json",
   progression: "progression.json",
-  "biome-encounter": "biome-encounter.json",
+  biome: "biome.json",
+  encounter: "encounter.json",
   migration: "migration.json",
   composed: "composed.json",
 };

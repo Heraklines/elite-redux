@@ -847,7 +847,8 @@ const RAW_CAPTURE_FILES = {
   content: "content.json",
   "reward-market": "reward-market.json",
   progression: "progression.json",
-  "biome-encounter": "biome-encounter.json",
+  biome: "biome.json",
+  encounter: "encounter.json",
   migration: "migration.json",
   composed: "composed.json",
 } as const;
@@ -913,20 +914,22 @@ describe("M4A fresh run oracle export", () => {
       generated.set("progression/nacli-medium-slow-level-17-v1.json", progression);
     }
 
-    const biomeEncounter = rawCapture(
-      "biome-encounter",
-      "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
+    const biome = rawCapture(
+      "biome",
+      "biomes/town-crossroads-route-v1",
       gaps,
     );
-    if (biomeEncounter != null && captureShape(
-      biomeEncounter,
-      "biomes/town-crossroads-route-v1+encounters/plains-wave-11-captured-v1",
-      "test/kernel-fixtures/m4/export/biome-encounter-capture.ts:captureBiomeEncounter",
-      ["biome", "encounter"],
+    if (biome != null) {
+      generated.set("biomes/town-crossroads-route-v1.json", biome);
+    }
+
+    const encounter = rawCapture(
+      "encounter",
+      "encounters/plains-wave-11-captured-v1",
       gaps,
-    )) {
-      generated.set("biomes/town-crossroads-route-v1.json", biomeEncounter.biome as JsonObject);
-      generated.set("encounters/plains-wave-11-captured-v1.json", biomeEncounter.encounter as JsonObject);
+    );
+    if (encounter != null) {
+      generated.set("encounters/plains-wave-11-captured-v1.json", encounter);
     }
 
     const migration = rawCapture("migration", "migration/m3-to-m4-companions-v1", gaps);

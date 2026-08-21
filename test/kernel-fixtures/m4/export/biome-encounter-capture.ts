@@ -740,86 +740,125 @@ function releaseGame(game: GameManager | null): void {
   }
 }
 
-async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: AnyRecord }> {
+async function createHeadlessGame(): Promise<{ phaserGame: Phaser.Game; game: GameManager }> {
   const PhaserGame = Phaser.Game;
   if (typeof PhaserGame !== "function") {
     gap("OBSERVATION_SEAM_MISSING", "Phaser.Game", "headless game constructor is unavailable");
   }
-  resetErBiomeStructure();
-  resetErRouting();
-  let phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
+  const phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
   const boot = Promise.withResolvers<void>();
   setTimeout(boot.resolve, 0);
   await boot.promise;
+  return { phaserGame, game: new GameManager(phaserGame) };
+}
+
+export async function captureBiome(): Promise<Record<string, JsonValue>> {
+  const { phaserGame, game } = await createHeadlessGame();
   const originalBattleSeed = BattleScene.prototype.randBattleSeedInt;
-  let game: GameManager | null = null;
-  let encounterInitial: AnyRecord | null = null;
-  let biome: AnyRecord;
   try {
-    const biomeScenarioSpec = {
+    resetErBiomeStructure();
+    resetErRouting();
+    const scenarioSpec = {
       v: 1,
       name: "M4A captured Town wave 10",
       notes: "Explicit test vector; not a natural single-seed segment.",
       party: [{ species: 7, moves: [33, 39, 55, 110], abilitySlot: 0, nature: 0 }],
       run: { seed: RUN_SEED, wave: 10, biome: BiomeId.TOWN, level: 10, difficulty: "ace" },
     } satisfies ScenarioSpec;
-    const biomeBuilt = buildDevScenario(biomeScenarioSpec);
-    game = new GameManager(phaserGame);
-    const biomeUi = game.scene.ui as AnyRecord;
-    biomeUi.shouldSkipDialogue = () => true;
+    const built = buildDevScenario(scenarioSpec);
+    const ui = game.scene.ui as AnyRecord;
+    ui.shouldSkipDialogue = () => true;
     await game.runToTitle();
-    const biomeStarters = biomeBuilt.scenario.setup();
+    const starters = built.scenario.setup();
     game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
-      game!.scene.gameMode = getGameMode(GameModes.CLASSIC);
+      game.scene.gameMode = getGameMode(GameModes.CLASSIC);
       const starterPhase = new SelectStarterPhase();
-      game!.override
+      game.override
         .seed(RUN_SEED)
         .startingWave(10)
         .startingBiome(BiomeId.TOWN);
-      game!.scene.phaseManager.pushNew("EncounterPhase", false);
-      starterPhase.initBattle(biomeStarters, true);
-      biomeBuilt.postLaunch();
+      game.scene.phaseManager.pushNew("EncounterPhase", false);
+      starterPhase.initBattle(starters, true);
+      built.postLaunch();
     });
     await game.phaseInterceptor.to("CommandPhase", false);
-    const biomeBattle = game.scene.currentBattle as AnyRecord | undefined;
-    if (biomeBattle == null || biomeBattle.waveIndex !== 10 || game.scene.arena.biomeId !== BiomeId.TOWN) {
+    const battle = game.scene.currentBattle as AnyRecord | undefined;
+    if (battle == null || battle.waveIndex !== 10 || game.scene.arena.biomeId !== BiomeId.TOWN) {
       gap("BIOME_VECTOR_MISMATCH", ENCOUNTER_SOURCE, "live Classic launch did not materialize wave 10 in Town");
     }
-    biome = captureStructureAndRoute(game);
-    game.promptHandler.clearPrompts();
-    game.scene.phaseManager.clearAllPhases();
-    const ui = game.scene.ui as AnyRecord;
-    if (typeof ui.resetModeChain === "function") {
-      ui.resetModeChain();
+    return json(captureStructureAndRoute(game), "biome") as Record<string, JsonValue>;
+  } catch (error) {
+    if (error instanceof M4CaptureGap) {
+      throw error;
     }
+    gap(
+      "BIOME_CALLBACK_UNOBSERVABLE",
+      STRUCTURE_SOURCE,
+      error instanceof Error ? error.message : String(error),
+    );
+  } finally {
+    releaseGame(game);
+    if (originalBattleSeed !== undefined) {
+      BattleScene.prototype.randBattleSeedInt = originalBattleSeed;
+    }
+    try {
+      phaserGame.destroy(true);
+    } catch {
+      // The browser harness may already own and dispose its Phaser instance.
+    }
+  }
+}
 
-    game.scene.gameMode = getGameMode(GameModes.CLASSIC);
-    const starterPhase = new SelectStarterPhase();
-    game.override
-      .seed(RUN_SEED)
-      .startingWave(11)
-      .startingBiome(BiomeId.PLAINS);
-    encounterInitial = frontier(game);
-    game.scene.phaseManager.pushNew("EncounterPhase", false);
-    starterPhase.initBattle(biomeStarters, true);
+export async function captureEncounter(): Promise<Record<string, JsonValue>> {
+  const { phaserGame, game } = await createHeadlessGame();
+  const originalBattleSeed = BattleScene.prototype.randBattleSeedInt;
+  let encounterInitial: AnyRecord | null = null;
+  try {
+    const scenarioSpec = {
+      v: 1,
+      name: "M4A captured Plains wave 11",
+      notes: "Explicit test vector; not a natural single-seed segment.",
+      party: [{ species: 7, moves: [33, 39, 55, 110], abilitySlot: 0, nature: 0 }],
+      run: { seed: RUN_SEED, wave: 11, biome: BiomeId.PLAINS, level: 10, difficulty: "ace" },
+    } satisfies ScenarioSpec;
+    const built = buildDevScenario(scenarioSpec);
+    const ui = game.scene.ui as AnyRecord;
+    ui.shouldSkipDialogue = () => true;
+    await game.runToTitle();
+    const starters = built.scenario.setup();
+    game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+      game.scene.gameMode = getGameMode(GameModes.CLASSIC);
+      const starterPhase = new SelectStarterPhase();
+      const scenarioSeed = RUN_SEED;
+      // Match the production launch frontier through the supported harness controls:
+      // pin the run seed before the requested Plains arena is materialized, then set wave and biome.
+      game.override
+        .seed(scenarioSeed)
+        .startingWave(11)
+        .startingBiome(BiomeId.PLAINS);
+      game.scene.phaseManager.pushNew("EncounterPhase", false);
+      starterPhase.initBattle(starters, true);
+      built.postLaunch();
+      encounterInitial = frontier(game);
+    });
 
     const captured = await withAsyncRngCapture("encounter", async () => {
-      await game!.phaseInterceptor.to("CommandPhase", false);
-      const battle = game!.scene.currentBattle as AnyRecord | undefined;
+      await game.phaseInterceptor.to("CommandPhase", false);
+      const battle = game.scene.currentBattle as AnyRecord | undefined;
       if (battle == null) {
         gap("ENCOUNTER_SOURCE_UNOBSERVABLE", ENCOUNTER_SOURCE, "EncounterPhase completed without a live Battle");
       }
-      if (battle.waveIndex !== 11 || game!.scene.arena.biomeId !== BiomeId.PLAINS) {
+      if (battle.waveIndex !== 11 || game.scene.arena.biomeId !== BiomeId.PLAINS) {
         gap(
           "ENCOUNTER_VECTOR_MISMATCH",
           ENCOUNTER_SOURCE,
-          `live EncounterPhase materialized wave ${String(battle.waveIndex)} in biome ${String(game!.scene.arena.biomeId)}`,
+          `live EncounterPhase materialized wave ${String(battle.waveIndex)} in biome ${String(game.scene.arena.biomeId)}`,
         );
       }
-      const players = game!.scene.getPlayerParty() as Pokemon[];
-      const enemies = game!.scene.getEnemyParty() as Pokemon[];
-      const playerField = game!.scene.getPlayerField(false) as Pokemon[];
-      const enemyField = game!.scene.getEnemyField(false) as Pokemon[];
+      const players = game.scene.getPlayerParty() as Pokemon[];
+      const enemies = game.scene.getEnemyParty() as Pokemon[];
+      const playerField = game.scene.getPlayerField(false) as Pokemon[];
+      const enemyField = game.scene.getEnemyField(false) as Pokemon[];
       if (players.length === 0 || enemies.length === 0 || playerField.length === 0 || enemyField.length === 0) {
         gap("ENCOUNTER_SOURCE_UNOBSERVABLE", ENCOUNTER_SOURCE, "post-initialization field did not expose both sides");
       }
@@ -830,7 +869,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       return {
         fixture_id: "encounters/plains-wave-11-captured-v1",
         wave: finite(battle.waveIndex, "encounter/wave"),
-        biome_id: finite(game!.scene.arena.biomeId, "encounter/biome"),
+        biome_id: finite(game.scene.arena.biomeId, "encounter/biome"),
         battle_seed: battle.battleSeed,
         battle_rng: battleRngView(battle),
         format: {
@@ -854,7 +893,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
           battler_index: mon.getBattlerIndex(),
           pokemon: pokemonView(mon, "player", index),
         })),
-        field: fieldView(game!, battle),
+        field: fieldView(game, battle),
         scripted_policy: {
           kind: "SCRIPTED_ONLY",
           source: "test/kernel-fixtures/m4/export/biome-encounter-capture.ts:explicit-command-input",
@@ -873,7 +912,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
     if (encounterInitial == null) {
       gap("ENCOUNTER_FRONTIER_UNOBSERVABLE", ENCOUNTER_SOURCE, "the live EncounterPhase launch frontier was not captured");
     }
-    const encounterFinal = frontier(game!);
+    const encounterFinal = frontier(game);
     const encounterRngDraws = sharedRngDraws("encounter", captured.rng, 0);
     const scriptedDecision = {
       kind: "SCRIPTED_COMMAND",
@@ -957,12 +996,9 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
         scriptedDecision,
       ],
       final: encounterFinal,
-      next_control: nextControl(game!),
+      next_control: nextControl(game),
     };
-    return {
-      biome,
-      encounter,
-    };
+    return json(encounter, "encounter") as Record<string, JsonValue>;
   } catch (error) {
     if (error instanceof M4CaptureGap) {
       throw error;
@@ -973,23 +1009,14 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       error instanceof Error ? (error.stack ?? error.message) : String(error),
     );
   } finally {
+    releaseGame(game);
     if (originalBattleSeed !== undefined) {
       BattleScene.prototype.randBattleSeedInt = originalBattleSeed;
     }
-    clearInterval(PromptHandler.runInterval);
-    PromptHandler.runInterval = undefined;
     try {
       phaserGame.destroy(true);
     } catch {
       // The browser harness may already own and dispose its Phaser instance.
     }
   }
-}
-
-export async function captureBiomeEncounter(): Promise<Record<string, JsonValue>> {
-  const captured = await captureLiveEncounter();
-  return {
-    biome: json(captured.biome, "biome") as JsonValue,
-    encounter: json(captured.encounter, "encounter") as JsonValue,
-  };
 }
