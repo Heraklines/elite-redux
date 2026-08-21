@@ -593,6 +593,7 @@ function firstDifference(left: unknown, right: unknown, path = "$"): string | nu
         return difference;
       }
     }
+    return null;
   }
   return path;
 }
