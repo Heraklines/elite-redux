@@ -67,7 +67,7 @@ jobs:
       - name: Validate clean deploy directory
         run: |
           node scripts/validate-editor-data.mjs editor/_deploy/data
-          test "$(node -p \"require('./editor/_deploy/version.json').sourceSha\")" = "$EDITOR_SOURCE_SHA"
+          node -e 'const { sourceSha } = require("./editor/_deploy/version.json"); if (sourceSha !== process.env.EDITOR_SOURCE_SHA) process.exit(1)'
 
       - name: Deploy ER Editor to Cloudflare Pages
         run: >-
