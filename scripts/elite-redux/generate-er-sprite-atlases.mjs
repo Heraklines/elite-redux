@@ -110,16 +110,16 @@ function main() {
     for (const png of pngs) {
       const pngPath = join(dir, png);
       const jsonPath = pngPath.replace(/\.png$/, ".json");
-      // Skip if already exists (idempotent)
-      if (existsSync(jsonPath)) {
-        skipped++;
-        continue;
-      }
       const atlas = makeAtlasJson(pngPath);
       if (!atlas) {
         continue;
       }
-      writeFileSync(jsonPath, JSON.stringify(atlas, null, 2));
+      const serialized = JSON.stringify(atlas, null, 2);
+      if (existsSync(jsonPath) && readFileSync(jsonPath, "utf8").trim() === serialized.trim()) {
+        skipped++;
+        continue;
+      }
+      writeFileSync(jsonPath, serialized);
       written++;
     }
   }

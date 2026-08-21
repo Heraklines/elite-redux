@@ -2191,7 +2191,7 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
       pitchSpecies(SpeciesId.ALOLA_RAICHU, "mega-female", { female: true }),
     ],
     pitchSpecies(ER_LILLIGANT_VERDANT_SPECIES_ID),
-    "Tagela, Intangrowth, Calyrex Chariot Mega, Mega Hypno, Mega Alolan Raichu Male, Mega Alolan Raichu Female",
+    "Tagela, Intangrowth, Calyrex Mega, Mega Hypno, Mega Alolan Raichu Male, Mega Alolan Raichu Female",
   ),
   fakemonPitchShowcaseScenario(
     8,

@@ -138,7 +138,7 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
   });
 
   it("covers all 35 newcomer and Alpha forms incl. the additive mega-z rows", () => {
-    // 28 existing newcomer/Alpha/Discord/Power Plant forms plus Calyrex Chariot,
+    // 28 existing newcomer/Alpha/Discord/Power Plant forms plus Mega Calyrex,
     // Mega Hypno, gender-split Mega Alolan Raichu, Mega Barbaracle Y, Mega
     // Verdant Lilligant, Mega Lilligant Verdant, and Corrupted Uxie.
     expect(ER_NEWCOMER_FORMS).toHaveLength(35);
@@ -188,6 +188,7 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     const expected = [
       {
         slug: "calyrex_chariot_mega",
+        formName: "Mega",
         baseSpecies: SpeciesId.CALYREX,
         formKey: "mega",
         types: [PokemonType.GRASS, PokemonType.PSYCHIC, PokemonType.ICE, PokemonType.GHOST],
@@ -294,12 +295,12 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(femaleCondition({ gender: Gender.MALE } as never)).toBe(false);
   });
 
-  it("registers Calyrex Chariot from both rider preforms", () => {
-    const chariot = (pokemonFormChanges[SpeciesId.CALYREX] ?? []).filter(fc => fc.formKey === "mega");
-    expect(chariot.map(fc => fc.preFormKey)).toEqual(["ice", "shadow"]);
+  it("registers Mega Calyrex from both rider preforms", () => {
+    const megaEdges = (pokemonFormChanges[SpeciesId.CALYREX] ?? []).filter(fc => fc.formKey === "mega");
+    expect(megaEdges.map(fc => fc.preFormKey)).toEqual(["ice", "shadow"]);
   });
 
-  it("registers rider-specific inactive Chariot reverts", () => {
+  it("registers rider-specific inactive Mega Calyrex reverts", () => {
     const edges = pokemonFormChanges[SpeciesId.CALYREX] ?? [];
     const reverses = edges.filter(fc => fc.preFormKey === "mega" && (fc.formKey === "ice" || fc.formKey === "shadow"));
     expect(reverses.map(fc => fc.formKey).sort()).toEqual(["ice", "shadow"]);
@@ -310,7 +311,7 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
       expect(reverse.conditions).toHaveLength(1);
     }
   });
-  it("hides Reins toggles while active Calyrite owns the Chariot form", async () => {
+  it("hides Reins toggles while active Calyrite owns the Mega form", async () => {
     await game.classicMode.startBattle(SpeciesId.CALYREX);
     const calyrex = game.field.getPlayerPokemon();
     const reins = new FormChangeItemModifierType(FormChangeItem.ICY_REINS_OF_UNITY).newModifier(calyrex);

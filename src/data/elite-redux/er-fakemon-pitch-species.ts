@@ -487,6 +487,7 @@ export function injectErFakemonPitchSpecies(): InjectErFakemonPitchSpeciesResult
     const added = registerErEditorMon({
       speciesId: def.id,
       name: def.name,
+      slug: def.slug,
       ...(def.category === undefined ? {} : { category: def.category }),
       type1: def.types[0],
       type2: def.types[1] ?? null,

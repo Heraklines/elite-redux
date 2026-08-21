@@ -34,6 +34,7 @@ import {
   installErFormSpriteRedirect,
   installErSpeciesFormSpriteDispatch,
 } from "#data/elite-redux/er-form-sprite-redirect";
+import { ErCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { PokemonForm } from "#data/pokemon-species";
 import { pokemonFormChanges, SpeciesFormChange, SpeciesFormChangeCondition } from "#data/pokemon-forms";
 import {
@@ -587,7 +588,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
   {
     baseSpecies: SpeciesId.CALYREX,
     formKey: "mega",
-    formName: "Chariot Mega",
+    formName: "Mega",
     slug: "calyrex_chariot_mega",
     types: [PokemonType.GRASS, PokemonType.PSYCHIC, PokemonType.ICE, PokemonType.GHOST],
     stats: [100, 155, 135, 155, 135, 100],
@@ -737,6 +738,10 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
   baseMut.formIndex = 0;
   baseMut.generation = species.generation;
   (species.forms as unknown as PokemonForm[]).push(baseForm);
+  const spriteSlug = ErCustomSpecies.getSpriteSlug(species.speciesId);
+  if (spriteSlug !== undefined) {
+    installErFormSpriteRedirect(baseForm, spriteSlug);
+  }
 }
 
 /**

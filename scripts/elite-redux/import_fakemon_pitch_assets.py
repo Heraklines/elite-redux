@@ -20,7 +20,7 @@ from pathlib import Path
 from PIL import Image
 
 
-SPRITE_SIZE = (64, 64)
+SPRITE_SIZE = (96, 96)
 ICON_FRAME_SIZE = (32, 32)
 
 

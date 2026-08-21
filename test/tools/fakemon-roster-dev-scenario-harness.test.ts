@@ -8,6 +8,7 @@ import Overrides from "#app/overrides";
 import {
   ER_CONKAPITATOR_SPECIES_ID,
   ER_DIPPOWDOWN_SPECIES_ID,
+  ER_FAKEMON_PITCH_SPECIES,
   ER_FALINKS_CONVERGENT_SPECIES_ID,
   ER_GURDURUR_SPECIES_ID,
   ER_INTANGROWTH_SPECIES_ID,
@@ -31,6 +32,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 const SCENARIO_LABELS = Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`);
+const PITCH_SPRITE_SLUGS = new Map(ER_FAKEMON_PITCH_SPECIES.map(({ id, slug }) => [id, slug]));
 
 type ExpectedShowcasePokemon = Readonly<{
   speciesId: number;
@@ -156,6 +158,23 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
       expect(game.scene.getPlayerParty().every(pokemon => pokemon.level === 100)).toBe(true);
       expect(game.scene.getPlayerParty().every(pokemon => pokemon.getMoveset().length > 0)).toBe(true);
       expect(game.scene.getEnemyParty().length).toBeGreaterThan(0);
+
+      for (const pokemon of [...game.scene.getPlayerParty(), ...game.scene.getEnemyParty()]) {
+        const slug = PITCH_SPRITE_SLUGS.get(pokemon.species.speciesId);
+        if (slug === undefined) {
+          continue;
+        }
+        const expectedPathPrefix = pokemon.formIndex === 0 ? `elite-redux/${slug}/` : "elite-redux/";
+        const expectedFrontKeyPrefix = pokemon.formIndex === 0 ? `pkmn__er__${slug}` : "pkmn__er__";
+        const expectedBackKeyPrefix = pokemon.formIndex === 0 ? `pkmn__back__er__${slug}` : "pkmn__back__er__";
+        const expectedIconKeyPrefix = pokemon.formIndex === 0 ? `er_icon__${slug}` : "er_icon__";
+        expect(pokemon.getBattleSpriteAtlasPath(false).startsWith(expectedPathPrefix)).toBe(true);
+        expect(pokemon.getBattleSpriteAtlasPath(true).startsWith(expectedPathPrefix)).toBe(true);
+        expect(pokemon.getBattleSpriteKey(false).startsWith(expectedFrontKeyPrefix)).toBe(true);
+        expect(pokemon.getBattleSpriteKey(true).startsWith(expectedBackKeyPrefix)).toBe(true);
+        expect(pokemon.getIconAtlasKey().startsWith(expectedIconKeyPrefix)).toBe(true);
+      }
+
       const expected = EXPECTED_SHOWCASES[label];
       if (expected) {
         const identity = (pokemon: {
