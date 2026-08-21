@@ -690,6 +690,23 @@ export async function captureComposedSegment(): Promise<JsonObject> {
   let rngTrace: RngCollector | undefined;
   const overrides = Overrides as unknown as { LEVEL_CAP_OVERRIDE: number };
   const priorLevelCapOverride = overrides.LEVEL_CAP_OVERRIDE;
+  // Solo-mode Egg construction seeds its property block with an unseeded
+  // randomString(24) (src/data/egg.ts:263, "byte-for-byte unchanged" solo
+  // behavior). The composed journey grants a wave-9 achievement egg, so the
+  // ambient Math.random must be pinned for fresh processes to agree. This is
+  // test-only ambient control, in the same class as the frozen locale/TZ.
+  const priorRandom = Math.random;
+  let ambientState = 0x4d349341;
+  Math.random = () => {
+    ambientState = (ambientState + 0x6d2b79f5) | 0;
+    let t = ambientState;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const restoreAmbient = (): void => {
+    Math.random = priorRandom;
+  };
   try {
     overrides.LEVEL_CAP_OVERRIDE = 17;
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
@@ -785,7 +802,7 @@ export async function captureComposedSegment(): Promise<JsonObject> {
       `${error instanceof Error ? (error.stack ?? error.message) : String(error)}; recent_tape=${JSON.stringify(diagnosticTape.slice(-12))}; recent_transitions=${JSON.stringify(diagnosticTransitions.slice(-12))}`,
     );
   } finally {
-    overrides.LEVEL_CAP_OVERRIDE = priorLevelCapOverride;
+    restoreAmbient();
     rngTrace?.restore();
     clearInterval(PromptHandler.runInterval);
     PromptHandler.runInterval = undefined;
