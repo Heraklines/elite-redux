@@ -65,6 +65,7 @@ let observedRewardPhase: SelectModifierPhase | null = null;
 let observedMarketPhase: BiomeShopPhase | null = null;
 let observedRewardOptions: AnyRecord[] = [];
 let observedMarketOptions: AnyRecord[] = [];
+let observedMarketQuantities: AnyRecord[] = [];
 
 const SEED_PREFIX = "m4a-reward-market-capture";
 const MAX_SEED_ATTEMPTS = 48;
@@ -278,6 +279,7 @@ function captureMarketStart(
   }
   observedMarketPhase = phaseValue;
   observedMarketOptions = options;
+  observedMarketQuantities = quantities;
   surface.round += 1;
   const after = phaseGraph(context.game, phase, "market", options, quantities);
   surface.generationBefore = generationBefore ?? undefined;
@@ -493,6 +495,7 @@ function restoreObservationHooks(): void {
   observedMarketPhase = null;
   observedRewardOptions = [];
   observedMarketOptions = [];
+  observedMarketQuantities = [];
 }
 
 async function waitUntil(
@@ -747,8 +750,8 @@ function findTargetedReward(phase: SelectModifierPhase): number {
 
 function findDirectMarketOption(phase: BiomeShopPhase): number {
   const options = phaseOptions(phase as AnyRecord, true);
-  const quantities = (phase as AnyRecord).qtys;
-  return options.findIndex((option, index) => option?.type != null && !(option.type instanceof PokemonModifierType) && Number(quantities?.[index]) > 0);
+  const quantities = observedMarketQuantities;
+  return options.findIndex((option, index) => option?.type != null && !(option.type instanceof PokemonModifierType) && Number(quantities[index]) > 0);
 }
 
 async function driveReward(game: GameManager): Promise<void> {
@@ -905,7 +908,14 @@ async function driveMarket(game: GameManager): Promise<void> {
     gap("MARKET_BIOME_UNOBSERVABLE", "src/phases/biome-shop-phase.ts:buildStock", `market opened in biome ${String(game.scene.arena.biomeId)}, not Town`);
   }
   const options = phaseOptions(phase as AnyRecord, true);
-  const quantities = (phase as AnyRecord).qtys;
+  const quantities = [...observedMarketQuantities];
+  if (quantities.length === 0) {
+    gap(
+      "MARKET_STOCK_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase.buildStock",
+      "captured market quantities are empty",
+    );
+  }
   surface.decisions.push({ kind: "MARKET_STOCK", biome: BiomeId.TOWN, options: optionGraph(options, "market.stock.options"), quantities: jsonValue(quantities, "market.stock.quantities") });
   const index = findDirectMarketOption(phase);
   if (index < 0) {
@@ -957,17 +967,32 @@ async function driveMarket(game: GameManager): Promise<void> {
     quantity_before: finiteNumber(quantities[index], "market.purchase.quantity_before"),
   });
   driveKey(game, Button.ACTION, "ACTION", "market");
-  await waitUntil(() => Number((phase as AnyRecord).qtys?.[index]) < Number(quantities[index]), "market purchase", "src/phases/biome-shop-phase.ts:applyModifier");
-  surface.decisions.push({ kind: "PURCHASE_COMMITTED", displayed_index: displayedIndex, remaining: jsonValue((phase as AnyRecord).qtys) });
+  await waitUntil(
+    () => {
+      const liveQuantities = (phase as AnyRecord).qtys;
+      return Array.isArray(liveQuantities) && Number(liveQuantities[index]) < Number(quantities[index]);
+    },
+    "market purchase",
+    "src/phases/biome-shop-phase.ts:applyModifier",
+  );
+  const liveQuantities = (phase as AnyRecord).qtys;
+  if (!Array.isArray(liveQuantities)) {
+    gap(
+      "MARKET_STOCK_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase.qtys",
+      "live market quantities disappeared after purchase",
+    );
+  }
+  surface.decisions.push({ kind: "PURCHASE_COMMITTED", displayed_index: displayedIndex, remaining: jsonValue(liveQuantities) });
   const afterPurchase = await awaitMarketInput(game);
-  surface.presentation.push({ mode: String(game.scene.ui.getMode()), phase: "BiomeShopPhase", displayed_index: Number((afterPurchase as AnyRecord).cursor ?? -1), stock: jsonValue((phase as AnyRecord).qtys) });
+  surface.presentation.push({ mode: String(game.scene.ui.getMode()), phase: "BiomeShopPhase", displayed_index: Number((afterPurchase as AnyRecord).cursor ?? -1), stock: jsonValue(liveQuantities) });
 
   surface.leaveRequested = true;
   driveKey(game, Button.CANCEL, "CANCEL", "market");
   await waitUntil(() => game.scene.ui.getMode() === UiMode.CONFIRM, "market leave confirmation", "src/phases/biome-shop-phase.ts:confirmLeave");
   driveKey(game, Button.ACTION, "ACTION", "market");
   await waitUntil(() => surface.final != null, "market leave", "src/phases/biome-shop-phase.ts:confirmLeave");
-  surface.decisions.push({ kind: "LEAVE", confirmed: true, remaining: jsonValue((phase as AnyRecord).qtys), money: finiteNumber(game.scene.money, "market.leave.money") });
+  surface.decisions.push({ kind: "LEAVE", confirmed: true, remaining: jsonValue(liveQuantities), money: finiteNumber(game.scene.money, "market.leave.money") });
 }
 
 function validateSurface(surface: SurfaceCapture | undefined, vector: string): RecordValue {

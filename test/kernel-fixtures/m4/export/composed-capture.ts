@@ -257,11 +257,15 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
     }
     if (phase === "CommandPhase" || phase === "MovePhase" || phase === "SelectTargetPhase" || phase === "SwitchPhase") {
       press(game, "Space", tape, transitions);
-      press(game, "Space", tape, transitions);
     }
     await sleep();
   }
-  gap("LIVE_BATTLE_FRONTIER_UNOBSERVABLE", "src/phases/command-phase.ts:processInput", `${context} did not reach ${stop.join("|")}`);
+  const battle = game.scene.currentBattle as AnyRecord | undefined;
+  gap(
+    "LIVE_BATTLE_FRONTIER_UNOBSERVABLE",
+    "src/phases/command-phase.ts:processInput",
+    `${context} did not reach ${stop.join("|")}; phase=${String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "")}; mode=${String(game.scene.ui.getMode())}; enemy_hp=${String(battle?.enemyParty?.[0]?.hp ?? "missing")}`,
+  );
 }
 
 async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {

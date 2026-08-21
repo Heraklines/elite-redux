@@ -655,6 +655,7 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
         },
       ],
       final: finalFrontier,
+      next_control: nextControl,
       final_observation: {
         canonical: after,
         money: moneyAfter,
