@@ -493,38 +493,37 @@ async function driveBiome(game: GameManager, tape: RawTapeEntry[], transitions: 
   });
   await game.phaseInterceptor.to("SelectBiomePhase", false);
 
-  game.onNextPrompt("SelectBiomePhase", UiMode.ER_MAP, () => {
-    // The production map deliberately blocks input for 1,000 ms. Phaser's
-    // scene clock is parked while the phase interceptor owns the phase, so the
-    // fresh-process oracle waits the same wall interval before sending keys.
-    setTimeout(() => {
-      const handler = game.scene.ui.getHandler() as AnyRecord;
-      const nodes = handler?.nodes;
-      const selectable = handler?.selectable;
-      if (!Array.isArray(nodes) || !Array.isArray(selectable)) {
-        gap("BIOME_ROUTE_OPTIONS_UNOBSERVABLE", "src/ui/handlers/er-map-picker-ui-handler.ts:nodes", "live route options are unavailable");
-      }
-      const nodeIndex = nodes.findIndex((node: AnyRecord) => node?.revealed === true && node.biome === BiomeId.PLAINS);
-      const targetCursor = selectable.indexOf(nodeIndex);
-      let cursor = Number(handler.cursor);
-      if (!Number.isSafeInteger(cursor) || targetCursor < 0) {
-        gap("PLAINS_ROUTE_UNOBSERVABLE", "src/data/elite-redux/er-biome-routing.ts:rollErNextBiomeNodes", "the live revealed route has no Plains choice");
-      }
-      while (cursor < targetCursor) {
-        press(game, "ArrowDown", tape, transitions);
-        cursor = Number(handler.cursor);
-      }
-      while (cursor > targetCursor) {
-        press(game, "ArrowUp", tape, transitions);
-        cursor = Number(handler.cursor);
-      }
-      if (cursor !== targetCursor) {
-        gap("BIOME_CURSOR_UNOBSERVABLE", "src/ui/handlers/er-map-picker-ui-handler.ts:cursor", "physical navigation did not reach the live Plains route");
-      }
-      press(game, "Space", tape, transitions);
-    });
-  });
-  await game.phaseInterceptor.to("EncounterPhase", false);
+  const encounterArrival = game.phaseInterceptor.to("EncounterPhase", false);
+  await waitForLiveCondition(
+    game,
+    () => game.scene.ui.getMode() === UiMode.ER_MAP,
+    "wave-10 route input readiness",
+  );
+  const handler = game.scene.ui.getHandler() as AnyRecord;
+  const nodes = handler?.nodes;
+  const selectable = handler?.selectable;
+  if (!Array.isArray(nodes) || !Array.isArray(selectable)) {
+    gap("BIOME_ROUTE_OPTIONS_UNOBSERVABLE", "src/ui/handlers/er-map-picker-ui-handler.ts:nodes", "live route options are unavailable");
+  }
+  const nodeIndex = nodes.findIndex((node: AnyRecord) => node?.revealed === true && node.biome === BiomeId.PLAINS);
+  const targetCursor = selectable.indexOf(nodeIndex);
+  let cursor = Number(handler.cursor);
+  if (!Number.isSafeInteger(cursor) || targetCursor < 0) {
+    gap("PLAINS_ROUTE_UNOBSERVABLE", "src/data/elite-redux/er-biome-routing.ts:rollErNextBiomeNodes", "the live revealed route has no Plains choice");
+  }
+  while (cursor < targetCursor) {
+    press(game, "ArrowDown", tape, transitions);
+    cursor = Number(handler.cursor);
+  }
+  while (cursor > targetCursor) {
+    press(game, "ArrowUp", tape, transitions);
+    cursor = Number(handler.cursor);
+  }
+  if (cursor !== targetCursor) {
+    gap("BIOME_CURSOR_UNOBSERVABLE", "src/ui/handlers/er-map-picker-ui-handler.ts:cursor", "physical navigation did not reach the live Plains route");
+  }
+  press(game, "Space", tape, transitions);
+  await encounterArrival;
 }
 function segment(
   id: SegmentId,
