@@ -101,3 +101,6 @@ dist-coop-transport-min/
 # Transient agent scratch artifacts (batch-2 work)
 scratch_*
 scratch_view/
+
+.omp-*/
+.omp-*.zip
