@@ -8,6 +8,7 @@
  * Button or phase helper is used as an action.
  */
 
+import Overrides from "#app/overrides";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import {
   captureOracleFrontier,
@@ -366,7 +367,14 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
   await waitForInputPhase(game, ["CommandPhase"], "wave-10 command after regular reward");
 }
 async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
-  await waitForInputPhase(game, ["BiomeShopPhase"], "wave-10 Town market");
+  await waitForInputPhase(game, ["SelectModifierPhase"], "wave-10 Town market");
+  if (game.scene.ui.getMode() !== UiMode.BIOME_SHOP) {
+    gap(
+      "MARKET_CONTROL_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase",
+      `wave-10 SelectModifierPhase opened UI mode ${String(game.scene.ui.getMode())}`,
+    );
+  }
   press(game, "Space", tape, transitions);
   press(game, "ArrowRight", tape, transitions);
   press(game, "Space", tape, transitions);
@@ -450,7 +458,10 @@ export async function captureComposedSegment(): Promise<JsonObject> {
   }
   let phaserGame: Phaser.Game | undefined;
   let rngTrace: RngCollector | undefined;
+  const overrides = Overrides as unknown as { LEVEL_CAP_OVERRIDE: number };
+  const priorLevelCapOverride = overrides.LEVEL_CAP_OVERRIDE;
   try {
+    overrides.LEVEL_CAP_OVERRIDE = 17;
     rngTrace = installRngTrace();
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     const game = await launch(phaserGame);
@@ -489,7 +500,7 @@ export async function captureComposedSegment(): Promise<JsonObject> {
     segments.push(segment("reward", rewardInitial, rewardFinal, tape.splice(0), transitions.splice(0), takeRngDraws(), game));
 
     const marketInitial = frontier(game, battleHash, runHash);
-    await driveBattleTo(game, ["BiomeShopPhase"], tape, transitions, "wave-10 battle");
+    await driveBattleTo(game, ["SelectModifierPhase"], tape, transitions, "wave-10 battle");
     await driveMarket(game, tape, transitions);
     const marketFinal = frontier(game, battleHash, runHash);
     segments.push(segment("market", marketInitial, marketFinal, tape.splice(0), transitions.splice(0), takeRngDraws(), game));
@@ -542,6 +553,7 @@ export async function captureComposedSegment(): Promise<JsonObject> {
       error instanceof Error ? (error.stack ?? error.message) : String(error),
     );
   } finally {
+    overrides.LEVEL_CAP_OVERRIDE = priorLevelCapOverride;
     rngTrace?.restore();
     clearInterval(PromptHandler.runInterval);
     PromptHandler.runInterval = undefined;

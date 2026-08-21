@@ -810,7 +810,11 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
         gap("ENCOUNTER_SOURCE_UNOBSERVABLE", ENCOUNTER_SOURCE, "EncounterPhase completed without a live Battle");
       }
       if (battle.waveIndex !== 11 || game!.scene.arena.biomeId !== BiomeId.PLAINS) {
-        gap("ENCOUNTER_VECTOR_MISMATCH", ENCOUNTER_SOURCE, "live EncounterPhase did not materialize wave 11 in Plains");
+        gap(
+          "ENCOUNTER_VECTOR_MISMATCH",
+          ENCOUNTER_SOURCE,
+          `live EncounterPhase materialized wave ${String(battle.waveIndex)} in biome ${String(game!.scene.arena.biomeId)}`,
+        );
       }
       const players = game!.scene.getPlayerParty() as Pokemon[];
       const enemies = game!.scene.getEnemyParty() as Pokemon[];
