@@ -15,6 +15,7 @@ import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { ModifierSelectUiHandler } from "#ui/handlers/modifier-select-ui-handler";
 import { BiomeShopUiHandler } from "#ui/handlers/biome-shop-ui-handler";
+import { captureOracleFrontier, captureOracleNextControl } from "./oracle-frontier";
 
 /** Test-only typed gap. The main exporter deliberately duck-types this error. */
 export class M4CaptureGap extends Error {
@@ -70,9 +71,19 @@ let observedMarketQuantities: AnyRecord[] = [];
 const SEED_PREFIX = "m4a-reward-market-capture";
 const MAX_SEED_ATTEMPTS = 48;
 const MONEY = 1_000_000;
+const BATTLE_CONTENT_HASH = process.env.M4_ORACLE_BATTLE_CONTENT_HASH ?? "";
+const RUN_CONTENT_HASH = process.env.M4_ORACLE_RUN_CONTENT_HASH ?? "";
 
 function gap(code: string, sourceSeam: string, message: string): never {
   throw new M4CaptureGap(code, sourceSeam, message);
+}
+
+function frontier(game: GameManager): RecordValue {
+  return captureOracleFrontier(game, BATTLE_CONTENT_HASH, RUN_CONTENT_HASH, gap) as RecordValue;
+}
+
+function nextControl(game: GameManager): RecordValue {
+  return captureOracleNextControl(game, gap) as RecordValue;
 }
 
 function finiteNumber(value: unknown, path: string): number {
@@ -1018,6 +1029,7 @@ function validateSurface(surface: SurfaceCapture | undefined, vector: string): R
   return {
     initial: jsonValue(surface.initial, `${vector}.initial`) as RecordValue,
     decisions: jsonValue(surface.decisions, `${vector}.decisions`) as JsonValue[],
+    rng_draws: jsonValue(surface.rngDraws, `${vector}.rng_draws`) as JsonValue[],
     ordered_transitions: jsonValue(surface.orderedTransitions, `${vector}.ordered_transitions`) as JsonValue[],
     mutations: jsonValue(surface.mutations, `${vector}.mutations`) as JsonValue[],
     presentation: jsonValue(surface.presentation, `${vector}.presentation`) as JsonValue[],
@@ -1039,9 +1051,17 @@ async function captureReward(seed: string): Promise<RecordValue> {
     liveGame.move.select(MoveId.SPLASH);
     await liveGame.doKillOpponents();
     await liveGame.phaseInterceptor.to("SelectModifierPhase");
+    const initialFrontier = frontier(liveGame);
     await driveReward(liveGame);
     const evidence = validateSurface(context.reward, "rewards/regular-reroll-lock-v1");
-    return evidence;
+    return {
+      ...evidence,
+      initial: initialFrontier,
+      initial_observation: evidence.initial,
+      final: frontier(liveGame),
+      final_observation: evidence.final,
+      next_control: nextControl(liveGame),
+    };
   } finally {
     activeCapture = null;
     releaseGame(game);
@@ -1070,9 +1090,17 @@ async function captureMarket(seed: string): Promise<RecordValue> {
       );
     }
     captureMarketStart(context, marketPhase, null);
+    const initialFrontier = frontier(liveGame);
     await driveMarket(liveGame);
     const evidence = validateSurface(context.market, "markets/town-wave-10-v1");
-    return evidence;
+    return {
+      ...evidence,
+      initial: initialFrontier,
+      initial_observation: evidence.initial,
+      final: frontier(liveGame),
+      final_observation: evidence.final,
+      next_control: nextControl(liveGame),
+    };
   } finally {
     activeCapture = null;
     releaseGame(game);

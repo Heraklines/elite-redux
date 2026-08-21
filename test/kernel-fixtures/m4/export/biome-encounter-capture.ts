@@ -747,7 +747,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
   }
   resetErBiomeStructure();
   resetErRouting();
-  const phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
+  let phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
   const boot = Promise.withResolvers<void>();
   setTimeout(boot.resolve, 0);
   await boot.promise;
@@ -788,6 +788,12 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
     biome = captureStructureAndRoute(game);
     releaseGame(game);
     game = null;
+    phaserGame.destroy(true);
+    phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
+    const encounterBoot = Promise.withResolvers<void>();
+    setTimeout(encounterBoot.resolve, 0);
+    await encounterBoot.promise;
+
 
     const scenarioSpec = {
       v: 1,
