@@ -158,7 +158,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: m4-foundation-cargo-test-log
-          path: rust/cargo-test-diagnostics.log
+          path: |
+            rust/cargo-test-diagnostics.log
+            rust/lockfile-drift.diff
           if-no-files-found: ignore
           retention-days: 7
 
@@ -166,8 +168,8 @@ jobs:
         working-directory: rust
         shell: bash
         run: |
-          if ! git diff --exit-code -- Cargo.lock; then
-            echo "::error::Cargo.lock drifted from the committed file; diff above"
+          if ! git diff --exit-code -- Cargo.lock > lockfile-drift.diff; then
+            cat lockfile-drift.diff
             exit 1
           fi
 
