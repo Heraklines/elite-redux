@@ -25,7 +25,10 @@ import {
   setErLeaveBiomeNow,
 } from "#data/elite-redux/er-biome-structure";
 import {
+  erPendingNodesReady,
+  getErPendingNodes,
   getErPrevBiome,
+  getErRoutingState,
   resetErRouting,
   rollErNextBiomeNodes,
 } from "#data/elite-redux/er-biome-routing";
@@ -34,6 +37,7 @@ import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { captureOracleFrontier, captureOracleNextControl } from "./oracle-frontier";
 import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
 import { BattleScene } from "#app/battle-scene";
 import { GameManager } from "#test/framework/game-manager";
@@ -89,6 +93,8 @@ const STRUCTURE_SOURCE = "src/data/elite-redux/er-biome-structure.ts:planErBiome
 const ROUTE_SOURCE = "src/data/elite-redux/er-biome-routing.ts:rollErNextBiomeNodes";
 const ENCOUNTER_SOURCE = "src/phases/encounter-phase.ts:runEncounter";
 const SAFE_U53_MAX = 9_007_199_254_740_991;
+const BATTLE_CONTENT_HASH = process.env.M4_ORACLE_BATTLE_CONTENT_HASH ?? "";
+const RUN_CONTENT_HASH = process.env.M4_ORACLE_RUN_CONTENT_HASH ?? "";
 
 let activeRngCapture: {
   capture: RngCapture;
@@ -322,6 +328,21 @@ function rngView(rng: RngCapture): AnyRecord {
     next_sequence: rng.draws.length,
   };
 }
+function sharedRngDraws(stream: string, capture: RngCapture, sequenceOffset: number): AnyRecord[] {
+  return capture.draws.map(draw => ({
+    ...draw,
+    sequence: draw.sequence + sequenceOffset,
+    stream,
+  }));
+}
+
+function frontier(game: GameManager): AnyRecord {
+  return captureOracleFrontier(game, BATTLE_CONTENT_HASH, RUN_CONTENT_HASH, gap);
+}
+
+function nextControl(game: GameManager): AnyRecord {
+  return captureOracleNextControl(game, gap);
+}
 
 function requireGlobalRoutingSeams(game: GameManager): void {
   const scene = globalScene as AnyRecord | undefined;
@@ -354,11 +375,18 @@ function requireGlobalRoutingSeams(game: GameManager): void {
 function captureStructureAndRoute(game: GameManager): AnyRecord {
   resetErBiomeStructure();
   resetErRouting();
-  const before = stateView();
+  const initial = frontier(game);
+  const structureBefore = stateView();
   const structureCapture = observeSource("STRUCTURE_CALLBACK_UNOBSERVABLE", STRUCTURE_SOURCE, () =>
     withRngCapture("structure", () => planErBiomeStructure(1, RUN_SEED)),
   );
   const plan = structureCapture.value;
+  const routeBefore = {
+    previous_biome_id: getErPrevBiome(),
+    routing_state: getErRoutingState() ?? null,
+    pending_nodes: getErPendingNodes(),
+    pending_nodes_ready: erPendingNodesReady(),
+  };
   if (plan.length !== 25 || plan.startWave !== 1) {
     gap(
       "STRUCTURE_VECTOR_MISMATCH",
@@ -375,6 +403,7 @@ function captureStructureAndRoute(game: GameManager): AnyRecord {
     { index: 1, id: "leave", label: "Leave" },
   ];
   restoreErBiomeStructure(25, 1, null);
+  const crossroadsBefore = stateView();
   if (!erShouldRaiseCrossroads(sourceWave)) {
     gap("CROSSROADS_VECTOR_MISMATCH", "src/data/elite-redux/er-biome-structure.ts:erShouldRaiseCrossroads", "wave 10 is not offered");
   }
@@ -384,6 +413,7 @@ function captureStructureAndRoute(game: GameManager): AnyRecord {
     gap("CROSSROADS_STAY_UNOBSERVABLE", "src/data/elite-redux/er-biome-structure.ts:erMarkBiomeStay", "Stay did not arm the first overstay anchor");
   }
   restoreErBiomeStructure(25, 1, null);
+  const leaveBefore = stateView();
   setErLeaveBiomeNow();
   const leaveAfter = stateView();
   if (leaveAfter.leave_biome_now !== true || erIsBiomeEnd(sourceWave) !== true) {
@@ -411,12 +441,138 @@ function captureStructureAndRoute(game: GameManager): AnyRecord {
     selected_node_index: selectedIndex,
     pending_route_nodes: orderedNodes,
   };
+  const routeStateAfter = {
+    previous_biome_id: getErPrevBiome(),
+    routing_state: getErRoutingState() ?? null,
+    pending_nodes: getErPendingNodes(),
+    pending_nodes_ready: erPendingNodesReady(),
+  };
+  const final = frontier(game);
+  const structureDraws = sharedRngDraws("structure", structureCapture.rng, 0);
+  const routeDraws = sharedRngDraws("route", routeCapture.rng, structureDraws.length);
+  const rngDraws = [...structureDraws, ...routeDraws];
+  const crossroadsDecision = {
+    kind: "CROSSROADS_OPTIONS",
+    source: "src/data/elite-redux/er-biome-structure.ts:erShouldRaiseCrossroads",
+    source_wave: sourceWave,
+    options: crossroadsOptions,
+  };
   return {
     fixture_id: "biomes/town-crossroads-route-v1",
     run_seed: RUN_SEED,
-    structure_before: before,
+    initial,
+    decisions: [
+      {
+        kind: "STRUCTURE_PLAN",
+        source: STRUCTURE_SOURCE,
+        seed: RUN_SEED,
+        start_wave: plan.startWave,
+        length: plan.length,
+      },
+      crossroadsDecision,
+      {
+        kind: "CROSSROADS_STAY_PROBE",
+        source: "src/data/elite-redux/er-biome-structure.ts:erMarkBiomeStay",
+        source_wave: sourceWave,
+        before: crossroadsBefore,
+        after: stayAfter,
+      },
+      {
+        kind: "CROSSROADS_LEAVE_PROBE",
+        source: "src/data/elite-redux/er-biome-structure.ts:setErLeaveBiomeNow",
+        source_wave: sourceWave,
+        before: leaveBefore,
+        after: leaveAfter,
+      },
+      {
+        kind: "ROUTE_SELECTION",
+        source: ROUTE_SOURCE,
+        entry_wave: 11,
+        selected: routeAfter,
+      },
+    ],
+    rng_draws: rngDraws,
+    ordered_transitions: [
+      {
+        sequence: 0,
+        kind: "BIOME_STRUCTURE",
+        source: STRUCTURE_SOURCE,
+        before: structureBefore,
+        after: structureAfter,
+      },
+      {
+        sequence: 1,
+        kind: "CROSSROADS_STAY",
+        source: "src/data/elite-redux/er-biome-structure.ts:erMarkBiomeStay",
+        before: crossroadsBefore,
+        after: stayAfter,
+      },
+      {
+        sequence: 2,
+        kind: "CROSSROADS_LEAVE",
+        source: "src/data/elite-redux/er-biome-structure.ts:setErLeaveBiomeNow",
+        before: leaveBefore,
+        after: leaveAfter,
+      },
+      {
+        sequence: 3,
+        kind: "ROUTE_OPTIONS",
+        source: ROUTE_SOURCE,
+        entry_wave: 11,
+        nodes: orderedNodes,
+      },
+      {
+        sequence: 4,
+        kind: "ROUTE_SELECTION",
+        source: ROUTE_SOURCE,
+        selected: routeAfter,
+      },
+    ],
+    mutations: [
+      {
+        kind: "BIOME_STRUCTURE_STATE",
+        source: STRUCTURE_SOURCE,
+        before: structureBefore,
+        after: structureAfter,
+      },
+      {
+        kind: "CROSSROADS_STATE",
+        source: "src/data/elite-redux/er-biome-structure.ts:erMarkBiomeStay",
+        before: crossroadsBefore,
+        after: stayAfter,
+      },
+      {
+        kind: "CROSSROADS_STATE",
+        source: "src/data/elite-redux/er-biome-structure.ts:setErLeaveBiomeNow",
+        before: leaveBefore,
+        after: leaveAfter,
+      },
+      {
+        kind: "ROUTE_STATE",
+        source: ROUTE_SOURCE,
+        before: routeBefore,
+        after: routeStateAfter,
+      },
+    ],
+    presentation: [
+      crossroadsDecision,
+      {
+        kind: "ROUTE_PRESENTATION",
+        source: "src/ui/handlers/er-map-picker-ui-handler.ts:nodes",
+        entry_wave: 11,
+        nodes: orderedNodes,
+        selected: routeAfter,
+      },
+    ],
+    final,
+    next_control: nextControl(game),
+    structure_before: structureBefore,
     structure_draws: structureCapture.rng.draws,
     structure_after: structureAfter,
+    rng_capture: {
+      structure: rngView(structureCapture.rng),
+      route: rngView(routeCapture.rng),
+    },
     crossroads: {
       source_wave: sourceWave,
       options: crossroadsOptions,
@@ -577,6 +733,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
   await boot.promise;
   const originalBattleSeed = BattleScene.prototype.randBattleSeedInt;
   let game: GameManager | null = null;
+  let encounterInitial: AnyRecord | null = null;
   try {
     const scenarioSpec = {
       name: "M4A captured Plains wave 11",
@@ -601,6 +758,7 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
         .seed(scenarioSeed)
         .startingWave(11)
         .startingBiome(BiomeId.PLAINS);
+      encounterInitial = frontier(game!);
       game!.scene.phaseManager.pushNew("EncounterPhase", false);
       starterPhase.initBattle(starters, true);
       built.postLaunch();
@@ -643,8 +801,16 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
           })),
         },
         enemy_party: enemies.map((mon, index) => pokemonView(mon, "enemy", index)),
-        enemy_leads: enemyField.map((mon, index) => ({ stable_index: index, battler_index: mon.getBattlerIndex(), pokemon: pokemonView(mon, "enemy", index) })),
-        player_leads: playerField.map((mon, index) => ({ stable_index: index, battler_index: mon.getBattlerIndex(), pokemon: pokemonView(mon, "player", index) })),
+        enemy_leads: enemyField.map((mon, index) => ({
+          stable_index: index,
+          battler_index: mon.getBattlerIndex(),
+          pokemon: pokemonView(mon, "enemy", index),
+        })),
+        player_leads: playerField.map((mon, index) => ({
+          stable_index: index,
+          battler_index: mon.getBattlerIndex(),
+          pokemon: pokemonView(mon, "player", index),
+        })),
         field: fieldView(game!, battle),
         scripted_policy: {
           kind: "SCRIPTED_ONLY",
@@ -661,9 +827,98 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
         },
       };
     });
+    if (encounterInitial == null) {
+      gap("ENCOUNTER_FRONTIER_UNOBSERVABLE", ENCOUNTER_SOURCE, "the live EncounterPhase launch frontier was not captured");
+    }
+    const encounterFinal = frontier(game!);
+    const encounterRngDraws = sharedRngDraws("encounter", captured.rng, 0);
+    const scriptedDecision = {
+      kind: "SCRIPTED_COMMAND",
+      source: "test/kernel-fixtures/m4/export/biome-encounter-capture.ts:explicit-command-input",
+      policy: captured.value.scripted_policy,
+    };
+    const encounter = {
+      ...captured.value,
+      fixture_id: "encounters/plains-wave-11-captured-v1",
+      initial: encounterInitial,
+      decisions: [
+        {
+          kind: "ENCOUNTER_GENERATION",
+          source: ENCOUNTER_SOURCE,
+          wave: captured.value.wave,
+          biome_id: captured.value.biome_id,
+        },
+        scriptedDecision,
+      ],
+      rng_before: captured.rng.before,
+      rng_draws: encounterRngDraws,
+      rng_after: captured.rng.after,
+      rng_capture: rngView(captured.rng),
+      ordered_transitions: [
+        {
+          sequence: 0,
+          kind: "CONTROL_TRANSITION",
+          source: "src/phases/encounter-phase.ts:EncounterPhase.start",
+          from: encounterInitial.canonical.runtime.phase,
+          to: encounterFinal.canonical.runtime.phase,
+        },
+        {
+          sequence: 1,
+          kind: "BATTLE_MATERIALIZED",
+          source: ENCOUNTER_SOURCE,
+          wave: captured.value.wave,
+          biome_id: captured.value.biome_id,
+          battle_seed: captured.value.battle_seed,
+        },
+        {
+          sequence: 2,
+          kind: "COMMAND_POLICY_READY",
+          source: "src/phases/command-phase.ts:handleCommand",
+          policy: captured.value.scripted_policy,
+        },
+      ],
+      mutations: [
+        {
+          kind: "CANONICAL_STATE",
+          source: "src/system/game-data.ts:GameData.getSessionSaveData",
+          before: encounterInitial.canonical,
+          after: encounterFinal.canonical,
+        },
+        {
+          kind: "RUN_RNG_FRONTIER",
+          source: "Phaser.Math.RND",
+          before: encounterInitial.rng.run,
+          after: encounterFinal.rng.run,
+        },
+        {
+          kind: "BATTLE_RNG_FRONTIER",
+          source: "src/battle-scene.ts:battleSeedState",
+          before: encounterInitial.rng.battle,
+          after: encounterFinal.rng.battle,
+        },
+        {
+          kind: "FIELD_MATERIALIZATION",
+          source: "src/phases/encounter-phase.ts:runEncounter",
+          after: captured.value.field,
+        },
+      ],
+      presentation: [
+        {
+          kind: "BATTLE_PRESENTATION",
+          source: "src/phases/encounter-phase.ts:runEncounter",
+          format: captured.value.format,
+          field: captured.value.field,
+          enemy_leads: captured.value.enemy_leads,
+          player_leads: captured.value.player_leads,
+        },
+        scriptedDecision,
+      ],
+      final: encounterFinal,
+      next_control: nextControl(game!),
+    };
     return {
       biome,
-      encounter: { ...captured.value, rng_before: captured.rng.before, rng_draws: captured.rng.draws, rng_after: captured.rng.after },
+      encounter,
     };
   } catch (error) {
     if (error instanceof M4CaptureGap) {
