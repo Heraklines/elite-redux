@@ -2,7 +2,7 @@
   "schema_version": 1,
   "m4_oracle_sha": "45c89493e7edec9c4da247a98cd7858b1f015c09",
   "m3_parity_oracle_sha": "3b534099919efae827019d4a3f3c4ab0ecd6d67b",
-  "contract_state": "G12_FROZEN_EXPORT_REQUIRED_BEFORE_M4B",
+  "contract_state": "G13_PUBLISHED_FRESH_PROCESS_VERIFIED",
   "exporter": {
     "script": "scripts/export-kernel-m4-oracle.mjs",
     "test": "test/kernel-fixtures/m4/export-run-oracle.test.ts",

@@ -197,7 +197,7 @@ assert(coverage.fixture_requirements.initial_state === "ORACLE_EXPORTED_WAVE_9_C
 assert(coverage.fixture_requirements.driver === "RAW_PHYSICAL_KEYS_ONLY", "coverage raw-key requirement mismatch");
 
 const oracle = manifests.get("m4-oracle-manifest.json");
-assert(oracle.contract_state === "G12_FROZEN_EXPORT_REQUIRED_BEFORE_M4B", "oracle publication state mismatch");
+assert(oracle.contract_state === "G13_PUBLISHED_FRESH_PROCESS_VERIFIED", "oracle publication state mismatch");
 assert(oracle.parity_segment.semantic_shortcuts_forbidden === true, "semantic shortcuts must be forbidden");
 assert(oracle.required_outputs.length === new Set(oracle.required_outputs).size, "oracle outputs must be unique");
 
