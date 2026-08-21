@@ -187,7 +187,13 @@ type RngCollector = {
   restore: () => void;
 };
 
-function installRngTrace(): RngCollector {
+function installRngTrace(game: GameManager): RngCollector {
+  const drawContext = (): JsonObject => ({
+    phase: String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? ""),
+    queued_phases: (game.scene.phaseManager as AnyRecord).getQueuedPhaseNames?.() ?? [],
+    ui_mode: String(game.scene.ui.getMode()),
+    wave: Number(game.scene.currentBattle?.waveIndex ?? -1),
+  });
   const random = Phaser.Math.RND as AnyRecord;
   const methods = ["integerInRange", "integer", "frac", "realInRange", "pick", "shuffle", "angle", "between", "normal", "weightedPick", "sign"] as const;
   const draws: JsonValue[] = [];
@@ -214,6 +220,7 @@ function installRngTrace(): RngCollector {
         consumed: before.state_string !== after.state_string,
         before_state: before,
         after_state: after,
+        context: drawContext(),
       });
       return result;
     };
@@ -249,6 +256,7 @@ function installRngTrace(): RngCollector {
       consumed: before.state_string !== after.state_string,
       before_state: before,
       after_state: after,
+      context: drawContext(),
     });
     return result;
   };
@@ -629,7 +637,7 @@ export async function captureComposedSegment(): Promise<JsonObject> {
     overrides.LEVEL_CAP_OVERRIDE = 17;
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
     const game = await launch(phaserGame);
-    rngTrace = installRngTrace();
+    rngTrace = installRngTrace(game);
     const target = game.scene.getPlayerParty()[0] as AnyRecord | undefined;
     if (target == null || target.species?.speciesId !== SpeciesId.NACLI) {
       gap("COMPOSED_PARTY_UNOBSERVABLE", "src/field/pokemon.ts:PlayerPokemon", "the live composed party does not contain Nacli");
