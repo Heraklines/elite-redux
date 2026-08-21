@@ -135,6 +135,16 @@ pub struct PendingModifierTarget {
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct RewardOffer {
+    pub offer_id: RunOfferId,
+    pub modifier_id: ModifierId,
+    pub tier: ModifierTier,
+    pub price: Money,
+    pub sold: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MarketStockEntry {
     pub stock_id: RunStockId,
     pub modifier_id: ModifierId,
