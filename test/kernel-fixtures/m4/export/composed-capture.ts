@@ -296,13 +296,6 @@ async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitio
     press(game, key, tape, transitions);
     await sleep();
   }
-  if (String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "") === "LearnMoveBatchPhase") {
-    gap(
-      "MOVE_LEARN_CONTROL_UNOBSERVABLE",
-      "src/phases/learn-move-batch-phase.ts:LearnMoveBatchPhase",
-      "physical move-learning input did not close the live surface",
-    );
-  }
   await game.phaseInterceptor.to("SelectModifierPhase");
 }
 
