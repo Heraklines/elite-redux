@@ -291,7 +291,12 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
 }
 
 async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
-  await waitForInputPhase(game, ["LearnMoveBatchPhase"], "wave-9 move learning");
+  await game.phaseInterceptor.to("LearnMoveBatchPhase");
+  await waitForLiveCondition(
+    game,
+    () => game.scene.ui.getMode() === UiMode.LEARN_MOVE_BATCH,
+    "wave-9 move-learning UI",
+  );
   const handler = game.scene.ui.getHandler() as AnyRecord;
   if (handler?.state !== "pickNew") {
     gap(
