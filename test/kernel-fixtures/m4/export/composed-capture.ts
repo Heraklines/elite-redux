@@ -467,7 +467,7 @@ async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions:
     () => Number(handler.getStock(target)) < stockBefore,
     "wave-10 market purchase",
   );
-  press(game, "Escape", tape, transitions);
+  press(game, "Backspace", tape, transitions);
   await waitForLiveCondition(
     game,
     () => game.scene.ui.getMode() === UiMode.CONFIRM,
