@@ -134,7 +134,7 @@ jobs:
           path: rust/cargo-diagnostics.log
           if-no-files-found: ignore
           retention-days: 7
- 
+
       - name: Run focused M4 foundation contracts
         working-directory: rust
         shell: bash
