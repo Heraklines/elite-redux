@@ -1,5 +1,6 @@
 import { BattleScene } from "#app/battle-scene";
-import { buildDevScenario } from "#app/dev-tools/test-suite/scenario-spec";
+import { Battle } from "#app/battle";
+import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
 import { getGameMode } from "#app/game-mode";
 import Overrides from "#app/overrides";
@@ -15,12 +16,14 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
 import { Button } from "#enums/buttons";
+import {
+  captureOracleFrontier,
+  captureOracleNextControl,
+  type JsonObject,
+  type JsonValue,
+} from "./oracle-frontier";
 import Phaser from "phaser";
 import { vi } from "vitest";
-
-export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue };
-export type JsonObject = { [key: string]: JsonValue };
-
 type AnyRecord = Record<string, any>;
 
 type CaptureTrace = {
@@ -30,6 +33,8 @@ type CaptureTrace = {
   readonly moveBatch: AnyRecord[];
   readonly setMove: AnyRecord[];
   readonly menuInputs: AnyRecord[];
+  readonly phaseTransitions: AnyRecord[];
+  readonly rngDraws: AnyRecord[];
 };
 
 /** A source seam that the test-only exporter could not drive or observe. */
@@ -183,6 +188,136 @@ function readPartySnapshot(game: GameManager, pokemon: Pokemon): JsonObject {
   return pokemonSnapshot(pokemon, partySlot);
 }
 
+type RngCollector = {
+  readonly draws: AnyRecord[];
+  readonly restore: () => void;
+};
+
+function f64Bits(value: number): string {
+  const bytes = new ArrayBuffer(8);
+  new DataView(bytes).setFloat64(0, value, false);
+  return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function rngState(value: unknown, path: string): JsonObject {
+  if (typeof value !== "string") {
+    gap("RNG_STATE_UNOBSERVABLE", "Phaser.Math.RandomDataGenerator.state", `${path} is not a string`);
+  }
+  const parts = value.split(",");
+  const carry = Number(parts[1]);
+  const values = parts.slice(2).map(Number);
+  if (
+    parts.length !== 5
+    || parts[0] !== "!rnd"
+    || !Number.isSafeInteger(carry)
+    || carry < 0
+    || carry > 0xffffffff
+    || values.some(entry => !Number.isFinite(entry) || entry < 0 || entry >= 1)
+  ) {
+    gap("RNG_STATE_UNOBSERVABLE", "Phaser.Math.RandomDataGenerator.state", `${path} is malformed`);
+  }
+  return {
+    state_string: value,
+    s0_bits: f64Bits(values[0]),
+    s1_bits: f64Bits(values[1]),
+    s2_bits: f64Bits(values[2]),
+    carry,
+  };
+}
+
+function installRngTrace(): RngCollector {
+  const random = Phaser.Math.RND as unknown as AnyRecord;
+  const methods = [
+    "integerInRange",
+    "integer",
+    "frac",
+    "realInRange",
+    "pick",
+    "shuffle",
+    "angle",
+    "between",
+    "normal",
+    "weightedPick",
+    "sign",
+  ] as const;
+  const restores: (() => void)[] = [];
+  const draws: AnyRecord[] = [];
+  let battleDrawInProgress = false;
+
+  for (const method of methods) {
+    const original = random[method];
+    if (typeof original !== "function") {
+      gap("RNG_OBSERVATION_SEAM_MISSING", `Phaser.Math.RND.${method}`, "RNG method is not callable");
+    }
+    random[method] = function (this: AnyRecord, ...args: unknown[]): unknown {
+      if (battleDrawInProgress) {
+        return original.apply(this, args);
+      }
+      const before = rngState(random.state(), `${method}.before`);
+      const result = original.apply(this, args);
+      const after = rngState(random.state(), `${method}.after`);
+      draws.push({
+        sequence: draws.length,
+        stream: "RUN",
+        public_api: method.toUpperCase(),
+        arguments: jsonSafe(args, `${method}.arguments`),
+        result: jsonSafe(result, `${method}.result`),
+        consumed: before.state_string !== after.state_string,
+        before_state: before,
+        after_state: after,
+      });
+      return result;
+    };
+    restores.push(() => {
+      random[method] = original;
+    });
+  }
+
+  const battleProto = Battle.prototype as unknown as AnyRecord;
+  const originalBattleRand = battleProto.randSeedInt;
+  if (typeof originalBattleRand !== "function") {
+    gap("RNG_OBSERVATION_SEAM_MISSING", "src/battle.ts:Battle.randSeedInt", "battle RNG method is not callable");
+  }
+  battleProto.randSeedInt = function (this: AnyRecord, ...args: unknown[]): unknown {
+    if (battleDrawInProgress) {
+      return originalBattleRand.apply(this, args);
+    }
+    const battleState = this.battleSeedState ?? random.state();
+    const before = rngState(battleState, "battle.before");
+    battleDrawInProgress = true;
+    let result: unknown;
+    try {
+      result = originalBattleRand.apply(this, args);
+    } finally {
+      battleDrawInProgress = false;
+    }
+    const after = rngState(this.battleSeedState ?? random.state(), "battle.after");
+    draws.push({
+      sequence: draws.length,
+      stream: "BATTLE",
+      public_api: "RAND_SEED_INT",
+      arguments: jsonSafe(args, "battle.arguments"),
+      result: jsonSafe(result, "battle.result"),
+      consumed: before.state_string !== after.state_string,
+      before_state: before,
+      after_state: after,
+    });
+    return result;
+  };
+  restores.push(() => {
+    battleProto.randSeedInt = originalBattleRand;
+  });
+
+  return {
+    draws,
+    restore: () => {
+      for (const restore of restores.reverse()) {
+        restore();
+      }
+    },
+  };
+}
+
 function installTrace(game: GameManager, trace: CaptureTrace): () => void {
   const battleSceneProto = BattleScene.prototype as AnyRecord;
   const pokemonProto = Pokemon.prototype as AnyRecord;
@@ -190,11 +325,13 @@ function installTrace(game: GameManager, trace: CaptureTrace): () => void {
   const originalApply = battleSceneProto.applyPartyExp;
   const originalAddExp = pokemonProto.addExp;
   const originalSetMove = pokemonProto.setMove;
+  const originalPushNew = phaseManagerProto.pushNew;
   const originalUnshiftNew = phaseManagerProto.unshiftNew;
   if (
     typeof originalApply !== "function"
     || typeof originalAddExp !== "function"
     || typeof originalSetMove !== "function"
+    || typeof originalPushNew !== "function"
     || typeof originalUnshiftNew !== "function"
   ) {
     gap("PROGRESSION_SEAM_MISSING", "src/battle-scene.ts:applyPartyExp -> src/phases/exp-phase.ts", "one or more live observation methods are unavailable");
@@ -246,7 +383,13 @@ function installTrace(game: GameManager, trace: CaptureTrace): () => void {
     return result;
   };
 
+  phaseManagerProto.pushNew = function (this: PhaseManager, phaseName: string, ...args: unknown[]): unknown {
+    trace.phaseTransitions.push({ sequence: trace.phaseTransitions.length, operation: "PUSH", phase: phaseName });
+    return originalPushNew.apply(this, [phaseName, ...args]);
+  };
+
   phaseManagerProto.unshiftNew = function (this: PhaseManager, phaseName: string, ...args: unknown[]): unknown {
+    trace.phaseTransitions.push({ sequence: trace.phaseTransitions.length, operation: "UNSHIFT", phase: phaseName });
     if (phaseName === "LevelUpPhase") {
       trace.levelUp.push({ phase: phaseName, args });
     } else if (phaseName === "LearnMoveBatchPhase") {
@@ -259,6 +402,7 @@ function installTrace(game: GameManager, trace: CaptureTrace): () => void {
     battleSceneProto.applyPartyExp = originalApply;
     pokemonProto.addExp = originalAddExp;
     pokemonProto.setMove = originalSetMove;
+    phaseManagerProto.pushNew = originalPushNew;
     phaseManagerProto.unshiftNew = originalUnshiftNew;
   };
 }
@@ -327,6 +471,7 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
   let phaserGame: Phaser.Game | undefined;
   let game: GameManager | undefined;
   let restoreTrace: (() => void) | undefined;
+  let rngTrace: RngCollector | undefined;
   let priorBattleRng: BattleScene["randBattleSeedInt"] | undefined;
   const trace: CaptureTrace = {
     applyPartyExp: [],
@@ -335,11 +480,14 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
     moveBatch: [],
     setMove: [],
     menuInputs: [],
+    phaseTransitions: [],
+    rngDraws: [],
   };
   const overrides = Overrides as unknown as { LEVEL_CAP_OVERRIDE: number };
   const priorCap = overrides.LEVEL_CAP_OVERRIDE;
   try {
     priorBattleRng = BattleScene.prototype.randBattleSeedInt;
+    rngTrace = installRngTrace();
     overrides.LEVEL_CAP_OVERRIDE = LEVEL_CAP_OVERRIDE;
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     const boot = Promise.withResolvers<void>();
@@ -374,11 +522,15 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
       gap("PARTICIPATION_TARGET_MISSING", "src/battle.ts:playerParticipantIds", "the live target was not admitted as a battle participant");
     }
     const enemyExpValue = finite(enemy.getExpValue(), "enemy.getExpValue");
-    restoreTrace = installTrace(game, trace);
     // launchProgressionScenario leaves the production command surface open. Re-observe that exact live
-    // CommandPhase before queuing the lead command; PromptHandler is FIFO, so registering a later
-    // LearnMoveBatchPhase prompt first would strand these CommandPhase callbacks behind it.
+    // CommandPhase before starting the transaction, then install source observation hooks.
     await game.phaseInterceptor.to("CommandPhase", false);
+    restoreTrace = installTrace(game, trace);
+    const battleHash = process.env.M4_ORACLE_BATTLE_CONTENT_HASH ?? "";
+    const runHash = process.env.M4_ORACLE_RUN_CONTENT_HASH ?? "";
+    const initialFrontier = captureOracleFrontier(game, battleHash, runHash, gap);
+    const rngStart = rngTrace?.draws.length ?? 0;
+    const initialMode = String(game.scene.ui.getMode());
     // Match the proven M3 exporter: select the move for the live PLAYER battler through MoveHelper, and
     // suppress its optional target callback because this single-target source battle has no target phase.
     game.move.select(MoveId.POUND, BattlerIndex.PLAYER, null);
@@ -393,6 +545,10 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
     await game.killPokemon(enemy);
     game.doSelectModifier();
     await game.phaseInterceptor.to("BattleEndPhase");
+    const finalFrontier = captureOracleFrontier(game, battleHash, runHash, gap);
+    const nextControl = captureOracleNextControl(game, gap);
+    const transactionRngDraws = rngTrace?.draws.slice(rngStart) ?? [];
+    trace.rngDraws.push(...transactionRngDraws);
     const after = readPartySnapshot(game, pokemon);
     const battleAfter = game.scene.currentBattle;
     const moneyAfter = finite(game.scene.money, "money.after");
@@ -437,12 +593,71 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
         initial_moves_source: "explicit composed fixture state, not natural learnset",
         pause_evolutions: false,
       },
-      initial: {
+      initial: initialFrontier,
+      initial_observation: {
         canonical: before,
         money: moneyBefore,
         participant_ids: participantIds.map((entry, index) => finite(entry, `participant_ids[${index}]`)),
         threshold_before_level: levelThreshold,
         seeded_experience: seededInitialExp,
+      },
+      decisions: [
+        { kind: "SELECT_MOVE", source: "MoveHelper.select", move_id: MoveId.POUND, battler: BattlerIndex.PLAYER },
+        {
+          kind: "DEFEAT_ENEMY",
+          source: "GameManager.killPokemon",
+          enemy_id: finite(enemy.id, "enemy.id"),
+          enemy_species_id: finite(enemy.species.speciesId, "enemy.species.speciesId"),
+        },
+        { kind: "SELECT_MODIFIER", source: "GameManager.doSelectModifier" },
+        {
+          kind: "LEARN_MOVE",
+          source: "LearnMoveBatchPhase",
+          candidate_move_ids: candidateIds,
+          move_id: LEARNED_MOVE,
+          slot: LEARNED_SLOT,
+        },
+        ...trace.menuInputs.map(input => ({
+          kind: "LOGICAL_BUTTON",
+          button: input.button,
+          phase: input.phase,
+          mode: input.mode,
+        })),
+      ],
+      rng_draws: trace.rngDraws,
+      ordered_transitions: [
+        {
+          kind: "CONTROL_TRANSITION",
+          control: "MOVE_LEARN",
+          phase: "CommandPhase",
+          mode: initialMode,
+        },
+        ...trace.phaseTransitions,
+      ],
+      mutations: [
+        {
+          kind: "STATE_FRONTIER",
+          before: initialFrontier.canonical,
+          after: finalFrontier.canonical,
+        },
+        { kind: "EXP_SETTLEMENT", observation: trace.applyPartyExp[0] },
+        { kind: "EXP_GAIN", observation: addExp[0] },
+        { kind: "MOVE_REPLACEMENT", observation: trace.setMove[0] },
+      ],
+      presentation: [
+        { kind: "LEVEL_UP", observations: trace.levelUp },
+        { kind: "LEARN_MOVE_BATCH", observations: trace.moveBatch },
+        { kind: "LOGICAL_MENU", inputs: trace.menuInputs },
+        {
+          kind: "FINAL_CONTROL",
+          phase: nextControl.phase,
+          queued_phases: nextControl.queued_phases,
+        },
+      ],
+      final: finalFrontier,
+      final_observation: {
+        canonical: after,
+        money: moneyAfter,
       },
       settlement: {
         source_enemy: {
@@ -466,15 +681,26 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
         assignments: [{ move_id: LEARNED_MOVE, slot: LEARNED_SLOT }],
         replacement_slot: LEARNED_SLOT,
       },
-      final: {
-        canonical: after,
-        money: moneyAfter,
-      },
       observations: {
         level_up: trace.levelUp,
         move_batch: trace.moveBatch,
         set_move: trace.setMove,
         add_exp: trace.addExp,
+        phase_transitions: trace.phaseTransitions,
+        rng_instrumented_methods: [
+          "integerInRange",
+          "integer",
+          "frac",
+          "realInRange",
+          "pick",
+          "shuffle",
+          "angle",
+          "between",
+          "normal",
+          "weightedPick",
+          "sign",
+        ],
+        rng_transaction_draw_count: trace.rngDraws.length,
       },
     }) as Record<string, JsonValue>;
   } catch (error) {
@@ -488,6 +714,7 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
       detail,
     );
   } finally {
+    rngTrace?.restore();
     restoreTrace?.();
     if (priorBattleRng != null) {
       BattleScene.prototype.randBattleSeedInt = priorBattleRng;
