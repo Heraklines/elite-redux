@@ -495,7 +495,11 @@ async function driveBiome(game: GameManager, tape: RawTapeEntry[], transitions: 
   });
   await game.phaseInterceptor.to("SelectBiomePhase", false);
 
-  const encounterArrival = game.phaseInterceptor.to("EncounterPhase", false);
+  const encounterArrival = game.phaseInterceptor.toFirst([
+    "NextEncounterPhase",
+    "NewBiomeEncounterPhase",
+    "CommandPhase",
+  ]);
   await waitForLiveCondition(
     game,
     () => game.scene.ui.getMode() === UiMode.ER_MAP,
@@ -519,7 +523,14 @@ async function driveBiome(game: GameManager, tape: RawTapeEntry[], transitions: 
     press(game, "ArrowDown", tape, transitions);
   }
   press(game, "Space", tape, transitions);
-  await encounterArrival;
+  const encounterBoundary = await encounterArrival;
+  if (encounterBoundary === "CommandPhase") {
+    gap(
+      "ENCOUNTER_PREPARED_FRONTIER_UNOBSERVABLE",
+      "src/phases/new-biome-encounter-phase.ts:NewBiomeEncounterPhase",
+      "wave-11 encounter completed before its prepared frontier was observed",
+    );
+  }
 }
 function segment(
   id: SegmentId,
