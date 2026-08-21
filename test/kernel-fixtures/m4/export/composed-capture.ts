@@ -309,6 +309,11 @@ async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitio
 
 async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
   await waitForInputPhase(game, ["SelectModifierPhase"], "wave-9 regular reward");
+  await waitForLiveCondition(
+    game,
+    () => (game.scene.ui.getHandler() as AnyRecord)?.awaitingActionInput === true,
+    "wave-9 reward input readiness",
+  );
   const initialHandler = game.scene.ui.getHandler() as AnyRecord;
   if (initialHandler?.awaitingActionInput !== true) {
     gap("REWARD_UI_UNOBSERVABLE", "src/ui/handlers/modifier-select-ui-handler.ts:awaitingActionInput", "regular reward handler is not actionable");
