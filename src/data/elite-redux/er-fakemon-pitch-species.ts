@@ -464,12 +464,18 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
   },
 ];
 
-/** Stable editor source mapping for the hand-authored 70051-70057 entries. */
+/** Stable editor source mapping for every Discord fakemon-pitch species. */
 export const ER_FAKEMON_PITCH_EDITOR_SPECIES = Object.freeze(
   Object.fromEntries(
-    ER_FAKEMON_PITCH_SPECIES.flatMap(def =>
-      def.editorConst === undefined ? [] : [[def.editorConst, { id: def.id, slug: def.slug }]],
-    ),
+    ER_FAKEMON_PITCH_SPECIES.map(def => {
+      const speciesConst =
+        def.editorConst
+        ?? `SPECIES_${def.name
+          .toUpperCase()
+          .replace(/[^A-Z0-9]+/g, "_")
+          .replace(/^_+|_+$/g, "")}`;
+      return [speciesConst, { id: def.id, slug: def.slug }] as const;
+    }),
   ),
 ) as Readonly<Record<string, Readonly<{ id: number; slug: string }>>>;
 

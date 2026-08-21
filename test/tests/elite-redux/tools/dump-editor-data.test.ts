@@ -23,6 +23,7 @@ import { allAbilities, allSpecies } from "#data/data-lists";
 import { ER_BALANCE_KNOBS } from "#data/elite-redux/er-balance-knobs";
 import { ER_TRAINER_CADENCE } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
+import { ER_FAKEMON_PITCH_EDITOR_SPECIES } from "#data/elite-redux/er-fakemon-pitch-species";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { ER_NEWCOMER_FORMS } from "#data/elite-redux/er-newcomer-forms";
@@ -86,6 +87,14 @@ describe("tools — dump editor SPA data", () => {
     for (const entry of newcomerCatalog) {
       constById.set(entry.id, constifyNewcomer(entry.name));
     }
+    const pitchCatalog = Object.entries(ER_FAKEMON_PITCH_EDITOR_SPECIES).map(([speciesConst, entry]) => ({
+      speciesConst,
+      id: entry.id,
+      slug: entry.slug,
+    }));
+    for (const entry of pitchCatalog) {
+      constById.set(entry.id, entry.speciesConst);
+    }
 
     // speciesConst → sprite slug.
     const slugByConst = new Map<string, string>();
@@ -110,6 +119,9 @@ describe("tools — dump editor SPA data", () => {
           slugByConst.set(speciesConst, aliasSlug);
         }
       }
+    }
+    for (const entry of pitchCatalog) {
+      slugByConst.set(entry.speciesConst, entry.slug);
     }
 
     // Vanilla display name → national dex number, for the customs' dex column
@@ -226,6 +238,12 @@ describe("tools — dump editor SPA data", () => {
         .filter(entry => !indexedNewcomers.has(entry.id))
         .map(entry => ({ id: entry.id, name: entry.name })),
       "registered newcomer species missing from the editor catalog",
+    ).toEqual([]);
+    expect(
+      pitchCatalog
+        .filter(entry => !allSpeciesIndex.some(species => species.id === entry.id && species.slug === entry.slug))
+        .map(entry => ({ id: entry.id, slug: entry.slug })),
+      "registered fakemon-pitch species missing from the editor catalog",
     ).toEqual([]);
     expect(
       newcomerCatalog

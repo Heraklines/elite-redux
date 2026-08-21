@@ -8018,3 +8018,9 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 
 - Regenerated the female Mega Alolan Raichu mini icon from its corrected female front-facing source. Its importer entry now explicitly refreshes that derived icon so future source regeneration cannot retain the old male-back-derived frame.
 - Asset commit `34275e40` contains only the corrected icon. Production remains untouched.
+
+2026-08-21 - Automatic ER Editor catalog refresh
+
+- Restored the complete form-aware editor catalog/search work and extended the runtime dump to include every registered fakemon-pitch species with stable sprite slugs.
+- Added a fail-closed catalog validator covering starter/all-species inclusion, forms, learnsets, TM pools, evolutions, and move/ability references.
+- Added an automatic `feat/elite-redux-port` workflow that regenerates all editor catalogs on GitHub runners and deploys only the standalone `er-editor` Cloudflare Pages project with cache revalidation. Game staging and production deployments are not part of this workflow.

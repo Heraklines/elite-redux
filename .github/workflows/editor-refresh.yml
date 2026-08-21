@@ -1,0 +1,78 @@
+name: Refresh ER Editor
+
+on:
+  push:
+    branches:
+      - feat/elite-redux-port
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: er-editor-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: github.repository == 'Heraklines/elite-redux'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check out current Elite Redux source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || 'feat/elite-redux-port' }}
+
+      - name: Record editor source revision
+        run: echo "EDITOR_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Generate static editor catalogs
+        run: node scripts/gen-editor-data.mjs
+
+      - name: Generate initialized runtime catalogs
+        env:
+          ER_SCENARIO: "1"
+        run: pnpm exec vitest run test/tests/elite-redux/tools/dump-editor-data.test.ts
+
+      - name: Generate Pokedex catalogs
+        env:
+          GEN_EDITOR_DATA: "1"
+        run: pnpm exec vitest run scripts/gen-editor-data/gen-pokedex-data.test.ts
+
+      - name: Validate generated editor data
+        run: node scripts/validate-editor-data.mjs editor/data
+
+      - name: Build clean editor deploy directory
+        run: |
+          rm -rf editor/_deploy
+          mkdir -p editor/_deploy/data
+          cp editor/index.html editor/app.js editor/_deploy/
+          cp editor/data/*.json editor/_deploy/data/
+          printf '{"sourceSha":"%s"}\n' "$EDITOR_SOURCE_SHA" > editor/_deploy/version.json
+          cat > editor/_deploy/_headers <<'EOF'
+          /*
+            Cache-Control: public, max-age=0, must-revalidate
+          /data/*
+            Cache-Control: public, max-age=0, must-revalidate
+          /version.json
+            Cache-Control: public, max-age=0, must-revalidate
+          EOF
+
+      - name: Validate clean deploy directory
+        run: |
+          node scripts/validate-editor-data.mjs editor/_deploy/data
+          test "$(node -p \"require('./editor/_deploy/version.json').sourceSha\")" = "$EDITOR_SOURCE_SHA"
+
+      - name: Deploy ER Editor to Cloudflare Pages
+        run: >-
+          npx wrangler pages deploy editor/_deploy
+          --project-name=er-editor
+          --branch=main
+          --commit-hash="$EDITOR_SOURCE_SHA"
+          --commit-dirty=true

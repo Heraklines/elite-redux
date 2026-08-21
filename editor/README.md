@@ -65,9 +65,12 @@ node scripts/gen-editor-data.mjs
 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/tools/dump-editor-data.test.ts
 ```
 
-Re-run when species/moves/items/factory sets change materially. The SPA
-overlays the live er-*.json overrides at load, so a stale snapshot only
-affects NEW species/items, not current values.
+The `Refresh ER Editor` GitHub workflow now runs these generators and validates
+their cross-references on every push to `feat/elite-redux-port`, then deploys a
+clean, cache-revalidated bundle to the standalone `er-editor` Pages project.
+The SPA still overlays the live er-*.json overrides at load; the generated
+snapshot supplies the complete current species, form, move, ability, item, and
+trainer catalogs.
 
 ## One-time setup
 
