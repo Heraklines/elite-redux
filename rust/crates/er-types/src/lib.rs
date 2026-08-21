@@ -26,14 +26,14 @@ pub use run_ids::{
     RouteNodeId, RunContentPackHash, RunContentPackHashError, RunInteractionSequence, RunOfferId,
     RunStockId, RunSurfaceId, RunTaskId, SurfaceDigest, SurfaceDigestError,
 };
-pub use run_model::{
-    BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
-    ModifierTierError, RewardAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
-};
 pub use run_control::{
     BiomeMarketControl, BiomeSelectControl, CrossroadsControl, GameControl, GameControlPlan,
     GameControlPlanError, MoveLearnControl, PresentationBarrier, RewardShopControl,
     SeatControlPlan, SurfaceControl,
+};
+pub use run_model::{
+    BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
+    ModifierTierError, RewardAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
 };
 pub use trace::*;
 pub use trace_v3::*;

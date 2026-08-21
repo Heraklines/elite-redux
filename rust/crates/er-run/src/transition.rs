@@ -10,7 +10,8 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use er_content::pack::ContentPack;
+use er_types::SeatId;
+use er_types::battle_ids::{BattleId, MoveId, MoveSlotIndex, PokemonId, WaveIndex};
 use er_state::digest_v2::MechanicalStateDigestV2;
 use er_state::game_v2::GameStateV2;
 use er_types::battle_ids::{BattleId, MoveId, MoveSlotIndex, PokemonId, WaveIndex};
@@ -22,7 +23,6 @@ use er_types::run_ids::{
     RunStockId, RunSurfaceId, RunTaskId,
 };
 use er_types::run_model::{LearnMoveDecision, ModifierTier, RunOutcome, RunStage, RunSurfaceKind};
-use er_types::SeatId;
 
 use crate::content::RunContentPack;
 use crate::rng_audit::RunRngDraw;

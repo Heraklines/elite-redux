@@ -357,12 +357,8 @@ impl PreparedTransactionSnapshotV3 {
             })?;
         }
         if let Some(plan) = &self.encounter_plan {
-            plan.validate().map_err(|error| {
-                invalid(
-                    "prepared_transaction.encounter_plan",
-                    error.to_string(),
-                )
-            })?;
+            plan.validate()
+                .map_err(|error| invalid("prepared_transaction.encounter_plan", error.to_string()))?;
             if plan.enemy_party.is_empty() {
                 return Err(invalid(
                     "prepared_transaction.encounter_plan.enemy_party",
