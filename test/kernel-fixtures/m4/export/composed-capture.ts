@@ -10,6 +10,7 @@
 
 import { Battle } from "#app/battle";
 import Overrides from "#app/overrides";
+import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import {
   captureOracleFrontier,
@@ -293,7 +294,10 @@ async function launch(phaserGame: Phaser.Game): Promise<GameManager> {
     built.postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");
-  await game.phaseInterceptor.to("CommandPhase");
+  // The boot-time biome-structure roll runs before the harness pins the run
+  // seed, so re-issue the production addressed roll (battle-scene.ts:2497
+  // semantics) against the pinned seed before any frontier is captured.
+  erRollBiomeLength(game.scene.arena.biomeId, 1, game.scene.seed);
   return game;
 }
 

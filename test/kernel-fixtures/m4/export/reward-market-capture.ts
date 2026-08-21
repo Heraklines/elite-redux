@@ -6,6 +6,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { modifierTypes } from "#data/data-lists";
+import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { BiomeShopPhase } from "#phases/biome-shop-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { PokemonModifierType } from "#modifiers/modifier-type";
@@ -555,7 +556,10 @@ async function launchGame(wave: number, seed: string): Promise<GameManager> {
     .seed(`${SEED_PREFIX}-${seed}`);
   await manager.classicMode.startBattle(SpeciesId.SQUIRTLE);
   manager.scene.money = MONEY;
-  manager.scene.lockModifierTiers = false;
+  // The boot-time biome-structure roll runs before the harness pins the run
+  // seed, so re-issue the production addressed roll (battle-scene.ts:2497
+  // semantics) against the pinned seed before any frontier is captured.
+  erRollBiomeLength(BiomeId.TOWN, 1, manager.scene.seed);
   manager.scene.reroll = false;
   return manager;
 }

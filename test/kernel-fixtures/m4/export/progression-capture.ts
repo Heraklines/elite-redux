@@ -4,6 +4,7 @@ import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/s
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
 import { getGameMode } from "#app/game-mode";
 import Overrides from "#app/overrides";
+import { erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
 import { PhaseManager } from "#app/phase-manager";
 import { ExpNotification } from "#enums/exp-notification";
 import { GameModes } from "#enums/game-modes";
@@ -435,6 +436,10 @@ async function launchProgressionScenario(phaserGame: Phaser.Game): Promise<GameM
   await game.phaseInterceptor.to("EncounterPhase");
   await game.phaseInterceptor.to("CommandPhase");
   scenario.onBattleStart?.();
+  // The boot-time biome-structure roll runs before the harness pins the run
+  // seed, so re-issue the production addressed roll (battle-scene.ts:2497
+  // semantics) against the pinned seed before any frontier is captured.
+  erRollBiomeLength(game.scene.arena.biomeId, 1, game.scene.seed);
   game.scene.expParty = ExpNotification.SKIP;
   return game;
 }
