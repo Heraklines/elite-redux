@@ -476,8 +476,9 @@ async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions:
     () => game.scene.ui.getMode() === UiMode.CONFIRM,
     "wave-10 market leave confirmation",
   );
+  const crossroadsArrival = game.phaseInterceptor.to("ErCrossroadsPhase", false);
   press(game, "Space", tape, transitions);
-  await game.phaseInterceptor.to("ErCrossroadsPhase", false);
+  await crossroadsArrival;
 }
 
 async function driveBiome(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
