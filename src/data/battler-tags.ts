@@ -1841,6 +1841,8 @@ export class MinimizeTag extends SerializableBattlerTag {
 
 export class DrowsyTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.DROWSY;
+  public readonly sleepTurnsRemaining?: number;
+
   constructor() {
     super(BattlerTagType.DROWSY, BattlerTagLapseType.TURN_END, 2, MoveId.YAWN);
   }
@@ -1859,10 +1861,19 @@ export class DrowsyTag extends SerializableBattlerTag {
     );
   }
 
+  public override loadTag(source: BaseBattlerTag & Pick<DrowsyTag, "tagType" | "sleepTurnsRemaining">): void {
+    super.loadTag(source);
+    (this as Mutable<this>).sleepTurnsRemaining = source.sleepTurnsRemaining;
+  }
+
+  public setSleepTurnsRemaining(turns: number): void {
+    (this as Mutable<this>).sleepTurnsRemaining = turns;
+  }
+
   lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
     if (!super.lapse(pokemon, lapseType)) {
       // TODO: Safeguard should not prevent yawn from setting sleep after tag use
-      pokemon.trySetStatus(StatusEffect.SLEEP);
+      pokemon.trySetStatus(StatusEffect.SLEEP, undefined, this.sleepTurnsRemaining);
       return false;
     }
 
@@ -4688,6 +4699,20 @@ export class ErBreachedTag extends SerializableBattlerTag {
   }
 }
 
+/** Bitter Drill's entry state: the holder loses one Defense stage and takes double drill damage. */
+export class ErEmbeddedTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_EMBEDDED;
+
+  constructor(sourceId = 0) {
+    super(BattlerTagType.ER_EMBEDDED, BattlerTagLapseType.CUSTOM, 1, MoveId.NONE, sourceId);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    pokemon.setStatStage(Stat.DEF, pokemon.getStatStage(Stat.DEF) - 1);
+  }
+}
+
 /** Serializable ownership marker for Decay's harmless, persistent poison. */
 export class ErDecayPoisonTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.ER_DECAY_POISON;
@@ -5142,6 +5167,8 @@ export function getBattlerTag(
       return new ErIrradiatedLockTag(sourceId);
     case BattlerTagType.ER_BREACHED:
       return new ErBreachedTag(sourceId);
+    case BattlerTagType.ER_EMBEDDED:
+      return new ErEmbeddedTag(sourceId);
     case BattlerTagType.ER_DECAY_POISON:
       return new ErDecayPoisonTag(sourceId);
     case BattlerTagType.ER_EMPOWERED_SWITCH_IN:
@@ -5305,6 +5332,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
   [BattlerTagType.ER_QUASHED]: ErQuashedTag;
   [BattlerTagType.ER_BLIND_JUSTICE]: ErBlindJusticeTag;
+  [BattlerTagType.ER_EMBEDDED]: ErEmbeddedTag;
   [BattlerTagType.ER_CONFECTED]: ErConfectedTag;
   [BattlerTagType.ER_IRRADIATED_TOXIC]: ErIrradiatedToxicTag;
   [BattlerTagType.ER_IRRADIATED_LOCK]: ErIrradiatedLockTag;

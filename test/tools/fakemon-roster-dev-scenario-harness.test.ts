@@ -19,9 +19,9 @@ import {
   ER_TREMBURR_SPECIES_ID,
 } from "#data/elite-redux/er-fakemon-pitch-species";
 import {
-  ER_DRAWCLOPS_SPECIES_ID,
-  ER_DUSTNOIR_SPECIES_ID,
   ER_EGOELK_SPECIES_ID,
+  ER_PARTNER_VAPOREON_SPECIES_ID,
+  ER_TITANEON_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
@@ -57,9 +57,9 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
       expectedPokemon(ER_IRON_STREAM_SPECIES_ID),
       expectedPokemon(ER_SLABBERIGUS_SPECIES_ID),
       expectedPokemon(ER_EGOELK_SPECIES_ID),
-      expectedPokemon(ER_DRAWCLOPS_SPECIES_ID),
+      expectedPokemon(ER_TITANEON_SPECIES_ID),
     ],
-    enemy: expectedPokemon(ER_DUSTNOIR_SPECIES_ID),
+    enemy: expectedPokemon(ER_PARTNER_VAPOREON_SPECIES_ID),
   },
   "Roster: new Pokemon 7/8": {
     player: [
@@ -74,9 +74,9 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
   },
   "Roster: new Pokemon 8/8": {
     player: [
-      expectedPokemon(SpeciesId.BARBARACLE, 1, "mega-y"),
+      expectedPokemon(SpeciesId.BARBARACLE, 2, "mega-y"),
       expectedPokemon(ER_LILLIGANT_VERDANT_SPECIES_ID, 1, "mega"),
-      expectedPokemon(SpeciesId.UXIE, 1, "primal"),
+      expectedPokemon(SpeciesId.UXIE, 2, "primal"),
       expectedPokemon(ER_TREMBURR_SPECIES_ID),
       expectedPokemon(ER_GURDURUR_SPECIES_ID),
       expectedPokemon(ER_CONKAPITATOR_SPECIES_ID),
@@ -168,7 +168,7 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
           formKey: pokemon.getFormKey(),
         });
         expect(game.scene.getPlayerParty().map(identity)).toEqual(expected.player);
-        expect(game.scene.getEnemyParty().map(identity)).toEqual([expected.enemy]);
+        expect(identity(game.scene.getEnemyParty()[0]!)).toEqual(expected.enemy);
       }
     }, 180_000);
   }

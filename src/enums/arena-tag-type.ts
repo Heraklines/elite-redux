@@ -106,4 +106,6 @@ export enum ArenaTagType {
    * Shown per-side in the battle info flyout.
    */
   GRAVE_MARKER = "GRAVE_MARKER",
+  /** Elite Redux Bitter Drill: grounded switch-ins gain an Embedded battler tag. */
+  ER_DRILL_BITS = "ER_DRILL_BITS",
 }

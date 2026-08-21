@@ -641,6 +641,7 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     actives: [ab(6075), AbilityId.LIMBER, AbilityId.PSYCHIC_SURGE],
     innates: [ab(6076), ab(6077), AbilityId.SOLID_ROCK],
     item: FormChangeItem.BARBARACITE_Y,
+    learnMoves: [MoveId.SWIRLY_ROOM],
   },
   {
     baseSpecies: ER_LILLIGANT_VERDANT_SPECIES_ID,

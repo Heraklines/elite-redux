@@ -52,6 +52,7 @@ interface PitchSpeciesDef {
   readonly name: string;
   readonly slug: string;
   readonly editorConst?: string;
+  readonly category?: string;
   readonly types: readonly [PokemonType, ...PokemonType[]];
   readonly stats: readonly [number, number, number, number, number, number];
   readonly actives: readonly [number, number, number];
@@ -355,6 +356,7 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
     name: "Mishamanus",
     slug: "mishamanus",
     editorConst: "SPECIES_MISHAMANUS",
+    category: "Astromancer Pokémon",
     types: [PokemonType.GHOST, PokemonType.FAIRY],
     stats: [75, 60, 60, 120, 120, 120],
     actives: [5325, 5224, 6052],
@@ -408,8 +410,9 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
     innates: [6066, 6067, 5697],
     weight: 76.5,
     catchRate: 90,
-    evolvesFrom: SpeciesId.YAMASK,
-    evolveLevel: 24,
+    // The pitch names an unspecified Yamask variant, so keep this final form direct.
+    eggTier: EggTier.RARE,
+    starterCost: 4,
     learnsetSource: SpeciesId.COFAGRIGUS,
   },
   {
@@ -419,8 +422,9 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
     editorConst: "SPECIES_TAGELA",
     types: [PokemonType.GHOST, PokemonType.PSYCHIC],
     stats: [65, 55, 115, 100, 40, 60],
-    actives: [6068, 5070, 5367],
-    innates: [5283, 6069, 6070],
+    // Tagela's pitch data is silent on abilities; preserve Tangela's live ER kit.
+    actives: [34, 4, 102],
+    innates: [144, 5080, 221],
     weight: 35,
     catchRate: 45,
     learnsetSource: SpeciesId.TANGELA,
@@ -483,7 +487,7 @@ export function injectErFakemonPitchSpecies(): InjectErFakemonPitchSpeciesResult
     const added = registerErEditorMon({
       speciesId: def.id,
       name: def.name,
-      slug: def.slug,
+      ...(def.category === undefined ? {} : { category: def.category }),
       type1: def.types[0],
       type2: def.types[1] ?? null,
       extraTypes: def.types.length > 2 ? def.types.slice(2) : undefined,

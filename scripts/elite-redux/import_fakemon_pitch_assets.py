@@ -162,15 +162,6 @@ SOURCES: dict[str, dict[str, object]] = {
         "front": GDRIVE / rel("1x3ojztqzcQM0Am_kG6zODSkYpCYOsvJm/480_1f.png"),
         "back": GDRIVE / rel("11FtS4LC7ICN-ARf9OAWg1evzCfY43q59/480_1b.png"),
     },
-    # Accepted renamed convergent Dusknoir line. Drawclops keeps its
-    # existing back/icon assets; Dustnoir keeps its existing icon.
-    "drawclops": {
-        "front": GDRIVE / rel("1zMTuSDyN9lgVCKjHbp2nBLyeD1GLBrQK/171.png"),
-    },
-    "dustnoir": {
-        "front": GDRIVE / rel("1u_BPsGlR1BvPGSyGNSKNhVfKO1dWi1vJ/172 (1).png"),
-        "back": GDRIVE / rel("1ixzvopYc9IyfMXvINQJ5-XzBktnYkYHS/172.png"),
-    },
 }
 
 
@@ -200,12 +191,14 @@ SHEETS: dict[str, dict[str, object]] = {
         "layout": "single_large",
     },
     "falinks_convergent": {
-        "front": GDRIVE / rel("1V-iMfLZzIcWcMj4MiJtSl_55WeoLQfqI/FALINKS_1.png"),
-        "layout": "view_pair",
+        "front": GDRIVE / rel("1es9QT9jNxN9h5HFIe4rXN96BWiygqZgj/FALINKS_1.png"),
+        "back": GDRIVE / rel("1c-poD2qpL-8XxS08kkWi3NACOr_gy-wW/FALINKS_1.png"),
+        "layout": "explicit_pair",
     },
     "hypno_mega": {
-        "front": GDRIVE / rel("1ipfViOooxeiYVROsl4DmON9kpejEqwsy/HYPNO_1.png"),
-        "layout": "view_pair",
+        "front": GDRIVE / rel("1cYJkQ_uXucFJI0EDiTk1N76zTBCuv7yp/HYPNO_1.png"),
+        "back": GDRIVE / rel("1piYrTwtPxkHNawZTu5_xMUQ4JOl0_4U4/HYPNO_1.png"),
+        "layout": "explicit_pair",
     },
     "raichu_alolan_mega_male": {
         "front": GDRIVE / rel("12sTZsyn5TJtyOsZYLCAsRispOCn4tkEx/image_by_lennybitao_dmo3ert.png"),
@@ -221,7 +214,7 @@ SHEETS: dict[str, dict[str, object]] = {
     },
     "lilligant_verdant_mega": {
         "front": GDRIVE / rel("1mI_44Vv7qZZI6js4HFQDJDkNisWYaVix/verdan_lilligant___moon_priestess_by_kfweagz_dmjs9lf-fullview.png"),
-        "layout": "lilligant_panel",
+        "layout": "lilligant_panel_mega",
     },
 }
 
@@ -461,9 +454,22 @@ def crop_zangoose(image: Image.Image) -> tuple[Image.Image, Image.Image, Image.I
     )
 def load_sheet(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, Image.Image], Image.Image | None]:
     layout = spec["layout"]
+    if layout == "explicit_pair":
+        return {
+            "front": open_rgba(library_root / spec["front"]),
+            "back": open_rgba(library_root / spec["back"]),
+        }, None
     if layout == "view_pair":
         front, back = crop_horizontal_pair(open_rgba(library_root / spec["front"]))
         return {"front": front, "back": back}, None
+    if layout == "lilligant_panel_mega":
+        sheet = open_rgba(library_root / spec["front"])
+        return {
+            "front": sheet.crop((649, 3, 779, 157)),
+            "back": sheet.crop((649, 166, 779, 315)),
+            "shiny": sheet.crop((809, 3, 939, 157)),
+            "shiny_back": sheet.crop((809, 166, 939, 315)),
+        }, None
     if layout == "lilligant_panel":
         sheet = open_rgba(library_root / spec["front"])
         return {

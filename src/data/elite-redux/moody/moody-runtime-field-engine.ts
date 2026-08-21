@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import type { BattlerTag } from "#data/battler-tags";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
 import { getMoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
@@ -1092,7 +1093,7 @@ function scenePort(): MoodyRuntimeExecutionPort<Pokemon> {
       }
     },
     shortenVolatile: (pokemon, volatile, turns) => {
-      const tag = pokemon.getTag(Number(volatile) as unknown as BattlerTagType);
+      const tag = pokemon.getTag(Number(volatile) as unknown as BattlerTagType) as BattlerTag | undefined;
       if (tag != null && tag.turnCount > 0) {
         tag.turnCount = Math.max(1, tag.turnCount - turns);
       }

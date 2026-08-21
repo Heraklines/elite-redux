@@ -148,7 +148,7 @@ export const ER_FAKEMON_PITCH_ABILITIES: readonly FakemonPitchAbilityDefinition[
   ability(
     ER_PERPETUAL_MOTION_ABILITY_ID,
     "Perpetual Motion",
-    "Uses a 20-power Rollout at the end of each turn, building power for up to four successful hits.",
+    "After landing a damaging hit, uses a 20-power Rollout at the end of the turn. Each consecutive successful automatic Rollout deals 10% more damage.",
   ),
   ability(ER_SWORDS_NATURE_ABILITY_ID, "Sword's Nature", "Combines Sword of Ruin and Keen Edge."),
   ability(ER_CRUSHING_ANTLERS_ABILITY_ID, "Crushing Antlers", "Combines Hunter's Horn and Rapier."),

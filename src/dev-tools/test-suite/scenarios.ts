@@ -82,8 +82,6 @@ import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#da
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import {
-  ER_DRAWCLOPS_SPECIES_ID,
-  ER_DUSTNOIR_SPECIES_ID,
   ER_EGOELK_SPECIES_ID,
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_TITANEON_SPECIES_ID,
@@ -2177,10 +2175,10 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
       pitchSpecies(ER_IRON_STREAM_SPECIES_ID),
       pitchSpecies(ER_SLABBERIGUS_SPECIES_ID),
       pitchSpecies(ER_EGOELK_SPECIES_ID),
-      pitchSpecies(ER_DRAWCLOPS_SPECIES_ID),
+      pitchSpecies(ER_TITANEON_SPECIES_ID),
     ],
-    pitchSpecies(ER_DUSTNOIR_SPECIES_ID),
-    "Mishamanus, Falinks Convergent, Iron Stream, Slabberigus, Egoelk, Drawclops",
+    pitchSpecies(ER_PARTNER_VAPOREON_SPECIES_ID),
+    "Mishamanus, Falinks Convergent, Iron Stream, Slabberigus, Egoelk, Titaneon",
   ),
   fakemonPitchShowcaseScenario(
     7,

@@ -7482,6 +7482,16 @@ function getPokemonWithWeatherBasedForms() {
         || (p.hasAbility(AbilityId.FLOWER_GIFT) && p.species.speciesId === SpeciesId.CHERRIM),
     );
 }
+function hasActiveReapAndSow(pokemon: Pokemon): boolean {
+  return pokemon
+    .getAbilitySources()
+    .some(
+      source =>
+        source.ability.id === (ER_REAP_AND_SOW_ABILITY_ID as AbilityId)
+        && pokemon.canApplyAbilitySource(source.ability, source.passive, source.passiveSlot ?? 0, false, false),
+    );
+}
+
 export function getWeatherCondition(...weatherTypes: WeatherType[]): AbAttrCondition {
   return (pokemon: Pokemon) => {
     if (globalScene.arena.weather?.isEffectSuppressed()) {
@@ -7493,16 +7503,8 @@ export function getWeatherCondition(...weatherTypes: WeatherType[]): AbAttrCondi
     return (
       (weatherTypes.includes(WeatherType.SUNNY) || weatherTypes.includes(WeatherType.HARSH_SUN))
       && globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
-      && (pokemon
-        .getActiveAbilitySources()
-        .some(source => source.ability.id === (ER_REAP_AND_SOW_ABILITY_ID as AbilityId))
-        || globalScene
-          .getField(true)
-          .some(fieldPokemon =>
-            fieldPokemon
-              .getActiveAbilitySources()
-              .some(source => source.ability.id === (ER_REAP_AND_SOW_ABILITY_ID as AbilityId)),
-          ))
+      && (hasActiveReapAndSow(pokemon)
+        || globalScene.getField(true).some(fieldPokemon => hasActiveReapAndSow(fieldPokemon)))
     );
   };
 }

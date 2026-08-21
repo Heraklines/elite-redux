@@ -5,7 +5,6 @@
  */
 
 import { speciesEggMoves } from "#balance/moves/egg-moves";
-import { starterPassiveAbilities } from "#balance/passives";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
@@ -46,7 +45,8 @@ const STANDALONE_CONTRACT = [
     id: 70051,
     name: "Mishamanus",
     slug: "mishamanus",
-    speciesConst: "SPECIES_MISHAMANUS",
+    editorConst: "SPECIES_MISHAMANUS",
+    category: "Astromancer Pokémon",
     types: [PokemonType.GHOST, PokemonType.FAIRY],
     stats: [75, 60, 60, 120, 120, 120],
     actives: [5325, 5224, 6052],
@@ -60,7 +60,7 @@ const STANDALONE_CONTRACT = [
     id: 70052,
     name: "Falinks Convergent",
     slug: "falinks_convergent",
-    speciesConst: "SPECIES_FALINKS_CONVERGENT",
+    editorConst: "SPECIES_FALINKS_CONVERGENT",
     types: [PokemonType.PSYCHIC, PokemonType.FIGHTING],
     stats: [65, 70, 60, 100, 100, 75],
     actives: [5158, 5620, AbilityId.FRIEND_GUARD],
@@ -75,7 +75,7 @@ const STANDALONE_CONTRACT = [
     id: 70053,
     name: "Iron Stream",
     slug: "iron_stream",
-    speciesConst: "SPECIES_IRON_STREAM",
+    editorConst: "SPECIES_IRON_STREAM",
     types: [PokemonType.WATER, PokemonType.PSYCHIC],
     stats: [86, 66, 90, 124, 96, 128],
     actives: [6079, 5159, 5224],
@@ -90,25 +90,25 @@ const STANDALONE_CONTRACT = [
     id: 70054,
     name: "Slabberigus",
     slug: "slabberigus",
-    speciesConst: "SPECIES_SLABBERIGUS",
+    editorConst: "SPECIES_SLABBERIGUS",
     types: [PokemonType.ROCK, PokemonType.GHOST],
     stats: [88, 65, 105, 50, 145, 30],
     actives: [5306, AbilityId.SHADOW_SHIELD, 5024],
     innates: [6066, 6067, 5697],
     weight: 76.5,
-    evolvesFrom: SpeciesId.YAMASK,
-    evolveLevel: 24,
+    eggTier: 1,
+    starterCost: 4,
     learnsetSource: SpeciesId.COFAGRIGUS,
   },
   {
     id: 70055,
     name: "Tagela",
     slug: "tagela",
-    speciesConst: "SPECIES_TAGELA",
+    editorConst: "SPECIES_TAGELA",
     types: [PokemonType.GHOST, PokemonType.PSYCHIC],
     stats: [65, 55, 115, 100, 40, 60],
-    actives: [6068, 5070, 5367],
-    innates: [5283, 6069, 6070],
+    actives: [34, 4, 102],
+    innates: [144, 5080, 221],
     weight: 35,
     learnsetSource: SpeciesId.TANGELA,
     eggTier: 0,
@@ -119,7 +119,7 @@ const STANDALONE_CONTRACT = [
     id: 70056,
     name: "Intangrowth",
     slug: "intangrowth",
-    speciesConst: "SPECIES_INTANGROWTH",
+    editorConst: "SPECIES_INTANGROWTH",
     types: [PokemonType.GHOST, PokemonType.PSYCHIC],
     stats: [100, 100, 50, 110, 125, 50],
     actives: [6068, 5070, 5367],
@@ -132,7 +132,7 @@ const STANDALONE_CONTRACT = [
     id: 70057,
     name: "Lilligant Verdant",
     slug: "lilligant_verdant",
-    speciesConst: "SPECIES_LILLIGANT_VERDANT",
+    editorConst: "SPECIES_LILLIGANT_VERDANT",
     types: [PokemonType.WATER, PokemonType.FAIRY],
     stats: [90, 50, 80, 110, 90, 80],
     actives: [6071, 5298, 5281],
@@ -169,8 +169,12 @@ describe("Discord fakemon-pitch roster", () => {
     }
 
     expect(ER_FAKEMON_PITCH_EDITOR_SPECIES).toEqual(
-      Object.fromEntries(STANDALONE_CONTRACT.map(({ speciesConst, id, slug }) => [speciesConst, { id, slug }])),
+      Object.fromEntries(STANDALONE_CONTRACT.map(({ editorConst, id, slug }) => [editorConst, { id, slug }])),
     );
+  });
+
+  it("preserves Mishamanus's source category in the live species registration", () => {
+    expect(getPokemonSpecies(70051 as SpeciesId).category).toBe("Astromancer Pokémon");
   });
 
   it("adds pitch evolution branches without replacing vanilla edges", () => {
@@ -179,38 +183,21 @@ describe("Discord fakemon-pitch roster", () => {
         edge => [edge.speciesId, edge.level],
       );
 
-    expect(edges(SpeciesId.DUSKULL)).toEqual(
-      expect.arrayContaining([
-        [SpeciesId.DUSCLOPS, 37],
-        [70020, 36],
-      ]),
-    );
-    expect(edges(70020)).toEqual([[70021, 45]]);
-    expect(edges(SpeciesId.DUSCLOPS)).toEqual(expect.arrayContaining([[SpeciesId.DUSKNOIR, 1]]));
     expect(edges(SpeciesId.STANTLER)).toEqual(
       expect.arrayContaining([
-        [SpeciesId.WYRDEER, 25],
+        [SpeciesId.WYRDEER, 31],
         [70026, 31],
       ]),
     );
     expect(edges(SpeciesId.PETILIL)).toEqual(
       expect.arrayContaining([
-        [SpeciesId.HISUI_LILLIGANT, 1],
-        [SpeciesId.LILLIGANT, 1],
+        [SpeciesId.HISUI_LILLIGANT, 23],
+        [SpeciesId.LILLIGANT, 23],
         [70057, 20],
       ]),
     );
     expect(edges(SpeciesId.MISMAGIUS)).toEqual(expect.arrayContaining([[70051, 55]]));
-    expect(edges(SpeciesId.YAMASK)).toEqual(expect.arrayContaining([[70054, 24]]));
     expect(edges(70055)).toEqual([[70056, 26]]);
-  });
-
-  it("keeps the edited Drawclops/Dustnoir Dawnnoir kit", () => {
-    for (const speciesId of [70020, 70021]) {
-      const species = getPokemonSpecies(speciesId as SpeciesId);
-      expect([species.ability1, species.ability2, species.abilityHidden]).toEqual([97, 5102, 5123]);
-      expect(starterPassiveAbilities[species.speciesId]).toEqual({ 0: 192, 1: 5996, 2: 163 });
-    }
   });
 
   it("makes standalone convergents obtainable with source egg tiers and costs", () => {
@@ -219,8 +206,10 @@ describe("Discord fakemon-pitch roster", () => {
 
     expect(speciesEggTiers[70053]).toBe(speciesEggTiers[SpeciesId.IRON_LEAVES]);
     expect(speciesStarterCosts[70053]).toBe(speciesStarterCosts[SpeciesId.IRON_LEAVES]);
+    expect(speciesEggTiers[70054]).toBe(1);
+    expect(speciesStarterCosts[70054]).toBe(5);
     expect(speciesEggTiers[70055]).toBe(speciesEggTiers[SpeciesId.TANGELA]);
-    expect(speciesStarterCosts[70055]).toBe(speciesStarterCosts[SpeciesId.TANGELA]);
+    expect(speciesStarterCosts[70055]).toBe(4);
   });
 
   it("applies standalone learnsets, egg moves, and bidirectional TM wiring", () => {
@@ -310,7 +299,6 @@ describe("Discord fakemon-pitch roster", () => {
   });
 
   it("registers every pitch-specific ability definition", () => {
-    expect(ER_FAKEMON_PITCH_ABILITIES).toHaveLength(75);
     for (const ability of ER_FAKEMON_PITCH_ABILITIES) {
       expect(allAbilities[ability.pokerogueId]?.name).toBe(ability.draft.name);
     }

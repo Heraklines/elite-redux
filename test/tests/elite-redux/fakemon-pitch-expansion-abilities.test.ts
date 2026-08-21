@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
-import { globalScene } from "#app/global-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import { SlabCurseTag } from "#data/battler-tags";
+import { allMoves } from "#data/data-lists";
 import { manualCompositeConstituents } from "#data/elite-redux/abilities/composite-newcomers";
 import {
   ER_BOOBY_TRAP_ABILITY_ID,
@@ -24,6 +25,7 @@ import {
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import {
   applyBoobyTrapHealing,
+  BitterDrillDamageAbAttr,
   BoobyTrapAbAttr,
   BoobyTrapItemLostAbAttr,
   CelestialJellyAbAttr,
@@ -31,12 +33,14 @@ import {
   ManifestContactAbAttr,
   MiracleBladeTypeChartAbAttr,
   OfudaAbAttr,
+  rotateSouthernCrossPunchTargets,
   SeaSpecterAbAttr,
   SlabsCurseAbAttr,
   SpiritualSaberNoContactAbAttr,
 } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
-import { Move } from "#data/moves/move";
+import type { Move } from "#data/moves/move";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
@@ -64,6 +68,14 @@ describe("fakemon pitch ability registration", () => {
   it("registers every owned ability", () => {
     expect(NEW_IDS.every(id => ER_FAKEMON_PITCH_ABILITIES.some(def => def.pokerogueId === id))).toBe(true);
   });
+
+  it("keeps source drafts and runtime registrations one-to-one", () => {
+    const sourceIds = ER_FAKEMON_PITCH_ABILITIES.map(def => def.draft.id);
+    const registeredIds = ER_FAKEMON_PITCH_ABILITIES.map(def => def.pokerogueId);
+    expect(new Set(sourceIds).size).toBe(sourceIds.length);
+    expect(new Set(registeredIds).size).toBe(registeredIds.length);
+    expect([...registeredIds].toSorted()).toEqual([...sourceIds].toSorted());
+  });
 });
 
 describe("Iron Stream and composite ability mechanics", () => {
@@ -89,20 +101,17 @@ describe("entry-local bespoke state", () => {
 
 describe("source-backed combat hooks", () => {
   it("routes Manifest through the real contact flag resolver and honors forced non-contact", () => {
-    const move = {
-      hasFlag: () => false,
-      hitsSubstitute: () => false,
-    } as unknown as Move;
+    const move = allMoves[MoveId.WATER_GUN];
     const holder = {
       hasAbilityWithAttr: () => false,
       getAllActiveAbilityAttrs: () => [new ManifestContactAbAttr()],
     } as never;
-    expect(Move.prototype.doesFlagEffectApply.call(move, { flag: MoveFlags.MAKES_CONTACT, user: holder })).toBe(true);
+    expect(move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: holder })).toBe(true);
     const forced = {
       hasAbilityWithAttr: (name: string) => name === "IgnoreContactAbAttr",
       getAllActiveAbilityAttrs: () => [new ManifestContactAbAttr()],
     } as never;
-    expect(Move.prototype.doesFlagEffectApply.call(move, { flag: MoveFlags.MAKES_CONTACT, user: forced })).toBe(false);
+    expect(move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: forced })).toBe(false);
   });
 
   it("applies Slab's Curse PP drain to every move and ends when one reaches zero", () => {
@@ -127,8 +136,16 @@ describe("source-backed combat hooks", () => {
   });
 
   it("Booby Trap curses only the first direct attacker per summon", () => {
-    const holder = { summonData: { erAbilityProvenance: [] } } as never;
-    const attacker = { id: 2, addTag: (..._args: unknown[]) => undefined } as never;
+    const holder = {
+      isPlayer: () => false,
+      summonData: { erAbilityProvenance: [] },
+    } as never;
+    const attacker = {
+      id: 2,
+      isPlayer: () => true,
+      canAddTag: () => true,
+      addTag: (..._args: unknown[]) => undefined,
+    } as never;
     const params = {
       pokemon: holder,
       opponent: attacker,
@@ -172,15 +189,68 @@ describe("source-backed combat hooks", () => {
   });
 
   it("Spiritual Saber marks Keen Edge moves as non-contact", () => {
-    const slicingMove = {
-      hasFlag: (flag: MoveFlags) => flag === MoveFlags.SLICING_MOVE,
-      hitsSubstitute: () => false,
-    } as unknown as Move;
     const user = {
       hasAbilityWithAttr: () => false,
       getAllActiveAbilityAttrs: () => [new SpiritualSaberNoContactAbAttr()],
     } as never;
-    expect(Move.prototype.doesFlagEffectApply.call(slicingMove, { flag: MoveFlags.MAKES_CONTACT, user })).toBe(false);
+    expect(
+      allMoves[MoveId.NIGHT_SLASH].doesFlagEffectApply({
+        flag: MoveFlags.MAKES_CONTACT,
+        user,
+      }),
+    ).toBe(false);
+  });
+
+  it("retargets the target arrays already captured by queued move phases", () => {
+    const firstTarget = 1;
+    const secondTarget = 3;
+    const capturedTargets = [firstTarget];
+    const command: { targets?: number[]; move: { targets: number[] } } = {
+      move: { targets: capturedTargets },
+    };
+    const previousScene = globalScene;
+    initGlobalScene({
+      currentBattle: {
+        turnCommands: { 0: command },
+      },
+    } as never);
+
+    try {
+      rotateSouthernCrossPunchTargets({
+        getOpponents: () => [
+          { isActive: () => true, getBattlerIndex: () => firstTarget },
+          { isActive: () => true, getBattlerIndex: () => secondTarget },
+        ],
+      } as never);
+
+      expect(command.targets).toBe(capturedTargets);
+      expect(command.move.targets).toBe(capturedTargets);
+      expect(capturedTargets).toEqual([secondTarget]);
+    } finally {
+      if (previousScene) {
+        initGlobalScene(previousScene);
+      }
+    }
+  });
+
+  it("doubles the attacker's drill power against an Embedded target", () => {
+    const attr = new BitterDrillDamageAbAttr();
+    const power = new NumberHolder(40);
+    const params = {
+      pokemon: {},
+      opponent: {
+        getTag: (tag: BattlerTagType) => (tag === BattlerTagType.ER_EMBEDDED ? {} : undefined),
+      },
+      move: {
+        hasFlag: (flag: MoveFlags) => flag === MoveFlags.DRILL_BASED,
+      },
+      power,
+      simulated: true,
+    } as never;
+
+    expect(attr.canApply(params)).toBe(true);
+    attr.apply(params);
+    expect(power.value).toBe(80);
   });
 });
 describe("remaining pitch contracts", () => {
@@ -216,11 +286,16 @@ describe("remaining pitch contracts", () => {
   it("Booby Trap curses the thief when its item is removed", () => {
     let cursed = false;
     const thief = {
+      isPlayer: () => true,
       addTag: () => {
         cursed = true;
       },
     } as never;
-    new BoobyTrapItemLostAbAttr().apply({ pokemon: { id: 1 } as never, opponent: thief, simulated: false });
+    new BoobyTrapItemLostAbAttr().apply({
+      pokemon: { id: 1, isPlayer: () => false, summonData: { erAbilityProvenance: [] } } as never,
+      opponent: thief,
+      simulated: false,
+    });
     expect(cursed).toBe(true);
   });
 
@@ -235,20 +310,27 @@ describe("remaining pitch contracts", () => {
         healed += amount;
       },
     };
-    const originalGetField = globalScene.getField;
-    globalScene.getField = () => [holder as never];
-    try {
-      applyBoobyTrapHealing({ id: 2 } as never, 21);
-    } finally {
-      globalScene.getField = originalGetField;
-    }
+    applyBoobyTrapHealing({ id: 2 } as never, 21, [holder as never]);
     expect(healed).toBe(10);
   });
 
   it("Low Tide answers with Water Surf after a Water move", () => {
     const attr = new LowTideWaterSurfAbAttr();
-    expect(attr.canApply({ move: { type: PokemonType.WATER } as Move, simulated: false } as never)).toBe(true);
-    expect(attr.canApply({ move: { type: PokemonType.FIRE } as Move, simulated: false } as never)).toBe(false);
+    const opponent = { getMoveType: (move: Move) => move.type } as never;
+    expect(
+      attr.canApply({
+        opponent,
+        move: allMoves[MoveId.WATER_GUN],
+        simulated: false,
+      } as never),
+    ).toBe(true);
+    expect(
+      attr.canApply({
+        opponent,
+        move: allMoves[MoveId.EMBER],
+        simulated: false,
+      } as never),
+    ).toBe(false);
   });
 
   it("wires Paper Talisman and Ebb and Flow to two existing constituent abilities", () => {
@@ -261,7 +343,9 @@ describe("remaining pitch contracts", () => {
   it("keeps the exact Spiritual Saber contract", () => {
     const definition = ER_FAKEMON_PITCH_ABILITIES.find(entry => entry.pokerogueId === ER_SPIRITUAL_SABER_ABILITY_ID)
       ?.draft.description;
-    expect(definition).toContain("Blade's Essence + Keen Edge");
+    expect(definition).toMatch(/Blade's Essence/u);
+    expect(definition).toMatch(/Keen Edge/u);
+    expect(definition).toMatch(/no contact/u);
   });
 
   it("keeps the exact Paper Talisman contract", () => {

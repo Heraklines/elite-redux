@@ -82,6 +82,7 @@ import { MoveResult } from "#enums/move-result";
 import { MoveTarget } from "#enums/move-target";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
+import { PositionalTagType } from "#enums/positional-tag-type";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
@@ -95,6 +96,7 @@ import {
   ER_ASTRAL_PROJECT_ABILITY_ID,
   ER_AUGUR_ABILITY_ID,
   ER_BALLASTER_ABILITY_ID,
+  ER_BITTER_DRILL_ABILITY_ID,
   ER_BLIND_JUSTICE_ABILITY_ID,
   ER_BOOBY_TRAP_ABILITY_ID,
   ER_BRIBERY_ABILITY_ID,
@@ -126,6 +128,7 @@ import {
   ER_PHOENIX_FOLIAGE_ABILITY_ID,
   ER_PHOTOVOLTAIC_ABILITY_ID,
   ER_POWER_GRINDER_ABILITY_ID,
+  ER_PROPHETIC_ABILITY_ID,
   ER_REAP_AND_SOW_ABILITY_ID,
   ER_SEA_SPECTER_ABILITY_ID,
   ER_SERFDOM_ABILITY_ID,
@@ -133,6 +136,7 @@ import {
   ER_SLEEPING_IN_ABILITY_ID,
   ER_SNOWBALL_FIGHT_ABILITY_ID,
   ER_SOMNILOQUY_ABILITY_ID,
+  ER_SOUTHERN_CROSS_PUNCH_ABILITY_ID,
   ER_SPATIAL_MAGIC_ABILITY_ID,
   ER_SPIRITUAL_SABER_ABILITY_ID,
   ER_SPLASH_DAMAGE_ABILITY_ID,
@@ -604,17 +608,45 @@ class SplashDamageAbAttr extends PostAttackAbAttr {
 }
 
 const PERPETUAL_MOTION_MARKER = "perpetual-motion";
+const PERPETUAL_MOTION_TRIGGER = "perpetual-motion:trigger";
+const PERPETUAL_MOTION_SUCCESSFUL_HITS = new Set<HitResult>([
+  HitResult.EFFECTIVE,
+  HitResult.SUPER_EFFECTIVE,
+  HitResult.NOT_VERY_EFFECTIVE,
+  HitResult.ONE_HIT_KO,
+]);
+
+class PerpetualMotionTriggerAbAttr extends PostAttackAbAttr {
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      super.canApply(params)
+      && PERPETUAL_MOTION_SUCCESSFUL_HITS.has(params.hitResult)
+      && !params.move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
+    );
+  }
+
+  override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
+    if (!simulated && !pokemon.turnData.erAbilityProvenance.includes(PERPETUAL_MOTION_TRIGGER)) {
+      pokemon.turnData.erAbilityProvenance.push(PERPETUAL_MOTION_TRIGGER);
+    }
+  }
+}
 
 class PerpetualMotionPostTurnAbAttr extends PostTurnAbAttr {
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     const turn = pokemon.tempSummonData?.turnCount ?? 0;
-    return !pokemon.isFainted() && turn > 0;
+    return !pokemon.isFainted() && turn > 0 && pokemon.turnData.erAbilityProvenance.includes(PERPETUAL_MOTION_TRIGGER);
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
     if (simulated) {
       return;
     }
+    const triggerIndex = pokemon.turnData.erAbilityProvenance.indexOf(PERPETUAL_MOTION_TRIGGER);
+    if (triggerIndex === -1) {
+      return;
+    }
+    pokemon.turnData.erAbilityProvenance.splice(triggerIndex, 1);
     const target = pokemon.getOpponents().find(opponent => !opponent.isFainted());
     if (!target) {
       return;
@@ -624,13 +656,12 @@ class PerpetualMotionPostTurnAbAttr extends PostTurnAbAttr {
     if (state.erPerpetualMotionPending) {
       state.erPerpetualMotionStreak = 0;
     }
-    const power = 20 * 2 ** state.erPerpetualMotionStreak;
     state.erPerpetualMotionPending = true;
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
       [target.getBattlerIndex()],
-      scriptedPokemonMove(MoveId.ROLLOUT, power, {
+      scriptedPokemonMove(MoveId.ROLLOUT, 20, {
         marker: PERPETUAL_MOTION_MARKER,
         stripConsecutiveUsePower: true,
       }),
@@ -659,7 +690,7 @@ class PerpetualMotionResolutionAbAttr extends ExecutedMoveAbAttr {
   }
 }
 
-class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
+export class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     return (
       super.canApply(params)
@@ -672,7 +703,7 @@ class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
       return;
     }
     const state = pokemon.summonData;
-    if (hitResult === HitResult.NO_EFFECT) {
+    if (!PERPETUAL_MOTION_SUCCESSFUL_HITS.has(hitResult)) {
       state.erPerpetualMotionPending = false;
       state.erPerpetualMotionStreak = 0;
       return;
@@ -681,7 +712,20 @@ class PerpetualMotionProgressAbAttr extends PostAttackAbAttr {
       return;
     }
     state.erPerpetualMotionPending = false;
-    state.erPerpetualMotionStreak = state.erPerpetualMotionStreak >= 3 ? 0 : state.erPerpetualMotionStreak + 1;
+    state.erPerpetualMotionStreak += 1;
+  }
+}
+
+export class PerpetualMotionPowerAbAttr extends VariableMovePowerAbAttr {
+  override canApply({ pokemon, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return (
+      !!pokemon.summonData.erPerpetualMotionPending
+      && move.attrs.some(attr => attr instanceof ScriptedMoveMarkerAttr && attr.key === PERPETUAL_MOTION_MARKER)
+    );
+  }
+
+  override apply({ pokemon, power }: PreAttackModifyPowerAbAttrParams): void {
+    power.value *= 1 + pokemon.summonData.erPerpetualMotionStreak * 0.1;
   }
 }
 
@@ -691,8 +735,9 @@ function hasPitchAbility(pokemon: Pokemon, abilityId: number): boolean {
 
 function isReapAndSowSunActive(pokemon: Pokemon): boolean {
   return (
-    hasPitchAbility(pokemon, ER_REAP_AND_SOW_ABILITY_ID)
-    && globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
+    globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
+    && globalScene.getField(true).some(fieldPokemon => hasPitchAbility(fieldPokemon, ER_REAP_AND_SOW_ABILITY_ID))
+    && !pokemon.isFainted()
   );
 }
 
@@ -725,7 +770,7 @@ export function spatialMagicWouldSwitch(holder: Pokemon, attacker: Pokemon, move
     !hasPitchAbility(holder, ER_SPATIAL_MAGIC_ABILITY_ID)
     || holder.isFainted()
     || attacker.isFainted()
-    || move.category === MoveCategory.STATUS
+    || (move.category !== MoveCategory.PHYSICAL && move.category !== MoveCategory.SPECIAL)
   ) {
     return false;
   }
@@ -982,9 +1027,11 @@ export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
       );
       break;
     case ER_PERPETUAL_MOTION_ABILITY_ID:
+      builder.attr(PerpetualMotionTriggerAbAttr);
       builder.attr(PerpetualMotionPostTurnAbAttr);
       builder.attr(PerpetualMotionResolutionAbAttr);
       builder.attr(PerpetualMotionProgressAbAttr);
+      builder.attr(PerpetualMotionPowerAbAttr);
       break;
     case ER_SNOWBALL_FIGHT_ABILITY_ID:
       builder.attr(CounterAttackOnHitAbAttr, {
@@ -1069,6 +1116,16 @@ export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
       builder.attr(OracleGuardTickAbAttr);
       builder.attr(ReceivedMoveDamageMultiplierAbAttr, (target: Pokemon) => oracleGuardActive(target), 0.5);
       break;
+    case ER_PROPHETIC_ABILITY_ID:
+      builder.attr(PropheticAbAttr);
+      break;
+    case ER_SOUTHERN_CROSS_PUNCH_ABILITY_ID:
+      builder.attr(SouthernCrossPunchAbAttr);
+      break;
+    case ER_BITTER_DRILL_ABILITY_ID:
+      builder.attr(BitterDrillAbAttr);
+      builder.attr(BitterDrillDamageAbAttr);
+      break;
     case ER_THIRD_EYE_ABILITY_ID:
       builder.attr(ThirdEyeAbAttr);
       break;
@@ -1118,6 +1175,106 @@ export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
     case ER_CELESTIAL_JELLY_ABILITY_ID:
       builder.attr(CelestialJellyAbAttr);
       break;
+  }
+}
+
+/** Prophetic chooses the stronger effective Future Sight or Doom Desire attack. */
+export class PropheticAbAttr extends PostSummonAbAttr {
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated) {
+      return;
+    }
+    const target = pokemon.getOpponents().find(opponent => !opponent.isFainted());
+    if (
+      !target
+      || !globalScene.arena.positionalTagManager.canAddTag(PositionalTagType.DELAYED_ATTACK, target.getBattlerIndex())
+    ) {
+      return;
+    }
+    globalScene.arena.positionalTagManager.addTag({
+      tagType: PositionalTagType.DELAYED_ATTACK,
+      sourceId: pokemon.id,
+      targetIndex: target.getBattlerIndex(),
+      sourceMove: MoveId.FUTURE_SIGHT,
+      sourceMoves: [MoveId.FUTURE_SIGHT, MoveId.DOOM_DESIRE],
+      turnCount: 3,
+    });
+  }
+}
+
+/** Southern Cross Punch rotates queued opposing targets one active slot right. */
+export class SouthernCrossPunchAbAttr extends PostAttackAbAttr {
+  override canApply({ pokemon, move, damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return (
+      !simulated
+      && damage > 0
+      && hitResult < HitResult.NO_EFFECT
+      && move.hasFlag(MoveFlags.PUNCHING_MOVE)
+      && pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof SouthernCrossPunchAbAttr)
+    );
+  }
+
+  override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
+    if (!simulated) {
+      rotateSouthernCrossPunchTargets(pokemon);
+    }
+  }
+}
+
+export function rotateSouthernCrossPunchTargets(pokemon: Pokemon): void {
+  const battle = globalScene.currentBattle;
+  if (!battle) {
+    return;
+  }
+  const opponents = pokemon.getOpponents().filter(opponent => opponent.isActive(true));
+  if (opponents.length < 2) {
+    return;
+  }
+  const opponentIndices = opponents.map(opponent => opponent.getBattlerIndex());
+  const nextIndex = new Map(
+    opponentIndices.map((index, i) => [index, opponentIndices[(i + 1) % opponentIndices.length]]),
+  );
+  for (const command of Object.values(battle.turnCommands)) {
+    const targets = command?.targets ?? command?.move?.targets;
+    if (!targets) {
+      continue;
+    }
+    for (let i = 0; i < targets.length; i++) {
+      targets[i] = nextIndex.get(targets[i]) ?? targets[i];
+    }
+    command.targets = targets;
+    if (command.move) {
+      command.move.targets = targets;
+    }
+  }
+}
+
+/** Bitter Drill lays persistent grounded entry bits after a successful drill hit. */
+export class BitterDrillAbAttr extends PostAttackAbAttr {
+  override canApply({ move, damage, hitResult, simulated }: PostMoveInteractionAbAttrParams): boolean {
+    return !simulated && damage > 0 && hitResult < HitResult.NO_EFFECT && move.hasFlag(MoveFlags.DRILL_BASED);
+  }
+
+  override apply({ pokemon, move, simulated }: PostMoveInteractionAbAttrParams): void {
+    if (!simulated) {
+      globalScene.arena.addTag(
+        ArenaTagType.ER_DRILL_BITS,
+        0,
+        move.id,
+        pokemon.id,
+        pokemon.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER,
+      );
+    }
+  }
+}
+
+export class BitterDrillDamageAbAttr extends VariableMovePowerAbAttr {
+  override canApply({ opponent, move }: PreAttackModifyPowerAbAttrParams): boolean {
+    return move.hasFlag(MoveFlags.DRILL_BASED) && opponent.getTag(BattlerTagType.ER_EMBEDDED) !== undefined;
+  }
+
+  override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
+    power.value *= 2;
   }
 }
 
@@ -1239,6 +1396,8 @@ export class BoobyTrapAbAttr extends PostDefendAbAttr {
       && hitResult < HitResult.NO_EFFECT
       && move.category !== MoveCategory.STATUS
       && opponent !== pokemon
+      && opponent.isPlayer() !== pokemon.isPlayer()
+      && opponent.canAddTag(BattlerTagType.CURSED)
       && !hasSummonAbilityProvenance(pokemon, "booby-trap:entry")
     );
   }
@@ -1296,7 +1455,7 @@ export class OfudaAbAttr extends PostDefendAbAttr {
 /** Low Tide draws in Water moves, absorbs them, and answers with 50 BP Surf. */
 export class LowTideWaterSurfAbAttr extends PostDefendAbAttr {
   override canApply({ opponent, move, simulated }: PostMoveInteractionAbAttrParams): boolean {
-    return !simulated && opponent.getMoveType(move) === PokemonType.WATER;
+    return !simulated && move.category !== MoveCategory.STATUS && opponent.getMoveType(move) === PokemonType.WATER;
   }
 
   override apply({ pokemon, simulated }: PostMoveInteractionAbAttrParams): void {
@@ -1366,19 +1525,21 @@ export class CelestialJellyAbAttr extends PreDefendFullHpEndureAbAttr {
 }
 
 /** Booby Trap healing is keyed to the holder's active, summon-local marker. */
-export function applyBoobyTrapHealing(target: Pokemon, damage: number): void {
+export function applyBoobyTrapHealing(
+  target: Pokemon,
+  damage: number,
+  field: readonly Pokemon[] = globalScene.getField(),
+): void {
   if (damage <= 0) {
     return;
   }
-  const source = globalScene
-    .getField()
-    .find(
-      pokemon =>
-        pokemon !== undefined
-        && pokemon !== target
-        && pokemon.isActive(true)
-        && pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof BoobyTrapAbAttr)
-        && pokemon.summonData.erAbilityProvenance.includes(`booby-trap:${target.id}`),
-    );
+  const source = field.find(
+    pokemon =>
+      pokemon != null
+      && pokemon !== target
+      && pokemon.isActive(true)
+      && pokemon.getAllActiveAbilityAttrs().some(attr => attr instanceof BoobyTrapAbAttr)
+      && pokemon.summonData.erAbilityProvenance.includes(`booby-trap:${target.id}`),
+  );
   source?.heal(Math.floor(damage / 2));
 }

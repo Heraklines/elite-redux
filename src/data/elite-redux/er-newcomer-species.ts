@@ -175,8 +175,9 @@ const LIFE_PRESERVER = 5916;
 // 5997-5998 (newcomer-batch2.ts). PREDATOR, CORRUPTED_MIND, FRIEND_GUARD are
 // reused from the batch-1 block above. ---
 const SNIPER = 97; // vanilla
-const LOOTER = 5102; // ER custom
+const BOOT_HILL = 5985; // codex signature
 const SPECTRALIZE = 5123;
+const DEADEYE = 5984; // codex "Deadeye Draw" (spec: Deadeye Draw)
 const MINIGUN = 5996; // composite (Quick Draw + Dual Wield)
 const TURBOBLAZE = 163; // vanilla
 const FLARE_BOOST = 138; // vanilla
@@ -359,17 +360,16 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
   // ===================== NEWCOMER BATCH 2 =====================
   // Drawclops — NEW middle stage: Duskull (Lv 36) -> Drawclops. Ground/Ghost.
   // BRANCHES off Duskull alongside the vanilla Duskull->Dusclops line (#240
-  // chooser). It shares Dawnnoir's edited Sniper/Looter/Spectralize +
-  // Stamina/Minigun/Turboblaze kit. FLAG: Duskull gains a second level edge
-  // (36) beside vanilla Dusclops (37).
+  // chooser). Same kit as Dustnoir ("same abilities for now"). FLAG: Duskull
+  // gains a second level edge (36) beside vanilla Dusclops (37).
   {
     speciesId: ER_DRAWCLOPS_SPECIES_ID,
     name: "Drawclops",
     slug: "drawclops",
     types: [PokemonType.GROUND, PokemonType.GHOST],
     stats: [110, 40, 90, 110, 80, 40],
-    actives: [SNIPER, LOOTER, SPECTRALIZE],
-    innates: [STAMINA, MINIGUN, TURBOBLAZE],
+    actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
+    innates: [DEADEYE, MINIGUN, TURBOBLAZE],
     catchRate: 60,
     // Between Dusclops (30.6kg) and Dusknoir (106.6kg) as a new middle stage. ~40kg.
     weight: 40.0,
@@ -389,8 +389,8 @@ export const ER_NEWCOMER_EVO_SPECIES: readonly NewcomerEvoSpeciesDef[] = [
     slug: "dustnoir",
     types: [PokemonType.GROUND, PokemonType.GHOST],
     stats: [120, 45, 105, 135, 90, 45],
-    actives: [SNIPER, LOOTER, SPECTRALIZE],
-    innates: [STAMINA, MINIGUN, TURBOBLAZE],
+    actives: [SNIPER, BOOT_HILL, SPECTRALIZE],
+    innates: [DEADEYE, MINIGUN, TURBOBLAZE],
     catchRate: 45,
     // Dusknoir convergent (Ground/Ghost, BST 540). Dusknoir is 106.6kg. ~108kg.
     weight: 108.0,

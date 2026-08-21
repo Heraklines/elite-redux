@@ -2233,6 +2233,31 @@ export class ErEntryTrapTag extends EntryHazardTag {
   }
 }
 
+/** Elite Redux Bitter Drill's persistent grounded entry hazard. */
+export class ErDrillBitsTag extends EntryHazardTag {
+  public override readonly tagType = ArenaTagType.ER_DRILL_BITS;
+
+  public override get maxLayers(): number {
+    return 1;
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  protected override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    if (simulated) {
+      return true;
+    }
+    pokemon.addTag(BattlerTagType.ER_EMBEDDED, 0, MoveId.NONE, this.sourceId);
+    return true;
+  }
+}
+
 // TODO: swap `sourceMove` and `sourceId` and make `sourceMove` an optional parameter
 export function getArenaTag(
   tagType: ArenaTagType,
@@ -2274,6 +2299,8 @@ export function getArenaTag(
       return new CreepingThornsTag(sourceId, side);
     case ArenaTagType.ER_INFESTATION_TRAP:
       return new ErEntryTrapTag(sourceId, side);
+    case ArenaTagType.ER_DRILL_BITS:
+      return new ErDrillBitsTag(MoveId.NONE, sourceId, side);
     case ArenaTagType.SEDIMENT_BLOOM:
       return new SedimentBloomTag(sourceId, side);
     case ArenaTagType.GRAVE_MARKER:
@@ -2356,14 +2383,15 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.NO_CRIT]: NoCritTag;
   [ArenaTagType.TOXIC_SPIKES]: ToxicSpikesTag;
   [ArenaTagType.HOT_COALS]: HotCoalsTag;
-  [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
-  [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
   [ArenaTagType.ER_INFESTATION_TRAP]: ErEntryTrapTag;
+  [ArenaTagType.ER_DRILL_BITS]: ErDrillBitsTag;
+  [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
   [ArenaTagType.SEDIMENT_BLOOM]: SedimentBloomTag;
   [ArenaTagType.GRAVE_MARKER]: GraveMarkerTag;
   [ArenaTagType.ER_WEATHER_LOCK]: ErWeatherLockTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;
+  [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
   [ArenaTagType.TRICK_ROOM]: TrickRoomTag;
   [ArenaTagType.INVERSE_ROOM]: InverseRoomTag;
   [ArenaTagType.MAGIC_ROOM]: MagicRoomTag;

@@ -18,7 +18,9 @@ import type { PendingHealTag } from "#data/arena-tag";
 import { EntryHazardTag, WeakenMoveTypeTag } from "#data/arena-tag";
 import { MoveChargeAnim } from "#data/battle-anims";
 import {
+  type BattlerTag,
   CommandedTag,
+  DrowsyTag,
   EncoreTag,
   GulpMissileTag,
   HelpingHandTag,
@@ -3579,11 +3581,14 @@ export class StatusEffectAttr extends MoveEffectAttr {
     if (!statusCheck) {
       return false;
     }
-
     const quiet = move.category !== MoveCategory.STATUS;
     if (this.effect === StatusEffect.SLEEP && user.hasAbility(ER_SLEEPING_IN_ABILITY_ID as unknown as AbilityId)) {
       const sleeper = this.selfTarget ? user : target;
-      return sleeper.addTag(BattlerTagType.DROWSY, 2, MoveId.YAWN, user.id);
+      const added = sleeper.addTag(BattlerTagType.DROWSY, 2, MoveId.YAWN, user.id);
+      if (added) {
+        sleeper.getTag(DrowsyTag)?.setSleepTurnsRemaining(2);
+      }
+      return added;
     }
     // Pass the move's category so a status-move-only immunity bypass (ER Mycelium
     // Might) fires only for STATUS moves, not a damaging move's secondary status.
@@ -7799,12 +7804,21 @@ export class AddBattlerTagAttr extends MoveEffectAttr {
     // TODO: Do any moves actually use chance-based battler tag adding?
     const moveChance = this.getMoveChance(user, target, move, this.selfTarget, true);
     if (moveChance < 0 || moveChance === 100 || user.randBattleSeedInt(100) < moveChance) {
-      return (this.selfTarget ? user : target).addTag(
+      const sleeper = this.selfTarget ? user : target;
+      const added = sleeper.addTag(
         this.tagType,
         user.randBattleSeedIntRange(this.turnCountMin, this.turnCountMax),
         move.id,
         user.id,
       );
+      if (
+        added
+        && this.tagType === BattlerTagType.DROWSY
+        && user.hasAbility(ER_SLEEPING_IN_ABILITY_ID as unknown as AbilityId)
+      ) {
+        sleeper.getTag(DrowsyTag)?.setSleepTurnsRemaining(2);
+      }
+      return added;
     }
 
     return false;
@@ -8394,7 +8408,7 @@ function addAngelsWrathMoveLock(user: Pokemon, target: Pokemon, move: Move, tagT
   history.push(temporaryMove);
   const added = target.addTag(tagType, 0, move.id, user.id);
   if (added) {
-    const tag = target.getTag(tagType);
+    const tag = target.getTag(tagType) as BattlerTag | undefined;
     if (tag) {
       tag.turnCount = 2;
     }

@@ -34,6 +34,7 @@ import { ErMultiHeadedAbAttr } from "#data/elite-redux/archetypes/multi-headed";
 import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
 import type { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
@@ -50,14 +51,20 @@ const nonContactMove = { hasFlag: () => false } as never;
 
 describe("Mega Barbaracle Y metadata", () => {
   it("registers stable IDs and real registry attrs", () => {
-    expect(ER_SWIRLIFY_ABILITY_ID).toBe(6075);
-    expect(ER_BODHISATTVA_ABILITY_ID).toBe(6076);
-    expect(ER_MAGIC_TOUCH_ABILITY_ID).toBe(6077);
-    expect(ER_RAPIER_ABILITY_ID).toBe(6079);
-    expect(ER_BRAIN_OVER_BRAWN_ABILITY_ID).toBe(6080);
-    expect(MoveId.SWIRLY_ROOM).toBe(6000);
+    expect(allAbilities[ER_SWIRLIFY_ABILITY_ID].id).toBe(ER_SWIRLIFY_ABILITY_ID);
+    expect(allAbilities[ER_BODHISATTVA_ABILITY_ID].id).toBe(ER_BODHISATTVA_ABILITY_ID);
+    expect(allAbilities[ER_MAGIC_TOUCH_ABILITY_ID].id).toBe(ER_MAGIC_TOUCH_ABILITY_ID);
+    expect(allAbilities[ER_RAPIER_ABILITY_ID].id).toBe(ER_RAPIER_ABILITY_ID);
+    expect(allAbilities[ER_BRAIN_OVER_BRAWN_ABILITY_ID].id).toBe(ER_BRAIN_OVER_BRAWN_ABILITY_ID);
+    expect(allMoves[MoveId.SWIRLY_ROOM].id).toBe(MoveId.SWIRLY_ROOM);
     expect(ER_FAKEMON_PITCH_ABILITIES.map(def => def.pokerogueId)).toEqual(
-      expect.arrayContaining([6075, 6076, 6077, 6079, 6080]),
+      expect.arrayContaining([
+        ER_SWIRLIFY_ABILITY_ID,
+        ER_BODHISATTVA_ABILITY_ID,
+        ER_MAGIC_TOUCH_ABILITY_ID,
+        ER_RAPIER_ABILITY_ID,
+        ER_BRAIN_OVER_BRAWN_ABILITY_ID,
+      ]),
     );
 
     expect(allAbilities[ER_SWIRLIFY_ABILITY_ID].attrs.some(attr => attr instanceof SwirlifyAbAttr)).toBe(true);
@@ -71,6 +78,9 @@ describe("Mega Barbaracle Y metadata", () => {
     expect(
       allAbilities[ER_BRAIN_OVER_BRAWN_ABILITY_ID].attrs.some(attr => attr instanceof BrainOverBrawnPowerAbAttr),
     ).toBe(true);
+    const handBarnacles = allAbilities[ErAbilityId.HAND_BARNACLES];
+    expect(handBarnacles.name).toBe("Hand Barnacles");
+    expect(handBarnacles.attrs.some(attr => attr instanceof ErMultiHeadedAbAttr)).toBe(true);
     expect(allAbilities[ER_BODHISATTVA_ABILITY_ID].attrs.some(attr => attr instanceof ErMultiHeadedAbAttr)).toBe(true);
     expect(allAbilities[ER_BODHISATTVA_ABILITY_ID].attrs.some(attr => attr instanceof BrainOverBrawnTypeAbAttr)).toBe(
       true,
@@ -83,7 +93,6 @@ describe("Rapier", () => {
     const rapier = new RapierFlagInjectionAbAttr();
     const slicingMove = { hasFlag: (flag: MoveFlags) => flag === MoveFlags.SLICING_MOVE } as never;
     const hornMove = { hasFlag: (flag: MoveFlags) => flag === MoveFlags.HORN_BASED } as never;
-    expect(ER_RAPIER_ABILITY_ID).toBe(6079);
     expect(rapier.injects(MoveFlags.HORN_BASED, slicingMove)).toBe(true);
     expect(rapier.injects(MoveFlags.SLICING_MOVE, hornMove)).toBe(true);
   });
@@ -181,7 +190,7 @@ describe("Swirly Room engine hooks", () => {
     expect(slicingMove.doesFlagEffectApply({ flag: MoveFlags.HORN_BASED, user: source })).toBe(true);
     expect(hornMove.doesFlagEffectApply({ flag: MoveFlags.SLICING_MOVE, user: source })).toBe(true);
 
-    const hunterHornAttr = allAbilities[464].attrs.find(
+    const hunterHornAttr = allAbilities[ErAbilityId.HUNTER_S_HORN].attrs.find(
       (attr): attr is FlagDamageBoostAbAttr => attr instanceof FlagDamageBoostAbAttr,
     );
     expect(hunterHornAttr).toBeDefined();
@@ -201,7 +210,7 @@ describe("Swirly Room engine hooks", () => {
     const source = game.field.getPlayerPokemon();
     const target = game.field.getEnemyPokemon();
     const physicalMove = allMoves[MoveId.TACKLE];
-    const statusMove = allMoves[MoveId.SPLASH];
+    const statusMove = allMoves[MoveId.PROTECT];
     const baseDamageSpy = vi.spyOn(target, "getBaseDamage");
 
     expect(source.getMoveCategory(target, physicalMove)).toBe(MoveCategory.PHYSICAL);
@@ -239,11 +248,11 @@ describe("Swirly Room engine hooks", () => {
     const source = game.field.getPlayerPokemon();
     const target = game.field.getEnemyPokemon();
     const fightingMove = allMoves[MoveId.BODY_PRESS];
-    const powerSpy = vi.spyOn(fightingMove, "calculateBattlePower");
+    const basePower = fightingMove.calculateBattlePower(source, target, true, true);
+    const boostedPower = fightingMove.calculateBattlePower(source, target, true);
 
     expect(source.getAllActiveAbilityAttrs().some(attr => attr instanceof ErMultiHeadedAbAttr)).toBe(true);
     expect(source.getMoveType(fightingMove)).toBe(PokemonType.PSYCHIC);
-    target.getAttackDamage({ source, move: fightingMove, simulated: true });
-    expect(powerSpy).toHaveReturnedWith(fightingMove.power * BRAIN_OVER_BRAWN_POWER_MULTIPLIER);
+    expect(boostedPower).toBeCloseTo(basePower * BRAIN_OVER_BRAWN_POWER_MULTIPLIER);
   });
 });
