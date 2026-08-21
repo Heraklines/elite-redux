@@ -492,7 +492,10 @@ async function driveBiome(game: GameManager, tape: RawTapeEntry[], transitions: 
   await game.phaseInterceptor.to("SelectBiomePhase", false);
 
   game.onNextPrompt("SelectBiomePhase", UiMode.ER_MAP, () => {
-    game.scene.time.delayedCall(1_001, () => {
+    // The production map deliberately blocks input for 1,000 ms. Phaser's
+    // scene clock is parked while the phase interceptor owns the phase, so the
+    // fresh-process oracle waits the same wall interval before sending keys.
+    setTimeout(() => {
       const handler = game.scene.ui.getHandler() as AnyRecord;
       const nodes = handler?.nodes;
       const selectable = handler?.selectable;
