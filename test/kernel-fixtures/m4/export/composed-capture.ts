@@ -137,7 +137,7 @@ function press(game: GameManager, keyName: KeyName, tape: RawTapeEntry[], transi
   if (typeof controller?.keyboardKeyDown !== "function" || typeof controller?.keyboardKeyUp !== "function") {
     gap("RAW_KEY_DRIVER_UNOBSERVABLE", "src/inputs-controller.ts:keyboardKeyDown/keyboardKeyUp", "production keyboard input driver is unavailable");
   }
-  const event = { code: info.key, key: info.key, keyCode: info.keyCode, which: info.keyCode, repeat: false } as KeyboardEvent;
+  const event = { code: keyName, key: info.key, keyCode: info.keyCode, which: info.keyCode, repeat: false } as KeyboardEvent;
   const phaseBefore = String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "");
   const modeBefore = String(game.scene.ui.getMode());
   controller.keyboardKeyDown(event);

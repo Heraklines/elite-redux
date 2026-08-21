@@ -99,7 +99,9 @@ function jsonValue(value: unknown, path = "$"): JsonValue {
     return finiteNumber(value, path);
   }
   if (Array.isArray(value)) {
-    return value.map((child, index) => jsonValue(child, `${path}[${index}]`));
+    return Array.from(value, (child, index) =>
+      child === undefined ? null : jsonValue(child, `${path}[${index}]`),
+    );
   }
   if (typeof value === "object") {
     const out: Record<string, JsonValue> = {};
