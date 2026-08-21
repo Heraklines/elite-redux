@@ -398,6 +398,12 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
 }
 async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
   await waitForInputPhase(game, ["SelectModifierPhase"], "wave-10 Town market");
+  await game.phaseInterceptor.to("SelectModifierPhase");
+  await waitForLiveCondition(
+    game,
+    () => game.scene.ui.getMode() === UiMode.BIOME_SHOP,
+    "wave-10 market input readiness",
+  );
   if (game.scene.ui.getMode() !== UiMode.BIOME_SHOP) {
     gap(
       "MARKET_CONTROL_UNOBSERVABLE",
