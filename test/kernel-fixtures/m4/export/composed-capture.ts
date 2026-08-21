@@ -519,6 +519,7 @@ async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions:
     "wave-10 market leave confirmation",
   );
   const crossroadsArrival = game.phaseInterceptor.to("ErCrossroadsPhase", false);
+  await sleep();
   press(game, "Space", tape, transitions);
   await crossroadsArrival;
 }
