@@ -256,8 +256,10 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
     if (stop.includes(phase)) {
       return;
     }
+    let handled = false;
     if (phase === "CommandPhase" || phase === "MovePhase" || phase === "SelectTargetPhase" || phase === "SwitchPhase") {
       press(game, "Space", tape, transitions);
+      handled = true;
     }
     if (phase === "EnemyCommandPhase") {
       await game.move.selectEnemyMove(MoveId.SPLASH, BattlerIndex.PLAYER);
@@ -266,6 +268,13 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
         move_id: MoveId.SPLASH,
         target: BattlerIndex.PLAYER,
       });
+      handled = true;
+    }
+    if (!handled) {
+      const boundary = await game.phaseInterceptor.toFirst([...new Set([...stop, "CommandPhase"])]);
+      if (stop.includes(boundary)) {
+        return;
+      }
     }
     await sleep();
   }

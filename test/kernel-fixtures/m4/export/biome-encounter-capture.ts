@@ -786,14 +786,12 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       gap("BIOME_VECTOR_MISMATCH", ENCOUNTER_SOURCE, "live Classic launch did not materialize wave 10 in Town");
     }
     biome = captureStructureAndRoute(game);
-    releaseGame(game);
-    game = null;
-    phaserGame.destroy(true);
-    phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
-    const encounterBoot = Promise.withResolvers<void>();
-    setTimeout(encounterBoot.resolve, 0);
-    await encounterBoot.promise;
-
+    game.promptHandler.clearPrompts();
+    game.scene.phaseManager.clearAllPhases();
+    const ui = game.scene.ui as AnyRecord;
+    if (typeof ui.resetModeChain === "function") {
+      ui.resetModeChain();
+    }
 
     const scenarioSpec = {
       v: 1,
@@ -803,26 +801,17 @@ async function captureLiveEncounter(): Promise<{ biome: AnyRecord; encounter: An
       run: { seed: RUN_SEED, wave: 11, biome: BiomeId.PLAINS, level: 10, difficulty: "ace" },
     } satisfies ScenarioSpec;
     const built = buildDevScenario(scenarioSpec);
-    game = new GameManager(phaserGame);
-    const ui = game.scene.ui as AnyRecord;
-    ui.shouldSkipDialogue = () => true;
-    await game.runToTitle();
     const starters = built.scenario.setup();
-    game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
-      game!.scene.gameMode = getGameMode(GameModes.CLASSIC);
-      const starterPhase = new SelectStarterPhase();
-      const scenarioSeed = RUN_SEED;
-      // Match the production launch frontier through the supported harness controls:
-      // pin the run seed before the requested Plains arena is materialized, then set wave and biome.
-      game!.override
-        .seed(scenarioSeed)
-        .startingWave(11)
-        .startingBiome(BiomeId.PLAINS);
-      encounterInitial = frontier(game!);
-      game!.scene.phaseManager.pushNew("EncounterPhase", false);
-      starterPhase.initBattle(starters, true);
-      built.postLaunch();
-    });
+    game.scene.gameMode = getGameMode(GameModes.CLASSIC);
+    const starterPhase = new SelectStarterPhase();
+    game.override
+      .seed(RUN_SEED)
+      .startingWave(11)
+      .startingBiome(BiomeId.PLAINS);
+    encounterInitial = frontier(game);
+    game.scene.phaseManager.pushNew("EncounterPhase", false);
+    starterPhase.initBattle(starters, true);
+    built.postLaunch();
 
     const captured = await withAsyncRngCapture("encounter", async () => {
       await game!.phaseInterceptor.to("CommandPhase", false);
