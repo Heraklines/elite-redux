@@ -291,6 +291,7 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
 }
 
 async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
+  game.onNextPrompt("LearnMoveBatchPhase", UiMode.LEARN_MOVE_BATCH, () => undefined);
   await game.phaseInterceptor.to("LearnMoveBatchPhase");
   await waitForLiveCondition(
     game,
