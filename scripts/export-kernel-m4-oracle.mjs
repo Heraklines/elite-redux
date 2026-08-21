@@ -391,6 +391,7 @@ try {
   if (failures.length > 0) {
     process.stderr.write(`${failures.join("\n")}\n`);
     cpSync(secondRaw, resolve(outputRoot, "raw-failure"), { recursive: true });
+    writeCanonicalFile(resolve(outputRoot, "raw-failure", "child-failures.json"), failures);
     const finalStatus = gitStatus();
     if (finalStatus !== initialStatus) {
       fail(`export changed the checkout; initial=${JSON.stringify(initialStatus)} final=${JSON.stringify(finalStatus)}`);
