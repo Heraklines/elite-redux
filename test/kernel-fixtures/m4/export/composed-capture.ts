@@ -622,9 +622,9 @@ export async function captureComposedSegment(): Promise<JsonObject> {
   const priorLevelCapOverride = overrides.LEVEL_CAP_OVERRIDE;
   try {
     overrides.LEVEL_CAP_OVERRIDE = 17;
-    rngTrace = installRngTrace();
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     const game = await launch(phaserGame);
+    rngTrace = installRngTrace();
     const target = game.scene.getPlayerParty()[0] as AnyRecord | undefined;
     if (target == null || target.species?.speciesId !== SpeciesId.NACLI) {
       gap("COMPOSED_PARTY_UNOBSERVABLE", "src/field/pokemon.ts:PlayerPokemon", "the live composed party does not contain Nacli");
