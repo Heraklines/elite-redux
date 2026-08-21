@@ -9,6 +9,7 @@ pub mod battle_ui;
 pub mod ids;
 pub mod input;
 pub mod protocol;
+pub mod run_control;
 pub mod run_ids;
 pub mod run_model;
 pub mod trace;
@@ -28,6 +29,11 @@ pub use run_ids::{
 pub use run_model::{
     BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
     ModifierTierError, RewardAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
+};
+pub use run_control::{
+    BiomeMarketControl, BiomeSelectControl, CrossroadsControl, GameControl, GameControlPlan,
+    GameControlPlanError, MoveLearnControl, PresentationBarrier, RewardShopControl,
+    SeatControlPlan, SurfaceControl,
 };
 pub use trace::*;
 pub use trace_v3::*;

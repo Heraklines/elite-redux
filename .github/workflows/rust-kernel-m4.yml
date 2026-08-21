@@ -118,23 +118,49 @@ jobs:
 
       - name: Check formatting and workspace
         working-directory: rust
+        shell: bash
         run: |
-          cargo fmt --all -- --check
-          cargo check --workspace --all-targets
+          set -euo pipefail
+          {
+            cargo fmt --all -- --check
+            cargo check --workspace --all-targets
+          } 2>&1 | tee cargo-diagnostics.log
 
+      - name: Upload Rust diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-foundation-cargo-log
+          path: rust/cargo-diagnostics.log
+          if-no-files-found: ignore
+          retention-days: 7
+ 
       - name: Run focused M4 foundation contracts
         working-directory: rust
+        shell: bash
         run: |
-          cargo test -p er-types --test m4_types
-          cargo test -p er-state --test m4_state_v2
-          cargo test -p er-run --test m4_content
-          cargo test -p er-content --test m4_pack
-          cargo test -p er-state --test m4_migration
-          cargo test -p er-run --test m4_settlement
-          cargo test -p er-state --test m4_foundation_properties
-          cargo test -p er-run --test m4_foundation_properties
-          cargo test -p er-kernel --test m4_snapshot_v3
-          cargo test -p er-sim --test m4_pair_snapshot_v3
+          set -euo pipefail
+          {
+            cargo test -p er-types --test m4_types
+            cargo test -p er-state --test m4_state_v2
+            cargo test -p er-run --test m4_content
+            cargo test -p er-content --test m4_pack
+            cargo test -p er-state --test m4_migration
+            cargo test -p er-run --test m4_settlement
+            cargo test -p er-state --test m4_foundation_properties
+            cargo test -p er-run --test m4_foundation_properties
+            cargo test -p er-kernel --test m4_snapshot_v3
+            cargo test -p er-sim --test m4_pair_snapshot_v3
+          } 2>&1 | tee cargo-test-diagnostics.log
+
+      - name: Upload Rust test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-foundation-cargo-test-log
+          path: rust/cargo-test-diagnostics.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Require committed lockfile
         working-directory: rust
