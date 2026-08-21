@@ -194,40 +194,49 @@ function installRngTrace(game: GameManager): RngCollector {
     ui_mode: String(game.scene.ui.getMode()),
     wave: Number(game.scene.currentBattle?.waveIndex ?? -1),
   });
-  const random = Phaser.Math.RND as AnyRecord;
-  const methods = ["integerInRange", "integer", "frac", "realInRange", "pick", "shuffle", "angle", "between", "normal", "weightedPick", "sign"] as const;
+  // Wrap the whole RND object with a recording proxy. Per-method hooks miss
+  // any consumer calling an unwrapped generator method (rotation, uuid,
+  // timestamp, real, int, ...) and let it silently advance the shared stream.
+  const inner = Phaser.Math.RND as AnyRecord;
+  const methods = ["integerInRange", "integer", "frac", "realInRange", "pick", "shuffle", "angle", "between", "normal", "weightedPick", "sign", "rotation", "uuid", "timestamp", "real", "int"] as const;
   const draws: JsonValue[] = [];
   const restores: (() => void)[] = [];
   let battleDrawInProgress = false;
-  for (const method of methods) {
-    const original = random[method];
-    if (typeof original !== "function") {
-      gap("RNG_OBSERVATION_SEAM_MISSING", `Phaser.Math.RND.${method}`, "RNG method is not callable");
+  const recordDraw = (method: string, args: unknown[], invoke: () => unknown): unknown => {
+    if (battleDrawInProgress) {
+      return invoke();
     }
-    random[method] = function (this: AnyRecord, ...args: unknown[]): unknown {
-      if (battleDrawInProgress) {
-        return original.apply(this, args);
-      }
-      const before = captureOracleRngState(random.state(), `${method}.before`, gap);
-      const result = original.apply(this, args);
-      const after = captureOracleRngState(random.state(), `${method}.after`, gap);
-      draws.push({
-        sequence: draws.length,
-        stream: "RUN",
-        public_api: method.toUpperCase(),
-        arguments: jsonValue(args, `${method}.arguments`),
-        result: jsonValue(result, `${method}.result`),
-        consumed: before.state_string !== after.state_string,
-        before_state: before,
-        after_state: after,
-        context: drawContext(),
-      });
-      return result;
-    };
-    restores.push(() => {
-      random[method] = original;
+    const before = captureOracleRngState(inner.state(), `${method}.before`, gap);
+    const result = invoke();
+    const after = captureOracleRngState(inner.state(), `${method}.after`, gap);
+    draws.push({
+      sequence: draws.length,
+      stream: "RUN",
+      public_api: method.toUpperCase(),
+      arguments: jsonValue(args, `${method}.arguments`),
+      result: jsonValue(result, `${method}.result`),
+      consumed: before.state_string !== after.state_string,
+      before_state: before,
+      after_state: after,
+      context: drawContext(),
     });
-  }
+    return result;
+  };
+  const proxy = new Proxy(inner, {
+    get(target, property) {
+      const value = Reflect.get(target, property, target);
+      if (typeof value !== "function" || !(methods as readonly string[]).includes(String(property))) {
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+      return function (this: AnyRecord, ...args: unknown[]): unknown {
+        return recordDraw(String(property), args, () => value.apply(target, args));
+      };
+    },
+  }) as AnyRecord;
+  (Phaser.Math as AnyRecord).RND = proxy;
+  restores.push(() => {
+    (Phaser.Math as AnyRecord).RND = inner;
+  });
 
   const battlePrototype = Battle.prototype as AnyRecord;
   const originalBattleDraw = battlePrototype.randSeedInt;
@@ -238,7 +247,7 @@ function installRngTrace(game: GameManager): RngCollector {
     if (battleDrawInProgress) {
       return originalBattleDraw.apply(this, args);
     }
-    const before = captureOracleRngState(this.battleSeedState ?? random.state(), "battle.before", gap);
+    const before = captureOracleRngState(this.battleSeedState ?? inner.state(), "battle.before", gap);
     battleDrawInProgress = true;
     let result: unknown;
     try {
@@ -246,7 +255,7 @@ function installRngTrace(game: GameManager): RngCollector {
     } finally {
       battleDrawInProgress = false;
     }
-    const after = captureOracleRngState(this.battleSeedState ?? random.state(), "battle.after", gap);
+    const after = captureOracleRngState(this.battleSeedState ?? inner.state(), "battle.after", gap);
     draws.push({
       sequence: draws.length,
       stream: "BATTLE",
