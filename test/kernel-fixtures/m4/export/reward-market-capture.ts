@@ -528,7 +528,7 @@ async function waitUntil(
 
 function ensurePhaserGame(): Phaser.Game {
   if (phaserGame == null) {
-    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
   }
   return phaserGame;
 }

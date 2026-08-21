@@ -540,7 +540,7 @@ async function launchLiveClassicBattle(): Promise<void> {
     if (priorBattleRng == null) {
       gap("TYPE_CHART_UNOBSERVABLE", "src/battle-scene.ts:BattleScene.randBattleSeedInt", "production battle RNG method is unavailable");
     }
-    livePhaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    livePhaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     liveGame = new GameManager(livePhaserGame);
     (BattleScene.prototype as AnyRecord).randBattleSeedInt = priorBattleRng;

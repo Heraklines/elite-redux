@@ -489,7 +489,7 @@ export async function captureProgression(): Promise<Record<string, JsonValue>> {
     priorBattleRng = BattleScene.prototype.randBattleSeedInt;
     rngTrace = installRngTrace();
     overrides.LEVEL_CAP_OVERRIDE = LEVEL_CAP_OVERRIDE;
-    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
     const boot = Promise.withResolvers<void>();
     setTimeout(boot.resolve, 0);
     await boot.promise;

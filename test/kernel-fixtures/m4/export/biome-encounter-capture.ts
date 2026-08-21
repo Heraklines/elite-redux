@@ -745,7 +745,10 @@ async function createHeadlessGame(): Promise<{ phaserGame: Phaser.Game; game: Ga
   if (typeof PhaserGame !== "function") {
     gap("OBSERVATION_SEAM_MISSING", "Phaser.Game", "headless game constructor is unavailable");
   }
-  const phaserGame = new PhaserGame({ type: Phaser.HEADLESS });
+  // A random Phaser config seed leaks into every `config.seed[0]` fallback
+  // (e.g. game-data loadSession) and makes boot-time biome-structure rolls
+  // process-dependent. Pin it so fresh processes stay byte-identical.
+  const phaserGame = new PhaserGame({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
   const boot = Promise.withResolvers<void>();
   setTimeout(boot.resolve, 0);
   await boot.promise;

@@ -623,7 +623,7 @@ export async function captureComposedSegment(): Promise<JsonObject> {
   const priorLevelCapOverride = overrides.LEVEL_CAP_OVERRIDE;
   try {
     overrides.LEVEL_CAP_OVERRIDE = 17;
-    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
     const game = await launch(phaserGame);
     rngTrace = installRngTrace();
     const target = game.scene.getPlayerParty()[0] as AnyRecord | undefined;

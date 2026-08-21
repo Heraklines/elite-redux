@@ -1020,7 +1020,7 @@ export async function captureMigrationCompanions(): Promise<Record<string, JsonV
   }
   let phaserGame: Phaser.Game;
   try {
-    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS, seed: ["m4-oracle-anchor"] });
     const boot = Promise.withResolvers<void>();
     setTimeout(boot.resolve, 0);
     await boot.promise;
