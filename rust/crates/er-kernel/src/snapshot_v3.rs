@@ -8,8 +8,8 @@
 use er_content::pack::ContentPack;
 use er_game::snapshot::{CommandAdmissionLedgerSnapshotV1, SeatControlHistorySnapshotV1};
 use er_protocol::ProtocolRuntimeSnapshotV2;
-use er_state::game_v2::GameStateV2;
 use er_run::encounter_plan::EncounterPlan;
+use er_state::game_v2::GameStateV2;
 use er_state::run_v2::{ProgressionQueue, RunCounters, RunSurfaceState};
 use er_types::battle_command::ScriptedEnemyPolicyV1;
 use er_types::battle_control::{BattleControlPlan, SeatMenuInstanceAllocator};
@@ -357,8 +357,9 @@ impl PreparedTransactionSnapshotV3 {
             })?;
         }
         if let Some(plan) = &self.encounter_plan {
-            plan.validate()
-                .map_err(|error| invalid("prepared_transaction.encounter_plan", error.to_string()))?;
+            plan.validate().map_err(|error| {
+                invalid("prepared_transaction.encounter_plan", error.to_string())
+            })?;
             if plan.enemy_party.is_empty() {
                 return Err(invalid(
                     "prepared_transaction.encounter_plan.enemy_party",
