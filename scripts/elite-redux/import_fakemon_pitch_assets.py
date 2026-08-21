@@ -202,11 +202,15 @@ SHEETS: dict[str, dict[str, object]] = {
     },
     "raichu_alolan_mega_male": {
         "front": GDRIVE / rel("12sTZsyn5TJtyOsZYLCAsRispOCn4tkEx/image_by_lennybitao_dmo3ert.png"),
-        "layout": "view_pair",
+        "back": GDRIVE / rel("1LyNF5wGwu8l8daogFzHoOYdRC6hFgNxP/image_by_lennybitao_dmo3e0q.png"),
+        "layout": "gender_view_pair",
+        "gender_index": 0,
     },
     "raichu_alolan_mega_female": {
-        "front": GDRIVE / rel("1LyNF5wGwu8l8daogFzHoOYdRC6hFgNxP/image_by_lennybitao_dmo3e0q.png"),
-        "layout": "view_pair",
+        "front": GDRIVE / rel("12sTZsyn5TJtyOsZYLCAsRispOCn4tkEx/image_by_lennybitao_dmo3ert.png"),
+        "back": GDRIVE / rel("1LyNF5wGwu8l8daogFzHoOYdRC6hFgNxP/image_by_lennybitao_dmo3e0q.png"),
+        "layout": "gender_view_pair",
+        "gender_index": 1,
     },
     "lilligant_verdant": {
         "front": GDRIVE / rel("1mI_44Vv7qZZI6js4HFQDJDkNisWYaVix/verdan_lilligant___moon_priestess_by_kfweagz_dmjs9lf-fullview.png"),
@@ -462,6 +466,19 @@ def load_sheet(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, I
     if layout == "view_pair":
         front, back = crop_horizontal_pair(open_rgba(library_root / spec["front"]))
         return {"front": front, "back": back}, None
+    if layout == "gender_view_pair":
+        # The first sheet contains male/female FRONT views; the second contains
+        # male/female BACK views. They are not per-gender front/back sheets.
+        front_sheet = open_rgba(library_root / spec["front"])
+        back_sheet = open_rgba(library_root / spec["back"])
+        gender_index = int(spec["gender_index"])
+        if gender_index not in (0, 1):
+            raise ValueError(f"gender_view_pair index must be 0 or 1, got {gender_index}")
+        if front_sheet.size != back_sheet.size or front_sheet.width % 2 != 0:
+            raise ValueError("gender_view_pair sheets must have matching dimensions and two equal columns")
+        front_views = crop_horizontal_pair(front_sheet)
+        back_views = crop_horizontal_pair(back_sheet)
+        return {"front": front_views[gender_index], "back": back_views[gender_index]}, None
     if layout == "lilligant_panel_mega":
         sheet = open_rgba(library_root / spec["front"])
         return {
