@@ -9,9 +9,12 @@ use thiserror::Error;
 
 use crate::SeatId;
 use crate::battle_control::{BattleControl, WaitingControl};
-use crate::battle_ids::{MenuInstanceId, RunSurfaceId};
-use crate::run_ids::RunInteractionSequence;
+use crate::battle_ids::MenuInstanceId;
+use crate::run_ids::{RunInteractionSequence, RunSurfaceId};
 use crate::run_model::RunOutcome;
+use crate::ui_menu::LogicalMenu;
+
+pub const GAME_CONTROL_PLAN_SCHEMA_VERSION: u32 = 1;
 
 /// Presentation barrier policy installed with a logical control.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
