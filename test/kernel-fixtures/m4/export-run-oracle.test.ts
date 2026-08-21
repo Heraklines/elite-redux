@@ -489,6 +489,7 @@ function validateRawKeyTape(value: JsonValue[], path: string): void {
     const downData = downEvent?.data as AnyRecord;
     const upData = upEvent?.data as AnyRecord;
     const downCode = downData?.code as AnyRecord;
+    const upCode = upData?.code as AnyRecord;
     if (
       downEvent?.kind !== "KEY_DOWN"
       || upEvent?.kind !== "KEY_UP"
