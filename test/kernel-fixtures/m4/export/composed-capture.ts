@@ -214,6 +214,8 @@ function installRngTrace(game: GameManager): RngCollector {
   // Wrap the whole RND object with a recording proxy. Per-method hooks miss
   // any consumer calling an unwrapped generator method (rotation, uuid,
   // timestamp, real, int, ...) and let it silently advance the shared stream.
+  // sow()/state() are recorded as SWAP events: they replace or restore the
+  // whole generator state and are causal evidence for every join frontier.
   const inner = Phaser.Math.RND as AnyRecord;
   const methods = ["integerInRange", "integer", "frac", "realInRange", "pick", "shuffle", "angle", "between", "normal", "weightedPick", "sign", "rotation", "uuid", "timestamp", "real", "int"] as const;
   const draws: JsonValue[] = [];
@@ -239,15 +241,44 @@ function installRngTrace(game: GameManager): RngCollector {
     });
     return result;
   };
+  const recordSwap = (method: string, args: unknown[], invoke: () => unknown): unknown => {
+    if (battleDrawInProgress) {
+      return invoke();
+    }
+    const before = captureOracleRngState(inner.state(), `${method}.before`, gap);
+    const result = invoke();
+    const after = captureOracleRngState(inner.state(), `${method}.after`, gap);
+    draws.push({
+      sequence: draws.length,
+      stream: "SWAP",
+      public_api: method.toUpperCase(),
+      arguments: jsonValue(args, `${method}.arguments`),
+      result: jsonValue(result ?? null, `${method}.result`),
+      consumed: false,
+      before_state: before,
+      after_state: after,
+      context: drawContext(),
+    });
+    return result;
+  };
   const proxy = new Proxy(inner, {
     get(target, property) {
+      const name = String(property);
       const value = Reflect.get(target, property, target);
-      if (typeof value !== "function" || !(methods as readonly string[]).includes(String(property))) {
-        return typeof value === "function" ? value.bind(target) : value;
+      if (typeof value !== "function") {
+        return value;
       }
-      return function (this: AnyRecord, ...args: unknown[]): unknown {
-        return recordDraw(String(property), args, () => value.apply(target, args));
-      };
+      if ((methods as readonly string[]).includes(name)) {
+        return function (...args: unknown[]): unknown {
+          return recordDraw(name, args, () => value.apply(target, args));
+        };
+      }
+      if ((["sow", "state"] as const).includes(name as "sow" | "state")) {
+        return function (...args: unknown[]): unknown {
+          return recordSwap(name, args, () => value.apply(target, args));
+        };
+      }
+      return value.bind(target);
     },
   }) as AnyRecord;
   (Phaser.Math as AnyRecord).RND = proxy;
