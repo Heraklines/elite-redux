@@ -22,6 +22,7 @@ import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { PokemonModifierType } from "#modifiers/modifier-type";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
@@ -411,10 +412,67 @@ async function driveMarket(game: GameManager, tape: RawTapeEntry[], transitions:
       `wave-10 SelectModifierPhase opened UI mode ${String(game.scene.ui.getMode())}`,
     );
   }
+  const phase = game.scene.phaseManager.getCurrentPhase() as AnyRecord;
+  const options = phase.shopOptions;
+  const quantities = phase.qtys;
+  const handler = game.scene.ui.getHandler() as AnyRecord;
+  if (!Array.isArray(options) || !Array.isArray(quantities) || typeof handler?.getStock !== "function") {
+    gap(
+      "MARKET_STOCK_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase.buildStock",
+      "live Town stock cannot be navigated",
+    );
+  }
+  const target = options.findIndex(
+    (option: AnyRecord, index: number) =>
+      option?.type != null
+      && !(option.type instanceof PokemonModifierType)
+      && Number(quantities[index]) > 0,
+  );
+  let cursor = Number(handler.cursor);
+  if (target < 0 || !Number.isSafeInteger(cursor)) {
+    gap(
+      "MARKET_DIRECT_OPTION_UNOBSERVABLE",
+      "src/phases/biome-shop-phase.ts:BiomeShopPhase.shopOptions",
+      "Town stock has no direct purchase target",
+    );
+  }
+  while (Math.floor(cursor / 4) < Math.floor(target / 4)) {
+    press(game, "ArrowDown", tape, transitions);
+    cursor = Number(handler.cursor);
+  }
+  while (Math.floor(cursor / 4) > Math.floor(target / 4)) {
+    press(game, "ArrowUp", tape, transitions);
+    cursor = Number(handler.cursor);
+  }
+  while (cursor % 4 < target % 4) {
+    press(game, "ArrowRight", tape, transitions);
+    cursor = Number(handler.cursor);
+  }
+  while (cursor % 4 > target % 4) {
+    press(game, "ArrowLeft", tape, transitions);
+    cursor = Number(handler.cursor);
+  }
+  if (cursor !== target) {
+    gap(
+      "MARKET_CURSOR_UNOBSERVABLE",
+      "src/ui/handlers/biome-shop-ui-handler.ts:cursor",
+      `physical market cursor ${cursor} did not reach ${target}`,
+    );
+  }
+  const stockBefore = Number(handler.getStock(target));
   press(game, "Space", tape, transitions);
-  press(game, "ArrowRight", tape, transitions);
-  press(game, "Space", tape, transitions);
+  await waitForLiveCondition(
+    game,
+    () => Number(handler.getStock(target)) < stockBefore,
+    "wave-10 market purchase",
+  );
   press(game, "Escape", tape, transitions);
+  await waitForLiveCondition(
+    game,
+    () => game.scene.ui.getMode() === UiMode.CONFIRM,
+    "wave-10 market leave confirmation",
+  );
   press(game, "Space", tape, transitions);
   await game.phaseInterceptor.to("ErCrossroadsPhase", false);
 }
