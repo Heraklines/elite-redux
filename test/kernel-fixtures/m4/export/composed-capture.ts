@@ -188,12 +188,29 @@ type RngCollector = {
 };
 
 function installRngTrace(game: GameManager): RngCollector {
-  const drawContext = (): JsonObject => ({
-    phase: String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? ""),
-    queued_phases: (game.scene.phaseManager as AnyRecord).getQueuedPhaseNames?.() ?? [],
-    ui_mode: String(game.scene.ui.getMode()),
-    wave: Number(game.scene.currentBattle?.waveIndex ?? -1),
-  });
+  const drawContext = (): JsonObject => {
+    const stack = new Error().stack ?? "";
+    const callsites: string[] = [];
+    for (const line of stack.split("\n")) {
+      const match = line.match(/((?:src|test)[\\/][^()\s]+?\.ts):\d+(?::\d+)?/u);
+      if (match != null) {
+        const site = match[1].replaceAll("\\", "/");
+        if (!callsites.includes(site)) {
+          callsites.push(site);
+        }
+      }
+      if (callsites.length >= 4) {
+        break;
+      }
+    }
+    return {
+      phase: String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? ""),
+      queued_phases: (game.scene.phaseManager as AnyRecord).getQueuedPhaseNames?.() ?? [],
+      ui_mode: String(game.scene.ui.getMode()),
+      wave: Number(game.scene.currentBattle?.waveIndex ?? -1),
+      diagnostic_callsites: callsites,
+    };
+  };
   // Wrap the whole RND object with a recording proxy. Per-method hooks miss
   // any consumer calling an unwrapped generator method (rotation, uuid,
   // timestamp, real, int, ...) and let it silently advance the shared stream.
