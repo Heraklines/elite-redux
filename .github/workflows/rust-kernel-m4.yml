@@ -191,6 +191,107 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  m4-m3-regression-core:
+    name: M3 regression core
+    needs:
+      - m4-source-lock
+      - m4-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out regression candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+
+      - name: Cache Rust regression artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-m3reg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-m3reg-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run M1-M3 content, state, battle, and protocol suites
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo test -p er-content
+            cargo test -p er-state
+            cargo test -p er-battle
+            cargo test -p er-protocol
+          } 2>&1 | tee m3-regression-core.log
+
+      - name: Upload core regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-m3regression-core-log
+          path: rust/m3-regression-core.log
+          if-no-files-found: ignore
+          retention-days: 7
+
+  m4-m3-regression-integration:
+    name: M3 regression integration
+    needs:
+      - m4-source-lock
+      - m4-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out regression candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+
+      - name: Cache Rust regression artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-m3reg-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-m3reg-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run M2-M3 game, kernel, and simulator campaigns
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            cargo test -p er-game
+            cargo test -p er-kernel
+            cargo test -p er-sim
+          } 2>&1 | tee m3-regression-integration.log
+
+      - name: Upload integration regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-m3regression-integration-log
+          path: rust/m3-regression-integration.log
+          if-no-files-found: ignore
+          retention-days: 7
+
   m4-oracle-probe:
     name: M4 oracle fresh-process probe
     needs:
