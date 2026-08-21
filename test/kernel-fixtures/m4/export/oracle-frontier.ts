@@ -86,10 +86,13 @@ function canonicalState(game: GameManager, fail: FrontierFailure): JsonObject {
   }
   const scene = game.scene as AnyRecord;
   const battle = scene.currentBattle as AnyRecord | undefined;
+  const canonicalSaveData = JSON.parse(JSON.stringify(saveData)) as AnyRecord;
+  delete canonicalSaveData.playTime;
+  delete canonicalSaveData.timestamp;
   return {
     schema_version: 2,
     kind: "GAME_STATE_V2",
-    save_data: jsonValue(JSON.parse(JSON.stringify(saveData)), "save_data", fail),
+    save_data: jsonValue(canonicalSaveData, "save_data", fail),
     runtime: {
       seed: String(scene.seed),
       wave_seed: String(scene.waveSeed),

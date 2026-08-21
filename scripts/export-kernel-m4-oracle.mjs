@@ -398,9 +398,18 @@ try {
     }
     fail(`M4A exporter child process failures:\n${failures.join("\n")}`);
   }
-  verifyCanonicalFiles(first, expected);
-  verifyCanonicalFiles(second, expected);
-  compareTrees(first, second, expected);
+  try {
+    verifyCanonicalFiles(first, expected);
+    verifyCanonicalFiles(second, expected);
+    compareTrees(first, second, expected);
+  } catch (error) {
+    cpSync(first, resolve(outputRoot, "diagnostic-first"), { recursive: true });
+    cpSync(second, resolve(outputRoot, "diagnostic-second"), { recursive: true });
+    writeCanonicalFile(resolve(outputRoot, "export-failure.json"), {
+      message: error instanceof Error ? error.message : String(error),
+    });
+    throw error;
+  }
   cpSync(first, outputRoot, { recursive: true });
   const published = verifyCanonicalFiles(outputRoot, expected);
   const finalStatus = gitStatus();
