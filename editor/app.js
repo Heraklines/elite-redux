@@ -1243,6 +1243,21 @@ function matchingSpeciesEntries(query, limit = 24) {
     .map(entry => entry.species);
 }
 
+function isRuntimeSpeciesForm(species) {
+  return Boolean(species?.baseConst && Number.isInteger(species?.formIndex) && species.formIndex > 0);
+}
+
+function pokedexSpeciesUniverse() {
+  const seen = new Set();
+  return [...POKEDEX_SPECIES, ...TRAINER_SPECIES_FORMS].filter(species => {
+    if (!species?.const || seen.has(species.const)) {
+      return false;
+    }
+    seen.add(species.const);
+    return true;
+  });
+}
+
 function openCtrSpeciesDrop(input) {
   const drop = input.parentElement?.querySelector(".ctr-species-drop");
   if (!drop) {
@@ -1274,10 +1289,17 @@ function closeCtrSpeciesDrops() {
 
 /** The Pokedex tabs' species list: ALL species, filtered by the header search, sorted. */
 function pokedexList() {
-  const f = ($("#search").value || "").trim().toLowerCase();
+  const f = speciesSearchKey($("#search").value);
+  const tokens = f.split(" ").filter(Boolean);
+  const universe = pokedexSpeciesUniverse();
   const list = f
-    ? POKEDEX_SPECIES.filter(s => s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f))
-    : POKEDEX_SPECIES;
+    ? universe.filter(s =>
+        speciesSearchValues(s).some(value => {
+          const key = speciesSearchKey(value);
+          return key.includes(f) || tokens.every(token => key.includes(token));
+        }),
+      )
+    : universe;
   const byDex = $("#sort").value === "dex";
   return [...list].sort((a, b) =>
     byDex ? (a.dex ?? 99999) - (b.dex ?? 99999) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name),
@@ -1412,13 +1434,14 @@ function evoChainHtml(s) {
 function pdHeadHtml(s) {
   const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
   const dirty = pdDirty(s.const, activeTab);
+  const runtimeForm = isRuntimeSpeciesForm(s);
   return `<div class="pd-head">
     <img src="${sprite}" alt="" onerror="this.style.visibility='hidden'" />
     <div>
       <div class="pd-title">${esc(s.name)} <small>#${s.dex ?? "—"} · ${esc(s.const)}</small></div>
     </div>
-    ${dirty ? '<span class="badge edited">modified</span>' : ""}
-    <button type="button" class="pd-revert" data-pdrevert="${s.const}"${dirty ? "" : " disabled"}>↺ Revert</button>
+    ${runtimeForm ? '<span class="badge">battle form</span>' : dirty ? '<span class="badge edited">modified</span>' : ""}
+    ${runtimeForm ? "" : `<button type="button" class="pd-revert" data-pdrevert="${s.const}"${dirty ? "" : " disabled"}>↺ Revert</button>`}
   </div>
   ${evoChainHtml(s)}`;
 }
@@ -1431,30 +1454,33 @@ function renderLearnsets(root) {
     return;
   }
   const s = spByConst.get(pdSelected);
+  const runtimeForm = isRuntimeSpeciesForm(s);
   const rows = (learn.current[pdSelected] || [])
     .map(([lvl, mv], idx) => ({ lvl, mv, idx }))
     .sort((a, b) => a.lvl - b.lvl || a.idx - b.idx);
   const rowsHtml = rows
     .map(
       r => `<div class="ls-row" data-idx="${r.idx}">
-        <input class="ls-level" type="number" min="1" max="100" value="${r.lvl}" data-idx="${r.idx}" />
+        <input class="ls-level" type="number" min="1" max="100" value="${r.lvl}" data-idx="${r.idx}"${runtimeForm ? " disabled" : ""} />
         <span class="ls-move">${r.lvl === 1 ? '<span class="ls-lv1">START</span> ' : ""}${moveLabel(moveById.get(r.mv))}</span>
-        <button type="button" class="ls-del" data-idx="${r.idx}" title="Remove">✕</button>
+        ${runtimeForm ? "" : `<button type="button" class="ls-del" data-idx="${r.idx}" title="Remove">✕</button>`}
       </div>`,
     )
     .join("");
   main.innerHTML = `${pdHeadHtml(s)}
-    <div class="pd-cols">
+    <div class="pd-cols${runtimeForm ? " pd-runtime-form" : ""}">
       <div class="pd-col">
-        <div class="pd-col-head">Learnable ${paletteControlsHtml(true)}</div>
-        <div class="pal" id="pal">${paletteHtml()}</div>
+        <div class="pd-col-head">${runtimeForm ? "Inherited from base species" : `Learnable ${paletteControlsHtml(true)}`}</div>
+        ${runtimeForm ? '<div class="pd-empty">This battle form uses its base species level-up pool.</div>' : `<div class="pal" id="pal">${paletteHtml()}</div>`}
       </div>
       <div class="pd-col">
         <div class="pd-col-head">Current learnset (${rows.length})</div>
         <div class="ls-list" data-drop="learn">${rowsHtml || '<div class="pd-empty">No level-up moves. Click or drag a move from the left to add one.</div>'}</div>
       </div>
     </div>`;
-  filterPalette();
+  if (!runtimeForm) {
+    filterPalette();
+  }
 }
 
 function renderTMs(root) {
@@ -1465,6 +1491,7 @@ function renderTMs(root) {
     return;
   }
   const s = spByConst.get(pdSelected);
+  const runtimeForm = isRuntimeSpeciesForm(s);
   const ids = (tms.current[pdSelected] || []).slice().sort((a, b) => {
     const ma = moveById.get(a);
     const mb = moveById.get(b);
@@ -1474,22 +1501,24 @@ function renderTMs(root) {
     .map(
       id => `<div class="tm-row" data-moveid="${id}">
         <span class="tm-move">${moveLabel(moveById.get(id))}</span>
-        <button type="button" class="tm-del" data-moveid="${id}" title="Remove">✕</button>
+        ${runtimeForm ? "" : `<button type="button" class="tm-del" data-moveid="${id}" title="Remove">✕</button>`}
       </div>`,
     )
     .join("");
   main.innerHTML = `${pdHeadHtml(s)}
-    <div class="pd-cols">
+    <div class="pd-cols${runtimeForm ? " pd-runtime-form" : ""}">
       <div class="pd-col">
-        <div class="pd-col-head">All moves ${paletteControlsHtml(false)}</div>
-        <div class="pal" id="pal">${paletteHtml()}</div>
+        <div class="pd-col-head">${runtimeForm ? "Inherited from base species" : `All moves ${paletteControlsHtml(false)}`}</div>
+        ${runtimeForm ? '<div class="pd-empty">This battle form uses its base species TM pool.</div>' : `<div class="pal" id="pal">${paletteHtml()}</div>`}
       </div>
       <div class="pd-col">
         <div class="pd-col-head">TM-learnable (${ids.length})</div>
         <div class="tm-list" data-drop="tm">${listHtml || '<div class="pd-empty">No TM moves. Click or drag a move from the left to add one.</div>'}</div>
       </div>
     </div>`;
-  filterPalette();
+  if (!runtimeForm) {
+    filterPalette();
+  }
 }
 
 const ABIL_SLOT_LABEL = {
@@ -1501,14 +1530,14 @@ const ABIL_SLOT_LABEL = {
   innate2: "Innate 3",
 };
 
-function abilSlotHtml(cur, slot) {
+function abilSlotHtml(cur, slot, readOnly = false) {
   const a = abilById.get(getAbilSlot(cur, slot));
   const isInnate = slot.startsWith("innate");
   return `<div class="abil-slot${slot === "hidden" || isInnate ? " hidden-slot" : ""}">
     <label>${ABIL_SLOT_LABEL[slot]}</label>
     <div class="combo">
-      <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}" />
-      <div class="abil-drop" data-slot="${slot}"></div>
+      <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}"${readOnly ? " disabled" : ""} />
+      ${readOnly ? "" : `<div class="abil-drop" data-slot="${slot}"></div>`}
     </div>
     <div class="abil-cur">
       <div class="acur-name">${a ? esc(a.name) : "<span style='color:var(--muted)'>none</span>"}</div>
@@ -1526,8 +1555,9 @@ function renderAbilities(root) {
   }
   const s = spByConst.get(pdSelected);
   const cur = abil.current[pdSelected] || EMPTY_ABIL;
-  const abilities = ["ability1", "ability2", "hidden"].map(slot => abilSlotHtml(cur, slot)).join("");
-  const innates = ["innate0", "innate1", "innate2"].map(slot => abilSlotHtml(cur, slot)).join("");
+  const runtimeForm = isRuntimeSpeciesForm(s);
+  const abilities = ["ability1", "ability2", "hidden"].map(slot => abilSlotHtml(cur, slot, runtimeForm)).join("");
+  const innates = ["innate0", "innate1", "innate2"].map(slot => abilSlotHtml(cur, slot, runtimeForm)).join("");
   main.innerHTML = `${pdHeadHtml(s)}
     <div class="abil-group-title">Abilities</div>
     <div class="abil-slots">${abilities}</div>
@@ -5990,6 +6020,23 @@ async function init() {
       spByConst.set(form.const, form);
       spByBattleIdentity.set(battleIdentityKey(form.id, form.formIndex), form);
       registerSpeciesSearchEntry(form);
+      const base =
+        spByConst.get(form.baseConst) || spByBattleIdentity.get(battleIdentityKey(form.id, 0)) || spById.get(form.id);
+      const baseConst = base?.const;
+      learn.current[form.const] = JSON.parse(JSON.stringify(learn.current[baseConst] || []));
+      tms.current[form.const] = JSON.parse(JSON.stringify(tms.current[baseConst] || []));
+      const formAbilities =
+        form.abilities && typeof form.abilities === "object" ? form.abilities : abil.current[baseConst];
+      abil.current[form.const] = {
+        ability1: Number(formAbilities?.ability1) || 0,
+        ability2: Number(formAbilities?.ability2) || 0,
+        hidden: Number(formAbilities?.hidden) || 0,
+        innates: [
+          Number(formAbilities?.innates?.[0]) || 0,
+          Number(formAbilities?.innates?.[1]) || 0,
+          Number(formAbilities?.innates?.[2]) || 0,
+        ],
+      };
     }
     learn.baseline = JSON.parse(JSON.stringify(learn.current));
     tms.baseline = JSON.parse(JSON.stringify(tms.current));

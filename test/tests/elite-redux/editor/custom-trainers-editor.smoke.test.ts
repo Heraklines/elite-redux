@@ -64,6 +64,9 @@ interface EditorHarness {
   spBySearchKey: Map<string, unknown>;
   registerSpeciesSearchEntry(species: Record<string, unknown>): void;
   speciesDatalistOptionsHtml(species: Record<string, unknown>[]): string;
+  pokedexList(): Record<string, any>[];
+  POKEDEX_SPECIES: Record<string, any>[];
+  TRAINER_SPECIES_FORMS: Record<string, any>[];
   onCustomTrainerSpeciesPointerDown(e: { target: Element; preventDefault(): void }): boolean;
   pokemonAtlasCache: Map<string, unknown>;
   renderPokemonFrame(slug: string, el: HTMLElement, targetSize: number): void;
@@ -146,12 +149,14 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, spBySearchKey, registerSpeciesSearchEntry, speciesDatalistOptionsHtml, onCustomTrainerSpeciesPointerDown, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, spBySearchKey, registerSpeciesSearchEntry, speciesDatalistOptionsHtml, pokedexList, onCustomTrainerSpeciesPointerDown, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
       get CHALLENGE_VALUES(){ return CHALLENGE_VALUES; }, set CHALLENGE_VALUES(v){ CHALLENGE_VALUES = v; },
       get CHALLENGE_PRESETS(){ return CHALLENGE_PRESETS; }, set CHALLENGE_PRESETS(v){ CHALLENGE_PRESETS = v; },
+      get POKEDEX_SPECIES(){ return POKEDEX_SPECIES; }, set POKEDEX_SPECIES(v){ POKEDEX_SPECIES = v; },
+      get TRAINER_SPECIES_FORMS(){ return TRAINER_SPECIES_FORMS; }, set TRAINER_SPECIES_FORMS(v){ TRAINER_SPECIES_FORMS = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -183,6 +188,8 @@ beforeEach(() => {
   ct.spByConst.clear();
   ct.spById.clear();
   ct.spByBattleIdentity.clear();
+  ct.POKEDEX_SPECIES = [];
+  ct.TRAINER_SPECIES_FORMS = [];
   ct.spBySearchKey.clear();
   ct.pokemonAtlasCache.clear();
   ct.MOVE_SET.clear();
@@ -262,6 +269,59 @@ beforeEach(() => {
 });
 
 describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
+  it("includes every runtime form in the shared Pokedex search using display-name aliases", () => {
+    ct.POKEDEX_SPECIES = [{ const: "SPECIES_CALYREX", name: "Calyrex", id: 898, dex: 898 }];
+    ct.TRAINER_SPECIES_FORMS = [
+      {
+        const: "SPECIES_CALYREX__FORM_MEGA",
+        baseConst: "SPECIES_CALYREX",
+        name: "Mega Calyrex",
+        aliases: ["Calyrex Mega", "Calyrex (Mega)"],
+        id: 898,
+        dex: 898,
+        formIndex: 3,
+      },
+      {
+        const: "SPECIES_HYPNO__FORM_MEGA",
+        baseConst: "SPECIES_HYPNO",
+        name: "Mega Hypno",
+        aliases: ["Hypno Mega", "Hypno (Mega)"],
+        id: 97,
+        dex: 97,
+        formIndex: 1,
+      },
+      {
+        const: "SPECIES_ALOLA_RAICHU__FORM_MEGA_MALE",
+        baseConst: "SPECIES_ALOLA_RAICHU",
+        name: "Mega Male Raichu",
+        aliases: ["Raichu Mega Male", "Raichu (Mega Male)"],
+        id: 2026,
+        dex: 26,
+        formIndex: 1,
+      },
+      {
+        const: "SPECIES_ALOLA_RAICHU__FORM_MEGA_FEMALE",
+        baseConst: "SPECIES_ALOLA_RAICHU",
+        name: "Mega Female Raichu",
+        aliases: ["Raichu Mega Female", "Raichu (Mega Female)"],
+        id: 2026,
+        dex: 26,
+        formIndex: 2,
+      },
+    ];
+
+    const search = q("#search") as HTMLInputElement;
+    for (const [query, expected] of [
+      ["calyrex mega", "SPECIES_CALYREX__FORM_MEGA"],
+      ["hypno mega", "SPECIES_HYPNO__FORM_MEGA"],
+      ["raichu mega male", "SPECIES_ALOLA_RAICHU__FORM_MEGA_MALE"],
+      ["raichu mega female", "SPECIES_ALOLA_RAICHU__FORM_MEGA_FEMALE"],
+    ]) {
+      search.value = query;
+      expect(ct.pokedexList().map(species => species.const)).toContain(expected);
+    }
+  });
+
   it("selects, saves, and reloads an exact newcomer form while cropping its animated atlas", () => {
     addSpecies("SPECIES_JUMPLUFF", 189, "Jumpluff");
     const mega = {
