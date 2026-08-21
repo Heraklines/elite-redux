@@ -8,11 +8,13 @@
  * Button or phase helper is used as an action.
  */
 
+import { Battle } from "#app/battle";
 import Overrides from "#app/overrides";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import {
   captureOracleFrontier,
   captureOracleNextControl,
+  captureOracleRngState,
 } from "./oracle-frontier";
 import { getGameMode } from "#app/game-mode";
 import { getLevelTotalExp, GrowthRate } from "#data/exp";
@@ -189,17 +191,22 @@ function installRngTrace(): RngCollector {
   const methods = ["integerInRange", "integer", "frac", "realInRange", "pick", "shuffle", "angle", "between", "normal", "weightedPick", "sign"] as const;
   const draws: JsonValue[] = [];
   const restores: (() => void)[] = [];
+  let battleDrawInProgress = false;
   for (const method of methods) {
     const original = random[method];
     if (typeof original !== "function") {
       gap("RNG_OBSERVATION_SEAM_MISSING", `Phaser.Math.RND.${method}`, "RNG method is not callable");
     }
     random[method] = function (this: AnyRecord, ...args: unknown[]): unknown {
-      const before = stateFromString(random.state(), `${method}.before`);
+      if (battleDrawInProgress) {
+        return original.apply(this, args);
+      }
+      const before = captureOracleRngState(random.state(), `${method}.before`, gap);
       const result = original.apply(this, args);
-      const after = stateFromString(random.state(), `${method}.after`);
+      const after = captureOracleRngState(random.state(), `${method}.after`, gap);
       draws.push({
         sequence: draws.length,
+        stream: "RUN",
         public_api: method.toUpperCase(),
         arguments: jsonValue(args, `${method}.arguments`),
         result: jsonValue(result, `${method}.result`),
@@ -213,6 +220,41 @@ function installRngTrace(): RngCollector {
       random[method] = original;
     });
   }
+
+  const battlePrototype = Battle.prototype as AnyRecord;
+  const originalBattleDraw = battlePrototype.randSeedInt;
+  if (typeof originalBattleDraw !== "function") {
+    gap("RNG_OBSERVATION_SEAM_MISSING", "src/battle.ts:Battle.randSeedInt", "battle RNG method is not callable");
+  }
+  battlePrototype.randSeedInt = function (this: AnyRecord, ...args: unknown[]): unknown {
+    if (battleDrawInProgress) {
+      return originalBattleDraw.apply(this, args);
+    }
+    const before = captureOracleRngState(this.battleSeedState ?? random.state(), "battle.before", gap);
+    battleDrawInProgress = true;
+    let result: unknown;
+    try {
+      result = originalBattleDraw.apply(this, args);
+    } finally {
+      battleDrawInProgress = false;
+    }
+    const after = captureOracleRngState(this.battleSeedState ?? random.state(), "battle.after", gap);
+    draws.push({
+      sequence: draws.length,
+      stream: "BATTLE",
+      public_api: "RAND_SEED_INT",
+      arguments: jsonValue(args, "battle.arguments"),
+      result: jsonValue(result, "battle.result"),
+      consumed: before.state_string !== after.state_string,
+      before_state: before,
+      after_state: after,
+    });
+    return result;
+  };
+  restores.push(() => {
+    battlePrototype.randSeedInt = originalBattleDraw;
+  });
+
   return {
     draws,
     restore: () => {

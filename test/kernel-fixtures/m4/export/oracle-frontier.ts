@@ -49,6 +49,14 @@ function rngState(state: unknown, path: string, fail: FrontierFailure): JsonObje
   return { state_string: state, s0_bits: bits[0], s1_bits: bits[1], s2_bits: bits[2], carry };
 }
 
+export function captureOracleRngState(
+  state: unknown,
+  path: string,
+  fail: FrontierFailure,
+): JsonObject {
+  return rngState(state, path, fail);
+}
+
 function queuedPhases(game: GameManager, fail: FrontierFailure): string[] {
   const manager = game.scene.phaseManager as AnyRecord;
   if (typeof manager.getQueuedPhaseNames !== "function") {
