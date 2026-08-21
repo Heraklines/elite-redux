@@ -211,6 +211,7 @@ SHEETS: dict[str, dict[str, object]] = {
         "back": GDRIVE / rel("1LyNF5wGwu8l8daogFzHoOYdRC6hFgNxP/image_by_lennybitao_dmo3e0q.png"),
         "layout": "gender_view_pair",
         "gender_index": 1,
+        "refresh_derived_icon": True,
     },
     "lilligant_verdant": {
         "front": GDRIVE / rel("1mI_44Vv7qZZI6js4HFQDJDkNisWYaVix/verdan_lilligant___moon_priestess_by_kfweagz_dmjs9lf-fullview.png"),
@@ -385,7 +386,13 @@ def derived_icon(front: Image.Image) -> Image.Image:
     return normalize_icon(front)
 
 
-def save_species(output_root: Path, slug: str, images: dict[str, Image.Image], icon: Image.Image | None = None) -> None:
+def save_species(
+    output_root: Path,
+    slug: str,
+    images: dict[str, Image.Image],
+    icon: Image.Image | None = None,
+    refresh_derived_icon: bool = False,
+) -> None:
     directory = output_root / slug
     directory.mkdir(parents=True, exist_ok=True)
     if "front" not in images:
@@ -417,7 +424,7 @@ def save_species(output_root: Path, slug: str, images: dict[str, Image.Image], i
     icon_path = directory / "icon.png"
     if icon is not None:
         normalize_icon(icon).save(icon_path)
-    elif not icon_path.is_file():
+    elif refresh_derived_icon or not icon_path.is_file():
         derived_icon(front).save(icon_path)
 
 def load_regular(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, Image.Image], Image.Image | None]:
@@ -534,13 +541,13 @@ def main() -> None:
         if selected is not None and slug not in selected:
             continue
         images, icon = load_regular(args.library_root, spec)
-        save_species(output_root, slug, images, icon)
+        save_species(output_root, slug, images, icon, bool(spec.get("refresh_derived_icon", False)))
         print(f"imported {slug}")
     for slug, spec in SHEETS.items():
         if selected is not None and slug not in selected:
             continue
         images, icon = load_sheet(args.library_root, spec)
-        save_species(output_root, slug, images, icon)
+        save_species(output_root, slug, images, icon, bool(spec.get("refresh_derived_icon", False)))
         print(f"imported {slug}")
 
     if selected is not None and "power_plant_live_current" not in selected:

@@ -8013,3 +8013,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 
 - Player battle-info compact/expanded transitions now move pooled type tabs 4+ together with the three fixed tabs. Quadruple, sextuple, and later N-type displays therefore retain the existing paired-column overlap instead of leaving extra tabs eight pixels below the health panel.
 - `git diff --check` passes. Staging verification is pending; production remains untouched.
+
+2026-08-21 - Female Mega Alolan Raichu mini icon
+
+- Regenerated the female Mega Alolan Raichu mini icon from its corrected female front-facing source. Its importer entry now explicitly refreshes that derived icon so future source regeneration cannot retain the old male-back-derived frame.
+- Asset commit `34275e40` contains only the corrected icon. Production remains untouched.
