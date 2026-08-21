@@ -291,33 +291,19 @@ async function driveBattleTo(game: GameManager, stop: readonly string[], tape: R
 }
 
 async function driveMoveLearn(game: GameManager, tape: RawTapeEntry[], transitions: JsonValue[]): Promise<void> {
-  game.onNextPrompt("LearnMoveBatchPhase", UiMode.LEARN_MOVE_BATCH, () => undefined);
-  await game.phaseInterceptor.to("LearnMoveBatchPhase");
-  await waitForLiveCondition(
-    game,
-    () => game.scene.ui.getMode() === UiMode.LEARN_MOVE_BATCH,
-    "wave-9 move-learning UI",
-  );
-  const handler = game.scene.ui.getHandler() as AnyRecord;
-  if (handler?.state !== "pickNew") {
+  if (game.scene.phaseManager.getCurrentPhase()?.phaseName !== "LearnMoveBatchPhase") {
     gap(
       "MOVE_LEARN_CONTROL_UNOBSERVABLE",
-      "src/ui/handlers/learn-move-batch-ui-handler.ts:state",
-      `move-learning opened in state ${String(handler?.state)}`,
+      "src/phases/learn-move-batch-phase.ts:LearnMoveBatchPhase",
+      "move-learning phase is not the current stop-before boundary",
     );
   }
-  press(game, "Space", tape, transitions);
-  await waitForLiveCondition(
-    game,
-    () => (game.scene.ui.getHandler() as AnyRecord)?.state === "pickSlot",
-    "move-learning overwrite slot",
-  );
-  press(game, "Space", tape, transitions);
-  await waitForLiveCondition(
-    game,
-    () => game.scene.ui.getMode() !== UiMode.LEARN_MOVE_BATCH,
-    "move-learning assignment completion",
-  );
+  game.onNextPrompt("LearnMoveBatchPhase", UiMode.LEARN_MOVE_BATCH, () => {
+    // The prompt callback only schedules the physical browser events. The live
+    // handler owns both state transitions: offered move -> overwrite slot 0.
+    press(game, "Space", tape, transitions);
+    press(game, "Space", tape, transitions);
+  });
   await game.phaseInterceptor.to("SelectModifierPhase");
 }
 
