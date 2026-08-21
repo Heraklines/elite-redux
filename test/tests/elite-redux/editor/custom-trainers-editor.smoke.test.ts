@@ -71,6 +71,7 @@ interface EditorHarness {
   pokemonAtlasCache: Map<string, unknown>;
   renderPokemonFrame(slug: string, el: HTMLElement, targetSize: number): void;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
+  TRAINER_CLASSES: { name: string; sprite: string; genders: boolean }[];
   trainerSpriteByKey: Map<string, { key: string; spriteKey: string; label: string; genders: boolean }>;
   SHINY_EFFECTS: { palette: any[]; surface: any[]; around: any[] };
   shinyEffectById: Map<string, { id: string; label: string; accent: string; category: string }>;
@@ -155,6 +156,7 @@ beforeAll(() => {
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
       get CHALLENGE_VALUES(){ return CHALLENGE_VALUES; }, set CHALLENGE_VALUES(v){ CHALLENGE_VALUES = v; },
       get CHALLENGE_PRESETS(){ return CHALLENGE_PRESETS; }, set CHALLENGE_PRESETS(v){ CHALLENGE_PRESETS = v; },
+      get TRAINER_CLASSES(){ return TRAINER_CLASSES; }, set TRAINER_CLASSES(v){ TRAINER_CLASSES = v; },
       get POKEDEX_SPECIES(){ return POKEDEX_SPECIES; }, set POKEDEX_SPECIES(v){ POKEDEX_SPECIES = v; },
       get TRAINER_SPECIES_FORMS(){ return TRAINER_SPECIES_FORMS; }, set TRAINER_SPECIES_FORMS(v){ TRAINER_SPECIES_FORMS = v; },
       setTab(v){ activeTab = v; },
@@ -211,9 +213,14 @@ beforeEach(() => {
     ct.abilIdByNormalizedName.set(ability.name.toLowerCase(), ability.id);
   }
   // Trainer-class sprite catalog: ACE_TRAINER ships both m/f sprites; HIKER a single one.
+  ct.TRAINER_CLASSES = [
+    { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true },
+    { name: "HIKER", sprite: "hiker", genders: false },
+  ];
   ct.trainerClassByName.clear();
-  ct.trainerClassByName.set("ACE_TRAINER", { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true });
-  ct.trainerClassByName.set("HIKER", { name: "HIKER", sprite: "hiker", genders: false });
+  for (const trainerClass of ct.TRAINER_CLASSES) {
+    ct.trainerClassByName.set(trainerClass.name, trainerClass);
+  }
   ct.trainerSpriteByKey.clear();
   // Shiny Lab effect registry fixture (a couple per category).
   ct.SHINY_EFFECTS.palette.length = 0;
