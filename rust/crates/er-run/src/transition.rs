@@ -10,10 +10,9 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use er_types::SeatId;
-use er_types::battle_ids::{BattleId, MoveId, MoveSlotIndex, PokemonId, WaveIndex};
 use er_state::digest_v2::MechanicalStateDigestV2;
 use er_state::game_v2::GameStateV2;
+use er_types::SeatId;
 use er_types::battle_ids::{BattleId, MoveId, MoveSlotIndex, PokemonId, WaveIndex};
 use er_types::battle_model::BattleStats;
 use er_types::ids::OperationId;

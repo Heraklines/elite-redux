@@ -21,15 +21,15 @@ pub use authority::*;
 pub use ids::*;
 pub use input::*;
 pub use protocol::*;
-pub use run_ids::{
-    BiomeId, EncounterId, Experience, GameRunId, GrowthRateId, ModifierId, Money, NatureId,
-    RouteNodeId, RunContentPackHash, RunContentPackHashError, RunInteractionSequence, RunOfferId,
-    RunStockId, RunSurfaceId, RunTaskId, SurfaceDigest, SurfaceDigestError,
-};
 pub use run_control::{
     BiomeMarketControl, BiomeSelectControl, CrossroadsControl, GameControl, GameControlPlan,
     GameControlPlanError, MoveLearnControl, PresentationBarrier, RewardShopControl,
     SeatControlPlan, SurfaceControl,
+};
+pub use run_ids::{
+    BiomeId, EncounterId, Experience, GameRunId, GrowthRateId, ModifierId, Money, NatureId,
+    RouteNodeId, RunContentPackHash, RunContentPackHashError, RunInteractionSequence, RunOfferId,
+    RunStockId, RunSurfaceId, RunTaskId, SurfaceDigest, SurfaceDigestError,
 };
 pub use run_model::{
     BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
@@ -48,7 +48,8 @@ mod tests {
     use crate::SafeU53;
 
     #[test]
-    fn m1_contract_modules_are_linked() {
-        assert!(SafeU53::new(1).is_ok());
+    fn safe_integer_boundary_is_exclusive() {
+        assert!(SafeU53::new(9_007_199_254_740_991).is_ok());
+        assert!(SafeU53::new(9_007_199_254_740_992).is_err());
     }
 }
