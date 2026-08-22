@@ -645,7 +645,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             .enabled
     );
 
-    let buy = "market/1/200";
+    let buy = "market/1/1";
     let leave = "market/leave";
     let menu = menu_for_surface(
         owner,
@@ -660,7 +660,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         header,
         stock: vec![MarketStockEntry {
             stock_id: RunStockId::new(safe(1)),
-            modifier_id: ModifierId::new(safe(200)),
+            modifier_id: ModifierId::new(safe(1)),
             tier: ModifierTier::Common,
             price: Money::new(safe(50)),
             initial_quantity: 1,
@@ -675,6 +675,9 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         menu,
     ));
     let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    let market_before = kernel
+        .run_frontier_digest()
+        .map_err(std::io::Error::other)?;
     press_physical(&mut kernel, owner, PhysicalKey::Space)?;
     assert_eq!(
         kernel.take_run_actions(),
@@ -683,6 +686,30 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             target: None,
             price: Money::new(safe(50))
         })]
+    );
+    assert_ne!(
+        kernel
+            .run_frontier_digest()
+            .map_err(std::io::Error::other)?,
+        market_before
+    );
+    let market_plan = kernel
+        .run_control_plan()
+        .ok_or("retained market control was not installed")?;
+    let er_types::run_control::GameControl::Surface(
+        er_types::run_control::SurfaceControl::BiomeMarket(market_control),
+    ) = &market_plan.seats[0].control
+    else {
+        return Err("market action did not retain its surface".into());
+    };
+    assert!(
+        !market_control
+            .menu
+            .options
+            .iter()
+            .find(|option| option.option_id.as_str() == buy)
+            .ok_or("purchased market option disappeared")?
+            .enabled
     );
 
     let stay = "crossroads/stay";

@@ -1,7 +1,7 @@
 //! Authority preparation for retained M4 run-surface actions.
 
 use er_run::modifier::{ModifierApplication, apply_modifier};
-use er_run::reward::pay_for_offer;
+use er_run::reward::{MarketStockView, buy_stock, pay_for_offer};
 use er_run::run_material::{
     AuthorityRunMaterial, RUN_INTERACTION_MATERIAL_VERSION, RUN_MATERIAL_M3_PARITY_ORACLE_SHA,
     RunInteractionMaterialV1, RunMaterialHeader,
@@ -17,11 +17,13 @@ use er_state::surface_digest::compute_surface_digest_v1;
 use er_types::SafeU53;
 use er_types::battle_ids::MenuInstanceId;
 use er_types::run_control::{
-    BiomeSelectControl, GameControl, GameControlPlan, RewardShopControl, SeatControlPlan,
-    SurfaceControl,
+    BiomeMarketControl, BiomeSelectControl, GameControl, GameControlPlan, RewardShopControl,
+    SeatControlPlan, SurfaceControl,
 };
 use er_types::run_ids::{RouteNodeId, RunSurfaceId, SurfaceDigest};
-use er_types::run_model::{CrossroadsAction, RewardAction, RunSurfaceAction, RunSurfaceKind};
+use er_types::run_model::{
+    BiomeMarketAction, CrossroadsAction, RewardAction, RunSurfaceAction, RunSurfaceKind,
+};
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{LogicalMenu, LogicalMenuOption, MenuNavigationEdge, NavigationDirection};
 use er_types::{MenuOptionId, OperationId};
@@ -39,6 +41,8 @@ pub enum RunTransitionPreparationError {
     MissingRoutes,
     #[error("selected reward offer or modifier is absent")]
     MissingReward,
+    #[error("selected market stock or modifier is absent")]
+    MissingMarket,
     #[error("selected modifier application is unsupported at this surface")]
     UnsupportedModifier,
     #[error("run transition allocator overflowed")]
@@ -56,6 +60,7 @@ pub fn can_prepare_action(action: &RunSurfaceAction) -> bool {
         action,
         RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn)
             | RunSurfaceAction::Reward(RewardAction::SelectFree { .. })
+            | RunSurfaceAction::BiomeMarket(BiomeMarketAction::Buy { .. })
     )
 }
 
@@ -472,6 +477,228 @@ pub fn prepare_reward_transition(
                 modifier_id: selected.modifier_id,
                 target: *target,
             }],
+            rng_audit: Vec::new(),
+            surface_after_digest: Some(surface_digest),
+        },
+    ))
+}
+
+pub fn prepare_market_transition(
+    before: &GameStateV2,
+    content: &GameContentBundle,
+    action: &RunSurfaceAction,
+    current_control: &GameControlPlan,
+) -> Result<AuthorityRunMaterial, RunTransitionPreparationError> {
+    let RunSurfaceAction::BiomeMarket(BiomeMarketAction::Buy {
+        stock,
+        target,
+        price,
+    }) = action
+    else {
+        return Err(RunTransitionPreparationError::UnsupportedAction);
+    };
+    let Some(RunSurfaceState::BiomeMarket(market)) = before.run.active_surface.as_ref() else {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    };
+    if current_control.owner_seat() != market.header.owner_seat {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    }
+    let selected = market
+        .stock
+        .iter()
+        .find(|entry| entry.stock_id == *stock)
+        .ok_or(RunTransitionPreparationError::MissingMarket)?;
+    let (money_after, updated_stock) = buy_stock(
+        before.run.money,
+        &[MarketStockView {
+            stock_id: selected.stock_id,
+            modifier_id: selected.modifier_id,
+            price: selected.price,
+            initial_quantity: selected.initial_quantity,
+            remaining_quantity: selected.remaining_quantity,
+            sold: selected.sold,
+        }],
+        *stock,
+        *price,
+    )
+    .map_err(|_| RunTransitionPreparationError::MissingMarket)?;
+    let modifier_index = usize::try_from(selected.modifier_id.get().get())
+        .map_err(|_| RunTransitionPreparationError::MissingMarket)?;
+    let modifier = content
+        .run
+        .modifiers
+        .get(modifier_index)
+        .and_then(Option::as_ref)
+        .ok_or(RunTransitionPreparationError::MissingMarket)?;
+    let application = apply_modifier(modifier, *target, None, 0)
+        .map_err(|_| RunTransitionPreparationError::UnsupportedModifier)?;
+    if application != ModifierApplication::Persistent {
+        return Err(RunTransitionPreparationError::UnsupportedModifier);
+    }
+
+    let menu_instance = current_control.next_menu_instance_id;
+    let next_menu_value = menu_instance
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    let next_menu_instance = MenuInstanceId::new(
+        SafeU53::new(next_menu_value)
+            .map_err(|_| RunTransitionPreparationError::AllocatorOverflow)?,
+    );
+    let control_id = current_control.next_control_id.clone();
+    let selected_option = format!("market/{}/{}", selected.stock_id, selected.modifier_id);
+
+    let mut after = before.clone();
+    after.run.money = money_after;
+    let Some(RunSurfaceState::BiomeMarket(after_market)) = after.run.active_surface.as_mut() else {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    };
+    let after_stock = after_market
+        .stock
+        .iter_mut()
+        .find(|entry| entry.stock_id == *stock)
+        .ok_or(RunTransitionPreparationError::MissingMarket)?;
+    after_stock.remaining_quantity = updated_stock.remaining_quantity;
+    after_stock.sold = updated_stock.sold;
+    after_market.header.action_ordinal = after_market
+        .header
+        .action_ordinal
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    after_market.header.menu.instance_id = menu_instance;
+    after_market.header.menu.control_id = control_id.clone();
+    if updated_stock.sold {
+        let option = after_market
+            .header
+            .menu
+            .options
+            .iter_mut()
+            .find(|option| option.option_id.as_str() == selected_option)
+            .ok_or(RunTransitionPreparationError::MissingMarket)?;
+        option.enabled = false;
+    }
+    if let Some(existing) = after
+        .run
+        .modifiers
+        .iter_mut()
+        .find(|entry| entry.modifier_id == selected.modifier_id)
+    {
+        existing.stacks = existing
+            .stacks
+            .checked_add(1)
+            .filter(|stacks| *stacks <= modifier.maximum_stack)
+            .ok_or(RunTransitionPreparationError::UnsupportedModifier)?;
+    } else {
+        after.run.modifiers.push(RunModifierInstance {
+            modifier_id: selected.modifier_id,
+            stacks: 1,
+        });
+        after
+            .run
+            .modifiers
+            .sort_unstable_by_key(|entry| entry.modifier_id);
+    }
+
+    let surface_snapshot = after
+        .run
+        .active_surface
+        .as_ref()
+        .cloned()
+        .ok_or(RunTransitionPreparationError::WrongSurface)?;
+    let surface_digest = compute_surface_digest_v1(&surface_snapshot)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    after
+        .run
+        .active_surface
+        .as_mut()
+        .expect("surface retained")
+        .header_mut()
+        .surface_digest = surface_digest.clone();
+    after
+        .validate()
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+    let after_menu = after
+        .run
+        .active_surface
+        .as_ref()
+        .expect("surface retained")
+        .header()
+        .menu
+        .clone();
+    let surface_control = SurfaceControl::BiomeMarket(BiomeMarketControl::new(
+        market.header.surface_id,
+        market.header.interaction_sequence,
+        after_menu,
+    ));
+    let seats = current_control
+        .seats
+        .iter()
+        .map(|seat| SeatControlPlan {
+            seat: seat.seat,
+            owner: seat.owner,
+            control_id: control_id.clone(),
+            menu_instance_id: menu_instance,
+            actionable_after: seat.actionable_after,
+            control: GameControl::Surface(surface_control.clone()),
+        })
+        .collect();
+    let next_control =
+        GameControlPlan::new(seats, format!("{control_id}/next"), next_menu_instance)
+            .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let before_digest = MechanicalStateDigestV2::compute(before)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    let after_digest = MechanicalStateDigestV2::compute(&after)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+
+    Ok(AuthorityRunMaterial::Interaction(
+        RunInteractionMaterialV1 {
+            schema_version: RUN_INTERACTION_MATERIAL_VERSION,
+            header: RunMaterialHeader {
+                m4_oracle_sha: content.run.m4_oracle_sha.clone(),
+                m3_parity_oracle_sha: RUN_MATERIAL_M3_PARITY_ORACLE_SHA.to_owned(),
+                battle_content_hash: before.battle_content_hash.clone(),
+                run_content_hash: before.run_content_hash.clone(),
+                operation_id: market.header.operation_id.clone(),
+                run_id: before.run.run_id,
+                wave: before.run.wave,
+                before_digest,
+                after_digest,
+                before_state: before.clone(),
+                after_state: after,
+                next_control,
+            },
+            surface_kind: RunSurfaceKind::BiomeMarket,
+            surface_id: market.header.surface_id,
+            owner_seat: market.header.owner_seat,
+            interaction_sequence: market.header.interaction_sequence,
+            action_ordinal: market.header.action_ordinal,
+            action: action.clone(),
+            mutations: vec![
+                RunMutation::MoneyChanged {
+                    before: before.run.money,
+                    after: money_after,
+                },
+                RunMutation::StockPurchased {
+                    stock: *stock,
+                    remaining_quantity: updated_stock.remaining_quantity,
+                },
+                RunMutation::ModifierApplied {
+                    modifier_id: selected.modifier_id,
+                    stacks: 1,
+                    target: *target,
+                },
+            ],
+            presentation: vec![
+                RunPresentationEvent::MoneyChanged {
+                    before: before.run.money,
+                    after: money_after,
+                },
+                RunPresentationEvent::ModifierAcquired {
+                    modifier_id: selected.modifier_id,
+                    target: *target,
+                },
+            ],
             rng_audit: Vec::new(),
             surface_after_digest: Some(surface_digest),
         },
