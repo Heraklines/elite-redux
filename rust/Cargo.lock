@@ -285,7 +285,9 @@ dependencies = [
  "er-rng",
  "er-state",
  "er-types",
+ "serde",
  "serde_json",
+ "thiserror",
  "wasm-bindgen",
  "wasm-bindgen-test",
 ]
