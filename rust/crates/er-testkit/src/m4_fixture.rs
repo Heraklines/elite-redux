@@ -12,9 +12,7 @@ use thiserror::Error;
 
 use er_content::species::SpeciesBaseStats;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
-use er_state::battle_v2::{
-    BattleParticipationState, BattleSettlementState, BattleStateV2,
-};
+use er_state::battle_v2::{BattleParticipationState, BattleSettlementState, BattleStateV2};
 use er_state::game_v2::GameStateV2;
 use er_state::pokemon_v2::{
     Iv, PokemonProgressionState, PokemonStateV2,
@@ -24,8 +22,8 @@ use er_state::run_v2::{
 };
 use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{
-    AbilityId, BattleId, BattleSide, ContentPackHash, GameModeId, MoveId, PartyIndex,
-    PokemonId, SpeciesId, WaveIndex,
+    AbilityId, BattleId, BattleSide, ContentPackHash, GameModeId, MoveId, PartyIndex, PokemonId,
+    SpeciesId, WaveIndex,
 };
 use er_types::battle_model::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonTyping, PokemonType, StatStages,
@@ -58,11 +56,7 @@ pub enum M4FixtureError {
 }
 
 fn field<'a>(value: &'a Value, name: &str) -> Result<&'a Value, M4FixtureError> {
-    value
-        .get(name)
-        .ok_or_else(|| M4FixtureError::MissingField {
-            field: name.to_owned(),
-        })
+    value.get(name).ok_or_else(|| M4FixtureError::MissingField { field: name.to_owned() })
 }
 
 fn u32_field(value: &Value, name: &str) -> Result<u32, M4FixtureError> {
@@ -106,8 +100,7 @@ pub fn convert_pokemon(
     pokemon_id: PokemonId,
     owner_seat: Option<SeatId>,
 ) -> Result<PokemonStateV2, M4FixtureError> {
-    let species_value =
-        u32_field(ts, "species")? as u64;
+    let species_value = u32_field(ts, "species")? as u64;
     let _species_id = SpeciesId::new(SafeU53::new(species_value).map_err(|_| {
         M4FixtureError::UnsupportedSpecies { species: species_value }
     })?);
@@ -115,11 +108,8 @@ pub fn convert_pokemon(
     let level = u16_field(ts, "level")?;
     let hp = u32_field(ts, "hp")?;
 
-    let stats_array = field(ts, "stats")?
-        .as_array()
-        .ok_or_else(|| M4FixtureError::MissingField {
-            field: "stats".to_owned(),
-        })?;
+    let stats_array =
+        field(ts, "stats")?.as_array().ok_or_else(|| M4FixtureError::MissingField { field: "stats".to_owned() })?;
     let stat_values: Vec<u32> = stats_array
         .iter()
         .filter_map(|v| v.as_u64().map(|v| v as u32))
@@ -146,11 +136,8 @@ pub fn convert_pokemon(
         })?;
     let mut ivs = [Iv::new(0).expect("zero iv"); 6];
     for (i, v) in ivs_array.iter().enumerate().take(6) {
-        ivs[i] = Iv::new(v.as_u64().unwrap_or(0) as u8).map_err(|_| {
-            M4FixtureError::MissingField {
-                field: format!("ivs[{i}]"),
-            }
-        })?;
+        ivs[i] = Iv::new(v.as_u64().unwrap_or(0) as u8)
+            .map_err(|_| M4FixtureError::MissingField { field: format!("ivs[{i}]") })?;
     }
 
     let nature_value = u32_field(ts, "nature")? as u8;
