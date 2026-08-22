@@ -37,7 +37,7 @@ pub enum RunRuntimeError {
 ///
 /// Material application replaces the whole state atomically on success and
 /// leaves `self` untouched on any failure (`m4-atomic-transition.md`).
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RunRuntime {
     state: GameStateV2,
     battle_content_hash: ContentPackHash,
