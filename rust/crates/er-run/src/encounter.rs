@@ -8,8 +8,8 @@
 use er_types::battle_ids::{BattleId, WaveIndex};
 use er_types::run_ids::{EncounterId, GameRunId};
 
+use crate::capability::EnemyPolicy;
 use crate::content::{EncounterGenerationMode, EncounterPlanDefinition, EncounterPlanSource};
-    use crate::capability::EnemyPolicy;
 use crate::encounter_plan::{CapturedPlanEvidence, EncounterPlan};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
