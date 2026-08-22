@@ -379,26 +379,22 @@ impl GameKernel {
     /// Applies one canonical run-material payload through the single shared
     /// production applier. Canonical bytes in, atomic state swap out; both
     /// authority and replica use exactly this entry point.
-    pub fn apply_run_material_bytes(
-        &mut self,
-        bytes: &[u8],
-    ) -> Result<(), KernelError> {
+    pub fn apply_run_material_bytes(&mut self, bytes: &[u8]) -> Result<(), KernelError> {
         if self.disposed {
             return Err(KernelError::Disposed);
         }
-        let runtime = self
-            .run
-            .as_mut()
-            .ok_or_else(|| KernelError::Canonical {
-                reason: "run mode is not active".to_owned(),
-            })?;
-        let material = er_run::decode_run_material(bytes)
-            .map_err(|error| KernelError::Canonical {
+        let runtime = self.run.as_mut().ok_or_else(|| KernelError::Canonical {
+            reason: "run mode is not active".to_owned(),
+        })?;
+        let material =
+            er_run::decode_run_material(bytes).map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
-        runtime.apply(&material).map_err(|error| KernelError::Canonical {
-            reason: error.to_string(),
-        })
+        runtime
+            .apply(&material)
+            .map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
