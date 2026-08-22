@@ -2,6 +2,14 @@ name: Community Suggestions Check
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - "community-editor/**"
+      - "editor/**"
+      - "workers/er-save-api/src/community-suggestions.ts"
+      - "workers/er-save-api/src/index.ts"
+      - "test/tests/elite-redux/community-editor/**"
+      - ".github/workflows/community-suggestions-check.yml"
   pull_request:
     paths:
       - "community-editor/**"
