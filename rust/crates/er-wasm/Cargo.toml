@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
 er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
@@ -21,7 +22,6 @@ er-protocol = { path = "../er-protocol" }
 er-rng = { path = "../er-rng" }
 er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
-serde_json.workspace = true
 wasm-bindgen.workspace = true
 
 [dev-dependencies]
