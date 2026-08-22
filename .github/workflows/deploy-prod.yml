@@ -191,6 +191,9 @@ jobs:
 
       # The production browser depends on the save/ghost routes from this exact
       # checkout. Publish the backward-compatible Worker before the browser.
+      - name: Refresh community suggestion achievement catalog
+        run: node scripts/elite-redux/build-community-suggestion-achievements.mjs
+
       - name: Deploy cloud-save API (production)
         uses: cloudflare/wrangler-action@v3
         with:

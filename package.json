@@ -67,6 +67,7 @@
     "er:audit-flag-mapping": "node scripts/elite-redux/audit-flag-mapping.mjs",
     "er:audit-archetype-coverage": "node scripts/elite-redux/audit-archetype-coverage.mjs",
     "er:verify-assets": "node scripts/elite-redux/verify-assets.mjs",
+    "er:community-achievements": "node scripts/elite-redux/build-community-suggestion-achievements.mjs",
     "er:test": "vitest run test/data/elite-redux",
     "er:scenario": "node scripts/run-scenario.mjs",
     "coop:gate": "node scripts/run-coop-gate.mjs"

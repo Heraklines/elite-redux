@@ -244,6 +244,30 @@ CREATE TABLE IF NOT EXISTS community_challenge_bookmarks (
 );
 CREATE INDEX IF NOT EXISTS idx_ccb_user ON community_challenge_bookmarks (user_id, created_at DESC);
 
+-- Community editor proposals. Proposal contents remain private to the author and
+-- authenticated staff; public surfaces expose only anonymized per-entity counts.
+CREATE TABLE IF NOT EXISTS community_editor_suggestions (
+  id              TEXT    PRIMARY KEY,
+  user_id         INTEGER NOT NULL,
+  entity_type     TEXT    NOT NULL,
+  entity_key      TEXT    NOT NULL,
+  entity_label    TEXT    NOT NULL,
+  changes_json    TEXT    NOT NULL,
+  baseline_json   TEXT    NOT NULL,
+  reason          TEXT    NOT NULL DEFAULT '',
+  source_revision TEXT    NOT NULL DEFAULT '',
+  status          TEXT    NOT NULL DEFAULT 'open',
+  reviewer_note   TEXT    NOT NULL DEFAULT '',
+  reviewed_at     INTEGER,
+  applied_at      INTEGER,
+  created_at      INTEGER NOT NULL,
+  updated_at      INTEGER NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_ces_status ON community_editor_suggestions (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ces_entity ON community_editor_suggestions (entity_type, entity_key, status);
+CREATE INDEX IF NOT EXISTS idx_ces_user ON community_editor_suggestions (user_id, created_at DESC);
+
 -- Showdown 1v1 stake escrow (Task D1). The server records match outcomes via dual
 -- attestation and emits per-uid settlement MUTATION records; saves are opaque so
 -- honest clients fetch (/showdown/pending) + apply + ack. All three tables are

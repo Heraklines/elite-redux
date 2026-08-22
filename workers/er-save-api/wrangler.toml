@@ -42,6 +42,7 @@ PUBLISH_USAGE_TIERS = "1"
 USAGE_TIER_SOURCE = "prod"
 USAGE_TIER_MIN_PLAYERS = "500"
 USAGE_TIER_MIN_RUNS = "5000"
+EDITOR_API_URL = "https://er-editor-api.heraklines.workers.dev"
 
 # ER (#384): nightly usage-tier aggregation - ONE invocation per day.
 [triggers]

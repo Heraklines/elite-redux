@@ -335,7 +335,9 @@ function dirtyCounts() {
 }
 
 function refreshChrome() {
-  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, ctrN, total } = dirtyCounts();
+  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, ctrN, total: localTotal } = dirtyCounts();
+  const stagedTotal = window.communitySuggestions?.stagedCount?.() || 0;
+  const total = localTotal + stagedTotal;
   saveBtn.textContent = `Save ${total} change${total === 1 ? "" : "s"}`;
   saveBtn.disabled = total === 0;
   const dots = {
@@ -350,6 +352,9 @@ function refreshChrome() {
     abilities: abN,
   };
   document.querySelectorAll("nav.tabs button").forEach(b => {
+    if (b.dataset.tab === "suggestions") {
+      return;
+    }
     const n = dots[b.dataset.tab];
     const label = b.textContent.replace(/\s*●$/, "");
     b.innerHTML = n > 0 ? `${esc(label)}<span class="dot">●</span>` : esc(label);
@@ -4745,6 +4750,8 @@ function render() {
     renderAssets(root);
   } else if (activeTab === "tournaments") {
     renderTournaments(root);
+  } else if (activeTab === "suggestions") {
+    window.communitySuggestions?.render?.(root);
   } else {
     renderGame(root);
   }
@@ -5660,6 +5667,7 @@ async function commit({ deploy }) {
     return;
   }
   const { deltas, bad } = buildDeltas();
+  window.communitySuggestions?.mergeStagedDeltas?.(deltas);
   if (bad.length > 0) {
     setStatus(`Fix ${bad.length} issue(s): ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? "…" : ""}`, ERR);
     return;
@@ -5727,6 +5735,9 @@ async function commit({ deploy }) {
       } else {
         markSaved(file);
       }
+    }
+    if (ctrConflicts.length === 0) {
+      await window.communitySuggestions?.markStagedApplied?.(password);
     }
     render();
     if (ctrConflicts.length > 0) {

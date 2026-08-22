@@ -384,6 +384,9 @@ jobs:
       # Do not mutate either live surface until every fallible build/verification step is green. The Worker
       # goes first so a newly published browser never calls an older save contract. Promotions are queued
       # above, so a run that reaches this point cannot strand the two halves between protocol versions.
+      - name: Refresh community suggestion achievement catalog
+        run: node scripts/elite-redux/build-community-suggestion-achievements.mjs
+
       - name: Deploy cloud-save API (staging)
         uses: cloudflare/wrangler-action@v3
         with:

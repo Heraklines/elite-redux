@@ -31,6 +31,7 @@ PUBLISH_USAGE_TIERS = "0"
 USAGE_TIER_SOURCE = "staging"
 USAGE_TIER_MIN_PLAYERS = "500"
 USAGE_TIER_MIN_RUNS = "5000"
+EDITOR_API_URL = "https://er-editor-api.heraklines.workers.dev"
 
 # Cron may be present for parity, but PUBLISH_USAGE_TIERS=0 + USAGE_TIER_SOURCE=staging
 # makes staging read-only for the shared er-assets usage-tiers.json feed.

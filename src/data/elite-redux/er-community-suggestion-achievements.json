@@ -1,0 +1,663 @@
+{
+  "schemaVersion": 1,
+  "totalPoints": 11930,
+  "requiredPoints": 5965,
+  "achievements": [
+    {
+      "id": "ABSOLUTE_ZERO",
+      "points": 130
+    },
+    {
+      "id": "ALL_IN",
+      "points": 75
+    },
+    {
+      "id": "ALL_SHINY_TIERS",
+      "points": 75
+    },
+    {
+      "id": "APEX_PREDATOR",
+      "points": 75
+    },
+    {
+      "id": "ARE_YOU_NOT_ENTERTAINED",
+      "points": 120
+    },
+    {
+      "id": "AUTO_COUNTER",
+      "points": 50
+    },
+    {
+      "id": "BACK_IN_BLOOD",
+      "points": 50
+    },
+    {
+      "id": "BEAM_SPAM",
+      "points": 50
+    },
+    {
+      "id": "BELIEVE_IT",
+      "points": 50
+    },
+    {
+      "id": "BETTER_TOGETHER",
+      "points": 25
+    },
+    {
+      "id": "BIOME_TOURIST",
+      "points": 75
+    },
+    {
+      "id": "BLACK_FRIDAY",
+      "points": 75
+    },
+    {
+      "id": "BUDGET_CHAMPION",
+      "points": 50
+    },
+    {
+      "id": "CAP_SPACE",
+      "points": 75
+    },
+    {
+      "id": "CCC_COMBO",
+      "points": 50
+    },
+    {
+      "id": "CENTER_STAGE",
+      "points": 50
+    },
+    {
+      "id": "CENTURY_OF_TROUBLE",
+      "points": 100
+    },
+    {
+      "id": "CHAIN_REACTION",
+      "points": 50
+    },
+    {
+      "id": "CHAMPION_MATERIAL",
+      "points": 150
+    },
+    {
+      "id": "CHARGE_IT_TO_THE_GAME",
+      "points": 50
+    },
+    {
+      "id": "CHECKMATE_IN_ONE",
+      "points": 100
+    },
+    {
+      "id": "CO_OP_INITIATE",
+      "points": 25
+    },
+    {
+      "id": "COCYTUS",
+      "points": 175
+    },
+    {
+      "id": "COMPLEAT_NIGHTMARE",
+      "points": 25
+    },
+    {
+      "id": "CRIT_MATTERED",
+      "points": 50
+    },
+    {
+      "id": "CROSS_VERSION_COMPATIBILITY",
+      "points": 75
+    },
+    {
+      "id": "DAVID_AND_GOLIATH",
+      "points": 75
+    },
+    {
+      "id": "DAVID_WAS_RANKED",
+      "points": 75
+    },
+    {
+      "id": "DEAD_CHANNEL",
+      "points": 100
+    },
+    {
+      "id": "DEAD_RINGER",
+      "points": 75
+    },
+    {
+      "id": "DELVE_TOO_DEEP",
+      "points": 100
+    },
+    {
+      "id": "DEVILS_BARGAIN",
+      "points": 50
+    },
+    {
+      "id": "DOUBLE_OR_NOTHING",
+      "points": 100
+    },
+    {
+      "id": "DREAMCATCHER",
+      "points": 50
+    },
+    {
+      "id": "DUELIST",
+      "points": 50
+    },
+    {
+      "id": "DYNAMIC_DUO",
+      "points": 100
+    },
+    {
+      "id": "END_THE_LEGEND",
+      "points": 50
+    },
+    {
+      "id": "ENDLESS_NIGHT",
+      "points": 130
+    },
+    {
+      "id": "EVERYONE_GET_OUT",
+      "points": 50
+    },
+    {
+      "id": "EVICTION_NOTICE",
+      "points": 75
+    },
+    {
+      "id": "EXORCIST",
+      "points": 75
+    },
+    {
+      "id": "FASHIONISTA",
+      "points": 25
+    },
+    {
+      "id": "FINAL_ANSWER",
+      "points": 50
+    },
+    {
+      "id": "FIRST_BLOOD",
+      "points": 25
+    },
+    {
+      "id": "FIVE_ALARM_STREAK",
+      "points": 75
+    },
+    {
+      "id": "FLAWLESS_DUEL",
+      "points": 75
+    },
+    {
+      "id": "FORM_VOLTRON",
+      "points": 50
+    },
+    {
+      "id": "FORMATION_BREAKER",
+      "points": 75
+    },
+    {
+      "id": "FOUR_MACHINES_ONE_DREAM",
+      "points": 50
+    },
+    {
+      "id": "FULL_ON_MEGA_POWER",
+      "points": 75
+    },
+    {
+      "id": "FUSION_DANCE",
+      "points": 50
+    },
+    {
+      "id": "GEAR_5",
+      "points": 50
+    },
+    {
+      "id": "GENERATION_GAP",
+      "points": 100
+    },
+    {
+      "id": "GENEROUS_SOUL",
+      "points": 25
+    },
+    {
+      "id": "GHOST_TRIAD",
+      "points": 75
+    },
+    {
+      "id": "GIUDECCA",
+      "points": 160
+    },
+    {
+      "id": "GLASS_CANNON",
+      "points": 100
+    },
+    {
+      "id": "GOLDEN_TICKET",
+      "points": 50
+    },
+    {
+      "id": "GOOD_CHIP",
+      "points": 50
+    },
+    {
+      "id": "GOOD_SPORT",
+      "points": 25
+    },
+    {
+      "id": "GREAT_EXPECTATIONS",
+      "points": 50
+    },
+    {
+      "id": "GROUNDHOG_WEEK",
+      "points": 100
+    },
+    {
+      "id": "GUARDIAN_ANGEL",
+      "points": 50
+    },
+    {
+      "id": "HEEDING_THE_WARNING",
+      "points": 50
+    },
+    {
+      "id": "HELL_AND_BACK",
+      "points": 100
+    },
+    {
+      "id": "HELL_HOUSE",
+      "points": 100
+    },
+    {
+      "id": "HELL_IS_OTHER_PEOPLE",
+      "points": 100
+    },
+    {
+      "id": "HIGH_ROLLER",
+      "points": 50
+    },
+    {
+      "id": "HOLD_IT",
+      "points": 50
+    },
+    {
+      "id": "HOLD_THE_LINE",
+      "points": 50
+    },
+    {
+      "id": "HOLLOW_WICKER_BASKET",
+      "points": 50
+    },
+    {
+      "id": "HOUSE_MONEY",
+      "points": 100
+    },
+    {
+      "id": "HOUSE_OF_MIRRORS",
+      "points": 100
+    },
+    {
+      "id": "I_JUST_GOT_HERE",
+      "points": 50
+    },
+    {
+      "id": "IDENTITY_THEFT",
+      "points": 75
+    },
+    {
+      "id": "IMMORTAL_OBJECT",
+      "points": 50
+    },
+    {
+      "id": "INCOMPATIBLE_HARDWARE",
+      "points": 25
+    },
+    {
+      "id": "INFERNO",
+      "points": 150
+    },
+    {
+      "id": "JURASSIC_END",
+      "points": 50
+    },
+    {
+      "id": "JUST_SAY_NO",
+      "points": 50
+    },
+    {
+      "id": "LAB_RAT",
+      "points": 50
+    },
+    {
+      "id": "LAST_MON_STANDING",
+      "points": 75
+    },
+    {
+      "id": "LAST_STAND",
+      "points": 110
+    },
+    {
+      "id": "LEFT_RIGHT_GOODNIGHT",
+      "points": 50
+    },
+    {
+      "id": "LEGENDARY_DUELIST",
+      "points": 100
+    },
+    {
+      "id": "LIFELINE_SUBSCRIPTION",
+      "points": 75
+    },
+    {
+      "id": "LIMBO",
+      "points": 100
+    },
+    {
+      "id": "LONG_HAUL_DUO",
+      "points": 75
+    },
+    {
+      "id": "LOOK_COLLECTOR_10",
+      "points": 25
+    },
+    {
+      "id": "LOOK_COLLECTOR_100",
+      "points": 100
+    },
+    {
+      "id": "LOOK_COLLECTOR_25",
+      "points": 50
+    },
+    {
+      "id": "LOOK_COLLECTOR_50",
+      "points": 75
+    },
+    {
+      "id": "MASTER_OF_ALL",
+      "points": 150
+    },
+    {
+      "id": "MASTER_PLAN",
+      "points": 110
+    },
+    {
+      "id": "MEGAFLARE",
+      "points": 50
+    },
+    {
+      "id": "META_BREAKER",
+      "points": 100
+    },
+    {
+      "id": "METAL_SLIME",
+      "points": 50
+    },
+    {
+      "id": "MONO_GEN_REDUX_VICTORY",
+      "points": 75
+    },
+    {
+      "id": "MONOCHROME_REQUIEM",
+      "points": 110
+    },
+    {
+      "id": "MUSEUM_QUALITY",
+      "points": 75
+    },
+    {
+      "id": "MUTUALLY_ASSURED_DESTRUCTION",
+      "points": 50
+    },
+    {
+      "id": "NAME_RECOGNITION",
+      "points": 75
+    },
+    {
+      "id": "NATURAL_SELECTION_BIAS",
+      "points": 75
+    },
+    {
+      "id": "NO_I_IN_TEAM",
+      "points": 50
+    },
+    {
+      "id": "NO_SELL",
+      "points": 75
+    },
+    {
+      "id": "NUMBER_GO_UP",
+      "points": 50
+    },
+    {
+      "id": "ONE_HP_AND_A_DREAM",
+      "points": 100
+    },
+    {
+      "id": "ONE_TURN_CLEAR",
+      "points": 75
+    },
+    {
+      "id": "OPPOSITION_RESEARCH",
+      "points": 100
+    },
+    {
+      "id": "ORIGINAL_DRAGON_SPIRIT",
+      "points": 50
+    },
+    {
+      "id": "PARALLEL_PLAY",
+      "points": 75
+    },
+    {
+      "id": "PARTNERS_IN_CRIME",
+      "points": 50
+    },
+    {
+      "id": "PERMADEATH",
+      "points": 125
+    },
+    {
+      "id": "PHANTOM_FORMATION",
+      "points": 120
+    },
+    {
+      "id": "PK_STARSTORM",
+      "points": 25
+    },
+    {
+      "id": "POKE_HIM_ON",
+      "points": 25
+    },
+    {
+      "id": "PRESET_CURATOR",
+      "points": 50
+    },
+    {
+      "id": "PRESET_JET_SET",
+      "points": 75
+    },
+    {
+      "id": "PRIMAL_CASCOON",
+      "points": 100
+    },
+    {
+      "id": "PRODIGAL_MON",
+      "points": 75
+    },
+    {
+      "id": "PURE_VANILLA",
+      "points": 75
+    },
+    {
+      "id": "PURGATORY",
+      "points": 125
+    },
+    {
+      "id": "RAGS_TO_RICHES",
+      "points": 75
+    },
+    {
+      "id": "RANKED_AND_FILED",
+      "points": 25
+    },
+    {
+      "id": "RAW_TALENT",
+      "points": 50
+    },
+    {
+      "id": "READ_THE_FINE_PRINT",
+      "points": 75
+    },
+    {
+      "id": "REALISTIC_FLASH_IS_BORING",
+      "points": 50
+    },
+    {
+      "id": "RELIC_HUNTER",
+      "points": 50
+    },
+    {
+      "id": "SCORCHED_EARTH",
+      "points": 130
+    },
+    {
+      "id": "SETUP_PAYOFF",
+      "points": 50
+    },
+    {
+      "id": "SEVEN_DEADLY_CHECKBOXES",
+      "points": 100
+    },
+    {
+      "id": "SHARED_TRIUMPH",
+      "points": 100
+    },
+    {
+      "id": "SHIELD_BREAK",
+      "points": 50
+    },
+    {
+      "id": "SIGNATURE_STYLE",
+      "points": 75
+    },
+    {
+      "id": "SIX_PACK",
+      "points": 25
+    },
+    {
+      "id": "SNAKES_ON_A_PLANE",
+      "points": 75
+    },
+    {
+      "id": "SORRY_FOR_THE_WAIT",
+      "points": 75
+    },
+    {
+      "id": "SQUATTER",
+      "points": 50
+    },
+    {
+      "id": "STATUS_QUO",
+      "points": 100
+    },
+    {
+      "id": "STRANGER_THAN_FICTION",
+      "points": 75
+    },
+    {
+      "id": "SUPER_ARMOR",
+      "points": 50
+    },
+    {
+      "id": "TECHNICAL_DIFFICULTIES",
+      "points": 25
+    },
+    {
+      "id": "TEMPEST",
+      "points": 130
+    },
+    {
+      "id": "THE_HOUSE_REMEMBERS",
+      "points": 50
+    },
+    {
+      "id": "THE_LONG_ROAD",
+      "points": 100
+    },
+    {
+      "id": "THE_LONGEST_TURN",
+      "points": 50
+    },
+    {
+      "id": "THE_UPSIDE_DOWN",
+      "points": 110
+    },
+    {
+      "id": "THREE_PIECE_COMBO",
+      "points": 75
+    },
+    {
+      "id": "THREES_COMPANY",
+      "points": 25
+    },
+    {
+      "id": "TRIAD_OF_HELL",
+      "points": 100
+    },
+    {
+      "id": "TRINITY_TEST",
+      "points": 120
+    },
+    {
+      "id": "TRIPLE_DOWN",
+      "points": 75
+    },
+    {
+      "id": "TRIPLE_EXORCISM",
+      "points": 100
+    },
+    {
+      "id": "TRIPLE_THREAT",
+      "points": 50
+    },
+    {
+      "id": "TWO_LEGENDS_ONE_SLOT",
+      "points": 75
+    },
+    {
+      "id": "TYPECAST_TRIO",
+      "points": 100
+    },
+    {
+      "id": "ULTRA_INSTINCT",
+      "points": 75
+    },
+    {
+      "id": "VETERAN_DUELIST",
+      "points": 75
+    },
+    {
+      "id": "WAR_OF_ATTRITION",
+      "points": 100
+    },
+    {
+      "id": "WE_BOTH_LIVED",
+      "points": 100
+    },
+    {
+      "id": "WEAVE_NATION_CERTIFIED",
+      "points": 50
+    },
+    {
+      "id": "YO",
+      "points": 50
+    },
+    {
+      "id": "ZERO_SUM_HERO",
+      "points": 100
+    },
+    {
+      "id": "ZERO_TO_HERO",
+      "points": 75
+    }
+  ]
+}
