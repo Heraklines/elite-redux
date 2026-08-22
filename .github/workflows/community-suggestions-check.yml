@@ -1,0 +1,25 @@
+name: Community Suggestions Check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "community-editor/**"
+      - "editor/**"
+      - "workers/er-save-api/src/community-suggestions.ts"
+      - "workers/er-save-api/src/index.ts"
+      - "test/tests/elite-redux/community-editor/**"
+      - ".github/workflows/community-suggestions-check.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Test suggestion validation and merge behavior
+        run: pnpm exec vitest run test/tests/elite-redux/community-editor/community-suggestions.test.ts
