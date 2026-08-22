@@ -27,7 +27,7 @@ pub enum ModifierApplication {
     /// Level increment applied to one target (cap-checked upstream).
     LevelsGained { target: PokemonId, levels: u8 },
     /// Ball inventory incremented for the registry key.
-    InventoryIncremented { key: &'static str },
+    InventoryIncremented { key: String },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -84,12 +84,9 @@ pub fn apply_modifier(
         ModifierEffectSpec::InventoryItem { key } => {
             // The slice admits only ball inventory keys; leak-free mapping via
             // match keeps the lifetime static.
-            let key = match key.as_str() {
-                "POKEBALL" => "POKEBALL",
-                "GREAT_BALL" => "GREAT_BALL",
-                other => other,
-            };
-            Ok(ModifierApplication::InventoryIncremented { key })
+            Ok(ModifierApplication::InventoryIncremented {
+                key: key.clone(),
+            })
         }
         ModifierEffectSpec::MoneyMultiplier { .. }
         | ModifierEffectSpec::ExperienceMultiplier { .. }

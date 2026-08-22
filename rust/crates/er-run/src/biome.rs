@@ -11,7 +11,6 @@
 use er_rng::phaser::PhaserRdg;
 use er_types::battle_ids::WaveIndex;
 use er_types::run_ids::{BiomeId, RouteNodeId};
-use thiserror::Error;
 
 /// Minimum rolled biome length in waves (`BIOME_LENGTH_MIN`).
 pub const BIOME_LENGTH_MIN: u16 = 7;
@@ -49,11 +48,11 @@ pub fn plan_er_biome_structure(
     start_wave: WaveIndex,
     run_seed: &str,
 ) -> Result<BiomeStructurePlan, BiomeError> {
-    let start = start_wave.get();
-    if start == 0 || start > u64::from(u16::MAX) {
+    let start_value = start_wave.get().get();
+    if start_value == 0 || start_value > u64::from(u16::MAX) {
         return Err(BiomeError::StartWaveOutsideSlice);
     }
-    let start = start as u16;
+    let start = start_value as u16;
     // Finale safety: never roll once at/inside the late zone or when the
     // biome's worst case could spill into it.
     if start >= late_game_threshold() || start + BIOME_LENGTH_MAX - 1 >= late_game_threshold() {
@@ -82,13 +81,13 @@ pub fn plan_er_biome_structure(
 ///
 /// Oracle evidence: Town entered on wave 1 raises the Crossroads at wave 10.
 pub fn crossroads_due(start_wave: WaveIndex, wave: WaveIndex) -> bool {
-    let start = start_wave.get();
-    let current = wave.get();
+    let start = start_wave.get().get();
+    let current = wave.get().get();
     if current < start {
         return false;
     }
     let spent = (current - start + 1) as u16;
-    spent % 5 == 0 && spent < NOTORIETY_FREE_WAVES.max(spent)
+    spent % 5 == 0
 }
 
 /// Arms the overstay anchor exactly once, only when the player deliberately
@@ -101,7 +100,7 @@ pub fn arm_overstay_anchor(
     if existing.is_some() {
         return existing;
     }
-    let spent = (wave.get() - start_wave.get() + 1) as u16;
+    let spent = (wave.get().get() - start_wave.get().get() + 1) as u16;
     if spent >= NOTORIETY_FREE_WAVES {
         Some(wave)
     } else {
