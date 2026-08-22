@@ -13,6 +13,7 @@ pub mod pokemon;
 pub mod pokemon_v2;
 pub mod run_v2;
 pub mod snapshot;
+pub mod surface_digest;
 pub mod validation;
 pub mod validation_v2;
 pub mod world_v2;

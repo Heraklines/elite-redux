@@ -277,6 +277,9 @@ fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<d
         control,
     )
     .map_err(std::io::Error::other)?;
+    let before = kernel
+        .run_frontier_digest()
+        .map_err(std::io::Error::other)?;
 
     for event in [
         RawInputEvent::KeyDown {
@@ -309,6 +312,22 @@ fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<d
             er_types::run_model::CrossroadsAction::MoveOn
         )]
     );
+    assert_ne!(
+        kernel
+            .run_frontier_digest()
+            .map_err(std::io::Error::other)?,
+        before,
+        "Crossroads selection must apply canonical material internally"
+    );
+    let plan = kernel
+        .run_control_plan()
+        .ok_or("BiomeSelect control was not installed")?;
+    assert!(matches!(
+        &plan.seats[0].control,
+        er_types::run_control::GameControl::Surface(
+            er_types::run_control::SurfaceControl::BiomeSelect(_)
+        )
+    ));
     Ok(())
 }
 

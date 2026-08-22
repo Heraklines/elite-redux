@@ -15,6 +15,7 @@ pub mod party_option_menu;
 pub mod replacement_menu;
 pub mod run_menu;
 pub mod run_runtime;
+pub mod run_transition;
 pub mod runtime;
 pub mod snapshot;
 pub mod target_menu;

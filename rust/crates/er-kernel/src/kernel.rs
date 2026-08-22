@@ -626,33 +626,59 @@ impl GameKernel {
             return Ok(Vec::new());
         };
         let output = self.input_router.handle(seat, event, &mut self.scheduler)?;
-        let reducer = self
-            .run_menu
-            .as_mut()
-            .ok_or_else(|| KernelError::Canonical {
-                reason: "run control is not installed".to_owned(),
-            })?;
-        for button in output.events {
-            if let Some(intent) =
-                reducer
-                    .apply_button(seat, button)
-                    .map_err(|error| KernelError::Canonical {
-                        reason: error.to_string(),
-                    })?
+        let mut actions = Vec::new();
+        {
+            let reducer = self
+                .run_menu
+                .as_mut()
+                .ok_or_else(|| KernelError::Canonical {
+                    reason: "run control is not installed".to_owned(),
+                })?;
+            for button in output.events {
+                if let Some(intent) =
+                    reducer
+                        .apply_button(seat, button)
+                        .map_err(|error| KernelError::Canonical {
+                            reason: error.to_string(),
+                        })?
+                {
+                    let state = self
+                        .run
+                        .as_ref()
+                        .expect("run mode checked before step_run")
+                        .state();
+                    let action =
+                        er_game::run_menu::resolve_intent(state, &intent).map_err(|error| {
+                            KernelError::Canonical {
+                                reason: error.to_string(),
+                            }
+                        })?;
+                    actions.push((action, reducer.plan().clone()));
+                }
+            }
+        }
+        for (action, control) in actions {
+            if action
+                == er_types::run_model::RunSurfaceAction::Crossroads(
+                    er_types::run_model::CrossroadsAction::MoveOn,
+                )
             {
-                let state = self
+                let material = self
                     .run
                     .as_ref()
                     .expect("run mode checked before step_run")
-                    .state();
-                let action =
-                    er_game::run_menu::resolve_intent(state, &intent).map_err(|error| {
-                        KernelError::Canonical {
-                            reason: error.to_string(),
-                        }
+                    .prepare_action_material(&action, &control)
+                    .map_err(|error| KernelError::Canonical {
+                        reason: error.to_string(),
                     })?;
-                self.pending_run_actions.push(action);
+                let bytes = er_run::encode_run_material(&material).map_err(|error| {
+                    KernelError::Canonical {
+                        reason: error.to_string(),
+                    }
+                })?;
+                self.apply_run_material_bytes(&bytes)?;
             }
+            self.pending_run_actions.push(action);
         }
         // Repeat ownership will bind to MenuInstanceId when virtual-time run
         // campaigns are enabled. Until then, discard the scheduled repeat

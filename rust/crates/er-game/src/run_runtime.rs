@@ -34,6 +34,8 @@ pub enum RunRuntimeError {
     InvalidAfterState,
     #[error("material next-control plan failed validation")]
     InvalidNextControl,
+    #[error("run surface action preparation failed")]
+    Preparation,
 }
 
 /// The run-side runtime: complete game state plus immutable content identity.
@@ -67,6 +69,20 @@ impl RunRuntime {
 
     pub fn state(&self) -> &GameStateV2 {
         &self.state
+    }
+
+    pub fn prepare_action_material(
+        &self,
+        action: &er_types::run_model::RunSurfaceAction,
+        current_control: &GameControlPlan,
+    ) -> Result<AuthorityRunMaterial, RunRuntimeError> {
+        crate::run_transition::prepare_crossroads_transition(
+            &self.state,
+            self.content.as_ref(),
+            action,
+            current_control,
+        )
+        .map_err(|_| RunRuntimeError::Preparation)
     }
 
     /// The endpoint-local mechanical frontier used in step 7 of the apply

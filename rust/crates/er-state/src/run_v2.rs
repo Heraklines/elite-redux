@@ -234,6 +234,16 @@ impl RunSurfaceState {
         }
     }
 
+    pub fn header_mut(&mut self) -> &mut SurfaceHeader {
+        match self {
+            Self::MoveLearn(value) => &mut value.header,
+            Self::RewardShop(value) => &mut value.header,
+            Self::BiomeMarket(value) => &mut value.header,
+            Self::Crossroads(value) => &mut value.header,
+            Self::BiomeSelect(value) => &mut value.header,
+        }
+    }
+
     pub fn validate(&self) -> Result<(), RunStateValidationError> {
         let header = self.header();
         if header.schema_version != RUN_SURFACE_STATE_SCHEMA_VERSION {
