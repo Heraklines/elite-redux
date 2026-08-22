@@ -62,7 +62,6 @@ pub fn prepare_encounter_plan(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use er_content::species::SpeciesBaseStats;
     use er_state::pokemon_v2::{Iv, PokemonProgressionState, PokemonStateV2};
     use er_types::SafeU53;
     use er_types::battle_command::ScriptedEnemyPolicyV1;
