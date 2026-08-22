@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - "arch/rust-kernel-m4"
+      - "wrk/rk-m4-*"
+      - "ci/rust-m4/**"
     paths:
       - ".github/workflows/rust-kernel-m4.yml"
       - ".nvmrc"

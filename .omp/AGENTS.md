@@ -6,7 +6,7 @@ This file is the durable iteration reminder for `arch/rust-kernel-m4`. The froze
 
 Do not use the six-job aggregate as a typo/format checker. Most elapsed time is GitHub runner startup, duplicate checkout/build work, the complete M1–M3 regressions, and the two-process Phaser oracle export.
 
-1. **Work on a focused branch.** Use `ci/rust-m4/<topic>` or the contract-owned `wrk/rk-m4-*` branch from the latest hosted-green integration SHA. The `Rust Kernel M4 Focused` workflow runs only Rust formatting, workspace compilation, and affected M4 crate tests.
+1. **Work on a focused branch.** Use `ci/rust-m4/<topic>` or the contract-owned `wrk/rk-m4-*` branch from the latest hosted-green integration SHA. The branch-aware M4 workflow runs Rust formatting, workspace compilation, and focused M4 tests without the oracle or complete regressions.
 2. **Validate locally before every push.** Free disk space first. Use the repository toolchain from `rust/rust-toolchain.toml`, then run:
    - `cargo fmt --all -- --check`
    - `cargo check -p <affected-crate> --all-targets`
@@ -26,5 +26,5 @@ Do not use the six-job aggregate as a typo/format checker. Most elapsed time is 
 
 ## Hosted workflow split
 
-- `.github/workflows/rust-kernel-m4-focused.yml`: fast worker/focused branches; Rust only.
-- `.github/workflows/rust-kernel-m4.yml`: integration/checkpoint workflow. Change classification skips the oracle for Rust-only pushes and skips Rust foundation work for oracle-only pushes. Full regressions run only on manual checkpoint dispatch.
+- `.github/workflows/rust-kernel-m4.yml` is branch-aware. Pushes to `ci/rust-m4/**` and `wrk/rk-m4-*` run focused Rust qualification; Rust-only integration pushes skip the oracle; oracle-only integration pushes skip Rust foundation work.
+- Full M1–M3 regressions and the complete oracle/foundation aggregate run only on manual checkpoint dispatch. If a standalone focused workflow is later added to the default branch, remove the worker-branch triggers from the aggregate workflow to avoid duplicate runs.
