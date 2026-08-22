@@ -6,13 +6,12 @@
 //! canonical state directly.
 
 use er_types::battle_ids::{MoveId, SpeciesId};
-use er_types::run_ids::Experience;
 use er_types::SafeU53;
+use er_types::run_ids::Experience;
 
 use crate::content::{GrowthRateKind, SpeciesProgressionDefinition};
 use crate::experience;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProgressionError {
     LevelOutsideSupportedRange,
     CapBelowCurrentLevel,

@@ -9,6 +9,8 @@
 use er_types::battle_ids::MoveId;
 use er_types::battle_model::MoveSlotState;
 
+use crate::progression::ProgressionError;
+
 /// The number of move slots admitted by the frozen battle model.
 pub const MOVE_SLOT_COUNT: usize = 4;
 
@@ -31,8 +33,8 @@ pub struct LearnMoveOutcome {
 /// - [`er_types::run_model::LearnMoveDecision::Candidate`] records the offered
 ///   move as pending (the surface shows replacement choices). It does not
 ///   mutate the moveset.
-/// - `Replace { slot }` writes the candidate into the chosen slot. The slot
-///   index is bounds-checked; PP state resets for the learned move.
+/// - `Replace { slot }` writes the candidate into the chosen slot. PP state
+///   resets for the learned move.
 /// - `Undo` restores the previous moveset snapshot taken at Candidate time.
 /// - `Cancel` declines the candidate and leaves the moveset unchanged.
 ///
@@ -62,7 +64,10 @@ pub fn apply_learn_move_decision(
                 pp_ups: 0,
                 max_pp_override: None,
             });
-            Ok(LearnMoveOutcome { moves, candidate })
+            Ok(LearnMoveOutcome {
+                moves,
+                candidate,
+            })
         }
         Decision::Undo => Ok(LearnMoveOutcome {
             moves: *pending_snapshot,
@@ -79,8 +84,8 @@ pub fn apply_learn_move_decision(
 mod tests {
     use super::*;
     use er_types::SafeU53;
-    use er_types::run_model::LearnMoveDecision;
     use er_types::battle_ids::MoveSlotIndex;
+    use er_types::run_model::LearnMoveDecision;
 
     fn move_id(value: u64) -> MoveId {
         MoveId::new(SafeU53::new(value).expect("safe move"))
@@ -139,13 +144,9 @@ mod tests {
     fn undo_restores_the_pending_snapshot_exactly() {
         let mut replaced = initial_moveset();
         replaced[0] = slot(34);
-        let outcome = apply_learn_move_decision(
-            &replaced,
-            &initial_moveset(),
-            move_id(34),
-            &LearnMoveDecision::Undo,
-        )
-        .expect("undo");
+        let outcome =
+            apply_learn_move_decision(&replaced, &initial_moveset(), move_id(34), &LearnMoveDecision::Undo)
+                .expect("undo");
         assert_eq!(outcome.moves, initial_moveset());
     }
 
