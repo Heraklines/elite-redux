@@ -5,10 +5,9 @@
 //! typed plan from caller-supplied captured data. Ordinary callback-driven
 //! pools, ability generation, and AI are unsupported and never synthesized.
 
-use er_types::battle_ids::{BattleId, WaveIndex};
+use er_types::battle_ids::WaveIndex;
 use er_types::run_ids::{EncounterId, GameRunId};
 
-use crate::capability::EnemyPolicy;
 use crate::content::{EncounterGenerationMode, EncounterPlanDefinition, EncounterPlanSource};
 use crate::encounter_plan::{CapturedPlanEvidence, EncounterPlan};
 
@@ -96,6 +95,8 @@ mod tests {
             max_pp_override: None,
         })
     }
+
+    use crate::capability::EnemyPolicy;
 
     fn definition() -> EncounterPlanDefinition {
         EncounterPlanDefinition {
