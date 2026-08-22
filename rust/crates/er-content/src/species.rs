@@ -95,17 +95,12 @@ impl SpeciesDefinition {
 
     /// Validates the selected ID, capability closure, and exact oracle data.
     pub fn validate(&self) -> Result<(), SpeciesDefinitionError> {
-        if !is_selected_species(self.id) {
+        let Some(expected) = canonical_species_for_wire(self.id) else {
             return Err(SpeciesDefinitionError::UnsupportedId { id: self.id });
-        }
-
+        };
         if !matches!(&self.capability, CapabilityStatus::Supported) {
             return Err(SpeciesDefinitionError::UnsupportedCapability { id: self.id });
         }
-
-        let Some(expected) = canonical_species(self.id) else {
-            return Err(SpeciesDefinitionError::UnsupportedId { id: self.id });
-        };
         if *self != expected {
             return Err(SpeciesDefinitionError::DefinitionMismatch { id: self.id });
         }
@@ -216,6 +211,13 @@ fn canonical_species(id: SpeciesId) -> Option<SpeciesDefinition> {
         52 => Some(meowth()),
         _ => None,
     }
+}
+
+fn canonical_species_for_wire(id: SpeciesId) -> Option<SpeciesDefinition> {
+    canonical_species(id).or_else(|| match u64::from(id) {
+        932 => Some(nacli()),
+        _ => None,
+    })
 }
 
 const fn selected_species_id(value: u64) -> SpeciesId {
@@ -342,6 +344,25 @@ fn meowth() -> SpeciesDefinition {
             special_attack: 65,
             special_defense: 40,
             speed: 90,
+        },
+        capability: supported(),
+    }
+}
+
+pub(crate) fn nacli() -> SpeciesDefinition {
+    SpeciesDefinition {
+        id: species_id(932),
+        base_types: PokemonTyping {
+            primary: PokemonType::Rock,
+            secondary: None,
+        },
+        base_stats: SpeciesBaseStats {
+            hp: 55,
+            attack: 55,
+            defense: 75,
+            special_attack: 35,
+            special_defense: 35,
+            speed: 25,
         },
         capability: supported(),
     }

@@ -4,6 +4,7 @@ use er_canonical::content_digest;
 use er_content::pack::m4_moves::{
     SELECTED_M4_MOVE_IDS, body_slam_34, selected_m4_move_definitions, validate_selected_m4_moves,
 };
+use er_content::pack::m4_species::{SELECTED_M4_SPECIES_IDS, validate_selected_m4_species};
 use er_content::pack::{
     CapabilityManifest, ContentPack, ContentPackError, M4_ORACLE_GAME_SHA, ORACLE_GAME_SHA,
     SELECTED_SCHEMA_VERSION, selected_capability_manifest, selected_content_pack,
@@ -72,6 +73,14 @@ fn m4_contains_exact_body_slam_and_new_hash() -> Result<(), Box<dyn Error>> {
     assert!(pack.hash.as_str().starts_with(ContentPackHash::PREFIX));
     assert_ne!(pack.hash, selected_content_pack()?.hash);
     validate_selected_m4_moves(&pack.moves)?;
+    validate_selected_m4_species(&pack.species)?;
+    assert_eq!(
+        pack.species
+            .iter()
+            .map(|species| species.id.get().get())
+            .collect::<Vec<_>>(),
+        SELECTED_M4_SPECIES_IDS
+    );
 
     let body = pack
         .moves

@@ -22,6 +22,8 @@ use thiserror::Error;
 pub mod m4_moves;
 #[path = "m4_pack.rs"]
 pub mod m4_pack;
+#[path = "m4_species.rs"]
+pub mod m4_species;
 pub use m4_pack::{selected_m4_capability_manifest, selected_m4_content_pack};
 
 /// The immutable M4 oracle identity for the extended selected slice.
@@ -72,6 +74,8 @@ pub enum ContentPackError {
     Moves(#[source] MoveCollectionError),
     #[error("selected M4 moves are invalid: {0}")]
     M4Moves(#[source] m4_moves::M4MoveCollectionError),
+    #[error("selected M4 species are invalid: {0}")]
+    M4Species(#[source] m4_species::M4SpeciesCollectionError),
     #[error("selected abilities are invalid: {0}")]
     Abilities(#[source] AbilityCollectionError),
     #[error("selected type chart is invalid: {0}")]
@@ -683,7 +687,15 @@ fn validate_pack_fields(
             },
         ));
     }
-    validate_selected_species(species).map_err(ContentPackError::Species)?;
+    match oracle {
+        ContentOracle::M3 => {
+            validate_selected_species(species).map_err(ContentPackError::Species)?;
+        }
+        ContentOracle::M4 => {
+            m4_species::validate_selected_m4_species(species)
+                .map_err(ContentPackError::M4Species)?;
+        }
+    }
     validate_selected_abilities(abilities).map_err(ContentPackError::Abilities)?;
     match oracle {
         ContentOracle::M3 => {
