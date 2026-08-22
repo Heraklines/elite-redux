@@ -7,6 +7,9 @@ use std::time::Instant;
 
 use er_game::run_runtime::project_terminal_or_wait_control;
 use er_kernel::{GameKernel, KernelInput};
+use er_run::biome::{RouteOption, plan_er_biome_structure, select_route};
+use er_run::modifier::{ModifierApplication, apply_modifier};
+use er_run::reward::{MarketStockView, RewardOfferView, buy_stock, pay_for_offer};
 use er_run::run_material::{
     AuthorityRunMaterial, RUN_MATERIAL_M3_PARITY_ORACLE_SHA, RUN_TERMINAL_MATERIAL_VERSION,
     RunMaterialHeader, RunTerminalMaterialV1, encode_run_material,
@@ -26,9 +29,10 @@ use er_types::run_control::{
     SurfaceControl,
 };
 use er_types::run_ids::{
-    Money, RunContentPackHash, RunInteractionSequence, RunSurfaceId, SurfaceDigest,
+    BiomeId, ModifierId, Money, RouteNodeId, RunContentPackHash, RunInteractionSequence,
+    RunOfferId, RunStockId, RunSurfaceId, SurfaceDigest,
 };
-use er_types::run_model::{RunOutcome, RunStage, RunSurfaceKind};
+use er_types::run_model::{ModifierTier, RunOutcome, RunStage, RunSurfaceKind};
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{LogicalMenu, LogicalMenuOption, MenuNavigationEdge, NavigationDirection};
 use er_types::{OperationId, SafeU53, SeatId};
@@ -247,6 +251,101 @@ fn m4_two_client_transitions_1000() -> Result {
             "id": "two-client-wave-transitions-1000",
             "transitions": PAIR_TRANSITION_COUNT,
             "execution_ms": elapsed_ms
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn m4_reward_market_cycles_1000() -> Result {
+    let content = selected_m4_game_content_bundle()?;
+    let modifier = content.run.modifiers[1]
+        .as_ref()
+        .ok_or("persistent modifier 1 missing")?;
+    let offer = RewardOfferView {
+        offer_id: RunOfferId::new(safe(1)),
+        modifier_id: ModifierId::new(safe(1)),
+        tier: ModifierTier::Common,
+        price: Money::ZERO,
+        sold: false,
+    };
+    let stock = MarketStockView {
+        stock_id: RunStockId::new(safe(1)),
+        modifier_id: ModifierId::new(safe(1)),
+        price: Money::new(safe(50)),
+        initial_quantity: 1,
+        remaining_quantity: 1,
+        sold: false,
+    };
+    let started = Instant::now();
+    let mut checksum = 0_u64;
+    for _ in 0..1_000 {
+        let balance = pay_for_offer(
+            Money::new(safe(1_000)),
+            std::slice::from_ref(&offer),
+            offer.offer_id,
+            None,
+        )
+        .map_err(|error| format!("reward payment failed: {error:?}"))?;
+        assert_eq!(
+            apply_modifier(modifier, None, None, 0)
+                .map_err(|error| format!("modifier application failed: {error:?}"))?,
+            ModifierApplication::Persistent
+        );
+        let (balance, purchased) = buy_stock(
+            balance,
+            std::slice::from_ref(&stock),
+            stock.stock_id,
+            stock.price,
+        )
+        .map_err(|error| format!("market purchase failed: {error:?}"))?;
+        checksum = checksum.wrapping_add(balance.get().get());
+        checksum = checksum.wrapping_add(u64::from(purchased.remaining_quantity));
+    }
+    std::hint::black_box(checksum);
+    println!(
+        "{}",
+        json!({
+            "id": "reward-market-cycles-1000",
+            "transitions": 1000,
+            "execution_ms": started.elapsed().as_millis(),
+            "checksum": checksum
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn m4_biome_transitions_1000() -> Result {
+    let route = RouteOption {
+        route_node_id: RouteNodeId::new(safe(1)),
+        biome: BiomeId::new(safe(1)),
+    };
+    let current = BiomeId::new(SafeU53::ZERO);
+    let started = Instant::now();
+    let mut checksum = 0_u64;
+    for index in 0..1_000_u64 {
+        let wave = er_types::battle_ids::WaveIndex::new(safe(1 + index % 100))?;
+        let plan = plan_er_biome_structure(wave, &format!("m4-bench-{index}"))
+            .map_err(|error| format!("biome plan failed: {error:?}"))?;
+        let selected = select_route(
+            std::slice::from_ref(&route),
+            current,
+            route.route_node_id,
+            route.biome,
+        )
+        .map_err(|error| format!("route selection failed: {error:?}"))?;
+        checksum = checksum.wrapping_add(u64::from(plan.length.unwrap_or(0)));
+        checksum = checksum.wrapping_add(selected.biome.get().get());
+    }
+    std::hint::black_box(checksum);
+    println!(
+        "{}",
+        json!({
+            "id": "biome-transitions-1000",
+            "transitions": 1000,
+            "execution_ms": started.elapsed().as_millis(),
+            "checksum": checksum
         })
     );
     Ok(())
