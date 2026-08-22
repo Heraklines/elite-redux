@@ -148,6 +148,7 @@ pub enum MoveFlag {
     Contact,
     ThawsUserFreeze,
     Powder,
+    Biting,
     Reflectable,
     IgnoreSubstitute,
 }
@@ -158,6 +159,7 @@ pub enum MoveEffectDefinition {
     Damage,
     ApplyStatus(StatusKind),
     ChangeStatStage { stat: BattleStat, delta: i8 },
+    Flinch,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -166,6 +168,7 @@ pub enum AbilityEffectDefinition {
     None,
     PostSummonAdjacentOpponentAttackMinusOne,
     NonSuperEffectiveAttackImmunity,
+    MentalEffectImmunity,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
@@ -351,6 +354,7 @@ pub enum ActionDisposition {
     SkippedActorInactive,
     SkippedTargetInactive,
     CancelledByParalysis,
+    CancelledByFlinch,
     Missed,
     NoEffect,
 }

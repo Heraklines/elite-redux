@@ -321,7 +321,9 @@ fn move_is_presentable(action_sequence: SafeU53, action_order: &[ResolvedAction]
     matches!(action.kind, ResolvedActionKind::Move)
         && !matches!(
             action.disposition,
-            ActionDisposition::SkippedActorInactive | ActionDisposition::CancelledByParalysis
+            ActionDisposition::SkippedActorInactive
+                | ActionDisposition::CancelledByParalysis
+                | ActionDisposition::CancelledByFlinch
         )
 }
 

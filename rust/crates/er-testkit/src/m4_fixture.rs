@@ -11,7 +11,6 @@ use serde_json::Value;
 use thiserror::Error;
 
 use er_content::pack::selected_m4_content_pack;
-use er_content::species::SpeciesBaseStats;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
 use er_run::content::selected_run_content_pack;
 use er_run::transition::GameContentBundle;
@@ -123,17 +122,6 @@ fn str_field<'a>(value: &'a Value, name: &str) -> Result<&'a str, M4FixtureError
         })
 }
 
-/// Nacli base stats from `src/data/balance/pokemon-species.ts` (the only
-/// species whose progression is in the selected slice).
-const NACLI_BASE: SpeciesBaseStats = SpeciesBaseStats {
-    hp: 55,
-    attack: 55,
-    defense: 75,
-    special_attack: 35,
-    special_defense: 35,
-    speed: 25,
-};
-
 /// Converts one TypeScript party/enemy Pokémon record into `PokemonStateV2`.
 ///
 /// The caller supplies the stable Pokémon ID and owner seat because those are
@@ -195,13 +183,33 @@ pub fn convert_pokemon(
     let experience_value = u32_field(ts, "exp")? as u64;
     let friendship = u16_field(ts, "friendship")?;
 
-    // Types: derive from the known slice species. Only Nacli is in-slice for
-    // the progression path; other species get Rock as a conservative default.
-    let types = PokemonTyping {
-        primary: PokemonType::Rock,
-        secondary: None,
+    let types = match species_value {
+        1 => PokemonTyping {
+            primary: PokemonType::Grass,
+            secondary: Some(PokemonType::Poison),
+        },
+        7 => PokemonTyping {
+            primary: PokemonType::Water,
+            secondary: None,
+        },
+        19 | 52 | 915 => PokemonTyping {
+            primary: PokemonType::Normal,
+            secondary: None,
+        },
+        23 => PokemonTyping {
+            primary: PokemonType::Poison,
+            secondary: None,
+        },
+        50 => PokemonTyping {
+            primary: PokemonType::Ground,
+            secondary: None,
+        },
+        932 => PokemonTyping {
+            primary: PokemonType::Rock,
+            secondary: None,
+        },
+        species => return Err(M4FixtureError::UnsupportedSpecies { species }),
     };
-    let _ = NACLI_BASE; // documented dependency
 
     // Status
     let status_value = field(ts, "status")?;
@@ -242,8 +250,17 @@ pub fn convert_pokemon(
     }
 
     let ability_index = u32_field(ts, "abilityIndex")? as u64;
+    let active_ability = match (species_value, ability_index) {
+        (915, 0) => 165,
+        (_, 0) => 0,
+        _ => {
+            return Err(M4FixtureError::UnsupportedAbility {
+                index: ability_index,
+            });
+        }
+    };
     let abilities = AbilityLoadout {
-        active: AbilityId::new(SafeU53::new(1 + ability_index).map_err(|_| {
+        active: AbilityId::new(SafeU53::new(active_ability).map_err(|_| {
             M4FixtureError::UnsupportedAbility {
                 index: ability_index,
             }
@@ -261,7 +278,7 @@ pub fn convert_pokemon(
                 field: "exp".to_owned(),
             }
         })?),
-        growth_rate: GrowthRateId::new(3), // Medium Slow
+        growth_rate: GrowthRateId::new(if species_value == 915 { 2 } else { 3 }),
         ivs,
         nature: NatureId::new(nature_value),
         effective_nature: NatureId::new(nature_value),

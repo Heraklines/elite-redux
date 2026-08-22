@@ -189,7 +189,10 @@ fn pokemon_content_is_supported(pokemon: &PokemonStateV2, content: &GameContentB
         .species
         .iter()
         .find(|definition| definition.id == pokemon.species_id)
-        .is_some_and(|definition| definition.capability == CapabilityStatus::Supported);
+        .is_some_and(|definition| {
+            definition.capability == CapabilityStatus::Supported
+                && definition.base_types == pokemon.types
+        });
     let moves = pokemon.moves.iter().flatten().all(|slot| {
         content
             .battle

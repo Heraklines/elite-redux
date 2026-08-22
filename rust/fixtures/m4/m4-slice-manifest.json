@@ -35,7 +35,8 @@
   "progression": {
     "species": { "id": 932, "key": "NACLI" },
     "growth_rate": { "id": 3, "key": "MEDIUM_SLOW" },
-    "nature_ids": [0, 3, 10, 15],
+    "captured_encounter_growth_rate": { "id": 2, "key": "MEDIUM_FAST" },
+    "nature_ids": [0, 3, 10, 15, 24],
     "selected_parity_nature": { "id": 0, "key": "HARDY" },
     "iv_order": ["HP", "ATK", "DEF", "SPATK", "SPDEF", "SPD"],
     "iv_range": { "minimum": 0, "maximum": 31 },

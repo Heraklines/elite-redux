@@ -163,6 +163,8 @@ assert(
 );
 assert(slice.progression.species.id === 932, "parity progression species must be Nacli 932");
 assert(slice.progression.growth_rate.id === 3, "parity progression growth must be Medium Slow 3");
+assert(slice.progression.captured_encounter_growth_rate.id === 2, "captured Lechonk growth must be Medium Fast 2");
+assert(slice.progression.nature_ids.includes(24), "captured Lechonk nature 24 must be supported");
 assert(slice.progression.parity_level_before === 16 && slice.progression.parity_level_after === 17, "parity progression must cross 16 to 17");
 assert(JSON.stringify(slice.progression.level_move_candidates.map(entry => entry.id)) === "[34]", "parity move candidates mismatch");
 assert(JSON.stringify(slice.progression.parity_initial_moves) === "[1,52,77,78]", "parity initial moves mismatch");

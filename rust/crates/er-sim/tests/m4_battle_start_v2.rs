@@ -18,6 +18,10 @@ const FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json"
 );
+const ENCOUNTER_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fixtures/m4/oracle/encounters/plains-wave-11-captured-v1.json"
+);
 const ORACLE: &str = "45c89493e7edec9c4da247a98cd7858b1f015c09";
 
 fn safe(value: u64) -> SafeU53 {
@@ -113,11 +117,62 @@ fn encounter_content_frontier_mismatch_fails_without_state_change() -> Result<()
 #[test]
 fn unsupported_encounter_species_fails_closed() -> Result<(), Box<dyn Error>> {
     let (state, mut plan, content) = state_and_plan()?;
-    plan.enemy_party[0].species_id = SpeciesId::new(safe(915));
+    plan.enemy_party[0].species_id = SpeciesId::new(safe(916));
     assert!(matches!(
         start_battle_v2(&state, &plan, SeatId::new(safe(1)), content.as_ref()),
         Err(BattleStartV2Error::UnsupportedContent)
     ));
     assert!(state.battle.is_none());
+    Ok(())
+}
+
+#[test]
+fn published_lechonk_encounter_is_admitted_by_expanded_slice() -> Result<(), Box<dyn Error>> {
+    let progression: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(FIXTURE)?)?;
+    let encounter: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(ENCOUNTER_FIXTURE)?)?;
+    let (mut state, content) = assemble_selected_game_state(&progression, ORACLE)?;
+    state.run.wave = er_types::battle_ids::WaveIndex::new(safe(11))?;
+    state.run.biome.biome = er_types::run_ids::BiomeId::new(safe(1));
+    state.run.biome.source_wave = state.run.wave;
+    let enemy_value = encounter["final"]["canonical"]["save_data"]["enemyParty"]
+        .as_array()
+        .and_then(|party| party.first())
+        .ok_or("captured enemy missing")?;
+    let enemy_id = PokemonId::new(safe(enemy_value["id"].as_u64().ok_or("captured enemy ID")?));
+    let enemy = er_testkit::m4_fixture::convert_pokemon(enemy_value, enemy_id, None)?;
+    assert_eq!(enemy.species_id.get().get(), 915);
+    assert_eq!(enemy.abilities.active.get().get(), 165);
+    let plan = EncounterPlan {
+        schema_version: ENCOUNTER_PLAN_SCHEMA_VERSION,
+        encounter_id: EncounterId::new(safe(1)),
+        run_id: state.run.run_id,
+        wave: state.run.wave,
+        biome: state.run.biome.biome,
+        format: BattleFormat::single(),
+        enemy_party: vec![enemy],
+        enemy_leads: vec![enemy_id],
+        player_leads: vec![state.player_party[0].id],
+        scripted_policy: ScriptedEnemyPolicyV1::new(SafeU53::ZERO, Vec::new())?,
+        battle_seed: encounter["final"]["canonical"]["runtime"]["battle_seed"]
+            .as_str()
+            .ok_or("captured battle seed")?
+            .to_owned(),
+        generation_audit: Vec::new(),
+        source: EncounterPlanSource::OracleCaptureRequired,
+        content_hash: Some(state.run_content_hash.clone()),
+    };
+    let after = start_battle_v2(&state, &plan, SeatId::new(safe(1)), content.as_ref())?;
+    assert_eq!(
+        after
+            .battle
+            .as_ref()
+            .ok_or("captured battle missing")?
+            .enemy_party[0]
+            .species_id
+            .get()
+            .get(),
+        915
+    );
     Ok(())
 }

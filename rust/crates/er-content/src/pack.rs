@@ -18,6 +18,8 @@ use er_types::battle_model::{
 };
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
+#[path = "m4_abilities.rs"]
+pub mod m4_abilities;
 #[path = "m4_moves.rs"]
 pub mod m4_moves;
 #[path = "m4_pack.rs"]
@@ -78,6 +80,8 @@ pub enum ContentPackError {
     M4Species(#[source] m4_species::M4SpeciesCollectionError),
     #[error("selected abilities are invalid: {0}")]
     Abilities(#[source] AbilityCollectionError),
+    #[error("selected M4 abilities are invalid: {0}")]
+    M4Abilities(#[source] m4_abilities::M4AbilityCollectionError),
     #[error("selected type chart is invalid: {0}")]
     TypeChart(#[source] TypeChartError),
     #[error("selected capability manifest is invalid: {0}")]
@@ -696,7 +700,15 @@ fn validate_pack_fields(
                 .map_err(ContentPackError::M4Species)?;
         }
     }
-    validate_selected_abilities(abilities).map_err(ContentPackError::Abilities)?;
+    match oracle {
+        ContentOracle::M3 => {
+            validate_selected_abilities(abilities).map_err(ContentPackError::Abilities)?;
+        }
+        ContentOracle::M4 => {
+            m4_abilities::validate_selected_m4_abilities(abilities)
+                .map_err(ContentPackError::M4Abilities)?;
+        }
+    }
     match oracle {
         ContentOracle::M3 => {
             validate_selected_moves(moves).map_err(ContentPackError::Moves)?;
@@ -925,25 +937,46 @@ fn canonical_capability_entries_for(oracle: ContentOracle) -> Vec<CapabilityEntr
 /// vocabulary and are therefore structurally unreachable. The M4 input path
 /// rejects external tag-state effects rather than silently dropping them.
 fn canonical_m4_capability_entries() -> Vec<CapabilityEntry> {
-    let body_slam = capability_entry(
-        CapabilitySubject::Move(move_id(34)),
-        supported(),
-        &["physical-hit", "paralysis-application"],
-        &["always-hit", "paralysis-full-stop", "paralysis-speed-order"],
-    );
-    let m3_entries = canonical_capability_entries();
-    let mut entries = Vec::with_capacity(m3_entries.len() + 1);
-    let mut inserted = false;
-    for entry in m3_entries {
-        if !inserted && body_slam.subject < entry.subject {
-            entries.push(body_slam.clone());
-            inserted = true;
-        }
-        entries.push(entry);
-    }
-    if !inserted {
-        entries.push(body_slam);
-    }
+    let mut entries = canonical_capability_entries();
+    entries.extend([
+        capability_entry(
+            CapabilitySubject::Move(move_id(34)),
+            supported(),
+            &["physical-hit", "paralysis-application"],
+            &["always-hit", "paralysis-full-stop", "paralysis-speed-order"],
+        ),
+        capability_entry(
+            CapabilitySubject::Move(move_id(39)),
+            supported(),
+            &["tail-whip-defense-down"],
+            &["spread-stage-down"],
+        ),
+        capability_entry(
+            CapabilitySubject::Move(move_id(98)),
+            supported(),
+            &["quick-attack-priority"],
+            &["priority-order"],
+        ),
+        capability_entry(
+            CapabilitySubject::Move(move_id(158)),
+            supported(),
+            &["hyper-fang-hit"],
+            &["flinch-before-action", "flinch-after-action"],
+        ),
+        capability_entry(
+            CapabilitySubject::Move(move_id(230)),
+            supported(),
+            &["sweet-scent-evasion-down"],
+            &["spread-stage-down"],
+        ),
+        capability_entry(
+            CapabilitySubject::Ability(ability_id(165)),
+            supported(),
+            &["aroma-veil-admission"],
+            &["mental-effect-immunity"],
+        ),
+    ]);
+    entries.sort_unstable_by(|left, right| left.subject.cmp(&right.subject));
     entries
 }
 

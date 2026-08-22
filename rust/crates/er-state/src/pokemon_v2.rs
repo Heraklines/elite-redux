@@ -89,17 +89,17 @@ impl PokemonProgressionState {
                 return Err(PokemonProgressionValidationError::InvalidIv { value: iv.get() });
             }
         }
-        if self.growth_rate.get() != 3 {
+        if !matches!(self.growth_rate.get(), 2 | 3) {
             return Err(PokemonProgressionValidationError::UnsupportedGrowthRate {
                 value: self.growth_rate.get(),
             });
         }
-        if !matches!(self.nature.get(), 0 | 3 | 10 | 15) {
+        if !matches!(self.nature.get(), 0 | 3 | 10 | 15 | 24) {
             return Err(PokemonProgressionValidationError::UnsupportedNature {
                 value: self.nature.get(),
             });
         }
-        if !matches!(self.effective_nature.get(), 0 | 3 | 10 | 15) {
+        if !matches!(self.effective_nature.get(), 0 | 3 | 10 | 15 | 24) {
             return Err(
                 PokemonProgressionValidationError::UnsupportedEffectiveNature {
                     value: self.effective_nature.get(),

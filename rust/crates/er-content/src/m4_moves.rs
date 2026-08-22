@@ -9,12 +9,16 @@ use thiserror::Error;
 use crate::moves::selected_move_definitions;
 
 /// The M4 battle move IDs in canonical ascending serialization order.
-pub const SELECTED_M4_MOVE_IDS: [MoveId; 7] = [
+pub const SELECTED_M4_MOVE_IDS: [MoveId; 11] = [
     m4_move_id(1),
     m4_move_id(34),
+    m4_move_id(39),
     m4_move_id(52),
     m4_move_id(77),
     m4_move_id(78),
+    m4_move_id(98),
+    m4_move_id(158),
+    m4_move_id(230),
     m4_move_id(351),
     m4_move_id(589),
 ];
@@ -63,22 +67,103 @@ pub fn body_slam_34() -> crate::moves::MoveDefinition {
     }
 }
 
-/// Returns the M3 move closure plus Body Slam, without mutating the M3 vector.
+pub fn tail_whip_39() -> crate::moves::MoveDefinition {
+    crate::moves::MoveDefinition {
+        id: m4_move_id(39),
+        category: MoveCategory::Status,
+        move_type: PokemonType::Normal,
+        power: MovePower::None,
+        accuracy: MoveAccuracy::Percent(100),
+        base_pp: 30,
+        effect_chance: EffectChance::None,
+        priority: 0,
+        target: MoveTarget::AllNearEnemies,
+        flags: vec![MoveFlag::Reflectable],
+        effects: vec![MoveEffectDefinition::ChangeStatStage {
+            stat: er_types::battle_model::BattleStat::Defense,
+            delta: -1,
+        }],
+        capability: CapabilityStatus::Supported,
+    }
+}
+
+pub fn quick_attack_98() -> crate::moves::MoveDefinition {
+    crate::moves::MoveDefinition {
+        id: m4_move_id(98),
+        category: MoveCategory::Physical,
+        move_type: PokemonType::Normal,
+        power: MovePower::Value(40),
+        accuracy: MoveAccuracy::Percent(100),
+        base_pp: 30,
+        effect_chance: EffectChance::None,
+        priority: 1,
+        target: MoveTarget::NearOther,
+        flags: vec![MoveFlag::Contact],
+        effects: vec![MoveEffectDefinition::Damage],
+        capability: CapabilityStatus::Supported,
+    }
+}
+
+pub fn hyper_fang_158() -> crate::moves::MoveDefinition {
+    crate::moves::MoveDefinition {
+        id: m4_move_id(158),
+        category: MoveCategory::Physical,
+        move_type: PokemonType::Normal,
+        power: MovePower::Value(85),
+        accuracy: MoveAccuracy::Percent(90),
+        base_pp: 15,
+        effect_chance: EffectChance::Percent(30),
+        priority: 0,
+        target: MoveTarget::NearOther,
+        flags: vec![MoveFlag::Contact, MoveFlag::Biting],
+        effects: vec![MoveEffectDefinition::Damage, MoveEffectDefinition::Flinch],
+        capability: CapabilityStatus::Supported,
+    }
+}
+
+pub fn sweet_scent_230() -> crate::moves::MoveDefinition {
+    crate::moves::MoveDefinition {
+        id: m4_move_id(230),
+        category: MoveCategory::Status,
+        move_type: PokemonType::Normal,
+        power: MovePower::None,
+        accuracy: MoveAccuracy::Percent(100),
+        base_pp: 20,
+        effect_chance: EffectChance::None,
+        priority: 0,
+        target: MoveTarget::AllNearEnemies,
+        flags: vec![MoveFlag::Reflectable],
+        effects: vec![MoveEffectDefinition::ChangeStatStage {
+            stat: er_types::battle_model::BattleStat::Evasion,
+            delta: -2,
+        }],
+        capability: CapabilityStatus::Supported,
+    }
+}
+
+pub(crate) fn captured_move(id: MoveId) -> Option<crate::moves::MoveDefinition> {
+    match id.get().get() {
+        34 => Some(body_slam_34()),
+        39 => Some(tail_whip_39()),
+        98 => Some(quick_attack_98()),
+        158 => Some(hyper_fang_158()),
+        230 => Some(sweet_scent_230()),
+        _ => None,
+    }
+}
+
+/// Returns the M3 move closure plus the captured M4 additions, without
+/// mutating the M3 vector.
 pub fn selected_m4_move_definitions() -> Vec<crate::moves::MoveDefinition> {
-    let body_slam = body_slam_34();
-    let m3_definitions = selected_move_definitions();
-    let mut definitions = Vec::with_capacity(SELECTED_M4_MOVE_IDS.len());
-    let mut inserted = false;
-    for definition in m3_definitions {
-        if !inserted && body_slam.id < definition.id {
-            definitions.push(body_slam.clone());
-            inserted = true;
-        }
-        definitions.push(definition);
-    }
-    if !inserted {
-        definitions.push(body_slam);
-    }
+    let mut definitions = selected_move_definitions();
+    definitions.extend([
+        body_slam_34(),
+        tail_whip_39(),
+        quick_attack_98(),
+        hyper_fang_158(),
+        sweet_scent_230(),
+    ]);
+    definitions.sort_unstable_by_key(|definition| definition.id);
     definitions
 }
 
@@ -93,7 +178,6 @@ pub fn validate_selected_m4_moves(
         });
     }
 
-    let body_slam = body_slam_34();
     for (index, (definition, expected)) in definitions
         .iter()
         .zip(SELECTED_M4_MOVE_IDS.iter().copied())
@@ -106,11 +190,7 @@ pub fn validate_selected_m4_moves(
                 expected,
             });
         }
-        if definition.id == body_slam.id {
-            if definition != &body_slam {
-                return Err(M4MoveCollectionError::BodySlamDefinitionMismatch { index });
-            }
-        } else if definition.validate().is_err() {
+        if definition.validate().is_err() {
             return Err(M4MoveCollectionError::InvalidM3Definition { index });
         }
     }

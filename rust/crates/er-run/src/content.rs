@@ -29,6 +29,7 @@ pub const M3_PARITY_ORACLE_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GrowthRateKind {
+    MediumFast,
     MediumSlow,
 }
 
@@ -823,12 +824,17 @@ pub fn selected_run_content_pack(
     battle_content_hash: ContentPackHash,
 ) -> Result<RunContentPack, RunContentError> {
     let mut growth_rates = vec![None; 4];
+    growth_rates[2] = Some(GrowthRateDefinition {
+        id: GrowthRateId::new(2),
+        key: "MEDIUM_FAST".to_owned(),
+        kind: GrowthRateKind::MediumFast,
+    });
     growth_rates[3] = Some(GrowthRateDefinition {
         id: GrowthRateId::new(3),
         key: "MEDIUM_SLOW".to_owned(),
         kind: GrowthRateKind::MediumSlow,
     });
-    let mut natures = vec![None; 16];
+    let mut natures = vec![None; 25];
     natures[0] = Some(NatureDefinition {
         id: NatureId::new(0),
         key: "HARDY".to_owned(),
@@ -852,6 +858,12 @@ pub fn selected_run_content_pack(
         key: "MODEST".to_owned(),
         raised_stat: Some(NatureStat::SpecialAttack),
         lowered_stat: Some(NatureStat::Attack),
+    });
+    natures[24] = Some(NatureDefinition {
+        id: NatureId::new(24),
+        key: "QUIRKY".to_owned(),
+        raised_stat: None,
+        lowered_stat: None,
     });
 
     let mut species_progression = vec![None; 933];

@@ -1,5 +1,7 @@
 //! Atomic turn and stored-replacement orchestration.
 
+use std::collections::BTreeSet;
+
 use er_content::moves::MoveDefinitionError;
 use er_content::pack::ContentPack;
 use er_rng::audit::{RngDraw, RngReason, RngStream};
@@ -195,11 +197,22 @@ where
     let mut mutations = Vec::new();
     let mut causal_events = Vec::new();
     let mut turn_occurrence = 0_u32;
+    let mut flinched = BTreeSet::new();
 
     while let Some(action) = queue
         .pop_next(&after, &mut runtime)
         .map_err(|source| map_action_order_error(source, &after, true))?
     {
+        if matches!(action.command, NormalizedBattleCommand::Fight { .. })
+            && flinched.remove(&action.actor)
+        {
+            push_pending_action(
+                &mut action_order,
+                &action,
+                ActionDisposition::CancelledByFlinch,
+            )?;
+            continue;
+        }
         match &action.command {
             NormalizedBattleCommand::Switch { .. } => {
                 resolve_switch_action(
@@ -212,7 +225,7 @@ where
                 )?;
             }
             NormalizedBattleCommand::Fight { .. } => {
-                resolve_move_action(
+                let newly_flinched = resolve_move_action(
                     &mut after,
                     &action,
                     content,
@@ -224,6 +237,7 @@ where
                     &mut mutations,
                     &mut causal_events,
                 )?;
+                flinched.extend(newly_flinched);
             }
         }
         {
@@ -555,7 +569,7 @@ fn resolve_move_action(
     action_order: &mut Vec<ResolvedAction>,
     mutations: &mut Vec<BattleMutation>,
     causal_events: &mut Vec<PresentationCausalEvent>,
-) -> Result<(), BattleResolveError> {
+) -> Result<Vec<PokemonId>, BattleResolveError> {
     let rng_audit_start = runtime.audit_entries().len();
     let result = {
         let battle = active_battle_mut(state)?;
@@ -630,7 +644,12 @@ fn resolve_move_action(
             )?;
         }
     }
-    Ok(())
+    Ok(result
+        .targets
+        .iter()
+        .filter(|target| target.flinched)
+        .filter_map(|target| target.pokemon)
+        .collect())
 }
 
 fn record_battle_rng_draw(

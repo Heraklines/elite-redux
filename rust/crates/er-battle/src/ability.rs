@@ -21,11 +21,14 @@ pub const INTIMIDATE_ABILITY_ID: AbilityId = selected_ability_id(22);
 
 /// The selected Wonder Guard ability ID.
 pub const WONDER_GUARD_ABILITY_ID: AbilityId = selected_ability_id(25);
+/// The selected Aroma Veil ability ID.
+pub const AROMA_VEIL_ABILITY_ID: AbilityId = selected_ability_id(165);
 
 /// Short aliases for callers that use the canonical ability names as IDs.
 pub const NONE: AbilityId = NONE_ABILITY_ID;
 pub const INTIMIDATE: AbilityId = INTIMIDATE_ABILITY_ID;
 pub const WONDER_GUARD: AbilityId = WONDER_GUARD_ABILITY_ID;
+pub const AROMA_VEIL: AbilityId = AROMA_VEIL_ABILITY_ID;
 
 /// A selected ability after immutable-content validation.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -56,6 +59,10 @@ impl ResolvedAbility {
             self.effect,
             AbilityEffectDefinition::NonSuperEffectiveAttackImmunity
         )
+    }
+
+    pub const fn blocks_mental_effects(self) -> bool {
+        matches!(self.effect, AbilityEffectDefinition::MentalEffectImmunity)
     }
 }
 

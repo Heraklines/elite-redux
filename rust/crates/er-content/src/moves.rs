@@ -143,9 +143,9 @@ impl MoveDefinition {
 
     /// Validates IDs, ranges, closed effects, and exact selected data.
     pub fn validate(&self) -> Result<(), MoveDefinitionError> {
-        if !is_selected_move(self.id) {
+        let Some(expected) = canonical_move_for_wire(self.id) else {
             return Err(MoveDefinitionError::UnsupportedId { id: self.id });
-        }
+        };
 
         if !matches!(&self.capability, CapabilityStatus::Supported) {
             return Err(MoveDefinitionError::UnsupportedCapability { id: self.id });
@@ -215,13 +215,19 @@ impl MoveDefinition {
                     }
                 }
                 MoveEffectDefinition::ChangeStatStage { stat, delta } => {
-                    if *stat != BattleStat::Attack || *delta != -1 {
+                    if !matches!(
+                        (*stat, *delta),
+                        (BattleStat::Attack, -1)
+                            | (BattleStat::Defense, -1)
+                            | (BattleStat::Evasion, -2)
+                    ) {
                         return Err(MoveDefinitionError::UnsupportedEffect {
                             id: self.id,
                             effect: effect.clone(),
                         });
                     }
                 }
+                MoveEffectDefinition::Flinch => {}
             }
         }
 
@@ -253,9 +259,7 @@ impl MoveDefinition {
             }
         }
 
-        let Some(expected) = canonical_move(self.id) else {
-            return Err(MoveDefinitionError::UnsupportedId { id: self.id });
-        };
+        let expected = expected;
         if *self != expected {
             return Err(MoveDefinitionError::DefinitionMismatch { id: self.id });
         }
@@ -385,6 +389,10 @@ fn canonical_move(id: MoveId) -> Option<MoveDefinition> {
         589 => Some(play_nice()),
         _ => None,
     }
+}
+
+fn canonical_move_for_wire(id: MoveId) -> Option<MoveDefinition> {
+    canonical_move(id).or_else(|| crate::pack::m4_moves::captured_move(id))
 }
 
 const fn selected_move_id(value: u64) -> MoveId {

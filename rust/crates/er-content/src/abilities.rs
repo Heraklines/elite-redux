@@ -82,9 +82,9 @@ impl AbilityDefinition {
 
     /// Validates IDs, capability closure, and exact selected data.
     pub fn validate(&self) -> Result<(), AbilityDefinitionError> {
-        if !is_selected_ability(self.id) {
+        let Some(expected) = canonical_ability_for_wire(self.id) else {
             return Err(AbilityDefinitionError::UnsupportedId { id: self.id });
-        }
+        };
 
         if !matches!(&self.capability, CapabilityStatus::Supported) {
             return Err(AbilityDefinitionError::UnsupportedCapability { id: self.id });
@@ -95,6 +95,7 @@ impl AbilityDefinition {
             AbilityEffectDefinition::None
                 | AbilityEffectDefinition::PostSummonAdjacentOpponentAttackMinusOne
                 | AbilityEffectDefinition::NonSuperEffectiveAttackImmunity
+                | AbilityEffectDefinition::MentalEffectImmunity
         ) {
             return Err(AbilityDefinitionError::UnsupportedEffect {
                 id: self.id,
@@ -102,9 +103,6 @@ impl AbilityDefinition {
             });
         }
 
-        let Some(expected) = canonical_ability(self.id) else {
-            return Err(AbilityDefinitionError::UnsupportedId { id: self.id });
-        };
         if *self != expected {
             return Err(AbilityDefinitionError::DefinitionMismatch { id: self.id });
         }
@@ -205,6 +203,13 @@ fn canonical_ability(id: AbilityId) -> Option<AbilityDefinition> {
     }
 }
 
+fn canonical_ability_for_wire(id: AbilityId) -> Option<AbilityDefinition> {
+    canonical_ability(id).or_else(|| match u64::from(id) {
+        165 => Some(aroma_veil()),
+        _ => None,
+    })
+}
+
 const fn selected_ability_id(value: u64) -> AbilityId {
     match SafeU53::new(value) {
         Ok(value) => AbilityId::new(value),
@@ -240,6 +245,14 @@ fn wonder_guard() -> AbilityDefinition {
     AbilityDefinition {
         id: ability_id(25),
         effect: AbilityEffectDefinition::NonSuperEffectiveAttackImmunity,
+        capability: supported(),
+    }
+}
+
+pub(crate) fn aroma_veil() -> AbilityDefinition {
+    AbilityDefinition {
+        id: ability_id(165),
+        effect: AbilityEffectDefinition::MentalEffectImmunity,
         capability: supported(),
     }
 }

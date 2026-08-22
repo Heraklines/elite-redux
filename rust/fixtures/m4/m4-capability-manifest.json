@@ -6,12 +6,16 @@
   "supported": {
     "modifier_tiers": [0, 1, 2, 3, 4],
     "modes": ["CLASSIC_SOLO", "CLASSIC_COOP_DOUBLE"],
-    "growth_rates": [{ "id": 3, "key": "MEDIUM_SLOW" }],
+    "growth_rates": [
+      { "id": 2, "key": "MEDIUM_FAST" },
+      { "id": 3, "key": "MEDIUM_SLOW" }
+    ],
     "natures": [
       { "id": 0, "key": "HARDY" },
       { "id": 3, "key": "ADAMANT" },
       { "id": 10, "key": "TIMID" },
-      { "id": 15, "key": "MODEST" }
+      { "id": 15, "key": "MODEST" },
+      { "id": 24, "key": "QUIRKY" }
     ],
     "modifier_registry_keys": [
       "AMULET_COIN",

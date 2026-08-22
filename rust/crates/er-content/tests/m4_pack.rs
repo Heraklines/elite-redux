@@ -1,8 +1,10 @@
 use std::error::Error;
 
 use er_canonical::content_digest;
+use er_content::pack::m4_abilities::{SELECTED_M4_ABILITY_IDS, validate_selected_m4_abilities};
 use er_content::pack::m4_moves::{
-    SELECTED_M4_MOVE_IDS, body_slam_34, selected_m4_move_definitions, validate_selected_m4_moves,
+    SELECTED_M4_MOVE_IDS, body_slam_34, hyper_fang_158, quick_attack_98,
+    selected_m4_move_definitions, sweet_scent_230, tail_whip_39, validate_selected_m4_moves,
 };
 use er_content::pack::m4_species::{SELECTED_M4_SPECIES_IDS, validate_selected_m4_species};
 use er_content::pack::{
@@ -12,8 +14,9 @@ use er_content::pack::{
 };
 use er_types::battle_ids::{ContentPackHash, MoveId};
 use er_types::battle_model::{
-    CapabilityStatus, CapabilitySubject, EffectChance, MoveAccuracy, MoveCategory,
-    MoveEffectDefinition, MoveFlag, MovePower, MoveTarget, PokemonType, StatusKind,
+    AbilityEffectDefinition, BattleStat, CapabilityStatus, CapabilitySubject, EffectChance,
+    MoveAccuracy, MoveCategory, MoveEffectDefinition, MoveFlag, MovePower, MoveTarget, PokemonType,
+    StatusKind,
 };
 use er_types::ids::SafeU53;
 use serde_json::Value;
@@ -57,7 +60,7 @@ fn m3_selection_bytes_and_hash_remain_unchanged() -> Result<(), Box<dyn Error>> 
     assert_eq!(first, second);
     assert_eq!(first_bytes, serde_json::to_vec(&second)?);
     assert_eq!(first.hash, first.recompute_hash()?);
-    assert_eq!(first.moves.len(), SELECTED_M4_MOVE_IDS.len() - 1);
+    assert_eq!(first.moves.len(), SELECTED_M4_MOVE_IDS.len() - 5);
     assert_eq!(first.capability_manifest, selected_capability_manifest());
     assert_ne!(first.hash, m4.hash);
     Ok(())
@@ -74,6 +77,14 @@ fn m4_contains_exact_body_slam_and_new_hash() -> Result<(), Box<dyn Error>> {
     assert_ne!(pack.hash, selected_content_pack()?.hash);
     validate_selected_m4_moves(&pack.moves)?;
     validate_selected_m4_species(&pack.species)?;
+    validate_selected_m4_abilities(&pack.abilities)?;
+    assert_eq!(
+        pack.abilities
+            .iter()
+            .map(|ability| ability.id.get().get())
+            .collect::<Vec<_>>(),
+        SELECTED_M4_ABILITY_IDS
+    );
     assert_eq!(
         pack.species
             .iter()
@@ -105,6 +116,48 @@ fn m4_contains_exact_body_slam_and_new_hash() -> Result<(), Box<dyn Error>> {
         ]
     );
     assert_eq!(body.capability, CapabilityStatus::Supported);
+    assert_eq!(
+        pack.moves
+            .iter()
+            .find(|definition| definition.id == move_id(39)),
+        Some(&tail_whip_39())
+    );
+    assert_eq!(
+        pack.moves
+            .iter()
+            .find(|definition| definition.id == move_id(98)),
+        Some(&quick_attack_98())
+    );
+    assert_eq!(
+        pack.moves
+            .iter()
+            .find(|definition| definition.id == move_id(158)),
+        Some(&hyper_fang_158())
+    );
+    assert_eq!(
+        hyper_fang_158().effects,
+        vec![MoveEffectDefinition::Damage, MoveEffectDefinition::Flinch]
+    );
+    assert_eq!(
+        pack.moves
+            .iter()
+            .find(|definition| definition.id == move_id(230)),
+        Some(&sweet_scent_230())
+    );
+    assert_eq!(
+        sweet_scent_230().effects,
+        vec![MoveEffectDefinition::ChangeStatStage {
+            stat: BattleStat::Evasion,
+            delta: -2,
+        }]
+    );
+    assert_eq!(
+        pack.abilities
+            .iter()
+            .find(|definition| definition.id.get().get() == 165)
+            .map(|definition| definition.effect),
+        Some(AbilityEffectDefinition::MentalEffectImmunity)
+    );
 
     let capability = pack
         .capability_manifest

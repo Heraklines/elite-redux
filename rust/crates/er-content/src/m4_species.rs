@@ -1,8 +1,8 @@
-use crate::species::{SpeciesDefinition, nacli, species_definitions};
+use crate::species::{SpeciesDefinition, lechonk, nacli, species_definitions};
 use er_types::battle_ids::SpeciesId;
 use thiserror::Error;
 
-pub const SELECTED_M4_SPECIES_IDS: [u64; 7] = [1, 7, 19, 23, 50, 52, 932];
+pub const SELECTED_M4_SPECIES_IDS: [u64; 8] = [1, 7, 19, 23, 50, 52, 915, 932];
 
 #[derive(Debug, Error)]
 pub enum M4SpeciesCollectionError {
@@ -20,6 +20,7 @@ pub enum M4SpeciesCollectionError {
 
 pub fn selected_m4_species_definitions() -> Vec<SpeciesDefinition> {
     let mut definitions = species_definitions();
+    definitions.push(lechonk());
     definitions.push(nacli());
     definitions
 }

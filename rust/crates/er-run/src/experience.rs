@@ -154,6 +154,8 @@ fn closed_form(level: u32, curve: usize) -> Option<u64> {
 /// TypeScript curve and produce the exact threshold for `level`.
 pub fn level_total_exp(level: u16, growth_rate: &GrowthRateKind) -> Result<u64, LevelExpError> {
     match growth_rate {
+        GrowthRateKind::MediumFast => total_exp_at_level(level, curve::MEDIUM_FAST)
+            .ok_or(LevelExpError::LevelOutsideSupportedRange),
         GrowthRateKind::MediumSlow => total_exp_at_level(level, curve::MEDIUM_SLOW)
             .ok_or(LevelExpError::LevelOutsideSupportedRange),
     }

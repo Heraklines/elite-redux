@@ -512,6 +512,10 @@ fn evaluate_defensive_resolved(
                 reason: DefensiveAbilityPassReason::NotApplicable,
             }
         }
+        AbilityEffectDefinition::MentalEffectImmunity => DefensiveAbilityOutcome::Passed {
+            ability_id: resolved.ability_id,
+            reason: DefensiveAbilityPassReason::NotApplicable,
+        },
         AbilityEffectDefinition::NonSuperEffectiveAttackImmunity => {
             if input.move_category == MoveCategory::Status {
                 return DefensiveAbilityOutcome::Passed {

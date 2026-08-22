@@ -160,6 +160,7 @@ pub struct MoveTargetResult {
     pub hp_mutation: Option<HpMutation>,
     pub status_effects: Vec<StatusApplicationOutcome>,
     pub stat_stage_effects: Vec<StatStageMutation>,
+    pub flinched: bool,
     pub faint_request: Option<FaintRequest>,
 }
 
@@ -178,6 +179,7 @@ impl MoveTargetResult {
             hp_mutation: None,
             status_effects: Vec::new(),
             stat_stage_effects: Vec::new(),
+            flinched: false,
             faint_request: None,
         }
     }
@@ -351,6 +353,7 @@ fn resolve_damaging_target<G: DefensiveAbilityGate>(
             hp_mutation: None,
             status_effects: Vec::new(),
             stat_stage_effects: Vec::new(),
+            flinched: false,
             faint_request: None,
         });
     }
@@ -378,6 +381,7 @@ fn resolve_damaging_target<G: DefensiveAbilityGate>(
             hp_mutation: None,
             status_effects: Vec::new(),
             stat_stage_effects: Vec::new(),
+            flinched: false,
             faint_request: None,
         });
     }
@@ -396,6 +400,7 @@ fn resolve_damaging_target<G: DefensiveAbilityGate>(
             hp_mutation: None,
             status_effects: Vec::new(),
             stat_stage_effects: Vec::new(),
+            flinched: false,
             faint_request: None,
         });
     }
@@ -434,6 +439,7 @@ fn resolve_damaging_target<G: DefensiveAbilityGate>(
         hp_mutation,
         status_effects: Vec::new(),
         stat_stage_effects: Vec::new(),
+        flinched: false,
         faint_request,
     };
 
@@ -467,6 +473,7 @@ fn resolve_status_target(
             hp_mutation: None,
             status_effects: Vec::new(),
             stat_stage_effects: Vec::new(),
+            flinched: false,
             faint_request: None,
         });
     }
@@ -483,6 +490,7 @@ fn resolve_status_target(
         hp_mutation: None,
         status_effects: Vec::new(),
         stat_stage_effects: Vec::new(),
+        flinched: false,
         faint_request: None,
     };
     apply_non_damage_effects(runtime, actor, target, move_definition, &mut result)?;
@@ -669,6 +677,13 @@ fn apply_non_damage_effects(
                     let mutation = apply_stage_delta(&mut target.stat_stages, *stat, *delta);
                     result.stat_stage_effects.push(mutation);
                 }
+            }
+            MoveEffectDefinition::Flinch => {
+                result.flinched = secondary_stage_chance(
+                    runtime,
+                    move_definition.effect_chance.clone(),
+                    move_definition.id,
+                )?;
             }
         }
     }

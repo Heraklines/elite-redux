@@ -6,7 +6,7 @@ use er_battle::legality::{build_command_offer, build_scripted_enemy_offer};
 use er_battle::outcome::derive_battle_outcome;
 use er_battle::resolver::{BattleMutation, BattleNextDecision};
 use er_battle::{resolve_replacement, resolve_turn};
-use er_content::pack::{ContentPack, selected_content_pack};
+use er_content::pack::{ContentPack, selected_content_pack, selected_m4_content_pack};
 use er_content::species::find_species;
 use er_rng::audit::RngReason;
 use er_rng::battle::BattleRngState;
@@ -1041,5 +1041,48 @@ fn replacement_authenticates_stored_occurrence_consumes_no_turn_or_rng_and_drain
             ability_id,
         } if *pokemon == player_reserve && *ability_id == INTIMIDATE_ABILITY_ID
     ));
+    Ok(())
+}
+
+#[test]
+fn m4_hyper_fang_flinch_cancels_a_slower_pending_action() -> TestResult {
+    let content = selected_m4_content_pack()?;
+    let player = pokemon(
+        &content,
+        1,
+        Some(seat(1)?),
+        &[158],
+        100,
+        StatusKind::None,
+        200,
+    )?;
+    let enemy = pokemon(&content, 2, None, &[1], 100, StatusKind::None, 100)?;
+    let enemy_id = pokemon_id(2)?;
+    let mut winning_seed = None;
+    for index in 0..512 {
+        let mut state = state_with_parties(&content, vec![player.clone()], vec![enemy.clone()])?;
+        let battle_turn = battle(&state)?.turn;
+        battle_mut(&mut state)?.battle_rng =
+            BattleRngState::new(format!("m4-turn-flinch-{index}"), battle_turn);
+        let commands = admit_single_fights(&mut state, &content, 158, 1)?;
+        let operation = turn_operation(&state)?;
+        let transition = resolve_turn(
+            &state,
+            &commands,
+            AuthorityEpoch::new(safe(9)?),
+            &operation,
+            &content,
+        )?;
+        if transition.action_order.iter().any(|action| {
+            action.actor == enemy_id && action.disposition == ActionDisposition::CancelledByFlinch
+        }) {
+            winning_seed = Some(index);
+            break;
+        }
+    }
+    assert!(
+        winning_seed.is_some(),
+        "no deterministic pre-action flinch found in 512 seeds"
+    );
     Ok(())
 }

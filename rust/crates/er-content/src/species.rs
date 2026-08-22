@@ -215,6 +215,7 @@ fn canonical_species(id: SpeciesId) -> Option<SpeciesDefinition> {
 
 fn canonical_species_for_wire(id: SpeciesId) -> Option<SpeciesDefinition> {
     canonical_species(id).or_else(|| match u64::from(id) {
+        915 => Some(lechonk()),
         932 => Some(nacli()),
         _ => None,
     })
@@ -344,6 +345,25 @@ fn meowth() -> SpeciesDefinition {
             special_attack: 65,
             special_defense: 40,
             speed: 90,
+        },
+        capability: supported(),
+    }
+}
+
+pub(crate) fn lechonk() -> SpeciesDefinition {
+    SpeciesDefinition {
+        id: species_id(915),
+        base_types: PokemonTyping {
+            primary: PokemonType::Normal,
+            secondary: None,
+        },
+        base_stats: SpeciesBaseStats {
+            hp: 54,
+            attack: 45,
+            defense: 40,
+            special_attack: 35,
+            special_defense: 45,
+            speed: 35,
         },
         capability: supported(),
     }

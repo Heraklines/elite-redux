@@ -18,7 +18,7 @@ use er_battle::move_pipeline::{
 };
 use er_battle::status::{ParalysisActivationOutcome, StatusApplicationOutcome, StatusRejection};
 use er_content::moves::{MoveDefinition, find_move};
-use er_content::pack::{ContentPack, selected_content_pack};
+use er_content::pack::{ContentPack, selected_content_pack, selected_m4_content_pack};
 use er_rng::audit::RngReason;
 use er_rng::battle::{BattleRngState, RngRuntime};
 use er_rng::phaser::{PhaserRdgState, RunRngState};
@@ -2248,6 +2248,66 @@ fn real_ability_adapter_blocks_wonder_guard_neutral_and_passes_super_effective()
     assert_reasons(
         &super_runtime,
         &[RngReason::CriticalHit, RngReason::DamageVariance],
+    );
+    Ok(())
+}
+
+#[test]
+fn m4_hyper_fang_flinch_is_audited_and_marked_for_later_action_cancellation() -> TestResult {
+    let content = selected_m4_content_pack()?;
+    let actor = pokemon(
+        1,
+        BattleSide::Player,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let base_target = pokemon(
+        2,
+        BattleSide::Enemy,
+        typing(PokemonType::Normal, None),
+        StatusKind::None,
+        200,
+        200,
+        0,
+        &[],
+        0,
+    )?;
+    let gate = RecordingGate::new(GateBehavior::Pass);
+    let mut flinch_seed = None;
+    for index in 0..512 {
+        let seed = format!("m4-hyper-fang-{index}");
+        let mut runtime = runtime_for_seed(&seed)?;
+        let mut target = base_target.clone();
+        let result = resolve_target_effect(
+            &mut runtime,
+            &actor,
+            target_slot()?,
+            &mut target,
+            &move_definition(&content, 158)?,
+            &content,
+            1,
+            false,
+            &gate,
+        )?;
+        if result.flinched {
+            assert!(
+                runtime
+                    .audit_entries()
+                    .iter()
+                    .any(|draw| draw.reason == RngReason::SecondaryEffect)
+            );
+            flinch_seed = Some(seed);
+            break;
+        }
+    }
+    assert!(
+        flinch_seed.is_some(),
+        "no deterministic Hyper Fang flinch found in 512 seeds"
     );
     Ok(())
 }

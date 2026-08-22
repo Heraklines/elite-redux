@@ -329,12 +329,13 @@ pub fn selected_run_capability_manifest() -> Result<RunCapabilityManifest, Capab
         oracle_game_sha: RUN_ORACLE_GAME_SHA.to_owned(),
         fail_closed: true,
         supported_modes,
-        supported_growth_rates: vec![GrowthRateId::new(3)],
+        supported_growth_rates: vec![GrowthRateId::new(2), GrowthRateId::new(3)],
         supported_natures: vec![
             NatureId::new(0),
             NatureId::new(3),
             NatureId::new(10),
             NatureId::new(15),
+            NatureId::new(24),
         ],
         modifier_registry_keys: vec![
             "AMULET_COIN".to_owned(),
