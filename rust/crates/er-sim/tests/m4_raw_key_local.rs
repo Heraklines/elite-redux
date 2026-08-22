@@ -313,13 +313,33 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
             browser_repeat: false,
             focus: InputFocus::Game,
         },
-        RawInputEvent::KeyUp {
-            code: PhysicalKey::Space,
-        },
     ] {
         let effects = kernel.step(KernelInput::RawInput { seat: owner, event })?;
         assert!(effects.is_empty(), "run intents remain internal");
     }
+    assert!(
+        kernel
+            .step(KernelInput::RawInput {
+                seat: owner,
+                event: RawInputEvent::KeyDown {
+                    code: PhysicalKey::Space,
+                    printable: true,
+                    browser_repeat: true,
+                    focus: InputFocus::Game,
+                },
+            })?
+            .is_empty()
+    );
+    assert!(
+        kernel
+            .step(KernelInput::RawInput {
+                seat: owner,
+                event: RawInputEvent::KeyUp {
+                    code: PhysicalKey::Space,
+                },
+            })?
+            .is_empty()
+    );
     for event in [
         RawInputEvent::KeyDown {
             code: PhysicalKey::Space,
