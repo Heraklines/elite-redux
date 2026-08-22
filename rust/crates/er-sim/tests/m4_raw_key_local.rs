@@ -247,7 +247,7 @@ fn crossroads_state_and_control(
 }
 
 #[test]
-fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<dyn Error>> {
+fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Error>> {
     use er_kernel::{GameKernel, KernelInput};
     use er_types::input::{
         GameButton, InputFocus, InputMap, KeyBinding, PhysicalKey, RawInputEvent,
@@ -304,13 +304,38 @@ fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<d
         let effects = kernel.step(KernelInput::RawInput { seat: owner, event })?;
         assert!(effects.is_empty(), "run intents remain internal");
     }
+    for event in [
+        RawInputEvent::KeyDown {
+            code: PhysicalKey::Space,
+            printable: true,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+        RawInputEvent::KeyUp {
+            code: PhysicalKey::Space,
+        },
+    ] {
+        assert!(
+            kernel
+                .step(KernelInput::RawInput { seat: owner, event })?
+                .is_empty()
+        );
+    }
 
     let actions = kernel.take_run_actions();
     assert_eq!(
         actions,
-        vec![er_types::run_model::RunSurfaceAction::Crossroads(
-            er_types::run_model::CrossroadsAction::MoveOn
-        )]
+        vec![
+            er_types::run_model::RunSurfaceAction::Crossroads(
+                er_types::run_model::CrossroadsAction::MoveOn,
+            ),
+            er_types::run_model::RunSurfaceAction::BiomeSelect(
+                er_types::run_model::BiomeSelectAction {
+                    route_node: er_types::run_ids::RouteNodeId::new(safe(1)),
+                    biome: er_types::run_ids::BiomeId::new(safe(1)),
+                },
+            ),
+        ]
     );
     assert_ne!(
         kernel
