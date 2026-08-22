@@ -20,6 +20,7 @@ import { isErBattleFormCustomSpecies, isErGenericPoolBanned } from "#data/elite-
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -71,6 +72,13 @@ describe.skipIf(!RUN)("ER generic-pool bans (Weird Dream / GTS, #414)", () => {
     // The predicate never bans vanilla ids - vanilla pools stay vanilla-ruled.
     expect(isErGenericPoolBanned(SpeciesId.SNORLAX, "Snorlax")).toBe(false);
     expect(isErGenericPoolBanned(SpeciesId.URSHIFU, "Urshifu")).toBe(false);
+  });
+
+  it("never admits standalone Primal Cascoon to generic trainer pools", () => {
+    setErDifficulty("hell");
+    const primalCascoon = allSpecies.find(sp => Number(sp.speciesId) === ErSpeciesId.CASCOON_PRIMAL);
+    expect(primalCascoon).toBeDefined();
+    expect(isErBattleFormCustomSpecies(primalCascoon!.speciesId, primalCascoon!.name)).toBe(true);
   });
 
   it("normal customs are allowed on Elite/Hell but banned on the pure-vanilla difficulties (#345)", () => {

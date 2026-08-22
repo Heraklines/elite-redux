@@ -5076,9 +5076,6 @@ export class BattleScene extends SceneBase {
   }
 
   validateVoucher(voucher: Voucher, args?: unknown[]): boolean {
-    if (this.gameMode.isFun) {
-      return false;
-    }
     if (!Object.hasOwn(this.gameData.voucherUnlocks, voucher.id) && voucher.validate(args)) {
       this.gameData.voucherUnlocks[voucher.id] = Date.now();
       this.ui.achvBar.showAchv(voucher);

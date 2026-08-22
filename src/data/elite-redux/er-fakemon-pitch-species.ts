@@ -452,7 +452,7 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
     name: "Lilligant Verdant",
     slug: "lilligant_verdant",
     editorConst: "SPECIES_LILLIGANT_VERDANT",
-    types: [PokemonType.WATER, PokemonType.FAIRY],
+    types: [PokemonType.WATER, PokemonType.FAIRY, PokemonType.GHOST],
     stats: [90, 50, 80, 110, 90, 80],
     actives: [6071, 5298, 5281],
     innates: [5596, 5233, AbilityId.QUEENLY_MAJESTY],

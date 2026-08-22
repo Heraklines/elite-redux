@@ -20,13 +20,15 @@
 
 import { allMoves } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
-import { computeBattleInfoStatRows } from "#ui/battle-info-overlay";
+import { computeBattleInfoEffectiveStat, computeBattleInfoStatRows } from "#ui/battle-info-overlay";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -98,5 +100,21 @@ describe.skipIf(!RUN)("BattleInfoOverlay stats rows — Acc/Eva/Crit wiring", ()
     vi.spyOn(mon, "getCritStage").mockReturnValue(6);
 
     expect(critRow(mon).stage).toBe(4);
+  });
+
+  it("shows the same effective Speed used by turn order, including Tailwind", async () => {
+    game.override.battleStyle("single").enemySpecies(SpeciesId.SNORLAX).enemyAbility(AbilityId.BALL_FETCH);
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    const mon = game.field.getPlayerPokemon();
+    const before = computeBattleInfoEffectiveStat(mon, Stat.SPD);
+
+    game.scene.arena.addTag(ArenaTagType.TAILWIND, 4, MoveId.TAILWIND, mon.id, ArenaTagSide.PLAYER);
+    const after = computeBattleInfoEffectiveStat(mon, Stat.SPD);
+
+    expect(after.base).toBe(before.base);
+    expect(after.effective).toBe(mon.getEffectiveStat(Stat.SPD));
+    expect(after.effective).toBeGreaterThan(before.effective);
+    expect(after.text).toBe(`${after.base}(${after.effective})`);
+    expect(after.direction).toBe(1);
   });
 });

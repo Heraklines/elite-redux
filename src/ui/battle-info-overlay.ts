@@ -138,6 +138,21 @@ export function computeBattleInfoStatRows(mon: Pokemon): { label: string; stage:
   ];
 }
 
+/** Pure model for the effective-stat values drawn in the right-hand box. */
+export function computeBattleInfoEffectiveStat(
+  mon: Pokemon,
+  stat: EffectiveStat,
+): { base: number; effective: number; text: string; direction: -1 | 0 | 1 } {
+  const base = mon.getStat(stat);
+  const effective = mon.getEffectiveStat(stat);
+  return {
+    base,
+    effective,
+    text: effective === base ? `${base}` : `${base}(${effective})`,
+    direction: effective === base ? 0 : effective > base ? 1 : -1,
+  };
+}
+
 // Cream-box layouts per page (drawn as the fallback panel; content placed inside).
 const STATS_BOXES: Box[] = [
   [64, 32, 128, 32], // name + type
@@ -563,14 +578,10 @@ export class BattleInfoOverlay {
       c.add(g);
     });
 
-    // Stat numbers (right box), 6 rows. For the 5 battle stats we show the value
-    // after the in-battle STAT-STAGE multiplier next to the base when a stage is
-    // active — e.g. a +1 Atk reads "147(220)", coloured green for a boost / red for
-    // a drop. We deliberately apply ONLY stat stages (the visible up/down arrows),
-    // NOT held-item/ability passives like Eviolite — those have no stage arrow, so
-    // folding them in (via getEffectiveStat) made stats "look changed" with nothing
-    // to explain it. The base already folds in vitamins, EVs, IVs and nature
-    // (getStat). HP has no stat stages → current/max.
+    // Stat numbers (right box), 6 rows. The parenthesized value is the engine's
+    // actual effective battle stat, including stages, abilities, items, status,
+    // Tailwind/pledges and tactical effects. This keeps the displayed Speed in
+    // lockstep with the speed-order calculation instead of showing stages only.
     const numbers: { lbl: string; stat: EffectiveStat | null }[] = [
       { lbl: "HP", stat: null },
       { lbl: "Atk", stat: Stat.ATK },
@@ -590,16 +601,9 @@ export class BattleInfoOverlay {
       if (stat === null) {
         text = `${mon.hp}/${mon.getMaxHp()}`;
       } else {
-        const base = mon.getStat(stat);
-        const stage = mon.getStatStage(stat); // -6..+6
-        if (stage === 0) {
-          text = `${base}`;
-        } else {
-          // Canonical battle-stat stage multiplier: max(2,2+s)/max(2,2-s).
-          const eff = Math.floor((base * Math.max(2, 2 + stage)) / Math.max(2, 2 - stage));
-          text = `${base}(${eff})`;
-          dir = stage > 0 ? 1 : -1;
-        }
+        const displayed = computeBattleInfoEffectiveStat(mon, stat);
+        text = displayed.text;
+        dir = displayed.direction;
       }
       const v = addTextObject(232, ny, text, TextStyle.WINDOW_ALT, { fontSize: "44px" });
       v.setOrigin(1, 0);

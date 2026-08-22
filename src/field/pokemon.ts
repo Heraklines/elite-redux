@@ -323,7 +323,7 @@ import {
 } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
-import type { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import {
@@ -597,6 +597,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ivs?: number[],
     nature?: Nature,
     dataSource?: Pokemon | PokemonData,
+    trainerOwned = false,
   ) {
     super(globalScene, x, y);
 
@@ -699,7 +700,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
       if (level > 1) {
         const fused = new BooleanHolder(globalScene.gameMode.isSplicedOnly);
-        if (!fused.value && this.isEnemy() && !this.hasTrainer()) {
+        // EnemyPokemon.trainerSlot is assigned only after super() returns, so
+        // virtual hasTrainer() is necessarily false here. Use the constructor
+        // ownership hint to keep trainer/ghost teams out of wild fusion rolls.
+        if (!fused.value && this.isEnemy() && !trainerOwned) {
           globalScene.applyModifier(EnemyFusionChanceModifier, false, fused);
           // ER Laboratory (#439 §3): the experiment biome biases the WILD fusion
           // roll - ~half of wild encounters here come out as fusions. Only the
@@ -9587,6 +9591,7 @@ export class EnemyPokemon extends Pokemon {
       undefined,
       dataSource ? dataSource.nature : undefined,
       dataSource,
+      trainerSlot !== TrainerSlot.NONE,
     );
 
     this.trainerSlot = trainerSlot;

@@ -1075,9 +1075,6 @@ function grantCandy(species: SpeciesId, amount: number): void {
 
 /** Add egg-gacha vouchers (clamped to >= 0; rides the normal save cycle like candy). */
 function grantVouchers(voucherType: VoucherType, count: number): void {
-  if (globalScene.gameMode.isFun) {
-    return;
-  }
   if (count > 0) {
     globalScene.gameData.voucherCounts[voucherType] += count;
   }

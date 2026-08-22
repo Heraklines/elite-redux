@@ -156,4 +156,32 @@ describe("ER integer depth reward rates", () => {
     expect(resolveErRewardRates(context({ difficulty: "hell", runWave: 181 })).baseVoucher).toBe(11);
     expect(resolveErRewardRates(context({ difficulty: "youngster", runWave: 181 })).totalVoucher).toBe(0);
   });
+
+  it("uses the lower Fun Youngster curve and Classic Ace rates for Fun Hell", () => {
+    const funYoungster = Array.from({ length: 10 }, (_, tier) =>
+      resolveErRewardRates(
+        context({
+          difficulty: "youngster",
+          runWave: tier * 20 + 1,
+          funMode: true,
+        }),
+      ),
+    );
+    const classicYoungster = Array.from({ length: 10 }, (_, tier) =>
+      resolveErRewardRates(context({ difficulty: "youngster", runWave: tier * 20 + 1 })),
+    );
+    expect(funYoungster.map(rate => rate.baseCandy)).toEqual([1, 1, 1, 2, 2, 2, 3, 4, 4, 6]);
+    expect(funYoungster.reduce((sum, rate) => sum + rate.baseCandy, 0)).toBe(26);
+    expect(classicYoungster.reduce((sum, rate) => sum + rate.baseCandy, 0)).toBe(37);
+
+    for (let tier = 0; tier < 10; tier++) {
+      const funHell = resolveErRewardRates(context({ difficulty: "hell", runWave: tier * 20 + 1, funMode: true }));
+      const classicAce = resolveErRewardRates(context({ difficulty: "ace", runWave: tier * 20 + 1 }));
+      expect([funHell.baseShiny, funHell.baseCandy, funHell.baseVoucher]).toEqual([
+        classicAce.baseShiny,
+        classicAce.baseCandy,
+        classicAce.baseVoucher,
+      ]);
+    }
+  });
 });

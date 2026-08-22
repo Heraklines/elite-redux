@@ -65,11 +65,7 @@ import {
   restoreErCustomTrainerTracking,
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
-import {
-  getErEndlessSaveData,
-  isErEndlessContinuationActive,
-  restoreErEndlessContinuation,
-} from "#data/elite-redux/er-endless-continuation";
+import { getErEndlessSaveData, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { getFunModeConfig, resetFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import {
@@ -7279,9 +7275,9 @@ export class GameData {
       return false;
     }
 
-    // Run candy uses the same integer depth/Favour/Endless total displayed by
-    // the reward-rate panel. Eggs and ordinary Fun Mode remain unscaled.
-    if (count > 0 && (!globalScene.gameMode.isFun || isErEndlessContinuationActive())) {
+    // Run candy uses the same integer depth/Favour/Endless/Fun total displayed
+    // by the reward-rate panel. Egg/explicit grants remain unscaled.
+    if (count > 0) {
       count *= fromEgg ? 1 : getCurrentErRewardRates().totalCandy;
     }
 

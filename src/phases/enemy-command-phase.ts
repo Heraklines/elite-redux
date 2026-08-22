@@ -284,7 +284,12 @@ export class EnemyCommandPhase extends FieldPhase {
     if (trainer && enemyPokemon.getMoveQueue().length === 0) {
       const opponents = enemyPokemon.getOpponents();
 
-      if (!enemyPokemon.isTrapped()) {
+      // A trainer may voluntarily switch each active seat at most once in a row.
+      // Once that cap is reached, skip the expensive bench evaluation and fall
+      // through to getNextMove(), which performs the normal move + target AI
+      // calculation. Any attack below ends the consecutive-switch streak.
+      const consecutiveSwitchCap = battle.getBattlerCount();
+      if (!enemyPokemon.isTrapped() && battle.enemySwitchCounter < consecutiveSwitchCap) {
         // ER smarter AI (Elite/Hell): use the best-move matchup metric for both
         // the bench and the active mon, and a tuned (lower) switch threshold so
         // the AI swaps to a real counter more readily. Inactive -> vanilla.
@@ -344,7 +349,7 @@ export class EnemyCommandPhase extends FieldPhase {
       skip: this.skipTurn,
     };
 
-    globalScene.currentBattle.enemySwitchCounter = Math.max(globalScene.currentBattle.enemySwitchCounter - 1, 0);
+    globalScene.currentBattle.enemySwitchCounter = 0;
 
     this.end();
   }

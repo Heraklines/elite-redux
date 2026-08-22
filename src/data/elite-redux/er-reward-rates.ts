@@ -4,6 +4,7 @@ import {
   getErEndlessEquivalentDepth,
   isErEndlessContinuationActive,
 } from "#data/elite-redux/er-endless-continuation";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getErDifficulty, type ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getErRunPacing, type ErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { getRunFavourCap, getRunShinyFavour } from "#data/elite-redux/er-shiny-favour";
@@ -19,6 +20,8 @@ export interface ErRewardRateContext {
   favourCap: 3 | 5;
   endlessActive: boolean;
   endlessEquivalentDepth: number;
+  /** Resolve the deliberately lower Fun-mode economy instead of Classic. */
+  funMode?: boolean;
 }
 
 export interface ErRewardRateBreakdown {
@@ -71,6 +74,15 @@ function rewardDifficulty(difficulty: ErDifficulty): RewardDifficulty {
   return difficulty === "mystery" ? "hell" : difficulty;
 }
 
+/**
+ * Fun Youngster's ten-tier curve is approximately 30% below the unmodified
+ * Classic Youngster curve in aggregate. Keep integer rates because candy and
+ * voucher balances are integer account currencies.
+ */
+const FUN_YOUNGSTER_SHINY = Object.freeze([1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+const FUN_YOUNGSTER_CANDY = Object.freeze([1, 1, 1, 2, 2, 2, 3, 4, 4, 6]);
+const FUN_YOUNGSTER_VOUCHER = Object.freeze([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
 function assertRateTable(key: string, values: readonly number[], youngsterVouchers = false): void {
   if (
     values.length !== 10
@@ -105,15 +117,20 @@ export function getErIntegerFavourMultiplier(favourPoints: number, cap: 3 | 5): 
 }
 
 export function resolveErRewardRates(context: ErRewardRateContext): ErRewardRateBreakdown {
-  const difficulty = rewardDifficulty(context.difficulty);
+  // Fun Hell deliberately pays the same base economy as unmodified Classic
+  // Ace. Fun Youngster uses its own lower curve below.
+  const difficulty = context.funMode && context.difficulty === "hell" ? "ace" : rewardDifficulty(context.difficulty);
   const equivalentWave = context.endlessActive
     ? 200
     : Math.min(200, Math.max(1, Math.floor(context.runWave)) * (context.pacing === "sprint" ? 2 : 1));
   const tier = context.endlessActive ? 10 : getErRewardTier(context.runWave, context.pacing);
   const tierIndex = tier - 1;
-  const baseShiny = rateTable(SHINY_KEYS[difficulty])[tierIndex];
-  const baseCandy = rateTable(CANDY_KEYS[difficulty])[tierIndex];
-  const baseVoucher = rateTable(VOUCHER_KEYS[context.pacing][difficulty], difficulty === "youngster")[tierIndex];
+  const funYoungster = context.funMode === true && context.difficulty === "youngster";
+  const baseShiny = funYoungster ? FUN_YOUNGSTER_SHINY[tierIndex] : rateTable(SHINY_KEYS[difficulty])[tierIndex];
+  const baseCandy = funYoungster ? FUN_YOUNGSTER_CANDY[tierIndex] : rateTable(CANDY_KEYS[difficulty])[tierIndex];
+  const baseVoucher = funYoungster
+    ? FUN_YOUNGSTER_VOUCHER[tierIndex]
+    : rateTable(VOUCHER_KEYS[context.pacing][difficulty], difficulty === "youngster")[tierIndex];
   const favourMultiplier = getErIntegerFavourMultiplier(context.favourPoints, context.favourCap);
   const endlessBonus = context.endlessActive
     ? Math.floor(
@@ -142,14 +159,16 @@ export function resolveErRewardRates(context: ErRewardRateContext): ErRewardRate
 export function getErRewardRatesAtWave(runWave: number): ErRewardRateBreakdown {
   const endlessActive = isErEndlessContinuationActive();
   const cap = Math.floor(getRunFavourCap()) >= 5 ? 5 : 3;
+  const funMode = globalScene.gameMode?.isFun === true;
   return resolveErRewardRates({
-    difficulty: getErDifficulty(),
+    difficulty: funMode ? getFunModeConfig().difficulty : getErDifficulty(),
     pacing: getErRunPacing(),
     runWave,
     favourPoints: getRunShinyFavour(),
     favourCap: cap,
     endlessActive,
     endlessEquivalentDepth: endlessActive ? getErEndlessEquivalentDepth(runWave) : 0,
+    funMode,
   });
 }
 

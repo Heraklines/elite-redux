@@ -42,6 +42,7 @@ import { CustomPokemonData } from "#data/pokemon/pokemon-data";
 import type { AbilityId } from "#enums/ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
 import { GameModes } from "#enums/game-modes";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { LevelMoves } from "#types/pokemon-level-moves";
@@ -340,7 +341,14 @@ describe("Fun Mode deterministic per-Pokemon randomization", () => {
     expect(replacement).not.toBeNull();
     expect(current).not.toContain(replacement);
     expect(allMoves[replacement!].isUnimplemented).toBe(false);
+    expect(allMoves[replacement!].category).not.toBe(MoveCategory.STATUS);
     expect(getFunScrambledMoveId(12345, MoveId.TACKLE, 20, 3, current)).toBe(replacement);
+
+    const statusMove = allMoves.find(move => move?.category === MoveCategory.STATUS && !move.isUnimplemented);
+    expect(statusMove).toBeDefined();
+    const statusReplacement = getFunScrambledMoveId(12345, statusMove!.id, 20, 3, current);
+    expect(statusReplacement).not.toBeNull();
+    expect(allMoves[statusReplacement!].category).toBe(MoveCategory.STATUS);
   });
 
   it("selects a stable obtainable evolution target distinct from the current species", () => {

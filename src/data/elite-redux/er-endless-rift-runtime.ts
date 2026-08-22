@@ -120,31 +120,32 @@ function createPokemonMove(
   return new MoveConstructor(moveId, ppUsed, ppUp, maxPpOverride);
 }
 
-function selectTemporaryMove(
+function selectTemporaryMoveMatching(
   domain: string,
   excluded: ReadonlySet<MoveId>,
-  predicate: (move: Move) => boolean = () => true,
-): Move {
-  const pool = eligibleTemporaryMoves().filter(move => !excluded.has(move.id) && predicate(move));
-  const fallback = eligibleTemporaryMoves().filter(move => !excluded.has(move.id));
-  const candidates = pool.length > 0 ? pool : fallback;
-  return candidates[hash32(`${getErEndlessState()?.seed ?? ""}:${domain}`) % candidates.length];
+  predicate: (move: Move) => boolean,
+): Move | null {
+  const candidates = eligibleTemporaryMoves().filter(move => !excluded.has(move.id) && predicate(move));
+  return candidates.length > 0
+    ? candidates[hash32(`${getErEndlessState()?.seed ?? ""}:${domain}`) % candidates.length]
+    : null;
 }
 
 function installMetronomeVeilMoves(pokemon: Pokemon, current: ErEndlessBattleRuntimeSaveData): void {
   ensureMoveSnapshot(pokemon, current);
   const selected: Move[] = [];
   const excluded = new Set<MoveId>();
-  for (let slot = 0; slot < 4; slot++) {
-    const move = selectTemporaryMove(
+  const originalMoves = pokemon.getMoveset().slice(0, 4);
+  for (let slot = 0; slot < originalMoves.length; slot++) {
+    const original = originalMoves[slot].getMove();
+    const move = selectTemporaryMoveMatching(
       `veil:${current.wave}:${pokemonKey(pokemon)}:${slot}`,
       excluded,
-      slot < 2
-        ? candidate => candidate.category !== MoveCategory.STATUS
-        : slot === 2
-          ? candidate => candidate.category !== MoveCategory.STATUS && candidate.power >= 70
-          : () => true,
-    );
+      candidate =>
+        original.category === MoveCategory.STATUS
+          ? candidate.category === MoveCategory.STATUS
+          : candidate.category !== MoveCategory.STATUS,
+    ) ?? original;
     selected.push(move);
     excluded.add(move.id);
   }
@@ -946,18 +947,22 @@ export function recordErEndlessMoveOutcome(
   }
   if (hasErEndlessRift("move-scrambler") && slot >= 0) {
     const currentMove = user.getMoveset()[slot];
+    const currentCategory = currentMove.getMove().category;
     const excluded = new Set(user.getMoveset().map(candidate => candidate.moveId));
-    const replacement = selectTemporaryMove(
+    const replacement = selectTemporaryMoveMatching(
       `scramble:${current.wave}:${key}:${slot}:${globalScene.currentBattle.turn}:${currentMove.ppUsed}`,
       excluded,
+      candidate =>
+        currentCategory === MoveCategory.STATUS
+          ? candidate.category === MoveCategory.STATUS
+          : candidate.category !== MoveCategory.STATUS,
     );
-    user.moveset[slot] = createPokemonMove(
-      user,
-      replacement.id,
-      currentMove.ppUsed,
-      0,
-      currentMove.maxPpOverride ?? currentMove.getMovePp(),
-    );
+    if (replacement) {
+      // A changed move starts with its own full PP. Carrying the old move's PP
+      // usage/max override could make the replacement immediately unusable or
+      // display an impossible PP total.
+      user.moveset[slot] = createPokemonMove(user, replacement.id);
+    }
   }
   if (current.bloodcasts[key]) {
     delete current.bloodcasts[key];

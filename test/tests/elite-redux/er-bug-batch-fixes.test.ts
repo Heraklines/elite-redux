@@ -34,7 +34,7 @@ import { StatStageChangeAttr } from "#data/moves/move";
 import { removePokemonForTraining } from "#data/mystery-encounters/encounters/training-session-encounter";
 import { DANCING_MOVES } from "#data/mystery-encounters/requirements/requirement-groups";
 import { shouldAddEncounterPokemonToParty } from "#data/mystery-encounters/utils/encounter-pokemon-utils";
-import { CustomPokemonData, PokemonBattleData } from "#data/pokemon/pokemon-data";
+import { PokemonBattleData } from "#data/pokemon/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -105,10 +105,11 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
     expect(mon.getTag(BattlerTagType.DROWSY)).toBeUndefined();
   });
 
-  it("Soul Harvest's faint counter survives its save/load data channel", () => {
-    const data = new CustomPokemonData({ erSoulHarvestFaintCount: 4 });
-    const restored = new CustomPokemonData(JSON.parse(JSON.stringify(data)) as CustomPokemonData);
+  it("Soul Harvest's faint counter survives a mid-battle save but resets next battle", () => {
+    const data = new PokemonBattleData({ erSoulHarvestFaintCount: 4 });
+    const restored = new PokemonBattleData(JSON.parse(JSON.stringify(data)) as PokemonBattleData);
     expect(restored.erSoulHarvestFaintCount).toBe(4);
+    expect(new PokemonBattleData().erSoulHarvestFaintCount).toBe(0);
   });
 
   it("Dancing Lessons recognizes Mystic Dance", () => {

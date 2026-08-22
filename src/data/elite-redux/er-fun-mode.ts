@@ -12,6 +12,7 @@ import {
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
+import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
@@ -367,7 +368,16 @@ export function getFunScrambledMoveId(
     return null;
   }
   const excluded = new Set<MoveId>([...currentMoveIds, MoveId.NONE, MoveId.STRUGGLE]);
-  const pool = movePool().filter(moveId => !excluded.has(moveId));
+  const usedCategory = allMoves[usedMoveId].category;
+  const pool = movePool().filter(moveId => {
+    if (excluded.has(moveId)) {
+      return false;
+    }
+    const candidateCategory = allMoves[moveId].category;
+    return usedCategory === MoveCategory.STATUS
+      ? candidateCategory === MoveCategory.STATUS
+      : candidateCategory !== MoveCategory.STATUS;
+  });
   if (pool.length === 0) {
     return null;
   }

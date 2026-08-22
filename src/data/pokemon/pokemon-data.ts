@@ -79,8 +79,6 @@ export class CustomPokemonData {
   public erBlackShiny = false;
   public erGiftAbilities: number[] = [];
   public erGiftIndex = 0;
-  /** Soul Harvest's run-long faint counter. Serialized so save/reload cannot erase its accumulated multiplier. */
-  public erSoulHarvestFaintCount = 0;
   /**
    * ER Shiny Lab: an optional carried cosmetic look for cross-player ghosts.
    * Permanent starter unlocks still live in starterData; this compact tuple is
@@ -189,7 +187,6 @@ export class CustomPokemonData {
     this.erBlackShiny = data?.erBlackShiny ?? false;
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
-    this.erSoulHarvestFaintCount = data?.erSoulHarvestFaintCount ?? 0;
     this.erShinyLab = normalizeErShinyLabSavedLook(data?.erShinyLab);
     this.erShinyLabName = sanitizeErShinyLabPresetName(data?.erShinyLabName) || undefined;
     this.erShinyLabSuppressLocal = data?.erShinyLabSuppressLocal ?? false;
@@ -512,6 +509,8 @@ export class PokemonTempSummonData {
 export class PokemonBattleData {
   /** Serializable once-per-battle latches for custom ability mechanics. */
   public erAbilityProvenance: string[] = [];
+  /** Soul Harvest faints accumulated in this battle; resets between encounters. */
+  public erSoulHarvestFaintCount = 0;
   /** Counter tracking direct hits this Pokemon has received during this battle; used for {@linkcode MoveId.RAGE_FIST} */
   public hitCount = 0;
   /** Whether this Pokemon has eaten a berry this battle; used for {@linkcode MoveId.BELCH} */
@@ -562,6 +561,7 @@ export class PokemonBattleData {
       this.cowardProtectUsed = source.cowardProtectUsed ?? false;
       this.lostItems = source.lostItems ?? [];
       this.erAbilityProvenance = source.erAbilityProvenance ?? [];
+      this.erSoulHarvestFaintCount = source.erSoulHarvestFaintCount ?? 0;
     }
   }
 }

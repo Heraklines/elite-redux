@@ -81,6 +81,9 @@ export const modifierSortFunc = (a: Modifier, b: Modifier): number => {
 export class ModifierBar extends Phaser.GameObjects.Container {
   private player: boolean;
   private modifierCache: PersistentModifier[];
+  private modifierPresentationSignature = "";
+  private readonly modifierIdentity = new WeakMap<PersistentModifier, number>();
+  private nextModifierIdentity = 1;
 
   constructor(enemy?: boolean) {
     super(globalScene, 1 + (enemy ? 302 : 0), 2);
@@ -95,8 +98,6 @@ export class ModifierBar extends Phaser.GameObjects.Container {
    * @param hideHeldItems - If set to "true", only modifiers not assigned to a Pokémon are displayed
    */
   updateModifiers(modifiers: PersistentModifier[], hideHeldItems = false) {
-    this.removeAll(true);
-
     const visibleIconModifiers = modifiers.filter(m => m.isIconVisible());
     const nonPokemonSpecificModifiers = visibleIconModifiers
       .filter(m => !(m as PokemonHeldItemModifier).pokemonId)
@@ -108,6 +109,33 @@ export class ModifierBar extends Phaser.GameObjects.Container {
     const sortedVisibleIconModifiers = hideHeldItems
       ? nonPokemonSpecificModifiers
       : nonPokemonSpecificModifiers.concat(pokemonSpecificModifiers);
+
+    const presentationSignature = `${hideHeldItems}:${sortedVisibleIconModifiers
+      .map(modifier => {
+        let identity = this.modifierIdentity.get(modifier);
+        if (identity === undefined) {
+          identity = this.nextModifierIdentity++;
+          this.modifierIdentity.set(modifier, identity);
+        }
+        const holder = modifier instanceof PokemonHeldItemModifier ? modifier.getPokemon() : undefined;
+        const holderAppearance = holder
+          ? `${holder.species.speciesId}:${holder.formIndex}:${holder.shiny}:${holder.variant}:${holder.fusionSpecies?.speciesId ?? ""}:${holder.fusionFormIndex}:${holder.fusionShiny}:${holder.fusionVariant}:${holder.customPokemonData?.erBlackShiny ?? false}`
+          : "";
+        return `${identity}:${modifier.type.id}:${modifier.stackCount}:${modifier.virtualStackCount}:${holderAppearance}`;
+      })
+      .join("|")}`;
+
+    // Updating stats can call this several times without changing the modifier
+    // presentation. Rebuilding every Phaser icon is especially expensive in
+    // long runs with large held-item inventories, so leave an identical bar in
+    // place. Object identity is part of the key to keep tooltip closures fresh
+    // after loading a save into replacement modifier instances.
+    if (presentationSignature === this.modifierPresentationSignature) {
+      this.modifierCache = modifiers;
+      return;
+    }
+
+    this.removeAll(true);
 
     sortedVisibleIconModifiers.forEach((modifier: PersistentModifier, i: number) => {
       const icon = modifier.getIcon();
@@ -136,6 +164,7 @@ export class ModifierBar extends Phaser.GameObjects.Container {
     }
 
     this.modifierCache = modifiers;
+    this.modifierPresentationSignature = presentationSignature;
   }
 
   updateModifierOverflowVisibility(ignoreLimit: boolean) {
@@ -354,9 +383,6 @@ export class AddVoucherModifier extends ConsumableModifier {
    * @returns always `true`
    */
   override apply(): boolean {
-    if (globalScene.gameMode.isFun) {
-      return true;
-    }
     const voucherCounts = globalScene.gameData.voucherCounts;
     voucherCounts[this.voucherType] += this.count;
 
