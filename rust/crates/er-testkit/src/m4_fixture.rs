@@ -14,9 +14,7 @@ use er_content::species::SpeciesBaseStats;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
 use er_state::battle_v2::{BattleParticipationState, BattleSettlementState, BattleStateV2};
 use er_state::game_v2::GameStateV2;
-use er_state::pokemon_v2::{
-    Iv, PokemonProgressionState, PokemonStateV2,
-};
+use er_state::pokemon_v2::{Iv, PokemonProgressionState, PokemonStateV2};
 use er_state::run_v2::{
     BiomeRuntimeState, ProgressionQueue, RunCounters, RunModifierInstance, RunStateV2,
 };
@@ -26,8 +24,8 @@ use er_types::battle_ids::{
     SpeciesId, WaveIndex,
 };
 use er_types::battle_model::{
-    AbilityLoadout, BattleStats, MoveSlotState, PokemonTyping, PokemonType, StatStages,
-    StatusKind, StatusState,
+    AbilityLoadout, BattleStats, MoveSlotState, PokemonType, PokemonTyping, StatStages, StatusKind,
+    StatusState,
 };
 use er_types::run_ids::{
     BiomeId, Experience, GameRunId, GrowthRateId, Money, NatureId, RunContentPackHash,
@@ -56,7 +54,9 @@ pub enum M4FixtureError {
 }
 
 fn field<'a>(value: &'a Value, name: &str) -> Result<&'a Value, M4FixtureError> {
-    value.get(name).ok_or_else(|| M4FixtureError::MissingField { field: name.to_owned() })
+    value.get(name).ok_or_else(|| M4FixtureError::MissingField {
+        field: name.to_owned(),
+    })
 }
 
 fn u32_field(value: &Value, name: &str) -> Result<u32, M4FixtureError> {
@@ -102,14 +102,20 @@ pub fn convert_pokemon(
 ) -> Result<PokemonStateV2, M4FixtureError> {
     let species_value = u32_field(ts, "species")? as u64;
     let _species_id = SpeciesId::new(SafeU53::new(species_value).map_err(|_| {
-        M4FixtureError::UnsupportedSpecies { species: species_value }
+        M4FixtureError::UnsupportedSpecies {
+            species: species_value,
+        }
     })?);
     let form_index = u16_field(ts, "formIndex")?;
     let level = u16_field(ts, "level")?;
     let hp = u32_field(ts, "hp")?;
 
     let stats_array =
-        field(ts, "stats")?.as_array().ok_or_else(|| M4FixtureError::MissingField { field: "stats".to_owned() })?;
+        field(ts, "stats")?
+            .as_array()
+            .ok_or_else(|| M4FixtureError::MissingField {
+                field: "stats".to_owned(),
+            })?;
     let stat_values: Vec<u32> = stats_array
         .iter()
         .filter_map(|v| v.as_u64().map(|v| v as u32))
@@ -136,8 +142,10 @@ pub fn convert_pokemon(
         })?;
     let mut ivs = [Iv::new(0).expect("zero iv"); 6];
     for (i, v) in ivs_array.iter().enumerate().take(6) {
-        ivs[i] = Iv::new(v.as_u64().unwrap_or(0) as u8)
-            .map_err(|_| M4FixtureError::MissingField { field: format!("ivs[{i}]") })?;
+        ivs[i] =
+            Iv::new(v.as_u64().unwrap_or(0) as u8).map_err(|_| M4FixtureError::MissingField {
+                field: format!("ivs[{i}]"),
+            })?;
     }
 
     let nature_value = u32_field(ts, "nature")? as u8;
@@ -179,11 +187,11 @@ pub fn convert_pokemon(
         let move_value = u32_field(entry, "moveId")? as u64;
         let pp_used = u16_field(entry, "ppUsed")?;
         moves[i] = Some(MoveSlotState {
-            move_id: MoveId::new(
-                SafeU53::new(move_value).map_err(|_| M4FixtureError::UnsupportedMove {
+            move_id: MoveId::new(SafeU53::new(move_value).map_err(|_| {
+                M4FixtureError::UnsupportedMove {
                     move_id: move_value,
-                })?,
-            ),
+                }
+            })?),
             pp_used,
             pp_ups: 0,
             max_pp_override: None,
@@ -193,7 +201,9 @@ pub fn convert_pokemon(
     let ability_index = u32_field(ts, "abilityIndex")? as u64;
     let abilities = AbilityLoadout {
         active: AbilityId::new(SafeU53::new(1 + ability_index).map_err(|_| {
-            M4FixtureError::UnsupportedAbility { index: ability_index }
+            M4FixtureError::UnsupportedAbility {
+                index: ability_index,
+            }
         })?),
         passives: [None, None, None],
         active_suppressed: false,
@@ -232,7 +242,9 @@ pub fn convert_pokemon(
         id: pokemon_id,
         owner_seat,
         species_id: SpeciesId::new(SafeU53::new(species_value).map_err(|_| {
-            M4FixtureError::UnsupportedSpecies { species: species_value }
+            M4FixtureError::UnsupportedSpecies {
+                species: species_value,
+            }
         })?),
         form_index,
         level,
@@ -258,10 +270,11 @@ pub fn build_run_state(
     wave: WaveIndex,
     money: Money,
 ) -> Result<RunStateV2, M4FixtureError> {
-    let rdg = PhaserRdgState::from_values(1, 0.0, 0.0, 0.0)
-        .map_err(|_| M4FixtureError::MissingField {
+    let rdg = PhaserRdgState::from_values(1, 0.0, 0.0, 0.0).map_err(|_| {
+        M4FixtureError::MissingField {
             field: "rng".to_owned(),
-        })?;
+        }
+    })?;
     Ok(RunStateV2 {
         schema_version: er_state::run_v2::RUN_STATE_SCHEMA_VERSION,
         run_id: GameRunId::new(SafeU53::new(1).expect("run id")),
@@ -286,8 +299,7 @@ pub fn build_run_state(
             route_node: None,
             previous_biome: None,
             recent_biomes: [None, None],
-            structure_start_wave: WaveIndex::new(SafeU53::new(1).expect("wave"))
-                .expect("positive"),
+            structure_start_wave: WaveIndex::new(SafeU53::new(1).expect("wave")).expect("positive"),
             structure_length: None,
             leave_biome_now: false,
             overstay_anchor_wave: None,
@@ -319,31 +331,36 @@ pub fn assemble_game_state(
 
     let seed = str_field(runtime, "seed")?.to_owned();
     let wave_value = u32_field(runtime, "wave")? as u64;
-    let wave = WaveIndex::new(SafeU53::new(wave_value).map_err(|_| {
-        M4FixtureError::MissingField {
-            field: "wave".to_owned(),
-        }
-    })?)?;
+    let wave =
+        WaveIndex::new(
+            SafeU53::new(wave_value).map_err(|_| M4FixtureError::MissingField {
+                field: "wave".to_owned(),
+            })?,
+        )?;
     let money_value = u32_field(save_data, "money")? as u64;
-    let money = Money::new(SafeU53::new(money_value).map_err(|_| {
-        M4FixtureError::MissingField {
-            field: "money".to_owned(),
-        }
-    })?)?;
+    let money =
+        Money::new(
+            SafeU53::new(money_value).map_err(|_| M4FixtureError::MissingField {
+                field: "money".to_owned(),
+            })?,
+        )?;
 
     let mut player_party = Vec::new();
-    let party = field(save_data, "party")?
-        .as_array()
-        .ok_or_else(|| M4FixtureError::MissingField {
-            field: "party".to_owned(),
-        })?;
+    let party =
+        field(save_data, "party")?
+            .as_array()
+            .ok_or_else(|| M4FixtureError::MissingField {
+                field: "party".to_owned(),
+            })?;
     let player_seat = SeatId::new(SafeU53::new(1).expect("seat"));
     for (index, entry) in party.iter().enumerate() {
         let pid_value = u32_field(entry, "id")? as u64;
         let pokemon_id =
-            PokemonId::new(SafeU53::new(pid_value).map_err(|_| M4FixtureError::MissingField {
-                field: format!("party[{index}].id"),
-            })?)?;
+            PokemonId::new(
+                SafeU53::new(pid_value).map_err(|_| M4FixtureError::MissingField {
+                    field: format!("party[{index}].id"),
+                })?,
+            )?;
         player_party.push(convert_pokemon(entry, pokemon_id, Some(player_seat))?);
     }
 
@@ -395,15 +412,17 @@ mod tests {
         assert_eq!(converted.hp, 48);
         assert_eq!(converted.max_hp, 48);
         assert_eq!(converted.stats.attack, 29);
-        assert_eq!(
-            converted.progression.experience.get().get(),
-            4329
-        );
+        assert_eq!(converted.progression.experience.get().get(), 4329);
         assert_eq!(converted.progression.friendship, 50);
         assert!(!converted.fainted);
         // Moveset parity: slot 0 = Pound (1).
         assert_eq!(
-            converted.moves[0].as_ref().expect("slot").move_id.get().get(),
+            converted.moves[0]
+                .as_ref()
+                .expect("slot")
+                .move_id
+                .get()
+                .get(),
             1
         );
     }
