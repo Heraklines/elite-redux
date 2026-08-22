@@ -151,6 +151,7 @@ dependencies = [
  "er-battle",
  "er-canonical",
  "er-content",
+ "er-run",
  "er-rng",
  "er-state",
  "er-types",
