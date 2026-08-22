@@ -29,8 +29,7 @@ pub const RUN_INTERACTION_MATERIAL_VERSION: u32 = 1;
 pub const RUN_TERMINAL_MATERIAL_VERSION: u32 = 1;
 
 /// The frozen M3 parity oracle SHA carried by every run material.
-pub const RUN_MATERIAL_M3_PARITY_ORACLE_SHA: &str =
-    "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+pub const RUN_MATERIAL_M3_PARITY_ORACLE_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 
 #[derive(Debug, Error)]
 pub enum RunMaterialCodecError {
