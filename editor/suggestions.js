@@ -2,6 +2,7 @@
   const API = "https://er-save-api.heraklines.workers.dev";
   const STAGED_KEY = "er-editor-staged-community-suggestions";
   const IGNORED_KEY = "er-editor-ignored-suggestion-authors";
+  const DEMO_QUEUE_KEY = "er-community-editor-demo-suggestions";
   const demo = new URLSearchParams(location.search).has("suggestion-demo");
   const esc = value =>
     String(value ?? "").replace(
@@ -96,6 +97,15 @@
     },
   ];
 
+  function localDemoItems() {
+    try {
+      const value = JSON.parse(localStorage.getItem(DEMO_QUEUE_KEY) || "[]");
+      return Array.isArray(value) ? value : [];
+    } catch {
+      return [];
+    }
+  }
+
   function password() {
     return (document.querySelector("#password")?.value || "").trim();
   }
@@ -150,7 +160,7 @@
     draw();
     try {
       if (demo) {
-        items = demoItems.filter(item => status === "all" || item.status === status);
+        items = [...localDemoItems(), ...demoItems].filter(item => status === "all" || item.status === status);
       } else {
         items = (await staffRequest("/community/editor-suggestions/staff/list", { status })).items || [];
       }
@@ -359,6 +369,11 @@
   };
 
   window.communitySuggestions = api;
+  window.addEventListener("storage", event => {
+    if (demo && event.key === DEMO_QUEUE_KEY) {
+      void load();
+    }
+  });
   if (!demo && document.querySelector("nav.tabs [data-tab='suggestions']")) {
     fetch(`${API}/community/editor-suggestions/counts`)
       .then(response => response.json())

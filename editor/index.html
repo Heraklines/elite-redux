@@ -499,6 +499,39 @@
         .sug-rows { max-height: 320px; }
         .sug-detail { overflow-y: visible; }
       }
+      .community-only { display: none; }
+      body.community-mode .community-only { display: inline-flex; }
+      body.community-mode #author,
+      body.community-mode #password,
+      body.community-mode #deploy,
+      body.community-mode nav.tabs [data-tab="assets"],
+      body.community-mode nav.tabs [data-tab="addmon"],
+      body.community-mode nav.tabs [data-tab="tournaments"],
+      body.community-mode nav.tabs [data-tab="suggestions"] { display: none; }
+      #community-access { color: var(--muted); font-size: 12px; white-space: nowrap; }
+      #community-access[data-state="eligible"] { color: var(--ok); }
+      #community-access[data-state="locked"], #community-access[data-state="error"] { color: var(--warn); }
+      dialog.community-dialog {
+        width: min(440px, calc(100vw - 28px)); border: 1px solid var(--line); border-radius: 10px;
+        background: var(--panel); color: var(--text); padding: 0; box-shadow: 0 18px 60px rgba(0,0,0,.5);
+      }
+      dialog.community-dialog::backdrop { background: rgba(7, 7, 12, .72); }
+      .community-dialog form { padding: 18px; display: grid; gap: 12px; }
+      .community-dialog h2 { margin: 0; font-size: 17px; }
+      .community-dialog p { margin: 0; color: var(--muted); font-size: 12px; }
+      .community-dialog label { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+      .community-dialog input, .community-dialog textarea { width: 100%; }
+      .community-dialog textarea {
+        min-height: 96px; resize: vertical; background: var(--panel2); color: var(--text);
+        border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: inherit;
+      }
+      .community-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+      #community-login-status { min-height: 18px; color: var(--warn); font-size: 12px; }
+      @media (max-width: 760px) {
+        body.community-mode header { align-items: stretch; }
+        body.community-mode #search { order: 5; flex-basis: 100%; }
+        #community-access { order: 4; flex: 1; }
+      }
     </style>
   </head>
   <body>
@@ -512,6 +545,8 @@
       </select>
       <input id="author" type="text" placeholder="Your name (for the commit)" style="width:170px" />
       <input id="password" type="password" placeholder="Editor password" style="width:150px" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      <button id="community-login" type="button" class="community-only">Log in</button>
+      <span id="community-access" class="community-only">Log in to make suggestions</span>
       <button id="undo" type="button" title="Undo the last egg-move change (one step back)" disabled>↶ Undo</button>
       <button id="save" type="button" class="primary" disabled>Save 0 changes</button>
       <button id="deploy" type="button" title="Commit changes (if any) and rebuild + deploy the staging site">
@@ -535,6 +570,31 @@
       <button type="button" data-tab="suggestions">💬 Suggestions <span id="suggestion-nav-count"></span></button>
     </nav>
     <main id="content"></main>
+    <dialog id="community-login-dialog" class="community-dialog">
+      <form id="community-login-form">
+        <h2>Log in with your game account</h2>
+        <p>Suggestions unlock after earning half of the points available from Pokerogue Redux achievements.</p>
+        <label>Username <input id="community-username" autocomplete="username" required /></label>
+        <label>Password <input id="community-password" type="password" autocomplete="current-password" required /></label>
+        <div id="community-login-status" role="status"></div>
+        <div class="community-dialog-actions">
+          <button id="community-login-cancel" type="button">Cancel</button>
+          <button type="submit" class="primary">Log in</button>
+        </div>
+      </form>
+    </dialog>
+    <dialog id="community-reason-dialog" class="community-dialog">
+      <form method="dialog">
+        <h2>Make suggestion</h2>
+        <p id="community-reason-summary"></p>
+        <label>Reasoning (optional) <textarea id="community-reason" maxlength="1200" placeholder="What problem does this solve? Add matchups, run context, or evidence when useful."></textarea></label>
+        <div class="community-dialog-actions">
+          <button id="community-reason-cancel" type="button">Cancel</button>
+          <button type="submit" value="submit" class="primary">Submit suggestion</button>
+        </div>
+      </form>
+    </dialog>
+    <script src="./community-mode.js"></script>
     <script src="./app.js"></script>
     <script src="./suggestions.js"></script>
   </body>

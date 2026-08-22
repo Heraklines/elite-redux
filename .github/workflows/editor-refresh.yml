@@ -55,7 +55,7 @@ jobs:
         run: |
           rm -rf editor/_deploy
           mkdir -p editor/_deploy/data
-          cp editor/index.html editor/app.js editor/suggestions.js editor/_deploy/
+          cp editor/index.html editor/app.js editor/community-mode.js editor/suggestions.js editor/_deploy/
           cp editor/data/*.json editor/_deploy/data/
           printf '{"sourceSha":"%s"}\n' "$EDITOR_SOURCE_SHA" > editor/_deploy/version.json
           cat > editor/_deploy/_headers <<'EOF'
