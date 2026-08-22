@@ -16,7 +16,7 @@ use crate::money;
 /// candidate state. Persistent effects (multipliers, charms, lock capsule)
 /// resolve to [`ModifierApplication::Persistent`] and are appended to
 /// `RunStateV2.modifiers` by the caller.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ModifierApplication {
     /// No immediate mechanical change; the instance persists on the run.
     Persistent,

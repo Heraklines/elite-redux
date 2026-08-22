@@ -151,7 +151,7 @@ mod tests {
     use er_types::SafeU53;
 
     fn wave(value: u64) -> WaveIndex {
-        WaveIndex::new(SafeU53::new(value).expect("wave"))
+        WaveIndex::new(SafeU53::new(value).expect("wave")).expect("positive wave")
     }
 
     #[test]
@@ -160,7 +160,7 @@ mod tests {
         // explicit vector: probe seed m4a-town-15, start wave 1, length 25.
         let plan = plan_er_biome_structure(wave(1), "m4a-town-15").expect("town structure");
         assert_eq!(plan.length, Some(25));
-        assert_eq!(plan.start_wave.get(), 1);
+        assert_eq!(plan.start_wave.get().get(), 1);
     }
 
     #[test]

@@ -141,7 +141,7 @@ mod tests {
     fn undo_restores_the_pending_snapshot_exactly() {
         let mut replaced = initial_moveset();
         replaced[0] = slot(34);
-        let outcome = apply_learn_move_decision(
+        apply_learn_move_decision(
             &replaced,
             &initial_moveset(),
             move_id(34),

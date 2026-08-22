@@ -9,6 +9,7 @@ use er_types::battle_ids::{BattleId, WaveIndex};
 use er_types::run_ids::{EncounterId, GameRunId};
 
 use crate::content::{EncounterGenerationMode, EncounterPlanDefinition, EncounterPlanSource};
+    use crate::capability::EnemyPolicy;
 use crate::encounter_plan::{CapturedPlanEvidence, EncounterPlan};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -62,7 +63,6 @@ pub fn prepare_encounter_plan(
 mod tests {
     use super::*;
     use er_content::species::SpeciesBaseStats;
-    use er_state::pokemon_v2::StatStages;
     use er_state::pokemon_v2::{Iv, PokemonProgressionState, PokemonStateV2};
     use er_types::SafeU53;
     use er_types::battle_command::ScriptedEnemyPolicyV1;
@@ -102,7 +102,7 @@ mod tests {
             biome_id: er_types::run_ids::BiomeId::new(safe(1)),
             source: EncounterPlanSource::OracleCaptureRequired,
             generation_mode: EncounterGenerationMode::StaticCapturedVector,
-            enemy_policy: crate::content::EnemyPolicy::ScriptedEnemyPolicyV1,
+            enemy_policy: EnemyPolicy::ScriptedEnemyPolicyV1,
             captured_vector_key: "plains-wave-11-captured-v1".to_owned(),
         }
     }
@@ -204,7 +204,7 @@ mod tests {
             captured_evidence(vec![captured_enemy()]),
         )
         .expect("plan");
-        assert_eq!(plan.wave.get(), 11);
+        assert_eq!(plan.wave.get().get(), 11);
         assert_eq!(plan.enemy_party[0].species_id.get().get(), 16);
         assert_eq!(plan.enemy_leads, vec![pokemon_id(9001)]);
     }
