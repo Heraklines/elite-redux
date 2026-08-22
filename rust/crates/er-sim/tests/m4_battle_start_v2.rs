@@ -1,3 +1,4 @@
+use er_game::battle_adapter_v2::{merge_battle_v1_into_v2, project_battle_v2_to_v1};
 use std::error::Error;
 use std::sync::Arc;
 
@@ -96,6 +97,35 @@ fn captured_encounter_plan_starts_complete_v2_battle_atomically() -> Result<(), 
             .field
             .occupant(&battle.format, FieldSlot::new(BattleSide::Enemy, 0)?,)?,
         Some(plan.enemy_leads[0])
+    );
+    let projected = project_battle_v2_to_v1(&after)?;
+    assert_eq!(merge_battle_v1_into_v2(&after, &projected)?, after);
+    let mut resolved = projected;
+    let resolved_enemy = resolved
+        .battle
+        .as_mut()
+        .and_then(|battle| battle.enemy_party.first_mut())
+        .ok_or("projected enemy missing")?;
+    resolved_enemy.hp -= 1;
+    let merged = merge_battle_v1_into_v2(&after, &resolved)?;
+    assert_eq!(
+        merged.player_party[0].progression,
+        after.player_party[0].progression
+    );
+    assert_eq!(
+        merged
+            .battle
+            .as_ref()
+            .ok_or("merged battle missing")?
+            .enemy_party[0]
+            .hp,
+        after
+            .battle
+            .as_ref()
+            .ok_or("source battle missing")?
+            .enemy_party[0]
+            .hp
+            - 1
     );
     after.validate()?;
     Ok(())

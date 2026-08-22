@@ -2,6 +2,7 @@
 
 #[doc(hidden)]
 pub mod authority_commands;
+pub mod battle_adapter_v2;
 pub mod battle_start_v2;
 pub mod command_menu;
 pub mod internal_event;
