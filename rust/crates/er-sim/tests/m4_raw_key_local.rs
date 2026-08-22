@@ -101,7 +101,7 @@ fn runtime_rejects_local_frontier_mismatch() -> Result<(), Box<dyn Error>> {
         run_content_hash: run_hash,
         operation_id: er_types::OperationId::new("V2/WAVE/e1/w9/tick1")?,
         run_id: er_types::run_ids::GameRunId::new(SafeU53::new(1)?),
-        wave: er_types::battle_ids::WaveIndex::new(SafeU53::new(10)?),
+        wave: er_types::battle_ids::WaveIndex::new(SafeU53::new(10)?).map_err(|e| e.to_string())?,
         before_digest: fake_digest.clone(),
         after_digest: fake_digest,
         before_state: runtime.state().clone(),
