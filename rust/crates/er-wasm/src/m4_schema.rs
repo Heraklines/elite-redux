@@ -20,11 +20,12 @@ pub enum WasmSchemaError {
 /// numbers, and emits one trailing newline — the exact wire shape consumed by
 /// the browser adapter.
 pub fn encode_game_state(state: &GameStateV2) -> Result<Vec<u8>, WasmSchemaError> {
-    state.validate().map_err(serde_json::Error::custom)?;
-    let mut output = String::new();
-    er_canonical::serialize_canonical(state, &mut output)?;
-    output.push('\n');
-    Ok(output.into_bytes())
+    state.validate().map_err(|error| {
+        WasmSchemaError::Serialize(serde_json::Error::custom(error.to_string()))
+    })?;
+    let mut bytes = er_canonical::canonical_bytes(state)?;
+    bytes.push(b'\n');
+    Ok(bytes)
 }
 
 /// Deserializes a V2 game state and rejects non-canonical input by requiring
