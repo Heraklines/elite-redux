@@ -14,9 +14,7 @@ use er_state::game_v2::GameStateV2;
 use er_types::battle_ids::{BattleId, WaveIndex};
 use er_types::ids::OperationId;
 use er_types::run_control::GameControlPlan;
-use er_types::run_ids::{
-    GameRunId, RunContentPackHash, RunInteractionSequence, RunSurfaceId,
-};
+use er_types::run_ids::{GameRunId, RunContentPackHash, RunInteractionSequence, RunSurfaceId};
 use er_types::run_model::{RunOutcome, RunSurfaceAction, RunSurfaceKind};
 use er_types::{SeatId, battle_ids::ContentPackHash};
 
