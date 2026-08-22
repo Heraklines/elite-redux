@@ -114,9 +114,8 @@ pub fn recompute_stats(
     ];
     let mut values = [0u32; 6];
     for (index, axis) in AXES.iter().enumerate() {
-        let raw = f64::from(axis.base(base_stats) * 2 + u32::from(ivs[index]))
-            * f64::from(level)
-            * 0.01;
+        let raw =
+            f64::from(axis.base(base_stats) * 2 + u32::from(ivs[index])) * f64::from(level) * 0.01;
         let mut value = raw.floor();
         if *axis == StatAxis::Hp {
             value += f64::from(level) + 10.0;
