@@ -5,11 +5,16 @@
 //! into validated `GameStateV2`. This is the single unblocking item for the
 //! raw-key campaigns, benchmarks, and final gates.
 
+use std::sync::Arc;
+
 use serde_json::Value;
 use thiserror::Error;
 
+use er_content::pack::selected_m4_content_pack;
 use er_content::species::SpeciesBaseStats;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
+use er_run::content::selected_run_content_pack;
+use er_run::transition::GameContentBundle;
 use er_state::game_v2::GameStateV2;
 use er_state::pokemon_v2::{Iv, PokemonProgressionState, PokemonStateV2};
 use er_state::run_v2::{BiomeRuntimeState, ProgressionQueue, RunCounters, RunStateV2};
@@ -46,6 +51,49 @@ pub enum M4FixtureError {
     UnsupportedAbility { index: u64 },
     #[error("fixture M4 oracle SHA does not match the requested oracle")]
     WrongOracle,
+    #[error("published M4 content bundle is invalid: {0}")]
+    Content(String),
+}
+
+const ORACLE_BATTLE_CONTENT_HASH: &str =
+    "blake3-v1:cd0738f7c0d09be0fb0cec5fbcdbf060810d9cc502dcfec671325ddc08a75112";
+const ORACLE_RUN_CONTENT_HASH: &str =
+    "blake3-v1:f079ef60e7ebdb975c05d62d64aee08979aa243dbca308297be5cc8aa359d697";
+
+/// Constructs the current immutable selected M4 battle/run content bundle.
+pub fn selected_m4_game_content_bundle() -> Result<Arc<GameContentBundle>, M4FixtureError> {
+    let battle =
+        selected_m4_content_pack().map_err(|error| M4FixtureError::Content(error.to_string()))?;
+    let run = selected_run_content_pack(battle.hash.clone())
+        .map_err(|error| M4FixtureError::Content(error.to_string()))?;
+    Ok(Arc::new(GameContentBundle::new(
+        Arc::new(battle),
+        Arc::new(run),
+    )))
+}
+
+/// Validates the frozen oracle content identity, then maps the fixture state
+/// onto the current selected semantic content pack.
+pub fn assemble_selected_game_state(
+    fixture: &Value,
+    m4_oracle_sha: &str,
+) -> Result<(GameStateV2, Arc<GameContentBundle>), M4FixtureError> {
+    let initial = field(fixture, "initial")?;
+    if str_field(initial, "battle_content_hash")? != ORACLE_BATTLE_CONTENT_HASH
+        || str_field(initial, "run_content_hash")? != ORACLE_RUN_CONTENT_HASH
+    {
+        return Err(M4FixtureError::Content(
+            "fixture content identity is not the frozen oracle pair".to_owned(),
+        ));
+    }
+    let content = selected_m4_game_content_bundle()?;
+    let state = assemble_game_state(
+        fixture,
+        content.battle.hash.clone(),
+        content.run.run_content_hash.clone(),
+        m4_oracle_sha,
+    )?;
+    Ok((state, content))
 }
 
 fn field<'a>(value: &'a Value, name: &str) -> Result<&'a Value, M4FixtureError> {

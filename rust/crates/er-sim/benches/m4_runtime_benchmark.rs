@@ -18,7 +18,7 @@ use er_state::game_v2::GameStateV2;
 use er_state::run_v2::{
     CrossroadsSurfaceState, RUN_SURFACE_STATE_SCHEMA_VERSION, RunSurfaceState, SurfaceHeader,
 };
-use er_testkit::m4_fixture::assemble_game_state;
+use er_testkit::m4_fixture::{assemble_selected_game_state, selected_m4_game_content_bundle};
 use er_types::battle_ids::{ContentPackHash, MenuInstanceId};
 use er_types::input::{GameButton, InputFocus, InputMap, KeyBinding, PhysicalKey, RawInputEvent};
 use er_types::run_control::{
@@ -48,23 +48,16 @@ fn safe(value: u64) -> SafeU53 {
 
 fn fixture_state() -> Result<(GameStateV2, ContentPackHash, RunContentPackHash)> {
     let fixture: serde_json::Value = serde_json::from_str(FIXTURE)?;
-    let initial = &fixture["initial"];
-    let battle = ContentPackHash::new(
-        initial["battle_content_hash"]
-            .as_str()
-            .ok_or("battle content hash")?,
-    )?;
-    let run = RunContentPackHash::new(
-        initial["run_content_hash"]
-            .as_str()
-            .ok_or("run content hash")?,
-    )?;
-    let state = assemble_game_state(&fixture, battle.clone(), run.clone(), ORACLE)?;
-    Ok((state, battle, run))
+    let (state, _) = assemble_selected_game_state(&fixture, ORACLE)?;
+    Ok((
+        state.clone(),
+        state.battle_content_hash,
+        state.run_content_hash,
+    ))
 }
 
 fn raw_kernel() -> Result<(GameKernel, SeatId)> {
-    let (mut state, battle, run) = fixture_state()?;
+    let (mut state, _, _) = fixture_state()?;
     let owner = SeatId::new(safe(1));
     let surface_id = RunSurfaceId::new(safe(1));
     let interaction = RunInteractionSequence::new(SafeU53::ZERO);
@@ -135,8 +128,13 @@ fn raw_kernel() -> Result<(GameKernel, SeatId)> {
         initial_repeat_delay_ms: safe(250),
         repeat_interval_ms: safe(250),
     };
-    let kernel = GameKernel::new_run_with_control(state, battle, run, ORACLE, input_map, plan)
-        .map_err(std::io::Error::other)?;
+    let kernel = GameKernel::new_run_with_control(
+        state,
+        selected_m4_game_content_bundle()?,
+        input_map,
+        plan,
+    )
+    .map_err(std::io::Error::other)?;
     Ok((kernel, owner))
 }
 
@@ -224,11 +222,11 @@ fn m4_run_surface_raw_key_events_100000() -> Result {
 
 #[test]
 fn m4_two_client_transitions_1000() -> Result {
-    let (initial, battle, run) = fixture_state()?;
-    let host = GameKernel::new_run(initial.clone(), battle.clone(), run.clone(), ORACLE)
-        .map_err(std::io::Error::other)?;
-    let guest =
-        GameKernel::new_run(initial.clone(), battle, run, ORACLE).map_err(std::io::Error::other)?;
+    let (initial, _, _) = fixture_state()?;
+    let content = selected_m4_game_content_bundle()?;
+    let host =
+        GameKernel::new_run(initial.clone(), content.clone()).map_err(std::io::Error::other)?;
+    let guest = GameKernel::new_run(initial.clone(), content).map_err(std::io::Error::other)?;
     let mut pair = M4RunPair::new(host, guest);
     let mut state = initial;
     let started = Instant::now();

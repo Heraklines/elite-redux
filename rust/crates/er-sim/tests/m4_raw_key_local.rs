@@ -10,7 +10,7 @@ use std::error::Error;
 
 use er_game::run_runtime::RunRuntime;
 use er_state::digest_v2::MechanicalStateDigestV2;
-use er_testkit::m4_fixture::assemble_game_state;
+use er_testkit::m4_fixture::{assemble_game_state, selected_m4_game_content_bundle};
 use er_types::SafeU53;
 use er_types::battle_ids::ContentPackHash;
 use er_types::run_ids::RunContentPackHash;
@@ -37,7 +37,16 @@ fn content_hashes(
     let run = initial["run_content_hash"]
         .as_str()
         .ok_or("missing run_content_hash")?;
-    Ok((ContentPackHash::new(battle)?, RunContentPackHash::new(run)?))
+    if battle != "blake3-v1:cd0738f7c0d09be0fb0cec5fbcdbf060810d9cc502dcfec671325ddc08a75112"
+        || run != "blake3-v1:f079ef60e7ebdb975c05d62d64aee08979aa243dbca308297be5cc8aa359d697"
+    {
+        return Err("fixture content identity is not frozen".into());
+    }
+    let content = selected_m4_game_content_bundle()?;
+    Ok((
+        content.battle.hash.clone(),
+        content.run.run_content_hash.clone(),
+    ))
 }
 
 #[test]
@@ -75,7 +84,7 @@ fn runtime_accepts_validated_state_and_computes_frontier() -> Result<(), Box<dyn
         run_hash.clone(),
         M4_ORACLE_SHA,
     )?;
-    let runtime = RunRuntime::new(state, battle_hash, run_hash, "test-oracle-sha")?;
+    let runtime = RunRuntime::new(state, selected_m4_game_content_bundle()?)?;
 
     // The frontier digest must be a well-formed blake3-v1 value.
     let frontier = runtime.frontier_digest()?;
@@ -105,12 +114,12 @@ fn runtime_rejects_local_frontier_mismatch() -> Result<(), Box<dyn Error>> {
         run_hash.clone(),
         M4_ORACLE_SHA,
     )?;
-    let mut runtime = RunRuntime::new(state, battle_hash.clone(), run_hash.clone(), "test")?;
+    let mut runtime = RunRuntime::new(state, selected_m4_game_content_bundle()?)?;
 
     // Build a material whose before_digest does NOT match the local frontier.
     let fake_digest = MechanicalStateDigestV2::new(format!("blake3-v1:{}", "f".repeat(64)))?;
     let header = RunMaterialHeader {
-        m4_oracle_sha: "test".to_owned(),
+        m4_oracle_sha: M4_ORACLE_SHA.to_owned(),
         m3_parity_oracle_sha: "3b534099919efae827019d4a3f3c4ab0ecd6d67b".to_owned(),
         battle_content_hash: battle_hash,
         run_content_hash: run_hash,
@@ -245,7 +254,7 @@ fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<d
     };
 
     let fixture = load_fixture_value(PROGRESSION_FIXTURE)?;
-    let (state, battle_hash, run_hash, control, owner) = crossroads_state_and_control(&fixture)?;
+    let (state, _, _, control, owner) = crossroads_state_and_control(&fixture)?;
     let input_map = InputMap {
         keyboard: vec![
             KeyBinding {
@@ -261,9 +270,13 @@ fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<d
         initial_repeat_delay_ms: safe(250),
         repeat_interval_ms: safe(250),
     };
-    let mut kernel =
-        GameKernel::new_run_with_control(state, battle_hash, run_hash, "test", input_map, control)
-            .map_err(std::io::Error::other)?;
+    let mut kernel = GameKernel::new_run_with_control(
+        state,
+        selected_m4_game_content_bundle()?,
+        input_map,
+        control,
+    )
+    .map_err(std::io::Error::other)?;
 
     for event in [
         RawInputEvent::KeyDown {
@@ -417,9 +430,7 @@ fn kernel_for_surface(
     };
     let kernel = er_kernel::GameKernel::new_run_with_control(
         state,
-        battle_hash,
-        run_hash,
-        M4_ORACLE_SHA,
+        selected_m4_game_content_bundle()?,
         input_map,
         plan,
     )

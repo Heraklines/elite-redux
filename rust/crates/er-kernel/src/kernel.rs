@@ -365,17 +365,10 @@ impl GameKernel {
     /// decision flows through [`AuthorityRunMaterial`] application.
     pub fn new_run(
         state: er_state::game_v2::GameStateV2,
-        battle_content_hash: er_types::battle_ids::ContentPackHash,
-        run_content_hash: er_types::run_ids::RunContentPackHash,
-        m4_oracle_sha: impl Into<String>,
+        content: Arc<er_run::transition::GameContentBundle>,
     ) -> Result<Self, String> {
-        let runtime = er_game::run_runtime::RunRuntime::new(
-            state,
-            battle_content_hash,
-            run_content_hash.clone(),
-            m4_oracle_sha,
-        )
-        .map_err(|error| error.to_string())?;
+        let runtime = er_game::run_runtime::RunRuntime::new(state, content)
+            .map_err(|error| error.to_string())?;
         let mut kernel = Self::new(KernelConfig::default());
         kernel.run = Some(runtime);
         Ok(kernel)
@@ -386,19 +379,12 @@ impl GameKernel {
     /// external input can be accepted.
     pub fn new_run_with_control(
         state: er_state::game_v2::GameStateV2,
-        battle_content_hash: er_types::battle_ids::ContentPackHash,
-        run_content_hash: er_types::run_ids::RunContentPackHash,
-        m4_oracle_sha: impl Into<String>,
+        content: Arc<er_run::transition::GameContentBundle>,
         input_map: InputMap,
         control: er_types::run_control::GameControlPlan,
     ) -> Result<Self, String> {
-        let runtime = er_game::run_runtime::RunRuntime::new(
-            state,
-            battle_content_hash,
-            run_content_hash,
-            m4_oracle_sha,
-        )
-        .map_err(|error| error.to_string())?;
+        let runtime = er_game::run_runtime::RunRuntime::new(state, content)
+            .map_err(|error| error.to_string())?;
         let run_menu =
             er_game::run_menu::RunMenuReducer::new(control).map_err(|error| error.to_string())?;
         let mut kernel = Self::new(KernelConfig {

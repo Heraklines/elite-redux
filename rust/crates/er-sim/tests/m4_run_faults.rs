@@ -13,7 +13,7 @@ use er_run::transition::{RunMutation, RunPresentationEvent};
 use er_sim::{M4PairError, M4RunPair};
 use er_state::digest_v2::MechanicalStateDigestV2;
 use er_state::game_v2::GameStateV2;
-use er_testkit::m4_fixture::assemble_game_state;
+use er_testkit::m4_fixture::{assemble_selected_game_state, selected_m4_game_content_bundle};
 use er_types::battle_ids::{ContentPackHash, MenuInstanceId};
 use er_types::run_ids::{Money, RunContentPackHash};
 use er_types::{OperationId, SafeU53, SeatId};
@@ -30,19 +30,12 @@ fn safe(value: u64) -> SafeU53 {
 
 fn load_state() -> Result<(GameStateV2, ContentPackHash, RunContentPackHash), Box<dyn Error>> {
     let fixture: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(FIXTURE)?)?;
-    let initial = &fixture["initial"];
-    let battle = ContentPackHash::new(
-        initial["battle_content_hash"]
-            .as_str()
-            .ok_or("battle content hash")?,
-    )?;
-    let run = RunContentPackHash::new(
-        initial["run_content_hash"]
-            .as_str()
-            .ok_or("run content hash")?,
-    )?;
-    let state = assemble_game_state(&fixture, battle.clone(), run.clone(), ORACLE)?;
-    Ok((state, battle, run))
+    let (state, _) = assemble_selected_game_state(&fixture, ORACLE)?;
+    Ok((
+        state.clone(),
+        state.battle_content_hash,
+        state.run_content_hash,
+    ))
 }
 
 fn material(
@@ -93,24 +86,21 @@ fn material(
     Ok((encode_run_material(&material)?, after))
 }
 
-fn pair(
-    state: GameStateV2,
-    battle: ContentPackHash,
-    run: RunContentPackHash,
-) -> Result<M4RunPair, Box<dyn Error>> {
-    let host = GameKernel::new_run(state.clone(), battle.clone(), run.clone(), ORACLE)
-        .map_err(std::io::Error::other)?;
-    let guest = GameKernel::new_run(state, battle, run, ORACLE).map_err(std::io::Error::other)?;
+fn pair(state: GameStateV2) -> Result<M4RunPair, Box<dyn Error>> {
+    let content = selected_m4_game_content_bundle()?;
+    let host =
+        GameKernel::new_run(state.clone(), content.clone()).map_err(std::io::Error::other)?;
+    let guest = GameKernel::new_run(state, content).map_err(std::io::Error::other)?;
     Ok(M4RunPair::new(host, guest))
 }
 
 #[test]
 fn delayed_out_of_order_duplicate_material_catches_up_after_reconnect() -> Result<(), Box<dyn Error>>
 {
-    let (state, battle, run) = load_state()?;
+    let (state, _, _) = load_state()?;
     let (first, after_first) = material(&state, 10_000, "1:1:REWARD:900001", 1)?;
     let (second, _) = material(&after_first, 10_500, "1:1:REWARD:900002", 2)?;
-    let mut pair = pair(state, battle, run)?;
+    let mut pair = pair(state)?;
 
     let first_packet = pair.commit_authority(first, safe(100))?;
     pair.duplicate_packet(first_packet)?;
@@ -137,10 +127,10 @@ fn delayed_out_of_order_duplicate_material_catches_up_after_reconnect() -> Resul
 
 #[test]
 fn dropped_copy_and_conflicting_operation_fail_closed() -> Result<(), Box<dyn Error>> {
-    let (state, battle, run) = load_state()?;
+    let (state, _, _) = load_state()?;
     let (bytes, _) = material(&state, 11_000, "1:1:SHOP_BUY:900003", 1)?;
     let (conflict, _) = material(&state, 12_000, "1:1:SHOP_BUY:900003", 2)?;
-    let mut pair = pair(state, battle, run)?;
+    let mut pair = pair(state)?;
 
     let original = pair.commit_authority(bytes, SafeU53::ZERO)?;
     pair.duplicate_packet(original)?;
@@ -168,11 +158,10 @@ fn invalid_next_menu_aborts_before_state_swap() -> Result<(), Box<dyn Error>> {
     use er_types::ui::CancelPolicy;
     use er_types::ui_menu::{LogicalMenu, LogicalMenuOption};
 
-    let (state, battle, run) = load_state()?;
-    let mut runtime =
-        er_game::run_runtime::RunRuntime::new(state.clone(), battle.clone(), run.clone(), ORACLE)?;
-    let mut kernel =
-        GameKernel::new_run(state.clone(), battle, run, ORACLE).map_err(std::io::Error::other)?;
+    let (state, _, _) = load_state()?;
+    let content = selected_m4_game_content_bundle()?;
+    let mut runtime = er_game::run_runtime::RunRuntime::new(state.clone(), content.clone())?;
+    let mut kernel = GameKernel::new_run(state.clone(), content).map_err(std::io::Error::other)?;
     let before = kernel
         .run_frontier_digest()
         .map_err(std::io::Error::other)?;

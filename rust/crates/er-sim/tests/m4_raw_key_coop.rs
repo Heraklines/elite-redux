@@ -7,14 +7,14 @@ use er_sim::{M4PairError, M4RunPair, PairEndpoint};
 use er_state::run_v2::{
     CrossroadsSurfaceState, RUN_SURFACE_STATE_SCHEMA_VERSION, RunSurfaceState, SurfaceHeader,
 };
-use er_testkit::m4_fixture::assemble_game_state;
-use er_types::battle_ids::{ContentPackHash, MenuInstanceId};
+use er_testkit::m4_fixture::assemble_selected_game_state;
+use er_types::battle_ids::MenuInstanceId;
 use er_types::input::{GameButton, InputFocus, InputMap, KeyBinding, PhysicalKey, RawInputEvent};
 use er_types::run_control::{
     CrossroadsControl, GameControl, GameControlPlan, PresentationBarrier, SeatControlPlan,
     SurfaceControl,
 };
-use er_types::run_ids::{RunContentPackHash, RunInteractionSequence, RunSurfaceId, SurfaceDigest};
+use er_types::run_ids::{RunInteractionSequence, RunSurfaceId, SurfaceDigest};
 use er_types::run_model::{
     CrossroadsAction, RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
 };
@@ -34,18 +34,7 @@ fn safe(value: u64) -> SafeU53 {
 
 fn kernels() -> Result<(GameKernel, GameKernel, SeatId, SeatId), Box<dyn Error>> {
     let fixture: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(FIXTURE)?)?;
-    let initial = &fixture["initial"];
-    let battle_hash = ContentPackHash::new(
-        initial["battle_content_hash"]
-            .as_str()
-            .ok_or("battle content hash")?,
-    )?;
-    let run_hash = RunContentPackHash::new(
-        initial["run_content_hash"]
-            .as_str()
-            .ok_or("run content hash")?,
-    )?;
-    let mut state = assemble_game_state(&fixture, battle_hash.clone(), run_hash.clone(), ORACLE)?;
+    let (mut state, content) = assemble_selected_game_state(&fixture, ORACLE)?;
     let watcher = SeatId::new(safe(1));
     let owner = SeatId::new(safe(2));
     let surface_id = RunSurfaceId::new(safe(1));
@@ -131,16 +120,13 @@ fn kernels() -> Result<(GameKernel, GameKernel, SeatId, SeatId), Box<dyn Error>>
     };
     let host = GameKernel::new_run_with_control(
         state.clone(),
-        battle_hash.clone(),
-        run_hash.clone(),
-        ORACLE,
+        content.clone(),
         input_map.clone(),
         plan.clone(),
     )
     .map_err(std::io::Error::other)?;
-    let guest =
-        GameKernel::new_run_with_control(state, battle_hash, run_hash, ORACLE, input_map, plan)
-            .map_err(std::io::Error::other)?;
+    let guest = GameKernel::new_run_with_control(state, content, input_map, plan)
+        .map_err(std::io::Error::other)?;
     Ok((host, guest, owner, watcher))
 }
 

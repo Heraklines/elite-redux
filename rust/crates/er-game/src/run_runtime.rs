@@ -5,9 +5,12 @@
 //! applier serves both authority and replica: neither side adopts a prepared
 //! candidate directly, and replicas never rerun any RNG.
 
+use std::sync::Arc;
+
 use thiserror::Error;
 
 use er_run::run_material::{AuthorityRunMaterial, RunMaterialHeader};
+use er_run::transition::GameContentBundle;
 use er_state::digest_v2::MechanicalStateDigestV2;
 use er_state::game_v2::GameStateV2;
 use er_types::SeatId;
@@ -40,9 +43,7 @@ pub enum RunRuntimeError {
 #[derive(Clone, Debug)]
 pub struct RunRuntime {
     state: GameStateV2,
-    battle_content_hash: ContentPackHash,
-    run_content_hash: er_types::run_ids::RunContentPackHash,
-    m4_oracle_sha: String,
+    content: Arc<GameContentBundle>,
 }
 
 impl RunRuntime {
@@ -50,19 +51,18 @@ impl RunRuntime {
     /// identity. State must already validate.
     pub fn new(
         state: GameStateV2,
-        battle_content_hash: ContentPackHash,
-        run_content_hash: er_types::run_ids::RunContentPackHash,
-        m4_oracle_sha: impl Into<String>,
+        content: Arc<GameContentBundle>,
     ) -> Result<Self, RunRuntimeError> {
         state
             .validate()
             .map_err(|_| RunRuntimeError::InvalidAfterState)?;
-        Ok(Self {
-            state,
-            battle_content_hash,
-            run_content_hash,
-            m4_oracle_sha: m4_oracle_sha.into(),
-        })
+        if state.battle_content_hash != content.battle.hash
+            || state.run_content_hash != content.run.run_content_hash
+            || content.run.battle_content_hash != content.battle.hash
+        {
+            return Err(RunRuntimeError::ContentIdentity);
+        }
+        Ok(Self { state, content })
     }
 
     pub fn state(&self) -> &GameStateV2 {
@@ -107,9 +107,9 @@ impl RunRuntime {
         Self::validate_header(
             header,
             material,
-            self.battle_content_hash.clone(),
-            self.run_content_hash.clone(),
-            &self.m4_oracle_sha,
+            self.content.battle.hash.clone(),
+            self.content.run.run_content_hash.clone(),
+            &self.content.run.m4_oracle_sha,
         )?;
         let local = self.frontier_digest()?;
         if *header.before_digest.as_str() != *local.as_str() {
