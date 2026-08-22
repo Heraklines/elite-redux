@@ -169,6 +169,8 @@ fn invalid_next_menu_aborts_before_state_swap() -> Result<(), Box<dyn Error>> {
     use er_types::ui_menu::{LogicalMenu, LogicalMenuOption};
 
     let (state, battle, run) = load_state()?;
+    let mut runtime =
+        er_game::run_runtime::RunRuntime::new(state.clone(), battle.clone(), run.clone(), ORACLE)?;
     let mut kernel =
         GameKernel::new_run(state.clone(), battle, run, ORACLE).map_err(std::io::Error::other)?;
     let before = kernel
@@ -216,5 +218,8 @@ fn invalid_next_menu_aborts_before_state_swap() -> Result<(), Box<dyn Error>> {
             .map_err(std::io::Error::other)?,
         before
     );
+    let runtime_before = runtime.frontier_digest()?;
+    assert!(runtime.apply(&material).is_err());
+    assert_eq!(runtime.frontier_digest()?, runtime_before);
     Ok(())
 }

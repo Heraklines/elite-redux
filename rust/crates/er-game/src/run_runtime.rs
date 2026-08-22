@@ -119,9 +119,7 @@ impl RunRuntime {
             .after_state
             .validate()
             .map_err(|_| RunRuntimeError::InvalidAfterState)?;
-        header
-            .next_control
-            .validate()
+        crate::run_menu::RunMenuReducer::new(header.next_control.clone())
             .map_err(|_| RunRuntimeError::InvalidNextControl)?;
         // Step 9: atomic whole-state swap. Nothing above mutated self.
         self.state = header.after_state.clone();
