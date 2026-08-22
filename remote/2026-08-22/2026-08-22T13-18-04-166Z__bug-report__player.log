@@ -1,0 +1,2101 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:71814efeed95a1f4d51cf571e06f3c6aeea29a66:run-32321987254.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36
+platform: Win32
+screen:   2560x1440 @1x  devmem:32 GB
+boot:     boot-start@0ms -> loading-complete@37241ms -> title-shown@40994ms
+lastSess: ok (reached title)
+mode:     4  wave:3  difficulty:hell
+seed:     jUwGEIoLQk9cyuF8zvTkjMnL
+party:    Iron Valiant(L7 29/29), Luvdisc(L7 26/26), Marbeep(L5 23/23), Finneon(L5 21/21), Tapu Koko(L5 23/23), Togepi(L5 20/20)
+
+----- DESCRIPTION -----
+amarkov - shiny lab on iron valiant causing huge performance issues
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:71814efeed95a1f4d51cf571e06f3c6aeea29a66:run-32321987254.1","source":"github","sha":"71814efeed95a1f4d51cf571e06f3c6aeea29a66","workflow":{"provider":"github-actions","runId":"32321987254","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[13:03:42.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.062] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.062] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.062] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.062] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.062] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.062] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.063] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.063] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.063] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.080] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.080] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.080] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.081] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.081] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.081] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.081] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.081] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.081] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.081] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.081] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.082] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.082] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.082] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.099] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.099] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.099] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.099] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.100] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.100] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.100] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.100] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.100] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.100] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.100] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.100] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.100] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.118] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.118] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.118] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.119] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.119] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.119] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.119] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.119] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.119] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.119] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.119] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.119] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.137] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.137] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.137] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.137] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.137] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.138] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.138] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.138] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.138] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.138] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.138] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.138] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.154] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.154] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.154] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.154] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.154] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.154] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.155] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.155] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.155] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.155] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.155] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.155] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.170] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.170] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.171] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.171] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.171] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.171] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.171] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.171] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.172] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.172] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.172] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.187] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.187] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.187] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.187] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.188] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.188] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.188] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.188] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.188] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.188] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.188] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.204] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.204] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.204] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.205] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.205] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.205] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.205] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.205] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.205] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.205] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.205] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.221] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.221] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.221] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.221] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.222] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.222] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.222] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.222] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.222] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.222] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.222] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.222] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.238] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.238] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.238] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.238] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.239] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.239] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.239] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.239] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.239] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.239] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.239] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.239] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.240] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.240] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.255] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.255] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.255] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.255] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.255] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.255] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.255] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.255] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.256] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.256] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.256] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.256] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.256] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.256] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.266] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.267] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.267] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.267] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.267] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.267] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.267] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.268] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.268] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.268] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.268] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.268] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.268] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.279] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.279] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.279] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.279] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.279] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.279] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.280] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.280] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.280] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.280] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.280] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.280] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.291] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.292] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.292] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.292] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.292] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.292] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.292] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.293] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.293] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.293] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.293] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.293] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.293] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.293] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.293] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.293] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.305] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.305] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.305] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.305] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.306] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.306] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.306] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.306] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.306] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.306] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.306] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.306] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.307] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.307] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.320] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.320] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.320] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:03:42.320] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:03:42.320] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:42.320] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:42.321] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:42.321] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:03:42.321] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:03:42.321] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:03:42.321] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:03:42.321] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:03:42.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:03:42.321] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:03:42.327] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:42.327] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:42.877] LOG: Koffing's icon 109 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:03:43.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:43.070] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:43.075] LOG: Koffing's icon 109 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:03:43.589] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:03:43.589] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:03:44.071] LOG: Koffing's icon 109 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:03:45.711] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:03:45.711] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:03:46.085] LOG: Stufful's icon 759 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:03:51.629] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:03:52.213] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:03:52.213] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:03:52.474] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:03:54.695] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:54.695] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:55.291] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:03:58.097] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:03:58.097] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:03:58.567] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:04:10.504] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:04:10.504] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:04:10.703] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:04:15.470] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:04:15.470] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:04:21.560] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:04:22.567] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:04:22.567] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:04:22.786] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:04:27.790] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:04:27.790] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:04:28.167] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:04:31.910] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:04:31.910] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:04:32.881] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:04:36.128] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:04:36.128] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:04:36.296] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:04:40.007] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:04:45.571] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:04:45.571] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:04:45.961] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:04:55.359] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:04:55.359] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:04:55.559] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:04:55.560] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:04:55.560] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:04:55.717] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:04:55.962] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:05:03.669] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:05:03.669] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:05:04.119] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:05:04.468] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:05:04.468] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:05:04.784] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:05:14.569] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:05:14.569] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:05:14.762] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:05:15.481] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:05:18.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:05:18.188] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:05:18.488] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:05:21.767] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:05:21.767] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:05:22.094] LOG: Stufful's icon 759 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:05:22.667] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:05:22.667] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:05:23.818] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:05:25.348] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:05:32.284] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:05:32.284] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:05:32.908] LOG: Fidough's icon 926 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:05:44.084] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:05:44.084] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:05:44.268] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:06:00.303] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:06:00.303] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:06:04.860] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:06:04.860] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:06:04.860] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:06:05.257] LOG: Tapu Lele's icon 786 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:06:05.258] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:06:05.258] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:06:05.464] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:06:06.172] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:06:06.172] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:06:06.593] LOG: Stufful's icon 759 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:07:04.861] LOG: %cSaving starter preferences color: blue
+[13:07:05.266] LOG: %cSaving starter preferences color: blue
+[13:07:05.721] LOG: %cSaving starter preferences color: blue
+[13:07:06.162] LOG: %cSaving starter preferences color: blue
+[13:07:06.797] LOG: %cSaving starter preferences color: blue
+[13:07:07.164] LOG: %cSaving starter preferences color: blue
+[13:07:07.665] LOG: %cSaving starter preferences color: blue
+[13:07:08.065] LOG: %cSaving starter preferences color: blue
+[13:07:08.866] LOG: %cSaving starter preferences color: blue
+[13:07:09.174] LOG: %cSaving starter preferences color: blue
+[13:07:11.667] LOG: %cSaving starter preferences color: blue
+[13:07:12.605] LOG: %cSaving starter preferences color: blue
+[13:07:12.911] LOG: %cSaving starter preferences color: blue
+[13:07:13.281] LOG: %cSaving starter preferences color: blue
+[13:07:13.499] LOG: %cSaving starter preferences color: blue
+[13:07:13.681] LOG: %cSaving starter preferences color: blue
+[13:07:13.868] LOG: %cSaving starter preferences color: blue
+[13:07:14.057] LOG: %cSaving starter preferences color: blue
+[13:07:33.196] LOG: %cSaving starter preferences color: blue
+[13:07:35.381] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:07:35.381] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:07:35.582] LOG: Fidough's icon 926 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:07:37.264] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:07:37.264] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:07:38.472] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:07:42.103] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:07:42.103] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:08:02.997] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:08:03.288] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:08:03.288] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:08:04.773] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:08:05.176] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:08:05.176] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:08:05.465] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:08:07.511] LOG: %cSaving starter preferences color: blue
+[13:08:07.823] LOG: %cSaving starter preferences color: blue
+[13:08:17.016] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:17.016] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:17.660] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:18.565] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:18.565] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:18.766] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:19.467] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:19.467] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:19.622] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:20.180] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:20.180] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:20.415] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:36.599] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:36.599] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:37.666] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:37.972] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:37.972] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:38.116] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:40.569] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:40.569] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:43.258] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:08:48.307] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:08:48.307] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:08:48.993] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:08:55.920] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:08:55.920] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:08:56.061] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:08:56.566] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:08:56.566] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:08:57.317] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:09:08.261] LOG: %cSaving starter preferences color: blue
+[13:09:08.780] LOG: %cSaving starter preferences color: blue
+[13:09:09.215] LOG: %cSaving starter preferences color: blue
+[13:09:09.689] LOG: %cSaving starter preferences color: blue
+[13:09:19.256] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:09:19.256] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:09:19.955] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:10:16.786] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:17.302] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:10:17.302] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:10:17.503] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:10:17.504] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:10:17.504] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:10:17.979] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:10:25.005] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:25.005] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:25.194] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:34.473] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:10:34.474] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:10:34.775] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:10:37.801] LOG: Iron Valiant's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:41.261] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:41.261] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:41.458] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:41.870] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:10:41.870] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:10:42.110] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:10:43.056] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:43.056] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:43.898] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:44.850] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:44.850] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:52.511] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:52.959] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:52.959] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:57.794] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:58.059] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:58.059] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:58.660] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:10:58.661] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:10:58.661] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:10:58.988] LOG: Tapu Lele's icon 786 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:10:58.988] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:10:58.988] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:10:59.758] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:01.983] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:11:01.983] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:11:02.351] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:02.587] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:11:02.587] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:11:03.665] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:05.052] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:05.052] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:05.250] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:11.658] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:11:11.658] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:11:11.874] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:11:13.557] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:13.557] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:13.787] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:15.377] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:11:15.377] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:11:15.572] LOG: Fezandipiti's icon 1016 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:11:15.573] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:11:15.573] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:11:16.000] LOG: Milcery's icon 868 does not match getIconId with female: true, formIndex: 0, shiny: true, variant: 1
+[13:11:16.389] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:16.389] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:16.987] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:17.171] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:17.171] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:17.487] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:18.068] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:18.068] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:18.248] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:18.686] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:18.686] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:19.458] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:19.459] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:11:19.459] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:11:19.688] LOG: Tapu Lele's icon 786 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:11:19.689] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:19.689] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:20.274] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:20.508] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:20.508] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:22.270] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:23.753] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:11:50.276] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:50.276] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:11:50.276] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:11:50.460] LOG: Tapu Koko's icon 785 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:12:53.852] LOG: %cSaving starter preferences color: blue
+[13:12:54.253] LOG: %cSaving starter preferences color: blue
+[13:12:55.060] LOG: %cSaving starter preferences color: blue
+[13:12:55.459] LOG: %cSaving starter preferences color: blue
+[13:12:57.458] LOG: %cSaving starter preferences color: blue
+[13:12:57.887] LOG: %cSaving starter preferences color: blue
+[13:12:59.496] LOG: %cSaving starter preferences color: blue
+[13:12:59.802] LOG: %cSaving starter preferences color: blue
+[13:13:00.262] LOG: %cSaving starter preferences color: blue
+[13:13:00.661] LOG: %cSaving starter preferences color: blue
+[13:13:00.860] LOG: %cSaving starter preferences color: blue
+[13:13:01.014] LOG: %cSaving starter preferences color: blue
+[13:13:01.379] LOG: %cSaving starter preferences color: blue
+[13:13:01.661] LOG: %cSaving starter preferences color: blue
+[13:13:16.584] LOG: %cSaving starter preferences color: blue
+[13:13:16.992] LOG: %cSaving starter preferences color: blue
+[13:13:21.069] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:13:46.505] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:13:46.580] LOG: Getting Session Slot id: %d 0
+[13:13:46.580] LOG: Getting Session Slot id: %d 1
+[13:13:46.580] LOG: Getting Session Slot id: %d 2
+[13:13:46.581] LOG: Getting Session Slot id: %d 3
+[13:13:46.582] LOG: Getting Session Slot id: %d 4
+[13:13:46.950] ERROR: Session read failed (missing).
+[13:13:46.950] ERROR: Session read failed (missing).
+[13:13:46.950] ERROR: Session read failed (missing).
+[13:13:46.950] ERROR: Session read failed (missing).
+[13:13:46.951] ERROR: Session read failed (missing).
+[13:13:50.930] LOG: Wave Seed: 5ixz[XwkFoqRNGYIiFKRJ8PC 1
+[13:13:50.940] LOG: %cStart Phase EncounterPhase color:green;
+[13:13:50.941] LOG: Starting species pool tier: UNCOMMON
+[13:13:50.948] LOG: Pokemon: Wild Fidough | Species ID: 926 | Level: 2 | Nature: Gentle (+SpDef/-Def)
+[13:13:50.948] LOG: Stats (IVs): HP: 13 (22), Atk: 7 (10), Def: 6 (1), Spatk: 6 (4), Spdef: 8 (14), Spd: 8 (30)
+[13:13:50.948] LOG: Ability: Gluttony | Passive Ability: Well-Baked Body 
+[13:13:50.948] LOG: Moveset: ["Lovely Bite","Growl","Howl"]
+[13:13:51.090] DEBUG: Session data saved to slot 0!
+[13:13:51.091] LOG: Wave Seed: 5ixz[XwkFoqRNGYIiFKRJ8PC 1
+[13:13:51.552] LOG: %cStart Phase SummonPhase color:green;
+[13:13:51.852] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:13:51.957] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:13:51.958] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:13:53.097] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:13:53.097] LOG: %cStart Phase PostSummonPhase color:green;
+[13:13:53.097] LOG: Ran PSP for: Iron Valiant
+[13:13:53.098] LOG: %cStart Phase PostSummonPhase color:green;
+[13:13:53.098] LOG: Ran PSP for: Fidough
+[13:13:53.098] LOG: %cStart Phase PostSummonPhase color:green;
+[13:13:53.098] LOG: %cStart Phase TurnInitPhase color:green;
+[13:13:53.098] LOG: %cStart Phase CommandPhase color:green;
+[13:13:56.052] LOG: Move: PLAY_ROUGH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:13:56.053] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:13:56.053] LOG: Battle Seed: fNp8tIqkZrjCpALi
+[13:13:56.053] LOG: %cStart Phase TurnStartPhase color:green;
+[13:13:56.053] LOG: %cStart Phase MovePhase color:green;
+[13:13:56.053] LOG: %cUser: Iron Valiant
+Move: PLAY_ROUGH
+Use Mode: NORMAL color:orchid
+[13:13:56.054] LOG: %cStart Phase MessagePhase color:green;
+[13:13:56.145] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:13:56.146] LOG: crit stage: +0
+[13:13:56.148] LOG: Move: Play Rough | Base damage: 17.321599999999997 | Power: 60.48 | Source attack: 19 | Target defense: 6
+[13:13:56.148] LOG: Move: Play Rough | Attack damage: 24
+[13:13:56.149] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:13:56.165] LOG: %cStart Phase FaintPhase color:green;
+[13:13:56.253] LOG: %cStart Phase MessagePhase color:green;
+[13:13:56.696] LOG: %cStart Phase VictoryPhase color:green;
+[13:13:56.696] LOG: %cStart Phase ExpPhase color:green;
+[13:13:56.886] LOG: %cStart Phase MoveEndPhase color:green;
+[13:13:56.886] LOG: %cStart Phase TurnInitPhase color:green;
+[13:13:56.886] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:13:56.886] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:13:56.886] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:13:56.886] LOG: %cStart Phase BerryPhase color:green;
+[13:13:56.886] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:13:56.886] LOG: %cStart Phase TurnEndPhase color:green;
+[13:13:56.887] LOG: %cStart Phase BattleEndPhase color:green;
+[13:13:56.887] LOG: Battle Score: 13 (1 Turns x1)
+[13:13:56.887] LOG: Total Score: 13
+[13:13:56.890] LOG: %cStart Phase EggLapsePhase color:green;
+[13:13:56.890] LOG: %cStart Phase EggLapsePhase color:green;
+[13:13:56.890] LOG: %cStart Phase SelectModifierPhase color:green;
+[13:13:56.890] LOG: Wave Seed: 5ixz[XwkFoqRNGYIiFKRJ8PC 1
+[13:14:04.321] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:14:04.321] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:14:05.370] LOG: %cStart Phase NewBattlePhase color:green;
+[13:14:05.370] LOG: Wave Seed: 6jy{\YxlGprSOHZJjGLSK9QD 2
+[13:14:05.379] LOG: [er-ghost] wave 2: ghost 'Perkwad' (run ended at 24)
+[13:14:05.379] LOG: %cStart Phase ReturnPhase color:green;
+[13:14:05.490] LOG: %cStart Phase ShowTrainerPhase color:green;
+[13:14:05.590] LOG: %cStart Phase NextEncounterPhase color:green;
+[13:14:05.593] LOG: ER #419: BST cap (460 @ w2) - replacing Stantler (465) with Greedent (460)
+[13:14:05.598] LOG: Pokemon: Foe Greedent | Species ID: 820 | Level: 2 | Nature: Impish (+Def/-SpAtk)
+[13:14:05.598] LOG: Stats (IVs): HP: 17 (30), Atk: 9 (30), Def: 8 (31), Spatk: 8 (22), Spdef: 8 (29), Spd: 6 (29)
+[13:14:05.598] LOG: Ability: Looter | Passive Ability: Gluttony 
+[13:14:05.598] LOG: Moveset: ["Tackle","Berry Smash","Stockpile","Defense Curl"]
+[13:14:05.605] LOG: Pokemon: Foe Buneary | Species ID: 427 | Level: 2 | Nature: Adamant (+Atk/-SpAtk)
+[13:14:05.605] LOG: Stats (IVs): HP: 14 (25), Atk: 8 (31), Def: 8 (28), Spatk: 6 (31), Spdef: 7 (31), Spd: 7 (30)
+[13:14:05.605] LOG: Ability: Run Away | Passive Ability: Fur Coat 
+[13:14:05.605] LOG: Moveset: ["Extreme Speed","Triple Axel","Thunderous Kick","Fake Out"]
+[13:14:05.610] LOG: Pokemon: Foe Dunsparce | Species ID: 206 | Level: 2 | Nature: Timid (+Spd/-Atk)
+[13:14:05.610] LOG: Stats (IVs): HP: 16 (27), Atk: 8 (28), Def: 9 (23), Spatk: 7 (29), Spdef: 7 (27), Spd: 6 (29)
+[13:14:05.610] LOG: Ability: Serene Grace | Passive Ability: Super Luck 
+[13:14:05.610] LOG: Moveset: ["Body Slam","Earth Power","Rollout (P)","Coil"]
+[13:14:05.616] LOG: Pokemon: Foe Kricketune | Species ID: 402 | Level: 2 | Nature: Jolly (+Spd/-SpAtk)
+[13:14:05.616] LOG: Stats (IVs): HP: 15 (26), Atk: 8 (30), Def: 7 (28), Spatk: 9 (29), Spdef: 7 (30), Spd: 7 (31)
+[13:14:05.616] LOG: Ability: Perfectionist | Passive Ability: Mountaineer 
+[13:14:05.616] LOG: Moveset: ["Victory Dance","Bonemerang","Lunge","Population Bomb"]
+[13:14:05.621] LOG: Pokemon: Foe Pidgeotto | Species ID: 17 | Level: 2 | Nature: Bold (+Def/-Atk)
+[13:14:05.621] LOG: Stats (IVs): HP: 14 (28), Atk: 7 (31), Def: 6 (31), Spatk: 8 (27), Spdef: 7 (30), Spd: 8 (30)
+[13:14:05.621] LOG: Ability: Majestic Bird | Passive Ability: Flock 
+[13:14:05.621] LOG: Moveset: ["Calm Mind","Bleakwind Storm","Steel Wing","Twister"]
+[13:14:05.623] LOG: ER #419: BST cap (460 @ w2) - replacing Oricorio form 2 (496) with Onix (450)
+[13:14:05.628] LOG: Pokemon: Foe Onix | Species ID: 95 | Level: 2 | Nature: Gentle (+SpDef/-Def)
+[13:14:05.628] LOG: Stats (IVs): HP: 14 (21), Atk: 8 (30), Def: 13 (30), Spatk: 6 (3), Spdef: 7 (29), Spd: 7 (10)
+[13:14:05.628] LOG: Ability: Rock Head | Passive Ability: Sturdy 
+[13:14:05.628] LOG: Moveset: ["Smack Down","Self-Destruct","Sharpen","Rock Polish"]
+[13:14:06.368] LOG: Battle Seed: IQ6Viw95KiZwY7Lr
+[13:14:06.369] LOG: Applied Protein (enemy)
+[13:14:06.369] LOG: Applied HP Up (enemy)
+[13:14:06.370] LOG: Generated AI funcs
+[13:14:06.469] DEBUG: Session data saved to slot 0!
+[13:14:06.469] LOG: Applied Protein (enemy)
+[13:14:06.469] LOG: Applied HP Up (enemy)
+[13:14:06.470] LOG: Wave Seed: 6jy{\YxlGprSOHZJjGLSK9QD 2
+[13:14:06.681] LOG: Hex Maniac Perkwad
+[13:14:06.681] LOG: Dialogue dialogue:hexManiac.encounter.1 skipped
+[13:14:06.749] LOG: Hex Maniac Perkwad
+[13:14:06.982] LOG: %cStart Phase SummonPhase color:green;
+[13:14:06.982] LOG: Perkwad
+[13:14:07.153] LOG: Applied Protein (enemy)
+[13:14:07.153] LOG: Applied HP Up (enemy)
+[13:14:07.281] LOG: %cStart Phase SummonPhase color:green;
+[13:14:07.281] LOG: Perkwad
+[13:14:07.450] LOG: Applied Protein (enemy)
+[13:14:07.451] LOG: Applied HP Up (enemy)
+[13:14:07.582] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:14:07.682] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:14:07.782] LOG: %cStart Phase SummonPhase color:green;
+[13:14:08.082] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:14:08.182] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:14:08.183] LOG: %cStart Phase SummonPhase color:green;
+[13:14:08.183] WARN: The Pokemon about to be sent out is fainted or illegal under a challenge. Attempting to resolve...
+[13:14:08.183] WARN: Swapped %s %O with %s %O Finneon {"name":"Finneon","type":"Container","x":106,"y":148,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":false,"blendMode":-1,"textureKey":"","frameKey":"","data":{}} Iron Valiant {"name":"Iron Valiant","type":"Container","x":74,"y":140,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":true,"blendMode":-1,"textureKey":"","frameKey":"","data":{}}
+[13:14:08.482] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:14:08.592] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:14:08.596] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:08.596] LOG: Ran PSP for: Iron Valiant
+[13:14:08.599] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:08.599] LOG: Ran PSP for: Luvdisc
+[13:14:08.602] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:08.602] LOG: %cStart Phase MovePhase color:green;
+[13:14:08.602] LOG: %cUser: Luvdisc
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[13:14:08.606] LOG: %cStart Phase MessagePhase color:green;
+[13:14:08.756] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:08.758] LOG: %cStart Phase MessagePhase color:green;
+[13:14:08.992] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:08.994] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:08.994] LOG: Ran PSP for: Buneary
+[13:14:08.995] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:08.995] LOG: Ran PSP for: Greedent
+[13:14:08.996] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:08.996] LOG: %cStart Phase TurnInitPhase color:green;
+[13:14:08.996] LOG: %cStart Phase CommandPhase color:green;
+[13:14:10.362] LOG: Move: SECRET_SWORD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:14:10.362] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:10.768] LOG: %cStart Phase CommandPhase color:green;
+[13:14:13.202] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:14:13.202] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:14:19.678] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:14:19.679] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:20.162] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:20.162] LOG: Applied X Attack 
+[13:14:20.163] LOG: Applied X Attack 
+[13:14:20.163] LOG: Applied X Attack 
+[13:14:20.163] LOG: Applied X Attack 
+[13:14:20.164] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:20.165] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:20.165] LOG: Applied X Attack 
+[13:14:20.165] LOG: Applied X Attack 
+[13:14:20.165] LOG: Applied X Attack 
+[13:14:20.166] LOG: Applied X Attack 
+[13:14:20.166] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:20.167] LOG: Applied X Attack 
+[13:14:20.167] LOG: Applied X Attack 
+[13:14:20.167] LOG: Applied X Attack 
+[13:14:20.168] LOG: Applied X Attack 
+[13:14:20.168] LOG: %cStart Phase TurnStartPhase color:green;
+[13:14:20.168] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:14:20.169] LOG: Perkwad
+[13:14:20.447] LOG: Perkwad
+[13:14:20.552] LOG: Applied Protein (enemy)
+[13:14:20.553] LOG: Applied HP Up (enemy)
+[13:14:20.692] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:20.692] LOG: Ran PSP for: Pidgeotto
+[13:14:20.694] LOG: %cStart Phase MovePhase color:green;
+[13:14:20.694] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:14:20.702] LOG: %cStart Phase MessagePhase color:green;
+[13:14:20.859] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:20.862] LOG: %cStart Phase MessagePhase color:green;
+[13:14:21.068] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:21.069] LOG: %cStart Phase MovePhase color:green;
+[13:14:21.069] LOG: %cUser: Luvdisc
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[13:14:21.076] LOG: %cStart Phase MessagePhase color:green;
+[13:14:21.178] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:21.180] LOG: %cStart Phase MessagePhase color:green;
+[13:14:21.445] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:21.446] LOG: %cStart Phase MovePhase color:green;
+[13:14:21.446] LOG: %cUser: Greedent
+Move: DEFENSE_CURL
+Use Mode: NORMAL color:orchid
+[13:14:21.454] LOG: %cStart Phase MessagePhase color:green;
+[13:14:21.578] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:21.579] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:21.581] LOG: %cStart Phase MessagePhase color:green;
+[13:14:21.798] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:21.798] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:14:21.798] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:14:21.798] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:14:21.798] LOG: %cStart Phase BerryPhase color:green;
+[13:14:21.803] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:14:21.807] LOG: %cStart Phase TurnEndPhase color:green;
+[13:14:21.811] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:21.811] LOG: %cStart Phase MessagePhase color:green;
+[13:14:22.061] LOG: %cStart Phase TurnInitPhase color:green;
+[13:14:22.061] LOG: %cStart Phase CommandPhase color:green;
+[13:14:23.164] LOG: Move: SECRET_SWORD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:14:23.165] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:23.375] LOG: %cStart Phase CommandPhase color:green;
+[13:14:23.752] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:14:23.753] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:23.950] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:23.951] LOG: Applied X Attack 
+[13:14:23.951] LOG: Applied X Attack 
+[13:14:23.952] LOG: Applied X Attack 
+[13:14:23.952] LOG: Applied X Attack 
+[13:14:23.953] LOG: Battle Seed: IQ6Viw95KiZwY7Lr
+[13:14:23.953] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:23.954] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:23.954] LOG: Applied X Attack 
+[13:14:23.954] LOG: Applied X Attack 
+[13:14:23.954] LOG: Applied X Attack 
+[13:14:23.955] LOG: Applied X Attack 
+[13:14:23.955] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:23.956] LOG: Applied X Attack 
+[13:14:23.956] LOG: Applied X Attack 
+[13:14:23.956] LOG: Applied X Attack 
+[13:14:23.957] LOG: Applied X Attack 
+[13:14:23.958] LOG: Applied X Attack 
+[13:14:23.958] LOG: Applied X Attack 
+[13:14:23.958] LOG: Applied X Attack 
+[13:14:23.959] LOG: Applied X Attack 
+[13:14:23.960] LOG: %cStart Phase TurnStartPhase color:green;
+[13:14:23.961] LOG: %cStart Phase MovePhase color:green;
+[13:14:23.961] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:14:23.962] LOG: %cStart Phase MessagePhase color:green;
+[13:14:24.069] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:24.072] LOG: crit stage: +0
+[13:14:24.073] LOG: Applied X Attack 
+[13:14:24.074] LOG: Move: Secret Sword | Base damage: 8.183466666666666 | Power: 52.699999999999996 | Source attack: 22 | Target defense: 15
+[13:14:24.075] LOG: Applied Protein (enemy)
+[13:14:24.075] LOG: Applied HP Up (enemy)
+[13:14:24.076] LOG: Move: Secret Sword | Attack damage: 11
+[13:14:24.077] LOG: %cStart Phase MessagePhase color:green;
+[13:14:24.367] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:14:24.381] LOG: %cStart Phase MessagePhase color:green;
+[13:14:24.580] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:24.582] LOG: %cStart Phase MovePhase color:green;
+[13:14:24.582] LOG: %cUser: Luvdisc
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[13:14:24.590] LOG: %cStart Phase MessagePhase color:green;
+[13:14:24.747] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:24.749] LOG: crit stage: +0
+[13:14:24.751] LOG: Move: Bubble Beam | Base damage: 4.657142857142857 | Power: 15.500000000000002 | Source attack: 15 | Target defense: 7
+[13:14:24.752] LOG: Move: Bubble Beam | Attack damage: 6
+[13:14:24.753] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:14:24.761] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:24.762] LOG: crit stage: +0
+[13:14:24.764] LOG: Move: Bubble Beam | Base damage: 4.657142857142857 | Power: 15.500000000000002 | Source attack: 15 | Target defense: 7
+[13:14:24.764] LOG: Move: Bubble Beam | Attack damage: 6
+[13:14:24.765] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:14:24.781] LOG: %cStart Phase MessagePhase color:green;
+[13:14:24.980] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:24.981] LOG: %cStart Phase MovePhase color:green;
+[13:14:24.981] LOG: %cUser: Pidgeotto
+Move: CALM_MIND
+Use Mode: NORMAL color:orchid
+[13:14:24.989] LOG: %cStart Phase MessagePhase color:green;
+[13:14:25.149] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:25.150] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:25.150] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:25.153] LOG: %cStart Phase MessagePhase color:green;
+[13:14:25.370] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:25.372] LOG: %cStart Phase MessagePhase color:green;
+[13:14:25.600] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:25.600] LOG: %cStart Phase MovePhase color:green;
+[13:14:25.600] LOG: %cUser: Greedent
+Move: DEFENSE_CURL
+Use Mode: NORMAL color:orchid
+[13:14:25.609] LOG: %cStart Phase MessagePhase color:green;
+[13:14:25.761] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:25.761] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:25.763] LOG: %cStart Phase MessagePhase color:green;
+[13:14:25.971] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:25.971] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:14:25.971] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:14:25.971] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:14:25.971] LOG: %cStart Phase BerryPhase color:green;
+[13:14:25.975] LOG: Applied Salac Berry (enemy)
+[13:14:25.975] LOG: Applied Petaya Berry (enemy)
+[13:14:25.975] LOG: Applied Sitrus Berry (enemy)
+[13:14:25.976] LOG: Applied Protein (enemy)
+[13:14:25.976] LOG: Applied HP Up (enemy)
+[13:14:25.977] LOG: %cStart Phase CommonAnimPhase color:green;
+[13:14:25.977] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:25.979] LOG: %cStart Phase MessagePhase color:green;
+[13:14:26.201] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:26.203] LOG: %cStart Phase MessagePhase color:green;
+[13:14:26.449] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:26.449] LOG: %cStart Phase MessagePhase color:green;
+[13:14:26.750] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:26.752] LOG: %cStart Phase MessagePhase color:green;
+[13:14:26.981] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:14:26.985] LOG: %cStart Phase TurnEndPhase color:green;
+[13:14:26.989] LOG: Applied Leftovers (enemy)
+[13:14:26.989] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:26.989] LOG: %cStart Phase MessagePhase color:green;
+[13:14:27.201] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:27.202] LOG: %cStart Phase MessagePhase color:green;
+[13:14:27.491] LOG: %cStart Phase TurnInitPhase color:green;
+[13:14:27.492] LOG: %cStart Phase CommandPhase color:green;
+[13:14:27.763] LOG: Move: SECRET_SWORD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:14:27.763] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:27.954] LOG: %cStart Phase CommandPhase color:green;
+[13:14:28.275] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:14:28.275] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:28.451] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:28.453] LOG: Applied X Attack 
+[13:14:28.453] LOG: Applied X Attack 
+[13:14:28.453] LOG: Applied X Attack 
+[13:14:28.454] LOG: Applied X Attack 
+[13:14:28.454] LOG: Battle Seed: IQ6Viw95KiZwY7Lr
+[13:14:28.455] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:28.455] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:28.455] LOG: Applied X Attack 
+[13:14:28.455] LOG: Applied X Attack 
+[13:14:28.455] LOG: Applied X Attack 
+[13:14:28.456] LOG: Applied X Attack 
+[13:14:28.456] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:28.457] LOG: Applied X Attack 
+[13:14:28.457] LOG: Applied X Attack 
+[13:14:28.457] LOG: Applied X Attack 
+[13:14:28.458] LOG: Applied X Attack 
+[13:14:28.458] LOG: %cStart Phase TurnStartPhase color:green;
+[13:14:28.458] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:14:28.458] LOG: Perkwad
+[13:14:28.754] LOG: Perkwad
+[13:14:28.856] LOG: Applied Protein (enemy)
+[13:14:28.856] LOG: Applied HP Up (enemy)
+[13:14:28.987] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:28.987] LOG: Ran PSP for: Kricketune
+[13:14:28.989] LOG: %cStart Phase MovePhase color:green;
+[13:14:28.990] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:14:28.999] LOG: %cStart Phase MessagePhase color:green;
+[13:14:29.152] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:29.154] LOG: %cStart Phase MessagePhase color:green;
+[13:14:29.392] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:29.394] LOG: %cStart Phase MovePhase color:green;
+[13:14:29.394] LOG: %cUser: Luvdisc
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[13:14:29.403] LOG: %cStart Phase MessagePhase color:green;
+[13:14:29.557] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:29.560] LOG: crit stage: +0
+[13:14:29.561] LOG: Move: Bubble Beam | Base damage: 4.657142857142857 | Power: 15.500000000000002 | Source attack: 15 | Target defense: 7
+[13:14:29.562] LOG: Move: Bubble Beam | Attack damage: 6
+[13:14:29.562] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:14:29.574] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:29.575] LOG: crit stage: +0
+[13:14:29.577] LOG: Move: Bubble Beam | Base damage: 4.657142857142857 | Power: 15.500000000000002 | Source attack: 15 | Target defense: 7
+[13:14:29.577] LOG: Move: Bubble Beam | Attack damage: 6
+[13:14:29.578] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:14:29.594] LOG: %cStart Phase MessagePhase color:green;
+[13:14:29.793] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:29.793] LOG: %cStart Phase MovePhase color:green;
+[13:14:29.793] LOG: %cUser: Greedent
+Move: DEFENSE_CURL
+Use Mode: NORMAL color:orchid
+[13:14:29.802] LOG: %cStart Phase MessagePhase color:green;
+[13:14:29.953] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:29.953] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:29.955] LOG: %cStart Phase MessagePhase color:green;
+[13:14:30.173] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:30.173] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:14:30.173] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:14:30.173] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:14:30.173] LOG: %cStart Phase BerryPhase color:green;
+[13:14:30.178] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:14:30.182] LOG: %cStart Phase TurnEndPhase color:green;
+[13:14:30.187] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:30.187] LOG: %cStart Phase MessagePhase color:green;
+[13:14:30.442] LOG: %cStart Phase TurnInitPhase color:green;
+[13:14:30.443] LOG: %cStart Phase CommandPhase color:green;
+[13:14:30.683] LOG: Move: SECRET_SWORD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:14:30.683] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:30.885] LOG: %cStart Phase CommandPhase color:green;
+[13:14:31.271] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:14:31.271] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:31.557] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:31.558] LOG: Applied X Attack 
+[13:14:31.558] LOG: Applied X Attack 
+[13:14:31.558] LOG: Applied X Attack 
+[13:14:31.559] LOG: Applied X Attack 
+[13:14:31.560] LOG: Battle Seed: IQ6Viw95KiZwY7Lr
+[13:14:31.560] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:31.560] WARN: BattlerTag STOCKPILING is missing a score!
+[13:14:31.560] LOG: Applied X Attack 
+[13:14:31.560] LOG: Applied X Attack 
+[13:14:31.560] LOG: Applied X Attack 
+[13:14:31.561] LOG: Applied X Attack 
+[13:14:31.561] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:14:31.562] LOG: Applied X Attack 
+[13:14:31.562] LOG: Applied X Attack 
+[13:14:31.562] LOG: Applied X Attack 
+[13:14:31.563] LOG: Applied X Attack 
+[13:14:31.563] LOG: %cStart Phase TurnStartPhase color:green;
+[13:14:31.563] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:14:31.564] LOG: Perkwad
+[13:14:31.858] LOG: Perkwad
+[13:14:31.945] LOG: Applied Protein (enemy)
+[13:14:31.945] LOG: Applied HP Up (enemy)
+[13:14:32.089] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:14:32.184] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:32.184] LOG: Ran PSP for: Buneary
+[13:14:32.187] LOG: %cStart Phase MovePhase color:green;
+[13:14:32.187] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:14:32.196] LOG: %cStart Phase MessagePhase color:green;
+[13:14:32.360] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:32.362] LOG: crit stage: +0
+[13:14:32.363] LOG: Applied X Attack 
+[13:14:32.364] LOG: Move: Secret Sword | Base damage: 5.71008 | Power: 52.699999999999996 | Source attack: 22 | Target defense: 25
+[13:14:32.365] LOG: Move: Secret Sword | Attack damage: 16
+[13:14:32.365] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:14:32.374] LOG: %cStart Phase MessagePhase color:green;
+[13:14:32.584] LOG: %cStart Phase FaintPhase color:green;
+[13:14:32.645] LOG: %cStart Phase MessagePhase color:green;
+[13:14:32.744] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:14:32.745] LOG: %cStart Phase MessagePhase color:green;
+[13:14:32.945] LOG: %cStart Phase VictoryPhase color:green;
+[13:14:32.946] LOG: %cStart Phase ExpPhase color:green;
+[13:14:33.265] LOG: %cStart Phase LevelUpPhase color:green;
+[13:14:33.266] LOG: %cStart Phase ExpPhase color:green;
+[13:14:33.656] LOG: %cStart Phase LevelUpPhase color:green;
+[13:14:33.656] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:33.657] LOG: %cStart Phase MovePhase color:green;
+[13:14:33.657] LOG: %cUser: Luvdisc
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[13:14:33.660] LOG: %cStart Phase MessagePhase color:green;
+[13:14:33.775] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:14:33.777] LOG: %cStart Phase MessagePhase color:green;
+[13:14:34.050] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:34.050] LOG: %cStart Phase MovePhase color:green;
+[13:14:34.050] LOG: %cStart Phase MoveEndPhase color:green;
+[13:14:34.050] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:14:34.050] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:14:34.050] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:14:34.050] LOG: %cStart Phase BerryPhase color:green;
+[13:14:34.052] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:14:34.054] LOG: %cStart Phase TurnEndPhase color:green;
+[13:14:34.056] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:14:34.056] LOG: %cStart Phase MessagePhase color:green;
+[13:14:34.255] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:14:34.475] LOG: Perkwad
+[13:14:34.550] LOG: Applied Protein (enemy)
+[13:14:34.550] LOG: Applied HP Up (enemy)
+[13:14:34.690] LOG: %cStart Phase PostSummonPhase color:green;
+[13:14:34.690] LOG: Ran PSP for: Dunsparce
+[13:14:34.691] LOG: %cStart Phase TurnInitPhase color:green;
+[13:14:34.691] LOG: %cStart Phase CommandPhase color:green;
+[13:14:34.945] LOG: Move: SECRET_SWORD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:14:34.945] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:14:35.608] LOG: %cStart Phase CommandPhase color:green;
+[13:14:39.054] DEBUG: Session data saved to slot 0!
+[13:14:43.703] LOG: Seed: LCFsNoBLbOSAVmgdGa3uK2bi
+[13:14:43.703] LOG: Wave Seed: LCFsNoBLbOSAVmgdGa3uK2bi 0
+[13:14:43.948] WARN: AnimationManager key already exists: prompt
+[13:14:43.948] WARN: AnimationManager key already exists: tera_sparkle
+[13:14:43.948] LOG: Seed: jUwGEIoLQk9cyuF8zvTkjMnL
+[13:14:43.948] LOG: Wave Seed: jUwGEIoLQk9cyuF8zvTkjMnL 0
+[13:14:45.320] LOG: %cStart Phase LoginPhase color:green;
+[13:14:46.084] LOG: Client Session: 54QzabCNE94ZBsHEXWO3K5nReHAxxj3P
+[13:14:47.402] LOG: %cStart Phase TitlePhase color:green;
+[13:14:47.403] LOG: Getting Session Slot id: %d 0
+[13:14:47.794] LOG: use seasonal splash messages true
+[13:15:02.459] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:15:04.453] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:15:04.556] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.556] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.557] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.557] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.557] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.557] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.557] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.557] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.557] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.557] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.558] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.558] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.558] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.558] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.558] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.558] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.558] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.558] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.560] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.560] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.579] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.579] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.579] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.579] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.579] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.579] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.580] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.580] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.580] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.580] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.580] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.580] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.580] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.580] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.594] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.594] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.594] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.594] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.595] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.595] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.595] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.595] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.595] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.595] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.595] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.595] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.595] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.595] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.595] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.595] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.596] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.596] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.596] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.596] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.609] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.609] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.610] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.610] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.610] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.610] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.610] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.610] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.610] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.611] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.611] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.611] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.611] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.611] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.611] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.625] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.625] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.625] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.625] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.625] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.625] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.625] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.625] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.626] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.626] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.626] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.626] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.626] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.626] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.626] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.640] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.640] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.640] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.640] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.640] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.640] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.640] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.640] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.640] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.640] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.641] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.641] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.641] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.641] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.641] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.641] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.641] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.641] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.641] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.641] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.655] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.655] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.655] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.655] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.655] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.655] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.655] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.655] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.656] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.656] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.656] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.656] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.656] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.656] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.656] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.656] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.656] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.656] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.656] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.656] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.670] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.670] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.670] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.670] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.670] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.670] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.670] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.670] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.670] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.670] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.671] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.671] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.671] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.671] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.671] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.671] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.671] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.671] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.671] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.671] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.684] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.684] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.685] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.685] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.685] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.685] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.685] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.685] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.685] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.685] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.685] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.685] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.685] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.685] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.686] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.686] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.686] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.686] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.686] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.686] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.699] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.699] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.699] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.699] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.700] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.700] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.700] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.700] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.700] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.700] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.700] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.701] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.701] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.701] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.714] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.714] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.715] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.715] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.715] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.715] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.715] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.715] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.715] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.715] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.715] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.715] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.715] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.715] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.716] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.716] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.716] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.716] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.716] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.716] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.729] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.729] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.729] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.729] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.730] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.730] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.730] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.730] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.730] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.730] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.730] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.730] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.731] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.731] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.744] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.744] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.744] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.744] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.744] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.744] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.745] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.745] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.745] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.745] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.745] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.745] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.745] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.745] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.759] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.759] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.759] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.759] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.759] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.759] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.759] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.759] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.759] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.759] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.760] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.760] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.760] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.760] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.760] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.760] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.760] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.760] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.760] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.760] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.773] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.773] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.773] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.773] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.774] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.774] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.774] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.774] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.774] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.774] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.774] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.774] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.775] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.775] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.788] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.788] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.788] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.788] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.788] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.788] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.789] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.789] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.789] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.789] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.789] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.789] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.789] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.789] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.800] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.800] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.800] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.800] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.801] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.801] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.801] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.801] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.801] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.801] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.801] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.801] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.802] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.802] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.813] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.813] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.813] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.813] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.814] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.814] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.814] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.814] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.814] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.814] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.814] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.814] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.814] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.814] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.814] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.814] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.815] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.815] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.815] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.815] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.827] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.827] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.827] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.827] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.827] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.827] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.827] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.827] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.828] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.828] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.828] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.828] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.828] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.828] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.828] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.828] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.828] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.828] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.828] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.828] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.841] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.841] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.841] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.841] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.841] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.841] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.841] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.841] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.841] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.841] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.842] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.842] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.842] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.842] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.842] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.842] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.842] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.842] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.842] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.842] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.856] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.856] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.856] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:04.856] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:04.856] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:04.856] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:04.856] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:04.856] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:04.856] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 759_2
+[13:15:04.856] LOG: Stufful's variant icon does not exist. Replacing with default.
+[13:15:04.857] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:04.857] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:15:04.857] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 786_2
+[13:15:04.857] LOG: Tapu Lele's variant icon does not exist. Replacing with default.
+[13:15:04.857] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 868_2
+[13:15:04.857] LOG: Milcery's variant icon does not exist. Replacing with default.
+[13:15:04.857] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 926_2
+[13:15:04.857] LOG: Fidough's variant icon does not exist. Replacing with default.
+[13:15:04.857] WARN: Texture "%s" has no frame "%s" pokemon_icons_9v 1016_2
+[13:15:04.857] LOG: Fezandipiti's variant icon does not exist. Replacing with default.
+[13:15:04.863] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.863] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:04.866] LOG: Koffing's icon 109 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:15:04.866] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:04.866] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:05.242] LOG: Koffing's icon 109 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:15:07.188] WARN: Texture "%s" has no frame "%s" pokemon_icons_1v 109_2
+[13:15:07.188] LOG: Koffing's variant icon does not exist. Replacing with default.
+[13:15:07.738] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:15:08.371] LOG: Koffing's icon 109 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:15:08.373] WARN: Texture "%s" has no frame "%s" pokemon_icons_2v 209_2
+[13:15:08.373] LOG: Snubbull's variant icon does not exist. Replacing with default.
+[13:15:08.560] LOG: Snubbull's icon 209 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:15:10.282] WARN: Texture "%s" has no frame "%s" pokemon_icons_6v 707_3
+[13:15:10.282] LOG: Klefki's variant icon does not exist. Replacing with default.
+[13:15:10.395] LOG: Klefki's icon 707 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[13:15:13.047] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:13.047] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:13.349] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:15:14.153] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 439_2
+[13:15:14.153] LOG: Mime Jr.'s variant icon does not exist. Replacing with default.
+[13:15:14.353] LOG: Mime Jr.'s icon 439 does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 1
+[13:16:01.056] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:16:01.118] LOG: Getting Session Slot id: %d 0
+[13:16:01.121] LOG: Getting Session Slot id: %d 1
+[13:16:01.121] LOG: Getting Session Slot id: %d 2
+[13:16:01.121] LOG: Getting Session Slot id: %d 3
+[13:16:01.122] LOG: Getting Session Slot id: %d 4
+[13:16:01.447] ERROR: Session read failed (missing).
+[13:16:01.448] ERROR: Session read failed (missing).
+[13:16:01.450] ERROR: Session read failed (missing).
+[13:16:01.456] ERROR: Session read failed (missing).
+[13:16:01.573] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:16:01.573] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:16:09.446] DEBUG: %cSending a request to delete session in slot %d color: blue 0
+[13:16:09.480] LOG: Wave Seed: kVxHFJpMRl:dzvG9{wUlkNoM 1
+[13:16:09.489] LOG: %cStart Phase EncounterPhase color:green;
+[13:16:09.491] LOG: Starting species pool tier: UNCOMMON
+[13:16:09.496] LOG: Pokemon: Wild Whismur | Species ID: 293 | Level: 2 | Nature: Sassy (+SpDef/-Spd)
+[13:16:09.496] LOG: Stats (IVs): HP: 15 (27), Atk: 7 (30), Def: 6 (31), Spatk: 8 (8), Spdef: 7 (8), Spd: 6 (24)
+[13:16:09.496] LOG: Ability: Scrappy | Passive Ability: Soundproof 
+[13:16:09.496] LOG: Moveset: ["Growl","Howl","Screech","Astonish"]
+[13:16:09.609] DEBUG: Session data saved to slot 0!
+[13:16:13.147] LOG: Wave Seed: kVxHFJpMRl:dzvG9{wUlkNoM 1
+[13:16:13.562] LOG: %cStart Phase SummonPhase color:green;
+[13:16:13.841] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:16:13.954] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:16:13.954] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:16:14.896] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:16:14.897] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:14.897] LOG: Ran PSP for: Iron Valiant
+[13:16:14.897] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:14.897] LOG: Ran PSP for: Whismur
+[13:16:14.897] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:14.897] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:14.897] LOG: %cStart Phase CommandPhase color:green;
+[13:16:16.337] LOG: Move: SECRET_SWORD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:16:16.338] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:16.338] LOG: Battle Seed: bLpyIhdh8LtdRHfh
+[13:16:16.338] LOG: %cStart Phase TurnStartPhase color:green;
+[13:16:16.339] LOG: %cStart Phase MovePhase color:green;
+[13:16:16.339] LOG: %cUser: Whismur
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[13:16:16.339] LOG: %cStart Phase MessagePhase color:green;
+[13:16:16.454] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:16.455] LOG: crit stage: +0
+[13:16:16.456] LOG: Move: Astonish | Base damage: 2.4181333333333335 | Power: 16 | Source attack: 7 | Target defense: 15
+[13:16:16.457] LOG: Move: Astonish | Attack damage: 0
+[13:16:16.458] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:16.458] LOG: %cStart Phase MovePhase color:green;
+[13:16:16.458] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:16:16.458] LOG: %cStart Phase MessagePhase color:green;
+[13:16:16.654] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:16.655] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:16:16.655] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:16:16.655] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:16:16.655] LOG: %cStart Phase BerryPhase color:green;
+[13:16:16.655] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:16:16.655] LOG: %cStart Phase TurnEndPhase color:green;
+[13:16:16.656] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:16.656] LOG: %cStart Phase CommandPhase color:green;
+[13:16:17.556] LOG: Move: SECRET_SWORD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:16:17.557] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:17.557] LOG: Battle Seed: bLpyIhdh8LtdRHfh
+[13:16:17.557] LOG: %cStart Phase TurnStartPhase color:green;
+[13:16:17.557] LOG: %cStart Phase MovePhase color:green;
+[13:16:17.557] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:16:17.558] LOG: %cStart Phase MessagePhase color:green;
+[13:16:17.673] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:17.675] LOG: crit stage: +1
+[13:16:17.676] LOG: Move: Secret Sword | Base damage: 10.613333333333333 | Power: 34 | Source attack: 19 | Target defense: 6
+[13:16:17.676] LOG: Move: Secret Sword | Attack damage: 29
+[13:16:17.677] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:16:17.693] LOG: %cStart Phase MessagePhase color:green;
+[13:16:17.940] LOG: %cStart Phase FaintPhase color:green;
+[13:16:18.039] LOG: %cStart Phase MessagePhase color:green;
+[13:16:18.261] LOG: %cStart Phase VictoryPhase color:green;
+[13:16:18.261] LOG: %cStart Phase ExpPhase color:green;
+[13:16:18.484] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:18.484] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:18.485] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:16:18.485] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:16:18.485] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:16:18.485] LOG: %cStart Phase BerryPhase color:green;
+[13:16:18.485] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:16:18.485] LOG: %cStart Phase TurnEndPhase color:green;
+[13:16:18.485] LOG: %cStart Phase BattleEndPhase color:green;
+[13:16:18.485] LOG: Battle Score: 10 (2 Turns x0.84)
+[13:16:18.485] LOG: Total Score: 10
+[13:16:18.488] LOG: %cStart Phase EggLapsePhase color:green;
+[13:16:18.488] LOG: %cStart Phase EggLapsePhase color:green;
+[13:16:18.488] LOG: %cStart Phase SelectModifierPhase color:green;
+[13:16:18.488] LOG: Wave Seed: kVxHFJpMRl:dzvG9{wUlkNoM 1
+[13:16:24.497] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:16:24.497] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+[13:16:25.154] LOG: %cStart Phase NewBattlePhase color:green;
+[13:16:25.154] LOG: Wave Seed: lWyIGKqNSm;e{wH:|xVmlOpN 2
+[13:16:25.162] LOG: [er-ghost] wave 2: ghost 'beezinthetrav' (run ended at 6)
+[13:16:25.162] LOG: %cStart Phase ReturnPhase color:green;
+[13:16:25.276] LOG: %cStart Phase ShowTrainerPhase color:green;
+[13:16:25.377] LOG: %cStart Phase NextEncounterPhase color:green;
+[13:16:25.382] LOG: Pokemon: Foe Charmander | Species ID: 4 | Level: 2 | Nature: Quirky (-)
+[13:16:25.382] LOG: Stats (IVs): HP: 14 (15), Atk: 6 (15), Def: 6 (15), Spatk: 8 (15), Spdef: 8 (15), Spd: 8 (15)
+[13:16:25.382] LOG: Ability: Flame Body | Passive Ability: Blaze 
+[13:16:25.382] LOG: Moveset: ["Fire Fang","Flamethrower","Growl","Leer"]
+[13:16:25.388] LOG: Pokemon: Foe Sprigatito | Species ID: 906 | Level: 2 | Nature: Hardy (-)
+[13:16:25.388] LOG: Stats (IVs): HP: 14 (15), Atk: 6 (15), Def: 7 (15), Spatk: 7 (15), Spdef: 7 (15), Spd: 8 (15)
+[13:16:25.388] LOG: Ability: Soothing Aroma | Passive Ability: Overgrow 
+[13:16:25.388] LOG: Moveset: ["Tail Whip","Fury Swipes","Hone Claws","Fertile Fangs"]
+[13:16:25.391] LOG: Pokemon: Foe Turtwig | Species ID: 387 | Level: 2 | Nature: Bashful (-)
+[13:16:25.391] LOG: Stats (IVs): HP: 14 (15), Atk: 8 (15), Def: 7 (15), Spatk: 7 (15), Spdef: 7 (15), Spd: 6 (15)
+[13:16:25.391] LOG: Ability: Shell Armor | Passive Ability: Overgrow 
+[13:16:25.391] LOG: Moveset: ["Bullet Seed","Fertile Fangs","Mega Drain","Tackle"]
+[13:16:25.467] LOG: Battle Seed: kt5rIt4c76f6SJks
+[13:16:25.467] LOG: Applied HP Up (enemy)
+[13:16:25.467] LOG: Generated AI funcs
+[13:16:25.563] DEBUG: Session data saved to slot 0!
+[13:16:25.563] LOG: Applied HP Up (enemy)
+[13:16:25.563] LOG: Wave Seed: lWyIGKqNSm;e{wH:|xVmlOpN 2
+[13:16:25.780] LOG: Musician beezinthetrav
+[13:16:25.781] LOG: Dialogue dialogue:musician.encounter.1 skipped
+[13:16:25.846] LOG: Musician beezinthetrav
+[13:16:26.148] LOG: %cStart Phase SummonPhase color:green;
+[13:16:26.148] LOG: beezinthetrav
+[13:16:26.297] LOG: Applied HP Up (enemy)
+[13:16:26.444] LOG: %cStart Phase SummonPhase color:green;
+[13:16:26.444] LOG: beezinthetrav
+[13:16:26.646] LOG: Applied HP Up (enemy)
+[13:16:26.777] LOG: %cStart Phase SummonPhase color:green;
+[13:16:27.067] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:16:27.167] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:16:27.168] LOG: %cStart Phase SummonPhase color:green;
+[13:16:27.168] WARN: The Pokemon about to be sent out is fainted or illegal under a challenge. Attempting to resolve...
+[13:16:27.168] WARN: Swapped %s %O with %s %O Finneon {"name":"Finneon","type":"Container","x":106,"y":148,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":false,"blendMode":-1,"textureKey":"","frameKey":"","data":{}} Iron Valiant {"name":"Iron Valiant","type":"Container","x":74,"y":140,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":true,"blendMode":-1,"textureKey":"","frameKey":"","data":{}}
+[13:16:27.477] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:16:27.577] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:16:27.580] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:27.580] LOG: Ran PSP for: Iron Valiant
+[13:16:27.583] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:27.583] LOG: Ran PSP for: Luvdisc
+[13:16:27.586] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:27.586] LOG: %cStart Phase MovePhase color:green;
+[13:16:27.586] LOG: %cUser: Luvdisc
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[13:16:27.590] LOG: %cStart Phase MessagePhase color:green;
+[13:16:27.698] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:27.699] LOG: %cStart Phase MessagePhase color:green;
+[13:16:27.968] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:27.969] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:27.969] LOG: Ran PSP for: Charmander
+[13:16:27.970] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:27.970] LOG: Ran PSP for: Sprigatito
+[13:16:27.971] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:27.972] LOG: %cStart Phase MovePhase color:green;
+[13:16:27.972] LOG: %cUser: Sprigatito
+Move: HEAL_BELL
+Use Mode: FOLLOW_UP color:orchid
+[13:16:27.979] LOG: %cStart Phase MessagePhase color:green;
+[13:16:28.098] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:28.100] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:16:28.100] LOG: %cStart Phase MessagePhase color:green;
+[13:16:28.357] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:16:28.357] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:16:28.357] LOG: %cStart Phase ResetStatusPhase color:green;
+[13:16:28.357] LOG: %cStart Phase MessagePhase color:green;
+[13:16:28.559] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:28.559] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:28.559] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:28.559] LOG: %cStart Phase CommandPhase color:green;
+[13:16:32.856] LOG: Move: PHOTON_GEYSER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:16:32.856] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:33.739] LOG: %cStart Phase CommandPhase color:green;
+[13:16:38.242] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:16:38.243] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:39.642] LOG: %cStart Phase CommandPhase color:green;
+[13:16:41.042] LOG: Move: CAPTIVATE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:16:41.042] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:42.043] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:42.045] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:42.048] LOG: %cStart Phase TurnStartPhase color:green;
+[13:16:42.049] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:16:42.049] LOG: beezinthetrav
+[13:16:42.344] LOG: beezinthetrav
+[13:16:42.445] LOG: Applied HP Up (enemy)
+[13:16:42.581] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:16:42.676] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:42.676] LOG: Ran PSP for: Turtwig
+[13:16:42.679] LOG: %cStart Phase MovePhase color:green;
+[13:16:42.679] LOG: %cUser: Iron Valiant
+Move: PHOTON_GEYSER
+Use Mode: NORMAL color:orchid
+[13:16:42.687] LOG: %cStart Phase MessagePhase color:green;
+[13:16:42.848] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:42.850] LOG: Applied Dire Hit 
+[13:16:42.850] LOG: crit stage: +2
+[13:16:42.852] LOG: Move: Photon Geyser | Base damage: 11.616326530612247 | Power: 44.28571428571429 | Source attack: 19 | Target defense: 7
+[13:16:42.853] LOG: Move: Photon Geyser | Attack damage: 10
+[13:16:42.854] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:16:42.868] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:42.869] LOG: %cStart Phase MovePhase color:green;
+[13:16:42.869] LOG: %cUser: Luvdisc
+Move: CAPTIVATE
+Use Mode: NORMAL color:orchid
+[13:16:42.878] LOG: %cStart Phase MessagePhase color:green;
+[13:16:42.976] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:42.978] LOG: Applied Dire Hit 
+[13:16:42.978] LOG: crit stage: +2
+[13:16:42.980] LOG: Move: Captivate | Base damage: 6.934693877551021 | Power: 28.78571428571429 | Source attack: 15 | Target defense: 7
+[13:16:42.980] LOG: Move: Captivate | Attack damage: 10
+[13:16:42.981] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:16:42.997] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:42.997] LOG: %cStart Phase MovePhase color:green;
+[13:16:42.997] LOG: %cUser: Sprigatito
+Move: HONE_CLAWS
+Use Mode: NORMAL color:orchid
+[13:16:43.011] LOG: %cStart Phase MessagePhase color:green;
+[13:16:43.156] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:43.157] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:16:43.157] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:16:43.159] LOG: %cStart Phase MessagePhase color:green;
+[13:16:43.387] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:16:43.388] LOG: %cStart Phase MessagePhase color:green;
+[13:16:43.647] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:43.647] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:16:43.647] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:16:43.647] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:16:43.647] LOG: %cStart Phase BerryPhase color:green;
+[13:16:43.652] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:16:43.656] LOG: %cStart Phase TurnEndPhase color:green;
+[13:16:43.660] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:16:43.660] LOG: %cStart Phase MessagePhase color:green;
+[13:16:43.863] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:16:43.863] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:16:43.864] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:43.864] LOG: %cStart Phase CommandPhase color:green;
+[13:16:44.059] LOG: Move: PHOTON_GEYSER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:16:44.060] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:44.343] LOG: %cStart Phase CommandPhase color:green;
+[13:16:44.879] LOG: Move: CAPTIVATE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:16:44.879] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:45.084] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:45.086] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:45.087] LOG: %cStart Phase TurnStartPhase color:green;
+[13:16:45.088] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:16:45.088] LOG: beezinthetrav
+[13:16:45.368] LOG: beezinthetrav
+[13:16:45.447] LOG: Applied HP Up (enemy)
+[13:16:45.582] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:45.582] LOG: Ran PSP for: Charmander
+[13:16:45.583] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:16:45.583] LOG: beezinthetrav
+[13:16:45.868] LOG: beezinthetrav
+[13:16:45.946] LOG: Applied HP Up (enemy)
+[13:16:46.092] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:46.092] LOG: Ran PSP for: Sprigatito
+[13:16:46.093] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:46.094] LOG: %cStart Phase MovePhase color:green;
+[13:16:46.094] LOG: %cUser: Iron Valiant
+Move: PHOTON_GEYSER
+Use Mode: NORMAL color:orchid
+[13:16:46.101] LOG: %cStart Phase MessagePhase color:green;
+[13:16:46.251] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:46.252] LOG: Battle Seed: kt5rIt4c76f6SJks
+[13:16:46.252] LOG: Applied Dire Hit 
+[13:16:46.253] LOG: crit stage: +2
+[13:16:46.254] LOG: Move: Photon Geyser | Base damage: 11.616326530612247 | Power: 44.28571428571429 | Source attack: 19 | Target defense: 7
+[13:16:46.255] LOG: Move: Photon Geyser | Attack damage: 10
+[13:16:46.256] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:16:46.268] LOG: %cStart Phase FaintPhase color:green;
+[13:16:46.349] LOG: %cStart Phase MessagePhase color:green;
+[13:16:46.467] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:16:46.468] LOG: %cStart Phase MessagePhase color:green;
+[13:16:46.668] LOG: %cStart Phase VictoryPhase color:green;
+[13:16:46.669] LOG: %cStart Phase ExpPhase color:green;
+[13:16:46.869] LOG: %cStart Phase ExpPhase color:green;
+[13:16:47.052] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:47.053] LOG: %cStart Phase MovePhase color:green;
+[13:16:47.053] LOG: %cUser: Luvdisc
+Move: CAPTIVATE
+Use Mode: NORMAL color:orchid
+[13:16:47.056] LOG: %cStart Phase MessagePhase color:green;
+[13:16:47.159] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:47.160] LOG: Applied Dire Hit 
+[13:16:47.161] LOG: crit stage: +2
+[13:16:47.162] LOG: Move: Captivate | Base damage: 9.237551020408164 | Power: 28.78571428571429 | Source attack: 22 | Target defense: 7
+[13:16:47.162] LOG: Move: Captivate | Attack damage: 19
+[13:16:47.163] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:16:47.179] LOG: %cStart Phase MessagePhase color:green;
+[13:16:47.389] LOG: %cStart Phase FaintPhase color:green;
+[13:16:47.447] LOG: %cStart Phase MessagePhase color:green;
+[13:16:47.562] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:16:47.563] LOG: %cStart Phase MessagePhase color:green;
+[13:16:47.769] LOG: %cStart Phase VictoryPhase color:green;
+[13:16:47.769] LOG: %cStart Phase ExpPhase color:green;
+[13:16:48.060] LOG: %cStart Phase LevelUpPhase color:green;
+[13:16:48.060] LOG: %cStart Phase ExpPhase color:green;
+[13:16:48.460] LOG: %cStart Phase LevelUpPhase color:green;
+[13:16:48.460] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:48.460] LOG: %cStart Phase MovePhase color:green;
+[13:16:48.460] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:48.460] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:16:48.460] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:16:48.460] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:16:48.460] LOG: %cStart Phase BerryPhase color:green;
+[13:16:48.461] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:16:48.461] LOG: %cStart Phase TurnEndPhase color:green;
+[13:16:48.462] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:16:48.462] LOG: %cStart Phase MessagePhase color:green;
+[13:16:48.680] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:16:48.941] LOG: beezinthetrav
+[13:16:49.038] LOG: Applied HP Up (enemy)
+[13:16:49.181] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:16:49.280] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:49.280] LOG: Ran PSP for: Turtwig
+[13:16:49.280] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:16:49.372] LOG: %cStart Phase PostSummonPhase color:green;
+[13:16:49.372] LOG: Ran PSP for: Charmander
+[13:16:49.372] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:49.372] LOG: %cStart Phase CommandPhase color:green;
+[13:16:49.639] LOG: Move: PHOTON_GEYSER Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:16:49.640] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:49.840] LOG: %cStart Phase CommandPhase color:green;
+[13:16:50.146] LOG: Move: CAPTIVATE Move targets: {"targets":[2,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:16:50.146] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:16:50.338] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:16:50.340] LOG: Battle Seed: kt5rIt4c76f6SJks
+[13:16:50.343] LOG: %cStart Phase TurnStartPhase color:green;
+[13:16:50.343] LOG: %cStart Phase MovePhase color:green;
+[13:16:50.343] LOG: %cUser: Iron Valiant
+Move: PHOTON_GEYSER
+Use Mode: NORMAL color:orchid
+[13:16:50.344] LOG: %cStart Phase MessagePhase color:green;
+[13:16:50.439] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:16:50.440] LOG: Applied Dire Hit 
+[13:16:50.440] LOG: crit stage: +2
+[13:16:50.442] LOG: Move: Photon Geyser | Base damage: 14.248163265306124 | Power: 44.28571428571429 | Source attack: 22 | Target defense: 7
+[13:16:50.443] LOG: Move: Photon Geyser | Attack damage: 19
+[13:16:50.443] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:16:50.451] LOG: %cStart Phase MessagePhase color:green;
+[13:16:50.651] LOG: %cStart Phase FaintPhase color:green;
+[13:16:50.741] LOG: %cStart Phase MessagePhase color:green;
+[13:16:50.838] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:16:50.838] LOG: %cStart Phase MessagePhase color:green;
+[13:16:51.038] LOG: %cStart Phase VictoryPhase color:green;
+[13:16:51.039] LOG: %cStart Phase ExpPhase color:green;
+[13:16:51.262] LOG: %cStart Phase ExpPhase color:green;
+[13:16:51.439] LOG: %cStart Phase MoveEndPhase color:green;
+[13:16:51.439] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:51.439] LOG: %cStart Phase TurnInitPhase color:green;
+[13:16:51.439] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:16:51.439] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:16:51.439] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:16:51.439] LOG: %cStart Phase BerryPhase color:green;
+[13:16:51.440] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:16:51.441] LOG: %cStart Phase TurnEndPhase color:green;
+[13:16:51.441] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:16:51.441] LOG: %cStart Phase MessagePhase color:green;
+[13:16:51.641] LOG: %cStart Phase BattleEndPhase color:green;
+[13:16:51.641] LOG: Battle Score: 31 (3 Turns x0.76)
+[13:16:51.641] LOG: Total Score: 41
+[13:16:51.649] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[13:16:51.649] LOG: Musician beezinthetrav
+[13:16:51.649] LOG: Musician beezinthetrav
+[13:16:51.767] LOG: Dialogue dialogue:musician.victory.1 skipped
+[13:16:51.767] LOG: %cStart Phase MoneyRewardPhase color:green;
+[13:16:52.139] LOG: %cStart Phase ModifierRewardPhase color:green;
+[13:16:52.378] LOG: %cStart Phase EggLapsePhase color:green;
+[13:16:52.378] LOG: %cStart Phase EggLapsePhase color:green;
+[13:16:52.379] LOG: %cStart Phase SelectModifierPhase color:green;
+[13:16:52.379] LOG: Wave Seed: lWyIGKqNSm;e{wH:|xVmlOpN 2
+[13:17:01.451] LOG: %cStart Phase NewBattlePhase color:green;
+[13:17:01.452] LOG: Wave Seed: mXzJHLrOTn<f|xI;}yWnmPqO 3
+[13:17:01.459] LOG: [er-ghost] wave 3: ghost 'KonkeyDong25' (run ended at 15)
+[13:17:01.460] LOG: %cStart Phase ReturnPhase color:green;
+[13:17:01.577] LOG: %cStart Phase ReturnPhase color:green;
+[13:17:01.697] LOG: %cStart Phase ShowTrainerPhase color:green;
+[13:17:01.797] LOG: %cStart Phase NextEncounterPhase color:green;
+[13:17:01.802] LOG: Pokemon: Foe Cyndaquil | Species ID: 155 | Level: 3 | Nature: Serious (-)
+[13:17:01.802] LOG: Stats (IVs): HP: 16 (15), Atk: 9 (15), Def: 8 (15), Spatk: 9 (15), Spdef: 8 (15), Spd: 8 (15)
+[13:17:01.802] LOG: Ability: Flame Body | Passive Ability: Blaze 
+[13:17:01.802] LOG: Moveset: ["Defense Curl","Flame Wheel","Leer","Mud Shot"]
+[13:17:01.806] LOG: Pokemon: Foe Grookey | Species ID: 810 | Level: 3 | Nature: Hardy (-)
+[13:17:01.806] LOG: Stats (IVs): HP: 16 (15), Atk: 10 (15), Def: 8 (15), Spatk: 7 (15), Spdef: 8 (15), Spd: 9 (15)
+[13:17:01.806] LOG: Ability: Grassy Surge | Passive Ability: Overgrow 
+[13:17:01.806] LOG: Moveset: ["Drum Beating","Growl","Fake Out","Trailblaze"]
+[13:17:01.809] LOG: Pokemon: Foe Mudkip | Species ID: 258 | Level: 3 | Nature: Bashful (-)
+[13:17:01.809] LOG: Stats (IVs): HP: 17 (15), Atk: 10 (15), Def: 8 (15), Spatk: 8 (15), Spdef: 7 (15), Spd: 8 (15)
+[13:17:01.809] LOG: Ability: Swift Swim | Passive Ability: Torrent 
+[13:17:01.809] LOG: Moveset: ["Tackle","Smack Down","Bubble Beam","Mud Sport"]
+[13:17:01.998] LOG: Battle Seed: GNghk10raVSHu0Fv
+[13:17:01.999] LOG: Generated AI funcs
+[13:17:02.097] DEBUG: Session data saved to slot 0!
+[13:17:02.098] LOG: Wave Seed: mXzJHLrOTn<f|xI;}yWnmPqO 3
+[13:17:02.359] LOG: Hex Maniac KonkeyDong25
+[13:17:02.359] LOG: Dialogue dialogue:hexManiac.encounter.1 skipped
+[13:17:02.398] LOG: Hex Maniac KonkeyDong25
+[13:17:06.442] LOG: %cStart Phase SummonPhase color:green;
+[13:17:06.442] LOG: KonkeyDong25
+[13:17:06.742] LOG: %cStart Phase SummonPhase color:green;
+[13:17:06.742] LOG: KonkeyDong25
+[13:17:07.043] LOG: %cStart Phase SummonPhase color:green;
+[13:17:07.336] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:17:07.438] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:17:07.440] LOG: %cStart Phase SummonPhase color:green;
+[13:17:07.739] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:17:07.843] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:17:07.846] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:07.846] LOG: Ran PSP for: Iron Valiant
+[13:17:07.849] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:07.849] LOG: Ran PSP for: Luvdisc
+[13:17:07.853] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:07.853] LOG: %cStart Phase MovePhase color:green;
+[13:17:07.853] LOG: %cUser: Luvdisc
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[13:17:07.857] LOG: %cStart Phase MessagePhase color:green;
+[13:17:07.961] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:17:07.962] LOG: %cStart Phase MessagePhase color:green;
+[13:17:08.263] LOG: %cStart Phase MoveEndPhase color:green;
+[13:17:08.264] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:08.264] LOG: Ran PSP for: Grookey
+[13:17:08.265] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:08.265] LOG: Ran PSP for: Cyndaquil
+[13:17:08.267] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:08.275] LOG: %cStart Phase CommonAnimPhase color:green;
+[13:17:08.275] LOG: %cStart Phase MessagePhase color:green;
+[13:17:08.481] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:08.481] LOG: %cStart Phase TurnInitPhase color:green;
+[13:17:08.481] LOG: %cStart Phase CommandPhase color:green;
+[13:17:10.086] LOG: Move: PHOTON_GEYSER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:17:10.087] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:17:10.543] LOG: %cStart Phase CommandPhase color:green;
+[13:17:12.243] LOG: %cStart Phase CommandPhase color:green;
+[13:17:14.443] LOG: Move: SECRET_SWORD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[13:17:14.444] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:17:15.042] LOG: %cStart Phase CommandPhase color:green;
+[13:17:15.974] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Luvdisc
+[13:17:15.975] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:17:16.456] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:17:16.460] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:17:16.464] LOG: %cStart Phase TurnStartPhase color:green;
+[13:17:16.465] LOG: %cStart Phase MovePhase color:green;
+[13:17:16.465] LOG: %cUser: Iron Valiant
+Move: SECRET_SWORD
+Use Mode: NORMAL color:orchid
+[13:17:16.466] LOG: %cStart Phase MessagePhase color:green;
+[13:17:16.596] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:17:16.598] LOG: Applied Dire Hit 
+[13:17:16.598] LOG: crit stage: +2
+[13:17:16.600] LOG: Move: Secret Sword | Base damage: 11.991142857142858 | Power: 41.285714285714285 | Source attack: 22 | Target defense: 8
+[13:17:16.601] LOG: Move: Secret Sword | Attack damage: 26
+[13:17:16.601] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:17:16.644] LOG: %cStart Phase MessagePhase color:green;
+[13:17:16.845] LOG: %cStart Phase FaintPhase color:green;
+[13:17:16.949] LOG: %cStart Phase MessagePhase color:green;
+[13:17:17.292] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:17:17.293] LOG: %cStart Phase MessagePhase color:green;
+[13:17:17.543] LOG: %cStart Phase VictoryPhase color:green;
+[13:17:17.543] LOG: %cStart Phase ExpPhase color:green;
+[13:17:17.543] LOG: Applied Super EXP. Charm 
+[13:17:17.887] LOG: %cStart Phase LevelUpPhase color:green;
+[13:17:17.887] LOG: %cStart Phase ExpPhase color:green;
+[13:17:17.887] LOG: Applied Super EXP. Charm 
+[13:17:18.097] LOG: %cStart Phase LevelUpPhase color:green;
+[13:17:18.097] LOG: %cStart Phase MoveEndPhase color:green;
+[13:17:18.099] LOG: %cStart Phase MovePhase color:green;
+[13:17:18.099] LOG: %cUser: Luvdisc
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[13:17:18.103] LOG: %cStart Phase MessagePhase color:green;
+[13:17:18.251] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:17:18.253] LOG: Applied Dire Hit 
+[13:17:18.253] LOG: crit stage: +2
+[13:17:18.254] LOG: Move: Bubble Beam | Base damage: 6.079999999999999 | Power: 12.142857142857142 | Source attack: 28 | Target defense: 8
+[13:17:18.255] LOG: Move: Bubble Beam | Attack damage: 23
+[13:17:18.256] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:17:18.267] LOG: %cStart Phase MessagePhase color:green;
+[13:17:18.477] LOG: %cStart Phase MessagePhase color:green;
+[13:17:18.695] LOG: %cStart Phase MessagePhase color:green;
+[13:17:18.895] LOG: %cStart Phase FaintPhase color:green;
+[13:17:18.957] LOG: %cStart Phase MessagePhase color:green;
+[13:17:19.145] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:17:19.145] LOG: %cStart Phase MessagePhase color:green;
+[13:17:19.357] LOG: %cStart Phase VictoryPhase color:green;
+[13:17:19.358] LOG: %cStart Phase ExpPhase color:green;
+[13:17:19.358] LOG: Applied Super EXP. Charm 
+[13:17:21.647] LOG: %cStart Phase ExpPhase color:green;
+[13:17:21.647] LOG: Applied Super EXP. Charm 
+[13:17:23.279] LOG: %cStart Phase MoveEndPhase color:green;
+[13:17:23.279] LOG: %cStart Phase MovePhase color:green;
+[13:17:23.279] LOG: %cStart Phase MoveEndPhase color:green;
+[13:17:23.279] LOG: %cStart Phase MovePhase color:green;
+[13:17:23.279] LOG: %cStart Phase MoveEndPhase color:green;
+[13:17:23.279] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:17:23.279] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:17:23.279] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:17:23.279] LOG: %cStart Phase BerryPhase color:green;
+[13:17:23.280] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:17:23.280] LOG: %cStart Phase TurnEndPhase color:green;
+[13:17:23.285] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:17:23.285] LOG: %cStart Phase MessagePhase color:green;
+[13:17:23.537] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:17:23.537] LOG: %cStart Phase MessagePhase color:green;
+[13:17:23.736] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:17:23.736] LOG: %cStart Phase MessagePhase color:green;
+[13:17:23.939] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:17:24.179] LOG: KonkeyDong25
+[13:17:24.471] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:24.471] LOG: Ran PSP for: Mudkip
+[13:17:24.471] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:17:24.566] LOG: %cStart Phase PostSummonPhase color:green;
+[13:17:24.566] LOG: Ran PSP for: Cyndaquil
+[13:17:24.566] LOG: %cStart Phase TurnInitPhase color:green;
+[13:17:24.566] LOG: %cStart Phase CommandPhase color:green;
+[13:17:26.890] WARN: Texture "%s" has no frame "%s" pokemon_icons_7v 785_3
+[13:17:26.890] LOG: Tapu Koko's variant icon does not exist. Replacing with default.
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"jUwGEIoLQk9cyuF8zvTkjMnL","gameModeId":4,"difficulty":"youngster","challenges":[],"roster":[{"id":310140316,"player":true,"species":1006,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":23,"stats":[29,25,19,20,15,26],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":722,"ppUsed":0,"ppUp":0},{"moveId":548,"ppUsed":0,"ppUp":0},{"moveId":748,"ppUsed":0,"ppUp":0},{"moveId":583,"ppUsed":0,"ppUp":0}],"status":null,"friendship":0,"metLevel":5,"metBiome":-1,"metSpecies":1006,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[1],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":0,"targets":[2],"useMode":1,"result":2},{"move":548,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[105,294,5597],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":4182793356,"player":true,"species":456,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":161,"levelExp":0,"gender":0,"hp":21,"stats":[21,9,12,14,12,13],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":585,"ppUsed":0,"ppUp":0},{"moveId":730,"ppUsed":0,"ppUp":0},{"moveId":573,"ppUsed":0,"ppUp":0},{"moveId":613,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":456,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2119327305,"player":true,"species":10029,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":23,"stats":[23,9,11,15,11,9],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":177,"ppUsed":0,"ppUp":0},{"moveId":483,"ppUsed":0,"ppUp":0},{"moveId":777,"ppUsed":0,"ppUp":0},{"moveId":79,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":10029,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1151030511,"player":true,"species":370,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":116,"levelExp":0,"gender":0,"hp":21,"stats":[26,9,14,19,16,25],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":531,"ppUsed":0,"ppUp":0},{"moveId":445,"ppUsed":0,"ppUp":0},{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":370,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,3,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":392,"targets":[2],"result":1,"useMode":3},{"move":445,"targets":[3],"result":1,"useMode":1},{"move":445,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2498529556,"player":true,"species":785,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":23,"stats":[23,20,14,16,13,19],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":716,"ppUsed":0,"ppUp":0},{"moveId":583,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0},{"moveId":110,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":785,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":373928530,"player":true,"species":175,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":116,"levelExp":0,"gender":0,"hp":20,"stats":[20,7,13,10,13,9],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":45,"ppUsed":0,"ppUp":0},{"moveId":547,"ppUsed":0,"ppUp":0},{"moveId":603,"ppUsed":0,"ppUp":0},{"moveId":577,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":175,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":1,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"command","wave":1,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1,"target":2}},{"type":"interaction","seq":0,"kind":"reward","choice":1},{"type":"interaction","seq":1,"kind":"reward","choice":3},{"type":"command","wave":2,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":2,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2}},{"type":"command","wave":2,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":2,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":2,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":2,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":2,"turn":3,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":1}},{"type":"interaction","seq":2,"kind":"reward","choice":0},{"type":"interaction","seq":3,"kind":"reward","choice":1},{"type":"command","wave":3,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":3,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":3,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":2}}],"endState":{"waveIndex":3,"money":2100,"party":[{"species":1006,"level":7,"hp":29,"maxHp":29},{"species":370,"level":7,"hp":26,"maxHp":26},{"species":10029,"level":5,"hp":23,"maxHp":23},{"species":456,"level":5,"hp":21,"maxHp":21},{"species":785,"level":5,"hp":23,"maxHp":23},{"species":175,"level":5,"hp":20,"maxHp":20}]},"checkpoint":{"wave":1,"seed":"jUwGEIoLQk9cyuF8zvTkjMnL","party":[{"id":310140316,"player":true,"species":1006,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":23,"stats":[29,25,19,20,15,26],"ivs":[31,31,31,31,31,31],"nature":13,"moveset":[{"moveId":722,"ppUsed":0,"ppUp":0},{"moveId":548,"ppUsed":0,"ppUp":0},{"moveId":748,"ppUsed":0,"ppUp":0},{"moveId":583,"ppUsed":0,"ppUp":0}],"status":null,"friendship":0,"metLevel":5,"metBiome":-1,"metSpecies":1006,"metWave":-1,"luck":5,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[1],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":0,"targets":[2],"useMode":1,"result":2},{"move":548,"targets":[2],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":true,"erGiftAbilities":[105,294,5597],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":4182793356,"player":true,"species":456,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":161,"levelExp":0,"gender":0,"hp":21,"stats":[21,9,12,14,12,13],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":585,"ppUsed":0,"ppUp":0},{"moveId":730,"ppUsed":0,"ppUp":0},{"moveId":573,"ppUsed":0,"ppUp":0},{"moveId":613,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":456,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2119327305,"player":true,"species":10029,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":5,"exp":125,"levelExp":0,"gender":0,"hp":23,"stats":[23,9,11,15,11,9],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":177,"ppUsed":0,"ppUp":0},{"moveId":483,"ppUsed":0,"ppUp":0},{"moveId":777,"ppUsed":0,"ppUp":0},{"moveId":79,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":10029,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":6,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":1151030511,"player":true,"species":370,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":5,"exp":116,"levelExp":0,"gender":0,"hp":21,"stats":[26,9,14,19,16,25],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":531,"ppUsed":0,"ppUp":0},{"moveId":445,"ppUsed":0,"ppUp":0},{"moveId":61,"ppUsed":0,"ppUp":0},{"moveId":736,"ppUsed":0,"ppUp":0}],"status":null,"friendship":70,"metLevel":5,"metBiome":-1,"metSpecies":370,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":10,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,3,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":392,"targets":[2],"result":1,"useMode":3},{"move":445,"targets":[3],"result":1,"useMode":1},{"move":445,"targets":[3],"result":1,"useMode":1}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":2498529556,"player":true,"species":785,"formIndex":0,"abilityIndex":0,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":135,"levelExp":0,"gender":-1,"hp":23,"stats":[23,20,14,16,13,19],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":716,"ppUsed":0,"ppUp":0},{"moveId":583,"ppUsed":0,"ppUp":0},{"moveId":14,"ppUsed":0,"ppUp":0},{"moveId":110,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":785,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":12,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":373928530,"player":true,"species":175,"formIndex":0,"abilityIndex":2,"passive":false,"shiny":true,"variant":2,"pokeball":0,"level":5,"exp":116,"levelExp":0,"gender":0,"hp":20,"stats":[20,7,13,10,13,9],"ivs":[31,31,31,31,31,31],"nature":10,"moveset":[{"moveId":45,"ppUsed":0,"ppUp":0},{"moveId":547,"ppUsed":0,"ppUp":0},{"moveId":603,"ppUsed":0,"ppUp":0},{"moveId":577,"ppUsed":0,"ppUp":0}],"status":null,"friendship":50,"metLevel":5,"metBiome":-1,"metSpecies":175,"metWave":-1,"luck":3,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[],"fusionShiny":false,"fusionLuck":3,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":1,"className":"MapModifier"}],"money":1200,"pokeballCounts":{"0":5,"1":0,"2":0,"3":0,"4":0}}}
