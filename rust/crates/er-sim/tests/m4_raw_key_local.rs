@@ -578,7 +578,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         })]
     );
 
-    let free = "reward/free/1/100";
+    let free = "reward/free/1/1";
     let skip = "reward/skip";
     let menu = menu_for_surface(
         owner,
@@ -593,7 +593,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         header,
         offers: vec![RewardOffer {
             offer_id: RunOfferId::new(safe(1)),
-            modifier_id: ModifierId::new(safe(100)),
+            modifier_id: ModifierId::new(safe(1)),
             tier: ModifierTier::Common,
             price: Money::ZERO,
             sold: false,
@@ -609,6 +609,9 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         menu,
     ));
     let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    let reward_before = kernel
+        .run_frontier_digest()
+        .map_err(std::io::Error::other)?;
     press_physical(&mut kernel, owner, PhysicalKey::Space)?;
     assert_eq!(
         kernel.take_run_actions(),
@@ -616,6 +619,30 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             offer: RunOfferId::new(safe(1)),
             target: None
         })]
+    );
+    assert_ne!(
+        kernel
+            .run_frontier_digest()
+            .map_err(std::io::Error::other)?,
+        reward_before
+    );
+    let reward_plan = kernel
+        .run_control_plan()
+        .ok_or("retained reward control was not installed")?;
+    let er_types::run_control::GameControl::Surface(
+        er_types::run_control::SurfaceControl::RewardShop(reward_control),
+    ) = &reward_plan.seats[0].control
+    else {
+        return Err("reward action did not retain its surface".into());
+    };
+    assert!(
+        !reward_control
+            .menu
+            .options
+            .iter()
+            .find(|option| option.option_id.as_str() == free)
+            .ok_or("selected reward option disappeared")?
+            .enabled
     );
 
     let buy = "market/1/200";

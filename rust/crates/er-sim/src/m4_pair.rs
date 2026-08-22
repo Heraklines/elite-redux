@@ -123,9 +123,7 @@ impl M4RunPair {
             kernel.take_run_actions()
         };
         for action in &actions {
-            if action
-                == &RunSurfaceAction::Crossroads(er_types::run_model::CrossroadsAction::MoveOn)
-            {
+            if er_game::run_transition::can_prepare_action(action) {
                 let bytes = self.host.prepare_run_action_material_bytes(action)?;
                 let delay_ms = std::mem::replace(&mut self.next_material_delay_ms, SafeU53::ZERO);
                 self.commit_authority(bytes, delay_ms)?;

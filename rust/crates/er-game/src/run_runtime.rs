@@ -76,13 +76,26 @@ impl RunRuntime {
         action: &er_types::run_model::RunSurfaceAction,
         current_control: &GameControlPlan,
     ) -> Result<AuthorityRunMaterial, RunRuntimeError> {
-        crate::run_transition::prepare_crossroads_transition(
-            &self.state,
-            self.content.as_ref(),
-            action,
-            current_control,
-        )
-        .map_err(|_| RunRuntimeError::Preparation)
+        let prepared = match action {
+            er_types::run_model::RunSurfaceAction::Crossroads(_) => {
+                crate::run_transition::prepare_crossroads_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
+            er_types::run_model::RunSurfaceAction::Reward(_) => {
+                crate::run_transition::prepare_reward_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
+            _ => Err(crate::run_transition::RunTransitionPreparationError::UnsupportedAction),
+        };
+        prepared.map_err(|_| RunRuntimeError::Preparation)
     }
 
     /// The endpoint-local mechanical frontier used in step 7 of the apply

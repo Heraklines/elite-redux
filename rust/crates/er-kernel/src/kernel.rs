@@ -705,10 +705,7 @@ impl GameKernel {
         }
         for (action, control) in actions {
             if self.run_role == Some(RunKernelRole::Local)
-                && action
-                    == er_types::run_model::RunSurfaceAction::Crossroads(
-                        er_types::run_model::CrossroadsAction::MoveOn,
-                    )
+                && er_game::run_transition::can_prepare_action(&action)
             {
                 let material = self
                     .run
