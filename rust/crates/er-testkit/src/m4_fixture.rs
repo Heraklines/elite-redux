@@ -289,8 +289,8 @@ pub fn build_run_state(
         wave,
         next_battle_id: BattleId::new(SafeU53::new(1).expect("battle id")),
         run_rng: RunRngState { rdg },
-        stage: RunStage::Battle,
-        outcome: RunOutcome::InProgress,
+        stage: RunStage::Complete,
+        outcome: RunOutcome::Victory,
         money,
         modifiers: Vec::new(),
         progression: ProgressionQueue {
