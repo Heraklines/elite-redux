@@ -10,10 +10,10 @@ use thiserror::Error;
 use er_run::run_material::{AuthorityRunMaterial, RunMaterialHeader};
 use er_state::digest_v2::MechanicalStateDigestV2;
 use er_state::game_v2::GameStateV2;
+use er_types::SeatId;
 use er_types::battle_ids::ContentPackHash;
 use er_types::run_control::{GameControl, GameControlPlan};
 use er_types::run_model::RunStage;
-use er_types::SeatId;
 
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum RunRuntimeError {
@@ -54,7 +54,9 @@ impl RunRuntime {
         run_content_hash: er_types::run_ids::RunContentPackHash,
         m4_oracle_sha: impl Into<String>,
     ) -> Result<Self, RunRuntimeError> {
-        state.validate().map_err(|_| RunRuntimeError::InvalidAfterState)?;
+        state
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidAfterState)?;
         Ok(Self {
             state,
             battle_content_hash,
@@ -81,10 +83,7 @@ impl RunRuntime {
     /// recompute both digests from the carried states, compare the local
     /// frontier, validate control, then swap atomically. Duplicate application
     /// is detected upstream by operation identity at the kernel layer.
-    pub fn apply(
-        &mut self,
-        material: &AuthorityRunMaterial,
-    ) -> Result<(), RunRuntimeError> {
+    pub fn apply(&mut self, material: &AuthorityRunMaterial) -> Result<(), RunRuntimeError> {
         let header = match material {
             AuthorityRunMaterial::WaveAdvance(value) => {
                 if value.schema_version != er_run::run_material::WAVE_ADVANCE_MATERIAL_VERSION {
@@ -105,13 +104,25 @@ impl RunRuntime {
                 &value.header
             }
         };
-        Self::validate_header(header, material, self.battle_content_hash.clone(), self.run_content_hash.clone(), &self.m4_oracle_sha)?;
+        Self::validate_header(
+            header,
+            material,
+            self.battle_content_hash.clone(),
+            self.run_content_hash.clone(),
+            &self.m4_oracle_sha,
+        )?;
         let local = self.frontier_digest()?;
         if *header.before_digest.as_str() != *local.as_str() {
             return Err(RunRuntimeError::LocalFrontierMismatch);
         }
-        header.after_state.validate().map_err(|_| RunRuntimeError::InvalidAfterState)?;
-        header.next_control.validate().map_err(|_| RunRuntimeError::InvalidNextControl)?;
+        header
+            .after_state
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidAfterState)?;
+        header
+            .next_control
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidNextControl)?;
         // Step 9: atomic whole-state swap. Nothing above mutated self.
         self.state = header.after_state.clone();
         Ok(())
@@ -165,7 +176,9 @@ pub fn project_terminal_or_wait_control(
     owner_seat: SeatId,
     menu_instance_id: er_types::MenuInstanceId,
 ) -> Result<GameControlPlan, RunRuntimeError> {
-    state.validate().map_err(|_| RunRuntimeError::InvalidAfterState)?;
+    state
+        .validate()
+        .map_err(|_| RunRuntimeError::InvalidAfterState)?;
     if state.run.stage != RunStage::Complete {
         // Only the terminal stage's control is fully determined by state
         // alone; surface menus are projected by their owning adapters.
