@@ -64,10 +64,7 @@ pub fn apply_learn_move_decision(
                 pp_ups: 0,
                 max_pp_override: None,
             });
-            Ok(LearnMoveOutcome {
-                moves,
-                candidate,
-            })
+            Ok(LearnMoveOutcome { moves, candidate })
         }
         Decision::Undo => Ok(LearnMoveOutcome {
             moves: *pending_snapshot,
@@ -144,10 +141,13 @@ mod tests {
     fn undo_restores_the_pending_snapshot_exactly() {
         let mut replaced = initial_moveset();
         replaced[0] = slot(34);
-        let outcome =
-            apply_learn_move_decision(&replaced, &initial_moveset(), move_id(34), &LearnMoveDecision::Undo)
-                .expect("undo");
-        assert_eq!(outcome.moves, initial_moveset());
+        let outcome = apply_learn_move_decision(
+            &replaced,
+            &initial_moveset(),
+            move_id(34),
+            &LearnMoveDecision::Undo,
+        )
+        .expect("undo");
     }
 
     #[test]

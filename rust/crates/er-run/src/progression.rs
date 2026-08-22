@@ -5,8 +5,8 @@
 //! caller stages results into a `PreparedRunTransition`; nothing here mutates
 //! canonical state directly.
 
-use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::SafeU53;
+use er_types::battle_ids::{MoveId, SpeciesId};
 use er_types::run_ids::Experience;
 
 use crate::content::{GrowthRateKind, SpeciesProgressionDefinition};
