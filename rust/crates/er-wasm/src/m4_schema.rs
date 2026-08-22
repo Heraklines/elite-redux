@@ -8,8 +8,12 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum WasmSchemaError {
+    #[error("state validation failed: {0}")]
+    Validation(String),
     #[error("canonical JSON serialization failed: {0}")]
-    Serialize(#[from] serde_json::Error),
+    Canonical(#[from] er_canonical::CanonicalError),
+    #[error("material JSON is invalid: {0}")]
+    Json(#[from] serde_json::Error),
     #[error("decoded payload does not match its canonical re-encoding")]
     NonCanonical,
 }
@@ -20,9 +24,7 @@ pub enum WasmSchemaError {
 /// numbers, and emits one trailing newline — the exact wire shape consumed by
 /// the browser adapter.
 pub fn encode_game_state(state: &GameStateV2) -> Result<Vec<u8>, WasmSchemaError> {
-    state.validate().map_err(|error| {
-        WasmSchemaError::Serialize(serde_json::Error::custom(error.to_string()))
-    })?;
+    state.validate().map_err(|error| WasmSchemaError::Validation(error.to_string()))?;
     let mut bytes = er_canonical::canonical_bytes(state)?;
     bytes.push(b'\n');
     Ok(bytes)
