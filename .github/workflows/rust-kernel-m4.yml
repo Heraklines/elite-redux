@@ -361,6 +361,52 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  m4-focused-runtime-benchmarks:
+    name: M4 focused runtime benchmarks
+    needs:
+      - m4-source-lock
+      - m4-contract-freeze
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out benchmark candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Cache Rust benchmark artifacts
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m4-bench-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m4-bench-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Measure implemented run runtime paths
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --release -p er-sim --bench m4_runtime_benchmark -- --nocapture \
+            2>&1 | tee m4-focused-runtime-benchmarks.log
+
+      - name: Upload focused benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m4-focused-runtime-benchmarks
+          path: rust/m4-focused-runtime-benchmarks.log
+          if-no-files-found: error
+          retention-days: 14
+
   m4-oracle-probe:
     name: M4 oracle fresh-process probe
     needs:
