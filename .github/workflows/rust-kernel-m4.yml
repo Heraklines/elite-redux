@@ -213,6 +213,7 @@ jobs:
             cargo test -p er-run --test m4_foundation_properties
             cargo test -p er-kernel --test m4_snapshot_v3
             cargo test -p er-sim --test m4_pair_snapshot_v3
+            cargo test -p er-sim --test m4_battle_start_v2
             cargo test -p er-sim --test m4_raw_key_local
             cargo test -p er-sim --test m4_raw_key_coop
             cargo test -p er-sim --test m4_run_faults

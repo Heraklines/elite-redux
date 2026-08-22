@@ -2,6 +2,7 @@
 
 #[doc(hidden)]
 pub mod authority_commands;
+pub mod battle_start_v2;
 pub mod command_menu;
 pub mod internal_event;
 // The local adapter remains production source while its kernel integration
