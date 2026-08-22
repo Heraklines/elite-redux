@@ -106,3 +106,4 @@ scratch_view/
 .omp-*.zip
 .omp-*
 rustup-init.exe
+rust/target/

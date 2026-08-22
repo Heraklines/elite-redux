@@ -145,6 +145,8 @@ pub enum ControlMenuPlan {
 pub struct GameKernel {
     battle: Option<Box<BattleMode>>,
     run: Option<er_game::run_runtime::RunRuntime>,
+    run_menu: Option<er_game::run_menu::RunMenuReducer>,
+    pending_run_intents: Vec<er_game::run_menu::RunMenuIntent>,
     input_router: InputRouter,
     ui_reducer: UiReducer,
     scheduler: KernelScheduler,
@@ -333,6 +335,8 @@ impl GameKernel {
             protocol,
             protocol_init_error,
             run: None,
+            run_menu: None,
+            pending_run_intents: Vec::new(),
             terminal: None,
             disposed: false,
         };
@@ -377,6 +381,58 @@ impl GameKernel {
         Ok(kernel)
     }
 
+    /// Construct an actionable M4 run kernel with one retained control plan
+    /// and a physical-input map. The plan is installed inside Rust before any
+    /// external input can be accepted.
+    pub fn new_run_with_control(
+        state: er_state::game_v2::GameStateV2,
+        battle_content_hash: er_types::battle_ids::ContentPackHash,
+        run_content_hash: er_types::run_ids::RunContentPackHash,
+        m4_oracle_sha: impl Into<String>,
+        input_map: InputMap,
+        control: er_types::run_control::GameControlPlan,
+    ) -> Result<Self, String> {
+        let runtime = er_game::run_runtime::RunRuntime::new(
+            state,
+            battle_content_hash,
+            run_content_hash,
+            m4_oracle_sha,
+        )
+        .map_err(|error| error.to_string())?;
+        let run_menu =
+            er_game::run_menu::RunMenuReducer::new(control).map_err(|error| error.to_string())?;
+        let mut kernel = Self::new(KernelConfig {
+            input_map,
+            ..KernelConfig::default()
+        });
+        kernel.run = Some(runtime);
+        kernel.run_menu = Some(run_menu);
+        Ok(kernel)
+    }
+
+    pub fn install_run_control(
+        &mut self,
+        control: er_types::run_control::GameControlPlan,
+    ) -> Result<(), String> {
+        if self.run.is_none() {
+            return Err("run mode is not active".to_owned());
+        }
+        let reducer =
+            er_game::run_menu::RunMenuReducer::new(control).map_err(|error| error.to_string())?;
+        self.run_menu = Some(reducer);
+        Ok(())
+    }
+
+    pub fn run_control_plan(&self) -> Option<&er_types::run_control::GameControlPlan> {
+        self.run_menu
+            .as_ref()
+            .map(er_game::run_menu::RunMenuReducer::plan)
+    }
+
+    pub fn take_run_intents(&mut self) -> Vec<er_game::run_menu::RunMenuIntent> {
+        std::mem::take(&mut self.pending_run_intents)
+    }
+
     /// Applies one canonical run-material payload through the single shared
     /// production applier. Canonical bytes in, atomic state swap out; both
     /// authority and replica use exactly this entry point.
@@ -384,18 +440,21 @@ impl GameKernel {
         if self.disposed {
             return Err(KernelError::Disposed);
         }
-        let runtime = self.run.as_mut().ok_or_else(|| KernelError::Canonical {
-            reason: "run mode is not active".to_owned(),
-        })?;
         let material =
             er_run::decode_run_material(bytes).map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
+        let next_control = material.next_control().clone();
+        let runtime = self.run.as_mut().ok_or_else(|| KernelError::Canonical {
+            reason: "run mode is not active".to_owned(),
+        })?;
         runtime
             .apply(&material)
             .map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
-            })
+            })?;
+        self.install_run_control(next_control)
+            .map_err(|reason| KernelError::Canonical { reason })
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
@@ -409,6 +468,9 @@ impl GameKernel {
         }
         if self.terminal.is_some() {
             return Ok(Vec::new());
+        }
+        if self.run.is_some() {
+            return self.step_run(input);
         }
         if let Some(battle) = self.battle.as_mut() {
             let effects = battle
@@ -542,6 +604,46 @@ impl GameKernel {
                 Ok(effects)
             }
         }
+    }
+
+    fn step_run(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
+        let KernelInput::RawInput { seat, event } = input else {
+            // Run-side timers, presentation settlements, transport, and
+            // storage are internalized in later handlers. Unsupported legacy
+            // acknowledgements never become causal on the M4 path.
+            return Ok(Vec::new());
+        };
+        let output = self.input_router.handle(seat, event, &mut self.scheduler)?;
+        let reducer = self
+            .run_menu
+            .as_mut()
+            .ok_or_else(|| KernelError::Canonical {
+                reason: "run control is not installed".to_owned(),
+            })?;
+        for button in output.events {
+            if let Some(intent) =
+                reducer
+                    .apply_button(seat, button)
+                    .map_err(|error| KernelError::Canonical {
+                        reason: error.to_string(),
+                    })?
+            {
+                self.pending_run_intents.push(intent);
+            }
+        }
+        // Repeat ownership will bind to MenuInstanceId when virtual-time run
+        // campaigns are enabled. Until then, discard the scheduled repeat
+        // immediately: one physical keydown can affect only its current menu.
+        for timer in output.timers {
+            let timer_id = match timer {
+                InputTimerCommand::Schedule { timer_id, .. }
+                | InputTimerCommand::Cancel { timer_id } => timer_id,
+            };
+            self.input_router
+                .discard_timer(timer_id, &mut self.scheduler);
+        }
+        self.sync_live_resources();
+        Ok(Vec::new())
     }
 
     pub fn snapshot(&self) -> KernelSnapshot {

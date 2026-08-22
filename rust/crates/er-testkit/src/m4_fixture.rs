@@ -5,23 +5,16 @@
 //! into validated `GameStateV2`. This is the single unblocking item for the
 //! raw-key campaigns, benchmarks, and final gates.
 
-use std::collections::BTreeSet;
-
 use serde_json::Value;
 use thiserror::Error;
 
 use er_content::species::SpeciesBaseStats;
 use er_rng::phaser::{PhaserRdgState, RunRngState};
-use er_state::battle_v2::{BattleParticipationState, BattleSettlementState, BattleStateV2};
 use er_state::game_v2::GameStateV2;
 use er_state::pokemon_v2::{Iv, PokemonProgressionState, PokemonStateV2};
-use er_state::run_v2::{
-    BiomeRuntimeState, ProgressionQueue, RunCounters, RunModifierInstance, RunStateV2,
-};
-use er_types::battle_command::CommandCollectionState;
+use er_state::run_v2::{BiomeRuntimeState, ProgressionQueue, RunCounters, RunStateV2};
 use er_types::battle_ids::{
-    AbilityId, BattleId, BattleSide, ContentPackHash, GameModeId, MoveId, PartyIndex, PokemonId,
-    SpeciesId, WaveIndex,
+    AbilityId, BattleId, ContentPackHash, GameModeId, MoveId, PokemonId, SpeciesId, WaveIndex,
 };
 use er_types::battle_model::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonType, PokemonTyping, StatStages, StatusKind,
@@ -32,7 +25,7 @@ use er_types::run_ids::{
     RunInteractionSequence, RunSurfaceId, RunTaskId,
 };
 use er_types::run_model::{RunOutcome, RunStage};
-use er_types::{OperationId, SafeU53, SeatId};
+use er_types::{SafeU53, SeatId};
 
 /// The frozen M3 parity oracle SHA carried by the published fixtures.
 pub const M4_M3_PARITY_ORACLE_SHA: &str = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
@@ -51,6 +44,8 @@ pub enum M4FixtureError {
     UnsupportedMove { move_id: u64 },
     #[error("fixture ability index {index} is outside the selected content slice")]
     UnsupportedAbility { index: u64 },
+    #[error("fixture M4 oracle SHA does not match the requested oracle")]
+    WrongOracle,
 }
 
 fn field<'a>(value: &'a Value, name: &str) -> Result<&'a Value, M4FixtureError> {
@@ -331,6 +326,10 @@ pub fn assemble_game_state(
     run_hash: RunContentPackHash,
     m4_oracle_sha: &str,
 ) -> Result<GameStateV2, M4FixtureError> {
+    let observed_oracle = str_field(field(fixture, "provenance")?, "m4_oracle_sha")?;
+    if observed_oracle != m4_oracle_sha {
+        return Err(M4FixtureError::WrongOracle);
+    }
     let canonical = field(fixture, "initial")?;
     let canonical = field(canonical, "canonical")?;
     let save_data = field(canonical, "save_data")?;
