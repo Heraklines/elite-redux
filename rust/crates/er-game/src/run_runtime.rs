@@ -76,6 +76,7 @@ impl RunRuntime {
         action: &er_types::run_model::RunSurfaceAction,
         current_control: &GameControlPlan,
         encounter: Option<&er_run::encounter_plan::EncounterPlan>,
+        reward_surface: Option<&er_state::run_v2::RewardShopSurfaceState>,
     ) -> Result<AuthorityRunMaterial, RunRuntimeError> {
         let prepared = match action {
             er_types::run_model::RunSurfaceAction::Crossroads(_) => {
@@ -102,6 +103,19 @@ impl RunRuntime {
                     current_control,
                 )
             }
+            er_types::run_model::RunSurfaceAction::LearnMove(
+                er_types::run_model::LearnMoveDecision::Replace { .. },
+            ) => reward_surface
+                .ok_or(crate::run_transition::RunTransitionPreparationError::MissingReward)
+                .and_then(|reward_surface| {
+                    crate::run_transition::prepare_move_replace_transition(
+                        &self.state,
+                        self.content.as_ref(),
+                        action,
+                        current_control,
+                        reward_surface,
+                    )
+                }),
             er_types::run_model::RunSurfaceAction::LearnMove(_) => {
                 crate::run_transition::prepare_move_learn_transition(
                     &self.state,

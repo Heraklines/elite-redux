@@ -154,6 +154,7 @@ pub struct GameKernel {
     run: Option<er_game::run_runtime::RunRuntime>,
     run_role: Option<RunKernelRole>,
     run_encounter: Option<er_run::encounter_plan::EncounterPlan>,
+    run_reward_surface: Option<er_state::run_v2::RewardShopSurfaceState>,
     run_menu: Option<er_game::run_menu::RunMenuReducer>,
     pending_run_actions: Vec<er_types::run_model::RunSurfaceAction>,
     input_router: InputRouter,
@@ -346,6 +347,7 @@ impl GameKernel {
             run: None,
             run_role: None,
             run_encounter: None,
+            run_reward_surface: None,
             run_menu: None,
             pending_run_actions: Vec::new(),
             terminal: None,
@@ -450,6 +452,17 @@ impl GameKernel {
         Ok(kernel)
     }
 
+    pub fn with_run_reward_surface(
+        mut self,
+        surface: er_state::run_v2::RewardShopSurfaceState,
+    ) -> Result<Self, String> {
+        er_state::run_v2::RunSurfaceState::RewardShop(surface.clone())
+            .validate()
+            .map_err(|error| error.to_string())?;
+        self.run_reward_surface = Some(surface);
+        Ok(self)
+    }
+
     pub fn install_run_control(
         &mut self,
         control: er_types::run_control::GameControlPlan,
@@ -467,6 +480,13 @@ impl GameKernel {
         self.run_menu
             .as_ref()
             .map(er_game::run_menu::RunMenuReducer::plan)
+    }
+
+    #[doc(hidden)]
+    pub fn run_state(&self) -> Option<&er_state::game_v2::GameStateV2> {
+        self.run
+            .as_ref()
+            .map(er_game::run_runtime::RunRuntime::state)
     }
 
     /// Returns the current run mechanical frontier without exposing mutable
@@ -490,9 +510,8 @@ impl GameKernel {
         std::mem::take(&mut self.pending_run_actions)
     }
 
-    /// Applies one canonical run-material payload through the single shared
-    /// production applier. Canonical bytes in, atomic state swap out; both
-    /// authority and replica use exactly this entry point.
+    /// Canonical-encodes the authority candidate for one internally produced
+    /// run-surface action without applying it.
     #[doc(hidden)]
     pub fn prepare_run_action_material_bytes(
         &self,
@@ -509,7 +528,12 @@ impl GameKernel {
             })?
             .plan();
         let material = runtime
-            .prepare_action_material(action, control, self.run_encounter.as_ref())
+            .prepare_action_material(
+                action,
+                control,
+                self.run_encounter.as_ref(),
+                self.run_reward_surface.as_ref(),
+            )
             .map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
@@ -736,15 +760,20 @@ impl GameKernel {
                                 reason: error.to_string(),
                             }
                         })?;
-                    actions.push((action, reducer.plan().clone()));
+                    actions.push(action);
                 }
             }
         }
-        for (action, _control) in actions {
-            let has_required_evidence = !matches!(
-                action,
-                er_types::run_model::RunSurfaceAction::BiomeSelect(_)
-            ) || self.run_encounter.is_some();
+        for action in actions {
+            let has_required_evidence = match action {
+                er_types::run_model::RunSurfaceAction::BiomeSelect(_) => {
+                    self.run_encounter.is_some()
+                }
+                er_types::run_model::RunSurfaceAction::LearnMove(
+                    er_types::run_model::LearnMoveDecision::Replace { .. },
+                ) => self.run_reward_surface.is_some(),
+                _ => true,
+            };
             if self.run_role == Some(RunKernelRole::Local)
                 && has_required_evidence
                 && er_game::run_transition::can_prepare_action(&action)

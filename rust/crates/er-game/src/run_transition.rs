@@ -6,6 +6,7 @@ use crate::command_menu::{CommandRootSelection, build_command_root_control};
 use er_run::biome::{RouteOption, select_route};
 use er_run::encounter_plan::EncounterPlan;
 use er_run::modifier::{ModifierApplication, apply_modifier};
+use er_run::move_learning::apply_learn_move_decision;
 use er_run::reward::{MarketStockView, buy_stock, pay_for_offer};
 use er_run::run_material::{
     AuthorityRunMaterial, RUN_INTERACTION_MATERIAL_VERSION, RUN_MATERIAL_M3_PARITY_ORACLE_SHA,
@@ -78,6 +79,7 @@ pub fn can_prepare_action(action: &RunSurfaceAction) -> bool {
             | RunSurfaceAction::Reward(RewardAction::SelectFree { .. })
             | RunSurfaceAction::BiomeMarket(BiomeMarketAction::Buy { .. })
             | RunSurfaceAction::LearnMove(LearnMoveDecision::Candidate { .. })
+            | RunSurfaceAction::LearnMove(LearnMoveDecision::Replace { .. })
             | RunSurfaceAction::BiomeSelect(BiomeSelectAction { .. })
     )
 }
@@ -1085,6 +1087,160 @@ pub fn prepare_biome_select_transition(
             ],
             rng_audit: encounter.generation_audit.clone(),
             surface_after_digest: None,
+        },
+    ))
+}
+
+pub fn prepare_move_replace_transition(
+    before: &GameStateV2,
+    content: &GameContentBundle,
+    action: &RunSurfaceAction,
+    current_control: &GameControlPlan,
+    reward_template: &er_state::run_v2::RewardShopSurfaceState,
+) -> Result<AuthorityRunMaterial, RunTransitionPreparationError> {
+    let RunSurfaceAction::LearnMove(LearnMoveDecision::Replace { slot }) = action else {
+        return Err(RunTransitionPreparationError::UnsupportedAction);
+    };
+    let Some(RunSurfaceState::MoveLearn(learning)) = before.run.active_surface.as_ref() else {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    };
+    let pokemon_index = before
+        .player_party
+        .iter()
+        .position(|pokemon| pokemon.id == learning.task.pokemon)
+        .ok_or(RunTransitionPreparationError::MissingMove)?;
+    let moves_before = before.player_party[pokemon_index].moves;
+    let outcome = apply_learn_move_decision(
+        &moves_before,
+        &moves_before,
+        learning.task.move_id,
+        &LearnMoveDecision::Replace { slot: *slot },
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidState(format!("{error:?}")))?;
+    let replaced = moves_before[usize::from(slot.get())].map(|entry| entry.move_id);
+    let menu_instance = current_control.next_menu_instance_id;
+    let next_menu_value = menu_instance
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    let surface_id = before.run.counters.next_surface_id;
+    let next_surface_value = surface_id
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    let control_id = current_control.next_control_id.clone();
+
+    let mut after = before.clone();
+    after.player_party[pokemon_index].moves = outcome.moves;
+    let mut reward = reward_template.clone();
+    reward.header.surface_id = surface_id;
+    reward.header.owner_seat = learning.header.owner_seat;
+    reward.header.interaction_sequence = learning.header.interaction_sequence;
+    reward.header.action_ordinal = 0;
+    reward.header.menu.instance_id = menu_instance;
+    reward.header.menu.owner_seat = learning.header.owner_seat;
+    reward.header.menu.control_id = control_id.clone();
+    let mut reward_surface = RunSurfaceState::RewardShop(reward);
+    let surface_digest = compute_surface_digest_v1(&reward_surface)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    reward_surface.header_mut().surface_digest = surface_digest.clone();
+    after.run.active_surface = Some(reward_surface);
+    after.run.counters.next_surface_id = RunSurfaceId::new(
+        SafeU53::new(next_surface_value)
+            .map_err(|_| RunTransitionPreparationError::AllocatorOverflow)?,
+    );
+    after
+        .validate()
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+
+    let reward = match after.run.active_surface.as_ref() {
+        Some(RunSurfaceState::RewardShop(reward)) => reward,
+        _ => return Err(RunTransitionPreparationError::MissingReward),
+    };
+    let surface_control = SurfaceControl::RewardShop(RewardShopControl::new(
+        reward.header.surface_id,
+        reward.header.interaction_sequence,
+        reward.header.menu.clone(),
+    ));
+    let seats = current_control
+        .seats
+        .iter()
+        .map(|seat| SeatControlPlan {
+            seat: seat.seat,
+            owner: seat.owner,
+            control_id: control_id.clone(),
+            menu_instance_id: menu_instance,
+            actionable_after: seat.actionable_after,
+            control: GameControl::Surface(surface_control.clone()),
+        })
+        .collect();
+    let next_control = GameControlPlan::new(
+        seats,
+        format!("{control_id}/next"),
+        MenuInstanceId::new(
+            SafeU53::new(next_menu_value)
+                .map_err(|_| RunTransitionPreparationError::AllocatorOverflow)?,
+        ),
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let before_digest = MechanicalStateDigestV2::compute(before)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    let after_digest = MechanicalStateDigestV2::compute(&after)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+
+    Ok(AuthorityRunMaterial::Interaction(
+        RunInteractionMaterialV1 {
+            schema_version: RUN_INTERACTION_MATERIAL_VERSION,
+            header: RunMaterialHeader {
+                m4_oracle_sha: content.run.m4_oracle_sha.clone(),
+                m3_parity_oracle_sha: RUN_MATERIAL_M3_PARITY_ORACLE_SHA.to_owned(),
+                battle_content_hash: before.battle_content_hash.clone(),
+                run_content_hash: before.run_content_hash.clone(),
+                operation_id: learning.header.operation_id.clone(),
+                run_id: before.run.run_id,
+                wave: before.run.wave,
+                before_digest,
+                after_digest,
+                before_state: before.clone(),
+                after_state: after,
+                next_control,
+            },
+            surface_kind: RunSurfaceKind::MoveLearn,
+            surface_id: learning.header.surface_id,
+            owner_seat: learning.header.owner_seat,
+            interaction_sequence: learning.header.interaction_sequence,
+            action_ordinal: learning.header.action_ordinal,
+            action: action.clone(),
+            mutations: vec![
+                RunMutation::MoveLearned {
+                    pokemon: learning.task.pokemon,
+                    slot: *slot,
+                    learned: learning.task.move_id,
+                    replaced,
+                },
+                RunMutation::SurfaceClosed,
+                RunMutation::SurfaceOpened {
+                    kind: RunSurfaceKind::RewardShop,
+                    surface_id,
+                },
+            ],
+            presentation: vec![
+                RunPresentationEvent::MoveReplaced {
+                    pokemon: learning.task.pokemon,
+                    slot: *slot,
+                    forgotten: replaced.ok_or(RunTransitionPreparationError::MissingMove)?,
+                    learned: learning.task.move_id,
+                },
+                RunPresentationEvent::SurfaceClosed,
+                RunPresentationEvent::SurfacePresented {
+                    kind: RunSurfaceKind::RewardShop,
+                    surface_id,
+                },
+            ],
+            rng_audit: Vec::new(),
+            surface_after_digest: Some(surface_digest),
         },
     ))
 }

@@ -503,6 +503,44 @@ fn surface_header(
     })
 }
 
+fn reward_followup_surface(
+    owner: er_types::SeatId,
+    interaction: er_types::run_ids::RunInteractionSequence,
+) -> Result<er_state::run_v2::RewardShopSurfaceState, Box<dyn Error>> {
+    use er_state::run_v2::{RewardOffer, RewardShopSurfaceState};
+    use er_types::run_ids::{ModifierId, Money, RunOfferId};
+    use er_types::run_model::{ModifierTier, RunSurfaceKind};
+    use er_types::ui::CancelPolicy;
+
+    let free = "reward/free/1/1";
+    let skip = "reward/skip";
+    let menu = menu_for_surface(
+        owner,
+        3,
+        free,
+        &[(free, true), (skip, true)],
+        &[],
+        CancelPolicy::Select(er_types::MenuOptionId::new(skip)?),
+    )?;
+    let mut header = surface_header(owner, 2, RunSurfaceKind::RewardShop, menu)?;
+    header.interaction_sequence = interaction;
+    header.operation_id = er_types::OperationId::new("1:1:REWARD:9000000")?;
+    Ok(RewardShopSurfaceState {
+        header,
+        offers: vec![RewardOffer {
+            offer_id: RunOfferId::new(safe(1)),
+            modifier_id: ModifierId::new(safe(1)),
+            tier: ModifierTier::Common,
+            price: Money::ZERO,
+            sold: false,
+        }],
+        lock_tiers: Vec::new(),
+        reroll_count: 0,
+        reroll_cost: Money::new(safe(250)),
+        pending_target: None,
+    })
+}
+
 fn kernel_for_surface(
     fixture: &serde_json::Value,
     surface: er_state::run_v2::RunSurfaceState,
@@ -664,7 +702,10 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         interaction,
         menu,
     ));
-    let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    let (kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    let mut kernel = kernel
+        .with_run_reward_surface(reward_followup_surface(owner, interaction)?)
+        .map_err(std::io::Error::other)?;
     let move_before = kernel
         .run_frontier_digest()
         .map_err(std::io::Error::other)?;
@@ -697,6 +738,44 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         vec![RunSurfaceAction::LearnMove(LearnMoveDecision::Replace {
             slot: er_types::battle_ids::MoveSlotIndex::ZERO,
         })]
+    );
+    let reward_plan = kernel
+        .run_control_plan()
+        .ok_or("reward control was not installed after move replacement")?;
+    assert!(matches!(
+        &reward_plan.seats[0].control,
+        er_types::run_control::GameControl::Surface(
+            er_types::run_control::SurfaceControl::RewardShop(_)
+        )
+    ));
+    assert_eq!(
+        kernel
+            .run_state()
+            .ok_or("run state missing after move replacement")?
+            .player_party[0]
+            .moves[0]
+            .ok_or("replacement slot missing")?
+            .move_id
+            .get()
+            .get(),
+        34
+    );
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::Reward(RewardAction::SelectFree {
+            offer: RunOfferId::new(safe(1)),
+            target: None,
+        })]
+    );
+    assert!(
+        kernel
+            .run_state()
+            .ok_or("run state missing after reward")?
+            .run
+            .modifiers
+            .iter()
+            .any(|modifier| modifier.modifier_id == ModifierId::new(safe(1)))
     );
     dispose_run_kernel(&mut kernel);
 
