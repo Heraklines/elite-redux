@@ -8,10 +8,14 @@
 
 use std::collections::BTreeMap;
 
-use er_kernel::{GameKernel, KernelError};
+use er_kernel::{GameKernel, KernelError, KernelInput};
 use er_run::run_material::{RunMaterialCodecError, decode_run_material};
 use er_state::digest_v2::MechanicalStateDigestV2;
-use er_types::{OperationId, SafeU53};
+use er_types::input::RawInputEvent;
+use er_types::run_model::RunSurfaceAction;
+use er_types::{OperationId, SafeU53, SeatId};
+
+use crate::PairEndpoint;
 use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -40,6 +44,8 @@ pub enum M4PairError {
     MissingFrontier,
     #[error("run state digest failed: {0}")]
     StateDigest(String),
+    #[error("raw input targeted a disconnected endpoint")]
+    DisconnectedInput,
 }
 
 #[derive(Debug)]
@@ -86,6 +92,33 @@ impl M4RunPair {
 
     pub fn reconnect_guest(&mut self) {
         self.guest_connected = true;
+    }
+
+    /// Delivers one physical input event to one independent endpoint.
+    pub fn step_raw(
+        &mut self,
+        endpoint: PairEndpoint,
+        seat: SeatId,
+        event: RawInputEvent,
+    ) -> Result<(), M4PairError> {
+        if endpoint == PairEndpoint::Guest && !self.guest_connected {
+            return Err(M4PairError::DisconnectedInput);
+        }
+        let kernel = match endpoint {
+            PairEndpoint::Host => &mut self.host,
+            PairEndpoint::Guest => &mut self.guest,
+        };
+        kernel.step(KernelInput::RawInput { seat, event })?;
+        Ok(())
+    }
+
+    /// Read-only typed action audit for campaign assertions.
+    #[doc(hidden)]
+    pub fn take_actions(&mut self, endpoint: PairEndpoint) -> Vec<RunSurfaceAction> {
+        match endpoint {
+            PairEndpoint::Host => self.host.take_run_actions(),
+            PairEndpoint::Guest => self.guest.take_run_actions(),
+        }
     }
 
     /// Applies canonical bytes to the authority through the production applier,
