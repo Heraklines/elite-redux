@@ -226,6 +226,7 @@ dependencies = [
  "er-kernel",
  "er-protocol",
  "er-rng",
+ "er-run",
  "er-state",
  "er-testkit",
  "er-types",
