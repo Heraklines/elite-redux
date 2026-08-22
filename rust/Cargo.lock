@@ -255,6 +255,7 @@ dependencies = [
  "er-content",
  "er-kernel",
  "er-protocol",
+ "er-run",
  "er-rng",
  "er-state",
  "er-types",
