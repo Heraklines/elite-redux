@@ -569,12 +569,37 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         menu,
     ));
     let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
-    press_physical(&mut kernel, owner, PhysicalKey::ArrowDown)?;
+    let move_before = kernel
+        .run_frontier_digest()
+        .map_err(std::io::Error::other)?;
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::LearnMove(LearnMoveDecision::Candidate {
+            move_id: MoveId::new(safe(34)),
+        })]
+    );
+    assert_ne!(
+        kernel
+            .run_frontier_digest()
+            .map_err(std::io::Error::other)?,
+        move_before
+    );
+    let move_plan = kernel
+        .run_control_plan()
+        .ok_or("retained move-learning control was not installed")?;
+    let er_types::run_control::GameControl::Surface(
+        er_types::run_control::SurfaceControl::MoveLearn(move_control),
+    ) = &move_plan.seats[0].control
+    else {
+        return Err("move candidate did not retain its surface".into());
+    };
+    assert_eq!(move_control.menu.selected_option_id.as_str(), replacement);
     press_physical(&mut kernel, owner, PhysicalKey::Space)?;
     assert_eq!(
         kernel.take_run_actions(),
         vec![RunSurfaceAction::LearnMove(LearnMoveDecision::Replace {
-            slot: er_types::battle_ids::MoveSlotIndex::ZERO
+            slot: er_types::battle_ids::MoveSlotIndex::ZERO,
         })]
     );
 

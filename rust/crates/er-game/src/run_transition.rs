@@ -17,12 +17,13 @@ use er_state::surface_digest::compute_surface_digest_v1;
 use er_types::SafeU53;
 use er_types::battle_ids::MenuInstanceId;
 use er_types::run_control::{
-    BiomeMarketControl, BiomeSelectControl, GameControl, GameControlPlan, RewardShopControl,
-    SeatControlPlan, SurfaceControl,
+    BiomeMarketControl, BiomeSelectControl, GameControl, GameControlPlan, MoveLearnControl,
+    RewardShopControl, SeatControlPlan, SurfaceControl,
 };
 use er_types::run_ids::{RouteNodeId, RunSurfaceId, SurfaceDigest};
 use er_types::run_model::{
-    BiomeMarketAction, CrossroadsAction, RewardAction, RunSurfaceAction, RunSurfaceKind,
+    BiomeMarketAction, CrossroadsAction, LearnMoveDecision, RewardAction, RunSurfaceAction,
+    RunSurfaceKind,
 };
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{LogicalMenu, LogicalMenuOption, MenuNavigationEdge, NavigationDirection};
@@ -61,6 +62,7 @@ pub fn can_prepare_action(action: &RunSurfaceAction) -> bool {
         RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn)
             | RunSurfaceAction::Reward(RewardAction::SelectFree { .. })
             | RunSurfaceAction::BiomeMarket(BiomeMarketAction::Buy { .. })
+            | RunSurfaceAction::LearnMove(LearnMoveDecision::Candidate { .. })
     )
 }
 
@@ -699,6 +701,147 @@ pub fn prepare_market_transition(
                     target: *target,
                 },
             ],
+            rng_audit: Vec::new(),
+            surface_after_digest: Some(surface_digest),
+        },
+    ))
+}
+
+pub fn prepare_move_learn_transition(
+    before: &GameStateV2,
+    content: &GameContentBundle,
+    action: &RunSurfaceAction,
+    current_control: &GameControlPlan,
+) -> Result<AuthorityRunMaterial, RunTransitionPreparationError> {
+    let RunSurfaceAction::LearnMove(LearnMoveDecision::Candidate { move_id }) = action else {
+        return Err(RunTransitionPreparationError::UnsupportedAction);
+    };
+    let Some(RunSurfaceState::MoveLearn(learning)) = before.run.active_surface.as_ref() else {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    };
+    if learning.task.move_id != *move_id
+        || current_control.owner_seat() != learning.header.owner_seat
+    {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    }
+    let menu_instance = current_control.next_menu_instance_id;
+    let next_menu_value = menu_instance
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    let next_menu_instance = MenuInstanceId::new(
+        SafeU53::new(next_menu_value)
+            .map_err(|_| RunTransitionPreparationError::AllocatorOverflow)?,
+    );
+    let control_id = current_control.next_control_id.clone();
+    let candidate_id = format!("learn/candidate/{}", move_id.get().get());
+    let replacement_prefix = format!("learn/replace/{}/", learning.task.pokemon.get().get());
+
+    let mut after = before.clone();
+    let Some(RunSurfaceState::MoveLearn(after_learning)) = after.run.active_surface.as_mut() else {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    };
+    after_learning.header.action_ordinal = after_learning
+        .header
+        .action_ordinal
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    after_learning.header.menu.instance_id = menu_instance;
+    after_learning.header.menu.control_id = control_id.clone();
+    let candidate = after_learning
+        .header
+        .menu
+        .options
+        .iter_mut()
+        .find(|option| option.option_id.as_str() == candidate_id)
+        .ok_or(RunTransitionPreparationError::MissingReward)?;
+    candidate.enabled = false;
+    let replacement = after_learning
+        .header
+        .menu
+        .options
+        .iter()
+        .find(|option| option.enabled && option.option_id.as_str().starts_with(&replacement_prefix))
+        .ok_or(RunTransitionPreparationError::UnsupportedAction)?;
+    after_learning.header.menu.selected_option_id = replacement.option_id.clone();
+
+    let surface_snapshot = after
+        .run
+        .active_surface
+        .as_ref()
+        .cloned()
+        .ok_or(RunTransitionPreparationError::WrongSurface)?;
+    let surface_digest = compute_surface_digest_v1(&surface_snapshot)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    after
+        .run
+        .active_surface
+        .as_mut()
+        .expect("surface retained")
+        .header_mut()
+        .surface_digest = surface_digest.clone();
+    after
+        .validate()
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+    let after_menu = after
+        .run
+        .active_surface
+        .as_ref()
+        .expect("surface retained")
+        .header()
+        .menu
+        .clone();
+    let surface_control = SurfaceControl::MoveLearn(MoveLearnControl::new(
+        learning.header.surface_id,
+        learning.header.interaction_sequence,
+        after_menu,
+    ));
+    let seats = current_control
+        .seats
+        .iter()
+        .map(|seat| SeatControlPlan {
+            seat: seat.seat,
+            owner: seat.owner,
+            control_id: control_id.clone(),
+            menu_instance_id: menu_instance,
+            actionable_after: seat.actionable_after,
+            control: GameControl::Surface(surface_control.clone()),
+        })
+        .collect();
+    let next_control =
+        GameControlPlan::new(seats, format!("{control_id}/next"), next_menu_instance)
+            .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let before_digest = MechanicalStateDigestV2::compute(before)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    let after_digest = MechanicalStateDigestV2::compute(&after)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+
+    Ok(AuthorityRunMaterial::Interaction(
+        RunInteractionMaterialV1 {
+            schema_version: RUN_INTERACTION_MATERIAL_VERSION,
+            header: RunMaterialHeader {
+                m4_oracle_sha: content.run.m4_oracle_sha.clone(),
+                m3_parity_oracle_sha: RUN_MATERIAL_M3_PARITY_ORACLE_SHA.to_owned(),
+                battle_content_hash: before.battle_content_hash.clone(),
+                run_content_hash: before.run_content_hash.clone(),
+                operation_id: learning.header.operation_id.clone(),
+                run_id: before.run.run_id,
+                wave: before.run.wave,
+                before_digest,
+                after_digest,
+                before_state: before.clone(),
+                after_state: after,
+                next_control,
+            },
+            surface_kind: RunSurfaceKind::MoveLearn,
+            surface_id: learning.header.surface_id,
+            owner_seat: learning.header.owner_seat,
+            interaction_sequence: learning.header.interaction_sequence,
+            action_ordinal: learning.header.action_ordinal,
+            action: action.clone(),
+            mutations: Vec::new(),
+            presentation: Vec::new(),
             rng_audit: Vec::new(),
             surface_after_digest: Some(surface_digest),
         },

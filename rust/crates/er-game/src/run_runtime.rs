@@ -101,6 +101,14 @@ impl RunRuntime {
                     current_control,
                 )
             }
+            er_types::run_model::RunSurfaceAction::LearnMove(_) => {
+                crate::run_transition::prepare_move_learn_transition(
+                    &self.state,
+                    self.content.as_ref(),
+                    action,
+                    current_control,
+                )
+            }
             _ => Err(crate::run_transition::RunTransitionPreparationError::UnsupportedAction),
         };
         prepared.map_err(|_| RunRuntimeError::Preparation)
