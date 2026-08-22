@@ -175,8 +175,8 @@ mod tests {
 
     #[test]
     fn award_clamps_to_cap_threshold_like_the_oracle() {
-        let gain = apply_experience_award(exp(4329), exp(70), 16, 17, &SLICE_GROWTH_KIND)
-            .expect("award");
+        let gain =
+            apply_experience_award(exp(4329), exp(70), 16, 17, &SLICE_GROWTH_KIND).expect("award");
         assert_eq!(gain.after.get().get(), 4330);
         assert_eq!(gain.level_before, 16);
         assert_eq!(gain.level_after, 17);
@@ -186,8 +186,7 @@ mod tests {
     #[test]
     fn awards_below_the_next_threshold_keep_the_level() {
         let gain =
-            apply_experience_award(exp(3600), exp(10), 16, 100, &SLICE_GROWTH_KIND)
-                .expect("award");
+            apply_experience_award(exp(3600), exp(10), 16, 100, &SLICE_GROWTH_KIND).expect("award");
         assert_eq!(gain.after.get().get(), 3610);
         assert_eq!(gain.level_after, 16);
     }

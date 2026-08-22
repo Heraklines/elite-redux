@@ -62,10 +62,7 @@ pub fn apply_learn_move_decision(
                 pp_ups: 0,
                 max_pp_override: None,
             });
-            Ok(LearnMoveOutcome {
-                moves,
-                candidate,
-            })
+            Ok(LearnMoveOutcome { moves, candidate })
         }
         Decision::Undo => Ok(LearnMoveOutcome {
             moves: *pending_snapshot,
@@ -129,7 +126,9 @@ mod tests {
             &initial_moveset(),
             &initial_moveset(),
             move_id(34),
-            &LearnMoveDecision::Candidate { move_id: move_id(34) },
+            &LearnMoveDecision::Candidate {
+                move_id: move_id(34),
+            },
         )
         .expect("candidate");
         assert_eq!(outcome.moves, initial_moveset());

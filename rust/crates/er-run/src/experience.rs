@@ -37,15 +37,14 @@ const EXP_LEVELS: [[u32; 99]; 6] = [
     ],
     // FAST
     [
-        0, 6, 21, 51, 100, 172, 274, 409, 583, 800, 1064, 1382, 1757, 2195, 2700, 3276, 3930,
-        4665, 5487, 6400, 7408, 8518, 9733, 11059, 12500, 14060, 15746, 17561, 19511, 21600,
-        23832, 26214, 28749, 31443, 34300, 37324, 40522, 43897, 47455, 51200, 55136, 59270, 63605,
-        68147, 72900, 77868, 83058, 88473, 94119, 100000, 106120, 112486, 119101, 125971, 133100,
-        140492, 148154, 156089, 164303, 172800, 181584, 190662, 200037, 209715, 219700, 229996,
-        240610, 251545, 262807, 274400, 286328, 298598, 311213, 324179, 337500, 351180, 365226,
-        379641, 394431, 409600, 425152, 441094, 457429, 474163, 491300, 508844, 526802, 545177,
-        563975, 583200, 602856, 622950, 643485, 664467, 685900, 707788, 730138, 752953, 776239,
-        800000,
+        0, 6, 21, 51, 100, 172, 274, 409, 583, 800, 1064, 1382, 1757, 2195, 2700, 3276, 3930, 4665,
+        5487, 6400, 7408, 8518, 9733, 11059, 12500, 14060, 15746, 17561, 19511, 21600, 23832,
+        26214, 28749, 31443, 34300, 37324, 40522, 43897, 47455, 51200, 55136, 59270, 63605, 68147,
+        72900, 77868, 83058, 88473, 94119, 100000, 106120, 112486, 119101, 125971, 133100, 140492,
+        148154, 156089, 164303, 172800, 181584, 190662, 200037, 209715, 219700, 229996, 240610,
+        251545, 262807, 274400, 286328, 298598, 311213, 324179, 337500, 351180, 365226, 379641,
+        394431, 409600, 425152, 441094, 457429, 474163, 491300, 508844, 526802, 545177, 563975,
+        583200, 602856, 622950, 643485, 664467, 685900, 707788, 730138, 752953, 776239, 800000,
     ],
     // MEDIUM_FAST
     [
@@ -131,8 +130,7 @@ pub(crate) fn total_exp_at_level(level: u16, curve: usize) -> Option<u64> {
 /// The single oracle rounding point shared by every non-`MEDIUM_FAST` curve.
 fn blend(curve_value: u64, medium_fast_value: u64) -> u64 {
     let curve_f64 = f64::from(u32::try_from(curve_value).unwrap_or(u32::MAX));
-    let medium_fast_f64 =
-        f64::from(u32::try_from(medium_fast_value).unwrap_or(u32::MAX));
+    let medium_fast_f64 = f64::from(u32::try_from(medium_fast_value).unwrap_or(u32::MAX));
     (curve_f64 * 0.325 + medium_fast_f64 * 0.675).floor() as u64
 }
 
@@ -144,9 +142,7 @@ fn closed_form(level: u32, curve: usize) -> Option<u64> {
         curve::ERRATIC => (n.powi(4) + n.powi(3) * 2000.0) / 3500.0,
         curve::FAST => (n.powi(3) * 4.0) / 5.0,
         curve::MEDIUM_FAST => n.powi(3),
-        curve::MEDIUM_SLOW => {
-            (n.powi(3) * 6.0) / 5.0 - 15.0 * n * n + 100.0 * n - 140.0
-        }
+        curve::MEDIUM_SLOW => (n.powi(3) * 6.0) / 5.0 - 15.0 * n * n + 100.0 * n - 140.0,
         curve::SLOW => (n.powi(3) * 5.0) / 4.0,
         curve::FLUCTUATING => (n.powi(3) * (n / 2.0 + 8.0) * 4.0) / (100.0 + n),
         _ => return None,
@@ -156,15 +152,10 @@ fn closed_form(level: u32, curve: usize) -> Option<u64> {
 
 /// The selected-slice entry point: map a content-declared growth rate onto its
 /// TypeScript curve and produce the exact threshold for `level`.
-pub fn level_total_exp(
-    level: u16,
-    growth_rate: &GrowthRateKind,
-) -> Result<u64, LevelExpError> {
+pub fn level_total_exp(level: u16, growth_rate: &GrowthRateKind) -> Result<u64, LevelExpError> {
     match growth_rate {
-        GrowthRateKind::MediumSlow => {
-            total_exp_at_level(level, curve::MEDIUM_SLOW)
-                .ok_or(LevelExpError::LevelOutsideSupportedRange)
-        }
+        GrowthRateKind::MediumSlow => total_exp_at_level(level, curve::MEDIUM_SLOW)
+            .ok_or(LevelExpError::LevelOutsideSupportedRange),
     }
 }
 
@@ -179,10 +170,7 @@ mod tests {
         // 4329 sits exactly one point below it on the MEDIUM_SLOW curve.
         assert_eq!(total_exp_at_level(16, curve::MEDIUM_SLOW), Some(3588));
         assert_eq!(total_exp_at_level(17, curve::MEDIUM_SLOW), Some(4330));
-        assert_eq!(
-            level_total_exp(17, &GrowthRateKind::MediumSlow),
-            Ok(4330)
-        );
+        assert_eq!(level_total_exp(17, &GrowthRateKind::MediumSlow), Ok(4330));
     }
 
     #[test]
@@ -193,10 +181,7 @@ mod tests {
 
     #[test]
     fn closed_polynomials_extend_past_the_tables() {
-        let expected = ((100f64.powi(3) * 6.0 / 5.0
-            - 15.0 * 100.0 * 100.0
-            + 100.0 * 100.0
-            - 140.0)
+        let expected = ((100f64.powi(3) * 6.0 / 5.0 - 15.0 * 100.0 * 100.0 + 100.0 * 100.0 - 140.0)
             .floor()
             * 0.325
             + 1_000_000_f64 * 0.675)

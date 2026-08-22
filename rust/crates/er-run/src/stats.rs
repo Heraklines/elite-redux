@@ -114,8 +114,7 @@ pub fn recompute_stats(
     ];
     let mut values = [0u32; 6];
     for (index, axis) in AXES.iter().enumerate() {
-        let raw =
-            f64::from(base.base(*axis) * 2 + u32::from(ivs[index])) * f64::from(level) * 0.01;
+        let raw = f64::from(base.base(*axis) * 2 + u32::from(ivs[index])) * f64::from(level) * 0.01;
         let mut value = raw.floor();
         if *axis == StatAxis::Hp {
             value += f64::from(level) + 10.0;
@@ -194,8 +193,8 @@ mod tests {
     #[test]
     fn nacli_parity_vectors_match_published_fixture() {
         let ivs = [31u8; 6];
-        let bare = recompute_stats(&nacli_base(), ivs, 16, &hardy(), &zero_bonuses())
-            .expect("level 16");
+        let bare =
+            recompute_stats(&nacli_base(), ivs, 16, &hardy(), &zero_bonuses()).expect("level 16");
         assert_eq!(
             [
                 bare.hp,
@@ -210,10 +209,10 @@ mod tests {
         // Oracle evidence carries an observed permanent attack bonus of +2.
         let mut bonuses = zero_bonuses();
         bonuses.attack = 2;
-        let level16 = recompute_stats(&nacli_base(), ivs, 16, &hardy(), &bonuses)
-            .expect("level 16");
-        let level17 = recompute_stats(&nacli_base(), ivs, 17, &hardy(), &bonuses)
-            .expect("level 17");
+        let level16 =
+            recompute_stats(&nacli_base(), ivs, 16, &hardy(), &bonuses).expect("level 16");
+        let level17 =
+            recompute_stats(&nacli_base(), ivs, 17, &hardy(), &bonuses).expect("level 17");
         assert_eq!(
             [
                 level16.hp,
@@ -240,14 +239,8 @@ mod tests {
 
     #[test]
     fn raised_and_lowered_natures_use_exact_factors() {
-        let stats = recompute_stats(
-            &nacli_base(),
-            [31u8; 6],
-            17,
-            &adamant(),
-            &zero_bonuses(),
-        )
-        .expect("level 17");
+        let stats = recompute_stats(&nacli_base(), [31u8; 6], 17, &adamant(), &zero_bonuses())
+            .expect("level 17");
         // Bare attack 28 -> x1.1 ceil = 31; bare special attack 22 -> x0.9 floor = 19.
         assert_eq!(stats.attack, 31);
         assert_eq!(stats.special_attack, 19);
