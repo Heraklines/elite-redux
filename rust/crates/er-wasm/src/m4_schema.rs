@@ -24,7 +24,9 @@ pub enum WasmSchemaError {
 /// numbers, and emits one trailing newline — the exact wire shape consumed by
 /// the browser adapter.
 pub fn encode_game_state(state: &GameStateV2) -> Result<Vec<u8>, WasmSchemaError> {
-    state.validate().map_err(|error| WasmSchemaError::Validation(error.to_string()))?;
+    state
+        .validate()
+        .map_err(|error| WasmSchemaError::Validation(error.to_string()))?;
     let mut bytes = er_canonical::canonical_bytes(state)?;
     bytes.push(b'\n');
     Ok(bytes)
