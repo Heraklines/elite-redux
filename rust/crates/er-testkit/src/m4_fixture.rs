@@ -217,13 +217,20 @@ pub fn convert_pokemon(
             M4FixtureError::MissingField {
                 field: "exp".to_owned(),
             }
-        })?)?,
+        })?),
         growth_rate: GrowthRateId::new(3), // Medium Slow
         ivs,
         nature: NatureId::new(nature_value),
         effective_nature: NatureId::new(nature_value),
         friendship,
-        permanent_bonuses: Default::default(),
+        permanent_bonuses: er_state::pokemon_v2::PermanentStatBonuses {
+            hp: 0,
+            attack: 0,
+            defense: 0,
+            special_attack: 0,
+            special_defense: 0,
+            speed: 0,
+        },
         pause_evolutions: false,
     };
 
@@ -336,14 +343,15 @@ pub fn assemble_game_state(
             SafeU53::new(wave_value).map_err(|_| M4FixtureError::MissingField {
                 field: "wave".to_owned(),
             })?,
-        )?;
+        )
+        .expect("positive wave");
     let money_value = u32_field(save_data, "money")? as u64;
     let money =
         Money::new(
             SafeU53::new(money_value).map_err(|_| M4FixtureError::MissingField {
                 field: "money".to_owned(),
             })?,
-        )?;
+        );
 
     let mut player_party = Vec::new();
     let party =
@@ -360,7 +368,7 @@ pub fn assemble_game_state(
                 SafeU53::new(pid_value).map_err(|_| M4FixtureError::MissingField {
                     field: format!("party[{index}].id"),
                 })?,
-            )?;
+            );
         player_party.push(convert_pokemon(entry, pokemon_id, Some(player_seat))?);
     }
 
