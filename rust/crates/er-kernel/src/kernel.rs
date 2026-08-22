@@ -332,6 +332,7 @@ impl GameKernel {
             protocol_config,
             protocol,
             protocol_init_error,
+            run: None,
             terminal: None,
             disposed: false,
         };
