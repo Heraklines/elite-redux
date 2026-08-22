@@ -52,7 +52,7 @@ fn progression_fixture_produces_validated_v2_state() -> Result<(), Box<dyn Error
 
     // Party must contain Nacli at level 16 with exp 4329.
     assert!(!state.player_party.is_empty(), "party must not be empty");
-    assert_eq!(state.run.stage, er_types::run_model::RunStage::Battle);
+    assert_eq!(state.run.stage, er_types::run_model::RunStage::Complete);
     assert_eq!(
         state.run.outcome,
         er_types::run_model::RunOutcome::InProgress
