@@ -429,6 +429,19 @@ impl GameKernel {
             .map(er_game::run_menu::RunMenuReducer::plan)
     }
 
+    /// Returns the current run mechanical frontier without exposing mutable
+    /// runtime state.
+    #[doc(hidden)]
+    pub fn run_frontier_digest(
+        &self,
+    ) -> Result<er_state::digest_v2::MechanicalStateDigestV2, String> {
+        self.run
+            .as_ref()
+            .ok_or_else(|| "run mode is not active".to_owned())?
+            .frontier_digest()
+            .map_err(|error| error.to_string())
+    }
+
     /// Drains the typed action audit produced by internal physical-input
     /// reduction. This is a read-only test observation; it is never accepted
     /// as a causal kernel input.
