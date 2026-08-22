@@ -202,7 +202,8 @@ jobs:
       - name: Check out regression candidate
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+          filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /rust/
@@ -253,7 +254,8 @@ jobs:
       - name: Check out regression candidate
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
+          filter: blob:none
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /rust/
