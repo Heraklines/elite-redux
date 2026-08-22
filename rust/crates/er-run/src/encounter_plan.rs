@@ -20,6 +20,22 @@ use crate::rng_audit::RunRngDraw;
 
 pub const ENCOUNTER_PLAN_SCHEMA_VERSION: u32 = 1;
 
+/// Caller-supplied captured evidence assembled into an [`EncounterPlan`].
+///
+/// Every field comes from the published oracle JSON via the testkit loader;
+/// nothing here is reconstructed from content.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CapturedPlanEvidence {
+    pub format: BattleFormat,
+    pub enemy_party: Vec<PokemonStateV2>,
+    pub enemy_leads: Vec<PokemonId>,
+    pub player_leads: Vec<PokemonId>,
+    pub scripted_policy: ScriptedEnemyPolicyV1,
+    pub battle_seed: String,
+    pub generation_audit: Vec<RunRngDraw>,
+    pub run_content_hash: Option<RunContentPackHash>,
+}
+
 /// The complete authority-prepared input for one battle start.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
