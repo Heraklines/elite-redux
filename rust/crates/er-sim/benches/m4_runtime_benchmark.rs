@@ -5,9 +5,12 @@
 use std::error::Error;
 use std::time::Instant;
 
+use er_game::battle_start_v2::start_battle_v2;
 use er_game::run_runtime::project_terminal_or_wait_control;
 use er_kernel::{GameKernel, KernelInput};
 use er_run::biome::{RouteOption, plan_er_biome_structure, select_route};
+use er_run::content::EncounterPlanSource;
+use er_run::encounter_plan::{ENCOUNTER_PLAN_SCHEMA_VERSION, EncounterPlan};
 use er_run::modifier::{ModifierApplication, apply_modifier};
 use er_run::reward::{MarketStockView, RewardOfferView, buy_stock, pay_for_offer};
 use er_run::run_material::{
@@ -22,7 +25,8 @@ use er_state::run_v2::{
     CrossroadsSurfaceState, RUN_SURFACE_STATE_SCHEMA_VERSION, RunSurfaceState, SurfaceHeader,
 };
 use er_testkit::m4_fixture::{assemble_selected_game_state, selected_m4_game_content_bundle};
-use er_types::battle_ids::{ContentPackHash, MenuInstanceId};
+use er_types::battle_command::ScriptedEnemyPolicyV1;
+use er_types::battle_ids::{BattleFormat, ContentPackHash, MenuInstanceId, PokemonId};
 use er_types::input::{GameButton, InputFocus, InputMap, KeyBinding, PhysicalKey, RawInputEvent};
 use er_types::run_control::{
     CrossroadsControl, GameControl, GameControlPlan, PresentationBarrier, SeatControlPlan,
@@ -43,6 +47,8 @@ const FIXTURE: &str =
 const ORACLE: &str = "45c89493e7edec9c4da247a98cd7858b1f015c09";
 const RAW_EVENT_COUNT: u64 = 100_000;
 const PAIR_TRANSITION_COUNT: u64 = 1_000;
+const ENCOUNTER_FIXTURE: &str =
+    include_str!("../../../fixtures/m4/oracle/encounters/plains-wave-11-captured-v1.json");
 
 type Result<T = ()> = std::result::Result<T, Box<dyn Error>>;
 
@@ -344,6 +350,66 @@ fn m4_biome_transitions_1000() -> Result {
         json!({
             "id": "biome-transitions-1000",
             "transitions": 1000,
+            "execution_ms": started.elapsed().as_millis(),
+            "checksum": checksum
+        })
+    );
+    Ok(())
+}
+
+#[test]
+fn m4_wave_transitions_10000() -> Result {
+    let fixture: serde_json::Value = serde_json::from_str(FIXTURE)?;
+    let encounter_fixture: serde_json::Value = serde_json::from_str(ENCOUNTER_FIXTURE)?;
+    let (mut state, content) = assemble_selected_game_state(&fixture, ORACLE)?;
+    state.run.wave = er_types::battle_ids::WaveIndex::new(safe(11))?;
+    state.run.biome.biome = BiomeId::new(safe(1));
+    state.run.biome.source_wave = state.run.wave;
+    let enemy_value = encounter_fixture["final"]["canonical"]["save_data"]["enemyParty"]
+        .as_array()
+        .and_then(|party| party.first())
+        .ok_or("captured enemy missing")?;
+    let enemy_id = PokemonId::new(safe(enemy_value["id"].as_u64().ok_or("captured enemy ID")?));
+    let enemy = er_testkit::m4_fixture::convert_pokemon(enemy_value, enemy_id, None)?;
+    let plan = EncounterPlan {
+        schema_version: ENCOUNTER_PLAN_SCHEMA_VERSION,
+        encounter_id: er_types::run_ids::EncounterId::new(safe(1)),
+        run_id: state.run.run_id,
+        wave: state.run.wave,
+        biome: state.run.biome.biome,
+        format: BattleFormat::single(),
+        enemy_party: vec![enemy],
+        enemy_leads: vec![enemy_id],
+        player_leads: vec![state.player_party[0].id],
+        scripted_policy: ScriptedEnemyPolicyV1::new(SafeU53::ZERO, Vec::new())?,
+        battle_seed: encounter_fixture["final"]["canonical"]["runtime"]["battle_seed"]
+            .as_str()
+            .ok_or("captured battle seed")?
+            .to_owned(),
+        generation_audit: Vec::new(),
+        source: EncounterPlanSource::OracleCaptureRequired,
+        content_hash: Some(state.run_content_hash.clone()),
+    };
+    let started = Instant::now();
+    let mut checksum = 0_u64;
+    for _ in 0..10_000 {
+        let after = start_battle_v2(&state, &plan, SeatId::new(safe(1)), content.as_ref())?;
+        checksum = checksum.wrapping_add(
+            after
+                .battle
+                .as_ref()
+                .ok_or("started battle missing")?
+                .battle_id
+                .get()
+                .get(),
+        );
+    }
+    std::hint::black_box(checksum);
+    println!(
+        "{}",
+        json!({
+            "id": "wave-transitions-10000",
+            "transitions": 10000,
             "execution_ms": started.elapsed().as_millis(),
             "checksum": checksum
         })
