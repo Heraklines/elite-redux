@@ -18,5 +18,6 @@ pub use kernel::{
     AuthorityResolutionPlan, BattleProtocolConfig, BattleProtocolRoleConfig, ControlMenuPlan,
     GameKernel, KernelConfig, KernelEffect, KernelError, KernelInput, KernelSnapshot,
     LiveResourceSnapshot, MenuProposalPlan, ProtocolKernelConfig, ProtocolRoleConfig,
+    RunKernelRole,
 };
 pub use ui_reducer::UiReducer;

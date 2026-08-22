@@ -58,6 +58,8 @@ pub struct M4RunPair {
     queue: Vec<QueuedRunPacket>,
     host_applied: BTreeMap<OperationId, Vec<u8>>,
     guest_applied: BTreeMap<OperationId, Vec<u8>>,
+    host_actions: Vec<RunSurfaceAction>,
+    guest_actions: Vec<RunSurfaceAction>,
 }
 
 impl M4RunPair {
@@ -71,6 +73,8 @@ impl M4RunPair {
             queue: Vec::new(),
             host_applied: BTreeMap::new(),
             guest_applied: BTreeMap::new(),
+            host_actions: Vec::new(),
+            guest_actions: Vec::new(),
         }
     }
 
@@ -104,11 +108,27 @@ impl M4RunPair {
         if endpoint == PairEndpoint::Guest && !self.guest_connected {
             return Err(M4PairError::DisconnectedInput);
         }
-        let kernel = match endpoint {
-            PairEndpoint::Host => &mut self.host,
-            PairEndpoint::Guest => &mut self.guest,
+        let actions = {
+            let kernel = match endpoint {
+                PairEndpoint::Host => &mut self.host,
+                PairEndpoint::Guest => &mut self.guest,
+            };
+            kernel.step(KernelInput::RawInput { seat, event })?;
+            kernel.take_run_actions()
         };
-        kernel.step(KernelInput::RawInput { seat, event })?;
+        for action in &actions {
+            if action
+                == &RunSurfaceAction::Crossroads(er_types::run_model::CrossroadsAction::MoveOn)
+            {
+                let bytes = self.host.prepare_run_action_material_bytes(action)?;
+                self.commit_authority(bytes, SafeU53::ZERO)?;
+                self.deliver_due()?;
+            }
+        }
+        match endpoint {
+            PairEndpoint::Host => self.host_actions.extend(actions),
+            PairEndpoint::Guest => self.guest_actions.extend(actions),
+        }
         Ok(())
     }
 
@@ -116,8 +136,8 @@ impl M4RunPair {
     #[doc(hidden)]
     pub fn take_actions(&mut self, endpoint: PairEndpoint) -> Vec<RunSurfaceAction> {
         match endpoint {
-            PairEndpoint::Host => self.host.take_run_actions(),
-            PairEndpoint::Guest => self.guest.take_run_actions(),
+            PairEndpoint::Host => std::mem::take(&mut self.host_actions),
+            PairEndpoint::Guest => std::mem::take(&mut self.guest_actions),
         }
     }
 
@@ -263,6 +283,8 @@ impl M4RunPair {
         self.queue.clear();
         self.host_applied.clear();
         self.guest_applied.clear();
+        self.host_actions.clear();
+        self.guest_actions.clear();
         self.host.dispose(reason);
         self.guest.dispose(reason);
         (self.host.live_resources(), self.guest.live_resources())

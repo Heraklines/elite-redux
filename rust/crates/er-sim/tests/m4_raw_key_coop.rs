@@ -2,7 +2,7 @@
 
 use std::error::Error;
 
-use er_kernel::GameKernel;
+use er_kernel::{GameKernel, RunKernelRole};
 use er_sim::{M4PairError, M4RunPair, PairEndpoint};
 use er_state::run_v2::{
     CrossroadsSurfaceState, RUN_SURFACE_STATE_SCHEMA_VERSION, RunSurfaceState, SurfaceHeader,
@@ -118,15 +118,17 @@ fn kernels() -> Result<(GameKernel, GameKernel, SeatId, SeatId), Box<dyn Error>>
         initial_repeat_delay_ms: safe(250),
         repeat_interval_ms: safe(250),
     };
-    let host = GameKernel::new_run_with_control(
+    let host = GameKernel::new_run_endpoint(
         state.clone(),
         content.clone(),
         input_map.clone(),
         plan.clone(),
+        RunKernelRole::Authority,
     )
     .map_err(std::io::Error::other)?;
-    let guest = GameKernel::new_run_with_control(state, content, input_map, plan)
-        .map_err(std::io::Error::other)?;
+    let guest =
+        GameKernel::new_run_endpoint(state, content, input_map, plan, RunKernelRole::Replica)
+            .map_err(std::io::Error::other)?;
     Ok((host, guest, owner, watcher))
 }
 
@@ -175,5 +177,10 @@ fn guest_owner_acts_by_physical_keys_while_watcher_and_disconnected_input_fail_c
         vec![RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn)]
     );
     assert!(pair.take_actions(PairEndpoint::Host).is_empty());
+    assert_eq!(
+        pair.frontiers()?.0,
+        pair.frontiers()?.1,
+        "guest proposal must resolve once on authority and apply on both endpoints"
+    );
     Ok(())
 }

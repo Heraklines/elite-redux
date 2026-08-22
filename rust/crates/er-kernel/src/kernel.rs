@@ -141,10 +141,18 @@ pub enum ControlMenuPlan {
     },
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RunKernelRole {
+    Local,
+    Authority,
+    Replica,
+}
+
 #[derive(Clone, Debug)]
 pub struct GameKernel {
     battle: Option<Box<BattleMode>>,
     run: Option<er_game::run_runtime::RunRuntime>,
+    run_role: Option<RunKernelRole>,
     run_menu: Option<er_game::run_menu::RunMenuReducer>,
     pending_run_actions: Vec<er_types::run_model::RunSurfaceAction>,
     input_router: InputRouter,
@@ -335,6 +343,7 @@ impl GameKernel {
             protocol,
             protocol_init_error,
             run: None,
+            run_role: None,
             run_menu: None,
             pending_run_actions: Vec::new(),
             terminal: None,
@@ -371,6 +380,7 @@ impl GameKernel {
             .map_err(|error| error.to_string())?;
         let mut kernel = Self::new(KernelConfig::default());
         kernel.run = Some(runtime);
+        kernel.run_role = Some(RunKernelRole::Local);
         Ok(kernel)
     }
 
@@ -383,6 +393,16 @@ impl GameKernel {
         input_map: InputMap,
         control: er_types::run_control::GameControlPlan,
     ) -> Result<Self, String> {
+        Self::new_run_endpoint(state, content, input_map, control, RunKernelRole::Local)
+    }
+
+    pub fn new_run_endpoint(
+        state: er_state::game_v2::GameStateV2,
+        content: Arc<er_run::transition::GameContentBundle>,
+        input_map: InputMap,
+        control: er_types::run_control::GameControlPlan,
+        role: RunKernelRole,
+    ) -> Result<Self, String> {
         let runtime = er_game::run_runtime::RunRuntime::new(state, content)
             .map_err(|error| error.to_string())?;
         let run_menu =
@@ -392,6 +412,7 @@ impl GameKernel {
             ..KernelConfig::default()
         });
         kernel.run = Some(runtime);
+        kernel.run_role = Some(role);
         kernel.run_menu = Some(run_menu);
         Ok(kernel)
     }
@@ -439,6 +460,31 @@ impl GameKernel {
     /// Applies one canonical run-material payload through the single shared
     /// production applier. Canonical bytes in, atomic state swap out; both
     /// authority and replica use exactly this entry point.
+    #[doc(hidden)]
+    pub fn prepare_run_action_material_bytes(
+        &self,
+        action: &er_types::run_model::RunSurfaceAction,
+    ) -> Result<Vec<u8>, KernelError> {
+        let runtime = self.run.as_ref().ok_or_else(|| KernelError::Canonical {
+            reason: "run mode is not active".to_owned(),
+        })?;
+        let control = self
+            .run_menu
+            .as_ref()
+            .ok_or_else(|| KernelError::Canonical {
+                reason: "run control is not installed".to_owned(),
+            })?
+            .plan();
+        let material = runtime
+            .prepare_action_material(action, control)
+            .map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })?;
+        er_run::encode_run_material(&material).map_err(|error| KernelError::Canonical {
+            reason: error.to_string(),
+        })
+    }
+
     pub fn apply_run_material_bytes(&mut self, bytes: &[u8]) -> Result<(), KernelError> {
         if self.disposed {
             return Err(KernelError::Disposed);
@@ -658,10 +704,11 @@ impl GameKernel {
             }
         }
         for (action, control) in actions {
-            if action
-                == er_types::run_model::RunSurfaceAction::Crossroads(
-                    er_types::run_model::CrossroadsAction::MoveOn,
-                )
+            if self.run_role == Some(RunKernelRole::Local)
+                && action
+                    == er_types::run_model::RunSurfaceAction::Crossroads(
+                        er_types::run_model::CrossroadsAction::MoveOn,
+                    )
             {
                 let material = self
                     .run
