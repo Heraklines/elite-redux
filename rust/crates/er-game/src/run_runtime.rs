@@ -174,7 +174,7 @@ pub fn project_terminal_or_wait_control(
     state: &GameStateV2,
     next_control_id: impl Into<String>,
     owner_seat: SeatId,
-    menu_instance_id: er_types::MenuInstanceId,
+    menu_instance_id: er_types::battle_ids::MenuInstanceId,
 ) -> Result<GameControlPlan, RunRuntimeError> {
     state
         .validate()
