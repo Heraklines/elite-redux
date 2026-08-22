@@ -146,7 +146,7 @@ pub struct GameKernel {
     battle: Option<Box<BattleMode>>,
     run: Option<er_game::run_runtime::RunRuntime>,
     run_menu: Option<er_game::run_menu::RunMenuReducer>,
-    pending_run_intents: Vec<er_game::run_menu::RunMenuIntent>,
+    pending_run_actions: Vec<er_types::run_model::RunSurfaceAction>,
     input_router: InputRouter,
     ui_reducer: UiReducer,
     scheduler: KernelScheduler,
@@ -336,7 +336,7 @@ impl GameKernel {
             protocol_init_error,
             run: None,
             run_menu: None,
-            pending_run_intents: Vec::new(),
+            pending_run_actions: Vec::new(),
             terminal: None,
             disposed: false,
         };
@@ -429,8 +429,12 @@ impl GameKernel {
             .map(er_game::run_menu::RunMenuReducer::plan)
     }
 
-    pub fn take_run_intents(&mut self) -> Vec<er_game::run_menu::RunMenuIntent> {
-        std::mem::take(&mut self.pending_run_intents)
+    /// Drains the typed action audit produced by internal physical-input
+    /// reduction. This is a read-only test observation; it is never accepted
+    /// as a causal kernel input.
+    #[doc(hidden)]
+    pub fn take_run_actions(&mut self) -> Vec<er_types::run_model::RunSurfaceAction> {
+        std::mem::take(&mut self.pending_run_actions)
     }
 
     /// Applies one canonical run-material payload through the single shared
@@ -628,7 +632,18 @@ impl GameKernel {
                         reason: error.to_string(),
                     })?
             {
-                self.pending_run_intents.push(intent);
+                let state = self
+                    .run
+                    .as_ref()
+                    .expect("run mode checked before step_run")
+                    .state();
+                let action =
+                    er_game::run_menu::resolve_intent(state, &intent).map_err(|error| {
+                        KernelError::Canonical {
+                            reason: error.to_string(),
+                        }
+                    })?;
+                self.pending_run_actions.push(action);
             }
         }
         // Repeat ownership will bind to MenuInstanceId when virtual-time run

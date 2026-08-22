@@ -239,7 +239,6 @@ fn crossroads_state_and_control(
 
 #[test]
 fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<dyn Error>> {
-    use er_game::run_menu::RunMenuIntentKind;
     use er_kernel::{GameKernel, KernelInput};
     use er_types::input::{
         GameButton, InputFocus, InputMap, KeyBinding, PhysicalKey, RawInputEvent,
@@ -290,11 +289,388 @@ fn physical_keys_navigate_crossroads_and_submit_one_intent() -> Result<(), Box<d
         assert!(effects.is_empty(), "run intents remain internal");
     }
 
-    let intents = kernel.take_run_intents();
-    assert_eq!(intents.len(), 1);
+    let actions = kernel.take_run_actions();
     assert_eq!(
-        intents[0].kind,
-        RunMenuIntentKind::Submit(er_types::MenuOptionId::new("crossroads/leave")?)
+        actions,
+        vec![er_types::run_model::RunSurfaceAction::Crossroads(
+            er_types::run_model::CrossroadsAction::MoveOn
+        )]
+    );
+    Ok(())
+}
+
+fn menu_for_surface(
+    owner: er_types::SeatId,
+    instance: u64,
+    selected: &str,
+    options: &[(&str, bool)],
+    edges: &[(&str, er_types::ui_menu::NavigationDirection, &str)],
+    cancel: er_types::ui::CancelPolicy,
+) -> Result<er_types::ui_menu::LogicalMenu, Box<dyn Error>> {
+    use er_types::battle_ids::MenuInstanceId;
+    use er_types::ui_menu::{LogicalMenuOption, MenuNavigationEdge};
+
+    Ok(er_types::ui_menu::LogicalMenu::new(
+        MenuInstanceId::new(safe(instance)),
+        owner,
+        format!("run/surface/{instance}"),
+        er_types::MenuOptionId::new(selected)?,
+        options
+            .iter()
+            .map(|(id, enabled)| -> Result<_, Box<dyn Error>> {
+                let option_id = er_types::MenuOptionId::new(*id)?;
+                Ok(LogicalMenuOption::new(option_id, *enabled, None)?)
+            })
+            .collect::<Result<Vec<_>, _>>()?,
+        edges
+            .iter()
+            .map(|(from, direction, to)| {
+                Ok(MenuNavigationEdge::new(
+                    er_types::MenuOptionId::new(*from)?,
+                    *direction,
+                    er_types::MenuOptionId::new(*to)?,
+                ))
+            })
+            .collect::<Result<Vec<_>, er_types::StringIdError>>()?,
+        cancel,
+    )?)
+}
+
+fn surface_header(
+    owner: er_types::SeatId,
+    surface_id: u64,
+    kind: er_types::run_model::RunSurfaceKind,
+    menu: er_types::ui_menu::LogicalMenu,
+) -> Result<er_state::run_v2::SurfaceHeader, Box<dyn Error>> {
+    use er_state::run_v2::RUN_SURFACE_STATE_SCHEMA_VERSION;
+    use er_types::run_ids::{RunInteractionSequence, RunSurfaceId, SurfaceDigest};
+
+    Ok(er_state::run_v2::SurfaceHeader {
+        schema_version: RUN_SURFACE_STATE_SCHEMA_VERSION,
+        surface_id: RunSurfaceId::new(safe(surface_id)),
+        kind,
+        owner_seat: owner,
+        interaction_sequence: RunInteractionSequence::new(SafeU53::ZERO),
+        action_ordinal: 0,
+        operation_id: er_types::OperationId::new(format!("1:1:SURFACE:{surface_id}"))?,
+        menu,
+        surface_digest: SurfaceDigest::new(format!("blake3-v1:{}", "0".repeat(64)))?,
+    })
+}
+
+fn kernel_for_surface(
+    fixture: &serde_json::Value,
+    surface: er_state::run_v2::RunSurfaceState,
+    control: er_types::run_control::SurfaceControl,
+) -> Result<(er_kernel::GameKernel, er_types::SeatId), Box<dyn Error>> {
+    use er_types::battle_ids::MenuInstanceId;
+    use er_types::input::{GameButton, InputMap, KeyBinding, PhysicalKey};
+    use er_types::run_control::{
+        GameControl, GameControlPlan, PresentationBarrier, SeatControlPlan,
+    };
+    use er_types::run_model::{RunOutcome, RunStage};
+
+    let (battle_hash, run_hash) = content_hashes(fixture)?;
+    let mut state = assemble_game_state(
+        fixture,
+        battle_hash.clone(),
+        run_hash.clone(),
+        M4_ORACLE_SHA,
+    )?;
+    let owner = surface.header().owner_seat;
+    state.run.stage = RunStage::Surface;
+    state.run.outcome = RunOutcome::InProgress;
+    state.run.active_surface = Some(surface);
+    state.validate().map_err(|error| error.to_string())?;
+    let control_id = control.menu().control_id.clone();
+    let menu_instance_id = control.menu().instance_id;
+    let plan = GameControlPlan::new(
+        vec![SeatControlPlan {
+            seat: owner,
+            owner: true,
+            control_id,
+            menu_instance_id,
+            actionable_after: PresentationBarrier::NonBlocking,
+            control: GameControl::Surface(control),
+        }],
+        "run/surface/next".to_owned(),
+        MenuInstanceId::new(safe(menu_instance_id.get().get() + 1)),
+    )?;
+    let input_map = InputMap {
+        keyboard: vec![
+            KeyBinding {
+                key: PhysicalKey::ArrowDown,
+                button: GameButton::Down,
+            },
+            KeyBinding {
+                key: PhysicalKey::ArrowRight,
+                button: GameButton::Right,
+            },
+            KeyBinding {
+                key: PhysicalKey::Space,
+                button: GameButton::Submit,
+            },
+        ],
+        gamepad: Vec::new(),
+        initial_repeat_delay_ms: safe(250),
+        repeat_interval_ms: safe(250),
+    };
+    let kernel = er_kernel::GameKernel::new_run_with_control(
+        state,
+        battle_hash,
+        run_hash,
+        M4_ORACLE_SHA,
+        input_map,
+        plan,
+    )
+    .map_err(std::io::Error::other)?;
+    Ok((kernel, owner))
+}
+
+fn press_physical(
+    kernel: &mut er_kernel::GameKernel,
+    owner: er_types::SeatId,
+    key: er_types::input::PhysicalKey,
+) -> Result<(), Box<dyn Error>> {
+    use er_kernel::KernelInput;
+    use er_types::input::{InputFocus, RawInputEvent};
+
+    let printable = matches!(key, er_types::input::PhysicalKey::Space);
+    for event in [
+        RawInputEvent::KeyDown {
+            code: key.clone(),
+            printable,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+        RawInputEvent::KeyUp { code: key },
+    ] {
+        assert!(
+            kernel
+                .step(KernelInput::RawInput { seat: owner, event })?
+                .is_empty()
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<(), Box<dyn Error>> {
+    use er_state::run_v2::{
+        BiomeMarketSurfaceState, BiomeSelectSurfaceState, CrossroadsSurfaceState, LearnMoveTask,
+        MarketStockEntry, MoveLearnSurfaceState, RewardOffer, RewardShopSurfaceState, RouteNode,
+        RunSurfaceState,
+    };
+    use er_types::battle_ids::{BattleId, MoveId};
+    use er_types::input::PhysicalKey;
+    use er_types::run_control::{
+        BiomeMarketControl, BiomeSelectControl, CrossroadsControl, MoveLearnControl,
+        RewardShopControl, SurfaceControl,
+    };
+    use er_types::run_ids::{
+        BiomeId, ModifierId, Money, RouteNodeId, RunInteractionSequence, RunOfferId, RunStockId,
+    };
+    use er_types::run_model::{
+        BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, ModifierTier,
+        RewardAction, RunSurfaceAction, RunSurfaceKind,
+    };
+    use er_types::ui::CancelPolicy;
+    use er_types::ui_menu::NavigationDirection;
+
+    let fixture = load_fixture_value(PROGRESSION_FIXTURE)?;
+    let base = assemble_game_state(
+        &fixture,
+        content_hashes(&fixture)?.0,
+        content_hashes(&fixture)?.1,
+        M4_ORACLE_SHA,
+    )?;
+    let owner = er_types::SeatId::new(safe(1));
+    let pokemon = base.player_party[0].id;
+    let interaction = RunInteractionSequence::new(SafeU53::ZERO);
+
+    let candidate = "learn/candidate/34".to_owned();
+    let replacement = format!("learn/replace/{}/0", pokemon.get().get());
+    let menu = menu_for_surface(
+        owner,
+        11,
+        &candidate,
+        &[(&candidate, true), (&replacement, true)],
+        &[(&candidate, NavigationDirection::Down, &replacement)],
+        CancelPolicy::Disabled,
+    )?;
+    let header = surface_header(owner, 11, RunSurfaceKind::MoveLearn, menu.clone())?;
+    let surface = RunSurfaceState::MoveLearn(MoveLearnSurfaceState {
+        header,
+        task: LearnMoveTask {
+            pokemon,
+            move_id: MoveId::new(safe(34)),
+            source_battle_id: BattleId::new(safe(1)),
+        },
+        pending_slot: None,
+    });
+    let control = SurfaceControl::MoveLearn(MoveLearnControl::new(
+        er_types::run_ids::RunSurfaceId::new(safe(11)),
+        interaction,
+        menu,
+    ));
+    let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    press_physical(&mut kernel, owner, PhysicalKey::ArrowDown)?;
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::LearnMove(LearnMoveDecision::Replace {
+            slot: er_types::battle_ids::MoveSlotIndex::ZERO
+        })]
+    );
+
+    let free = "reward/free/1/100";
+    let skip = "reward/skip";
+    let menu = menu_for_surface(
+        owner,
+        21,
+        free,
+        &[(free, true), (skip, true)],
+        &[(free, NavigationDirection::Down, skip)],
+        CancelPolicy::Select(er_types::MenuOptionId::new(skip)?),
+    )?;
+    let header = surface_header(owner, 21, RunSurfaceKind::RewardShop, menu.clone())?;
+    let surface = RunSurfaceState::RewardShop(RewardShopSurfaceState {
+        header,
+        offers: vec![RewardOffer {
+            offer_id: RunOfferId::new(safe(1)),
+            modifier_id: ModifierId::new(safe(100)),
+            tier: ModifierTier::Common,
+            price: Money::ZERO,
+            sold: false,
+        }],
+        lock_tiers: Vec::new(),
+        reroll_count: 0,
+        reroll_cost: Money::new(safe(250)),
+        pending_target: None,
+    });
+    let control = SurfaceControl::RewardShop(RewardShopControl::new(
+        er_types::run_ids::RunSurfaceId::new(safe(21)),
+        interaction,
+        menu,
+    ));
+    let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::Reward(RewardAction::SelectFree {
+            offer: RunOfferId::new(safe(1)),
+            target: None
+        })]
+    );
+
+    let buy = "market/1/200";
+    let leave = "market/leave";
+    let menu = menu_for_surface(
+        owner,
+        31,
+        buy,
+        &[(buy, true), (leave, true)],
+        &[(buy, NavigationDirection::Right, leave)],
+        CancelPolicy::Select(er_types::MenuOptionId::new(leave)?),
+    )?;
+    let header = surface_header(owner, 31, RunSurfaceKind::BiomeMarket, menu.clone())?;
+    let surface = RunSurfaceState::BiomeMarket(BiomeMarketSurfaceState {
+        header,
+        stock: vec![MarketStockEntry {
+            stock_id: RunStockId::new(safe(1)),
+            modifier_id: ModifierId::new(safe(200)),
+            tier: ModifierTier::Common,
+            price: Money::new(safe(50)),
+            initial_quantity: 1,
+            remaining_quantity: 1,
+            sold: false,
+        }],
+        pending_target: None,
+    });
+    let control = SurfaceControl::BiomeMarket(BiomeMarketControl::new(
+        er_types::run_ids::RunSurfaceId::new(safe(31)),
+        interaction,
+        menu,
+    ));
+    let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::BiomeMarket(BiomeMarketAction::Buy {
+            stock: RunStockId::new(safe(1)),
+            target: None,
+            price: Money::new(safe(50))
+        })]
+    );
+
+    let stay = "crossroads/stay";
+    let leave = "crossroads/leave";
+    let menu = menu_for_surface(
+        owner,
+        41,
+        stay,
+        &[(stay, true), (leave, true)],
+        &[(stay, NavigationDirection::Down, leave)],
+        CancelPolicy::Select(er_types::MenuOptionId::new(leave)?),
+    )?;
+    let header = surface_header(owner, 41, RunSurfaceKind::Crossroads, menu.clone())?;
+    let source_wave = base.run.wave;
+    let surface = RunSurfaceState::Crossroads(CrossroadsSurfaceState {
+        header,
+        source_wave,
+    });
+    let control = SurfaceControl::Crossroads(CrossroadsControl::new(
+        er_types::run_ids::RunSurfaceId::new(safe(41)),
+        interaction,
+        menu,
+    ));
+    let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    press_physical(&mut kernel, owner, PhysicalKey::ArrowDown)?;
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn)]
+    );
+
+    let route_a = "biome/1/2";
+    let route_b = "biome/2/3";
+    let menu = menu_for_surface(
+        owner,
+        51,
+        route_a,
+        &[(route_a, true), (route_b, true)],
+        &[(route_a, NavigationDirection::Right, route_b)],
+        CancelPolicy::Disabled,
+    )?;
+    let header = surface_header(owner, 51, RunSurfaceKind::BiomeSelect, menu.clone())?;
+    let surface = RunSurfaceState::BiomeSelect(BiomeSelectSurfaceState {
+        header,
+        routes: vec![
+            RouteNode {
+                route_node_id: RouteNodeId::new(safe(1)),
+                biome: BiomeId::new(safe(2)),
+            },
+            RouteNode {
+                route_node_id: RouteNodeId::new(safe(2)),
+                biome: BiomeId::new(safe(3)),
+            },
+        ],
+        inherited_crossroads_sequence: Some(interaction),
+    });
+    let control = SurfaceControl::BiomeSelect(BiomeSelectControl::new(
+        er_types::run_ids::RunSurfaceId::new(safe(51)),
+        interaction,
+        menu,
+    ));
+    let (mut kernel, owner) = kernel_for_surface(&fixture, surface, control)?;
+    press_physical(&mut kernel, owner, PhysicalKey::ArrowRight)?;
+    press_physical(&mut kernel, owner, PhysicalKey::Space)?;
+    assert_eq!(
+        kernel.take_run_actions(),
+        vec![RunSurfaceAction::BiomeSelect(BiomeSelectAction {
+            route_node: RouteNodeId::new(safe(2)),
+            biome: BiomeId::new(safe(3))
+        })]
     );
     Ok(())
 }

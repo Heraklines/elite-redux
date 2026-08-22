@@ -6,10 +6,17 @@
 //! internal intent, and cancel follows the frozen [`CancelPolicy`]. No UI or
 //! semantic action enters through an external boundary.
 
+use er_state::game_v2::GameStateV2;
+use er_state::run_v2::RunSurfaceState;
 use er_types::SeatId;
+use er_types::battle_ids::MoveSlotIndex;
 use er_types::input::{ButtonEvent, GameButton};
 use er_types::run_control::{GameControl, GameControlPlan, PresentationBarrier, SurfaceControl};
 use er_types::run_ids::{RunInteractionSequence, RunSurfaceId};
+use er_types::run_model::{
+    BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, RewardAction,
+    RunSurfaceAction,
+};
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{LogicalMenu, NavigationDirection};
 use er_types::{MenuOptionId, StringIdError};
@@ -47,6 +54,12 @@ pub enum RunMenuError {
     DisabledOption,
     #[error("cancel target is invalid: {0}")]
     InvalidCancelOption(#[from] StringIdError),
+    #[error("run state has no active surface")]
+    NoActiveSurface,
+    #[error("run intent does not identify the active surface")]
+    StaleSurface,
+    #[error("menu option does not map to a supported action on the active surface")]
+    UnsupportedOption,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -142,6 +155,187 @@ impl RunMenuReducer {
             _ => Ok(None),
         }
     }
+}
+
+/// Resolves one internally produced menu intent against the canonical active
+/// surface. Stable option identity is interpreted only after surface owner,
+/// generation, and enabled-state validation; no campaign-supplied semantic
+/// action enters this boundary.
+pub fn resolve_intent(
+    state: &GameStateV2,
+    intent: &RunMenuIntent,
+) -> Result<RunSurfaceAction, RunMenuError> {
+    let surface = state
+        .run
+        .active_surface
+        .as_ref()
+        .ok_or(RunMenuError::NoActiveSurface)?;
+    let header = surface.header();
+    if header.owner_seat != intent.seat
+        || header.surface_id != intent.surface_id
+        || header.interaction_sequence != intent.interaction_sequence
+    {
+        return Err(RunMenuError::StaleSurface);
+    }
+
+    let option = match &intent.kind {
+        RunMenuIntentKind::Submit(option) | RunMenuIntentKind::Cancel(Some(option)) => {
+            let enabled = header
+                .menu
+                .options
+                .iter()
+                .find(|entry| entry.option_id == *option)
+                .is_some_and(|entry| entry.enabled);
+            if !enabled {
+                return Err(RunMenuError::DisabledOption);
+            }
+            Some(option.as_str())
+        }
+        RunMenuIntentKind::Cancel(None) => None,
+    };
+
+    match surface {
+        RunSurfaceState::MoveLearn(value) => resolve_move_learn(state, value, option),
+        RunSurfaceState::RewardShop(value) => resolve_reward(value, option),
+        RunSurfaceState::BiomeMarket(value) => resolve_market(value, option),
+        RunSurfaceState::Crossroads(_) => match option {
+            Some("crossroads/stay") => Ok(RunSurfaceAction::Crossroads(CrossroadsAction::Stay)),
+            Some("crossroads/leave") | None => {
+                Ok(RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn))
+            }
+            _ => Err(RunMenuError::UnsupportedOption),
+        },
+        RunSurfaceState::BiomeSelect(value) => {
+            let Some(option) = option else {
+                return Err(RunMenuError::UnsupportedOption);
+            };
+            value
+                .routes
+                .iter()
+                .find(|route| {
+                    option == format!("biome/{}/{}", route.route_node_id, route.biome).as_str()
+                })
+                .map(|route| {
+                    RunSurfaceAction::BiomeSelect(BiomeSelectAction {
+                        route_node: route.route_node_id,
+                        biome: route.biome,
+                    })
+                })
+                .ok_or(RunMenuError::UnsupportedOption)
+        }
+    }
+}
+
+fn resolve_move_learn(
+    state: &GameStateV2,
+    surface: &er_state::run_v2::MoveLearnSurfaceState,
+    option: Option<&str>,
+) -> Result<RunSurfaceAction, RunMenuError> {
+    let decision = match option {
+        Some("learn/undo") => LearnMoveDecision::Undo,
+        Some("learn/cancel") | None => LearnMoveDecision::Cancel,
+        Some(option)
+            if option == format!("learn/candidate/{}", surface.task.move_id.get().get()) =>
+        {
+            LearnMoveDecision::Candidate {
+                move_id: surface.task.move_id,
+            }
+        }
+        Some(option) => {
+            let pokemon = state
+                .player_party
+                .iter()
+                .find(|pokemon| pokemon.id == surface.task.pokemon)
+                .ok_or(RunMenuError::UnsupportedOption)?;
+            let slot = pokemon
+                .moves
+                .iter()
+                .enumerate()
+                .find_map(|(slot, move_slot)| {
+                    let expected = format!("learn/replace/{}/{}", pokemon.id.get().get(), slot);
+                    (move_slot.is_some() && option == expected).then_some(slot)
+                })
+                .ok_or(RunMenuError::UnsupportedOption)?;
+            LearnMoveDecision::Replace {
+                slot: MoveSlotIndex::try_from(slot as u64)
+                    .map_err(|_| RunMenuError::UnsupportedOption)?,
+            }
+        }
+    };
+    Ok(RunSurfaceAction::LearnMove(decision))
+}
+
+fn resolve_reward(
+    surface: &er_state::run_v2::RewardShopSurfaceState,
+    option: Option<&str>,
+) -> Result<RunSurfaceAction, RunMenuError> {
+    let action = match option {
+        Some("reward/skip") | None => RewardAction::Skip,
+        Some("reward/reroll") => RewardAction::Reroll,
+        Some(option) => {
+            if let Some(offer) = surface.offers.iter().find(|offer| {
+                let prefix = if offer.price == er_types::run_ids::Money::ZERO {
+                    "reward/free"
+                } else {
+                    "reward/shop"
+                };
+                !offer.sold
+                    && option
+                        == format!("{prefix}/{}/{}", offer.offer_id, offer.modifier_id).as_str()
+            }) {
+                let target = surface.pending_target.as_ref().map(|target| target.pokemon);
+                if offer.price == er_types::run_ids::Money::ZERO {
+                    RewardAction::SelectFree {
+                        offer: offer.offer_id,
+                        target,
+                    }
+                } else {
+                    RewardAction::Buy {
+                        offer: offer.offer_id,
+                        target,
+                        price: offer.price,
+                    }
+                }
+            } else if let Some(tier) = option.strip_prefix("reward/lock/") {
+                let tier = tier
+                    .parse::<u8>()
+                    .ok()
+                    .and_then(|tier| er_types::run_model::ModifierTier::try_from(tier).ok())
+                    .ok_or(RunMenuError::UnsupportedOption)?;
+                RewardAction::ToggleLock { tier }
+            } else {
+                return Err(RunMenuError::UnsupportedOption);
+            }
+        }
+    };
+    Ok(RunSurfaceAction::Reward(action))
+}
+
+fn resolve_market(
+    surface: &er_state::run_v2::BiomeMarketSurfaceState,
+    option: Option<&str>,
+) -> Result<RunSurfaceAction, RunMenuError> {
+    let action = match option {
+        Some("market/leave") | None => BiomeMarketAction::Leave,
+        Some(option) => {
+            let stock = surface
+                .stock
+                .iter()
+                .find(|stock| {
+                    !stock.sold
+                        && stock.remaining_quantity > 0
+                        && option
+                            == format!("market/{}/{}", stock.stock_id, stock.modifier_id).as_str()
+                })
+                .ok_or(RunMenuError::UnsupportedOption)?;
+            BiomeMarketAction::Buy {
+                stock: stock.stock_id,
+                target: surface.pending_target.as_ref().map(|target| target.pokemon),
+                price: stock.price,
+            }
+        }
+    };
+    Ok(RunSurfaceAction::BiomeMarket(action))
 }
 
 fn direction(button: GameButton) -> Option<NavigationDirection> {
