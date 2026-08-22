@@ -434,6 +434,71 @@
       .tour-reward-place { padding: 4px 0 6px; border-bottom: 1px dashed var(--line); margin-bottom: 4px; }
       .tour-back { margin-bottom: 10px; }
       .tour-err { color: #e0556a; font-size: 13px; margin: 8px 0; }
+      /* ---- Community suggestion review ---- */
+      .sug-shell { display: grid; grid-template-columns: 300px minmax(420px, 1fr) 272px; height: calc(100vh - 122px); min-height: 480px; }
+      .sug-list, .sug-detail, .sug-inspector { overflow-y: auto; min-height: 0; min-width: 0; }
+      .sug-list, .sug-inspector { background: var(--panel); }
+      .sug-list { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
+      .sug-inspector { border-left: 1px solid var(--line); padding: 12px; }
+      .sug-inspector h3 { margin: 2px 0 10px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+      .sug-toolbar { position: sticky; top: 0; z-index: 2; padding: 10px; border-bottom: 1px solid var(--line); background: var(--panel); display: grid; gap: 8px; flex: none; }
+      .sug-toolbar-row { display: flex; gap: 6px; }
+      .sug-toolbar-row > * { min-width: 0; flex: 1; }
+      .sug-toolbar input { width: 100%; }
+      .sug-toolbar .hint { color: var(--muted); font-size: 11px; }
+      .sug-rows { flex: 1; overflow-y: auto; min-height: 0; }
+      .sug-card { display: block; width: 100%; text-align: left; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+      .sug-card:hover { background: var(--panel2); }
+      .sug-card.active { background: var(--panel2); box-shadow: inset 3px 0 var(--accent); }
+      .sug-card-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+      .sug-card strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+      .sug-card small { color: var(--muted); display: block; margin-top: 3px; font-size: 11px; }
+      .sug-status { flex: none; padding: 1px 6px; border: 1px solid var(--line); border-radius: 10px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+      .sug-status.open { color: var(--warn); border-color: var(--warn); }
+      .sug-status.approved, .sug-status.applied { color: var(--ok); border-color: var(--ok); }
+      .sug-detail { padding: 16px 18px 28px; }
+      .sug-detail h2 { margin: 0 0 4px; font-size: 17px; }
+      .sug-detail h3 { margin: 18px 0 4px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+      .sug-byline { color: var(--muted); margin-bottom: 14px; font-size: 12px; overflow-wrap: anywhere; }
+      .sug-byline .link { border: 0; padding: 0; background: none; color: #d6538b; font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+      .sug-byline .link:hover { color: var(--text); }
+      .sug-reason { padding: 10px 12px; background: var(--panel); border-left: 3px solid var(--accent); white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+      .sug-diff { border: 1px solid var(--line); margin-top: 8px; }
+      .sug-diff-path { padding: 6px 9px; color: var(--muted); background: var(--panel2); font: 11px ui-monospace, monospace; overflow-wrap: anywhere; }
+      .sug-diff-values { display: grid; grid-template-columns: 1fr 1fr; }
+      .sug-before, .sug-after { min-width: 0; padding: 7px 9px; font: 12px/1.45 ui-monospace, monospace; white-space: pre-wrap; word-break: break-word; }
+      .sug-before { color: #e9919e; background: rgba(150, 35, 55, .08); }
+      .sug-after { color: #82dfb5; background: rgba(35, 150, 100, .08); border-left: 1px solid var(--line); }
+      .sug-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+      .sug-actions .approve { background: #176745; border-color: var(--ok); }
+      .sug-actions .approve:hover { filter: brightness(1.15); }
+      .sug-actions .dismiss { color: #ef8293; border-color: #e0556a; }
+      .sug-author-button { display: flex; width: 100%; align-items: center; gap: 9px; padding: 7px 8px; text-align: left; }
+      .sug-author-button small { display: block; margin-top: 1px; color: var(--muted); font-size: 11px; }
+      .sug-avatar { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 50%; background: #4c3044; color: #ffd9e8; font-weight: 700; font-size: 13px; }
+      .sug-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin: 10px 0; }
+      .sug-stat { min-width: 0; padding: 6px 7px; background: var(--panel2); }
+      .sug-stat b { display: block; font-size: 13px; }
+      .sug-stat small { display: block; color: var(--muted); font-size: 10px; }
+      .sug-inspector .hint { color: var(--muted); font-size: 11px; line-height: 1.5; margin: 8px 0; }
+      .sug-ignore { width: 100%; color: var(--muted); font-size: 12px; }
+      .sug-ignore:hover { color: var(--text); border-color: var(--muted); }
+      .sug-empty { padding: 28px 16px; color: var(--muted); text-align: center; font-size: 13px; }
+      .sug-shell button:focus-visible, .sug-shell input:focus-visible, .sug-shell select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+      .sug-card:focus-visible, .sug-author-button:focus-visible { outline-offset: -2px; }
+      @media (max-width: 980px) {
+        .sug-shell { grid-template-columns: 250px minmax(0, 1fr); }
+        .sug-inspector { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+        .sug-stats { grid-template-columns: repeat(3, 1fr); }
+        .sug-diff-values { grid-template-columns: 1fr; }
+        .sug-after { border-left: 0; border-top: 1px solid var(--line); }
+      }
+      @media (max-width: 680px) {
+        .sug-shell { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 0; }
+        .sug-list { border-right: 0; border-bottom: 1px solid var(--line); }
+        .sug-rows { max-height: 320px; }
+        .sug-detail { overflow-y: visible; }
+      }
     </style>
   </head>
   <body>
@@ -467,8 +532,10 @@
       <button type="button" data-tab="game">🎛 Game</button>
       <button type="button" data-tab="addmon">➕ Add a Mon</button>
       <button type="button" data-tab="tournaments">🏆 Tournaments</button>
+      <button type="button" data-tab="suggestions">💬 Suggestions <span id="suggestion-nav-count"></span></button>
     </nav>
     <main id="content"></main>
     <script src="./app.js"></script>
+    <script src="./suggestions.js"></script>
   </body>
 </html>

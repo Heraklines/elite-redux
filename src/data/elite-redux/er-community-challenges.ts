@@ -33,6 +33,7 @@ import type { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
+import suggestionAchievementCatalog from "./er-community-suggestion-achievements.json";
 
 /** Schema version for forward-compatible config migration. */
 export const COMMUNITY_CHALLENGE_SCHEMA_VERSION = 1;
@@ -513,8 +514,9 @@ export async function fetchCommunityFeed(query?: {
 // no-op / null offline, exactly like the feed fetch above.
 // ---------------------------------------------------------------------------
 
-/** Achievement ids whose live holder tally the client reports + reads (mirrors the worker allow-list). */
+/** Featured achievement ids whose live holder tally the client reads. */
 export const TRACKED_ACHV_IDS: readonly string[] = ["INFERNO"];
+const COMMUNITY_SUGGESTION_ACHV_IDS = suggestionAchievementCatalog.achievements.map(achievement => achievement.id);
 
 /** One holder row in a tally: the trainer name + their (earliest) unlock epoch ms. */
 export interface AchvTallyHolder {
@@ -547,7 +549,8 @@ export async function reportTrackedAchievements(achvUnlocks: Record<string, numb
   if (!base || !token || typeof fetch !== "function") {
     return;
   }
-  const unlocked = TRACKED_ACHV_IDS.filter(id => id in achvUnlocks).map(id => ({ id, at: achvUnlocks[id] }));
+  const reportable = new Set([...TRACKED_ACHV_IDS, ...COMMUNITY_SUGGESTION_ACHV_IDS]);
+  const unlocked = [...reportable].filter(id => id in achvUnlocks).map(id => ({ id, at: achvUnlocks[id] }));
   if (unlocked.length === 0) {
     return; // nothing tracked unlocked yet - don't bother the server.
   }

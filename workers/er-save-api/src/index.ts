@@ -31,6 +31,7 @@
 // for tens of thousands of daily-active players.
 // =============================================================================
 
+import communitySuggestionAchievements from "../../../src/data/elite-redux/er-community-suggestion-achievements.json";
 import { BiomeId } from "../../../src/enums/biome-id";
 import { Challenges } from "../../../src/enums/challenges";
 // ER customs live in dedicated high-range enums (moves >= 5000, species >= 10000), registered at
@@ -44,6 +45,7 @@ import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type"
 import { SpeciesId } from "../../../src/enums/species-id";
 import { TrainerType } from "../../../src/enums/trainer-type";
 import { TrainerVariant } from "../../../src/enums/trainer-variant";
+import { validateCommunitySuggestion } from "./community-suggestions";
 import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
   applyResultReport,
@@ -111,6 +113,8 @@ interface Env {
    * Set via `wrangler secret put`. Unset = the tournament-grant route is disabled (503).
    */
   SHOWDOWN_GRANT_SECRET?: string;
+  /** Staff editor API used to verify the existing shared editor password. */
+  EDITOR_API_URL?: string;
 }
 
 interface UserRow {
@@ -3469,6 +3473,35 @@ async function ensureCommunityTables(env: Env): Promise<void> {
      )`,
   ).run();
   await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ah_achv ON achievement_holders (achv_id)").run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS community_editor_suggestions (
+       id              TEXT    PRIMARY KEY,
+       user_id         INTEGER NOT NULL,
+       entity_type     TEXT    NOT NULL,
+       entity_key      TEXT    NOT NULL,
+       entity_label    TEXT    NOT NULL,
+       changes_json    TEXT    NOT NULL,
+       baseline_json   TEXT    NOT NULL,
+       reason          TEXT    NOT NULL DEFAULT '',
+       source_revision TEXT    NOT NULL DEFAULT '',
+       status          TEXT    NOT NULL DEFAULT 'open',
+       reviewer_note   TEXT    NOT NULL DEFAULT '',
+       reviewed_at     INTEGER,
+       applied_at      INTEGER,
+       created_at      INTEGER NOT NULL,
+       updated_at      INTEGER NOT NULL,
+       FOREIGN KEY (user_id) REFERENCES users(id)
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_ces_status ON community_editor_suggestions (status, created_at DESC)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_ces_entity ON community_editor_suggestions (entity_type, entity_key, status)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_ces_user ON community_editor_suggestions (user_id, created_at DESC)",
+  ).run();
   communityTablesReady = true;
 }
 
@@ -3479,6 +3512,10 @@ async function ensureCommunityTables(env: Env): Promise<void> {
 // more featured achievements can be added without touching the route logic.
 // ---------------------------------------------------------------------------
 const TRACKED_ACHV_IDS = new Set(["INFERNO"]);
+const COMMUNITY_SUGGESTION_ACHIEVEMENTS = new Map(
+  communitySuggestionAchievements.achievements.map(achievement => [achievement.id, achievement.points]),
+);
+const COMMUNITY_SUGGESTION_REQUIRED_POINTS = communitySuggestionAchievements.requiredPoints;
 
 // ---------------------------------------------------------------------------
 // Shared config validator. This is a VERBATIM copy of the client's
@@ -4393,7 +4430,8 @@ async function handleCommunityHistory(auth: TokenPayload, env: Env, cors: Record
  * POST /community/achv - the player REPORTS their tracked achievement unlocks (the
  * client sends these because system saves are encrypted and the worker can't read
  * achvUnlocks itself). Body: `{ unlocked: Array<{ id: string; at?: number }> }`.
- * Only ids in TRACKED_ACHV_IDS are stored (anything else is ignored - anti-abuse).
+ * Only featured tally ids or the generated Redux-only suggestion-eligibility ids
+ * are stored (anything else is ignored - anti-abuse).
  * The UPSERT keeps the EARLIEST unlock time per (user, achv). Always `{ ok: true }`.
  */
 async function handleCommunityAchvReport(
@@ -4418,12 +4456,12 @@ async function handleCommunityAchvReport(
   // Cap the number of processed entries to bound work per request. Build the
   // statement batch functionally (a bare `[]` would infer `never[]`), matching the
   // other batched community handlers - drop malformed / non-tracked ids (anti-abuse).
-  const stmts = unlocked.slice(0, 32).flatMap((entry: unknown) => {
+  const stmts = unlocked.slice(0, 256).flatMap((entry: unknown) => {
     if (!entry || typeof entry !== "object") {
       return [];
     }
     const id = (entry as { id?: unknown }).id;
-    if (typeof id !== "string" || !TRACKED_ACHV_IDS.has(id)) {
+    if (typeof id !== "string" || (!TRACKED_ACHV_IDS.has(id) && !COMMUNITY_SUGGESTION_ACHIEVEMENTS.has(id))) {
       return [];
     }
     const rawAt = Number((entry as { at?: unknown }).at);
@@ -4488,6 +4526,320 @@ async function handleCommunityAchvTally(url: URL, env: Env, cors: Record<string,
   const totalRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM system_saves").first<{ c: number }>();
   const totalTrainers = totalRow?.c ?? 0;
   return json({ tally, totalTrainers }, 200, cors);
+}
+
+interface CommunitySuggestionRow {
+  id: string;
+  user_id: number;
+  username?: string | null;
+  entity_type: string;
+  entity_key: string;
+  entity_label: string;
+  changes_json: string;
+  baseline_json: string;
+  reason: string;
+  source_revision: string;
+  status: string;
+  reviewer_note: string;
+  reviewed_at: number | null;
+  applied_at: number | null;
+  created_at: number;
+  updated_at: number;
+  leaderboard_stats?: string | null;
+  author_suggestions?: number;
+  author_applied?: number;
+}
+
+async function readCommunitySuggestionBody(request: Request): Promise<Record<string, unknown> | null> {
+  const textBody = await request.text();
+  if (textBody.length > 48_000) {
+    return null;
+  }
+  try {
+    const value = JSON.parse(textBody) as unknown;
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+async function communitySuggestionEligibility(auth: TokenPayload, env: Env) {
+  await ensureCommunityTables(env);
+  const { results } = await env.DB.prepare("SELECT achv_id FROM achievement_holders WHERE user_id = ?")
+    .bind(auth.uid)
+    .all<{ achv_id: string }>();
+  const unlocked = new Set((results ?? []).map(row => row.achv_id));
+  let points = 0;
+  let achievementCount = 0;
+  for (const [id, score] of COMMUNITY_SUGGESTION_ACHIEVEMENTS) {
+    if (unlocked.has(id)) {
+      points += score;
+      achievementCount++;
+    }
+  }
+  return {
+    eligible: points >= COMMUNITY_SUGGESTION_REQUIRED_POINTS,
+    points,
+    requiredPoints: COMMUNITY_SUGGESTION_REQUIRED_POINTS,
+    totalPoints: communitySuggestionAchievements.totalPoints,
+    achievementCount,
+    totalAchievements: COMMUNITY_SUGGESTION_ACHIEVEMENTS.size,
+  };
+}
+
+function suggestionJson(row: CommunitySuggestionRow, includeAuthor = false) {
+  let authorStats: Record<string, unknown> | null = null;
+  if (includeAuthor && row.leaderboard_stats) {
+    try {
+      authorStats = JSON.parse(row.leaderboard_stats) as Record<string, unknown>;
+    } catch {
+      authorStats = null;
+    }
+  }
+  return {
+    id: row.id,
+    ...(includeAuthor
+      ? {
+          author: row.username ?? "Trainer",
+          authorStats,
+          authorSuggestionCount: row.author_suggestions ?? 0,
+          authorAppliedCount: row.author_applied ?? 0,
+        }
+      : {}),
+    entityType: row.entity_type,
+    entityKey: row.entity_key,
+    entityLabel: row.entity_label,
+    changes: JSON.parse(row.changes_json),
+    baseline: JSON.parse(row.baseline_json),
+    reason: row.reason,
+    sourceRevision: row.source_revision,
+    status: row.status,
+    reviewerNote: row.reviewer_note,
+    reviewedAt: row.reviewed_at,
+    appliedAt: row.applied_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function handleCommunitySuggestionEligibility(
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  return json(await communitySuggestionEligibility(auth, env), 200, cors);
+}
+
+async function handleCommunitySuggestionCreate(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const eligibility = await communitySuggestionEligibility(auth, env);
+  if (!eligibility.eligible) {
+    return json({ error: "More Redux achievement points are required.", eligibility }, 403, cors);
+  }
+  const body = await readCommunitySuggestionBody(request);
+  if (body === null) {
+    return json({ error: "Suggestion is too large." }, 413, cors);
+  }
+  const validation = validateCommunitySuggestion(body);
+  if (!validation.ok || !validation.draft) {
+    return json({ error: "Invalid suggestion.", errors: validation.errors }, 422, cors);
+  }
+  const open = await env.DB.prepare(
+    "SELECT COUNT(*) AS count FROM community_editor_suggestions WHERE user_id = ? AND status IN ('open', 'approved')",
+  )
+    .bind(auth.uid)
+    .first<{ count: number }>();
+  if ((open?.count ?? 0) >= 12) {
+    return json({ error: "You already have 12 active suggestions. Resolve or withdraw one first." }, 429, cors);
+  }
+  const draft = validation.draft;
+  const now = Date.now();
+  const id = crypto.randomUUID();
+  await env.DB.prepare(
+    `INSERT INTO community_editor_suggestions
+       (id, user_id, entity_type, entity_key, entity_label, changes_json, baseline_json, reason,
+        source_revision, status, created_at, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 'open', ?10, ?10)`,
+  )
+    .bind(
+      id,
+      auth.uid,
+      draft.entityType,
+      draft.entityKey,
+      draft.entityLabel,
+      JSON.stringify(draft.changes),
+      JSON.stringify(draft.baseline),
+      draft.reason,
+      draft.sourceRevision,
+      now,
+    )
+    .run();
+  return json({ ok: true, id, status: "open" }, 201, cors);
+}
+
+async function handleCommunitySuggestionMine(
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const { results } = await env.DB.prepare(
+    `SELECT * FROM community_editor_suggestions
+      WHERE user_id = ?
+      ORDER BY created_at DESC
+      LIMIT 100`,
+  )
+    .bind(auth.uid)
+    .all<CommunitySuggestionRow>();
+  return json({ items: (results ?? []).map(row => suggestionJson(row)) }, 200, cors);
+}
+
+async function handleCommunitySuggestionWithdraw(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const body = await readCommunitySuggestionBody(request);
+  const id = typeof body?.id === "string" ? body.id : "";
+  if (!id) {
+    return json({ error: "Suggestion id is required." }, 400, cors);
+  }
+  const result = await env.DB.prepare(
+    `UPDATE community_editor_suggestions
+        SET status = 'withdrawn', updated_at = ?1
+      WHERE id = ?2 AND user_id = ?3 AND status = 'open'`,
+  )
+    .bind(Date.now(), id, auth.uid)
+    .run();
+  return result.meta.changes > 0
+    ? json({ ok: true }, 200, cors)
+    : json({ error: "Open suggestion not found." }, 404, cors);
+}
+
+async function handleCommunitySuggestionCounts(env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const { results } = await env.DB.prepare(
+    `SELECT entity_type, entity_key, COUNT(*) AS count
+       FROM community_editor_suggestions
+      WHERE status = 'open'
+      GROUP BY entity_type, entity_key
+      ORDER BY count DESC
+      LIMIT 500`,
+  ).all<{ entity_type: string; entity_key: string; count: number }>();
+  return json(
+    {
+      items: (results ?? []).map(row => ({
+        entityType: row.entity_type,
+        entityKey: row.entity_key,
+        count: row.count,
+      })),
+    },
+    200,
+    cors,
+  );
+}
+
+async function verifyEditorPassword(password: string, env: Env): Promise<boolean> {
+  if (!password) {
+    return false;
+  }
+  const base = (env.EDITOR_API_URL ?? "https://er-editor-api.heraklines.workers.dev").replace(/\/$/, "");
+  try {
+    const response = await fetch(`${base}/auth-check`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+async function handleCommunitySuggestionStaffList(
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const body = await readCommunitySuggestionBody(request);
+  const password = typeof body?.password === "string" ? body.password.trim() : "";
+  if (!(await verifyEditorPassword(password, env))) {
+    return json({ error: "Invalid editor password." }, 401, cors);
+  }
+  await ensureCommunityTables(env);
+  const allowedStatuses = new Set(["open", "approved", "dismissed", "applied", "withdrawn", "all"]);
+  const status = typeof body?.status === "string" && allowedStatuses.has(body.status) ? body.status : "open";
+  const entityType = typeof body?.entityType === "string" ? body.entityType : "";
+  const clauses: string[] = [];
+  const binds: unknown[] = [];
+  if (status !== "all") {
+    clauses.push("s.status = ?");
+    binds.push(status);
+  }
+  if (entityType) {
+    clauses.push("s.entity_type = ?");
+    binds.push(entityType);
+  }
+  const where = clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+  const { results } = await env.DB.prepare(
+    `SELECT s.*, u.username, ss.leaderboard_stats,
+            (SELECT COUNT(*) FROM community_editor_suggestions sx WHERE sx.user_id = s.user_id) AS author_suggestions,
+            (SELECT COUNT(*) FROM community_editor_suggestions sa WHERE sa.user_id = s.user_id AND sa.status = 'applied') AS author_applied
+       FROM community_editor_suggestions s
+       JOIN users u ON u.id = s.user_id
+       LEFT JOIN system_saves ss ON ss.user_id = s.user_id
+       ${where}
+      ORDER BY CASE s.status WHEN 'open' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, s.created_at DESC
+      LIMIT 250`,
+  )
+    .bind(...binds)
+    .all<CommunitySuggestionRow>();
+  return json({ items: (results ?? []).map(row => suggestionJson(row, true)) }, 200, cors);
+}
+
+async function handleCommunitySuggestionStaffReview(
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const body = await readCommunitySuggestionBody(request);
+  const password = typeof body?.password === "string" ? body.password.trim() : "";
+  if (!(await verifyEditorPassword(password, env))) {
+    return json({ error: "Invalid editor password." }, 401, cors);
+  }
+  const id = typeof body?.id === "string" ? body.id : "";
+  const action = typeof body?.action === "string" ? body.action : "";
+  const note = typeof body?.note === "string" ? body.note.trim().slice(0, 1200) : "";
+  if (!id || !["approve", "dismiss", "applied"].includes(action)) {
+    return json({ error: "A valid id and action are required." }, 400, cors);
+  }
+  await ensureCommunityTables(env);
+  const now = Date.now();
+  const nextStatus = action === "approve" ? "approved" : action === "dismiss" ? "dismissed" : "applied";
+  const allowedState =
+    action === "applied"
+      ? "status = 'approved'"
+      : action === "approve"
+        ? "status = 'open'"
+        : "status IN ('open', 'approved')";
+  const result = await env.DB.prepare(
+    `UPDATE community_editor_suggestions
+        SET status = ?1, reviewer_note = ?2, reviewed_at = ?3,
+            applied_at = CASE WHEN ?1 = 'applied' THEN ?3 ELSE applied_at END,
+            updated_at = ?3
+      WHERE id = ?4 AND ${allowedState}`,
+  )
+    .bind(nextStatus, note, now, id)
+    .run();
+  return result.meta.changes > 0
+    ? json({ ok: true, id, status: nextStatus }, 200, cors)
+    : json({ error: "Suggestion is no longer in a reviewable state." }, 409, cors);
 }
 
 // #endregion
@@ -5343,6 +5695,17 @@ export default {
       if (pathname === "/community/achv-tally" && method === "GET") {
         return await handleCommunityAchvTally(url, env, cors);
       }
+      // Public aggregate markers never expose authors or proposal contents.
+      if (pathname === "/community/editor-suggestions/counts" && method === "GET") {
+        return await handleCommunitySuggestionCounts(env, cors);
+      }
+      // Staff routes use the existing editor password, verified by er-editor-api.
+      if (pathname === "/community/editor-suggestions/staff/list" && method === "POST") {
+        return await handleCommunitySuggestionStaffList(request, env, cors);
+      }
+      if (pathname === "/community/editor-suggestions/staff/review" && method === "POST") {
+        return await handleCommunitySuggestionStaffReview(request, env, cors);
+      }
       // Logout is harmless without a valid token (tokens are stateless); the
       // client clears its cookie regardless.
       if (pathname === "/account/logout" && method === "GET") {
@@ -5469,10 +5832,23 @@ export default {
       if (pathname === "/community/history" && method === "GET") {
         return await handleCommunityHistory(auth, env, cors);
       }
-      // Player reports their tracked achievement unlocks (system saves are encrypted,
-      // so the worker can't read achvUnlocks itself). Only TRACKED_ACHV_IDS are stored.
+      // Player reports allowlisted achievement unlocks (system saves are encrypted,
+      // so the worker can't read achvUnlocks itself). Used by featured tallies and
+      // Redux-only community-editor eligibility.
       if (pathname === "/community/achv" && method === "POST") {
         return await handleCommunityAchvReport(request, auth, env, cors);
+      }
+      if (pathname === "/community/editor-suggestions/eligibility" && method === "GET") {
+        return await handleCommunitySuggestionEligibility(auth, env, cors);
+      }
+      if (pathname === "/community/editor-suggestions" && method === "POST") {
+        return await handleCommunitySuggestionCreate(request, auth, env, cors);
+      }
+      if (pathname === "/community/editor-suggestions/mine" && method === "GET") {
+        return await handleCommunitySuggestionMine(auth, env, cors);
+      }
+      if (pathname === "/community/editor-suggestions/withdraw" && method === "POST") {
+        return await handleCommunitySuggestionWithdraw(request, auth, env, cors);
       }
       // Showdown 1v1 escrow (D1). All authed; the pure state machine is in ./showdown-escrow.ts.
       if (pathname === "/showdown/match" && method === "POST") {

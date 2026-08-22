@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PokéRogue Redux Community Editor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #111019;
+        --panel: #1b1a26;
+        --panel2: #232131;
+        --panel3: #2a2739;
+        --line: #3a374b;
+        --text: #f3f0f7;
+        --muted: #a7a1b5;
+        --accent: #bd2865;
+        --accent2: #eaafca;
+        --ok: #55d69f;
+        --warn: #f2bd64;
+        --danger: #ef6e7d;
+      }
+      * { box-sizing: border-box; }
+      ::selection { background: rgba(189, 40, 101, .5); }
+      :focus-visible { outline: 2px solid var(--accent2); outline-offset: 1px; }
+      body { margin: 0; min-width: 320px; background: var(--bg); color: var(--text); font: 14px/1.45 Inter, system-ui, sans-serif; }
+      button, input, select, textarea { font: inherit; }
+      button { color: inherit; }
+      .shell { min-height: 100vh; display: grid; grid-template-rows: auto auto 1fr; }
+      header { min-height: 60px; display: flex; align-items: center; gap: 16px; padding: 9px 20px; border-bottom: 1px solid var(--line); background: #171620; }
+      .brand { display: flex; align-items: center; gap: 11px; min-width: 250px; }
+      .mark { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border: 1px solid #e14983; background: var(--accent); font-weight: 800; font-size: 17px; }
+      .brand strong { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .brand small { color: var(--muted); }
+      .global-search { position: relative; flex: 1; max-width: 620px; }
+      .global-search input { width: 100%; height: 38px; padding: 0 13px 0 36px; background: var(--panel); border: 1px solid var(--line); color: var(--text); }
+      .global-search span { position: absolute; left: 12px; top: 9px; color: var(--muted); }
+      .account { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+      .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #483348; color: #ffd9e8; font-weight: 700; }
+      .account button, .btn { border: 1px solid var(--line); background: var(--panel2); padding: 8px 12px; cursor: pointer; font-weight: 600; transition: border-color .12s, color .12s; }
+      .account button:hover, .btn:hover { border-color: var(--accent2); color: #ffffff; }
+      .eligibility { display: flex; align-items: center; gap: 14px; min-height: 46px; padding: 6px 20px; border-bottom: 1px solid var(--line); background: #15141d; }
+      .eligibility strong { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--ok); }
+      .progress { width: min(340px, 30vw); height: 7px; background: #302d3d; overflow: hidden; }
+      .progress i { display: block; height: 100%; width: 0; background: var(--ok); transition: width .2s; }
+      .eligibility span { color: var(--muted); font-size: 12px; }
+      .layout { min-height: 0; display: grid; grid-template-columns: 238px minmax(440px, 1fr) 350px; }
+      aside, main { min-height: 0; }
+      .rail { border-right: 1px solid var(--line); padding: 16px 10px; background: #171620; }
+      .rail h2, .review h2 { margin: 0 10px 10px; color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+      .rail button { position: relative; display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; border: 0; border-left: 3px solid transparent; background: transparent; color: var(--muted); padding: 10px 12px; cursor: pointer; text-align: left; font-weight: 500; transition: background .12s, color .12s, border-color .12s; }
+      .rail button:hover { color: var(--text); background: var(--panel); }
+      .rail button.active { color: var(--text); background: var(--panel2); border-left-color: var(--accent); font-weight: 600; }
+      .count { min-width: 21px; height: 19px; padding: 1px 6px; display: grid; place-items: center; background: #3b2637; color: #f2b5d0; border: 1px solid #70405b; font-size: 11px; }
+      .rail-note { margin: 24px 10px 0; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+      main { padding: 20px 22px 40px; overflow-y: auto; }
+      .entity-head { display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center; margin-bottom: 16px; }
+      .sprite { width: 76px; height: 76px; object-fit: contain; image-rendering: pixelated; background: #0e0d14; border: 1px solid var(--line); }
+      .entity-head h1 { margin: 0 0 3px; font-size: 22px; line-height: 1.15; letter-spacing: -.01em; }
+      .entity-head p { margin: 0; color: var(--muted); font-size: 12.5px; }
+      .entity-head > div { min-width: 0; }
+      .marker { align-self: start; display: flex; gap: 7px; align-items: center; color: var(--accent2); border: 1px solid #72405a; padding: 6px 9px; background: #2b1e2a; font-size: 12px; }
+      .section { margin-top: 10px; padding-bottom: 12px; border-top: 1px solid var(--line); }
+      .section-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 0 8px; }
+      .section-title h3 { margin: 0; font-size: 14px; }
+      .section-title span { color: var(--muted); font-size: 11px; }
+      .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+      .field { min-width: 0; padding: 10px 11px; border: 1px solid var(--line); background: var(--panel); transition: border-color .12s, background .12s; }
+      .field.changed { border-color: var(--accent); background: #261b27; }
+      label { display: block; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 5px; }
+      input, select, textarea { width: 100%; min-height: 34px; color: var(--text); background: #13121b; border: 1px solid var(--line); padding: 7px 9px; caret-color: var(--accent2); transition: border-color .12s; }
+      textarea { min-height: 0; }
+      input:hover, select:hover, textarea:hover { border-color: #4d4a63; }
+      input:focus, select:focus, textarea:focus { border-color: var(--accent2); }
+      .ability-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+      .ability { min-width: 0; padding: 9px; border: 1px solid var(--line); background: var(--panel); transition: border-color .12s; }
+      .ability.innate { border-top-color: #5c8fc8; }
+      .ability.changed { border-color: var(--accent); }
+      .ability small { display: block; height: 33px; overflow: hidden; margin-top: 6px; color: var(--muted); font-size: 10px; line-height: 11px; }
+      .move-entry { display: flex; gap: 8px; }
+      .move-entry textarea { min-height: 78px; resize: vertical; }
+      .hint { margin-top: 5px; color: var(--muted); font-size: 11px; }
+      .review { border-left: 1px solid var(--line); background: #171620; padding: 16px; overflow-y: auto; }
+      .review h2 { margin-left: 0; }
+      .empty-diff { padding: 20px 14px; border: 1px dashed var(--line); color: var(--muted); text-align: center; font-size: 12px; }
+      .diff-list { display: grid; gap: 8px; }
+      .diff { padding: 8px 10px; border-left: 2px solid var(--accent); background: var(--panel); }
+      .diff b { display: block; font-size: 11.5px; word-break: break-all; }
+      .diff-values { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin-top: 6px; border: 1px solid var(--line); background: var(--line); font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
+      .diff-values span { min-width: 0; padding: 5px 7px; background: #14131c; white-space: pre-wrap; word-break: break-word; }
+      .diff-values .from { color: #e9929f; }
+      .diff-values .to { color: #7dd8ab; }
+      .mine-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+      .reason { margin-top: 16px; }
+      .reason textarea { min-height: 82px; resize: vertical; }
+      .submit { width: 100%; margin-top: 12px; border: 1px solid #df4c84; background: var(--accent); color: white; padding: 12px 14px; font-weight: 700; letter-spacing: .02em; cursor: pointer; transition: background .12s; }
+      .submit:hover:not(:disabled) { background: #ce3175; }
+      .submit:disabled { opacity: .45; cursor: not-allowed; }
+      .status { min-height: 22px; margin-top: 9px; color: var(--muted); font-size: 12px; }
+      .status.ok { color: var(--ok); }
+      .status.error { color: var(--danger); }
+      dialog { width: min(430px, calc(100vw - 30px)); max-height: calc(100vh - 40px); overflow-y: auto; border: 1px solid var(--line); background: var(--panel); color: var(--text); padding: 0; }
+      dialog::backdrop { background: rgba(0, 0, 0, .72); }
+      .modal { padding: 22px; }
+      .modal h2 { margin: 0 0 5px; }
+      .modal p { color: var(--muted); margin: 0 0 18px; }
+      .modal .field { margin-top: 9px; padding: 0; border: 0; }
+      .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+      .modal .primary { background: var(--accent); border-color: #df4c84; }
+      @media (max-width: 1050px) {
+        .layout { grid-template-columns: 210px minmax(0, 1fr); }
+        .review { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+      }
+      @media (max-width: 720px) {
+        header { padding: 9px 12px; flex-wrap: wrap; }
+        .brand { min-width: 0; flex: 1; }
+        .global-search { order: 3; flex-basis: 100%; max-width: none; }
+        .account span { display: none; }
+        .eligibility { padding: 7px 12px; gap: 8px; }
+        .eligibility span { display: none; }
+        .progress { flex: 1; width: auto; }
+        .layout { display: block; }
+        .rail { display: flex; gap: 5px; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); padding: 8px; }
+        .rail h2, .rail-note { display: none; }
+        .rail button { width: auto; white-space: nowrap; border-left: 0; border-bottom: 2px solid transparent; }
+        .rail button.active { border-bottom-color: var(--accent); }
+        main { padding: 16px 12px 28px; }
+        .entity-head { grid-template-columns: auto 1fr; }
+        .marker { grid-column: 1 / -1; }
+        .ability-grid { grid-template-columns: 1fr; }
+        .review { padding: 14px 12px; }
+      }
+      @media (max-width: 560px) {
+        .field-grid { grid-template-columns: 1fr; }
+        .diff-values { grid-template-columns: 1fr; }
+        .sprite { width: 56px; height: 56px; }
+        .entity-head h1 { font-size: 19px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div class="brand"><div class="mark">ER</div><div><strong>Community Balance Lab</strong><small>PokéRogue Redux</small></div></div>
+        <div class="global-search" role="search"><span aria-hidden="true">⌕</span><input id="search" aria-label="Search entities" placeholder="Search Pokémon, items, trainers, or rules" autocomplete="off" /></div>
+        <div class="account"><div class="avatar" id="avatar" aria-hidden="true">?</div><span id="username">Guest</span><button type="button" id="login-button">Log in</button></div>
+      </header>
+      <div class="eligibility"><strong id="eligibility-label">Log in to check access</strong><div class="progress"><i id="eligibility-bar"></i></div><span id="eligibility-copy">Redux-only achievements determine suggestion access.</span></div>
+      <div class="layout">
+        <aside class="rail" aria-label="Suggestion sections">
+          <h2>Suggest changes</h2>
+          <button type="button" class="active" data-tab="pokemon" aria-pressed="true">Pokémon <span class="count" id="pokemon-count">0</span></button>
+          <button type="button" data-tab="items" aria-pressed="false">Items <span class="count" id="item-count">0</span></button>
+          <button type="button" data-tab="trainers" aria-pressed="false">Trainers <span class="count" id="trainer-count">0</span></button>
+          <button type="button" data-tab="game" aria-pressed="false">Game rules <span class="count" id="game-count">0</span></button>
+          <button type="button" data-tab="mine" aria-pressed="false">My suggestions</button>
+          <p class="rail-note">Proposals are reviewed by staff. Approval stages a change; it does not publish immediately.</p>
+        </aside>
+        <main>
+          <div class="entity-head">
+            <img class="sprite" id="sprite" alt="Selected Pokémon" />
+            <div><h1 id="entity-name">Loading editor…</h1><p id="entity-meta"></p></div>
+            <div class="marker" id="entity-marker" hidden><span aria-hidden="true">●</span><span id="entity-marker-copy"></span></div>
+          </div>
+          <div id="editor"></div>
+        </main>
+        <aside class="review">
+          <h2>Proposed diff</h2>
+          <div id="diff" class="empty-diff" aria-live="polite">Change a value to build a proposal.</div>
+          <div class="reason"><label for="reason">Reasoning (optional)</label><textarea id="reason" maxlength="1200" placeholder="What problem does this solve? Include matchups, run context, or evidence if useful."></textarea><div class="hint"><span id="reason-count">0</span>/1200</div></div>
+          <button type="button" class="submit" id="submit" disabled>Submit suggestion</button>
+          <div class="status" id="status" role="status"></div>
+        </aside>
+      </div>
+    </div>
+    <dialog id="login-dialog">
+      <form class="modal" id="login-form" method="dialog">
+        <h2>Log in with your game account</h2>
+        <p>Your password is sent only to the existing PokéRogue Redux account service.</p>
+        <div class="field"><label for="login-user">Username</label><input id="login-user" autocomplete="username" required /></div>
+        <div class="field"><label for="login-pass">Password</label><input id="login-pass" type="password" autocomplete="current-password" required /></div>
+        <div class="status" id="login-status"></div>
+        <div class="modal-actions"><button class="btn" id="login-cancel" type="button">Cancel</button><button class="btn primary" id="login-submit" type="submit">Log in</button></div>
+      </form>
+    </dialog>
+    <script src="app.js"></script>
+  </body>
+</html>

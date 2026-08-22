@@ -51,6 +51,7 @@ import type {
 } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopLaunchSnapshotAbortReason, CoopResumeCommitment } from "#data/elite-redux/coop/coop-transport";
 import { getErAchievementRunState, restoreErAchievementRunState } from "#data/elite-redux/er-achievement-run-state";
+import { reportTrackedAchievements } from "#data/elite-redux/er-community-challenges";
 import {
   getCommunityAllowedSpecies,
   getCommunityRunState,
@@ -969,6 +970,9 @@ export class GameData {
       return true;
     }
     this.markCloudSyncSuccess();
+    // Keep server-side Redux achievement provenance current for community-editor
+    // eligibility. Fire-and-forget so this never delays or fails a save.
+    void reportTrackedAchievements(this.achvUnlocks);
     return true;
   }
 
