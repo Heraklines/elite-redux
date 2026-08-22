@@ -2,6 +2,7 @@
 //! resolver's battle-local state.
 
 use er_state::battle::BattleState;
+use er_state::battle_v2::DefeatedEnemyRecord;
 use er_state::game_v2::GameStateV2;
 use er_state::pokemon::PokemonState;
 use er_state::pokemon_v2::PokemonStateV2;
@@ -116,6 +117,23 @@ pub fn merge_battle_v1_into_v2(
         .ok_or(BattleAdapterV2Error::MissingBattle)?;
     for (target, source) in after_battle.enemy_party.iter_mut().zip(&battle.enemy_party) {
         merge_pokemon(target, source)?;
+    }
+    for enemy in &after_battle.enemy_party {
+        if enemy.fainted
+            && !after_battle
+                .participation
+                .defeated_enemies
+                .iter()
+                .any(|record| record.pokemon == enemy.id)
+        {
+            after_battle
+                .participation
+                .defeated_enemies
+                .push(DefeatedEnemyRecord {
+                    pokemon: enemy.id,
+                    owner_seat: None,
+                });
+        }
     }
     after_battle.turn = battle.turn;
     after_battle.field = battle.field.clone();

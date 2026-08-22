@@ -687,13 +687,21 @@ impl GameKernel {
             return Ok(Vec::new());
         }
         if self.battle.is_some() {
-            let (effects, resolved, resources) = {
+            let embedded = self.run.is_some();
+            let mut embedded_terminal = None;
+            let (mut effects, resolved, resources) = {
                 let battle = self.battle.as_mut().expect("battle checked above");
-                let effects = battle
-                    .step(&mut self.scheduler, &mut self.terminal, input)
-                    .map_err(|error| KernelError::Battle {
-                        reason: error.to_string(),
-                    })?;
+                let terminal = if embedded {
+                    &mut embedded_terminal
+                } else {
+                    &mut self.terminal
+                };
+                let effects =
+                    battle
+                        .step(&mut self.scheduler, terminal, input)
+                        .map_err(|error| KernelError::Battle {
+                            reason: error.to_string(),
+                        })?;
                 (
                     effects,
                     battle.game_state().clone(),
@@ -702,9 +710,12 @@ impl GameKernel {
             };
             if let Some(run) = self.run.as_mut() {
                 run.sync_battle_mechanics(&resolved)
+                    .and_then(|()| run.settle_terminal_battle())
                     .map_err(|error| KernelError::Battle {
                         reason: error.to_string(),
                     })?;
+                effects
+                    .retain(|effect| !matches!(effect, KernelEffect::EnterSharedTerminal { .. }));
             }
             self.live_resources = resources;
             return Ok(effects);

@@ -85,6 +85,28 @@ impl RunRuntime {
         Ok(())
     }
 
+    pub fn settle_terminal_battle(&mut self) -> Result<(), RunRuntimeError> {
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(RunRuntimeError::InvalidAfterState)?;
+        if battle.outcome == er_types::battle_model::BattleOutcome::Ongoing
+            || battle.settlement.settled
+        {
+            return Ok(());
+        }
+        let prepared = er_run::settlement::prepare_battle_settlement(
+            &self.state,
+            &er_run::settlement::BattleSettlementInput {
+                source_battle_id: battle.battle_id,
+                wave: battle.wave,
+            },
+        )
+        .map_err(|error| RunRuntimeError::Preparation(error.to_string()))?;
+        self.state = prepared.after_state;
+        Ok(())
+    }
     pub fn prepare_action_material(
         &self,
         action: &er_types::run_model::RunSurfaceAction,

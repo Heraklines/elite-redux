@@ -518,6 +518,21 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
         er_types::battle_model::BattleOutcome::Victory,
         "raw wave-11 battle did not reach victory"
     );
+    let run_after = kernel
+        .run_state()
+        .ok_or("run state missing after victory settlement")?;
+    assert_eq!(
+        run_after.run.stage,
+        er_types::run_model::RunStage::AwaitingWaveAdvance
+    );
+    assert!(
+        run_after
+            .battle
+            .as_ref()
+            .ok_or("settled battle missing")?
+            .settlement
+            .settled
+    );
     assert!(
         kernel
             .dispose("Crossroads route campaign complete")
