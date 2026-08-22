@@ -10,7 +10,9 @@ use std::error::Error;
 
 use er_game::run_runtime::RunRuntime;
 use er_state::digest_v2::MechanicalStateDigestV2;
-use er_testkit::m4_fixture::{assemble_game_state, selected_m4_game_content_bundle};
+use er_testkit::m4_fixture::{
+    assemble_game_state, assemble_selected_game_state, selected_m4_game_content_bundle,
+};
 use er_types::SafeU53;
 use er_types::battle_ids::ContentPackHash;
 use er_types::run_ids::RunContentPackHash;
@@ -70,6 +72,20 @@ fn progression_fixture_produces_validated_v2_state() -> Result<(), Box<dyn Error
     assert_eq!(state.run.stage, er_types::run_model::RunStage::Complete);
     assert_eq!(state.run.outcome, er_types::run_model::RunOutcome::Victory);
 
+    Ok(())
+}
+
+#[test]
+fn runtime_rejects_state_bound_to_legacy_oracle_content_hash() -> Result<(), Box<dyn Error>> {
+    let fixture = load_fixture_value(PROGRESSION_FIXTURE)?;
+    let (mut state, content) = assemble_selected_game_state(&fixture, M4_ORACLE_SHA)?;
+    state.battle_content_hash = ContentPackHash::new(
+        "blake3-v1:cd0738f7c0d09be0fb0cec5fbcdbf060810d9cc502dcfec671325ddc08a75112",
+    )?;
+    assert!(matches!(
+        RunRuntime::new(state, content),
+        Err(er_game::run_runtime::RunRuntimeError::ContentIdentity)
+    ));
     Ok(())
 }
 
