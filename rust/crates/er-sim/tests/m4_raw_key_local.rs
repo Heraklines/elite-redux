@@ -466,30 +466,57 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
         .and_then(|battle| battle.enemy_party.first())
         .ok_or("wave-11 enemy missing")?
         .hp;
-    for _ in 0..2 {
-        for event in [
-            RawInputEvent::KeyDown {
-                code: PhysicalKey::Enter,
-                printable: false,
-                browser_repeat: false,
-                focus: InputFocus::Game,
-            },
-            RawInputEvent::KeyUp {
-                code: PhysicalKey::Enter,
-            },
-        ] {
-            let _ = kernel.step(KernelInput::RawInput { seat: owner, event })?;
+    for _turn in 0..8 {
+        let ongoing = kernel
+            .run_state()
+            .and_then(|state| state.battle.as_ref())
+            .is_some_and(|battle| battle.outcome == er_types::battle_model::BattleOutcome::Ongoing);
+        if !ongoing {
+            break;
+        }
+        let mut effects = Vec::new();
+        for _ in 0..2 {
+            for event in [
+                RawInputEvent::KeyDown {
+                    code: PhysicalKey::Enter,
+                    printable: false,
+                    browser_repeat: false,
+                    focus: InputFocus::Game,
+                },
+                RawInputEvent::KeyUp {
+                    code: PhysicalKey::Enter,
+                },
+            ] {
+                effects.extend(kernel.step(KernelInput::RawInput { seat: owner, event })?);
+            }
+        }
+        let presentations = effects
+            .iter()
+            .filter_map(|effect| match effect {
+                er_types::KernelEffect::PresentBattle { event, .. } => Some(event.clone()),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        for event in presentations {
+            let _ = kernel.step(KernelInput::BattlePresentationOutcome {
+                endpoint: owner,
+                event_id: event.event_id,
+                outcome: er_types::battle_ui::PresentationSettlementOutcome::Settled,
+            })?;
         }
     }
-    let enemy_hp_after = kernel
+    let battle_after = kernel
         .run_state()
         .and_then(|state| state.battle.as_ref())
-        .and_then(|battle| battle.enemy_party.first())
-        .ok_or("wave-11 enemy missing after turn")?
-        .hp;
+        .ok_or("wave-11 battle missing after raw turns")?;
     assert!(
-        enemy_hp_after < enemy_hp_before,
+        battle_after.enemy_party[0].hp < enemy_hp_before,
         "raw battle input did not resolve through V2 mechanics"
+    );
+    assert_eq!(
+        battle_after.outcome,
+        er_types::battle_model::BattleOutcome::Victory,
+        "raw wave-11 battle did not reach victory"
     );
     assert!(
         kernel
