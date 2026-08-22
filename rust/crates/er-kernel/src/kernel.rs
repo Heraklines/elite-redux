@@ -1005,6 +1005,9 @@ impl GameKernel {
         self.protocol = None;
         self.pending_presentations.clear();
         self.completed_presentations.clear();
+        self.pending_run_actions.clear();
+        self.run_menu = None;
+        self.run = None;
         self.disposed = true;
         self.live_resources = LiveResourceSnapshot::default();
         effects

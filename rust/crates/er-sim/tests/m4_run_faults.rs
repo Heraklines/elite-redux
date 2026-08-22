@@ -129,6 +129,9 @@ fn delayed_out_of_order_duplicate_material_catches_up_after_reconnect() -> Resul
     assert!(pair.queued_packets().is_empty());
     let (host, guest) = pair.frontiers()?;
     assert_eq!(host, guest);
+    let (host_resources, guest_resources) = pair.teardown("fault campaign complete");
+    assert_eq!(host_resources, er_types::LiveResourceSnapshot::default());
+    assert_eq!(guest_resources, er_types::LiveResourceSnapshot::default());
     Ok(())
 }
 
@@ -148,5 +151,8 @@ fn dropped_copy_and_conflicting_operation_fail_closed() -> Result<(), Box<dyn Er
         pair.commit_authority(conflict, SafeU53::ZERO),
         Err(M4PairError::OperationConflict)
     ));
+    let (host_resources, guest_resources) = pair.teardown("conflict campaign complete");
+    assert_eq!(host_resources, er_types::LiveResourceSnapshot::default());
+    assert_eq!(guest_resources, er_types::LiveResourceSnapshot::default());
     Ok(())
 }

@@ -252,6 +252,22 @@ impl M4RunPair {
         Ok((host, guest))
     }
 
+    /// Disposes both endpoints and every pair-owned transport record.
+    pub fn teardown(
+        &mut self,
+        reason: &str,
+    ) -> (
+        er_types::LiveResourceSnapshot,
+        er_types::LiveResourceSnapshot,
+    ) {
+        self.queue.clear();
+        self.host_applied.clear();
+        self.guest_applied.clear();
+        self.host.dispose(reason);
+        self.guest.dispose(reason);
+        (self.host.live_resources(), self.guest.live_resources())
+    }
+
     fn enqueue(
         &mut self,
         operation_id: OperationId,
