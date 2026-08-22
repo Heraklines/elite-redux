@@ -1,4 +1,5 @@
 //! Deterministic run-state content, validation, and pure M4 mechanics.
+//! Focused CI exercises this crate before integration checkpoint qualification.
 
 pub mod biome;
 pub mod capability;
