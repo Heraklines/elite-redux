@@ -144,6 +144,7 @@ pub enum ControlMenuPlan {
 #[derive(Clone, Debug)]
 pub struct GameKernel {
     battle: Option<Box<BattleMode>>,
+    run: Option<er_game::run_runtime::RunRuntime>,
     input_router: InputRouter,
     ui_reducer: UiReducer,
     scheduler: KernelScheduler,
@@ -352,6 +353,52 @@ impl GameKernel {
         kernel.live_resources = battle.live_resources(&kernel.scheduler);
         kernel.battle = Some(Box::new(battle));
         Ok(kernel)
+    }
+
+    /// Construct the production M4 run kernel from validated initial state.
+    /// No fixture-authored plans are installed on this path; every causal
+    /// decision flows through [`AuthorityRunMaterial`] application.
+    pub fn new_run(
+        state: er_state::game_v2::GameStateV2,
+        battle_content_hash: er_types::battle_ids::ContentPackHash,
+        run_content_hash: er_types::run_ids::RunContentPackHash,
+        m4_oracle_sha: impl Into<String>,
+    ) -> Result<Self, String> {
+        let runtime = er_game::run_runtime::RunRuntime::new(
+            state,
+            battle_content_hash,
+            run_content_hash.clone(),
+            m4_oracle_sha,
+        )
+        .map_err(|error| error.to_string())?;
+        let mut kernel = Self::new(KernelConfig::default());
+        kernel.run = Some(runtime);
+        Ok(kernel)
+    }
+
+    /// Applies one canonical run-material payload through the single shared
+    /// production applier. Canonical bytes in, atomic state swap out; both
+    /// authority and replica use exactly this entry point.
+    pub fn apply_run_material_bytes(
+        &mut self,
+        bytes: &[u8],
+    ) -> Result<(), KernelError> {
+        if self.disposed {
+            return Err(KernelError::Disposed);
+        }
+        let runtime = self
+            .run
+            .as_mut()
+            .ok_or_else(|| KernelError::Canonical {
+                reason: "run mode is not active".to_owned(),
+            })?;
+        let material = er_run::decode_run_material(bytes)
+            .map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })?;
+        runtime.apply(&material).map_err(|error| KernelError::Canonical {
+            reason: error.to_string(),
+        })
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
