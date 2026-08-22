@@ -1,0 +1,257 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+build:    github:71814efeed95a1f4d51cf571e06f3c6aeea29a66:run-32321987254.1
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Iron Safari/537.36
+platform: Win32
+screen:   2560x1440 @1x  devmem:8 GB
+boot:     boot-start@0ms -> loading-complete@7289ms -> title-shown@10987ms
+lastSess: ok (reached title)
+mode:     0  wave:96  difficulty:youngster
+seed:     oqlCunXkRiJO1YLeWElUtNJl
+party:    Zacian(L198 704/704), Mew(L209 785/785)
+
+----- DESCRIPTION -----
+There seems to be a problem with Ability Primal mew that prevents me from completing Wave as the game stops after defeating Pokemon
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:71814efeed95a1f4d51cf571e06f3c6aeea29a66:run-32321987254.1","source":"github","sha":"71814efeed95a1f4d51cf571e06f3c6aeea29a66","workflow":{"provider":"github-actions","runId":"32321987254","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[01:49:10.781] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[01:49:11.065] LOG: [ER] build {"version":1,"id":"github:71814efeed95a1f4d51cf571e06f3c6aeea29a66:run-32321987254.1","source":"github","sha":"71814efeed95a1f4d51cf571e06f3c6aeea29a66","workflow":{"provider":"github-actions","runId":"32321987254","runAttempt":1,"workflow":"Deploy Production","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+[01:49:16.974] DEBUG: Destroying loading scene
+[01:49:16.974] DEBUG: Destroyed loading scene
+[01:49:17.013] LOG: Seed: DMGrBXPHIR02EMI6ibz2HIAv
+[01:49:17.014] LOG: Wave Seed: DMGrBXPHIR02EMI6ibz2HIAv 0
+[01:49:17.931] LOG: %cStart Phase LoginPhase color:green;
+[01:49:18.731] LOG: Client Session: JH3fuil5ycvNAgxhiwgVYV1qxFMDpgv8
+[01:49:20.608] DEBUG: Using cached system data
+[01:49:20.663] LOG: %cStart Phase TitlePhase color:green;
+[01:49:20.664] LOG: Getting Session Slot id: %d 0
+[01:49:21.511] LOG: use seasonal splash messages true
+[01:49:27.512] LOG: Getting Session Slot id: %d 0
+[01:49:28.244] LOG: Wave Seed: oqlCunXkRiJO1YLeWElUtNJl 0
+[01:49:28.244] LOG: Seed: oqlCunXkRiJO1YLeWElUtNJl
+[01:49:28.245] LOG: Wave Seed: ÏÑÌ£ÕÎ¸Ë²Éª¯¹¬Å·¥ÌµÔ®ªÌ 96
+[01:49:28.250] LOG: Applied Iron 
+[01:49:28.250] LOG: Applied Protein 
+[01:49:28.250] LOG: Applied HP Up 
+[01:49:28.250] LOG: Applied Zinc 
+[01:49:28.250] LOG: Applied Carbos 
+[01:49:28.250] LOG: Applied Carbos 
+[01:49:28.251] LOG: Applied Calcium 
+[01:49:28.251] LOG: Applied Iron 
+[01:49:28.251] LOG: Applied HP Up 
+[01:49:28.251] LOG: Applied Soul Dew 
+[01:49:28.251] LOG: Applied Soul Dew 
+[01:49:28.254] LOG: Applied Iron 
+[01:49:28.254] LOG: Applied Protein 
+[01:49:28.254] LOG: Applied HP Up 
+[01:49:28.254] LOG: Applied Zinc 
+[01:49:28.254] LOG: Applied Carbos 
+[01:49:28.254] LOG: Applied Carbos 
+[01:49:28.254] LOG: Applied Calcium 
+[01:49:28.254] LOG: Applied Iron 
+[01:49:28.254] LOG: Applied HP Up 
+[01:49:28.254] LOG: Applied Soul Dew 
+[01:49:28.255] LOG: Applied Soul Dew 
+[01:49:28.257] LOG: Applied Iron 
+[01:49:28.257] LOG: Applied Protein 
+[01:49:28.257] LOG: Applied HP Up 
+[01:49:28.257] LOG: Applied Zinc 
+[01:49:28.257] LOG: Applied Carbos 
+[01:49:28.257] LOG: Applied Carbos 
+[01:49:28.257] LOG: Applied Calcium 
+[01:49:28.257] LOG: Applied Iron 
+[01:49:28.257] LOG: Applied HP Up 
+[01:49:28.257] LOG: Applied Soul Dew 
+[01:49:28.257] LOG: Applied Soul Dew 
+[01:49:28.334] LOG: %cStart Phase EncounterPhase color:green;
+[01:49:28.337] LOG: Pokemon: Wild Iron Valiant | Species ID: 1006 | Level: 173 | Nature: Naughty (+Atk/-SpDef)
+[01:49:28.337] LOG: Stats (IVs): HP: 490 (30), Atk: 546 (24), Def: 316 (0), Spatk: 437 (10), Spdef: 234 (28), Spd: 434 (16)
+[01:49:28.337] LOG: Ability: Hubris | Passive Ability: Quark Drive 
+[01:49:28.337] LOG: Moveset: ["Fleur Cannon","Shocking Edge","Close Combat","Destiny Bond"]
+[01:49:28.338] LOG: Pokemon: Wild Flutter Mane | Species ID: 987 | Level: 159 | Nature: Rash (+SpAtk/-SpDef)
+[01:49:28.338] LOG: Stats (IVs): HP: 356 (8), Atk: 194 (9), Def: 197 (11), Spatk: 516 (22), Spdef: 393 (2), Spd: 442 (5)
+[01:49:28.338] LOG: Ability: Vengeful Spirit | Passive Ability: Protosynthesis 
+[01:49:28.338] LOG: Moveset: ["Raging Souls","Infernal Parade","Imprison","Mystical Fire"]
+[01:49:28.803] LOG: Wave Seed: ÏÑÌ£ÕÎ¸Ë²Éª¯¹¬Å·¥ÌµÔ®ªÌ 96
+[01:49:29.463] LOG: %cStart Phase SummonPhase color:green;
+[01:49:29.667] LOG: Applied Iron 
+[01:49:29.667] LOG: Applied Protein 
+[01:49:29.667] LOG: Applied HP Up 
+[01:49:29.667] LOG: Applied Zinc 
+[01:49:29.667] LOG: Applied Carbos 
+[01:49:29.668] LOG: Applied Carbos 
+[01:49:29.668] LOG: Applied Calcium 
+[01:49:29.668] LOG: Applied Iron 
+[01:49:29.668] LOG: Applied HP Up 
+[01:49:29.668] LOG: Applied Soul Dew 
+[01:49:29.668] LOG: Applied Soul Dew 
+[01:49:29.850] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:49:29.994] LOG: %cStart Phase SummonPhase color:green;
+[01:49:30.201] LOG: Applied Iron 
+[01:49:30.201] LOG: Applied Protein 
+[01:49:30.201] LOG: Applied HP Up 
+[01:49:30.201] LOG: Applied Zinc 
+[01:49:30.201] LOG: Applied Carbos 
+[01:49:30.201] LOG: Applied Carbos 
+[01:49:30.201] LOG: Applied Calcium 
+[01:49:30.201] LOG: Applied Iron 
+[01:49:30.201] LOG: Applied HP Up 
+[01:49:30.201] LOG: Applied Soul Dew 
+[01:49:30.201] LOG: Applied Soul Dew 
+[01:49:30.383] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:49:30.528] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:49:30.530] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:30.530] LOG: Ran PSP for: Primal Mew
+[01:49:30.533] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:30.534] LOG: %cStart Phase MessagePhase color:green;
+[01:49:30.861] LOG: %cStart Phase MessagePhase color:green;
+[01:49:31.208] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:31.208] LOG: Ran PSP for: Zacian
+[01:49:31.210] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:31.210] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:49:31.428] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:49:31.685] LOG: %cStart Phase MessagePhase color:green;
+[01:49:31.972] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:49:32.007] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:32.007] LOG: Ran PSP for: Flutter Mane
+[01:49:32.008] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:32.009] LOG: Ran PSP for: Iron Valiant
+[01:49:32.009] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:32.009] LOG: %cStart Phase PostSummonPhase color:green;
+[01:49:32.009] LOG: %cStart Phase TurnInitPhase color:green;
+[01:49:32.010] LOG: %cStart Phase CommandPhase color:green;
+[01:49:34.028] LOG: Move: PIXIE_SLASH Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Zacian
+[01:49:34.029] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:49:35.356] LOG: %cStart Phase CommandPhase color:green;
+[01:49:36.395] LOG: Move: EXPANDING_FORCE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Primal Mew
+[01:49:36.396] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:49:36.739] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:49:36.741] LOG: Applied X Sp. Def 
+[01:49:36.741] LOG: Applied X Sp. Def 
+[01:49:36.742] LOG: Battle Seed: VPpibuLcq0PXL0DS
+[01:49:36.744] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:49:36.744] LOG: Applied X Sp. Def 
+[01:49:36.744] LOG: Applied X Sp. Def 
+[01:49:36.744] LOG: Applied X Sp. Def 
+[01:49:36.745] LOG: Applied X Sp. Def 
+[01:49:36.745] LOG: Applied X Sp. Def 
+[01:49:36.745] LOG: Applied X Sp. Def 
+[01:49:36.746] LOG: %cStart Phase TurnStartPhase color:green;
+[01:49:36.749] LOG: %cStart Phase ErShatteredPsycheBonusPhase color:green;
+[01:49:36.749] LOG: %cStart Phase MovePhase color:green;
+[01:49:36.749] LOG: %cUser: Primal Mew
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[01:49:36.752] LOG: %cStart Phase MessagePhase color:green;
+[01:49:36.917] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:49:36.918] LOG: Applied Wide Lens 
+[01:49:37.378] LOG: Applied Dire Hit 
+[01:49:37.379] LOG: crit stage: +1
+[01:49:37.380] LOG: Move: Expanding Force | Base damage: 1104.7035897435896 | Power: 120 | Source attack: 1256 | Target defense: 234
+[01:49:37.381] LOG: Move: Expanding Force | Attack damage: 2203
+[01:49:37.382] LOG: Applied Amulet Coin 
+[01:49:37.382] LOG: Applied Golden Punch 
+[01:49:37.383] LOG: Applied Shell Bell 
+[01:49:37.383] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:49:37.389] LOG: %cStart Phase FaintPhase color:green;
+[01:49:40.274] LOG: %cStart Phase MessagePhase color:green;
+[01:49:40.478] LOG: %cStart Phase VictoryPhase color:green;
+[01:49:40.478] LOG: Applied Soothe Bell 
+[01:49:40.479] LOG: Applied Lucky Egg 
+[01:49:40.479] LOG: Applied Soothe Bell 
+[01:49:40.480] LOG: %cStart Phase ExpPhase color:green;
+[01:49:40.480] LOG: Applied Super EXP. Charm 
+[01:49:40.480] LOG: Applied EXP. Charm 
+[01:49:41.434] LOG: %cStart Phase LevelUpPhase color:green;
+[01:49:41.434] LOG: Applied Iron 
+[01:49:41.434] LOG: Applied Protein 
+[01:49:41.434] LOG: Applied HP Up 
+[01:49:41.434] LOG: Applied Zinc 
+[01:49:41.434] LOG: Applied Carbos 
+[01:49:41.435] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:49:41.656] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:49:42.145] LOG: %cStart Phase MessagePhase color:green;
+[01:49:42.450] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:49:42.484] LOG: %cStart Phase MoveEndPhase color:green;
+[01:49:42.484] LOG: %cStart Phase MovePhase color:green;
+[01:49:42.484] LOG: %cUser: Zacian
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[01:49:42.485] LOG: %cStart Phase MessagePhase color:green;
+[01:49:42.750] LOG: %cStart Phase MoveEndPhase color:green;
+[01:49:42.750] LOG: %cStart Phase MovePhase color:green;
+[01:49:42.750] LOG: %cStart Phase MoveEndPhase color:green;
+[01:49:42.750] LOG: %cStart Phase MovePhase color:green;
+[01:49:42.750] LOG: %cStart Phase MoveEndPhase color:green;
+[01:49:42.750] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:49:42.750] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:49:42.750] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:49:42.750] LOG: %cStart Phase BerryPhase color:green;
+[01:49:42.751] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:49:42.751] LOG: %cStart Phase TurnEndPhase color:green;
+[01:49:42.753] LOG: %cStart Phase TurnInitPhase color:green;
+[01:49:42.753] LOG: %cStart Phase CommandPhase color:green;
+[01:50:03.667] LOG: Move: PIXIE_SLASH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Zacian
+[01:50:03.668] LOG: %cStart Phase CommandPhase color:green;
+[01:50:04.789] LOG: Move: EXPANDING_FORCE Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Primal Mew
+[01:50:04.790] LOG: %cStart Phase TurnStartPhase color:green;
+[01:50:04.791] LOG: %cStart Phase MovePhase color:green;
+[01:50:04.791] LOG: %cUser: Primal Mew
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[01:50:04.791] WARN: Primal Mew is attempting to use a move with no targets
+[01:50:04.791] LOG: %cStart Phase MoveEndPhase color:green;
+[01:50:04.791] LOG: %cStart Phase MovePhase color:green;
+[01:50:04.791] LOG: %cUser: Zacian
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[01:50:04.791] WARN: Zacian is attempting to use a move with no targets
+[01:50:04.791] LOG: %cStart Phase MoveEndPhase color:green;
+[01:50:04.791] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:50:04.791] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:50:04.791] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:50:04.791] LOG: %cStart Phase BerryPhase color:green;
+[01:50:04.792] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:50:04.792] LOG: %cStart Phase TurnEndPhase color:green;
+[01:50:04.793] LOG: %cStart Phase TurnInitPhase color:green;
+[01:50:04.793] LOG: %cStart Phase CommandPhase color:green;
+[01:50:05.828] LOG: Move: PIXIE_SLASH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Zacian
+[01:50:05.829] LOG: %cStart Phase CommandPhase color:green;
+[01:50:06.573] LOG: Move: EXPANDING_FORCE Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Primal Mew
+[01:50:06.573] LOG: %cStart Phase TurnStartPhase color:green;
+[01:50:06.574] LOG: %cStart Phase MovePhase color:green;
+[01:50:06.575] LOG: %cUser: Primal Mew
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[01:50:06.575] WARN: Primal Mew is attempting to use a move with no targets
+[01:50:06.575] LOG: %cStart Phase MoveEndPhase color:green;
+[01:50:06.575] LOG: %cStart Phase MovePhase color:green;
+[01:50:06.575] LOG: %cUser: Zacian
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[01:50:06.575] WARN: Zacian is attempting to use a move with no targets
+[01:50:06.575] LOG: %cStart Phase MoveEndPhase color:green;
+[01:50:06.575] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:50:06.575] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:50:06.575] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:50:06.575] LOG: %cStart Phase BerryPhase color:green;
+[01:50:06.575] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:50:06.575] LOG: %cStart Phase TurnEndPhase color:green;
+[01:50:06.576] LOG: %cStart Phase TurnInitPhase color:green;
+[01:50:06.576] LOG: %cStart Phase CommandPhase color:green;
+[01:50:07.445] LOG: Move: PIXIE_SLASH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Zacian
+[01:50:07.446] LOG: %cStart Phase CommandPhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+{"version":2,"seed":"oqlCunXkRiJO1YLeWElUtNJl","gameModeId":0,"difficulty":"youngster","challenges":[],"roster":[{"id":3100272006,"player":true,"species":888,"formIndex":1,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":194,"exp":7894621,"levelExp":0,"gender":-1,"hp":690,"stats":[704,1406,656,344,565,707],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":891,"ppUsed":0,"ppUp":3},{"moveId":5015,"ppUsed":0,"ppUp":0},{"moveId":781,"ppUsed":0,"ppUp":3},{"moveId":5070,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":888,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[1,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":0,"targets":[2],"useMode":1,"result":2},{"move":0,"targets":[],"useMode":1,"result":2},{"move":0,"targets":[],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":787374464,"player":true,"species":151,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":209,"exp":9516537,"levelExp":0,"gender":-1,"hp":785,"stats":[785,317,776,1256,613,872],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":797,"ppUsed":0,"ppUp":0},{"moveId":831,"ppUsed":0,"ppUp":3},{"moveId":591,"ppUsed":0,"ppUp":0},{"moveId":59,"ppUsed":0,"ppUp":3}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":151,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[59],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[13],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":797,"targets":[2],"result":1,"useMode":1},{"move":0,"targets":[],"useMode":1,"result":2},{"move":0,"targets":[],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"events":[{"type":"command","wave":96,"turn":1,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":96,"turn":1,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":96,"turn":2,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":96,"turn":2,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":96,"turn":3,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}},{"type":"command","wave":96,"turn":3,"slotFieldIndex":1,"command":{"kind":"move","moveIndex":0}},{"type":"command","wave":96,"turn":4,"slotFieldIndex":0,"command":{"kind":"move","moveIndex":1}}],"endState":{"waveIndex":96,"money":254841,"party":[{"species":888,"level":198,"hp":704,"maxHp":704},{"species":151,"level":209,"hp":785,"maxHp":785}]},"checkpoint":{"wave":96,"seed":"oqlCunXkRiJO1YLeWElUtNJl","party":[{"id":3100272006,"player":true,"species":888,"formIndex":1,"abilityIndex":2,"passive":false,"shiny":true,"variant":1,"pokeball":0,"level":194,"exp":7894621,"levelExp":0,"gender":-1,"hp":690,"stats":[704,1406,656,344,565,707],"ivs":[31,31,31,31,31,31],"nature":3,"moveset":[{"moveId":891,"ppUsed":0,"ppUp":3},{"moveId":5015,"ppUsed":0,"ppUp":0},{"moveId":781,"ppUsed":0,"ppUp":3},{"moveId":5070,"ppUsed":0,"ppUp":0}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":888,"metWave":-1,"luck":2,"pauseEvolutions":false,"pokerus":false,"usedTMs":[],"teraType":17,"isTerastallized":false,"stellarTypesBoosted":[],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":2,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[1,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":0,"targets":[2],"useMode":1,"result":2},{"move":0,"targets":[],"useMode":1,"result":2},{"move":0,"targets":[],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null},{"id":787374464,"player":true,"species":151,"formIndex":1,"abilityIndex":0,"passive":false,"shiny":true,"variant":0,"pokeball":0,"level":209,"exp":9516537,"levelExp":0,"gender":-1,"hp":785,"stats":[785,317,776,1256,613,872],"ivs":[31,31,31,31,31,31],"nature":15,"moveset":[{"moveId":797,"ppUsed":0,"ppUp":0},{"moveId":831,"ppUsed":0,"ppUp":3},{"moveId":591,"ppUsed":0,"ppUp":0},{"moveId":59,"ppUsed":0,"ppUp":3}],"status":null,"friendship":255,"metLevel":5,"metBiome":-1,"metSpecies":151,"metWave":-1,"luck":1,"pauseEvolutions":false,"pokerus":false,"usedTMs":[59],"teraType":13,"isTerastallized":false,"stellarTypesBoosted":[13],"fusionSpecies":null,"fusionShiny":false,"fusionVariant":0,"fusionLuck":1,"fusionTeraType":0,"boss":false,"bossSegments":0,"summonData":{"statStages":[0,0,0,0,0,0,0],"moveQueue":[],"tags":[],"abilitySuppressed":false,"abilitiesApplied":[],"erSuppressedInnateSlots":[false,false,false],"erTimedAbilitySuppressions":[],"erAbilityProvenance":[],"erImposterCopiedAttackBoost":false,"chuckusterReductionUsed":false,"forceAttackerOutUsed":false,"erCommandedUsedThisSwitchIn":false,"stats":[0,0,0,0,0,0],"types":[],"berriesEatenLast":[],"moveHistory":[{"move":797,"targets":[2],"result":1,"useMode":1},{"move":0,"targets":[],"useMode":1,"result":2},{"move":0,"targets":[],"useMode":1,"result":2}]},"battleData":{"hitCount":0,"hasEatenBerry":false,"berriesEaten":[],"anticipationDodgeUsed":false,"rudeAwakeningTriggered":false,"cowardProtectUsed":false,"lostItems":[]},"customPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"fusionCustomPokemonData":{"spriteScale":-1,"ability":-1,"passive":-1,"passive2":-1,"passive3":-1,"nature":-1,"bonusMoveSlots":0,"abilityOverridesForm":false,"types":[],"hitsRecCount":null,"erBlackShiny":false,"erGiftAbilities":[],"erGiftIndex":0,"erSoulHarvestFaintCount":0,"erShinyLabSuppressLocal":false,"erInnateShrineUnlocked":false,"erCursedStat":-1,"erLockedAbilitySlots":[],"erRunUnlockedAbilitySlots":[],"erFunPseudoMega":false,"erEndlessAvalancheAbilities":[]},"mysteryEncounterPokemonData":null,"fusionMysteryEncounterPokemonData":null}],"modifiers":[{"player":true,"typeId":"MAP","args":[],"stackCount":4,"className":"MapModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[5],"args":[787374464,5],"stackCount":6,"className":"BaseStatModifier"},{"player":true,"typeId":"SUPER_EXP_CHARM","args":[60],"stackCount":9,"className":"ExpBoosterModifier"},{"player":true,"typeId":"EXP_SHARE","args":[],"stackCount":5,"className":"ExpShareModifier"},{"player":true,"typeId":"EXP_CHARM","args":[25],"stackCount":19,"className":"ExpBoosterModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[3],"args":[787374464,3],"stackCount":8,"className":"BaseStatModifier"},{"player":true,"typeId":"WIDE_LENS","args":[787374464,5],"stackCount":3,"className":"PokemonMoveAccuracyBoosterModifier"},{"player":true,"typeId":"HEALING_CHARM","args":[1.1],"stackCount":1,"className":"HealingBoosterModifier"},{"player":true,"typeId":"ER_CHILI_SAMPLE","args":[787374464,"chiliSample",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_CHILI_SAMPLE","args":[3100272006,"chiliSample",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[787374464],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"SOOTHE_BELL","args":[3100272006],"stackCount":3,"className":"PokemonFriendshipBoosterModifier"},{"player":true,"typeId":"ER_WISE_GLASSES","args":[787374464,"wiseGlasses",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[2],"args":[3100272006,2],"stackCount":3,"className":"BaseStatModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[1],"args":[3100272006,1],"stackCount":8,"className":"BaseStatModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[2],"args":[787374464,2],"stackCount":3,"className":"BaseStatModifier"},{"player":true,"typeId":"GOLDEN_POKEBALL","args":[],"stackCount":3,"className":"ExtraModifierModifier"},{"player":true,"typeId":"FOCUS_BAND","args":[3100272006],"stackCount":3,"className":"SurviveDamageModifier"},{"player":true,"typeId":"GOLDEN_PUNCH","args":[3100272006],"stackCount":5,"className":"DamageMoneyRewardModifier"},{"player":true,"typeId":"ER_HEAVY_DUTY_BOOTS","args":[3100272006,"heavyDutyBoots",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[0],"args":[3100272006,0],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"CANDY_JAR","args":[],"stackCount":2,"className":"LevelIncrementBoosterModifier"},{"player":true,"typeId":"ER_LUCKY_HEART","args":[787374464,"luckyHeart",2,0],"stackCount":2,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"BERRY_POUCH","args":[],"stackCount":1,"className":"PreserveBerryModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[4],"args":[3100272006,4],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"ER_RUSTY_CLAW","args":[3100272006,"rustyClaw",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_LUCKY_HEART","args":[3100272006,"luckyHeart",2,0],"stackCount":2,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"TERA_ORB","args":[],"stackCount":1,"className":"TerastallizeAccessModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[3100272006,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"SHELL_BELL","args":[787374464],"stackCount":1,"className":"HitHealModifier"},{"player":true,"typeId":"ER_MUSCLE_BAND","args":[3100272006,"muscleBand",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[0],"args":[787374464,0],"stackCount":2,"className":"BaseStatModifier"},{"player":true,"typeId":"ER_SAFETY_GOGGLES","args":[3100272006,"safetyGoggles",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"ER_SAFETY_GOGGLES","args":[787374464,"safetyGoggles",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"WIDE_LENS","args":[3100272006,5],"stackCount":3,"className":"PokemonMoveAccuracyBoosterModifier"},{"player":true,"typeId":"ER_COPPER_ROD","args":[787374464,"copperRod",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_COPPER_ROD","args":[3100272006,"copperRod",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_CLEAR_AMULET","args":[3100272006,"clearAmulet",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[1],"args":[787374464,1],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"ER_CLEAR_AMULET","args":[787374464,"clearAmulet",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"SOUL_DEW","args":[787374464],"stackCount":3,"className":"PokemonNatureWeightModifier"},{"player":true,"typeId":"ER_HEAVY_DUTY_BOOTS","args":[787374464,"heavyDutyBoots",false,0],"stackCount":1,"className":"ErTacticalItemModifier"},{"player":true,"typeId":"AMULET_COIN","args":[],"stackCount":1,"className":"MoneyMultiplierModifier"},{"player":true,"typeId":"MINI_BLACK_HOLE","args":[3100272006],"stackCount":1,"className":"TurnHeldItemTransferModifier"},{"player":true,"typeId":"MEGA_BRACELET","args":[],"stackCount":1,"className":"MegaEvolutionAccessModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[7],"args":[3100272006,7],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[9],"args":[3100272006,9],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"ABILITY_CHARM","args":[],"stackCount":1,"className":"MysteryEventRateBoosterModifier"},{"player":true,"typeId":"BASE_STAT_BOOSTER","typePregenArgs":[5],"args":[3100272006,5],"stackCount":1,"className":"BaseStatModifier"},{"player":true,"typeId":"LOCK_CAPSULE","args":[],"stackCount":1,"className":"LockModifierTiersModifier"},{"player":true,"typeId":"RARE_FORM_CHANGE_ITEM","typePregenArgs":[60],"args":[3100272006,60,true],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[6],"args":[3100272006,6],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"ATTACK_TYPE_BOOSTER","typePregenArgs":[5],"args":[787374464,5,20],"stackCount":1,"className":"AttackTypeBoosterModifier"},{"player":true,"typeId":"FORM_CHANGE_ITEM","typePregenArgs":[387],"args":[787374464,387,true],"stackCount":1,"className":"PokemonFormChangeItemModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[10],"args":[3100272006,10],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[5],"args":[3100272006,5],"stackCount":2,"className":"BerryModifier"},{"player":true,"typeId":"LUCKY_EGG","args":[3100272006,40],"stackCount":1,"className":"PokemonExpBoosterModifier"},{"player":true,"typeId":"BERRY","typePregenArgs":[5],"args":[787374464,5],"stackCount":1,"className":"BerryModifier"},{"player":true,"typeId":"GOLDEN_PUNCH","args":[787374464],"stackCount":1,"className":"DamageMoneyRewardModifier"},{"player":true,"typeId":"ER_STEEL_GEM","args":[3100272006,8],"stackCount":1,"className":"ErGemModifier"},{"player":true,"typeId":"ER_STEEL_GEM","args":[787374464,8],"stackCount":1,"className":"ErGemModifier"},{"player":true,"typeId":"ER_POWER_HERB","args":[3100272006,"powerHerb",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"ER_POWER_HERB","args":[787374464,"powerHerb",2,0],"stackCount":1,"className":"ErCommunityItemModifier"},{"player":true,"typeId":"DIRE_HIT","args":[5,5],"stackCount":1,"className":"TempCritBoosterModifier"},{"player":true,"typeId":"TEMP_STAT_STAGE_BOOSTER","typePregenArgs":[4],"args":[4,5,5],"stackCount":1,"className":"TempStatStageBoosterModifier"}],"money":254334,"pokeballCounts":{"0":10,"1":9,"2":0,"3":0,"4":0}}}
