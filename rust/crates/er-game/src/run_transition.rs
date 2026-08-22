@@ -44,6 +44,8 @@ pub enum RunTransitionPreparationError {
     MissingReward,
     #[error("selected market stock or modifier is absent")]
     MissingMarket,
+    #[error("selected move-learning option is absent")]
+    MissingMove,
     #[error("selected modifier application is unsupported at this surface")]
     UnsupportedModifier,
     #[error("run transition allocator overflowed")]
@@ -755,7 +757,7 @@ pub fn prepare_move_learn_transition(
         .options
         .iter_mut()
         .find(|option| option.option_id.as_str() == candidate_id)
-        .ok_or(RunTransitionPreparationError::MissingReward)?;
+        .ok_or(RunTransitionPreparationError::MissingMove)?;
     candidate.enabled = false;
     let replacement = after_learning
         .header
@@ -763,7 +765,7 @@ pub fn prepare_move_learn_transition(
         .options
         .iter()
         .find(|option| option.enabled && option.option_id.as_str().starts_with(&replacement_prefix))
-        .ok_or(RunTransitionPreparationError::UnsupportedAction)?;
+        .ok_or(RunTransitionPreparationError::MissingMove)?;
     after_learning.header.menu.selected_option_id = replacement.option_id.clone();
 
     let surface_snapshot = after

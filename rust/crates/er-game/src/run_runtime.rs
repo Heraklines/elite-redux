@@ -18,7 +18,7 @@ use er_types::battle_ids::ContentPackHash;
 use er_types::run_control::{GameControl, GameControlPlan};
 use er_types::run_model::RunStage;
 
-#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum RunRuntimeError {
     #[error("material before-digest disagrees with the endpoint-local frontier")]
     LocalFrontierMismatch,
@@ -34,8 +34,8 @@ pub enum RunRuntimeError {
     InvalidAfterState,
     #[error("material next-control plan failed validation")]
     InvalidNextControl,
-    #[error("run surface action preparation failed")]
-    Preparation,
+    #[error("run surface action preparation failed: {0}")]
+    Preparation(String),
 }
 
 /// The run-side runtime: complete game state plus immutable content identity.
@@ -111,7 +111,7 @@ impl RunRuntime {
             }
             _ => Err(crate::run_transition::RunTransitionPreparationError::UnsupportedAction),
         };
-        prepared.map_err(|_| RunRuntimeError::Preparation)
+        prepared.map_err(|error| RunRuntimeError::Preparation(error.to_string()))
     }
 
     /// The endpoint-local mechanical frontier used in step 7 of the apply
