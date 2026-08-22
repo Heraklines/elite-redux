@@ -2,18 +2,20 @@
 
 use er_rng::battle::BattleRngState;
 use er_run::encounter_plan::EncounterPlan;
+use er_run::transition::GameContentBundle;
 use er_state::battle_v2::{
     BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState, BattleStateV2,
 };
 use er_state::field::FieldState;
 use er_state::game_v2::GameStateV2;
+use er_state::pokemon_v2::PokemonStateV2;
 use er_types::SafeU53;
 use er_types::SeatId;
 use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{BattleSide, FaintOccurrenceId, FieldSlot, TurnIndex};
 use er_types::battle_model::{
-    BattleOutcome, GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind,
-    WeatherState,
+    BattleOutcome, CapabilityStatus, GlobalAbilitySuppressionState, TerrainKind, TerrainState,
+    WeatherKind, WeatherState,
 };
 use er_types::run_ids::Money;
 use er_types::run_model::{RunOutcome, RunStage};
@@ -29,6 +31,8 @@ pub enum BattleStartV2Error {
     FrontierMismatch,
     #[error("encounter lead identity is absent from its owning party")]
     MissingLead,
+    #[error("encounter reaches content outside the supported battle slice")]
+    UnsupportedContent,
     #[error("battle allocator overflowed")]
     AllocatorOverflow,
     #[error("battle field construction failed: {0}")]
@@ -45,6 +49,7 @@ pub fn start_battle_v2(
     before: &GameStateV2,
     plan: &EncounterPlan,
     authority_seat: SeatId,
+    content: &GameContentBundle,
 ) -> Result<GameStateV2, BattleStartV2Error> {
     before
         .validate()
@@ -58,6 +63,16 @@ pub fn start_battle_v2(
         || before.battle.is_some()
     {
         return Err(BattleStartV2Error::FrontierMismatch);
+    }
+    if before.battle_content_hash != content.battle.hash
+        || before.run_content_hash != content.run.run_content_hash
+        || before
+            .player_party
+            .iter()
+            .chain(plan.enemy_party.iter())
+            .any(|pokemon| !pokemon_content_is_supported(pokemon, content))
+    {
+        return Err(BattleStartV2Error::UnsupportedContent);
     }
     if plan
         .player_leads
@@ -166,4 +181,33 @@ pub fn start_battle_v2(
         .validate()
         .map_err(|error| BattleStartV2Error::InvalidAfter(error.to_string()))?;
     Ok(after)
+}
+
+fn pokemon_content_is_supported(pokemon: &PokemonStateV2, content: &GameContentBundle) -> bool {
+    let species = content
+        .battle
+        .species
+        .iter()
+        .find(|definition| definition.id == pokemon.species_id)
+        .is_some_and(|definition| definition.capability == CapabilityStatus::Supported);
+    let moves = pokemon.moves.iter().flatten().all(|slot| {
+        content
+            .battle
+            .moves
+            .iter()
+            .find(|definition| definition.id == slot.move_id)
+            .is_some_and(|definition| definition.capability == CapabilityStatus::Supported)
+    });
+    let abilities = std::iter::once(Some(pokemon.abilities.active))
+        .chain(pokemon.abilities.passives)
+        .flatten()
+        .all(|ability| {
+            content
+                .battle
+                .abilities
+                .iter()
+                .find(|definition| definition.id == ability)
+                .is_some_and(|definition| definition.capability == CapabilityStatus::Supported)
+        });
+    species && moves && abilities
 }

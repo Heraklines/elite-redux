@@ -1,13 +1,16 @@
 use std::error::Error;
+use std::sync::Arc;
 
 use er_game::battle_start_v2::{BattleStartV2Error, start_battle_v2};
 use er_run::content::EncounterPlanSource;
 use er_run::encounter_plan::{ENCOUNTER_PLAN_SCHEMA_VERSION, EncounterPlan};
+use er_run::transition::GameContentBundle;
 use er_testkit::m4_fixture::assemble_selected_game_state;
 use er_types::SafeU53;
 use er_types::SeatId;
 use er_types::battle_command::ScriptedEnemyPolicyV1;
-use er_types::battle_ids::{BattleFormat, BattleSide, FieldSlot, PokemonId};
+use er_types::battle_ids::{AbilityId, BattleFormat, BattleSide, FieldSlot, PokemonId, SpeciesId};
+use er_types::battle_model::{PokemonType, PokemonTyping};
 use er_types::run_ids::EncounterId;
 use er_types::run_model::{RunOutcome, RunStage};
 
@@ -21,9 +24,23 @@ fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("safe u53")
 }
 
-fn state_and_plan() -> Result<(er_state::game_v2::GameStateV2, EncounterPlan), Box<dyn Error>> {
+fn state_and_plan() -> Result<
+    (
+        er_state::game_v2::GameStateV2,
+        EncounterPlan,
+        Arc<GameContentBundle>,
+    ),
+    Box<dyn Error>,
+> {
     let fixture: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(FIXTURE)?)?;
-    let (state, _) = assemble_selected_game_state(&fixture, ORACLE)?;
+    let (mut state, content) = assemble_selected_game_state(&fixture, ORACLE)?;
+    state.player_party[0].species_id = SpeciesId::new(safe(7));
+    state.player_party[0].types = PokemonTyping {
+        primary: PokemonType::Water,
+        secondary: None,
+    };
+    state.player_party[0].moves[1..].fill(None);
+    state.player_party[0].abilities.active = AbilityId::new(SafeU53::ZERO);
     let player = state.player_party[0].id;
     let mut enemy = state.player_party[0].clone();
     enemy.id = PokemonId::new(safe(9_001));
@@ -44,15 +61,15 @@ fn state_and_plan() -> Result<(er_state::game_v2::GameStateV2, EncounterPlan), B
         source: EncounterPlanSource::OracleCaptureRequired,
         content_hash: Some(state.run_content_hash.clone()),
     };
-    Ok((state, plan))
+    Ok((state, plan, content))
 }
 
 #[test]
 fn captured_encounter_plan_starts_complete_v2_battle_atomically() -> Result<(), Box<dyn Error>> {
-    let (state, plan) = state_and_plan()?;
+    let (state, plan, content) = state_and_plan()?;
     let before = state.clone();
     let authority = SeatId::new(safe(1));
-    let after = start_battle_v2(&state, &plan, authority)?;
+    let after = start_battle_v2(&state, &plan, authority, content.as_ref())?;
 
     assert_eq!(state, before, "battle start must not mutate its input");
     assert_eq!(after.run.stage, RunStage::Battle);
@@ -82,13 +99,25 @@ fn captured_encounter_plan_starts_complete_v2_battle_atomically() -> Result<(), 
 
 #[test]
 fn encounter_content_frontier_mismatch_fails_without_state_change() -> Result<(), Box<dyn Error>> {
-    let (state, mut plan) = state_and_plan()?;
+    let (state, mut plan, content) = state_and_plan()?;
     plan.content_hash = None;
     assert!(matches!(
-        start_battle_v2(&state, &plan, SeatId::new(safe(1))),
+        start_battle_v2(&state, &plan, SeatId::new(safe(1)), content.as_ref()),
         Err(BattleStartV2Error::FrontierMismatch)
     ));
     assert!(state.battle.is_none());
     assert_eq!(state.run.stage, RunStage::Complete);
+    Ok(())
+}
+
+#[test]
+fn unsupported_encounter_species_fails_closed() -> Result<(), Box<dyn Error>> {
+    let (state, mut plan, content) = state_and_plan()?;
+    plan.enemy_party[0].species_id = SpeciesId::new(safe(915));
+    assert!(matches!(
+        start_battle_v2(&state, &plan, SeatId::new(safe(1)), content.as_ref()),
+        Err(BattleStartV2Error::UnsupportedContent)
+    ));
+    assert!(state.battle.is_none());
     Ok(())
 }
