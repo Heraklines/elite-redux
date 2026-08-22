@@ -16,14 +16,17 @@ use er_types::battle_ids::ContentPackHash;
 use er_types::run_ids::RunContentPackHash;
 
 /// The published progression fixture path relative to the repository root.
-const PROGRESSION_FIXTURE: &str = "rust/fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json";
+const PROGRESSION_FIXTURE: &str =
+    "rust/fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json";
 
 fn load_fixture_value(path: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let data = std::fs::read_to_string(path)?;
     Ok(serde_json::from_str(&data)?)
 }
 
-fn content_hashes(fixture: &serde_json::Value) -> Result<(ContentPackHash, RunContentPackHash), Box<dyn Error>> {
+fn content_hashes(
+    fixture: &serde_json::Value,
+) -> Result<(ContentPackHash, RunContentPackHash), Box<dyn Error>> {
     let initial = &fixture["initial"];
     let battle = initial["battle_content_hash"]
         .as_str()
@@ -48,7 +51,10 @@ fn progression_fixture_produces_validated_v2_state() -> Result<(), Box<dyn Error
     // Party must contain Nacli at level 16 with exp 4329.
     assert!(!state.player_party.is_empty(), "party must not be empty");
     assert_eq!(state.run.stage, er_types::run_model::RunStage::Battle);
-    assert_eq!(state.run.outcome, er_types::run_model::RunOutcome::InProgress);
+    assert_eq!(
+        state.run.outcome,
+        er_types::run_model::RunOutcome::InProgress
+    );
 
     Ok(())
 }
@@ -78,9 +84,7 @@ fn runtime_accepts_validated_state_and_computes_frontier() -> Result<(), Box<dyn
 
 #[test]
 fn runtime_rejects_local_frontier_mismatch() -> Result<(), Box<dyn Error>> {
-    use er_run::run_material::{
-        AuthorityRunMaterial, RunMaterialHeader, WaveAdvanceMaterialV1,
-    };
+    use er_run::run_material::{AuthorityRunMaterial, RunMaterialHeader, WaveAdvanceMaterialV1};
 
     let fixture = load_fixture_value(PROGRESSION_FIXTURE)?;
     let (battle_hash, run_hash) = content_hashes(&fixture)?;
