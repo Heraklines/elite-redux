@@ -69,7 +69,7 @@ mod tests {
     use er_types::battle_ids::{
         AbilityId, BattleFormat, MoveId, MoveSlotIndex, PokemonId, SpeciesId,
     };
-    use er_types::battle_model::{AbilityLoadout, BattleStats, MoveSlotState, StatusState};
+    use er_types::battle_model::{AbilityLoadout, BattleStats, MoveSlotState, StatStages, StatusState};
 
     fn safe(value: u64) -> SafeU53 {
         SafeU53::new(value).expect("safe u53")
