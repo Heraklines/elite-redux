@@ -156,3 +156,65 @@ fn dropped_copy_and_conflicting_operation_fail_closed() -> Result<(), Box<dyn Er
     assert_eq!(guest_resources, er_types::LiveResourceSnapshot::default());
     Ok(())
 }
+
+#[test]
+fn invalid_next_menu_aborts_before_state_swap() -> Result<(), Box<dyn Error>> {
+    use er_run::run_material::decode_run_material;
+    use er_types::run_control::{
+        CrossroadsControl, GameControl, GameControlPlan, PresentationBarrier, SeatControlPlan,
+        SurfaceControl,
+    };
+    use er_types::run_ids::{RunInteractionSequence, RunSurfaceId};
+    use er_types::ui::CancelPolicy;
+    use er_types::ui_menu::{LogicalMenu, LogicalMenuOption};
+
+    let (state, battle, run) = load_state()?;
+    let mut kernel =
+        GameKernel::new_run(state.clone(), battle, run, ORACLE).map_err(std::io::Error::other)?;
+    let before = kernel
+        .run_frontier_digest()
+        .map_err(std::io::Error::other)?;
+    let (bytes, _) = material(&state, 13_000, "1:1:REWARD:900004", 1)?;
+    let mut material = decode_run_material(&bytes)?;
+    let owner = SeatId::new(safe(1));
+    let present = er_types::MenuOptionId::new("crossroads/stay")?;
+    let invalid_menu = LogicalMenu {
+        instance_id: MenuInstanceId::new(safe(1)),
+        owner_seat: owner,
+        control_id: "run/invalid-menu".to_owned(),
+        selected_option_id: er_types::MenuOptionId::new("crossroads/missing")?,
+        options: vec![LogicalMenuOption::new(present, true, None)?],
+        navigation: Vec::new(),
+        cancel: CancelPolicy::Disabled,
+    };
+    let control = SurfaceControl::Crossroads(CrossroadsControl::new(
+        RunSurfaceId::new(safe(1)),
+        RunInteractionSequence::new(SafeU53::ZERO),
+        invalid_menu,
+    ));
+    let invalid_plan = GameControlPlan::new(
+        vec![SeatControlPlan {
+            seat: owner,
+            owner: true,
+            control_id: "run/invalid-menu".to_owned(),
+            menu_instance_id: MenuInstanceId::new(safe(1)),
+            actionable_after: PresentationBarrier::NonBlocking,
+            control: GameControl::Surface(control),
+        }],
+        "run/next".to_owned(),
+        MenuInstanceId::new(safe(2)),
+    )?;
+    let AuthorityRunMaterial::Terminal(value) = &mut material else {
+        return Err("fixture helper must produce terminal material".into());
+    };
+    value.header.next_control = invalid_plan;
+    let invalid_bytes = encode_run_material(&material)?;
+    assert!(kernel.apply_run_material_bytes(&invalid_bytes).is_err());
+    assert_eq!(
+        kernel
+            .run_frontier_digest()
+            .map_err(std::io::Error::other)?,
+        before
+    );
+    Ok(())
+}

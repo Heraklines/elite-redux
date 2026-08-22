@@ -461,17 +461,26 @@ impl GameKernel {
             er_run::decode_run_material(bytes).map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
-        let next_control = material.next_control().clone();
-        let runtime = self.run.as_mut().ok_or_else(|| KernelError::Canonical {
-            reason: "run mode is not active".to_owned(),
-        })?;
-        runtime
+        let next_menu = er_game::run_menu::RunMenuReducer::new(material.next_control().clone())
+            .map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })?;
+        let mut staged_runtime =
+            self.run
+                .as_ref()
+                .cloned()
+                .ok_or_else(|| KernelError::Canonical {
+                    reason: "run mode is not active".to_owned(),
+                })?;
+        staged_runtime
             .apply(&material)
             .map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
-        self.install_run_control(next_control)
-            .map_err(|reason| KernelError::Canonical { reason })
+        self.run = Some(staged_runtime);
+        self.run_menu = Some(next_menu);
+        self.pending_run_actions.clear();
+        Ok(())
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
