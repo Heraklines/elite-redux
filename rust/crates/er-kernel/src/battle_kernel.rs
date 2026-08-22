@@ -366,6 +366,93 @@ impl BattleMode {
         Ok(mode)
     }
 
+    pub(crate) fn from_existing_game(
+        game: GameRuntime,
+        protocol_config: BattleProtocolConfig,
+    ) -> Result<Self, BattleInitializationError> {
+        let local_seat = game.local_seat();
+        let battle_authority = game
+            .state()
+            .battle
+            .as_ref()
+            .ok_or_else(|| protocol_init("battle runtime has no active battle"))?
+            .authority_seat;
+        let human_seat_values = human_seats(
+            &game
+                .state()
+                .battle
+                .as_ref()
+                .ok_or_else(|| protocol_init("battle runtime has no active battle"))?
+                .format,
+        )
+        .map_err(|error| protocol_init(&format!("battle topology: {error}")))?;
+        match &protocol_config.role {
+            BattleProtocolRoleConfig::Authority { log, .. } => {
+                if local_seat != battle_authority {
+                    return Err(protocol_init(
+                        "authority protocol role does not match the battle authority seat",
+                    ));
+                }
+                let mut expected_peers = human_seat_values
+                    .iter()
+                    .copied()
+                    .filter(|seat| *seat != battle_authority)
+                    .collect::<Vec<_>>();
+                expected_peers.sort_unstable();
+                let mut actual_peers = log
+                    .peer_bindings
+                    .iter()
+                    .map(|binding| binding.seat_id)
+                    .collect::<Vec<_>>();
+                actual_peers.sort_unstable();
+                if actual_peers != expected_peers {
+                    return Err(protocol_init(
+                        "authority peer bindings do not exactly match the battle human topology",
+                    ));
+                }
+            }
+            BattleProtocolRoleConfig::Replica { replica, .. } => {
+                if local_seat == battle_authority
+                    || replica.authority_seat_id != battle_authority
+                    || !human_seat_values.contains(&local_seat)
+                {
+                    return Err(protocol_init(
+                        "replica protocol role does not match the battle authority seat",
+                    ));
+                }
+            }
+        }
+        let protocol = BattleProtocolState::new(&protocol_config, local_seat)?;
+        let presentations = BattlePresentationState::new(local_seat);
+        let projection = projection_for(&game, &presentations, false)
+            .map_err(|error| protocol_init(&error.to_string()))?;
+        let ui = BattleUiAdapter::with_default_map(local_seat, projection).map_err(|error| {
+            BattleInitializationError::Ui {
+                reason: error.to_string(),
+            }
+        })?;
+        let mode = Self {
+            game: Arc::new(game),
+            game_changed_in_transaction: false,
+            ui,
+            protocol_config,
+            protocol,
+            presentations,
+            presentation_revisions: BTreeMap::new(),
+            suspended: false,
+            terminal_fenced: false,
+            last_rng_audit: Vec::new(),
+            last_internal_events: Vec::new(),
+        };
+        mode.validate_quiescent()
+            .map_err(|error| protocol_init(&error.to_string()))?;
+        Ok(mode)
+    }
+
+    pub(crate) fn game_state(&self) -> &er_state::snapshot::GameState {
+        self.game.state()
+    }
+
     pub(crate) fn step(
         &mut self,
         scheduler: &mut KernelScheduler,

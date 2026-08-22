@@ -279,20 +279,48 @@ fn captured_encounter(
         enemy_value["id"].as_u64().ok_or("captured enemy ID")?,
     ));
     let enemy = er_testkit::m4_fixture::convert_pokemon(enemy_value, enemy_id, None)?;
+    let wave = er_types::battle_ids::WaveIndex::new(safe(11))?;
+    let enemy_slot =
+        er_types::battle_ids::FieldSlot::new(er_types::battle_ids::BattleSide::Enemy, 0)?;
+    let mut enemy_commands = Vec::new();
+    for index in 0..16_u64 {
+        let turn = er_types::battle_ids::TurnIndex::new(safe(index + 1))?;
+        let cursor = safe(index);
+        let command_operation = er_types::battle_command::scripted_enemy_command_operation_id(
+            state.run.next_battle_id,
+            wave,
+            turn,
+            enemy_slot,
+            cursor,
+        )?;
+        enemy_commands.push(er_types::battle_command::ScriptedEnemyBattleCommandV1::new(
+            command_operation,
+            state.run.next_battle_id,
+            wave,
+            turn,
+            cursor,
+            enemy_id,
+            enemy_slot,
+            er_types::battle_command::BattleCommand::fight(
+                enemy_id,
+                er_types::battle_ids::MoveSlotIndex::ZERO,
+                er_types::battle_command::BattleTargetSelection::Implicit,
+            )?,
+        )?);
+    }
+    let scripted_policy =
+        er_types::battle_command::ScriptedEnemyPolicyV1::new(SafeU53::ZERO, enemy_commands)?;
     Ok(er_run::encounter_plan::EncounterPlan {
         schema_version: er_run::encounter_plan::ENCOUNTER_PLAN_SCHEMA_VERSION,
         encounter_id: er_types::run_ids::EncounterId::new(safe(1)),
         run_id: state.run.run_id,
-        wave: er_types::battle_ids::WaveIndex::new(safe(11))?,
+        wave,
         biome: er_types::run_ids::BiomeId::new(safe(1)),
         format: er_types::battle_ids::BattleFormat::single(),
         enemy_party: vec![enemy],
         enemy_leads: vec![enemy_id],
         player_leads: vec![state.player_party[0].id],
-        scripted_policy: er_types::battle_command::ScriptedEnemyPolicyV1::new(
-            SafeU53::ZERO,
-            Vec::new(),
-        )?,
+        scripted_policy,
         battle_seed: fixture["final"]["canonical"]["runtime"]["battle_seed"]
             .as_str()
             .ok_or("captured battle seed")?
@@ -432,6 +460,37 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
             er_types::battle_control::BattleControl::CommandRoot(_)
         )
     ));
+    let enemy_hp_before = kernel
+        .run_state()
+        .and_then(|state| state.battle.as_ref())
+        .and_then(|battle| battle.enemy_party.first())
+        .ok_or("wave-11 enemy missing")?
+        .hp;
+    for _ in 0..2 {
+        for event in [
+            RawInputEvent::KeyDown {
+                code: PhysicalKey::Enter,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            },
+            RawInputEvent::KeyUp {
+                code: PhysicalKey::Enter,
+            },
+        ] {
+            let _ = kernel.step(KernelInput::RawInput { seat: owner, event })?;
+        }
+    }
+    let enemy_hp_after = kernel
+        .run_state()
+        .and_then(|state| state.battle.as_ref())
+        .and_then(|battle| battle.enemy_party.first())
+        .ok_or("wave-11 enemy missing after turn")?
+        .hp;
+    assert!(
+        enemy_hp_after < enemy_hp_before,
+        "raw battle input did not resolve through V2 mechanics"
+    );
     assert!(
         kernel
             .dispose("Crossroads route campaign complete")

@@ -254,6 +254,61 @@ struct MenuSubmission {
     option_id: MenuOptionId,
 }
 
+fn local_run_battle_protocol(authority: SeatId) -> Result<BattleProtocolConfig, KernelError> {
+    let id_error = |error: er_types::StringIdError| KernelError::Canonical {
+        reason: error.to_string(),
+    };
+    let context = FrameContext {
+        session_id: er_types::SessionId::new("m4-run-local-session").map_err(id_error)?,
+        run_id: er_types::RunId::new("m4-run-local").map_err(id_error)?,
+        session_epoch: SafeU53::new(1).map_err(|error| KernelError::Canonical {
+            reason: error.to_string(),
+        })?,
+        seat_map_id: "m4-run-local-seat-map".to_owned(),
+        membership_revision: er_types::MembershipRevision::new(SafeU53::new(1).map_err(
+            |error| KernelError::Canonical {
+                reason: error.to_string(),
+            },
+        )?),
+        sender_seat_id: authority,
+        authority_seat_id: authority,
+        connection_generation: ConnectionGeneration::ZERO,
+    };
+    Ok(BattleProtocolConfig {
+        role: BattleProtocolRoleConfig::Authority {
+            log: AuthorityLogConfig {
+                local_context: context,
+                peer_bindings: Vec::new(),
+                owner_id: "m4-run-local-authority".to_owned(),
+                retain_capacity: SafeU53::new(64).map_err(|error| KernelError::Canonical {
+                    reason: error.to_string(),
+                })?,
+                delivery_backoff: er_protocol::BackoffPolicy {
+                    initial_ms: SafeU53::new(250).map_err(|error| KernelError::Canonical {
+                        reason: error.to_string(),
+                    })?,
+                    maximum_ms: SafeU53::new(5_000).map_err(|error| KernelError::Canonical {
+                        reason: error.to_string(),
+                    })?,
+                    factor_numerator: SafeU53::new(2).map_err(|error| KernelError::Canonical {
+                        reason: error.to_string(),
+                    })?,
+                    factor_denominator: SafeU53::new(1).map_err(|error| {
+                        KernelError::Canonical {
+                            reason: error.to_string(),
+                        }
+                    })?,
+                },
+                delivery_time_class: TimeClass::Connected,
+                max_delivery_attempts: None,
+            },
+            proposal_capacity: SafeU53::new(64).map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })?,
+        },
+    })
+}
+
 #[derive(Clone, Debug)]
 enum CommandPlan {
     EmptyLocalPartition,
@@ -568,8 +623,51 @@ impl GameKernel {
             .map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
+        let staged_battle = if encounter_consumed && self.run_role == Some(RunKernelRole::Local) {
+            let encounter = self
+                .run_encounter
+                .as_ref()
+                .ok_or_else(|| KernelError::Canonical {
+                    reason: "captured encounter evidence is missing".to_owned(),
+                })?;
+            let projected =
+                er_game::battle_adapter_v2::project_battle_v2_to_v1(staged_runtime.state())
+                    .map_err(|error| KernelError::Battle {
+                        reason: error.to_string(),
+                    })?;
+            let local_seat = staged_runtime
+                .state()
+                .battle
+                .as_ref()
+                .ok_or_else(|| KernelError::Battle {
+                    reason: "started V2 battle is missing".to_owned(),
+                })?
+                .authority_seat;
+            let game = er_game::runtime::GameRuntime::from_existing_battle(
+                projected,
+                local_seat,
+                encounter.scripted_policy.clone(),
+                staged_runtime.content().battle.clone(),
+            )
+            .map_err(|error| KernelError::Battle {
+                reason: error.to_string(),
+            })?;
+            let protocol = local_run_battle_protocol(local_seat)?;
+            Some(
+                BattleMode::from_existing_game(game, protocol).map_err(|error| {
+                    KernelError::Battle {
+                        reason: error.to_string(),
+                    }
+                })?,
+            )
+        } else {
+            None
+        };
         self.run = Some(staged_runtime);
         self.run_menu = Some(next_menu);
+        if let Some(battle) = staged_battle {
+            self.battle = Some(Box::new(battle));
+        }
         if encounter_consumed {
             self.run_encounter = None;
         }
@@ -588,17 +686,31 @@ impl GameKernel {
         if self.terminal.is_some() {
             return Ok(Vec::new());
         }
+        if self.battle.is_some() {
+            let (effects, resolved, resources) = {
+                let battle = self.battle.as_mut().expect("battle checked above");
+                let effects = battle
+                    .step(&mut self.scheduler, &mut self.terminal, input)
+                    .map_err(|error| KernelError::Battle {
+                        reason: error.to_string(),
+                    })?;
+                (
+                    effects,
+                    battle.game_state().clone(),
+                    battle.live_resources(&self.scheduler),
+                )
+            };
+            if let Some(run) = self.run.as_mut() {
+                run.sync_battle_mechanics(&resolved)
+                    .map_err(|error| KernelError::Battle {
+                        reason: error.to_string(),
+                    })?;
+            }
+            self.live_resources = resources;
+            return Ok(effects);
+        }
         if self.run.is_some() {
             return self.step_run(input);
-        }
-        if let Some(battle) = self.battle.as_mut() {
-            let effects = battle
-                .step(&mut self.scheduler, &mut self.terminal, input)
-                .map_err(|error| KernelError::Battle {
-                    reason: error.to_string(),
-                })?;
-            self.live_resources = battle.live_resources(&self.scheduler);
-            return Ok(effects);
         }
         match input {
             KernelInput::RawInput { seat, event } => {

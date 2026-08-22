@@ -20,7 +20,7 @@ use er_battle::{
 use er_canonical::{CanonicalError, canonical_bytes};
 use er_content::moves::find_move;
 pub use er_content::pack::ContentPack;
-use er_content::pack::ORACLE_GAME_SHA;
+use er_content::pack::{M4_ORACLE_GAME_SHA, ORACLE_GAME_SHA};
 use er_rng::audit::{RngDraw, RngPublicApi, RngReason, RngStream};
 use er_rng::battle::RngRuntime;
 use er_state::battle::{BattleOutcome, BattleRngState, BattleState};
@@ -683,7 +683,9 @@ fn validate_material_header(
     if schema_version != BATTLE_MATERIAL_SCHEMA_VERSION {
         return Err(BattleMaterialApplyError::SchemaVersionMismatch);
     }
-    if oracle_game_sha != ORACLE_GAME_SHA || content.oracle_game_sha != ORACLE_GAME_SHA {
+    if oracle_game_sha != content.oracle_game_sha
+        || !matches!(oracle_game_sha, ORACLE_GAME_SHA | M4_ORACLE_GAME_SHA)
+    {
         return Err(BattleMaterialApplyError::OracleIdentityMismatch);
     }
     if matches!(validation, ContentValidationMode::Full) && content.validate().is_err() {

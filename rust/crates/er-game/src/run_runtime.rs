@@ -71,6 +71,20 @@ impl RunRuntime {
         &self.state
     }
 
+    pub fn content(&self) -> &Arc<GameContentBundle> {
+        &self.content
+    }
+
+    pub fn sync_battle_mechanics(
+        &mut self,
+        resolved: &er_state::snapshot::GameState,
+    ) -> Result<(), RunRuntimeError> {
+        let merged = crate::battle_adapter_v2::merge_battle_v1_into_v2(&self.state, resolved)
+            .map_err(|error| RunRuntimeError::Preparation(error.to_string()))?;
+        self.state = merged;
+        Ok(())
+    }
+
     pub fn prepare_action_material(
         &self,
         action: &er_types::run_model::RunSurfaceAction,

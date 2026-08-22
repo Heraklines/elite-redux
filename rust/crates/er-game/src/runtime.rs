@@ -309,6 +309,52 @@ impl GameRuntime {
         Self::new_battle(config, content)
     }
 
+    /// Rehydrates the battle runtime from an already-created canonical battle
+    /// without consuming battle/run RNG or allocating a new battle identity.
+    pub fn from_existing_battle(
+        mut state: GameState,
+        local_seat: SeatId,
+        scripted_enemy_policy: ScriptedEnemyPolicyV1,
+        content: Arc<ContentPack>,
+    ) -> Result<Self, BattleInitializationError> {
+        content.validate()?;
+        scripted_enemy_policy.validate()?;
+        validate_state_content_trusted(&state, content.as_ref()).map_err(map_legality_error)?;
+        let battle = state
+            .battle
+            .as_ref()
+            .ok_or_else(|| invalid_config("existing battle state is missing"))?;
+        let human_seat_values = human_seats(&battle.format)?;
+        if !human_seat_values.contains(&local_seat) {
+            return Err(invalid_config("local_seat is not a human battle seat"));
+        }
+        let (frontier, scripted_enemy_policy) =
+            build_command_frontier(&state, &scripted_enemy_policy, content.as_ref())?;
+        state
+            .battle
+            .as_mut()
+            .ok_or(GameRuntimeError::NoActiveBattle)?
+            .command_state = CommandCollectionState::new(frontier, Vec::new())?;
+        validate_state_content_trusted(&state, content.as_ref()).map_err(map_legality_error)?;
+        let allocators = initial_allocators(&human_seat_values)?;
+        let control =
+            project_command_frontier(&state, &human_seat_values, &allocators, content.as_ref())?;
+        let runtime = Self {
+            state,
+            control,
+            local_seat,
+            scripted_enemy_policy,
+            menu_history: Vec::new(),
+            command_fingerprints: Vec::new(),
+            replacement_fingerprints: Vec::new(),
+            authority_remote_paths: BTreeMap::new(),
+            pending_no_legal_replacement: None,
+            content,
+        };
+        runtime.validate()?;
+        Ok(runtime)
+    }
+
     fn new_battle_inner(
         config: BattleGameConfig,
         wave_seed: &str,
