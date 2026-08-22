@@ -11,6 +11,7 @@ er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
 er-kernel = { path = "../er-kernel" }
 er-protocol = { path = "../er-protocol" }
+er-run = { path = "../er-run" }
 er-rng = { path = "../er-rng" }
 er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
