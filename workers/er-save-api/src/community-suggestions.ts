@@ -29,6 +29,33 @@ export interface SuggestionValidationResult {
   draft?: CommunitySuggestionDraft;
 }
 
+export interface CommunitySuggestionEligibilityProgress {
+  eligible: boolean;
+  achievementCount: number;
+  requiredAchievements: number;
+  totalAchievements: number;
+}
+
+export function calculateCommunitySuggestionEligibility(
+  unlockedIds: Iterable<string>,
+  eligibleIds: ReadonlySet<string>,
+  requiredAchievements: number,
+): CommunitySuggestionEligibilityProgress {
+  const unlocked = new Set(unlockedIds);
+  let achievementCount = 0;
+  for (const id of eligibleIds) {
+    if (unlocked.has(id)) {
+      achievementCount++;
+    }
+  }
+  return {
+    eligible: achievementCount >= requiredAchievements,
+    achievementCount,
+    requiredAchievements,
+    totalAchievements: eligibleIds.size,
+  };
+}
+
 const FILES = new Set<string>(COMMUNITY_SUGGESTION_FILES);
 const ENTITY_TYPES = new Set(["pokemon", "item", "trainer", "game", "other"]);
 const MAX_REASON = 1200;

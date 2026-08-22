@@ -1,663 +1,502 @@
 {
-  "schemaVersion": 1,
-  "totalPoints": 11930,
-  "requiredPoints": 5965,
+  "schemaVersion": 2,
+  "sourceAchievementCount": 239,
+  "vanillaCatalogSize": 76,
+  "vanillaAchievementsExcluded": 75,
+  "totalAchievements": 164,
+  "requiredAchievements": 82,
   "achievements": [
     {
-      "id": "ABSOLUTE_ZERO",
-      "points": 130
+      "id": "ABSOLUTE_ZERO"
     },
     {
-      "id": "ALL_IN",
-      "points": 75
+      "id": "ALL_IN"
     },
     {
-      "id": "ALL_SHINY_TIERS",
-      "points": 75
+      "id": "ALL_SHINY_TIERS"
     },
     {
-      "id": "APEX_PREDATOR",
-      "points": 75
+      "id": "APEX_PREDATOR"
     },
     {
-      "id": "ARE_YOU_NOT_ENTERTAINED",
-      "points": 120
+      "id": "ARE_YOU_NOT_ENTERTAINED"
     },
     {
-      "id": "AUTO_COUNTER",
-      "points": 50
+      "id": "AUTO_COUNTER"
     },
     {
-      "id": "BACK_IN_BLOOD",
-      "points": 50
+      "id": "BACK_IN_BLOOD"
     },
     {
-      "id": "BEAM_SPAM",
-      "points": 50
+      "id": "BEAM_SPAM"
     },
     {
-      "id": "BELIEVE_IT",
-      "points": 50
+      "id": "BELIEVE_IT"
     },
     {
-      "id": "BETTER_TOGETHER",
-      "points": 25
+      "id": "BETTER_TOGETHER"
     },
     {
-      "id": "BIOME_TOURIST",
-      "points": 75
+      "id": "BIOME_TOURIST"
     },
     {
-      "id": "BLACK_FRIDAY",
-      "points": 75
+      "id": "BLACK_FRIDAY"
     },
     {
-      "id": "BUDGET_CHAMPION",
-      "points": 50
+      "id": "BUDGET_CHAMPION"
     },
     {
-      "id": "CAP_SPACE",
-      "points": 75
+      "id": "CAP_SPACE"
     },
     {
-      "id": "CCC_COMBO",
-      "points": 50
+      "id": "CCC_COMBO"
     },
     {
-      "id": "CENTER_STAGE",
-      "points": 50
+      "id": "CENTER_STAGE"
     },
     {
-      "id": "CENTURY_OF_TROUBLE",
-      "points": 100
+      "id": "CENTURY_OF_TROUBLE"
     },
     {
-      "id": "CHAIN_REACTION",
-      "points": 50
+      "id": "CHAIN_REACTION"
     },
     {
-      "id": "CHAMPION_MATERIAL",
-      "points": 150
+      "id": "CHAMPION_MATERIAL"
     },
     {
-      "id": "CHARGE_IT_TO_THE_GAME",
-      "points": 50
+      "id": "CHARGE_IT_TO_THE_GAME"
     },
     {
-      "id": "CHECKMATE_IN_ONE",
-      "points": 100
+      "id": "CHECKMATE_IN_ONE"
     },
     {
-      "id": "CO_OP_INITIATE",
-      "points": 25
+      "id": "CO_OP_INITIATE"
     },
     {
-      "id": "COCYTUS",
-      "points": 175
+      "id": "COCYTUS"
     },
     {
-      "id": "COMPLEAT_NIGHTMARE",
-      "points": 25
+      "id": "COMPLEAT_NIGHTMARE"
     },
     {
-      "id": "CRIT_MATTERED",
-      "points": 50
+      "id": "CRIT_MATTERED"
     },
     {
-      "id": "CROSS_VERSION_COMPATIBILITY",
-      "points": 75
+      "id": "CROSS_VERSION_COMPATIBILITY"
     },
     {
-      "id": "DAVID_AND_GOLIATH",
-      "points": 75
+      "id": "DAVID_AND_GOLIATH"
     },
     {
-      "id": "DAVID_WAS_RANKED",
-      "points": 75
+      "id": "DAVID_WAS_RANKED"
     },
     {
-      "id": "DEAD_CHANNEL",
-      "points": 100
+      "id": "DEAD_CHANNEL"
     },
     {
-      "id": "DEAD_RINGER",
-      "points": 75
+      "id": "DEAD_RINGER"
     },
     {
-      "id": "DELVE_TOO_DEEP",
-      "points": 100
+      "id": "DELVE_TOO_DEEP"
     },
     {
-      "id": "DEVILS_BARGAIN",
-      "points": 50
+      "id": "DEVILS_BARGAIN"
     },
     {
-      "id": "DOUBLE_OR_NOTHING",
-      "points": 100
+      "id": "DOUBLE_OR_NOTHING"
     },
     {
-      "id": "DREAMCATCHER",
-      "points": 50
+      "id": "DREAMCATCHER"
     },
     {
-      "id": "DUELIST",
-      "points": 50
+      "id": "DUELIST"
     },
     {
-      "id": "DYNAMIC_DUO",
-      "points": 100
+      "id": "DYNAMIC_DUO"
     },
     {
-      "id": "END_THE_LEGEND",
-      "points": 50
+      "id": "END_THE_LEGEND"
     },
     {
-      "id": "ENDLESS_NIGHT",
-      "points": 130
+      "id": "ENDLESS_NIGHT"
     },
     {
-      "id": "EVERYONE_GET_OUT",
-      "points": 50
+      "id": "EVERYONE_GET_OUT"
     },
     {
-      "id": "EVICTION_NOTICE",
-      "points": 75
+      "id": "EVICTION_NOTICE"
     },
     {
-      "id": "EXORCIST",
-      "points": 75
+      "id": "EXORCIST"
     },
     {
-      "id": "FASHIONISTA",
-      "points": 25
+      "id": "FASHIONISTA"
     },
     {
-      "id": "FINAL_ANSWER",
-      "points": 50
+      "id": "FINAL_ANSWER"
     },
     {
-      "id": "FIRST_BLOOD",
-      "points": 25
+      "id": "FIRST_BLOOD"
     },
     {
-      "id": "FIVE_ALARM_STREAK",
-      "points": 75
+      "id": "FIVE_ALARM_STREAK"
     },
     {
-      "id": "FLAWLESS_DUEL",
-      "points": 75
+      "id": "FLAWLESS_DUEL"
     },
     {
-      "id": "FORM_VOLTRON",
-      "points": 50
+      "id": "FORM_VOLTRON"
     },
     {
-      "id": "FORMATION_BREAKER",
-      "points": 75
+      "id": "FORMATION_BREAKER"
     },
     {
-      "id": "FOUR_MACHINES_ONE_DREAM",
-      "points": 50
+      "id": "FOUR_MACHINES_ONE_DREAM"
     },
     {
-      "id": "FULL_ON_MEGA_POWER",
-      "points": 75
+      "id": "FULL_ON_MEGA_POWER"
     },
     {
-      "id": "FUSION_DANCE",
-      "points": 50
+      "id": "FUSION_DANCE"
     },
     {
-      "id": "GEAR_5",
-      "points": 50
+      "id": "GEAR_5"
     },
     {
-      "id": "GENERATION_GAP",
-      "points": 100
+      "id": "GENERATION_GAP"
     },
     {
-      "id": "GENEROUS_SOUL",
-      "points": 25
+      "id": "GENEROUS_SOUL"
     },
     {
-      "id": "GHOST_TRIAD",
-      "points": 75
+      "id": "GHOST_TRIAD"
     },
     {
-      "id": "GIUDECCA",
-      "points": 160
+      "id": "GIUDECCA"
     },
     {
-      "id": "GLASS_CANNON",
-      "points": 100
+      "id": "GLASS_CANNON"
     },
     {
-      "id": "GOLDEN_TICKET",
-      "points": 50
+      "id": "GOLDEN_TICKET"
     },
     {
-      "id": "GOOD_CHIP",
-      "points": 50
+      "id": "GOOD_CHIP"
     },
     {
-      "id": "GOOD_SPORT",
-      "points": 25
+      "id": "GOOD_SPORT"
     },
     {
-      "id": "GREAT_EXPECTATIONS",
-      "points": 50
+      "id": "GREAT_EXPECTATIONS"
     },
     {
-      "id": "GROUNDHOG_WEEK",
-      "points": 100
+      "id": "GROUNDHOG_WEEK"
     },
     {
-      "id": "GUARDIAN_ANGEL",
-      "points": 50
+      "id": "GUARDIAN_ANGEL"
     },
     {
-      "id": "HEEDING_THE_WARNING",
-      "points": 50
+      "id": "HEEDING_THE_WARNING"
     },
     {
-      "id": "HELL_AND_BACK",
-      "points": 100
+      "id": "HELL_AND_BACK"
     },
     {
-      "id": "HELL_HOUSE",
-      "points": 100
+      "id": "HELL_HOUSE"
     },
     {
-      "id": "HELL_IS_OTHER_PEOPLE",
-      "points": 100
+      "id": "HELL_IS_OTHER_PEOPLE"
     },
     {
-      "id": "HIGH_ROLLER",
-      "points": 50
+      "id": "HIGH_ROLLER"
     },
     {
-      "id": "HOLD_IT",
-      "points": 50
+      "id": "HOLD_IT"
     },
     {
-      "id": "HOLD_THE_LINE",
-      "points": 50
+      "id": "HOLD_THE_LINE"
     },
     {
-      "id": "HOLLOW_WICKER_BASKET",
-      "points": 50
+      "id": "HOLLOW_WICKER_BASKET"
     },
     {
-      "id": "HOUSE_MONEY",
-      "points": 100
+      "id": "HOUSE_MONEY"
     },
     {
-      "id": "HOUSE_OF_MIRRORS",
-      "points": 100
+      "id": "HOUSE_OF_MIRRORS"
     },
     {
-      "id": "I_JUST_GOT_HERE",
-      "points": 50
+      "id": "I_JUST_GOT_HERE"
     },
     {
-      "id": "IDENTITY_THEFT",
-      "points": 75
+      "id": "IDENTITY_THEFT"
     },
     {
-      "id": "IMMORTAL_OBJECT",
-      "points": 50
+      "id": "IMMORTAL_OBJECT"
     },
     {
-      "id": "INCOMPATIBLE_HARDWARE",
-      "points": 25
+      "id": "INCOMPATIBLE_HARDWARE"
     },
     {
-      "id": "INFERNO",
-      "points": 150
+      "id": "INFERNO"
     },
     {
-      "id": "JURASSIC_END",
-      "points": 50
+      "id": "JURASSIC_END"
     },
     {
-      "id": "JUST_SAY_NO",
-      "points": 50
+      "id": "JUST_SAY_NO"
     },
     {
-      "id": "LAB_RAT",
-      "points": 50
+      "id": "LAB_RAT"
     },
     {
-      "id": "LAST_MON_STANDING",
-      "points": 75
+      "id": "LAST_MON_STANDING"
     },
     {
-      "id": "LAST_STAND",
-      "points": 110
+      "id": "LAST_STAND"
     },
     {
-      "id": "LEFT_RIGHT_GOODNIGHT",
-      "points": 50
+      "id": "LEFT_RIGHT_GOODNIGHT"
     },
     {
-      "id": "LEGENDARY_DUELIST",
-      "points": 100
+      "id": "LEGENDARY_DUELIST"
     },
     {
-      "id": "LIFELINE_SUBSCRIPTION",
-      "points": 75
+      "id": "LIFELINE_SUBSCRIPTION"
     },
     {
-      "id": "LIMBO",
-      "points": 100
+      "id": "LIMBO"
     },
     {
-      "id": "LONG_HAUL_DUO",
-      "points": 75
+      "id": "LONG_HAUL_DUO"
     },
     {
-      "id": "LOOK_COLLECTOR_10",
-      "points": 25
+      "id": "LOOK_COLLECTOR_10"
     },
     {
-      "id": "LOOK_COLLECTOR_100",
-      "points": 100
+      "id": "LOOK_COLLECTOR_100"
     },
     {
-      "id": "LOOK_COLLECTOR_25",
-      "points": 50
+      "id": "LOOK_COLLECTOR_25"
     },
     {
-      "id": "LOOK_COLLECTOR_50",
-      "points": 75
+      "id": "LOOK_COLLECTOR_50"
     },
     {
-      "id": "MASTER_OF_ALL",
-      "points": 150
+      "id": "MASTER_OF_ALL"
     },
     {
-      "id": "MASTER_PLAN",
-      "points": 110
+      "id": "MASTER_PLAN"
     },
     {
-      "id": "MEGAFLARE",
-      "points": 50
+      "id": "MEGAFLARE"
     },
     {
-      "id": "META_BREAKER",
-      "points": 100
+      "id": "META_BREAKER"
     },
     {
-      "id": "METAL_SLIME",
-      "points": 50
+      "id": "METAL_SLIME"
     },
     {
-      "id": "MONO_GEN_REDUX_VICTORY",
-      "points": 75
+      "id": "MONO_GEN_REDUX_VICTORY"
     },
     {
-      "id": "MONOCHROME_REQUIEM",
-      "points": 110
+      "id": "MONOCHROME_REQUIEM"
     },
     {
-      "id": "MUSEUM_QUALITY",
-      "points": 75
+      "id": "MUSEUM_QUALITY"
     },
     {
-      "id": "MUTUALLY_ASSURED_DESTRUCTION",
-      "points": 50
+      "id": "MUTUALLY_ASSURED_DESTRUCTION"
     },
     {
-      "id": "NAME_RECOGNITION",
-      "points": 75
+      "id": "NAME_RECOGNITION"
     },
     {
-      "id": "NATURAL_SELECTION_BIAS",
-      "points": 75
+      "id": "NATURAL_SELECTION_BIAS"
     },
     {
-      "id": "NO_I_IN_TEAM",
-      "points": 50
+      "id": "NO_I_IN_TEAM"
     },
     {
-      "id": "NO_SELL",
-      "points": 75
+      "id": "NO_SELL"
     },
     {
-      "id": "NUMBER_GO_UP",
-      "points": 50
+      "id": "NUMBER_GO_UP"
     },
     {
-      "id": "ONE_HP_AND_A_DREAM",
-      "points": 100
+      "id": "ONE_HP_AND_A_DREAM"
     },
     {
-      "id": "ONE_TURN_CLEAR",
-      "points": 75
+      "id": "ONE_TURN_CLEAR"
     },
     {
-      "id": "OPPOSITION_RESEARCH",
-      "points": 100
+      "id": "OPPOSITION_RESEARCH"
     },
     {
-      "id": "ORIGINAL_DRAGON_SPIRIT",
-      "points": 50
+      "id": "ORIGINAL_DRAGON_SPIRIT"
     },
     {
-      "id": "PARALLEL_PLAY",
-      "points": 75
+      "id": "PARALLEL_PLAY"
     },
     {
-      "id": "PARTNERS_IN_CRIME",
-      "points": 50
+      "id": "PARTNERS_IN_CRIME"
     },
     {
-      "id": "PERMADEATH",
-      "points": 125
+      "id": "PERMADEATH"
     },
     {
-      "id": "PHANTOM_FORMATION",
-      "points": 120
+      "id": "PHANTOM_FORMATION"
     },
     {
-      "id": "PK_STARSTORM",
-      "points": 25
+      "id": "PK_STARSTORM"
     },
     {
-      "id": "POKE_HIM_ON",
-      "points": 25
+      "id": "POKE_HIM_ON"
     },
     {
-      "id": "PRESET_CURATOR",
-      "points": 50
+      "id": "PRESET_CURATOR"
     },
     {
-      "id": "PRESET_JET_SET",
-      "points": 75
+      "id": "PRESET_JET_SET"
     },
     {
-      "id": "PRIMAL_CASCOON",
-      "points": 100
+      "id": "PRIMAL_CASCOON"
     },
     {
-      "id": "PRODIGAL_MON",
-      "points": 75
+      "id": "PRODIGAL_MON"
     },
     {
-      "id": "PURE_VANILLA",
-      "points": 75
+      "id": "PURE_VANILLA"
     },
     {
-      "id": "PURGATORY",
-      "points": 125
+      "id": "PURGATORY"
     },
     {
-      "id": "RAGS_TO_RICHES",
-      "points": 75
+      "id": "RAGS_TO_RICHES"
     },
     {
-      "id": "RANKED_AND_FILED",
-      "points": 25
+      "id": "RANKED_AND_FILED"
     },
     {
-      "id": "RAW_TALENT",
-      "points": 50
+      "id": "RAW_TALENT"
     },
     {
-      "id": "READ_THE_FINE_PRINT",
-      "points": 75
+      "id": "READ_THE_FINE_PRINT"
     },
     {
-      "id": "REALISTIC_FLASH_IS_BORING",
-      "points": 50
+      "id": "REALISTIC_FLASH_IS_BORING"
     },
     {
-      "id": "RELIC_HUNTER",
-      "points": 50
+      "id": "RELIC_HUNTER"
     },
     {
-      "id": "SCORCHED_EARTH",
-      "points": 130
+      "id": "SCORCHED_EARTH"
     },
     {
-      "id": "SETUP_PAYOFF",
-      "points": 50
+      "id": "SETUP_PAYOFF"
     },
     {
-      "id": "SEVEN_DEADLY_CHECKBOXES",
-      "points": 100
+      "id": "SEVEN_DEADLY_CHECKBOXES"
     },
     {
-      "id": "SHARED_TRIUMPH",
-      "points": 100
+      "id": "SHARED_TRIUMPH"
     },
     {
-      "id": "SHIELD_BREAK",
-      "points": 50
+      "id": "SHIELD_BREAK"
     },
     {
-      "id": "SIGNATURE_STYLE",
-      "points": 75
+      "id": "SIGNATURE_STYLE"
     },
     {
-      "id": "SIX_PACK",
-      "points": 25
+      "id": "SIX_PACK"
     },
     {
-      "id": "SNAKES_ON_A_PLANE",
-      "points": 75
+      "id": "SNAKES_ON_A_PLANE"
     },
     {
-      "id": "SORRY_FOR_THE_WAIT",
-      "points": 75
+      "id": "SORRY_FOR_THE_WAIT"
     },
     {
-      "id": "SQUATTER",
-      "points": 50
+      "id": "SQUATTER"
     },
     {
-      "id": "STATUS_QUO",
-      "points": 100
+      "id": "STATUS_QUO"
     },
     {
-      "id": "STRANGER_THAN_FICTION",
-      "points": 75
+      "id": "STRANGER_THAN_FICTION"
     },
     {
-      "id": "SUPER_ARMOR",
-      "points": 50
+      "id": "SUPER_ARMOR"
     },
     {
-      "id": "TECHNICAL_DIFFICULTIES",
-      "points": 25
+      "id": "TECHNICAL_DIFFICULTIES"
     },
     {
-      "id": "TEMPEST",
-      "points": 130
+      "id": "TEMPEST"
     },
     {
-      "id": "THE_HOUSE_REMEMBERS",
-      "points": 50
+      "id": "THE_HOUSE_REMEMBERS"
     },
     {
-      "id": "THE_LONG_ROAD",
-      "points": 100
+      "id": "THE_LONG_ROAD"
     },
     {
-      "id": "THE_LONGEST_TURN",
-      "points": 50
+      "id": "THE_LONGEST_TURN"
     },
     {
-      "id": "THE_UPSIDE_DOWN",
-      "points": 110
+      "id": "THE_UPSIDE_DOWN"
     },
     {
-      "id": "THREE_PIECE_COMBO",
-      "points": 75
+      "id": "THREE_PIECE_COMBO"
     },
     {
-      "id": "THREES_COMPANY",
-      "points": 25
+      "id": "THREES_COMPANY"
     },
     {
-      "id": "TRIAD_OF_HELL",
-      "points": 100
+      "id": "TRIAD_OF_HELL"
     },
     {
-      "id": "TRINITY_TEST",
-      "points": 120
+      "id": "TRINITY_TEST"
     },
     {
-      "id": "TRIPLE_DOWN",
-      "points": 75
+      "id": "TRIPLE_DOWN"
     },
     {
-      "id": "TRIPLE_EXORCISM",
-      "points": 100
+      "id": "TRIPLE_EXORCISM"
     },
     {
-      "id": "TRIPLE_THREAT",
-      "points": 50
+      "id": "TRIPLE_THREAT"
     },
     {
-      "id": "TWO_LEGENDS_ONE_SLOT",
-      "points": 75
+      "id": "TWO_LEGENDS_ONE_SLOT"
     },
     {
-      "id": "TYPECAST_TRIO",
-      "points": 100
+      "id": "TYPECAST_TRIO"
     },
     {
-      "id": "ULTRA_INSTINCT",
-      "points": 75
+      "id": "ULTRA_INSTINCT"
     },
     {
-      "id": "VETERAN_DUELIST",
-      "points": 75
+      "id": "VETERAN_DUELIST"
     },
     {
-      "id": "WAR_OF_ATTRITION",
-      "points": 100
+      "id": "WAR_OF_ATTRITION"
     },
     {
-      "id": "WE_BOTH_LIVED",
-      "points": 100
+      "id": "WE_BOTH_LIVED"
     },
     {
-      "id": "WEAVE_NATION_CERTIFIED",
-      "points": 50
+      "id": "WEAVE_NATION_CERTIFIED"
     },
     {
-      "id": "YO",
-      "points": 50
+      "id": "YO"
     },
     {
-      "id": "ZERO_SUM_HERO",
-      "points": 100
+      "id": "ZERO_SUM_HERO"
     },
     {
-      "id": "ZERO_TO_HERO",
-      "points": 75
+      "id": "ZERO_TO_HERO"
     }
   ]
 }

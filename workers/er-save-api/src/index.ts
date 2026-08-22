@@ -45,7 +45,7 @@ import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type"
 import { SpeciesId } from "../../../src/enums/species-id";
 import { TrainerType } from "../../../src/enums/trainer-type";
 import { TrainerVariant } from "../../../src/enums/trainer-variant";
-import { validateCommunitySuggestion } from "./community-suggestions";
+import { calculateCommunitySuggestionEligibility, validateCommunitySuggestion } from "./community-suggestions";
 import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
   applyResultReport,
@@ -3512,10 +3512,10 @@ async function ensureCommunityTables(env: Env): Promise<void> {
 // more featured achievements can be added without touching the route logic.
 // ---------------------------------------------------------------------------
 const TRACKED_ACHV_IDS = new Set(["INFERNO"]);
-const COMMUNITY_SUGGESTION_ACHIEVEMENTS = new Map(
-  communitySuggestionAchievements.achievements.map(achievement => [achievement.id, achievement.points]),
+const COMMUNITY_SUGGESTION_ACHIEVEMENTS = new Set(
+  communitySuggestionAchievements.achievements.map(achievement => achievement.id),
 );
-const COMMUNITY_SUGGESTION_REQUIRED_POINTS = communitySuggestionAchievements.requiredPoints;
+const COMMUNITY_SUGGESTION_REQUIRED_ACHIEVEMENTS = communitySuggestionAchievements.requiredAchievements;
 
 // ---------------------------------------------------------------------------
 // Shared config validator. This is a VERBATIM copy of the client's
@@ -4568,23 +4568,11 @@ async function communitySuggestionEligibility(auth: TokenPayload, env: Env) {
   const { results } = await env.DB.prepare("SELECT achv_id FROM achievement_holders WHERE user_id = ?")
     .bind(auth.uid)
     .all<{ achv_id: string }>();
-  const unlocked = new Set((results ?? []).map(row => row.achv_id));
-  let points = 0;
-  let achievementCount = 0;
-  for (const [id, score] of COMMUNITY_SUGGESTION_ACHIEVEMENTS) {
-    if (unlocked.has(id)) {
-      points += score;
-      achievementCount++;
-    }
-  }
-  return {
-    eligible: points >= COMMUNITY_SUGGESTION_REQUIRED_POINTS,
-    points,
-    requiredPoints: COMMUNITY_SUGGESTION_REQUIRED_POINTS,
-    totalPoints: communitySuggestionAchievements.totalPoints,
-    achievementCount,
-    totalAchievements: COMMUNITY_SUGGESTION_ACHIEVEMENTS.size,
-  };
+  return calculateCommunitySuggestionEligibility(
+    (results ?? []).map(row => row.achv_id),
+    COMMUNITY_SUGGESTION_ACHIEVEMENTS,
+    COMMUNITY_SUGGESTION_REQUIRED_ACHIEVEMENTS,
+  );
 }
 
 function suggestionJson(row: CommunitySuggestionRow, includeAuthor = false) {
@@ -4638,7 +4626,7 @@ async function handleCommunitySuggestionCreate(
 ): Promise<Response> {
   const eligibility = await communitySuggestionEligibility(auth, env);
   if (!eligibility.eligible) {
-    return json({ error: "More Redux achievement points are required.", eligibility }, 403, cors);
+    return json({ error: "More Redux-only achievements are required.", eligibility }, 403, cors);
   }
   const body = await readCommunitySuggestionBody(request);
   if (body === null) {

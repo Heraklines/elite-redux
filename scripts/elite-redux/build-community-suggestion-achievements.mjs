@@ -27,37 +27,38 @@ if (!achievementsObject) {
   throw new Error(`Could not find the achvs object in ${sourcePath}`);
 }
 
-const achievements = [];
+const allAchievementIds = [];
 for (const property of achievementsObject.properties) {
   if (!ts.isPropertyAssignment(property)) {
     continue;
   }
   const id = property.name.getText(source).replaceAll(/["']/g, "");
-  if (vanillaIds.has(id)) {
-    continue;
-  }
-  let expression = property.initializer;
-  while (ts.isCallExpression(expression) && ts.isPropertyAccessExpression(expression.expression)) {
-    expression = expression.expression.expression;
-  }
-  if (!ts.isNewExpression(expression)) {
-    throw new Error(`Achievement ${id} is not constructed with new`);
-  }
-  const score = expression.arguments?.[3];
-  if (!score || !ts.isNumericLiteral(score)) {
-    throw new Error(`Achievement ${id} does not have a literal score in constructor argument 4`);
-  }
-  achievements.push({ id, points: Number(score.text) });
+  allAchievementIds.push(id);
 }
 
-achievements.sort((a, b) => a.id.localeCompare(b.id));
-const totalPoints = achievements.reduce((total, achievement) => total + achievement.points, 0);
+const sourceIds = new Set(allAchievementIds);
+const missingVanillaIds = [...vanillaIds].filter(id => !sourceIds.has(id));
+if (missingVanillaIds.length > 0) {
+  console.warn(`Vanilla achievement ids not present in ${sourcePath}: ${missingVanillaIds.join(", ")}`);
+}
+const vanillaAchievementsExcluded = [...vanillaIds].filter(id => sourceIds.has(id)).length;
+
+const achievements = allAchievementIds
+  .filter(id => !vanillaIds.has(id))
+  .sort((a, b) => a.localeCompare(b))
+  .map(id => ({ id }));
+const totalAchievements = achievements.length;
 const catalog = {
-  schemaVersion: 1,
-  totalPoints,
-  requiredPoints: Math.ceil(totalPoints / 2),
+  schemaVersion: 2,
+  sourceAchievementCount: allAchievementIds.length,
+  vanillaCatalogSize: vanillaIds.size,
+  vanillaAchievementsExcluded,
+  totalAchievements,
+  requiredAchievements: Math.ceil(totalAchievements / 2),
   achievements,
 };
 
 await writeFile(outputPath, `${JSON.stringify(catalog, null, 2)}\n`);
-console.log(`Wrote ${achievements.length} Redux-only achievements (${totalPoints} total points) to ${outputPath}.`);
+console.log(
+  `Wrote ${totalAchievements} Redux-only achievements; ${catalog.requiredAchievements} are required for community suggestions.`,
+);

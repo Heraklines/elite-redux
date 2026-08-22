@@ -8,6 +8,9 @@ on:
       - "editor/**"
       - "workers/er-save-api/src/community-suggestions.ts"
       - "workers/er-save-api/src/index.ts"
+      - "scripts/elite-redux/build-community-suggestion-achievements.mjs"
+      - "scripts/elite-redux/vanilla-achievement-ids.json"
+      - "src/data/elite-redux/er-community-suggestion-achievements.json"
       - "test/tests/elite-redux/community-editor/**"
       - ".github/workflows/community-suggestions-check.yml"
   pull_request:
@@ -16,6 +19,9 @@ on:
       - "editor/**"
       - "workers/er-save-api/src/community-suggestions.ts"
       - "workers/er-save-api/src/index.ts"
+      - "scripts/elite-redux/build-community-suggestion-achievements.mjs"
+      - "scripts/elite-redux/vanilla-achievement-ids.json"
+      - "src/data/elite-redux/er-community-suggestion-achievements.json"
       - "test/tests/elite-redux/community-editor/**"
       - ".github/workflows/community-suggestions-check.yml"
 
@@ -31,3 +37,8 @@ jobs:
 
       - name: Test suggestion validation and merge behavior
         run: pnpm exec vitest run test/tests/elite-redux/community-editor/community-suggestions.test.ts
+
+      - name: Verify generated Redux achievement eligibility catalog
+        run: |
+          node scripts/elite-redux/build-community-suggestion-achievements.mjs
+          git diff --exit-code -- src/data/elite-redux/er-community-suggestion-achievements.json
