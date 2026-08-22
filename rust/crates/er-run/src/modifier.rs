@@ -82,11 +82,7 @@ pub fn apply_modifier(
             levels: *levels,
         }),
         ModifierEffectSpec::InventoryItem { key } => {
-            // The slice admits only ball inventory keys; leak-free mapping via
-            // match keeps the lifetime static.
-            Ok(ModifierApplication::InventoryIncremented {
-                key: key.clone(),
-            })
+            Ok(ModifierApplication::InventoryIncremented { key: key.clone() })
         }
         ModifierEffectSpec::MoneyMultiplier { .. }
         | ModifierEffectSpec::ExperienceMultiplier { .. }
