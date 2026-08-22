@@ -13,6 +13,7 @@ pub mod move_menu;
 pub mod party_menu;
 pub mod party_option_menu;
 pub mod replacement_menu;
+pub mod run_runtime;
 pub mod runtime;
 pub mod snapshot;
 pub mod target_menu;

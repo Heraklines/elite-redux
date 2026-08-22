@@ -10,6 +10,7 @@ er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
 er-rng = { path = "../er-rng" }
+er-run = { path = "../er-run" }
 er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 serde.workspace = true
