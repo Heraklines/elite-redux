@@ -60,6 +60,7 @@ pub struct M4RunPair {
     guest_applied: BTreeMap<OperationId, Vec<u8>>,
     host_actions: Vec<RunSurfaceAction>,
     guest_actions: Vec<RunSurfaceAction>,
+    next_material_delay_ms: SafeU53,
 }
 
 impl M4RunPair {
@@ -75,6 +76,7 @@ impl M4RunPair {
             guest_applied: BTreeMap::new(),
             host_actions: Vec::new(),
             guest_actions: Vec::new(),
+            next_material_delay_ms: SafeU53::ZERO,
         }
     }
 
@@ -92,6 +94,10 @@ impl M4RunPair {
 
     pub fn disconnect_guest(&mut self) {
         self.guest_connected = false;
+    }
+
+    pub fn delay_next_material(&mut self, delay_ms: SafeU53) {
+        self.next_material_delay_ms = delay_ms;
     }
 
     pub fn reconnect_guest(&mut self) {
@@ -121,7 +127,8 @@ impl M4RunPair {
                 == &RunSurfaceAction::Crossroads(er_types::run_model::CrossroadsAction::MoveOn)
             {
                 let bytes = self.host.prepare_run_action_material_bytes(action)?;
-                self.commit_authority(bytes, SafeU53::ZERO)?;
+                let delay_ms = std::mem::replace(&mut self.next_material_delay_ms, SafeU53::ZERO);
+                self.commit_authority(bytes, delay_ms)?;
                 self.deliver_due()?;
             }
         }
@@ -287,6 +294,7 @@ impl M4RunPair {
         self.guest_actions.clear();
         self.host.dispose(reason);
         self.guest.dispose(reason);
+        self.next_material_delay_ms = SafeU53::ZERO;
         (self.host.live_resources(), self.guest.live_resources())
     }
 

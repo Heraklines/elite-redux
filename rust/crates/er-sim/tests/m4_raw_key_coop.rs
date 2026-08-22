@@ -184,3 +184,33 @@ fn guest_owner_acts_by_physical_keys_while_watcher_and_disconnected_input_fail_c
     );
     Ok(())
 }
+
+#[test]
+fn delayed_duplicate_guest_action_recovers_without_replica_resolution() -> Result<(), Box<dyn Error>>
+{
+    let (host, guest, owner, _) = kernels()?;
+    let mut pair = M4RunPair::new(host, guest);
+    pair.delay_next_material(safe(100));
+
+    for key in [PhysicalKey::ArrowDown, PhysicalKey::Space] {
+        pair.step_raw(PairEndpoint::Guest, owner, raw(key.clone(), true))?;
+        pair.step_raw(PairEndpoint::Guest, owner, raw(key, false))?;
+    }
+    assert_ne!(pair.frontiers()?.0, pair.frontiers()?.1);
+    assert_eq!(pair.queued_packets().len(), 1);
+    let packet_id = pair.queued_packets()[0].packet_id;
+    pair.duplicate_packet(packet_id)?;
+
+    pair.disconnect_guest();
+    assert_eq!(pair.advance_time(safe(100))?, 0);
+    pair.reconnect_guest();
+    assert_eq!(pair.deliver_due()?, 1);
+    assert!(pair.queued_packets().is_empty());
+    assert_eq!(pair.frontiers()?.0, pair.frontiers()?.1);
+    assert_eq!(
+        pair.take_actions(PairEndpoint::Guest),
+        vec![RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn)]
+    );
+    assert!(pair.take_actions(PairEndpoint::Host).is_empty());
+    Ok(())
+}
