@@ -16,8 +16,10 @@ use er_types::battle_ids::ContentPackHash;
 use er_types::run_ids::RunContentPackHash;
 
 /// The published progression fixture path relative to the repository root.
-const PROGRESSION_FIXTURE: &str =
-    "rust/fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json";
+const PROGRESSION_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json"
+);
 
 fn load_fixture_value(path: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     let data = std::fs::read_to_string(path)?;
