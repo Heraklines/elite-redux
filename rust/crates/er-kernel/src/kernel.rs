@@ -405,9 +405,26 @@ impl GameKernel {
         control: er_types::run_control::GameControlPlan,
         encounter: er_run::encounter_plan::EncounterPlan,
     ) -> Result<Self, String> {
+        Self::new_run_endpoint_with_encounter(
+            state,
+            content,
+            input_map,
+            control,
+            RunKernelRole::Local,
+            encounter,
+        )
+    }
+
+    pub fn new_run_endpoint_with_encounter(
+        state: er_state::game_v2::GameStateV2,
+        content: Arc<er_run::transition::GameContentBundle>,
+        input_map: InputMap,
+        control: er_types::run_control::GameControlPlan,
+        role: RunKernelRole,
+        encounter: er_run::encounter_plan::EncounterPlan,
+    ) -> Result<Self, String> {
         encounter.validate().map_err(|error| error.to_string())?;
-        let mut kernel =
-            Self::new_run_endpoint(state, content, input_map, control, RunKernelRole::Local)?;
+        let mut kernel = Self::new_run_endpoint(state, content, input_map, control, role)?;
         kernel.run_encounter = Some(encounter);
         Ok(kernel)
     }

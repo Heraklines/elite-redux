@@ -23,7 +23,7 @@ use er_types::SafeU53;
 use er_types::battle_command::{
     BattleCommandOffer, BattleTargetSelection, OfferedMoveCommand, OfferedSwitchCommand,
 };
-use er_types::battle_control::BattleControl;
+use er_types::battle_control::{BattleControl, WaitingControl, WaitingReason};
 use er_types::battle_ids::{BattleSide, FieldSlot, MenuInstanceId, MoveSlotIndex, PartyIndex};
 use er_types::run_control::{
     BiomeMarketControl, BiomeSelectControl, GameControl, GameControlPlan, MoveLearnControl,
@@ -877,8 +877,7 @@ pub fn prepare_biome_select_transition(
     let Some(RunSurfaceState::BiomeSelect(surface)) = before.run.active_surface.as_ref() else {
         return Err(RunTransitionPreparationError::WrongSurface);
     };
-    if current_control.seats.len() != 1
-        || current_control.owner_seat() != surface.header.owner_seat
+    if current_control.owner_seat() != surface.header.owner_seat
         || encounter.biome != *biome
         || encounter.run_id != before.run.run_id
     {
@@ -1008,15 +1007,29 @@ pub fn prepare_biome_select_transition(
         CommandRootSelection::Fight,
     )
     .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
-    let next_control = GameControlPlan::new(
-        vec![SeatControlPlan {
-            seat: surface.header.owner_seat,
-            owner: true,
+    let waiting = WaitingControl::new(
+        WaitingReason::AuthorityEntry,
+        vec![surface.header.operation_id.clone()],
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let seats = current_control
+        .seats
+        .iter()
+        .map(|seat| SeatControlPlan {
+            seat: seat.seat,
+            owner: seat.owner,
             control_id: control_id.clone(),
             menu_instance_id: menu_instance,
-            actionable_after: current_control.seats[0].actionable_after,
-            control: GameControl::Battle(BattleControl::CommandRoot(root)),
-        }],
+            actionable_after: seat.actionable_after,
+            control: if seat.owner {
+                GameControl::Battle(BattleControl::CommandRoot(root.clone()))
+            } else {
+                GameControl::Waiting(waiting.clone())
+            },
+        })
+        .collect();
+    let next_control = GameControlPlan::new(
+        seats,
         format!("{control_id}/next"),
         MenuInstanceId::new(
             SafeU53::new(next_menu_value)
