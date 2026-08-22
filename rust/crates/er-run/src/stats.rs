@@ -93,7 +93,7 @@ fn nature_factor(nature: &NatureDefinition, axis: StatAxis) -> f64 {
 /// `ivs` are the six raw individual values in oracle axis order (HP, Attack,
 /// Defense, Special Attack, Special Defense, Speed).
 pub fn recompute_stats(
-    base: &SpeciesBaseStats,
+    base_stats: &SpeciesBaseStats,
     ivs: [u8; 6],
     level: u16,
     nature: &NatureDefinition,
@@ -114,7 +114,9 @@ pub fn recompute_stats(
     ];
     let mut values = [0u32; 6];
     for (index, axis) in AXES.iter().enumerate() {
-        let raw = f64::from(base.base(*axis) * 2 + u32::from(ivs[index])) * f64::from(level) * 0.01;
+        let raw = f64::from(axis.base(base_stats) * 2 + u32::from(ivs[index]))
+            * f64::from(level)
+            * 0.01;
         let mut value = raw.floor();
         if *axis == StatAxis::Hp {
             value += f64::from(level) + 10.0;
@@ -127,6 +129,9 @@ pub fn recompute_stats(
                 } else {
                     (value * factor).floor()
                 };
+                if value < 1.0 {
+                    value = 1.0;
+                }
             }
         }
         value += f64::from(axis.bonus(bonuses));

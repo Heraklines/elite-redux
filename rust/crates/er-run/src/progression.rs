@@ -12,10 +12,12 @@ use er_types::run_ids::Experience;
 use crate::content::{GrowthRateKind, SpeciesProgressionDefinition};
 use crate::experience;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ProgressionError {
     LevelOutsideSupportedRange,
     CapBelowCurrentLevel,
     ExperienceOverflow,
+    UnknownReplacementSlot,
 }
 
 /// One atomic experience award resolved against the level-cap threshold.
@@ -135,8 +137,6 @@ pub fn friendship_after_level_up(before: u16, levels_gained: u16) -> u16 {
 mod tests {
     use super::*;
     use crate::content::{EvolutionDefinition, LevelMoveDefinition};
-    use er_types::battle_ids::SpeciesId as SpeciesIdType;
-    use er_types::run_ids::GrowthRateId;
 
     fn exp(value: u64) -> Experience {
         Experience::new(SafeU53::new(value).expect("safe exp"))
@@ -146,8 +146,8 @@ mod tests {
         MoveId::new(SafeU53::new(value).expect("safe move"))
     }
 
-    fn species_id(value: u64) -> SpeciesIdType {
-        SpeciesIdType::new(SafeU53::new(value).expect("safe species"))
+    fn species_id(value: u64) -> SpeciesId {
+        SpeciesId::new(SafeU53::new(value).expect("safe species"))
     }
 
     /// Mirrors the frozen Nacli entry in
@@ -156,7 +156,7 @@ mod tests {
         SpeciesProgressionDefinition {
             species_id: species_id(932),
             key: "NACLI".to_owned(),
-            growth_rate: GrowthRateId::new(3),
+            growth_rate: er_types::run_ids::GrowthRateId::new(3),
             base_experience: 56,
             parity_level_before: 16,
             parity_level_after: 17,
