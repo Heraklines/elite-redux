@@ -104,3 +104,5 @@ scratch_view/
 
 .omp-*/
 .omp-*.zip
+.omp-*
+rustup-init.exe
