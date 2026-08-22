@@ -9,7 +9,9 @@
 
   let token = demo ? "demo" : localStorage.getItem(TOKEN_KEY) || "";
   let username = demo ? "UmbraKai" : localStorage.getItem(USER_KEY) || "";
-  let eligibility = demo ? { eligible: true, points: 7425, requiredPoints: 5965, totalPoints: 11930 } : null;
+  let eligibility = demo
+    ? { eligible: true, achievementCount: 96, requiredAchievements: 82, totalAchievements: 164 }
+    : null;
 
   const $ = selector => document.querySelector(selector);
 
@@ -43,7 +45,7 @@
 
   async function refreshEligibility() {
     if (demo) {
-      setAccess("Eligible: 7,425 / 5,965 Redux points", "eligible");
+      setAccess("Eligible: 96 Redux achievements (82 required)", "eligible");
       return;
     }
     if (!token) {
@@ -66,8 +68,8 @@
       }
       setAccess(
         eligibility.eligible
-          ? `Eligible: ${Number(eligibility.points).toLocaleString()} / ${Number(eligibility.requiredPoints).toLocaleString()} Redux points`
-          : `${Number(eligibility.points).toLocaleString()} / ${Number(eligibility.requiredPoints).toLocaleString()} Redux points required`,
+          ? `Eligible: ${Number(eligibility.achievementCount).toLocaleString()} Redux achievements (${Number(eligibility.requiredAchievements).toLocaleString()} required)`
+          : `${Number(eligibility.achievementCount).toLocaleString()} / ${Number(eligibility.requiredAchievements).toLocaleString()} Redux achievements required`,
         eligibility.eligible ? "eligible" : "locked",
       );
     } catch {
@@ -143,7 +145,7 @@
       throw new Error("Log in before submitting this suggestion.");
     }
     if (!eligibility?.eligible) {
-      throw new Error("This account has not reached half of the Redux-only achievement points yet.");
+      throw new Error("This account has not unlocked half of the Redux-only achievements yet.");
     }
     const reason = await promptReason(summary);
     if (reason === null) {

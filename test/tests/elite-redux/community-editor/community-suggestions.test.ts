@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import vanillaAchievementIds from "../../../../scripts/elite-redux/vanilla-achievement-ids.json";
+import communitySuggestionAchievements from "../../../../src/data/elite-redux/er-community-suggestion-achievements.json";
 import {
+  calculateCommunitySuggestionEligibility,
   mergeSuggestionDeltas,
   validateCommunitySuggestion,
 } from "../../../../workers/er-save-api/src/community-suggestions";
@@ -23,6 +26,40 @@ const validDraft = {
 };
 
 describe("community editor suggestion validation", () => {
+  it("gates by half of distinct Redux-only achievements, not achievement points", () => {
+    const reduxIds = communitySuggestionAchievements.achievements.map(achievement => achievement.id);
+    const vanillaIds = new Set(vanillaAchievementIds);
+
+    expect(new Set(reduxIds).size).toBe(reduxIds.length);
+    expect(reduxIds.some(id => vanillaIds.has(id))).toBe(false);
+    expect(communitySuggestionAchievements.totalAchievements).toBe(reduxIds.length);
+    expect(communitySuggestionAchievements.requiredAchievements).toBe(Math.ceil(reduxIds.length / 2));
+    expect(communitySuggestionAchievements.sourceAchievementCount).toBe(
+      communitySuggestionAchievements.totalAchievements + communitySuggestionAchievements.vanillaAchievementsExcluded,
+    );
+
+    const eligibleIds = new Set(reduxIds);
+    const belowThreshold = calculateCommunitySuggestionEligibility(
+      reduxIds.slice(0, communitySuggestionAchievements.requiredAchievements - 1),
+      eligibleIds,
+      communitySuggestionAchievements.requiredAchievements,
+    );
+    const atThreshold = calculateCommunitySuggestionEligibility(
+      [...reduxIds.slice(0, communitySuggestionAchievements.requiredAchievements), reduxIds[0]],
+      eligibleIds,
+      communitySuggestionAchievements.requiredAchievements,
+    );
+
+    expect(belowThreshold).toMatchObject({
+      eligible: false,
+      achievementCount: communitySuggestionAchievements.requiredAchievements - 1,
+    });
+    expect(atThreshold).toMatchObject({
+      eligible: true,
+      achievementCount: communitySuggestionAchievements.requiredAchievements,
+    });
+  });
+
   it("accepts a bounded editor-native delta", () => {
     expect(validateCommunitySuggestion(validDraft)).toMatchObject({ ok: true, errors: [] });
   });
