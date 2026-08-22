@@ -170,7 +170,9 @@ assert(slice.progression.level_cap_source === "TEST_ONLY_LEVEL_CAP_OVERRIDE_17",
 assert(slice.progression.pause_evolutions === false && slice.progression.evolution_level === 23, "parity evolution boundary mismatch");
 assert(slice.progression.initial_moves_source === "ORACLE_COMPOSED_SUPPORTED_BATTLE_LOADOUT", "parity loadout source mismatch");
 assert(slice.battle_content.move_ids.includes(34), "battle content omits Body Slam 34");
-assert(JSON.stringify(slice.battle_content.m4_additional_move_ids) === "[34]", "M4 additional battle move closure must contain only Body Slam 34");
+assert(JSON.stringify(slice.battle_content.m4_additional_move_ids) === "[34,39,98,158,230]", "M4 additional battle move closure must match the captured encounter expansion");
+assert(slice.battle_content.species_ids.includes(915), "captured encounter expansion omits Lechonk 915");
+assert(slice.battle_content.ability_ids.includes(165), "captured encounter expansion omits Aroma Veil 165");
 assert(slice.regular_reward_shop.supports_reroll === true && slice.regular_reward_shop.supports_locks === true, "regular shop must own reroll and locks");
 assert(slice.biome_market.supports_reroll === false && slice.biome_market.supports_locks === false, "biome market must not expose reroll or locks");
 assert(slice.encounter_candidates.length === 1 && slice.encounter_candidates[0].source === "ORACLE_CAPTURE_REQUIRED", "parity encounter must remain an explicit captured-vector prerequisite");

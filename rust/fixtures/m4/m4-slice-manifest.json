@@ -25,11 +25,11 @@
     "natural_single_seed_claim": false
   },
   "battle_content": {
-    "species_ids": [1, 7, 19, 23, 50, 52, 932],
-    "move_ids": [1, 34, 52, 77, 78, 351, 589],
-    "ability_ids": [0, 22, 25],
+    "species_ids": [1, 7, 19, 23, 50, 52, 915, 932],
+    "move_ids": [1, 34, 39, 52, 77, 78, 98, 158, 230, 351, 589],
+    "ability_ids": [0, 22, 25, 165],
     "m3_source_manifest": "../m3/m3-slice-manifest.json",
-    "m4_additional_move_ids": [34],
+    "m4_additional_move_ids": [34, 39, 98, 158, 230],
     "m4_additional_content_source": "M4_ORACLE_EXPORTED_POST_INITIALIZATION_DEFINITIONS"
   },
   "progression": {
