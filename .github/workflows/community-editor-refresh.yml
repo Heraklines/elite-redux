@@ -51,7 +51,8 @@ jobs:
         run: |
           rm -rf community-editor/_deploy
           mkdir -p community-editor/_deploy/data
-          cp community-editor/index.html community-editor/app.js community-editor/_deploy/
+          cp editor/index.html editor/app.js editor/community-mode.js editor/suggestions.js community-editor/_deploy/
+          sed -i 's#<body>#<body><script>window.ER_EDITOR_MODE = "community";</script>#' community-editor/_deploy/index.html
           cp editor/data/*.json community-editor/_deploy/data/
           printf '{"sourceSha":"%s"}\n' "$EDITOR_SOURCE_SHA" > community-editor/_deploy/version.json
           cat > community-editor/_deploy/_headers <<'EOF'
@@ -65,7 +66,9 @@ jobs:
 
       - name: Validate community editor bundle
         run: |
-          node --check community-editor/app.js
+          node --check community-editor/_deploy/app.js
+          node --check community-editor/_deploy/community-mode.js
+          node --check community-editor/_deploy/suggestions.js
           node scripts/validate-editor-data.mjs community-editor/_deploy/data
 
       - name: Deploy Community ER Editor to Cloudflare Pages

@@ -179,6 +179,9 @@ const saveBtn = $("#save");
 const deployBtn = $("#deploy");
 const undoBtn = $("#undo");
 const ERR = "#c0392b";
+const communityMode = window.communityEditorMode;
+
+communityMode?.init();
 
 const prettify = name =>
   name
@@ -336,9 +339,11 @@ function dirtyCounts() {
 
 function refreshChrome() {
   const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, ctrN, total: localTotal } = dirtyCounts();
-  const stagedTotal = window.communitySuggestions?.stagedCount?.() || 0;
+  const stagedTotal = communityMode?.enabled ? 0 : window.communitySuggestions?.stagedCount?.() || 0;
   const total = localTotal + stagedTotal;
-  saveBtn.textContent = `Save ${total} change${total === 1 ? "" : "s"}`;
+  saveBtn.textContent = communityMode?.enabled
+    ? `Make suggestion${total > 0 ? ` (${total} change${total === 1 ? "" : "s"})` : ""}`
+    : `Save ${total} change${total === 1 ? "" : "s"}`;
   saveBtn.disabled = total === 0;
   const dots = {
     eggmoves: eggN,
@@ -5658,8 +5663,183 @@ function buildDeltas() {
   return { deltas, bad };
 }
 
+function communityBaselineSource(file) {
+  if (file === "egg-moves") {
+    return egg.baseline;
+  }
+  if (file === "species-tuning") {
+    return sp.baseline;
+  }
+  if (file === "item-tuning") {
+    return item.baseline;
+  }
+  if (file === "balance-tuning") {
+    return bal.baseline;
+  }
+  if (file === "learnsets") {
+    return learn.baseline;
+  }
+  if (file === "tm-learnsets") {
+    return tms.baseline;
+  }
+  if (file === "species-abilities") {
+    return abil.baseline;
+  }
+  if (file === "custom-trainers") {
+    return CTR_LIVE;
+  }
+  if (file === "custom-trainers-config") {
+    return ctrConfig.baseline;
+  }
+  if (file === "trainer-tuning") {
+    return {
+      frequency: tr.baseline?.freq || {},
+      sets: {
+        factoryExcludeSpecies: tr.baseline?.excluded || [],
+        factorySetOverrides: trSets.baseline,
+      },
+    };
+  }
+  return {};
+}
+
+function communityProjectBaseline(change, source) {
+  if (source === undefined) {
+    return null;
+  }
+  if (!change || typeof change !== "object" || Array.isArray(change)) {
+    return JSON.parse(JSON.stringify(source));
+  }
+  const result = {};
+  for (const [key, value] of Object.entries(change)) {
+    result[key] = communityProjectBaseline(value, source?.[key]);
+  }
+  return result;
+}
+
+function communityBaselineFor(deltas) {
+  return Object.fromEntries(
+    Object.entries(deltas).map(([file, delta]) => [
+      file,
+      communityProjectBaseline(delta, communityBaselineSource(file)),
+    ]),
+  );
+}
+
+function communityLeafCount(value) {
+  if (!value || typeof value !== "object") {
+    return 1;
+  }
+  return Object.values(value).reduce((total, entry) => total + communityLeafCount(entry), 0);
+}
+
+function communitySuggestionIdentity(deltas) {
+  const refs = [];
+  for (const [file, delta] of Object.entries(deltas)) {
+    for (const key of Object.keys(delta)) {
+      refs.push({ file, key });
+    }
+  }
+  const uniqueKeys = [...new Set(refs.map(ref => ref.key))];
+  if (uniqueKeys.length !== 1) {
+    return {
+      entityType: "other",
+      entityKey: `BATCH_${Date.now()}`,
+      entityLabel: `Editor proposal (${communityLeafCount(deltas)} changes)`,
+    };
+  }
+  const key = uniqueKeys[0];
+  const files = new Set(refs.map(ref => ref.file));
+  const species = spByConst.get(key) || SPECIES.find(entry => entry.const === key);
+  if (species) {
+    return { entityType: "pokemon", entityKey: key, entityLabel: species.name };
+  }
+  const itemEntry = ITEMS.find(entry => entry.key === key);
+  if (itemEntry) {
+    return { entityType: "item", entityKey: key, entityLabel: prettify(key) };
+  }
+  if (files.has("custom-trainers")) {
+    return {
+      entityType: "trainer",
+      entityKey: key,
+      entityLabel: ctr.current[key]?.name || CTR_LIVE[key]?.name || prettify(key),
+    };
+  }
+  const knob = KNOBS.find(entry => entry.key === key);
+  return {
+    entityType: files.has("trainer-tuning") ? "trainer" : "game",
+    entityKey: /^[A-Za-z0-9_.:-]+$/.test(key) ? key : `CHANGE_${Date.now()}`,
+    entityLabel: knob?.label || prettify(key),
+  };
+}
+
+function markCommunitySuggested(files, deltas) {
+  for (const file of files) {
+    if (file === "custom-trainers") {
+      ctr.baseline = JSON.parse(JSON.stringify(ctr.current));
+      for (const [key, value] of Object.entries(deltas[file] || {})) {
+        if (value === null) {
+          delete CTR_LIVE[key];
+        } else {
+          CTR_LIVE[key] = JSON.parse(JSON.stringify(value));
+        }
+      }
+    } else {
+      markSaved(file);
+    }
+  }
+}
+
+async function submitCommunitySuggestion() {
+  const { deltas, bad } = buildDeltas();
+  if (bad.length > 0) {
+    setStatus(`Fix ${bad.length} issue(s): ${bad.slice(0, 3).join("; ")}${bad.length > 3 ? "..." : ""}`, ERR);
+    return;
+  }
+  const files = Object.keys(deltas);
+  if (files.length === 0) {
+    setStatus("Make at least one change first.");
+    return;
+  }
+  if (files.length > 6 || communityLeafCount(deltas) > 300) {
+    setStatus("This proposal is too large. Submit it as a few focused suggestions.", ERR);
+    return;
+  }
+  saveBtn.disabled = true;
+  try {
+    const version = await fetchJson("./version.json", {});
+    const identity = communitySuggestionIdentity(deltas);
+    const fieldCount = communityLeafCount(deltas);
+    const result = await communityMode.submitDraft(
+      {
+        ...identity,
+        reason: "",
+        sourceRevision: version.sourceSha || "",
+        changes: deltas,
+        baseline: communityBaselineFor(deltas),
+      },
+      `${fieldCount} changed value${fieldCount === 1 ? "" : "s"} across ${files.length} editor section${files.length === 1 ? "" : "s"}. Staff will see the exact before and after values.`,
+    );
+    if (!result) {
+      setStatus("Suggestion cancelled.");
+      return;
+    }
+    markCommunitySuggested(files, deltas);
+    render();
+    setStatus("Suggestion submitted for staff review.", "var(--ok)");
+  } catch (error) {
+    setStatus(error.message || String(error), ERR);
+  } finally {
+    refreshChrome();
+  }
+}
+
 // ---- Save / deploy --------------------------------------------------------------------
 async function commit({ deploy }) {
+  if (communityMode?.enabled) {
+    await submitCommunitySuggestion();
+    return;
+  }
   // Trim: pasted / autofilled passwords often carry a stray space that would 401.
   const password = ($("#password")?.value || "").trim();
   if (!password) {
