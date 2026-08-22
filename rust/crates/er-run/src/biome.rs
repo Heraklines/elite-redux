@@ -62,8 +62,7 @@ pub fn plan_er_biome_structure(
             start_wave,
         });
     }
-    let mut rng =
-        PhaserRdg::from_seed(&format!("{run_seed}:er-biome-length:{start}"));
+    let mut rng = PhaserRdg::from_seed(&format!("{run_seed}:er-biome-length:{start}"));
     let minimum = er_types::SafeU53::new(u64::from(BIOME_LENGTH_MIN)).expect("min");
     let maximum = er_types::SafeU53::new(u64::from(BIOME_LENGTH_MAX)).expect("max");
     let a = rng
@@ -160,8 +159,7 @@ mod tests {
     fn town_structure_matches_the_captured_vector() {
         // Published fixture biomes/town-crossroads-route-v1.json asserts the
         // explicit vector: probe seed m4a-town-15, start wave 1, length 25.
-        let plan =
-            plan_er_biome_structure(wave(1), "m4a-town-15").expect("town structure");
+        let plan = plan_er_biome_structure(wave(1), "m4a-town-15").expect("town structure");
         assert_eq!(plan.length, Some(25));
         assert_eq!(plan.start_wave.get(), 1);
     }
@@ -180,8 +178,7 @@ mod tests {
     #[test]
     fn lengths_stay_within_the_frozen_band() {
         for start in [1u64, 5, 40, 100] {
-            let plan =
-                plan_er_biome_structure(wave(start), "band-check").expect("plan");
+            let plan = plan_er_biome_structure(wave(start), "band-check").expect("plan");
             let length = plan.length.expect("rolled before the late zone");
             assert!((BIOME_LENGTH_MIN..=BIOME_LENGTH_MAX).contains(&length));
         }
@@ -209,10 +206,7 @@ mod tests {
     #[test]
     fn overstay_arms_once_at_ten_spent_waves() {
         assert_eq!(arm_overstay_anchor(None, wave(1), wave(9)), None);
-        assert_eq!(
-            arm_overstay_anchor(None, wave(1), wave(10)),
-            Some(wave(10))
-        );
+        assert_eq!(arm_overstay_anchor(None, wave(1), wave(10)), Some(wave(10)));
         // A second stay cannot move an armed anchor.
         assert_eq!(
             arm_overstay_anchor(Some(wave(10)), wave(1), wave(15)),
@@ -222,12 +216,10 @@ mod tests {
 
     #[test]
     fn route_selection_validates_both_identities() {
-        let options = [
-            RouteOption {
-                route_node_id: RouteNodeId::new(SafeU53::new(1).expect("node")),
-                biome: BiomeId::new(SafeU53::new(1).expect("biome")),
-            },
-        ];
+        let options = [RouteOption {
+            route_node_id: RouteNodeId::new(SafeU53::new(1).expect("node")),
+            biome: BiomeId::new(SafeU53::new(1).expect("biome")),
+        }];
         let town = BiomeId::new(SafeU53::new(0).expect("town"));
         let plains = BiomeId::new(SafeU53::new(1).expect("plains"));
         assert!(select_route(&options, town, options[0].route_node_id, plains).is_ok());

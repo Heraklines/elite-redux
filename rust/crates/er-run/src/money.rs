@@ -22,7 +22,9 @@ pub fn credit(balance: Money, delta: u64) -> Result<Money, MoneyError> {
         .get()
         .checked_add(delta)
         .ok_or(MoneyError::Overflow)?;
-    Ok(Money::new(er_types::SafeU53::new(next).map_err(|_| MoneyError::Overflow)?))
+    Ok(Money::new(
+        er_types::SafeU53::new(next).map_err(|_| MoneyError::Overflow)?,
+    ))
 }
 
 /// Subtracts a non-negative payment from a balance.
@@ -32,7 +34,9 @@ pub fn debit(balance: Money, amount: u64) -> Result<Money, MoneyError> {
         return Err(MoneyError::Underflow);
     }
     let next = current - amount;
-    Ok(Money::new(er_types::SafeU53::new(next).map_err(|_| MoneyError::Underflow)?))
+    Ok(Money::new(
+        er_types::SafeU53::new(next).map_err(|_| MoneyError::Underflow)?,
+    ))
 }
 
 #[cfg(test)]
@@ -53,10 +57,7 @@ mod tests {
 
     #[test]
     fn underflow_is_typed_not_saturating() {
-        assert_eq!(
-            debit(money(100), 101),
-            Err(MoneyError::Underflow)
-        );
+        assert_eq!(debit(money(100), 101), Err(MoneyError::Underflow));
     }
 
     #[test]

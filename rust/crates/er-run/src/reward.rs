@@ -8,7 +8,7 @@
 
 use er_types::battle_ids::PokemonId;
 use er_types::battle_model::ModifierTier;
-use er_types::run_ids::{Money, ModifierId, RunOfferId, RunStockId};
+use er_types::run_ids::{ModifierId, Money, RunOfferId, RunStockId};
 
 use crate::content::{MarketRuleSet, RewardRuleSet};
 use crate::money;
@@ -242,7 +242,12 @@ mod tests {
             Ok(money(10))
         );
         assert_eq!(
-            pay_for_offer(money(10), std::slice::from_ref(&free), free.offer_id, Some(money(0))),
+            pay_for_offer(
+                money(10),
+                std::slice::from_ref(&free),
+                free.offer_id,
+                Some(money(0))
+            ),
             Ok(money(10))
         );
         let paid = offer(false);
@@ -274,7 +279,12 @@ mod tests {
             Err(ShopError::PriceMismatch)
         );
         assert_eq!(
-            pay_for_offer(money(299), std::slice::from_ref(&paid), paid.offer_id, Some(money(300))),
+            pay_for_offer(
+                money(299),
+                std::slice::from_ref(&paid),
+                paid.offer_id,
+                Some(money(300))
+            ),
             Err(ShopError::InsufficientMoney)
         );
     }
@@ -317,9 +327,13 @@ mod tests {
             remaining_quantity: 2,
             sold: false,
         };
-        let (balance, updated) =
-            buy_stock(money(500), std::slice::from_ref(&stock), stock.stock_id, money(60))
-                .expect("buy");
+        let (balance, updated) = buy_stock(
+            money(500),
+            std::slice::from_ref(&stock),
+            stock.stock_id,
+            money(60),
+        )
+        .expect("buy");
         assert_eq!(balance.get().get(), 440);
         assert_eq!(updated.remaining_quantity, 1);
         assert!(!updated.sold);

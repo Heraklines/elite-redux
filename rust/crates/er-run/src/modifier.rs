@@ -105,9 +105,7 @@ pub fn stage_money(
     application: &ModifierApplication,
 ) -> Result<Option<Money>, money::MoneyError> {
     match application {
-        ModifierApplication::MoneyCredited { amount } => {
-            money::credit(balance, *amount).map(Some)
-        }
+        ModifierApplication::MoneyCredited { amount } => money::credit(balance, *amount).map(Some),
         _ => Ok(None),
     }
 }
@@ -124,7 +122,11 @@ mod tests {
     use er_content::species::SpeciesBaseStats;
     use er_types::run_ids::ModifierId;
 
-    fn definition(id: u64, target: ModifierTargetKind, effect: ModifierEffectSpec) -> ModifierDefinition {
+    fn definition(
+        id: u64,
+        target: ModifierTargetKind,
+        effect: ModifierEffectSpec,
+    ) -> ModifierDefinition {
         ModifierDefinition {
             id: ModifierId::new(er_types::SafeU53::new(id).expect("id")),
             oracle_registry_key: String::new(),
@@ -150,8 +152,7 @@ mod tests {
             },
         );
         // Nacli level-17 max HP is 50 from the published fixture.
-        let application =
-            apply_modifier(&potion, Some(target()), Some(50), 0).expect("apply");
+        let application = apply_modifier(&potion, Some(target()), Some(50), 0).expect("apply");
         assert_eq!(
             application,
             ModifierApplication::HpRestored {

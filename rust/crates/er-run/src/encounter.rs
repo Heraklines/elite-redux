@@ -62,16 +62,14 @@ pub fn prepare_encounter_plan(
 mod tests {
     use super::*;
     use er_content::species::SpeciesBaseStats;
-    use er_state::pokemon_v2::{
-        Iv, PokemonProgressionState, PokemonStateV2,
-    };
+    use er_state::pokemon_v2::StatStages;
+    use er_state::pokemon_v2::{Iv, PokemonProgressionState, PokemonStateV2};
     use er_types::SafeU53;
     use er_types::battle_command::ScriptedEnemyPolicyV1;
     use er_types::battle_ids::{
         AbilityId, BattleFormat, MoveId, MoveSlotIndex, PokemonId, SpeciesId,
     };
     use er_types::battle_model::{AbilityLoadout, MoveSlotState, StatusState};
-    use er_state::pokemon_v2::StatStages;
 
     fn safe(value: u64) -> SafeU53 {
         SafeU53::new(value).expect("safe u53")
@@ -117,7 +115,10 @@ mod tests {
             species_id: species(16),
             form_index: 0,
             level: 11,
-            types: er_types::battle_model::PokemonTyping { primary: er_types::battle_model::PokemonType::Normal, secondary: None },
+            types: er_types::battle_model::PokemonTyping {
+                primary: er_types::battle_model::PokemonType::Normal,
+                secondary: None,
+            },
             stats: BattleStats {
                 hp: 30,
                 attack: 20,
@@ -157,7 +158,14 @@ mod tests {
                 nature: er_types::run_ids::NatureId::new(0),
                 effective_nature: er_types::run_ids::NatureId::new(0),
                 friendship: 50,
-                permanent_bonuses: er_state::pokemon_v2::PermanentStatBonuses { hp: 0, attack: 0, defense: 0, special_attack: 0, special_defense: 0, speed: 0 },
+                permanent_bonuses: er_state::pokemon_v2::PermanentStatBonuses {
+                    hp: 0,
+                    attack: 0,
+                    defense: 0,
+                    special_attack: 0,
+                    special_defense: 0,
+                    speed: 0,
+                },
                 pause_evolutions: false,
             },
         }
@@ -174,8 +182,7 @@ mod tests {
             enemy_party,
             enemy_leads,
             player_leads: vec![pokemon_id(1)],
-            scripted_policy: ScriptedEnemyPolicyV1::new(SafeU53::ZERO, Vec::new())
-                .expect("policy"),
+            scripted_policy: ScriptedEnemyPolicyV1::new(SafeU53::ZERO, Vec::new()).expect("policy"),
             battle_seed: "captured-seed".to_owned(),
             generation_audit: Vec::new(),
             run_content_hash: Some(
