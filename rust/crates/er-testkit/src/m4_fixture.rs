@@ -413,7 +413,7 @@ mod tests {
             ],
             "player": true
         });
-        let pid = PokemonId::new(SafeU53::new(3260031740).expect("pid")).expect("pid");
+        let pid = PokemonId::new(SafeU53::new(3260031740).expect("pid"));
         let seat = SeatId::new(SafeU53::new(1).expect("seat"));
         let converted = convert_pokemon(&ts, pid, Some(seat)).expect("convert");
         assert_eq!(converted.level, 16);
