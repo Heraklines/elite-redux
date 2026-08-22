@@ -153,6 +153,7 @@ pub struct GameKernel {
     battle: Option<Box<BattleMode>>,
     run: Option<er_game::run_runtime::RunRuntime>,
     run_role: Option<RunKernelRole>,
+    run_encounter: Option<er_run::encounter_plan::EncounterPlan>,
     run_menu: Option<er_game::run_menu::RunMenuReducer>,
     pending_run_actions: Vec<er_types::run_model::RunSurfaceAction>,
     input_router: InputRouter,
@@ -344,6 +345,7 @@ impl GameKernel {
             protocol_init_error,
             run: None,
             run_role: None,
+            run_encounter: None,
             run_menu: None,
             pending_run_actions: Vec::new(),
             terminal: None,
@@ -394,6 +396,20 @@ impl GameKernel {
         control: er_types::run_control::GameControlPlan,
     ) -> Result<Self, String> {
         Self::new_run_endpoint(state, content, input_map, control, RunKernelRole::Local)
+    }
+
+    pub fn new_run_with_control_and_encounter(
+        state: er_state::game_v2::GameStateV2,
+        content: Arc<er_run::transition::GameContentBundle>,
+        input_map: InputMap,
+        control: er_types::run_control::GameControlPlan,
+        encounter: er_run::encounter_plan::EncounterPlan,
+    ) -> Result<Self, String> {
+        encounter.validate().map_err(|error| error.to_string())?;
+        let mut kernel =
+            Self::new_run_endpoint(state, content, input_map, control, RunKernelRole::Local)?;
+        kernel.run_encounter = Some(encounter);
+        Ok(kernel)
     }
 
     pub fn new_run_endpoint(
@@ -476,7 +492,7 @@ impl GameKernel {
             })?
             .plan();
         let material = runtime
-            .prepare_action_material(action, control)
+            .prepare_action_material(action, control, self.run_encounter.as_ref())
             .map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
@@ -493,6 +509,8 @@ impl GameKernel {
             er_run::decode_run_material(bytes).map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
             })?;
+        let encounter_consumed =
+            material.after_state().run.stage == er_types::run_model::RunStage::Battle;
         let next_menu = er_game::run_menu::RunMenuReducer::new(material.next_control().clone())
             .map_err(|error| KernelError::Canonical {
                 reason: error.to_string(),
@@ -511,7 +529,9 @@ impl GameKernel {
             })?;
         self.run = Some(staged_runtime);
         self.run_menu = Some(next_menu);
-        self.pending_run_actions.clear();
+        if encounter_consumed {
+            self.run_encounter = None;
+        }
         Ok(())
     }
 
@@ -703,23 +723,16 @@ impl GameKernel {
                 }
             }
         }
-        for (action, control) in actions {
+        for (action, _control) in actions {
+            let has_required_evidence = !matches!(
+                action,
+                er_types::run_model::RunSurfaceAction::BiomeSelect(_)
+            ) || self.run_encounter.is_some();
             if self.run_role == Some(RunKernelRole::Local)
+                && has_required_evidence
                 && er_game::run_transition::can_prepare_action(&action)
             {
-                let material = self
-                    .run
-                    .as_ref()
-                    .expect("run mode checked before step_run")
-                    .prepare_action_material(&action, &control)
-                    .map_err(|error| KernelError::Canonical {
-                        reason: error.to_string(),
-                    })?;
-                let bytes = er_run::encode_run_material(&material).map_err(|error| {
-                    KernelError::Canonical {
-                        reason: error.to_string(),
-                    }
-                })?;
+                let bytes = self.prepare_run_action_material_bytes(&action)?;
                 self.apply_run_material_bytes(&bytes)?;
             }
             self.pending_run_actions.push(action);

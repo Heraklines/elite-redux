@@ -22,6 +22,10 @@ const PROGRESSION_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../../fixtures/m4/oracle/progression/nacli-medium-slow-level-17-v1.json"
 );
+const ENCOUNTER_FIXTURE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../fixtures/m4/oracle/encounters/plains-wave-11-captured-v1.json"
+);
 const M4_ORACLE_SHA: &str = "45c89493e7edec9c4da247a98cd7858b1f015c09";
 
 fn load_fixture_value(path: &str) -> Result<serde_json::Value, Box<dyn Error>> {
@@ -238,6 +242,7 @@ fn crossroads_state_and_control(
         menu: menu.clone(),
         surface_digest: SurfaceDigest::new(format!("blake3-v1:{}", "0".repeat(64)))?,
     };
+    state.run.wave = er_types::battle_ids::WaveIndex::new(safe(10))?;
     state.run.stage = RunStage::Surface;
     state.run.outcome = RunOutcome::InProgress;
     state.run.active_surface = Some(RunSurfaceState::Crossroads(CrossroadsSurfaceState {
@@ -260,6 +265,42 @@ fn crossroads_state_and_control(
         MenuInstanceId::new(safe(2)),
     )?;
     Ok((state, battle_hash, run_hash, control, owner))
+}
+
+fn captured_encounter(
+    state: &er_state::game_v2::GameStateV2,
+) -> Result<er_run::encounter_plan::EncounterPlan, Box<dyn Error>> {
+    let fixture = load_fixture_value(ENCOUNTER_FIXTURE)?;
+    let enemy_value = fixture["final"]["canonical"]["save_data"]["enemyParty"]
+        .as_array()
+        .and_then(|party| party.first())
+        .ok_or("captured enemy missing")?;
+    let enemy_id = er_types::battle_ids::PokemonId::new(safe(
+        enemy_value["id"].as_u64().ok_or("captured enemy ID")?,
+    ));
+    let enemy = er_testkit::m4_fixture::convert_pokemon(enemy_value, enemy_id, None)?;
+    Ok(er_run::encounter_plan::EncounterPlan {
+        schema_version: er_run::encounter_plan::ENCOUNTER_PLAN_SCHEMA_VERSION,
+        encounter_id: er_types::run_ids::EncounterId::new(safe(1)),
+        run_id: state.run.run_id,
+        wave: er_types::battle_ids::WaveIndex::new(safe(11))?,
+        biome: er_types::run_ids::BiomeId::new(safe(1)),
+        format: er_types::battle_ids::BattleFormat::single(),
+        enemy_party: vec![enemy],
+        enemy_leads: vec![enemy_id],
+        player_leads: vec![state.player_party[0].id],
+        scripted_policy: er_types::battle_command::ScriptedEnemyPolicyV1::new(
+            SafeU53::ZERO,
+            Vec::new(),
+        )?,
+        battle_seed: fixture["final"]["canonical"]["runtime"]["battle_seed"]
+            .as_str()
+            .ok_or("captured battle seed")?
+            .to_owned(),
+        generation_audit: Vec::new(),
+        source: er_run::content::EncounterPlanSource::OracleCaptureRequired,
+        content_hash: Some(state.run_content_hash.clone()),
+    })
 }
 
 #[test]
@@ -286,11 +327,13 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
         initial_repeat_delay_ms: safe(250),
         repeat_interval_ms: safe(250),
     };
-    let mut kernel = GameKernel::new_run_with_control(
+    let encounter = captured_encounter(&state)?;
+    let mut kernel = GameKernel::new_run_with_control_and_encounter(
         state,
         selected_m4_game_content_bundle()?,
         input_map,
         control,
+        encounter,
     )
     .map_err(std::io::Error::other)?;
     let before = kernel
@@ -382,11 +425,11 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
     );
     let plan = kernel
         .run_control_plan()
-        .ok_or("BiomeSelect control was not installed")?;
+        .ok_or("battle control was not installed")?;
     assert!(matches!(
         &plan.seats[0].control,
-        er_types::run_control::GameControl::Surface(
-            er_types::run_control::SurfaceControl::BiomeSelect(_)
+        er_types::run_control::GameControl::Battle(
+            er_types::battle_control::BattleControl::CommandRoot(_)
         )
     ));
     assert!(

@@ -1,5 +1,10 @@
 //! Authority preparation for retained M4 run-surface actions.
 
+use crate::battle_start_v2::start_battle_v2;
+use crate::command_menu::{CommandRootSelection, build_command_root_control};
+
+use er_run::biome::{RouteOption, select_route};
+use er_run::encounter_plan::EncounterPlan;
 use er_run::modifier::{ModifierApplication, apply_modifier};
 use er_run::reward::{MarketStockView, buy_stock, pay_for_offer};
 use er_run::run_material::{
@@ -15,15 +20,19 @@ use er_state::run_v2::{
 };
 use er_state::surface_digest::compute_surface_digest_v1;
 use er_types::SafeU53;
-use er_types::battle_ids::MenuInstanceId;
+use er_types::battle_command::{
+    BattleCommandOffer, BattleTargetSelection, OfferedMoveCommand, OfferedSwitchCommand,
+};
+use er_types::battle_control::BattleControl;
+use er_types::battle_ids::{BattleSide, FieldSlot, MenuInstanceId, MoveSlotIndex, PartyIndex};
 use er_types::run_control::{
     BiomeMarketControl, BiomeSelectControl, GameControl, GameControlPlan, MoveLearnControl,
     RewardShopControl, SeatControlPlan, SurfaceControl,
 };
 use er_types::run_ids::{RouteNodeId, RunSurfaceId, SurfaceDigest};
 use er_types::run_model::{
-    BiomeMarketAction, CrossroadsAction, LearnMoveDecision, RewardAction, RunSurfaceAction,
-    RunSurfaceKind,
+    BiomeMarketAction, BiomeSelectAction, CrossroadsAction, LearnMoveDecision, RewardAction,
+    RunOutcome, RunStage, RunSurfaceAction, RunSurfaceKind,
 };
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::{LogicalMenu, LogicalMenuOption, MenuNavigationEdge, NavigationDirection};
@@ -46,6 +55,10 @@ pub enum RunTransitionPreparationError {
     MissingMarket,
     #[error("selected move-learning option is absent")]
     MissingMove,
+    #[error("captured encounter evidence is absent or mismatched")]
+    MissingEncounter,
+    #[error("captured encounter battle topology is outside the supported local slice")]
+    UnsupportedBattleTopology,
     #[error("selected modifier application is unsupported at this surface")]
     UnsupportedModifier,
     #[error("run transition allocator overflowed")]
@@ -65,6 +78,7 @@ pub fn can_prepare_action(action: &RunSurfaceAction) -> bool {
             | RunSurfaceAction::Reward(RewardAction::SelectFree { .. })
             | RunSurfaceAction::BiomeMarket(BiomeMarketAction::Buy { .. })
             | RunSurfaceAction::LearnMove(LearnMoveDecision::Candidate { .. })
+            | RunSurfaceAction::BiomeSelect(BiomeSelectAction { .. })
     )
 }
 
@@ -846,6 +860,218 @@ pub fn prepare_move_learn_transition(
             presentation: Vec::new(),
             rng_audit: Vec::new(),
             surface_after_digest: Some(surface_digest),
+        },
+    ))
+}
+
+pub fn prepare_biome_select_transition(
+    before: &GameStateV2,
+    content: &GameContentBundle,
+    action: &RunSurfaceAction,
+    current_control: &GameControlPlan,
+    encounter: &EncounterPlan,
+) -> Result<AuthorityRunMaterial, RunTransitionPreparationError> {
+    let RunSurfaceAction::BiomeSelect(BiomeSelectAction { route_node, biome }) = action else {
+        return Err(RunTransitionPreparationError::UnsupportedAction);
+    };
+    let Some(RunSurfaceState::BiomeSelect(surface)) = before.run.active_surface.as_ref() else {
+        return Err(RunTransitionPreparationError::WrongSurface);
+    };
+    if current_control.seats.len() != 1
+        || current_control.owner_seat() != surface.header.owner_seat
+        || encounter.biome != *biome
+        || encounter.run_id != before.run.run_id
+    {
+        return Err(RunTransitionPreparationError::MissingEncounter);
+    }
+    let options = surface
+        .routes
+        .iter()
+        .map(|route| RouteOption {
+            route_node_id: route.route_node_id,
+            biome: route.biome,
+        })
+        .collect::<Vec<_>>();
+    select_route(&options, before.run.biome.biome, *route_node, *biome)
+        .map_err(|_| RunTransitionPreparationError::MissingEncounter)?;
+    if encounter.format.player_capacity != 1 || encounter.format.enemy_capacity != 1 {
+        return Err(RunTransitionPreparationError::UnsupportedBattleTopology);
+    }
+    let expected_wave = before
+        .run
+        .wave
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    if encounter.wave.get().get() != expected_wave {
+        return Err(RunTransitionPreparationError::MissingEncounter);
+    }
+
+    let before_biome = before.run.biome.biome;
+    let mut battle_frontier = before.clone();
+    battle_frontier.run.wave = encounter.wave;
+    battle_frontier.run.stage = RunStage::Complete;
+    battle_frontier.run.outcome = RunOutcome::Victory;
+    battle_frontier.run.active_surface = None;
+    battle_frontier.run.biome.recent_biomes[1] = battle_frontier.run.biome.recent_biomes[0];
+    battle_frontier.run.biome.recent_biomes[0] = battle_frontier.run.biome.previous_biome;
+    battle_frontier.run.biome.previous_biome = Some(before_biome);
+    battle_frontier.run.biome.biome = *biome;
+    battle_frontier.run.biome.source_wave = encounter.wave;
+    battle_frontier.run.biome.route_node = Some(*route_node);
+    battle_frontier.run.biome.structure_start_wave = encounter.wave;
+    battle_frontier.run.biome.structure_length = None;
+    battle_frontier.run.biome.leave_biome_now = false;
+    battle_frontier.run.biome.overstay_anchor_wave = None;
+    battle_frontier
+        .validate()
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+    let after = start_battle_v2(
+        &battle_frontier,
+        encounter,
+        surface.header.owner_seat,
+        content,
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+    let battle = after
+        .battle
+        .as_ref()
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    let player_slot = FieldSlot::new(BattleSide::Player, 0)
+        .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let actor = battle
+        .field
+        .occupant(&battle.format, player_slot)
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    let actor_state = after
+        .player_party
+        .iter()
+        .find(|pokemon| pokemon.id == actor)
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    let mut fight = Vec::new();
+    for (index, slot) in actor_state.moves.iter().enumerate() {
+        let Some(slot) = slot else {
+            continue;
+        };
+        let definition = content
+            .battle
+            .moves
+            .iter()
+            .find(|definition| definition.id == slot.move_id)
+            .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+        if slot.pp_used >= definition.base_pp {
+            continue;
+        }
+        fight.push(
+            OfferedMoveCommand::new(
+                MoveSlotIndex::try_from(index as u64).map_err(|error| {
+                    RunTransitionPreparationError::InvalidIdentity(error.to_string())
+                })?,
+                vec![BattleTargetSelection::Implicit],
+            )
+            .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?,
+        );
+    }
+    let switches = after
+        .player_party
+        .iter()
+        .enumerate()
+        .filter(|(_, pokemon)| {
+            pokemon.id != actor
+                && !pokemon.fainted
+                && pokemon.owner_seat == Some(surface.header.owner_seat)
+        })
+        .map(|(index, pokemon)| {
+            PartyIndex::try_from(index as u64)
+                .map(|party_slot| OfferedSwitchCommand::new(party_slot, pokemon.id))
+                .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let offer = BattleCommandOffer::new(fight, switches)
+        .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let menu_instance = current_control.next_menu_instance_id;
+    let next_menu_value = menu_instance
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    let control_id = current_control.next_control_id.clone();
+    let root = build_command_root_control(
+        menu_instance,
+        surface.header.owner_seat,
+        control_id.clone(),
+        actor,
+        player_slot,
+        &offer,
+        CommandRootSelection::Fight,
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let next_control = GameControlPlan::new(
+        vec![SeatControlPlan {
+            seat: surface.header.owner_seat,
+            owner: true,
+            control_id: control_id.clone(),
+            menu_instance_id: menu_instance,
+            actionable_after: current_control.seats[0].actionable_after,
+            control: GameControl::Battle(BattleControl::CommandRoot(root)),
+        }],
+        format!("{control_id}/next"),
+        MenuInstanceId::new(
+            SafeU53::new(next_menu_value)
+                .map_err(|_| RunTransitionPreparationError::AllocatorOverflow)?,
+        ),
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let before_digest = MechanicalStateDigestV2::compute(before)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    let after_digest = MechanicalStateDigestV2::compute(&after)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+
+    Ok(AuthorityRunMaterial::Interaction(
+        RunInteractionMaterialV1 {
+            schema_version: RUN_INTERACTION_MATERIAL_VERSION,
+            header: RunMaterialHeader {
+                m4_oracle_sha: content.run.m4_oracle_sha.clone(),
+                m3_parity_oracle_sha: RUN_MATERIAL_M3_PARITY_ORACLE_SHA.to_owned(),
+                battle_content_hash: before.battle_content_hash.clone(),
+                run_content_hash: before.run_content_hash.clone(),
+                operation_id: surface.header.operation_id.clone(),
+                run_id: before.run.run_id,
+                wave: before.run.wave,
+                before_digest,
+                after_digest,
+                before_state: before.clone(),
+                after_state: after,
+                next_control,
+            },
+            surface_kind: RunSurfaceKind::BiomeSelect,
+            surface_id: surface.header.surface_id,
+            owner_seat: surface.header.owner_seat,
+            interaction_sequence: surface.header.interaction_sequence,
+            action_ordinal: surface.header.action_ordinal,
+            action: action.clone(),
+            mutations: vec![
+                RunMutation::SurfaceClosed,
+                RunMutation::WaveAdvanced {
+                    before: before.run.wave,
+                    after: encounter.wave,
+                },
+                RunMutation::BiomeArrived {
+                    before: before_biome,
+                    after: *biome,
+                },
+            ],
+            presentation: vec![
+                RunPresentationEvent::SurfaceClosed,
+                RunPresentationEvent::BiomeArrived { biome: *biome },
+                RunPresentationEvent::WaveStarted {
+                    wave: encounter.wave,
+                },
+            ],
+            rng_audit: encounter.generation_audit.clone(),
+            surface_after_digest: None,
         },
     ))
 }

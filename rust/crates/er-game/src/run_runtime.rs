@@ -75,6 +75,7 @@ impl RunRuntime {
         &self,
         action: &er_types::run_model::RunSurfaceAction,
         current_control: &GameControlPlan,
+        encounter: Option<&er_run::encounter_plan::EncounterPlan>,
     ) -> Result<AuthorityRunMaterial, RunRuntimeError> {
         let prepared = match action {
             er_types::run_model::RunSurfaceAction::Crossroads(_) => {
@@ -109,7 +110,17 @@ impl RunRuntime {
                     current_control,
                 )
             }
-            _ => Err(crate::run_transition::RunTransitionPreparationError::UnsupportedAction),
+            er_types::run_model::RunSurfaceAction::BiomeSelect(_) => encounter
+                .ok_or(crate::run_transition::RunTransitionPreparationError::MissingEncounter)
+                .and_then(|encounter| {
+                    crate::run_transition::prepare_biome_select_transition(
+                        &self.state,
+                        self.content.as_ref(),
+                        action,
+                        current_control,
+                        encounter,
+                    )
+                }),
         };
         prepared.map_err(|error| RunRuntimeError::Preparation(error.to_string()))
     }
