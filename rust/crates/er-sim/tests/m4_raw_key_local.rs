@@ -353,6 +353,15 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
             er_types::run_control::SurfaceControl::BiomeSelect(_)
         )
     ));
+    assert!(
+        kernel
+            .dispose("Crossroads route campaign complete")
+            .is_empty()
+    );
+    assert_eq!(
+        kernel.live_resources(),
+        er_types::LiveResourceSnapshot::default()
+    );
     Ok(())
 }
 
@@ -509,6 +518,14 @@ fn press_physical(
     Ok(())
 }
 
+fn dispose_run_kernel(kernel: &mut er_kernel::GameKernel) {
+    assert!(kernel.dispose("M4 raw-key campaign complete").is_empty());
+    assert_eq!(
+        kernel.live_resources(),
+        er_types::LiveResourceSnapshot::default()
+    );
+}
+
 #[test]
 fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<(), Box<dyn Error>> {
     use er_state::run_v2::{
@@ -602,6 +619,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             slot: er_types::battle_ids::MoveSlotIndex::ZERO,
         })]
     );
+    dispose_run_kernel(&mut kernel);
 
     let free = "reward/free/1/1";
     let skip = "reward/skip";
@@ -669,6 +687,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             .ok_or("selected reward option disappeared")?
             .enabled
     );
+    dispose_run_kernel(&mut kernel);
 
     let buy = "market/1/1";
     let leave = "market/leave";
@@ -736,6 +755,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             .ok_or("purchased market option disappeared")?
             .enabled
     );
+    dispose_run_kernel(&mut kernel);
 
     let stay = "crossroads/stay";
     let leave = "crossroads/leave";
@@ -765,6 +785,7 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
         kernel.take_run_actions(),
         vec![RunSurfaceAction::Crossroads(CrossroadsAction::MoveOn)]
     );
+    dispose_run_kernel(&mut kernel);
 
     let route_a = "biome/1/2";
     let route_b = "biome/2/3";
@@ -806,5 +827,6 @@ fn physical_keys_resolve_every_m4_surface_family_to_typed_actions() -> Result<()
             biome: BiomeId::new(safe(3))
         })]
     );
+    dispose_run_kernel(&mut kernel);
     Ok(())
 }
