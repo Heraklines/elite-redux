@@ -331,6 +331,56 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  m6-contract-freeze:
+    name: M6 G21 contract freeze
+    needs: m6-semantic-extraction
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /docs/plans/rust-kernel/
+            /rust/contracts/
+            /rust/fixtures/m5/m5-final-qualification.json
+            /rust/fixtures/m6/
+            /scripts/check-kernel-m6-contract.mjs
+          submodules: false
+      - name: Validate exact M6 contracts and semantic inventory
+        run: node scripts/check-kernel-m6-contract.mjs
+
+  m6-contract-types:
+    name: M6 G21 compileable contracts
+    needs: m6-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-g21-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-g21-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check and test M6 contract types
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p er-types -p er-mechanics
+          cargo test -p er-mechanics
+
   m6-g21-oracle-bootstrap:
     name: M6 G21 oracle bootstrap
     needs:
@@ -340,6 +390,8 @@ jobs:
       - m6-oracle-refresh
       - m6-semantic-extraction
       - m6-oracle-classification
+      - m6-contract-freeze
+      - m6-contract-types
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

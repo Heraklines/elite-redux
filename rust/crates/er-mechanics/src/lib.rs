@@ -6,6 +6,7 @@
 pub mod condition;
 pub mod families;
 pub mod ids;
+pub mod m6;
 pub mod operation;
 pub mod program;
 pub mod selector;
@@ -14,6 +15,7 @@ pub mod value;
 pub use condition::*;
 pub use families::*;
 pub use ids::*;
+pub use m6::*;
 pub use operation::*;
 pub use program::*;
 pub use selector::*;

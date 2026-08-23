@@ -7,7 +7,7 @@ At M5 final SHA `200caaee1697fe40a293f0a5da76af8b11f3cea9`:
 - `rust/crates/er-content/src/m5_pack.rs` exposes `BattleContentPackV2` and schema version 2.
 - `rust/crates/er-state/src/migration_v3.rs` exposes `GameStateV3`.
 - `rust/crates/er-state/src/mechanic_state.rs` exposes `MechanicStateStoreV1` and ordered held-item state.
-- `rust/crates/er-game/src/material.rs` exposes turn and replacement material V1.
+- `rust/crates/er-game/src/material.rs` exposes Rust DTO names ending in `V1`, while `rust/contracts/m5-contract.toml` freezes their M5 wire/material contract version as 3.
 - `rust/crates/er-kernel/src/snapshot_v4.rs` exposes restorable kernel snapshot and trace V4.
 - `rust/crates/er-kernel/src/snapshot.rs` forbids a live prepared transaction in a public snapshot.
 - `rust/crates/er-battle/src/mechanics_executor.rs`, `mechanics_query.rs`, and `mechanics_mutation.rs` are the prepared/direct execution parity surface.
@@ -22,7 +22,7 @@ The G21 contract freeze reserves:
 - `MechanicsIrV2` / program schema 2;
 - `GameStateV4` / game-state schema 4;
 - `MechanicStateStoreV2`;
-- turn and replacement material V2;
+- battle turn and replacement material contract version 4;
 - restorable kernel and pair snapshot V5;
 - kernel trace V5;
 - benchmark manifest V1 for the M6 workload family.
