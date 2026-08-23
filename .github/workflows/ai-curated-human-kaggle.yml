@@ -26,6 +26,11 @@ on:
         required: true
         type: string
         default: 20260823,20260824,20260825
+      diagnose_only:
+        description: Inspect the current private Kaggle kernel without reading R2 or launching training
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -40,7 +45,9 @@ env:
 
 jobs:
   handoff:
-    if: github.repository == 'Heraklines/elite-redux'
+    if: >-
+      github.repository == 'Heraklines/elite-redux' &&
+      (github.event_name == 'push' || !inputs.diagnose_only)
     name: R2 to private Kaggle GPU
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -227,3 +234,51 @@ jobs:
             "$RUNNER_TEMP/er-combat-data-dictionary.json" \
             "$RUNNER_TEMP/ai-kaggle-dataset" \
             "$RUNNER_TEMP/ai-kaggle-kernel"
+
+  diagnose:
+    if: >-
+      github.repository == 'Heraklines/elite-redux' &&
+      github.event_name == 'workflow_dispatch' &&
+      inputs.diagnose_only
+    name: Inspect private Kaggle GPU run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned Kaggle client
+        run: python -m pip install kaggle==2.2.4
+      - name: Read sanitized status and failure tail remotely
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          kernel_slug="$KAGGLE_USERNAME/$AI_KERNEL_NAME"
+          kaggle kernels status "$kernel_slug" || true
+          output="$RUNNER_TEMP/kaggle-output"
+          mkdir -p "$output"
+          kaggle kernels output "$kernel_slug" --path "$output" --force || true
+          python - "$output" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          files = sorted(path for path in root.rglob("*") if path.is_file())
+          print(json.dumps({
+              "outputFiles": [
+                  {"path": path.relative_to(root).as_posix(), "bytes": path.stat().st_size}
+                  for path in files
+              ]
+          }))
+          for path in files:
+              if path.name == "failure.json":
+                  print(json.dumps({"failure": json.loads(path.read_text(encoding="utf-8"))}, indent=2))
+              elif path.suffix == ".log":
+                  lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                  print(json.dumps({"kernelLogTail": lines[-240:]}, indent=2))
+          PY
+          rm -rf "$output"
