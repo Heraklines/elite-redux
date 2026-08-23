@@ -345,9 +345,9 @@ jobs:
           node scripts/classify-kernel-m5-oracle-refresh.mjs \
             --oracle-sha "$M5_ORACLE_SHA" \
             --legacy-m3 rust/fixtures/m3/oracle \
-            --fresh-m3 artifacts/fresh-m3 \
+            --fresh-m3 artifacts/fresh-m3/m5-m3-oracle \
             --legacy-m4 rust/fixtures/m4/oracle \
-            --fresh-m4 artifacts/fresh-m4 \
+            --fresh-m4 artifacts/fresh-m4/m5-m4-oracle \
             --output "$GITHUB_WORKSPACE/artifacts/m5-oracle-drift-v1.json" \
             2>&1 | tee "$RUNNER_TEMP/m5-oracle-classification.log"
 
