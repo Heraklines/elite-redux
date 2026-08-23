@@ -97,6 +97,16 @@ jobs:
             --output "$RUNNER_TEMP/m5-source-catalog-v1.json" \
             2>&1 | tee "$RUNNER_TEMP/m5-source-catalog.log"
 
+      - name: Publish source-catalog failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(tail -c 30000 "$RUNNER_TEMP/m5-source-catalog.log" 2>/dev/null || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 source catalog failure::$diagnostic"
+
       - name: Upload source catalog
         if: always()
         uses: actions/upload-artifact@v6
@@ -198,6 +208,16 @@ jobs:
             node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m5-m4-oracle" \
               2>&1 | tee "$RUNNER_TEMP/m5-m4-oracle.log"
           fi
+
+      - name: Publish oracle-refresh failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(tail -c 30000 "$RUNNER_TEMP/m5-${{ matrix.fixture }}-oracle.log" 2>/dev/null || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 ${{ matrix.fixture }} oracle refresh failure::$diagnostic"
 
       - name: Upload refreshed fixtures or typed gaps
         if: always()
