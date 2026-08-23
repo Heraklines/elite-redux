@@ -280,6 +280,7 @@ dependencies = [
  "er-battle",
  "er-canonical",
  "er-content",
+ "er-mechanics",
  "er-kernel",
  "er-protocol",
  "er-rng",
