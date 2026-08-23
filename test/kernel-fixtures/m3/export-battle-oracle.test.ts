@@ -1806,6 +1806,7 @@ const RNG_REASON_BY_FRAME: Readonly<Record<string, string>> = Object.freeze({
   "Pokemon.getAttackDamage": "DamageVariance",
   "Pokemon.getCriticalHitResult": "CriticalHit",
   "MoveEffectPhase.hitCheck": "Accuracy",
+  "MovePhase.checkPara": "ParalysisActivation",
   randSeedShuffle: "SpeedTie",
   doublePowerChanceMessageFunc: "SecondaryEffect",
   "StatStageChangePhase.onChange": "SecondaryEffect",
