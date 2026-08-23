@@ -1,6 +1,11 @@
 name: AI Production V4 Sharded Curation (Private)
 
 on:
+  push:
+    branches:
+      - codex/combat-ai-human-retrain-20260822
+    paths:
+      - ".github/ai-production-v4-curation-request.json"
   workflow_dispatch:
     inputs:
       start_date:
@@ -38,14 +43,31 @@ jobs:
           fetch-depth: 1
           submodules: false
       - uses: ./.github/actions/setup-deps
+      - name: Resolve requested date range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_START_DATE: ${{ inputs.start_date || '' }}
+          INPUT_END_DATE: ${{ inputs.end_date || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            start=$(jq -er '.startDate' .github/ai-production-v4-curation-request.json)
+            end=$(jq -er '.endDate' .github/ai-production-v4-curation-request.json)
+          else
+            start="$INPUT_START_DATE"
+            end="$INPUT_END_DATE"
+          fi
+          echo "CURATION_START_DATE=$start" >> "$GITHUB_ENV"
+          echo "CURATION_END_DATE=$end" >> "$GITHUB_ENV"
       - name: Verify private episode audit contract
         run: node --test scripts/ai/combat-contract-v4-audit.test.mjs
       - name: Assign UTC date prefixes
         shell: bash
         run: |
           set -euo pipefail
-          start="${{ inputs.start_date }}"
-          end="${{ inputs.end_date }}"
+          start="$CURATION_START_DATE"
+          end="$CURATION_END_DATE"
           if [[ -z "$end" ]]; then end="$(date -u +%F)"; fi
           python - "$start" "$end" "${{ matrix.shard }}" 5 > "$RUNNER_TEMP/dates.txt" <<'PY'
           from datetime import date, timedelta
@@ -122,6 +144,23 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Resolve requested date range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_START_DATE: ${{ inputs.start_date || '' }}
+          INPUT_END_DATE: ${{ inputs.end_date || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            start=$(jq -er '.startDate' .github/ai-production-v4-curation-request.json)
+            end=$(jq -er '.endDate' .github/ai-production-v4-curation-request.json)
+          else
+            start="$INPUT_START_DATE"
+            end="$INPUT_END_DATE"
+          fi
+          echo "CURATION_START_DATE=$start" >> "$GITHUB_ENV"
+          echo "CURATION_END_DATE=$end" >> "$GITHUB_ENV"
       - name: Verify merge and global curation logic
         working-directory: ml/policy
         run: >-
@@ -132,8 +171,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          start="${{ inputs.start_date }}"
-          end="${{ inputs.end_date }}"
+          start="$CURATION_START_DATE"
+          end="$CURATION_END_DATE"
           if [[ -z "$end" ]]; then end="$(date -u +%F)"; fi
           python - "$start" "$end" > "$RUNNER_TEMP/dates.txt" <<'PY'
           from datetime import date, timedelta
