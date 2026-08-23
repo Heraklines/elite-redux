@@ -33,10 +33,25 @@ def write_episode(handle: TextIO, episode: dict[str, Any]) -> None:
     handle.write("\n")
 
 
-def merge(inputs: list[Path], output: Path, report_path: Path) -> dict[str, Any]:
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def merge(
+    inputs: list[Path],
+    output: Path,
+    report_path: Path,
+    delete_inputs: bool = False,
+) -> dict[str, Any]:
     ordered_inputs = sorted(path.resolve() for path in inputs)
     if not ordered_inputs or any(not path.is_file() for path in ordered_inputs):
         raise ValueError("all input episode shards must exist")
+    if output.resolve() in ordered_inputs or report_path.resolve() in ordered_inputs:
+        raise ValueError("merge output and report must not overwrite an input shard")
     output.parent.mkdir(parents=True, exist_ok=True)
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -72,6 +87,8 @@ def merge(inputs: list[Path], output: Path, report_path: Path) -> dict[str, Any]
                             if count == 1:
                                 write_episode(text, episode)
                                 output_records += 1
+                        if delete_inputs:
+                            path.unlink()
         database.close()
 
     report = {
@@ -85,8 +102,9 @@ def merge(inputs: list[Path], output: Path, report_path: Path) -> dict[str, Any]
         "duplicateEpisodeIdsExcluded": int(duplicate_episode_ids or 0),
         "duplicateRecordsExcluded": int(duplicate_records or 0),
         "outputEpisodes": output_records,
+        "inputShardsDeleted": len(ordered_inputs) if delete_inputs else 0,
         "output": {
-            "sha256": hashlib.sha256(output.read_bytes()).hexdigest(),
+            "sha256": file_sha256(output),
             "bytes": output.stat().st_size,
         },
     }
@@ -101,12 +119,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--inputs", type=Path, nargs="+", required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
+    parser.add_argument("--delete-inputs", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    report = merge(args.inputs, args.output, args.report)
+    report = merge(args.inputs, args.output, args.report, args.delete_inputs)
     print(json.dumps(report, sort_keys=True))
 
 

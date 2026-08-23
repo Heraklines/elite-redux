@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import tempfile
 import unittest
@@ -52,6 +53,23 @@ class MergeContractV4EpisodeShardsTest(unittest.TestCase):
 
             self.assertEqual(report["inputShards"], 2)
             self.assertEqual(report["outputEpisodes"], 1)
+
+    def test_can_release_input_shards_after_the_second_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as scratch:
+            root = Path(scratch)
+            first = root / "first.jsonl.gz"
+            second = root / "second.jsonl.gz"
+            output = root / "merged.jsonl.gz"
+            write_shard(first, [{"episodeId": "a"}])
+            write_shard(second, [{"episodeId": "b"}])
+
+            report = merge([first, second], output, root / "report.json", delete_inputs=True)
+
+            self.assertFalse(first.exists())
+            self.assertFalse(second.exists())
+            self.assertEqual(report["inputShardsDeleted"], 2)
+            self.assertEqual(report["outputEpisodes"], 2)
+            self.assertEqual(report["output"]["sha256"], hashlib.sha256(output.read_bytes()).hexdigest())
 
 
 if __name__ == "__main__":

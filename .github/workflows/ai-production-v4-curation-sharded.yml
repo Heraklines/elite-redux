@@ -174,7 +174,7 @@ jobs:
     needs: extract
     name: Merge and globally curate private episodes
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 720
     steps:
       - uses: actions/checkout@v6
         with:
@@ -262,7 +262,8 @@ jobs:
           python ml/policy/merge_contract_v4_episode_shards.py \
             --inputs "$RUNNER_TEMP"/episodes/*.jsonl.gz \
             --output "$RUNNER_TEMP/eligible-episodes.jsonl.gz" \
-            --report ai-report/episode-merge-report.json
+            --report ai-report/episode-merge-report.json \
+            --delete-inputs
           python ml/policy/curate_contract_v4.py \
             --episodes "$RUNNER_TEMP/eligible-episodes.jsonl.gz" \
             --private-out "$RUNNER_TEMP/curated-v4" \
