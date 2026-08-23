@@ -84,12 +84,15 @@ function capture(): Json {
   Phaser.Math.RND.sow(["m6-semantic-runtime"]);
   if (allSpecies.length === 0 || allMoves.length === 0 || allAbilities.length === 0) initializeGame();
   const species = [...allSpecies]
+    .filter(entry => entry != null)
     .map(entry => ({ id: Number((entry as unknown as RecordValue).speciesId), definition: descriptor(entry) }))
     .sort((left, right) => left.id - right.id);
   const moves = [...allMoves]
+    .filter(entry => entry != null)
     .map(entry => ({ id: Number((entry as unknown as RecordValue).id), definition: descriptor(entry) }))
     .sort((left, right) => left.id - right.id);
   const abilities = [...allAbilities]
+    .filter(entry => entry != null)
     .map(entry => ({ id: Number((entry as unknown as RecordValue).id), definition: descriptor(entry) }))
     .sort((left, right) => left.id - right.id);
   const modifiers = Object.keys(modifierTypes).sort().map(key => {
