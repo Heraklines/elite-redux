@@ -566,29 +566,17 @@ fn run_complete_batch(count: usize) -> std::result::Result<(u64, u64), String> {
     execute().map_err(|error| error.to_string())
 }
 
-#[test]
-fn m4_complete_runs_200_waves_100() -> Result {
+fn run_complete_worker(worker: u64) -> Result {
     let started = Instant::now();
-    let results = std::thread::scope(|scope| {
-        (0..4)
-            .map(|_| scope.spawn(|| run_complete_batch(25)))
-            .collect::<Vec<_>>()
-            .into_iter()
-            .map(|worker| {
-                worker
-                    .join()
-                    .map_err(|_| "200-wave benchmark worker panicked".to_owned())?
-            })
-            .collect::<std::result::Result<Vec<_>, String>>()
-    })?;
-    let checksum = results.iter().map(|result| result.0).sum::<u64>();
-    let raw_events = results.iter().map(|result| result.1).sum::<u64>();
+    let (checksum, raw_events) = run_complete_batch(25)?;
     std::hint::black_box(checksum);
     println!(
         "{}",
         json!({
             "id": "complete-runs-200-waves-100",
-            "runs": 100,
+            "worker": worker,
+            "worker_runs": 25,
+            "total_runs": 100,
             "workers": 4,
             "waves_each": 200,
             "events": raw_events,
@@ -597,4 +585,24 @@ fn m4_complete_runs_200_waves_100() -> Result {
         })
     );
     Ok(())
+}
+
+#[test]
+fn m4_complete_runs_worker_0() -> Result {
+    run_complete_worker(0)
+}
+
+#[test]
+fn m4_complete_runs_worker_1() -> Result {
+    run_complete_worker(1)
+}
+
+#[test]
+fn m4_complete_runs_worker_2() -> Result {
+    run_complete_worker(2)
+}
+
+#[test]
+fn m4_complete_runs_worker_3() -> Result {
+    run_complete_worker(3)
 }
