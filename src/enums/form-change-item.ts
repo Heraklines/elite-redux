@@ -390,4 +390,9 @@ export enum FormChangeItem {
   BARBARACITE_Y,
   LILLIGANITE_VERDANT,
   DISTORTED_CHAIN,
+  // BerNerd roster (2026-08). Append-only for save compatibility.
+  GOLURKITE_Y,
+  SKUNTANKITE,
+  DODRIONITE,
+  PYUKUMUKUNITE,
 }

@@ -284,6 +284,11 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["BARBARACITE_Y", "lucarionite"],
   ["LILLIGANITE_VERDANT", "lucarionite"],
   ["DISTORTED_CHAIN", "lucarionite"],
+  // BerNerd roster stones (source art does not include dedicated item icons).
+  ["GOLURKITE_Y", "lucarionite"],
+  ["SKUNTANKITE", "lucarionite"],
+  ["DODRIONITE", "lucarionite"],
+  ["PYUKUMUKUNITE", "lucarionite"],
 ];
 
 type FcRecord = Record<string, number>;

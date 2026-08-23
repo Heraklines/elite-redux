@@ -46,6 +46,11 @@ export const ER_SLABBERIGUS_SPECIES_ID = 70054;
 export const ER_TAGELA_SPECIES_ID = 70055;
 export const ER_INTANGROWTH_SPECIES_ID = 70056;
 export const ER_LILLIGANT_VERDANT_SPECIES_ID = 70057;
+export const ER_VANTARROW_SPECIES_ID = 70058;
+export const ER_CHROMIGHTY_SPECIES_ID = 70059;
+export const ER_TEMPORAL_SKULL_SPECIES_ID = 70060;
+export const ER_QUAKERSBY_SPECIES_ID = 70061;
+export const ER_GUZZLORD_M_SPECIES_ID = 70062;
 
 interface PitchSpeciesDef {
   readonly id: number;
@@ -461,6 +466,85 @@ export const ER_FAKEMON_PITCH_SPECIES: readonly PitchSpeciesDef[] = [
     evolvesFrom: SpeciesId.PETILIL,
     evolveLevel: 20,
     learnsetSource: SpeciesId.LILLIGANT,
+  },
+  {
+    id: ER_VANTARROW_SPECIES_ID,
+    name: "Vantarrow",
+    slug: "vantarrow",
+    category: "Metallic Marksman Pokemon",
+    types: [PokemonType.STEEL, PokemonType.DARK],
+    stats: [65, 125, 80, 60, 100, 95],
+    actives: [AbilityId.WEAK_ARMOR, 6090, AbilityId.MOLD_BREAKER],
+    innates: [6091, AbilityId.BATTLE_ARMOR, 6092],
+    weight: 85,
+    catchRate: 45,
+    evolvesFrom: SpeciesId.CHARCADET,
+    evolveLevel: 30,
+    learnsetSource: SpeciesId.CERULEDGE,
+  },
+  {
+    id: ER_CHROMIGHTY_SPECIES_ID,
+    name: "Chromighty",
+    slug: "chromighty",
+    category: "Silver Pugilist Pokemon",
+    types: [PokemonType.STEEL, PokemonType.FIRE],
+    stats: [95, 60, 80, 125, 100, 65],
+    actives: [AbilityId.WEAK_ARMOR, 5267, 6093],
+    innates: [AbilityId.BATTLE_ARMOR, 5443, 6094],
+    weight: 85,
+    catchRate: 45,
+    evolvesFrom: SpeciesId.CHARCADET,
+    evolveLevel: 30,
+    learnsetSource: SpeciesId.ARMAROUGE,
+  },
+  {
+    id: ER_TEMPORAL_SKULL_SPECIES_ID,
+    name: "Temporal Skull",
+    slug: "temporal_skull",
+    category: "Paradox Pokemon",
+    types: [PokemonType.NORMAL, PokemonType.GROUND],
+    stats: [135, 85, 135, 45, 85, 85],
+    actives: [6095, 5013, AbilityId.TECHNICIAN],
+    innates: [AbilityId.PROTOSYNTHESIS, 6096, AbilityId.PARENTAL_BOND],
+    weight: 92,
+    catchRate: 30,
+    evolvesFrom: SpeciesId.MAROWAK,
+    evolveLevel: 50,
+    learnsetSource: SpeciesId.MAROWAK,
+    eggTier: EggTier.EPIC,
+    starterCost: 6,
+    eggMoveSource: SpeciesId.CUBONE,
+    learnsetAdditions: [[1, MoveId.IVORY_IMPACT]],
+  },
+  {
+    id: ER_QUAKERSBY_SPECIES_ID,
+    name: "Quakersby",
+    slug: "quakersby",
+    category: "Pulverizing Pokemon",
+    types: [PokemonType.NORMAL, PokemonType.GROUND],
+    stats: [125, 76, 92, 50, 92, 88],
+    actives: [AbilityId.SHEER_FORCE, AbilityId.PICKUP, 6097],
+    innates: [AbilityId.HUGE_POWER, 6098, 6099],
+    weight: 55,
+    catchRate: 45,
+    evolvesFrom: SpeciesId.DIGGERSBY,
+    evolveLevel: 50,
+    learnsetSource: SpeciesId.DIGGERSBY,
+  },
+  {
+    id: ER_GUZZLORD_M_SPECIES_ID,
+    name: "Guzzlord M",
+    slug: "guzzlord_m",
+    types: [PokemonType.DARK, PokemonType.DRAGON],
+    stats: [223, 131, 68, 127, 68, 53],
+    actives: [6100, 6101, 5411],
+    innates: [AbilityId.BEAST_BOOST, 6102, 6103],
+    weight: 888,
+    catchRate: 15,
+    learnsetSource: SpeciesId.GUZZLORD,
+    eggTier: EggTier.LEGENDARY,
+    starterCost: 8,
+    eggMoveSource: SpeciesId.GUZZLORD,
   },
 ];
 

@@ -6112,7 +6112,8 @@ export class RageFistPowerAttr extends VariablePowerAttr {
      * Substitute hits call user.damageAndUpdate() with a damage value of 0, also causing
       no counter increment
     */
-    const hitCount = user.battleData.hitCount;
+    const hasRagingFist = user.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "RagingFistAbAttr");
+    const hitCount = user.battleData.hitCount * (hasRagingFist ? 2 : 1);
     const basePower: NumberHolder = args[0];
 
     basePower.value = 50 * (1 + Math.min(hitCount, 6));

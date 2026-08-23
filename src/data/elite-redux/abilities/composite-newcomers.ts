@@ -40,24 +40,41 @@ import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import {
+  ER_BEJEWELED_ABILITY_ID,
+  ER_BLAZE_RELEASE_ABILITY_ID,
   ER_BODHISATTVA_ABILITY_ID,
+  ER_CRANISPHERE_ABILITY_ID,
   ER_CRUSHING_ANTLERS_ABILITY_ID,
   ER_CRYOGENESIS_ABILITY_ID,
+  ER_CURSED_SPIRIT_ABILITY_ID,
   ER_DAYDREAMER_ABILITY_ID,
   ER_DIRTY_SNOWBALL_ABILITY_ID,
   ER_EBB_AND_FLOW_ABILITY_ID,
+  ER_EXOSUIT_ABILITY_ID,
   ER_FLUTTERING_SPIRIT_ABILITY_ID,
+  ER_FOURTH_DEGREE_ABILITY_ID,
   ER_FREE_SPIRIT_ABILITY_ID,
   ER_IN_THE_CLOUDS_ABILITY_ID,
+  ER_IN_THE_ROUGH_ABILITY_ID,
+  ER_KAGUTSUCHI_ABILITY_ID,
+  ER_KYOKUSHIN_ABILITY_ID,
+  ER_LINGERING_MUSK_ABILITY_ID,
   ER_MAGISTRATE_ABILITY_ID,
+  ER_MONK_ABILITY_ID,
   ER_MOONARCH_ABILITY_ID,
   ER_NUCLEUS_ABILITY_ID,
   ER_PAPER_TALISMAN_ABILITY_ID,
   ER_PHOTOVOLTAIC_ABILITY_ID,
+  ER_PUNGENCY_ABILITY_ID,
   ER_SOLAR_PANEL_ABILITY_ID,
   ER_SPIRITUAL_SABER_ABILITY_ID,
+  ER_SPLASH_DAMAGE_ABILITY_ID,
+  ER_STRONG_HEADED_ABILITY_ID,
   ER_SWORDS_NATURE_ABILITY_ID,
   ER_THICK_SKULLED_ABILITY_ID,
+  ER_TWO_CHAMBERED_ABILITY_ID,
+  ER_VORACITY_ABILITY_ID,
+  ER_WORLD_EATER_ABILITY_ID,
 } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import {
   ER_DRAGONFRUIT_ABILITY_ID,
@@ -546,6 +563,102 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     description: "Hand Barnacles + Brain Over Brawn.",
     constituents: [HAND_BARNACLES, BRAIN_OVER_BRAWN],
   },
+  [ER_MONK_ABILITY_ID]: {
+    id: ER_MONK_ABILITY_ID,
+    name: "Monk",
+    description: "Inner Focus + an empowered, disruption-proof Focus Punch.",
+    constituents: [AbilityId.INNER_FOCUS],
+  },
+  [ER_LINGERING_MUSK_ABILITY_ID]: {
+    id: ER_LINGERING_MUSK_ABILITY_ID,
+    name: "Lingering Musk",
+    description: "Lingering Aroma + delayed end-of-turn fainting.",
+    constituents: [AbilityId.LINGERING_AROMA],
+  },
+  [ER_PUNGENCY_ABILITY_ID]: {
+    id: ER_PUNGENCY_ABILITY_ID,
+    name: "Pungency",
+    description: "Stench + Aftermath.",
+    constituents: [AbilityId.STENCH, AbilityId.AFTERMATH],
+  },
+  [ER_TWO_CHAMBERED_ABILITY_ID]: {
+    id: ER_TWO_CHAMBERED_ABILITY_ID,
+    name: "Two-Chambered",
+    description: "Dual Wield + Splash Damage.",
+    constituents: [5169, ER_SPLASH_DAMAGE_ABILITY_ID],
+  },
+  [ER_STRONG_HEADED_ABILITY_ID]: {
+    id: ER_STRONG_HEADED_ABILITY_ID,
+    name: "Strong-Headed",
+    description: "Multi-Headed + Moxie.",
+    constituents: [5085, AbilityId.MOXIE],
+  },
+  [ER_KYOKUSHIN_ABILITY_ID]: {
+    id: ER_KYOKUSHIN_ABILITY_ID,
+    name: "Kyokushin",
+    description: "Roundhouse + Mixed Martial Arts.",
+    constituents: [5139, 5514],
+  },
+  [ER_CURSED_SPIRIT_ABILITY_ID]: {
+    id: ER_CURSED_SPIRIT_ABILITY_ID,
+    name: "Cursed Spirit",
+    description: "Ill Will + Avenger.",
+    constituents: [5285, 5030],
+  },
+  [ER_CRANISPHERE_ABILITY_ID]: {
+    id: ER_CRANISPHERE_ABILITY_ID,
+    name: "Cranisphere",
+    description: "Bone Zone + a one-turn first Skull Bash.",
+    constituents: [5091],
+  },
+  [ER_EXOSUIT_ABILITY_ID]: {
+    id: ER_EXOSUIT_ABILITY_ID,
+    name: "Exosuit",
+    description: "Battle Armor + Unburden.",
+    constituents: [AbilityId.BATTLE_ARMOR, AbilityId.UNBURDEN],
+  },
+  [ER_VORACITY_ABILITY_ID]: {
+    id: ER_VORACITY_ABILITY_ID,
+    name: "Voracity",
+    description: "Unnerve + Gluttony.",
+    constituents: [AbilityId.UNNERVE, AbilityId.GLUTTONY],
+  },
+  [ER_WORLD_EATER_ABILITY_ID]: {
+    id: ER_WORLD_EATER_ABILITY_ID,
+    name: "World-Eater",
+    description: "Devourer + Jaws of Carnage.",
+    constituents: [5249, 5174],
+  },
+  [ER_BLAZE_RELEASE_ABILITY_ID]: {
+    id: ER_BLAZE_RELEASE_ABILITY_ID,
+    name: "Blaze Release",
+    description: "Immolate + Amaterasu.",
+    constituents: [5017, 6106],
+  },
+  [ER_KAGUTSUCHI_ABILITY_ID]: {
+    id: ER_KAGUTSUCHI_ABILITY_ID,
+    name: "Kagutsuchi",
+    description: "Mythical Arrows + Fourth Degree.",
+    constituents: [5308, 6107],
+  },
+  [ER_FOURTH_DEGREE_ABILITY_ID]: {
+    id: ER_FOURTH_DEGREE_ABILITY_ID,
+    name: "Fourth Degree",
+    description: "Sniper + critical hits burn.",
+    constituents: [AbilityId.SNIPER],
+  },
+  [ER_BEJEWELED_ABILITY_ID]: {
+    id: ER_BEJEWELED_ABILITY_ID,
+    name: "Bejeweled",
+    description: "Crystallize + Stellarize.",
+    constituents: [5018, 6053],
+  },
+  [ER_IN_THE_ROUGH_ABILITY_ID]: {
+    id: ER_IN_THE_ROUGH_ABILITY_ID,
+    name: "In the Rough",
+    description: "Crystalline Armor + Rough Skin.",
+    constituents: [5588, AbilityId.ROUGH_SKIN],
+  },
 };
 
 /**
@@ -601,11 +714,6 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
     if (!ability) {
       continue;
     }
-    const preservedBespokeAttrs = ability.attrs.filter(
-      attr =>
-        (def.id === ER_PHOTOVOLTAIC_ABILITY_ID && attr.constructor.name === "PhotovoltaicTypeAbAttr")
-        || (def.id === ER_SPIRITUAL_SABER_ABILITY_ID && attr.constructor.name === "SpiritualSaberNoContactAbAttr"),
-    );
     const collected: AbAttr[] = [];
     for (const constituentId of def.constituents) {
       const attrs = resolveConstituentAttrs(constituentId);
@@ -617,6 +725,12 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
         collected.push(attr);
       }
     }
+    // Keep bespoke riders wired directly onto a composite (e.g. Photovoltaic's
+    // type graft, Spiritual Saber's contact override, and the BerNerd compound
+    // abilities). Constituent-derived attrs are rebuilt below, so only ctor
+    // shapes absent from the resolved parts are preserved.
+    const constituentCtorNames = new Set(collected.map(attr => attr.constructor.name));
+    const preservedBespokeAttrs = ability.attrs.filter(attr => !constituentCtorNames.has(attr.constructor.name));
     if (collected.length === 0) {
       continue;
     }

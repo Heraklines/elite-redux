@@ -42,6 +42,7 @@ import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { BadSpliceAbAttr, ER_BAD_SPLICE_ABILITY_ID } from "#data/elite-redux/abilities/bad-splice";
 import { wireBarbaracleAbility } from "#data/elite-redux/abilities/barbaracle-mechanics";
+import { wireBernerdRosterAbility } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import {
   BorrowedTimeDecayAbAttr,
   BorrowedTimeSummonAbAttr,
@@ -1075,6 +1076,7 @@ function buildCustomAbility(
   // real mechanics for whichever id matches (no-op for non-signature ids).
   wireNewcomerSignatureAbility(builder, pokerogueId);
   wireFakemonPitchAbility(builder, pokerogueId);
+  wireBernerdRosterAbility(builder, pokerogueId);
   wireBarbaracleAbility(builder, pokerogueId);
   wireRaichuPitchAbility(builder, pokerogueId);
 

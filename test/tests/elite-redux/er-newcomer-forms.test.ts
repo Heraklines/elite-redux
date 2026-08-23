@@ -137,11 +137,12 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(moves.some(([, moveId]) => moveId === MoveId.LEAF_BLADE)).toBe(true);
   });
 
-  it("covers all 35 newcomer and Alpha forms incl. the additive mega-z rows", () => {
+  it("covers all 42 newcomer, Partner, and Alpha forms incl. the additive mega-z rows", () => {
     // 28 existing newcomer/Alpha/Discord/Power Plant forms plus Mega Calyrex,
     // Mega Hypno, gender-split Mega Alolan Raichu, Mega Barbaracle Y, Mega
     // Verdant Lilligant, Mega Lilligant Verdant, and Corrupted Uxie.
-    expect(ER_NEWCOMER_FORMS).toHaveLength(35);
+    // The BerNerd batch adds Partner Rowlet/Onix/Gimmighoul and four megas.
+    expect(ER_NEWCOMER_FORMS).toHaveLength(42);
 
     // Mega Skarmory Z is ADDITIVE: it does not disturb the existing ER Mega
     // Skarmory Y, and lands on a distinct `mega-z` formIndex.
@@ -179,6 +180,22 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(partner?.isStarterSelectable).toBe(true);
     const megaEdge = (pokemonFormChanges[SpeciesId.FIDOUGH] ?? []).find(fc => fc.formKey === "mega");
     expect(megaEdge?.preFormKey).toBe("partner");
+
+    for (const [speciesId, slug] of [
+      [SpeciesId.ROWLET, "rowlet_partner"],
+      [SpeciesId.ONIX, "onix_partner"],
+      [SpeciesId.GIMMIGHOUL, "gimmighoul_partner"],
+    ] as const) {
+      const species = getPokemonSpecies(speciesId);
+      const partnerFormIndex = species.forms.findIndex(form => form.formKey === "partner");
+      expect(partnerFormIndex, `${slug} partner form`).toBeGreaterThan(0);
+      expect(species.forms[partnerFormIndex].isStarterSelectable).toBe(true);
+      expect(species.getSpriteAtlasPath(false, partnerFormIndex)).toBe(`elite-redux/${slug}/front`);
+      expect(species.getSpriteAtlasPath(false, partnerFormIndex, false, 0, true)).toBe(`elite-redux/${slug}/back`);
+      expect(species.getIconAtlasKey(partnerFormIndex)).toBe(`er_icon__${slug}`);
+      // Cycling back to form 0 must restore the ordinary species sprite path.
+      expect(species.getSpriteAtlasPath(false, 0)).not.toContain(slug);
+    }
 
     const lucarioZ = getPokemonSpecies(SpeciesId.LUCARIO).forms.find(f => f.formKey === "mega");
     expect(lucarioZ?.formName).toBe("Mega Z");

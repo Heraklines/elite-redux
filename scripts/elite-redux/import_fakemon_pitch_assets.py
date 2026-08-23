@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import colorsys
+import json
 from collections import Counter, deque
 from pathlib import Path
 
@@ -223,6 +224,24 @@ SHEETS: dict[str, dict[str, object]] = {
     },
 }
 
+# BerNerd's approved Discord roster. Paths are relative to the separately
+# supplied Bum archive; keeping this table distinct prevents the private local
+# source library path from leaking into the repository.
+BERNERD_SOURCES: dict[str, dict[str, object]] = {
+    "golurk_mega_y": {"front": rel("Mega Golurk/mega golurk.png"), "back": rel("Mega Golurk/mega golurk back.PNG"), "shiny": rel("Mega Golurk/mega golurk shiny.png"), "shiny_back": rel("Mega Golurk/mega golurk shiny back.PNG"), "icon": rel("Mega Golurk/icon m golurk.PNG")},
+    "skuntank_mega": {"front": rel("Mega Skuntank/m skuntank.png"), "back": rel("Mega Skuntank/m skuntank back.PNG"), "shiny": rel("Mega Skuntank/m skuntank shiny.png"), "shiny_back": rel("Mega Skuntank/m skuntank shiny back.PNG"), "icon": rel("Mega Skuntank/icon skunt.PNG")},
+    "dodrio_mega": {"front": rel("Mega Dodrio/mega dodrio.png"), "back": rel("Mega Dodrio/mega dodrio back.PNG"), "shiny": rel("Mega Dodrio/mega dodrio shiny.png"), "shiny_back": rel("Mega Dodrio/mega dodrio shiny back.PNG"), "icon": rel("Mega Dodrio/icon dodrio.png")},
+    "vantarrow": {"front": rel("Evo Charcadet (Dark)/darkcharcadetevo.png"), "back": rel("Evo Charcadet (Dark)/darkcharcadetevo back.PNG"), "shiny": rel("Evo Charcadet (Dark)/darkcharcadetevo sh1.png"), "shiny_back": rel("Evo Charcadet (Dark)/darkcharcadetevo sh1 back.PNG"), "icon": rel("Evo Charcadet (Dark)/icon charcadet.png")},
+    "chromighty": {"front": rel("FREE Evo Charcadet (steel-fire)/chromighty.png"), "back": rel("FREE Evo Charcadet (steel-fire)/chromighty back.PNG"), "shiny": rel("FREE Evo Charcadet (steel-fire)/chromighty shiny.png"), "shiny_back": rel("FREE Evo Charcadet (steel-fire)/chromighty shiny back.PNG"), "icon": rel("FREE Evo Charcadet (steel-fire)/icon cromighty.PNG")},
+    "temporal_skull": {"front": rel("Evo marowak/Evo Marowak kanto/marowak evo.png"), "back": rel("Evo marowak/Evo Marowak kanto/marowak evo back.PNG"), "shiny": rel("Evo marowak/Evo Marowak kanto/marowak evo shiny.png"), "shiny_back": rel("Evo marowak/Evo Marowak kanto/marowak evo shiny back.PNG"), "icon": rel("Evo marowak/Evo Marowak kanto/icon marowak evo.png")},
+    "quakersby": {"front": rel("Evo Diggersby/quakersby.png"), "back": rel("Evo Diggersby/quakersby back.PNG"), "shiny": rel("Evo Diggersby/quakersby shiny.png"), "shiny_back": rel("Evo Diggersby/quakersby shiny back.PNG"), "icon": rel("Evo Diggersby/quakersby icon.png")},
+    "guzzlord_m": {"front": rel("Ultra Guzzlord (black hole)/blackhole guzzlord.png"), "back": rel("Ultra Guzzlord (black hole)/blackhole guzzlord back.PNG"), "shiny": rel("Ultra Guzzlord (black hole)/blackhole guzzlord sh1.png"), "shiny_back": rel("Ultra Guzzlord (black hole)/blackhole guzzlord sh1 back.PNG"), "icon": rel("Ultra Guzzlord (black hole)/icon guzzlo.PNG")},
+    "pyukumuku_mega": {"front": rel("Mega (tag) Pyukumuku/mega pyukumuku.png"), "back": rel("Mega (tag) Pyukumuku/mega pyukumuku back.PNG"), "shiny": rel("Mega (tag) Pyukumuku/mega pyukumuku shiny.png"), "shiny_back": rel("Mega (tag) Pyukumuku/mega pyukumuku shiny back.PNG"), "icon": rel("Mega (tag) Pyukumuku/icon mega pyukum.PNG")},
+    "rowlet_partner": {"front": rel("Primal Rowlet oisin/oisin.png"), "back": rel("Primal Rowlet oisin/oisin back.PNG"), "shiny": rel("Primal Rowlet oisin/oisin shiy.png"), "shiny_back": rel("Primal Rowlet oisin/oisin shiy back.PNG"), "icon": rel("Primal Rowlet oisin/oisin icon.PNG")},
+    "onix_partner": {"front": rel("Mega Carbonix/Front.png"), "back": rel("Mega Carbonix/mega carbonix back.PNG"), "icon": rel("Mega Carbonix/mega carbonix icon.png"), "palette_transfer": True},
+    "gimmighoul_partner": {"front": rel("Evo Gimmighoul chest/gimmighoul evo.png"), "back": rel("Evo Gimmighoul chest/gimmighoul evo back.PNG"), "shiny": rel("Evo Gimmighoul chest/gimmighoul evo sh.png"), "shiny_back": rel("Evo Gimmighoul chest/gimmighoul evo sh back.PNG"), "icon": rel("Evo Gimmighoul chest/icon gimmighoul e.PNG")},
+}
+
 
 def remove_border_background(image: Image.Image) -> Image.Image:
     """Drop a solid/checker backdrop without touching immutable sources."""
@@ -353,6 +372,28 @@ def hue_shift(image: Image.Image, degrees: float = 155.0) -> Image.Image:
     return out
 
 
+def palette_transfer(source_front: Image.Image, target_front: Image.Image, source_back: Image.Image) -> Image.Image:
+    """Transfer the approved front palette onto the matching back geometry."""
+    source_front = source_front.convert("RGBA")
+    target_front = target_front.convert("RGBA")
+    source_back = source_back.convert("RGBA")
+    if source_front.size != target_front.size:
+        raise ValueError("palette transfer front/reference dimensions must match")
+    votes: dict[tuple[int, int, int], Counter[tuple[int, int, int]]] = {}
+    for source, target in zip(source_front.getdata(), target_front.getdata()):
+        if source[3] and target[3]:
+            votes.setdefault(source[:3], Counter())[target[:3]] += 1
+    mapping = {source: choices.most_common(1)[0][0] for source, choices in votes.items()}
+    out = Image.new("RGBA", source_back.size)
+    for index, pixel in enumerate(source_back.getdata()):
+        if pixel[3] == 0:
+            out.putpixel((index % out.width, index // out.width), pixel)
+            continue
+        replacement = mapping.get(pixel[:3], pixel[:3])
+        out.putpixel((index % out.width, index // out.width), (*replacement, pixel[3]))
+    return out
+
+
 def normalize_icon(image: Image.Image) -> Image.Image:
     image = image.convert("RGBA")
     width, height = image.size
@@ -386,6 +427,33 @@ def derived_icon(front: Image.Image) -> Image.Image:
     return normalize_icon(front)
 
 
+def write_single_frame_atlas(path: Path, image_name: str, size: tuple[int, int], frame_size: tuple[int, int] | None = None) -> None:
+    """Write the one-frame TexturePacker metadata consumed by the game loader."""
+    frame_width, frame_height = frame_size or size
+    atlas = {
+        "textures": [
+            {
+                "image": image_name,
+                "format": "RGBA8888",
+                "size": {"w": size[0], "h": size[1]},
+                "scale": 1,
+                "frames": [
+                    {
+                        "filename": "0001.png",
+                        "rotated": False,
+                        "trimmed": False,
+                        "sourceSize": {"w": frame_width, "h": frame_height},
+                        "spriteSourceSize": {"x": 0, "y": 0, "w": frame_width, "h": frame_height},
+                        "frame": {"x": 0, "y": 0, "w": frame_width, "h": frame_height},
+                    }
+                ],
+            }
+        ],
+        "meta": {"app": "er-build/generate-er-sprite-atlases", "version": "1.0"},
+    }
+    path.write_text(json.dumps(atlas, indent=2) + "\n", encoding="utf-8")
+
+
 def save_species(
     output_root: Path,
     slug: str,
@@ -413,6 +481,8 @@ def save_species(
     shiny.save(directory / "shiny.png")
     shiny_2.save(directory / "shiny-2.png")
     shiny_3.save(directory / "shiny-3.png")
+    for basename in ("front", "shiny", "shiny-2", "shiny-3"):
+        write_single_frame_atlas(directory / f"{basename}.json", f"{basename}.png", SPRITE_SIZE)
     if has_back_source:
         shiny_back = normalize_sprite(images.get("shiny_back", hue_shift(back)))
         shiny_back_2 = normalize_sprite(images.get("shiny_back_2", hue_shift(shiny_back, 120.0)))
@@ -421,11 +491,14 @@ def save_species(
         shiny_back.save(directory / "shiny-back.png")
         shiny_back_2.save(directory / "shiny-back-2.png")
         shiny_back_3.save(directory / "shiny-back-3.png")
+        for basename in ("back", "shiny-back", "shiny-back-2", "shiny-back-3"):
+            write_single_frame_atlas(directory / f"{basename}.json", f"{basename}.png", SPRITE_SIZE)
     icon_path = directory / "icon.png"
     if icon is not None:
         normalize_icon(icon).save(icon_path)
     elif refresh_derived_icon or not icon_path.is_file():
         derived_icon(front).save(icon_path)
+    write_single_frame_atlas(directory / "icon.json", "icon.png", (32, 64), ICON_FRAME_SIZE)
 
 def load_regular(library_root: Path, spec: dict[str, object]) -> tuple[dict[str, Image.Image], Image.Image | None]:
     if "sheet" in spec:
@@ -529,6 +602,8 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--library-root", type=Path, required=True)
     parser.add_argument("--assets-root", type=Path, required=True)
+    parser.add_argument("--bernerd-root", type=Path)
+    parser.add_argument("--onix-partner-front", type=Path)
     parser.add_argument(
         "--slugs",
         help="Comma-separated approved output slugs; omit only for the legacy full import.",
@@ -549,6 +624,21 @@ def main() -> None:
         images, icon = load_sheet(args.library_root, spec)
         save_species(output_root, slug, images, icon, bool(spec.get("refresh_derived_icon", False)))
         print(f"imported {slug}")
+
+    if args.bernerd_root is not None:
+        for slug, spec in BERNERD_SOURCES.items():
+            if selected is not None and slug not in selected:
+                continue
+            images, icon = load_regular(args.bernerd_root, spec)
+            if bool(spec.get("palette_transfer", False)):
+                if args.onix_partner_front is None:
+                    raise ValueError("--onix-partner-front is required for the approved Onix Partner recolor")
+                target_front = open_rgba(args.onix_partner_front)
+                images["back"] = palette_transfer(images["front"], target_front, images["back"])
+                images["front"] = target_front
+                icon = None
+            save_species(output_root, slug, images, icon, True)
+            print(f"imported {slug}")
 
     if selected is not None and "power_plant_live_current" not in selected:
         return

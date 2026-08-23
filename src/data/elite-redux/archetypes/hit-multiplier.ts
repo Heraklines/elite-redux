@@ -86,6 +86,8 @@ export interface HitMultiplierFilter {
   readonly type?: PokemonType;
   /** Move flag(s) that triggers the extra strike. Omit to accept any flags. */
   readonly flag?: MoveFlags;
+  /** At least one of these flags must match. Mutually exclusive with `flag`. */
+  readonly flagsAny?: readonly MoveFlags[];
 }
 
 /** Construction options for {@linkcode HitMultiplierAbAttr}. */
@@ -135,6 +137,9 @@ export class HitMultiplierAbAttr extends AddSecondStrikeAbAttr {
     if (opts.filter?.flag === MoveFlags.NONE) {
       throw new Error("[HitMultiplierAbAttr] filter.flag must be a non-NONE MoveFlags bit when set");
     }
+    if (opts.filter?.flagsAny?.some(flag => flag === MoveFlags.NONE)) {
+      throw new Error("[HitMultiplierAbAttr] filter.flagsAny cannot contain NONE");
+    }
     super();
     this.extraStrikes = opts.extraStrikes;
     this.filter = opts.filter ?? {};
@@ -181,6 +186,12 @@ export class HitMultiplierAbAttr extends AddSecondStrikeAbAttr {
       return false;
     }
     if (filter.flag !== undefined && !move.doesFlagEffectApply({ flag: filter.flag, user: pokemon })) {
+      return false;
+    }
+    if (
+      filter.flagsAny !== undefined
+      && !filter.flagsAny.some(flag => move.doesFlagEffectApply({ flag, user: pokemon }))
+    ) {
       return false;
     }
     return true;

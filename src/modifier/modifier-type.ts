@@ -1894,7 +1894,7 @@ class SpeciesStatBoosterModifierTypeGenerator extends ModifierTypeGenerator {
     THICK_CLUB: {
       stats: [Stat.ATK],
       multiplier: 2,
-      species: [SpeciesId.CUBONE, SpeciesId.MAROWAK, SpeciesId.ALOLA_MAROWAK],
+      species: [SpeciesId.CUBONE, SpeciesId.MAROWAK, SpeciesId.ALOLA_MAROWAK, 70060 as SpeciesId],
       rare: true,
     },
     METAL_POWDER: {

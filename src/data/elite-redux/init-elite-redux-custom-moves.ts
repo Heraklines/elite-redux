@@ -79,6 +79,7 @@ import {
   MultiHitPowerIncrementAttr,
   PhotonGeyserCategoryAttr,
   PsychoShiftEffectAttr,
+  RechargeAttr,
   RemoveArenaTrapAttr,
   RemoveScreensAttr,
   SelfStatusMove,
@@ -96,6 +97,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ChargeAnim } from "#enums/move-anims-common";
 import { MoveCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
 import { MultiHitType } from "#enums/multi-hit-type";
@@ -426,6 +428,28 @@ function buildSwirlyRoomMove(): Move {
     .target(MoveTarget.BOTH_SIDES);
 }
 
+function buildIvoryImpactMove(): Move {
+  ErCustomAttackMove.registerDraft(
+    MoveId.IVORY_IMPACT,
+    "Ivory Impact",
+    "The user crashes into the target with ancient bone, then must recharge.",
+    "The user crashes into the target with ancient bone, then must recharge.",
+  );
+  const move = new ErCustomAttackMove(
+    MoveId.IVORY_IMPACT,
+    PokemonType.NORMAL,
+    MoveCategory.PHYSICAL,
+    150,
+    100,
+    5,
+    -1,
+    0,
+    9,
+  ).attr(RechargeAttr);
+  applyErArchetypeToMove(move, MoveFlags.BONE_BASED, []);
+  return move;
+}
+
 /** Count the number of set bits in a (non-negative integer) bitmask. */
 function popcount(mask: number): number {
   // The ER MoveFlags enum has < 32 bits, so a simple Brian-Kernighan loop is fine.
@@ -519,6 +543,17 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       result.errors.push(`Failed to construct manual move "Swirly Room": ${msg}`);
+    }
+  }
+  if (existingIds.has(MoveId.IVORY_IMPACT)) {
+    result.customsAlreadyPresent++;
+  } else {
+    try {
+      (allMoves as Move[])[MoveId.IVORY_IMPACT] = buildIvoryImpactMove();
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Failed to construct manual move "Ivory Impact": ${msg}`);
     }
   }
   return result;

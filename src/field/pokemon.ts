@@ -2059,6 +2059,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
     critStage.value += fieldCritBonus;
+    const jackpotSides = (globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> } | undefined)
+      ?.erJackpotSides;
+    if (jackpotSides?.has(source.isPlayer())) {
+      critStage.value += 1;
+    }
 
     // ER Pretentious: the attacker's accumulated KO crit-stacks. Scanned by name.
     for (const attr of source.getAllActiveAbilityAttrs()) {
@@ -2533,7 +2538,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (globalScene.gameMode.isCoop && this.customPokemonData?.coopLuck != null) {
       return this.customPokemonData.coopLuck;
     }
-    const base = this.luck + (this.isFusion() ? this.fusionLuck : 0);
+    const jackpotLuck = (this.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck ? 1 : 0;
+    const base = this.luck + (this.isFusion() ? this.fusionLuck : 0) + jackpotLuck;
     // ER (#432): a Black Shiny is the rarest shiny tier and grants a flat
     // Luck 5 (a regular shiny caps at 3). DERIVED here, never stored - the
     // save keeps its ordinary variant/luck fields untouched, so this is
@@ -5526,7 +5532,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ignoreSourceAbility) {
       const subAttrs = source.getAllActiveAbilityAttrs();
       for (const attr of subAttrs) {
-        if (attr?.constructor?.name === "AttackStatSubstituteAbAttr") {
+        if (typeof (attr as unknown as { resolveStat?: unknown })?.resolveStat === "function") {
           const sub = (
             attr as unknown as { resolveStat: (m: Move, p: boolean, s: Pokemon) => EffectiveStat | null }
           ).resolveStat(move, isPhysical, source);
@@ -5761,7 +5767,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // defense, no burn halving, Light-Screen-blocked).
     if (!ignoreSourceAbility) {
       for (const attr of source.getAllActiveAbilityAttrs()) {
-        if (attr?.constructor?.name === "MoveCategoryOverrideAbAttr") {
+        if (typeof (attr as unknown as { resolveCategory?: unknown })?.resolveCategory === "function") {
           const overridden = (
             attr as unknown as { resolveCategory: (m: Move, u: Pokemon) => MoveCategory | null }
           ).resolveCategory(move, source);
@@ -5947,7 +5953,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // full damage on every strike, so without this Multi-Headed hit 2-3× at 100%.
     // Scoped to Multi-Headed holders only — Multi-Lens, Parental Bond and ordinary
     // multi-hit moves are untouched.
-    if (hasMultiHeadedAttr(source.getAllActiveAbilityAttrs())) {
+    if (
+      hasMultiHeadedAttr(source.getAllActiveAbilityAttrs())
+      && move.id !== MoveId.COUNTER
+      && move.id !== MoveId.MIRROR_COAT
+    ) {
       const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
       if (strikeIndex > 0) {
         multiStrikeEnhancementMultiplier.value *= source.turnData.hitCount <= 2 ? 0.25 : strikeIndex === 1 ? 0.2 : 0.15;
@@ -6117,6 +6127,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      */
     const erLibraryMultiplier = erLibraryDamageMultiplier(this, move);
 
+    // Mega Golurk Y's Reduction Rune caps surrounding attackers' weakness
+    // multiplier at 1.5x (ordinary weakness) or 2x (4x and above).
+    const reductionRuneMultiplier =
+      typeMultiplier > 1
+      && globalScene
+        .getField(true)
+        .some(
+          holder =>
+            holder !== source
+            && holder.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "ReductionRuneAbAttr"),
+        )
+        ? typeMultiplier >= 4
+          ? 2 / typeMultiplier
+          : 1.5 / typeMultiplier
+        : 1;
+
     damage.value = toDmgValue(
       baseDamage
         * targetMultiplier
@@ -6136,7 +6162,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * mistyTerrainMultiplier
         * erRelicMultiplier
         * erRelicDefenderMultiplier
-        * erLibraryMultiplier,
+        * erLibraryMultiplier
+        * reductionRuneMultiplier,
     );
     if (
       this.status?.effect === StatusEffect.BURN
@@ -7773,6 +7800,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       overrideMessage,
     );
 
+    if (
+      effect === StatusEffect.BURN
+      && sourcePokemon?.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "AmaterasuMarkerAbAttr")
+    ) {
+      (this.waveData as unknown as { amaterasuBurnSourceId?: number }).amaterasuBurnSourceId = sourcePokemon.id;
+    }
+
     onErEndlessStatusInflicted(this, sourcePokemon, effect);
 
     return true;
@@ -7911,6 +7945,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   resetStatus(revive = true, confusion = false, reloadAssets = false, asPhase = true): void {
     const lastStatus = this.status?.effect;
+    if (lastStatus === StatusEffect.BURN) {
+      const sourceId = (this.waveData as unknown as { amaterasuBurnSourceId?: number }).amaterasuBurnSourceId;
+      // Once Amaterasu inflicts the burn it remains unhealable for this battle,
+      // even if the source switches out or faints. waveData resets at the next
+      // encounter, so ordinary between-battle status cleanup still works.
+      if (sourceId !== undefined) {
+        return;
+      }
+    }
     if (!revive && lastStatus === StatusEffect.FAINT) {
       return;
     }

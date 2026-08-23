@@ -6,18 +6,23 @@
 import { isDevEncounterPersistenceBypassActive, loadDevTools } from "#app/dev-tools/registry";
 import Overrides from "#app/overrides";
 import {
+  ER_CHROMIGHTY_SPECIES_ID,
   ER_CONKAPITATOR_SPECIES_ID,
   ER_DIPPOWDOWN_SPECIES_ID,
   ER_FAKEMON_PITCH_SPECIES,
   ER_FALINKS_CONVERGENT_SPECIES_ID,
   ER_GURDURUR_SPECIES_ID,
+  ER_GUZZLORD_M_SPECIES_ID,
   ER_INTANGROWTH_SPECIES_ID,
   ER_IRON_STREAM_SPECIES_ID,
   ER_LILLIGANT_VERDANT_SPECIES_ID,
   ER_MISHAMANUS_SPECIES_ID,
+  ER_QUAKERSBY_SPECIES_ID,
   ER_SLABBERIGUS_SPECIES_ID,
   ER_TAGELA_SPECIES_ID,
+  ER_TEMPORAL_SKULL_SPECIES_ID,
   ER_TREMBURR_SPECIES_ID,
+  ER_VANTARROW_SPECIES_ID,
 } from "#data/elite-redux/er-fakemon-pitch-species";
 import {
   ER_EGOELK_SPECIES_ID,
@@ -27,11 +32,16 @@ import {
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
-const SCENARIO_LABELS = Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`);
+const SCENARIO_LABELS = [
+  ...Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`),
+  "Roster: BerNerd additions 1/2",
+  "Roster: BerNerd additions 2/2",
+];
 const PITCH_SPRITE_SLUGS = new Map(ER_FAKEMON_PITCH_SPECIES.map(({ id, slug }) => [id, slug]));
 
 type ExpectedShowcasePokemon = Readonly<{
@@ -48,6 +58,12 @@ type ExpectedShowcase = Readonly<{
 const expectedPokemon = (speciesId: number, formIndex = 0, formKey = ""): ExpectedShowcasePokemon => ({
   speciesId,
   formIndex,
+  formKey,
+});
+
+const expectedFormPokemon = (speciesId: number, formKey: string): ExpectedShowcasePokemon => ({
+  speciesId,
+  formIndex: -1,
   formKey,
 });
 
@@ -84,6 +100,28 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
       expectedPokemon(ER_CONKAPITATOR_SPECIES_ID),
     ],
     enemy: expectedPokemon(ER_DIPPOWDOWN_SPECIES_ID),
+  },
+  "Roster: BerNerd additions 1/2": {
+    player: [
+      expectedPokemon(ER_VANTARROW_SPECIES_ID),
+      expectedPokemon(ER_CHROMIGHTY_SPECIES_ID),
+      expectedPokemon(ER_TEMPORAL_SKULL_SPECIES_ID),
+      expectedPokemon(ER_QUAKERSBY_SPECIES_ID),
+      expectedPokemon(ER_GUZZLORD_M_SPECIES_ID),
+      expectedFormPokemon(SpeciesId.GOLURK, "mega-y"),
+    ],
+    enemy: expectedFormPokemon(SpeciesId.SKUNTANK, "mega"),
+  },
+  "Roster: BerNerd additions 2/2": {
+    player: [
+      expectedFormPokemon(SpeciesId.SKUNTANK, "mega"),
+      expectedFormPokemon(SpeciesId.DODRIO, "mega"),
+      expectedFormPokemon(SpeciesId.PYUKUMUKU, "mega"),
+      expectedFormPokemon(SpeciesId.ROWLET, "partner"),
+      expectedFormPokemon(SpeciesId.ONIX, "partner"),
+      expectedFormPokemon(SpeciesId.GIMMIGHOUL, "partner"),
+    ],
+    enemy: expectedFormPokemon(SpeciesId.GOLURK, "mega-y"),
   },
 };
 
@@ -131,9 +169,11 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
     await loadDevTools();
   });
-  it("keeps eight showcase labels unique and contiguous", () => {
-    expect(SCENARIO_LABELS).toEqual(Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`));
-    expect(new Set(SCENARIO_LABELS).size).toBe(8);
+  it("keeps all showcase labels unique and registered", () => {
+    expect(SCENARIO_LABELS.slice(0, 8)).toEqual(
+      Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`),
+    );
+    expect(new Set(SCENARIO_LABELS).size).toBe(10);
     expect(Object.keys(EXPECTED_SHOWCASES)).toEqual(SCENARIO_LABELS.slice(5));
   });
 
@@ -186,8 +226,17 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
           formIndex: pokemon.formIndex,
           formKey: pokemon.getFormKey(),
         });
-        expect(game.scene.getPlayerParty().map(identity)).toEqual(expected.player);
-        expect(identity(game.scene.getEnemyParty()[0]!)).toEqual(expected.enemy);
+        const resolveExpected = (pokemon: ExpectedShowcasePokemon): ExpectedShowcasePokemon => ({
+          ...pokemon,
+          formIndex:
+            pokemon.formIndex >= 0
+              ? pokemon.formIndex
+              : getPokemonSpecies(pokemon.speciesId as SpeciesId).forms.findIndex(
+                  form => form.formKey === pokemon.formKey,
+                ),
+        });
+        expect(game.scene.getPlayerParty().map(identity)).toEqual(expected.player.map(resolveExpected));
+        expect(identity(game.scene.getEnemyParty()[0]!)).toEqual(resolveExpected(expected.enemy));
       }
     }, 180_000);
   }

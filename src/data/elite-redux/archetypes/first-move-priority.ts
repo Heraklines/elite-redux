@@ -28,15 +28,15 @@ function setUsedPriority(pokemon: ChangeMovePriorityAbAttrParams["pokemon"], use
 }
 
 export class FirstFlaggedMovePriorityAbAttr extends ChangeMovePriorityAbAttr {
-  private readonly flag: MoveFlags;
+  private readonly flags: readonly MoveFlags[];
 
-  constructor(flag: MoveFlags) {
+  constructor(flag: MoveFlags | readonly MoveFlags[]) {
     super(() => false, 0);
-    this.flag = flag;
+    this.flags = Array.isArray(flag) ? flag : [flag];
   }
 
   override canApply({ pokemon, move }: ChangeMovePriorityAbAttrParams): boolean {
-    return !hasUsedPriority(pokemon) && move.hasFlag(this.flag);
+    return !hasUsedPriority(pokemon) && this.flags.some(flag => move.hasFlag(flag));
   }
 
   override apply({ priority }: ChangeMovePriorityAbAttrParams): void {
@@ -45,12 +45,12 @@ export class FirstFlaggedMovePriorityAbAttr extends ChangeMovePriorityAbAttr {
 }
 
 export class ConsumeFirstFlaggedMovePriorityAbAttr extends PostAttackAbAttr {
-  private readonly flag: MoveFlags;
+  private readonly flags: readonly MoveFlags[];
   private readonly regainOnKo: boolean;
 
-  constructor(flag: MoveFlags, regainOnKo = false) {
+  constructor(flag: MoveFlags | readonly MoveFlags[], regainOnKo = false) {
     super();
-    this.flag = flag;
+    this.flags = Array.isArray(flag) ? flag : [flag];
     this.regainOnKo = regainOnKo;
   }
 
@@ -61,11 +61,11 @@ export class ConsumeFirstFlaggedMovePriorityAbAttr extends PostAttackAbAttr {
       HitResult.NOT_VERY_EFFECTIVE,
       HitResult.ONE_HIT_KO,
     ].includes(hitResult);
-    return landed && (move.hasFlag(this.flag) || (this.regainOnKo && opponent.isFainted()));
+    return landed && (this.flags.some(flag => move.hasFlag(flag)) || (this.regainOnKo && opponent.isFainted()));
   }
 
   override apply({ pokemon, move, opponent }: PostMoveInteractionAbAttrParams): void {
-    if (move.hasFlag(this.flag)) {
+    if (this.flags.some(flag => move.hasFlag(flag))) {
       setUsedPriority(pokemon, true);
     }
     if (this.regainOnKo && opponent.isFainted()) {

@@ -84,6 +84,43 @@ export const ER_MAGIC_TOUCH_ABILITY_ID = 6077;
 export const ER_CELESTIAL_JELLY_ABILITY_ID = 6078;
 export const ER_RAPIER_ABILITY_ID = 6079;
 export const ER_BRAIN_OVER_BRAWN_ABILITY_ID = 6080;
+// BerNerd roster + Partner trio (2026-08). Append-only custom ids.
+export const ER_SUBVERSION_ABILITY_ID = 6081;
+export const ER_REDUCTION_RUNE_ABILITY_ID = 6082;
+export const ER_MONK_ABILITY_ID = 6083;
+export const ER_LINGERING_MUSK_ABILITY_ID = 6084;
+export const ER_PUNGENCY_ABILITY_ID = 6085;
+export const ER_TWO_CHAMBERED_ABILITY_ID = 6086;
+export const ER_STRONG_HEADED_ABILITY_ID = 6087;
+export const ER_PUSH_KICK_ABILITY_ID = 6088;
+export const ER_KYOKUSHIN_ABILITY_ID = 6089;
+export const ER_FREE_AIM_ABILITY_ID = 6090;
+export const ER_FLURRY_ABILITY_ID = 6091;
+export const ER_QUICK_CHARGE_ABILITY_ID = 6092;
+export const ER_FLICKER_JAB_ABILITY_ID = 6093;
+export const ER_TWIN_LION_FISTS_ABILITY_ID = 6094;
+export const ER_CURSED_SPIRIT_ABILITY_ID = 6095;
+export const ER_CRANISPHERE_ABILITY_ID = 6096;
+export const ER_MUDBALL_ABILITY_ID = 6097;
+export const ER_EXOSUIT_ABILITY_ID = 6098;
+export const ER_KNUCKLE_DOWN_ABILITY_ID = 6099;
+export const ER_FOREBODING_FANGS_ABILITY_ID = 6100;
+export const ER_VORACITY_ABILITY_ID = 6101;
+export const ER_VOID_ABILITY_ID = 6102;
+export const ER_WORLD_EATER_ABILITY_ID = 6103;
+export const ER_MUTUAL_DESTRUCTION_ABILITY_ID = 6104;
+export const ER_CROSSBOW_ABILITY_ID = 6105;
+export const ER_AMATERASU_ABILITY_ID = 6106;
+export const ER_FOURTH_DEGREE_ABILITY_ID = 6107;
+export const ER_BLAZE_RELEASE_ABILITY_ID = 6108;
+export const ER_KAGUTSUCHI_ABILITY_ID = 6109;
+export const ER_GRIT_ABILITY_ID = 6110;
+export const ER_BEJEWELED_ABILITY_ID = 6111;
+export const ER_IN_THE_ROUGH_ABILITY_ID = 6112;
+export const ER_FAILED_CHECK_ABILITY_ID = 6113;
+export const ER_JACKPOT_ABILITY_ID = 6114;
+export const ER_SHARING_IS_SCARING_ABILITY_ID = 6115;
+export const ER_RAGING_FIST_ABILITY_ID = 6116;
 
 export interface FakemonPitchAbilityDefinition {
   readonly draft: ErAbilityDraft;
@@ -348,4 +385,100 @@ export const ER_FAKEMON_PITCH_ABILITIES: readonly FakemonPitchAbilityDefinition[
     "Brain Over Brawn",
     "Fighting-type moves become Psychic-type and receive a 1.2x power boost.",
   ),
+  ability(
+    ER_SUBVERSION_ABILITY_ID,
+    "Subversion",
+    "Moves use the lower attacking stat, become its matching category, and deal 1.5x damage.",
+  ),
+  ability(
+    ER_REDUCTION_RUNE_ABILITY_ID,
+    "Reduction Rune",
+    "Super-effective damage dealt by surrounding Pokemon is reduced: 2x becomes 1.5x and 4x becomes 2x.",
+  ),
+  ability(
+    ER_MONK_ABILITY_ID,
+    "Monk",
+    "Inner Focus; Focus Punch becomes a 150-power, priority-0 Punch move that cannot be disrupted.",
+  ),
+  ability(
+    ER_LINGERING_MUSK_ABILITY_ID,
+    "Lingering Musk",
+    "Lingering Aroma; lethal damage is delayed until the end of the turn.",
+  ),
+  ability(ER_PUNGENCY_ABILITY_ID, "Pungency", "Stench + Aftermath."),
+  ability(ER_TWO_CHAMBERED_ABILITY_ID, "Two-Chambered", "Dual Wield + Splash Damage."),
+  ability(ER_STRONG_HEADED_ABILITY_ID, "Strong-Headed", "Multi-Headed + Moxie."),
+  ability(
+    ER_PUSH_KICK_ABILITY_ID,
+    "Push Kick",
+    "The first Kick move used each turn lowers the target's Defense by one stage.",
+  ),
+  ability(ER_KYOKUSHIN_ABILITY_ID, "Kyokushin", "Roundhouse + Mixed Martial Arts."),
+  ability(
+    ER_FREE_AIM_ABILITY_ID,
+    "Free Aim",
+    "Attacks ignore redirection and select the opponent that would take the most damage, prioritizing knockouts.",
+  ),
+  ability(ER_FLURRY_ABILITY_ID, "Flurry", "Kick and Arrow moves hit twice at 70% power each."),
+  ability(
+    ER_QUICK_CHARGE_ABILITY_ID,
+    "Quick Charge",
+    "The first Arrow or Reckless move after entry gains one priority.",
+  ),
+  ability(ER_FLICKER_JAB_ABILITY_ID, "Flicker Jab", "The first Horn or Punch move after entry gains one priority."),
+  ability(
+    ER_TWIN_LION_FISTS_ABILITY_ID,
+    "Twin Lion Fists",
+    "Punch moves hit twice at 60% power and heal one quarter of damage dealt.",
+  ),
+  ability(ER_CURSED_SPIRIT_ABILITY_ID, "Cursed Spirit", "Ill Will + Avenger."),
+  ability(
+    ER_CRANISPHERE_ABILITY_ID,
+    "Cranisphere",
+    "Bone Zone; the first Skull Bash after entry executes in one turn.",
+  ),
+  ability(
+    ER_MUDBALL_ABILITY_ID,
+    "Mudball",
+    "Uses Mud Sport on entry and strikes incoming Flying-type Pokemon with a 20-power Mud Bomb.",
+  ),
+  ability(ER_EXOSUIT_ABILITY_ID, "Exosuit", "Battle Armor + Unburden."),
+  ability(ER_KNUCKLE_DOWN_ABILITY_ID, "Knuckle Down", "Using a Punch move raises Attack by one stage."),
+  ability(ER_FOREBODING_FANGS_ABILITY_ID, "Foreboding Fangs", "Biting moves inflict Fear."),
+  ability(ER_VORACITY_ABILITY_ID, "Voracity", "Unnerve + Gluttony."),
+  ability(ER_VOID_ABILITY_ID, "Void", "Steals one held item from an opponent at the end of every turn."),
+  ability(ER_WORLD_EATER_ABILITY_ID, "World-Eater", "Devourer + Jaws of Carnage."),
+  ability(
+    ER_MUTUAL_DESTRUCTION_ABILITY_ID,
+    "Mutual Destruction",
+    "On fainting, uses Pain Split before dealing Innards Out damage equal to its resulting HP.",
+  ),
+  ability(ER_CROSSBOW_ABILITY_ID, "Crossbow", "Arrow attacks lower the target's Defense by one stage."),
+  ability(ER_AMATERASU_ABILITY_ID, "Amaterasu", "Burns inflicted by this Pokemon cannot be healed during the battle."),
+  ability(ER_FOURTH_DEGREE_ABILITY_ID, "Fourth Degree", "Sniper; critical hits burn the target."),
+  ability(ER_BLAZE_RELEASE_ABILITY_ID, "Blaze Release", "Immolate + Amaterasu."),
+  ability(ER_KAGUTSUCHI_ABILITY_ID, "Kagutsuchi", "Mythical Arrows + Fourth Degree."),
+  ability(
+    ER_GRIT_ABILITY_ID,
+    "Grit",
+    "While statused, attacks use Defense instead of Attack and Sp. Def instead of Sp. Atk.",
+  ),
+  ability(ER_BEJEWELED_ABILITY_ID, "Bejeweled", "Crystallize + Stellarize."),
+  ability(ER_IN_THE_ROUGH_ABILITY_ID, "In the Rough", "Crystalline Armor + Rough Skin."),
+  ability(
+    ER_FAILED_CHECK_ABILITY_ID,
+    "Failed Check",
+    "When hit by a non-contact move, retaliates with a 30-power Make It Rain.",
+  ),
+  ability(
+    ER_JACKPOT_ABILITY_ID,
+    "Jackpot",
+    "Uses Happy Hour on entry and grants its side one critical-hit stage and one Luck for the battle; cannot stack.",
+  ),
+  ability(
+    ER_SHARING_IS_SCARING_ABILITY_ID,
+    "Sharing is Scaring",
+    "Self-inflicted stat drops are redirected to opposing Pokemon.",
+  ),
+  ability(ER_RAGING_FIST_ABILITY_ID, "Raging Fist", "Rage Fist gains power twice as quickly when this Pokemon is hit."),
 ];

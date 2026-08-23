@@ -1,8 +1,10 @@
+import { getMoveAnimUrl } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { initEliteReduxCustomMoves } from "#data/elite-redux/init-elite-redux-custom-moves";
 import {
   HitHealAttr,
   MovePowerMultiplierAttr,
+  RechargeAttr,
   RecoilAttr,
   StatusEffectAttr,
   VariableMoveTypeAttr,
@@ -10,6 +12,7 @@ import {
 import { ErMoveId } from "#enums/er-move-id";
 import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
+import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { describe, expect, it } from "vitest";
 
@@ -93,6 +96,18 @@ describe("initEliteReduxCustomMoves (B2 + D4)", () => {
     // directly observable from here).
     const result = initEliteReduxCustomMoves();
     expect(result.errors).toHaveLength(0);
+  });
+
+  it("registers Temporal Skull's Ivory Impact as a 150 BP Bone move with recharge", () => {
+    const move = allMoves[MoveId.IVORY_IMPACT];
+    expect(move?.name).toBe("Ivory Impact");
+    expect(move?.type).toBe(PokemonType.NORMAL);
+    expect(move?.category).toBe(MoveCategory.PHYSICAL);
+    expect(move?.power).toBe(150);
+    expect(move?.hasFlag(MoveFlags.BONE_BASED)).toBe(true);
+    expect(move?.attrs.some(attr => attr instanceof RechargeAttr)).toBe(true);
+    expect(ErMoveId.IVORY_IMPACT).toBe(MoveId.IVORY_IMPACT);
+    expect(getMoveAnimUrl(MoveId.IVORY_IMPACT)).toBe("./battle-anims/bone-rush.json");
   });
 
   // -------------------------------------------------------------------------

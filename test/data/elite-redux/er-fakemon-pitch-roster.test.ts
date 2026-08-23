@@ -38,6 +38,10 @@ const MEGA_FORMS = [
   [SpeciesId.REUNICLUS, "mega-x", FormChangeItem.REUNICLUSITE_X, "reuniclus_mega_x"],
   [SpeciesId.XATU, "mega", FormChangeItem.XATUNITE, "xatu_mega"],
   [SpeciesId.ZANGOOSE, "mega", FormChangeItem.ZANGOOSEITE, "zangoose_mega"],
+  [SpeciesId.GOLURK, "mega-y", FormChangeItem.GOLURKITE_Y, "golurk_mega_y"],
+  [SpeciesId.SKUNTANK, "mega", FormChangeItem.SKUNTANKITE, "skuntank_mega"],
+  [SpeciesId.DODRIO, "mega", FormChangeItem.DODRIONITE, "dodrio_mega"],
+  [SpeciesId.PYUKUMUKU, "mega", FormChangeItem.PYUKUMUKUNITE, "pyukumuku_mega"],
 ] as const;
 
 const STANDALONE_CONTRACT = [
@@ -145,7 +149,7 @@ const STANDALONE_CONTRACT = [
 ] as const;
 describe("Discord fakemon-pitch roster", () => {
   it("registers every custom species with its complete six-ability kit", () => {
-    expect(ER_FAKEMON_PITCH_SPECIES).toHaveLength(25);
+    expect(ER_FAKEMON_PITCH_SPECIES).toHaveLength(30);
     for (const def of ER_FAKEMON_PITCH_SPECIES) {
       const species = getPokemonSpecies(def.id as SpeciesId);
 
@@ -291,7 +295,7 @@ describe("Discord fakemon-pitch roster", () => {
       ...MEGA_FORMS.map(([, , , slug]) => slug),
       "power_plant_live_current",
     ];
-    expect(new Set(slugs).size).toBe(33);
+    expect(new Set(slugs).size).toBe(42);
     for (const slug of slugs) {
       expect(erBlackSpritePathFromBase(`elite-redux/${slug}/front`)).toBe(`black/elite-redux/${slug}/front`);
       expect(erBlackSpritePathFromBase(`elite-redux/${slug}/back`)).toBe(`black/elite-redux/${slug}/back`);

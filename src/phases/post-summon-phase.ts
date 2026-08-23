@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { MysteryEncounterPostSummonTag } from "#data/battler-tags";
 import { erBadSpliceOnOpponentSummon } from "#data/elite-redux/abilities/bad-splice";
+import { erMudballOnOpponentSummon } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyCursedIdol } from "#data/elite-redux/er-relics";
@@ -71,6 +72,7 @@ export class PostSummonPhase extends PokemonPhase {
     // ER Bad Splice (5932): if an opposing active holder carries Bad Splice,
     // splice this just-summoned foe from its own party.
     erBadSpliceOnOpponentSummon(pokemon);
+    erMudballOnOpponentSummon(pokemon);
 
     this.end();
   }

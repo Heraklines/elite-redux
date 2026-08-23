@@ -177,6 +177,7 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   [
     MoveId.SKULL_BASH,
     move => {
+      orFlag(move, MoveFlags.BONE_BASED);
       if (move.chargeAttrs) {
         move.chargeAttrs = move.chargeAttrs.filter(attr => !(attr instanceof StatStageChangeAttr));
         move.chargeAttrs.push(new StatStageChangeAttr([Stat.ATK], 1, true));
@@ -1400,7 +1401,10 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(
         move,
         new MovePowerMultiplierAttr((user, _target, m) =>
-          user.turnData.attacksReceived.some(r => r.damage > 0) ? 40 / m.power : 1,
+          user.turnData.attacksReceived.some(r => r.damage > 0)
+          && !user.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "MonkFocusPunchAbAttr")
+            ? 40 / m.power
+            : 1,
         ),
       );
     },

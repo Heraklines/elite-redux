@@ -51,11 +51,13 @@ import {
 import { resetErEndlessContinuation, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import {
+  ER_CHROMIGHTY_SPECIES_ID,
   ER_CONKAPITATOR_SPECIES_ID,
   ER_DIPPOWDOWN_SPECIES_ID,
   ER_EQUILIBRA_SPECIES_ID,
   ER_FALINKS_CONVERGENT_SPECIES_ID,
   ER_GURDURUR_SPECIES_ID,
+  ER_GUZZLORD_M_SPECIES_ID,
   ER_INTANGROWTH_SPECIES_ID,
   ER_IRON_STREAM_SPECIES_ID,
   ER_JUSTYKE_SPECIES_ID,
@@ -68,12 +70,15 @@ import {
   ER_PONYTA_REDUX_SPECIES_ID,
   ER_POWER_PLANT_SPECIES_ID,
   ER_PYROTHON_SPECIES_ID,
+  ER_QUAKERSBY_SPECIES_ID,
   ER_RAPIDASH_REDUX_SPECIES_ID,
   ER_SLABBERIGUS_SPECIES_ID,
   ER_SNUGLETT_SPECIES_ID,
   ER_SNUGTRIO_SPECIES_ID,
   ER_TAGELA_SPECIES_ID,
+  ER_TEMPORAL_SKULL_SPECIES_ID,
   ER_TREMBURR_SPECIES_ID,
+  ER_VANTARROW_SPECIES_ID,
   ER_VOLTRIEVER_SPECIES_ID,
   ER_WAILBORE_SPECIES_ID,
 } from "#data/elite-redux/er-fakemon-pitch-species";
@@ -2101,6 +2106,23 @@ function fakemonPitchShowcaseScenario(
   };
 }
 
+function bernerdRosterShowcaseScenario(
+  number: number,
+  members: readonly FakemonPitchShowcaseMember[],
+  enemy: FakemonPitchShowcaseMember,
+  names: string,
+): DevScenario {
+  return {
+    ...fakemonPitchShowcaseScenario(number, members, enemy, names),
+    label: `Roster: BerNerd additions ${number}/2`,
+    description:
+      `BerNerd roster showcase ${number}/2.\n`
+      + `PLAYER: ${names}.\n`
+      + "DO: inspect the party, cycle the Partner forms where present, and test the listed signature mechanics.\n"
+      + "EXPECT: the dedicated sprites, typing, stats, abilities, innates, moves, and form identities remain intact.",
+  };
+}
+
 const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
   fakemonPitchShowcaseScenario(
     1,
@@ -2205,6 +2227,40 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
     ],
     pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
     "Mega Barbaracle Y, Mega Lilligant Verdant, Corrupted Uxie, Tremburr, Gurdurur, Conkapitator",
+  ),
+  bernerdRosterShowcaseScenario(
+    1,
+    [
+      pitchSpecies(ER_VANTARROW_SPECIES_ID),
+      pitchSpecies(ER_CHROMIGHTY_SPECIES_ID),
+      pitchSpecies(ER_TEMPORAL_SKULL_SPECIES_ID, undefined, {
+        moveset: [MoveId.IVORY_IMPACT, MoveId.SKULL_BASH, MoveId.BONEMERANG, MoveId.PROTECT],
+      }),
+      pitchSpecies(ER_QUAKERSBY_SPECIES_ID),
+      pitchSpecies(ER_GUZZLORD_M_SPECIES_ID),
+      pitchSpecies(SpeciesId.GOLURK, "mega-y"),
+    ],
+    pitchSpecies(SpeciesId.SKUNTANK, "mega"),
+    "Vantarrow, Chromighty, Temporal Skull, Quakersby, Guzzlord M, Mega Golurk Y",
+  ),
+  bernerdRosterShowcaseScenario(
+    2,
+    [
+      pitchSpecies(SpeciesId.SKUNTANK, "mega"),
+      pitchSpecies(SpeciesId.DODRIO, "mega"),
+      pitchSpecies(SpeciesId.PYUKUMUKU, "mega", {
+        moveset: [MoveId.COUNTER, MoveId.MIRROR_COAT, MoveId.PAIN_SPLIT, MoveId.PROTECT],
+      }),
+      pitchSpecies(SpeciesId.ROWLET, "partner", {
+        moveset: [MoveId.TORCH_SONG, MoveId.HYPER_VOICE, MoveId.REVELATION_DANCE, MoveId.PROTECT],
+      }),
+      pitchSpecies(SpeciesId.ONIX, "partner"),
+      pitchSpecies(SpeciesId.GIMMIGHOUL, "partner", {
+        moveset: [MoveId.MAKE_IT_RAIN, MoveId.HAPPY_HOUR, MoveId.SHADOW_BALL, MoveId.PROTECT],
+      }),
+    ],
+    pitchSpecies(SpeciesId.GOLURK, "mega-y"),
+    "Mega Skuntank, Mega Dodrio, Mega Pyukumuku, Partner Rowlet, Partner Onix, Partner Gimmighoul",
   ),
 ];
 
@@ -21845,6 +21901,8 @@ const DEV_MENU_SCENARIO_LABELS = new Set([
   "Roster: new Pokemon 6/8",
   "Roster: new Pokemon 7/8",
   "Roster: new Pokemon 8/8",
+  "Roster: BerNerd additions 1/2",
+  "Roster: BerNerd additions 2/2",
   "Endless: final boss auto-KO",
   "Endless: deep Hell ghost (wave 401)",
 ]);

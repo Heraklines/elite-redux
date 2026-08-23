@@ -1052,6 +1052,31 @@ export class MoveEffectPhase extends PokemonPhase {
     target.destroySubstitute();
     target.lapseTag(BattlerTagType.COMMANDED);
 
+    // Free Aim carries remaining strikes onto the best surviving opponent.
+    // Re-run the same KO-first / damage-second choice used by MovePhase so a
+    // multi-hit arrow or kicking move does not waste its remaining hits on the
+    // battler it just knocked out.
+    if (
+      user.turnData.hitsLeft > 1
+      && user.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "FreeAimAbAttr")
+    ) {
+      const candidates = user.getOpponents(true).filter(opponent => !opponent.isFainted() && opponent !== target);
+      candidates.sort((a, b) => {
+        const aDamage = a.getAttackDamage({ source: user, move: this.move, simulated: true }).damage;
+        const bDamage = b.getAttackDamage({ source: user, move: this.move, simulated: true }).damage;
+        return (
+          Number(bDamage >= b.hp) - Number(aDamage >= a.hp)
+          || bDamage - aDamage
+          || a.getBattlerIndex() - b.getBattlerIndex()
+        );
+      });
+      if (candidates[0]) {
+        this.targets = [candidates[0].getBattlerIndex()];
+        this.lastHit = false;
+        return;
+      }
+    }
+
     // Force `lastHit` to be true if this is a multi hit move with hits left
     // `hitsLeft` must be left as-is in order for the message displaying the number of hits
     // to display the proper number.

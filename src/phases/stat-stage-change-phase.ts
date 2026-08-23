@@ -240,6 +240,22 @@ export class StatStageChangePhase extends PokemonPhase {
       // incoming drops). No VANILLA ability wires this attr, so unmodded behaviour
       // is unchanged - vanilla Clear Body still lets self-drops through.
       if (!cancelled.value && this.selfTarget && stages.value < 0) {
+        // Partner Gimmighoul — the holder ignores its own drops and applies
+        // the same drop to every opposing active instead.
+        if (
+          !simulate
+          && pokemon.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "SharingIsScaringAbAttr")
+        ) {
+          for (const opponent of pokemon.getOpponents().filter(p => !p.isFainted())) {
+            globalScene.phaseManager.unshiftNew(
+              "StatStageChangePhase",
+              opponent.getBattlerIndex(),
+              false,
+              [stat],
+              stages.value,
+            );
+          }
+        }
         applyAbAttrs("SelfStatDropImmunityAbAttr", {
           pokemon,
           stat,

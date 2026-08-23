@@ -664,6 +664,27 @@ export class MovePhase extends PokemonPhase {
       return;
     }
 
+    // Vantarrow's Free Aim retargets before the ordinary redirect pass, then
+    // returns so Follow Me, Rage Powder, and redirecting abilities cannot
+    // override the selected maximum-damage opponent.
+    if (this.pokemon.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "FreeAimAbAttr")) {
+      const move = this.move.getMove();
+      const candidates = this.pokemon
+        .getOpponents(true)
+        .filter(target => !target.isFainted() && this.canRedirectTo(target));
+      candidates.sort((a, b) => {
+        const aDamage = a.getAttackDamage({ source: this.pokemon, move, simulated: true }).damage;
+        const bDamage = b.getAttackDamage({ source: this.pokemon, move, simulated: true }).damage;
+        const aKo = aDamage >= a.hp;
+        const bKo = bDamage >= b.hp;
+        return Number(bKo) - Number(aKo) || bDamage - aDamage || a.getBattlerIndex() - b.getBattlerIndex();
+      });
+      if (candidates[0]) {
+        this.targets[0] = candidates[0].getBattlerIndex();
+      }
+      return;
+    }
+
     const currentTarget = this.targets[0];
     const redirectTarget = new NumberHolder(currentTarget);
 

@@ -97,7 +97,7 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
     expect(zForms.length).toBeGreaterThan(0);
   });
 
-  it("appends the six form-change items in save-sensitive order", () => {
+  it("appends the ten newcomer form-change items in save-sensitive order", () => {
     expect([
       FormChangeItem.CALYRITE,
       FormChangeItem.HYPNITE,
@@ -105,6 +105,10 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
       FormChangeItem.BARBARACITE_Y,
       FormChangeItem.LILLIGANITE_VERDANT,
       FormChangeItem.DISTORTED_CHAIN,
+      FormChangeItem.GOLURKITE_Y,
+      FormChangeItem.SKUNTANKITE,
+      FormChangeItem.DODRIONITE,
+      FormChangeItem.PYUKUMUKUNITE,
     ]).toEqual([
       FormChangeItem.CALYRITE,
       FormChangeItem.CALYRITE + 1,
@@ -112,6 +116,10 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
       FormChangeItem.CALYRITE + 3,
       FormChangeItem.CALYRITE + 4,
       FormChangeItem.CALYRITE + 5,
+      FormChangeItem.CALYRITE + 6,
+      FormChangeItem.CALYRITE + 7,
+      FormChangeItem.CALYRITE + 8,
+      FormChangeItem.CALYRITE + 9,
     ]);
   });
 

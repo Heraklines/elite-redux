@@ -445,6 +445,11 @@ const ER_ANIMS_SUBDIR = "./battle-anims-er";
  * @internal Exported only for tests.
  */
 export function getMoveAnimUrl(move: MoveId): string | null {
+  // Manual signature move: reuse the shipped Bone Rush animation until it has
+  // dedicated art instead of probing a guaranteed-missing custom atlas.
+  if (move === MoveId.IVORY_IMPACT) {
+    return "./battle-anims/bone-rush.json";
+  }
   if (move >= ER_CUSTOM_MOVE_ID_CUTOFF) {
     // Build a reverse-lookup of ErMoveId once and cache. ErMoveId is a
     // `const` object, not a TS reverse-mapped enum, so we have to invert

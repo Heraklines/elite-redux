@@ -343,12 +343,18 @@ export class Egg {
       }
 
       // This function has way to many optional parameters
-      // Partner Fidough is the hatchable form. Hatching it records the partner
-      // form unlock, after which starter select can cycle to it with F.
-      const hatchFormIndex =
-        pokemonSpecies.speciesId === SpeciesId.FIDOUGH
-          ? pokemonSpecies.forms.findIndex(form => form.formKey === "partner")
-          : -1;
+      // Partner species hatch in their Partner form. Hatching records that form
+      // unlock, after which starter select can cycle base <-> Partner (and the
+      // form sprite dispatcher follows the selected form rather than the base).
+      const partnerHatchSpecies = new Set<number>([
+        SpeciesId.FIDOUGH,
+        SpeciesId.ROWLET,
+        SpeciesId.ONIX,
+        SpeciesId.GIMMIGHOUL,
+      ]);
+      const hatchFormIndex = partnerHatchSpecies.has(pokemonSpecies.speciesId)
+        ? pokemonSpecies.forms.findIndex(form => form.formKey === "partner")
+        : -1;
       ret = globalScene.addPlayerPokemon(
         pokemonSpecies,
         1,
