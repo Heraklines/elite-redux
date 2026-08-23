@@ -198,6 +198,7 @@ version = "0.1.0"
 dependencies = [
  "er-types",
  "serde",
+ "serde_json",
  "thiserror",
 ]
 

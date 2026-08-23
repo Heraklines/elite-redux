@@ -1,5 +1,5 @@
 use er_mechanics::{
-    ArithmeticOperator, BindingKind, ConditionArena, HookBinding, MechanicOperation,
+    ArithmeticOperator, BindingKind, ConditionArena, ConditionNode, HookBinding, MechanicOperation,
     MechanicsProgramV1, ProgramBudget, ProgramRange, ProgramValidationError, QueryModifier,
     QueryValueKind, SelectorArena, ValueNode, ValueNodeId,
 };
@@ -106,4 +106,16 @@ fn rejects_ambiguous_source_identity() {
         program.validate(),
         Err(ProgramValidationError::InvalidSource)
     );
+}
+
+#[test]
+fn rejects_dynamic_callback_condition_nodes() {
+    let dynamic = r#"{"kind":"CALLBACK","function":"(state) => true","arguments":[]}"#;
+    assert!(serde_json::from_str::<ConditionNode>(dynamic).is_err());
+}
+
+#[test]
+fn rejects_unknown_operations_in_program_json() {
+    let dynamic = r#"{"kind":"EXECUTE_SCRIPT","script":"damage *= 2"}"#;
+    assert!(serde_json::from_str::<MechanicOperation>(dynamic).is_err());
 }
