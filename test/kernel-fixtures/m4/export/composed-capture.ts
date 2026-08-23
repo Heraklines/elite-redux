@@ -508,12 +508,16 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
       break;
     }
     if (phaseName === "ErAbilityCapsulePhase") {
-      await game.phaseInterceptor.to("ErAbilityCapsulePhase");
-      await waitForLiveCondition(
-        game,
-        () => game.scene.ui.getMode() === UiMode.OPTION_SELECT,
-        "ability capsule choice readiness",
-      );
+      if (game.scene.ui.getMode() !== UiMode.OPTION_SELECT) {
+        const capsule = game.scene.phaseManager.getCurrentPhase();
+        game.scene.phaseManager.prepareCurrentPhaseForStart();
+        capsule?.start();
+        await waitForLiveCondition(
+          game,
+          () => game.scene.ui.getMode() === UiMode.OPTION_SELECT,
+          "ability capsule choice readiness",
+        );
+      }
       press(game, "Space", tape, transitions);
       await sleep();
       continue;
