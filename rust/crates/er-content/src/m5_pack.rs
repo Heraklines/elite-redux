@@ -181,8 +181,7 @@ impl BattleContentPackV2 {
             bespoke: &self.bespoke,
             type_chart: &self.type_chart,
         };
-        let digest =
-            content_digest(&input).map_err(BattlePackLoadError::Canonical)?;
+        let digest = content_digest(&input).map_err(BattlePackLoadError::Canonical)?;
         Ok(format!("{CONTENT_HASH_PREFIX}{digest}"))
     }
 
