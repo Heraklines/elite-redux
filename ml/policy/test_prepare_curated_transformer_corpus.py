@@ -76,6 +76,14 @@ class PrepareCuratedTransformerCorpusTest(unittest.TestCase):
             self.assertEqual(report["unknownOutcomeBattles"], 2)
             self.assertFalse(report["heldOutSplitIncluded"])
             self.assertFalse((output / "policy-all-test.jsonl.gzpack").exists())
+            packed_splits = {}
+            for split in ("train", "validation"):
+                with gzip.open(output / f"policy-all-{split}.jsonl.gzpack", "rt", encoding="utf-8") as handle:
+                    rows = [json.loads(line) for line in handle]
+                self.assertTrue(rows)
+                self.assertTrue(all(row["curationSplit"] == split for row in rows))
+                packed_splits[split] = {row["sourcePartitionId"] for row in rows}
+            self.assertFalse(packed_splits["train"].intersection(packed_splits["validation"]))
             with gzip.open(output / "completed-battle-terminals.jsonl.gzpack", "rt", encoding="utf-8") as handle:
                 terminals = [json.loads(line) for line in handle]
             self.assertEqual(len(terminals), 2)

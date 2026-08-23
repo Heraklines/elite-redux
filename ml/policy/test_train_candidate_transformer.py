@@ -87,6 +87,7 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
                     "dictionaryHash": dictionary_hash,
                     "policySource": "human-v1",
                     "policyTarget": True,
+                    "curationSplit": "train" if index < 4 else "validation",
                     "observation": {"selfParty": [], "opponentActive": []},
                     "candidates": candidates,
                     "candidateFeatures": [
@@ -153,6 +154,13 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
             ))
             self.assertTrue((output / "model.safetensors").is_file())
             self.assertEqual(report["data"]["decisions"], 6)
+            self.assertEqual(report["data"]["trainDecisions"], 4)
+            self.assertEqual(report["data"]["validationDecisions"], 2)
+            self.assertEqual(report["data"]["splitStrategy"], "curator-fixed-source-v1")
+            self.assertFalse(
+                set(report["data"]["trainSourcePartitions"])
+                & set(report["data"]["validationSourcePartitions"])
+            )
             self.assertEqual(report["data"]["sourcePolicies"], {"human-v1": 6})
             self.assertEqual(report["objective"]["lossEpisodePolicyWeight"], 0.0)
 

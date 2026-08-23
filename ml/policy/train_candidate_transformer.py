@@ -88,6 +88,7 @@ class DecisionExample:
     terminal_value: float | None
     policy_weight: float
     history: tuple[DecisionState, ...]
+    curation_split: str | None = None
 
 
 class DecisionDataset(Dataset[DecisionExample]):
@@ -686,6 +687,9 @@ def make_examples(
     examples: list[DecisionExample] = []
     history_by_trajectory: dict[str, deque[DecisionState]] = {}
     for decision in decisions:
+        curation_split = decision.get("curationSplit")
+        if curation_split is not None and curation_split not in ("train", "validation"):
+            raise ValueError(f"decision {decision['decisionId']} has invalid curation split {curation_split!r}")
         candidates = decision["candidates"]
         feature_rows = {row["candidateId"]: row for row in decision["candidateFeatures"]}
         features = np.asarray([feature_rows[candidate["id"]]["values"] for candidate in candidates], dtype=np.float32)
@@ -778,6 +782,7 @@ def make_examples(
                 terminal_value=value,
                 policy_weight=weight,
                 history=tuple(trajectory_history) if history_length else (),
+                curation_split=curation_split,
             )
         )
         trajectory_history.append(state)
@@ -1312,14 +1317,42 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         flush=True,
     )
     examples = er_examples + transfer_examples
-    train_partition_ids, validation_partition_ids = split_groups(
-        [example.source_partition_id for example in er_examples],
-        args.seed,
-    )
-    er_train_examples = [example for example in er_examples if example.source_partition_id in train_partition_ids]
-    validation_examples = [
-        example for example in er_examples if example.source_partition_id in validation_partition_ids
-    ]
+    curation_splits = {example.curation_split for example in er_examples}
+    if curation_splits == {"train", "validation"}:
+        splits_by_partition: dict[str, set[str]] = defaultdict(set)
+        for example in er_examples:
+            assert example.curation_split is not None
+            splits_by_partition[example.source_partition_id].add(example.curation_split)
+        overlapping_partitions = sorted(
+            partition for partition, splits in splits_by_partition.items() if len(splits) != 1
+        )
+        if overlapping_partitions:
+            raise ValueError(
+                f"source partitions cross curated train/validation splits: {overlapping_partitions[:5]}"
+            )
+        train_partition_ids = {
+            example.source_partition_id for example in er_examples if example.curation_split == "train"
+        }
+        validation_partition_ids = {
+            example.source_partition_id for example in er_examples if example.curation_split == "validation"
+        }
+        er_train_examples = [example for example in er_examples if example.curation_split == "train"]
+        validation_examples = [example for example in er_examples if example.curation_split == "validation"]
+        split_strategy = "curator-fixed-source-v1"
+    elif curation_splits == {None}:
+        train_partition_ids, validation_partition_ids = split_groups(
+            [example.source_partition_id for example in er_examples],
+            args.seed,
+        )
+        er_train_examples = [
+            example for example in er_examples if example.source_partition_id in train_partition_ids
+        ]
+        validation_examples = [
+            example for example in er_examples if example.source_partition_id in validation_partition_ids
+        ]
+        split_strategy = "seeded-source-66-34-v1"
+    else:
+        raise ValueError("ER corpus mixes curated and unannotated train/validation records")
     train_examples = er_train_examples + (transfer_examples if args.transfer_mode == "joint" else [])
     if not er_train_examples or not validation_examples:
         raise ValueError("both train and validation examples are required")
@@ -1532,6 +1565,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "validationSourcePartitions": sorted(validation_partition_ids),
             "trainSplitGroups": len({example.split_group_id for example in train_examples}),
             "validationSplitGroups": len({example.split_group_id for example in validation_examples}),
+            "splitStrategy": split_strategy,
             "domains": dict(Counter(DOMAIN_NAMES[example.domain_id] for example in examples)),
             "sourcePolicies": dict(source_policies),
             "policyTargetDecisions": policy_target_decisions,

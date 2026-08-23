@@ -7,7 +7,6 @@ import argparse
 import gzip
 import hashlib
 import json
-import shutil
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -111,24 +110,29 @@ def assemble(
     for split in SPLITS:
         source = curated_dir / f"{policy_dataset}-{split}.jsonl.gz"
         destination = output_dir / f"{source.name}pack"
-        shutil.copyfile(source, destination)
         policy_outputs.append(destination.name)
-        for decision in iter_gzip_jsonl(source):
-            if decision.get("kind") != "combat_decision":
-                raise ValueError(f"{source} contains a non-decision policy row")
-            if decision.get("policySource") != "human-v1" or decision.get("policyTarget") is not True:
-                raise ValueError(f"{source} contains a non-human policy target")
-            if any(decision.get(name) != value for name, value in identity.items()):
-                raise ValueError(f"{source} contains a mixed runtime identity")
-            stable_battle_id = battle_id(decision)
-            if stable_battle_id is None:
-                raise ValueError(f"decision {decision.get('decisionId')} has no stable battleId")
-            selected_battles.add(stable_battle_id)
-            source_partition = decision.get("sourcePartitionId")
-            if not isinstance(source_partition, str) or not source_partition:
-                raise ValueError(f"decision {decision.get('decisionId')} has no source partition")
-            source_partitions.add(source_partition)
-            decision_count += 1
+        with destination.open("wb") as raw:
+            with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed:
+                for decision in iter_gzip_jsonl(source):
+                    if decision.get("kind") != "combat_decision":
+                        raise ValueError(f"{source} contains a non-decision policy row")
+                    if decision.get("policySource") != "human-v1" or decision.get("policyTarget") is not True:
+                        raise ValueError(f"{source} contains a non-human policy target")
+                    if any(decision.get(name) != value for name, value in identity.items()):
+                        raise ValueError(f"{source} contains a mixed runtime identity")
+                    stable_battle_id = battle_id(decision)
+                    if stable_battle_id is None:
+                        raise ValueError(f"decision {decision.get('decisionId')} has no stable battleId")
+                    selected_battles.add(stable_battle_id)
+                    source_partition = decision.get("sourcePartitionId")
+                    if not isinstance(source_partition, str) or not source_partition:
+                        raise ValueError(f"decision {decision.get('decisionId')} has no source partition")
+                    source_partitions.add(source_partition)
+                    decision_count += 1
+                    packed = {**decision, "curationSplit": split}
+                    compressed.write(
+                        f"{json.dumps(packed, sort_keys=True, separators=(',', ':'))}\n".encode()
+                    )
 
     terminals: dict[str, dict[str, Any]] = {}
     completed_episodes = 0
