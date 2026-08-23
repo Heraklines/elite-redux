@@ -31,7 +31,6 @@ class ChunkWriter:
         self.path: Path | None = None
         self.uncompressed_bytes = 0
         self.records = 0
-        self._open()
 
     def _open(self) -> None:
         index = len(self.files)
@@ -58,6 +57,8 @@ class ChunkWriter:
     def write(self, line: bytes) -> None:
         if not line.endswith(b"\n"):
             line += b"\n"
+        if self.compressed is None:
+            self._open()
         if self.records and self.uncompressed_bytes + len(line) > self.max_uncompressed_bytes:
             self._close()
             self._open()
@@ -67,7 +68,8 @@ class ChunkWriter:
         self.records += 1
 
     def close(self) -> list[dict[str, int | str]]:
-        self._close()
+        if self.compressed is not None:
+            self._close()
         return self.files
 
 
@@ -106,7 +108,7 @@ def chunk(
     report = {
         "reportVersion": 1,
         "gate": "private-gzip-jsonl-upload-chunks",
-        "passed": records > 0 and all(row["bytes"] < max_compressed_bytes for row in files),
+        "passed": all(row["bytes"] < max_compressed_bytes for row in files),
         "privacy": {"rawIdentifiersIncluded": False, "rawRecordsIncluded": False},
         "records": records,
         "oversizedRecords": oversized_records,

@@ -10,6 +10,20 @@ from chunk_gzip_jsonl import chunk
 
 
 class ChunkGzipJsonlTest(unittest.TestCase):
+    def test_accepts_an_empty_date_partition_without_creating_a_chunk(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "source.jsonl.gz"
+            with gzip.open(source, "wt", encoding="utf-8"):
+                pass
+
+            report = chunk(source, root / "chunks", "2026-08-09", 128, root / "report.json")
+
+            self.assertTrue(report["passed"])
+            self.assertEqual(report["records"], 0)
+            self.assertEqual(report["files"], [])
+            self.assertEqual(list((root / "chunks").glob("*")), [])
+
     def test_splits_only_at_episode_boundaries_and_preserves_order(self) -> None:
         episodes = [{"episodeId": f"episode-{index}", "payload": "x" * 80} for index in range(5)]
         with tempfile.TemporaryDirectory() as temporary:

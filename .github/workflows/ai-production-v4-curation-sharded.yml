@@ -136,6 +136,7 @@ jobs:
               object_key="ai-private/contract-v4-work/$GITHUB_RUN_ID/$name"
               npx wrangler r2 object put "er-telemetry/$object_key" --file "$file" --remote
             done < <(jq -r '.chunks[] | [.name, .sha256, .bytes] | @tsv' "$RUNNER_TEMP/manifests/$day.json")
+            rm -rf "$chunk_dir" "$audit_dir"
           done < "$RUNNER_TEMP/dates.txt"
       - uses: actions/upload-artifact@v4
         with:
