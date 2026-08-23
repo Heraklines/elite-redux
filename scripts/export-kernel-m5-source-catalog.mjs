@@ -25,6 +25,25 @@ const ENUM_CATALOGS = new Map([
   ["ArenaTagType", "arena_tags"],
   ["PositionalTagType", "positional_tags"],
 ]);
+const RNG_CALL_NAMES = new Set([
+  "integerInRange",
+  "randBattleSeedInt",
+  "randSeedInt",
+  "randSeedItem",
+  "randSeedShuffle",
+  "random",
+  "realInRange",
+]);
+const DISPATCH_CALL_NAMES = new Set([
+  "applyAbAttrs",
+  "applyFilteredAbAttrs",
+  "applyMoveAttrs",
+  "applyFilteredMoveAttrs",
+  "applyModifiers",
+  "applyModifier",
+  "applyArenaTags",
+  "applyBattlerTags",
+]);
 const MECHANICS_ROOTS = [
   "src/data/abilities",
   "src/data/arena-tag.ts",
@@ -344,6 +363,38 @@ function catalogAttributeAttachment(sourceFile, node, oracleRoot, output) {
     source: location(sourceFile, node, oracleRoot),
   });
 }
+function callName(expression) {
+  if (ts.isIdentifier(expression)) {
+    return expression.text;
+  }
+  if (ts.isPropertyAccessExpression(expression)) {
+    return expression.name.text;
+  }
+  return null;
+}
+
+function catalogDispatchAndRngSite(sourceFile, node, oracleRoot, output) {
+  const name = callName(node.expression);
+  if (!name) {
+    return;
+  }
+  if (RNG_CALL_NAMES.has(name)) {
+    output.rng_sites.push({
+      call: node.expression.getText(sourceFile),
+      arguments: node.arguments.map(argument => argument.getText(sourceFile)),
+      source: location(sourceFile, node, oracleRoot),
+    });
+  }
+  if (DISPATCH_CALL_NAMES.has(name)) {
+    const first = node.arguments[0];
+    output.dispatch_sites.push({
+      call: node.expression.getText(sourceFile),
+      hook: first && ts.isStringLiteralLike(first) ? first.text : null,
+      arguments: node.arguments.length,
+      source: location(sourceFile, node, oracleRoot),
+    });
+  }
+}
 
 function unwrapObjectLiteral(initializer) {
   if (ts.isObjectLiteralExpression(initializer)) {
@@ -391,6 +442,7 @@ function visitSourceFile(sourceFile, oracleRoot, output) {
       catalogNewExpression(sourceFile, node, oracleRoot, output);
     } else if (ts.isCallExpression(node)) {
       catalogAttributeAttachment(sourceFile, node, oracleRoot, output);
+      catalogDispatchAndRngSite(sourceFile, node, oracleRoot, output);
     } else if (ts.isVariableDeclaration(node)) {
       catalogModifierRegistry(sourceFile, node, oracleRoot, output);
     }
@@ -420,6 +472,8 @@ function sortCatalog(output) {
   output.mechanic_classes.sort((left, right) => left.family.localeCompare(right.family, "en") || left.name.localeCompare(right.name, "en") || left.source.path.localeCompare(right.source.path, "en") || left.source.line - right.source.line);
   output.registrations.sort((left, right) => left.catalog.localeCompare(right.catalog, "en") || left.enum_name.localeCompare(right.enum_name, "en") || left.member.localeCompare(right.member, "en") || left.source.path.localeCompare(right.source.path, "en") || left.source.line - right.source.line);
   output.attribute_attachments.sort((left, right) => left.attribute.localeCompare(right.attribute, "en") || left.source.path.localeCompare(right.source.path, "en") || left.source.line - right.source.line);
+  output.dispatch_sites.sort((left, right) => (left.hook ?? "").localeCompare(right.hook ?? "", "en") || left.call.localeCompare(right.call, "en") || left.source.path.localeCompare(right.source.path, "en") || left.source.line - right.source.line);
+  output.rng_sites.sort((left, right) => left.call.localeCompare(right.call, "en") || left.source.path.localeCompare(right.source.path, "en") || left.source.line - right.source.line);
   output.source_files.sort((left, right) => left.path.localeCompare(right.path, "en"));
 }
 
@@ -442,6 +496,8 @@ const output = {
   mechanic_classes: [],
   registrations: [],
   attribute_attachments: [],
+  dispatch_sites: [],
+  rng_sites: [],
   source_files: [],
 };
 for (const file of files) {
