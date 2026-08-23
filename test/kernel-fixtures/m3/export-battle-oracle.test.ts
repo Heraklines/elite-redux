@@ -1806,13 +1806,14 @@ const RNG_REASON_BY_FRAME: Readonly<Record<string, string>> = Object.freeze({
   "Pokemon.getAttackDamage": "DamageVariance",
   "Pokemon.getCriticalHitResult": "CriticalHit",
   "MoveEffectPhase.hitCheck": "Accuracy",
-  "MovePhase.checkPara": "ParalysisActivation",
   randSeedShuffle: "SpeedTie",
   doublePowerChanceMessageFunc: "SecondaryEffect",
+  "StatStageChangePhase.onChange": "SecondaryEffect",
 });
 
 const RNG_REASON_BY_METHOD: Readonly<Record<string, string>> = Object.freeze({
   apply: "SecondaryEffect",
+  onChange: "SecondaryEffect",
 });
 
 const RNG_HELPER_FRAME = /(?:randSeedInt|randSeedIntRange|randBattleSeedInt|integerInRange|randSeedItem|randSeedFloat|pick)\b/u;
