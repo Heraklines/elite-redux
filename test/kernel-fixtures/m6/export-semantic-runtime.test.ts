@@ -28,7 +28,9 @@ function compareText(left: string, right: string): number {
 function reflect(value: unknown, seen: WeakSet<object>, depth = 0): Json {
   if (value === null || typeof value === "boolean" || typeof value === "string") return value;
   if (typeof value === "number") {
-    if (!Number.isFinite(value)) throw new Error("NONFINITE_RUNTIME_SEMANTIC_VALUE");
+    if (Number.isNaN(value)) return { kind: "NONFINITE_NUMBER", value: "NAN" };
+    if (value === Number.POSITIVE_INFINITY) return { kind: "NONFINITE_NUMBER", value: "POSITIVE_INFINITY" };
+    if (value === Number.NEGATIVE_INFINITY) return { kind: "NONFINITE_NUMBER", value: "NEGATIVE_INFINITY" };
     return Object.is(value, -0) ? 0 : value;
   }
   if (typeof value === "function") {
