@@ -60,14 +60,16 @@ for (const [runtimeKey, rawKey] of [
   ["arena_tags", "arena_tags"],
   ["positional_tags", "positional_tags"],
 ]) {
-  exactValues(`${runtimeKey} identities`, runtime[runtimeKey].map(entry => entry.id), raw[rawKey].map(entry => entry.numeric_id));
+  // Tag enums are string-valued in the oracle; compare canonical member keys.
+  exactValues(
+    `${runtimeKey} identities`,
+    runtime[runtimeKey].map(entry => entry.key),
+    raw[rawKey].map(entry => entry.member),
+  );
 }
 
 function staticUnits(kind, id) {
   return semantic.behavior_units.filter(unit => unit.id.source.kind === kind && unit.id.source.numeric_id === id);
-}
-
-function runtimeAttributeClasses(definition) {
   if (!Array.isArray(definition?.attrs)) return [];
   return definition.attrs
     .map(attribute => attribute?.class)
