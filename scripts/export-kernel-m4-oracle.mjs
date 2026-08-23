@@ -31,7 +31,9 @@ const HELPER_OUTPUT_FILES = {
 };
 const HELPER_KINDS = Object.keys(HELPER_OUTPUT_FILES);
 const MANIFEST_PATH = "rust/fixtures/m4/m4-oracle-manifest.json";
-const ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+const LEGACY_M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+const LEGACY_M3_PARITY_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const ORACLE_SHA = process.env.M5_ORACLE_REFRESH_SHA ?? LEGACY_M4_ORACLE_SHA;
 
 function fail(message) {
   console.error(`M4A oracle exporter: ${message}`);
@@ -125,11 +127,11 @@ function exporterSha() {
 
 function expectedInventory() {
   const manifest = JSON.parse(readFileSync(resolve(REPO_ROOT, MANIFEST_PATH), "utf8"));
-  if (manifest.m4_oracle_sha !== ORACLE_SHA) {
-    fail(`M4 manifest m4_oracle_sha is not ${ORACLE_SHA}`);
+  if (manifest.m4_oracle_sha !== LEGACY_M4_ORACLE_SHA) {
+    fail(`M4 selection manifest m4_oracle_sha is not ${LEGACY_M4_ORACLE_SHA}`);
   }
-  if (manifest.m3_parity_oracle_sha !== "3b534099919efae827019d4a3f3c4ab0ecd6d67b") {
-    fail("M4 manifest m3_parity_oracle_sha is not the frozen M3 parity oracle");
+  if (manifest.m3_parity_oracle_sha !== LEGACY_M3_PARITY_ORACLE_SHA) {
+    fail("M4 selection manifest m3_parity_oracle_sha is not the frozen M3 parity oracle");
   }
   if (!Array.isArray(manifest.required_outputs) || manifest.required_outputs.length === 0) {
     fail("M4 manifest has no required_outputs");

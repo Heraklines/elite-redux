@@ -18,8 +18,10 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
-const M3_PARITY_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
-const M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+const LEGACY_M3_PARITY_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const LEGACY_M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+const M3_PARITY_ORACLE_SHA = process.env.M5_ORACLE_REFRESH_SHA ?? LEGACY_M3_PARITY_ORACLE_SHA;
+const M4_ORACLE_SHA = process.env.M5_ORACLE_REFRESH_SHA ?? LEGACY_M4_ORACLE_SHA;
 const SAFE_U53_MAX = 9_007_199_254_740_991;
 const REQUIRED_OUTPUT_ROOT = process.env.M4_ORACLE_OUTPUT_ROOT;
 const REQUIRED_EXPORTER_SHA = process.env.M4_ORACLE_EXPORTER_SHA;

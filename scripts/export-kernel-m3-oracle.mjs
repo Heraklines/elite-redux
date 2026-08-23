@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const TEST_PATH = "test/kernel-fixtures/m3/export-battle-oracle.test.ts";
-const ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const ORACLE_SHA = process.env.M5_ORACLE_REFRESH_SHA ?? "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
 
 function fail(message) {
   console.error(`M3A-05 exporter: ${message}`);

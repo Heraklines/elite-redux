@@ -1,0 +1,251 @@
+name: Rust Kernel M5 Gate
+
+on:
+  push:
+    branches:
+      - "arch/rust-kernel-m5"
+      - "wrk/rk-m5-*"
+      - "ci/rust-m5/**"
+    paths:
+      - ".github/workflows/rust-kernel-m5.yml"
+      - ".nvmrc"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - "docs/plans/rust-kernel/m5-*.md"
+      - "rust/**"
+      - "scripts/*kernel-m5*.mjs"
+      - "scripts/export-kernel-m3-oracle.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m3/**"
+      - "test/kernel-fixtures/m4/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m5-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  M4_FINAL_SHA: dde38446141880ec32331622307cc19105aee309
+  M5_ORACLE_SHA: 328824692f95b1aa1b38af85b54a6b72d9259eb4
+
+jobs:
+  m5-source-lock:
+    name: M5 source lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Preserve M4 production TypeScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "${M4_FINAL_SHA}^{commit}"
+          git merge-base --is-ancestor "$M4_FINAL_SHA" "$GITHUB_SHA"
+          git diff --exit-code "$M4_FINAL_SHA" "$GITHUB_SHA" -- src rust/source-lock.toml
+          git diff --check "$M4_FINAL_SHA" "$GITHUB_SHA"
+
+  m5-source-catalog:
+    name: M5 source catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out integration tooling
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Install repository-pinned pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install immutable parser dependency
+        run: pnpm install --frozen-lockfile
+
+      - name: Materialize exact read-only oracle source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m5-oracle" "$M5_ORACLE_SHA"
+
+      - name: Export deterministic source catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node scripts/export-kernel-m5-source-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m5-oracle" \
+            --oracle-sha "$M5_ORACLE_SHA" \
+            --output "$GITHUB_WORKSPACE/artifacts/m5-source-catalog-v1.json"
+
+      - name: Upload source catalog
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-source-catalog
+          path: artifacts/m5-source-catalog-v1.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m5-oracle-refresh:
+    name: M5 ${{ matrix.fixture }} oracle refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [m3, m4]
+    steps:
+      - name: Check out integration tooling
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+
+      - name: Install repository-pinned pnpm
+        uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+
+      - name: Install repository-pinned Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Restore pinned BLAKE3 verifier
+        if: matrix.fixture == 'm4'
+        id: b3sum-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m5-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
+      - name: Install pinned BLAKE3 verifier
+        if: matrix.fixture == 'm4'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
+            cargo install b3sum --version 1.8.6 --locked
+          fi
+          b3sum --version | grep -Fx 'b3sum 1.8.6'
+
+      - name: Save pinned BLAKE3 verifier
+        if: matrix.fixture == 'm4' && steps.b3sum-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ~/.cargo/bin/b3sum
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: m5-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
+
+      - name: Materialize exact oracle source and test overlay
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m5-oracle" "$M5_ORACLE_SHA"
+          node scripts/prepare-kernel-m5-oracle-refresh.mjs \
+            --oracle-root "$RUNNER_TEMP/m5-oracle" \
+            --oracle-sha "$M5_ORACLE_SHA"
+
+      - name: Install immutable oracle dependencies
+        working-directory: ${{ runner.temp }}/m5-oracle
+        run: pnpm install --frozen-lockfile
+
+      - name: Export refreshed fixtures twice
+        working-directory: ${{ runner.temp }}/m5-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M5_ORACLE_REFRESH_SHA: ${{ env.M5_ORACLE_SHA }}
+          M4_ORACLE_GAP_REPORT: ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle/gaps.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m5-${{ matrix.fixture }}-oracle"
+          if [[ "${{ matrix.fixture }}" == "m3" ]]; then
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m5-m3-oracle"
+          else
+            node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m5-m4-oracle"
+          fi
+
+      - name: Upload refreshed fixtures or typed gaps
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-${{ matrix.fixture }}-oracle-refresh
+          path: ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle
+          if-no-files-found: warn
+          retention-days: 30
+
+  m5-oracle-classification:
+    name: M5 oracle drift classification
+    needs:
+      - m5-source-lock
+      - m5-source-catalog
+      - m5-oracle-refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact integration candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+
+      - name: Download M3 refresh
+        uses: actions/download-artifact@v6
+        with:
+          name: m5-m3-oracle-refresh
+          path: artifacts/fresh-m3
+
+      - name: Download M4 refresh
+        uses: actions/download-artifact@v6
+        with:
+          name: m5-m4-oracle-refresh
+          path: artifacts/fresh-m4
+
+      - name: Classify every fixture difference
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/classify-kernel-m5-oracle-refresh.mjs \
+            --oracle-sha "$M5_ORACLE_SHA" \
+            --legacy-m3 rust/fixtures/m3/oracle \
+            --fresh-m3 artifacts/fresh-m3 \
+            --legacy-m4 rust/fixtures/m4/oracle \
+            --fresh-m4 artifacts/fresh-m4 \
+            --output "$GITHUB_WORKSPACE/artifacts/m5-oracle-drift-v1.json"
+
+      - name: Upload classified drift
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-oracle-drift
+          path: artifacts/m5-oracle-drift-v1.json
+          if-no-files-found: error
+          retention-days: 30

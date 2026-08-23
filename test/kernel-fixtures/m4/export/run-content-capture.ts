@@ -46,8 +46,10 @@ export class M4CaptureGap extends Error {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../../..");
-const M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
-const M3_PARITY_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const LEGACY_M4_ORACLE_SHA = "45c89493e7edec9c4da247a98cd7858b1f015c09";
+const LEGACY_M3_PARITY_ORACLE_SHA = "3b534099919efae827019d4a3f3c4ab0ecd6d67b";
+const M4_ORACLE_SHA = process.env.M5_ORACLE_REFRESH_SHA ?? LEGACY_M4_ORACLE_SHA;
+const M3_PARITY_ORACLE_SHA = process.env.M5_ORACLE_REFRESH_SHA ?? LEGACY_M3_PARITY_ORACLE_SHA;
 const RUN_HASH_DOMAIN = "pokerogue-redux/m4/run-content/v1";
 const SAFE_U53_MAX = 9_007_199_254_740_991;
 
@@ -629,7 +631,7 @@ function battleTypeChart(slice: AnyRecord): JsonObject {
 
 function battleCapability(capability: AnyRecord, moves: readonly JsonValue[], abilities: readonly JsonValue[]): JsonObject {
   exact(safeInteger(capability.schema_version, "battle_capability.schema_version"), 1, "battle_capability.schema_version");
-  exact(requireString(capability.oracle_game_sha, "battle_capability.oracle_game_sha"), M3_PARITY_ORACLE_SHA, "battle_capability.oracle_game_sha");
+  exact(requireString(capability.oracle_game_sha, "battle_capability.oracle_game_sha"), LEGACY_M3_PARITY_ORACLE_SHA, "battle_capability.oracle_game_sha");
   const entries = requireArray(capability.entries, "battle_capability.entries").map((raw, index) => {
     const entry = requireRecord(raw, `battle_capability.entries[${index}]`);
     const kind = requireString(entry.subject_kind, `battle_capability.entries[${index}].subject_kind`);
@@ -957,7 +959,7 @@ function selectedBiomes(slice: AnyRecord): JsonValue[] {
 
 function runCapability(manifest: AnyRecord): JsonObject {
   exact(safeInteger(manifest.schema_version, "m4_capability.schema_version"), 1, "m4_capability.schema_version");
-  exact(requireString(manifest.m4_oracle_sha, "m4_capability.m4_oracle_sha"), M4_ORACLE_SHA, "m4_capability.m4_oracle_sha");
+  exact(requireString(manifest.m4_oracle_sha, "m4_capability.m4_oracle_sha"), LEGACY_M4_ORACLE_SHA, "m4_capability.m4_oracle_sha");
   const supported = requireRecord(manifest.supported, "m4_capability.supported");
   const unsupported = requireArray(manifest.unsupported, "m4_capability.unsupported").map((entry, index) => requireString(requireRecord(entry, `m4_capability.unsupported[${index}]`).code, `m4_capability.unsupported[${index}].code`));
   return {
@@ -1049,7 +1051,7 @@ export async function captureRunContent(): Promise<Record<string, JsonValue>> {
     ensureLiveRegistries();
     await launchLiveClassicBattle();
     const slice = readJson("rust/fixtures/m4/m4-slice-manifest.json");
-    exact(requireString(slice.m4_oracle_sha, "m4_slice.m4_oracle_sha"), M4_ORACLE_SHA, "m4_slice.m4_oracle_sha");
+    exact(requireString(slice.m4_oracle_sha, "m4_slice.m4_oracle_sha"), LEGACY_M4_ORACLE_SHA, "m4_slice.m4_oracle_sha");
     const battleSlice = readJson("rust/fixtures/m3/m3-slice-manifest.json");
     const capability = readJson("rust/fixtures/m3/m3-capability-manifest.json");
     const species = battleSpecies(battleSlice);
