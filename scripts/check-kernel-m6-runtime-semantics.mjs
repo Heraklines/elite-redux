@@ -70,6 +70,9 @@ for (const [runtimeKey, rawKey] of [
 
 function staticUnits(kind, id) {
   return semantic.behavior_units.filter(unit => unit.id.source.kind === kind && unit.id.source.numeric_id === id);
+}
+
+function runtimeAttributeClasses(definition) {
   if (!Array.isArray(definition?.attrs)) return [];
   return definition.attrs
     .map(attribute => attribute?.class)
