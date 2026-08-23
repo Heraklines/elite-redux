@@ -348,12 +348,26 @@ jobs:
             --fresh-m3 artifacts/fresh-m3 \
             --legacy-m4 rust/fixtures/m4/oracle \
             --fresh-m4 artifacts/fresh-m4 \
-            --output "$GITHUB_WORKSPACE/artifacts/m5-oracle-drift-v1.json"
+            --output "$GITHUB_WORKSPACE/artifacts/m5-oracle-drift-v1.json" \
+            2>&1 | tee "$RUNNER_TEMP/m5-oracle-classification.log"
+
+      - name: Publish classification failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(tail -c 3500 "$RUNNER_TEMP/m5-oracle-classification.log" 2>/dev/null || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M5 oracle classification failure::$diagnostic"
 
       - name: Upload classified drift
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: m5-oracle-drift
-          path: artifacts/m5-oracle-drift-v1.json
-          if-no-files-found: error
+          path: |
+            artifacts/m5-oracle-drift-v1.json
+            ${{ runner.temp }}/m5-oracle-classification.log
+          if-no-files-found: warn
           retention-days: 30
