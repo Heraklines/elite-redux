@@ -502,27 +502,26 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
   }
   press(game, "Space", tape, transitions);
   await sleep();
-  if (game.scene.phaseManager.getCurrentPhase()?.phaseName === "ErAbilityCapsulePhase") {
-    await waitForLiveCondition(
-      game,
-      () => game.scene.ui.getMode() === UiMode.OPTION_SELECT,
-      "ability capsule choice readiness",
-    );
-    press(game, "Space", tape, transitions);
-    await sleep();
-  }
-  for (let attempt = 0; attempt < 12; attempt += 1) {
-    const mode = game.scene.ui.getMode();
+  for (let attempt = 0; attempt < 16; attempt += 1) {
     const phaseName = String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "");
     if (phaseName === "CommandPhase") {
       break;
     }
-    const interactive =
-      mode === UiMode.PARTY
-      || mode === UiMode.MESSAGE
-      || mode === UiMode.OPTION_SELECT;
-    if (!interactive) {
-      break;
+    if (phaseName === "ErAbilityCapsulePhase") {
+      await game.phaseInterceptor.to("ErAbilityCapsulePhase");
+      await waitForLiveCondition(
+        game,
+        () => game.scene.ui.getMode() === UiMode.OPTION_SELECT,
+        "ability capsule choice readiness",
+      );
+      press(game, "Space", tape, transitions);
+      await sleep();
+      continue;
+    }
+    const mode = game.scene.ui.getMode();
+    if (mode !== UiMode.PARTY && mode !== UiMode.MESSAGE && mode !== UiMode.OPTION_SELECT) {
+      await sleep();
+      continue;
     }
     press(game, "Space", tape, transitions);
     await sleep();
