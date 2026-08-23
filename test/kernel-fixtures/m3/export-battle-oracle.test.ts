@@ -1232,9 +1232,9 @@ function installObservationHooks(): void {
     if (!Number.isSafeInteger(result) || result < min || result > max) {
       fail("RNG_DRAW_UNOBSERVABLE", `direct Phaser integerInRange returned ${String(result)}`);
     }
-    const callsite = callsiteId(stack);
     const reason = rngReason(stack);
-    const publicApi = seedOffset && callsite === "src/utils/common.ts:151" ? "FISHER_YATES_SWAP" : "INTEGER_IN_RANGE";
+    const callsite = callsiteId(stack);
+    const publicApi = seedOffset && reason === "SpeedTie" ? "FISHER_YATES_SWAP" : "INTEGER_IN_RANGE";
     activeTrace.rngDraws.push({
       sequence: activeTrace.nextRngSequence++,
       stream: seedOffset ? "SEED_OFFSET" : "RUN",
@@ -1796,56 +1796,57 @@ function mutationPath(trace: ObservationTrace, value: AnyRecord, kind: string): 
   return `battle/${kind.toLowerCase()}`;
 }
 
-const RNG_REASON_BY_CALLSITE: Readonly<Record<string, string>> = Object.freeze({
-  "src/utils/common.ts:151": "SpeedTie",
-  "src/field/pokemon.ts:5550": "DamageVariance",
-  "src/field/pokemon.ts:5880": "CriticalHit",
-  "src/phases/move-effect-phase.ts:563": "Accuracy",
-  "src/phases/move-phase.ts:546": "ParalysisActivation",
-  "src/data/moves/move.ts:3502": "SecondaryEffect",
-  "src/data/moves/move.ts:3533": "SecondaryEffect",
-  "src/data/elite-redux/init-elite-redux-ability-upgrades.ts:496": "SecondaryEffect",
+/**
+ * Reason resolution is keyed on the first non-RNG-plumbing source FRAME of the
+ * capture stack, by function name, so the overlay survives line drift between
+ * oracle cuts. Full `Class.method` keys win over bare method keys; a bare
+ * `apply` frame is a secondary-effect chance roll.
+ */
+const RNG_REASON_BY_FRAME: Readonly<Record<string, string>> = Object.freeze({
+  "Pokemon.getAttackDamage": "DamageVariance",
+  "Pokemon.getCriticalHitResult": "CriticalHit",
+  "MoveEffectPhase.hitCheck": "Accuracy",
+  "MovePhase.checkPara": "ParalysisActivation",
+  randSeedShuffle: "SpeedTie",
+  doublePowerChanceMessageFunc: "SecondaryEffect",
 });
 
-const RNG_HELPER_CALLSITES = new Set([
-  "src/utils/common.ts:105",
-  "src/battle-scene.ts:1501",
-  "src/field/pokemon.ts:8007",
-  "src/field/pokemon.ts:8017",
-]);
+const RNG_REASON_BY_METHOD: Readonly<Record<string, string>> = Object.freeze({
+  apply: "SecondaryEffect",
+});
 
-function stackCallsites(stack: string): string[] {
-  const callsites: string[] = [];
+const RNG_HELPER_FRAME = /(?:randSeedInt|randSeedIntRange|randBattleSeedInt|integerInRange|randSeedItem|randSeedFloat|pick)\b/u;
+
+type StackFrame = { full: string; method: string; source: string; line: number };
+
+function stackFrames(stack: string): StackFrame[] {
+  const frames: StackFrame[] = [];
   for (const line of stack.split("\n")) {
-    const match = line.match(/((?:src|test|scripts)[\\/][^()\s]+?\.ts):(\d+)(?::\d+)?/u);
+    const match = /\bat\s+(?:(.+?)\s+\()?(?:((?:src|test|scripts)[\\/][^()\s]+?):(\d+):\d+\))?/u.exec(line);
     if (match == null) {
       continue;
     }
-    const callsite = `${match[1].replaceAll("\\", "/")}:${match[2]}`;
-    if (!callsites.includes(callsite)) {
-      callsites.push(callsite);
+    const full = match[1] ?? "<anonymous>";
+    const source = match[2]?.replaceAll("\\", "/");
+    if (source == null || (!source.startsWith("src/") && !source.startsWith("test/") && !source.startsWith("scripts/"))) {
+      continue;
     }
+    const method = full.includes(".") ? full.slice(full.lastIndexOf(".") + 1) : full;
+    frames.push({ full, method, source, line: Number(match[3]) });
   }
-  return callsites;
+  return frames;
 }
 
 function callsiteId(stack: string): string {
-  const callsites = stackCallsites(stack);
-  const sourceCallsite = callsites.find(callsite => callsite.startsWith("src/") && !RNG_HELPER_CALLSITES.has(callsite));
-  if (sourceCallsite == null) {
-    fail("UNMAPPED_RNG_REASON", callsites[0] ?? "unknown-callsite");
+  const frame = stackFrames(stack).find(
+    candidate => candidate.source.startsWith("src/") && !RNG_HELPER_FRAME.test(candidate.full),
+  );
+  if (frame == null) {
+    return fail("UNMAPPED_RNG_REASON", stack.split("\n")[0] ?? "empty-stack");
   }
-  return sourceCallsite;
+  return `${frame.source}:${frame.line}`;
 }
 
-function rngReason(stack: string): string {
-  const callsite = callsiteId(stack);
-  const reason = RNG_REASON_BY_CALLSITE[callsite];
-  if (reason == null) {
-    fail("UNMAPPED_RNG_REASON", callsite);
-  }
-  return reason;
-}
 
 function fingerprint(value: unknown): string {
   return createHash("sha256")
