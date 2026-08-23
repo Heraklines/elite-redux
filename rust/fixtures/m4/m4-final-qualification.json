@@ -1,0 +1,16 @@
+{
+  "milestone": "M4",
+  "sha": "dde38446141880ec32331622307cc19105aee309",
+  "gate_run_id": 32609726694,
+  "oracle_probe": "success",
+  "m3_regression_core": "success",
+  "m3_regression_integration": "success",
+  "m4_foundation": "success",
+  "raw_key_local": "success",
+  "raw_key_coop": "success",
+  "fault_recovery": "success",
+  "snapshot_v3": "success",
+  "native_wasm_parity": "success",
+  "benchmark": "success",
+  "aggregate": "success"
+}
