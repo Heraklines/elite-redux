@@ -120,7 +120,7 @@ jobs:
           set -euo pipefail
           {
             cargo fmt --all -- --check
-            cargo check -p er-types -p er-mechanics -p er-content
+            cargo check -p er-types -p er-mechanics -p er-content -p er-content-compiler
             cargo test -p er-mechanics --test program_validation
             cargo test -p er-content --test m5_pack
           } 2>&1 | tee "$RUNNER_TEMP/m5-ir-foundation.log"

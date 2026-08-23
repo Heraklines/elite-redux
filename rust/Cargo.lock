@@ -138,6 +138,20 @@ name = "er-content"
 version = "0.1.0"
 dependencies = [
  "er-canonical",
+ "er-mechanics",
+ "er-types",
+ "serde",
+ "serde_json",
+ "thiserror",
+]
+
+[[package]]
+name = "er-content-compiler"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-content",
+ "er-mechanics",
  "er-types",
  "serde",
  "serde_json",
