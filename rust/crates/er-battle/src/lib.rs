@@ -14,6 +14,7 @@ pub mod legality;
 pub mod mechanics;
 pub mod mechanics_condition;
 pub mod mechanics_executor;
+pub mod mechanics_selector;
 pub mod move_effect;
 pub mod move_pipeline;
 pub mod outcome;
