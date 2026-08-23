@@ -20,7 +20,7 @@ fn safe(value: u64) -> SafeU53 {
 
 fn program(id: u64) -> MechanicsProgramV1 {
     MechanicsProgramV1 {
-        schema_version: er_mechanics::MECHANICS_PROGRAM_VERSION,
+        schema_version: er_types::mechanics::MECHANICS_PROGRAM_VERSION,
         id: MechanicsProgramId::new(safe(id)),
         source: MechanicSourceId::numeric(MechanicSourceKind::ActiveAbility, safe(22)),
         bindings: vec![HookBinding {

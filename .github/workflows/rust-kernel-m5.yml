@@ -215,7 +215,6 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Restore pinned BLAKE3 verifier
-        if: matrix.fixture == 'm4'
         id: b3sum-cache
         uses: actions/cache/restore@v5
         with:
@@ -226,7 +225,6 @@ jobs:
           key: m5-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
 
       - name: Install pinned BLAKE3 verifier
-        if: matrix.fixture == 'm4'
         shell: bash
         run: |
           set -euo pipefail
@@ -236,7 +234,7 @@ jobs:
           b3sum --version | grep -Fx 'b3sum 1.8.6'
 
       - name: Save pinned BLAKE3 verifier
-        if: matrix.fixture == 'm4' && steps.b3sum-cache.outputs.cache-hit != 'true'
+        if: steps.b3sum-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v5
         with:
           path: |
