@@ -1847,6 +1847,27 @@ function callsiteId(stack: string): string {
   return `${frame.source}:${frame.line}`;
 }
 
+function rngReason(stack: string): string {
+  for (const frame of stackFrames(stack)) {
+    if (frame.source.startsWith("test/") || frame.source.startsWith("scripts/")) {
+      continue;
+    }
+    if (RNG_HELPER_FRAME.test(frame.full) || RNG_HELPER_FRAME.test(frame.source)) {
+      continue;
+    }
+    const reason =
+      RNG_REASON_BY_FRAME[frame.full] ?? RNG_REASON_BY_FRAME[frame.method] ?? RNG_REASON_BY_METHOD[frame.method];
+    if (reason != null) {
+      return reason;
+    }
+    return fail(
+      "UNMAPPED_RNG_REASON",
+      `${frame.full} @ ${frame.source}:${frame.line} (head: ${stack.split("\n").slice(0, 4).join(" | ")})`,
+    );
+  }
+  return fail("UNMAPPED_RNG_REASON", stack.split("\n")[0] ?? "empty-stack");
+}
+
 
 function fingerprint(value: unknown): string {
   return createHash("sha256")
