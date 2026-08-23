@@ -58,8 +58,6 @@ class ChunkWriter:
     def write(self, line: bytes) -> None:
         if not line.endswith(b"\n"):
             line += b"\n"
-        if len(line) > self.max_uncompressed_bytes:
-            raise ValueError("one JSONL record exceeds the configured upload shard size")
         if self.records and self.uncompressed_bytes + len(line) > self.max_uncompressed_bytes:
             self._close()
             self._open()
@@ -79,9 +77,12 @@ def chunk(
     prefix: str,
     max_uncompressed_bytes: int,
     report_path: Path,
+    max_compressed_bytes: int = 300 * 1024 * 1024,
 ) -> dict:
     if max_uncompressed_bytes < 1:
         raise ValueError("max_uncompressed_bytes must be positive")
+    if max_compressed_bytes < 1:
+        raise ValueError("max_compressed_bytes must be positive")
     writer = ChunkWriter(output_dir, prefix, max_uncompressed_bytes)
     records = 0
     with gzip.open(source, "rb") as handle:
@@ -97,13 +98,20 @@ def chunk(
             writer.write(line)
             records += 1
     files = writer.close()
+    oversized_records = sum(
+        1
+        for row in files
+        if row["records"] == 1 and row["uncompressedBytes"] > max_uncompressed_bytes
+    )
     report = {
         "reportVersion": 1,
         "gate": "private-gzip-jsonl-upload-chunks",
-        "passed": records > 0 and all(row["bytes"] < 300 * 1024 * 1024 for row in files),
+        "passed": records > 0 and all(row["bytes"] < max_compressed_bytes for row in files),
         "privacy": {"rawIdentifiersIncluded": False, "rawRecordsIncluded": False},
         "records": records,
+        "oversizedRecords": oversized_records,
         "maxUncompressedBytes": max_uncompressed_bytes,
+        "maxCompressedBytes": max_compressed_bytes,
         "files": files,
     }
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -119,13 +127,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--prefix", required=True)
     parser.add_argument("--max-uncompressed-bytes", type=int, default=128 * 1024 * 1024)
+    parser.add_argument("--max-compressed-bytes", type=int, default=300 * 1024 * 1024)
     parser.add_argument("--report", type=Path, required=True)
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    report = chunk(args.input, args.output_dir, args.prefix, args.max_uncompressed_bytes, args.report)
+    report = chunk(
+        args.input,
+        args.output_dir,
+        args.prefix,
+        args.max_uncompressed_bytes,
+        args.report,
+        args.max_compressed_bytes,
+    )
     print(json.dumps(report, sort_keys=True))
 
 
