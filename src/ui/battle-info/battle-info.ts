@@ -13,6 +13,7 @@ import type { Pokemon } from "#field/pokemon";
 import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import { getErShinyLabNameStyleForPokemon, getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
+import { battleInfoTypeTextureKey } from "#ui/battle-info/type-tab-layout";
 import { buildMoodyBarrierLayout } from "#ui/moody/moody-presentation";
 import { addTextObject } from "#ui/text";
 import { fixedInt, getLocalizedSpriteKey, getShinyDescriptor } from "#utils/common";
@@ -740,15 +741,19 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   setTypes(types: PokemonType[]): void {
     const key = `pbinfo_${this.player ? "player" : "enemy"}`;
     this.type1Icon
-      .setTexture(`${key}_type${types.length > 1 ? "1" : ""}`)
+      .setTexture(battleInfoTypeTextureKey(key, 0, types.length))
       .setFrame(PokemonType[types[0]].toLowerCase());
     this.type2Icon.setVisible(types.length > 1);
     this.type3Icon.setVisible(types.length > 2);
     if (types.length > 1) {
-      this.type2Icon.setFrame(PokemonType[types[1]].toLowerCase());
+      this.type2Icon
+        .setTexture(battleInfoTypeTextureKey(key, 1, types.length))
+        .setFrame(PokemonType[types[1]].toLowerCase());
     }
     if (types.length > 2) {
-      this.type3Icon.setFrame(PokemonType[types[2]].toLowerCase());
+      this.type3Icon
+        .setTexture(battleInfoTypeTextureKey(key, 2, types.length))
+        .setFrame(PokemonType[types[2]].toLowerCase());
     }
     // ER N-type substrate (maintainer paired-column layout): types 4..N pair into
     // VERTICAL COLUMNS advancing along the type3->type1 axis, mirroring the game's
@@ -773,6 +778,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       const column = Math.floor(i / 2);
       const row = i % 2;
       icon.setPosition(this.type1Icon.x + colDx * column, row === 0 ? rowTopY : rowBottomY);
+      icon.setTexture(battleInfoTypeTextureKey(key, i, types.length));
       icon.setFrame(PokemonType[types[i]].toLowerCase());
       icon.setVisible(true);
     }

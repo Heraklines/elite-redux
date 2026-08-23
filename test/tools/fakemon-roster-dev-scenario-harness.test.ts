@@ -110,8 +110,8 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
   },
   "Roster: new Pokemon 10/10": {
     player: [
-      expectedFormPokemon(SpeciesId.SKUNTANK, "mega"),
       expectedFormPokemon(SpeciesId.DODRIO, "mega"),
+      expectedFormPokemon(SpeciesId.SKUNTANK, "mega"),
       expectedFormPokemon(SpeciesId.PYUKUMUKU, "mega"),
       expectedFormPokemon(SpeciesId.ROWLET, "partner"),
       expectedFormPokemon(SpeciesId.ONIX, "partner"),

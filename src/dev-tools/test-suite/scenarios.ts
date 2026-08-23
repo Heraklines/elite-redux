@@ -2229,8 +2229,8 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
   fakemonPitchShowcaseScenario(
     10,
     [
-      pitchSpecies(SpeciesId.SKUNTANK, "mega"),
       pitchSpecies(SpeciesId.DODRIO, "mega"),
+      pitchSpecies(SpeciesId.SKUNTANK, "mega"),
       pitchSpecies(SpeciesId.PYUKUMUKU, "mega", {
         moveset: [MoveId.COUNTER, MoveId.MIRROR_COAT, MoveId.PAIN_SPLIT, MoveId.PROTECT],
       }),
