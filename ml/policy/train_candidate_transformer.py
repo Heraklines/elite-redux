@@ -36,7 +36,6 @@ from train_candidate_baselines import (  # noqa: E402
     accumulate_dictionary_references,
     empty_dictionary_references,
     is_policy_target,
-    jsonl_files,
     record_battle_id,
     record_policy_source,
     record_split_group,
@@ -139,9 +138,24 @@ class ErSelectionSummary:
     rollout_selection: dict[str, Any] | None
 
 
+def er_jsonl_files(path: Path) -> list[Path]:
+    candidates = [path] if path.is_file() else path.rglob("*")
+    return sorted(
+        candidate
+        for candidate in candidates
+        if candidate.is_file()
+        and (candidate.name.endswith(".jsonl") or candidate.name.endswith(".jsonl.gz"))
+    )
+
+
 def iter_er_jsonl_records(path: Path) -> Iterator[tuple[dict[str, Any], Path, int]]:
-    for file in jsonl_files(path):
-        with file.open("r", encoding="utf-8") as handle:
+    for file in er_jsonl_files(path):
+        input_handle = (
+            gzip.open(file, "rt", encoding="utf-8")
+            if file.name.endswith(".gz")
+            else file.open("r", encoding="utf-8")
+        )
+        with input_handle as handle:
             for line_number, line in enumerate(handle, 1):
                 if line.strip():
                     yield json.loads(line), file, line_number
@@ -1527,7 +1541,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             "rolloutSelection": rollout_selection,
             "identity": identity,
             "dictionaryCoverage": dictionary_coverage,
-            "erJsonlSha256": dataset_hash(jsonl_files(args.data)),
+            "erJsonlSha256": dataset_hash(er_jsonl_files(args.data)),
             "transferJsonlSha256": dataset_hash(transfer_jsonl_files(args.transfer_data)) if args.transfer_data else None,
         },
         "validation": final_metrics,

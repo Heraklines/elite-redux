@@ -1,0 +1,201 @@
+name: AI Curated Human Kaggle Training (Private)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset_id:
+        description: Private contract-v4 curation dataset ID from the semantic-audit run
+        required: true
+        type: string
+      training_profile:
+        description: Candidate transformer size and training budget
+        required: true
+        type: choice
+        default: baseline
+        options:
+          - smoke
+          - baseline
+          - large
+      seeds:
+        description: Comma-separated unique training seeds
+        required: true
+        type: string
+        default: 20260823,20260824,20260825
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-curated-human-kaggle-training
+  cancel-in-progress: false
+
+env:
+  AI_DATASET_NAME: er-ai-curated-human-v4-20260823
+  AI_KERNEL_NAME: er-ai-curated-human-v4-gpu-20260823
+
+jobs:
+  handoff:
+    if: github.repository == 'Heraklines/elite-redux'
+    name: R2 to private Kaggle GPU
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: ./.github/actions/setup-deps
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned Kaggle client
+        run: python -m pip install kaggle==2.2.4
+      - name: Verify corpus adapter and compressed trainer input
+        working-directory: ml/policy
+        run: >-
+          python -m unittest
+          test_prepare_curated_transformer_corpus
+          test_train_candidate_transformer
+      - name: Fetch and verify private curated shards from R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          DATASET_ID: ${{ inputs.dataset_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$DATASET_ID" =~ ^[0-9a-f]{24}$ ]]
+          curated="$RUNNER_TEMP/curated-v4"
+          mkdir -p "$curated"
+          prefix="ai-private/contract-v4/$DATASET_ID"
+          npx wrangler r2 object get \
+            "er-telemetry/$prefix/manifest.json" \
+            --file "$curated/manifest.json" \
+            --remote
+          test "$(jq -r '.datasetId' "$curated/manifest.json")" = "$DATASET_ID"
+          while IFS=$'\t' read -r name expected_hash; do
+            [[ "$name" =~ ^[a-z0-9-]+\.jsonl\.gz$ ]]
+            npx wrangler r2 object get \
+              "er-telemetry/$prefix/$name" \
+              --file "$curated/$name" \
+              --remote
+            test "$(sha256sum "$curated/$name" | cut -d' ' -f1)" = "$expected_hash"
+          done < <(jq -r '.files[] | [.name, .sha256] | @tsv' "$curated/manifest.json")
+      - name: Assemble all-human policy plus completed-outcome value corpus
+        shell: bash
+        run: |
+          set -euo pipefail
+          python ml/policy/prepare_curated_transformer_corpus.py \
+            --curated-dir "$RUNNER_TEMP/curated-v4" \
+            --out "$RUNNER_TEMP/training-v4" \
+            --report ai-corpus-report.json \
+            --policy-dataset policy-all
+          jq -e '
+            .policyDecisions > 0 and
+            .sourcePartitions > 1 and
+            .matchedBattleTerminals > 0 and
+            .heldOutSplitIncluded == false and
+            .rawIdentifiersIncluded == false
+          ' ai-corpus-report.json > /dev/null
+      - name: Fetch exact data dictionary and runtime item supplement
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dictionary_hash=$(jq -r '.identity.dictionaryHash' "$RUNNER_TEMP/curated-v4/manifest.json")
+          [[ "$dictionary_hash" =~ ^[0-9a-f]{64}$ ]]
+          npx wrangler r2 object get \
+            "er-telemetry/dictionaries/$dictionary_hash.json" \
+            --file "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            --remote
+          test "$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)" = "$dictionary_hash"
+          node scripts/ai/build-runtime-item-dictionary-supplement.mjs \
+            "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            "$RUNNER_TEMP/training-v4/runtime-item-dictionary-supplement.json"
+      - name: Seal compressed training bundle
+        env:
+          TRAINING_PROFILE: ${{ inputs.training_profile }}
+          TRAINING_SEEDS: ${{ inputs.seeds }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TRAINING_SEEDS" =~ ^[0-9]+(,[0-9]+)*$ ]]
+          node scripts/ai/prepare-kaggle-candidate-training.mjs \
+            "$RUNNER_TEMP/training-v4" \
+            "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            "$RUNNER_TEMP/ai-kaggle-dataset/er-ai-training-bundle.zip" \
+            "$TRAINING_PROFILE" "$TRAINING_SEEDS"
+          python scripts/ai/verify_kaggle_training_bundle.py \
+            "$RUNNER_TEMP/ai-kaggle-dataset/er-ai-training-bundle.zip" \
+            "$GITHUB_WORKSPACE"
+      - name: Build private Kaggle manifests
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+        run: >-
+          python scripts/ai/build_private_kaggle_manifests.py
+          "$RUNNER_TEMP"
+          "$KAGGLE_USERNAME"
+          "$AI_DATASET_NAME"
+          "$AI_KERNEL_NAME"
+      - name: Publish private dataset directly and launch GPU kernel
+        env:
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+          DATASET_ID: ${{ inputs.dataset_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$KAGGLE_USERNAME"
+          test -n "$KAGGLE_KEY"
+          dataset_slug="$KAGGLE_USERNAME/$AI_DATASET_NAME"
+          if kaggle datasets status "$dataset_slug" >/dev/null 2>&1; then
+            kaggle datasets version \
+              --path "$RUNNER_TEMP/ai-kaggle-dataset" \
+              --message "curated v4 $DATASET_ID from $GITHUB_SHA"
+          else
+            kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
+          fi
+          dataset_status=""
+          for _ in $(seq 1 90); do
+            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
+            if [[ "$dataset_status" == "ready" ]]; then
+              break
+            fi
+            sleep 10
+          done
+          if [[ "$dataset_status" != "ready" ]]; then
+            echo "::error::Private Kaggle dataset did not become ready (status: ${dataset_status:-unavailable})"
+            exit 1
+          fi
+          kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
+          {
+            echo "### Private all-human v4 GPU handoff"
+            echo "- Curated dataset ID: \`$DATASET_ID\`"
+            echo "- Kaggle dataset: \`$dataset_slug\` (private)"
+            echo "- Kaggle kernel: \`$KAGGLE_USERNAME/$AI_KERNEL_NAME\` (private GPU)"
+            echo "- Source commit: \`$GITHUB_SHA\`"
+            echo "- Policy objective: all eligible human decisions, including losses and incomplete battles"
+            echo "- Value objective: completed battle outcomes only"
+            echo "- Permanent curator test split: excluded from training bundle"
+            echo "- Hell AI actions: absent from policy labels"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish sanitized corpus report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-curated-human-kaggle-corpus-report
+          path: ai-corpus-report.json
+          retention-days: 30
+          if-no-files-found: warn
+      - name: Delete private runner-local data
+        if: always()
+        shell: bash
+        run: |
+          rm -rf \
+            "$RUNNER_TEMP/curated-v4" \
+            "$RUNNER_TEMP/training-v4" \
+            "$RUNNER_TEMP/er-combat-data-dictionary.json" \
+            "$RUNNER_TEMP/ai-kaggle-dataset" \
+            "$RUNNER_TEMP/ai-kaggle-kernel"
