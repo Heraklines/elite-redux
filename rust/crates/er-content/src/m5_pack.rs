@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use er_canonical::{CanonicalError, content_digest};
 use er_mechanics::{MechanicsProgramV1, ProgramValidationError};
 use er_types::battle_model::CapabilityStatus;
-use er_types::mechanics::{MechanicSourceId, MechanicsProgramId};
+use er_types::mechanics::MechanicsProgramId;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

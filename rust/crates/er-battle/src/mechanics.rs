@@ -157,7 +157,7 @@ pub fn collect_mechanic_sources(
             }
             ClassificationKind::Unsupported => {
                 return Err(MechanicSourceError::ReachableUnsupported {
-                    source: source.source,
+                    subject: source.source,
                 });
             }
         }
@@ -177,6 +177,6 @@ pub enum MechanicSourceError {
     MissingProgram,
     #[error("bespoke mechanic has no symbol")]
     MissingBespoke,
-    #[error("reachable mechanic is unsupported: {source:?}")]
-    ReachableUnsupported { source: MechanicSourceId },
+    #[error("reachable mechanic is unsupported: {subject:?}")]
+    ReachableUnsupported { subject: MechanicSourceId },
 }
