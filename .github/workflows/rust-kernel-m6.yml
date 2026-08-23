@@ -198,14 +198,16 @@ jobs:
         run: diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
       - name: Verify runtime and static semantic agreement
         run: |
+          set -euo pipefail
           node scripts/check-kernel-m6-runtime-semantics.mjs \
             "$RUNNER_TEMP/m6-runtime-a.json" \
             rust/fixtures/m6/semantic-catalog-v1.json \
-            rust/fixtures/m6/raw-source-catalog-v2.json
+            rust/fixtures/m6/raw-source-catalog-v2.json \
+            2>&1 | tee "$RUNNER_TEMP/m6-runtime-agreement.log"
       - name: Publish runtime semantic failure
         if: failure()
         run: |
-          diagnostic="$(tail -c 3500 "$RUNNER_TEMP/m6-runtime-a.log" 2>/dev/null || true)"
+          diagnostic="$(tail -c 3500 "$RUNNER_TEMP/m6-runtime-agreement.log" 2>/dev/null || tail -c 3500 "$RUNNER_TEMP/m6-runtime-a.log" 2>/dev/null || true)"
           diagnostic="${diagnostic//'%'/'%25'}"
           diagnostic="${diagnostic//$'\r'/'%0D'}"
           diagnostic="${diagnostic//$'\n'/'%0A'}"
