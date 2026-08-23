@@ -3,7 +3,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -463,6 +463,7 @@ const memberIds = new Map();
 for (const kind of ["moves", "abilities"]) {
   for (const entry of raw[kind]) memberIds.set(`${entry.enum_name}/${entry.member}`, entry.numeric_id);
 }
+appendManualAbilities(raw, input.oracleRoot);
 function manualCatalogDeclarations(path, minimumId) {
   return numericDeclarations(path, "_ID").filter(entry => entry.id >= minimumId);
 }
@@ -485,6 +486,35 @@ function appendManualMoves(raw, oracleRoot) {
     });
   }
 }
+
+function tsFilesUnder(directory) {
+  const files = [];
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) files.push(...tsFilesUnder(path));
+    else if (entry.isFile() && entry.name.endsWith(".ts")) files.push(path);
+  }
+  return files;
+}
+
+function appendManualAbilities(raw, oracleRoot) {
+  const existing = new Set(raw.abilities.map(entry => entry.numeric_id));
+  for (const path of tsFilesUnder(resolve(oracleRoot, "src/data/elite-redux")).sort(compareText)) {
+    for (const entry of numericDeclarations(path, "_ABILITY_ID")) {
+      if (entry.id < 5_000 || existing.has(entry.id)) continue;
+      existing.add(entry.id);
+      raw.abilities.push({
+        enum_name: "AbilityId",
+        member: entry.key,
+        numeric_id: entry.id,
+        initializer: null,
+        ordinal: raw.abilities.length,
+        source: entry.source,
+      });
+    }
+  }
+}
+
 
 const units = [];
 const ordinals = new Map();
