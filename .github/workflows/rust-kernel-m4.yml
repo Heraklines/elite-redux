@@ -262,7 +262,10 @@ jobs:
     needs:
       - m4-source-lock
       - m4-contract-freeze
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       contains(github.event.head_commit.message, 'qualification'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -315,7 +318,10 @@ jobs:
     needs:
       - m4-source-lock
       - m4-contract-freeze
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       contains(github.event.head_commit.message, 'qualification'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -365,9 +371,14 @@ jobs:
   m4-focused-runtime-benchmarks:
     name: M4 focused runtime benchmarks
     needs:
+      - classify
       - m4-source-lock
       - m4-contract-freeze
-    if: github.event_name == 'workflow_dispatch'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+       needs.classify.outputs.rust == 'true' &&
+       contains(github.event.head_commit.message, 'qualification'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -487,3 +498,46 @@ jobs:
             ${{ runner.temp }}/m4-oracle-output
           if-no-files-found: warn
           retention-days: 14
+
+  m4-g15-qualification:
+    name: M4 G15 exact-SHA qualification
+    needs:
+      - classify
+      - m4-source-lock
+      - m4-contract-freeze
+      - m4-foundation-rust
+      - m4-m3-regression-core
+      - m4-m3-regression-integration
+      - m4-focused-runtime-benchmarks
+      - m4-oracle-probe
+    if: >-
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.ref == 'refs/heads/arch/rust-kernel-m4' &&
+        contains(github.event.head_commit.message, 'qualification')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every M4 qualification dependency
+        env:
+          SOURCE_LOCK: ${{ needs.m4-source-lock.result }}
+          CONTRACT_FREEZE: ${{ needs.m4-contract-freeze.result }}
+          FOUNDATION: ${{ needs.m4-foundation-rust.result }}
+          REGRESSION_CORE: ${{ needs.m4-m3-regression-core.result }}
+          REGRESSION_INTEGRATION: ${{ needs.m4-m3-regression-integration.result }}
+          BENCHMARKS: ${{ needs.m4-focused-runtime-benchmarks.result }}
+          ORACLE: ${{ needs.m4-oracle-probe.result }}
+        run: |
+          set -euo pipefail
+          for result in \
+            "$SOURCE_LOCK" \
+            "$CONTRACT_FREEZE" \
+            "$FOUNDATION" \
+            "$REGRESSION_CORE" \
+            "$REGRESSION_INTEGRATION" \
+            "$BENCHMARKS" \
+            "$ORACLE"
+          do
+            test "$result" = success
+          done
+          printf '%s\n' "M4 exact SHA $GITHUB_SHA passed G15 qualification"
