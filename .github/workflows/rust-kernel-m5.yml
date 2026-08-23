@@ -486,3 +486,14 @@ jobs:
     steps:
       - name: Attest exact-SHA G18 executor
         run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G18 executor"
+
+  m5-g19-family:
+    name: M5 G19 family aggregate
+    needs:
+      - m5-g18-executor
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest every admitted family primitive
+        run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G19 families"
