@@ -6,19 +6,19 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
-import io
 import json
 import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, TextIO
+from typing import Any, BinaryIO, Iterable
 
 
 SPLIT_SEED = "er-human-telemetry-split-v1"
 CURATION_SEED = "er-contract-v4-curation-v1"
 SPLITS = ("train", "validation", "test")
 TOKEN_GROUPS = ("actor", "targets", "destination", "field", "action")
+MAX_UPLOAD_SHARD_UNCOMPRESSED_BYTES = 128 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -63,6 +63,14 @@ class PolicyMeta:
 
 def sha256(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(8 * 1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def source_split(source_id: str) -> str:
@@ -408,30 +416,60 @@ def select_policy(
 
 
 class DeterministicGzipWriter:
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, max_uncompressed_bytes: int = MAX_UPLOAD_SHARD_UNCOMPRESSED_BYTES) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
-        self.path = path
-        self.raw = path.open("wb")
-        self.compressed = gzip.GzipFile(filename="", mode="wb", fileobj=self.raw, mtime=0)
-        self.text: TextIO = io.TextIOWrapper(self.compressed, encoding="utf-8", newline="\n")
+        self.base_path = path
+        self.max_uncompressed_bytes = max_uncompressed_bytes
+        self.files: list[dict[str, Any]] = []
+        self.path: Path
+        self.raw: BinaryIO
+        self.compressed: gzip.GzipFile
         self.records = 0
+        self.uncompressed_bytes = 0
+        self._open()
+
+    def _part_path(self, index: int) -> Path:
+        if index == 0:
+            return self.base_path
+        suffix = ".jsonl.gz"
+        if not self.base_path.name.endswith(suffix):
+            raise ValueError("curated shard path must end in .jsonl.gz")
+        stem = self.base_path.name[: -len(suffix)]
+        return self.base_path.with_name(f"{stem}-part-{index:05d}{suffix}")
+
+    def _open(self) -> None:
+        self.path = self._part_path(len(self.files))
+        self.raw = self.path.open("wb")
+        self.compressed = gzip.GzipFile(filename="", mode="wb", fileobj=self.raw, mtime=0)
+        self.records = 0
+        self.uncompressed_bytes = 0
+
+    def _close_part(self) -> None:
+        self.compressed.close()
+        self.raw.close()
+        self.files.append(
+            {
+                "name": self.path.name,
+                "sha256": file_sha256(self.path),
+                "bytes": self.path.stat().st_size,
+                "records": self.records,
+            }
+        )
 
     def write(self, record: dict[str, Any]) -> None:
-        self.text.write(json.dumps(record, sort_keys=True, separators=(",", ":")))
-        self.text.write("\n")
+        payload = f"{json.dumps(record, sort_keys=True, separators=(',', ':'))}\n".encode()
+        if len(payload) > self.max_uncompressed_bytes:
+            raise ValueError("one curated record exceeds the configured upload shard size")
+        if self.records and self.uncompressed_bytes + len(payload) > self.max_uncompressed_bytes:
+            self._close_part()
+            self._open()
+        self.compressed.write(payload)
         self.records += 1
+        self.uncompressed_bytes += len(payload)
 
-    def close(self) -> dict[str, Any]:
-        self.text.flush()
-        self.text.close()
-        self.raw.close()
-        digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
-        return {
-            "name": self.path.name,
-            "sha256": digest,
-            "bytes": self.path.stat().st_size,
-            "records": self.records,
-        }
+    def close(self) -> list[dict[str, Any]]:
+        self._close_part()
+        return self.files
 
 
 def materialize(
@@ -478,8 +516,17 @@ def materialize(
         ):
             writers[("critic-all-outcomes", meta.split)].write(episode)
             critic_sources[f"{meta.split}:{meta.source_id}"] += 1
-    files = [writer.close() for writer in writers.values()]
+    files = [descriptor for writer in writers.values() for descriptor in writer.close()]
     return files, strata_counts, policy_sources, critic_sources
+
+
+def dataset_record_count(files: list[dict[str, Any]], dataset: str, split: str) -> int:
+    prefix = f"{dataset}-{split}"
+    return sum(
+        int(row["records"])
+        for row in files
+        if row["name"] == f"{prefix}.jsonl.gz" or row["name"].startswith(f"{prefix}-part-")
+    )
 
 
 def count_sources(counts: Counter[str], split: str) -> int:
@@ -519,7 +566,7 @@ def curate(path: Path, private_out: Path, report_path: Path, config: CurationCon
     )
     policy_counts = Counter(candidate.split for candidate in selected.values())
     critic_counts = {
-        split: next(row["records"] for row in files if row["name"] == f"critic-all-outcomes-{split}.jsonl.gz")
+        split: dataset_record_count(files, "critic-all-outcomes", split)
         for split in SPLITS
     }
     report = {

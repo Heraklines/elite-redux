@@ -71,6 +71,15 @@ def battle_id(record: dict[str, Any]) -> str | None:
     return None
 
 
+def curated_shards(curated_dir: Path, dataset: str, split: str) -> list[Path]:
+    base = curated_dir / f"{dataset}-{split}.jsonl.gz"
+    parts = sorted(curated_dir.glob(f"{dataset}-{split}-part-*.jsonl.gz"))
+    shards = ([base] if base.is_file() else []) + parts
+    if not shards:
+        raise ValueError(f"curated dataset is missing {dataset}-{split} shards")
+    return shards
+
+
 def normalize_terminal(
     terminal: dict[str, Any],
     episode: dict[str, Any],
@@ -108,47 +117,47 @@ def assemble(
     selected_battles: set[str] = set()
     policy_outputs: list[str] = []
     for split in SPLITS:
-        source = curated_dir / f"{policy_dataset}-{split}.jsonl.gz"
-        destination = output_dir / f"{source.name}pack"
-        policy_outputs.append(destination.name)
-        with destination.open("wb") as raw:
-            with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed:
-                for decision in iter_gzip_jsonl(source):
-                    if decision.get("kind") != "combat_decision":
-                        raise ValueError(f"{source} contains a non-decision policy row")
-                    if decision.get("policySource") != "human-v1" or decision.get("policyTarget") is not True:
-                        raise ValueError(f"{source} contains a non-human policy target")
-                    if any(decision.get(name) != value for name, value in identity.items()):
-                        raise ValueError(f"{source} contains a mixed runtime identity")
-                    stable_battle_id = battle_id(decision)
-                    if stable_battle_id is None:
-                        raise ValueError(f"decision {decision.get('decisionId')} has no stable battleId")
-                    selected_battles.add(stable_battle_id)
-                    source_partition = decision.get("sourcePartitionId")
-                    if not isinstance(source_partition, str) or not source_partition:
-                        raise ValueError(f"decision {decision.get('decisionId')} has no source partition")
-                    source_partitions.add(source_partition)
-                    decision_count += 1
-                    packed = {**decision, "curationSplit": split}
-                    compressed.write(
-                        f"{json.dumps(packed, sort_keys=True, separators=(',', ':'))}\n".encode()
-                    )
+        for source in curated_shards(curated_dir, policy_dataset, split):
+            destination = output_dir / f"{source.name}pack"
+            policy_outputs.append(destination.name)
+            with destination.open("wb") as raw:
+                with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed:
+                    for decision in iter_gzip_jsonl(source):
+                        if decision.get("kind") != "combat_decision":
+                            raise ValueError(f"{source} contains a non-decision policy row")
+                        if decision.get("policySource") != "human-v1" or decision.get("policyTarget") is not True:
+                            raise ValueError(f"{source} contains a non-human policy target")
+                        if any(decision.get(name) != value for name, value in identity.items()):
+                            raise ValueError(f"{source} contains a mixed runtime identity")
+                        stable_battle_id = battle_id(decision)
+                        if stable_battle_id is None:
+                            raise ValueError(f"decision {decision.get('decisionId')} has no stable battleId")
+                        selected_battles.add(stable_battle_id)
+                        source_partition = decision.get("sourcePartitionId")
+                        if not isinstance(source_partition, str) or not source_partition:
+                            raise ValueError(f"decision {decision.get('decisionId')} has no source partition")
+                        source_partitions.add(source_partition)
+                        decision_count += 1
+                        packed = {**decision, "curationSplit": split}
+                        compressed.write(
+                            f"{json.dumps(packed, sort_keys=True, separators=(',', ':'))}\n".encode()
+                        )
 
     terminals: dict[str, dict[str, Any]] = {}
     completed_episodes = 0
     for split in SPLITS:
-        source = curated_dir / f"critic-all-outcomes-{split}.jsonl.gz"
-        for episode in iter_gzip_jsonl(source):
-            completed_episodes += 1
-            for terminal in episode.get("battleTerminals", []):
-                normalized = normalize_terminal(terminal, episode, identity)
-                stable_battle_id = battle_id(normalized)
-                assert stable_battle_id is not None
-                if stable_battle_id not in selected_battles:
-                    continue
-                previous = terminals.setdefault(stable_battle_id, normalized)
-                if previous != normalized:
-                    raise ValueError(f"conflicting terminal records for battle {stable_battle_id}")
+        for source in curated_shards(curated_dir, "critic-all-outcomes", split):
+            for episode in iter_gzip_jsonl(source):
+                completed_episodes += 1
+                for terminal in episode.get("battleTerminals", []):
+                    normalized = normalize_terminal(terminal, episode, identity)
+                    stable_battle_id = battle_id(normalized)
+                    assert stable_battle_id is not None
+                    if stable_battle_id not in selected_battles:
+                        continue
+                    previous = terminals.setdefault(stable_battle_id, normalized)
+                    if previous != normalized:
+                        raise ValueError(f"conflicting terminal records for battle {stable_battle_id}")
 
     terminal_path = output_dir / "completed-battle-terminals.jsonl.gzpack"
     with terminal_path.open("wb") as raw:

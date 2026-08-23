@@ -58,6 +58,12 @@ class PrepareCuratedTransformerCorpusTest(unittest.TestCase):
                     "battleTerminals": [{"battleId": battle_id, "outcome": "victory"}],
                 }
                 files.append(write_gzip_jsonl(curated / f"critic-all-outcomes-{split}.jsonl.gz", [episode]))
+            files.append(
+                write_gzip_jsonl(
+                    curated / "policy-all-train-part-00001.jsonl.gz",
+                    [decision("train", "part", False)],
+                )
+            )
             manifest = {
                 "datasetId": "a" * 24,
                 "contractVersion": 4,
@@ -69,17 +75,20 @@ class PrepareCuratedTransformerCorpusTest(unittest.TestCase):
 
             report = assemble(curated, output)
 
-            self.assertEqual(report["policyDecisions"], 4)
-            self.assertEqual(report["sourcePartitions"], 4)
-            self.assertEqual(report["selectedBattles"], 4)
+            self.assertEqual(report["policyDecisions"], 5)
+            self.assertEqual(report["sourcePartitions"], 5)
+            self.assertEqual(report["selectedBattles"], 5)
             self.assertEqual(report["matchedBattleTerminals"], 2)
-            self.assertEqual(report["unknownOutcomeBattles"], 2)
+            self.assertEqual(report["unknownOutcomeBattles"], 3)
             self.assertFalse(report["heldOutSplitIncluded"])
             self.assertFalse((output / "policy-all-test.jsonl.gzpack").exists())
+            self.assertTrue((output / "policy-all-train-part-00001.jsonl.gzpack").exists())
             packed_splits = {}
             for split in ("train", "validation"):
-                with gzip.open(output / f"policy-all-{split}.jsonl.gzpack", "rt", encoding="utf-8") as handle:
-                    rows = [json.loads(line) for line in handle]
+                rows = []
+                for shard in sorted(output.glob(f"policy-all-{split}*.jsonl.gzpack")):
+                    with gzip.open(shard, "rt", encoding="utf-8") as handle:
+                        rows.extend(json.loads(line) for line in handle)
                 self.assertTrue(rows)
                 self.assertTrue(all(row["curationSplit"] == split for row in rows))
                 packed_splits[split] = {row["sourcePartitionId"] for row in rows}

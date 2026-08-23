@@ -7,6 +7,7 @@ from pathlib import Path
 
 from curate_contract_v4 import (
     CurationConfig,
+    DeterministicGzipWriter,
     analyze_episode,
     curate,
     select_policy,
@@ -154,6 +155,23 @@ def episode(
 
 
 class ContractV4CurationTest(unittest.TestCase):
+    def test_curated_writer_rotates_on_record_boundaries(self) -> None:
+        records = [{"episodeId": f"episode-{index}", "payload": "x" * 80} for index in range(5)]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            writer = DeterministicGzipWriter(root / "policy-all-train.jsonl.gz", max_uncompressed_bytes=180)
+            for record in records:
+                writer.write(record)
+            descriptors = writer.close()
+
+            restored = []
+            for descriptor in descriptors:
+                self.assertLess(descriptor["bytes"], 300 * 1024 * 1024)
+                with gzip.open(root / descriptor["name"], "rt", encoding="utf-8") as handle:
+                    restored.extend(json.loads(line) for line in handle)
+            self.assertEqual(restored, records)
+            self.assertGreater(len(descriptors), 1)
+
     def test_cross_split_run_lineage_is_quarantined_before_policy_selection(self) -> None:
         train = episode("train-clone", source_for("train"), "copied-seed", 10)
         validation = episode("validation-clone", source_for("validation"), "copied-seed", 11)
