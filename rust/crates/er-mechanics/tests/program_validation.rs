@@ -134,3 +134,124 @@ fn every_frozen_family_is_unique_and_query_owned() {
         er_mechanics::MechanicFamily::HeldItemLifecycle
     );
 }
+
+#[test]
+fn every_admitted_family_has_a_closed_runtime_primitive() {
+    use er_mechanics::{
+        ActionOperationKind, FieldEffectKind, FieldEffectOperationKind, HpOperationKind,
+        ItemOperationKind, MechanicFamily, MechanicInstanceTemplate, MechanicStatePayload,
+        StageOperationKind, StatusOperationKind, SwitchOperationKind,
+    };
+    let selector = er_mechanics::SelectorNodeId::ZERO;
+    let value = er_mechanics::ValueNodeId::ZERO;
+    let program = MechanicsProgramId::new(ONE);
+    let cases = [
+        (
+            MechanicFamily::DamageTypeCritical,
+            MechanicOperation::Hp {
+                operation: HpOperationKind::Damage,
+                targets: selector,
+                amount: value,
+            },
+        ),
+        (
+            MechanicFamily::MultiHitRecoilDrain,
+            MechanicOperation::Hp {
+                operation: HpOperationKind::RecoilFromDamage,
+                targets: selector,
+                amount: value,
+            },
+        ),
+        (
+            MechanicFamily::MajorStatus,
+            MechanicOperation::Status {
+                operation: StatusOperationKind::Apply,
+                targets: selector,
+                status_id: ONE,
+                duration: None,
+            },
+        ),
+        (
+            MechanicFamily::VolatileEffects,
+            MechanicOperation::CreateInstance {
+                owners: selector,
+                template: MechanicInstanceTemplate {
+                    program_id: program,
+                    remaining_turns: Some(1),
+                    counters: Vec::new(),
+                    payload: MechanicStatePayload::Empty,
+                },
+            },
+        ),
+        (
+            MechanicFamily::StatPrioritySpeedAccuracy,
+            MechanicOperation::StatStage {
+                operation: StageOperationKind::Add,
+                targets: selector,
+                stat_id: 0,
+                stages: value,
+            },
+        ),
+        (
+            MechanicFamily::SwitchingPivot,
+            MechanicOperation::Switch {
+                operation: SwitchOperationKind::Pivot,
+                actors: selector,
+                party_slot: None,
+                field_slot: None,
+            },
+        ),
+        (
+            MechanicFamily::WeatherTerrain,
+            MechanicOperation::FieldEffect {
+                effect: FieldEffectKind::Weather,
+                operation: FieldEffectOperationKind::Apply,
+                targets: selector,
+                effect_id: ONE,
+                duration: Some(value),
+            },
+        ),
+        (
+            MechanicFamily::HazardsScreensConditions,
+            MechanicOperation::FieldEffect {
+                effect: FieldEffectKind::SideCondition,
+                operation: FieldEffectOperationKind::Apply,
+                targets: selector,
+                effect_id: ONE,
+                duration: Some(value),
+            },
+        ),
+        (
+            MechanicFamily::SuppressionImmunityRedirection,
+            MechanicOperation::Action {
+                operation: ActionOperationKind::Cancel,
+                targets: selector,
+                move_id: None,
+                count: None,
+            },
+        ),
+        (
+            MechanicFamily::HeldItemLifecycle,
+            MechanicOperation::Item {
+                operation: ItemOperationKind::Consume,
+                targets: selector,
+                item_id: ONE,
+            },
+        ),
+        (
+            MechanicFamily::Bespoke,
+            MechanicOperation::Action {
+                operation: ActionOperationKind::QueueClosedMove,
+                targets: selector,
+                move_id: Some(ONE),
+                count: None,
+            },
+        ),
+    ];
+    for (family, operation) in cases {
+        assert!(
+            er_mechanics::operation_belongs_to(family, &operation),
+            "{family:?} rejected its representative primitive"
+        );
+    }
+}
