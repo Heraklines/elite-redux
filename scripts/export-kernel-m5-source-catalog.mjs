@@ -55,6 +55,7 @@ const MECHANICS_ROOTS = [
   "src/data/status-effect.ts",
   "src/data/terrain.ts",
   "src/data/weather.ts",
+  "src/data/trainers",
   "src/field",
   "src/modifier",
 ];

@@ -26,7 +26,12 @@ responsibilities = [
 [semantic_extraction]
 exclusive = [
   "scripts/export-kernel-m6-semantic-catalog.mjs",
+  "scripts/export-kernel-m5-source-catalog.mjs",
+  "scripts/check-kernel-m6-contract.mjs",
+  "scripts/check-kernel-m6-runtime-semantics.mjs",
+  "scripts/diagnose-kernel-m6-semantic-diff.mjs",
   "test/kernel-fixtures/m6/export-semantic-runtime.test.ts",
+  "test/kernel-fixtures/m4/export/oracle-frontier.ts",
   "rust/fixtures/m6/raw-source-catalog-v2.json",
   "rust/fixtures/m6/semantic-catalog-v1.json",
   "rust/fixtures/m6/behavior-unit-manifest-v1.json",
@@ -40,11 +45,14 @@ exclusive = [
 [m6a_ids_catalog]
 exclusive = [
   "rust/crates/er-types/src/m6.rs",
+  "rust/crates/er-types/src/lib.rs",
   "rust/crates/er-content/src/m6_catalog.rs",
 ]
 
 [m6a_ir_hooks_queries]
 exclusive = [
+  "rust/crates/er-mechanics/src/lib.rs",
+  "rust/crates/er-mechanics/src/m6.rs",
   "rust/crates/er-mechanics/src/v2/hook.rs",
   "rust/crates/er-mechanics/src/v2/query.rs",
   "rust/crates/er-mechanics/src/v2/program.rs",

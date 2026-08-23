@@ -4,7 +4,7 @@ Oracle SHA: `3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7`.
 
 ## Raw inventory
 
-The pinned static catalog records 250 RNG call sites with exact source path, line, column, callee, and source arguments. The inventory includes both battle mechanics and non-battle run systems. Presence in this inventory is not permission for the battle core to call process-global RNG.
+The pinned static catalog records 273 RNG call sites with exact source path, line, column, callee, and source arguments. This includes 23 seeded trainer-configuration sites previously outside the M5 mechanics roots. The inventory includes battle mechanics and non-battle run systems. Presence in this inventory is not permission for the battle core to call process-global RNG.
 
 Observed callees include battle-substream calls such as `pokemon.randBattleSeedInt`, generic seeded helpers such as `randSeedInt`, item/shuffle helpers, and five direct `Math.random` sites. Direct `Math.random` is an architectural gap until proven non-mechanical or replaced at a closed deterministic boundary.
 
@@ -20,6 +20,8 @@ oracle SHA
 ```
 
 Line/column are diagnostics; provenance hash and source ordinal prevent two same-line calls from collapsing.
+
+Every site owns one unique `BESPOKE` gap behavior unit at G21. The site records that owner and a stable per-owner execution ordinal. Source argument text is retained only as `SOURCE_EXPRESSION_GAP`; stream, range, and singleton policy remain explicitly non-executable until an oracle witness replaces each gap with closed semantics.
 
 ## Domain classification
 
@@ -52,7 +54,7 @@ Battle-mechanical sites use a closed reason, including:
 - form or transform behavior;
 - source-identified bespoke mechanic.
 
-The bespoke reason carries a `BehaviorUnitId`; it is not an arbitrary string. This preserves exact replay identity while the behavior is closed during M6C.
+The bespoke reason is paired with a frozen `BehaviorUnitId` owner; it is not an arbitrary string. This preserves exact replay identity while the behavior is closed during M6C.
 
 ## Ordering rules
 
@@ -62,6 +64,7 @@ The bespoke reason carries a `BehaviorUnitId`; it is not an arbitrary string. Th
 - Query and mutation stages may draw only at a declared site.
 - Run and battle streams remain separate.
 - Native and Wasm compare every draw, not only the final state.
+- A battle mechanics program rejects every non-`BATTLE_MECHANICAL` domain and every absent/zero closed range.
 
 ## Witness requirement
 

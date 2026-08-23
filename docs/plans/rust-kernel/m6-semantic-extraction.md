@@ -10,7 +10,7 @@
 
 ## Frozen inventory
 
-`rust/fixtures/m6/semantic-catalog-v1.json` contains 4,077 source identities and 6,089 behavior units:
+`rust/fixtures/m6/semantic-catalog-v1.json` contains 4,350 source identities and 6,362 behavior units:
 
 | Source kind | Identities | Behavior units |
 |---|---:|---:|
@@ -26,16 +26,16 @@
 | Positional tag | 3 | 3 |
 | Species | 1,082 | 1,082 |
 | Form | 534 | 534 |
-| Unattached attribute or fixed-dispatch callsite | 507 | 507 |
+| Unattached attribute, fixed dispatch, or RNG callsite | 780 | 780 |
 
 Resolution totals:
 
 - `RESOLVED_INTRINSIC`: 1,544.
-- `RESOLVED_OPERANDS`: 2,194.
-- `BESPOKE_GAP`: 2,351.
+- `RESOLVED_OPERANDS`: 0.
+- `BESPOKE_GAP`: 4,818.
 - Unclassified identities or units: zero.
 
-A resolved operand is not an implementation claim. It means the static constructor operands fit the closed catalog descriptor vocabulary. Oracle witnesses remain required before the corresponding behavior becomes supported.
+No attribute operand is considered compiler-ready at G21. Literal and symbolic descriptors preserve evidence, but every attribute remains a gap until an audited per-attribute schema freezes its exact hook, condition, operand types, and operation.
 
 ## Evidence products
 
@@ -45,7 +45,7 @@ A resolved operand is not an implementation claim. It means the static construct
 - `primitive-gap-manifest-v1.json`: every callback or fixed-dispatch gap; no callback source text is embedded.
 - `bespoke-clusters-v1.json`: deterministic gap clustering.
 - `oracle-witness-plan-v1.json`: one positive and one negative witness obligation per behavior unit.
-- `rng-site-manifest-v1.json`: all 250 RNG sites with stable identity, domain, and closed draw-reason classification.
+- `rng-site-manifest-v1.json`: all 273 RNG sites with stable identity, unique behavior-unit owner, domain/reason classification, and explicit non-executable range/stream/singleton gaps.
 
 Behavior-unit identity is:
 
@@ -100,21 +100,22 @@ Runtime reflection does not make a callback portable. A callback remains a bespo
 
 ## Bespoke closure boundary
 
-The 2,351 current gaps are grouped mechanically as:
+The 4,818 current gaps are grouped mechanically as:
 
 | Cluster | Gap count |
 |---|---:|
+| Boss/custom ER | 1 |
 | Charge/recharge lock | 12 |
-| Custom dispatch | 1,190 |
+| Custom dispatch | 2,395 |
 | Delayed/scheduled effect | 4 |
-| Item/berry lifecycle | 266 |
-| Protect/endure/guard | 26 |
-| Special damage/counter | 78 |
-| Status/volatile/tag | 417 |
+| Item/berry lifecycle | 323 |
+| Protect/endure/guard | 42 |
+| Special damage/counter | 158 |
+| Status/volatile/tag | 903 |
 | Substitute proxy HP | 8 |
-| Suppression/unusual immunity | 94 |
-| Switch/trap/redirect | 100 |
-| Transform/form copy | 99 |
+| Suppression/unusual immunity | 134 |
+| Switch/trap/redirect | 123 |
+| Transform/form copy | 658 |
 | Weather/terrain/field | 57 |
 
 These names are scheduling clusters, not implementations. G24 requires every member to be compiled or implemented through an explicit bespoke Rust mechanic with canonical state. No gap may become supported because an untyped callback is invoked, ignored, or treated as `NONE`.
@@ -123,5 +124,5 @@ These names are scheduling clusters, not implementations. G24 requires every mem
 
 - Static parsing cannot determine callback semantics.
 - Source inspection establishes state shape and hook sites but not every cross-phase ordering edge.
-- RNG sites have conservative closed static classifications; each battle-mechanical classification remains provisional until its oracle witness proves domain, reason, range, and execution order.
+- RNG sites have conservative static domain/reason classifications and unique gap behavior owners. Range, stream, and singleton semantics remain explicitly non-executable until oracle witnesses close them.
 - Runtime callback hashes are diagnostic evidence tied to the pinned transform toolchain, not stable cross-version behavior IDs.

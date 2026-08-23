@@ -121,7 +121,9 @@ function sourceLocation(sourceFile, node, oracleRoot) {
 }
 
 function sourceIdentity(kind, numericId = null, registryKey = null) {
-  return { kind, numeric_id: numericId, registry_key: registryKey };
+  if (numericId != null && registryKey == null) return { kind, numeric_id: numericId };
+  if (numericId == null && registryKey != null && registryKey !== "") return { kind, registry_key: registryKey };
+  fail(`invalid ${kind} source identity shape`);
 }
 
 function identityKey(source) {
@@ -144,19 +146,48 @@ function reference(node) {
   return found;
 }
 
+function jsNumberBits(value) {
+  const bytes = new ArrayBuffer(8);
+  new DataView(bytes).setFloat64(0, value, false);
+  return [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function numericOperand(value) {
+  return Number.isSafeInteger(value)
+    ? { kind: "SAFE_INTEGER", value }
+    : { kind: "JS_NUMBER_BITS", bits: jsNumberBits(value) };
+}
+
+function objectKey(property, sourceFile) {
+  if (ts.isIdentifier(property.name) || ts.isStringLiteralLike(property.name) || ts.isNumericLiteral(property.name)) {
+    return property.name.getText(sourceFile).replace(/^['"]|['"]$/gu, "");
+  }
+  return null;
+}
+
 function operand(node, sourceFile) {
-  if (ts.isNumericLiteral(node)) return { kind: "INTEGER", value: Number(node.text) };
+  if (ts.isNumericLiteral(node)) return numericOperand(Number(node.text));
   if (ts.isStringLiteralLike(node)) return { kind: "STRING", value: node.text };
   if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword) {
     return { kind: "BOOLEAN", value: node.kind === ts.SyntaxKind.TrueKeyword };
   }
   if (node.kind === ts.SyntaxKind.NullKeyword) return { kind: "NULL" };
   if (ts.isPrefixUnaryExpression(node) && ts.isNumericLiteral(node.operand)) {
+    if (node.operator !== ts.SyntaxKind.MinusToken && node.operator !== ts.SyntaxKind.PlusToken) {
+      return callbackOperand(node, sourceFile);
+    }
     const value = Number(node.operand.text);
-    return { kind: "INTEGER", value: node.operator === ts.SyntaxKind.MinusToken ? -value : value };
+    return numericOperand(node.operator === ts.SyntaxKind.MinusToken ? -value : value);
   }
-  if (ts.isPropertyAccessExpression(node)) {
-    return { kind: "ENUM", owner: node.expression.getText(sourceFile), member: node.name.text };
+  if (ts.isPropertyAccessExpression(node) && ts.isIdentifier(node.expression)) {
+    const location = sourceLocation(sourceFile, node, input.oracleRoot);
+    return {
+      kind: "SYMBOL_PROVENANCE",
+      owner: node.expression.text,
+      member: node.name.text,
+      provenance_hash: hash(`${location.path}:${location.line}:${location.column}:${node.getText(sourceFile)}`),
+      source: location,
+    };
   }
   if (ts.isArrayLiteralExpression(node)) {
     return { kind: "ARRAY", values: node.elements.map(value => operand(value, sourceFile)) };
@@ -165,7 +196,9 @@ function operand(node, sourceFile) {
     const entries = [];
     for (const property of node.properties) {
       if (!ts.isPropertyAssignment(property)) return callbackOperand(node, sourceFile);
-      entries.push({ key: property.name.getText(sourceFile), value: operand(property.initializer, sourceFile) });
+      const key = objectKey(property, sourceFile);
+      if (key == null) return callbackOperand(node, sourceFile);
+      entries.push({ key, value: operand(property.initializer, sourceFile) });
     }
     return { kind: "OBJECT", entries };
   }
@@ -221,12 +254,60 @@ function attributeClassName(node, sourceFile) {
   if (ts.isNewExpression(node)) return node.expression.getText(sourceFile);
   return node.getText(sourceFile);
 }
+const AUDITED_ATTRIBUTE_SCHEMAS = new Set();
 
-function semanticResolution(hook, effect, values, implementation) {
+function builderChainRoot(node) {
+  let current = node;
+  while (current.parent) {
+    const parent = current.parent;
+    if (ts.isPropertyAccessExpression(parent) && parent.expression === current) {
+      current = parent;
+    } else if (ts.isCallExpression(parent) && parent.expression === current) {
+      current = parent;
+    } else {
+      break;
+    }
+  }
+  return current;
+}
+
+function builderConditions(node, sourceFile) {
+  const conditions = [];
+  const seen = new Set();
+  const visit = value => {
+    if (
+      ts.isCallExpression(value)
+      && ts.isPropertyAccessExpression(value.expression)
+      && value.expression.name.text === "condition"
+      && value.arguments[0]
+    ) {
+      const condition = operand(value.arguments[0], sourceFile);
+      const key = canonicalText(condition);
+      if (!seen.has(key)) {
+        seen.add(key);
+        conditions.push(condition);
+      }
+    }
+    ts.forEachChild(value, visit);
+  };
+  visit(builderChainRoot(node));
+  return conditions;
+}
+
+function combinedCondition(node, sourceFile, inlineCondition) {
+  const conditions = [...builderConditions(node, sourceFile)];
+  if (inlineCondition.kind !== "ALWAYS") conditions.push(inlineCondition);
+  if (conditions.length === 0) return inlineCondition;
+  if (conditions.length === 1) return conditions[0];
+  return { kind: "ARRAY", values: conditions };
+}
+
+function semanticResolution(hook, effect, values, implementation, attributeName) {
   return callbackPresent(values)
     || hook === "UNRESOLVED_HOOK"
     || effect === "UNRESOLVED_EFFECT"
     || implementation == null
+    || !AUDITED_ATTRIBUTE_SCHEMAS.has(attributeName)
     ? "BESPOKE_GAP"
     : "RESOLVED_OPERANDS";
 }
@@ -235,7 +316,7 @@ function rngDomain(site) {
   if (site.call === "Math.random") return "FORBIDDEN_NONDETERMINISTIC";
   const path = site.source.path.toLowerCase();
   if (path.includes("/coop/") && path.includes("-ai")) return "BATTLE_POLICY";
-  if (/(achievement|bargain|biome|economy|loot|map-event|mega-tier|quiz|relic|reward|trainer\\.ts)/u.test(path)) {
+  if (path.includes("/data/trainers/") || /(achievement|bargain|biome|economy|loot|map-event|mega-tier|quiz|relic|reward|trainer\.ts)/u.test(path)) {
     return "RUN_MECHANICAL";
   }
   return "BATTLE_MECHANICAL";
@@ -285,6 +366,7 @@ function gapCluster(unit) {
 
 function callbackPresent(operands) {
   return operands.some(value => value.kind === "CALLBACK_PROVENANCE"
+    || value.kind === "SYMBOL_PROVENANCE"
     || value.kind === "ARRAY" && callbackPresent(value.values)
     || value.kind === "OBJECT" && callbackPresent(value.entries.map(entry => entry.value)));
 }
@@ -336,7 +418,9 @@ function addUnit(source, unitKind, provenance, semantic) {
     ordinal,
     provenance_hash: hash(provenance),
   };
-  units.push({ id, provenance, semantic });
+  const unit = { id, provenance, semantic };
+  units.push(unit);
+  return unit;
 }
 
 function addIntrinsic(kind, entries, unitKind, registry = false, resolved = false) {
@@ -490,9 +574,10 @@ for (const path of files) {
           const numericId = memberIds.get(`${ref.owner}/${ref.member}`);
           if (Number.isSafeInteger(numericId)) {
             const operands = node.arguments.slice(attributeIndex + 1).map(value => operand(value, sourceFile));
-            const condition = method === "conditionalAttr"
+            const inlineCondition = method === "conditionalAttr"
               ? operand(node.arguments[0], sourceFile)
               : { kind: "ALWAYS" };
+            const condition = combinedCondition(node, sourceFile, inlineCondition);
             const location = sourceLocation(sourceFile, node, input.oracleRoot);
             const attributeName = attributeClassName(attribute, sourceFile);
             const conditional = method === "conditionalAttr";
@@ -513,7 +598,7 @@ for (const path of files) {
                   effect: { kind: effect, attribute: attributeName },
                   operands,
                   implementation,
-                  resolution: semanticResolution(hook, effect, [condition, ...operands], implementation),
+                  resolution: semanticResolution(hook, effect, [condition, ...operands], implementation, attributeName),
                 },
               );
             }
@@ -538,7 +623,7 @@ for (const attachment of raw.attribute_attachments) {
     target: { kind: "CALLSITE_DEFINED" },
     condition: { kind: attachment.method === "conditionalAttr" ? "CALLBACK_PROVENANCE" : "ALWAYS" },
     effect: { kind: effect, attribute: attachment.attribute },
-    operands: [{ kind: "INTEGER", value: attachment.argument_count }],
+    operands: [{ kind: "SAFE_INTEGER", value: attachment.argument_count }],
     implementation,
     resolution: "BESPOKE_GAP",
   });
@@ -550,7 +635,7 @@ for (const site of raw.dispatch_sites) {
     hook: site.hook ?? "FIXED_DISPATCH",
     target: { kind: "CALLSITE_DEFINED" },
     effect: { kind: "FIXED_DISPATCH", call: site.call },
-    operands: [{ kind: "INTEGER", value: site.arguments }],
+    operands: [{ kind: "SAFE_INTEGER", value: site.arguments }],
     resolution: "BESPOKE_GAP",
   });
 }
@@ -590,6 +675,45 @@ const forms = formDescriptors.sort((left, right) =>
   left.species_id - right.species_id || left.form_index - right.form_index
 );
 
+const rngSites = raw.rng_sites.map((site, ordinal) => {
+  const source = sourceIdentity(
+    "BESPOKE",
+    null,
+    `RNG:${site.source.path}:${site.source.line}:${site.source.column}:${site.call}`,
+  );
+  const unit = addUnit(source, "FIXED_DISPATCH_BEHAVIOR", site.source, {
+    hook: "RNG_SITE",
+    target: { kind: "CALLSITE_DEFINED" },
+    condition: { kind: "ALWAYS" },
+    effect: { kind: "RNG_CALLSITE", call: site.call },
+    operands: [{ kind: "SOURCE_EXPRESSION_GAP", arguments: site.arguments }],
+    implementation: null,
+    resolution: "BESPOKE_GAP",
+  });
+  const domain = rngDomain(site);
+  return {
+    id: {
+      ordinal,
+      provenance_hash: hash(site),
+    },
+    owner: unit.id,
+    execution_ordinal: 0,
+    source: site.source,
+    call: site.call,
+    arguments: site.arguments,
+    domain,
+    reason: rngReason(site),
+    stream: domain === "BATTLE_MECHANICAL" ? "BATTLE_SUBSTREAM" : domain === "RUN_MECHANICAL" ? "RUN_STREAM" : "UNRESOLVED_GAP",
+    range: {
+      kind: "SOURCE_EXPRESSION_GAP",
+      arguments: site.arguments,
+      provenance_hash: hash(site.arguments),
+    },
+    singleton_policy: "ORACLE_UNVERIFIED_GAP",
+    binding_status: "BESPOKE_GAP",
+  };
+});
+
 const sourceRank = new Map(SOURCE_KIND_ORDER.map((kind, rank) => [kind, rank]));
 const behaviorRank = new Map(BEHAVIOR_KIND_ORDER.map((kind, rank) => [kind, rank]));
 units.sort((left, right) => {
@@ -619,17 +743,10 @@ for (const unit of units) {
   }
   resolvedSources.find(entry => identityKey(entry.source) === key).behavior_unit_count += 1;
 }
-const rngSites = raw.rng_sites.map((site, ordinal) => ({
-  id: {
-    ordinal,
-    provenance_hash: hash(site),
-  },
-  source: site.source,
-  call: site.call,
-  arguments: site.arguments,
-  domain: rngDomain(site),
-  reason: rngReason(site),
-}));
+const rngByOwner = new Map();
+for (const site of rngSites) {
+  rngByOwner.set(canonicalText(site.owner), [site.id]);
+}
 
 const rawV2 = {
   ...raw,
@@ -655,7 +772,7 @@ const witnessPlans = units.map(unit => ({
   expected_source: unit.id.source,
   positive_assertions: [{ kind: "SOURCE_REACHED" }],
   negative_assertions: [{ kind: "FALSE_CONDITION_DOES_NOT_MUTATE" }],
-  rng_contract: [],
+  rng_contract: rngByOwner.get(canonicalText(unit.id)) ?? [],
 }));
 writeJson(input.outputRoot, "raw-source-catalog-v2.json", rawV2);
 writeJson(input.outputRoot, "semantic-catalog-v1.json", semantic);

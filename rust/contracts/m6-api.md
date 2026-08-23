@@ -24,8 +24,17 @@ M6 does not port renderer behavior or allow TypeScript callbacks to execute in p
 pub struct BehaviorUnitOrdinal(pub u32);
 pub struct RngSiteOrdinal(pub u32);
 
+pub enum BehaviorSourceId {
+    Move { numeric_id: SafeU53 },
+    ActiveAbility { numeric_id: SafeU53 },
+    PassiveAbility { numeric_id: SafeU53 },
+    HeldItem { registry_key: String },
+    // closed numeric/registry variants for every source class, including
+    // Species and Form
+}
+
 pub struct BehaviorUnitId {
-    pub source: MechanicSourceId,
+    pub source: BehaviorSourceId,
     pub unit_kind: BehaviorUnitKind,
     pub ordinal: BehaviorUnitOrdinal,
     pub provenance_hash: ProvenanceHash,
@@ -37,7 +46,7 @@ pub struct RngSiteId {
 }
 ```
 
-`BehaviorUnitKind`, RNG domain/reason, and provenance hash are closed typed values. A provenance hash identifies evidence; it never dispatches code. Every source identity owns at least one behavior unit. Every behavior unit has exactly one classification.
+`BehaviorSourceId` fixes numeric versus registry-key representation per source class; alternate payload shapes fail deserialization. `BehaviorUnitKind`, RNG domain/reason, and provenance hash are closed typed values. Provenance hashes validate at deserialization and identify evidence; they never dispatch code. Every source identity owns at least one behavior unit. Every behavior unit has exactly one classification.
 
 ## Semantic catalog
 
@@ -49,6 +58,8 @@ Static resolutions mean:
 - `RESOLVED_OPERANDS`: hook, effect, condition, implementation class, and operands fit the closed descriptor vocabulary;
 - `BESPOKE_GAP`: callback, unresolved hook/effect, unattached callsite, fixed dispatch, or opaque lifecycle remains.
 
+At G21, `RESOLVED_OPERANDS` is intentionally empty. No attribute becomes compiler-ready until an audited per-attribute schema freezes its hook, condition, operand types, selector, and operation.
+
 None of these values means production support. Support is granted only by the compiled/bespoke classification plus witnesses.
 
 ## Mechanics IR V2
@@ -57,7 +68,7 @@ None of these values means production support. Support is granted only by the co
 pub struct MechanicsProgramV2 {
     pub schema_version: u32,
     pub id: MechanicsProgramId,
-    pub source: MechanicSourceId,
+    pub source: BehaviorSourceId,
     pub behavior_units: Vec<BehaviorUnitId>,
     pub bindings: Vec<HookBindingV2>,
     pub conditions: ConditionArenaV2,

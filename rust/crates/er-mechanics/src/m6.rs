@@ -6,8 +6,8 @@
 use std::collections::BTreeSet;
 
 use er_types::{
-    BehaviorUnitId, M6_MECHANICS_PROGRAM_VERSION, MechanicSourceId, MechanicsProgramId,
-    RngSiteDefinitionV1, RngSiteId,
+    BehaviorSourceId, BehaviorUnitId, M6_MECHANICS_PROGRAM_VERSION, MechanicsProgramId,
+    RngDomainV1, RngSiteDefinitionV1, RngSiteId,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -103,7 +103,7 @@ pub struct RngSiteBindingContractV1 {
 pub struct MechanicsProgramV2Contract {
     pub schema_version: u32,
     pub id: MechanicsProgramId,
-    pub source: MechanicSourceId,
+    pub source: BehaviorSourceId,
     pub behavior_units: Vec<BehaviorUnitId>,
     pub rng_sites: Vec<RngSiteBindingContractV1>,
     pub budget: ProgramBudgetV2,
@@ -123,6 +123,14 @@ impl MechanicsProgramV2Contract {
             .validate()
             .map_err(|_| MechanicsProgramV2ContractError::InvalidSource)?;
         self.budget.validate()?;
+        if self.rng_sites.len() > usize::from(self.budget.rng_draws) {
+            return Err(
+                MechanicsProgramV2ContractError::RngBindingCountAboveBudget {
+                    actual: self.rng_sites.len(),
+                    budget: self.budget.rng_draws,
+                },
+            );
+        }
         if self.behavior_units.is_empty() {
             return Err(MechanicsProgramV2ContractError::MissingBehaviorUnit);
         }
@@ -147,16 +155,25 @@ impl MechanicsProgramV2Contract {
             if !rng_ids.insert(&binding.site.id) {
                 return Err(MechanicsProgramV2ContractError::DuplicateRngSite);
             }
+            if binding.execution_ordinal >= self.budget.rng_draws {
+                return Err(
+                    MechanicsProgramV2ContractError::RngBindingOrdinalAboveBudget {
+                        ordinal: binding.execution_ordinal,
+                        budget: self.budget.rng_draws,
+                    },
+                );
+            }
+            if binding.site.domain != RngDomainV1::BattleMechanical {
+                return Err(MechanicsProgramV2ContractError::InvalidBattleRngDomain);
+            }
+            if binding.site.requested_range == er_types::SafeU53::ZERO {
+                return Err(MechanicsProgramV2ContractError::InvalidRngRange);
+            }
             if previous_ordinal.is_some_and(|value| value >= binding.execution_ordinal) {
                 return Err(MechanicsProgramV2ContractError::RngSitesNotOrdered);
             }
             previous_ordinal = Some(binding.execution_ordinal);
-            let owner = binding
-                .site
-                .owner
-                .as_ref()
-                .ok_or(MechanicsProgramV2ContractError::RngSiteMissingOwner)?;
-            if !behavior_units.contains(owner) {
+            if !behavior_units.contains(&binding.site.owner) {
                 return Err(MechanicsProgramV2ContractError::RngSiteOwnerMismatch);
             }
         }
@@ -184,10 +201,17 @@ pub enum MechanicsProgramV2ContractError {
     DuplicateRngSite,
     #[error("mechanics RNG sites must have strictly increasing execution ordinals")]
     RngSitesNotOrdered,
-    #[error("mechanics RNG site must name its behavior-unit owner")]
-    RngSiteMissingOwner,
+
     #[error("mechanics RNG site owner is not owned by the program")]
     RngSiteOwnerMismatch,
+    #[error("mechanics RNG binding count {actual} exceeds declared draw budget {budget}")]
+    RngBindingCountAboveBudget { actual: usize, budget: u16 },
+    #[error("mechanics RNG binding ordinal {ordinal} exceeds declared draw budget {budget}")]
+    RngBindingOrdinalAboveBudget { ordinal: u16, budget: u16 },
+    #[error("battle mechanics programs may bind only BATTLE_MECHANICAL RNG sites")]
+    InvalidBattleRngDomain,
+    #[error("battle mechanics RNG sites require a positive closed range")]
+    InvalidRngRange,
     #[error("program budget {resource} {actual} exceeds ceiling {maximum}")]
     BudgetAboveCeiling {
         resource: &'static str,
@@ -199,13 +223,16 @@ pub enum MechanicsProgramV2ContractError {
 #[cfg(test)]
 mod tests {
     use er_types::{
-        BehaviorUnitKind, BehaviorUnitOrdinal, MechanicSourceKind, ProvenanceHash, SafeU53,
+        BehaviorSourceId, BehaviorUnitKind, BehaviorUnitOrdinal, ProvenanceHash, RngDomainV1,
+        RngReasonV2, RngSiteDefinitionV1, RngSiteId, RngSiteOrdinal, SafeU53,
     };
 
     use super::*;
 
     fn program() -> MechanicsProgramV2Contract {
-        let source = MechanicSourceId::numeric(MechanicSourceKind::Move, SafeU53::new(1).unwrap());
+        let source = BehaviorSourceId::Move {
+            numeric_id: SafeU53::new(1).unwrap(),
+        };
         MechanicsProgramV2Contract {
             schema_version: M6_MECHANICS_PROGRAM_VERSION,
             id: MechanicsProgramId::try_from_u64(1).unwrap(),
@@ -246,6 +273,58 @@ mod tests {
         assert_eq!(
             program.validate(),
             Err(MechanicsProgramV2ContractError::BehaviorUnitsNotSortedUnique)
+        );
+    }
+
+    #[test]
+    fn rng_binding_cannot_exceed_declared_draw_budget() {
+        let mut program = program();
+        program.rng_sites.push(RngSiteBindingContractV1 {
+            site: RngSiteDefinitionV1 {
+                id: RngSiteId {
+                    ordinal: RngSiteOrdinal::ZERO,
+                    provenance_hash: ProvenanceHash::parse("1".repeat(64)).unwrap(),
+                },
+                owner: program.behavior_units[0].clone(),
+                domain: RngDomainV1::BattleMechanical,
+                reason: RngReasonV2::Accuracy,
+                requested_range: SafeU53::new(100).unwrap(),
+                draw_for_singleton: false,
+            },
+            execution_ordinal: 0,
+        });
+        assert_eq!(
+            program.validate(),
+            Err(
+                MechanicsProgramV2ContractError::RngBindingCountAboveBudget {
+                    actual: 1,
+                    budget: 0,
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn battle_program_rejects_forbidden_rng_domain() {
+        let mut program = program();
+        program.budget.rng_draws = 1;
+        program.rng_sites.push(RngSiteBindingContractV1 {
+            site: RngSiteDefinitionV1 {
+                id: RngSiteId {
+                    ordinal: RngSiteOrdinal::ZERO,
+                    provenance_hash: ProvenanceHash::parse("2".repeat(64)).unwrap(),
+                },
+                owner: program.behavior_units[0].clone(),
+                domain: RngDomainV1::ForbiddenNondeterministic,
+                reason: RngReasonV2::SourceIdentifiedBespoke,
+                requested_range: SafeU53::new(100).unwrap(),
+                draw_for_singleton: false,
+            },
+            execution_ordinal: 0,
+        });
+        assert_eq!(
+            program.validate(),
+            Err(MechanicsProgramV2ContractError::InvalidBattleRngDomain)
         );
     }
 }

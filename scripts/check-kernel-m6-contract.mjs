@@ -81,18 +81,39 @@ const files = [
 ];
 for (const [key, path] of files) assertEqual(canonicalSha256(path), required(contract, key), path);
 
+const raw = readJson("rust/fixtures/m6/raw-source-catalog-v2.json");
+assertEqual(raw.species.length, required(contract, "species_count"), "species count");
+assertEqual(raw.forms.length, required(contract, "form_count"), "form count");
+assertEqual(raw.moves.length, required(contract, "move_count"), "move count");
+assertEqual(raw.abilities.length, required(contract, "active_ability_count"), "ability count");
+assertEqual(raw.modifier_types.length, required(contract, "held_item_modifier_count"), "held-item modifier count");
+
 const semantic = readJson("rust/fixtures/m6/semantic-catalog-v1.json");
 const units = semantic.behavior_units;
 const sources = semantic.sources;
 assertEqual(sources.length, required(contract, "source_identity_count"), "source identity count");
 assertEqual(units.length, required(contract, "behavior_unit_count"), "behavior-unit count");
+const sourceKindCount = kind => sources.filter(entry => entry.source.kind === kind).length;
+assertEqual(sourceKindCount("MOVE"), required(contract, "move_count"), "move source count");
+assertEqual(sourceKindCount("ACTIVE_ABILITY"), required(contract, "active_ability_count"), "active ability source count");
+assertEqual(sourceKindCount("PASSIVE_ABILITY"), required(contract, "passive_ability_count"), "passive ability source count");
+assertEqual(sourceKindCount("HELD_ITEM"), required(contract, "held_item_modifier_count"), "held-item source count");
+assertEqual(sourceKindCount("SPECIES"), required(contract, "species_count"), "species source count");
+assertEqual(sourceKindCount("FORM"), required(contract, "form_count"), "form source count");
 
+const numericSourceKinds = new Set(["MOVE", "ACTIVE_ABILITY", "PASSIVE_ABILITY", "MAJOR_STATUS", "WEATHER", "TERRAIN", "SPECIES"]);
 const sourceKeys = new Set();
 for (const entry of sources) {
   const key = identityKey(entry.source);
   if (sourceKeys.has(key)) fail(`duplicate source identity ${key}`);
   sourceKeys.add(key);
   if (!Number.isSafeInteger(entry.behavior_unit_count) || entry.behavior_unit_count <= 0) fail(`invalid behavior-unit count for ${key}`);
+  const source = entry.source;
+  if (numericSourceKinds.has(source.kind)) {
+    if (!Number.isSafeInteger(source.numeric_id) || "registry_key" in source) fail(`invalid numeric source shape ${key}`);
+  } else if (typeof source.registry_key !== "string" || source.registry_key === "" || "numeric_id" in source) {
+    fail(`invalid registry source shape ${key}`);
+  }
 }
 
 const behaviorKeys = new Set();
@@ -130,8 +151,25 @@ for (const site of rng.sites) {
   if (rngKeys.has(key)) fail(`duplicate RNG site ${key}`);
   rngKeys.add(key);
   if (!site.domain || !site.reason) fail(`unclassified RNG site ${key}`);
+  if (site.owner == null || !behaviorKeys.has(behaviorKey(site.owner))) fail(`RNG site ${key} has unknown behavior-unit owner`);
+  if (!Number.isSafeInteger(site.execution_ordinal) || site.execution_ordinal < 0) fail(`RNG site ${key} has invalid execution ordinal`);
+  if (site.binding_status !== "BESPOKE_GAP") fail(`RNG site ${key} unexpectedly claims executable closure`);
+  if (site.range?.kind !== "SOURCE_EXPRESSION_GAP" || site.singleton_policy !== "ORACLE_UNVERIFIED_GAP" || !site.stream) {
+    fail(`RNG site ${key} lacks explicit gap range/stream/singleton evidence`);
+  }
 }
 
+
+const witnessPlan = readJson("rust/fixtures/m6/oracle-witness-plan-v1.json");
+assertEqual(witnessPlan.witness_count, units.length, "witness count");
+const witnesses = new Map(witnessPlan.witnesses.map(witness => [behaviorKey(witness.behavior_unit), witness]));
+for (const site of rng.sites) {
+  const witness = witnesses.get(behaviorKey(site.owner));
+  if (witness == null) fail(`RNG site ${site.id.ordinal} owner lacks witness`);
+  if (!witness.rng_contract.some(id => JSON.stringify(id) === JSON.stringify(site.id))) {
+    fail(`RNG site ${site.id.ordinal} is absent from owner witness contract`);
+  }
+}
 for (const path of [
   "docs/plans/rust-kernel/m6-semantic-extraction.md",
   "docs/plans/rust-kernel/m6-trigger-order.md",

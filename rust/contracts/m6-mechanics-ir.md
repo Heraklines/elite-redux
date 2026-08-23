@@ -96,9 +96,9 @@ A scheduled event has stable ID, source behavior unit, owner/target, creation or
 
 ## RNG bindings
 
-Every battle-mechanical draw is bound to one catalog RNG site with closed domain, reason, stream, range semantics, singleton policy, and behavior-unit owner. `Math.random` sites classify as forbidden until proven non-mechanical or replaced by a deterministic boundary.
+Every catalog RNG site has a unique behavior-unit owner and per-owner ordinal. At G21, raw source expressions, streams, ranges, and singleton policies remain explicit non-executable gaps. A prepared battle-mechanical program may bind a site only after an oracle witness replaces those gaps with a closed `BATTLE_MECHANICAL` domain, reason, stream, positive range, and singleton policy. Run, policy, presentation, test, and forbidden domains are rejected by the battle-program validator.
 
-No unsupported path may consume a draw. Evidence reports the first divergent site, reason, range, result, and before/after fingerprints.
+`Math.random` sites remain catalogued as forbidden evidence until proven non-mechanical or replaced at a deterministic boundary. No unsupported path may consume a draw. Evidence reports the first divergent site, reason, range, result, and before/after fingerprints.
 
 ## Budgets
 

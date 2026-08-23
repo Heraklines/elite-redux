@@ -196,6 +196,12 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/m6-runtime-b.log"
       - name: Verify runtime semantic determinism
         run: diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
+      - name: Verify runtime and static semantic agreement
+        run: |
+          node scripts/check-kernel-m6-runtime-semantics.mjs \
+            "$RUNNER_TEMP/m6-runtime-a.json" \
+            rust/fixtures/m6/semantic-catalog-v1.json \
+            rust/fixtures/m6/raw-source-catalog-v2.json
       - name: Publish runtime semantic failure
         if: failure()
         run: |
