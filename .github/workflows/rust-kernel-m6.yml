@@ -21,6 +21,7 @@ on:
       - "scripts/prepare-kernel-m5-oracle-refresh.mjs"
       - "test/kernel-fixtures/m3/**"
       - "test/kernel-fixtures/m4/**"
+      - "test/kernel-fixtures/m6/**"
   workflow_dispatch:
 
 permissions:
@@ -104,6 +105,87 @@ jobs:
         with:
           name: m6-source-catalog
           path: ${{ runner.temp }}/m6-source-catalog-v2.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m6-semantic-extraction:
+    name: M6 semantic extraction
+    needs: m6-source-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v6
+        with:
+          name: m6-source-catalog
+          path: artifacts/source-catalog
+      - name: Materialize exact M6 oracle
+        run: git worktree add --detach "$RUNNER_TEMP/m6-oracle" "$M6_ORACLE_SHA"
+      - name: Export static semantic catalog twice
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_TYPESCRIPT_ROOT: ${{ github.workspace }}/node_modules/typescript
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m6-semantic-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m6-oracle" \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --raw-catalog "$GITHUB_WORKSPACE/artifacts/source-catalog/m6-source-catalog-v2.json" \
+            --output-root "$RUNNER_TEMP/m6-semantic-a"
+          node scripts/export-kernel-m6-semantic-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m6-oracle" \
+            --oracle-sha "$M6_ORACLE_SHA" \
+            --raw-catalog "$GITHUB_WORKSPACE/artifacts/source-catalog/m6-source-catalog-v2.json" \
+            --output-root "$RUNNER_TEMP/m6-semantic-b"
+          diff -ru "$RUNNER_TEMP/m6-semantic-a" "$RUNNER_TEMP/m6-semantic-b"
+          diff -ru rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
+      - name: Apply runtime semantic test overlay
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m6-oracle/test/kernel-fixtures/m6"
+          cp test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            "$RUNNER_TEMP/m6-oracle/test/kernel-fixtures/m6/export-semantic-runtime.test.ts"
+      - name: Install immutable oracle dependencies
+        working-directory: ${{ runner.temp }}/m6-oracle
+        run: pnpm install --frozen-lockfile
+      - name: Export runtime semantic catalog twice
+        working-directory: ${{ runner.temp }}/m6-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_ORACLE_SHA: ${{ env.M6_ORACLE_SHA }}
+        run: |
+          set -euo pipefail
+          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m6-runtime-a.json" \
+            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+              --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
+          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m6-runtime-b.json" \
+            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+              --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
+          diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m6-semantic-extraction
+          path: |
+            ${{ runner.temp }}/m6-semantic-a
+            ${{ runner.temp }}/m6-runtime-a.json
           if-no-files-found: error
           retention-days: 30
 
@@ -256,6 +338,7 @@ jobs:
       - m6-m5-final-manifest
       - m6-source-catalog
       - m6-oracle-refresh
+      - m6-semantic-extraction
       - m6-oracle-classification
     runs-on: ubuntu-latest
     timeout-minutes: 5
