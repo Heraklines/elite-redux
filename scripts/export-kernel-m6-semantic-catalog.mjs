@@ -429,7 +429,10 @@ function numericDeclarations(path, suffix) {
         || !declaration.name.text.endsWith(suffix)
         || !declaration.initializer
       ) continue;
-      const value = operand(declaration.initializer, file);
+      const declaredInitializer = ts.isAsExpression(declaration.initializer)
+        ? declaration.initializer.expression
+        : declaration.initializer;
+      const value = operand(declaredInitializer, file);
       if (value.kind !== "SAFE_INTEGER") continue;
       entries.push({
         id: value.value,
@@ -454,10 +457,35 @@ raw.source_files = raw.source_files.map(entry => {
   return { ...entry, sha256: hash(source) };
 });
 
+appendManualMoves(raw, input.oracleRoot);
+
 const memberIds = new Map();
 for (const kind of ["moves", "abilities"]) {
   for (const entry of raw[kind]) memberIds.set(`${entry.enum_name}/${entry.member}`, entry.numeric_id);
 }
+function manualCatalogDeclarations(path, minimumId) {
+  return numericDeclarations(path, "_ID").filter(entry => entry.id >= minimumId);
+}
+
+function appendManualMoves(raw, oracleRoot) {
+  const existing = new Set(raw.moves.map(entry => entry.numeric_id));
+  for (const entry of manualCatalogDeclarations(
+    resolve(oracleRoot, "src/data/elite-redux/init-elite-redux-vanilla-rebalance.ts"),
+    5_000,
+  )) {
+    if (existing.has(entry.id)) continue;
+    existing.add(entry.id);
+    raw.moves.push({
+      enum_name: "MoveId",
+      member: entry.key,
+      numeric_id: entry.id,
+      initializer: null,
+      ordinal: raw.moves.length,
+      source: entry.source,
+    });
+  }
+}
+
 const units = [];
 const ordinals = new Map();
 function addUnit(source, unitKind, provenance, semantic) {
