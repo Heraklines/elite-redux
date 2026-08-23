@@ -28,6 +28,7 @@ import { CommandPhase } from "#phases/command-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
+import { launchDetachedStarters } from "./starter-launch";
 import { vi } from "vitest";
 import Phaser from "phaser";
 
@@ -584,7 +585,7 @@ async function launchScenario(spec: ScenarioSpec, phaserGame: Phaser.Game): Prom
     }
     game.scene.setSeed(scenarioSeed);
     game.scene.resetSeed();
-    starterPhase.initBattle(starters, true, owners);
+    launchDetachedStarters(starterPhase, starters, owners);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");

@@ -38,6 +38,7 @@ import { UiMode } from "#enums/ui-mode";
 import { Pokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { captureOracleFrontier, captureOracleNextControl } from "./oracle-frontier";
+import { launchDetachedStarters } from "./starter-launch";
 import { buildDevScenario, type ScenarioSpec } from "#app/dev-tools/test-suite/scenario-spec";
 import { BattleScene } from "#app/battle-scene";
 import { GameManager } from "#test/framework/game-manager";
@@ -781,7 +782,7 @@ export async function captureBiome(): Promise<Record<string, JsonValue>> {
         .startingWave(10)
         .startingBiome(BiomeId.TOWN);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      starterPhase.initBattle(starters, true);
+      launchDetachedStarters(starterPhase, starters);
       built.postLaunch();
     });
     await game.phaseInterceptor.to("CommandPhase", false);
@@ -840,7 +841,7 @@ export async function captureEncounter(): Promise<Record<string, JsonValue>> {
         .startingWave(11)
         .startingBiome(BiomeId.PLAINS);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      starterPhase.initBattle(starters, true);
+      launchDetachedStarters(starterPhase, starters);
       built.postLaunch();
     });
 

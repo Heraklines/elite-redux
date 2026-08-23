@@ -48,6 +48,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import Phaser from "phaser";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { launchDetachedStarters } from "../m4/export/starter-launch";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "../../..");
@@ -914,7 +915,7 @@ async function launchScenario(spec: ScenarioSpec): Promise<GameManager> {
     // ordinary encounter reset derive the wave stream from the same run seed.
     game.scene.setSeed(scenarioSeed);
     game.scene.resetSeed();
-    starterPhase.initBattle(starters, true, coopOwners);
+    launchDetachedStarters(starterPhase, starters, coopOwners);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");

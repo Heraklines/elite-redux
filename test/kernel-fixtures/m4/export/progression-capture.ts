@@ -23,6 +23,7 @@ import {
   type JsonObject,
   type JsonValue,
 } from "./oracle-frontier";
+import { launchDetachedStarters } from "./starter-launch";
 import Phaser from "phaser";
 import { vi } from "vitest";
 type AnyRecord = Record<string, any>;
@@ -430,7 +431,7 @@ async function launchProgressionScenario(phaserGame: Phaser.Game): Promise<GameM
       game.scene.setSeed(scenarioSeed);
       game.scene.resetSeed();
     }
-    starterPhase.initBattle(starters, true);
+    launchDetachedStarters(starterPhase, starters);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");

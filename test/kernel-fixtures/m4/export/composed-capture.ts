@@ -30,6 +30,7 @@ import { PokemonModifierType } from "#modifiers/modifier-type";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import { PromptHandler } from "#test/helpers/prompt-handler";
+import { launchDetachedStarters } from "./starter-launch";
 import Phaser from "phaser";
 import { vi } from "vitest";
 
@@ -355,7 +356,7 @@ async function launch(phaserGame: Phaser.Game): Promise<GameManager> {
     game.scene.phaseManager.pushNew("EncounterPhase", false);
     game.scene.setSeed(SEED);
     game.scene.resetSeed();
-    new SelectStarterPhase().initBattle(starters, true);
+    launchDetachedStarters(new SelectStarterPhase(), starters);
     built.postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");
