@@ -89,6 +89,41 @@ const entries = [
   ...catalog.battler_tags.map(entry => numeric("BATTLER_TAG", entry)),
   ...catalog.positional_tags.map(entry => numeric("POSITIONAL_TAG", entry)),
 ];
+
+const KIND_RANK = new Map([
+  "MOVE",
+  "ACTIVE_ABILITY",
+  "PASSIVE_ABILITY",
+  "HELD_ITEM",
+  "MAJOR_STATUS",
+  "VOLATILE_STATUS",
+  "WEATHER",
+  "TERRAIN",
+  "SIDE_CONDITION",
+  "ARENA_TAG",
+  "BATTLER_TAG",
+  "POSITIONAL_TAG",
+  "BESPOKE",
+].map((kind, rank) => [kind, rank]));
+
+entries.sort((left, right) => {
+  const leftRank = KIND_RANK.get(left.subject.kind);
+  const rightRank = KIND_RANK.get(right.subject.kind);
+  if (leftRank !== rightRank) {
+    return leftRank - rightRank;
+  }
+  const leftNumeric = left.subject.numeric_id;
+  const rightNumeric = right.subject.numeric_id;
+  if (leftNumeric !== rightNumeric) {
+    if (leftNumeric == null) return -1;
+    if (rightNumeric == null) return 1;
+    return leftNumeric - rightNumeric;
+  }
+  const leftKey = left.subject.registry_key ?? "";
+  const rightKey = right.subject.registry_key ?? "";
+  return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+});
+
 const keys = new Set();
 for (const entry of entries) {
   const key = JSON.stringify(entry.subject);
