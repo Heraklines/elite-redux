@@ -80,7 +80,7 @@ fn pack() -> BattleContentPackV2 {
             registry_key: "POTION".to_owned(),
             capability: CapabilityStatus::Supported,
         }],
-        programs: vec![Some(program(1))],
+        programs: vec![None, Some(program(1))],
         classifications: ClassificationManifestV1(vec![ClassificationEntryV1 {
             subject: MechanicSourceId::numeric(MechanicSourceKind::ActiveAbility, safe(22)),
             kind: ClassificationKind::Compiled,
@@ -122,6 +122,6 @@ fn program_slot_mismatch_is_rejected() {
     let bytes = serde_json::to_vec(&fixture).expect("serialize");
     assert!(matches!(
         er_content::pack::m5_pack::load_battle_content_pack_v2(&bytes),
-        Err(BattlePackLoadError::ProgramIndex { index: 1, .. })
+        Err(BattlePackLoadError::ProgramIndex { index: 2, .. })
     ));
 }

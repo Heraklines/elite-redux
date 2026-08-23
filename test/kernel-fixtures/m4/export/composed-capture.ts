@@ -511,11 +511,9 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
     const interactive =
       mode === UiMode.PARTY
       || mode === UiMode.MESSAGE
+      || mode === UiMode.OPTION_SELECT
       || phaseName === "ErAbilityCapsulePhase"
       || phaseName === "SelectModifierPhase";
-    if (!interactive) {
-      break;
-    }
     press(game, "Space", tape, transitions);
     await sleep();
   }
