@@ -1,6 +1,11 @@
 name: AI Curated Human Kaggle Training (Private)
 
 on:
+  push:
+    branches:
+      - codex/combat-ai-human-retrain-20260822
+    paths:
+      - ".github/ai-curated-human-dataset.json"
   workflow_dispatch:
     inputs:
       dataset_id:
@@ -50,6 +55,31 @@ jobs:
           python-version: "3.12"
       - name: Install pinned Kaggle client
         run: python -m pip install kaggle==2.2.4
+      - name: Resolve requested curated dataset and training budget
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_DATASET_ID: ${{ inputs.dataset_id || '' }}
+          INPUT_PROFILE: ${{ inputs.training_profile || '' }}
+          INPUT_SEEDS: ${{ inputs.seeds || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == "push" ]]; then
+            config=.github/ai-curated-human-dataset.json
+            dataset_id=$(jq -er '.datasetId' "$config")
+            training_profile=$(jq -er '.trainingProfile' "$config")
+            training_seeds=$(jq -er '.seeds' "$config")
+          else
+            dataset_id="$INPUT_DATASET_ID"
+            training_profile="$INPUT_PROFILE"
+            training_seeds="$INPUT_SEEDS"
+          fi
+          [[ "$dataset_id" =~ ^[0-9a-f]{24}$ ]]
+          [[ "$training_profile" =~ ^(smoke|baseline|large)$ ]]
+          [[ "$training_seeds" =~ ^[0-9]+(,[0-9]+)*$ ]]
+          echo "DATASET_ID=$dataset_id" >> "$GITHUB_ENV"
+          echo "TRAINING_PROFILE=$training_profile" >> "$GITHUB_ENV"
+          echo "TRAINING_SEEDS=$training_seeds" >> "$GITHUB_ENV"
       - name: Verify corpus adapter and compressed trainer input
         working-directory: ml/policy
         run: >-
@@ -60,7 +90,6 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          DATASET_ID: ${{ inputs.dataset_id }}
         shell: bash
         run: |
           set -euo pipefail
@@ -115,9 +144,6 @@ jobs:
             "$RUNNER_TEMP/er-combat-data-dictionary.json" \
             "$RUNNER_TEMP/training-v4/runtime-item-dictionary-supplement.json"
       - name: Seal compressed training bundle
-        env:
-          TRAINING_PROFILE: ${{ inputs.training_profile }}
-          TRAINING_SEEDS: ${{ inputs.seeds }}
         shell: bash
         run: |
           set -euo pipefail
@@ -143,7 +169,6 @@ jobs:
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-          DATASET_ID: ${{ inputs.dataset_id }}
         shell: bash
         run: |
           set -euo pipefail
