@@ -168,22 +168,42 @@ jobs:
       - name: Install immutable oracle dependencies
         working-directory: ${{ runner.temp }}/m6-oracle
         run: pnpm install --frozen-lockfile
-      - name: Export runtime semantic catalog twice
+      - name: Export first runtime semantic catalog
         working-directory: ${{ runner.temp }}/m6-oracle
         env:
           LC_ALL: C
           LANG: C
           TZ: UTC
           M6_ORACLE_SHA: ${{ env.M6_ORACLE_SHA }}
+          M6_SEMANTIC_RUNTIME_OUTPUT: ${{ runner.temp }}/m6-runtime-a.json
         run: |
           set -euo pipefail
-          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m6-runtime-a.json" \
-            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
-              --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
-          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m6-runtime-b.json" \
-            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
-              --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
-          diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
+          pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism \
+            2>&1 | tee "$RUNNER_TEMP/m6-runtime-a.log"
+      - name: Export repeated runtime semantic catalog
+        working-directory: ${{ runner.temp }}/m6-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_ORACLE_SHA: ${{ env.M6_ORACLE_SHA }}
+          M6_SEMANTIC_RUNTIME_OUTPUT: ${{ runner.temp }}/m6-runtime-b.json
+        run: |
+          set -euo pipefail
+          pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism \
+            2>&1 | tee "$RUNNER_TEMP/m6-runtime-b.log"
+      - name: Verify runtime semantic determinism
+        run: diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
+      - name: Publish runtime semantic failure
+        if: failure()
+        run: |
+          diagnostic="$(tail -c 3500 "$RUNNER_TEMP/m6-runtime-a.log" 2>/dev/null || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M6 runtime semantic extraction failure::$diagnostic"
       - uses: actions/upload-artifact@v6
         if: always()
         with:
