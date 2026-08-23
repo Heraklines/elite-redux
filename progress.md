@@ -1,5 +1,35 @@
 Original prompt: Build a true two-real-browser public-UI game-over journey that proves the retained terminal race end-to-end using only keyboard/DOM input after boot, with an exact build-time production-call-chain fixture, workflow dispatch, exact evidence, ownership, and remote proof.
 
+- 2026-08-19 Black-Shiny Shiny-Lab presentation fix: the authored Black atlases intentionally use negative trim offsets so their baked halo can extend beyond the original source box. The CPU Shiny-Lab overlay now preserves that overflow while anchoring against the original source box, preventing the old 16 px battle float and summary offset. Black source animation frames refresh at their native 10 FPS in every battle format while the expensive surface/aura time channel keeps the existing 125/250/500 ms singles/doubles/triples cadence. Effects, atlas frames, animation speed, and the separate triple send-out optimizations remain intact. A focused GitHub Actions run passed all seven pacing/geometry tests; the full repository run passed shards 1/4/5 while the existing oversized shards 2/3 hit their 10-minute limit. Staging and production remain untouched.
+
+- 2026-08-19 Triple/Black-Shiny send-out performance: authored Black Shinies no longer decode the invisible underlying epic/red atlas before their dedicated black front/back atlases; cry and custom-icon loading remain intact. CPU-rendered Shiny Lab surface/aura refreshes keep their existing visual cadence but their six triple-battle slots begin on separate 24 ms frame offsets, preventing simultaneous pixel rendering and canvas texture uploads. The previously unbounded raw source-frame pixel cache is now a 192-frame LRU, preventing long runs with animated six-mon fields from retaining every encountered frame indefinitely. No effects, animation frames, mechanics, AI, or battle presentation were removed. GitHub verification and staging deployment are pending; production remains untouched.
+
+- 2026-08-19 Endless breadth/scaling fix: the shared worker already considered every completed, non-Endless run across every difficulty, but its response was silently capped at 20 teams while deep-Endless danger weighting could favor one team 21:1. Endless now requests a diverse 240-team batch, refreshes every 40 ghost encounters up to a bounded 600-team in-memory pool, never performs the old per-wave fetch, and limits danger preference to 3:1. Exact-team, uploader, and semantic-team cooldowns remain active; only victorious teams with saved held items qualify. The existing independent depth-based enemy-boon curve and Rift pulse/target curve remain intact. Only the old health milestone is replaced: every 15 Normal/7 Sprint Endless waves adds one seed-stable pressure package consisting of one extra enemy boon roll, one randomly distributed health segment, or two additional active Rift slots. Each seed-randomized group of three milestones contains one of every package, slowing health growth without allowing reloads or unlucky health-only streaks; wild and trainer encounters use the same scaling. Boss encounters receive twice the complete enemy-boon budget and twice the mixed milestone's segment budget. Every 50-depth raid slot and reserve is a strongest-form boss selected from the top 20 cost-10+ starter lines (with Primal Cascoon retained and Moltres EX forced to Mega), carries exactly twice the health segments an ordinary wild boss would receive at that wave, a Prime Ward Stone, every applicable resist berry, normal generated items, and a protected real 10+-stack completed-ghost inventory. Ghost snapshots retain normal generated Hell berries, wards, held items, and boss layers before saved inventory is added. Enemy relic modifiers/icons clear at the next encounter boundary. Ordinary Endless Avalanche rolls are serialized per Pokemon and append without rerolling earlier slots; the explicit Avalanche Reroll Rift temporarily rerolls the full added list each battle without overwriting that canonical saved list. GitHub Actions verified the new boss-pool, raid-item, segment-scaling, Avalanche-serialization, and 80-team worker-breadth tests; the aggregate run remains non-green because the repository's existing lint/test baseline exceeds the workflow's 10-minute shard limit. Production remains untouched.
+
+- 2026-08-19 Endless Ability Avalanche performance pass: passive construction now deduplicates through one ID set, Fun Avalanche selection is cached, rotating-Avalanche indexing is O(1), active-source eligibility reuses resolved ability objects, attribute dispatch carries resolved source/Avalanche metadata into rift hooks, and abilities lazily index attrs by trigger type. Turning Display -> Ability Trigger Banners Off now bypasses Show/Hide phase creation entirely in ordinary solo play while co-op/showdown retain their ordered presentation events. Mechanics, Avalanche counts, rift rules, and AI quality are unchanged. Remote GitHub verification is pending; production remains untouched.
+
+- 2026-08-17 Endless staging launch root cause: the authenticated staging log proves the full Hell team and Cascoon are created, then `EncounterPhase` receives `false` from its mandatory pre-presentation `saveAll()` and immediately resets to title. The previous local browser proof used offline persistence and could not expose this. `Endless: final boss auto-KO` now opts into a dev-run-scoped encounter-persistence bypass, cleared whenever title is rebuilt. This preserves the visible wave-200 fight, first-move-triggered self-KO, Endless prompt, and wave-201 continuation without changing persistence for any normal run or other scenario. Remote CI and staging deployment are pending; production remains untouched.
+
+- 2026-08-17 Endless final-boss scenario correction: `Endless: final boss auto-KO` now restores the full six-Pokemon completed-Hell team, enters a visible/playable wave-200 Primal Cascoon battle, and waits until the player commits the first move before a consume-once dev-only callback self-KOs the boss. The browser harness proved the ordered journey: living boss command screen -> Fight -> move accepted -> boss faint -> Endless offer -> opening Rift -> playable wave 201. Production boss behavior is untouched; staging deployment remains pending.
+
+- 2026-08-17 reward economy/UI work in `codex/reward-rate-panel-20260817`: centralized integer depth tables for Shiny/Candy/Voucher across Normal/Sprint/Favour/Endless, batched trainer voucher payout, persisted Hell Training Cache, and a fixed-size three-row panel under Luck with per-row breakdown tooltips, WebGL aura, reduced-motion behavior, and Canvas fallback. Local test execution remains forbidden; remote GitHub Actions and headless visual verification are pending. Production remains untouched.
+
+- 2026-08-17 Endless dev routing follow-up: dev scenarios now reset leaked Normal/Sprint pacing, and `Endless: final boss auto-KO` additionally pins Normal pacing before creating its wave-200 finale. Previously, entering this scenario after any Sprint run made wave 200 fail `isWaveFinal`, so the ordinary game-over router skipped `EndlessOfferPhase` and cleaned the run back to title. Real run selection and saved-run pacing are unchanged. Remote Tests run `31986138337` passed all five execution shards, including `er-run-pacing` 12/12 and `endless-dev-scenarios` 4/4; the final aggregate report still reproduces the shared branch's unrelated baseline failures.
+
+- 2026-08-17 Endless dev launch follow-up: the final-boss handoff no longer aborts run creation when its legacy completed-Hell fixture cannot reconstruct every old generated held-item subtype. It restores every resolvable saved item/relic, records the exact restored/expected count as a dev warning, and continues into the wave-200 fight. The generic one-shot dev party-setup seam is also guarded and consumed even on failure, preventing any dev fixture callback from ejecting the player back to title. Production encounter and boss behavior are unchanged. Remote Tests run `31983465143` executed all five shards successfully; its final report merge remains red only on the repository's unrelated pre-existing move-data expectations, TM compatibility exception, and empty source-audit files.
+
+- 2026-08-17 Endless dev handoff correction: the visible Dev Scenarios picker now contains only Scenario Builder, Custom Trainers, and `Endless: final boss auto-KO`. That final scenario materializes the sanitized six-mon completed-Hell snapshot as the PLAYER party, including recorded forms/moves/IVs/natures/ability slots/passives/shiny data, all resolvable saved held-item entries, Blood Pact, and Second Wind. Its lethal call remains a consume-once `onBattleStart` callback guarded by `currentBattle.isClassicFinalBoss`; no production boss path contains the auto-KO. The historical scenario catalog remains available only to focused automated repro tooling and is no longer registered in the staff picker. No staging or production deployment.
+
+- 2026-08-14 Sprint/Fun Ability reroll fixes: Sprint's first choose-two reward pool now excludes every party-target item as well as explicit nested continuation rewards, including after rerolls, so the first selection always resolves in-place and preserves the second pick. The initial Fun Ability review now moves focus from REROLL ALL to START after reroll, so the next confirm launches the run. Verification: real-handler ability callback 1/1, public Sprint reroll -> first pick -> second pick journey 1/1, Upgraded Map rearm 1/1, real render harness with inspected START-selected PNG 1/1, `git diff --check`, and the no-telemetry standalone Cloudflare payload build pass. No staging or production deployment.
+
+- 2026-08-13 local regression fixes: Challenge mode now shares Classic's Normal/Sprint selector and all Sprint mechanics gates; Sprint rerolls retain the five-option/two-free-pick state; Fun Mega stones can be moved through player item management without becoming battle-stealable, arrive inactive, and deactivation restores base evolution eligibility. Verification: Sprint pacing 11/11, Fun Mega lifecycle/transfer 4/4, reward phase 11/11 implemented tests (2 existing TODOs), `git diff --check`, and the production Vite build pass. No staging or production deployment.
+
+- 2026-08-13 Fun Mode selection follow-up: fresh Fun Mode configuration now starts with every modifier OFF. `ACTION`/Space continues to rotate or toggle the highlighted rule; `SUBMIT`/Enter moves focus directly to literal START and only confirms when START is already focused, including when a saved setup exists. Saved configurations remain opt-in through Last Setup. Verification: 28/28 Fun Mode logic tests, 4/4 real handler input tests, visual render harness inspection for OFF defaults and START focus, and the standalone Cloudflare payload build all pass. Do not deploy to staging yet.
+
+- 2026-08-13 Sprint staging work: Classic now offers Normal/Sprint after difficulty on dev/staging. Sprint keeps real save/RNG waves 1-100, doubles progression/EXP/friendship/egg cadence, uses five-wave checkpoints and markets, a single five-option choose-two reward screen, compressed fixed battles/gyms/ghosts, progression-depth ghost eligibility, chapter-aligned biomes, fractional vouchers, and persisted pacing. Challenge-specific heal replacement still applies at Sprint checkpoints. Production remains untouched; the focused pacing suite passes 10/10 and the staging-mode standalone/Cloudflare payload build passes. Repository-wide typecheck remains blocked by existing unrelated ER archetype and test typing errors; no reported error points to a Sprint-touched file. Staging deployment is pending.
+
+- 2026-08-11 Moody banner refinement in `codex/fun-mega-mode-20260809`: removed the redundant TRAINER BOON/CURSE label, switched the reused ability bar to a true violet tint fill, vertically centered the single effect name, preserved the full untrimmed enemy trainer frame, and aligned its upper-half cut edge with the banner. Browser verification is complete; production and normal staging remain untouched.
+
 - Based isolated branch `ci/coop/p33-gameover-public-ui` on integration SHA `abb57b17c1c6b5bcad3309cb242359b089c1e816`.
 - Added exact build+URL-gated visible Memento starter fixture and retained `WAVE_ADVANCE(gameOver)` RTC delay.
 - Added public journey assertions for raw-hint rejection, retained journal bootstrap, phantom replay unpark, terminal continuation, paired GameOver, and host authority release.
@@ -6807,3 +6837,1190 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
   now emits the complete canonical generation vector, every parser checks its local element, and shared-
   frontier proofs require both clients to report the same vector. This preserves strict authentication while
   admitting the Worker's legitimate sequential hot-rejoin counters and generalizes naturally beyond two seats.
+
+## 2026-08-02 - TM Case terminal successor and party-mutating reward matrix
+
+- Player host/guest logs at dev-log tip `7261510f1feab3bf4dd5401593dfa107df87ff0d` prove the wave-5 TM Case
+  mutation itself converged. The host targeted guest-owned party slot 1, the guest selected forget slot 1, and
+  both advanced mechanically to wave 6. The host then rejected wave-6 `CONTROL_COMMIT` because the nested
+  `LEARN_MOVE` result hard-coded `allowNextWaveStart=false` after replacing the terminal reward as the V2 head.
+- `LEARN_MOVE` decisions now carry and validate a mandatory immutable `allowNextWaveStart` bit. Ordinary
+  terminal-reward teaching derives true from its captured nested return plan; Mystery/nested reward returns and
+  non-nested level-up teaching remain false. Contradictory `nextInteraction + allowNextWaveStart` material and
+  incomplete learn payloads fail closed before successor construction.
+- Shared-terminal reception now logs the authenticated peer reason, so the replica's Send Logs report identifies
+  the same causal failure instead of only showing a generic shared-terminal frame and closed data channel.
+- The matrix inventory exposed a second real synchronization gap before dispatch: concrete ordinary-TM and Mint
+  variants did not implement `getPregenArgs()`. Their watcher reconstruction could therefore re-roll and consume
+  replica RNG despite the reward stream claiming an immutable variant. Both now serialize their move/nature id,
+  with a failure-first round-trip test that reconstructs from an empty/different watcher party without rolling.
+- Added a build-and-URL-gated `party-mutating-rewards` public journey matrix. Twelve isolated remote jobs reuse one
+  sealed build and drive TM Case, Learner's Shroom, Memory Mushroom, an ordinary TM, all three custom Ability
+  workflows, Ability Randomizer, Move Slot Expander, PP Up, Ether, and Mint through two visible Chromium clients.
+  Every entry targets the guest-owned combined party slot through public keys, requires exact cross-browser
+  material parity at a wave-2 command frontier, and checks the configured mutation actually changed the target.
+- The fixture uses four-move Garchomp starters, so all teaching entries traverse the player-reported full-moveset
+  forget picker instead of the old empty-slot auto-learn shortcut. The CI observer remains read-only and now
+  exposes the party mutation fields needed for exact assertions (moves/PP/PP Up, move cap, nature, tera, and
+  ability identities); it never mutates the game or bypasses UI/relay/Authority V2.
+- Next: qualify the full remote gate after the formatter-only red is folded in, then dispatch the 12-way browser
+  matrix without exceeding the 32-runner co-op ceiling. Tera shards, fusion, evolution/form items, restoratives,
+  and status/revive preconditions need dedicated deterministic fixtures before claiming complete consumable
+  coverage; the first matrix covers every already-driveable nested picker and the exact live failure family.
+
+## 2026-08-02 - full-moveset TM browser driver correction
+
+- Live matrix `30750278739` exposed `TM_GREAT` as a harness-path red, not a completed product mutation: the
+  Summary picker defaults to its fifth "new move/cancel" row, while the driver mistook Summary's page cursor
+  (`cursor:3`) for a real move row and confirmed cancellation. The resulting return to the reward screen made
+  its cursor oracle time out before any TM result was committed.
+- The CI-only semantic observer now publishes the real learn-move row identity (`move:<id>:slot:<n>` versus
+  `learn-move:cancel`). The public driver must visibly navigate to an existing move row before confirming, and
+  records that exact selection. This prevents every full-moveset TM/Shroom case from earning a false green by
+  clicking the cancel row.
+- No local co-op or browser tests were run. Keep matrix `30750278739` alive for independent item evidence; run
+  the corrected exact-SHA matrix remotely after its remaining jobs are classified.
+
+## 2026-08-02 - party-fixture and post-reward oracle corrections
+
+- Matrix `30750278739` proved the restorative/revival fixture rendered two visible starters per seat but then
+  rejected each seat's Caterpie from its mirrored roster envelope: Garchomp cost four plus Caterpie cost two
+  exceeded the ordinary five-point budget. The shared party therefore had only three members, `party[3]` was
+  absent, and the deterministic damaged/status/fainted reserve precondition never existed. The exact build- and
+  URL-gated party-reward fixture now makes only that envelope metadata free, matching the already-authorized
+  visible fixture while leaving production roster validation unchanged.
+- A successfully applied Ability Capsule reached wave 2 on both browsers, but Mystery difficulty opened the
+  wave-2 Mystery Encounter before any CommandPhase. The final oracle incorrectly required a wave-2 command and
+  reported the completed mutation as unfinished. Party material proof now accepts the newest classified,
+  exact-address semantic frontier, prefers Command when available, and requires both clients to expose the same
+  Authority V2 address and byte-equivalent mutation projection.
+- No local co-op or browser tests were run; these harness corrections will be qualified in the next exact-SHA
+  remote item matrix after the still-active diagnostic matrix finishes.
+
+## 2026-08-02 - Dex Nav retained projection and form-change UI coverage
+
+- The Dex Nav artifact proved a production continuation omission. Its reward commit correctly declared
+  `AWAIT_SUCCESSOR -> ABILITY_PRESENT`, but the guest reward projector's concrete modifier switch omitted
+  `ErDexNavModifierType`. It therefore returned `continuation=false`, advanced into ordinary `NewBattlePhase`,
+  and began a 120-second wave-2 enemy wait while the host still owned the two-pick Dex Nav surface. Dex Nav is
+  now retained before the ordinary Pokemon-target guard (its payload intentionally carries slot `-1`) by the
+  same projection path as every other ability workflow, so the V2 presentation overrides a live reward
+  continuation instead of racing a stale next-wave renderer.
+- The ordinary form-change item applied successfully and opened the real `FormChangePhase`, but the CI observer
+  emitted `unclassified` for its actionable `EVOLUTION_SCENE` handler. The driver consequently supplied no
+  player-equivalent Space and timed out while the replica was already parked at the ordered next-wave wait.
+  Form change now has an explicit semantic battle-presentation surface and uses the same readiness/address/
+  phase-instance fences as evolution prompts.
+- These changes were derived from the live two-browser artifacts, not inferred from the matrix conclusion.
+  Verification remains remote-only after the diagnostic matrix completes.
+
+## 2026-08-02 - form-change presentation lease and evolution fixture floors
+
+- Matrix `30752299479` supplied stronger failure evidence after the semantic form surface landed. The authority
+  visibly reached the terminal "changed form" prompt with `awaitingActionInput=true`, but the observer reported
+  `inputBlocked=true`: Authority V2's single local-presentation registry admitted ordinary evolution and its
+  replay, but omitted both rich form-change phase identities. Production therefore rejected the same Space the
+  browser driver correctly refused to send, leaving the authority in `FormChangePhase` while its peer waited in
+  `NewBattlePhase`. Both `FormChangePhase` and `CoopFormChangeCutsceneReplayPhase` now lease only their exact
+  `EVOLUTION_SCENE` prompt; mechanically shared overlays in either phase remain frozen.
+- The read-only browser observer and battle-prompt driver now classify both the ordinary and mechanics-free
+  form-change cutscene phases under one `battle:form-change` surface. This makes the remote journey prove each
+  local terminal prompt is genuinely actionable rather than papering over the production input gate.
+- The same matrix proved ordinary Water Stone evolution was rejected solely because the isolated Staryu
+  fixture started at level 5 below every configured level floor. Only the exact `EVOLUTION_ITEM` fixture now
+  starts at level 30; the rare Scroll fixture remains level 70 and normal progression/evolution journeys retain
+  their existing levels.
+- No local co-op, Vitest, or browser execution was performed. These changes are queued for one new exact-SHA
+  remote 36-variant item matrix after static contracts pass.
+
+## 2026-08-03 - terminal evolution authority/replica bridge split
+
+- Exact animations-on run `30772488229` completed its ordinary `EVOLUTION_ITEM` cutscene and committed the
+  immutable reward result, then the authority client failed closed with `A signed next-wave wait opened outside
+  the authoritative renderer.` The retained trace shows the authority replacing its ordinary `NewBattlePhase`
+  with the signed structural bridge immediately before starting it; this is a production role-boundary defect,
+  not a campaign timeout or input-driver failure.
+- `EvolutionPhase` now queues that signed bridge only when the local Authority V2 role is `replica`. The
+  authority keeps its normal locally-owned successor, while both roles still settle the exact terminal
+  interaction result. A focused unit contract covers authority, replica, non-wave successor, and absent-session
+  cases, and the browser source contract prevents this role guard from being silently removed.
+- The same run's `RARE_EVOLUTION_ITEM` red is deliberately not folded into this change: its evidence reaches the
+  guest-owned Learn Move commit but lets the replica begin `NextEncounterPhase` before retained presentation
+  settlement can retry the buffered successor. That separate scheduler-ordering mechanism will be fixed and
+  qualified only after the ordinary evolution role split is measured on its own exact SHA.
+- No local co-op, Vitest, Chromium, or compilation run was performed. Verification remains remote-only.
+
+## 2026-08-03 - retained evolution closes before its nested successor starts
+
+- The `RARE_EVOLUTION_ITEM` artifact from run `30772488229` proves a second production defect. On the replica,
+  the retained evolution reported completion at `23:59:10.399`; ordinary `NewBattlePhase` started three
+  milliseconds later and `NextEncounterPhase` another three milliseconds after that. Only then did the replay
+  completion callback retry reward revision 5. The replica was already on wave 2, so it correctly rejected the
+  wave-1 reward image as cross-wave; the guest-owned Learn Move revision 6 consequently remained a permanent
+  `frontier=5/4/4` gap.
+- Retained progression completion now uses the existing atomic authority-commit scheduler seam: it selects but
+  does not start the queued local successor, invokes the exact V2 completion callback, and starts that local
+  successor only if the callback neither projected a replacement nor left an ordered same-wave wait pending.
+  This also handles a genuinely delayed revision 6: the unsigned local tail remains selected but unstarted
+  until the network-delivered interaction replaces it, rather than relying on revision 6 already being buffered.
+- The scheduler now detects a modal installed and started by its callback, preventing a second `start()` call.
+  Behavioral tests cover both the projected-modal and delayed-entry branches; source contracts bind retained
+  progression and reward-evolution settlement to the atomic path and the explicit `allowNextWaveStart` fence.
+- Focused ordinary Evolution Item run `30774089940` crossed the previously failing bridge, completed the
+  animations-on evolution, converged both parties on Raichu, reached wave 2, and exposed the shared command
+  frontier. That isolates this scheduler change to the separate nested rare-evolution mechanism. No local
+  co-op, Vitest, Chromium, or compilation run was performed.
+
+## 2026-08-03 - reward-owned evolution authority ledger evidence
+
+- The only red after ordinary run `30774089940` had completed gameplay was the final presentation oracle:
+  `authority=[]` versus one replica `renderer-completed` evolution. Both final screenshots and semantic
+  observations show wave 2, equivalent parties, and the same state digest, so this is a harness-evidence red,
+  not a product desync or softlock.
+- The authority did retain the complete evolution inside revision-5 `INTERACTION_COMMIT`; the read-only
+  authority observer was simply attached only to the earlier `WAVE_ADVANCE` capture, which is already closed
+  when a reward-owned evolution finishes. `commitRewardAuthoritativeResult` now emits the authority receipt
+  only after that exact immutable reward result successfully enters the negotiated log. The equality oracle
+  remains strict; it is no longer relaxed to accept renderer-only evidence.
+- A remote source contract binds the reward observer to the post-retention seam. The next focused
+  animations-on measurements are ordinary `EVOLUTION_ITEM` and nested `RARE_EVOLUTION_ITEM` on the combined
+  scheduler/evidence tip.
+
+## 2026-08-03 - projected Learn Move resumes its retained unstarted successor
+
+- Combined exact-SHA run `30775674276` proved the preceding retained-evolution scheduler change: both variants
+  retained their reward revision, both evolution presentations completed on authority and replica, and the rare
+  branch admitted and installed its guest-owned Learn Move revisions through `frontier=7/7/7`.
+- The ordinary variant reached the shared wave-2 command and failed only because its isolated level-30 fixture
+  was incorrectly subject to the normal-level mandatory-EXP cue. Party-mutating reward journeys now preserve
+  strict authority/renderer ledger equality while excluding that impossible EXP requirement.
+- The rare variant exposed one further production scheduler seam. Its projected `CoopReplayLearnMovePhase`
+  closed through ordinary `super.end()`, which restored the parked `NewBattlePhase` but—correctly for an
+  ordinary already-running modal predecessor—did not start it. The host reached wave 2 while the replica stayed
+  on that unstarted wave-1 successor. PhaseManager now records exact started phase objects and its atomic
+  Authority V2 close starts a restored successor only when that object had deliberately never started; ordinary
+  temporary modals still resume their running predecessor without a duplicate start.
+- The browser's Backspace had already submitted the projected decline and revision 7 was applied. The driver
+  nevertheless waited for a second stop-teaching confirmation that this replay path does not open, masking the
+  real successor stall behind a harness timeout. It now accepts either a fresh actionable confirmation or a
+  fresh non-Learn-Move successor surface at the same or a later ordered address. Focused behavioral contracts cover both
+  scheduler branches; verification remains one combined remote animations-on reward journey.
+
+## 2026-08-03 - V2 Learn Move has one projector and role-owned evolution evidence
+
+- Combined exact-SHA run `30778145880` proved the ordinary reward path mechanically complete: the evolution
+  rendered, both parties converged, and both clients reached the shared wave-2 command frontier. Its final red
+  was evidence-only. WebRTC assigned the host authority role to the page labeled `guest-seat`, while the legacy
+  depth assertion scraped host/guest prose from fixed harness labels. The strict `browser-progression-event`
+  records already contained the exact `authority-recorded` and `renderer-completed` pair. Evolution breadth now
+  compares those typed lifecycle records by embedded role and stage across both pages, retaining exact identity
+  equality and the mandatory depth-evolution requirement.
+- The rare variant exposed the remaining product mechanism. Revision 6's typed SHARED_INTERACTION projector
+  opened the correct `CoopReplayLearnMovePhase`, but its live materializer also emitted the legacy
+  `learnMoveForward` carrier and queued a second replay copy. After revision 7 closed the exact projected modal
+  and started `NewBattlePhase`, that obsolete copy reopened at the wave-2 address and permanently deferred the
+  replica's command commit. Under V2, single and batch prompt material is now acknowledged without invoking the
+  legacy presentation carrier; the central projector is the sole phase creator. Legacy sessions retain the
+  forward path unchanged.
+- The rare trace also recorded one CI-only fatal observation during the pre-picker `EVOLUTION_SCENE`: the visible
+  wave parser returned `undefined`, so JSON serialization omitted the schema-required `displayedWave` field.
+  Both active and passive semantic observers now emit explicit `null` until the HUD has painted. This does not
+  weaken the visible-wave contract; a later actionable gameplay surface must still carry its positive parsed
+  wave.
+- Focused source/behavior contracts cover the single-projector cutover, batch parity, role-label reversal, and
+  explicit-null transitional observation. No local co-op, Vitest, Chromium, or compilation run was performed;
+  the next measurement is the same two-variant animations-on journey on one frozen exact SHA.
+
+## 2026-08-03 - rare evolution is mechanically complete; chained-presentation ceiling corrected
+
+- Exact-SHA run `30779783513` is the first combined proof after the single-projector cutover. Ordinary
+  `EVOLUTION_ITEM` passed fully. `RARE_EVOLUTION_ITEM` opened exactly one `CoopReplayLearnMovePhase`, installed
+  its exact actionable picker at revision 6, applied the decline once at revision 7, closed that picker, and
+  advanced both real browsers to wave 2. There is no duplicate Learn Move phase, revision gap, desync, or
+  stationary wait in this artifact.
+- The rare lane's red is harness-only. The immutable animations-on between-wave ceiling expired at
+  `03:03:45.891` while both traces were still recording causal ordered phase/stream progress. At that instant
+  one client had entered wave-2 `CoopReplayTurnPhase`; the other was rendering the same wave's encounter-entry
+  ability sequence. Final screenshots visibly show both clients in wave 2. The guest admitted revision 8's
+  exact command frontier seconds later, but diagnostics began before the renderer could finish the finite
+  pre-command presentation.
+- The old outer bound allowed only one dense turn for the entire chained boundary. Animations-on between-wave
+  waits now receive the ordinary fixed between-wave window plus one measured dense-presentation ceiling.
+  Their sliding deadline still refreshes only from causal phase/authority/renderer evidence and remains clipped
+  by that immutable sum; a stationary softlock retains the ordinary no-progress deadline, and every
+  animations-skipped profile is unchanged.
+- The source contract now pins this composition so later timeout cleanup cannot reintroduce the false red.
+  No production code changed for this classification, and no local co-op, Vitest, Chromium, or compilation
+  execution was performed.
+- Exact-SHA rerun `30781406128` passed in two real Chromium clients with animations enabled. The replica
+  started exactly one `CoopReplayLearnMovePhase`; the authority started exactly one native `LearnMovePhase`;
+  revision 7 converged at `frontier=7/7/7`; and revision 8 installed the wave-2 command at
+  `frontier=8/8/8`. Both final screenshots show the same evolved party and actionable wave-2 command UI.
+
+## 2026-08-03 - merged-tip gate red classification
+
+- The first full gate on the clean feat integration merge (`45549616c`, run `30782657795`) completed all 33
+  jobs. Browser-native WebRTC and every shard except B1/B11 passed. The aggregate red consists of three stale
+  assertions plus one newly merged feat type-contract regression; it did not expose a new co-op product
+  desync, softlock, or recovery failure.
+- The presentation source contract still required Evolution to pass an inline object literal. Production now
+  creates one typed immutable `presentation` value and gives that same value to both the retained progression
+  recorder and reward settlement. The contract now verifies this stronger single-result invariant.
+- B1 still expected the projected single-Learn-Move terminal to retire through `setModeBoundedWhen()` and its
+  ambient asynchronous callback. The V2 terminal deliberately closes through the exact phase projector, so
+  the failure-first check is inverted: invoking that legacy async tail is now a failure.
+- B11 still expected V2 to populate the legacy learn-move forward-in-flight registry. The exact projected phase
+  and public panel were demonstrably parked until their immutable commit; the legacy registry must remain
+  empty after the single-projector cutover. The assertion now binds that intended architecture.
+- The nine `ab-attrs.ts` override diagnostics share one cause: merged feat added optional `useMode` without the
+  explicit `| undefined` required by the repository's exact-optional parameter contract. The other two merged
+  diagnostics are a missing non-null guard around the Superego WeakMap value. Both production typing repairs
+  are narrowly scoped and preserve runtime behavior.
+- Local Biome inspection itself hit the known Windows worker stack-overflow before producing a verdict. No
+  local co-op, Vitest, Chromium, or compilation run was performed. The repaired exact SHA will be verified by
+  the remote full gate.
+- Remote gate `30783417776` verified the merged type repair, B1, B11, every other A/B/C/P shard, all four P33
+  mutation shards, the sealed production bundle, and browser-native WebRTC: 31 substantive jobs passed. Its
+  sole underlying red was the source-contract file reaching one later obsolete assertion that still demanded
+  `this.end(); onComplete()` after an earlier assertion in the same test already required the atomic
+  `shiftPhaseThroughCoopAuthorityCommit()` scheduler. That final legacy assertion now rejects the unsafe old
+  ordering instead. The aggregate red is consequential only.
+- Exact-SHA gate `30783864052` again passed all 31 substantive production/type/shard/mutation/WebRTC jobs.
+  Its fast source lane advanced beyond the progression contract and found one dependent meta-contract still
+  matching the old B1 assertion's English prose. The contract now names the actual invariant: a projected
+  single-Learn-Move terminal must not delegate retirement to an ambient async UI callback. B13's apparent
+  delay was GitHub infrastructure (checkout consumed 8m42s); the isolated test shard itself completed green.
+- Gate `30784448306` passed the complete fast source/public-UI/node-pure contract lane and all 31 substantive
+  jobs. Its only underlying red was Biome requesting a one-line layout for the updated meta-contract; no type,
+  behavioral, mutation, bundle, or WebRTC check failed. The formatter's exact output is applied verbatim.
+
+## 2026-08-03 - exact merged-tip gate and reward-matrix startup classification
+
+- Final gate `30785138089` is fully green at exact SHA `cba587c2b93d9a2872923bd8a65df41c465c6631`: all
+  33 jobs passed, including static/type/format, every A/B/C/P shard, all mutation-assurance shards, the sealed
+  bundle, and browser-native WebRTC.
+- Exact-SHA two-browser reward matrix `30785547999` is intentionally left running. Its first five reds
+  (`SUPER_POTION`, `MAX_REVIVE`, `TM_ULTRA`, `TM_CASE`, and `REVIVE`) are one repeated CI startup mechanism,
+  not five reward defects: no lane registered accounts or reached gameplay; both browsers fetched roughly
+  2,900 immutable upstream assets (about 32 MiB) under the 28-job fan-out, and `LoginPhase` first appeared at
+  307-311 seconds, just after the five-minute boot wait expired. Final screenshots visibly show the login
+  surface and traces contain zero key presses.
+- The same still-running matrix has already produced green real-browser reward evidence for `MAX_POTION`,
+  `POTION`, `RARER_CANDY`, and `ETHER`. Inspected artifacts prove the named reward was visibly selected through
+  the public UI, party material converged on both clients at the exact Authority V2 address, and both browsers
+  reached the actionable wave-2 command frontier. `MAX_POTION`, for example, proves slot 3 changed from 4/19
+  HP to 19/19 HP on both replicas; paired final screenshots show the synchronized wave-2 double battle.
+- Do not mutate production for the five startup reds. Finish and classify every matrix lane, then correct the
+  remote asset-loading/fan-out contract and rerun only the lanes that never crossed setup.
+
+## 2026-08-03 - reward matrix exposed the native Learn Move projector collision
+
+- `TM_GREAT`, `TM_COMMON`, `ER_LEARNERS_SHROOM`, and `MEMORY_MUSHROOM` all reached real gameplay and exposed
+  one identical product softlock. The reward continuation started a native `LearnMovePhase` on the replica,
+  but the ordinary Authority V2 projector always installed a second `CoopReplayLearnMovePhase` over it.
+  Revision 7 closed the replay and advanced the authority; the replica then uncovered the stale native phase,
+  which kept resending the already-committed choice while revision 8's wave-2 command remained at frontier
+  `8/7/7`. This is the exact user-visible frozen learn-move/party-item class the matrix was built to catch.
+- The central ordinary projector now first binds the immutable Learn Move operation address to a matching
+  running native phase. It also stages that address on an exact queued reward continuation before falling back
+  to replay materialization. Staging is owner-exact for either seat; a guest-owned picker stays interactive,
+  while only a host-owned mirror enters watcher mode. Level-up learns, which have no native replica phase,
+  retain the replay fallback.
+- The legacy forward adapter uses the same generalized current/queued binding contract. Failure-first source
+  coverage pins both the live-phase reuse and queued-phase staging ahead of replay construction, preventing a
+  future refactor from restoring two simultaneously authoritative picker objects.
+- `RARE_EVOLUTION_ITEM` is a separate CI-load classification in this 28-way run: at roughly three frames per
+  second its finite animations-disabled evolution presentation was still emitting ordered stage heartbeats
+  when the lane deadline expired. `HYPER_POTION` visibly mirrored the requested cursor in the final screenshot;
+  its harness observer timed out after the watcher applied the cursor event and therefore is not evidence of a
+  reward cursor product failure. Both remain candidates for reduced-fanout remeasurement after the product fix.
+
+## 2026-08-03 - post-fix gate fixture migration
+
+- Exact-SHA gate `30787474307` passed 30 substantive jobs and exposed only two Lane-A crashes in
+  `coop-learn-move-inline-park.test.ts`. Both stopped before their behavioral assertions because the minimal
+  fake PhaseManager lacked the real `hasPhaseOfType()` query newly used by the native-continuation preflight.
+  Production PhaseManager has this API; this is a stale fixture surface, not a runtime failure.
+- The fixture now faithfully reports that it contains no queued native `LearnMovePhase`, allowing the two
+  tests to continue covering their owned fallback cases: inline replay over a parked renderer and queued replay
+  when the renderer is drainable. No production behavior changed for this gate repair.
+
+## 2026-08-03 - reward cursor readiness race retained instead of dropped
+
+- The `HYPER_POTION` lane in run `30785547999` was not merely an observer miss. The owner became actionable,
+  moved to Hyper Potion, and sent mirror FIFO entry `n=0` while the slower watcher was still completing its
+  reward animation. `CoopUiMirror` logged an apply and consumed the entry even though the watcher's real
+  `ModifierSelectUiHandler.processInput()` returned false. Two minutes later its semantic cursor remained on
+  Poke Ball. Mechanical Authority V2 state was unaffected, but presentation was genuinely stale.
+- The mirror engine now returns the real handler readiness verdict. A false result retains the exact FIFO entry
+  and retries it at a short cadence only while the same session and UI mode remain live. Success advances the
+  high-water mark once; a mode mismatch still drops cosmetic stale input, and a renderer exception remains
+  fail-soft without poisoning later entries.
+- A failure-first loopback test reproduces the owner-ready/watcher-rendering race with no game engine and proves
+  the retained input applies exactly once after readiness. This closes the prior coverage gap: the mirror tests
+  had modeled every watcher handler as synchronously ready, unlike two real browsers under asymmetric load.
+
+## 2026-08-03 - learn-move exact-SHA remeasurement and finite prompt driver
+
+- Exact-SHA browser run `30787688209` proves the native-phase reuse production fix in three independent item
+  workflows: `TM_COMMON`, `ER_LEARNERS_SHROOM`, and `MEMORY_MUSHROOM` all passed through the real two-browser
+  UI and reached the converged wave-2 command frontier. Their former stale native picker softlock is gone.
+- `TM_GREAT` reached and bound the exact revision-6 learn-move operation to the existing native phase on the
+  replica, so it did not reproduce the product collision. Its red was a harness call-chain gap: after accepting
+  the Yes/No confirmation, native `LearnMovePhase` presents one actionable “Which move should be forgotten?”
+  MESSAGE before opening Summary. The driver waited for Summary without pressing that finite prompt, leaving
+  the authority visibly and safely awaiting human input while the replica already showed the read-only list.
+- The accept driver now recognizes only same-address, actionable `LearnMovePhase` narration, advances each
+  unique prompt generation once through the public keyboard path, and then requires the exact actionable
+  Summary picker. A pure contract test distinguishes that prompt from wrong-address/stale material and from the
+  completed picker. No production change was made for the `TM_GREAT` classification.
+- The full 36-item matrix keeps its 28-runner throughput but now receives a measured seven-minute first-load
+  budget. This is scoped only to `party-mutating-rewards`: run `30785547999` proved five setup-only reds whose
+  browsers first reached LoginPhase at 307-311 seconds under CDN fan-out, just beyond the old five-minute bound.
+  Ordinary journeys retain the five-minute boot contract, and the matrix's 20-minute total setup ceiling is
+  unchanged.
+
+## 2026-08-03 - focused reward and exact gate classification
+
+- Exact-SHA two-browser run `30788976362` passed both focused cases on candidate
+  `e32712bb37617e2b039e7136574ef78423d11914`.
+- `HYPER_POTION` mirrored the named reward cursor to the watcher, selected the exact guest-owned party target,
+  converged that target from 4/19 HP to 19/19 HP on both clients, and installed the identical wave-2 command
+  frontier and state digest. The former stale Poke Ball watcher cursor did not recur.
+- `TM_GREAT` traversed the finite native Learn Move narration, opened the exact Summary picker, committed one
+  replacement (move 323 -> move 14), closed the exact queued picker, and installed the identical wave-2 command
+  frontier on both clients. The trace contains no duplicate `CoopReplayLearnMovePhase` and no `8/7/7` stall.
+- `ER_LEARNERS_SHROOM` and `MEMORY_MUSHROOM` had already passed the same exact native-phase reuse path in run
+  `30787688209`; the final broad reward matrix will requalify them together with `TM_CASE`.
+- Full gate `30794206320` passed static/type/format, the fast Authority V2/public-UI contracts, every A/B/C/P
+  behavioral shard, all four mutation shards, the immutable bundle, and tier-1 native WebRTC. Its sole
+  underlying red was CI-only: the browser job spent 11m46s cloning the immutable assets submodule, leaving only
+  2m16s of its 15-minute job ceiling for a sealed-production checkpoint whose known-green runtime is about
+  4m31s. GitHub cancelled the step and the aggregate correctly mirrored that cancellation; no product assertion
+  failed.
+- The browser job now retains all strict transport-internal no-progress bounds but has a measured 25-minute
+  wall-clock ceiling so transient checkout latency cannot manufacture the same cancellation. A source contract
+  prevents the job budget from dropping below the measured checkout-plus-checkpoint requirement.
+
+## 2026-08-03 - live Mystery trainer tail split isolated
+
+- Paired staging logs from build `4693e5c26` proved a product control split after a wave-9 embedded Mystery
+  trainer battle: both clients had the same mechanical digest, but the host entered `TrainerVictoryPhase`
+  while the guest remained held in `BattleEndPhase` awaiting the later reward-prepared `battle-settled` entry.
+- The candidate now runs automatic Mystery reward preparation in a non-interactive phase immediately after
+  host BattleEnd. Its retained complete state releases both clients into the same TrainerVictory/Money tail;
+  a later phase opens the already-prepared reward surfaces without repeating automatic effects.
+- `TrainerVictoryPhase` now establishes an explicit co-op enemy-trainer hidden postcondition before ending.
+  The sealed browser observer carries exact enemy-trainer visible/alpha state on every semantic surface.
+- The public prompt driver no longer advances a one-sided TrainerVictory prompt: both real browsers must
+  expose the same actionable address first. The evidence sink fails if the first surface after TrainerVictory
+  still presents the defeated trainer.
+- TODO: commit/push the candidate and use remote GitHub runners for source/unit/type checks plus a real
+  Mystery trainer browser reproduction. Do not qualify this production fix through local gameplay tests.
+
+## 2026-08-03 - ordered normal trainer-victory control and exact consumer lease
+
+- The first V2 normal-trainer candidate proved that `TrainerVictoryPhase` needed its own typed
+  `trainer-victory-open` CONTROL_COMMIT between the settled TURN and WAVE entries. The commit carries the
+  complete authoritative state, immutable trainer identity, and a mandatory ordered successor wait; the
+  projector installs the exact replica presentation and the phase establishes enemy-trainer-hidden before
+  completion.
+- Gate evidence then exposed two real ordering races. First, the won-wave predecessor wait did not admit the
+  new control address; it now names only the exact trainer-victory coordinate (plus the existing exact
+  replacement address where applicable). Second, a following WAVE entry could replace `latestControl` before
+  the trainer phase started; an address-exact pending runtime lease now survives that admission and is cleared
+  only by the real phase completion or hard epoch reset.
+- Exact-SHA gate `30817216159` exposed the final race: a legacy guest tail could briefly construct an
+  unsanctioned `TrainerVictoryPhase`, the renderer gate neutralized it, and the V2 projector's phase-tree query
+  then mistook that object for its authorized consumer and queued nothing. Tip `07465e273` makes the first
+  exact lease installation always queue one ordered consumer; the lease itself is the only duplicate guard.
+- Final remote qualification is running at exact SHA `07465e273`: full gate `30817902430` and 10-wave
+  two-real-browser Mystery campaign `30817905195`. The older gate and Mystery run remain untouched as
+  failure-first evidence. No local gameplay, Vitest, Chromium, or compilation process was run.
+- Gate `30817902430` proved that first-lease construction was still neutralized by the older strict-tail
+  renderer gate: CONTROL_COMMIT authority was exact, but that gate recognized only WAVE sanctions. The
+  follow-up wraps construction in a synchronous consumed-once control permit. The ambient phase remains
+  blocked before and after the call; only the phase object created inside the ordered projector is admitted.
+- Exact-SHA gate `30818711037` on production candidate `8695cfa89` turned the formerly failing trainer-tail
+  shards P1, B11, C3, and C5 green. The remaining C1 red occurred only because the one-process soak stopped
+  authority immediately before `MysteryEncounterPhase.start()` could emit `ME_PRESENT`, then incorrectly
+  demanded that the guest abandon its valid signed `NewBattlePhase` wait and infer a local predecessor.
+- The soak now preserves that exact signed wait when the host has already installed the destination Mystery
+  battle; the ordinary ME projector will replace it once `processMeWave` starts the real surface. This is a
+  harness-only correction with a pinned source contract. The only other gate red was import ordering, fixed
+  without changing runtime behavior. Real two-browser Mystery run `30818713774` remains active and untouched.
+- Focused closure run `30820751128` passed static, all source/node contracts, and all six selected shards,
+  including the exact C1 45-wave journey that previously rejected the signed Mystery destination wait.
+- Two-browser Mystery run `30818713774` proved both clients installed the ordered normal trainer-victory
+  control at revision 35. Its red was driver-only: both local prompts were actionable, but the helper pressed
+  the host and returned; once the host entered rewards, its reciprocal-readiness check permanently refused
+  the guest's still-actionable prompt, so only the host arrived at `shop:7:6`.
+- The prompt driver now consumes an exact paired TrainerVictory generation atomically through ordinary Space
+  input on both browsers. Its focused contract now requires one call to press both seats exactly once. No
+  production code changed for this classification; the guest's visible trainer was still the active victory
+  presentation, not a stale sprite after completion.
+
+## 2026-08-03 - live repeated-trainer presentation overtake
+
+- Paired staging logs from exact build `e7857b72b` show wave 5's normal trainer control reached
+  `controlInstalled`, then the session continued through shops and later battles. At wave 8 the guest applied
+  authoritative state tick 139 but rejected the new Rival `trainer-victory-open` revision 48 before projection.
+  The generic material error hid which invariant failed.
+- Root architectural gap: a `trainer-victory-open` entry used `AWAIT_SUCCESSOR` as its successor, and the
+  ordinary projector signed that wait as installed as soon as immutable material/phase construction existed.
+  It did not wait for the replica's finite TrainerVictory prompt to complete. A following WAVE entry could
+  therefore overtake the prompt and leave its exact pending presentation lease alive until a later trainer
+  battle conflicted with it.
+- Candidate change holds the replica's final control proof until the exact real `TrainerVictoryPhase` finish
+  records completion, then retries the retained V2 entry on the existing address-exact microtask path. The
+  projector does not queue the presentation again after completion. Every trainer material/cursor/successor/
+  lease/ledger rejection now emits a specific diagnostic. A Rival regression covers both
+  `SUPER_EXP_CHARM` and `EXP_SHARE` material instead of only one Voucher reward.
+- TODO: commit/push without local execution, run remote static plus the owned trainer boundary/runtime shards,
+  then run a two-browser journey that crosses at least two trainer victories before deploying the corrected
+  exact SHA to staging. Preserve active runs `30822228534` and `30824237635` for artifact classification.
+
+## 2026-08-03 - trainer-victory completion fence and human-skew qualification
+
+- Paired live staging logs at exact build `e7857b72b` proved a repeated-trainer overtake: the guest signed
+  `trainer-victory-open` as installed before its finite prompt completed, a later WAVE entry advanced, and
+  wave 8 rejected the next trainer lease against the stale wave-5 presentation.
+- Production commit `6d67e02a7` now withholds the replica's `controlInstalled` proof until the exact real
+  TrainerVictory phase records completion, then retries the retained V2 entry through the existing
+  address-exact projector. Completed retained redelivery cannot queue the presentation again. Exact rejection
+  diagnostics and a Rival multi-reward regression were added.
+- Staging deploy `30826469191` is green at build marker `github:6674542b37d3cbb6f3e885af11645ec58f436e3d:run-30826469191.1`.
+  No production deployment was made.
+- Depth run `30825927786` at the first fenced product reached wave 5 TrainerVictory on both browsers with
+  identical state digest. It exposed a second product defect: the guest remained at frontier `24/24/23`, but
+  its exact real prompt reported `awaitingActionInput=true,inputBlocked=true`. The projector returned deferred
+  before installing the immutable successor wait locally, so the physical-input gate still saw the prior TURN
+  control and made the completion proof circularly impossible.
+- Final production commit `bd87ac311` deliberately leaves the successor claim uninstalled (so even an early
+  authenticated successor remains fail-closed) and grants a narrow pre-install input lease only when the
+  replica role, source operation, `trainer-victory-open` material, retained operation ID, wave, turn, current
+  phase, and actionable MESSAGE handler all match. The authority cannot overtake the prompt, but the renderer
+  can dismiss it. A source-order contract and the real two-browser staggered driver pin both sides.
+- The public browser driver now deliberately presses the authority's paired TrainerVictory prompt first,
+  delays, proves the replica's exact prompt remains actionable, then presses the replica. This reproduces
+  human timing instead of atomically pressing both clients. Remote pure-driver coverage pins the call chain.
+- Mystery run `30824237635` was another harness red: synchronized command authority progressed through turn
+  13 on wave 6, but the generic 12-turn cap mislabeled it as a softlock. Only Mystery receives a 30-turn
+  ceiling and cycles observer-proven damaging moves; the independent campaign wall clock remains fail-closed.
+- Runs `30829379718` and `30829450654` are preserved evidence for the superseded early-install draft and must
+  not qualify the final product. Exact `bd87ac311` run `30829771979` passed remote owned type/format, every
+  public source/driver contract, the focused trainer-victory Vitest, sealed build, and artifact publication;
+  its fresh two-browser leg is queued/running. Ten-wave depth `30829775259` and ten-wave Mystery
+  `30829978557` are the exact long-form qualifications.
+- Staging deploy `30829928856` succeeded with public marker
+  `github:bd87ac3113a60ae27db99c24a14dba37f4091620:run-30829928856.1`. Production remains untouched.
+- Exact short journey `30829771979` is fully green: remote type/format/contracts/Vitest/build plus two real
+  Chromium clients completing fresh registration, public lobby pairing, and the wave-2 frontier in 743s.
+  Its compact artifact reports `status=passed,error=null` and contains no desync, softlock, material rejection,
+  or unexpected control-deferred line.
+- Do not run gameplay/Vitest/TypeScript locally; use GitHub-hosted workflows and preserve the 32-runner
+  ceiling.
+
+## 2026-08-03 - trainer driver correction and Mystery transition presentation retention
+
+- Exact depth artifact `30829775259` did not reproduce a product input block at wave 5. Both real browsers
+  exposed the same actionable `TrainerVictoryPhase`, but the driver required a replica-local `BattleEndPhase`
+  marker that an authoritative renderer can never produce. Harness commit `b69d2c381` proves the causal
+  BattleEnd successor on the host, then requires both immutable trainer-victory addresses and advances both
+  public prompts with human skew. The regression fixture now models the real direct CONTROL projection.
+- Exact Mystery artifact `30829978557` exposed a separate production presentation loss. The authority recorded
+  one wave-6 arena-cleanup message (`The pointed stones disappeared...`), the guest received only its
+  best-effort live packet at a non-battle address with no replay consumer, and opening wave 7 discarded the
+  still-unsealed recorder. Mechanics stayed converged, but the ordered presentation ledger correctly failed
+  67 authority events versus 66 renderer receipts.
+- Production commit `86f977e59` opens `newBattle()` cleanup in a deferred transition recorder. Only an
+  unpublished, unsealed turn-one prefix from the same session and exactly adjacent wave may carry across a
+  non-battle Mystery surface; published battle material, wrong sessions, non-adjacent waves, and ordinary stale
+  recordings remain fail-closed. The next real battle releases the prefix and its CONTROL commit retains it.
+  Node and source contracts cover the exact carry plus every rejection fence.
+- Full co-op-only gate `30833666863` is green on `86f977e59`: static/type/format, public and Authority V2
+  contracts, every A/B/C/P shard, all mutation shards, immutable browser bundle, and native WebRTC/rejoin.
+- Formatter-only harness commits produced final exact staging tip `fefa52ee2`. Staging deploy `30834358397`
+  succeeded and public `version.json` verifies marker
+  `github:fefa52ee2d78c032e102a4936e78d13c64a87081:run-30834358397.1`. Production was not touched.
+- Ten-wave Mystery `30834049605` and normal-depth `30834244287` are the active exact-tip two-browser
+  qualifications. Preserve both runs and classify their artifacts before any further product change.
+- The player's new Send Logs upload had still not reached the dev-log branch after repeated pulls (2,096 total,
+  zero new), so no claim about that specific report may be made until the upload appears.
+
+## 2026-08-03 - final-tip browser qualification and scaled manual-depth budget
+
+- Exact final-production-tip Mystery journey `30834049605` passed on `fefa52ee2`: two real browsers cleared ten
+  target waves and arrived at wave 11, crossed six-plus Mystery surfaces, alternated reward ownership, crossed
+  the real wave-7 trainer-victory prompt with parity and trainer-presentation cleanup proof, and reported no
+  desync, softlock, or authoritative material rejection.
+- Exact animations-enabled surface journey `30835172528` passed on the same production tip. Both real browsers
+  rendered the complete wave-1 and wave-2 battle presentation, exercised both reward-owner directions, replayed
+  the wave-3 ability presentation, and converged at the wave-3 command frontier with no product error.
+- Ten-wave normal-depth run `30834244287` was a harness-budget red, not a product assertion: it cleared seven
+  complete waves, including a real normal trainer victory at wave 5, and was entering the wave-8 trainer
+  presentation with parity true and revision 43 installed when the fixed 45-minute campaign lifecycle timer
+  killed the process. No desync, softlock, session failure, or material rejection preceded the timeout.
+- Harness-only commit `e22f070b5` preserves the calibrated 45-minute budget for the ordinary four-wave depth
+  profile but grants manually requested depth journeys above four waves an 80-minute campaign lifecycle and
+  matching 83/90-minute step/job ceilings. Product code is unchanged.
+- Exact pushed-tip smoke `30838327971` is fully green at `e22f070b5`: workflow selection, sealed bundle,
+  format/boundary/contracts, solo navigation, and the one-wave two-real-browser campaign all completed. The
+  paired clients issued a synchronized command, crossed rewards, and converged at the wave-2 frontier.
+- Staging remains the already-qualified production bundle
+  `github:fefa52ee2d78c032e102a4936e78d13c64a87081:run-30834358397.1`; the harness-only commit was not deployed
+  and production was not touched.
+- The newly reported human desync is deliberately unresolved rather than guessed. Repeated pulls still show
+  zero new files and 2,096 total reports; remote `dev-logs` remains at `1379dbd2b52eb1fa89f6e2fb3a1a7ae7752321ce`.
+  Ask the player to press Send Logs again on both clients or attach the downloaded reports directly. Do not
+  integrate this candidate into `feat/elite-redux-port` until that capture is available and classified, unless
+  the maintainer explicitly accepts the unresolved report.
+
+## 2026-08-03 - live wave-9 presentation watchdog false positive
+
+- The paired reports finally arrived at dev-log tip `e2702eb770a62cb42b0a2cd2563e9ae2b3c2251b`:
+  guest `2026-08-03T18-28-54-673Z__no-scenario__desync.log` and host
+  `2026-08-03T18-28-58-460Z__no-scenario__anon.log`. Both are exact staging build `fefa52ee2`, session epoch
+  `1828639826663409`.
+- This was not a mechanical divergence. Wave 9 turn 1 converged at state tick 44 and digest
+  `06da3761b28ca4c5` on both clients. A guest `CoopStatStageReplayPhase` legitimately took about ten seconds
+  before the next presentation phase started. The old five-second observation failed after one following
+  no-frame interval, permanently recorded `stat-watchdog-expired`, and the exact final presentation proof then
+  requested the shared terminal even though authoritative state had already converged.
+- Production commit `0877ade2f` replaces that assumed frame-rate ceiling with a 30-second rolling no-frame
+  window while retaining the independent 120-second hard wall for advancing animations whose completion
+  callback never arrives. Ten seconds of renderer starvation is tolerated; a real 30-second freeze and the
+  hard wall still fail closed.
+- The same capture exposed an independent learn-move retry leak: a committed guest decision included
+  authority-authored successor metadata absent from the original proposal, so JSON-stringifying the complete
+  payload produced different cancellation keys. Retry identity now uses only the stable human decision fields
+  plus wave/turn; the retained decision cancels its one-second resend after commit.
+- Test commit `cb4339055` updates every manual watchdog fixture to advance the runtime-owned authority clock
+  through the rolling stall window instead of treating the first callback as expiry. Exact focused run
+  `30845805626` is fully green: static/type/format, source/node contracts, B13, and aggregate. The production
+  P1 presentation lane passed in `30844705682`, and exact production candidate journey `30844705840` passed
+  fresh registration, public lobby pairing, two real Chromium clients, rewards, and the wave-2 frontier.
+- Staging deploy `30846035981` is green and public `version.json` verifies
+  `github:cb433905559a2f20ea95cb83a67a996d06ddecc5:run-30846035981.1`. Production was not touched.
+
+## 2026-08-03 - live reward pause/settings input-lease softlock
+
+- Dev-log tip `60bfc61052f77bdd126b2961be218cfb77e3e4c8` contains the exact host/guest pair from staging build
+  `cb4339055` (run `922a05bd-2f99-46b6-8c04-776963161286`, epoch `1828644884076428`). Both engines
+  converged through wave 13 turn 2 at digest/checksum `a430b83de3719365`, then installed the same guest-owned
+  reward operation at global V2 revision 34. The host remained connected and waited for interaction choice
+  seq 13 for more than ten minutes; the guest remained in `SelectModifierPhase` with no machine wait.
+- The live softlock is an input-lease seam, not a mechanics divergence. Escape opens `UiMode.MENU` directly
+  from `UiInputs.buttonMenu`, bypassing `UI.processInput`. Once MENU/SETTINGS replaces MODIFIER_SELECT,
+  `isCoopV2InteractionHumanInputFrozen` correctly sees that the exact reward handler is no longer installed,
+  but previously rejected every local overlay key as if it could advance shared authority. Sprites continued
+  animating while cursor, Cancel, and Settings input were dead; the peer could never receive the reward choice.
+- The production fix adds `coopLocalOverlayInputAllowed`: MENU itself is local, while nested Settings/generic
+  chrome is admitted only with a real MENU ancestor and an all-`local-only` registry path. Any mirrored
+  descendant fails closed, so generic CONFIRM/OPTION_SELECT cannot acquire a mechanical bypass. Escape now
+  exits Settings through its normal CANCEL cleanup path. No overlay input is mirrored or releases the shared
+  reward lease; closing both overlays returns to the same address, digest, selection, and owner.
+- The CI observer now uses the identical production predicate and publishes actionable `pause-menu` and
+  `pause-settings` surfaces. The new `reward-pause-settings` journey uses two real Chromium clients and only
+  public keys to open Settings during a live reward, move its cursor, capture the screen, Escape twice, prove
+  the exact reward is restored, leave rewards, and converge at the wave-2 command frontier. This closes the
+  coverage hole: prior Settings walks happened only before pairing, so they never intersected the V2 freeze.
+
+## 2026-08-03 - live double-trainer double-KO replacement frontier
+
+- Paired dev logs at `heraklines/dev-logs` tip `38999871e3dcda2300a9a9b8748a9e570657845f`
+  reproduce the report `double battle ko then not switch in` on staging build `cb4339055`. The host and guest
+  were mechanically identical after wave 14 turn 1 except for `saveDataDigest`: the host's temporary generic
+  trainer shell selected a COMMON-pool class while the renderer selected RARE, leaving their module-scoped
+  `erLastGenericTrainerType` cursors different. Both authoritative enemy switch events reached the guest, but
+  the unresolved preceding TURN_COMMIT held them behind the V2 revision gap until the authority deadline.
+- Production commit `19d2310ad` adds the generic-trainer no-repeat cursor to ordinary authoritative material
+  and full snapshots, restores it before save-data checksum verification, and registers it in the replication
+  contract. The direct save-data regression proves a divergent renderer cursor is detected, adopted, and
+  converged.
+- The first exact gate `30853730581` was 31/32 substantive jobs green. Its sole red was a failure-first test
+  fixture error: a random double ACE_TRAINER legally generated only three total enemies, while the new test
+  required two leads plus two per-trainer-slot reserves. This was not a product failure; browser-native WebRTC
+  and every other gate job passed.
+- Harness-only commit `296b89e01` pins only the missing reserve for each real trainer slot before the live
+  battle is mirrored; all command, faint, switch, replay, and presentation code remains production. Exact B8
+  evidence in run `30854723189` is green: 46/46 tests, `erLastGenericTrainerType host=35 -> restored`, two real
+  `SwitchSummonPhase` starts, `continuationReady`, and final checksum matches.
+- Exact final-SHA full co-op gate `30854723189` is fully green: all 33 jobs passed on
+  `296b89e01aa25e61b049c92ef88fba98bb85735b`, including every A/B/C/P shard, mutation assurance,
+  static/type/format, immutable browser bundle, and browser-native production WebRTC/rejoin.
+- Staging deploy `30855403585` succeeded and public `/version.json` verifies
+  `github:296b89e01aa25e61b049c92ef88fba98bb85735b:run-30855403585.1`. Production was not touched.
+- Continuous two-real-browser 30-wave journey `30854725171` remains active and must not be cancelled. Its live
+  heartbeats show successful fresh-account onboarding, settings-attested 10x speed, public lobby pairing,
+  level-100 three-mon fixtures on both seats, and both clients at the shared wave-1 command frontier. Continue
+  monitoring it through the first trainer replacement and eventual wave-30 terminal.
+
+## 2026-08-03 - double-KO closure and browser input pacing
+
+- The continuous run `30854725171` exposed a harness-only trainer-cleanup mismatch: it compared Phaser's raw
+  `visible` bit even though both trainer sprites had alpha zero and the public rendered-presentation contract
+  correctly reported them absent. Harness commit `8521d2dcb` now compares canonical rendered trainer
+  presentation and carries a regression for transparent-but-visible sprite shells. Production code is unchanged.
+- Its successor run `30857009580` reached the wave-5 trainer victory but redlined at reward rendezvous
+  `shop:5:4`. Artifact traces prove the authority and replica had both completed the trainer battle; the replica
+  was still on the actionable voucher `MESSAGE` immediately before the shop. The public-key driver issued the
+  next Space in the same Phaser frame as the previous prompt transition, treated the voucher as consumed, and
+  never retried it. The rendezvous correctly failed closed because one browser had been left behind; this was
+  not a product or Authority V2 defect.
+- Harness commit `689d9e86f` adds an event-driven input receipt: every public DOM key waits until a strictly later
+  Phaser frame observes the key released before another key may be sent. The exact remote build job proves
+  format, both public-driver boundaries, the wait/rendering contract suite, and the sealed browser bundle.
+- Exact focused two-real-browser run `30860049050` is fully green at `689d9e86f`. It cleared six continuous
+  waves with ordinary public keyboard/DOM control, including the exact wave-5 trainer victory, host-owned
+  reward, and `shop:5:4` handoff; both clients then converged at the wave-6 command frontier and ultimately the
+  addressed wave-7 mystery frontier. The artifact summary reports `status: passed`, `finalWave: 7`, no error,
+  graceful cleanup, zero fallback turns, and no recovery. The compact evidence is retained under
+  `.artifacts-doubleko-depth-30860049050-compact/`.
+- The production double-KO fix remains the already deployed staging bundle
+  `github:296b89e01aa25e61b049c92ef88fba98bb85735b:run-30855403585.1`. Commits `8521d2dcb` and `689d9e86f`
+  are test/observer-only, so no additional staging deploy is required. Production remains untouched.
+
+## 2026-08-04 - Stormglass successor closure and retained trainer-reward driver
+
+- Exact registered-interactions run `30863183864` exposed a real Authority V2 successor-address defect:
+  after the host chose Stormglass on a wave-2 Mystery battle, it authored `ME_PRESENT` in the protocol's
+  pre-turn domain `w2:t0`, while the predecessor admitted only the ambient battle shell's `w2:t1` address.
+  Production commit `a75912d9b` authorizes only the exact same-wave `ME_PRESENT:t0` alternative alongside
+  the ordinary command frontier. Focused rerun `30864499291` is green, but its random Ace-mode wave 2
+  selected the command alternative and therefore did not itself prove the Mystery branch.
+- Continuous navigation run `30862517427` failed at wave-5 shop rendezvous even though product authority,
+  state, and retained wave progression had converged. The replica was left on a real actionable Voucher
+  `ModifierRewardPhase` because the driver required a local `BattleEndPhase` marker that Authority V2
+  replicas intentionally never execute. Harness commits `39142a700`/`f4362888a` accept only the exact
+  ordered `projected trainer victory rev=N wave=W turn=T` proof and retain wrong-wave/no-proof negative
+  coverage. Exact remote build/type/format/contracts are green in run `30865215640`; its 30-wave browser
+  job remains active and must not be cancelled.
+- The registered-interactions journey is being strengthened instead of adding a production shortcut. It
+  now selects the real Mystery difficulty through the public UI, targets wave 2 so same-wave embedded
+  battles cannot end the test early, receives only bounded extensions from proven public surface actions,
+  and must observe the replica's exact Stormglass `ME_PRESENT:w2:t0` successor plus a completed paired
+  Mystery terminal at a later wave. Remote-only qualification is still required.
+- Staging deployment `30865970812` completed at exact SHA `f4362888a`; public `version.json` verifies
+  `github:f4362888a35ee483439b57c3dfa6ffb7cc9ad00a:run-30865970812.1`. Testers can exercise the
+  product fixes while closure continues. Production remains untouched.
+
+## 2026-08-04 - final-candidate remote qualification in flight
+
+- Harness-only commit `de729b901` makes `registered-interactions` publicly select Mystery difficulty,
+  continue through wave 2, and fail closed unless the replica records the exact Stormglass successor
+  `ME_PRESENT:w2:t0` followed by a completed paired Mystery terminal on a later wave.
+- Full co-op gate `30866276318` is running on exact SHA `de729b901`; 30 of 32 jobs were already green with
+  no reds at the latest inspection, leaving only B11 and browser-native WebRTC active.
+- Strengthened two-browser journey `30866144196` is running on the same exact SHA. Live heartbeats prove
+  fresh-account onboarding, public Settings selection of 10x speed, public lobby pairing, and entry into
+  the real Mystery-difficulty setup; it has not yet reached the asserted Stormglass successor.
+- Continuous navigation journey `30865215640` remains active on product SHA `f4362888a` and must not be
+  cancelled. Live heartbeats show four completed waves and entry into the real wave-5 trainer battle after
+  alternating reward ownership; no park, desync, or product error has appeared.
+- Exact-candidate animations-enabled surface campaign `30866783630` was dispatched on `de729b901` so final
+  presentation qualification runs in parallel without exceeding the 32-runner co-op ceiling.
+- TODO: preserve all three browser runs; inspect compact/full artifacts rather than classifying from the
+  workflow badge alone; repair only a demonstrated mechanism; then freeze, fast-forward the feature branch,
+  and deploy the qualified exact tip to staging only. Production remains forbidden without explicit approval.
+- Registered run `30866144196` failed before gameplay with
+  `target not in options [youngster,ace,elite,hell]`: the journey requested the staging-only Mystery
+  difficulty but its sealed bundle omitted `VITE_DEV_TOOLS=1`. This is a harness build-parity defect, not a
+  product or Authority V2 failure. The scoped correction enables that flag only for `registered-interactions`
+  and adds a source contract preventing either omission or broad enablement.
+- Harness-parity fix `30e962786` is pushed. Replacement exact-SHA registered-interactions run
+  `30866998703` is active; preserve it and require its compact artifact to prove the real `mystery` picker,
+  Stormglass `ME_PRESENT:w2:t0`, and a later completed Mystery terminal before calling this surface green.
+- Full exact-SHA browser matrix `30867124011` is active on `30e962786`: animations-enabled surface, normal
+  depth, ten-wave Mystery, and dirty-account profiles. This is the final broad browser qualification candidate;
+  do not substitute the older `93ec1f5de` matrix for its verdict.
+- Live staging logs `2026-08-04T00-59-15-360Z` (guest) and `00-59-27-025Z` (host), epoch
+  `1828663779855824`, proved a product defect in Fun and Games at wave 16: both clients adopted the same
+  `ME_PRESENT`/state, but the inline Wobbuffet minigame bypassed `initBattleWithEnemyConfig`, emitted no
+  mechanical `ME_TERMINAL("battle")`, and the first `command-open` was correctly rejected behind the stale
+  `SHARED_INTERACTION` predecessor. The fix now gives every battle terminal a typed `boot`, commits this
+  exceptional surface as `direct-turn`, states the third turn's exact `AWAIT_SUCCESSOR(ME_TERMINAL)`, and
+  admits its step-1 `reward-settled` result only from the parked finalizer. ME_PICK remains non-mechanical.
+- The same report's guest-only blank battlers maps to an independent presentation readiness gap: ordinary
+  NewBiome and Mystery renderer paths could initialize sprite nodes after their earlier asset join and then
+  release control while the real atlas was still loading. Those continuations now await
+  `settleCoopFieldPresentationReady`; ordinary trainer adoption also conceals premature enemy info panels and
+  cannot end its intro until every adopted enemy seat is visually actionable.
+- The existing exact-build `registered-interactions` two-browser journey now deterministically forces Fun and
+  Games at wave 2 and supplies its paid option through initial-save fixture money. Its terminal assertion
+  requires Mystery type 27 to reach wave 3, so the same public keyboard/DOM lane proves party selection, all
+  three direct Wobbuffet turns, retained reward settlement, and the successor without adding another runner.
+- Focused run `30871406758` never launched Chromium: all owned type/format checks passed, but the new
+  release-cutover source contract expected `turnsRemaining` text after the `FUN_AND_GAMES` predicate even
+  though the implementation deliberately captured that engine value before constructing the predicate. The
+  contract now anchors the actual `mysteryTerminalAfterTurn` declaration and its `turnsRemaining <= 0`
+  condition. This is a harness-only correction; the qualified product material remains unchanged.
+- Surface artifact `30867124011` proves a separate product ordering bug after a host-owned faint: V2
+  replacement revision 3 was already admitted at `materialDeferred`, but the guest drained its live Sticky
+  Web/stat prefix before the compatibility checkpoint installed Chikorita, so the stat renderer failed with
+  `stat-actor-not-displayed`. The renderer now consults the address-exact pending V2 replacement ledger and
+  holds both buffered and newly arriving live hints behind that immutable checkpoint. A failure-first stream
+  regression preserves the latency hints and proves only the checkpoint can win their parked race.
+- Ordinary guest wild intros had another presentation-only ordering seam: `showInfo()` exposed the bars before
+  the adopted object's atlas/sprite readiness was proven. The wild branch now uses the same bounded,
+  address-lifetime-fenced `materializeCoopAdoptedEnemyFieldReady` gate as trainers, then reveals the sprite,
+  cry, info, and encounter message. This is cosmetic projection only and executes no field setup or mechanics.
+- Candidate run `30872650241` stopped before Chromium on exactly two formatter-only diffs in the new runtime
+  query/call site. Its owned TypeScript slice was clean (repository baseline 206 unrelated diagnostics). The
+  formatter output was applied verbatim; no production behavior or test expectation changed.
+- The focused browser build had silently omitted `shadow.ts`, `coop-battle-stream.ts`, `encounter-phase.ts`,
+  and the stream regression from its owned static slice. The type diagnostic fence now owns every co-op data
+  module plus these encounter/test seams, Biome checks the four exact files, and faint-replacement builds run
+  the real battle-stream Vitest regression remotely before Chromium. Future changes to this call chain can no
+  longer reach the expensive browser job without first proving the exact race contract.
+- Exact staged registered-interactions run `30871894932` reached the real Revival Blessing interaction before
+  the forced Wobbuffet event and exposed a different product scheduler race. The guest admitted and projected
+  the exact `REVIVAL` commit at global revision 4 from `CoopMoveAnimReplayPhase`; the PARTY watcher visibly
+  opened, but the move animation's later completion shifted the newly installed modal out and restored the
+  completed replay beneath it. The result was a real PARTY UI with no phase/control owner and a permanent
+  `controlDeferred` wait. This is not an ambient address defect: the exact address, payload, and projector all
+  succeeded before phase ownership was clobbered.
+- The scheduler now identifies the phase requesting a shift. A suspended predecessor's asynchronous terminal
+  is recorded without displacing the authoritative modal; when that modal closes, the completed predecessor
+  is retired instead of resurrected and the ordered queue advances. Co-op replay phases that previously called
+  the manager directly now carry their identity through the same seam. The focused registered-interactions
+  build owns the scheduler/replay files and runs the failure-first modal regression remotely before Chromium.
+- Navigation-depth run `30865215640` finished red on the older `f4362888a` build after 2h34m. Its already
+  preserved predecessor artifact had shown the driver exhausting one party-mutating reward, returning to the
+  reward row, then suppressing the new nested target because the second item reused the same V2 address and
+  phase identity. The retry path now clears only both reward-related handled appearances (`reward:*` and
+  `reward-target:*`), retaining unrelated Mystery/navigation ledgers; a focused node regression guards it.
+- Faint-replacement animations-on run `30872915830` remains active on exact SHA `9a1bfd9df` and must not be
+  cancelled. It independently qualifies the replacement/live-event ordering and ordinary wild atomic reveal
+  fixes while the combined modal/reward-retry candidate is prepared. Production remains untouched.
+- Protected navigation run `30865215640` ultimately completed waves 1-29 in one real two-browser session,
+  including wave-10/wave-20 Wide Lens purchases under opposite owners, three Crossroads choices, two World
+  Maps and new-biome entries, three Mystery encounters, three replacement picks, and the wave-30 boss command
+  frontier with identical digest `234058c9cc4713bb`. Its final red is harness-only: four members of the
+  opposite seat's party were depleted, leaving both active battlers owned by one surviving seat; the public
+  game correctly opened two consecutive CommandPhases for that browser, while the driver permanently removed
+  a browser after its first command and waited for an impossible command from the depleted peer.
+- The sequential public driver now consumes distinct same-address command surfaces rather than assuming one
+  command per browser. It can drive two battlers from one surviving seat, still rejects replaying an append-only
+  surface, and requires the ordinary authenticated collection-close proof before marking the depleted browser
+  omitted. A failure-first node regression reproduces the exact wave-30 owner partition. No product code was
+  changed for this red.
+- Combined build `30874099531` passed its owned TypeScript/format slice and stopped before Chromium on one
+  source-contract literal: the replacement test still searched for `shiftPhase()` after the production seam
+  was deliberately strengthened to `shiftPhase(this)`. The assertion now names the identity-bearing call while
+  preserving its original materialize-before-yield ordering check; this is test maintenance, not a new product
+  behavior change.
+- Exact registered-interactions run `30874955240` proved the modal fix: Revival Blessing completed, replacement
+  applied, Stormglass completed, and both clients entered Fun and Games with identical wave-2 state. It then
+  exposed a separate single-controller command seam. The host-owned Seel was the only active player battler;
+  the guest replayed the full Wobbuffet presentation and installed `COMMAND_FRONTIER`, but its renderer-only
+  partner-slot auto-resolve skipped the reciprocal `cmd:2:1` arrival. The host therefore exhausted seven
+  retries despite a healthy transport. The scoped fix announces readiness from that replica path only when
+  every expected field slot is materialized and none belongs to the local role; an incomplete double field
+  remains closed for replacement. Engine-free and source-order regressions cover both sides of that distinction.
+- The first spectator predicate in `e549fbcf0` assumed the Wobbuffet minigame changed the battle arrangement to
+  capacity one. The captured surface proves the opposite: Fun & Games deliberately retains the two-slot co-op
+  arrangement while materializing only its selected host-owned battler. Exact rerun `30877261872` never reached
+  gameplay (cold asset proxy exhausted the public LoginPhase wait), so it neither proved nor disproved the
+  product change. The predicate now admits exactly one known non-local active owner only when the live Mystery
+  explicitly declares the direct-turn `NO_BATTLE` geometry; an ordinary capacity-two field with one missing
+  slot still fails closed. The pure regression covers both identical shapes with the declaration toggled.
+- Full exact gate `30878504470` exposed one stale source contract in the fast-contract job: it still required
+  the old zero-argument `shiftPhase()` signature after the scheduler fix made the completing phase identity
+  explicit. The production implementation is correct and the focused scheduler regression is green; the
+  exhaustive assertion now proves the stronger invariant that a stale predecessor completion returns before
+  it can settle or shift the currently installed authoritative modal.
+- The same gate's B/C/P failures all collapsed to one test-harness migration gap before any co-op runtime was
+  constructed: every failing test stopped in `TitlePhase`. The shared helpers created a detached
+  `SelectStarterPhase` and historically relied on its eventual `end()` to shift whichever phase happened to be
+  current. Identity-safe `shiftPhase(this)` correctly rejects that unrelated completion. All detached test/dev
+  launchers now use an explicit entrypoint that captures the current phase before asynchronous party/asset
+  construction and may advance only that exact phase. Normal SelectStarterPhase execution remains unchanged.
+- The migration covers the shared classic/challenge/GameManager launchers, developer scenarios, replay tools,
+  the ER player regression, and all detached Showdown test fixtures. The Showdown/tournament production modes
+  were not changed. A fast source contract pins the captured-phase entrypoint so future fixtures cannot silently
+  restore the old unrelated-phase advancement dependency. The entrypoint captures the owning phase manager as
+  well as its current phase before asynchronous construction, so a later global-scene swap cannot redirect the
+  completion into another browser/test scene.
+- Corrected exact-SHA full co-op gate `30879903358` is running on `de84fa69e`. The superseded gate
+  `30878504470` finished with every runtime red rooted before co-op construction in the detached-launcher
+  TitlePhase stall, plus the already-corrected import format and stale scheduler source assertion. Preserve the
+  focused registered-interactions browser run `30878110322` on gameplay SHA `087be79c2`; it remains the direct
+  product proof for the Wobbuffet single-controller rendezvous and must not be cancelled or replaced by the
+  headless gate.
+- Gate `30879903358`'s fast-contract job found one additional stale test spelling: the learn-move scheduler
+  assertion still searched for `successorWasStarted(selectedSuccessor)` after the modal-race fix deliberately
+  made `selectedAfterClose` the post-commit identity. The assertion now pins that actual stronger identity;
+  running runtime shards remain untouched and continue to qualify the launcher migration.
+- The corrected B13 shard then reached its first real replay test and exposed one remaining detached fixture:
+  the host-KO presentation test called `CoopReplayTurnPhase.start()` while live `CommandPhase` remained current,
+  so identity-safe `end()` correctly refused to shift it and the test observed no faint at all. The test now uses
+  its file's existing production-equivalent `replaceWithCoopAuthoritativePhase` replay driver. This is harness
+  repair only; captured logs showed production replay queued move/HP/faint/finalize in the correct order.
+- Live staging report `2026-08-04T05-24-16-325Z` on `087be79c2` proves the forced Fun and Games battle now
+  enters and resolves all three turns, including Wobbuffet faint, Victory/EXP, TURN_COMMIT rev 6, and the
+  post-BattleEnd `ME_TERMINAL battle-settled` at rev 7. Both peers ACKed that terminal through
+  `controlInstalled`; the authority nevertheless remained in `MysteryEncounterRewardsPhase` with the guest
+  waiting for its final terminal. Root cause is the V2 physical-input freeze: the KO callback opens one
+  action-only loss narration after the battle handoff, while the existing host-engine narration carve-out
+  categorically rejected every handoff-era MESSAGE. The lease now reopens only after the retained active ME
+  control is `battle-settled` or `reward-settled`, and the same post-battle text is streamed cosmetically to
+  the renderer. Live battle narration still cannot borrow this lease.
+- Registered-interactions run `30878110322` independently proves the Wobbuffet spectator rendezvous itself is
+  fixed: host and guest converged at `cmd:2:1`, the guest installed its real watcher, and the host exposed an
+  actionable `command:fight`. The browser driver then mislabeled that skip-to-fight command as passive because
+  its shared-frontier matcher accepted only the root `command:command` surface. The command admission/frontier
+  and depleted-seat partition now treat readiness-proven `command:fight` as the same exact addressed command
+  owner, allowing the outer campaign loop to drive all three direct turns and reach the newly fixed KO tail.
+- Exact-SHA journey `30881554604` caught one browser-entry integration omission before staging: its diagnostic
+  lease mirror still called `coopHostEngineDialogueMessageAdvanceAllowed` with the pre-KO signature. The entry
+  now imports and supplies the same `coopMePostBattleContinuationActive()` proof as production UI/runtime, so
+  the observer cannot disagree with the input gate about the retained Wobbuffet continuation. This is observer
+  wiring only; the journey stopped at remote typecheck before building or exercising gameplay.
+- Follow-up exact-SHA journey `30882089205` proved the complete owned TypeScript slice clean (206 unrelated
+  baseline diagnostics) and stopped only on two deterministic Biome formatting deltas in the new predicate and
+  skip-to-fight frontier expression. The source now matches the remote formatter's printed output exactly; no
+  gameplay or test mechanism changed in this follow-up.
+- Exact-SHA journey `30882318510` again proved the owned TypeScript slice clean and reduced the style-only red
+  to Biome relocating the long Wobbuffet authority comment through the boolean chain. The same predicate is now
+  expressed as a named `hasNarrationLease` boolean with the authority explanation above it, eliminating the
+  formatter ambiguity without changing the admitted states.
+- Exact build `1a60ad618` passed the complete journey build/seal static and contract stage, then deployed green
+  to staging in run `30882709713`; the canonical staging `version.json` reports that exact SHA. Production was
+  not touched. Its registered-interactions two-browser proof is run `30882551464` and remains protected while
+  the Wobbuffet KO/loss-narration continuation is exercised through the public UI.
+- The old full gate `30879903358` did not reveal another product-authority defect in its between-wave reds. Its
+  guest traces show Authority V2 reconstructing the correct wave/field, followed by the HEADLESS-only atlas
+  model leaving every newly constructed battler on `pkmn__sub` with no cache or animation entry. The unchanged
+  production presentation wall then correctly failed closed. The model previously scanned only Pokemon that
+  existed at a phase boundary; an authoritative state transaction can construct and call `loadAssets()` inside
+  one continuation, before another scan is possible. The harness now hooks both BattleScene Pokemon-creation
+  chokepoints synchronously and refreshes direct abbreviated re-mirrors, while still running the real loader
+  before modeling only Phaser's missing HEADLESS cache/live-key effects. A regression creates and loads a fresh
+  post-install enemy and requires the exact texture, animation, and live sprite key.
+- Exact public-UI run `30882551464` is green on staging SHA `1a60ad618`: Mystery type 27 was driven by its
+  assigned guest owner through the embedded battle and retained post-KO narration, the reward surface opened,
+  and both Chromium clients reached the next Mystery frontier on wave 3. This is the human-equivalent proof
+  that the live Wobbuffet KO continuation no longer parks either client after `battle-settled`.
+- Gate `30883819101` qualified every runtime shard except B9 after the HEADLESS creation-hook repair; prior B5,
+  C1, C3, B10, and P1 Title/atlas failures are green. B9 is a test clock bug: it started the asynchronous
+  authoritative Mystery presentation and immediately asserted field seating, before the production atlas wall
+  could resolve. The regression now waits for the actual `TurnInitPhase` actionability boundary and retains all
+  field/container/sprite/info-bar assertions. The other red was the already-corrected static import/unused-arg
+  pair; neither red demonstrates a production defect.
+- Corrected gate `30884814489` is green on exact SHA `1d1ec0adb`: all 33 jobs passed, including every
+  deterministic Authority V2 shard, mutation assurance, browser-native WebRTC/rejoin, and static contracts.
+- The final animations-enabled registered-interactions run `30885322016` reached the wave-2 Fun and Games
+  battle with both sprites present and both engines progressing through turn 2, but the browser driver waited
+  for an impossible second turn-1 command owner. The authority's one `CommandPhase` emitted `command:command`
+  and then `command:fight` with the same exact address and `phaseInstance=53`; the append-only scanner counted
+  those two views of one menu as two battler commands. The driver now identities a decision by browser, exact
+  address, and runtime phase instance, retires same-instance submenu aliases, and preserves two real same-seat
+  battler commands because their phase instances differ. A failure-first pure regression reproduces the exact
+  animation-on ordering and requires the alias to be retired before the final-owner presentation proof.
+- Corrected animations-enabled run `30888258354` proves the command alias repair: both browsers completed the
+  animated wave-1 turns, faint replacement, Revival, and reward. At the wave-2 Fun and Games encounter both
+  clients had aborted their boot request for `biome-bgm-loop-points.json`; the host later changed music and
+  dereferenced the still-uninitialized `town` entry, throwing from encounter presentation. The enclosing host
+  transaction then reset only that browser to Title while its guest remained in `NewBattlePhase`. Biome music
+  metadata is now initialized to an empty map, resolved through a finite zero fallback, and its optional fetch
+  rejection is contained. The same transaction catch now uses the retained shared terminal for authoritative
+  sessions instead of ever abandoning a peer through a host-only reset. Focused data and wiring regressions pin
+  both halves; the exact SHA still requires remote gate and animations-enabled browser requalification.
+- Full exact-SHA gate `30913821192` is green on `2bbe3c3b1` across all 32 jobs. Its animations-enabled
+  registered-interactions requalification `30913823828` was cancelled externally at 14:05 while both clients
+  were healthy in the wave-2 Wobbuffet battle (heartbeats 200, wave 1 already complete). Its build/static stage
+  was green and both diagnostic artifacts are preserved under `.artifacts-registered-30913823828-cancelled`;
+  the cancellation is infrastructure/process evidence, not a product verdict.
+- Paired staging logs `2026-08-04T13-38-57-460Z` / `13-38-59-075Z` show Greater Ability Randomizer itself
+  committed identically and advanced both parties. The reported blank player side followed a Check Team
+  `REORDER [2,0]`: the owner removed the old lead before the promoted battler's atlas completed, while the
+  watcher changed only its party array and never reconciled the field. The shared presentation projector now
+  loads every promoted active battler behind the still-visible old field, then atomically hides stale objects
+  and exposes the exact party-front field on both clients without replaying summon mechanics.
+- The same nested return exposed a broader cursor weakness: relative `uiInput` replay cannot converge accounts
+  with different `shopCursorTarget` preferences and cannot repair a watcher left on the top reward screen while
+  the owner visits Check Team. The cosmetic FIFO now carries an absolute ModifierSelect cursor checkpoint after
+  every real handler (re)install, retrying until both owner capture and watcher application are actionable. It
+  remains presentation-only; authoritative choices and mutations still use retained interaction commits.
+- The Greater Ability Randomizer two-browser profile now must drive the exact public path through ordinary keys:
+  reward action row -> Check Team -> Move slot 0 -> swap with slot 2 -> prove identical party order and fully
+  visible active sprites/info bars on both clients -> return -> prove the watcher received the owner's absolute
+  reward cursor. The previous journey selected only the reward and therefore could not catch either live defect.
+- Exact-SHA co-op gate `30920221918` is green across all 32 jobs at `46242a915`. The first animations-on
+  Greater Randomizer journey `30921224449` never launched Chromium: its stricter owned-file check found format
+  drift plus Biome's static cycle detector retaining the deferred UI -> field-projector edge. The behavior gate
+  had already proven the deferred import was runtime-safe, but the dependency graph is now structurally clean as
+  well: a type-only one-way party-reorder presentation registry separates UI callers from Pokemon presentation
+  classes, and the ordinary field-presentation module installs the concrete projector before reward handling.
+- Parallel exact-SHA requalification at `f9e0c697d` (`30921736586` gate, `30921739860` journey) proved the cycle
+  diagnostics were gone. Both static jobs stopped only on Biome's safe import-order assist in the two registry
+  callers; Chromium again did not launch. The imports are now canonically ordered. The already-running gate
+  shards remain valid behavioral evidence because this final correction changes import order only.
+- Exact-SHA animations-on run `30922386512` reached the newly representative Greater Randomizer Check Team
+  reorder and failed on the original blank-field symptom rather than passing a party-array proxy. Both clients
+  mechanically adopted `[bench, guest lead, old lead, bench]`, but the watcher carrier marked only the unchanged
+  guest lead as presented. The owner had started the asynchronous promoted-atlas settle and immediately
+  published the V2 CHECK result; capture therefore observed the promoted lead as not yet on field. The watcher
+  correctly applied that immutable presentation bit, skipped mechanical replay in projection-only mode, and
+  retained one visible battler indefinitely. The owner now blocks further PARTY input and defers publishing the
+  CHECK result until the promoted field is actually ready under the phase-owned runtime. The watcher also runs
+  the same readiness projector after DATA application and withholds `controlInstalled` until the exact active
+  sprites and info bars exist. A failure-first projection-only regression models DATA-first party permutation,
+  delayed atlas completion, old-field retention, and final exact field replacement.
+- The first exact rerun at `eb1718da0` stopped before Chromium on one unused local caught by the owned-file
+  formatter. Corrected SHA `ba30d35f6` passed the full bundle/static and focused reorder preflight; real-browser
+  run `30926493613` is the authoritative animations-on Check Team proof and must not be replaced by the earlier
+  matrix-dispatch failure `30925644568`, whose build was green but whose journey job was never created.
+- Paired browser artifacts and the latest staging logs expose a separate guest-only trainer asymmetry: the host
+  executes `ReturnPhase -> ShowTrainerPhase -> NextEncounterPhase`, while the signed V2 renderer went directly
+  to `NextEncounterPhase` and the guest branch of `ShowTrainerPhase` explicitly hid the trainer. The signed
+  destination tail now queues a presentation-authorized trainer phase before trainer/ME/new-biome encounters.
+  That phase hides only Pokemon sprite/info layers (mechanical field membership and checksum stay intact),
+  renders the normal trainer tween, and leaves the authoritative encounter projector to reveal the destination
+  field. Unsigned/stale guest trainer phases remain fail-closed. New CI-only positive evidence requires this cue
+  plus enemy-trainer intro and victory presentation on both real browsers; final-hidden cleanup alone no longer
+  qualifies the lifecycle.
+
+2026-08-09 - Fun Mode staging checkpoint
+
+- Added a standalone Fun Mode configuration screen with independent Pokemon, type, ability, and level-up move randomizers. Runs use Youngster cadence, skip difficulty selection, and grant no Favor, candy multipliers, or vouchers.
+- Randomized per-Pokemon state is deterministic from Pokemon identity so saves and battle reconstruction retain the same types, abilities, innates, and learnset. Random encounters use the full starter-safe species/form pool and bypass the BST clamp only when the Pokemon randomizer is enabled.
+- Implemented Klutz item suppression and adjacent-ally Symbiosis transfer. Removed stale `(N)` markers from Klutz, Symbiosis, Overzealous, Sunstrike, and Tempest Storm, and aligned their displayed descriptions with runtime behavior.
+- Verification: Fun Mode suite 11/11, Klutz/Symbiosis focused integration scenarios green, ability-overhaul suite 25/25, targeted TypeScript diagnostics clear, full Vite build green, and staging deploy `31290756176` green at `a578bf5f7`.
+- Visual harness: desktop and 390x844 mobile layouts are non-overlapping; toggles, START, direct starter-select flow, and return-to-config behavior work; no browser console errors were emitted. Production remains untouched.
+
+2026-08-09 - Fun Mega Mode staging checkpoint (UI revision pending approval)
+
+- Added Mega Mode and Stat Shuffle toggles plus a one-time pre-wave-1 party ability review/reroll screen.
+- Mega Stone metadata now derives each stone's stat delta from its real source and target Mega forms. Species with real Megas use only their compatible form; species without one receive a saved, temporary pseudo-Mega record that preserves their sprite and abilities while applying the stone delta.
+- Stat Shuffle applies to every Pokemon whenever selected and preserves that Pokemon's BST. When a Pokemon is real- or pseudo-Mega'd, the shuffle runs after the Mega statline is established, so it redistributes the full effective Mega BST rather than the pre-Mega stats.
+- Pseudo-Megas expose `isMega()`, save/load through `CustomPokemonData`, and show a compact gold `M` marker beside their name in battle info, party, and summary UI.
+- Mega Mode starts with a Mega Bracelet, puts all available Mega Stones in the Ultra reward generator, suppresses the Rogue stone generator, increases stone frequency, and ramps generated enemy Megas from 8% on wave 1 to 100% from wave 50.
+- Every Mega Stone reward/item description previews its source-to-Mega transition and all six stat deltas. The pseudo-Mega applies that delta only after the stone is assigned; Stat Shuffle then redistributes the already-effective Mega statline without changing its BST.
+- Verification after the Stat Shuffle correction: focused Fun Mode suite 17/17, no targeted TypeScript diagnostics, Biome has informational complexity notices only, and the full Vite production build is green. The repository-wide typecheck still has unrelated baseline failures outside the touched files.
+- UI approval gate: three selector/reroll directions are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options`. Do not treat the compact reroll layout as approved or deploy its revision until one option is selected. Production remains forbidden.
+- UI process rule: for new player-facing screens, prepare multiple labeled visual options on the Desktop for owner approval before locking in or deploying the layout; continue non-visual implementation and testing in parallel.
+- Exact staging artifact: `5a92e90a76586fb7c122ce23748abe7566606256`, deploy run `31333105827`. Topic branch only; production and `feat/elite-redux-port` remain untouched.
+
+2026-08-09 - Fun Mode UI continuation
+
+- Fun Mode's modifier selector now follows the Challenge Mode presentation and controls: 60/40 list/detail split, matching boolean arrows, orange description text, matching START bar/cursor, and a header `Last Setup` button.
+- Last Setup is saved per account when a Fun Mode run starts. It restores all six modifier choices and deliberately resets the ability-reroll seed instead of silently restoring a previous randomized party result.
+- The ability review no longer hides descriptions behind Pokemon selection. Its two-column/six-card layout renders every party member's active ability, three innates, and all 24 short descriptions at once; only `REROLL ALL` and `START RUN` receive input focus.
+- Alternative all-description layouts are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options v2`. The implemented baseline is the refined two-column Option A requested by the owner; visual iteration can continue without reverting the persistence or input work.
+- Verification: focused Fun Mode suite 18/18, touched-file TypeScript diagnostics clear, Biome clean except one pre-existing informational notice in `src/utils/data.ts`, and the full Vite production build is green. Staging canvas verification remains required before promotion; production remains forbidden.
+
+2026-08-09 - Fun Mode refined ability review
+
+- Replaced the interim card layout with the selected refined Option C: no title/header band, six compact full-width Pokemon rows, four always-visible ability columns per row, and smaller `REROLL ALL` / `START` controls.
+- Each Pokemon now receives six distinct deterministic randomized abilities. Slots 0-2 are three independently randomized choice abilities and slots 3-5 are three independently randomized innates; `REROLL ALL` regenerates the complete six-slot set.
+- A selected Pokemon shows a compact `R A1/3` indicator. `R` cycles that Pokemon's active choice ability, while every current ability name and description remains visible for the full party.
+- Long descriptions are word-safe paginated and rotate automatically every 2.8 seconds with dynamic text sizing, preventing them from overflowing their ability column.
+- Verification: focused Fun Mode suite 18/18, including six-slot uniqueness and reroll stability; touched-file TypeScript diagnostics clear; `git diff --check` clean; full Vite production build green. Production remains forbidden.
+- Exact staging artifact: `a4361d4422865fd5ade18a2a05fb9d432434cbf1`, deploy run `31336966322`. Live Phaser verification covered the Challenge-style selector, three-Pokemon ability review, `R` choice cycling, timed long-description paging, complete reroll, and continuation into the run without layout overlap or Fun Mode UI exceptions. The static A/B/C comparison images remain under `C:\Users\Hafida\Desktop\Fun Mode UI Options v2`; the live staging pass was inspected directly in the browser harness. The shared feature branch and production remain untouched.
+
+2026-08-10 - Fun Mode modifier continuation (ability UI approval still blocked)
+
+- The live Option C at staging artifact `a4361d4422865fd5ade18a2a05fb9d432434cbf1` was explicitly rejected: its source text rendered unreadably small and the three-Pokemon case left most of the screen unused. It is not approved. No replacement ability-review layout has been added to the game diff or deployed.
+- Added four independent, composable Fun Mode modifiers: Evolution Shuffle, Item Chaos, Weather Roulette, and Move Scrambler. Last Setup accepts legacy six-toggle saves and initializes every newer toggle to off.
+- Evolution Shuffle preserves each original evolution trigger and timing, but deterministically replaces the result with a starter-safe random species/form. Generated enemies use the same shuffled evolution result once their normal evolution threshold succeeds.
+- Item Chaos gives every eligible reward tier and item equal weight, suppresses luck-based tier upgrades, applies the same equal weighting to enemy held-item pools, and guarantees at least one random held item per generated enemy. Explicit scripted/guaranteed rewards remain explicit.
+- Weather Roulette rerolls clear or a supported normal/Elite Redux weather at every encounter. Move Scrambler replaces the successfully used move slot after resolution for player and enemy Pokemon, excludes unavailable moves and duplicates, resets PP state, and does not fire on charge setup or virtual follow-up uses.
+- Updated the Challenge-style Fun Mode selector to scroll ten independent toggles while retaining the Last Setup and Start controls. The ability-review UI remains untouched pending visual approval.
+- New three- and six-starter layout mockups are saved under `C:\Users\Hafida\Desktop\Fun Mode UI Options v3`. They are review images only. C1 adapts from three spacious rows to six compact full-width rows; C2 demonstrates the smaller two-column tradeoff.
+- Verification: focused Fun Mode suite 22/22; no touched-file TypeScript diagnostics (repository-wide typecheck still has unrelated baseline failures); `git diff --check` clean; full Vite development build green. No staging or production deployment was made from this continuation, and `feat/elite-redux-port` remains untouched.
+
+2026-08-10 - Fun Mode adaptive ability review and Mega presentation
+
+- Replaced the rejected fixed six-row ability review with the approved C1 adaptive layout. One to three starters use three spacious rows; four, five, and six starters progressively use 40-, 32-, and 27-pixel rows. Icon scale, name width, typography, wrapping, description page length, dividers, and cursor bounds change as one density so every ability and description remains visible without shrinking to unreadable text.
+- Mega Mode's Ultra reward generator now includes every registered Mega Stone. Stones matching a real Mega in the current party receive four entries in the weighted pool while every other stone retains one entry, so compatible stones are preferred without excluding unusual pseudo-Mega templates.
+- An unmatched stone may now grant a stat-only pseudo-Mega to any non-Mega Pokemon, including a species that has a different real Mega. A matching stone still selects the actual Mega form. The saved pseudo-Mega record, effective-Mega Stat Shuffle order, and single-stone-per-Pokemon rule are unchanged.
+- Replaced the placeholder gold `M` with a transparent gold Mega emblem in battle info, party slots, and summary. The emblem lives in `Heraklines/er-assets` commit `2e3a97169` so staging can pin it without changing production's current immutable asset SHA.
+- Added one shared six-stat delta panel for Mega Stone rewards and summary item hover. It names the source and target form, displays exact signed deltas, and draws positive/negative bars around a common baseline. Ordinary runs retain their existing item-description behavior.
+- Verification: focused Fun Mode suite 22/22 and standalone Cloudflare payload build green. Repository-wide typecheck remains red only on unrelated baseline terrain/vendor/test errors and reports no touched-file error. Production remains forbidden.
+
+2026-08-10 - Ability Avalanche and final Mega presentation correction
+
+- Ability Avalanche preserves the normal active ability plus all three base innate slots. Its first randomized extra is explicitly `Ability 5` at wave 60, followed by Ability 6/7/etc. every 20 waves; extras are deterministic, duplicate-free, and apply to player, wild, and trainer Pokemon.
+- Summary and in-battle Info now use the same focus contract: Confirm enters the ability list, Up/Down scroll only while focused, and Cancel exits list focus. Outside list focus, Up/Down retain their existing Pokemon-switching behavior. A second Confirm in Summary opens the selected ability's long description.
+- Both screens reserve a separate control strip with scroll arrows/ranges, so the controls never overlap ability descriptions. The initial Summary frame visibly contains the active ability, all three base innates, and Ability 5; scrolled frames visibly reach Ability 6 and later slots.
+- Battle Info always keeps its graphics fallback beneath streamed ROM art, preventing partial/blank panels when a player opens or scrolls the list while assets are still settling.
+- Corrected the prior Mega note: the final transparent Mega Evolution emblem is in `Heraklines/er-assets` feature commit `31c2642a4`. The rejected separate stat panel was removed; reward, summary-item, and battle-item Mega deltas extend the native item description instead.
+- Verification: Fun Mode/Avalanche logic 24/24; focused Biome error gate and `git diff --check` green; final nine-recipe Fun Mega/Avalanche visual regression batch green, including initial/focused Summary and Battle Info states. Fresh screenshots are under `C:\Users\Hafida\Desktop\Fun Mode UI Preview`. No staging or production deployment was made, and `feat/elite-redux-port` remains untouched.
+
+2026-08-10 - Fun Mode selector parity and Weather Chaos correction
+
+- Corrected the selector's premature seven-row scroll limit to the same nine-row budget as Challenge Mode, eliminating the unused lower-left space. Small pixel arrows now independently indicate whether earlier or later modifiers remain off-screen.
+- Added Challenge Mode's saved-setup behavior to the START region: LEFT/RIGHT switches between START and Reuse Last Setup, Confirm applies the selected action, and Cancel returns from the header/START focus to the modifier list. The existing header Last Setup shortcut remains account-specific.
+- Renamed Weather Roulette to Weather Chaos and changed its player-facing description to `Every encounter begins with random weather/terrain, including clear weather.` The behavior now independently rolls every supported weather (including clear) and terrain (including no terrain) at biome entry and between encounters in the same biome.
+- Production remains forbidden. Deploy only the isolated Fun Mode branch to staging, with the co-op signaling Worker disabled.
+
+2026-08-11 - Moody Mode implementation and visual closure
+
+- Normal staging and production remain forbidden. No deployment was made. The only allowed publication target remains a separate isolated Moody preview with co-op signaling disabled.
+- The catalog contains 100 boons and 30 curses. All 30 curses and 99 boons are executable through production-reachable adapters with deterministic event, choice, lifecycle, combat, progression, and save/load coverage.
+- Set Collector is the sole deliberate exception: its source specification explicitly blocks release until the item-and-vitamin catalogue is audited and sensible sets are authored. It remains fail-closed and cannot be drafted; a regression pins that boundary so invented generic sets cannot silently ship.
+- Recruiter's Eye generates durable encounter-scoped ability, egg-move, and nature traits; capture odds and post-capture ownership commit through AttemptCapturePhase. Bounty contracts, Recycler, Warranty, Contraband, Blood Market alternatives, formation/field timed effects, Feedback Loop accounting, Apex segments, and coordinator choices are wired through their live producers and consumers.
+- Moody UI now covers boon lifecycle choice, dense Ledger, party/summary attachments, enemy ability overflow, battle HUD progress, contextual choice/target queues, biome reports, Borrowed Future, Bounty, Recycler, Legacy, Blood Market, Pressure, item stacks, and run recap. Desktop and mobile captures cover all 17 surfaces.
+- Synthetic Kimi K3 visual review identified three blocking layout defects. Boon description pagination now reserves a whole-line pager gutter, Ledger title/tabs/footer no longer collide, and the party state summary no longer overlaps Cancel. All three were recaptured and verified on desktop and mobile.
+- Final deterministic evidence: core suite 15/15 files and 489/489 tests; field suite 3/3 files and 192/192 tests; Phaser/UI suite 8/8 files and 50/50 tests. The final Vite development bundle built 3,583 modules and minified 14,365 JSON files successfully.
+- Repository-wide TypeScript remains red only on unrelated baseline files and produced no Moody/touched-file diagnostic. Scoped formatting and `git diff --check` are required to remain green before committing or publishing the isolated preview.
+- Isolated preview publication completed at `https://elite-redux-moody.pages.dev/`. It is a new Cloudflare Pages project, uses staging save/telemetry endpoints, has Showdown/tournaments disabled, and points co-op at a non-routable origin. Neither normal staging nor production was deployed.
+- The preview bundle is pinned to immutable `er-assets` SHA `478de96ef00e8edd2955003c66bbef4b02d63d1e`. A fresh deployed-browser smoke pass reached the Phaser canvas at desktop size with zero failed or HTTP 4xx/5xx asset requests; direct checks for the pseudo-Mega emblem and new arena art returned 200.
+
+2026-08-11 - Moody cadence and native UI correction
+
+- Corrected the run cadence: the opening presents three boons first and attaches one deterministic Dread I curse only after the chosen boon commits. Every later ten-wave boon draft attaches one new non-repeating random curse, with Dread II/III weight increasing by wave.
+- Both the opening draft and recurring draft now share an exactly-once completion path. A successful selection or a rejected UI transition commits the curse and advances the run/phase once, removing the former curse-first black-screen route.
+- Removed the permanent battle overlay. Battle now defaults to a compact left-edge `MOOD` tab that expands on left navigation or touch; the complete inspection surface remains the Summary `MOOD` page and Ledger.
+- Party effects use the native active/benched slot silhouette as a one-pixel rarity-colored outline plus compact color pips. The outline follows each sprite's chamfered corners; pip text was removed after visual testing proved pixel-font glyphs could obscure the card.
+- Battler-specific Moody state is marked beside the native name icons. Barrier is rendered as a white terminal segment inside the existing HP bar instead of a separate panel. Automatic biome reports and Final Draft choices use compact contextual surfaces.
+- Desktop and 390x844 captures were reviewed twice with Synthetic Kimi K3. The final pass found no blocker in the native party outline/pips, Summary detail view, expanded battle panel, or collapsed battle default.
+- Verification: focused cadence/UI suite 27/27; complete Moody suite 25 files and 572/572 tests; Frostbound's state-only runtime regression 18/18; touched-file TypeScript diagnostics clear; direct scoped Biome check and `git diff --check` green. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+- Isolated preview deployment `2707aecc` is live at `https://elite-redux-moody.pages.dev/`, built from game commit `1b1694cb0` with the immutable assets pin, staging save/telemetry endpoints, disabled co-op origin, and Showdown/tournaments disabled. The canonical domain serves the exact built entry bundle and a deployed-browser smoke reached the 1920x1080 Phaser canvas with no failed requests.
+- Removed the oversized party-card overflow text and the redundant selected Pokemon name from the Moody detail box. The box now lists four exact boon/curse/runtime labels plus a compact remaining count; desktop/mobile harness captures verify the native card markers and single-line detail layout. Barrier geometry is explicitly tested as a terminal HP-bar segment sized by `barrier / maxHp` and clamped to current HP; its final pale-cyan base, diagonal cyan shield hatch, and solid leading cap visually separate it from both green HP and the empty white track.
+
+2026-08-11 - Moody progression clarity and trainer parity
+
+- Rank-up cards now show the current and next ranks as a compact arrow plus only the exact upgrade delta. They no longer repeat the full previous-rank description.
+- Mithridatism now exposes exact cure progress and thresholds in player-facing UI. Resistance I activates after three cures at 50% prevention; Resistance II activates after six cures at 75%, and Weaponized displays its exact +25% damage and 20% damage-reduction effects while afflicted.
+- Fixed the live Mithridatism formation adapter to apply the documented 50%/75% prevention tiers. Internal serialized tracker keys are filtered from every player-facing progress list.
+- Trainer boon generation now spends the same number of boon acquisition points as the player and cannot waste a point by rolling an already max-rank boon. Trainers remain curse-free. Their actual boon loadout, rank, target, description, and accumulated power are available from a mirrored right-side battle drawer.
+- The player and trainer battle drawers use shared keyboard, controller, and pointer input, include scrolling indicators, and reposition between the opposing health stacks in triple battles. The post-draft curse report displays the exact curse and requires confirmation before play resumes.
+- Party layout and its selected-effect panel now adapt to the actual party size and visible progress volume. Counter-based boons, including Mithridatism, show their current counts and next threshold.
+- Verification: focused Moody logic/UI suite 5 files and 264/264 tests; scoped formatting and `git diff --check` green; standalone Cloudflare payload build green with 1,735 files. Synthetic Kimi K3 visual review was completed; the final pass corrected the curse dialog's fixed-height dead space, widened battle-drawer wrapping to the actual panel bounds, and strengthened its scroll indicator. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+- Isolated preview deployment `e8043048` is live at `https://elite-redux-moody.pages.dev/` from game commit `a962c5ded`. Canonical and deployment URLs serve the final bundle, and the deployed asset redirects were directly verified against immutable `er-assets` SHA `478de96ef00e8edd2955003c66bbef4b02d63d1e`.
+
+2026-08-11 - Moody draft transition regression
+
+- Root cause of the post-boon black screen: both opening and recurring boon drafts were destructively opened with `setMode`, while the picker closes through `revertMode`. That left no prior UI mode in the chain, so the mandatory curse receipt restored a dead/full-screen draft owner instead of the battle or starter surface.
+- Both draft entry points now use `setOverlayMode`, matching the picker and curse report close contract. Focused Moody surface tests pass 14/14. No site was deployed.
+
+2026-08-11 - Moody trainer-effect flyouts and pre-battle guard
+
+- Boon and curse activations now reuse the native ability-bar lane with a violet trainer-owned treatment: a compact `TRAINER BOON`/`TRAINER CURSE` label, exact effect name, accent line, and a cropped upper-trainer portrait contained inside the bar. Long names scale and truncate within the existing bar width; no new persistent battle overlay was added.
+- Every one of the 100 boons and 30 curses has an explicit `flyout` or `drawer-only` policy. Runtime and formation adapters emit structured player/enemy cues, while passive/economy effects remain in the Ledger/drawers. Display Settings exposes `Boon & Curse Trigger Banners`, defaulting to On.
+- An occupied ability bar is hidden before the trainer effect is retried, preserving the shared presentation lane without overlapping or looping banners. Dedicated boon and curse dev scenarios cover the visual treatment.
+- Fixed a second opening-run black-screen source: pre-battle stat queries could dereference `currentBattle` before EncounterPhase created it. The runtime battle key now returns a deterministic `prebattle` sentinel, with a regression proving speed lookup is neutral before a battle exists.
+- Live Phaser verification reached combat from the Fun selector and displayed the violet Mithridatism trainer banner after the opening switch prompt and move commitment. The complete focused gate passed 5 files and 226/226 tests; the local production build compiled 3,584 modules and minified 14,365 JSON files successfully.
+- No normal staging, isolated preview, Cloudflare Worker, asset host, or production deployment was performed for this work.
+
+2026-08-11 - Moody inspection, persistence, lead enforcement, and trainer banner closure
+
+- Replaced the battle drawer's debug-oriented output with a names-first accordion: player boons precede curses, the enemy drawer lists boons only, Confirm expands exactly one selected entry, and internal progress IDs plus recent-trigger history are no longer player-facing. Expanded entries retain human-readable counters, thresholds, stacks, and effect values.
+- Restless Lead now validates the selected lead against the previous battle's persistent lead, records valid selections immediately, and automatically moves the first conscious reserve into lead when the repeated lead is invalid. The replacement is recorded through the same event path, preventing the curse from becoming a no-op on the next battle.
+- Underdog Dividend now uses the live party-average level in both its description and runtime calculation. Its UI states the exact five-level threshold, +2% per-level five-stat scaling, caps, XP multipliers, and unevolved multiplier.
+- Borrowed Future is trainer-battle-only, shows each active opposing lead and its committed move in a compact top strip, and delegates lead changes to the native party reorder screen. Only active lead slots can initiate replacement, the forecast is hidden while reordering, and the player can begin or leave the reorder screen without becoming trapped.
+- Confirmed save/reload persistence for committed boon ranks/evolutions/targets, curse state, counters/flags/values, dormancy, formation state, and persistent field values such as Restless Lead's previous lead. The round-trip regression compares the complete serialized Moody payload after restore.
+- Trainer-owned boon/curse cues reuse the native ability flyout with the approved violet treatment and no redundant TRAINER BOON/CURSE text. The player portrait path remains unchanged. Enemy portraits scan the original untrimmed atlas dimensions, preserve the full horizontal sprite, display the actual upper half, clear inherited tint/flip state, sit after the title, and align their cut edge to the visible banner boundary.
+- Runtime ownership remains complete for all 30 curses and 99 releasable boons. Set Collector is still the sole fail-closed exception and remains excluded from drafting until its curated set catalogue is authored.
+- Verification: engine-neutral Moody gate 15/15 files and 514/514 tests; field gate 3/3 files and 198/198 tests; Phaser/UI gate 9/9 files and 56/56 tests. Repository-wide TypeScript still exits on unrelated baseline failures and reports no diagnostic in any touched file. Normal staging and production remain forbidden; publication is limited to the isolated Moody preview.
+
+2026-08-11 - Full Mix, trigger noise, and telemetry controls
+
+- Added Full Mix as the second Mega Mode variant. Pseudo-Mega stones can now apply their stat delta alone or additionally contribute one non-duplicate Mega type and replace innate slots one and three with the selected Mega template's corresponding innates. Proper Mega evolutions retain their authored forms.
+- Summary Stats Confirm now cycles through calculated stats, IVs, and the effective six-stat base spread. The base-spread view deliberately reuses the native stat rows without an oversized BST heading.
+- Continuous Moody effects are drawer-only. Trigger flyouts are restricted to discrete combat events, and Type Tax no longer emits a false trigger when the acting Pokemon has no duplicated type.
+- Added a general `build:standalone:no-telemetry` target. Staging and production deploy workflows now expose a default-on `collect_player_training_data` switch; disabling it sets only `VITE_TELEMETRY=off` and leaves save, tournament, Showdown, and matchmaking endpoints intact.
+- Moody remains unpromoted until integration verification completes. No normal staging or production deployment was performed.
+
+2026-08-12 - Player-training telemetry removal and Moody performance follow-up
+
+- Removed every runtime integration for the recently added player-training telemetry: startup initialization, command snapshots, joint-action capture, turn/battle/run outcomes, capture/run events, session teardown, and raw UI input/surface/choice emitters. The telemetry implementation files remain dormant for reversibility, while tournament, matchmaking, save, and existing Showdown control-plane behavior remain intact.
+- Reduced Rest Cycle to 5% HP and 1 PP at base and 10% at rank II, with matching player-facing descriptions.
+- Corrected boon draft composition: before the 12-boon cap, upgrades now occupy about 30% of offer slots, no draft can become three upgrades, and one draft cannot repeat the same boon. At the cap, distinct rank-up offers fill the draft.
+- Made Moody trigger banners use fixed wall-clock entrance and hold times, so high game speed no longer makes them disappear immediately.
+- Decoupled Shiny Lab battle refresh cadence from game speed and reduced CPU refresh frequency as active battler count grows. This is a separate older performance improvement, not the identified recent telemetry regression.
+- Verification: targeted Moody/Shiny tests 201/201 green; final standalone no-telemetry build and Cloudflare payload validation green; scoped Biome exits clean with baseline warnings only; `git diff --check` green. No staging or production deployment was performed.
+
+2026-08-12 - Moody/Fun integration release gate
+
+- Fixed Overflow Ward at full HP. Healing phases now preserve the requested overheal event only when an applicable Overflow Ward, Overflow Doctrine, or Shared Cup effect is active, allowing shield conversion without changing ordinary full-HP healing behavior.
+- Fixed Bastion Seat's first-entry detection. It now uses a battle-scoped per-Pokemon entry mark rather than move history retained from previous battles, so the opening barrier is granted exactly once even when the battler has already acted in an earlier encounter.
+- Fixed the Fun Mode return-to-title input lock. Leaving the selector now performs a one-way TitlePhase handoff and returns immediately instead of refreshing the retired full-screen handler after the title menu owns input.
+- The complete integrated Moody/Fun/Shiny gate passes 25/25 files and 597/597 tests. The standalone no-player-training-telemetry build passes with 3,574 transformed modules and a validated 1,731-file Cloudflare Pages payload; scoped Biome formatting and `git diff --check` are green.
+- Set Collector remains the sole deliberate Moody content exception and stays excluded from drafting until curated item/vitamin sets are authored. Production remains forbidden; this checkpoint is eligible only for normal staging verification.
+
+2026-08-12 - Triple-battle command profiling
+
+- Confirmed the current staging build has player-training telemetry disabled, so no network or IndexedDB telemetry work runs during turns.
+- A real staging log showed the two enemy decisions in a double battle consuming roughly 1.1s and 1.5s on desktop Firefox before move animation. Triples repeat the same KO, switch-matchup, threat, target, and damage simulations for three enemy slots against up to three opponents.
+- Wrapped each complete enemy AI decision in the existing synchronous active-ability-source cache. This preserves AI scoring and damage behavior while reusing immutable ability/innate/suppression resolution across the many simulations in that command.
+- Removed unconditional move-pool, score-array, sorted-pool, and chosen-move console dumps from the same hot path. They ran for every enemy slot and were multiplied in triples, with additional overhead whenever a browser or the in-game log collector retained console output.
+- Remaining secondary rendering risk: multiple animated Shiny Lab battlers still perform CPU texture refreshes, although their cadence was already reduced for multi battles. This was not identified as the recent regression and was left unchanged.
+- Verification: the enemy-command behavior suite passes 2/2, 12 current triple regression scenarios pass, scoped Biome and `git diff --check` are clean, and the 3,575-module standalone no-player-training-telemetry build plus 1,731-file Cloudflare payload check passes. Seven old triple fixtures now fail only because they still assume the intentionally forbidden wave-1 wild triple; no assertion reaches the optimized command behavior in those cases.
+
+2026-08-12 - Ability Randomizer review readability and flyout control
+
+- Reworked the startup Ability Randomizer review itself, keeping all six Pokemon and their four current ability slots visible while substantially increasing name, ability, and description text sizes. Long descriptions now page every eight seconds instead of rapidly alternating every 2.8 seconds.
+- Added a Display Settings option named `Ability Trigger Banners`, defaulting to On. Turning it Off suppresses native ability flyouts, including Ability Avalanche's large activation sequences, while preserving ability reveals, battle state, and co-op presentation events.
+- The authoritative co-op replay path treats a disabled ability banner as an intentional visual skip, reveals the exact ability slot, and settles the event without waiting on a flyout watchdog.
+- Captured and visually inspected the real six-Pokemon startup review through the existing game scenario harness at `output/ability-review-final-candidate.png`. No temporary capture route remains in production source.
+- Verification: focused ability-flyout behavior passes 2/2, disabled host/guest co-op regressions pass 2/2, scoped Biome and `git diff --check` are clean, and the standalone no-player-training-telemetry build plus Cloudflare payload validation passes.
+- Keyboard and gamepad inputs already share the same immediate UI dispatch and repeat interval. No separate controller-delay branch was found; the earlier main-thread triple AI work may improve the reported symptom, but controller latency has not been independently reproduced or signed off with physical gamepad input.
+- Nothing was deployed. The UI remains local pending visual approval.
+- Follow-up visual pass fixed the startup-review icon geometry: icons now use actual object scaling instead of scale values as origin parameters, are centered slightly right of the screen edge, remain fully visible, and retain a fixed gap before every name. The stable six-Pokemon harness capture verifies the final layout; no deployment was performed.
+
+2026-08-15 - Universal early-wave move-power ramp
+
+- All ordinary damaging moves now use 40% of their fully resolved battle power on wave 1 and scale linearly to 100%. Normal pacing reaches full power on wave 30; Sprint reaches full power on wave 15.
+- The multiplier is applied once in the shared move-power calculation, so player attacks, opponent attacks, AI damage forecasts, variable-power moves, ability boosts, and all battle formats use the same deterministic value. Status moves, fixed-damage moves, and one-hit-KO moves retain their existing special paths.
+- Pre-battle callers fall back to full power when no current battle exists, avoiding menu/setup regressions.
+- Verification: pacing suite 12/12 green; focused headless battle symmetry scenario green for both attack directions at waves 1 and 30; production build green with 3,576 transformed modules and 14,365 minified JSON files; scoped formatting and `git diff --check` green. Repository-wide TypeScript continues to fail on pre-existing unrelated ER diagnostics and reports none in the touched files. Nothing was deployed.
+
+2026-08-15 - Hell and Ghost Trainers snapshot inventory
+
+- In Hell pacing, ordinary trainer encounters after wave 100 in Normal or wave 50 in Sprint deterministically become ghost trainers at an approximately 50% rate. The Ghost Trainers challenge continues to make every eligible trainer encounter a ghost.
+- Every ghost source now uses the same inventory rules: held items and relics from the saved ghost snapshot are restored onto the enemy party, then normal encounter additions such as ward stones, resist berries, boss bars, and other generated modifiers remain layered on top.
+- Combat-relevant relic behavior is side-aware, so enemy ghost relics affect their owner without granting player relic progression or achievements. Run-economy relic effects remain player-only because a one-battle ghost has no persistent shop, map, egg, or run economy.
+- Ghost-held items cannot enter the player's inventory through Thief-style transfer, Trick/Switcheroo, Mini Black Hole, or the shared held-item transfer path. A valid theft instead removes the item from the ghost.
+- Added GitHub-runner coverage for Hell Normal/Sprint thresholds and distribution, deterministic selection, additive snapshot inventory and relic restoration, Ghost Trainers challenge coverage, and theft destruction. No deployment was performed.
+
+2026-08-17 - Postgame Endless continuation
+
+- Completing the final boss in any supported run now offers a continuation into Endless without resetting the party, inventory, relics, boons, curses, pacing, difficulty, or run identity. Declining preserves the normal completed-run flow.
+- Endless loops the 200-equivalent-wave world cadence while retaining permanent progression. Rift pressure starts immediately, pulses every five Normal waves or three Sprint waves, overlaps at the specified depth cadence, and uses the established curse UI when a Rift is acquired.
+- Ordinary trainer encounters are victorious cross-player ghosts with their complete saved held-item and relic snapshots. Normal generated encounter modifiers still layer on top, ghost items cannot be stolen, and attempted theft removes the item instead.
+- Ghosts are normalized against the current player party: player-top level parity with the short Youngster/Ace opening offset, plus role-matched vitamin totals redistributed according to each ghost member's own statline.
+- Added 50-equivalent-wave raids and the 200-equivalent-wave Primal Cascoon finale, including boss segments, two active minions, reserve entry every second segment break, cleanses, seven-move finale support, and the Endless Avalanche curve.
+- Added anonymized, idempotent ghost performance reporting and exact danger weighting. A save-persistent hidden Nemesis relationship can promote dangerous returning ghosts with equipment, boon, donor, replacement, and segment upgrades without exposing account data or adding a player-facing Nemesis label.
+- Endless state, active Rifts, battle overlays, routes, Nemesis progression, and encounter accounting serialize with the run. Focused state regressions are delegated to GitHub Actions; no local test execution or deployment was performed.
+- Returning Nemeses now scale their saved relic stacks separately from ordinary ghosts: unchanged on the first return, 1.5x on the second and third, and 1.75x from the fourth onward, always bounded by each relic's normal stack cap.
+- Removed internal implementation wording from the player-facing Endless Move Scrambler Rift description.
+
+2026-08-17 - Reward-rate panel visibility correction
+
+- Made the compact Shiny/Candy/Voucher multiplier panel an explicit reward-shop opt-in. Ordinary battle and any future non-shop Luck display now force the panel hidden.
+- The post-battle modifier selection handler is the only runtime caller that opts into the panel.
+- The headless game UI harness rendered both `modifier-select-reward-rates` and `battle-command`: the panel is present in the reward shop and absent from the battle command screen. Both captures passed.
+- Nothing was deployed to staging or production.
+
+2026-08-17 - Endless Avalanche visibility, Rift Ledger, and triple presentation hot paths
+
+- Endless keeps its asymmetric guaranteed Ability Avalanche curve: enemies begin with one extra ability immediately after continuation starts while players begin at zero, then each side follows its existing independent depth curve. Battle Info and Summary now classify the actual runtime-added Avalanche ability IDs, so Moody extras, transforms, and black-shiny gifts cannot shift or hide the rows; the existing focus-and-scroll controls expose abilities beyond the four base slots.
+- Added a read-only Rift Ledger to the Endless pause menu. It lists every active pressure/mutation Rift, pulses remaining, acquisition depth, hostility, and the full effect description with list scrolling and paged details. The view reads the already-serialized Endless state and is classified local-only for co-op.
+- The submitted Endless triple log shows AI decisions completing in roughly 20 ms, but repeated Avalanche pool reconstruction plus 119 missing cry/animation-frame warnings during spread presentation. Endless Avalanche selection is now bounded-cached and returns defensive copies; missing cry and animation frames are skipped before Phaser warning/render work. Battle calculations and AI choices are unchanged.
+- Added remote-runner coverage for the opening enemy/player Avalanche asymmetry, cached deterministic selections, Rift display metadata, and a real Rift Ledger render recipe. Local repository tests remain intentionally unrun per maintainer instruction. Browser smoke boot completed; full interaction and visual signoff, GitHub runners, integration, and staging deploy remain pending. Production remains untouched.
+
+2026-08-20 - New Pokemon roster scenario launch repair
+
+- Rebased the five roster showcase scenarios on the proven Endless dev-scenario launch contract: explicit pending starter levels, deterministic Youngster/Normal run settings, and encounter persistence bypass for disposable fixtures.
+- Added a focused headless scenario harness that launches each entry through the same `__erLaunchDevScenarioByLabel` hook used by the in-game dev menu and requires the real flow to reach `CommandPhase` with all six level-100 player Pokemon and a live opponent.
+- Verification: all five roster scenarios pass the harness. No browser automation was used. Production and co-op remain untouched.
+
+2026-08-21 - N-type player battle-info alignment
+
+- Player battle-info compact/expanded transitions now move pooled type tabs 4+ together with the three fixed tabs. Quadruple, sextuple, and later N-type displays therefore retain the existing paired-column overlap instead of leaving extra tabs eight pixels below the health panel.
+- `git diff --check` passes. Staging verification is pending; production remains untouched.
+
+2026-08-21 - Female Mega Alolan Raichu mini icon
+
+- Regenerated the female Mega Alolan Raichu mini icon from its corrected female front-facing source. Its importer entry now explicitly refreshes that derived icon so future source regeneration cannot retain the old male-back-derived frame.
+- Asset commit `34275e40` contains only the corrected icon. Production remains untouched.
+
+2026-08-21 - Automatic ER Editor catalog refresh
+
+- Restored the complete form-aware editor catalog/search work and extended the runtime dump to include every registered fakemon-pitch species with stable sprite slugs.
+- Added a fail-closed catalog validator covering starter/all-species inclusion, forms, learnsets, TM pools, evolutions, and move/ability references.
+- Added an automatic `feat/elite-redux-port` workflow that regenerates all editor catalogs on GitHub runners and deploys only the standalone `er-editor` Cloudflare Pages project with cache revalidation. Game staging and production deployments are not part of this workflow.

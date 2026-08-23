@@ -6,9 +6,15 @@
 // Unit tests for the ER ghost-team gauntlet scheduling (#217).
 
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
-import { markTrainerAsGhost } from "#data/elite-redux/er-ghost-teams";
+import {
+  hasErGhostSavedItems,
+  markTrainerAsGhost,
+  shouldRequireLateHellGhostItems,
+  shouldUseLateHellGhostTrainer,
+} from "#data/elite-redux/er-ghost-teams";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { resetErRunPacing, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import type { Trainer } from "#field/trainer";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -18,6 +24,7 @@ const FIXED_WAVES = new Set([182, 184, 186, 188, 190, 195]);
 describe("ER ghost teams", () => {
   afterEach(() => {
     resetErDifficulty();
+    resetErRunPacing();
   });
 
   it("spawns the right number of ghosts per difficulty (Ace 1 / Elite 3 / Hell 8)", () => {
@@ -62,5 +69,75 @@ describe("ER ghost teams", () => {
     setErDifficulty("ace");
     expect(isErGhostWave(196)).toBe(true);
     expect(isErGhostWave(192)).toBe(false);
+  });
+
+  it("replaces about half of late Hell trainer encounters deterministically", () => {
+    setErDifficulty("hell");
+    expect(shouldUseLateHellGhostTrainer(100, "run-a")).toBe(false);
+    const normalRolls = Array.from({ length: 100 }, (_, i) => shouldUseLateHellGhostTrainer(101 + i, "run-a"));
+    expect(normalRolls.filter(Boolean).length).toBeGreaterThanOrEqual(40);
+    expect(normalRolls.filter(Boolean).length).toBeLessThanOrEqual(60);
+    expect(shouldUseLateHellGhostTrainer(137, "run-a")).toBe(shouldUseLateHellGhostTrainer(137, "run-a"));
+
+    setErRunPacing("sprint");
+    expect(shouldUseLateHellGhostTrainer(50, "run-a")).toBe(false);
+    const sprintRolls = Array.from({ length: 100 }, (_, i) => shouldUseLateHellGhostTrainer(51 + i, "run-a"));
+    expect(sprintRolls.filter(Boolean).length).toBeGreaterThanOrEqual(40);
+    expect(sprintRolls.filter(Boolean).length).toBeLessThanOrEqual(60);
+  });
+
+  it("never enables late replacement outside Hell", () => {
+    setErDifficulty("elite");
+    expect(shouldUseLateHellGhostTrainer(150, "run-a")).toBe(false);
+    setErRunPacing("sprint");
+    expect(shouldUseLateHellGhostTrainer(75, "run-a")).toBe(false);
+  });
+
+  it("requires saved held items after the Hell threshold while leaving relics optional", () => {
+    const base = {
+      id: "inventory-check",
+      trainerName: "Inventory Ghost",
+      difficulty: "hell",
+      waveReached: 150,
+      isVictory: true,
+      timestamp: 1,
+      party: [
+        {
+          speciesId: 25,
+          formIndex: 0,
+          abilityIndex: 0,
+          ivs: [31, 31, 31, 31, 31, 31],
+          nature: 0,
+          level: 80,
+          gender: 0,
+          shiny: false,
+          variant: 0,
+          passive: false,
+          moves: [],
+        },
+      ],
+    } satisfies GhostTeamSnapshot;
+    expect(hasErGhostSavedItems(base)).toBe(false);
+    expect(hasErGhostSavedItems({ ...base, relics: [["bloodPact", 1, null]] })).toBe(false);
+    expect(
+      hasErGhostSavedItems({
+        ...base,
+        party: [{ ...base.party[0], heldItems: [["LEFTOVERS", 1]] }],
+      }),
+    ).toBe(true);
+    expect(
+      hasErGhostSavedItems({
+        ...base,
+        party: [{ ...base.party[0], heldItems: [["LEFTOVERS", 1]] }],
+        relics: [["bloodPact", 1, null]],
+      }),
+    ).toBe(true);
+
+    setErDifficulty("hell");
+    expect(shouldRequireLateHellGhostItems(100)).toBe(false);
+    expect(shouldRequireLateHellGhostItems(101)).toBe(true);
+    setErRunPacing("sprint");
+    expect(shouldRequireLateHellGhostItems(50)).toBe(false);
+    expect(shouldRequireLateHellGhostItems(51)).toBe(true);
   });
 });

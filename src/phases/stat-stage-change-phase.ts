@@ -9,9 +9,19 @@ import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-tu
 import { erRecordAchievementStatStage } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erTacticalAfterStatDrop, erTacticalGuardStatDrop } from "#data/elite-redux/er-tactical-items";
+import {
+  moodyFormationStatFromBattleStat,
+  notifyMoodyFormationEnemyStatIncrease,
+  shouldMoodyFormationPreventStatDrop,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  notifyMoodyCoordinatorEnemyStatIncrease,
+  notifyMoodyCoordinatorPositiveStatOverflow,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { type BattleStat, getStatKey, getStatStageChangeDescriptionKey, Stat } from "#enums/stat";
 import type { Pokemon } from "#field/pokemon";
 import { ResetNegativeStatStageModifier } from "#modifiers/modifier";
@@ -93,6 +103,14 @@ export class StatStageChangePhase extends PokemonPhase {
     }
 
     const pokemon = this.getPokemon();
+    // A queued post-KO stat change can outlive its battler when NewBattlePhase
+    // replaces the defeated field. Treat that stale phase as already resolved.
+    if (pokemon == null) {
+      return this.end();
+    }
+    if (this.stages > 0 && pokemon.getTag(BattlerTagType.ER_IRRADIATED_LOCK)) {
+      return this.end();
+    }
     let opponentPokemon: Pokemon | undefined;
 
     /** Gets the position of last enemy or player pokemon that used ability or move, primarily for double battles involving Mirror Armor */
@@ -144,6 +162,14 @@ export class StatStageChangePhase extends PokemonPhase {
 
     const filteredStats = this.stats.filter(stat => {
       const cancelled = new BooleanHolder(false);
+      const formationStat = moodyFormationStatFromBattleStat(stat);
+      if (
+        formationStat != null
+        && stages.value < 0
+        && shouldMoodyFormationPreventStatDrop(pokemon, formationStat, stages.value)
+      ) {
+        cancelled.value = true;
+      }
 
       // ignoreAbilities also bypasses Mist / ProtectStat (Clear Body, Full Metal
       // Body): ER Mirror Armor's reflected drop lands through the attacker's
@@ -214,6 +240,22 @@ export class StatStageChangePhase extends PokemonPhase {
       // incoming drops). No VANILLA ability wires this attr, so unmodded behaviour
       // is unchanged - vanilla Clear Body still lets self-drops through.
       if (!cancelled.value && this.selfTarget && stages.value < 0) {
+        // Partner Gimmighoul — the holder ignores its own drops and applies
+        // the same drop to every opposing active instead.
+        if (
+          !simulate
+          && pokemon.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "SharingIsScaringAbAttr")
+        ) {
+          for (const opponent of pokemon.getOpponents().filter(p => !p.isFainted())) {
+            globalScene.phaseManager.unshiftNew(
+              "StatStageChangePhase",
+              opponent.getBattlerIndex(),
+              false,
+              [stat],
+              stages.value,
+            );
+          }
+        }
         applyAbAttrs("SelfStatDropImmunityAbAttr", {
           pokemon,
           stat,
@@ -251,6 +293,10 @@ export class StatStageChangePhase extends PokemonPhase {
           ? Math.min(pokemon.getStatStage(s) + stages.value, 6)
           : Math.max(pokemon.getStatStage(s) + stages.value, -6)) - pokemon.getStatStage(s),
     );
+    const overflowStages =
+      stages.value > 0
+        ? filteredStats.reduce((total, stat) => total + Math.max(0, pokemon.getStatStage(stat) + stages.value - 6), 0)
+        : 0;
 
     this.onChange?.(this.getPokemon(), filteredStats, relLevels);
 
@@ -270,6 +316,10 @@ export class StatStageChangePhase extends PokemonPhase {
         }
 
         pokemon.setStatStage(s, pokemon.getStatStage(s) + stages.value);
+        const formationStat = moodyFormationStatFromBattleStat(s);
+        if (!pokemon.isPlayer() && formationStat != null && stages.value > 0) {
+          notifyMoodyFormationEnemyStatIncrease(formationStat, stages.value);
+        }
         if (stages.value > 0) {
           applySuperegoAfterBoost(pokemon, s, this.canBeCopied);
         }
@@ -289,6 +339,13 @@ export class StatStageChangePhase extends PokemonPhase {
             value: pokemon.getStatStage(s),
           });
         }
+      }
+
+      if (overflowStages > 0) {
+        notifyMoodyCoordinatorPositiveStatOverflow(pokemon, overflowStages);
+      }
+      if (!pokemon.isPlayer() && stages.value > 0 && filteredStats.length > 0) {
+        notifyMoodyCoordinatorEnemyStatIncrease(pokemon, filteredStats, stages.value);
       }
 
       if (stages.value > 0 && this.canBeCopied) {

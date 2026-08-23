@@ -113,5 +113,10 @@ export function clearErAilments(pokemon: Pokemon): boolean {
  * @returns `true` if at least one ER status tag was removed.
  */
 export function clearAllErStatuses(pokemon: Pokemon): boolean {
-  return clearErAilments(pokemon);
+  const clearedAilment = clearErAilments(pokemon);
+  const hadDrowsy = pokemon.getTag(BattlerTagType.DROWSY) != null;
+  if (hadDrowsy) {
+    pokemon.removeTag(BattlerTagType.DROWSY);
+  }
+  return clearedAilment || hadDrowsy;
 }

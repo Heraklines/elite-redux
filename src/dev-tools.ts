@@ -17,16 +17,17 @@
 // =============================================================================
 
 import type { BattleScene } from "#app/battle-scene";
-import { GameModes, getGameMode } from "#app/game-mode";
+import { getGameMode } from "#app/game-mode";
 import defaultOverrides from "#app/overrides";
 import { allSpecies } from "#data/data-lists";
 import { Gender } from "#data/gender";
 import type { PokemonSpecies } from "#data/pokemon-species";
+import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { PlayerPokemon } from "#field/pokemon";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
-import type { Starter } from "#ui/handlers/starter-select-ui-handler";
+import type { Starter } from "#types/save-data";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { AES, enc } from "crypto-js";
 
@@ -36,7 +37,7 @@ function resolveSpecies(ref: number | string): PokemonSpecies {
     return getPokemonSpecies(ref as SpeciesId);
   }
   // Try SpeciesId enum key (e.g. "BOUFFALANT", "SWINUB_REDUX").
-  const enumVal = (SpeciesId as Record<string, number>)[ref.toUpperCase()];
+  const enumVal = (SpeciesId as unknown as Record<string, number>)[ref.toUpperCase()];
   if (typeof enumVal === "number") {
     return getPokemonSpecies(enumVal as SpeciesId);
   }
@@ -217,11 +218,11 @@ export function installDevTools(scene: BattleScene): void {
 
       // Proven test pattern (classic-mode-helper.runToSummon): construct a
       // detached SelectStarterPhase, queue the EncounterPhase, then run
-      // initBattle to build the party + first battle. The live phase manager
-      // then advances into the encounter automatically.
+      // initBattleFromCurrentPhase to build the party + first battle. The live
+      // phase manager then advances the captured TitlePhase into the encounter.
       const phase = new SelectStarterPhase();
       scene.phaseManager.pushNew("EncounterPhase", false);
-      phase.initBattle(starters);
+      phase.initBattleFromCurrentPhase(starters);
     },
   };
 

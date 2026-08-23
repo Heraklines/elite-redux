@@ -20,6 +20,11 @@ export class ReloadHelper extends GameManagerHelper {
     });
   }
 
+  /** Supply an externally parsed session to the normal title-screen reload path. */
+  public setSessionData(sessionData: SessionSaveData): void {
+    this.sessionData = sessionData;
+  }
+
   /**
    * Simulate reloading the session from the title screen, until reaching the
    * beginning of the first turn (equivalent to running `startBattle()`) for

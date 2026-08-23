@@ -373,8 +373,8 @@
       "description": "Ökar avsevärt chansen att möta en vild pokémon som är skimrande."
     },
     "ABILITY_CHARM": {
-      "name": "Säregen amulett",
-      "description": "Ökar avsevärt chansen att möta en vild pokémon med ett hemligt särdrag."
+      "name": "Mysterieamulett",
+      "description": "Fördubblar chansen att en mystisk händelse dyker upp."
     },
     "CATCHING_CHARM": {
       "name": "Fångstamulett",

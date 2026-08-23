@@ -109,7 +109,7 @@ const CUSTOM_DESCRIPTIONS: ReadonlyMap<number, string> = new Map([
   [461, "Uses Tickle on entry. After lowering a target's stats, follows up with a 20 BP Covet."],
   [
     511,
-    "On entry, eligible opposing Pokemon must use Struggle for one turn. Psychic, Dark, Heavy Metal, and Superheavy Pokemon are immune.",
+    "On entry, the opposing lead must use Struggle for one turn. Psychic, Dark, Heavy Metal, and Superheavy Pokemon are immune.",
   ],
   [479, "Ability-provided perfect accuracy is disabled for all Pokemon. The holder can always flee from wild battles."],
   [518, "On contact, steals up to 4 PP from the used move and restores it to one random depleted move."],
@@ -789,6 +789,17 @@ export function initEliteReduxAbilityUpgrades(): AbilityUpgradeResult {
     const retained = ability.attrs.filter(attr => attr.constructor.name !== "RemoveScreensOnTypedAttackAbAttr");
     return Number(
       replaceAbilityAttrsOnce(ability, "upgrade:fighting-spirit:scrappy", [
+        ...retained.map(attr => () => attr),
+        ...allAbilities[AbilityId.SCRAPPY].attrs.map(attr => () => attr),
+      ]),
+    );
+  });
+  patch(762, ability => {
+    // Qigong contains Fighting Spirit. Keep the composite in sync with the
+    // upgraded constituent: Scrappy replaces the old screen-breaking rider.
+    const retained = ability.attrs.filter(attr => attr.constructor.name !== "RemoveScreensOnTypedAttackAbAttr");
+    return Number(
+      replaceAbilityAttrsOnce(ability, "upgrade:qigong:fighting-spirit-scrappy", [
         ...retained.map(attr => () => attr),
         ...allAbilities[AbilityId.SCRAPPY].attrs.map(attr => () => attr),
       ]),

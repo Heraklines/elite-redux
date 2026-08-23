@@ -41,6 +41,8 @@ import {
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { BadSpliceAbAttr, ER_BAD_SPLICE_ABILITY_ID } from "#data/elite-redux/abilities/bad-splice";
+import { wireBarbaracleAbility } from "#data/elite-redux/abilities/barbaracle-mechanics";
+import { wireBernerdRosterAbility } from "#data/elite-redux/abilities/bernerd-roster-mechanics";
 import {
   BorrowedTimeDecayAbAttr,
   BorrowedTimeSummonAbAttr,
@@ -68,6 +70,9 @@ import {
   OverloadedPowerAbAttr,
   OverloadedPriorityAbAttr,
 } from "#data/elite-redux/abilities/electivire";
+import { ER_FAKEMON_PITCH_ABILITIES } from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { wireFakemonPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
+import { wireRaichuPitchAbility } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
   ER_SUGAR_RUSH_ABILITY_ID,
   ER_UPCYCLE_ABILITY_ID,
@@ -721,6 +726,11 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
   // Newcomer BATCH 2 — signature abilities (codex batch, ids 5971-5994, real
   // mechanics attached in buildCustomAbility via wireNewcomerSignatureAbility).
   manualDrafts.push(...ER_NEWCOMER_SIGNATURE_ABILITIES);
+  // Permission-cleared fakemon pitch ability batch (6004-6051). Composite
+  // definitions are repeated below and skipped by existingIds after this first
+  // registration; their final constituent attrs are still populated by the
+  // post-init manual-composite pass.
+  manualDrafts.push(...ER_FAKEMON_PITCH_ABILITIES);
   // Newcomer BATCH 2 — the TWO residual parked placeholders (Meteor Mass,
   // Inverse Room) the codex batch does not define. Named + battle-inert so each
   // mon carries the correctly-named slot; flagged for the designer.
@@ -819,7 +829,7 @@ export function refreshEliteReduxComposites(): RefreshEliteReduxCompositesResult
   const result: RefreshEliteReduxCompositesResult = { refreshed: 0, errors: [] };
   for (const draft of ER_ABILITIES) {
     const row = ER_ABILITY_ARCHETYPES[draft.id];
-    if (row === undefined || row.archetype !== "composite-vanilla-mashup" || draft.id === 652) {
+    if (row === undefined || row.archetype !== "composite-vanilla-mashup" || draft.name === "Sugar Rush") {
       continue;
     }
     const pokerogueId = ER_ID_MAP.abilities[draft.id];
@@ -900,6 +910,11 @@ function buildCustomAbility(
   if (archetypeRow !== undefined && pokerogueId !== ER_SUGAR_RUSH_ABILITY_ID) {
     wireArchetypeAttrs(builder, draft.id, archetypeRow.archetype, archetypeRow.params, result);
   }
+  // Fire Aspect copies Desolate Land's weather lifecycle. Its clear-weather attr
+  // must still run when the holder faints, just like the vanilla constituent.
+  if (draft.name === "Fire Aspect") {
+    builder.bypassFaint();
+  }
 
   if (pokerogueId === ER_SUGAR_RUSH_ABILITY_ID) {
     builder.attr(
@@ -924,7 +939,7 @@ function buildCustomAbility(
 
   // ER abilities whose ROM text marks them uncopiable / unsuppressable. Keyed by
   // ER source id (draft.id).
-  if (draft.id === 669) {
+  if (draft.name === "Flammable Coat") {
     // Flammable Coat — "Cannot be copied or suppressed."
     builder.unsuppressable().uncopiable().unreplaceable();
   }
@@ -932,7 +947,7 @@ function buildCustomAbility(
   // Bespoke ER abilities whose behavior is two-part or otherwise not a single
   // archetype shape, so the dispatcher leaves them empty (classified "bespoke").
   // Wire their attrs by hand here. Keyed by ER source id (draft.id).
-  if (draft.id === 340) {
+  if (draft.name === "Fatal Precision") {
     // Fatal Precision — "Super-effective moves never miss and always crit."
     // Never-miss reuses the conditional-always-hit primitive's superEffective
     // gate; always-crit adds a ConditionalCrit gated on the same SE check.
@@ -942,7 +957,7 @@ function buildCustomAbility(
       (user, target, move) => !!target && target.getMoveEffectiveness(user, move) > 1,
     );
   }
-  if (draft.id === 355) {
+  if (draft.name === "Speed Force") {
     // Speed Force — "Contact moves use 20% of its Speed stat additionally."
     // Adds 20% of the holder's Speed onto its Attack for contact moves.
     builder.attr(SpeedBonusToStatAbAttr, { stat: Stat.ATK, speedFraction: 0.2, filter: { contact: "only" } });
@@ -1060,6 +1075,10 @@ function buildCustomAbility(
   // Newcomer BATCH 2 signature abilities (codex batch, 5971-5994): attach the
   // real mechanics for whichever id matches (no-op for non-signature ids).
   wireNewcomerSignatureAbility(builder, pokerogueId);
+  wireFakemonPitchAbility(builder, pokerogueId);
+  wireBernerdRosterAbility(builder, pokerogueId);
+  wireBarbaracleAbility(builder, pokerogueId);
+  wireRaichuPitchAbility(builder, pokerogueId);
 
   if (pokerogueId === ER_CLOSED_CIRCUIT_ABILITY_ID) {
     builder.attr(ClosedCircuitAbAttr);

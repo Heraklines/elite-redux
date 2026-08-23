@@ -19,6 +19,7 @@ on:
       # production journey merely because it was not added to this list yet.
       - "src/field/**"
       - "src/phase-manager.ts"
+      - "src/phase.ts"
       - "src/phases/**"
       - "src/ui/**"
       - "test/browser/coop-public-ui/**"
@@ -37,6 +38,7 @@ on:
           - probe
           - fresh-wave2
           - fresh-resume
+          - reward-pause-settings
           - same-tab-rejoin
           - reverse-resume
           - faint-replacement
@@ -45,6 +47,7 @@ on:
           - game-over
           - registered-interactions
           - ability-capsule
+          - party-mutating-rewards
           - showdown-battle
           - resume-scan-isolation
           - save-mutations
@@ -96,12 +99,27 @@ on:
         required: true
         type: string
         default: "[]"
+      party_reward_ids:
+        description: Optional closed JSON subset for a focused party-mutating-rewards rerun
+        required: false
+        type: string
+        default: ""
+      render_profile:
+        description: Presentation fidelity for manually dispatched journeys
+        required: true
+        type: choice
+        default: animations-skipped-depth
+        options:
+          - animations-skipped-depth
+          - animations-on-surface
 
 permissions:
   contents: read
 
 concurrency:
-  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
+  # Presentation-fidelity qualification is independent from the fast mechanical lane. Keep each profile
+  # serialized with itself, but do not make an animations-on proof wait behind an animations-skipped run.
+  group: coop-public-ui-${{ github.ref }}-${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}-${{ inputs.render_profile || 'animations-skipped-depth' }}
   cancel-in-progress: false
 
 env:
@@ -157,7 +175,7 @@ jobs:
           status=$?
           set -e
           diagnostics="$(grep -Ec '^[^(]+\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
-          owned="$(grep -E '^(scripts/coop-browser-entry|src/data/elite-redux/coop/authority-v2/cutover-interaction|src/data/elite-redux/coop/coop-durability|src/data/elite-redux/coop/coop-runtime|src/data/elite-redux/coop/coop-transport|src/data/elite-redux/coop/coop-wave-resolution-bridge|src/data/elite-redux/coop/coop-webrtc-transport|src/data/moves/move|src/dev-tools/registry|src/phases/command-phase|src/phases/coop-replay-turn-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
+          owned="$(grep -E '^(scripts/coop-browser-entry|src/battle-scene|src/data/elite-redux/coop/[^()]+|src/data/moves/move|src/dev-tools/registry|src/phase-manager|src/phase|src/phases/command-phase|src/phases/coop-guest-faint-switch-phase|src/phases/coop-replay-learn-move-batch|src/phases/coop-replay-learn-move-phase|src/phases/coop-replay-phases|src/phases/coop-replay-turn-phase|src/phases/encounter-phase|src/phases/er-ability-capsule-phase|src/phases/er-crossroads-phase|src/phases/er-dex-nav-phase|src/phases/er-greater-ability-capsule-phase|src/phases/er-greater-ability-randomizer-phase|src/phases/learn-move-phase|src/phases/party-heal-phase|src/phases/select-modifier-phase|src/phases/select-starter-phase|src/phases/title-phase|src/system/game-data|src/ui-inputs|src/ui/handlers/modifier-select-ui-handler|src/ui/handlers/party-ui-handler|src/ui/handlers/save-slot-select-ui-handler|src/ui/handlers/starter-select-ui-handler|src/ui/ui|test/tests/elite-redux/coop/coop-ability-picker-relay.test|test/tests/elite-redux/coop/coop-battle-stream.test|test/tests/elite-redux/coop/coop-shop-check-ops.test|test/tests/elite-redux/coop/coop-ui-mirror.test|test/tools/coop-soak-driver)\.ts\([0-9]+,[0-9]+\): error TS' coop-public-ui-typecheck.log || true)"
           if [ -n "$owned" ]; then
             printf '%s\n' "$owned"
             exit 1
@@ -171,17 +189,33 @@ jobs:
           pnpm exec biome check --diagnostic-level=error --max-diagnostics=none \
             .github/workflows/coop-public-ui-journey.yml \
             scripts/coop-browser-entry.ts \
+            src/battle-scene.ts \
             scripts/prepare-coop-browser-artifact.mjs \
+            src/data/elite-redux/coop/authority-v2/shadow.ts \
             src/data/elite-redux/coop/authority-v2/cutover-interaction.ts \
+            src/data/elite-redux/coop/coop-battle-stream.ts \
             src/data/elite-redux/coop/coop-durability.ts \
+          src/data/elite-redux/coop/coop-field-presentation.ts \
+          src/data/elite-redux/coop/coop-trainer-transition-observer.ts \
+          src/data/elite-redux/coop/coop-operation-envelope.ts \
+            src/data/elite-redux/coop/coop-party-reorder-presentation.ts \
+            src/data/elite-redux/coop/coop-reward-operation.ts \
             src/data/elite-redux/coop/coop-runtime.ts \
             src/data/elite-redux/coop/coop-transport.ts \
+            src/data/elite-redux/coop/coop-ui-mirror.ts \
+            src/data/elite-redux/coop/coop-ui-registry.ts \
             src/data/elite-redux/coop/coop-wave-resolution-bridge.ts \
             src/data/elite-redux/coop/coop-webrtc-transport.ts \
             src/data/moves/move.ts \
             src/dev-tools/registry.ts \
+            src/phase-manager.ts \
+            src/phase.ts \
             src/phases/command-phase.ts \
+            src/phases/coop-guest-faint-switch-phase.ts \
+            src/phases/coop-replay-learn-move-batch.ts \
+            src/phases/coop-replay-phases.ts \
             src/phases/coop-replay-turn-phase.ts \
+            src/phases/encounter-phase.ts \
             src/phases/er-ability-capsule-phase.ts \
             src/phases/er-crossroads-phase.ts \
             src/phases/er-dex-nav-phase.ts \
@@ -191,11 +225,16 @@ jobs:
             src/phases/select-modifier-phase.ts \
             src/phases/select-starter-phase.ts \
             src/phases/title-phase.ts \
+            src/ui-inputs.ts \
+            src/ui/handlers/modifier-select-ui-handler.ts \
             src/ui/handlers/party-ui-handler.ts \
             src/ui/handlers/save-slot-select-ui-handler.ts \
             src/ui/handlers/starter-select-ui-handler.ts \
+            src/ui/ui.ts \
             test/browser/coop-public-ui/browser-workflow-fanout.test.mjs \
             test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs \
+            test/browser/coop-public-ui/campaign-exp-phase.test.mjs \
+            test/browser/coop-public-ui/campaign-render-profile.test.mjs \
             test/browser/coop-public-ui/campaign-policy.mjs \
             test/browser/coop-public-ui/campaign.mjs \
             test/browser/coop-public-ui/campaign-nav.mjs \
@@ -212,7 +251,9 @@ jobs:
             test/browser/coop-public-ui/local-worker-vite.config.mjs \
             test/browser/coop-public-ui/market-gold-standard.test.mjs \
             test/browser/coop-public-ui/market-journey.mjs \
+            test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs \
             test/browser/coop-public-ui/navigation-depth-campaign.test.mjs \
+            test/browser/coop-public-ui/pause-overlay-journey.test.mjs \
             test/browser/coop-public-ui/preview-server.mjs \
             test/browser/coop-public-ui/preview-server.test.mjs \
             test/browser/coop-public-ui/provision-accounts.mjs \
@@ -227,11 +268,23 @@ jobs:
             test/browser/coop-public-ui/terminal-watchdog.mjs \
             test/browser/coop-public-ui/vite.config.mjs \
             test/tests/elite-redux/coop/coop-duo-wave-operation.test.ts \
+            test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts \
+            test/tests/elite-redux/coop/coop-battle-stream.test.ts \
             test/tests/elite-redux/coop/coop-guest-renderer.test.ts \
             test/tests/elite-redux/coop/coop-p33-client.test.ts \
             test/tests/elite-redux/coop/coop-session-controller.test.ts \
+            test/tests/elite-redux/coop/coop-shop-check-ops.test.ts \
+            test/tests/elite-redux/coop/coop-ui-mirror.test.ts \
             test/tests/elite-redux/coop/coop-wave-operation-durability.test.ts \
             test/tools/coop-soak-driver.ts
+
+      - name: Verify party-reorder presentation and reward cursor mirroring
+        if: inputs.journey == 'party-mutating-rewards'
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-shop-check-ops.test.ts
+          test/tests/elite-redux/coop/coop-ui-mirror.test.ts
+          --reporter=dot
 
       - name: Verify retained GameOver two-engine operation regression
         if: inputs.journey == 'game-over'
@@ -272,6 +325,33 @@ jobs:
       - name: Verify bounded public post-turn progress contracts
         run: node --test test/browser/coop-public-ui/public-ui-post-turn-budget.test.mjs
 
+      - name: Verify human-skew trainer settlement contracts
+        run: node --test test/browser/coop-public-ui/campaign-exp-phase.test.mjs
+
+      - name: Verify signed guest trainer-transition contracts
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-guest-renderer.test.ts
+          -t "guest's player-trainer transition|projected trainer cue"
+          --reporter=dot
+
+      - name: Verify progressing Mystery battle contracts
+        run: node --test test/browser/coop-public-ui/mystery-gauntlet-campaign.test.mjs
+
+      - name: Verify local pause overlay input and two-browser journey contracts
+        run: >-
+          node --test test/browser/coop-public-ui/pause-overlay-journey.test.mjs
+
+      - name: Verify local pause overlay classification
+        run: npx vitest run test/tests/elite-redux/coop/coop-ui-registry.test.ts --reporter=dot
+
       - name: Verify strict Commander browser evidence contracts
         run: node --test test/browser/coop-public-ui/commander-evidence.test.mjs
 
@@ -299,6 +379,41 @@ jobs:
       - name: Verify public journey uses the release Authority V2 cutover
         run: node --test test/browser/coop-public-ui/authority-v2-gate-contract.test.mjs
 
+      - name: Verify replacement live-order stream regression
+        if: inputs.journey == 'faint-replacement'
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: npx vitest run test/tests/elite-redux/coop/coop-battle-stream.test.ts --reporter=dot
+
+      - name: Verify authoritative modal scheduler ownership regression
+        if: inputs.journey == 'registered-interactions'
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: >-
+          npx vitest run
+          test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts
+          --reporter=dot
+
+      - name: Verify immutable trainer-victory material before browser launch
+        env:
+          ER_SCENARIO: "1"
+          COOP_AUTHORITY_V2_TURN: "on"
+          COOP_AUTHORITY_V2_REPLACEMENT: "on"
+          COOP_AUTHORITY_V2_WAVE: "on"
+          COOP_AUTHORITY_V2_INTERACTION: "on"
+          COOP_AUTHORITY_V2_RECOVERY: "on"
+        run: npx vitest run test/tests/elite-redux/coop/coop-trainer-victory-boundary.test.ts --reporter=dot
+
       - name: Verify exact two-browser Showdown admission and turn contracts
         run: node --test test/browser/coop-public-ui/showdown-browser-evidence.test.mjs
 
@@ -307,9 +422,13 @@ jobs:
           COOP_BROWSER_OUT_DIR: dist-coop-public-ui
           VITE_BYPASS_LOGIN: 0
           VITE_BYPASS_TUTORIAL: 0
+          # Mystery difficulty is intentionally staging/dev-only. The focused registered-interactions
+          # journey must expose the same fifth public picker option as staging; every other journey keeps
+          # the ordinary four-difficulty production surface.
+          VITE_DEV_TOOLS: ${{ inputs.journey == 'registered-interactions' && '1' || '0' }}
           VITE_COOP_LOBBY_ROOM_QUERY: 1
           VITE_COOP_SERVER_URL: ${{ env.COOP_UI_SIGNAL_ORIGIN }}
-          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'ability-capsule' && 'ability-capsule') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
+          VITE_COOP_BROWSER_FIXTURE: ${{ (inputs.journey == 'commander-skip' && 'commander-skip') || ((inputs.journey == 'faint-replacement' || inputs.journey == 'half-wipe') && 'faint-replacement') || (inputs.journey == 'game-over' && 'game-over') || (inputs.journey == 'registered-interactions' && 'registered-interactions') || (inputs.journey == 'ability-capsule' && 'ability-capsule') || (inputs.journey == 'party-mutating-rewards' && 'party-mutating-rewards') || ((inputs.journey == 'navigation-depth-30' || inputs.journey == 'market-wide-lens') && 'navigation-depth-30') || (inputs.journey == 'evolution-sync' && 'evolution-sync') || (inputs.journey == 'showdown-battle' && 'showdown-battle') || 'off' }}
           VITE_COOP_SIGNALING_PROTOCOL: p33
           VITE_COOP_AUTHORITY_V2_TURN: "on"
           VITE_COOP_AUTHORITY_V2_REPLACEMENT: "on"
@@ -336,7 +455,7 @@ jobs:
           if-no-files-found: error
 
   primary-journey:
-    name: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts' }}
+    name: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }} / ${{ inputs.cadence || 'normal' }} / ${{ inputs.journey == 'party-mutating-rewards' && matrix.party_reward_id || (inputs.journey == 'commander-skip' && matrix.commander_owner_seat || 'primary accounts') }}
     needs: browser-build
     runs-on: ubuntu-latest
     # The fresh+resume journey deliberately runs two complete launches. Its adaptive progress budget can
@@ -345,8 +464,14 @@ jobs:
     timeout-minutes: ${{ (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'navigation-depth-30' && 240 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'market-wide-lens' && 100 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'fresh-resume' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'same-tab-rejoin') && 55 || ((inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'save-mutations' || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'resume-scan-isolation') && 50 || (inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume') == 'commander-skip' && 45 || 35 }}
     strategy:
       fail-fast: false
+      # The repository account exposes forty hosted runners, with eight reserved for the other active
+      # workstream. The complete consumable matrix is intentionally wider than that budget, so Actions
+      # queues the tail rather than ever exceeding the agreed 32-runner ceiling (the build has finished
+      # before this job starts, leaving four additional slots for summaries/transient overlap).
+      max-parallel: 28
       matrix:
         commander_owner_seat: ${{ fromJSON(inputs.journey == 'commander-skip' && '["host-seat","guest-seat"]' || '["host-seat"]') }}
+        party_reward_id: ${{ fromJSON(inputs.journey == 'party-mutating-rewards' && inputs.party_reward_ids != '' && inputs.party_reward_ids || inputs.journey == 'party-mutating-rewards' && '["TM_CASE","ER_LEARNERS_SHROOM","MEMORY_MUSHROOM","TM_COMMON","TM_GREAT","TM_ULTRA","ER_ABILITY_CAPSULE","ER_GREATER_ABILITY_CAPSULE","ER_GREATER_ABILITY_RANDOMIZER","ABILITY_RANDOMIZER","MOVE_SLOT_EXPANDER","PP_UP","PP_MAX","ETHER","MAX_ETHER","ELIXIR","MAX_ELIXIR","MINT","TERA_SHARD","RARE_CANDY","RARER_CANDY","POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL","SACRED_ASH","EVOLUTION_ITEM","RARE_EVOLUTION_ITEM","FORM_CHANGE_ITEM","RARE_FORM_CHANGE_ITEM","DNA_SPLICERS","ER_DEX_NAV"]' || '["NONE"]') }}
     steps:
       - name: Check out exact implementation SHA (harness only)
         uses: actions/checkout@v6
@@ -411,18 +536,27 @@ jobs:
           # launched ordinary level-5 starters in exact-SHA run 30698494882.
           COOP_UI_JOURNEY: ${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}
           COOP_UI_ACCOUNT_MODE: register
-          COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ github.run_attempt }}
+          COOP_UI_LOBBY_ROOM: primary-${{ github.run_id }}-${{ matrix.commander_owner_seat }}-${{ matrix.party_reward_id }}-${{ github.run_attempt }}
           COOP_UI_REQUESTER_SEAT: ${{ inputs.requester_seat || 'guest-seat' }}
           # Browser roles remain tied to their public seats regardless of which seat sends the invitation.
           # The half-wipe caller explicitly selects the replica-owned guest seat.
           COOP_UI_FAINT_OWNER_SEAT: ${{ inputs.faint_owner_seat || 'guest-seat' }}
           COOP_UI_COMMANDER_OWNER_SEAT: ${{ matrix.commander_owner_seat }}
+          # The focused registered-interaction journey must exercise the real alternative successor
+          # after Stormglass, not depend on a random Ace-mode ME roll. Selecting Mystery through the
+          # public difficulty menu guarantees wave 2 is an ME while every other journey retains Ace.
+          COOP_UI_DIFFICULTY_ID: ${{ inputs.journey == 'registered-interactions' && 'mystery' || 'ace' }}
+          COOP_UI_DIFFICULTY_OPTION_ID: ${{ inputs.journey == 'registered-interactions' && 'mystery' || 'ace' }}
           COOP_UI_HOST_LOCALE: en
           # The retained GameOver oracle isolates terminal ordering from the separately-gated
           # cross-locale fingerprint contract. All other public journeys keep the EN/DE lane.
           COOP_UI_GUEST_LOCALE: ${{ inputs.journey == 'game-over' && 'en' || 'de' }}
           COOP_UI_HOST_TITLE_NEW_GAME_KEYS: ${{ inputs.host_title_keys || '[]' }}
           COOP_UI_GUEST_TITLE_NEW_GAME_KEYS: ${{ inputs.guest_title_keys || '[]' }}
+          # The 36-item reward matrix can push jsDelivr's immutable first-load past five minutes
+          # without entering gameplay (run 30785547999 reached LoginPhase at 307-311s). Preserve the
+          # ordinary strict boot budget and give only this high-fanout diagnostic profile measured headroom.
+          COOP_UI_BOOT_TIMEOUT_MS: ${{ inputs.journey == 'party-mutating-rewards' && '420000' || '300000' }}
           COOP_UI_ACTION_DELAY_MS: ${{ (inputs.cadence == 'fast' && '70') || (inputs.cadence == 'slow' && '420') || '180' }}
           COOP_UI_SETTLE_DELAY_MS: ${{ (inputs.cadence == 'fast' && '300') || (inputs.cadence == 'slow' && '1300') || '750' }}
           # The continuous wave-1 -> wave-20 profile naturally reaches the wave-10 guest-owned
@@ -436,8 +570,10 @@ jobs:
           # market deadline. Give the continuous wave-20 proof its measured 85-minute lifecycle;
           # this remains immutable and leaves 15 minutes for bounded diagnosis/artifact upload.
           COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS: ${{ inputs.journey == 'navigation-depth-30' && '13800000' || inputs.journey == 'market-wide-lens' && '5100000' || '2700000' }}
-          COOP_UI_RENDER_PROFILE: animations-skipped-depth
-          COOP_UI_REWARD_MODE: ${{ inputs.journey == 'ability-capsule' && 'pick-first' || 'leave' }}
+          COOP_UI_RENDER_PROFILE: ${{ inputs.render_profile || 'animations-skipped-depth' }}
+          COOP_UI_REWARD_MODE: ${{ (inputs.journey == 'ability-capsule' || inputs.journey == 'party-mutating-rewards') && 'pick-first' || 'leave' }}
+          COOP_UI_PARTY_REWARD_ID: ${{ inputs.journey == 'party-mutating-rewards' && matrix.party_reward_id || '' }}
+          COOP_UI_REWARD_PARTY_SLOT: ${{ inputs.journey == 'party-mutating-rewards' && contains(fromJSON('["POTION","SUPER_POTION","HYPER_POTION","MAX_POTION","FULL_RESTORE","REVIVE","MAX_REVIVE","FULL_HEAL"]'), matrix.party_reward_id) && '3' || inputs.journey == 'party-mutating-rewards' && '1' || '0' }}
           COOP_UI_RAISE_SPEED: "1"
           COOP_UI_MARKET_MODE: ${{ (inputs.journey == 'market-wide-lens' || inputs.journey == 'navigation-depth-30') && 'target-held' || 'leave' }}
           COOP_UI_MARKET_TARGET_ID: WIDE_LENS
@@ -477,10 +613,15 @@ jobs:
             [ -S "$socket" ] || { echo "Xvfb for $socket failed to start" >&2; exit 1; }
           done
           export COOP_UI_DISPLAY_HOST=:98 COOP_UI_DISPLAY_GUEST=:99
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" ]]; then
+            # Clear wave 1, choose Stormglass at wave 2, then finish the forced Mystery successor.
+            # A Mystery option may embed a battle at the same address, so target wave 2 keeps the
+            # campaign alive until the event reaches its real wave-3 terminal frontier.
+            export COOP_UI_CAMPAIGN_WAVES=2
+          elif [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" ]]; then
             export COOP_UI_CAMPAIGN_WAVES=1
           fi
-          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
+          if [[ "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "market-wide-lens" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "registered-interactions" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "ability-capsule" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "party-mutating-rewards" || "${{ inputs.journey || (github.event_name == 'push' && 'fresh-wave2') || 'fresh-resume' }}" == "navigation-depth-30" ]]; then
             node test/browser/coop-public-ui/run-campaign.mjs &
             campaign_pid=$!
             (
@@ -517,7 +658,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-primary-compact-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-primary-compact-${{ matrix.commander_owner_seat }}-${{ matrix.party_reward_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: |
             dev-logs/coop-public-ui/**/summary.json
             dev-logs/coop-public-ui/**/*.jsonl
@@ -533,7 +674,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-public-ui-primary-${{ matrix.commander_owner_seat }}-${{ github.sha }}-${{ github.run_attempt }}
+          name: coop-public-ui-primary-${{ matrix.commander_owner_seat }}-${{ matrix.party_reward_id }}-${{ github.sha }}-${{ github.run_attempt }}
           path: dev-logs/coop-public-ui/**
           retention-days: 14
           if-no-files-found: warn

@@ -44,22 +44,32 @@ jobs:
           node stats/gen-usage-tiers.mjs stats/data/usage-tiers.json
           node stats/apply-m5cap-tiers.mjs
 
+      - name: Test leaderboard calculations
+        run: node --test stats/*.test.mjs
+
+      - name: Generate production leaderboards
+        run: node stats/gen-leaderboards.mjs
+
       - name: Validate freshness, completeness, and privacy
-        run: node stats/validate-stats-data.mjs
+        run: |
+          node stats/validate-stats-data.mjs
+          node stats/validate-leaderboards.mjs
 
       - name: Build clean deploy directory
         working-directory: stats
         run: |
           rm -rf _stats_deploy
           mkdir -p _stats_deploy/data
-          cp index.html app.js styles.css _stats_deploy/
-          cp data/dex.json data/species-stats.json data/dex-detail.json data/species-extra.json _stats_deploy/data/
+          cp index.html app.js styles.css leaderboards.html leaderboards.js leaderboards.css _stats_deploy/
+          cp data/dex.json data/species-stats.json data/dex-detail.json data/species-extra.json data/leaderboards.json _stats_deploy/data/
           printf '%s' '{"note":"not public"}' > _stats_deploy/data/_runs.json
           printf '%s' '{"note":"not public"}' > _stats_deploy/data/_showdown.json
           printf '%s\n' '/data/*' '  Cache-Control: public, max-age=0, must-revalidate' > _stats_deploy/_headers
 
       - name: Validate deploy directory
-        run: node stats/validate-stats-data.mjs --deploy=stats/_stats_deploy
+        run: |
+          node stats/validate-stats-data.mjs --deploy=stats/_stats_deploy
+          node stats/validate-leaderboards.mjs --deploy=stats/_stats_deploy
 
       - name: Deploy er-stats to Cloudflare Pages
         working-directory: stats

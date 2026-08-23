@@ -12,6 +12,7 @@ import type { PokemonSpeciesForm } from "#data/pokemon-species";
 import type { TypeDamageMultiplier } from "#data/type";
 import type { AbilityId } from "#enums/ability-id";
 import type { BerryType } from "#enums/berry-type";
+import type { FormChangeItem } from "#enums/form-change-item";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -161,6 +162,16 @@ export class CustomPokemonData {
    * {@linkcode ErOmniformMovesetStore | omniform-movesets.ts}.
    */
   public erOmniformMovesets?: ErOmniformMovesetStore | undefined;
+  /** Fun Mode's run-scoped Mega Stone record. Present only while the Pokemon is Mega'd. */
+  public erFunMegaStone?: FormChangeItem | undefined;
+  /** True when the Mega is a stat-delta pseudo form rather than a sprite/form change. */
+  public erFunPseudoMega = false;
+  /**
+   * Canonical post-clear Endless Ability Avalanche rolls for this Pokemon.
+   * The list is append-only as new slots unlock, so encounter-only effects
+   * cannot reroll abilities that the Pokemon already earned.
+   */
+  public erEndlessAvalancheAbilities: AbilityId[] = [];
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -186,6 +197,11 @@ export class CustomPokemonData {
     this.coopPassiveAttr = data?.coopPassiveAttr ?? undefined;
     this.coopLuck = data?.coopLuck ?? undefined;
     this.erOmniformMovesets = data?.erOmniformMovesets ?? undefined;
+    this.erFunMegaStone = data?.erFunMegaStone ?? undefined;
+    this.erFunPseudoMega = data?.erFunPseudoMega ?? false;
+    this.erEndlessAvalancheAbilities = Array.isArray(data?.erEndlessAvalancheAbilities)
+      ? [...data.erEndlessAvalancheAbilities]
+      : [];
   }
 }
 
@@ -254,6 +270,8 @@ interface SerializedPokemonSummonData {
   illusion?: SerializedIllusionData | undefined;
   berriesEatenLast: BerryType[];
   moveHistory: TurnMove[];
+  erPerpetualMotionStreak?: number;
+  erPerpetualMotionPending?: boolean;
 }
 
 /**
@@ -283,6 +301,10 @@ export class PokemonSummonData {
   public erTimedAbilitySuppressions: TimedAbilitySuppression[] = [];
   /** Reusable once-per-entry markers for ability mechanics. */
   public erAbilityProvenance: string[] = [];
+  /** Number of consecutive successful Perpetual Motion hits for this summon. */
+  public erPerpetualMotionStreak = 0;
+  /** Whether the current automatic Perpetual Motion cast is awaiting resolution. */
+  public erPerpetualMotionPending = false;
   /** Imposter transformed this summon, so copied damaging moves retain its 1.3x rider. */
   public erImposterCopiedAttackBoost = false;
   /**
@@ -485,6 +507,10 @@ export class PokemonTempSummonData {
  * Resets at the start of a new battle (but not on switch).
  */
 export class PokemonBattleData {
+  /** Serializable once-per-battle latches for custom ability mechanics. */
+  public erAbilityProvenance: string[] = [];
+  /** Soul Harvest faints accumulated in this battle; resets between encounters. */
+  public erSoulHarvestFaintCount = 0;
   /** Counter tracking direct hits this Pokemon has received during this battle; used for {@linkcode MoveId.RAGE_FIST} */
   public hitCount = 0;
   /** Whether this Pokemon has eaten a berry this battle; used for {@linkcode MoveId.BELCH} */
@@ -534,6 +560,8 @@ export class PokemonBattleData {
       this.rudeAwakeningTriggered = source.rudeAwakeningTriggered ?? false;
       this.cowardProtectUsed = source.cowardProtectUsed ?? false;
       this.lostItems = source.lostItems ?? [];
+      this.erAbilityProvenance = source.erAbilityProvenance ?? [];
+      this.erSoulHarvestFaintCount = source.erSoulHarvestFaintCount ?? 0;
     }
   }
 }

@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
+import { sleepingInBlocksMove } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { erLibraryRecordFoeMove } from "#data/elite-redux/abilities/library";
 import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
 import {
@@ -12,6 +13,21 @@ import {
   recordCoopEvent,
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
+import { consumeErEndlessMoveCost } from "#data/elite-redux/er-endless-rift-runtime";
+import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
+import {
+  notifyMoodyFormationMoveAttempt,
+  notifyMoodyFormationMoveResolved,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  notifyMoodyRuntimeBeforeMove,
+  notifyMoodyRuntimeMoveResolved,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  getMoodyCoordinatorMoveSelection,
+  notifyMoodyCoordinatorMoveResolved,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { canMoodyActWhileAsleep, getMoodyPpCost } from "#data/elite-redux/moody/moody-scene-adapter";
 import { SpeciesFormChangePreMoveTrigger } from "#data/form-change-triggers";
 import { getStatusEffectActivationText } from "#data/status-effect";
 import { getTerrainBlockMessage } from "#data/terrain";
@@ -62,6 +78,7 @@ export class MovePhase extends PokemonPhase {
   protected failed = false;
   /** Whether the current move should fail and retain PP. */
   protected cancelled = false;
+  private moodyCoordinatorReported = false;
 
   /** Flag set to `true` during {@linkcode checkFreeze} that indicates that the pokemon will thaw if it passes the failure conditions */
   private declare thaw?: boolean;
@@ -156,6 +173,10 @@ export class MovePhase extends PokemonPhase {
       [this.move, this.targets] = override;
     }
 
+    const activeTargets = this.getActiveTargetPokemon();
+    notifyMoodyFormationMoveAttempt(user, activeTargets, this.move.getMove(), this.useMode);
+    notifyMoodyRuntimeBeforeMove(user, activeTargets[0], this.move.getMove());
+
     // For the purposes of payback and kin, the pokemon is considered to have acted
     // if it attempted to move at all.
     user.turnData.acted = true;
@@ -211,6 +232,14 @@ export class MovePhase extends PokemonPhase {
     const charging = isChargingMove && !user.getTag(BattlerTagType.CHARGING);
     /** Indicates this is the release turn of the move */
     const releasing = isChargingMove && !charging;
+
+    // A faster battler may remove every queued target before this phase starts.
+    // Resolve that edge before committing PP; otherwise the move both failed and
+    // consumed PP, and empty-side effects could enter their no-target path.
+    if (this.getActiveTargetPokemon().length === 0 && this.resolveFinalPreMoveCancellationChecks(false)) {
+      this.end();
+      return;
+    }
 
     // Charging moves consume PP when they begin charging, *not* when they release
     if (!releasing) {
@@ -292,7 +321,8 @@ export class MovePhase extends PokemonPhase {
     // A big if statement will handle the checks (that each have side effects!) in the correct order
     return (
       this.checkSleep()
-      || this.checkFreeze()
+      || this.checkSleepingIn()
+      || this.checkBurnFatigue()
       || this.checkPP()
       || this.checkValidity()
       || this.checkTagCancel(BattlerTagType.TRUANT)
@@ -366,9 +396,36 @@ export class MovePhase extends PokemonPhase {
 
     const bypassSleepHolder = new BooleanHolder(false);
     applyMoveAttrs("BypassSleepAttr", this.pokemon, null, this.move.getMove(), bypassSleepHolder);
+    bypassSleepHolder.value ||= canMoodyActWhileAsleep(this.pokemon, this.move.getMove());
     const cancel = !bypassSleepHolder.value;
     this.triggerStatus(StatusEffect.SLEEP, cancel);
     return cancel;
+  }
+
+  protected checkSleepingIn(): boolean {
+    if (!sleepingInBlocksMove(this.pokemon, this.move.getMove())) {
+      return false;
+    }
+    this.showFailedText();
+    return true;
+  }
+
+  protected checkBurnFatigue(): boolean {
+    const hasBurnFatigueAura = globalScene
+      .getField(true)
+      .some(
+        holder => !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId),
+      );
+    if (
+      this.useMode === MoveUseMode.INDIRECT
+      || this.pokemon.status?.effect !== StatusEffect.BURN
+      || !hasBurnFatigueAura
+      || this.pokemon.randBattleSeedInt(3) !== 0
+    ) {
+      return false;
+    }
+    globalScene.phaseManager.queueMessage(`${getPokemonNameWithAffix(this.pokemon)} is overcome by burn fatigue!`);
+    return true;
   }
 
   /**
@@ -473,8 +530,10 @@ export class MovePhase extends PokemonPhase {
       && !usability.value
     ) {
       failedText = i18next.t("battle:moveCannotUseChallenge", { moveName });
-    } else {
+    } else if (getMoodyCoordinatorMoveSelection(this.pokemon, moveId).selectable) {
       return false;
+    } else {
+      failedText = `${moveName} is sealed by Negative Space!`;
     }
 
     this.cancel();
@@ -605,6 +664,27 @@ export class MovePhase extends PokemonPhase {
       return;
     }
 
+    // Vantarrow's Free Aim retargets before the ordinary redirect pass, then
+    // returns so Follow Me, Rage Powder, and redirecting abilities cannot
+    // override the selected maximum-damage opponent.
+    if (this.pokemon.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "FreeAimAbAttr")) {
+      const move = this.move.getMove();
+      const candidates = this.pokemon
+        .getOpponents(true)
+        .filter(target => !target.isFainted() && this.canRedirectTo(target));
+      candidates.sort((a, b) => {
+        const aDamage = a.getAttackDamage({ source: this.pokemon, move, simulated: true }).damage;
+        const bDamage = b.getAttackDamage({ source: this.pokemon, move, simulated: true }).damage;
+        const aKo = aDamage >= a.hp;
+        const bKo = bDamage >= b.hp;
+        return Number(bKo) - Number(aKo) || bDamage - aDamage || a.getBattlerIndex() - b.getBattlerIndex();
+      });
+      if (candidates[0]) {
+        this.targets[0] = candidates[0].getBattlerIndex();
+      }
+      return;
+    }
+
     const currentTarget = this.targets[0];
     const redirectTarget = new NumberHolder(currentTarget);
 
@@ -698,8 +778,15 @@ export class MovePhase extends PokemonPhase {
     if (!isIgnorePP(this.useMode)) {
       const move = this.move;
       // "commit" to using the move, deducting PP.
-      const ppUsed = 1 + this.getPpIncreaseFromPressure(this.getActiveTargetPokemon());
-      move.usePp(ppUsed);
+      const ppUsed = getMoodyPpCost(
+        this.pokemon,
+        move,
+        1 + this.getPpIncreaseFromPressure(this.getActiveTargetPokemon()),
+      );
+      const endlessCost = consumeErEndlessMoveCost(this.pokemon, move.getMove(), ppUsed);
+      if (endlessCost.useIndividualPp) {
+        move.usePp(endlessCost.ppCost);
+      }
       globalScene.eventTarget.dispatchEvent(new MoveUsedEvent(this.pokemon.id, move.getMove(), move.ppUsed));
     }
   }
@@ -863,7 +950,7 @@ export class MovePhase extends PokemonPhase {
    * @returns Whether the move failed due to an edge case
    */
   // TODO: The first part of this check seems already covered in `checkValidity`...
-  protected resolveFinalPreMoveCancellationChecks(): boolean {
+  protected resolveFinalPreMoveCancellationChecks(lapseMoveTags = true): boolean {
     let targets = this.getActiveTargetPokemon();
     const moveQueue = this.pokemon.getMoveQueue();
 
@@ -906,7 +993,9 @@ export class MovePhase extends PokemonPhase {
       this.pokemon.pushMoveHistory(this.moveHistoryEntry);
       return true;
     }
-    this.pokemon.lapseTags(BattlerTagLapseType.MOVE);
+    if (lapseMoveTags) {
+      this.pokemon.lapseTags(BattlerTagLapseType.MOVE);
+    }
     return false;
   }
 
@@ -1062,11 +1151,32 @@ export class MovePhase extends PokemonPhase {
    * Queue a {@linkcode MoveEndPhase} and then end this phase.
    */
   public end(): void {
+    if (this.cancelled || this.failed) {
+      notifyMoodyFormationMoveResolved(this.pokemon, this.move.getMove(), "failed");
+    }
+    notifyMoodyRuntimeMoveResolved(
+      this.pokemon,
+      this.getActiveTargetPokemon()[0],
+      this.move.getMove(),
+      !this.cancelled && !this.failed,
+    );
+    if (!this.moodyCoordinatorReported) {
+      this.moodyCoordinatorReported = true;
+      notifyMoodyCoordinatorMoveResolved(
+        this.pokemon,
+        this.move.moveId,
+        this.getActiveTargetPokemon(),
+        !this.cancelled && !this.failed,
+        this.move.getMove().category !== MoveCategory.STATUS,
+        this.useMode === MoveUseMode.FOLLOW_UP,
+      );
+    }
     globalScene.phaseManager.unshiftNew(
       "MoveEndPhase",
       this.pokemon.getBattlerIndex(),
       this.getActiveTargetPokemon(),
       isVirtual(this.useMode),
+      this.cancelled ? undefined : this.move.moveId,
     );
 
     super.end();

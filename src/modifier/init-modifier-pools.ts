@@ -2,6 +2,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
@@ -19,6 +20,7 @@ import {
   BerryModifier,
   DamageCalculatorModifier,
   DoubleBattleChanceBoosterModifier,
+  MysteryEventRateBoosterModifier,
   SpeciesCritBoosterModifier,
   TurnStatusEffectModifier,
 } from "#modifiers/modifier";
@@ -358,7 +360,7 @@ function initGreatModifierPool() {
     new WeightedModifierType(
       modifierTypes.VOUCHER,
       (_party: readonly Pokemon[], rerollCount: number) =>
-        globalScene.gameMode.isDaily ? 0 : Math.max(1 - rerollCount, 0),
+        globalScene.gameMode.isDaily || globalScene.gameMode.isFun ? 0 : Math.max(1 - rerollCount, 0),
       1,
     ),
   ].map(m => {
@@ -384,8 +386,11 @@ function initUltraModifierPool() {
     ),
     new WeightedModifierType(
       modifierTypes.FORM_CHANGE_ITEM,
-      () => Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
-      24,
+      () =>
+        globalScene.gameMode.isFun && getFunModeConfig().megaMode
+          ? Math.min(12 + Math.floor(globalScene.currentBattle.waveIndex / 10) * 4, 36)
+          : Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
+      36,
     ),
     new WeightedModifierType(modifierTypes.AMULET_COIN, skipInLastClassicWaveOrDefault(3)),
     new WeightedModifierType(modifierTypes.EVIOLITE, (party: Pokemon[]) => {
@@ -645,6 +650,7 @@ function initUltraModifierPool() {
     // (permanently unlock one innate, or run-unlock two). Rarer than the GREAT-tier
     // normal capsule, so a lower weight.
     new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_CAPSULE, 2),
+    new WeightedModifierType(modifierTypes.MOVE_RANDOMIZER, 4),
     // ER Expert Belt: ULTRA per maintainer (2026-07-16) - x1.2 super-effective
     // damage, single stack per mon (getMaxHeldItemCount 1).
     new WeightedModifierType(modifierTypes.ER_EXPERT_BELT, 3),
@@ -698,10 +704,19 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.BATON, 2),
     new WeightedModifierType(modifierTypes.SOUL_DEW, 7),
     new WeightedModifierType(modifierTypes.CATCHING_CHARM, () => (globalScene.gameMode.isClassic ? 0 : 4), 4),
-    new WeightedModifierType(modifierTypes.ABILITY_CHARM, skipInClassicAfterWave(189, 6)),
+    new WeightedModifierType(
+      modifierTypes.ABILITY_CHARM,
+      () =>
+        globalScene.currentBattle.waveIndex < globalScene.gameMode.getMysteryEncounterLegalWaves()[1]
+        && !globalScene.findModifier(modifier => modifier instanceof MysteryEventRateBoosterModifier)
+          ? 6
+          : 0,
+      6,
+    ),
     // ER custom Rogue-tier consumables.
     new WeightedModifierType(modifierTypes.ABILITY_RANDOMIZER, 4),
     new WeightedModifierType(modifierTypes.MOVE_SLOT_EXPANDER, 4),
+    new WeightedModifierType(modifierTypes.ER_GREATER_MOVE_RANDOMIZER, () => (globalScene.gameMode.isCoop ? 0 : 2), 2),
     new WeightedModifierType(modifierTypes.ER_OMNI_GEM, 3),
     // ER tactical held items - batch 2 ROGUE-tier additions (2026-07-16).
     new WeightedModifierType(modifierTypes.ER_METRONOME_ITEM, 3),
@@ -722,7 +737,10 @@ function initRogueModifierPool() {
     new WeightedModifierType(modifierTypes.SUPER_EXP_CHARM, skipInLastClassicWaveOrDefault(8)),
     new WeightedModifierType(
       modifierTypes.RARE_FORM_CHANGE_ITEM,
-      () => Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
+      () =>
+        globalScene.gameMode.isFun && getFunModeConfig().megaMode
+          ? 0
+          : Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 50), 4) * 6,
       24,
     ),
     new WeightedModifierType(
@@ -737,7 +755,8 @@ function initRogueModifierPool() {
     ),
     new WeightedModifierType(
       modifierTypes.VOUCHER_PLUS,
-      (_party: Pokemon[], rerollCount: number) => (globalScene.gameMode.isDaily ? 0 : Math.max(3 - rerollCount * 1, 0)),
+      (_party: Pokemon[], rerollCount: number) =>
+        globalScene.gameMode.isDaily || globalScene.gameMode.isFun ? 0 : Math.max(3 - rerollCount * 1, 0),
       3,
     ),
   ].map(m => {
@@ -758,7 +777,10 @@ function initMasterModifierPool() {
     new WeightedModifierType(
       modifierTypes.VOUCHER_PREMIUM,
       (_party: Pokemon[], rerollCount: number) =>
-        !globalScene.gameMode.isDaily && !globalScene.gameMode.isEndless && !globalScene.gameMode.isSplicedOnly
+        !globalScene.gameMode.isDaily
+        && !globalScene.gameMode.isFun
+        && !globalScene.gameMode.isEndless
+        && !globalScene.gameMode.isSplicedOnly
           ? Math.max(5 - rerollCount * 2, 0)
           : 0,
       5,

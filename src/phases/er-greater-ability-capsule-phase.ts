@@ -96,6 +96,8 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
   /** Exact runtime that owns this phase; never re-read after a picker callback or await. */
   private readonly coopOwningRuntime = getCoopRuntime();
   private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
+  /** Distinguishes each nested option/party appearance inside this one long-lived phase. */
+  private coopSurfaceGeneration = 0;
 
   constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
     super();
@@ -144,6 +146,11 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         "ability",
         `greaterCapsule WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker)`,
       );
+      // The watcher owns one passive MESSAGE appearance for this presentation. It never calls
+      // openChoice(), so allocate that generation explicitly before publishing readiness. A zero
+      // generation is not a valid surface identity and made the real-browser oracle reject an
+      // otherwise correctly parked watcher as input-inert/ambiguous.
+      this.coopSurfaceGeneration += 1;
       // The inherited reward handler is not this ABILITY_PRESENT control. Install the registered passive
       // watcher surface before asking the projector for controlInstalled; otherwise the remote owner window
       // waits forever for a proof this replica can never legally produce.
@@ -178,8 +185,14 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     return true;
   }
 
+  /** Read-only browser-oracle identity for repeated nested pickers; it grants no input authority. */
+  public coopV2SurfaceGeneration(): number {
+    return this.coopSurfaceGeneration;
+  }
+
   /** The top-level "Permanently unlock an innate" / "Run-unlock two innates" menu. */
   private openChoice(mon: PlayerPokemon): void {
+    this.coopSurfaceGeneration += 1;
     const canPermanent = greaterCapsuleCanPermanentlyUnlock(mon);
     const canRunTwo = greaterCapsuleCanRunUnlockTwo(mon);
 
@@ -229,6 +242,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
    * message and reopens the picker. Cancelling returns to the top-level choice.
    */
   private openPermanentPicker(mon: PlayerPokemon): void {
+    this.coopSurfaceGeneration += 1;
     const unlockable = greaterCapsulePermanentlyUnlockableInnateSlots(mon);
     if (unlockable.length === 0) {
       this.openChoice(mon);
@@ -280,6 +294,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
    * Cancelling at any point returns to the top-level choice (nothing applied yet).
    */
   private openRunUnlockPicker(mon: PlayerPokemon, picked: number[]): void {
+    this.coopSurfaceGeneration += 1;
     // Only slots that are still LOCKED and not already chosen this session are valid.
     const remaining = erRunUnlockableInnateSlots(mon).filter(u => !picked.includes(u.slot));
     if (remaining.length === 0) {

@@ -10,7 +10,6 @@ import { GameModes } from "#enums/game-modes";
 import {
   areShowdownTournamentsEnabled,
   isShowdown1v1Enabled,
-  SHOWDOWN_NETCODE_MODE,
   showdownTournamentLaunchConfig,
   TitlePhase,
 } from "#phases/title-phase";
@@ -159,18 +158,20 @@ describe("title mode selection", () => {
     expect(showdownOption?.label).toBe(GameMode.getModeName(GameModes.SHOWDOWN));
     expect(modeOptions).not.toContainEqual(expect.objectContaining({ semanticId: "showdown-sync" }));
     showdownOption?.handler();
-    expect(teamMenuSpy).toHaveBeenCalledWith(expect.any(Function), SHOWDOWN_NETCODE_MODE);
+    expect(teamMenuSpy).toHaveBeenCalledOnce();
   });
 
-  it("supports explicit URL overrides for testing and emergency shutdown", () => {
+  it("allows test overrides only in tournament-enabled builds", () => {
     expect(isShowdown1v1Enabled("")).toBe(true);
     expect(areShowdownTournamentsEnabled("")).toBe(false);
     expect(areShowdownTournamentsEnabled("", true)).toBe(true);
     expect(areShowdownTournamentsEnabled("?enableShowdownTournaments=0", true)).toBe(false);
     expect(isShowdown1v1Enabled("?enableShowdown1v1=0")).toBe(false);
-    expect(areShowdownTournamentsEnabled("?enableShowdownTournaments=1")).toBe(true);
+    expect(areShowdownTournamentsEnabled("?enableShowdownTournaments=1")).toBe(false);
+    expect(areShowdownTournamentsEnabled("?enableShowdownTournaments=1", true)).toBe(true);
     expect(isShowdown1v1Enabled("?enableShowdown=0")).toBe(false);
-    expect(areShowdownTournamentsEnabled("?enableShowdown=1")).toBe(true);
+    expect(areShowdownTournamentsEnabled("?enableShowdown=1")).toBe(false);
+    expect(areShowdownTournamentsEnabled("?enableShowdown=1", true)).toBe(true);
   });
 
   it("launches tournament matches through the same lockstep Showdown runtime", () => {

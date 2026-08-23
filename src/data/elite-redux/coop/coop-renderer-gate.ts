@@ -358,6 +358,34 @@ let strictTails = readInitialStrictTails();
 let sanctionedTailPhases: ReadonlySet<string> | null = null;
 
 /**
+ * A CONTROL_COMMIT may authorize one boundary-tail renderer outside the later WAVE_ADVANCE tail.
+ * Keep that permission synchronous and consumed-on-first-construction: the V2 projector owns the
+ * exact operation/address lease, while this cycle-free factory gate only admits the one phase object
+ * constructed inside the projector's call stack. It must never become a durable phase-name allowlist.
+ */
+let orderedControlPhasePermit: { readonly phaseName: string; consumed: boolean } | null = null;
+
+export function withCoopOrderedControlPhasePermit<T>(phaseName: string, construct: () => T): T {
+  if (!isCoopAuthoritativeGuestGated()) {
+    return construct();
+  }
+  if (!COOP_WAVE_TAIL_PHASES.has(phaseName) || orderedControlPhasePermit != null) {
+    throw new Error(`Invalid nested ordered co-op renderer permit for ${phaseName}.`);
+  }
+  const permit = { phaseName, consumed: false };
+  orderedControlPhasePermit = permit;
+  try {
+    const result = construct();
+    if (!permit.consumed) {
+      throw new Error(`Ordered co-op renderer permit for ${phaseName} did not construct its exact phase.`);
+    }
+    return result;
+  } finally {
+    orderedControlPhasePermit = null;
+  }
+}
+
+/**
  * A BIOME_PICK committed after the wave's WAVE_ADVANCE can legitimately add a biome tail that the earlier
  * wave operation could not predict (the wave-10 shop -> Crossroads Leave case). Keep that authority as a
  * single exact permit, not as a broad phase allow: destination, source, wave and operation identity all
@@ -796,11 +824,18 @@ export function coopRendererGateNeutralizes(phaseName: string, constructorArgs: 
     // Wave-2f STRICT-TAILS: a tail the current authoritative operation did NOT sanction fails closed under
     // renderer enforcement, or is surfaced loudly and allowed under observe rollback. Only the boundary-tail
     // group is checked; presentation / input-intent allowlist entries are always fine.
+    const orderedControlPermit = orderedControlPhasePermit;
+    const orderedControlPermitted =
+      orderedControlPermit?.phaseName === phaseName && orderedControlPermit.consumed === false;
+    if (orderedControlPermitted) {
+      orderedControlPermit.consumed = true;
+    }
     if (
       strictTails
       && COOP_WAVE_TAIL_PHASES.has(phaseName)
       && !(sanctionedTailPhases?.has(phaseName) ?? false)
       && !biomePermitSanctions(phaseName, constructorArgs)
+      && !orderedControlPermitted
     ) {
       if (enforced) {
         logTailBlock(phaseName);

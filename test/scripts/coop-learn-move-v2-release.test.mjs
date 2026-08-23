@@ -78,6 +78,16 @@ test("the authority closes the real phase, proves it, retains exact state, and o
   const callback = scheduler.lastIndexOf("commitAfterClose()");
   const start = scheduler.indexOf("this.startCurrentPhase()", callback);
   assert.ok(callback >= 0 && start > callback, "the queued successor cannot start before result retention succeeds");
+  assert.match(
+    scheduler,
+    /const selectedSuccessor = this\.currentPhase;[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*this\.currentPhase !== selectedSuccessor[\s\S]*!startSelectedSuccessor[\s\S]*this\.startCurrentPhase\(\)/u,
+    "a V2 modal projected by the atomic callback owns its single start and suppresses the obsolete successor",
+  );
+  assert.match(
+    scheduler,
+    /const selectedAfterClose = this\.currentPhase;[\s\S]*const successorWasStarted = this\.startedPhases\.has\(selectedAfterClose\)[\s\S]*startSelectedSuccessor = commitAfterClose\(\)[\s\S]*if \(!successorWasStarted\) \{[\s\S]*this\.startCurrentPhase\(\)/u,
+    "closing a projected modal starts a retained unstarted successor without restarting an ordinary predecessor",
+  );
 });
 
 test("every host-owned prompt and decline continuation re-enters its captured V2 runtime", () => {
@@ -161,6 +171,16 @@ test("exact host/guest owner material is the sole replica release and duplicate 
     exactRelease >= 0 && rawCompatibility > exactRelease,
     "V2 returns through the exact consumer before the legacy raw-result materializer",
   );
+  const promptStart = materializer.indexOf('if (payload.type === "prompt") {');
+  const promptCutover = materializer.indexOf("if (isCoopV2InteractionCutoverActive", promptStart);
+  const promptEnd = materializer.indexOf("if (isCoopV2InteractionCutoverActive", promptCutover + 1);
+  const prompt = materializer.slice(promptStart, promptEnd);
+  assert.ok(promptStart >= 0 && promptCutover > promptStart && promptEnd > promptCutover);
+  assert.match(prompt, /isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]*return true/u);
+  assert.ok(
+    prompt.indexOf("return true") < prompt.indexOf("materializeCommittedInteractionOutcome("),
+    "V2 prompt material is acknowledged before the legacy forward carrier can queue a duplicate picker",
+  );
 
   const queueOwned = section(
     learnMove,
@@ -171,8 +191,8 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(queueOwned, /this\.coopSubmittedV2ForgetSlot !== forgetSlot/u);
   assert.match(queueOwned, /!this\.coopAwaitingHostOwnedPresentation/u);
   assert.match(queueOwned, /const scene = globalScene/u);
-  assert.match(queueOwned, /runWhenCoopRuntimeActive\(runtime/u);
-  assert.match(queueOwned, /globalScene !== scene/u);
+  assert.match(queueOwned, /retirePresentationMode\(UiMode\.SUMMARY, this\.messageMode\)/u);
+  assert.doesNotMatch(queueOwned, /setModeBoundedWhen|runWhenCoopRuntimeActive/u);
   const queueEnd = queueOwned.indexOf("super.end()");
   const queueClosed = queueOwned.indexOf("scene.phaseManager.getCurrentPhase() === this", queueEnd);
   const queueProof = queueOwned.indexOf("settleCoopV2InteractionOperation(", queueClosed);
@@ -188,16 +208,17 @@ test("exact host/guest owner material is the sole replica release and duplicate 
   assert.match(projected, /this\.ownerIsGuest && this\.submittedV2MoveIndex !== forgetSlot/u);
   assert.match(projected, /!this\.ownerIsGuest && this\.submittedV2MoveIndex != null/u);
   assert.match(projected, /const scene = globalScene/u);
-  assert.match(projected, /runWhenCoopRuntimeActive\(runtime/u);
-  assert.match(projected, /globalScene !== scene/u);
-  const projectedEnd = projected.indexOf("super.end()");
-  const projectedClosed = projected.indexOf("scene.phaseManager.getCurrentPhase() === this", projectedEnd);
-  const projectedProof = projected.indexOf("settleCoopV2InteractionOperation(", projectedClosed);
+  assert.match(projected, /retirePresentationMode\(UiMode\.SUMMARY, UiMode\.MESSAGE\)/u);
+  assert.doesNotMatch(projected, /setModeBoundedWhen|runWhenCoopRuntimeActive/u);
+  const projectedShift = projected.indexOf("shiftPhaseThroughCoopAuthorityCommit(");
+  const projectedProof = projected.indexOf("settleCoopV2InteractionOperation(", projectedShift);
+  const projectedFailure = projected.indexOf("if (!closed)", projectedProof);
   assert.ok(
-    projectedEnd >= 0 && projectedClosed > projectedEnd && projectedProof > projectedClosed,
-    "the projected picker proves terminal only after its real phase ends",
+    projectedShift >= 0 && projectedProof > projectedShift && projectedFailure > projectedProof,
+    "the projected picker proves terminal atomically before its retained successor starts",
   );
-  assert.match(duo, /the single-move terminal resumes under the peer ambient before its captured runtime reactivates/u);
+  assert.doesNotMatch(projected, /super\.end\(\)/u, "the projected picker cannot restore an unstarted standby blindly");
+  assert.match(duo, /the single-move V2 terminal cannot delegate phase retirement to an ambient async UI callback/u);
   assert.match(
     duo,
     /firstConfirmGeneration[\s\S]+getSurfaceGeneration\?\.\(\)[\s\S]+> firstConfirmGeneration/u,

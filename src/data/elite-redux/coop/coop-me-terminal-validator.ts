@@ -172,7 +172,7 @@ function isCompleteCoopSerializedTrainer(value: unknown): value is CoopSerialize
   );
 }
 
-function isCompleteCoopTrainerVictoryMaterial(value: unknown): value is CoopTrainerVictoryMaterial {
+export function isCompleteCoopTrainerVictoryMaterial(value: unknown): value is CoopTrainerVictoryMaterial {
   if (!isPlainObject(value)) {
     return false;
   }
@@ -262,6 +262,7 @@ export function isCompleteCoopMeTerminalPayload(value: unknown): value is CoopMe
     const trainerBattle = destination.encounterMode === MysteryEncounterMode.TRAINER_BATTLE;
     return (
       destination.kind === "battle"
+      && (destination.boot === "encounter-phase" || destination.boot === "direct-turn")
       && isSafeNonNegativeInteger(destination.hostTurn)
       && isSafeNonNegativeInteger(destination.encounterMode)
       && (trainerBattle ? isCompleteCoopSerializedTrainer(destination.trainer) : destination.trainer === null)

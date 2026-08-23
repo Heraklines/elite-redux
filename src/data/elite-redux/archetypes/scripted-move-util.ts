@@ -35,10 +35,12 @@ import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import type { Pokemon } from "#field/pokemon";
 import {
+  ConsecutiveUsePowerMultiplierAttr,
   HitHealAttr,
   HpPowerAttr,
   MagnitudePowerAttr,
   type Move,
+  MoveAttr,
   PreMoveMessageAttr,
   RechargeAttr,
   ScaledHpPowerAttr,
@@ -59,6 +61,13 @@ export interface ScriptedMoveOptions {
    * allowing normal actions next turn"). No-op for moves with no recharge.
    */
   readonly noRecharge?: boolean;
+  /**
+   * Strip native consecutive-use power scaling from this scripted clone.
+   * Used when an ability owns a separate progression state.
+   */
+  readonly stripConsecutiveUsePower?: boolean;
+  /** Marker carried by the cloned move for a post-resolution ability hook. */
+  readonly marker?: string;
   /**
    * When set, replace the cloned move's {@linkcode HpPowerAttr} (vanilla's
    * hardcoded 150-BP-at-full-HP scaling, used by Eruption) with a
@@ -81,6 +90,13 @@ export interface ScriptedMoveOptions {
   readonly nonReflectable?: boolean;
   /** Scales healing attrs on this scripted cast without mutating the registered move. */
   readonly healMultiplier?: number;
+}
+
+/** Metadata attached to a scripted clone for ability-local post-resolution hooks. */
+export class ScriptedMoveMarkerAttr extends MoveAttr {
+  constructor(public readonly key: string) {
+    super();
+  }
 }
 
 function getMagnitudeLevel(range: readonly [min: number, max: number]): number {
@@ -118,6 +134,8 @@ class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly bypassFirstMoveCondition: boolean;
   private readonly magnitudeRange: readonly [min: number, max: number] | undefined;
   private readonly noRecharge: boolean;
+  private readonly stripConsecutiveUsePower: boolean;
+  private readonly marker: string | undefined;
   private readonly nonReflectable: boolean;
   private readonly hpScaledBasePower: number | undefined;
   private readonly category: MoveCategory | undefined;
@@ -132,6 +150,8 @@ class PowerOverriddenPokemonMove extends PokemonMove {
     this.bypassFirstMoveCondition = opts.bypassFirstMoveCondition ?? false;
     this.magnitudeRange = opts.magnitudeRange;
     this.noRecharge = opts.noRecharge ?? false;
+    this.stripConsecutiveUsePower = opts.stripConsecutiveUsePower ?? false;
+    this.marker = opts.marker;
     this.hpScaledBasePower = opts.hpScaledBasePower;
     this.category = opts.category;
     this.type = opts.type;
@@ -148,6 +168,11 @@ class PowerOverriddenPokemonMove extends PokemonMove {
       // are overridden. `calculateBattlePower` seeds the holder with
       // `this.power`, so the override takes effect for this cast alone.
       const clone = Object.assign(Object.create(Object.getPrototypeOf(base)), base) as Move;
+      if (this.stripConsecutiveUsePower) {
+        // Per-ability progression owns the streak; native consecutive-use
+        // history must not participate in this scripted clone.
+        clone.attrs = clone.attrs.filter(attr => !(attr instanceof ConsecutiveUsePowerMultiplierAttr));
+      }
       if (this.power !== undefined) {
         (clone as unknown as { power: number }).power = this.power;
       }
@@ -208,6 +233,9 @@ class PowerOverriddenPokemonMove extends PokemonMove {
           return attr;
         });
       }
+      if (this.marker !== undefined) {
+        clone.attrs = [...clone.attrs, new ScriptedMoveMarkerAttr(this.marker)];
+      }
       this.cached = clone;
     }
     return this.cached;
@@ -234,7 +262,9 @@ export function scriptedPokemonMove(moveId: MoveId, power?: number, opts: Script
     && !bypassFirstMoveCondition
     && magnitudeRange === undefined
     && !noRecharge
+    && !opts.stripConsecutiveUsePower
     && !nonReflectable
+    && opts.marker === undefined
     && opts.healMultiplier === undefined
     && opts.category === undefined
     && opts.type === undefined

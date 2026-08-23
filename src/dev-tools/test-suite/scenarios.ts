@@ -26,12 +26,15 @@ import { TerrainType } from "#app/data/terrain";
 import {
   setClearMeOverrideAfterFirst,
   setPendingDevCustomTrainerForce,
+  setPendingDevEndlessOffer,
   setPendingDevEnemyParty,
+  setPendingDevGhostTeam,
 } from "#app/dev-tools/registry";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
-import { modifierTypes } from "#data/data-lists";
+import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { allMoves, modifierTypes } from "#data/data-lists";
 import { ER_CRACKED_VESSEL_ABILITY_ID } from "#data/elite-redux/abilities/newcomer-signature-abilities";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
@@ -45,7 +48,41 @@ import {
   erCustomTrainerHeldModifierConfigs,
   resolveErCustomTrainerMoveIds,
 } from "#data/elite-redux/er-custom-trainers";
+import { resetErEndlessContinuation, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
+import {
+  ER_CHROMIGHTY_SPECIES_ID,
+  ER_CONKAPITATOR_SPECIES_ID,
+  ER_DIPPOWDOWN_SPECIES_ID,
+  ER_EQUILIBRA_SPECIES_ID,
+  ER_FALINKS_CONVERGENT_SPECIES_ID,
+  ER_GURDURUR_SPECIES_ID,
+  ER_GUZZLORD_M_SPECIES_ID,
+  ER_INTANGROWTH_SPECIES_ID,
+  ER_IRON_STREAM_SPECIES_ID,
+  ER_JUSTYKE_SPECIES_ID,
+  ER_LICKILICKING_SPECIES_ID,
+  ER_LILLIGANT_VERDANT_SPECIES_ID,
+  ER_MANGLING_BLADE_SPECIES_ID,
+  ER_MISHAMANUS_SPECIES_ID,
+  ER_OCTILLERY_REDUX_SPECIES_ID,
+  ER_PENTASNUG_SPECIES_ID,
+  ER_PONYTA_REDUX_SPECIES_ID,
+  ER_POWER_PLANT_SPECIES_ID,
+  ER_PYROTHON_SPECIES_ID,
+  ER_QUAKERSBY_SPECIES_ID,
+  ER_RAPIDASH_REDUX_SPECIES_ID,
+  ER_SLABBERIGUS_SPECIES_ID,
+  ER_SNUGLETT_SPECIES_ID,
+  ER_SNUGTRIO_SPECIES_ID,
+  ER_TAGELA_SPECIES_ID,
+  ER_TEMPORAL_SKULL_SPECIES_ID,
+  ER_TREMBURR_SPECIES_ID,
+  ER_VANTARROW_SPECIES_ID,
+  ER_VOLTRIEVER_SPECIES_ID,
+  ER_WAILBORE_SPECIES_ID,
+} from "#data/elite-redux/er-fakemon-pitch-species";
+import { DEFAULT_FUN_MODE_CONFIG, getFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { type GhostMember, type GhostTeamSnapshot, seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
@@ -54,12 +91,14 @@ import {
   ER_PARTNER_VAPOREON_SPECIES_ID,
   ER_TITANEON_SPECIES_ID,
 } from "#data/elite-redux/er-newcomer-species";
+import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import {
   type ErDifficulty,
   setErDifficulty,
   setErDifficulty as setErDifficultyForScenario,
 } from "#data/elite-redux/er-run-difficulty";
+import { resetErRunPacing, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import {
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   encodeErShinyLabLoadout,
@@ -68,6 +107,8 @@ import {
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
+import { setMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
+import { restoreMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -80,6 +121,7 @@ import { ErAbilityId } from "#enums/er-ability-id";
 import { ErMoveId } from "#enums/er-move-id";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { GameModes } from "#enums/game-modes";
+import { HitResult } from "#enums/hit-result";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { Nature } from "#enums/nature";
@@ -89,18 +131,43 @@ import { SpeciesId } from "#enums/species-id";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { TimeOfDay } from "#enums/time-of-day";
+import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { PlayerPokemon } from "#field/pokemon";
-import type { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { ErRelicModifier, type PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
-import { erCommunityItemModifierType, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
+import {
+  erCommunityItemModifierType,
+  ModifierTypeGenerator,
+  PokemonHeldItemModifierType,
+} from "#modifiers/modifier-type";
 import type { Variant } from "#sprites/variant";
+import { getModifierDataTypeFactory } from "#system/modifier-data";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
 import { openErMapOverlay } from "#ui/er-map-ui-handler";
+import { Page as SummaryPage, SummaryUiMode } from "#ui/handlers/summary-ui-handler";
+import {
+  demoMoodyBattleHud,
+  demoMoodyBloodMarketOperation,
+  demoMoodyBorrowedFutureOperation,
+  demoMoodyBountyOperation,
+  demoMoodyChoice,
+  demoMoodyEnemyPanel,
+  demoMoodyLegacyOperation,
+  demoMoodyLivePresentation,
+  demoMoodyPressureValveOperation,
+  demoMoodyRecyclerOperation,
+  demoMoodyState,
+  demoMoodyTargetPicker,
+  demoMoodyTransitionSections,
+} from "#ui/moody/moody-demo-data";
+import type { MoodyOperationModel } from "#ui/moody/moody-operation";
+import { PartyUiMode } from "#ui/party-ui-handler";
 import { isSlotUnlocked, PASSIVE_SLOTS, unlockSlot } from "#utils/passive-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { type ErCustomTrainerLaunchPlan, planErCustomTrainerLaunch } from "./custom-trainer-picker";
+import { DEV_HELL_VICTORY_GHOST } from "./fixtures/hell-victory-ghost";
 
 export interface DevScenario {
   /** Short name for the picker list. */
@@ -119,6 +186,10 @@ export interface DevScenario {
   onPartyReady?: () => void;
   /** Optional: runs ONCE on the first turn, after both sides are summoned. */
   onBattleStart?: () => void;
+  /** Optional: runs ONCE after the first turn's player and enemy commands are committed. */
+  onFirstTurnCommitted?: () => void;
+  /** Optional: skip encounter cloud-save gates for the lifetime of a throwaway dev fixture. */
+  bypassEncounterPersistence?: boolean;
   /**
    * Optional: guarantee these reward options in the FIRST shop after the opening
    * battle ("start in the store, test a specific item"). Each is a
@@ -147,7 +218,7 @@ function makeStarter(speciesId: SpeciesId, opts: StarterOpts = {}): Starter {
     shiny: opts.shiny ?? false,
     variant: opts.variant ?? 0,
     formIndex: opts.formIndex ?? 0,
-    female: opts.female,
+    ...(opts.female === undefined ? {} : { female: opts.female }),
     abilityIndex: opts.abilityIndex ?? 0,
     passive: false,
     nature: opts.nature ?? Nature.HARDY,
@@ -264,6 +335,8 @@ const DEV_OVERRIDE_DEFAULTS = {
  */
 export function resetDevOverrides(): void {
   Object.assign(O, structuredClone(DEV_OVERRIDE_DEFAULTS));
+  resetErRunPacing();
+  resetErEndlessContinuation();
   // The smarter AI is master-OFF in real play; clear any per-scenario force so
   // only the AI scenarios (which re-enable it below) ever exercise it.
   setErSmartAiTestForced(false);
@@ -366,22 +439,26 @@ export function translatePreparedGhostLevels(
 
 /** Restore every resolvable held item stored on a sampled ghost roster. */
 export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], members: readonly GhostMember[]): number {
-  const registry = modifierTypes as Record<string, ModifierTypeFunc | undefined>;
   let applied = 0;
   party.forEach((mon, index) => {
-    for (const [typeId, rawCount] of members[index]?.heldItems ?? []) {
-      const factory = registry[typeId];
+    for (const [typeId, rawCount, generatedTypeArgs] of members[index]?.heldItems ?? []) {
+      const factory = getModifierDataTypeFactory(typeId);
       if (typeof factory !== "function") {
         continue;
       }
       try {
-        const type = factory();
+        const storedType = factory();
+        const type =
+          storedType instanceof ModifierTypeGenerator
+            ? storedType.generateType([mon], Array.isArray(generatedTypeArgs) ? generatedTypeArgs : undefined)
+            : storedType;
         if (!(type instanceof PokemonHeldItemModifierType)) {
           continue;
         }
-        const modifier = type.withIdFromFunc(factory).newModifier(mon) as PokemonHeldItemModifier;
+        type.id = typeId;
+        const modifier = type.newModifier(mon) as PokemonHeldItemModifier;
         modifier.pokemonId = mon.id;
-        modifier.stackCount = Math.max(1, Math.floor(Number(rawCount) || 1));
+        modifier.stackCount = Math.min(Math.max(1, Math.floor(Number(rawCount) || 1)), modifier.getMaxStackCount());
         globalScene.addModifier(modifier, true, false, false, true);
         applied++;
       } catch {
@@ -390,6 +467,33 @@ export function applyPreparedGhostHeldItems(party: readonly PlayerPokemon[], mem
       }
     }
   });
+  globalScene.updateModifiers(true);
+  return applied;
+}
+
+/** Restore every valid player relic stored on a sampled ghost run. */
+export function applyPreparedGhostRelics(snapshot: GhostTeamSnapshot): number {
+  let applied = 0;
+  for (const [rawKind, rawStack, rawWeather] of snapshot.relics ?? []) {
+    if (!Object.hasOwn(ER_RELIC_CONFIG, rawKind)) {
+      continue;
+    }
+    const kind = rawKind as ErRelicKind;
+    const typeId = `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+    const type = getModifierDataTypeFactory(typeId)?.();
+    if (type) {
+      type.id = typeId;
+    }
+    const modifier = type?.newModifier();
+    const stack = Math.floor(Number(rawStack));
+    if (!(modifier instanceof ErRelicModifier) || !Number.isFinite(stack) || stack <= 0) {
+      continue;
+    }
+    modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+    modifier.chosenWeather = Number.isFinite(rawWeather) ? rawWeather : null;
+    globalScene.addModifier(modifier, true, false, false, true);
+    applied++;
+  }
   globalScene.updateModifiers(true);
   return applied;
 }
@@ -1549,7 +1653,631 @@ const EASY_ABILITY_ADDITION_SCENARIOS: DevScenario[] = [
   }),
 ];
 
+function setupMoodyUiHarness(): Starter[] {
+  resetDevOverrides();
+  setFunModeConfig({
+    ...DEFAULT_FUN_MODE_CONFIG,
+    randomizePokemon: false,
+    randomizeTypes: false,
+    randomizeAbilities: false,
+    randomizeLevelUpMoves: false,
+    weatherRoulette: true,
+    moodyMode: false,
+  });
+  setOverrides({
+    STARTING_WAVE_OVERRIDE: 31,
+    STARTING_LEVEL_OVERRIDE: 60,
+    BATTLE_STYLE_OVERRIDE: "single",
+    BATTLE_TYPE_OVERRIDE: BattleType.WILD,
+    DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+    ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+    ENEMY_LEVEL_OVERRIDE: 20,
+    ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+    ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+  });
+  return [
+    makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.FLAMETHROWER, MoveId.FLY, MoveId.ROOST, MoveId.SOLAR_BEAM] }),
+    makeStarter(SpeciesId.BLASTOISE, { moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.PROTECT, MoveId.AURA_SPHERE] }),
+    makeStarter(SpeciesId.VENUSAUR, {
+      moveset: [MoveId.GIGA_DRAIN, MoveId.SLUDGE_BOMB, MoveId.SLEEP_POWDER, MoveId.SYNTHESIS],
+    }),
+    makeStarter(SpeciesId.PIKACHU, { moveset: [MoveId.THUNDERBOLT, MoveId.VOLT_SWITCH, MoveId.SURF, MoveId.PROTECT] }),
+    makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.SLEEP_TALK] }),
+    makeStarter(SpeciesId.GENGAR, {
+      moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.DESTINY_BOND, MoveId.THUNDERBOLT],
+    }),
+  ];
+}
+
+function setupMoodyAdaptivePartyHarness(): Starter[] {
+  const party = setupMoodyUiHarness();
+  setOverrides({ BATTLE_STYLE_OVERRIDE: "triple" });
+  return party.slice(0, 4);
+}
+
+function setupMoodyTrainerFlyoutHarness(): Starter[] {
+  const party = setupMoodyUiHarness();
+  setOverrides({
+    BATTLE_TYPE_OVERRIDE: BattleType.TRAINER,
+    DISABLE_STANDARD_TRAINERS_OVERRIDE: false,
+    ENEMY_SPECIES_OVERRIDE: null,
+    ENEMY_LEVEL_OVERRIDE: 0,
+    ENEMY_ABILITY_OVERRIDE: AbilityId.NONE,
+    ENEMY_MOVESET_OVERRIDE: [],
+  });
+  return party;
+}
+
+function installMoodyUiDemoState(): void {
+  const state = demoMoodyState();
+  const ids = globalScene.getPlayerParty().map(pokemon => pokemon.id);
+  state.boons = state.boons.map(boon =>
+    boon.target == null
+      ? { ...boon }
+      : {
+          ...boon,
+          target: {
+            ...boon.target,
+            ...(boon.target.pokemonIds == null
+              ? {}
+              : { pokemonIds: boon.target.pokemonIds.map(id => ids[Math.max(0, id - 1001)] ?? ids[0]!) }),
+          },
+        },
+  );
+  restoreMoodyModeState(state);
+  setMoodyEnemyBoonLoadout({ waveIndex: 31, boons: [...demoMoodyEnemyPanel().boons] });
+  const livePresentation = demoMoodyLivePresentation(ids);
+  const captureTarget = globalScene.getEnemyField().find(pokemon => pokemon?.isActive(true));
+  if (livePresentation.recruiterEye != null && captureTarget != null) {
+    livePresentation.recruiterEye = { ...livePresentation.recruiterEye, pokemonId: captureTarget.id };
+  }
+  globalScene.ui.setMoodyLivePresentation(livePresentation);
+}
+
+function openMoodyUiHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  installMoodyUiDemoState();
+  globalScene.time.delayedCall(600, () => {
+    open();
+    (
+      window as typeof window & {
+        __erMoodyUiHarnessReady?: boolean;
+      }
+    ).__erMoodyUiHarnessReady = true;
+  });
+}
+
+function openMoodyBattleUiHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  installMoodyUiDemoState();
+  const openWhenCommandReady = () => {
+    if (globalScene.ui.getMode() !== UiMode.COMMAND) {
+      globalScene.time.delayedCall(50, openWhenCommandReady);
+      return;
+    }
+    open();
+    const signalWhenVisible = () => {
+      if (globalScene.ui.getMode() !== UiMode.MOODY_CHOICE) {
+        globalScene.time.delayedCall(50, signalWhenVisible);
+        return;
+      }
+      (
+        window as typeof window & {
+          __erMoodyUiHarnessReady?: boolean;
+        }
+      ).__erMoodyUiHarnessReady = true;
+    };
+    signalWhenVisible();
+  };
+  openWhenCommandReady();
+}
+
+function openMoodyFlyoutHarness(open: () => void): void {
+  setFunModeConfig({ ...getFunModeConfig(), moodyMode: true });
+  globalScene.showMoodyEffectFlyouts = true;
+  globalScene.time.delayedCall(600, () => {
+    open();
+    const signalWhenVisible = () => {
+      if (!globalScene.abilityBar.isVisible()) {
+        globalScene.time.delayedCall(50, signalWhenVisible);
+        return;
+      }
+      (
+        window as typeof window & {
+          __erMoodyUiHarnessReady?: boolean;
+        }
+      ).__erMoodyUiHarnessReady = true;
+    };
+    signalWhenVisible();
+  });
+}
+
+function hideMoodyEnemyTrainerHarnessFieldSprite(remainingFrames = 30): void {
+  const trainer = globalScene.currentBattle?.trainer;
+  trainer?.setVisible(false);
+  for (const sprite of trainer?.getSprites() ?? []) {
+    sprite.setVisible(false);
+  }
+  if (remainingFrames > 0) {
+    globalScene.time.delayedCall(50, () => hideMoodyEnemyTrainerHarnessFieldSprite(remainingFrames - 1));
+  }
+}
+
+function buildMoodyBorrowedFutureHarnessModel(): MoodyOperationModel {
+  const model = demoMoodyBorrowedFutureOperation();
+  const enemies = globalScene.getEnemyField().filter(pokemon => pokemon?.isActive(true));
+  const party = globalScene.getPlayerParty();
+  return {
+    ...model,
+    leadCount: globalScene.currentBattle.getBattlerCount(),
+    committedActions: enemies.map(pokemon => ({
+      pokemonId: String(pokemon.id),
+      actor: pokemon.getNameToRender(),
+      action: pokemon.getMoveset()[0]?.getName() ?? "No move",
+      target: "Committed target",
+    })),
+    options: party.map(pokemon => ({
+      id: String(pokemon.id),
+      label: pokemon.getNameToRender(),
+      description: "Available for a lead slot.",
+    })),
+  };
+}
+
+const MOODY_UI_HARNESS_SCENARIOS: DevScenario[] = [
+  {
+    label: "UI: Moody boon lifecycle",
+    description: "Real post-boss boon handler with rank/evolution/replacement and target flows.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.MOODY_BOON_SELECT, 100, () => {})),
+  },
+  {
+    label: "UI: Moody Ledger dense",
+    description: "Five-tab Ledger with a full twelve-line build, bindings, progress, history, and Codex.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.MOODY_LEDGER)),
+  },
+  {
+    label: "UI: Moody party attach",
+    description: "Live six-mon party cards with slot, Pokemon, pair, item, and team Moody attachments.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {})),
+  },
+  {
+    label: "UI: Moody party adaptive",
+    description: "Four-mon triple party with three compact active cards and one vertically centered reserve.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {})),
+  },
+  {
+    label: "UI: Moody summary attach",
+    description: "Live summary MOOD tab with bound Pokemon, move, item, slot, pair, and team details.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(
+        () =>
+          void globalScene.ui.setModeWithoutClear(
+            UiMode.SUMMARY,
+            globalScene.getPlayerParty()[0],
+            SummaryUiMode.DEFAULT,
+            SummaryPage.MOOD,
+          ),
+      ),
+  },
+  {
+    label: "UI: Moody enemy eight",
+    description: "Enemy Mood panel with eight roster positions, hidden reserves, observed boons, and debug details.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.setOverlayMode(UiMode.MOODY_ENEMY_PANEL, demoMoodyEnemyPanel())),
+  },
+  {
+    label: "UI: Moody battle HUD",
+    description: "Live battle rule strip, tracker tray, trigger feed, barrier, debt, and revival overlays.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => {
+        globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
+        globalScene.ui.pushMoodyTrigger("Bastion Seat II: +64 barrier");
+      }),
+  },
+  {
+    label: "UI: Moody battle HUD triple",
+    description: "Triple-battle player and enemy side drawers positioned clear of both three-mon health stacks.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => {
+        globalScene.ui.setMoodyBattleHudModel(demoMoodyBattleHud());
+        globalScene.ui.pushMoodyTrigger("Mithridatism: Poison 2/3 cures");
+      }),
+  },
+  {
+    label: "UI: Moody trainer boon flyout",
+    description: "Violet ability-bar variant with the player trainer portrait attached to a boon trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "player");
+      }),
+  },
+  {
+    label: "UI: Moody enemy trainer boon flyout",
+    description: "Violet enemy-side ability-bar variant with the opposing trainer portrait attached to a boon trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        hideMoodyEnemyTrainerHarnessFieldSprite();
+        void globalScene.abilityBar.showTrainerEffect("Mithridatism II", "boon", "enemy");
+      }),
+  },
+  {
+    label: "UI: Moody trainer curse flyout",
+    description: "Dark-violet ability-bar variant with the player trainer portrait attached to a curse trigger.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyTrainerFlyoutHarness,
+    onBattleStart: () =>
+      openMoodyFlyoutHarness(() => {
+        globalScene.ui.pushMoodyTrigger("Reverse Snowball: enemy stats +9%", {
+          effectId: "reverse-snowball",
+          name: "Reverse Snowball",
+          kind: "curse",
+          side: "player",
+        });
+      }),
+  },
+  {
+    label: "UI: Moody curse received",
+    description: "Mandatory post-draft curse reveal with Dread, exact effect text, target, and confirm-only exit.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.showMoodyCurseReceived({ curseId: "type-tax", acquiredAtWave: 10 })),
+  },
+  {
+    label: "UI: Moody choice queue",
+    description: "Queued contextual choice using the same input path as Final Draft and post-battle decisions.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.requestMoodyChoice(demoMoodyChoice())),
+  },
+  {
+    label: "UI: Moody target eight",
+    description: "Generic target/binding picker with eight candidates, attachments, previews, and ineligible reasons.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.requestMoodyTarget(demoMoodyTargetPicker())),
+  },
+  {
+    label: "UI: Moody biome report",
+    description: "Paged biome-transition report for Mood Swing, Cursed Inventory, Entropy, debt, and healing.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.showMoodyBiomeReport(demoMoodyTransitionSections())),
+  },
+  {
+    label: "UI: Moody Borrowed Future",
+    description: "Compact one-to-three lead forecast with committed moves and restricted party reorder.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyAdaptivePartyHarness,
+    onBattleStart: () =>
+      openMoodyBattleUiHarness(
+        () => void globalScene.ui.showMoodyBorrowedFuture(buildMoodyBorrowedFutureHarnessModel()),
+      ),
+  },
+  {
+    label: "UI: Moody bounty board",
+    description: "Bounty Board objectives with progress, rewards, feasibility, and failure conditions.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.showMoodyBountyBoard(demoMoodyBountyOperation())),
+  },
+  {
+    label: "UI: Moody Recycler",
+    description: "Production reward operation: choose an exact destroyed offer and return it to the reward owner.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyRecycler(demoMoodyRecyclerOperation())),
+  },
+  {
+    label: "UI: Moody Legacy Slot",
+    description: "Production release/replacement inheritance selection with exact retained progression.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyLegacySlot(demoMoodyLegacyOperation())),
+  },
+  {
+    label: "UI: Moody Blood Market",
+    description: "Production money-versus-blood payment choice with debtor, debt duration, premium, and growth.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyBloodMarket(demoMoodyBloodMarketOperation())),
+  },
+  {
+    label: "UI: Moody Pressure Valve",
+    description: "Production acquisition choice returning exactly Healing, Barrier, or PP.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(() => void globalScene.ui.requestMoodyPressureValve(demoMoodyPressureValveOperation())),
+  },
+  {
+    label: "UI: Moody item stack",
+    description: "Native party item-management flow with Moody stack markers and contextual status.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () =>
+      openMoodyUiHarness(
+        () => void globalScene.ui.setOverlayMode(UiMode.PARTY, PartyUiMode.MODIFIER_TRANSFER, -1, () => {}),
+      ),
+  },
+  {
+    label: "UI: Moody run recap",
+    description: "End-run recap built from the live Moody save state.",
+    gameMode: GameModes.FUN,
+    setup: setupMoodyUiHarness,
+    onBattleStart: () => openMoodyUiHarness(() => void globalScene.ui.showMoodyRunRecap("UI-HARNESS-SEED")),
+  },
+];
+
+interface FakemonPitchShowcaseMember {
+  readonly speciesId: SpeciesId;
+  readonly formKey?: string;
+  readonly female?: boolean;
+  readonly moveset?: MoveId[];
+}
+
+const pitchSpecies = (
+  speciesId: number,
+  formKey?: string,
+  options: Pick<FakemonPitchShowcaseMember, "female" | "moveset"> = {},
+): FakemonPitchShowcaseMember => ({
+  speciesId: erSpecies(speciesId),
+  ...(formKey ? { formKey } : {}),
+  ...options,
+});
+
+function fakemonPitchMoveset(speciesId: SpeciesId): StarterMoveset {
+  const levelMoves = (pokemonSpeciesLevelMoves as Record<number, [number, MoveId][]>)[speciesId] ?? [];
+  const uniqueMoves = [...new Set(levelMoves.filter(([level]) => level <= 100).map(([, move]) => move))];
+  const selected = uniqueMoves.slice(-4);
+  if (selected.length === 0) {
+    selected.push(MoveId.TACKLE, MoveId.PROTECT);
+  }
+  return selected as StarterMoveset;
+}
+
+const fakemonPitchStarter = (member: FakemonPitchShowcaseMember): Starter =>
+  makeStarter(member.speciesId, {
+    formIndex: member.formKey ? formIndexByKey(member.speciesId, member.formKey) : 0,
+    ...(member.female === undefined ? {} : { female: member.female }),
+    moveset: member.moveset ?? fakemonPitchMoveset(member.speciesId),
+  });
+
+function fakemonPitchShowcaseScenario(
+  number: number,
+  members: readonly FakemonPitchShowcaseMember[],
+  enemy: FakemonPitchShowcaseMember,
+  names: string,
+): DevScenario {
+  return {
+    label: `Roster: new Pokemon ${number}/10`,
+    description:
+      `New Pokemon roster showcase ${number}/10.\n`
+      + `PLAYER: ${names}.\n`
+      + "DO: open Check Team and battle info, then inspect sprites, forms, typings, moves, and abilities.\n"
+      + "EXPECT: all six player slots and the opponent use additions from the new roster.",
+    startingLevels: members.map(() => 100),
+    bypassEncounterPersistence: true,
+    setup: () => {
+      resetDevOverrides();
+      setErRunPacing("normal");
+      setErDifficulty("youngster");
+      const enemyFormIndex = enemy.formKey ? formIndexByKey(enemy.speciesId, enemy.formKey) : 0;
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        BATTLE_STYLE_OVERRIDE: "single",
+        BATTLE_TYPE_OVERRIDE: BattleType.WILD,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+        ENEMY_SPECIES_OVERRIDE: enemy.speciesId,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_FORM_OVERRIDES: enemy.formKey ? { [enemy.speciesId]: enemyFormIndex } : {},
+      });
+      return members.map(fakemonPitchStarter);
+    },
+  };
+}
+
+const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
+  fakemonPitchShowcaseScenario(
+    1,
+    [
+      pitchSpecies(ER_TREMBURR_SPECIES_ID),
+      pitchSpecies(ER_GURDURUR_SPECIES_ID),
+      pitchSpecies(ER_CONKAPITATOR_SPECIES_ID),
+      pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
+      pitchSpecies(ER_JUSTYKE_SPECIES_ID),
+      pitchSpecies(ER_EQUILIBRA_SPECIES_ID),
+    ],
+    pitchSpecies(ER_WAILBORE_SPECIES_ID),
+    "Tremburr, Gurdurur, Conkapitator, Dippowdown, Justyke, Equilibra",
+  ),
+  fakemonPitchShowcaseScenario(
+    2,
+    [
+      pitchSpecies(ER_LICKILICKING_SPECIES_ID),
+      pitchSpecies(ER_MANGLING_BLADE_SPECIES_ID),
+      pitchSpecies(ER_OCTILLERY_REDUX_SPECIES_ID),
+      pitchSpecies(ER_SNUGLETT_SPECIES_ID),
+      pitchSpecies(ER_SNUGTRIO_SPECIES_ID),
+      pitchSpecies(ER_PENTASNUG_SPECIES_ID),
+    ],
+    pitchSpecies(ER_VOLTRIEVER_SPECIES_ID),
+    "Lickilicking, Mangling Blade, Octillery Redux, Snuglett, Snugtrio, Pentasnug",
+  ),
+  fakemonPitchShowcaseScenario(
+    3,
+    [
+      pitchSpecies(ER_POWER_PLANT_SPECIES_ID),
+      pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
+      pitchSpecies(ER_PYROTHON_SPECIES_ID),
+      pitchSpecies(ER_PONYTA_REDUX_SPECIES_ID),
+      pitchSpecies(ER_RAPIDASH_REDUX_SPECIES_ID),
+      pitchSpecies(ER_VOLTRIEVER_SPECIES_ID),
+    ],
+    pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
+    "Power Plant, Live Current, Pyrothon, Ponyta Redux, Rapidash Redux, Voltriever",
+  ),
+  fakemonPitchShowcaseScenario(
+    4,
+    [
+      pitchSpecies(ER_WAILBORE_SPECIES_ID),
+      pitchSpecies(SpeciesId.CRYOGONAL, "mega"),
+      pitchSpecies(SpeciesId.JIRACHI, "mega"),
+      pitchSpecies(SpeciesId.LEDIAN, "mega"),
+      pitchSpecies(SpeciesId.RAMPARDOS, "mega"),
+      pitchSpecies(SpeciesId.REUNICLUS, "mega-x"),
+    ],
+    pitchSpecies(ER_MANGLING_BLADE_SPECIES_ID),
+    "Wailbore, Mega Cryogonal, Mega Jirachi, Mega Ledian, Mega Rampardos, Mega Reuniclus X",
+  ),
+  fakemonPitchShowcaseScenario(
+    5,
+    [
+      pitchSpecies(SpeciesId.XATU, "mega"),
+      pitchSpecies(SpeciesId.ZANGOOSE, "mega"),
+      pitchSpecies(ER_CONKAPITATOR_SPECIES_ID),
+      pitchSpecies(ER_PENTASNUG_SPECIES_ID),
+      pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
+      pitchSpecies(ER_MANGLING_BLADE_SPECIES_ID),
+    ],
+    pitchSpecies(ER_POWER_PLANT_SPECIES_ID, "live-current"),
+    "Mega Xatu, Mega Zangoose, Conkapitator, Pentasnug, Live Current, Mangling Blade",
+  ),
+  fakemonPitchShowcaseScenario(
+    6,
+    [
+      pitchSpecies(ER_MISHAMANUS_SPECIES_ID),
+      pitchSpecies(ER_FALINKS_CONVERGENT_SPECIES_ID),
+      pitchSpecies(ER_IRON_STREAM_SPECIES_ID),
+      pitchSpecies(ER_SLABBERIGUS_SPECIES_ID),
+      pitchSpecies(ER_EGOELK_SPECIES_ID),
+      pitchSpecies(ER_TITANEON_SPECIES_ID),
+    ],
+    pitchSpecies(ER_PARTNER_VAPOREON_SPECIES_ID),
+    "Mishamanus, Falinks Convergent, Iron Stream, Slabberigus, Egoelk, Titaneon",
+  ),
+  fakemonPitchShowcaseScenario(
+    7,
+    [
+      pitchSpecies(ER_TAGELA_SPECIES_ID),
+      pitchSpecies(ER_INTANGROWTH_SPECIES_ID),
+      pitchSpecies(SpeciesId.CALYREX, "mega"),
+      pitchSpecies(SpeciesId.HYPNO, "mega"),
+      pitchSpecies(SpeciesId.ALOLA_RAICHU, "mega-male", { female: false }),
+      pitchSpecies(SpeciesId.ALOLA_RAICHU, "mega-female", { female: true }),
+    ],
+    pitchSpecies(ER_LILLIGANT_VERDANT_SPECIES_ID),
+    "Tagela, Intangrowth, Calyrex Mega, Mega Hypno, Mega Alolan Raichu Male, Mega Alolan Raichu Female",
+  ),
+  fakemonPitchShowcaseScenario(
+    8,
+    [
+      pitchSpecies(SpeciesId.BARBARACLE, "mega-y", { moveset: [MoveId.SWIRLY_ROOM] }),
+      pitchSpecies(ER_LILLIGANT_VERDANT_SPECIES_ID, "mega"),
+      pitchSpecies(SpeciesId.UXIE, "primal"),
+      pitchSpecies(ER_TREMBURR_SPECIES_ID),
+      pitchSpecies(ER_GURDURUR_SPECIES_ID),
+      pitchSpecies(ER_CONKAPITATOR_SPECIES_ID),
+    ],
+    pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
+    "Mega Barbaracle Y, Mega Lilligant Verdant, Corrupted Uxie, Tremburr, Gurdurur, Conkapitator",
+  ),
+  fakemonPitchShowcaseScenario(
+    9,
+    [
+      pitchSpecies(ER_VANTARROW_SPECIES_ID),
+      pitchSpecies(ER_CHROMIGHTY_SPECIES_ID),
+      pitchSpecies(ER_TEMPORAL_SKULL_SPECIES_ID, undefined, {
+        moveset: [MoveId.IVORY_IMPACT, MoveId.SKULL_BASH, MoveId.BONEMERANG, MoveId.PROTECT],
+      }),
+      pitchSpecies(ER_QUAKERSBY_SPECIES_ID),
+      pitchSpecies(ER_GUZZLORD_M_SPECIES_ID),
+      pitchSpecies(SpeciesId.GOLURK, "mega-y"),
+    ],
+    pitchSpecies(SpeciesId.SKUNTANK, "mega"),
+    "Vantarrow, Chromighty, Temporal Skull, Quakersby, Guzzlord M, Mega Golurk Y",
+  ),
+  fakemonPitchShowcaseScenario(
+    10,
+    [
+      pitchSpecies(SpeciesId.SKUNTANK, "mega"),
+      pitchSpecies(SpeciesId.DODRIO, "mega"),
+      pitchSpecies(SpeciesId.PYUKUMUKU, "mega", {
+        moveset: [MoveId.COUNTER, MoveId.MIRROR_COAT, MoveId.PAIN_SPLIT, MoveId.PROTECT],
+      }),
+      pitchSpecies(SpeciesId.ROWLET, "partner", {
+        moveset: [MoveId.TORCH_SONG, MoveId.HYPER_VOICE, MoveId.REVELATION_DANCE, MoveId.PROTECT],
+      }),
+      pitchSpecies(SpeciesId.ONIX, "partner"),
+      pitchSpecies(SpeciesId.GIMMIGHOUL, "partner", {
+        moveset: [MoveId.MAKE_IT_RAIN, MoveId.HAPPY_HOUR, MoveId.SHADOW_BALL, MoveId.PROTECT],
+      }),
+    ],
+    pitchSpecies(SpeciesId.GOLURK, "mega-y"),
+    "Mega Skuntank, Mega Dodrio, Mega Pyukumuku, Partner Rowlet, Partner Onix, Partner Gimmighoul",
+  ),
+];
+
 export const DEV_SCENARIOS: DevScenario[] = [
+  ...MOODY_UI_HARNESS_SCENARIOS,
+  ...FAKEMON_PITCH_SHOWCASE_SCENARIOS,
+  {
+    label: "UI: Moody boss draft",
+    description:
+      "Starts a Fun run on wave 10 with only Moody Mode enabled.\n"
+      + "DO: defeat the harmless Magikarp and inspect the three-card boon draft, its long-text paging, targeting, and the Moody Ledger in the pause menu.\n"
+      + "EXPECT: exactly one mandatory draft appears before the biome market; selecting a boon records it in the ledger.",
+    gameMode: GameModes.FUN,
+    setup: () => {
+      resetDevOverrides();
+      setFunModeConfig({
+        ...DEFAULT_FUN_MODE_CONFIG,
+        randomizePokemon: false,
+        randomizeTypes: false,
+        randomizeAbilities: false,
+        randomizeLevelUpMoves: false,
+        moodyMode: true,
+      });
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 1,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.CHARIZARD, { moveset: [MoveId.FLAMETHROWER, MoveId.SPLASH] })];
+    },
+  },
   ...BG_CHECK_SCENARIOS,
   ...BG_BIOME_SCENARIOS,
   ...EASY_ABILITY_ADDITION_SCENARIOS,
@@ -5675,6 +6403,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
     // keep levelling Garchomp to reopen the panel - no global XP override needed.
     shopItems: [modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY],
   },
+  {
+    label: "Move Randomizers: type + category",
+    description:
+      "Garchomp has 8 move slots and Dragon/Ground/Fire typing, with Fire added at runtime.\n"
+      + "DO: KO Magikarp, then choose either randomizer. Pick Garchomp and any of its 8\n"
+      + "move slots. The normal item replaces that slot immediately. The Greater item asks\n"
+      + "for Physical, Special, or Status after the slot. Run the scenario once per item.\n"
+      + "EXPECT: the chosen slot changes, every result is Dragon, Ground, or Fire type, and\n"
+      + "the Greater result also matches the selected category. All 8 slots remain usable.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.FIRE_FANG, MoveId.PROTECT],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (player) {
+        player.customPokemonData.bonusMoveSlots = 4;
+        allMoves
+          .filter(
+            move => move != null && move.id !== MoveId.NONE && move.id !== MoveId.STRUGGLE && !move.isUnimplemented,
+          )
+          .slice(0, 4)
+          .forEach((move, index) => player.setMove(4 + index, move.id));
+        player.summonData.addedType = PokemonType.FIRE;
+      }
+    },
+    shopItems: [modifierTypes.MOVE_RANDOMIZER, modifierTypes.ER_GREATER_MOVE_RANDOMIZER],
+  },
   // ===========================================================================
   // FEATURES — this session
   // ===========================================================================
@@ -5904,6 +6670,39 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     onBattleStart: () => boostPlayer(allStages(2)),
+  },
+  {
+    label: "Pharaoh's Ankh: 1 HP marker",
+    description:
+      "Pharaoh's Ankh is active and Snorlax begins at low HP.\n"
+      + "DO: let Magikarp hit Snorlax with Tackle, then open the party screen.\n"
+      + "EXPECT: Ankh activates once, Snorlax remains at 1 HP, and neither its battle\n"
+      + "display nor party slot shows the FNT status marker.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_PHARAOH_ANKH" }],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.PIDGEY, {
+          moveset: [MoveId.GUST, MoveId.QUICK_ATTACK, MoveId.SAND_ATTACK, MoveId.SPLASH],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const pokemon = globalScene.getPlayerPokemon();
+      if (pokemon) {
+        pokemon.hp = Math.max(1, Math.floor(pokemon.getMaxHp() * 0.15));
+        pokemon.updateInfo();
+      }
+    },
   },
   {
     label: "ER Relics: Lookout/Quartermaster/Collector (#439)",
@@ -7560,6 +8359,117 @@ export const DEV_SCENARIOS: DevScenario[] = [
         MYSTERY_ENCOUNTER_OVERRIDE: MysteryEncounterType.COLOSSEUM,
       });
       return colosseumTestParty();
+    },
+  },
+  // ===========================================================================
+  // Endless continuation — final offer and full recorded Hell ghost
+  // ===========================================================================
+  {
+    label: "Endless: final boss auto-KO",
+    description:
+      "Endless entry test with a sanitized team from a real completed Hell run.\n"
+      + "All six recorded Pokemon, forms, moves, IVs, natures, abilities, shiny data,\n"
+      + "held items, Blood Pact, and Second Wind are restored as YOUR team. The scenario\n"
+      + "starts a visible, playable Hell wave-200 Primal Cascoon battle. Select a move\n"
+      + "on turn one; after that command is accepted, Cascoon applies lethal self-damage.\n"
+      + "EXPECT: the normal boss faint/victory path completes, then the postgame choice\n"
+      + "offers ENDLESS or END RUN. Choosing ENDLESS shows the opening Rifts and continues.\n"
+      + "SAFETY: the auto-KO exists only in this dev scenario; normal bosses are untouched.",
+    startingLevels: DEV_HELL_VICTORY_GHOST.party.map(member => member.level),
+    bypassEncounterPersistence: true,
+    setup: () => {
+      resetDevOverrides();
+      setErRunPacing("normal");
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 200,
+        STARTING_LEVEL_OVERRIDE: 200,
+        STARTING_BIOME_OVERRIDE: BiomeId.END,
+      });
+      return usableGhostMembers(DEV_HELL_VICTORY_GHOST)
+        .map(ghostMemberStarter)
+        .filter((starter): starter is Starter => starter !== null);
+    },
+    onPartyReady: () => {
+      const members = usableGhostMembers(DEV_HELL_VICTORY_GHOST);
+      const expectedItems = members.reduce((total, member) => total + (member.heldItems?.length ?? 0), 0);
+      const restoredItems = applyPreparedGhostHeldItems(globalScene.getPlayerParty(), members);
+      const expectedRelics = DEV_HELL_VICTORY_GHOST.relics?.length ?? 0;
+      const restoredRelics = applyPreparedGhostRelics(DEV_HELL_VICTORY_GHOST);
+      if (restoredItems !== expectedItems || restoredRelics !== expectedRelics) {
+        console.warn(
+          `[dev-tools] Hell victory legacy loadout restored partially: items ${restoredItems}/${expectedItems}, relics ${restoredRelics}/${expectedRelics}`,
+        );
+      }
+    },
+    onFirstTurnCommitted: () => {
+      const boss = globalScene.getEnemyPokemon();
+      if (!boss || !globalScene.currentBattle.isClassicFinalBoss) {
+        throw new Error("Endless final-boss scenario did not create the classic finale");
+      }
+      setPendingDevEndlessOffer();
+
+      // Hell's first finale stage deliberately clamps lethal damage to 1 HP. This
+      // scenario skips the fight, so mark the already-Primal boss as its final
+      // black stage first. The normal FaintPhase still owns the KO and victory.
+      boss.customPokemonData.erBlackShiny = true;
+      boss.damageAndUpdate(Math.max(1, boss.hp), {
+        result: HitResult.INDIRECT_KO,
+        ignoreSegments: true,
+      });
+      globalScene.phaseManager.unshiftNew("MessagePhase", `${boss.getNameToRender()}'s power collapses inward!`, 750);
+    },
+  },
+  {
+    label: "Endless: deep Hell ghost (wave 401)",
+    description:
+      "Deep Endless ghost showcase at wave 401 (equivalent depth 201). The player has\n"
+      + "10 added Avalanche abilities, every enemy has 21, and four Rifts are already\n"
+      + "active so the Avalanche pages and Rift Ledger can be inspected immediately.\n"
+      + "The opponent is a sanitized snapshot from a real completed Hell run: all six\n"
+      + "recorded species/forms, moves, IVs, abilities, shiny data, 46 held-item entries,\n"
+      + "Blood Pact, and Second Wind are restored. Normal Endless enemy items, wards,\n"
+      + "boons, and scaling remain additive.\n"
+      + "Open Check Team / battle info and the modifier bars to inspect the complete loadout.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 401,
+        STARTING_LEVEL_OVERRIDE: 200,
+      });
+      return [
+        ...colosseumTestParty(),
+        makeStarter(SpeciesId.GHOLDENGO, {
+          moveset: [MoveId.MAKE_IT_RAIN, MoveId.SHADOW_BALL, MoveId.THUNDERBOLT, MoveId.NASTY_PLOT],
+        }),
+        makeStarter(SpeciesId.DRAGONITE, {
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.EXTREME_SPEED, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.STONE_EDGE, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    onPartyReady: () => {
+      const restored = restoreErEndlessContinuation({
+        version: 1,
+        enteredAtWave: 200,
+        seed: "dev-hell-victory-showcase",
+        pulse: 40,
+        ghostEncounters: 20,
+        activeRifts: [
+          { id: "inverse-rift", pulsesRemaining: 2, acquiredAtDepth: 200 },
+          { id: "weather-carousel", pulsesRemaining: 3, acquiredAtDepth: 200 },
+          { id: "avalanche-reroll", pulsesRemaining: 3, acquiredAtDepth: 200 },
+          { id: "overheal-barrier", pulsesRemaining: 4, acquiredAtDepth: 200 },
+        ],
+        ghostHistory: [],
+      });
+      if (!restored) {
+        throw new Error("Could not initialize the Endless showcase state");
+      }
+      setPendingDevGhostTeam(structuredClone(DEV_HELL_VICTORY_GHOST));
     },
   },
   // ===========================================================================
@@ -20959,3 +21869,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
 ];
+
+/**
+ * Scenarios registered in the in-game picker. The historical catalog remains
+ * importable by focused repro tooling, but it is no longer exposed to staff.
+ * Builder and custom-trainer testers are registered separately by index.ts.
+ */
+const DEV_MENU_SCENARIO_LABELS = new Set([
+  "Roster: new Pokemon 1/10",
+  "Roster: new Pokemon 2/10",
+  "Roster: new Pokemon 3/10",
+  "Roster: new Pokemon 4/10",
+  "Roster: new Pokemon 5/10",
+  "Roster: new Pokemon 6/10",
+  "Roster: new Pokemon 7/10",
+  "Roster: new Pokemon 8/10",
+  "Roster: new Pokemon 9/10",
+  "Roster: new Pokemon 10/10",
+  "Endless: final boss auto-KO",
+  "Endless: deep Hell ghost (wave 401)",
+]);
+
+export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(scenario =>
+  DEV_MENU_SCENARIO_LABELS.has(scenario.label),
+);

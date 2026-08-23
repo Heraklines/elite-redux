@@ -14,7 +14,7 @@
 
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror, type CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /** Flush the microtask queue so loopback deliveries land before we assert. */
 const flush = () => new Promise<void>(resolve => setTimeout(resolve, 0));
@@ -78,6 +78,113 @@ describe("co-op live-cursor mirror (#633)", () => {
 
     owner.dispose();
     watcher.dispose();
+  });
+
+  it("installs an ordered absolute cursor checkpoint before replaying later buttons", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopUiMirror(host);
+    const watcher = new CoopUiMirror(guest);
+    const applied: string[] = [];
+    const ownerEngine: CoopUiMirrorEngine = {
+      getMode: () => MODE,
+      applyButton: () => undefined,
+      captureState: () => [0, 2],
+    };
+    const watcherEngine: CoopUiMirrorEngine = {
+      getMode: () => MODE,
+      applyButton: button => {
+        applied.push(`button:${button}`);
+      },
+      applyState: state => {
+        applied.push(`state:${state.join(",")}`);
+      },
+    };
+    owner.attach(ownerEngine);
+    watcher.attach(watcherEngine);
+    owner.beginSession("owner", MODE, SEQ);
+
+    // The owner can finish opening before a CPU-dilated watcher. Both entries must buffer and
+    // later apply in one FIFO: absolute state first, then the relative human input.
+    owner.relayOwnerState(MODE);
+    owner.relayOwnerButton(10, MODE);
+    await flush();
+    watcher.beginSession("watcher", MODE, SEQ);
+
+    expect(applied).toEqual(["state:0,2", "button:10"]);
+    owner.dispose();
+    watcher.dispose();
+  });
+
+  it("retries an absolute cursor checkpoint until the watcher handler is actionable", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopUiMirror(host);
+    const watcher = new CoopUiMirror(guest);
+    let ready = false;
+    const applied: number[][] = [];
+    owner.attach({ getMode: () => MODE, applyButton: () => undefined, captureState: () => [1, 0] });
+    watcher.attach({
+      getMode: () => MODE,
+      applyButton: () => undefined,
+      applyState: state => {
+        if (!ready) {
+          return false;
+        }
+        applied.push([...state]);
+        return true;
+      },
+    });
+    owner.beginSession("owner", MODE, SEQ);
+    watcher.beginSession("watcher", MODE, SEQ);
+
+    vi.useFakeTimers();
+    try {
+      owner.relayOwnerState(MODE);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(applied).toEqual([]);
+      ready = true;
+      await vi.advanceTimersByTimeAsync(50);
+      expect(applied).toEqual([[1, 0]]);
+    } finally {
+      owner.dispose();
+      watcher.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits to capture the owner state until its reopened handler is actionable", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopUiMirror(host);
+    const watcher = new CoopUiMirror(guest);
+    let ownerReady = false;
+    const applied: number[][] = [];
+    owner.attach({
+      getMode: () => MODE,
+      applyButton: () => undefined,
+      captureState: () => (ownerReady ? [0, 2] : null),
+    });
+    watcher.attach({
+      getMode: () => MODE,
+      applyButton: () => undefined,
+      applyState: state => {
+        applied.push([...state]);
+      },
+    });
+    owner.beginSession("owner", MODE, SEQ);
+    watcher.beginSession("watcher", MODE, SEQ);
+
+    vi.useFakeTimers();
+    try {
+      owner.relayOwnerState(MODE);
+      await vi.advanceTimersByTimeAsync(50);
+      expect(applied).toEqual([]);
+      ownerReady = true;
+      await vi.advanceTimersByTimeAsync(50);
+      expect(applied).toEqual([[0, 2]]);
+    } finally {
+      owner.dispose();
+      watcher.dispose();
+      vi.useRealTimers();
+    }
   });
 
   it("tolerates an out-of-order gap: waits for the missing index, then catches up", async () => {
@@ -160,6 +267,47 @@ describe("co-op live-cursor mirror (#633)", () => {
     expect(eng.applied).toEqual([50]); // dropped, not mis-applied
 
     watcher.dispose();
+  });
+
+  it("retains an owner cursor edge until the slower watcher's exact handler becomes actionable", async () => {
+    const { host, guest } = createLoopbackPair();
+    const watcher = new CoopUiMirror(guest);
+    const applied: number[] = [];
+    let ready = false;
+    const engine: CoopUiMirrorEngine = {
+      getMode: () => MODE,
+      applyButton(button: number) {
+        if (!ready) {
+          return false;
+        }
+        applied.push(button);
+        return true;
+      },
+    };
+    watcher.attach(engine);
+
+    // Pre-buffer the real race: the owner is actionable and sends while the watcher is still
+    // finishing its reward animation. Opening the watcher session attempts, but must not consume,
+    // the exact n=0 cursor edge.
+    host.send({ t: "uiInput", seq: SEQ, n: 0, button: 45, mode: MODE });
+    await flush();
+
+    vi.useFakeTimers();
+    try {
+      watcher.beginSession("watcher", MODE, SEQ);
+      expect(applied).toEqual([]);
+
+      ready = true;
+      await vi.advanceTimersByTimeAsync(50);
+      expect(applied).toEqual([45]);
+
+      // A later timer tick cannot replay the already-consumed FIFO entry.
+      await vi.advanceTimersByTimeAsync(100);
+      expect(applied).toEqual([45]);
+    } finally {
+      watcher.dispose();
+      vi.useRealTimers();
+    }
   });
 
   it("ignores input for a DIFFERENT session seq and reports watcher/active state", async () => {

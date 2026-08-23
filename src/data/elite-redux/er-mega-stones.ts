@@ -270,6 +270,25 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
   ["LUXRAYITE_Y", "lucarionite"],
   ["YVELTALITE_Z", "lucarionite"],
   ["METAGROSSITE_BOND", "lucarionite"],
+  // Discord fakemon-pitch source-backed forms (append-only enum entries).
+  ["CRYOGONALITE", "glalitite"],
+  ["JIRACHITE", "lucarionite"],
+  ["LEDIANITE", "beedrillite"],
+  ["RAMPARDOSITE", "tyranitarite"],
+  ["REUNICLUSITE_X", "alakazite"],
+  ["XATUNITE", "pidgeotite"],
+  ["ZANGOOSEITE", "lucarionite"],
+  ["CALYRITE", "lucarionite"],
+  ["HYPNITE", "lucarionite"],
+  ["ALORAICHUNITE", "lucarionite"],
+  ["BARBARACITE_Y", "lucarionite"],
+  ["LILLIGANITE_VERDANT", "lucarionite"],
+  ["DISTORTED_CHAIN", "lucarionite"],
+  // BerNerd roster stones (source art does not include dedicated item icons).
+  ["GOLURKITE_Y", "lucarionite"],
+  ["SKUNTANKITE", "lucarionite"],
+  ["DODRIONITE", "lucarionite"],
+  ["PYUKUMUKUNITE", "lucarionite"],
 ];
 
 type FcRecord = Record<string, number>;

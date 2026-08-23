@@ -17,8 +17,23 @@ import {
 } from "#data/elite-redux/er-achievement-tracker";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { isErEndlessRaidWave, recordErEndlessGhostPlayerFaint } from "#data/elite-redux/er-endless-continuation";
+import {
+  claimErEndlessGraveReturn,
+  markErEndlessRaidMinionSlotEmpty,
+  recordErEndlessKo,
+} from "#data/elite-redux/er-endless-rift-runtime";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
-import { erMomentumEngineOnEnemyKo, erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
+import { erMomentumEngineOnFoeKo, erRelicRecordFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
+import { notifyMoodyFormationFaint } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  observeMoodyRuntimeFaint,
+  resolveMoodyFaintLaneOrder,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  notifyMoodyCoordinatorFaint,
+  notifyMoodyCoordinatorFinalizedFaint,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
@@ -45,6 +60,9 @@ export class FaintPhase extends PokemonPhase {
    */
   private readonly preventInstantRevive: boolean;
 
+  /** Whether an enemy replacement must resolve before the already-queued turn actions continue. */
+  private readonly immediateEnemyReplacement: boolean;
+
   /**
    * The source Pokemon that dealt fatal damage; only present for faints triggered by a move.
    */
@@ -53,17 +71,33 @@ export class FaintPhase extends PokemonPhase {
   /** Immutable authoritative event identity captured before any delayed/re-entrant faint work. */
   private faintSourceAddress: CoopFaintSourceAddress | undefined;
 
-  constructor(battlerIndex: BattlerIndex, preventInstantRevive = false, source?: Pokemon) {
+  constructor(
+    battlerIndex: BattlerIndex,
+    preventInstantRevive = false,
+    source?: Pokemon,
+    immediateEnemyReplacement = false,
+  ) {
     super(battlerIndex);
 
     this.preventInstantRevive = preventInstantRevive;
     this.source = source;
+    this.immediateEnemyReplacement = immediateEnemyReplacement;
   }
 
   public override start(): void {
     super.start();
 
     const faintPokemon = this.getPokemon();
+    const moodyFieldObservation = observeMoodyRuntimeFaint(faintPokemon, this.source);
+    const moodyIntervention = resolveMoodyFaintLaneOrder({
+      field: () => moodyFieldObservation,
+      formation: () => undefined,
+      coordinator: () => notifyMoodyCoordinatorFaint(faintPokemon, this.source),
+    });
+    if (moodyIntervention != null) {
+      this.end();
+      return;
+    }
     const recordedFaintAddress = consumeCoopRecordedFaintAddress(this.battlerIndex);
     this.faintSourceAddress = {
       wave: globalScene.currentBattle.waveIndex,
@@ -72,6 +106,7 @@ export class FaintPhase extends PokemonPhase {
     };
 
     if (this.source) {
+      recordErEndlessKo(this.source);
       faintPokemon.getTag(BattlerTagType.DESTINY_BOND)?.lapse(this.source, BattlerTagLapseType.CUSTOM);
       faintPokemon.getTag(BattlerTagType.GRUDGE)?.lapse(faintPokemon, BattlerTagLapseType.CUSTOM, this.source);
     }
@@ -91,6 +126,15 @@ export class FaintPhase extends PokemonPhase {
         this.end();
         return;
       }
+    }
+
+    moodyFieldObservation.finalize();
+    notifyMoodyFormationFaint(faintPokemon, this.source);
+    notifyMoodyCoordinatorFinalizedFaint(faintPokemon, this.source);
+    if (faintPokemon.isPlayer()) {
+      recordErEndlessGhostPlayerFaint(
+        globalScene.getPlayerParty().filter(pokemon => pokemon.isAllowedInBattle()).length,
+      );
     }
 
     /**
@@ -153,10 +197,10 @@ export class FaintPhase extends PokemonPhase {
       recordErStreakFaint(pokemon);
       // ER relics (#439): a player faint breaks Morale Banner's faint-free bonus
       // for the rest of this biome.
-      erRelicRecordPlayerFaint();
+      erRelicRecordFaint(true);
       // ER relics (#439): Anchor - if the slot 6 mon is now the last one standing,
       // fully heal it once per biome (last stand). No-op unless the relic is held.
-      erTryAnchorLastStand();
+      erTryAnchorLastStand(true);
       globalScene.currentBattle.playerFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,
@@ -164,14 +208,15 @@ export class FaintPhase extends PokemonPhase {
     } else {
       globalScene.currentBattle.enemyFaints += 1;
       erRecordAchievementEnemyFaint(pokemon);
-      // ER relics (#439): Momentum Engine - each enemy KO grants the active player
-      // mon +1 Speed stage (resets each battle). No-op unless the relic is held.
-      erMomentumEngineOnEnemyKo();
+      erRelicRecordFaint(false);
+      erTryAnchorLastStand(false);
       globalScene.currentBattle.enemyFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,
       });
     }
+    // Momentum Engine belongs to the side that scored this KO.
+    erMomentumEngineOnFoeKo(pokemon.isPlayer());
 
     // #691 (host-language leak): the guest REGENERATES "X fainted!" in its OWN language from the `faint`
     // event (narrate=true), so the host must NOT also stream its (host-language) `fainted` line - suppress
@@ -235,6 +280,7 @@ export class FaintPhase extends PokemonPhase {
       }
     }
 
+    const endlessGraveReturn = !this.player && claimErEndlessGraveReturn(pokemon);
     if (this.player) {
       /** The total number of Pokemon in the player's party that can legally fight */
       const legalPlayerPokemon = globalScene.getPokemonAllowedInBattle();
@@ -274,7 +320,11 @@ export class FaintPhase extends PokemonPhase {
     } else {
       globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
       let willSwitchIn = false;
-      if ([BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)) {
+      const endlessRaid = isErEndlessRaidWave(globalScene.currentBattle.waveIndex);
+      if (
+        !endlessRaid
+        && [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
+      ) {
         // Slot-gate the replacement only in DOUBLES (each partner refills its own slot).
         // In a single battle ANY reserve must come in: mixed trainerSlot values (e.g. a
         // double-variant trainer config rolled into a single format) otherwise soft-lock
@@ -289,7 +339,7 @@ export class FaintPhase extends PokemonPhase {
                 && !p.isOnField()
                 && (!globalScene.currentBattle.double || p.trainerSlot === (pokemon as EnemyPokemon).trainerSlot),
             ).length > 0;
-        if (hasReservePartyMember) {
+        if (hasReservePartyMember || endlessGraveReturn) {
           // Showdown 1v1 (versus faint-replacement): the enemy side is the remote human GUEST's own
           // team, so the HOST must AWAIT the guest's relayed replacement pick instead of AI auto-picking
           // (the guest's renderer opens its own faint picker off this streamed faint and relays the
@@ -299,7 +349,12 @@ export class FaintPhase extends PokemonPhase {
           if (isVersusSession() && (getCoopController()?.role === "host" || isShowdownSyncSession())) {
             globalScene.phaseManager.pushNew("ShowdownEnemyFaintSwitchPhase", this.fieldIndex, faintSourceAddress);
           } else {
-            globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
+            const replacementArgs = [SwitchType.SWITCH, this.fieldIndex, -1, false, false] as const;
+            if (this.immediateEnemyReplacement) {
+              globalScene.phaseManager.unshiftNew("SwitchSummonPhase", ...replacementArgs);
+            } else {
+              globalScene.phaseManager.pushNew("SwitchSummonPhase", ...replacementArgs);
+            }
           }
           willSwitchIn = true;
         }
@@ -350,10 +405,36 @@ export class FaintPhase extends PokemonPhase {
             // ER Wasteland: pull the guaranteed wild drop FIRST (while the mon's
             // items still carry its pokemonId), THEN sweep the rest to post-battle
             // loot (which nulls the pokemonId for the ability-gated steal pool).
-            this.applyErWastelandWildDrop(pokemon as EnemyPokemon);
-            globalScene.currentBattle.addPostBattleLoot(pokemon as EnemyPokemon);
+            if (!endlessGraveReturn) {
+              this.applyErWastelandWildDrop(pokemon as EnemyPokemon);
+              globalScene.currentBattle.addPostBattleLoot(pokemon as EnemyPokemon);
+            }
           }
+          const endlessRaidMinionSlot =
+            !pokemon.isPlayer()
+            && isErEndlessRaidWave(globalScene.currentBattle.waveIndex)
+            && globalScene.getEnemyParty()[0] !== pokemon
+              ? pokemon.getFieldIndex()
+              : -1;
           pokemon.leaveField();
+          if (endlessRaidMinionSlot >= 0) {
+            markErEndlessRaidMinionSlotEmpty(endlessRaidMinionSlot);
+          }
+          if (!pokemon.isPlayer() && endlessGraveReturn) {
+            const enemy = pokemon as EnemyPokemon;
+            enemy.resetStatus(false, false, false, false);
+            enemy.hp = Math.max(1, Math.ceil(enemy.getMaxHp() / 2));
+            for (const move of enemy.getMoveset()) {
+              move.ppUsed = Math.max(0, move.getMovePp() - Math.ceil(move.getMovePp() / 2));
+            }
+            enemy.setBoss(true, 1);
+            const party = globalScene.currentBattle.enemyParty;
+            const partyIndex = party.indexOf(enemy);
+            if (partyIndex >= 0) {
+              party.splice(partyIndex, 1);
+              party.push(enemy);
+            }
+          }
           this.end();
         },
       });

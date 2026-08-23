@@ -87,6 +87,11 @@ const controlOpenAdapter = readFileSync(
   "utf8",
 );
 const replayMePhase = readFileSync(new URL("src/phases/coop-replay-me-phase.ts", root), "utf8");
+const coopTurnCommitPhase = readFileSync(new URL("src/phases/coop-turn-commit-phase.ts", root), "utf8");
+const funAndGamesEncounter = readFileSync(
+  new URL("src/data/mystery-encounters/encounters/fun-and-games-encounter.ts", root),
+  "utf8",
+);
 const crossroadsPhase = readFileSync(new URL("src/phases/er-crossroads-phase.ts", root), "utf8");
 const selectBiomePhase = readFileSync(new URL("src/phases/select-biome-phase.ts", root), "utf8");
 const biomeShopPhase = readFileSync(new URL("src/phases/biome-shop-phase.ts", root), "utf8");
@@ -782,8 +787,18 @@ test("a projected terminal reward parks on its signed N+1 wait until CONTROL_COM
   );
   assert.match(
     release,
-    /pushNew\(entersCommittedBiome \? "NewBiomeEncounterPhase" : "NextEncounterPhase"\)[\s\S]*?this\.end\(\)/u,
-    "ordinary waves retain NextEncounter while a complete biome permit cannot skip NewBiome presentation",
+    /queueCoopProjectedEncounterPresentationTail\(globalScene\.phaseManager,[\s\S]*?entersCommittedBiome,[\s\S]*?showPlayerTrainer:[\s\S]*?this\.end\(\)/u,
+    "the signed destination installs its complete encounter presentation tail before ending",
+  );
+  const projectedPresentationTailStart = newBattlePhase.indexOf(
+    "export function queueCoopProjectedEncounterPresentationTail(",
+  );
+  const projectedPresentationTailEnd = newBattlePhase.indexOf("\n}\n", projectedPresentationTailStart) + 2;
+  const projectedPresentationTail = newBattlePhase.slice(projectedPresentationTailStart, projectedPresentationTailEnd);
+  assert.match(
+    projectedPresentationTail,
+    /if \(params\.showPlayerTrainer\)[\s\S]*?pushNew\("ShowTrainerPhase", true\)[\s\S]*?pushNew\(params\.entersCommittedBiome \? "NewBiomeEncounterPhase" : "NextEncounterPhase"\)/u,
+    "the guest's player-trainer cue precedes both ordinary and committed-biome encounter tails",
   );
   assert.match(
     replayTurnPhase,
@@ -1238,6 +1253,22 @@ test("an exact Authority V2 guest command control arrives without waiting on a l
   );
 });
 
+test("a fully materialized single-controller replica announces command readiness before partner auto-resolve", () => {
+  const partnerBranch = commandPhase.indexOf("if (isAuthoritativeGuestPartnerSlot) {");
+  const spectatorArrival = commandPhase.indexOf("this.announceCoopSpectatorCommandArrival();", partnerBranch);
+  const partnerAutoResolve = commandPhase.indexOf("if (this.tryCoopAutoResolve())", partnerBranch);
+  assert.ok(partnerBranch >= 0, "the authoritative replica partner-slot branch is present");
+  assert.ok(
+    spectatorArrival > partnerBranch && spectatorArrival < partnerAutoResolve,
+    "the spectator renderer arrives before its host-owned slot is auto-resolved",
+  );
+  assert.match(
+    commandPhase,
+    /singleControllerBattle\s*=\s*globalScene\.currentBattle\.mysteryEncounter\?\.encounterMode\s*===\s*MysteryEncounterMode\.NO_BATTLE[\s\S]*?shouldAnnounceCoopSpectatorCommandArrival\([\s\S]*?controller\.role,[\s\S]*?playerCapacity,[\s\S]*?activeFieldOwners,[\s\S]*?singleControllerBattle,[\s\S]*?\)[\s\S]*?rendezvous\.arrive\(point\)/u,
+    "spectator arrival distinguishes the declared one-controller Mystery battle from an incomplete ordinary double",
+  );
+});
+
 test("interaction DATA cannot wait on a successor phase that ordinary V2 projection must create", () => {
   const materialStart = coopRuntime.indexOf("function materializeCoopMeOperationFromOp(");
   const materialEnd = coopRuntime.indexOf("\ntype CoopV2InteractionLiveMaterializer", materialStart);
@@ -1644,6 +1675,90 @@ test("Mystery trainer victory is installed from immutable terminal material", ()
   );
 });
 
+test("normal trainer victory retains its exact presentation lease across successor admission", () => {
+  assert.match(
+    coopRuntime,
+    /v2PendingTrainerVictoryPresentation:[\s\S]*operationId: string;[\s\S]*wave: number;[\s\S]*turn: number;/u,
+    "the runtime owns one exact live trainer-presentation address",
+  );
+  assert.match(
+    coopRuntime,
+    /if \(pendingPresentation == null && !presentationAlreadyCompleted\)[\s\S]*runtime\.v2PendingTrainerVictoryPresentation = \{[\s\S]*operationId: entry\.operationId,[\s\S]*wave: material\.wave,[\s\S]*turn: material\.turn,[\s\S]*\};[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
+    "first material installation retains the lease before exposing the real phase, while completed redelivery queues none",
+  );
+  const projectorStart = coopRuntime.indexOf('if (material.kind === "trainer-victory-open")');
+  const projectorEnd = coopRuntime.indexOf('if (material.kind === "replacement-open")', projectorStart);
+  assert.ok(projectorStart >= 0 && projectorEnd > projectorStart, "the trainer projector has a bounded source block");
+  assert.doesNotMatch(
+    coopRuntime.slice(projectorStart, projectorEnd),
+    /hasPhaseOfType\("TrainerVictoryPhase"\)/u,
+    "an unsanctioned legacy phase cannot impersonate the ordered V2 consumer",
+  );
+  assert.match(
+    coopRuntime.slice(projectorStart, projectorEnd),
+    /withCoopOrderedControlPhasePermit\("TrainerVictoryPhase",[\s\S]*unshiftNew\("TrainerVictoryPhase"\)/u,
+    "the CONTROL_COMMIT grants its exact phase construction a consumed renderer permit",
+  );
+  assert.match(
+    rendererGate,
+    /withCoopOrderedControlPhasePermit<[\s\S]*orderedControlPhasePermit[\s\S]*permit\.consumed[\s\S]*finally[\s\S]*orderedControlPhasePermit = null/u,
+    "the renderer permit is synchronous, consumed, and always cleared",
+  );
+  const addressStart = coopRuntime.indexOf("export function coopV2TrainerVictoryPresentationAddress(");
+  const addressEnd = coopRuntime.indexOf("\n/**", addressStart + 1);
+  assert.ok(
+    addressStart >= 0 && addressEnd > addressStart,
+    "the exact presentation resolver has a bounded source block",
+  );
+  const addressSource = coopRuntime.slice(addressStart, addressEnd);
+  assert.match(addressSource, /v2PendingTrainerVictoryPresentation/u);
+  assert.doesNotMatch(addressSource, /latestControl|resolveCoopRetainedWaveContinuationIdentity/u);
+
+  const finishStart = trainerVictoryPhase.indexOf("const finish = () => {");
+  const completeAt = trainerVictoryPhase.indexOf("completeCoopV2TrainerVictoryPresentation", finishStart);
+  const endAt = trainerVictoryPhase.indexOf("this.end();", finishStart);
+  assert.ok(
+    finishStart >= 0 && completeAt > finishStart && endAt > completeAt,
+    "the real presentation retires its exact lease before the phase manager can advance",
+  );
+  const controlProjectorStart = coopRuntime.indexOf("function projectCoopV2InteractionControl(");
+  const controlProjectorEnd = coopRuntime.indexOf("function markCoopV2ControlMaterialApplied", controlProjectorStart);
+  assert.ok(
+    controlProjectorStart >= 0 && controlProjectorEnd > controlProjectorStart,
+    "the ordinary control projector has a bounded block",
+  );
+  const projector = coopRuntime.slice(controlProjectorStart, controlProjectorEnd);
+  const localWaitInstallAt = projector.indexOf(
+    "const result = runtime.v2ControlLedger.project(control, null, runtime.controller.localSeatId);",
+  );
+  const completionFenceAt = projector.indexOf('sourceMaterial?.kind === "trainer-victory-open"');
+  assert.ok(
+    completionFenceAt >= 0 && localWaitInstallAt > completionFenceAt,
+    "the exact successor claim stays uninstalled while its external completion proof is withheld",
+  );
+  assert.match(
+    projector,
+    /sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*kind: "deferred"/u,
+    "a replica cannot sign the ordered successor wait before its real trainer presentation completes",
+  );
+  const inputFreezeStart = coopRuntime.indexOf("export function isCoopV2InteractionHumanInputFrozen(");
+  const inputFreezeEnd = coopRuntime.indexOf("\n/**", inputFreezeStart + 1);
+  const inputFreeze = coopRuntime.slice(inputFreezeStart, inputFreezeEnd);
+  assert.match(
+    inputFreeze,
+    /const exactTrainerVictoryPreinstallLease =[\s\S]*authorityRole === "replica"[\s\S]*sourceEntry != null[\s\S]*sourceEntry\.operationId === pending\.afterOperationId[\s\S]*sourceMaterial\?\.kind === "trainer-victory-open"[\s\S]*trainerPresentation != null[\s\S]*trainerPresentation\.operationId === sourceEntry\.operationId[\s\S]*trainerPresentation\.wave === sourceMaterial\.wave[\s\S]*trainerPresentation\.turn === sourceMaterial\.turn[\s\S]*!runtime\.v2CompletedTrainerVictoryPresentations\.has\(sourceMaterial\.wave\)[\s\S]*exactTrainerVictoryPreinstallLease[\s\S]*ledger\.isMaterialApplied\(pending\)[\s\S]*successorWaitAllowsLocalPresentationInput/u,
+    "the replica receives only the exact authenticated trainer-presentation input lease before completion",
+  );
+  const completionStart = coopRuntime.indexOf("export function completeCoopV2TrainerVictoryPresentation(");
+  const completionEnd = coopRuntime.indexOf("\n/**", completionStart + 1);
+  const completion = coopRuntime.slice(completionStart, completionEnd);
+  assert.match(
+    completion,
+    /v2CompletedTrainerVictoryPresentations\.add\(wave\)[\s\S]*scheduleCoopV2CommandProofRetry\(runtime\)/u,
+    "real phase completion retries the retained entry only after recording its exact presentation proof",
+  );
+});
+
 test("an embedded Mystery trainer battle retains and renders its trainer presentation", () => {
   assert.match(
     operationEnvelope,
@@ -1707,6 +1822,78 @@ test("an embedded Mystery battle retires its selector handler before the replica
     handoff,
     /else \{\s*currentPhase\.end\(\);\s*\}/u,
     "the V2 battle handoff cannot synchronously inherit the retired Mystery selector",
+  );
+});
+
+test("Fun and Games owns a complete direct-turn V2 lifecycle instead of opening combat from ME_PICK", () => {
+  assert.match(
+    operationEnvelope,
+    /readonly boot: "encounter-phase" \| "direct-turn";/u,
+    "the terminal declares its renderer boot instead of inferring it from NO_BATTLE",
+  );
+  assert.match(
+    meTerminalValidator,
+    /destination\.boot === "encounter-phase" \|\| destination\.boot === "direct-turn"/u,
+    "an untyped battle boot cannot enter the mechanical log",
+  );
+  const wobbuffetReady = funAndGamesEncounter.indexOf("await showWobbuffetHealthBar()");
+  const terminal = funAndGamesEncounter.indexOf("await coopMeOwnerRelayBattleHandoff", wobbuffetReady);
+  assert.ok(wobbuffetReady >= 0 && terminal > wobbuffetReady, "the complete battlers precede the retained terminal");
+  assert.match(
+    funAndGamesEncounter.slice(wobbuffetReady, terminal + 400),
+    /coopHostStreamMeBattleParty\(\)[\s\S]*boot: "direct-turn"/u,
+    "the exceptional inline combat path publishes its own typed handoff",
+  );
+  assert.match(
+    coopTurnCommitPhase,
+    /const mysteryTerminalAfterTurn =[\s\S]*MysteryEncounterType\.FUN_AND_GAMES[\s\S]*mysteryTurnsRemaining <= 0/u,
+    "the authority states the minigame's finite last turn from engine-owned state",
+  );
+  assert.match(
+    battleStream,
+    /boundary\.mysteryTerminalAfterTurn !== true[\s\S]*boundary\.mysteryTerminalAfterTurn === true[\s\S]*operationKind: "ME_TERMINAL"/u,
+    "the last direct turn parks for the exact terminal instead of fabricating turn four",
+  );
+  assert.match(
+    replayMePhase,
+    /committedDestination\.boot === "direct-turn"[\s\S]*pushNew\("TurnInitPhase"\)[\s\S]*settleCoopFieldPresentationReady/u,
+    "the renderer boots the already-authored battlers directly and proves their visual readiness before input",
+  );
+  assert.match(
+    coopRuntime,
+    /directTurnSettlement[\s\S]*prior\.terminal !== "pending" && !directTurnSettlement[\s\S]*terminal: "reward-settled"/u,
+    "the direct battle's result advances through the normal retained reward terminal",
+  );
+});
+
+test("replacement entry presentation cannot overtake its admitted immutable actor material", () => {
+  assert.match(
+    shadow,
+    /hasPendingReplicaReplacementForTurn[\s\S]*decodeReplacementCommitMaterial[\s\S]*authorityCarrier/u,
+    "the ordered replica exposes only an address-exact pending replacement proof",
+  );
+  assert.match(
+    coopRuntime,
+    /hasPendingCoopV2ReplacementMaterialForReplay[\s\S]*hasPendingReplicaReplacementForTurn/u,
+    "the renderer reads pending replacement order through its captured runtime",
+  );
+  assert.match(
+    replayTurnPhase,
+    /holdLiveBehindReplacement = hasPendingCoopV2ReplacementMaterialForReplay[\s\S]*holdLiveBehindReplacement[\s\S]*consumeLiveEventsFrom[\s\S]*awaitTurnOrLiveEvent\([\s\S]*holdLiveBehindReplacement/u,
+    "generic live hints remain buffered until the exact replacement transaction installs their actor",
+  );
+  assert.match(
+    battleStream,
+    /holdLiveBehindReplacement = false[\s\S]*!holdLiveBehindReplacement && liveEntry[\s\S]*holdLiveBehindReplacement \|\| !matchesWait/u,
+    "both buffered and newly-arriving live hints lose the race while replacement material is pending",
+  );
+});
+
+test("an authoritative wild intro cannot expose its bars before the adopted sprite is actionable", () => {
+  assert.match(
+    encounterPhase,
+    /BattleType\.WILD[\s\S]*revealWildEncounter[\s\S]*isCoopAuthoritativeGuest\(\)[\s\S]*materializeCoopAdoptedEnemyFieldReady\(isCurrent\)[\s\S]*revealWildEncounter\(\)/u,
+    "the guest proves the complete adopted field before running the ordinary wild reveal",
   );
 });
 
@@ -2149,6 +2336,7 @@ test("a won-wave faint reopens replacement only through one exact phase-owned CO
   const stagedWait = battleStream.slice(stagedWaitStart, stagedWaitEnd);
   assert.match(stagedWait, /allowedKinds: \["CONTROL_COMMIT", "WAVE_ADVANCE"\]/u);
   assert.match(stagedWait, /materialKind: "replacement-open"[\s\S]*turn: turn \+ 1/u);
+  assert.match(stagedWait, /materialKind: "trainer-victory-open"[\s\S]*turn: turn \+ 1/u);
   assert.match(stagedWait, /allowNextWaveStart: false/u);
 
   const switchStart = switchPhase.indexOf("const controlBoundary = establishCoopV2ReplacementControlBoundary(");
@@ -2651,13 +2839,42 @@ test("a host-owned V2 learn-move prompt retains the guest at the same wave until
   );
   assert.match(
     coopRuntime,
-    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2HostOwnedLearnMovePresentation\([\s\S]*learnMoveForwardInFlight\.add\(partySlot\)[\s\S]*return;/u,
+    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2LearnMovePresentation\([\s\S]*learnMoveForwardInFlight\.add\(partySlot\)[\s\S]*return;/u,
     "a prompt-first delivery must bind the already-queued reward continuation instead of spawning a duplicate replay",
   );
   assert.match(
     learnMovePhase,
-    /stageCoopV2HostOwnedLearnMovePresentation[\s\S]*this\.coopV2ControlOperationId = operationId;[\s\S]*this\.coopAwaitingHostOwnedPresentation = true;[\s\S]*const presentationWasStaged = this\.coopV2ControlOperationId != null;[\s\S]*coopWatchHostOwnedV2Decision\(move, pokemon\)/u,
+    /stageCoopV2LearnMovePresentation[\s\S]*this\.coopV2ControlOperationId = operationId;[\s\S]*this\.coopAwaitingHostOwnedPresentation = !ownerIsGuest;[\s\S]*const presentationWasStaged = this\.coopV2ControlOperationId != null;[\s\S]*coopWatchHostOwnedV2Decision\(move, pokemon\)/u,
     "the queued phase must retain the exact operation address and start the watcher from that address",
+  );
+});
+
+test("a guest-owned V2 learn-move prompt reuses its native reward continuation", () => {
+  const projectionStart = coopRuntime.indexOf("function prepareCoopV2OrdinaryInteractionControlSurface(");
+  const projectionEnd = coopRuntime.indexOf(
+    "\n/**\n * Construct the exact engine generation recovery",
+    projectionStart,
+  );
+  assert.ok(projectionStart >= 0 && projectionEnd > projectionStart, "ordinary interaction projector is bounded");
+  const projector = coopRuntime.slice(projectionStart, projectionEnd);
+  const nativeBinding = projector.indexOf('if (plan.kind === "learn-move")');
+  const replayFallback = projector.indexOf('|| plan.kind === "learn-move"', nativeBinding);
+  assert.ok(nativeBinding >= 0 && replayFallback > nativeBinding, "native learn-move binding precedes replay fallback");
+  const bindingBlock = projector.slice(nativeBinding, replayFallback);
+  assert.match(
+    bindingBlock,
+    /current\.is\("LearnMovePhase"\)[\s\S]*installCoopV2LearnMovePresentation\?\.\([\s\S]*ownerIsLocal[\s\S]*return true;/u,
+    "an already-running native picker receives the exact V2 address instead of being covered by a replay",
+  );
+  assert.match(
+    bindingBlock,
+    /hasPhaseOfType\("LearnMovePhase", phase => \{[\s\S]*stageCoopV2LearnMovePresentation\([\s\S]*ownerIsLocal[\s\S]*return true;/u,
+    "an exact queued native picker is staged before replay materialization",
+  );
+  assert.match(
+    learnMovePhase,
+    /const expectedOwner: CoopRole = ownerIsGuest \? "guest" : "host";[\s\S]*monOwner !== expectedOwner[\s\S]*this\.coopAwaitingHostOwnedPresentation = !ownerIsGuest;/u,
+    "queued native binding is address-exact for either party owner without turning a guest picker into a watcher",
   );
 });
 
@@ -3204,7 +3421,7 @@ test("a committed guest picker settles and buffers its V2 carrier before yieldin
   assert.ok(closeEnd > closeStart, "the committed close boundary has a bounded source block");
   const close = guestFaintSwitchPhase.slice(closeStart, closeEnd);
   const materialized = close.indexOf("markPickerMaterialized()");
-  const yielded = close.indexOf("scene.phaseManager.shiftPhase()");
+  const yielded = close.indexOf("scene.phaseManager.shiftPhase(this)");
   assert.ok(
     materialized >= 0 && yielded > materialized,
     "the exact picker terminal becomes materially settled before local phase progression can resume",
@@ -3542,8 +3759,13 @@ test("a chained biome picker preserves its exact interaction coordinate through 
   );
   assert.match(
     newBattlePhase,
-    /const sourceWave = globalScene\.currentBattle\?\.waveIndex \?\? -1;[\s\S]*?beginCoopRecording\(1, `\$\{controller\.sessionEpoch\}:\$\{sourceWave \+ 1\}`\);[\s\S]*?globalScene\.newBattle\(\);/u,
-    "the authority opens the destination presentation scope before newBattle narrates transition cleanup",
+    /const sourceWave = globalScene\.currentBattle\?\.waveIndex \?\? -1;[\s\S]*?beginCoopTransitionRecording\(1, `\$\{controller\.sessionEpoch\}:\$\{sourceWave \+ 1\}`\);[\s\S]*?globalScene\.newBattle\(\);/u,
+    "the authority opens a deferred destination presentation scope before newBattle narrates transition cleanup",
+  );
+  assert.match(
+    newBattlePhase,
+    /battleType !== BattleType\.MYSTERY_ENCOUNTER[\s\S]*?releaseCoopTransitionPresentation\(\)/u,
+    "only a real battle releases transition cues; non-battle Mystery waves carry them to an ordered consumer",
   );
   assert.match(
     campaignDriver,
@@ -4116,7 +4338,8 @@ test("the animations-on campaign extends a live between-wave renderer without we
   assert.match(campaignDriver, /const betweenWaveTimeoutMs = rig\.config\.timeoutMs \* 3/u);
   assert.match(
     campaignDriver,
-    /const betweenWaveBudget = policy\.moveAnimationsExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*hardCeilingMs: Math\.max\([\s\S]*betweenWaveTimeoutMs \+ ANIMATION_PROGRESS_ALLOWANCE_MS,[\s\S]*ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS/u,
+    /const retainedPartyEvolutionExpected = retainedPartyEvolutionNeedsProgressBudget\(policy\.partyMutatingReward\);[\s\S]*const betweenWaveBudget =[\s\S]*policy\.moveAnimationsExpected \|\| retainedPartyEvolutionExpected[\s\S]*createAnimationProgressBudget\(rig, commandCursors, betweenWaveTimeoutMs,[\s\S]*policy\.moveAnimationsExpected \? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : OUTCOME_HARD_CEILING_MS/u,
+    "one bounded between-wave window covers normal animation qualification and retained party evolutions",
   );
   assert.match(
     campaignDriver,
@@ -4126,6 +4349,16 @@ test("the animations-on campaign extends a live between-wave renderer without we
     campaignDriver,
     /const betweenWaveBudget = true/u,
     "the animation budget remains scoped to the animations-on profile",
+  );
+  assert.match(
+    campaignDriver,
+    /retainedEvolutionProgress[\s\S]*GUEST retained evolution heartbeat[\s\S]*stage=[\s\S]*retainedWaveProgress/u,
+    "finite retained-evolution stages must refresh the animations-on budget inside its immutable ceiling",
+  );
+  assert.match(
+    browserEntry,
+    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS[\s\S]*SelectModifierPhase:EVOLUTION_SCENE[\s\S]*LearnMovePhase:EVOLUTION_SCENE/u,
+    "the learn-move phase must not advertise input while the preceding evolution scene is still visible",
   );
 });
 
@@ -4249,6 +4482,11 @@ test("a scheduled Mystery preserves the replica's retained World Map predecessor
   assert.match(helper, /requireCoopSourceWave\(\) === sourceWave/u);
   assert.match(helper, /guestBiome\.start\(\)/u);
   assert.match(helper, /rig\.guestScene\.arena\.biomeId !== rig\.hostScene\.arena\.biomeId/u);
+  assert.match(
+    helper,
+    /guestPhase\?\.phaseName === "NewBattlePhase"[\s\S]*rig\.hostScene\.currentBattle\.waveIndex === destinationWave[\s\S]*BattleType\.MYSTERY_ENCOUNTER[\s\S]*return;/u,
+    "an already-signed NewBattle wait is retained until the authority emits the first Mystery entry",
+  );
 
   const scheduledStart = soakDriver.indexOf("        const nextMeType = opts.meWaves?.get(wave + 1);");
   const scheduledEnd = soakDriver.indexOf("      } catch (e) {", scheduledStart);
@@ -4467,8 +4705,13 @@ test("a passive command watcher carries the same visible-wave proof as an action
   assert.ok(watcherStart >= 0 && watcherEnd > watcherStart, "command watcher observation has a bounded source block");
   assert.match(
     browserEntry.slice(watcherStart, watcherEnd),
-    /displayedWave:\s*globalScene\.getDisplayedBiomeWaveIndex\(\)/u,
+    /displayedWave:\s*globalScene\.getDisplayedBiomeWaveIndex\(\) \?\? null/u,
     "the watcher cannot emit a mechanically valid proof while omitting its visible HUD wave",
+  );
+  assert.match(
+    browserEntry,
+    /const displayedWave = globalScene\.getDisplayedBiomeWaveIndex\(\) \?\? null/u,
+    "a transitional active surface must emit explicit null instead of omitting the required displayedWave field",
   );
 });
 

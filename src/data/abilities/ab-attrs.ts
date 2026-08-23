@@ -4,7 +4,12 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import type { EntryHazardTag, SuppressAbilitiesTag } from "#data/arena-tag";
 import { type BattlerTag, CritBoostTag } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
+import { markDamageNullified } from "#data/damage-nullification";
 import { allAbilities, allMoves } from "#data/data-lists";
+import {
+  ER_HONK_SHOO_ABILITY_ID,
+  ER_REAP_AND_SOW_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { suppressAbilityIdForTurns } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
@@ -421,6 +426,23 @@ export class ReceivedTypeDamageMultiplierAbAttr extends ReceivedMoveDamageMultip
 }
 
 /**
+ * Resolve the move types that this holder treats as equivalent for ability
+ * triggers, while preserving the attacker's effective move type as the base.
+ */
+function getTriggeredMoveTypes(holder: Pokemon, attacker: Pokemon, move: Move): ReadonlySet<PokemonType> {
+  const triggeredTypes = new Set<PokemonType>([attacker.getMoveType(move)]);
+  for (const attr of holder.getAllActiveAbilityAttrs()) {
+    if (!("getTriggeredMoveTypes" in attr) || typeof attr.getTriggeredMoveTypes !== "function") {
+      continue;
+    }
+    for (const type of attr.getTriggeredMoveTypes(move)) {
+      triggeredTypes.add(type);
+    }
+  }
+  return triggeredTypes;
+}
+
+/**
  * Shared interface used by several {@linkcode PreDefendAbAttr} abilities that influence the computed type effectiveness
  */
 export interface TypeMultiplierAbAttrParams extends AugmentMoveInteractionAbAttrParams {
@@ -447,7 +469,8 @@ export class TypeImmunityAbAttr extends PreDefendAbAttr {
     return (
       ![MoveTarget.BOTH_SIDES, MoveTarget.ENEMY_SIDE, MoveTarget.USER_SIDE].includes(move.moveTarget)
       && attacker !== pokemon
-      && attacker.getMoveType(move) === this.immuneType
+      && this.immuneType !== null
+      && getTriggeredMoveTypes(pokemon, attacker, move).has(this.immuneType)
     );
   }
 
@@ -609,13 +632,7 @@ export interface FieldPriorityMoveImmunityAbAttrParams extends AugmentMoveIntera
 
 export class FieldPriorityMoveImmunityAbAttr extends PreDefendAbAttr {
   override canApply({ move, opponent: attacker, cancelled, pokemon }: FieldPriorityMoveImmunityAbAttrParams): boolean {
-    return (
-      !cancelled.value
-      && move.getPriority(attacker) > 0
-      && !move.isAllyTarget()
-      && !move.isMultiTarget()
-      && attacker.isOpponent(pokemon)
-    );
+    return !cancelled.value && move.getPriority(attacker) > 0 && !move.isAllyTarget() && attacker.isOpponent(pokemon);
   }
 
   override apply({ cancelled }: FieldPriorityMoveImmunityAbAttrParams): void {
@@ -723,7 +740,7 @@ export interface PostMoveInteractionAbAttrParams extends AugmentMoveInteractionA
   /** The amount of damage dealt in the interaction. */
   readonly damage: number;
   /** How the triggering move was executed (normal input, automatic indirect move, etc.). */
-  readonly useMode?: MoveUseMode;
+  readonly useMode?: MoveUseMode | undefined;
 }
 
 export class PostDefendAbAttr extends AbAttr {
@@ -2730,6 +2747,11 @@ export abstract class PostSummonAbAttr extends AbAttr {
    */
   shouldActivateOnGain(): boolean {
     return this.activateOnGain;
+  }
+
+  /** Whether this entry effect should be replayed after an in-battle form change. */
+  shouldActivateOnFormChange(): boolean {
+    return true;
   }
 
   canApply(_params: Closed<AbAttrBaseParams>): boolean {
@@ -5015,6 +5037,15 @@ export class PostSummonFogRestoreDisguiseAbAttr extends PostSummonAbAttr {
     this.bustedFormIndex = bustedFormIndex;
   }
 
+  /**
+   * This is a genuine switch-in rider, not an ability entry effect. Replaying it
+   * after Disguise changes into its busted form would immediately restore the
+   * disguise while fog remains active, allowing every hit to be blocked.
+   */
+  override shouldActivateOnFormChange(): boolean {
+    return false;
+  }
+
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon.formIndex === this.bustedFormIndex && isFogWeather(globalScene.arena.weatherType);
   }
@@ -5574,10 +5605,10 @@ export class PostTurnFormChangeAbAttr extends PostTurnAbAttr {
 export class PostTurnHurtIfSleepingAbAttr extends PostTurnAbAttr {
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     return pokemon
-      .getOpponents()
+      .getOpponentsGenerator()
       .some(
         opp =>
-          (opp.status?.effect === StatusEffect.SLEEP || opp.hasAbility(AbilityId.COMATOSE))
+          (opp.status?.effect === StatusEffect.SLEEP || isComatoseLike(opp))
           && !opp.hasAbilityWithAttr("BlockNonDirectDamageAbAttr")
           && !opp.hasAbilityWithAttr("BadDreamsImmunityAbAttr")
           && !opp.switchOutStatus,
@@ -5589,10 +5620,9 @@ export class PostTurnHurtIfSleepingAbAttr extends PostTurnAbAttr {
     if (simulated) {
       return;
     }
-
     for (const opp of pokemon.getOpponentsGenerator()) {
       if (
-        (opp.status?.effect !== StatusEffect.SLEEP && !opp.hasAbility(AbilityId.COMATOSE))
+        (opp.status?.effect !== StatusEffect.SLEEP && !isComatoseLike(opp))
         || opp.switchOutStatus
         || opp.hasAbilityWithAttr("BadDreamsImmunityAbAttr")
       ) {
@@ -5767,13 +5797,18 @@ export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
   }
 }
 
+/** Parameters for item-loss hooks, including an opposing source when theft caused the loss. */
+export interface PostItemLostAbAttrParams extends AbAttrBaseParams {
+  readonly opponent?: Pokemon;
+}
+
 /** Triggers after the Pokemon loses or consumes an item */
 export class PostItemLostAbAttr extends AbAttr {
-  canApply(_params: Closed<AbAttrBaseParams>): boolean {
+  canApply(_params: Exact<Parameters<this["apply"]>[0]>): boolean {
     return true;
   }
 
-  apply(_params: Closed<AbAttrBaseParams>): void {}
+  apply(_params: Closed<PostItemLostAbAttrParams>): void {}
 }
 
 /** Applies a Battler Tag to the Pokemon after it loses or consumes an item */
@@ -6238,7 +6273,7 @@ export interface RedirectMoveAbAttrParams extends AbAttrBaseParams {
 /** Base class for abilities that redirect moves to the pokemon with this ability. */
 export abstract class RedirectMoveAbAttr extends AbAttr {
   override canApply({ pokemon, moveId, targetIndex, sourcePokemon }: RedirectMoveAbAttrParams): boolean {
-    if (!this.canRedirect(moveId, sourcePokemon)) {
+    if (!this.canRedirect(moveId, sourcePokemon, pokemon)) {
       return false;
     }
     // Triple: only redirect the move if this mon (the redirector) is ADJACENT to the attacker, so
@@ -6266,7 +6301,7 @@ export abstract class RedirectMoveAbAttr extends AbAttr {
     targetIndex.value = newTarget;
   }
 
-  protected canRedirect(moveId: MoveId, _user: Pokemon): boolean {
+  protected canRedirect(moveId: MoveId, _user: Pokemon, _holder?: Pokemon): boolean {
     const move = allMoves[moveId];
     return !![MoveTarget.NEAR_OTHER, MoveTarget.OTHER].find(t => move.moveTarget === t);
   }
@@ -6281,8 +6316,15 @@ export class RedirectTypeMoveAbAttr extends RedirectMoveAbAttr {
     this.type = type;
   }
 
-  protected override canRedirect(moveId: MoveId, user: Pokemon): boolean {
-    return super.canRedirect(moveId, user) && user.getMoveType(allMoves[moveId]) === this.type;
+  protected override canRedirect(moveId: MoveId, user: Pokemon, holder?: Pokemon): boolean {
+    if (!super.canRedirect(moveId, user, holder)) {
+      return false;
+    }
+    const move = allMoves[moveId];
+    if (holder === undefined) {
+      return user.getMoveType(move) === this.type;
+    }
+    return getTriggeredMoveTypes(holder, user, move).has(this.type);
   }
 }
 
@@ -6800,6 +6842,7 @@ export class FormBlockDamageAbAttr extends ReceivedMoveDamageMultiplierAbAttr {
     }
 
     damage.value = 0;
+    markDamageNullified(damage);
     if (this.recoil > 0) {
       pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() * this.recoil), {
         result: HitResult.INDIRECT,
@@ -7104,7 +7147,7 @@ export class ForceSwitchOutHelper {
     } else if (globalScene.currentBattle.battleType === BattleType.WILD) {
       const allyPokemon = switchOutTarget.getAlly();
 
-      if (!globalScene.currentBattle.waveIndex || globalScene.currentBattle.waveIndex % 10 === 0) {
+      if (!globalScene.currentBattle.waveIndex || globalScene.gameMode.isBoss(globalScene.currentBattle.waveIndex)) {
         return false;
       }
 
@@ -7421,6 +7464,12 @@ export class PostDamageForceSwitchAbAttr extends PostDamageAbAttr {
   }
 }
 
+export function isComatoseLike(pokemon: Pokemon): boolean {
+  return (
+    pokemon.hasAbility(AbilityId.COMATOSE)
+    || pokemon.getActiveAbilitySources().some(source => source.ability.id === (ER_HONK_SHOO_ABILITY_ID as AbilityId))
+  );
+}
 /**
  * @returns all Pokémon on field that have weather-based forms
  */
@@ -7433,13 +7482,30 @@ function getPokemonWithWeatherBasedForms() {
         || (p.hasAbility(AbilityId.FLOWER_GIFT) && p.species.speciesId === SpeciesId.CHERRIM),
     );
 }
+function hasActiveReapAndSow(pokemon: Pokemon): boolean {
+  return pokemon
+    .getAbilitySources()
+    .some(
+      source =>
+        source.ability.id === (ER_REAP_AND_SOW_ABILITY_ID as AbilityId)
+        && pokemon.canApplyAbilitySource(source.ability, source.passive, source.passiveSlot ?? 0, false, false),
+    );
+}
 
 export function getWeatherCondition(...weatherTypes: WeatherType[]): AbAttrCondition {
-  return () => {
+  return (pokemon: Pokemon) => {
     if (globalScene.arena.weather?.isEffectSuppressed()) {
       return false;
     }
-    return weatherTypes.includes(globalScene.arena.weatherType);
+    if (weatherTypes.includes(globalScene.arena.weatherType)) {
+      return true;
+    }
+    return (
+      (weatherTypes.includes(WeatherType.SUNNY) || weatherTypes.includes(WeatherType.HARSH_SUN))
+      && globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
+      && (hasActiveReapAndSow(pokemon)
+        || globalScene.getField(true).some(fieldPokemon => hasActiveReapAndSow(fieldPokemon)))
+    );
   };
 }
 

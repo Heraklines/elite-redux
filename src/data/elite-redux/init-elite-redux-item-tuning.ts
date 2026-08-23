@@ -81,15 +81,16 @@ function erCommunityKindForItemKey(itemKey: string): ErCommunityItemKind | undef
   return Object.hasOwn(ER_COMMUNITY_ITEM_CONFIG, kind) ? (kind as ErCommunityItemKind) : undefined;
 }
 
-function findPoolEntry(itemKey: string): { entry: WeightedModifierType; tier: ModifierTier } | undefined {
+function findPoolEntries(itemKey: string): Array<{ entry: WeightedModifierType; tier: ModifierTier }> {
+  const found: Array<{ entry: WeightedModifierType; tier: ModifierTier }> = [];
   for (const [, tier] of EDITABLE_TIERS) {
     for (const entry of modifierPool[tier] ?? []) {
       if (entry.modifierType.id === itemKey) {
-        return { entry, tier };
+        found.push({ entry, tier });
       }
     }
   }
-  return;
+  return found;
 }
 
 /**
@@ -119,12 +120,30 @@ export function applyErItemTuning(
     if (!needsPool) {
       continue;
     }
-    const found = findPoolEntry(itemKey);
-    if (found === undefined) {
+    const foundEntries = findPoolEntries(itemKey);
+    if (foundEntries.length === 0) {
       result.skipped++;
       continue;
     }
+    const requestedTier =
+      entry.tier === undefined ? undefined : EDITABLE_TIERS.find(([name]) => name === entry.tier)?.[1];
+    const found = foundEntries.find(candidate => candidate.tier === requestedTier) ?? foundEntries[0];
     const { entry: poolEntry, tier: currentTier } = found;
+
+    // The same item appearing in multiple tier buckets gives it multiple independent
+    // roll chances. Editor tuning describes one canonical reward entry, so collapse
+    // stale duplicates before applying its tier and weight (DNA Splicers was in both
+    // Great and Master while its tuning requested Ultra).
+    for (const duplicate of foundEntries) {
+      if (duplicate === found) {
+        continue;
+      }
+      const pool = modifierPool[duplicate.tier] ?? [];
+      const duplicateIndex = pool.indexOf(duplicate.entry);
+      if (duplicateIndex >= 0) {
+        pool.splice(duplicateIndex, 1);
+      }
+    }
 
     if (typeof entry.weight === "number" && entry.weight >= 0) {
       poolEntry.weight = entry.weight;
@@ -137,7 +156,7 @@ export function applyErItemTuning(
     }
 
     if (entry.tier !== undefined) {
-      const target = EDITABLE_TIERS.find(([name]) => name === entry.tier)?.[1];
+      const target = requestedTier;
       if (target === undefined) {
         result.skipped++;
       } else if (target !== currentTier) {

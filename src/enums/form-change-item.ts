@@ -375,4 +375,24 @@ export enum FormChangeItem {
   LUXRAYITE_Y,
   YVELTALITE_Z,
   METAGROSSITE_BOND,
+  // Discord fakemon-pitch roster (2026-08). Append-only for save compatibility.
+  CRYOGONALITE,
+  JIRACHITE,
+  LEDIANITE,
+  RAMPARDOSITE,
+  REUNICLUSITE_X,
+  XATUNITE,
+  ZANGOOSEITE,
+  // Source-backed fakemon-pitch forms (2026-08). Append-only for save compatibility.
+  CALYRITE,
+  HYPNITE,
+  ALORAICHUNITE,
+  BARBARACITE_Y,
+  LILLIGANITE_VERDANT,
+  DISTORTED_CHAIN,
+  // BerNerd roster (2026-08). Append-only for save compatibility.
+  GOLURKITE_Y,
+  SKUNTANKITE,
+  DODRIONITE,
+  PYUKUMUKUNITE,
 }

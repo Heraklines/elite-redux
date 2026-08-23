@@ -8,6 +8,7 @@ import type {
   CoopCommandOpenMaterialV2,
   CoopInteractionOpenMaterialV2,
   CoopReplacementOpenMaterialV2,
+  CoopTrainerVictoryOpenMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import type { CoopAuthorityEntry, CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import type { CoopAuthorityV2Shadow, CoopV2AuthorityFrontier } from "#data/elite-redux/coop/authority-v2/shadow";
@@ -54,6 +55,17 @@ export class CoopV2ControlCutover {
       return null;
     }
     return this.harness.tapReplacementOpen(input);
+  }
+
+  commitHostTrainerVictoryOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopTrainerVictoryOpenMaterialV2;
+    readonly successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>;
+  }): CoopAuthorityEntry | null {
+    if (this.disposed) {
+      return null;
+    }
+    return this.harness.tapTrainerVictoryOpen(input);
   }
 
   dispose(): void {

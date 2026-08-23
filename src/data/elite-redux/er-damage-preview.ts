@@ -25,8 +25,7 @@
 // =============================================================================
 
 import { getErHeadCount } from "#data/elite-redux/archetypes/multi-headed";
-import type { AbilityId } from "#enums/ability-id";
-import { ErAbilityId } from "#enums/er-ability-id";
+import { hasMultiHeadedAttr } from "#data/elite-redux/abilities/barbaracle-mechanics";
 import { MultiHitType } from "#enums/multi-hit-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -88,7 +87,7 @@ function multiHitFactor(
   // ER Multi-Headed: only on a move that can actually be multi-strike-enhanced
   // (matches the ability's own gate, so it never over-counts a charging/spread move).
   if (
-    source.hasAbility(ErAbilityId.MULTI_HEADED as unknown as AbilityId)
+    hasMultiHeadedAttr(source.getAllActiveAbilityAttrs())
     && move.canBeMultiStrikeEnhanced(source, false, target)
   ) {
     const heads = getErHeadCount(source);

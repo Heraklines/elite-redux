@@ -66,7 +66,12 @@ import { UiMode } from "#enums/ui-mode";
 import { EnemyPokemon, type Pokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
 import { EncounterPhase } from "#phases/encounter-phase";
+import {
+  type CoopProjectedEncounterPresentationQueue,
+  queueCoopProjectedEncounterPresentationTail,
+} from "#phases/new-battle-phase";
 import { NextEncounterPhase } from "#phases/next-encounter-phase";
+import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
 import { negotiateLocalSpoofPeer } from "#test/tools/coop-local-peer";
@@ -331,6 +336,74 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       runEncounterSpy.mockRestore();
       shouldAdoptSpy.mockRestore();
     }
+  });
+
+  it("shows the guest's player-trainer transition without changing authoritative field membership", async () => {
+    const playerField = await startCoopGuest();
+    const checksumBefore = coopEngine.captureCoopChecksum();
+    const fieldIdsBefore = globalScene.getField(true).map(pokemon => pokemon?.id ?? null);
+    globalScene.trainer.setVisible(false).setAlpha(0);
+    let finishTween: (() => void) | undefined;
+    const tweenSpy = vi.spyOn(globalScene.tweens, "add").mockImplementation(config => {
+      if ((config as Phaser.Types.Tweens.TweenBuilderConfig).targets === globalScene.trainer) {
+        finishTween = (config as Phaser.Types.Tweens.TweenBuilderConfig).onComplete as (() => void) | undefined;
+      }
+      return {} as Phaser.Tweens.Tween;
+    });
+    const phase = new ShowTrainerPhase(true);
+    const endSpy = vi.spyOn(phase, "end").mockImplementation(() => {});
+    try {
+      phase.start();
+
+      expect(globalScene.trainer.visible, "the guest sees the normal player-trainer entrance").toBe(true);
+      expect(globalScene.trainer.alpha, "a previous cleanup cannot leave the trainer transparent").toBe(1);
+      expect(finishTween, "the real trainer entrance tween remains the phase completion owner").toBeTypeOf("function");
+      expect(
+        globalScene.getField(true).map(pokemon => pokemon?.id ?? null),
+        "presentation-only recall keeps the authoritative seats intact",
+      ).toEqual(fieldIdsBefore);
+      for (const pokemon of playerField) {
+        expect(pokemon.isOnField(), `player ${pokemon.id} stays mechanically fielded`).toBe(true);
+        expect(pokemon.visible, `player ${pokemon.id} body is hidden behind the trainer transition`).toBe(false);
+        expect(pokemon.getSprite().visible, `player ${pokemon.id} sprite is hidden behind the trainer transition`).toBe(
+          false,
+        );
+        expect(
+          pokemon.getBattleInfo().visible,
+          `player ${pokemon.id} info is hidden behind the trainer transition`,
+        ).toBe(false);
+      }
+      expect(coopEngine.captureCoopChecksum(), "the positive trainer cue is mechanically checksum-neutral").toBe(
+        checksumBefore,
+      );
+
+      finishTween?.();
+      expect(endSpy).toHaveBeenCalledOnce();
+    } finally {
+      tweenSpy.mockRestore();
+    }
+  });
+
+  it("queues the projected trainer cue before its signed encounter tail", () => {
+    const queued: string[] = [];
+    const queue: CoopProjectedEncounterPresentationQueue = {
+      pushNew(name) {
+        queued.push(name);
+      },
+    };
+
+    queueCoopProjectedEncounterPresentationTail(queue, {
+      entersCommittedBiome: false,
+      showPlayerTrainer: true,
+    });
+    expect(queued).toEqual(["ShowTrainerPhase", "NextEncounterPhase"]);
+
+    queued.length = 0;
+    queueCoopProjectedEncounterPresentationTail(queue, {
+      entersCommittedBiome: true,
+      showPlayerTrainer: true,
+    });
+    expect(queued).toEqual(["ShowTrainerPhase", "NewBiomeEncounterPhase"]);
   });
 
   it("drops a stale next-encounter tween after shared teardown clears its battle", async () => {

@@ -38,6 +38,7 @@
 // =============================================================================
 
 import type { BiomeId } from "#enums/biome-id";
+import { getErFinaleRoutingStartWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { randSeedIntRange } from "#utils/common";
 
 /** Minimum rolled biome length in waves (#504). */
@@ -92,7 +93,7 @@ const CLASSIC_FINAL_WAVE = 200;
  * World Map gate, which is classic-only, so the classic final wave is correct.
  */
 function lateGameThreshold(): number {
-  return CLASSIC_FINAL_WAVE - LATE_GAME_MARGIN;
+  return isErSprintRun() ? getErFinaleRoutingStartWave() : CLASSIC_FINAL_WAVE - LATE_GAME_MARGIN;
 }
 
 /** True once we are inside the finale-safety zone (vanilla cadence forced). */
@@ -124,6 +125,19 @@ export interface ErBiomeStructurePlan {
 
 /** Pure, addressable structure plan used by retryable authoritative biome preparation. */
 export function planErBiomeStructure(startWave: number, runSeed?: string): ErBiomeStructurePlan {
+  if (isErSprintRun()) {
+    const finaleStart = lateGameThreshold();
+    if (startWave >= finaleStart) {
+      return { length: null, startWave };
+    }
+    const localRng = runSeed
+      ? new Phaser.Math.RandomDataGenerator([`${runSeed}:er-biome-length:${startWave}`])
+      : null;
+    const roll = localRng?.integerInRange(0, 99) ?? randSeedIntRange(0, 99);
+    const maximumStints = Math.max(1, Math.min(3, Math.floor((finaleStart - startWave) / 5)));
+    const stints = maximumStints === 1 ? 1 : maximumStints === 2 ? (roll < 15 ? 1 : 2) : roll < 15 ? 1 : roll < 70 ? 2 : 3;
+    return { length: stints * 5, startWave };
+  }
   // Finale safety: never roll a variable length once we're at/inside the late
   // zone, or if the biome's worst case could spill into it.
   if (startWave >= lateGameThreshold() || startWave + MAX_BAND_LENGTH - 1 >= lateGameThreshold()) {
@@ -169,7 +183,7 @@ export function erMarkBiomeStay(waveIndex: number): void {
   if (overstayAnchorWave !== null) {
     return;
   }
-  if (wavesSinceEnteredBiome(waveIndex) >= NOTORIETY_FREE_WAVES) {
+  if (wavesSinceEnteredBiome(waveIndex) >= (isErSprintRun() ? 5 : NOTORIETY_FREE_WAVES)) {
     overstayAnchorWave = waveIndex;
   }
 }

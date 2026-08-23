@@ -3,6 +3,11 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { CommonBattleAnim } from "#data/battle-anims";
 import { recordDirectCoopCommonAnimPresentation } from "#data/elite-redux/coop/coop-common-anim-presentation";
+import {
+  applyMoodyRuntimeStatusDamage,
+  notifyMoodyRuntimeDamageApplied,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { getMoodySelfStatusDamageMultiplier } from "#data/elite-redux/moody/moody-scene-adapter";
 import { getStatusEffectActivationText } from "#data/status-effect";
 import type { BattlerIndex } from "#enums/battler-index";
 import { CommonAnim } from "#enums/move-anims-common";
@@ -53,9 +58,13 @@ export class PostTurnStatusEffectPhase extends PokemonPhase {
     }
 
     if (damage.value) {
+      damage.value = Math.max(1, Math.floor(damage.value * getMoodySelfStatusDamageMultiplier(pokemon)));
+      damage.value = applyMoodyRuntimeStatusDamage(pokemon, damage.value, pokemon.status.effect);
       // Set preventEndure flag to avoid pokemon surviving thanks to focus band, sturdy, endure ...
       // TODO: Why doesn't this call `damageAndUpdate`?
-      globalScene.damageNumberHandler.add(this.getPokemon(), pokemon.damage(damage.value, false, true));
+      const dealt = pokemon.damage(damage.value, false, true);
+      globalScene.damageNumberHandler.add(this.getPokemon(), dealt);
+      notifyMoodyRuntimeDamageApplied(undefined, pokemon, dealt, false);
       pokemon.updateInfo();
       applyAbAttrs("PostDamageAbAttr", { pokemon, damage: damage.value });
     }

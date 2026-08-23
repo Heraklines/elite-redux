@@ -52,24 +52,30 @@ export class FieldPoisonWeaknessOnEntryAbAttr extends PostSummonAbAttr {
   }
 }
 
-/** Forces eligible opponents to use Struggle for their next turn only. */
+/** Forces the first living opposing lead to use Struggle for its next turn only. */
 export class TelekineticStruggleOnEntryAbAttr extends PostSummonAbAttr {
   override apply({ pokemon, simulated }: Parameters<PostSummonAbAttr["apply"]>[0]): void {
     if (simulated) {
       return;
     }
     const superheavyId = ER_ID_MAP.abilities[848] as AbilityId | undefined;
-    for (const opponent of pokemon.getOpponents()) {
-      if (
-        opponent.isOfType(PokemonType.PSYCHIC)
-        || opponent.isOfType(PokemonType.DARK)
-        || opponent.hasAbility(AbilityId.HEAVY_METAL)
-        || (superheavyId !== undefined && opponent.hasAbility(superheavyId))
-      ) {
-        continue;
-      }
-      opponent.tempSummonData.erTelekineticStruggle = true;
+    // Use the same automatic lead-target convention as other single-foe
+    // on-entry effects: no target-selection prompt and no spillover to the
+    // remaining doubles/triples slots. `onField=false` is deliberate because
+    // the player's initial PostSummon hook can run before the enemy lead has
+    // completed its own summon presentation, even though the field slot is
+    // already assigned.
+    const opponent = pokemon.getOpponents(false).find(candidate => !candidate.isFainted());
+    if (
+      !opponent
+      || opponent.isOfType(PokemonType.PSYCHIC)
+      || opponent.isOfType(PokemonType.DARK)
+      || opponent.hasAbility(AbilityId.HEAVY_METAL)
+      || (superheavyId !== undefined && opponent.hasAbility(superheavyId))
+    ) {
+      return;
     }
+    opponent.tempSummonData.erTelekineticStruggle = true;
   }
 }
 

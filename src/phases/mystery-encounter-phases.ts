@@ -8,7 +8,10 @@ import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate"
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { settleCoopFieldPresentation } from "#data/elite-redux/coop/coop-field-presentation";
+import {
+  settleCoopFieldPresentation,
+  settleCoopFieldPresentationReady,
+} from "#data/elite-redux/coop/coop-field-presentation";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   COOP_ME_AUTHORITY_TURN,
@@ -1183,41 +1186,81 @@ export class MysteryEncounterBattlePhase extends Phase {
    * the empty phase queue enter the ordinary TurnInit -> local-command/replay loop.
    */
   private materializeAuthoritativeGuestBattle(): void {
+    const scene = globalScene;
     const battle = globalScene.currentBattle;
+    const runtime = getCoopRuntime();
+    const generation = coopSessionGeneration();
+    if (runtime == null) {
+      failCoopSharedSession("Authoritative Mystery presentation lost its owning runtime");
+      return;
+    }
+    const remainsCurrent = (): boolean =>
+      globalScene === scene
+      && globalScene.currentBattle === battle
+      && globalScene.phaseManager.getCurrentPhase() === this
+      && getCoopRuntime() === runtime
+      && coopSessionGeneration() === generation;
     const playerCapacity = battle.arrangement.playerCapacity;
     const enemyCapacity = battle.arrangement.enemyCapacity;
     const enemySeats = globalScene
       .getEnemyParty()
       .slice(0, enemyCapacity)
       .map((pokemon, slot) => ({ pokemon, slot }));
-    settleCoopFieldPresentation({
-      side: "player",
-      seats: globalScene
-        .getPlayerParty()
-        .slice(0, playerCapacity)
-        .map((pokemon, slot) => ({ pokemon, slot })),
-      capacity: playerCapacity,
-      boundary: "me-battle-summon",
-      desired: "visible",
-      hideStale: true,
-      trainerDisposition: "hide-player",
-    });
-    const revealEnemyField = (): void => {
-      settleCoopFieldPresentation({
-        side: "enemy",
-        seats: enemySeats,
-        capacity: enemyCapacity,
+    const playerReady = settleCoopFieldPresentationReady(
+      {
+        side: "player",
+        seats: globalScene
+          .getPlayerParty()
+          .slice(0, playerCapacity)
+          .map((pokemon, slot) => ({ pokemon, slot })),
+        capacity: playerCapacity,
         boundary: "me-battle-summon",
         desired: "visible",
         hideStale: true,
-        trainerDisposition: "hide-enemy",
+        trainerDisposition: "hide-player",
+      },
+      remainsCurrent,
+    );
+    // Attach containment immediately; callbacks below still await the original promise and receive the
+    // rejection, while a long human trainer dialogue cannot make it an interim unhandled rejection.
+    void playerReady.catch(() => undefined);
+    // Begin the immutable enemy atlas work while trainer dialogue is playing. The final reveal below still
+    // revalidates nodes/lifetime through settleCoopFieldPresentationReady before it can release Command.
+    const enemyAssetPreload = Promise.allSettled(enemySeats.map(({ pokemon }) => pokemon.loadAssets(false)));
+    const revealEnemyField = (): void => {
+      void (async () => {
+        await playerReady;
+        const preload = await enemyAssetPreload;
+        if (preload.some(result => result.status === "rejected")) {
+          throw new Error("one or more Mystery battler atlases failed their preload");
+        }
+        await settleCoopFieldPresentationReady(
+          {
+            side: "enemy",
+            seats: enemySeats,
+            capacity: enemyCapacity,
+            boundary: "me-battle-summon",
+            desired: "visible",
+            hideStale: true,
+            trainerDisposition: "hide-enemy",
+          },
+          remainsCurrent,
+        );
+        if (!remainsCurrent()) {
+          return;
+        }
+        coopLog(
+          "me",
+          `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
+            + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)} mode=${battle.mysteryEncounter?.encounterMode}`,
+        );
+        this.end();
+      })().catch(error => {
+        if (remainsCurrent()) {
+          coopWarn("me", "authoritative Mystery battler presentation failed closed", error);
+          failCoopSharedSession("Authoritative Mystery battlers could not become actionable");
+        }
       });
-      coopLog(
-        "me",
-        `authoritative guest materialized ME battle players=${Math.min(playerCapacity, globalScene.getPlayerParty().length)} `
-          + `enemies=${Math.min(enemyCapacity, globalScene.getEnemyParty().length)} mode=${battle.mysteryEncounter?.encounterMode}`,
-      );
-      this.end();
     };
     const beginBattle = (onReady: () => void): void => {
       battle.started = true;
@@ -1237,11 +1280,6 @@ export class MysteryEncounterBattlePhase extends Phase {
     }
 
     const trainer = battle.trainer;
-    const runtime = getCoopRuntime();
-    if (runtime == null) {
-      failCoopSharedSession("Authoritative Mystery trainer presentation lost its owning runtime");
-      return;
-    }
     // The host awaited this trainer's dynamic sprite load before opening its own battle phase. The
     // replica received the descriptor earlier with the retained terminal, so hold this presentation phase
     // until its equivalent local asset is initialized instead of flashing a blank trainer for one browser.
@@ -1431,16 +1469,24 @@ export class MysteryEncounterRewardsPhase extends Phase {
   private readonly authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null;
   /** Settlement retained after automatic reward preparation on the authoritative host. */
   private readonly meSettlementPlan: CoopMeBattleSettlementPlan | null;
+  /**
+   * An embedded battle splits non-interactive preparation from its public reward surface so the retained
+   * state can release both clients into the same TrainerVictory tail. Non-battle and legacy paths keep the
+   * established combined phase.
+   */
+  private readonly meSettlementStage: "combined" | "prepare-only" | "open-prepared";
 
   constructor(
     addHealPhase = false,
     authoritativeRewardSurfaces: readonly CoopMeRewardSurfaceProjection[] | null = null,
     meSettlementPlan: CoopMeBattleSettlementPlan | null = null,
+    meSettlementStage: "combined" | "prepare-only" | "open-prepared" = "combined",
   ) {
     super();
     this.addHealPhase = addHealPhase;
     this.authoritativeRewardSurfaces = authoritativeRewardSurfaces;
     this.meSettlementPlan = meSettlementPlan;
+    this.meSettlementStage = meSettlementStage;
   }
 
   /**
@@ -1527,13 +1573,18 @@ export class MysteryEncounterRewardsPhase extends Phase {
     }
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
-    if (encounter.doContinueEncounter) {
+    if (this.meSettlementStage === "prepare-only" && this.meSettlementPlan == null) {
+      failCoopSharedSession("A staged Mystery battle reward preparation omitted its retained settlement plan.");
+      return;
+    }
+
+    if (encounter.doContinueEncounter && this.meSettlementStage !== "open-prepared") {
       encounter.doContinueEncounter().then(() => {
         this.end();
       });
     } else {
       globalScene.executeWithSeedOffset(() => {
-        if (encounter.onRewards) {
+        if (encounter.onRewards && this.meSettlementStage !== "open-prepared") {
           encounter.onRewards().then(() => {
             this.doEncounterRewardsAndContinue();
           });
@@ -1570,7 +1621,7 @@ export class MysteryEncounterRewardsPhase extends Phase {
   async doEncounterRewardsAndContinue(): Promise<void> {
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
-    if (encounter.doEncounterExp) {
+    if (this.meSettlementStage !== "prepare-only" && encounter.doEncounterExp) {
       encounter.doEncounterExp();
     }
 
@@ -1578,7 +1629,7 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // and encounters that clear/replace doEncounterRewards cannot accidentally reuse a stale helper plan.
     const rewardPlan =
       encounter.rewardPlan?.openRewardSurfaces === encounter.doEncounterRewards ? encounter.rewardPlan : null;
-    if (rewardPlan != null) {
+    if (rewardPlan != null && this.meSettlementStage !== "open-prepared") {
       try {
         const preparation = rewardPlan.prepareAutomaticEffects();
         if (preparation != null) {
@@ -1603,6 +1654,13 @@ export class MysteryEncounterRewardsPhase extends Phase {
       if (!battleSettlementRetained) {
         commitCoopMeNoBattleRewardSettlementAfterPreparation(this.meSettlementPlan);
       }
+    }
+
+    if (this.meSettlementStage === "prepare-only") {
+      // The retained battle-settled entry releases both clients into the same TrainerVictory/Money tail.
+      // This phase owns no public UI and must not also open the reward surfaces ahead of that presentation.
+      this.end();
+      return;
     }
 
     if (encounter.doEncounterRewards) {

@@ -17,6 +17,7 @@ import {
   createArrangement,
   DOUBLE_FORMAT,
   fieldSpriteOffset,
+  fieldSpriteScale,
   formatById,
   legacyFormat,
   SINGLE_FORMAT,
@@ -27,6 +28,7 @@ import {
 } from "#data/battle-format";
 import { BattlerIndex } from "#enums/battler-index";
 import { FieldPosition } from "#enums/field-position";
+import { SpeciesId } from "#enums/species-id";
 import { describe, expect, it } from "vitest";
 
 const arrFor = (f: typeof SINGLE_FORMAT) => createArrangement(f);
@@ -151,6 +153,13 @@ describe("battle-format: lookups", () => {
 });
 
 describe("battle-format sprite offsets", () => {
+  it("fits Ash-Greninja into triples without changing its single or double scale", () => {
+    expect(fieldSpriteScale(SpeciesId.GRENINJA, "ash", 1)).toBe(1);
+    expect(fieldSpriteScale(SpeciesId.GRENINJA, "ash", 2)).toBe(1);
+    expect(fieldSpriteScale(SpeciesId.GRENINJA, "ash", 3)).toBe(0.75);
+    expect(fieldSpriteScale(SpeciesId.GRENINJA, "", 3)).toBe(1);
+  });
+
   it("raises the left triple lane without moving the right or center lanes", () => {
     expect(fieldSpriteOffset(FieldPosition.LEFT, 3, true)).toEqual([-58, -4]);
     expect(fieldSpriteOffset(FieldPosition.RIGHT, 3, true)).toEqual([58, 4]);

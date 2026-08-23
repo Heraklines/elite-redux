@@ -23241,7 +23241,7 @@ export const ER_MOVES: readonly ErMoveDraft[] = [
     "moveConst": "MOVE_RIP_AND_TEAR",
     "name": "Rip and Tear",
     "shortName": "Rip and Tear",
-    "description": "The user tears into the foe with its fangs.",
+    "description": "Tears into the foe, but can't be used twice in a row.",
     "longDescription": "Lowers Speed. 50% chance to bleed. Can't be used twice in a row.",
     "types": [
       11
@@ -24523,10 +24523,10 @@ export const ER_MOVES: readonly ErMoveDraft[] = [
   {
     "id": 1009,
     "moveConst": "MOVE_SUNSTRIKE",
-    "name": "Sunstrike (N)",
+    "name": "Sunstrike",
     "shortName": "Sunstrike",
-    "description": "Strikes with harsh winds.",
-    "longDescription": "Strikes and negates evs, items, boosts, and hits lowest defense.",
+    "description": "Strikes with +1 priority and ignores the target's stat changes.",
+    "longDescription": "Strikes with +1 priority and ignores the target's stat changes.",
     "types": [
       2
     ],
@@ -24546,10 +24546,10 @@ export const ER_MOVES: readonly ErMoveDraft[] = [
   {
     "id": 1010,
     "moveConst": "MOVE_TEMPEST_STORM",
-    "name": "Tempest Storm (N)",
+    "name": "Tempest Storm",
     "shortName": "TempStorm",
-    "description": "Sets a thundershock storm.",
-    "longDescription": "Hits both sides with a thundershock at the end of each turn for 2-5 turns.",
+    "description": "Sets a thundershock storm that damages both sides each turn. Electric types are immune.",
+    "longDescription": "Sets a thundershock storm that damages both sides each turn. Electric types are immune.",
     "types": [
       4
     ],

@@ -132,4 +132,22 @@ describe.skipIf(!RUN)("ER redux-line evolution audit (raw ids)", () => {
     await psyduck.evolve(reduxEdge ?? null, psyduck.species);
     expect(psyduck.species.name).toBe("Shyduck");
   });
+
+  it("Redux Doublade evolves into the Redux Aegislash form", async () => {
+    await game.classicMode.runToSummon(SpeciesId.DOUBLADE);
+    const doublade = game.field.getPlayerPokemon();
+    const reduxIdx = doublade.species.forms.findIndex(form => form.formKey === "redux");
+    expect(reduxIdx, "Doublade has a redux form").toBeGreaterThan(0);
+    doublade.formIndex = reduxIdx;
+    doublade.level = 45;
+
+    const evolution = (pokemonEvolutions[SpeciesId.DOUBLADE] ?? []).find(
+      edge => edge.speciesId === SpeciesId.AEGISLASH && edge.validate(doublade),
+    );
+    expect(evolution, "Redux Doublade has a valid Aegislash evolution").toBeDefined();
+
+    await doublade.evolve(evolution ?? null, doublade.species);
+    expect(doublade.species.speciesId).toBe(SpeciesId.AEGISLASH);
+    expect(doublade.getFormKey()).toBe("redux");
+  });
 });

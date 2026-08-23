@@ -395,3 +395,29 @@ export const classicFixedBattles: FixedBattleConfigs = {
       allowLuckUpgrades: false,
     }),
 };
+
+/** Classic Sprint's authored 100-wave story schedule. Config objects are shared
+ * with Classic; only their run-wave addresses differ. */
+export const sprintFixedBattles: FixedBattleConfigs = {
+  3: classicFixedBattles[ClassicFixedBossWaves.TOWN_YOUNGSTER],
+  4: classicFixedBattles[ClassicFixedBossWaves.RIVAL_1],
+  13: classicFixedBattles[ClassicFixedBossWaves.RIVAL_2],
+  18: classicFixedBattles[ClassicFixedBossWaves.EVIL_GRUNT_1],
+  28: classicFixedBattles[ClassicFixedBossWaves.RIVAL_3],
+  31: classicFixedBattles[ClassicFixedBossWaves.EVIL_GRUNT_2],
+  32: classicFixedBattles[ClassicFixedBossWaves.EVIL_GRUNT_3],
+  33: classicFixedBattles[ClassicFixedBossWaves.EVIL_ADMIN_1],
+  48: classicFixedBattles[ClassicFixedBossWaves.RIVAL_4],
+  56: classicFixedBattles[ClassicFixedBossWaves.EVIL_GRUNT_4],
+  57: classicFixedBattles[ClassicFixedBossWaves.EVIL_ADMIN_2],
+  58: classicFixedBattles[ClassicFixedBossWaves.EVIL_BOSS_1],
+  73: classicFixedBattles[ClassicFixedBossWaves.RIVAL_5],
+  82: classicFixedBattles[ClassicFixedBossWaves.EVIL_ADMIN_3],
+  83: classicFixedBattles[ClassicFixedBossWaves.EVIL_BOSS_2],
+  91: classicFixedBattles[ClassicFixedBossWaves.ELITE_FOUR_1],
+  92: classicFixedBattles[ClassicFixedBossWaves.ELITE_FOUR_2],
+  93: classicFixedBattles[ClassicFixedBossWaves.ELITE_FOUR_3],
+  94: classicFixedBattles[ClassicFixedBossWaves.ELITE_FOUR_4],
+  95: classicFixedBattles[ClassicFixedBossWaves.CHAMPION],
+  98: classicFixedBattles[ClassicFixedBossWaves.RIVAL_6],
+};

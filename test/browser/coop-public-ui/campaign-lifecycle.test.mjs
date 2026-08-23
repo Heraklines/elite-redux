@@ -135,7 +135,11 @@ test("workflow reserves artifact-upload headroom and budgets the real-animation 
     workflow,
     /profile: "animations-on-surface", artifact: "surface", waves: \$surfaceWaves,[\s\S]*campaign_timeout_ms: "3120000",[\s\S]*process_timeout: "55m", job_timeout_minutes: 65/u,
   );
-  assert.match(workflow, /profile: "animations-skipped-depth"[\s\S]*campaign_timeout_ms: "2700000"/u);
+  assert.match(
+    workflow,
+    /profile: "animations-skipped-depth"[\s\S]*campaign_timeout_ms: \(if \(\$depthWaves \| tonumber\) > 4 then "4800000" else "2700000" end\)[\s\S]*process_timeout: \(if \(\$depthWaves \| tonumber\) > 4 then "83m" else "48m" end\)[\s\S]*job_timeout_minutes: \(if \(\$depthWaves \| tonumber\) > 4 then 90 else 55 end\)/u,
+    "an explicitly requested long depth journey gets measured lifecycle and artifact-upload headroom",
+  );
   assert.match(
     workflow,
     /campaign_waves:[\s\S]{0,220}?default: "4"[\s\S]*?DEPTH_WAVES: \$\{\{ inputs\.campaign_waves \|\| '4' \}\}/u,

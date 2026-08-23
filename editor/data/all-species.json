@@ -816,6 +816,14 @@
     "bst": 645
   },
   {
+    "const": "SPECIES_ASTOOT",
+    "name": "Astoot",
+    "slug": "astoot",
+    "id": 70002,
+    "dex": null,
+    "bst": 532
+  },
+  {
     "const": "SPECIES_AUDINO",
     "name": "Audino",
     "slug": "audino",
@@ -3208,6 +3216,14 @@
     "bst": 485
   },
   {
+    "const": "SPECIES_DISCUPID",
+    "name": "Discupid",
+    "slug": "discupid",
+    "id": 70003,
+    "dex": null,
+    "bst": 527
+  },
+  {
     "const": "SPECIES_DITTO",
     "name": "Ditto",
     "slug": "ditto",
@@ -3430,6 +3446,14 @@
     "id": 147,
     "dex": 147,
     "bst": 300
+  },
+  {
+    "const": "SPECIES_DRAWCLOPS",
+    "name": "Drawclops",
+    "slug": "drawclops",
+    "id": 70020,
+    "dex": null,
+    "bst": 470
   },
   {
     "const": "SPECIES_DREADNAUT",
@@ -3672,6 +3696,14 @@
     "bst": 310
   },
   {
+    "const": "SPECIES_DUSTNOIR",
+    "name": "Dustnoir",
+    "slug": "dustnoir",
+    "id": 70021,
+    "dex": null,
+    "bst": 540
+  },
+  {
     "const": "SPECIES_DUSTOX",
     "name": "Dustox",
     "slug": "dustox",
@@ -3734,6 +3766,14 @@
     "id": 10445,
     "dex": 133,
     "bst": 435
+  },
+  {
+    "const": "SPECIES_EGOELK",
+    "name": "Egoelk",
+    "slug": "egoelk",
+    "id": 70026,
+    "dex": null,
+    "bst": 525
   },
   {
     "const": "SPECIES_EISCUE",
@@ -4526,6 +4566,14 @@
     "id": 590,
     "dex": 590,
     "bst": 334
+  },
+  {
+    "const": "SPECIES_FORBIDDRON",
+    "name": "Forbiddron",
+    "slug": "forbiddron",
+    "id": 70027,
+    "dex": null,
+    "bst": 550
   },
   {
     "const": "SPECIES_FORRETRESS",
@@ -6294,6 +6342,14 @@
     "id": 10091,
     "dex": null,
     "bst": 530
+  },
+  {
+    "const": "SPECIES_IDOLFIN",
+    "name": "Idolfin",
+    "slug": "idolfin",
+    "id": 70028,
+    "dex": null,
+    "bst": 650
   },
   {
     "const": "SPECIES_IGGLYBUFF",
@@ -8992,6 +9048,14 @@
     "bst": 570
   },
   {
+    "const": "SPECIES_NIMBEON",
+    "name": "Nimbeon",
+    "slug": "nimbeon",
+    "id": 70022,
+    "dex": null,
+    "bst": 525
+  },
+  {
     "const": "SPECIES_NINCADA",
     "name": "Nincada",
     "slug": "nincada",
@@ -9454,6 +9518,94 @@
     "id": 47,
     "dex": 47,
     "bst": 515
+  },
+  {
+    "const": "SPECIES_PARTNER_ESPEON",
+    "name": "Partner Espeon",
+    "slug": "espeon",
+    "id": 70015,
+    "dex": 196,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_FLAREON",
+    "name": "Partner Flareon",
+    "slug": "flareon",
+    "id": 70014,
+    "dex": 136,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_GLACEON",
+    "name": "Partner Glaceon",
+    "slug": "glaceon",
+    "id": 70018,
+    "dex": 471,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_JOLTEON",
+    "name": "Partner Jolteon",
+    "slug": "jolteon",
+    "id": 70013,
+    "dex": 135,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_LEAFEON",
+    "name": "Partner Leafeon",
+    "slug": "leafeon",
+    "id": 70017,
+    "dex": 470,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_NIMBEON",
+    "name": "Partner Nimbeon",
+    "slug": "nimbeon",
+    "id": 70030,
+    "dex": null,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_RYUVEON",
+    "name": "Partner Ryuveon",
+    "slug": "ryuveon",
+    "id": 70031,
+    "dex": null,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_SYLVEON",
+    "name": "Partner Sylveon",
+    "slug": "sylveon",
+    "id": 70019,
+    "dex": 700,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_TITANEON",
+    "name": "Partner Titaneon",
+    "slug": "titaneon",
+    "id": 70032,
+    "dex": null,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_UMBREON",
+    "name": "Partner Umbreon",
+    "slug": "umbreon",
+    "id": 70016,
+    "dex": 197,
+    "bst": 525
+  },
+  {
+    "const": "SPECIES_PARTNER_VAPOREON",
+    "name": "Partner Vaporeon",
+    "slug": "vaporeon",
+    "id": 70012,
+    "dex": 134,
+    "bst": 525
   },
   {
     "const": "SPECIES_PASSIMIAN",
@@ -10568,6 +10720,14 @@
     "bst": 580
   },
   {
+    "const": "SPECIES_REGITUBE",
+    "name": "Regitube",
+    "slug": "regitube",
+    "id": 70004,
+    "dex": null,
+    "bst": 580
+  },
+  {
     "const": "SPECIES_RELICANTH",
     "name": "Relicanth",
     "slug": "relicanth",
@@ -10878,6 +11038,14 @@
     "id": 867,
     "dex": 867,
     "bst": 483
+  },
+  {
+    "const": "SPECIES_RYUVEON",
+    "name": "Ryuveon",
+    "slug": "ryuveon",
+    "id": 70023,
+    "dex": null,
+    "bst": 525
   },
   {
     "const": "SPECIES_SABLEYE",
@@ -13072,6 +13240,14 @@
     "bst": 600
   },
   {
+    "const": "SPECIES_TENTALECT",
+    "name": "Tentalect",
+    "slug": "tentalect",
+    "id": 70001,
+    "dex": null,
+    "bst": 600
+  },
+  {
     "const": "SPECIES_TEPIG",
     "name": "Tepig",
     "slug": "tepig",
@@ -13246,6 +13422,14 @@
     "id": 564,
     "dex": 564,
     "bst": 370
+  },
+  {
+    "const": "SPECIES_TITANEON",
+    "name": "Titaneon",
+    "slug": "titaneon",
+    "id": 70024,
+    "dex": null,
+    "bst": 525
   },
   {
     "const": "SPECIES_TOEDSCOOL",
@@ -13614,6 +13798,14 @@
     "id": 10779,
     "dex": 387,
     "bst": 320
+  },
+  {
+    "const": "SPECIES_TWINKLETUFF",
+    "name": "Twinkletuff",
+    "slug": "twinkletuff",
+    "id": 70025,
+    "dex": null,
+    "bst": 515
   },
   {
     "const": "SPECIES_TYMPOLE",
@@ -14630,6 +14822,14 @@
     "id": 10764,
     "dex": 461,
     "bst": 610
+  },
+  {
+    "const": "SPECIES_WEBBED_BRUISER",
+    "name": "Webbed Bruiser",
+    "slug": "webbed_bruiser",
+    "id": 70029,
+    "dex": null,
+    "bst": 570
   },
   {
     "const": "SPECIES_WEEDLE",

@@ -2,7 +2,10 @@ import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { allMoves } from "#data/data-lists";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { addItemIconSprite } from "#data/elite-redux/er-item-icon";
+import { queryMoodySceneEffects } from "#data/elite-redux/moody/moody-scene-adapter";
+import { getMoodyModeState, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
 import type { PokeballType } from "#enums/pokeball";
@@ -23,6 +26,17 @@ import Phaser from "phaser";
 export const SHOP_OPTIONS_ROW_LIMIT = 7;
 const SINGLE_SHOP_ROW_YOFFSET = 12;
 const DOUBLE_SHOP_ROW_YOFFSET = 24;
+/**
+ * ER/Moody: the reward toolbar's two "action" anchors on the 320px canvas.
+ * The Recycler button must never collide with the reroll label (or its cost
+ * text when locking rarity is unavailable). Foundation: "Reroll" (~30px) plus
+ * cost text (~30px) leaves free space only past x ≈ 92, and "Manage Items"
+ * shrinks to the center whenever the check-team label crowds it. 110 splits
+ * the remaining gap without overlapping either neighbor for every observed
+ * toolbar permutation, including the densest "reroll+cost+recycler+manage
+ * items+check team+lock" stack.
+ */
+const RECYCLER_BUTTON_X = 110;
 const OPTION_BUTTON_YPOSITION = -62;
 
 // ER: dedicated item-description box geometry. X/Y mirror the battle message text
@@ -30,8 +44,8 @@ const OPTION_BUTTON_YPOSITION = -62;
 // VISIBLE_H is the masked window height (~the message box's visible text area);
 // descriptions taller than this auto-scroll. Tunable if the clip looks off.
 const ITEM_DESC_X = 12;
-const ITEM_DESC_Y = -39;
-const ITEM_DESC_VISIBLE_H = 34;
+const ITEM_DESC_Y = -47;
+const ITEM_DESC_VISIBLE_H = 45;
 
 export class ModifierSelectUiHandler extends AwaitableUiHandler {
   private modifierContainer: Phaser.GameObjects.Container;
@@ -40,6 +54,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
   private transferButtonContainer: Phaser.GameObjects.Container;
   private checkButtonContainer: Phaser.GameObjects.Container;
   private continueButtonContainer: Phaser.GameObjects.Container;
+  private recyclerButtonContainer: Phaser.GameObjects.Container;
   private rerollCostText: Phaser.GameObjects.Text;
   private lockRarityButtonText: Phaser.GameObjects.Text;
   private moveInfoOverlay: MoveInfoOverlay;
@@ -52,6 +67,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
    */
   private itemDescText: Phaser.GameObjects.Text;
   private itemDescScroll: Phaser.Tweens.Tween | null = null;
+  private moodyRewardText: Phaser.GameObjects.Text;
   protected declare onActionInput: ModifierSelectCallback | null;
 
   private rowCursor = 0;
@@ -81,6 +97,15 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     this.modifierContainer = globalScene.add.container(0, 0);
     ui.add(this.modifierContainer);
+
+    this.moodyRewardText = addTextObject(12, -55, "", TextStyle.PARTY, {
+      fontSize: "28px",
+      fixedWidth: 286 * 6,
+      maxLines: 1,
+    })
+      .setOrigin(0, 0)
+      .setVisible(false);
+    this.modifierContainer.add(this.moodyRewardText);
 
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -130,6 +155,18 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.rerollCostText.setOrigin(0, 0);
     this.rerollCostText.setPositionRelative(rerollButtonText, rerollButtonText.displayWidth + 5, 1);
     this.rerollButtonContainer.add(this.rerollCostText);
+
+    this.recyclerButtonContainer = globalScene.add.container(RECYCLER_BUTTON_X, OPTION_BUTTON_YPOSITION);
+    this.recyclerButtonContainer.setName("recycler-btn").setVisible(false);
+    const recyclerButtonText = addTextObject(
+      -4,
+      -2,
+      i18next.t("modifierSelectUiHandler:recycle"),
+      TextStyle.PARTY,
+    ).setOrigin(0, 0);
+    recyclerButtonText.setName("text-recycler-btn");
+    this.recyclerButtonContainer.add(recyclerButtonText);
+    ui.add(this.recyclerButtonContainer);
 
     this.lockRarityButtonContainer = globalScene.add.container(16, OPTION_BUTTON_YPOSITION);
     this.lockRarityButtonContainer.setVisible(false);
@@ -254,6 +291,35 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.itemDescText.setVisible(false);
   }
 
+  private refreshMoodyRewardContext(slotCount: number): void {
+    const enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode;
+    const state = enabled ? getMoodyModeState() : null;
+    if (state == null || !this.player) {
+      this.moodyRewardText.setVisible(false);
+      return;
+    }
+    const effects = queryMoodySceneEffects({
+      reward: { slotIndex: 0, slotCount: Math.max(1, slotCount) },
+    });
+    const rewardBoons = state.boons.filter(boon => {
+      const kind = MOODY_BOON_BY_ID.get(boon.boonId)?.targetKind;
+      return !boon.dormant && (kind === "reward" || kind === "economy");
+    });
+    const effectParts: string[] = [];
+    if ((effects?.rewardRarityOffset ?? 0) !== 0) {
+      effectParts.push(`rarity ${effects!.rewardRarityOffset > 0 ? "+" : ""}${effects!.rewardRarityOffset}`);
+    }
+    if ((effects?.rewardQuantityMultiplier ?? 1) !== 1) {
+      effectParts.push(`quantity x${effects!.rewardQuantityMultiplier.toFixed(2)}`);
+    }
+    const names = rewardBoons
+      .slice(0, 2)
+      .map(boon => MOODY_BOON_BY_ID.get(boon.boonId)?.name ?? boon.boonId)
+      .join(" / ");
+    const text = [names, ...effectParts].filter(part => part.length > 0).join(" - ");
+    this.moodyRewardText.setText(text.length > 0 ? `MOOD: ${text}` : "").setVisible(text.length > 0);
+  }
+
   show(args: any[]): boolean {
     globalScene.disableMenu = false;
 
@@ -261,6 +327,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       if (args.length >= 3) {
         this.awaitingActionInput = true;
         this.onActionInput = args[2];
+      }
+      if (Array.isArray(args[1])) {
+        this.refreshMoodyRewardContext(args[1].length);
       }
       this.moveInfoOverlay.active = this.moveInfoOverlayActive;
       return false;
@@ -275,6 +344,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.getUi().clearText();
 
     this.player = args[0];
+    this.refreshMoodyRewardContext((args[1] as unknown[]).length);
 
     const partyHasHeldItem =
       this.player
@@ -295,6 +365,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     this.continueButtonContainer.setVisible(false);
     this.continueButtonContainer.setAlpha(0);
+
+    this.recyclerButtonContainer.setVisible(false);
+    this.recyclerButtonContainer.setAlpha(0);
 
     this.rerollButtonContainer.setPositionRelative(this.lockRarityButtonContainer, 0, canLockRarities ? -12 : 0);
 
@@ -360,7 +433,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
     /* Multiplies the appearance duration by the speed parameter so that it is always constant, and avoids "flashbangs" at game speed x5 */
     globalScene.showShopOverlay(750 * globalScene.gameSpeed);
-    globalScene.updateAndShowText(750);
+    globalScene.updateAndShowText(750, true);
     globalScene.updateBiomeWaveText();
     globalScene.updateMoneyText();
 
@@ -438,13 +511,21 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         this.checkButtonContainer.setAlpha(0);
         this.lockRarityButtonContainer.setAlpha(0);
         this.continueButtonContainer.setAlpha(0);
+        this.recyclerButtonContainer.setAlpha(0);
         this.rerollButtonContainer.setVisible(true);
         this.checkButtonContainer.setVisible(true);
         this.continueButtonContainer.setVisible(this.rerollCost < 0);
         this.lockRarityButtonContainer.setVisible(canLockRarities);
+        const recycler = getMoodyModeState()?.boons.find(
+          boon => boon.boonId === "recycler" && !boon.dormant && boon.progress?.flags?.recyclerUsedThisScreen !== true,
+        );
+        this.recyclerButtonContainer.setVisible(this.player && recycler != null && this.options.length > 1);
+        // Shift right of any on-screen reroll cost before fading in so the two
+        // labels never overlap for a single frame.
+        this.positionRecyclerButton();
 
         globalScene.tweens.add({
-          targets: [this.checkButtonContainer, this.continueButtonContainer],
+          targets: [this.checkButtonContainer, this.continueButtonContainer, this.recyclerButtonContainer],
           alpha: 1,
           duration: 250,
         });
@@ -563,33 +644,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           break;
         case Button.LEFT:
           if (!this.rowCursor) {
-            switch (this.cursor) {
-              case 0:
-                success = this.setCursor(2);
-                break;
-              case 1:
-                if (this.lockRarityButtonContainer.visible) {
-                  success = this.setCursor(3);
-                } else {
-                  success = this.rerollButtonContainer.visible && this.setCursor(0);
-                }
-                break;
-              case 2:
-                if (this.transferButtonContainer.visible) {
-                  success = this.setCursor(1);
-                } else if (this.rerollButtonContainer.visible) {
-                  success = this.setCursor(0);
-                } else {
-                  success = false;
-                }
-                break;
-              case 3:
-                if (this.lockRarityButtonContainer.visible) {
-                  success = this.setCursor(2);
-                } else {
-                  success = false;
-                }
-            }
+            success = this.moveToolbarCursor(-1);
           } else if (this.cursor) {
             success = this.setCursor(this.cursor - 1);
           } else if (this.rowCursor === 1 && this.options.length === 0) {
@@ -600,28 +655,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
           break;
         case Button.RIGHT:
           if (!this.rowCursor) {
-            switch (this.cursor) {
-              case 0:
-                if (this.transferButtonContainer.visible) {
-                  success = this.setCursor(1);
-                } else {
-                  success = this.setCursor(2);
-                }
-                break;
-              case 1:
-                success = this.setCursor(2);
-                break;
-              case 2:
-                success = this.setCursor(0);
-                break;
-              case 3:
-                if (this.transferButtonContainer.visible) {
-                  success = this.setCursor(1);
-                } else {
-                  success = this.setCursor(2);
-                }
-                break;
-            }
+            success = this.moveToolbarCursor(1);
           } else if (this.cursor < this.getRowItems(this.rowCursor) - 1) {
             success = this.setCursor(this.cursor + 1);
           } else if (this.rowCursor === 1 && this.options.length === 0) {
@@ -715,6 +749,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         OPTION_BUTTON_YPOSITION + 4,
       );
       ui.showText(i18next.t("modifierSelectUiHandler:checkTeamDesc"));
+    } else if (cursor === 4) {
+      this.cursorObj.setPosition(this.recyclerButtonContainer.x - 10, OPTION_BUTTON_YPOSITION + 4);
+      ui.showText("Destroy one reward offer and improve the remaining offers.");
     } else {
       this.cursorObj.setPosition(6, OPTION_BUTTON_YPOSITION + 4);
       ui.showText(i18next.t("modifierSelectUiHandler:lockRaritiesDesc"));
@@ -745,6 +782,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         if (newCursor === 1 && !this.transferButtonContainer.visible) {
           newCursor = 2;
         }
+        if (!this.toolbarCursorOrder().includes(newCursor)) {
+          newCursor = this.toolbarCursorOrder()[0] ?? 2;
+        }
       }
       // Allows to find lock rarity button when looping from the top
       if (rowCursor === 0 && lastRowCursor > 1 && newCursor === 0 && this.lockRarityButtonContainer.visible) {
@@ -762,15 +802,64 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     return false;
   }
 
+  /** Absolute cosmetic cursor checkpoint for the co-op reward-screen projector. */
+  getCoopMirrorCursorState(): readonly [rowCursor: number, cursor: number] | null {
+    return this.awaitingActionInput ? [this.rowCursor, this.cursor] : null;
+  }
+
+  /**
+   * Apply the owner's absolute cosmetic cursor checkpoint. Mechanics remain owned by the
+   * interaction commit; this only prevents account-local cursor preferences and nested-screen
+   * returns from giving the watcher a different visible starting point for later button replay.
+   */
+  applyCoopMirrorCursorState(state: readonly number[]): boolean {
+    if (!this.awaitingActionInput) {
+      return false;
+    }
+    const [rowCursor, cursor] = state;
+    const maxRow = this.shopOptionsRows.length + 1;
+    if (!Number.isSafeInteger(rowCursor) || !Number.isSafeInteger(cursor) || rowCursor < 0 || rowCursor > maxRow) {
+      return true;
+    }
+    const rowItems = rowCursor === 0 ? 5 : this.getRowItems(rowCursor);
+    if (cursor < 0 || cursor >= rowItems) {
+      return true;
+    }
+    if (this.rowCursor !== rowCursor) {
+      this.setRowCursor(rowCursor);
+    }
+    this.setCursor(cursor);
+    return true;
+  }
+
   private getRowItems(rowCursor: number): number {
     switch (rowCursor) {
       case 0:
-        return 3;
+        return 5;
       case 1:
         return this.options.length;
       default:
         return this.shopOptionsRows.at(-(rowCursor - 1))!.length;
     }
+  }
+
+  private toolbarCursorOrder(): number[] {
+    return [
+      ...(this.rerollButtonContainer.visible ? [0] : []),
+      ...(this.recyclerButtonContainer.visible ? [4] : []),
+      ...(this.transferButtonContainer.visible ? [1] : []),
+      ...(this.checkButtonContainer.visible ? [2] : []),
+      ...(this.lockRarityButtonContainer.visible ? [3] : []),
+    ];
+  }
+
+  private moveToolbarCursor(delta: -1 | 1): boolean {
+    const order = this.toolbarCursorOrder();
+    if (order.length < 2) {
+      return false;
+    }
+    const current = Math.max(0, order.indexOf(this.cursor));
+    return this.setCursor(order[(current + delta + order.length) % order.length]);
   }
 
   setRerollCost(rerollCost: number): void {
@@ -790,6 +879,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     const rerollDisabled = this.rerollCost < 0;
     if (rerollDisabled) {
       this.rerollCostText.setVisible(false);
+      this.positionRecyclerButton();
       return;
     }
     this.rerollCostText.setVisible(true);
@@ -800,6 +890,24 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     this.rerollCostText.setText(i18next.t("modifierSelectUiHandler:rerollCost", { formattedMoney }));
     this.rerollCostText.setColor(getTextColor(canReroll ? TextStyle.MONEY : TextStyle.PARTY_RED));
     this.rerollCostText.setShadowColor(getTextColor(canReroll ? TextStyle.MONEY : TextStyle.PARTY_RED, true));
+    this.positionRecyclerButton();
+  }
+
+  /**
+   * ER/Moody: keep the Recycler toolbar control clear of the reroll cost. The
+   * cost text only renders when the rarity lock hides it, so the Recycler
+   * anchor slides right whenever the cost string is actually on screen and
+   * back when it isn't; the same pass runs on visibility changes (show) and
+   * on language-independent size changes (updateRerollCostText).
+   */
+  private positionRecyclerButton(): void {
+    if (!this.recyclerButtonContainer) {
+      return;
+    }
+    const baseX = RECYCLER_BUTTON_X;
+    const costWidth = this.rerollCostText?.visible === true ? this.rerollCostText.displayWidth : 0;
+    const targetX = baseX + (costWidth > 0 ? costWidth + 8 : 0);
+    this.recyclerButtonContainer.setX(targetX);
   }
 
   updateLockRaritiesText(): void {
@@ -810,6 +918,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
 
   clear() {
     super.clear();
+    this.moodyRewardText?.setVisible(false);
 
     this.moveInfoOverlay.clear();
     this.moveInfoOverlayActive = false;
@@ -851,6 +960,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       this.checkButtonContainer,
       this.transferButtonContainer,
       this.lockRarityButtonContainer,
+      this.recyclerButtonContainer,
       this.continueButtonContainer,
     ].forEach(container => {
       if (container.visible) {

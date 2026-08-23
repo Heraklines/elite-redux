@@ -12,8 +12,10 @@ import { FreshStartChallenge } from "#data/challenge";
 import { allSpecies } from "#data/data-lists";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { ER_BLACK_SHINY_LUCK, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { ER_LILLIGANT_VERDANT_SPECIES_ID } from "#data/elite-redux/er-fakemon-pitch-species";
 import { ER_WEBBED_BRUISER_SPECIES_ID } from "#data/elite-redux/er-newcomer-species";
 import { resolveErSpeciesConstId } from "#data/elite-redux/er-type-nativization";
+import { pokemonFormChanges } from "#data/pokemon-forms";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { GameModes } from "#enums/game-modes";
@@ -25,7 +27,9 @@ import { GameManager } from "#test/framework/game-manager";
 import { generateStarters } from "#test/utils/game-manager-utils";
 import type { StarterAttributes } from "#types/save-data";
 import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
+import type { PokedexUiHandler } from "#ui/pokedex-ui-handler";
 import type { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
+import { speciesFormTypes } from "#ui/type-icon-strip";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -95,6 +99,20 @@ describe.skipIf(!RUN)("reported player UI regressions", () => {
 
     expect(internals.levelMoves.length).toBeGreaterThan(0);
     expect(internals.blockInput).toBe(false);
+  });
+
+  it("lists Verdant Lilligant in the Pokédex with its Water/Fairy/Ghost typing", async () => {
+    await game.runToTitle();
+    await game.scene.ui.setOverlayMode(UiMode.POKEDEX);
+    const handler = game.scene.ui.getHandler() as PokedexUiHandler;
+    const entries = (handler as unknown as { filteredPokemonData: { species: { speciesId: number } }[] })
+      .filteredPokemonData;
+    expect(entries.some(entry => entry.species.speciesId === ER_LILLIGANT_VERDANT_SPECIES_ID)).toBe(true);
+
+    const species = getPokemonSpecies(ER_LILLIGANT_VERDANT_SPECIES_ID as SpeciesId);
+    expect(speciesFormTypes(species)).toEqual([PokemonType.WATER, PokemonType.FAIRY, PokemonType.GHOST]);
+    expect(species.forms.some(form => form.formKey === "mega")).toBe(true);
+    expect(pokemonFormChanges[ER_LILLIGANT_VERDANT_SPECIES_ID]?.some(change => change.formKey === "mega")).toBe(true);
   });
 
   it("opens Webbed Bruiser's real Egg Moves menu with all four moves", async () => {
@@ -186,7 +204,7 @@ describe.skipIf(!RUN)("reported player UI regressions", () => {
     starters[0].erBlackShiny = true;
 
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    new SelectStarterPhase().initBattle(starters);
+    new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     await game.phaseInterceptor.to("EncounterPhase");
 
     const pokemon = game.scene.getPlayerParty()[0];

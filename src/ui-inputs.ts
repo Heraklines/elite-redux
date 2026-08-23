@@ -1,13 +1,16 @@
 import { globalScene } from "#app/global-scene";
 import type { InputsController } from "#app/inputs-controller";
 import { isDev } from "#constants/app-constants";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { Setting, SettingKeys, settingIndex } from "#system/settings";
 import { CommandUiHandler } from "#ui/command-ui-handler";
+import { openErMapOverlay } from "#ui/er-map-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
 import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
+import { MoodyLedgerUiHandler } from "#ui/moody-ledger-ui-handler";
 import { PartyUiHandler } from "#ui/party-ui-handler";
 import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokedexUiHandler } from "#ui/pokedex-ui-handler";
@@ -24,6 +27,16 @@ import { SummaryUiHandler } from "#ui/summary-ui-handler";
 import Phaser from "phaser";
 
 type ActionKeys = Record<Button, () => void>;
+
+export function mapMoodyLedgerCycleButton(button: Button): Button {
+  if (button === Button.CYCLE_FORM) {
+    return Button.CYCLE_ABILITY;
+  }
+  if (button === Button.CYCLE_SHINY) {
+    return Button.CYCLE_FORM;
+  }
+  return button;
+}
 
 export class UiInputs {
   private events: Phaser.Events.EventEmitter;
@@ -239,6 +252,17 @@ export class UiInputs {
         // controller, and the mobile virtual pad instead of opening or swallowing the pause menu.
         globalScene.ui.processInput(Button.MENU);
         break;
+      case UiMode.SETTINGS:
+      case UiMode.SETTINGS_DISPLAY:
+      case UiMode.SETTINGS_AUDIO:
+      case UiMode.SETTINGS_GAMEPAD:
+      case UiMode.SETTINGS_KEYBOARD:
+        // Escape opened this local pause-menu branch, so it must also be able to leave it. Route through
+        // the settings handler's ordinary CANCEL path (navigation reset + mode-chain revert) instead of
+        // bypassing handler cleanup. In co-op the provenance-checked local-overlay lease in UI keeps this
+        // input actionable without releasing or relaying the shared interaction underneath the menu.
+        globalScene.ui.processInput(Button.CANCEL);
+        break;
       case UiMode.MENU:
         globalScene.ui.revertMode();
         globalScene.playSound("ui/select");
@@ -249,6 +273,26 @@ export class UiInputs {
   }
 
   buttonCycleOption(button: Button): void {
+    const uiHandler = globalScene.ui?.getHandler();
+    if (button === Button.CYCLE_SHINY && globalScene.ui?.getMode() === UiMode.COMMAND) {
+      openErMapOverlay();
+      return;
+    }
+    if (
+      button === Button.CYCLE_GENDER
+      && globalScene.gameMode?.isFun === true
+      && getFunModeConfig().moodyMode
+      && [UiMode.MESSAGE, UiMode.COMMAND, UiMode.FIGHT, UiMode.BALL, UiMode.TARGET_SELECT].includes(
+        globalScene.ui.getMode(),
+      )
+    ) {
+      globalScene.ui.toggleMoodyTriggerFeed();
+      return;
+    }
+    if (uiHandler instanceof MoodyLedgerUiHandler) {
+      globalScene.ui.processInput(mapMoodyLedgerCycleButton(button));
+      return;
+    }
     const whitelist = [
       // ER (#356): the fight menu's right panel cycles STATS → DESCRIPTION →
       // DMG CALC on CYCLE_SHINY (R / RB). Without this entry the button was
@@ -288,7 +332,6 @@ export class UiInputs {
       SettingsGamepadUiHandler,
       SettingsKeyboardUiHandler,
     ];
-    const uiHandler = globalScene.ui?.getHandler();
     if (whitelist.some(handler => uiHandler instanceof handler)) {
       globalScene.ui.processInput(button);
     } else if (button === Button.CYCLE_TERA) {

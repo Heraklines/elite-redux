@@ -18,6 +18,7 @@ import {
   coopHostEngineDialogueMessageAdvanceAllowed,
   coopHostMeNarrationAwaitingGuestAck,
   coopHostStreamMeMessage,
+  coopMePostBattleContinuationActive,
   getCoopBattleStreamer,
   getCoopController,
   getCoopMePump,
@@ -30,10 +31,15 @@ import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 // #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
 import {
   coopAuthorityContinuationSurface,
+  coopLocalOverlayInputAllowed,
   coopUiClassOf,
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
 import { beginCoopUiRelayInput, endCoopUiRelayInput } from "#data/elite-redux/coop/coop-ui-relay-trace";
+import { type ErEndlessActiveRift, getErEndlessRiftDefinition } from "#data/elite-redux/er-endless-continuation";
+import { type MoodyEffectFlyoutCue, shouldShowMoodyEffectFlyout } from "#data/elite-redux/moody/moody-effect-flyout";
+import { getMoodyModeState, MOODY_CURSE_BY_ID } from "#data/elite-redux/moody/moody-state";
+import type { MoodyCurseInstance } from "#data/elite-redux/moody/moody-types";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -60,6 +66,7 @@ import { EggGachaUiHandler } from "#ui/egg-gacha-ui-handler";
 import { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
 import { EggListUiHandler } from "#ui/egg-list-ui-handler";
 import { EggSummaryUiHandler } from "#ui/egg-summary-ui-handler";
+import { EndlessRiftLedgerUiHandler } from "#ui/endless-rift-ledger-ui-handler";
 import { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
 import { ErChallengeTextInputUiHandler } from "#ui/er-challenge-text-input-ui-handler";
 import { ErMapPickerUiHandler } from "#ui/er-map-picker-ui-handler";
@@ -68,9 +75,11 @@ import { ErQuizUiHandler } from "#ui/er-quiz-ui-handler";
 import { ErShinyLabUiHandler } from "#ui/er-shiny-lab-ui-handler";
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
+import { FunModeSelectUiHandler } from "#ui/fun-mode-select-ui-handler";
 import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
 import { GamepadBindingUiHandler } from "#ui/gamepad-binding-ui-handler";
 import { GhostTrainerEditorUiHandler } from "#ui/ghost-trainer-editor-ui-handler";
+import { FunAbilityReviewUiHandler } from "#ui/handlers/fun-ability-review-ui-handler";
 import { KeyboardBindingUiHandler } from "#ui/keyboard-binding-ui-handler";
 import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import { LlmDirectorThemePickerUiHandler } from "#ui/llm-director-theme-picker-ui-handler";
@@ -80,6 +89,30 @@ import { LoginOrRegisterUiHandler } from "#ui/login-or-register-ui-handler";
 import { MenuUiHandler } from "#ui/menu-ui-handler";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
+import type { MoodyBattleHudModel } from "#ui/moody/moody-battle-hud";
+import { MoodyChoiceUiHandler } from "#ui/moody/moody-choice-ui-handler";
+import { MoodyCurseSelectUiHandler } from "#ui/moody/moody-curse-select-ui-handler";
+import { MoodyEnemyPanelUiHandler } from "#ui/moody/moody-enemy-panel-ui-handler";
+import {
+  buildMoodyDetailedRecapSections,
+  getMoodyLivePresentationSnapshot,
+  type MoodyLivePresentationSnapshot,
+  setMoodyLivePresentationSnapshot,
+} from "#ui/moody/moody-live-presentation";
+import type { MoodyOperationModel, MoodyOperationResult } from "#ui/moody/moody-operation";
+import {
+  buildMoodyRecapRows,
+  MOODY_DREAD_LABEL,
+  type MoodyChoicePanelModel,
+  type MoodyTargetPickerModel,
+  type MoodyTransitionSection,
+} from "#ui/moody/moody-presentation";
+import { MoodyRuntimeUi } from "#ui/moody/moody-runtime-ui";
+import type { MoodySectionReportConfig } from "#ui/moody/moody-section-report-ui-handler";
+import { MoodySectionReportUiHandler } from "#ui/moody/moody-section-report-ui-handler";
+import { MoodyTargetPickerUiHandler } from "#ui/moody/moody-target-picker-ui-handler";
+import { MoodyBoonSelectUiHandler } from "#ui/moody-boon-select-ui-handler";
+import { MoodyLedgerUiHandler } from "#ui/moody-ledger-ui-handler";
 import { MysteryEncounterUiHandler } from "#ui/mystery-encounter-ui-handler";
 import { NavigationManager } from "#ui/navigation-menu";
 import { OptionSelectUiHandler } from "#ui/option-select-ui-handler";
@@ -115,7 +148,6 @@ import { TournamentListUiHandler } from "#ui/tournament-list-ui-handler";
 import type { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { UnavailableModalUiHandler } from "#ui/unavailable-modal-ui-handler";
-import { executeIf } from "#utils/common";
 import i18next from "i18next";
 import { AdminUiHandler } from "./handlers/admin-ui-handler";
 import { RenameRunFormUiHandler } from "./handlers/rename-run-ui-handler";
@@ -132,7 +164,17 @@ const transitionModes = [
   UiMode.POKEDEX,
   UiMode.POKEDEX_PAGE,
   UiMode.CHALLENGE_SELECT,
+  UiMode.FUN_MODE_SELECT,
+  UiMode.FUN_ABILITY_REVIEW,
+  UiMode.ENDLESS_RIFT_LEDGER,
   UiMode.RUN_HISTORY,
+  // Moody Mode screens are full-screen reward/ledger surfaces: fade in/out like the
+  // other full-screen transition modes.
+  UiMode.MOODY_BOON_SELECT,
+  UiMode.MOODY_LEDGER,
+  UiMode.MOODY_CURSE_SELECT,
+  UiMode.MOODY_ENEMY_PANEL,
+  UiMode.MOODY_SECTION_REPORT,
 ];
 
 const noTransitionModes = [
@@ -200,6 +242,13 @@ export class UI extends Phaser.GameObjects.Container {
   public achvBar: AchvBar;
   public bgmBar: BgmBar;
   public savingIcon: SavingIconContainer;
+  private moodyRuntimeUi: MoodyRuntimeUi | null = null;
+  private readonly refreshMoodyRuntime = () => this.moodyRuntimeUi?.refresh(this.mode);
+  private readonly moodyChoiceQueue: {
+    model: MoodyChoicePanelModel;
+    resolve: (optionId: string | null) => void;
+  }[] = [];
+  private moodyChoiceOpen = false;
 
   private tooltipContainer: Phaser.GameObjects.Container;
   private tooltipBg: Phaser.GameObjects.NineSlice;
@@ -292,6 +341,16 @@ export class UI extends Phaser.GameObjects.Container {
       new TournamentListUiHandler(),
       new TournamentBracketUiHandler(),
       new ShowdownSyncCommandUiHandler(),
+      new FunModeSelectUiHandler(),
+      new FunAbilityReviewUiHandler(),
+      new EndlessRiftLedgerUiHandler(),
+      new MoodyBoonSelectUiHandler(),
+      new MoodyLedgerUiHandler(),
+      new MoodyCurseSelectUiHandler(),
+      new MoodyTargetPickerUiHandler(),
+      new MoodyChoiceUiHandler(),
+      new MoodyEnemyPanelUiHandler(),
+      new MoodySectionReportUiHandler(),
     ];
   }
 
@@ -316,6 +375,173 @@ export class UI extends Phaser.GameObjects.Container {
     this.savingIcon.setup();
 
     globalScene.uiContainer.add(this.savingIcon);
+
+    this.moodyRuntimeUi = new MoodyRuntimeUi();
+    globalScene.events.on(Phaser.Scenes.Events.UPDATE, this.refreshMoodyRuntime);
+  }
+
+  /** Push one ordered, non-modal Moody activation row into the live battle feed. */
+  public pushMoodyTrigger(label: string, cue?: MoodyEffectFlyoutCue): void {
+    this.moodyRuntimeUi?.pushTrigger(label);
+    if (cue != null && shouldShowMoodyEffectFlyout(cue.effectId)) {
+      globalScene.phaseManager.queueMoodyEffectDisplay(cue);
+    }
+  }
+
+  /** Keyboard/controller/mobile callers share the same expansion state as tapping the feed. */
+  public toggleMoodyTriggerFeed(): void {
+    this.moodyRuntimeUi?.toggleTriggerFeed();
+  }
+
+  /** Open the mirrored current-enemy boon drawer from the command grid or its touch tab. */
+  public toggleMoodyEnemyFeed(): void {
+    this.moodyRuntimeUi?.toggleEnemyFeed();
+  }
+
+  /** Mechanics-owned decisions may provide exact rule/tracker/HP state here. */
+  public setMoodyBattleHudModel(model: MoodyBattleHudModel | null): void {
+    this.moodyRuntimeUi?.setModel(model);
+    this.moodyRuntimeUi?.refresh(this.mode);
+  }
+
+  /** Replace the mechanics-owned presentation projection consumed by all Moody UI surfaces. */
+  public setMoodyLivePresentation(snapshot: MoodyLivePresentationSnapshot | null): void {
+    setMoodyLivePresentationSnapshot(snapshot);
+    this.moodyRuntimeUi?.refresh(this.mode);
+  }
+
+  /**
+   * Queue a mechanics-owned contextual decision. Only one modal is opened at a
+   * time; the next decision is presented after the prior handler has reverted.
+   */
+  public requestMoodyChoice(model: MoodyChoicePanelModel): Promise<string | null> {
+    return new Promise(resolve => {
+      this.moodyChoiceQueue.push({ model, resolve });
+      this.openNextMoodyChoice();
+    });
+  }
+
+  private openNextMoodyChoice(): void {
+    if (this.moodyChoiceOpen) {
+      return;
+    }
+    const request = this.moodyChoiceQueue.shift();
+    if (request == null) {
+      return;
+    }
+    this.moodyChoiceOpen = true;
+    void this.setOverlayMode(UiMode.MOODY_CHOICE, request.model, (optionId: string | null) => {
+      this.moodyChoiceOpen = false;
+      request.resolve(optionId);
+      this.openNextMoodyChoice();
+    });
+  }
+
+  /** Open the reusable binding picker against live mechanics-supplied targets. */
+  public requestMoodyTarget(model: MoodyTargetPickerModel): Promise<number | string | null> {
+    return new Promise(resolve => {
+      void this.setOverlayMode(UiMode.MOODY_TARGET_PICKER, model, resolve);
+    });
+  }
+
+  /** Production entry point for interactive Moody reward, contract, market, inheritance, and planning flows. */
+  public requestMoodyOperation(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return new Promise(resolve => {
+      void this.setOverlayMode(UiMode.MOODY_CHOICE, model, resolve);
+    });
+  }
+
+  public requestMoodyRecycler(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "recycler" });
+  }
+
+  public requestMoodyLegacySlot(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "legacy" });
+  }
+
+  public requestMoodyBloodMarket(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "blood-market" });
+  }
+
+  public requestMoodyPressureValve(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "pressure-valve" });
+  }
+
+  public requestMoodyItemStackAttachment(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "item-stack" });
+  }
+
+  /** Open a paged report and resolve after the player confirms or closes it. */
+  public showMoodyReport(config: Omit<MoodySectionReportConfig, "onAction">): Promise<"confirm" | "cancel"> {
+    return new Promise(resolve => {
+      void this.setOverlayMode(UiMode.MOODY_SECTION_REPORT, { ...config, onAction: resolve }).catch(() =>
+        resolve("cancel"),
+      );
+    });
+  }
+
+  /** Reveal the deterministic post-draft curse before battle flow resumes. */
+  public showMoodyCurseReceived(curse: MoodyCurseInstance): Promise<"confirm" | "cancel"> {
+    const definition = MOODY_CURSE_BY_ID.get(curse.curseId);
+    const targetSlot = curse.target?.partySlots?.[0];
+    const lines = [
+      definition?.description ?? "No description available.",
+      ...(targetSlot == null ? [] : [`Bound to party slot ${targetSlot + 1}.`]),
+    ];
+    return this.showMoodyReport({
+      title: "CURSE RECEIVED",
+      sections: [
+        {
+          title: `${definition == null ? "DREAD ?" : MOODY_DREAD_LABEL[definition.dread]} - ${definition?.name ?? curse.curseId}`,
+          lines,
+        },
+      ],
+      confirmLabel: "CONTINUE",
+      requireConfirm: true,
+    });
+  }
+
+  /** Reuse the curse-received report surface for a newly acquired Endless Rift. */
+  public showEndlessRiftReceived(rift: ErEndlessActiveRift): Promise<"confirm" | "cancel"> {
+    const definition = getErEndlessRiftDefinition(rift.id);
+    return this.showMoodyReport({
+      title: "RIFT RECEIVED",
+      sections: [
+        {
+          title: `${definition?.category === "pressure" ? "PRESSURE" : "MUTATION"} - ${definition?.name ?? rift.id}`,
+          lines: [
+            definition?.description ?? "No description available.",
+            `Duration: ${rift.pulsesRemaining} Rift pulse${rift.pulsesRemaining === 1 ? "" : "s"}.`,
+          ],
+        },
+      ],
+      confirmLabel: "CONTINUE",
+      requireConfirm: true,
+    });
+  }
+
+  public showMoodyBorrowedFuture(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "borrowed-future", reorderable: true });
+  }
+
+  public showMoodyBountyBoard(model: MoodyOperationModel): Promise<MoodyOperationResult> {
+    return this.requestMoodyOperation({ ...model, kind: "bounty" });
+  }
+
+  public showMoodyBiomeReport(sections: readonly MoodyTransitionSection[]): Promise<"confirm" | "cancel"> {
+    return this.showMoodyReport({ title: "BIOME REPORT", sections });
+  }
+
+  /** End-run entry point; mechanics provides the final seed label at GameOver. */
+  public showMoodyRunRecap(seedLabel: string): Promise<"confirm" | "cancel"> {
+    const state = getMoodyModeState();
+    const rows = state == null ? [] : buildMoodyRecapRows(state, seedLabel);
+    const baseSections: MoodyTransitionSection[] = [{ title: "Final build", lines: rows.map(row => row.label) }];
+    return this.showMoodyReport({
+      title: "MOODY RUN RECAP",
+      sections: buildMoodyDetailedRecapSections(baseSections, getMoodyLivePresentationSnapshot()?.recap),
+      footer: "UP DOWN page   A continue",
+    });
   }
 
   private setupTooltip() {
@@ -369,9 +595,7 @@ export class UI extends Phaser.GameObjects.Container {
    * @returns true if the input attempt succeeds
    */
   processInput(button: Button): boolean {
-    // #player-telemetry: emit the raw input as a compact code + surface context. No listener unless a
-    // telemetry build subscribed, so this is behavior-preserving.
-    this.emit("er-telemetry-input", button, this.mode);
+    this.moodyRuntimeUi?.refresh(this.mode);
     const coopUiInputId = beginCoopUiRelayInput(this.mode);
     try {
       return this.processInputCoopAware(button);
@@ -420,6 +644,7 @@ export class UI extends Phaser.GameObjects.Container {
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        mePostBattleContinuationActive: coopMePostBattleContinuationActive(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       });
       // Registered presentation prompts belong to each browser independently. They do not choose
@@ -430,7 +655,16 @@ export class UI extends Phaser.GameObjects.Container {
         globalScene.phaseManager.getCurrentPhase()?.phaseName,
         UiMode[this.mode],
       );
-      if (isCoopV2InteractionHumanInputFrozen() && !hostEngineDialogueAdvance && !localPresentationInput) {
+      // Pause/settings are per-client overlays: they neither choose nor release the exact shared control
+      // underneath them. Keep those inputs local and actionable, but require MENU ancestry for nested generic
+      // chrome so a mechanically authoritative CONFIRM/OPTION_SELECT cannot inherit this exemption by mode.
+      const localOverlayInput = coopLocalOverlayInputAllowed(this.mode, this.modeChain);
+      if (
+        isCoopV2InteractionHumanInputFrozen()
+        && !hostEngineDialogueAdvance
+        && !localPresentationInput
+        && !localOverlayInput
+      ) {
         return false;
       }
       // The exact narration lease owns every host MESSAGE surface until the remote owner dismisses
@@ -499,7 +733,11 @@ export class UI extends Phaser.GameObjects.Container {
         // arg is the watcher's resync barrier and must be the PRE-press mode.
         const modeBefore = this.mode;
         const result = this.processInputInner(button); // OWNER: drive locally...
-        mirror.relayOwnerButton(button, modeBefore); // ...then relay the cursor for the partner
+        // A button rejected while the owner's handler is still animating changed no local cursor.
+        // Relaying it anyway would make the watcher apply an action the owner never consumed.
+        if (result) {
+          mirror.relayOwnerButton(button, modeBefore); // ...then relay the consumed cursor for the partner
+        }
         return result;
       }
     }
@@ -557,6 +795,7 @@ export class UI extends Phaser.GameObjects.Container {
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        mePostBattleContinuationActive: coopMePostBattleContinuationActive(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       })
       || !this.coopMeReady()
@@ -570,6 +809,10 @@ export class UI extends Phaser.GameObjects.Container {
   private processInputInner(button: Button): boolean {
     if (this.overlayActive) {
       return false;
+    }
+
+    if (this.moodyRuntimeUi?.processInput(button, this.mode)) {
+      return true;
     }
 
     const handler = this.getHandler();
@@ -586,7 +829,18 @@ export class UI extends Phaser.GameObjects.Container {
     if (this._coopMirrorEngine == null) {
       this._coopMirrorEngine = {
         getMode: () => this.mode,
+        // Preserve the handler's readiness verdict. A CPU-dilated watcher can still be rendering
+        // the reward animation after the owner becomes actionable; the mirror retains and retries
+        // that exact cosmetic FIFO input instead of permanently losing the cursor edge.
         applyButton: (b: Button) => this.processInputInner(b),
+        captureState: () => {
+          const handler = this.getHandler();
+          return handler instanceof ModifierSelectUiHandler ? handler.getCoopMirrorCursorState() : null;
+        },
+        applyState: state => {
+          const handler = this.getHandler();
+          return handler instanceof ModifierSelectUiHandler ? handler.applyCoopMirrorCursorState(state) : true;
+        },
       };
     }
     return this._coopMirrorEngine;
@@ -631,7 +885,11 @@ export class UI extends Phaser.GameObjects.Container {
       // CoopReplayMePhase renders it. Hard-gated (coopMeInProgress() false in solo / outside an ME;
       // coopHostStreamMeMessage no-ops off the live authoritative host), so solo / lockstep / guest
       // are byte-identical. Streamed at the terminal render (not the `$`-page-split recursion above).
-      if (globalScene.gameMode.isCoop && coopMeInProgress() && !coopMeHandoffBattleStarted()) {
+      if (
+        globalScene.gameMode.isCoop
+        && coopMeInProgress()
+        && (!coopMeHandoffBattleStarted() || coopMePostBattleContinuationActive())
+      ) {
         if (isCoopDebug()) {
           coopLog("me", "ui: host streams ME narration (showText)", { len: text.length, preview: text.slice(0, 40) });
         }
@@ -687,7 +945,11 @@ export class UI extends Phaser.GameObjects.Container {
       const handler = this.getHandler();
       // Co-op AUTHORITATIVE host (#633, ADD-3): stream the resolved ME dialogue line to the guest.
       // Same hard gate as showText - byte-identical in solo / lockstep / off the authoritative host.
-      if (globalScene.gameMode.isCoop && coopMeInProgress() && !coopMeHandoffBattleStarted()) {
+      if (
+        globalScene.gameMode.isCoop
+        && coopMeInProgress()
+        && (!coopMeHandoffBattleStarted() || coopMePostBattleContinuationActive())
+      ) {
         if (isCoopDebug()) {
           coopLog("me", "ui: host streams ME narration (showDialogue)", {
             len: text.length,
@@ -948,7 +1210,7 @@ export class UI extends Phaser.GameObjects.Container {
           if (clear) {
             this.getHandler().clear();
           }
-          if (chainMode && this.mode && !clear) {
+          if (chainMode && !clear) {
             this.modeChain.push(this.mode);
             globalScene.updateGameInfo();
           }
@@ -957,9 +1219,6 @@ export class UI extends Phaser.GameObjects.Container {
           if (touchControls) {
             touchControls.dataset.uiMode = UiMode[mode];
           }
-          // #player-telemetry: emit the surface-open at the single mode chokepoint (UI is a Phaser
-          // EventEmitter). No listener unless a telemetry build subscribed, so this is behavior-preserving.
-          this.emit("er-telemetry-surface", mode, args);
           this.getHandler().show(args);
           this.coopAuthoritySurfaceReady(mode);
         }
@@ -1260,13 +1519,12 @@ export class UI extends Phaser.GameObjects.Container {
     });
   }
 
-  revertModes(): Promise<void> {
-    return new Promise<void>(resolve => {
-      if (this?.modeChain?.length === 0) {
-        return resolve();
+  async revertModes(): Promise<void> {
+    while (this.modeChain.length > 0) {
+      if (!(await this.revertMode())) {
+        break;
       }
-      this.revertMode().then(success => executeIf(success, this.revertModes).then(() => resolve()));
-    });
+    }
   }
 
   public getModeChain(): UiMode[] {
@@ -1293,6 +1551,11 @@ export class UI extends Phaser.GameObjects.Container {
    * and clears menus from {@linkcode NavigationManager} to prepare for reset
    */
   public freeUIData(): void {
+    globalScene.events.off(Phaser.Scenes.Events.UPDATE, this.refreshMoodyRuntime);
+    this.moodyRuntimeUi?.destroy();
+    this.moodyRuntimeUi = null;
+    this.moodyChoiceQueue.splice(0);
+    this.moodyChoiceOpen = false;
     this.handlers.forEach(h => h.destroy());
     this.handlers = [];
     NavigationManager.getInstance().clearNavigationMenus();

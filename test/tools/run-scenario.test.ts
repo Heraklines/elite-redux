@@ -136,6 +136,17 @@ import {
 } from "#data/elite-redux/ai/combat-tree-model";
 import { getErPendingNodes, resetErRouting, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import { getFunModeConfig, resetFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { MOODY_BOONS, MOODY_CURSES } from "#data/elite-redux/moody/moody-catalog.generated";
+import { resetMoodyEnemyBoonLoadout, setMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
+import { queryMoodySceneEffects } from "#data/elite-redux/moody/moody-scene-adapter";
+import {
+  createMoodyModeState,
+  getMoodyModeSaveData,
+  resetMoodyModeState,
+  restoreMoodyModeState,
+} from "#data/elite-redux/moody/moody-state";
+import type { MoodyBoonInstance } from "#data/elite-redux/moody/moody-types";
 import {
   clearTournamentMatchContext,
   isTournamentMatch,
@@ -1887,7 +1898,7 @@ async function launchScenario(
     if (scenario.onPartyReady) {
       setPendingDevPartySetup(scenario.onPartyReady);
     }
-    ssp.initBattle(starters, true);
+    ssp.initBattleFromCurrentPhase(starters, true);
     postLaunch();
   });
   await game.phaseInterceptor.to("EncounterPhase");
@@ -4309,7 +4320,8 @@ async function playCombatBatch(phaserGame: Phaser.Game, batch: CombatBatchInput)
   console.log(`BATCH RESULT ${JSON.stringify(summary)}`);
 }
 
-const RUN = (!!SPEC || !!COMBAT_BATCH) && process.env.ER_SCENARIO === "1";
+const MOODY_AUDIT = process.env.ER_RUN_MOODY_AUDIT === "1";
+const RUN = (!!SPEC || !!COMBAT_BATCH) && process.env.ER_SCENARIO === "1" && !MOODY_AUDIT;
 
 describe.skipIf(!RUN)("headless scenario runner", () => {
   let phaserGame: Phaser.Game;
@@ -4466,6 +4478,159 @@ describe.skipIf(!RUN)("headless scenario runner", () => {
       expect(SPEC).toBeTruthy();
     }
   }, RUN_TEST_TIMEOUT_MS);
+});
+
+const MOODY_EDITORIAL_COPY = [
+  /\bimplementation(?: status| detail)?\b/i,
+  /\bimplemented\b/i,
+  /\bcorrection text\b/i,
+  /\bscreenshot wording\b/i,
+  /\bdesigner note\b/i,
+  /\bdeveloper note\b/i,
+  /\bplayer-facing\b/i,
+  /\bmust be displayed(?: prominently)?\b/i,
+  /\bneeds an explicit .* adapter\b/i,
+  /\brequires a properly audited\b/i,
+  /\bmust prove basic feasibility\b/i,
+  /\bcontent remains blocked\b/i,
+  /\bauthored set\b/i,
+  /\bauthoritative rng\b/i,
+] as const;
+
+function moodyBranches(): MoodyBoonInstance[] {
+  return MOODY_BOONS.flatMap(boon => [
+    { instanceId: `${boon.id}:base`, boonId: boon.id, rank: 1 as const, acquiredAtWave: 10 },
+    { instanceId: `${boon.id}:rank-two`, boonId: boon.id, rank: 2 as const, acquiredAtWave: 20 },
+    ...boon.evolutions.map((evolution, index) => ({
+      instanceId: `${boon.id}:${evolution.id}`,
+      boonId: boon.id,
+      rank: 3 as const,
+      evolutionId: evolution.id,
+      acquiredAtWave: 30 + index * 10,
+    })),
+  ]);
+}
+
+describe.skipIf(!MOODY_AUDIT)("headless scenario runner - exhaustive Moody audit", () => {
+  let phaserGame: Phaser.Game;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  it("boots the real game, verifies every boon branch and curse, both ownership paths, save wire, and player copy", async () => {
+    const game = await launchScenario(phaserGame, DEMO_SPEC, { noMiss: true, noCrit: true });
+    game.scene.gameMode = getGameMode(GameModes.FUN);
+    setFunModeConfig({
+      ...getFunModeConfig(),
+      randomizePokemon: false,
+      randomizeTypes: false,
+      randomizeAbilities: false,
+      randomizeLevelUpMoves: false,
+      moodyMode: true,
+    });
+    const player = game.scene.getPlayerField()[0];
+    const enemy = game.scene.getEnemyField()[0];
+    const branches = moodyBranches();
+    const expectedBranches = MOODY_BOONS.reduce((sum, boon) => sum + 2 + boon.evolutions.length, 0);
+    expect(branches).toHaveLength(expectedBranches);
+
+    for (const branch of branches) {
+      const state = createMoodyModeState(`cli:${branch.instanceId}`);
+      state.boons = [
+        {
+          ...branch,
+          target: {
+            pokemonIds: [player.id],
+            partySlots: [0],
+            moveIds: [MoveId.TACKLE],
+            itemTypeIds: ["LEFTOVERS"],
+            option: branch.boonId === "set-collector" ? "complete-nutrition" : "cli-audit",
+          },
+          progress: { counters: { triggers: 2 }, flags: { primed: true }, values: { multiplier: 1.25 } },
+        },
+      ];
+      state.curses = MOODY_CURSES.map(curse => ({
+        curseId: curse.id,
+        acquiredAtWave: curse.number * 10,
+        progress: { counters: { triggers: curse.number }, flags: { active: true }, values: { multiplier: 1.1 } },
+      }));
+      expect(restoreMoodyModeState(JSON.parse(JSON.stringify(state))), branch.instanceId).toBe(true);
+      expect(getMoodyModeSaveData()?.boons[0], branch.instanceId).toEqual(state.boons[0]);
+      expect(getMoodyModeSaveData()?.curses, branch.instanceId).toEqual(state.curses);
+    }
+
+    const ownership = createMoodyModeState("cli:ownership");
+    ownership.boons = [
+      {
+        instanceId: "player:crowned-vanguard",
+        boonId: "crowned-vanguard",
+        rank: 1,
+        target: { pokemonIds: [player.id], partySlots: [0] },
+        acquiredAtWave: 10,
+      },
+    ];
+    expect(restoreMoodyModeState(ownership)).toBe(true);
+    setMoodyEnemyBoonLoadout({
+      waveIndex: game.scene.currentBattle.waveIndex,
+      boons: [
+        {
+          instanceId: "enemy:crowned-vanguard",
+          boonId: "crowned-vanguard",
+          rank: 1,
+          target: { pokemonIds: [enemy.id], partySlots: [0] },
+          acquiredAtWave: 10,
+        },
+      ],
+    });
+    expect(
+      queryMoodySceneEffects({
+        actor: player,
+        target: enemy,
+        move: player.getMoveset()[0].getMove(),
+        flags: { firstDamagingMove: true },
+      })?.priorityDelta,
+    ).toBe(1);
+    expect(
+      queryMoodySceneEffects({
+        actor: enemy,
+        target: player,
+        move: enemy.getMoveset()[0].getMove(),
+        flags: { firstDamagingMove: true },
+      })?.priorityDelta,
+    ).toBe(1);
+    const serialized = JSON.stringify(game.scene.gameData.getSessionSaveData());
+    const parsed = game.scene.gameData.parseSessionData(serialized);
+    expect(parsed.funModeConfig?.moodyMode).toBe(true);
+    expect(parsed.moodyModeState).toEqual(getMoodyModeSaveData());
+
+    const fields = [
+      ...MOODY_BOONS.flatMap(
+        boon =>
+          [
+            [`${boon.id}.scope`, boon.scope],
+            [`${boon.id}.base`, boon.base],
+            [`${boon.id}.rankTwo`, boon.rankTwo],
+            [`${boon.id}.fullDescription`, boon.fullDescription],
+            ...boon.evolutions.map(evolution => [`${boon.id}.${evolution.id}`, evolution.description]),
+          ] as const,
+      ),
+      ...MOODY_CURSES.map(curse => [`${curse.id}.description`, curse.description] as const),
+    ];
+    for (const [field, copy] of fields) {
+      expect(copy.trim().length, field).toBeGreaterThan(0);
+      for (const forbidden of MOODY_EDITORIAL_COPY) {
+        expect(copy, `${field} contains ${forbidden}`).not.toMatch(forbidden);
+      }
+    }
+
+    console.log(
+      `MOODY AUDIT PASS: ${MOODY_BOONS.length} boons, ${branches.length} boon branches, ${MOODY_CURSES.length} curses`,
+    );
+    resetMoodyEnemyBoonLoadout();
+    resetMoodyModeState();
+    resetFunModeConfig();
+  }, 1_200_000);
 });
 
 /** Whether the spec opts into any full-run behaviour (so the autopilot path is taken). */

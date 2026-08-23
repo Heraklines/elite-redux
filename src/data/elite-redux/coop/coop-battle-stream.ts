@@ -125,6 +125,12 @@ export interface CoopTurnBoundaryIdentity {
   /** True only for a battle spawned inside a retained Mystery encounter transaction. */
   readonly mysteryBattle: boolean;
   /**
+   * The authority has finished the last executable turn of Fun and Games and its next TurnInit will close
+   * the minigame through ME_TERMINAL. The enemy intentionally survives, so party state alone would wrongly
+   * advertise another command frontier.
+   */
+  readonly mysteryTerminalAfterTurn?: boolean;
+  /**
    * A normal wave transition already staged by the runtime while this material turn was still recording.
    *
    * This is stronger evidence than the captured party/field image: a double battle can transiently retain
@@ -133,6 +139,8 @@ export interface CoopTurnBoundaryIdentity {
    * the real WAVE_ADVANCE. Only the runtime that owns the staged transition may set this marker.
    */
   readonly deferredWaveOutcome?: "win" | "capture" | "flee";
+  /** True only when the staged win came from a normal trainer battle and must present TrainerVictoryPhase. */
+  readonly trainerVictoryPresentation?: boolean;
   /** Runtime mutation-barrier depth at capture; V2 refuses a non-zero value even after outer checks. */
   readonly pendingMutationTokens?: number;
 }
@@ -535,6 +543,16 @@ export function deferredCoopV2WaveSuccessorWait(
         turn: turn + 1,
         operationId: null,
       },
+      ...(boundary.deferredWaveOutcome === "win" && boundary.trainerVictoryPresentation === true
+        ? [
+            {
+              materialKind: "trainer-victory-open" as const,
+              wave,
+              turn: turn + 1,
+              operationId: null,
+            },
+          ]
+        : []),
     ],
     allowNextWaveStart: false,
     expectedOperationId: null,
@@ -2851,7 +2869,10 @@ export class CoopBattleStreamer {
     }
     // The runtime's already-staged transition owns this choice. The state image remains the complete
     // material payload, but it must not overrule a VictoryPhase decision by re-guessing COMMAND here.
-    const hasImmediateCommand = !hasDeferredWaveAdvance && hasCoopV2ImmediateCommandSuccessor(authoritativeState);
+    const hasImmediateCommand =
+      !hasDeferredWaveAdvance
+      && boundary.mysteryTerminalAfterTurn !== true
+      && hasCoopV2ImmediateCommandSuccessor(authoritativeState);
     const commandFrontier = hasImmediateCommand
       ? resolveCoopV2CommandFrontier(authoritativeState)
       : { commands: [], unresolved: [] };
@@ -2902,8 +2923,9 @@ export class CoopBattleStreamer {
         ? (deferredWaveWait
           ?? (!hasImmediateCommand
           && boundary.mysteryBattle
-          && authoritativePartyIsDefeated(authoritativeState.enemyParty)
-          && !authoritativePartyIsDefeated(authoritativeState.playerParty)
+          && (boundary.mysteryTerminalAfterTurn === true
+            || (authoritativePartyIsDefeated(authoritativeState.enemyParty)
+              && !authoritativePartyIsDefeated(authoritativeState.playerParty)))
             ? {
                 kind: "AWAIT_SUCCESSOR",
                 afterOperationId: operationId,
@@ -4732,6 +4754,7 @@ export class CoopBattleStreamer {
     turn: number,
     fromSeq: number,
     sourceWave?: number,
+    holdLiveBehindReplacement = false,
   ): Promise<
     | { kind: "turn"; res: CoopTurnResolution | null }
     | { kind: "live" }
@@ -4756,7 +4779,7 @@ export class CoopBattleStreamer {
       return this.awaitTurn(turn, sourceWave).then(res => ({ kind: "turn" as const, res }));
     }
     const liveEntry = this.liveTurnEntry(turn, sourceWave);
-    if (liveEntry != null && liveEntry[1].events.has(fromSeq)) {
+    if (!holdLiveBehindReplacement && liveEntry != null && liveEntry[1].events.has(fromSeq)) {
       return Promise.resolve({ kind: "live" as const });
     }
     const waitKey = this.turnWaitAddress(turn, sourceWave).key;
@@ -4776,7 +4799,7 @@ export class CoopBattleStreamer {
           waitedAddress == null
             ? this.authorityContext == null && liveAddress.turn === turn
             : sameTurnAddress(liveAddress, waitedAddress);
-        if (settled || !matchesWait || seq < fromSeq) {
+        if (settled || holdLiveBehindReplacement || !matchesWait || seq < fromSeq) {
           return;
         }
         settled = true;

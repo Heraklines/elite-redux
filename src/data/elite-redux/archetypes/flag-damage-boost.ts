@@ -102,7 +102,12 @@ export class FlagDamageBoostAbAttr extends MovePowerBoostAbAttr {
     if (opts.flag === MoveFlags.NONE) {
       throw new Error("[FlagDamageBoostAbAttr] flag must be a non-NONE MoveFlags bit");
     }
-    super((_pokemon, _defender, move) => move.hasFlag(opts.flag), opts.multiplier, false);
+    super(
+      (pokemon, defender, move) =>
+        move.doesFlagEffectApply({ flag: opts.flag, user: pokemon, target: defender ?? undefined }),
+      opts.multiplier,
+      false,
+    );
     this.flag = opts.flag;
     this.highHpMultiplier = opts.multiplier;
     this.lowHpMultiplier = opts.lowHpMultiplier ?? null;

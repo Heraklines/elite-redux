@@ -67,6 +67,12 @@ function makeStubScene(): BattleScene {
       getCurrentPhase() {
         return currentPhaseStub;
       },
+      // This fixture intentionally has no queued native LearnMovePhase. Keep the real PhaseManager
+      // query surface so the production preflight can prove that fact before exercising the replay
+      // fallback this test owns.
+      hasPhaseOfType() {
+        return false;
+      },
       unshiftNew(name: string, ...args: unknown[]) {
         rec.unshifted.push({ name, args });
       },

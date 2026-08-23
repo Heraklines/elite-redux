@@ -41,6 +41,7 @@ const TURN_PROGRESS =
 const REPLACEMENT_PHASE_START = /Start Phase (?:SwitchPhase|CoopGuestFaintSwitchPhase)/u;
 const BATTLE_END_PHASE = /Start Phase BattleEndPhase/u;
 const FAINT_PHASE = /Start Phase FaintPhase/u;
+const ORDERED_TRAINER_VICTORY = /\[coop:v2-control\] projected ordered trainer victory rev=\d+ wave=(\d+) turn=(\d+)/u;
 const NEXT_TURN_BATTLE_PROMPT_PHASES = new Set([
   "MessagePhase",
   "TrainerVictoryPhase",
@@ -60,6 +61,10 @@ const BATTLE_PROMPT_PHASES = new Map([
   [
     "battle:evolution",
     { phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]), uiMode: "EVOLUTION_SCENE" },
+  ],
+  [
+    "battle:form-change",
+    { phases: new Set(["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"]), uiMode: "EVOLUTION_SCENE" },
   ],
 ]);
 const INTERACTIVE_MYSTERY_NARRATION_PHASES = new Set([
@@ -102,6 +107,19 @@ const OUTCOME_HARD_CEILING_MS = 360_000;
 const ANIMATIONS_ON_MEASURED_PER_EVENT_MS = 18_000;
 const ANIMATIONS_ON_MAX_TURN_EVENTS = 32;
 const ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS = ANIMATIONS_ON_MEASURED_PER_EVENT_MS * ANIMATIONS_ON_MAX_TURN_EVENTS;
+const MYSTERY_PROGRESSING_BATTLE_MAX_TURNS = 30;
+
+/**
+ * Mystery encounters can deliberately create longer legal battles than the ordinary fast lane. Run
+ * 30824237635 was still installing the paired command frontier at turn 13 when the generic 12-turn cap
+ * mislabeled it a softlock. Preserve the strict default everywhere else, but give a visibly progressing
+ * Mystery battle bounded headroom under the campaign's separate immutable wall-clock deadline.
+ */
+export function campaignBattleTurnBudget(configuredMaxTurns, policy) {
+  return policy.mysteryGauntlet.required
+    ? Math.max(configuredMaxTurns, MYSTERY_PROGRESSING_BATTLE_MAX_TURNS)
+    : configuredMaxTurns;
+}
 
 function fromEach(clients, fn) {
   return Object.fromEntries(clients.map(client => [client.label, fn(client)]));
@@ -121,16 +139,19 @@ export function initialBattleCommandCursors(clients) {
 }
 
 const DIGEST_PARTS = /\[coop-browser:digest-parts\] (\{.*\})/u;
-const HOST_RETAINED_EVOLUTION =
-  /\[coop:progression\] HOST progression capture wave=(\d+) seq=\d+ k=evolution slot=(\d+) species=(\d+)->(\d+)/u;
-const GUEST_RETAINED_EVOLUTION =
-  /\[coop:progression\] GUEST retained evolution complete wave=(\d+) slot=(\d+) species=(\d+)->(\d+)/u;
-
-function retainedEvolutionKeys(client, pattern) {
-  return client.evidence.events.flatMap(event => {
-    const match = pattern.exec(event.text ?? "");
-    return match == null ? [] : [`${match[1]}:${match[2]}:${match[3]}->${match[4]}`];
-  });
+function retainedEvolutionKeys(rig, stage, role) {
+  const keys = new Set();
+  for (const client of Object.values(rig.clients)) {
+    for (const entry of client.evidence.events) {
+      const observation = entry.kind === "browser-progression-event" ? entry.observation : null;
+      const event = observation?.event;
+      if (observation?.stage !== stage || observation.role !== role || event?.k !== "evolution") {
+        continue;
+      }
+      keys.add(`${observation.wave}:${event.partySlot}:${event.fromSpeciesId}->${event.toSpeciesId}`);
+    }
+  }
+  return [...keys];
 }
 
 /**
@@ -139,8 +160,11 @@ function retainedEvolutionKeys(client, pattern) {
  * silently omit this presentation class while only testing low-level protocol validators.
  */
 export function assertRetainedEvolutionPresentationParity(rig, policy) {
-  const authority = retainedEvolutionKeys(rig.host, HOST_RETAINED_EVOLUTION).toSorted();
-  const renderer = retainedEvolutionKeys(rig.guest, GUEST_RETAINED_EVOLUTION).toSorted();
+  // Browser labels describe which account/page the harness launched first; WebRTC role selection may place
+  // the authority on either label. Compare the strict lifecycle ledger by its embedded role/stage instead
+  // of scraping legacy console prose from rig.host/rig.guest (run 30778145880 had the roles reversed).
+  const authority = retainedEvolutionKeys(rig, "authority-recorded", "host").toSorted();
+  const renderer = retainedEvolutionKeys(rig, "renderer-completed", "guest").toSorted();
   const proof = { authority, renderer, required: policy.targetWaves >= 30 && policy.navigation?.required !== true };
   for (const client of Object.values(rig.clients)) {
     client.evidence.record("campaign-retained-evolution-proof", proof);
@@ -674,6 +698,54 @@ async function assertRenderProfileExecution(rig, policy, progress) {
   await progress.note("render profile governed real battle execution", proof);
 }
 
+/**
+ * A hidden final trainer state is not proof that the transition ever rendered. For every trainer battle
+ * entered after wave 1, require the signed guest player-trainer cue plus positive enemy-trainer intro and
+ * victory samples on both real browsers.
+ */
+function assertTrainerPresentationCoverage(rig, battleKinds) {
+  const trainerWaves = [
+    ...new Set(battleKinds.filter(kind => kind.wave > 1 && kind.battleType === "TRAINER").map(kind => kind.wave)),
+  ];
+  if (trainerWaves.length === 0) {
+    return null;
+  }
+  const proof = trainerWaves.map(wave => {
+    const playerTransition = rig.guest.evidence.findTrainerTransition({ wave });
+    if (playerTransition == null) {
+      throw new Error(`[campaign-trainer-presentation] guest omitted the signed player-trainer cue at wave ${wave}`);
+    }
+    const clients = Object.values(rig.clients).map(client => {
+      const intro = client.evidence.events.find(
+        event =>
+          event.kind === "browser-surface2"
+          && event.observation.address?.wave === wave
+          && event.observation.phase === "NextEncounterPhase"
+          && event.observation.presentation?.enemyTrainerPresented === true,
+      );
+      const victory = client.evidence.events.find(
+        event =>
+          event.kind === "browser-surface2"
+          && event.observation.address?.wave === wave
+          && event.observation.phase === "TrainerVictoryPhase"
+          && event.observation.presentation?.enemyTrainerPresented === true,
+      );
+      if (intro == null || victory == null) {
+        throw new Error(
+          `[campaign-trainer-presentation] ${client.label} omitted ${intro == null ? "intro" : "victory"} `
+            + `trainer presentation at wave ${wave}`,
+        );
+      }
+      return { label: client.label, introEventIndex: intro.index, victoryEventIndex: victory.index };
+    });
+    return { wave, playerTransitionEventIndex: playerTransition.index, clients };
+  });
+  for (const client of Object.values(rig.clients)) {
+    client.evidence.record("campaign-trainer-presentation-coverage", { proof });
+  }
+  return proof;
+}
+
 function isExactNextTurnCommand(observation, expectedCommandAddress) {
   if (observation == null || expectedCommandAddress == null) {
     return false;
@@ -706,11 +778,13 @@ export function clientsAwaitingTurnProgress(rig, from, expectedCommandAddress = 
 
 export function findOwnedCommandFrontier(client, from) {
   const semantic = client.evidence.findLastSemanticSurface(from);
+  const ownedCommandSurface =
+    (semantic?.observation.surfaceId === "command:command" && semantic.observation.uiMode === "COMMAND")
+    || (semantic?.observation.surfaceId === "command:fight" && semantic.observation.uiMode === "FIGHT");
   if (
-    semantic?.observation.surfaceId === "command:command"
+    ownedCommandSurface
     && semantic.observation.ready?.handlerActive === true
     && semantic.observation.phase === "CommandPhase"
-    && semantic.observation.uiMode === "COMMAND"
     && semantic.observation.localSeat === client.publicSeat
     && semantic.observation.seatsWithInput?.includes(client.publicSeat)
   ) {
@@ -767,11 +841,13 @@ export function allClientsAtCurrentCommandFrontier(clients, from) {
     if (observation == null) {
       return findOwnedCommandFrontier(client, cursor) != null;
     }
+    const ownerSurface =
+      (observation.surfaceId === "command:command" && observation.uiMode === "COMMAND")
+      || (observation.surfaceId === "command:fight" && observation.uiMode === "FIGHT");
     const owner =
-      observation.surfaceId === "command:command"
+      ownerSurface
       && observation.operationClass === "command"
       && observation.phase === "CommandPhase"
-      && observation.uiMode === "COMMAND"
       && observation.ready?.handlerActive === true
       && observation.localSeat === client.publicSeat
       && observation.seatsWithInput?.includes(client.publicSeat);
@@ -875,7 +951,7 @@ function currentSharedCommandAddress(clients) {
  * prompt. Evolution specifically requires BattleEndPhase; FaintPhase alone cannot authorize it.
  * Arbitrary future-turn battle messages still cannot authorize input.
  */
-function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
+function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress, sharedCurrentAddress = null) {
   const observation = event.observation;
   const address = observation.address;
   const hasLiveBattleAddress =
@@ -892,11 +968,27 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
     return true;
   }
   const expectedParts = expectedAddress.split(":").map(Number);
+  // A completed turn can install the next COMMAND_FRONTIER before its local TurnInit narration becomes
+  // actionable. In that schedule the renderer is already the passive N+1 command watcher while the
+  // authority is visibly waiting on an ordinary N+1 MessagePhase. Both CURRENT semantic surfaces naming
+  // that exact immediate successor is stronger evidence than the old submitted-turn cursor: it proves the
+  // prompt is live, paired, and belongs to the committed successor (run 30927575552). One-sided or later
+  // future addresses remain excluded, and the caller's current-surface/readiness guards still apply.
+  const isPairedImmediateSuccessor =
+    sharedCurrentAddress === observedAddress
+    && expectedParts.length === 3
+    && expectedParts.every(part => Number.isSafeInteger(part))
+    && address?.epoch === expectedParts[0]
+    && address.wave === expectedParts[1]
+    && address.turn === expectedParts[2] + 1;
+  if (isPairedImmediateSuccessor) {
+    return true;
+  }
   const isSuccessorSettlementMessage =
     observation.surfaceId === "battle:message" && NEXT_TURN_BATTLE_PROMPT_PHASES.has(observation.phase);
   const isSuccessorEvolution =
-    observation.surfaceId === "battle:evolution"
-    && BATTLE_PROMPT_PHASES.get("battle:evolution")?.phases?.has(observation.phase) === true;
+    (observation.surfaceId === "battle:evolution" || observation.surfaceId === "battle:form-change")
+    && BATTLE_PROMPT_PHASES.get(observation.surfaceId)?.phases?.has(observation.phase) === true;
   if (
     !hasLiveBattleAddress
     || expectedParts.length !== 3
@@ -912,8 +1004,21 @@ function battlePromptMatchesAddress(client, scanFloor, event, expectedAddress) {
   if (isSuccessorEvolution) {
     return boundaryEvents.some(candidate => BATTLE_END_PHASE.test(candidate.text ?? ""));
   }
-  return boundaryEvents.some(
-    candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""),
+  // The Authority V2 renderer does not execute BattleEndPhase for a trainer win. Its signed
+  // trainer-victory-open entry projects TrainerVictoryPhase directly, and that finite presentation can
+  // legitimately queue account-local voucher ModifierRewardPhase prompts. Require the exact projection's
+  // authenticated wave/turn marker before admitting those successor-address prompts. A bare phase name (or
+  // a marker from another battle) remains insufficient, so this cannot turn an arbitrary future-turn message
+  // into input authority. Run 30862517427 otherwise left the guest's real voucher popup untouched while the
+  // host waited at shop:5:4 until rendezvous recovery exhausted.
+  const hasExactOrderedTrainerVictory = boundaryEvents.some(candidate => {
+    const match = ORDERED_TRAINER_VICTORY.exec(candidate.text ?? "");
+    return match != null && Number(match[1]) === address.wave && Number(match[2]) === address.turn;
+  });
+  return (
+    boundaryEvents.some(
+      candidate => BATTLE_END_PHASE.test(candidate.text ?? "") || FAINT_PHASE.test(candidate.text ?? ""),
+    ) || hasExactOrderedTrainerVictory
   );
 }
 
@@ -965,6 +1070,46 @@ export function createBattlePromptAdvancer(
       observation.phaseInstance,
       observation.surfaceGeneration ?? null,
     ]);
+  const pairedTrainerVictoryIsReady = observation => {
+    if (observation.phase !== "TrainerVictoryPhase") {
+      return true;
+    }
+    return clients.every(peer => {
+      const paired = peer.evidence.findLastSemanticSurface(from[peer.label] ?? 0)?.observation;
+      return (
+        paired?.phase === "TrainerVictoryPhase"
+        && paired.surfaceId === "battle:message"
+        && paired.address?.epoch === observation.address?.epoch
+        && paired.address?.wave === observation.address?.wave
+        && paired.address?.turn === observation.address?.turn
+        && paired.ready?.handlerActive === true
+        && paired.ready?.awaitingActionInput === true
+        && paired.ready?.inputBlocked !== true
+      );
+    });
+  };
+  const advanceReadyPrompt = async (client, readyEvent) => {
+    cursors.set(client.label, readyEvent.index + 1);
+    const { surfaceId, phase, phaseInstance } = readyEvent.observation;
+    consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
+    const statName =
+      surfaceId === "battle:evolution" || surfaceId === "battle:form-change"
+        ? "postBattleEvolutionPrompts"
+        : phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
+          ? "postBattleExpPrompts"
+          : "battleMessagePrompts";
+    stats[statName] = (stats[statName] ?? 0) + 1;
+    client.evidence.record("campaign-battle-prompt-advance", {
+      surfaceId,
+      phase,
+      phaseInstance,
+      readyEventIndex: readyEvent.index,
+      promptOrdinal: stats[statName],
+      inputSeat: client.label,
+      authority: client === rig.host,
+    });
+    await client.press("Space", `${purpose}-${client.label}-${surfaceId}-${stats[statName]}`);
+  };
   return async () => {
     if (expectedAddress == null && requireSharedCommandAddress) {
       expectedAddress = currentSharedCommandAddress(clients);
@@ -972,6 +1117,7 @@ export function createBattlePromptAdvancer(
         return false;
       }
     }
+    const sharedCurrentAddress = currentSharedCommandAddress(clients);
     for (const client of clients) {
       const readyEvent = client.evidence.events.slice(cursors.get(client.label) ?? 0).find(event => {
         if (event.kind !== "browser-surface2") {
@@ -984,7 +1130,13 @@ export function createBattlePromptAdvancer(
         // authorizes the entire bounded settlement narration chain. Keep that proof's scan floor at
         // this driver's boundary; otherwise consuming TrainerVictory/MoneyReward hides BattleEnd from
         // the immediately following MoneyReward/ModifierReward prompt (run 30370796112).
-        const addressMatches = battlePromptMatchesAddress(client, from[client.label] ?? 0, event, expectedAddress);
+        const addressMatches = battlePromptMatchesAddress(
+          client,
+          from[client.label] ?? 0,
+          event,
+          expectedAddress,
+          sharedCurrentAddress,
+        );
         return (
           BATTLE_PROMPT_PHASES.has(observation.surfaceId)
           && addressMatches
@@ -997,6 +1149,7 @@ export function createBattlePromptAdvancer(
           && observation.ready?.handlerActive === true
           && observation.ready?.awaitingActionInput === true
           && observation.ready?.inputBlocked !== true
+          && pairedTrainerVictoryIsReady(observation)
           && !consumedInstances.has(instanceKey)
         );
       });
@@ -1012,6 +1165,79 @@ export function createBattlePromptAdvancer(
       if (latestSurface?.index !== readyEvent.index) {
         cursors.set(client.label, readyEvent.index + 1);
         continue;
+      }
+      if (readyEvent.observation.phase === "TrainerVictoryPhase") {
+        // Both victory messages are local human-input surfaces. Real players do not dismiss them on the
+        // same frame, and the production Authority V2 contract must keep the ordered successor fenced while
+        // either exact presentation remains open. Start only after both addressed prompts are proven, then
+        // deliberately advance the authority first and hold a short human-sized skew before advancing the
+        // renderer. Re-prove the renderer after the skew: an older implementation let WAVE_ADVANCE overtake
+        // this prompt, so blindly spending the saved key would conceal the product failure instead of
+        // detecting it. The in-flight pair is completed in this call, avoiding the old next-poll bug where
+        // the authority's newer reward surface made the still-actionable renderer prompt undiscoverable.
+        const pairedEvents = clients.map(peer => ({
+          client: peer,
+          event: peer.evidence.findLastSemanticSurface(from[peer.label] ?? 0),
+        }));
+        const authorityPair = pairedEvents.find(({ client: peer }) => peer === rig.host);
+        const authorityObservation = authorityPair?.event?.observation;
+        // Only the authoritative engine executes BattleEndPhase. The renderer enters its retained
+        // TrainerVictoryPhase directly from the signed CONTROL_COMMIT, so requiring a renderer-local
+        // BattleEnd marker makes a healthy exact pair permanently undiscoverable. Prove the causal
+        // successor once on the host, then require both CURRENT prompts to name that same immutable
+        // successor address. The replica cannot manufacture this surface: production exposes it only
+        // after applying the retained trainer-victory-open material.
+        const pairIsCurrentAndUnspent = pairedEvents.every(({ client: peer, event }) => {
+          const observation = event?.observation;
+          return (
+            event != null
+            && observation?.phase === "TrainerVictoryPhase"
+            && observation.surfaceId === "battle:message"
+            && observation.address?.epoch === authorityObservation?.address?.epoch
+            && observation.address?.wave === authorityObservation?.address?.wave
+            && observation.address?.turn === authorityObservation?.address?.turn
+            && observation.ready?.handlerActive === true
+            && observation.ready?.awaitingActionInput === true
+            && observation.ready?.inputBlocked !== true
+            && !consumedInstances.has(instanceKeyFor(peer, observation))
+          );
+        });
+        if (
+          authorityPair?.event == null
+          || !battlePromptMatchesAddress(
+            authorityPair.client,
+            from[authorityPair.client.label] ?? 0,
+            authorityPair.event,
+            expectedAddress,
+          )
+          || !pairIsCurrentAndUnspent
+        ) {
+          continue;
+        }
+        await advanceReadyPrompt(authorityPair.client, authorityPair.event);
+        await delay(rig.trainerVictoryStaggerMs ?? 1_500);
+        for (const paired of pairedEvents) {
+          if (paired.client === rig.host || paired.event == null) {
+            continue;
+          }
+          const current = paired.client.evidence.findLastSemanticSurface(paired.event.index);
+          if (
+            current == null
+            || current.observation.phase !== "TrainerVictoryPhase"
+            || current.observation.surfaceId !== "battle:message"
+            || instanceKeyFor(paired.client, current.observation)
+              !== instanceKeyFor(paired.client, paired.event.observation)
+            || current.observation.ready?.handlerActive !== true
+            || current.observation.ready?.awaitingActionInput !== true
+            || current.observation.ready?.inputBlocked === true
+          ) {
+            throw new Error(
+              `${purpose}: renderer trainer-victory prompt was superseded during the authority-first human input skew`,
+            );
+          }
+          await advanceReadyPrompt(paired.client, current);
+        }
+        return true;
       }
       // The semantic mirror is frame-driven and can lag the production phase boundary on a heavily
       // throttled browser. In market-wide-lens 30691739712, SwitchPhase had already started but the
@@ -1031,26 +1257,7 @@ export function createBattlePromptAdvancer(
       if (isPartyPickerSurfaceOpen(latestSurface?.observation)) {
         continue;
       }
-      cursors.set(client.label, readyEvent.index + 1);
-      const { surfaceId, phase, phaseInstance } = readyEvent.observation;
-      consumedInstances.add(instanceKeyFor(client, readyEvent.observation));
-      const statName =
-        surfaceId === "battle:evolution"
-          ? "postBattleEvolutionPrompts"
-          : phase === "ExpPhase" || phase === "CoopWaveProgressionReplayPhase"
-            ? "postBattleExpPrompts"
-            : "battleMessagePrompts";
-      stats[statName] = (stats[statName] ?? 0) + 1;
-      client.evidence.record("campaign-battle-prompt-advance", {
-        surfaceId,
-        phase,
-        phaseInstance,
-        readyEventIndex: readyEvent.index,
-        promptOrdinal: stats[statName],
-        inputSeat: client.label,
-        authority: client === rig.host,
-      });
-      await client.press("Space", `${purpose}-${client.label}-${surfaceId}-${stats[statName]}`);
+      await advanceReadyPrompt(client, readyEvent);
       return true;
     }
     return false;
@@ -1192,7 +1399,15 @@ export function createAnimationProgressBudget(
     for (const event of events) {
       const text = event.text ?? "";
       const phase = OUTCOME_PROGRESS_PHASE.exec(text)?.[1] ?? null;
-      const retainedWaveProgress = phase === "CoopWaveProgressionReplayPhase" || /\bWAVE_ADVANCE\b/u.test(text);
+      // A retained evolution is one finite presentation event, but on the two-Chromium SwiftShader runner
+      // its staged tween can outlive the one-time replay-phase allowance. Every heartbeat names a distinct,
+      // monotonically advancing stage from that closed cutscene (assets -> cycle -> reveal -> completion),
+      // so it is causal progress rather than a keepalive. It may refresh only inside the existing immutable
+      // animations-on hard ceiling.
+      const retainedEvolutionProgress =
+        /\[coop:progression\] GUEST retained evolution heartbeat\b[\s\S]*\bstage=/u.test(text);
+      const retainedWaveProgress =
+        phase === "CoopWaveProgressionReplayPhase" || /\bWAVE_ADVANCE\b/u.test(text) || retainedEvolutionProgress;
       const progress =
         phase
         ?? (retainedWaveProgress ? "wave-successor" : null)
@@ -1271,6 +1486,14 @@ export function createRegisteredSurfaceProgressBudget(
     deadline: () => deadlineMs,
     hardDeadline: () => hardDeadlineMs,
   });
+}
+
+/** Whether a skipped-move-animation journey still retains a finite native evolution cutscene. */
+export function retainedPartyEvolutionNeedsProgressBudget(partyMutatingReward) {
+  return (
+    partyMutatingReward?.required === true
+    && /^(?:EVOLUTION_ITEM|RARE_EVOLUTION_ITEM)$/u.test(partyMutatingReward.rewardId ?? "")
+  );
 }
 
 /**
@@ -1556,7 +1779,10 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
     await rig.assertRetainedContinuation(cursors, proofName);
     return "reward";
   };
-  for (let turn = 1; turn <= rig.config.maxTurns; turn++) {
+  const maxBattleTurns = campaignBattleTurnBudget(rig.config.maxTurns, policy);
+  const cycleCampaignMoves =
+    policy.navigation.required || policy.market.requiredPurchases > 0 || policy.mysteryGauntlet.required;
+  for (let turn = 1; turn <= maxBattleTurns; turn++) {
     const purpose = `wave-${stats.wave}-turn-${turn}`;
     await reportProgress("battle turn started", {
       wave: stats.wave,
@@ -1597,7 +1823,7 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
                 // and cycles it like a human responding to an immunity; otherwise one immune foe
                 // can consume the longitudinal journey before it reaches the target interactions.
                 commandEvent,
-                cycleIndex: policy.navigation.required || policy.market.requiredPurchases > 0 ? turn - 1 : 0,
+                cycleIndex: cycleCampaignMoves ? turn - 1 : 0,
                 preferredMoveId: policy.registeredInteractions.preferredMoveId,
               }),
       },
@@ -1764,7 +1990,7 @@ async function driveBattleWave(rig, policy, stats, reportProgress = async () => 
     }
     commandCursors = from;
   }
-  throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${rig.config.maxTurns} rounds`);
+  throw new Error(`[campaign-softlock] wave ${stats.wave} did not reach rewards in ${maxBattleTurns} rounds`);
 }
 
 /**
@@ -2198,6 +2424,22 @@ export function selectLatestMysteryAuthorityEvent(events) {
       if (candidateOrder[index] !== selectedOrder[index]) {
         return candidateOrder[index] > selectedOrder[index] ? candidate : selected;
       }
+    }
+    // Cursor/selection projection can briefly lead or trail the actual owner even after both browsers
+    // publish the same immutable address and digest. Canonizing the runtime host in that frame freezes a
+    // transient watcher cursor and waits for the owner to reproduce stale presentation (run 30928165876,
+    // wave 6 reward). At an equal ordered address the actionable interaction owner is the source of truth;
+    // runtime host remains only the deterministic fallback when neither event proves ownership.
+    const isActionableOwner = event => {
+      const observation = event?.observation;
+      return (
+        observation?.localSeat === observation?.ownerSeat && observation.seatsWithInput?.includes(observation.ownerSeat)
+      );
+    };
+    const selectedIsOwner = isActionableOwner(selected);
+    const candidateIsOwner = isActionableOwner(candidate);
+    if (selectedIsOwner !== candidateIsOwner) {
+      return candidateIsOwner ? candidate : selected;
     }
     return candidate.observation.localRole === "host" ? candidate : selected;
   }, hostEvent);
@@ -2650,23 +2892,186 @@ async function checkpointAsymmetricLearnMoveSurface(rig, cursors, owner) {
 }
 
 /** Decline a learn cleanly: decline replacement, then confirm that teaching should stop. */
-async function driveLearnMoveDecline(rig, owner, boundary) {
+export async function driveLearnMoveDecline(rig, owner, boundary) {
   const firstIdentity = semanticAppearanceIdentity(boundary.ownerEvent);
   const from = boundary.ownerEvent.index + 1;
   await owner.press("Backspace", "campaign-learn-move-decline-replacement");
-  const stopConfirmation = await owner.evidence.waitForCondition(
+  const outcome = await owner.evidence.waitForCondition(
     sink => {
       const candidate = sink.findLastSemanticSurface(from, "learn-move:confirm");
-      return candidate != null
+      if (
+        candidate != null
         && semanticAppearanceIdentity(candidate) !== firstIdentity
         && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
         && isActionableSemanticObservation(candidate.observation)
-        ? candidate
+      ) {
+        return { kind: "confirmation", event: candidate };
+      }
+      // The projected guest picker can treat Backspace on its SUMMARY cancel row as the final decline and
+      // relay the immutable result immediately; unlike the host's ordinary LearnMovePhase it then opens no
+      // second CONFIRM. A fresh non-learn-move semantic surface at this or a later ordered address proves that
+      // this exact picker has closed. Return to the outer successor proof instead of waiting 120 seconds for a
+      // UI that cannot exist (rare-evolution run 30775674276).
+      const latest = sink.findLastSemanticSurface(from);
+      const expectedAddress = boundary.authority.address;
+      const observedAddress = latest?.observation.address;
+      const sameOrLaterAddress =
+        Number.isSafeInteger(expectedAddress?.epoch)
+        && observedAddress?.epoch === expectedAddress.epoch
+        && Number.isSafeInteger(expectedAddress.wave)
+        && Number.isSafeInteger(expectedAddress.turn)
+        && Number.isSafeInteger(observedAddress.wave)
+        && Number.isSafeInteger(observedAddress.turn)
+        && (observedAddress.wave > expectedAddress.wave
+          || (observedAddress.wave === expectedAddress.wave && observedAddress.turn >= expectedAddress.turn));
+      return latest != null && !latest.observation.surfaceId.startsWith("learn-move:") && sameOrLaterAddress
+        ? { kind: "closed", event: latest }
         : null;
     },
-    { timeoutMs: rig.config.timeoutMs, description: "learn-move stop-teaching confirmation" },
+    { timeoutMs: rig.config.timeoutMs, description: "learn-move decline confirmation or committed close" },
   );
-  await owner.press("Space", `campaign-learn-move-stop:${stopConfirmation.index}`);
+  if (outcome.kind === "confirmation") {
+    await owner.press("Space", `campaign-learn-move-stop:${outcome.event.index}`);
+  }
+}
+
+/** Classify the exact native prompt chain between accepting a teach and opening its Summary picker. */
+export function classifyLearnMovePickerProgress(observation, expectedAddress, localSeat) {
+  const sameAddress =
+    observation?.address?.epoch === expectedAddress?.epoch
+    && observation.address.wave === expectedAddress.wave
+    && observation.address.turn === expectedAddress.turn;
+  if (!sameAddress) {
+    return "wait";
+  }
+  if (
+    observation.surfaceId === "learn-move:confirm"
+    && observation.uiMode === "SUMMARY"
+    && isActionableSemanticObservation(observation)
+  ) {
+    return "ready";
+  }
+  if (
+    observation.surfaceId === "battle:message"
+    && observation.phase === "LearnMovePhase"
+    && observation.uiMode === "MESSAGE"
+    && observation.ready?.handlerActive === true
+    && observation.ready.awaitingActionInput === true
+    && observation.ready.inputBlocked !== true
+    && observation.seatsWithInput?.includes(localSeat)
+  ) {
+    return "advance";
+  }
+  return "wait";
+}
+
+/** Accept a full-moveset teach and replace the currently selected move through the real Summary UI. */
+async function driveLearnMoveAccept(rig, owner, boundary, rewardId) {
+  let picker = boundary.ownerEvent;
+  if (picker.observation.uiMode !== "SUMMARY") {
+    const pickerCursor = owner.evidence.cursor();
+    await owner.press("Space", "campaign-learn-move-accept-replacement");
+    const pickerDeadline = Date.now() + rig.config.timeoutMs;
+    const advancedPrompts = new Set();
+    for (;;) {
+      const candidate = owner.evidence.findLastSemanticSurface(pickerCursor);
+      const progress = classifyLearnMovePickerProgress(
+        candidate?.observation,
+        boundary.authority.address,
+        owner.publicSeat,
+      );
+      if (progress === "ready") {
+        picker = candidate;
+        break;
+      }
+      if (progress === "advance") {
+        const identity = semanticAppearanceIdentity(candidate);
+        if (!advancedPrompts.has(identity)) {
+          advancedPrompts.add(identity);
+          await owner.press("Space", `campaign-learn-move-open-picker:${candidate.index}`);
+          continue;
+        }
+      }
+      if (Date.now() >= pickerDeadline) {
+        throw new Error(`${owner.label}: timed out waiting for actionable learn-move forget picker`);
+      }
+      await delay(100);
+    }
+  }
+  if (picker.observation.uiMode !== "SUMMARY") {
+    throw new Error(`[campaign-learn-move] ${owner.label} never opened the full-moveset Summary picker`);
+  }
+  const replacementMoveId = picker.observation.optionIds?.find(optionId => /^move:\d+:slot:\d+$/u.test(optionId));
+  if (replacementMoveId == null) {
+    throw new Error(
+      `[campaign-learn-move] ${owner.label} exposed no existing move row in the full-moveset Summary picker: `
+        + JSON.stringify(picker.observation),
+    );
+  }
+  const replacementSelection = await selectOptionById(owner, {
+    surfaceId: "learn-move:confirm",
+    targetId: replacementMoveId,
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submit: false,
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: picker.index,
+  });
+  picker = owner.evidence.events[replacementSelection.surfaceEventIndex];
+  if (
+    picker?.observation?.uiMode !== "SUMMARY"
+    || picker.observation.selectedOptionId !== replacementMoveId
+    || picker.observation.selectedOptionId === "learn-move:cancel"
+  ) {
+    throw new Error(
+      `[campaign-learn-move] ${owner.label} did not select an existing move before confirming replacement: `
+        + JSON.stringify(picker?.observation ?? null),
+    );
+  }
+  const confirmationCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-learn-move-forget-selected");
+  const replacementResolution = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(confirmationCursor, "learn-move:confirm");
+      if (
+        candidate != null
+        && candidate.observation.uiMode === "CONFIRM"
+        && candidate.observation.selectedOptionId === "yes"
+        && JSON.stringify(candidate.observation.address) === JSON.stringify(boundary.authority.address)
+        && isActionableSemanticObservation(candidate.observation)
+      ) {
+        return { kind: "confirmation", event: candidate };
+      }
+      // Ordinary TM variants commit immediately when the player selects the forgotten move; TM Case
+      // and mushroom flows may instead open a final Yes/No prompt. Accept the former only after the
+      // owner has observably left LearnMovePhase at the same or a later exact authority address. The
+      // journey's final party-material oracle still proves that the requested move actually changed.
+      const transitioned = sink.findLastSemanticSurface(confirmationCursor);
+      const sourceAddress = boundary.authority.address;
+      const destinationAddress = transitioned?.observation?.address;
+      const orderedTransition =
+        transitioned != null
+        && transitioned.observation.phase !== "LearnMovePhase"
+        && transitioned.observation.surfaceId !== "unclassified"
+        && destinationAddress?.epoch === sourceAddress?.epoch
+        && (destinationAddress.wave > sourceAddress.wave
+          || (destinationAddress.wave === sourceAddress.wave && destinationAddress.turn >= sourceAddress.turn));
+      return orderedTransition ? { kind: "immediate", event: transitioned } : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "learn-move replacement confirmation or immediate commit" },
+  );
+  if (replacementResolution.kind === "confirmation") {
+    await owner.press("Space", `campaign-learn-move-confirm-replacement:${replacementResolution.event.index}`);
+  }
+  owner.evidence.record("campaign-learn-move-accepted", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    rewardId,
+    selectedOptionId: picker.observation.selectedOptionId,
+    navigationSteps: replacementSelection.steps,
+    resolution: replacementResolution.kind,
+    confirmationEventIndex: replacementResolution.kind === "confirmation" ? replacementResolution.event.index : null,
+    transitionEventIndex: replacementResolution.kind === "immediate" ? replacementResolution.event.index : null,
+  });
 }
 
 /**
@@ -2881,7 +3286,7 @@ async function checkpointAsymmetricRegisteredSurface(rig, driver, cursors, owner
 }
 
 /** Choose the stable party or ability option that advances the current registered ability workflow. */
-export function chooseAbilityInteractionOption(observation) {
+export function chooseAbilityInteractionOption(observation, excludedOptionIds = new Set()) {
   const options = observation?.optionIds;
   if (!Array.isArray(options) || options.length === 0) {
     return null;
@@ -2891,19 +3296,34 @@ export function chooseAbilityInteractionOption(observation) {
       ? `party-slot:${observation.interactionTargetPartySlot}`
       : null;
   }
-  if (typeof observation.selectedOptionId === "string" && options.includes(observation.selectedOptionId)) {
-    return observation.selectedOptionId;
+  if (observation.phase === "ErDexNavPhase") {
+    return options.find(optionId => /^slot:\d+$/u.test(optionId) && !excludedOptionIds.has(optionId)) ?? null;
+  }
+  if (observation.phase === "ErGreaterAbilityCapsulePhase" && options.includes("slot:1")) {
+    // Exercise the run-material branch. The permanent branch intentionally changes only the owner's
+    // account unlocks, whereas run-unlock-two must become identical current-party material on both peers.
+    return "slot:1";
   }
   const abilitySlots = observation.phase === "ErGreaterAbilityRandomizerPhase" ? [0, 1, 2, 3] : [1, 2, 3, 0];
-  return (
-    abilitySlots.map(slot => `party-option:ability-slot-${slot}`).find(optionId => options.includes(optionId)) ?? null
-  );
+  const abilitySlot = abilitySlots
+    .map(slot => `party-option:ability-slot-${slot}`)
+    .find(optionId => options.includes(optionId) && !excludedOptionIds.has(optionId));
+  if (abilitySlot != null) {
+    return abilitySlot;
+  }
+  return typeof observation.selectedOptionId === "string" && options.includes(observation.selectedOptionId)
+    ? observation.selectedOptionId
+    : null;
 }
 
 async function driveAbilityInteraction(rig, driver, owner, boundary) {
+  const priorChoiceIds = new Set(
+    owner.evidence.events
+      .filter(event => event.kind === "campaign-ability-choice" && event.phase === driver.abilityPhase)
+      .map(event => event.targetId),
+  );
   if (driver.abilitySurfaceKind !== "party") {
-    const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation);
-    await owner.sequence(driver.keys, `campaign-${driver.name}`);
+    const targetId = chooseAbilityInteractionOption(boundary.ownerEvent.observation, priorChoiceIds);
     if (driver.abilitySurfaceKind === "option" || driver.abilitySurfaceKind === "choice") {
       if (targetId == null) {
         throw new Error(
@@ -2911,17 +3331,27 @@ async function driveAbilityInteraction(rig, driver, owner, boundary) {
             + `${JSON.stringify(boundary.ownerEvent.observation)}`,
         );
       }
+      await selectOptionById(owner, {
+        surfaceId: driver.v2SurfaceId,
+        targetId,
+        navKeys: ["ArrowDown", "ArrowUp"],
+        submitKey: "Space",
+        timeoutMs: rig.config.timeoutMs,
+        fromCursor: boundary.ownerEvent.index,
+      });
       owner.evidence.record("campaign-ability-choice", {
         phase: driver.abilityPhase,
         surfaceId: driver.v2SurfaceId,
         targetId,
         address: boundary.authority.address,
       });
+    } else {
+      await owner.sequence(driver.keys, `campaign-${driver.name}`);
     }
     return;
   }
   let surface = boundary.ownerEvent;
-  let targetId = chooseAbilityInteractionOption(surface.observation);
+  let targetId = chooseAbilityInteractionOption(surface.observation, priorChoiceIds);
   if (targetId == null) {
     throw new Error(
       `[campaign-ability] ${driver.abilityPhase} exposed no driveable party choice: `
@@ -2949,7 +3379,7 @@ async function driveAbilityInteraction(rig, driver, owner, boundary) {
       },
       { timeoutMs: rig.config.timeoutMs, description: `${driver.abilityPhase} ability-slot submenu` },
     );
-    targetId = chooseAbilityInteractionOption(surface.observation);
+    targetId = chooseAbilityInteractionOption(surface.observation, priorChoiceIds);
     if (targetId == null || !targetId.startsWith("party-option:ability-slot-")) {
       throw new Error(
         `[campaign-ability] ${driver.abilityPhase} opened no stable ability-slot option: `
@@ -3173,6 +3603,332 @@ async function selectRewardOptionWithMirroredCursor(rig, owner, boundary, target
   return { ...navigation, authorityEvent, peerEvents };
 }
 
+/** Exact field proof for a Check Team reorder: party material and the visible battlers agree. */
+export function partyReorderPresentationMatches(observation, expectedPartyIds) {
+  const partyIds = observation?.partySlots?.map(slot => slot.pokemonId);
+  const expectedFieldIds = observation?.presentation?.expectedPlayerFieldIds;
+  const readyFieldIds = observation?.presentation?.playerField
+    ?.filter(
+      pokemon =>
+        pokemon.visible === true
+        && pokemon.alpha > 0
+        && pokemon.spriteVisible === true
+        && pokemon.spriteAlpha > 0
+        && pokemon.infoVisible === true
+        && pokemon.infoAlpha > 0,
+    )
+    .map(pokemon => pokemon.pokemonId);
+  return (
+    JSON.stringify(partyIds ?? null) === JSON.stringify(expectedPartyIds)
+    && observation?.presentation?.playerFieldReady === true
+    && Array.isArray(expectedFieldIds)
+    && expectedFieldIds.length > 0
+    && JSON.stringify(expectedFieldIds) === JSON.stringify(expectedPartyIds.slice(0, expectedFieldIds.length))
+    && JSON.stringify(readyFieldIds ?? null) === JSON.stringify(expectedFieldIds)
+  );
+}
+
+/**
+ * Returning from an owner-only party screen does not change the watcher UI. Keep the owner's fresh
+ * return cursor, but let each watcher reuse the exact post-reorder reward projection that already
+ * proved the new party digest. Requiring a later watcher emission turns a correct stable renderer
+ * into a timeout on slower clients.
+ */
+export function retainStableWatcherSurfaceCursors(returnCursors, stableCursors, watcherLabels) {
+  const cursors = { ...returnCursors };
+  for (const label of watcherLabels) {
+    const stableCursor = stableCursors[label];
+    if (!Number.isSafeInteger(stableCursor) || stableCursor < 0) {
+      throw new Error(`[campaign-convergence] ${label} has no stable watcher cursor`);
+    }
+    cursors[label] = stableCursor;
+  }
+  return cursors;
+}
+
+/** The Check Team return initially restores the action row; require the original reward-card row again. */
+export function restoredRewardRowMatches(observation, expectedOptionIds, expectedAddress) {
+  return (
+    observation?.surfaceId === "reward-shop"
+    && JSON.stringify(observation.address) === JSON.stringify(expectedAddress)
+    && JSON.stringify(observation.optionIds ?? null) === JSON.stringify(expectedOptionIds ?? null)
+    && isActionableSemanticObservation(observation)
+  );
+}
+
+async function restoreRewardRowAfterCheckTeam(rig, owner, boundary, restored) {
+  const expectedOptionIds = boundary.authority.optionIds;
+  const expectedAddress = boundary.authority.address;
+  if (!Array.isArray(expectedOptionIds) || expectedOptionIds.length === 0) {
+    throw new Error("[campaign-check-team] original reward row had no stable option identities");
+  }
+  let current = restored;
+  for (let step = 0; step <= 6; step++) {
+    if (restoredRewardRowMatches(current.authority, expectedOptionIds, expectedAddress)) {
+      const peerEvents = await Promise.all(
+        Object.values(rig.clients)
+          .filter(client => client !== owner)
+          .map(peer =>
+            peer.evidence.waitForCondition(
+              sink => {
+                const candidate = sink.findLastSemanticSurface(0, "reward-shop");
+                return rewardCursorProjectionMatches(current.authority, candidate?.observation) ? candidate : null;
+              },
+              { timeoutMs: rig.config.timeoutMs, description: `restored reward-card row on ${peer.label}` },
+            ),
+          ),
+      );
+      const proof = {
+        address: current.authority.address,
+        optionIds: current.authority.optionIds,
+        selectedOptionId: current.authority.selectedOptionId,
+        steps: step,
+      };
+      for (const client of Object.values(rig.clients)) {
+        client.evidence.record("campaign-check-team-reward-row-restored", proof);
+      }
+      return { ...current, peerEvents };
+    }
+    const fromCursor = owner.evidence.cursor();
+    const priorSelection = current.authority.selectedOptionId;
+    const priorOptions = JSON.stringify(current.authority.optionIds ?? null);
+    await owner.press("ArrowUp", `campaign-check-team-restore-reward-row-${step + 1}`);
+    const ownerEvent = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(fromCursor, "reward-shop");
+        const observation = candidate?.observation;
+        return candidate != null
+          && JSON.stringify(observation.address) === JSON.stringify(expectedAddress)
+          && isActionableSemanticObservation(observation)
+          && (observation.selectedOptionId !== priorSelection
+            || JSON.stringify(observation.optionIds ?? null) !== priorOptions)
+          ? candidate
+          : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: "Check Team return navigation toward retained reward cards" },
+    );
+    current = { authority: ownerEvent.observation, ownerEvent, peerEvents: [] };
+  }
+  throw new Error(
+    `[campaign-check-team] could not restore reward row ${JSON.stringify(expectedOptionIds)} after returning from PARTY`,
+  );
+}
+
+/**
+ * Exercise the player-reported nested reward path exclusively through public keyboard input:
+ * reward row -> Check Team -> Move active slot 0 -> swap with reserve slot 2 -> return.
+ * The watcher deliberately remains on the reward surface, so this asserts asymmetric UI plus
+ * identical party material and atomic visible-field readiness before accepting the return.
+ */
+async function driveRewardCheckTeamReorder(rig, owner, boundary) {
+  const clients = Object.values(rig.clients);
+  const peers = clients.filter(client => client !== owner);
+  const address = boundary.authority.address;
+  const addressJson = JSON.stringify(address);
+  const beforePartyIds = boundary.authority.partySlots?.map(slot => slot.pokemonId) ?? [];
+  if (beforePartyIds.length < 3) {
+    throw new Error(
+      `[campaign-check-team] requires an active lead and slot-2 reserve: ${JSON.stringify(boundary.authority.partySlots ?? null)}`,
+    );
+  }
+
+  // Account-local shopCursorTarget can start on rewards, actions, or a paid shop row. Walk
+  // downward by observed semantic state until the stable Check Team action row is visible.
+  let actionEvent = boundary.ownerEvent;
+  for (let step = 0; step < 6 && !actionEvent.observation.optionIds?.includes("reward-action:check-team"); step++) {
+    const beforeIndex = actionEvent.index;
+    await owner.press("ArrowDown", `campaign-check-team-action-row-${step}`);
+    actionEvent = await owner.evidence.waitForCondition(
+      sink => {
+        const candidate = sink.findLastSemanticSurface(beforeIndex, "reward-shop");
+        return candidate != null
+          && JSON.stringify(candidate.observation.address) === addressJson
+          && candidate.observation.selectedOptionId !== actionEvent.observation.selectedOptionId
+          && isActionableSemanticObservation(candidate.observation)
+          ? candidate
+          : null;
+      },
+      { timeoutMs: rig.config.timeoutMs, description: "Check Team reward action row navigation" },
+    );
+  }
+  if (!actionEvent.observation.optionIds?.includes("reward-action:check-team")) {
+    throw new Error(
+      `[campaign-check-team] reward surface exposed no Check Team action: ${JSON.stringify(actionEvent.observation)}`,
+    );
+  }
+
+  const peerCursorBeforeAction = fromEach(peers, peer => peer.evidence.cursor());
+  const selectedAction = await selectOptionById(owner, {
+    surfaceId: "reward-shop",
+    targetId: "reward-action:check-team",
+    navKeys: ["ArrowRight", "ArrowLeft"],
+    submit: false,
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: actionEvent.index,
+  });
+  const ownerActionEvent = owner.evidence.events[selectedAction.surfaceEventIndex];
+  const ownerAction = ownerActionEvent?.observation;
+  if (ownerAction?.selectedOptionId !== "reward-action:check-team") {
+    throw new Error(`[campaign-check-team] owner never selected Check Team: ${JSON.stringify(ownerAction ?? null)}`);
+  }
+  await Promise.all(
+    peers.map(peer =>
+      peer.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(peerCursorBeforeAction[peer.label], "reward-shop");
+          return rewardCursorProjectionMatches(ownerAction, candidate?.observation) ? candidate : null;
+        },
+        { timeoutMs: rig.config.timeoutMs, description: `mirrored Check Team cursor on ${peer.label}` },
+      ),
+    ),
+  );
+
+  const partyOpenCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-check-team-open");
+  let partyEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(partyOpenCursor, "party:reward-target");
+      return candidate != null
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && candidate.observation.optionIds?.includes("party-slot:2")
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team party list" },
+  );
+
+  const sourceMenuCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-slot:0",
+    navKeys: ["ArrowUp", "ArrowDown"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: partyEvent.index,
+  });
+  let moveEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(sourceMenuCursor, "party:reward-target");
+      return candidate?.observation.optionIds?.includes("party-option:move")
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team source Move action" },
+  );
+  const targetListCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:move",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: moveEvent.index,
+  });
+  partyEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(targetListCursor, "party:reward-target");
+      return candidate?.observation.optionIds?.includes("party-slot:2")
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team reorder target list" },
+  );
+
+  const targetMenuCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-slot:2",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: partyEvent.index,
+  });
+  moveEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(targetMenuCursor, "party:reward-target");
+      return candidate?.observation.optionIds?.includes("party-option:move")
+        && JSON.stringify(candidate.observation.address) === addressJson
+        && isActionableSemanticObservation(candidate.observation, { requireExplicitUnblocked: true })
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "Check Team target Move action" },
+  );
+
+  const convergenceCursors = fromEach(clients, client => client.evidence.cursor());
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:move",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: moveEvent.index,
+  });
+  const expectedPartyIds = [...beforePartyIds];
+  [expectedPartyIds[0], expectedPartyIds[2]] = [expectedPartyIds[2], expectedPartyIds[0]];
+  const converged = await Promise.all(
+    clients.map(client =>
+      client.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(convergenceCursors[client.label]);
+          return candidate != null && partyReorderPresentationMatches(candidate.observation, expectedPartyIds)
+            ? candidate
+            : null;
+        },
+        {
+          timeoutMs: rig.config.timeoutMs,
+          description: `Check Team party/visible-field convergence on ${client.label}`,
+        },
+      ),
+    ),
+  );
+  const proof = {
+    address,
+    ownerSeat: owner.publicSeat,
+    beforePartyIds,
+    expectedPartyIds,
+    fieldIds: converged.map(event => event.observation.presentation.expectedPlayerFieldIds),
+  };
+  for (const client of clients) {
+    client.evidence.record("campaign-check-team-reorder", proof);
+  }
+
+  const returnCursors = fromEach(clients, client => client.evidence.cursor());
+  // The watcher never left reward-shop. Its post-reorder surface is already the exact stable projection
+  // we need, and it is not required to emit a duplicate merely because the owner closes PARTY.
+  const restoredSurfaceCursors = retainStableWatcherSurfaceCursors(
+    returnCursors,
+    convergenceCursors,
+    peers.map(peer => peer.label),
+  );
+  await owner.press("Backspace", "campaign-check-team-return-to-reward");
+  const restored = await checkpointPairedMechanicalSurface(rig, "reward-shop", restoredSurfaceCursors, owner);
+  const restoredPeerEvents = await Promise.all(
+    peers.map(peer =>
+      peer.evidence.waitForCondition(
+        sink => {
+          const candidate = sink.findLastSemanticSurface(restoredSurfaceCursors[peer.label], "reward-shop");
+          return rewardCursorProjectionMatches(restored.authority, candidate?.observation) ? candidate : null;
+        },
+        { timeoutMs: rig.config.timeoutMs, description: `absolute reward cursor restored on ${peer.label}` },
+      ),
+    ),
+  );
+  for (const client of clients) {
+    client.evidence.record("campaign-check-team-return", {
+      address: restored.authority.address,
+      selectedOptionId: restored.authority.selectedOptionId,
+      watcherSeats: restoredPeerEvents.map(event => event.observation.localSeat),
+    });
+  }
+  return restoreRewardRowAfterCheckTeam(rig, owner, boundary, restored);
+}
+
 /**
  * A party-target reward is intentionally asymmetric while the owner chooses: the owner
  * opens PARTY and the watcher stays parked on its read-only reward replica. Prove that
@@ -3245,6 +4001,18 @@ export function rewardPartyTargetCandidates(boundary, fallbackSlot = 0) {
   let candidates = [];
   if (typeof rewardId === "string" && /REVIVE/u.test(rewardId)) {
     candidates = usableSlots.filter(slot => slot.fainted === true);
+  } else if (typeof rewardId === "string" && /^(?:FULL_HEAL|FULL_RESTORE)$/u.test(rewardId)) {
+    // Full Heal is legal on a full-HP status target, while Full Restore is legal for either
+    // missing HP or status. Run 30795897194 proved the old generic healing predicate discarded
+    // the exact burned reserve, exhausted two healthy active slots, and left an otherwise
+    // actionable production PARTY handler parked. Keep legality derived from the public party
+    // material so this remains a real UI driver rather than a fixture-specific slot shortcut.
+    candidates = usableSlots.filter(
+      slot =>
+        slot.fainted !== true
+        && (slot.statusEffect != null
+          || (typeof slot.hp === "number" && typeof slot.maxHp === "number" && slot.hp < slot.maxHp)),
+    );
   } else if (
     typeof rewardId === "string"
     && /POTION|RESTORE|HEAL|WATER|SODA|LEMONADE|MOOMOO_MILK|ENERGY_ROOT|BERRY/u.test(rewardId)
@@ -3367,6 +4135,199 @@ function campaignRewardUtility(optionId) {
   return 0;
 }
 
+function visiblePartyRewardFixtureId(authority, configuredId) {
+  const options = Array.isArray(authority?.optionIds) ? authority.optionIds : [];
+  return typeof configuredId === "string" && options.includes(configuredId) ? configuredId : null;
+}
+
+function partyRewardMutationProjection(slot) {
+  return slot == null
+    ? null
+    : {
+        pokemonId: slot.pokemonId,
+        speciesId: slot.speciesId,
+        formIndex: slot.formIndex,
+        fusionSpeciesId: slot.fusionSpeciesId,
+        fusionFormIndex: slot.fusionFormIndex,
+        hp: slot.hp,
+        maxHp: slot.maxHp,
+        fainted: slot.fainted,
+        level: slot.level,
+        exp: slot.exp,
+        statusEffect: slot.statusEffect,
+        abilityIndex: slot.abilityIndex,
+        abilityId: slot.abilityId,
+        innateAbilityIds: slot.innateAbilityIds,
+        abilitySlotActivity: slot.abilitySlotActivity,
+        runUnlockedAbilitySlots: slot.runUnlockedAbilitySlots,
+        nature: slot.nature,
+        teraType: slot.teraType,
+        maxMoveCount: slot.maxMoveCount,
+        bonusMoveSlots: slot.bonusMoveSlots,
+        modifierStacks: slot.modifierStacks,
+        moves: slot.moves,
+      };
+}
+
+const PARTY_REWARD_PRESENTATION_SURFACES = new Map([
+  [
+    "EVOLUTION_ITEM",
+    { surfaceId: "battle:evolution", phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]) },
+  ],
+  [
+    "RARE_EVOLUTION_ITEM",
+    { surfaceId: "battle:evolution", phases: new Set(["EvolutionPhase", "CoopWaveProgressionReplayPhase"]) },
+  ],
+  [
+    "FORM_CHANGE_ITEM",
+    { surfaceId: "battle:form-change", phases: new Set(["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"]) },
+  ],
+  [
+    "RARE_FORM_CHANGE_ITEM",
+    { surfaceId: "battle:form-change", phases: new Set(["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"]) },
+  ],
+]);
+
+/**
+ * A converged final form/species proves mechanics, but it does not prove the user-visible cutscene.
+ * Under the animations-on profile, require both public browsers to expose a fresh, input-ready
+ * evolution-scene surface after the exact reward action. This catches the V2 failure mode where the
+ * authority plays the ordinary phase while the complete result silently teleports the watcher to the
+ * final material without installing its mechanics-free renderer.
+ */
+export function assertPartyRewardPresentationParity(clients, rewardId, presentationCursors, renderProfile) {
+  const contract = PARTY_REWARD_PRESENTATION_SURFACES.get(rewardId);
+  if (renderProfile !== "animations-on-surface" || contract == null) {
+    return null;
+  }
+  const proof = clients.map(client => {
+    const from = presentationCursors?.[client.label];
+    if (!Number.isSafeInteger(from)) {
+      throw new Error(`[campaign-party-reward] ${rewardId} omitted the ${client.label} pre-action presentation cursor`);
+    }
+    const seen = new Map();
+    for (const event of client.evidence.events.slice(from)) {
+      const observation = event.kind === "browser-surface2" ? event.observation : null;
+      if (
+        observation?.surfaceId !== contract.surfaceId
+        || observation.uiMode !== "EVOLUTION_SCENE"
+        || !contract.phases.has(observation.phase)
+        || observation.ready?.handlerActive !== true
+        || !Number.isSafeInteger(observation.phaseInstance)
+      ) {
+        continue;
+      }
+      const identity = JSON.stringify([
+        observation.phase,
+        observation.phaseInstance,
+        observation.surfaceGeneration ?? null,
+      ]);
+      seen.set(identity, {
+        phase: observation.phase,
+        phaseInstance: observation.phaseInstance,
+        surfaceGeneration: observation.surfaceGeneration ?? null,
+        address: observation.address,
+      });
+    }
+    return { client: client.label, observations: [...seen.values()] };
+  });
+  const missing = proof.filter(entry => entry.observations.length === 0);
+  if (missing.length > 0) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} omitted animations-enabled ${contract.surfaceId} presentation: `
+        + JSON.stringify(proof),
+    );
+  }
+  for (const client of clients) {
+    client.evidence.record("campaign-party-reward-presentation-proof", {
+      rewardId,
+      surfaceId: contract.surfaceId,
+      clients: proof,
+    });
+  }
+  return proof;
+}
+
+function assertPartyRewardChangedConfiguredMaterial(rewardId, before, after, abilityChoices) {
+  const beforeProjection = partyRewardMutationProjection(before);
+  const afterProjection = partyRewardMutationProjection(after);
+  if (beforeProjection == null || afterProjection == null) {
+    throw new Error(`[campaign-party-reward] ${rewardId} had no before/after target material`);
+  }
+  const changed = JSON.stringify(beforeProjection) !== JSON.stringify(afterProjection);
+  if (!changed) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} crossed into the next wave without changing its target: `
+        + JSON.stringify({ before: beforeProjection, after: afterProjection, abilityChoices }),
+    );
+  }
+  if (rewardId === "MOVE_SLOT_EXPANDER" && after.maxMoveCount !== before.maxMoveCount + 1) {
+    throw new Error(
+      `[campaign-party-reward] Move Slot Expander did not raise the exact target cap: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (
+    (rewardId === "TM_CASE"
+      || rewardId === "ER_LEARNERS_SHROOM"
+      || rewardId === "MEMORY_MUSHROOM"
+      || rewardId === "TM_COMMON"
+      || rewardId === "TM_GREAT"
+      || rewardId === "TM_ULTRA")
+    && JSON.stringify(before.moves?.map(move => move.moveId)) === JSON.stringify(after.moves?.map(move => move.moveId))
+  ) {
+    throw new Error(`[campaign-party-reward] ${rewardId} accepted teaching but retained the old move ids`);
+  }
+  if (/^(?:POTION|SUPER_POTION|HYPER_POTION|MAX_POTION|FULL_RESTORE)$/u.test(rewardId) && after.hp <= before.hp) {
+    throw new Error(`[campaign-party-reward] ${rewardId} did not restore HP: ${JSON.stringify({ before, after })}`);
+  }
+  if (
+    /^(?:REVIVE|MAX_REVIVE)$/u.test(rewardId)
+    && (before.fainted !== true || after.fainted === true || after.hp <= 0)
+  ) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} did not revive the target: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (/^(?:FULL_RESTORE|FULL_HEAL)$/u.test(rewardId) && (before.statusEffect == null || after.statusEffect != null)) {
+    throw new Error(`[campaign-party-reward] ${rewardId} did not clear status: ${JSON.stringify({ before, after })}`);
+  }
+  if (rewardId === "RARE_CANDY" && after.level <= before.level) {
+    throw new Error(
+      `[campaign-party-reward] Rare Candy did not raise the target level: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (/^(?:EVOLUTION_ITEM|RARE_EVOLUTION_ITEM)$/u.test(rewardId) && after.speciesId === before.speciesId) {
+    throw new Error(
+      `[campaign-party-reward] ${rewardId} did not evolve the target: ${JSON.stringify({ before, after })}`,
+    );
+  }
+  if (/^(?:FORM_CHANGE_ITEM|RARE_FORM_CHANGE_ITEM)$/u.test(rewardId) && after.formIndex === before.formIndex) {
+    throw new Error(`[campaign-party-reward] ${rewardId} did not change form: ${JSON.stringify({ before, after })}`);
+  }
+  if (rewardId === "TERA_SHARD" && after.teraType === before.teraType) {
+    throw new Error(`[campaign-party-reward] Tera Shard retained the old type: ${JSON.stringify({ before, after })}`);
+  }
+  if (/^(?:PP_UP|PP_MAX)$/u.test(rewardId)) {
+    const beforePp = before.moves?.map(move => move.ppUp) ?? [];
+    const afterPp = after.moves?.map(move => move.ppUp) ?? [];
+    if (!afterPp.some((value, index) => value > (beforePp[index] ?? value))) {
+      throw new Error(
+        `[campaign-party-reward] ${rewardId} did not raise move PP: ${JSON.stringify({ before, after })}`,
+      );
+    }
+  }
+  if (/^(?:ETHER|MAX_ETHER|ELIXIR|MAX_ELIXIR)$/u.test(rewardId)) {
+    const beforeUsed = before.moves?.reduce((sum, move) => sum + (move.ppUsed ?? 0), 0) ?? 0;
+    const afterUsed = after.moves?.reduce((sum, move) => sum + (move.ppUsed ?? 0), 0) ?? 0;
+    if (afterUsed >= beforeUsed) {
+      throw new Error(`[campaign-party-reward] ${rewardId} did not restore PP: ${JSON.stringify({ before, after })}`);
+    }
+  }
+  if (rewardId === "DNA_SPLICERS" && after.fusionSpeciesId == null) {
+    throw new Error(`[campaign-party-reward] DNA Splicers did not install a fusion species: ${JSON.stringify(after)}`);
+  }
+}
+
 /**
  * Pick the highest-utility still-untried visible reward after a learn-move decline returns to the
  * same shop. The observer exposes only the option ids a player can currently see; selection still
@@ -3402,6 +4363,22 @@ export function chooseUntriedRewardOption(authority, rejectedRewardIds) {
  */
 export function isExplicitEmptyRewardShop(authority) {
   return Array.isArray(authority?.optionIds) && authority.optionIds.length === 0 && authority.optionCount === 0;
+}
+
+/**
+ * Release only the two semantic appearances that participate in an exhausted party-reward retry.
+ *
+ * The reward shop can reopen PARTY for a different item without changing the Authority V2 address,
+ * SelectModifierPhase instance, or PARTY surface generation. Keeping the first picker's handled
+ * identity therefore makes the driver ignore the second picker's real actionable UI forever. A
+ * human has explicitly returned to the reward row at this point, so both the row and its nested
+ * picker are new work; unrelated between-wave surfaces must remain suppressed.
+ */
+export function resetRewardRetrySurfaceLedger(handledIndex, clients) {
+  for (const client of clients) {
+    handledIndex.delete(`reward:${client.label}`);
+    handledIndex.delete(`reward-target:${client.label}`);
+  }
 }
 
 async function moveRewardPartyCursor(rig, owner, event, targetSlot) {
@@ -3533,9 +4510,102 @@ async function inspectRewardPartySummary(rig, owner, boundary, targetSlot, optio
   return openRewardPartyApply(rig, owner, boundary, targetSlot);
 }
 
+async function finishRewardFusion(rig, owner, boundary, primarySlot, fromCursor) {
+  const primary = boundary.authority.partySlots?.find(slot => slot.slot === primarySlot) ?? null;
+  const secondarySlot = boundary.authority.partySlots?.find(
+    slot =>
+      slot.slot !== primarySlot
+      && slot.coopOwner === primary?.coopOwner
+      && slot.fainted !== true
+      && slot.allowedInBattle === true,
+  )?.slot;
+  if (!Number.isSafeInteger(secondarySlot)) {
+    throw new Error(
+      `[campaign-reward-fusion] no same-owner secondary target for slot ${primarySlot}: `
+        + JSON.stringify(boundary.authority.partySlots ?? null),
+    );
+  }
+  let slotEvent = await owner.evidence.waitForCondition(
+    sink => {
+      const candidate = sink.findLastSemanticSurface(fromCursor, "party:reward-target");
+      const observation = candidate?.observation;
+      return candidate != null
+        && JSON.stringify(observation?.address) === JSON.stringify(boundary.authority.address)
+        && /^party-slot:\d+$/u.test(observation.selectedOptionId ?? "")
+        && isActionableSemanticObservation(observation)
+        ? candidate
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "DNA Splicers secondary party selector" },
+  );
+  slotEvent = await moveRewardPartyCursor(rig, owner, slotEvent, secondarySlot);
+  const secondaryCursor = owner.evidence.cursor();
+  await owner.press("Space", "campaign-reward-fusion-select-secondary");
+  const secondaryResolution = await owner.evidence.waitForCondition(
+    sink => {
+      const optionEvent = sink.findLastSemanticSurface(secondaryCursor, "party:reward-target");
+      if (
+        optionEvent != null
+        && JSON.stringify(optionEvent.observation.address) === JSON.stringify(boundary.authority.address)
+        && optionEvent.observation.optionIds?.includes("party-option:splice")
+        && isActionableSemanticObservation(optionEvent.observation)
+      ) {
+        return { kind: "splice-action", event: optionEvent };
+      }
+      const outcome = classifyRewardTargetApplyOutcome(sink.events, secondaryCursor, boundary.authority.address);
+      return outcome?.status === "accepted" ? { kind: "immediate", outcome } : null;
+    },
+    {
+      timeoutMs: rig.config.timeoutMs,
+      description: "DNA Splicers secondary target action or immediate fusion commit",
+    },
+  );
+  if (secondaryResolution.kind === "immediate") {
+    owner.evidence.record("campaign-reward-fusion-secondary", {
+      address: boundary.authority.address,
+      ownerSeat: owner.publicSeat,
+      primarySlot,
+      secondarySlot,
+      resolution: "immediate",
+    });
+    return secondaryResolution.outcome;
+  }
+  const optionEvent = secondaryResolution.event;
+  if (!optionEvent.observation.optionIds?.includes("party-option:splice")) {
+    throw new Error(
+      `[campaign-reward-fusion] slot ${secondarySlot} exposed no splice action: `
+        + JSON.stringify(optionEvent.observation.optionIds ?? null),
+    );
+  }
+  owner.evidence.record("campaign-reward-fusion-secondary", {
+    address: boundary.authority.address,
+    ownerSeat: owner.publicSeat,
+    primarySlot,
+    secondarySlot,
+    resolution: "splice-action",
+  });
+  const spliceCursor = owner.evidence.cursor();
+  await selectOptionById(owner, {
+    surfaceId: "party:reward-target",
+    targetId: "party-option:splice",
+    navKeys: ["ArrowDown", "ArrowUp"],
+    submitKey: "Space",
+    timeoutMs: rig.config.timeoutMs,
+    fromCursor: optionEvent.index,
+  });
+  return owner.evidence.waitForCondition(
+    sink => classifyRewardTargetApplyOutcome(sink.events, spliceCursor, boundary.authority.address),
+    { timeoutMs: rig.config.timeoutMs, description: "DNA Splicers accepted or visibly rejected" },
+  );
+}
+
 async function driveRewardPartyTarget(rig, driver, owner, boundary) {
   const target = rewardPartyTargetCandidates(boundary, driver.partySlot ?? 0);
-  const candidateSlots = target.slots;
+  const forcedSlot = driver.partySlot ?? 0;
+  const candidateSlots =
+    driver.forcePartySlot === true && target.slots.includes(forcedSlot)
+      ? [forcedSlot, ...target.slots.filter(slot => slot !== forcedSlot)]
+      : target.slots;
   let event = boundary.ownerEvent;
   for (const targetSlot of candidateSlots) {
     event = await moveRewardPartyCursor(rig, owner, event, targetSlot);
@@ -3551,6 +4621,10 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       ownerSeat: owner.publicSeat,
       partySlot: targetSlot,
       rewardId: target.rewardId,
+      presentationCursors: Object.fromEntries(
+        Object.values(rig.clients).map(client => [client.label, client.evidence.cursor()]),
+      ),
+      beforePartySlot: boundary.authority.partySlots?.find(slot => slot.slot === targetSlot) ?? null,
       selectedOptionId: optionEvent.observation.selectedOptionId,
       optionIds: optionEvent.observation.optionIds,
     });
@@ -3570,10 +4644,16 @@ async function driveRewardPartyTarget(rig, driver, owner, boundary) {
       timeoutMs: rig.config.timeoutMs,
       fromCursor: optionEvent.index,
     });
-    const outcome = await owner.evidence.waitForCondition(
-      sink => classifyRewardTargetApplyOutcome(sink.events, applyCursor, boundary.authority.address),
-      { timeoutMs: rig.config.timeoutMs, description: `reward target ${targetSlot} accepted or visibly rejected` },
-    );
+    const outcome =
+      target.rewardId === "DNA_SPLICERS" && actionOptionId === "party-option:apply"
+        ? await finishRewardFusion(rig, owner, boundary, targetSlot, applyCursor)
+        : await owner.evidence.waitForCondition(
+            sink => classifyRewardTargetApplyOutcome(sink.events, applyCursor, boundary.authority.address),
+            {
+              timeoutMs: rig.config.timeoutMs,
+              description: `reward target ${targetSlot} accepted or visibly rejected`,
+            },
+          );
     if (outcome.status === "accepted") {
       return {
         addressKey: authoritativeAddressKey(boundary.authority.address),
@@ -3919,13 +4999,40 @@ async function driveOnePendingSurface(
           ? await driveTargetedMarket(rig, cursors, driver.market)
           : await driveMarketLeave(rig, cursors);
     } else if (driver.name === "reward" && mechanicalBoundary != null && driver.confirmSurfaceId == null) {
+      if (
+        policy.partyMutatingReward.checkTeamReorder
+        && mechanicalBoundary.authority.optionIds?.includes(policy.partyMutatingReward.rewardId)
+        && !Object.values(rig.clients).some(client =>
+          client.evidence.events.some(event => event.kind === "campaign-check-team-reorder"),
+        )
+      ) {
+        mechanicalBoundary = await driveRewardCheckTeamReorder(rig, client, mechanicalBoundary);
+      }
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
       const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
       const capsuleTarget =
         mechanicalBoundary.authority.optionIds?.includes("ER_ABILITY_CAPSULE") && policy.abilityCapsule.required
           ? "ER_ABILITY_CAPSULE"
           : null;
-      const targetId = capsuleTarget ?? chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
+      const partyRewardTarget = policy.partyMutatingReward.required
+        ? visiblePartyRewardFixtureId(mechanicalBoundary.authority, policy.partyMutatingReward.rewardId)
+        : null;
+      if (policy.partyMutatingReward.required && partyRewardTarget == null) {
+        throw new Error(
+          `[campaign-party-reward] fixture reward ${policy.partyMutatingReward.rewardId} was not visible: `
+            + JSON.stringify(mechanicalBoundary.authority.optionIds ?? null),
+        );
+      }
+      const targetId =
+        capsuleTarget ?? partyRewardTarget ?? chooseUntriedRewardOption(mechanicalBoundary.authority, rejected);
+      if (policy.partyMutatingReward.direct && targetId === policy.partyMutatingReward.rewardId) {
+        client.evidence.record("campaign-direct-party-reward-action", {
+          address: mechanicalBoundary.authority.address,
+          ownerSeat: client.publicSeat,
+          rewardId: targetId,
+          beforePartySlots: mechanicalBoundary.authority.partySlots,
+        });
+      }
       if (targetId == null) {
         if (isExplicitEmptyRewardShop(mechanicalBoundary.authority)) {
           client.evidence.record("campaign-empty-reward-continue", {
@@ -3971,9 +5078,7 @@ async function driveOnePendingSurface(
         }
         rewardRetryState.rejectedByAddress.set(result.addressKey, rejected);
         rewardRetryState.pendingTarget = null;
-        for (const candidate of Object.values(rig.clients)) {
-          handledIndex.delete(`reward:${candidate.label}`);
-        }
+        resetRewardRetrySurfaceLedger(handledIndex, Object.values(rig.clients));
         client.evidence.record("campaign-reward-target-exhausted", {
           address: result.address,
           rewardId: result.rewardId,
@@ -3986,10 +5091,19 @@ async function driveOnePendingSurface(
     } else if (driver.name === "mystery-encounter") {
       await driveMysteryEncounterChoice(rig, client, cursors, driver.preferLastEnabledOption === true);
     } else if (driver.name === "learn-move-confirm" && mechanicalBoundary != null) {
-      await driveLearnMoveDecline(rig, client, mechanicalBoundary);
+      if (policy.partyMutatingReward.acceptLearnMove) {
+        await driveLearnMoveAccept(rig, client, mechanicalBoundary, policy.partyMutatingReward.rewardId);
+        rewardRetryState.pendingTarget = null;
+      } else {
+        await driveLearnMoveDecline(rig, client, mechanicalBoundary);
+      }
       const pending = rewardRetryState.pendingTarget;
       const addressKey = authoritativeAddressKey(mechanicalBoundary.authority.address);
-      if (pending?.rewardId != null && pending.addressKey === addressKey) {
+      if (
+        !policy.partyMutatingReward.acceptLearnMove
+        && pending?.rewardId != null
+        && pending.addressKey === addressKey
+      ) {
         const rejected = rewardRetryState.rejectedByAddress.get(addressKey) ?? new Set();
         rejected.add(pending.rewardId);
         rewardRetryState.rejectedByAddress.set(addressKey, rejected);
@@ -4261,6 +5375,46 @@ function latestCommandObservation(client, wave) {
   return observation?.operationClass === "command" && observation.address?.wave === wave ? observation : null;
 }
 
+/**
+ * Return the newest exact-address semantic projection that carries party material at/after `minWave`.
+ * Prefer a command projection within that newest wave when one exists, but do not require one: on
+ * Mystery difficulty the next authoritative surface can legitimately be the wave-N Mystery Encounter
+ * before CommandPhase opens. Requiring CommandPhase made a completed reward mutation look unfinished.
+ */
+function latestPartyMaterialObservation(client, minWave) {
+  const candidates = client.evidence.events.filter(event => {
+    const observation = event.kind === "browser-surface2" ? event.observation : null;
+    return (
+      Number.isSafeInteger(observation?.address?.epoch)
+      && Number.isSafeInteger(observation.address.wave)
+      && observation.address.wave >= minWave
+      && Number.isSafeInteger(observation.address.turn)
+      && observation.surfaceId !== "unclassified"
+      && Array.isArray(observation.partySlots)
+    );
+  });
+  const newestWave = candidates.reduce(
+    (wave, event) => Math.max(wave, event.observation.address.wave),
+    Number.NEGATIVE_INFINITY,
+  );
+  const newestWaveCandidates = candidates.filter(event => event.observation.address.wave === newestWave);
+  const command = newestWaveCandidates.findLast(event => event.observation.operationClass === "command");
+  return (command ?? newestWaveCandidates.at(-1))?.observation ?? null;
+}
+
+function assertPairedPartyMaterialFrontier(configuredId, observations) {
+  if (observations.some(observation => observation == null)) {
+    throw new Error(`[campaign-party-reward] ${configuredId} never exposed both wave-2 party projections`);
+  }
+  const addresses = observations.map(observation => observation.address);
+  if (JSON.stringify(addresses[0]) !== JSON.stringify(addresses[1])) {
+    throw new Error(
+      `[campaign-party-reward] ${configuredId} party material came from different authority addresses: `
+        + JSON.stringify(addresses),
+    );
+  }
+}
+
 /** Prove an exact initial-save fixture produced three level-100, evolution-paused mons per real seat. */
 function assertLongitudinalFixtureParty(rig, wave, context, evidenceKind, expectedSpecies) {
   const observations = Object.values(rig.clients).map(client => ({
@@ -4371,7 +5525,15 @@ export function recordNavigationCommandFrontier(rig, coverage, wave) {
       displayedWave: observation.displayedWave,
     };
   });
-  const canonical = projections.map(({ label: _label, ...projection }) => JSON.stringify(projection));
+  const canonical = projections.map(({ label: _label, presentation, ...projection }) =>
+    JSON.stringify({
+      ...projection,
+      presentation: {
+        trainerVisible: presentation.trainerVisible,
+        enemyTrainerPresented: presentation.enemyTrainerPresented,
+      },
+    }),
+  );
   if (canonical[0] !== canonical[1]) {
     throw new Error(
       `[campaign-navigation] command arena/presentation diverged at wave ${wave}: ${JSON.stringify(projections)}`,
@@ -4503,24 +5665,35 @@ async function advanceToNextWaveCommand(
   const betweenWaveTimeoutMs = rig.config.timeoutMs * 3;
   const fixedDeadline = Date.now() + betweenWaveTimeoutMs;
   // Runs 30205274431 and 30241841635 reached the old ceiling while both real browsers were still
-  // advancing ordered presentation, then proved the next shared command 44s and 22s later. That is a
-  // harness false red, not permission to wait indefinitely: animations-on alone may refresh the deadline
-  // from observed phase/authority/renderer progress, and the absolute ceiling is the same measured
-  // per-event software-WebGL budget used for one dense turn. All faster profiles retain the fixed deadline.
-  const betweenWaveBudget = policy.moveAnimationsExpected
-    ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
-        hardCeilingMs: Math.max(
-          betweenWaveTimeoutMs + ANIMATION_PROGRESS_ALLOWANCE_MS,
-          ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS,
-        ),
-      })
-    : null;
+  // advancing ordered presentation, then proved the next shared command 44s and 22s later. Run
+  // 30779783513 subsequently proved the turn-only ceiling was still too narrow for one finite chain of
+  // reward -> retained evolution -> learn-move -> next-encounter presentation: both clients reached wave 2,
+  // but the ceiling expired while one renderer was entering CoopReplayTurnPhase. That is a harness false
+  // red, not permission to wait indefinitely. The animations-on chain therefore gets the ordinary
+  // between-wave window plus at most one measured dense-presentation ceiling. Only causal phase/stream
+  // progress refreshes the sliding deadline, and the sum remains an immutable outer bound. All faster
+  // profiles retain the fixed deadline.
+  // Party-mutation fixtures deliberately retain the native evolution presentation even when
+  // ordinary move animations are skipped. Under the 28-way matrix in run 30795897194 the
+  // authoritative evolution and mirrored party material completed, but the finite cutscene was
+  // still emitting monotonically advancing stage heartbeats when the fixed 270s deadline fired.
+  // Reuse the same causal progress budget as normal presentation qualification, with a smaller
+  // immutable ceiling. Keepalives and repeated phase names still cannot extend it.
+  const retainedPartyEvolutionExpected = retainedPartyEvolutionNeedsProgressBudget(policy.partyMutatingReward);
+  const betweenWaveBudget =
+    policy.moveAnimationsExpected || retainedPartyEvolutionExpected
+      ? createAnimationProgressBudget(rig, commandCursors, betweenWaveTimeoutMs, {
+          hardCeilingMs:
+            betweenWaveTimeoutMs
+            + (policy.moveAnimationsExpected ? ANIMATIONS_ON_OUTCOME_HARD_CEILING_MS : OUTCOME_HARD_CEILING_MS),
+        })
+      : null;
   // Mystery difficulty deliberately chains encounters without opening a battle command between them, and the
   // longitudinal navigation profile can encounter the same chain between two geographic frontiers. Give each
   // observer-proven public action one ordinary surface allowance; never refresh from keepalives, phase names, or
   // time alone. The immutable ceiling remains derived from the finite required Mystery surface count.
   const registeredSurfaceProgressBudget =
-    policy.mysteryGauntlet.required || policy.navigation.required
+    policy.mysteryGauntlet.required || policy.navigation.required || policy.registeredInteractions.required
       ? createRegisteredSurfaceProgressBudget(
           betweenWaveTimeoutMs,
           rig.config.timeoutMs,
@@ -4759,6 +5932,7 @@ export async function runCampaign(rig) {
     mysteryGauntlet: policy.mysteryGauntlet,
     registeredInteractions: policy.registeredInteractions,
     abilityCapsule: policy.abilityCapsule,
+    partyMutatingReward: policy.partyMutatingReward,
     navigation: policy.navigation,
     expectReclaim: rig.config.expectReclaim,
     setupTimeoutMs: lifecycle.setupTimeoutMs,
@@ -4781,6 +5955,7 @@ export async function runCampaign(rig) {
       navigationFixture: policy.navigation.required || policy.market.requiredPurchases > 0,
       registeredInteractionsFixture: policy.registeredInteractions.required,
       abilityCapsuleFixture: policy.abilityCapsule.required,
+      partyRewardFixture: policy.partyMutatingReward.required,
     });
     await progress.note("fresh co-op run reached its first shared command surface");
     if (rig.config.expectReclaim) {
@@ -4839,7 +6014,7 @@ export async function runCampaign(rig) {
   let status = "continue";
   const marketCoverage = { visits: [], purchases: [] };
   const mysteryCoverage = { events: [], battleKinds: [] };
-  const registeredInteractionCoverage = { revival: [], stormglass: [] };
+  const registeredInteractionCoverage = { revival: [], stormglass: [], mysterySuccessor: null };
   try {
     for (let ordinal = 1; ordinal <= policy.maxBattleLoops && wavesCleared < policy.targetWaves; ordinal++) {
       battleLoops = ordinal;
@@ -4921,16 +6096,17 @@ export async function runCampaign(rig) {
         wavesCleared = Math.max(wavesCleared, advanced.boundary.wave - 1);
       }
       rig.assertWaveProgressionLedger(waveNo, `campaign-wave-${waveNo}-progression-ledger`, {
-        // The dedicated longitudinal and registered-interaction fixtures start both parties at
-        // level 100, so a completed battle correctly has no EXP presentation. Keep the complete
-        // authority-vs-renderer ledger equality proof above, but reserve the mandatory EXP cue
-        // for normal-level journeys that can actually gain EXP.
+        // The dedicated longitudinal, registered-interaction, and party-mutating reward fixtures start
+        // both parties above ordinary progression levels, so a completed battle can correctly have no EXP
+        // presentation. Keep the complete authority-vs-renderer ledger equality proof above, but reserve
+        // the mandatory EXP cue for normal-level journeys that can actually gain EXP.
         requireExp:
           !(
             policy.navigation.required
             || policy.market.requiredPurchases > 0
             || policy.mysteryGauntlet.required
             || policy.registeredInteractions.required
+            || policy.partyMutatingReward.required
           )
           && (battleKind.battleType === "WILD" || battleKind.battleType === "TRAINER"),
       });
@@ -4947,6 +6123,12 @@ export async function runCampaign(rig) {
     }
     if (status === "continue" && wavesCleared >= policy.targetWaves) {
       await assertRenderProfileExecution(rig, policy, progress);
+      const trainerPresentationProof = assertTrainerPresentationCoverage(rig, mysteryCoverage.battleKinds);
+      if (trainerPresentationProof != null) {
+        await progress.note("trainer presentation lifecycle proven on both browsers", {
+          proof: trainerPresentationProof,
+        });
+      }
     }
     assertMarketCoverage(marketCoverage, policy.market);
     if (policy.navigation.required) {
@@ -5056,21 +6238,230 @@ export async function runCampaign(rig) {
           ...client.evidence.events.filter(event => event.kind === "campaign-stormglass-choice"),
         );
       }
-      if (registeredInteractionCoverage.revival.length !== 1 || registeredInteractionCoverage.stormglass.length !== 1) {
+      const stormglassMysterySuccessor = clients
+        .flatMap(client => client.evidence.events)
+        .find(
+          event =>
+            typeof event.text === "string"
+            && /\[coop:v2-replica\] apply rev=\d+ kind=INTERACTION_COMMIT .*STORMGLASS.*interactionAddresses:op%3Ame:ME_PRESENT:w2:t0/u.test(
+              event.text,
+            ),
+        );
+      const completedMysterySuccessor = mysteryCoverage.events.find(
+        event => event.kind === "mystery" && event.wave === 2 && event.terminal?.wave > event.wave,
+      );
+      registeredInteractionCoverage.mysterySuccessor = completedMysterySuccessor ?? null;
+      // The exact-build picker forces Fun and Games (enum value 27). Completing its wave-2 event proves
+      // the public driver crossed party selection, three direct combat turns, reward settlement, and the
+      // next-wave successor instead of merely completing an arbitrary no-battle Mystery surface.
+      if (
+        registeredInteractionCoverage.revival.length !== 1
+        || registeredInteractionCoverage.stormglass.length !== 1
+        || stormglassMysterySuccessor == null
+        || completedMysterySuccessor == null
+        || completedMysterySuccessor.mysteryEncounterType !== 27
+      ) {
         throw new Error(
-          "[campaign-registered-interactions] exact fixture did not drive one Revival and one Stormglass choice: "
+          "[campaign-registered-interactions] exact fixture did not complete Revival -> Stormglass -> ME_PRESENT(t0) -> Mystery terminal: "
             + JSON.stringify({
               revival: registeredInteractionCoverage.revival,
               stormglass: registeredInteractionCoverage.stormglass,
+              stormglassMysterySuccessor: stormglassMysterySuccessor?.text ?? null,
+              mysterySuccessor: registeredInteractionCoverage.mysterySuccessor,
+              expectedMysteryEncounterType: 27,
             }),
         );
       }
       const proof = {
         revival: registeredInteractionCoverage.revival[0],
         stormglass: registeredInteractionCoverage.stormglass[0],
+        stormglassMysterySuccessor: stormglassMysterySuccessor.text,
+        mysterySuccessor: registeredInteractionCoverage.mysterySuccessor,
       };
       for (const client of clients) {
         client.evidence.record("campaign-registered-interaction-coverage", proof);
+      }
+    }
+    if (policy.partyMutatingReward.required) {
+      const configuredId = policy.partyMutatingReward.rewardId;
+      const allEvents = clients.flatMap(client => client.evidence.events);
+      const targetActions = allEvents.filter(event => {
+        if (event.kind !== "campaign-reward-target-action") {
+          return false;
+        }
+        return event.rewardId === configuredId;
+      });
+      const learnAccepts = allEvents.filter(
+        event => event.kind === "campaign-learn-move-accepted" && event.rewardId === configuredId,
+      );
+      const abilityChoices = allEvents.filter(event => event.kind === "campaign-ability-choice");
+      if (policy.partyMutatingReward.checkTeamReorder) {
+        const reorderProofs = allEvents.filter(event => event.kind === "campaign-check-team-reorder");
+        const returnProofs = allEvents.filter(event => event.kind === "campaign-check-team-return");
+        if (
+          reorderProofs.length !== clients.length
+          || returnProofs.length !== clients.length
+          || JSON.stringify(reorderProofs[0]?.expectedPartyIds ?? null)
+            !== JSON.stringify(reorderProofs.at(-1)?.expectedPartyIds ?? null)
+          || reorderProofs.some(event =>
+            event.fieldIds?.some(
+              fieldIds => JSON.stringify(fieldIds) !== JSON.stringify(event.expectedPartyIds.slice(0, fieldIds.length)),
+            ),
+          )
+        ) {
+          throw new Error(
+            `[campaign-check-team] ${configuredId} did not prove reorder, visible field, and cursor return on both browsers: `
+              + JSON.stringify({ reorderProofs, returnProofs }),
+          );
+        }
+      }
+      if (policy.partyMutatingReward.direct) {
+        const directActions = allEvents.filter(
+          event => event.kind === "campaign-direct-party-reward-action" && event.rewardId === configuredId,
+        );
+        if (directActions.length !== 1 || !Array.isArray(directActions[0].beforePartySlots)) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not produce one observable direct mutation: `
+              + JSON.stringify(directActions),
+          );
+        }
+        const finalObservations = clients.map(client => latestPartyMaterialObservation(client, 2));
+        assertPairedPartyMaterialFrontier(configuredId, finalObservations);
+        const finalParties = finalObservations.map(observation => observation.partySlots);
+        const finalProjections = finalParties.map(party =>
+          party.map(partyRewardMutationProjection).sort((left, right) => left.pokemonId - right.pokemonId),
+        );
+        if (JSON.stringify(finalProjections[0]) !== JSON.stringify(finalProjections[1])) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} whole-party material diverged at wave 2: `
+              + JSON.stringify(finalProjections),
+          );
+        }
+        const beforeSlots = directActions[0].beforePartySlots;
+        const afterById = new Map(finalParties[0].map(slot => [slot.pokemonId, slot]));
+        if (
+          configuredId === "RARER_CANDY"
+          && !beforeSlots.every(slot => (afterById.get(slot.pokemonId)?.level ?? slot.level) > slot.level)
+        ) {
+          throw new Error("[campaign-party-reward] Rarer Candy did not level the whole party");
+        }
+        if (configuredId === "SACRED_ASH") {
+          const faintedBefore = beforeSlots.filter(slot => slot.fainted === true);
+          if (
+            faintedBefore.length < 2
+            || faintedBefore.some(slot => {
+              const after = afterById.get(slot.pokemonId);
+              return after == null || after.fainted === true || after.hp <= 0;
+            })
+          ) {
+            throw new Error(
+              "[campaign-party-reward] Sacred Ash did not revive both prepared reserves: "
+                + JSON.stringify({ beforeSlots, after: finalParties[0] }),
+            );
+          }
+        }
+        if (configuredId === "ER_DEX_NAV") {
+          const dexChoices = abilityChoices.filter(event => event.phase === "ErDexNavPhase");
+          const ownerOutcomes = allEvents.filter(
+            event => event.kind === "console" && /dexNav OWNER relay OUTCOME .* op=DEX_NAV/u.test(event.text ?? ""),
+          );
+          const watcherOutcomes = allEvents.filter(
+            event =>
+              event.kind === "console"
+              && /dexNav WATCHER apply OUTCOME .* op=DEX_NAV .* timedOut=false/u.test(event.text ?? ""),
+          );
+          if (
+            dexChoices.length !== 2
+            || new Set(dexChoices.map(event => event.targetId)).size !== 2
+            || ownerOutcomes.length !== 1
+            || watcherOutcomes.length !== 1
+          ) {
+            throw new Error(
+              "[campaign-party-reward] Dex Nav did not complete its two-choice owner/watcher workflow: "
+                + JSON.stringify({
+                  dexChoices,
+                  ownerOutcomes: ownerOutcomes.length,
+                  watcherOutcomes: watcherOutcomes.length,
+                }),
+            );
+          }
+        }
+        const proof = {
+          rewardId: configuredId,
+          directAction: directActions[0],
+          finalAddress: finalObservations[0].address,
+          finalParty: finalParties[0],
+        };
+        for (const client of clients) {
+          client.evidence.record("campaign-party-mutating-reward-coverage", proof);
+        }
+      } else {
+        if (targetActions.length !== 1) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not produce exactly one public party action: `
+              + JSON.stringify(targetActions),
+          );
+        }
+        if (policy.partyMutatingReward.acceptLearnMove && learnAccepts.length !== 1) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not accept exactly one full-moveset learn prompt: `
+              + JSON.stringify(learnAccepts),
+          );
+        }
+        const targetAction = targetActions[0];
+        if (
+          targetAction.partySlot !== targetAction.beforePartySlot?.slot
+          || targetAction.beforePartySlot?.coopOwner !== "guest"
+        ) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} did not target the guest-owned combined party slot: `
+              + JSON.stringify(targetAction),
+          );
+        }
+        const targetPokemonId = targetAction.beforePartySlot?.pokemonId;
+        if (!Number.isSafeInteger(targetPokemonId)) {
+          throw new Error(`[campaign-party-reward] ${configuredId} target exposed no stable Pokemon id`);
+        }
+        const finalObservations = clients.map(client => latestPartyMaterialObservation(client, 2));
+        assertPairedPartyMaterialFrontier(configuredId, finalObservations);
+        const finalSlots = finalObservations.map(
+          observation => observation.partySlots.find(slot => slot.pokemonId === targetPokemonId) ?? null,
+        );
+        if (finalSlots.some(slot => slot == null)) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} never exposed the target on both wave-2 party projections`,
+          );
+        }
+        const finalProjections = finalSlots.map(partyRewardMutationProjection);
+        if (JSON.stringify(finalProjections[0]) !== JSON.stringify(finalProjections[1])) {
+          throw new Error(
+            `[campaign-party-reward] ${configuredId} target material diverged at wave 2: `
+              + JSON.stringify(finalProjections),
+          );
+        }
+        assertPartyRewardChangedConfiguredMaterial(
+          configuredId,
+          targetAction.beforePartySlot,
+          finalSlots[0],
+          abilityChoices,
+        );
+        assertPartyRewardPresentationParity(
+          clients,
+          configuredId,
+          targetAction.presentationCursors,
+          policy.renderProfile,
+        );
+        const proof = {
+          rewardId: configuredId,
+          targetAction,
+          learnAccept: learnAccepts[0] ?? null,
+          abilityChoice: abilityChoices[0] ?? null,
+          finalAddress: finalObservations[0].address,
+          finalTarget: finalSlots[0],
+        };
+        for (const client of clients) {
+          client.evidence.record("campaign-party-mutating-reward-coverage", proof);
+        }
       }
     }
     if (policy.abilityCapsule.required) {
@@ -5151,6 +6542,7 @@ export async function runCampaign(rig) {
       mysteryCoverage,
       registeredInteractionCoverage,
       abilityCapsule: policy.abilityCapsule,
+      partyMutatingReward: policy.partyMutatingReward,
       navigationCoverage,
     });
     await progress.writeStageRollup().catch(() => {});

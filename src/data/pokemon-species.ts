@@ -1080,8 +1080,19 @@ export abstract class PokemonSpeciesForm {
     });
   }
 
+  /** Queue only assets that are independent of this form's ordinary sprite atlas. */
+  async loadNonSpriteAssets(formIndex?: number): Promise<void> {
+    const cryKey = this.getCryKey(formIndex);
+    if (!globalScene.cache.audio.exists(cryKey)) {
+      globalScene.load.audio(cryKey, `audio/${cryKey}.m4a`);
+    }
+  }
+
   cry(soundConfig?: Phaser.Types.Sound.SoundConfig, ignorePlay?: boolean): AnySound | null {
     const cryKey = this.getCryKey(this.formIndex);
+    if (!globalScene.cache.audio.exists(cryKey)) {
+      return null;
+    }
     let cry: AnySound | null = globalScene.sound.get(cryKey) as AnySound;
     if (cry?.pendingRemove) {
       cry = null;

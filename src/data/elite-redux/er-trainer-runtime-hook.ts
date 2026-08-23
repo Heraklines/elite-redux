@@ -55,11 +55,13 @@ import {
 } from "#data/elite-redux/er-trainer-tuning";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
+import { isErEndlessContinuationActive } from "#data/elite-redux/er-endless-continuation";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
 import { grantErResistBerries, maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
 import { grantErWardStone, maybeAssignErWardStone } from "#data/elite-redux/er-ward-stones";
 import { erDifficultyToRosterTier, getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErProgressionWave } from "#data/elite-redux/er-run-pacing";
 import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import { SpeciesFormKey } from "#enums/species-form-key";
@@ -351,7 +353,8 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
       // E4 / champion-tier teams naturally show up at the end, not at wave 5.
       const ordered = usablePool.slice().sort((a, b) => teamStrength(a, tier) - teamStrength(b, tier));
       const wave = globalScene.currentBattle?.waveIndex ?? 1;
-      const frac = Math.min(1, Math.max(0, (wave - 1) / erWaveProgressionSpan()));
+      const progressionWave = getErProgressionWave(wave);
+      const frac = Math.min(1, Math.max(0, (progressionWave - 1) / erWaveProgressionSpan()));
       const targetIdx = Math.round(frac * (ordered.length - 1));
       // Pick from a window around the wave-appropriate strength, varied by the
       // RUN SEED (+ wave + type) via a pure hash — NOT the live RNG (which would
@@ -386,7 +389,7 @@ export function getErTrainerForTrainer(trainer: Trainer): ErTrainerRegistryEntry
 export function pickTierForWave(trainer: Trainer): ErRosterTier {
   const base = erDifficultyToRosterTier();
   const wave = globalScene.currentBattle?.waveIndex ?? 1;
-  const isBoss = trainer.config.isBoss || wave % 10 === 0;
+  const isBoss = trainer.config.isBoss || globalScene.gameMode.isBoss(wave);
   if (!isBoss) {
     return base;
   }
@@ -901,7 +904,7 @@ const ER_VITAMINS_APPLIED = new WeakSet<EnemyPokemon>();
  */
 export function applyErTrainerVitaminCatchup(party: readonly EnemyPokemon[]): void {
   try {
-    if (!globalScene.currentBattle?.trainer || party.length === 0) {
+    if (!globalScene.currentBattle?.trainer || party.length === 0 || isErEndlessContinuationActive()) {
       return;
     }
     // N = the most vitamins (summed stack counts) on a SINGLE player mon.
@@ -994,7 +997,7 @@ function applyErHellTrainerBossBuff(party: readonly EnemyPokemon[]): void {
       return;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    if (wave <= ER_HELL_TRAINER_BUFF_FROM_WAVE || !globalScene.currentBattle?.trainer) {
+    if (getErProgressionWave(wave) <= ER_HELL_TRAINER_BUFF_FROM_WAVE || !globalScene.currentBattle?.trainer) {
       return;
     }
     if (party.length === 0) {
@@ -1157,8 +1160,9 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
       return;
     }
     const wave = globalScene.currentBattle?.waveIndex ?? 0;
-    const isBossWave = wave % 10 === 0 || (globalScene.currentBattle?.trainer?.config.isBoss ?? false);
-    const baseCap = erEliteBstCapFor(wave, isBossWave, isHell);
+    const progressionWave = getErProgressionWave(wave);
+    const isBossWave = globalScene.gameMode.isBoss(wave) || (globalScene.currentBattle?.trainer?.config.isBoss ?? false);
+    const baseCap = erEliteBstCapFor(progressionWave, isBossWave, isHell);
     if (baseCap === null) {
       return;
     }
@@ -1169,7 +1173,7 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     const cap = baseCap + (erBiomeRoutingActive() ? erNotorietyBstBonus(wave) : 0);
     // Hell keeps its early legendary spikes (BST cap still trims most of them);
     // only the vanilla-facing ladders ban legend-likes before the legend wave.
-    const legendBanned = !isHell && wave < ER_ELITE_LEGEND_FROM_WAVE();
+    const legendBanned = !isHell && progressionWave < ER_ELITE_LEGEND_FROM_WAVE();
     const isLegendLike = (sp: PokemonSpecies): boolean => sp.legendary || sp.subLegendary || sp.mythical;
     const defaultForm = (sp: PokemonSpecies): PokemonSpeciesForm => sp.forms?.[0] ?? sp;
     const violatesSpecies = (sp: PokemonSpecies): boolean =>
@@ -1261,7 +1265,7 @@ function revertEarlyMega(enemy: EnemyPokemon): void {
   if (getErDifficulty() === "hell") {
     return;
   }
-  if ((globalScene.currentBattle?.waveIndex ?? 0) >= ER_MEGA_MIN_WAVE_NON_HELL()) {
+  if (getErProgressionWave(globalScene.currentBattle?.waveIndex ?? 0) >= ER_MEGA_MIN_WAVE_NON_HELL()) {
     return;
   }
   // (a) The species itself is a mega → swap to the base species.
@@ -1354,7 +1358,7 @@ function pickErMegaFormIndex(enemy: EnemyPokemon, itemId: number): number {
 function forceErMega(enemy: EnemyPokemon, itemId: number): void {
   if (getErDifficulty() !== "hell") {
     const waveIndex = globalScene.currentBattle?.waveIndex ?? 0;
-    if (waveIndex < ER_MEGA_MIN_WAVE_NON_HELL()) {
+    if (getErProgressionWave(waveIndex) < ER_MEGA_MIN_WAVE_NON_HELL()) {
       return;
     }
   }
@@ -1479,7 +1483,7 @@ export function getErFactoryTeamForTrainer(trainer: Trainer): readonly ErFactory
   const difficulty = getErDifficulty();
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
   const isRival = ER_RIVAL_TRAINER_TYPES.has(trainer.config.trainerType);
-  const isBossWave = trainer.config.isBoss || wave % 10 === 0;
+  const isBossWave = trainer.config.isBoss || globalScene.gameMode.isBoss(wave);
   if (!isErVanillaDifficulty(difficulty) && !isRival && !isBossWave) {
     // Editor-managed per-difficulty override first (er-trainer-tuning.json).
     const chancePct = erTunedFactoryTeamPct(difficulty) ?? ER_FACTORY_TEAM_CHANCE_PCT;
@@ -1487,7 +1491,7 @@ export function getErFactoryTeamForTrainer(trainer: Trainer): readonly ErFactory
     const pool = roll < chancePct ? resolvedFactorySets() : [];
     if (pool.length > 0) {
       const size = Math.max(1, trainer.getPartyTemplate?.()?.size ?? 1);
-      const frac = Math.min(1, Math.max(0, (wave - 1) / erWaveProgressionSpan()));
+      const frac = Math.min(1, Math.max(0, (getErProgressionWave(wave) - 1) / erWaveProgressionSpan()));
       const targetIdx = Math.round(frac * (pool.length - 1));
       const radius = Math.max(size * 8, 60);
       const lo = Math.max(0, targetIdx - radius);

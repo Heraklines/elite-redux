@@ -14,6 +14,9 @@ interface AssetsHarness {
   onMediaFileChange(input: HTMLInputElement): void;
   uploadMediaFile(): Promise<void>;
   setBgm(value: unknown[]): void;
+  setTrainerSprites(value: unknown[]): void;
+  upsertTrainerSprite(entry: Record<string, unknown>, assetsCommit?: string): void;
+  firstAtlasFrame(atlas: unknown): { crop: unknown; sheet: unknown } | null;
 }
 
 const HARNESS_HTML = `<!doctype html><html><body>
@@ -43,6 +46,13 @@ beforeAll(() => {
       onMediaFileChange,
       uploadMediaFile,
       setBgm(value) { BGM_LIST = value; },
+      setTrainerSprites(value) {
+        TRAINER_SPRITES = value;
+        trainerSpriteByKey.clear();
+        for (const sprite of value) trainerSpriteByKey.set(sprite.key, sprite);
+      },
+      upsertTrainerSprite,
+      firstAtlasFrame,
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
   win = dom.window;
@@ -52,6 +62,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   assets.setBgm([]);
+  assets.setTrainerSprites([]);
   assets.renderAssets(q("#content"));
 });
 
@@ -149,5 +160,77 @@ describe("ER Editor Assets direct media upload", () => {
 
     await expect(assets.uploadMediaFile()).rejects.toThrow("attribution and a public source URL");
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("shows the specific direct-upload failure beside the progress bar", async () => {
+    assets.setMediaSource("upload");
+    const fileInput = q<HTMLInputElement>("#asset-media-file");
+    Object.defineProperty(fileInput, "files", {
+      configurable: true,
+      value: [new win.File([new Uint8Array(32)], "Theme.mp3", { type: "audio/mpeg" })],
+    });
+    assets.onMediaFileChange(fileInput);
+    q<HTMLInputElement>("#asset-upload-rights").checked = true;
+    win.fetch = vi.fn(async () => Response.json({ error: "media storage unavailable" }, { status: 503 })) as never;
+
+    await expect(assets.uploadMediaFile()).rejects.toThrow("media storage unavailable");
+    expect(q("#asset-upload-progress-label").textContent).toBe("Upload failed: media storage unavailable");
+  });
+
+  it("renders uploaded trainer art thumbnails and accepts the upload atlas format", () => {
+    const hashAtlas = {
+      frames: { "0001.png": { frame: { x: 0, y: 0, w: 42, h: 64 } } },
+      meta: { size: { w: 42, h: 64 } },
+    };
+    expect(assets.firstAtlasFrame(hashAtlas)).toEqual({
+      crop: { x: 0, y: 0, w: 42, h: 64 },
+      sheet: { w: 42, h: 64 },
+    });
+
+    win.fetch = vi.fn(async () => Response.json(hashAtlas)) as never;
+    assets.setTrainerSprites([
+      {
+        key: "staff_pair",
+        spriteKey: "staff_pair",
+        label: "Staff Pair",
+        genders: true,
+        kind: "leader",
+        tags: ["staff"],
+        author: "Artist",
+        license: "permission",
+      },
+    ]);
+    assets.renderAssets(q("#content"));
+
+    const previews = win.document.querySelectorAll("[data-asset-sprite-preview]");
+    expect(previews).toHaveLength(2);
+    expect(previews[0].getAttribute("data-asset-sprite-preview")).toBe("staff_pair_m");
+    expect(previews[1].getAttribute("data-asset-sprite-preview")).toBe("staff_pair_f");
+    expect(q(".asset-sprite-track").textContent).toContain("Artist: Artist");
+  });
+
+  it("inserts a successful sprite upload into the live catalog immediately", () => {
+    assets.upsertTrainerSprite(
+      {
+        key: "new_staff",
+        spriteKey: "new_staff",
+        label: "New Staff",
+        genders: false,
+        kind: "other",
+        tags: [],
+      },
+      "abc123",
+    );
+    win.fetch = vi.fn(async () =>
+      Response.json({
+        frames: { "0001.png": { frame: { x: 0, y: 0, w: 32, h: 48 } } },
+        meta: { size: { w: 32, h: 48 } },
+      }),
+    ) as never;
+    assets.renderAssets(q("#content"));
+
+    const preview = q<HTMLElement>("[data-asset-sprite-preview='new_staff']");
+    expect(preview.dataset.assetSpriteBase).toContain("er-assets@abc123/images/trainer");
+    expect(q("[data-asset-sprite='new_staff']")).toBeTruthy();
   });
 });

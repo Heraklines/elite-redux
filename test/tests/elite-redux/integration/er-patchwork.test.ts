@@ -18,6 +18,7 @@ import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { WeatherType } from "#enums/weather-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -47,7 +48,7 @@ describe.skipIf(!RUN)("ER Patchwork (693)", () => {
       // (unlike Normal moves), so the disguise actually takes the hit and breaks.
       .enemyMoveset([MoveId.SHADOW_BALL]);
     // Mimikyu has the disguised (formIndex 0) / busted forms, so the block fires.
-    await game.classicMode.startBattle([SpeciesId.MIMIKYU]);
+    await game.classicMode.startBattle(SpeciesId.MIMIKYU);
 
     const player = game.field.getPlayerPokemon();
     const enemy = game.field.getEnemyPokemon();
@@ -63,5 +64,30 @@ describe.skipIf(!RUN)("ER Patchwork (693)", () => {
     // far less than a full Shadow Ball would deal.
     const lost = hpBefore - player.hp;
     expect(lost).toBeLessThanOrEqual(Math.ceil(player.getMaxHp() / 8) + 1);
+  });
+
+  it("does not immediately restore a broken disguise while fog persists", async () => {
+    game.override
+      .battleStyle("single")
+      .ability(ER_ID_MAP.abilities[693] as AbilityId)
+      .moveset([MoveId.SPLASH])
+      .weather(WeatherType.FOG)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset([MoveId.SHADOW_BALL]);
+    await game.classicMode.startBattle(SpeciesId.MIMIKYU);
+
+    const player = game.field.getPlayerPokemon();
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+
+    expect(player.formIndex, "Disguise stays busted after its own form change in persistent fog").toBe(1);
+    const hpAfterBreak = player.hp;
+
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+
+    expect(player.hp, "the next hit is no longer blocked").toBeLessThan(hpAfterBreak);
+    expect(player.formIndex).toBe(1);
   });
 });

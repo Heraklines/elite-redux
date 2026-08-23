@@ -22,6 +22,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { markBootMilestone } from "#data/elite-redux/er-boot-diagnostics";
 import { ER_NEWCOMER_FRONT_ICON_SLUGS, ER_NEWCOMER_ICON_SLUGS } from "#data/elite-redux/er-newcomer-species";
+import { ER_FAKEMON_PITCH_SPECIES } from "#data/elite-redux/er-fakemon-pitch-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import Phaser from "phaser";
 
@@ -55,6 +56,11 @@ export function getEliteReduxCustomIconLoads(): ErIconAtlasLoad[] {
   for (const slug of ER_NEWCOMER_ICON_SLUGS) {
     const file = ER_NEWCOMER_FRONT_ICON_SLUGS.has(slug) ? "front" : "icon";
     loads.push({ key: `er_icon__${slug}`, slug, file });
+  }
+  // Hand-authored fakemon-pitch species are registered separately from the manifests above;
+  // each provides a dedicated icon atlas.
+  for (const { slug } of ER_FAKEMON_PITCH_SPECIES) {
+    loads.push({ key: `er_icon__${slug}`, slug, file: "icon" });
   }
   return loads;
 }

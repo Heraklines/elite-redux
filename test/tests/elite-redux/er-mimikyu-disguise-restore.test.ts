@@ -26,7 +26,7 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
-import { FogRestoreDisguiseFormChangeAbAttr } from "#abilities/ab-attrs";
+import { FogRestoreDisguiseFormChangeAbAttr, PostSummonFogRestoreDisguiseAbAttr } from "#abilities/ab-attrs";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -111,5 +111,10 @@ describe.skipIf(!RUN)("ER Mimikyu disguise restore (behavior)", () => {
     expect(attr.canApply(params(WeatherType.SUNNY))).toBe(false); // wrong weather
     pokemon.formIndex = 0; // intact
     expect(attr.canApply(params(WeatherType.FOG))).toBe(false); // must not break an intact disguise
+  });
+
+  test("Patchwork's switch-in fog restore is not replayed when Disguise breaks", () => {
+    const attr = new PostSummonFogRestoreDisguiseAbAttr(1);
+    expect(attr.shouldActivateOnFormChange()).toBe(false);
   });
 });

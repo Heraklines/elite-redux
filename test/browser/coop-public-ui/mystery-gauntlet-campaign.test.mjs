@@ -14,6 +14,7 @@ import {
   assertAsymmetricRevivalProjection,
   assertAsymmetricStormglassProjection,
   assertMysteryFixtureParty,
+  campaignBattleTurnBudget,
   chooseAbilityInteractionOption,
   chooseMysteryEncounterOption,
   chooseRevivalPartySlot,
@@ -26,7 +27,11 @@ import {
   driveMysteryEncounterChoice,
   mechanicalBoundaryFromPairedSurfaces,
   pairedMysteryProjectionMatches,
+  partyReorderPresentationMatches,
   resolveSurfaceOwner,
+  restoredRewardRowMatches,
+  retainedPartyEvolutionNeedsProgressBudget,
+  retainStableWatcherSurfaceCursors,
   rewardCursorProjectionMatches,
   rewardPartyTargetCandidates,
   selectLatestMysteryAuthorityEvent,
@@ -259,6 +264,15 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityCapsulePhase",
+      selectedOptionId: "slot:0",
+      optionIds: ["slot:0", "slot:1", "slot:2"],
+    }),
+    "slot:1",
+    "the Greater Capsule journey must choose its run-material branch instead of an account-only permanent unlock",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption({
+      phase: "ErGreaterAbilityCapsulePhase",
       interactionTargetPartySlot: 2,
       optionIds: ["party-slot:0", "party-slot:1", "party-slot:2"],
     }),
@@ -267,6 +281,7 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityCapsulePhase",
+      selectedOptionId: "party-option:ability-slot-0",
       optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1", "party-option:ability-slot-2"],
     }),
     "party-option:ability-slot-1",
@@ -275,10 +290,35 @@ test("ability party driver targets the phase-owned mon and a stable ability slot
   assert.equal(
     chooseAbilityInteractionOption({
       phase: "ErGreaterAbilityRandomizerPhase",
+      selectedOptionId: "party-option:ability-slot-1",
       optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1"],
     }),
     "party-option:ability-slot-0",
     "the randomizer accepts any slot and deterministically uses the active slot first",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption(
+      {
+        phase: "ErGreaterAbilityCapsulePhase",
+        selectedOptionId: "party-option:ability-slot-1",
+        optionIds: ["party-option:ability-slot-0", "party-option:ability-slot-1", "party-option:ability-slot-2"],
+      },
+      new Set(["slot:1", "party-option:ability-slot-1"]),
+    ),
+    "party-option:ability-slot-2",
+    "the Greater Capsule run branch must choose a distinct second locked innate",
+  );
+  assert.equal(
+    chooseAbilityInteractionOption(
+      {
+        phase: "ErDexNavPhase",
+        selectedOptionId: "slot:0",
+        optionIds: ["slot:0", "slot:1", "slot:2"],
+      },
+      new Set(["slot:0"]),
+    ),
+    "slot:1",
+    "Dex Nav must choose a different visible ability on its second pass",
   );
 });
 
@@ -430,18 +470,21 @@ test("local presentation input has one registry shared by production and the two
   assert.match(registry, /COOP_LOCAL_PRESENTATION_INPUT_PHASES[\s\S]*"ScanIvsPhase"/u);
   assert.match(
     registry,
-    /COOP_LOCAL_PRESENTATION_INPUT_SURFACES[\s\S]*"EvolutionPhase"[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*"EVOLUTION_SCENE"/u,
+    /COOP_LOCAL_PRESENTATION_INPUT_SURFACES[\s\S]*"EvolutionPhase"[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*"FormChangePhase"[\s\S]*"CoopFormChangeCutsceneReplayPhase"[\s\S]*"EVOLUTION_SCENE"/u,
   );
   assert.match(gate, /\.\.\.COOP_LOCAL_PRESENTATION_INPUT_PHASES/u);
   assert.match(
     ui,
-    /localPresentationInput = isCoopLocalPresentationInputSurface[\s\S]*UiMode\[this\.mode\][\s\S]*!hostEngineDialogueAdvance && !localPresentationInput/u,
+    /localPresentationInput = isCoopLocalPresentationInputSurface[\s\S]*UiMode\[this\.mode\][\s\S]*localOverlayInput = coopLocalOverlayInputAllowed\(this\.mode, this\.modeChain\)[\s\S]*!hostEngineDialogueAdvance[\s\S]*!localPresentationInput[\s\S]*!localOverlayInput/u,
   );
   assert.match(
     observer,
     /case "CONFIRM":[\s\S]*isCoopLocalPresentationInputSurface\(phase, uiMode\)[\s\S]*ownerModel: "local"/u,
   );
-  assert.match(observer, /v2InputFrozen[\s\S]*&& !localPresentationInput/u);
+  assert.match(
+    observer,
+    /localOverlayInput = coopLocalOverlayInputAllowed\(ui\.getMode\(\), ui\.getModeChain\(\)\)[\s\S]*v2InputFrozen[\s\S]*&& !localPresentationInput[\s\S]*&& !localOverlayInput/u,
+  );
   assert.match(policy, /name: "iv-scanner"[\s\S]*localPerClientSurface: true/u);
   assert.match(campaign, /if \(driver\.localPerClientSurface\)[\s\S]*findLocalActionableIvScannerSurface/u);
   assert.match(campaign, /targetId: "no"[\s\S]*campaign-local-presentation/u);
@@ -740,6 +783,112 @@ test("reward cursor projection requires the watcher's exact addressed visual sel
   );
 });
 
+test("Check Team reorder proof requires both party order and an atomically ready visible field", () => {
+  const expectedPartyIds = [303, 202, 101, 404];
+  const ready = {
+    partySlots: expectedPartyIds.map(pokemonId => ({ pokemonId })),
+    presentation: {
+      expectedPlayerFieldIds: [303, 202],
+      playerFieldReady: true,
+      playerField: [
+        {
+          pokemonId: 303,
+          visible: true,
+          alpha: 1,
+          spriteVisible: true,
+          spriteAlpha: 1,
+          infoVisible: true,
+          infoAlpha: 1,
+        },
+        {
+          pokemonId: 202,
+          visible: true,
+          alpha: 1,
+          spriteVisible: true,
+          spriteAlpha: 1,
+          infoVisible: true,
+          infoAlpha: 1,
+        },
+      ],
+    },
+  };
+  assert.equal(partyReorderPresentationMatches(ready, expectedPartyIds), true);
+  assert.equal(
+    partyReorderPresentationMatches(
+      {
+        ...ready,
+        presentation: {
+          ...ready.presentation,
+          playerFieldReady: false,
+          playerField: ready.presentation.playerField.map(field => ({ ...field, visible: false })),
+        },
+      },
+      expectedPartyIds,
+    ),
+    false,
+    "mechanical party convergence cannot hide a blank active field",
+  );
+  assert.equal(
+    partyReorderPresentationMatches(
+      { ...ready, partySlots: [{ pokemonId: 101 }, ...ready.partySlots.slice(1)] },
+      expectedPartyIds,
+    ),
+    false,
+    "visible field convergence cannot hide a stale party order",
+  );
+});
+
+test("Check Team return reuses only the watcher's proven stable post-reorder surface", () => {
+  const returnCursors = { owner: 40, watcher: 50 };
+  const postReorderCursors = { owner: 20, watcher: 30 };
+  assert.deepEqual(retainStableWatcherSurfaceCursors(returnCursors, postReorderCursors, ["watcher"]), {
+    owner: 40,
+    watcher: 30,
+  });
+  assert.throws(
+    () => retainStableWatcherSurfaceCursors(returnCursors, {}, ["watcher"]),
+    /watcher has no stable watcher cursor/u,
+  );
+});
+
+test("Check Team return does not mistake its transient action row for the retained reward cards", () => {
+  const address = { epoch: 19, wave: 4, turn: 2 };
+  const base = {
+    surfaceId: "reward-shop",
+    address,
+    ready: { handlerActive: true, inputBlocked: false },
+  };
+  assert.equal(
+    restoredRewardRowMatches(
+      {
+        ...base,
+        selectedOptionId: "reward-action:check-team",
+        optionIds: ["reward-action:reroll", "reward-action:check-team"],
+      },
+      ["POKEBALL", "ER_GREATER_ABILITY_RANDOMIZER"],
+      address,
+    ),
+    false,
+  );
+  assert.equal(
+    restoredRewardRowMatches(
+      { ...base, selectedOptionId: "POKEBALL", optionIds: ["POKEBALL", "ER_GREATER_ABILITY_RANDOMIZER"] },
+      ["POKEBALL", "ER_GREATER_ABILITY_RANDOMIZER"],
+      address,
+    ),
+    true,
+  );
+});
+
+test("Greater Ability Randomizer policy mandates the public Check Team reorder journey", () => {
+  withEnvironment({ COOP_UI_PARTY_REWARD_ID: "ER_GREATER_ABILITY_RANDOMIZER" }, () => {
+    assert.equal(loadCampaignPolicy().partyMutatingReward.checkTeamReorder, true);
+  });
+  withEnvironment({ COOP_UI_PARTY_REWARD_ID: "ER_ABILITY_CAPSULE" }, () => {
+    assert.equal(loadCampaignPolicy().partyMutatingReward.checkTeamReorder, false);
+  });
+});
+
 test("ordinary campaign turns keep the strongest visible move instead of weakening by turn number", async () => {
   const campaign = await readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8");
   assert.doesNotMatch(
@@ -750,6 +899,20 @@ test("ordinary campaign turns keep the strongest visible move instead of weakeni
   assert.match(
     campaign,
     /driveBestCampaignMove\(client, commandPurpose, \{[\s\S]*?commandEvent,[\s\S]*?preferredMoveId:/u,
+  );
+  assert.match(
+    campaign,
+    /const cycleCampaignMoves =[\s\S]*policy\.navigation\.required[\s\S]*policy\.market\.requiredPurchases > 0[\s\S]*policy\.mysteryGauntlet\.required[\s\S]*cycleIndex: cycleCampaignMoves \? turn - 1 : 0/u,
+    "longitudinal and Mystery fixtures rotate their proven damaging moves instead of repeating an immunity",
+  );
+});
+
+test("a mechanically progressing Mystery battle is not mislabeled a softlock on turn thirteen", () => {
+  assert.equal(campaignBattleTurnBudget(12, { mysteryGauntlet: { required: true } }), 30);
+  assert.equal(
+    campaignBattleTurnBudget(12, { mysteryGauntlet: { required: false } }),
+    12,
+    "ordinary fast campaigns retain the stricter runaway-battle signal",
   );
 });
 
@@ -1364,6 +1527,7 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
     { slot: 0, fainted: false, hp: 20, maxHp: 20, allowedInBattle: true },
     { slot: 1, fainted: false, hp: 7, maxHp: 20, allowedInBattle: true },
     { slot: 2, fainted: true, hp: 0, maxHp: 20, allowedInBattle: false },
+    { slot: 3, fainted: false, hp: 20, maxHp: 20, statusEffect: 6, allowedInBattle: true },
   ];
   const boundary = rewardId => ({
     authority: { partySlots },
@@ -1381,6 +1545,10 @@ test("reward targeting chooses a legal visible party slot instead of blindly sel
   assert.deepEqual(chooseRewardPartyTargetSlot(boundary("RARE_CANDY"), 0), {
     slot: 0,
     rewardId: "RARE_CANDY",
+  });
+  assert.deepEqual(chooseRewardPartyTargetSlot(boundary("FULL_HEAL"), 0), {
+    slot: 1,
+    rewardId: "FULL_HEAL",
   });
 });
 
@@ -1430,6 +1598,13 @@ test("reward targeting follows nested move and ability choices instead of requir
     "party-option:ability-slot-0",
   );
   assert.equal(chooseRewardPartyActionOption({ optionIds: ["party-option:summary", "party-option:cancel"] }), null);
+});
+
+test("party evolution rewards retain a bounded presentation-progress budget when move animations are skipped", () => {
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "EVOLUTION_ITEM" }), true);
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "RARE_EVOLUTION_ITEM" }), true);
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: true, rewardId: "FORM_CHANGE_ITEM" }), false);
+  assert.equal(retainedPartyEvolutionNeedsProgressBudget({ required: false, rewardId: "EVOLUTION_ITEM" }), false);
 });
 
 test("reward targeting distinguishes an accepted transient PARTY shell from an inoperable prompt", () => {
@@ -1851,6 +2026,9 @@ test("paired Mystery convergence follows the newest ordered address when the int
     index: 101,
     observation: {
       localRole: "host",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
       address: { epoch: 1828208874108895, wave: 3, turn: 1 },
       stateDigest: "retired-wave-three",
     },
@@ -1859,6 +2037,9 @@ test("paired Mystery convergence follows the newest ordered address when the int
     index: 202,
     observation: {
       localRole: "guest",
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
       address: { epoch: 1828208874108895, wave: 4, turn: 1 },
       stateDigest: "authorized-wave-four",
     },
@@ -1877,9 +2058,40 @@ test("paired Mystery convergence follows the newest ordered address when the int
         observation: { ...runtimeHost.observation, address: interactionOwner.observation.address },
       },
     ]).observation.localRole,
-    "host",
-    "the host remains the deterministic canonical renderer once both browsers report the same address",
+    "guest",
+    "the actionable interaction owner is canonical once both browsers report the same address",
   );
+});
+
+test("paired Mystery convergence does not canonize a transient watcher reward cursor", () => {
+  const address = { epoch: 1828721258330852, wave: 6, turn: 1 };
+  const owner = {
+    index: 5160,
+    observation: {
+      localRole: "guest",
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      selectedOptionId: "cursor:0",
+      address,
+      stateDigest: "42525210ba7056ce",
+    },
+  };
+  const transientWatcher = {
+    index: 4800,
+    observation: {
+      localRole: "host",
+      localSeat: 0,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      selectedOptionId: "reward-action:reroll",
+      address,
+      stateDigest: "42525210ba7056ce",
+    },
+  };
+
+  assert.equal(selectLatestMysteryAuthorityEvent([transientWatcher, owner]), owner);
+  assert.equal(selectLatestMysteryAuthorityEvent([owner, transientWatcher]), owner);
 });
 
 test("the mystery narration driver advances selected-option and Bargain outcome prompts once", async () => {

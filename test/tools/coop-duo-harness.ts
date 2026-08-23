@@ -1417,6 +1417,40 @@ export function stubBattleInfo(mon: Pokemon): void {
 const headlessTextureKeys = new WeakMap<object, Set<string>>();
 const headlessAnimationKeys = new WeakMap<object, Set<string>>();
 const headlessWrappedPokemon = new WeakMap<BattleScene, WeakSet<object>>();
+const headlessCreationHooksInstalled = new WeakSet<BattleScene>();
+
+function modelHeadlessPokemonAtlasCompletion(
+  pokemon: Pokemon,
+  releasedTextureKeys: Set<string>,
+  releasedAnimationKeys: Set<string>,
+  wrappedPokemon: WeakSet<object>,
+): void {
+  if (wrappedPokemon.has(pokemon)) {
+    return;
+  }
+  wrappedPokemon.add(pokemon);
+  const original = pokemon.loadAssets.bind(pokemon);
+  // Install a plain per-instance adapter, not a Vitest spy. Renderer proofs legitimately layer their
+  // own delay/count spy around this model; spying on an existing spy makes the captured "original"
+  // resolve to the newly replaced implementation and recurse forever.
+  pokemon.loadAssets = async (ignoreOverride = true, useIllusion = false) => {
+    await original(ignoreOverride, useIllusion);
+    const key = pokemon.getBattleSpriteKey();
+    releasedTextureKeys.add(key);
+    releasedAnimationKeys.add(key);
+    for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
+      if (sprite == null) {
+        continue;
+      }
+      const live = sprite as unknown as {
+        texture: { key: string };
+        anims: { currentAnim?: { key: string } };
+      };
+      live.texture.key = key;
+      live.anims.currentAnim = { key };
+    }
+  };
+}
 
 export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): void {
   let textureKeys = headlessTextureKeys.get(scene.textures);
@@ -1445,35 +1479,45 @@ export function installHeadlessPlayerAtlasCompletionModel(scene: BattleScene): v
     wrappedPokemon = new WeakSet<object>();
     headlessWrappedPokemon.set(scene, wrappedPokemon);
   }
+  const releasedWrappedPokemon = wrappedPokemon;
+
+  if (!headlessCreationHooksInstalled.has(scene)) {
+    headlessCreationHooksInstalled.add(scene);
+    const originalAddPlayerPokemon = scene.addPlayerPokemon.bind(scene);
+    scene.addPlayerPokemon = (...args: Parameters<BattleScene["addPlayerPokemon"]>) => {
+      const pokemon = originalAddPlayerPokemon(...args);
+      modelHeadlessPokemonAtlasCompletion(
+        pokemon,
+        releasedTextureKeys,
+        releasedAnimationKeys,
+        releasedWrappedPokemon,
+      );
+      return pokemon;
+    };
+    const originalAddEnemyPokemon = scene.addEnemyPokemon.bind(scene);
+    scene.addEnemyPokemon = (...args: Parameters<BattleScene["addEnemyPokemon"]>) => {
+      const pokemon = originalAddEnemyPokemon(...args);
+      modelHeadlessPokemonAtlasCompletion(
+        pokemon,
+        releasedTextureKeys,
+        releasedAnimationKeys,
+        releasedWrappedPokemon,
+      );
+      return pokemon;
+    };
+  }
 
   // Wrap every currently materialized party object, not only the opening player leads. Turn-finalize
   // readiness also awaits live enemy atlases, and later presentation boundaries may promote a bench mon.
+  // The creation hooks above cover production reconstruction that creates and immediately loads a Pokemon
+  // inside one Authority V2 continuation, before a phase-boundary rescan could ever observe the new object.
   for (const pokemon of [...scene.getPlayerParty(), ...scene.getEnemyParty()]) {
-    if (wrappedPokemon.has(pokemon)) {
-      continue;
-    }
-    wrappedPokemon.add(pokemon);
-    const original = pokemon.loadAssets.bind(pokemon);
-    // Install a plain per-instance adapter, not a Vitest spy. Renderer proofs legitimately layer their
-    // own delay/count spy around this model; spying on an existing spy makes the captured "original"
-    // resolve to the newly replaced implementation and recurse forever.
-    pokemon.loadAssets = async (ignoreOverride = true, useIllusion = false) => {
-      await original(ignoreOverride, useIllusion);
-      const key = pokemon.getBattleSpriteKey();
-      releasedTextureKeys.add(key);
-      releasedAnimationKeys.add(key);
-      for (const sprite of [pokemon.getSprite(), pokemon.getTintSprite()]) {
-        if (sprite == null) {
-          continue;
-        }
-        const live = sprite as unknown as {
-          texture: { key: string };
-          anims: { currentAnim?: { key: string } };
-        };
-        live.texture.key = key;
-        live.anims.currentAnim = { key };
-      }
-    };
+    modelHeadlessPokemonAtlasCompletion(
+      pokemon,
+      releasedTextureKeys,
+      releasedAnimationKeys,
+      releasedWrappedPokemon,
+    );
   }
 }
 
@@ -3394,6 +3438,10 @@ export async function remirrorWave(rig: DuoRig, opts?: { preserveGuestPlayerPart
   realGuestCommandBoundaries.delete(rig.guestScene);
   await withClient(rig.guestCtx, () => {
     mirrorHostBattleToGuest(rig.hostScene, rig.guestScene, opts);
+    // This abbreviated mirror constructs Pokemon directly instead of calling BattleScene.add*Pokemon.
+    // Refresh immediately so the newly-created wave receives the same HEADLESS cache/live-key completion
+    // model as production reconstruction before a presentation-ready boundary can inspect it.
+    installHeadlessPlayerAtlasCompletionModel(rig.guestScene);
     const gf = rig.guestScene.getPlayerField();
     // Classic wave 200 deliberately starts with one field slot; phase two enables doubles and
     // summons the partner. Preserve ownership for every slot that exists instead of manufacturing

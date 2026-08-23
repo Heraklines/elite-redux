@@ -45,11 +45,13 @@ import { SpeciesId } from "#enums/species-id";
 import {
   type ErShinyLabSpriteFxLook,
   erShinyLabSpriteFxStateKey,
+  getErShinyLabBattleFxFrameMs,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpeciesIconSource,
   getErShinyLabSpriteFxLookForPokemon,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
+  resetErShinyLabSpriteFxTexture,
 } from "#sprites/er-shiny-lab-sprite-fx";
 import {
   ensureErShinyLabPaletteVariantCache,
@@ -60,6 +62,44 @@ import {
 } from "#sprites/variant";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it } from "vitest";
+
+describe("Shiny Lab battle FX performance", () => {
+  it("reduces CPU refresh frequency as more battlers are active", () => {
+    expect(getErShinyLabBattleFxFrameMs(1)).toBe(125);
+    expect(getErShinyLabBattleFxFrameMs(2)).toBe(250);
+    expect(getErShinyLabBattleFxFrameMs(3)).toBe(500);
+    expect(getErShinyLabBattleFxFrameMs(6)).toBe(500);
+  });
+});
+
+describe("Shiny Lab reusable mini-icon slots", () => {
+  it("forgets the previous species source when a starter-party slot is reused", () => {
+    const fxData = {
+      key: null,
+      sourceKey: "pokemon_icons_0",
+      sourceFrame: "pidgey",
+      sourceOriginX: 0.5,
+      sourceOriginY: 0.5,
+      state: "pidgey-look",
+    };
+    const sprite = {
+      pipelineData: {
+        erShinyLabFx: fxData,
+      },
+    } as unknown as Phaser.GameObjects.Sprite;
+
+    resetErShinyLabSpriteFxTexture(sprite, false);
+
+    expect(fxData).toMatchObject({
+      key: null,
+      sourceKey: null,
+      sourceFrame: null,
+      sourceOriginX: undefined,
+      sourceOriginY: undefined,
+      state: undefined,
+    });
+  });
+});
 
 type VariantPaletteCache = Record<string, Record<number, Record<string, string>>>;
 
@@ -459,6 +499,24 @@ describe("ER Shiny Lab data layer", () => {
     expect(normalizeErShinyLabSavedLook([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255])).toBeUndefined();
     expect(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout).toEqual({
       palette: "duoneon",
+      surface: "starmap",
+      around: "staticfield",
+    });
+  });
+
+  it("keeps a Black Shiny on its t4 atlas while retaining non-palette Lab effects", () => {
+    const look = encodeErShinyLabPreset({
+      loadout: { palette: "duoneon", surface: "starmap", around: "staticfield" },
+      params: labParams({ surfAmt: 0.8, aroAmt: 0.6, seed: 123 }),
+    });
+    const pokemon = {
+      species: getPokemonSpecies(SpeciesId.BULBASAUR),
+      shiny: true,
+      customPokemonData: { erBlackShiny: true, erShinyLab: look },
+    };
+
+    expect(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout).toEqual({
+      palette: null,
       surface: "starmap",
       around: "staticfield",
     });

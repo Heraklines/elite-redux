@@ -15,12 +15,12 @@ import { describe, expect, it } from "vitest";
 const challengeStub = (id: Challenges, value: number): Challenge => ({ id, value }) as unknown as Challenge;
 
 describe("ER shiny favour", () => {
-  it("curve: +0.5x per 5 favour, capped at 3x", () => {
+  it("curve: nearest whole multiplier, capped at 3x", () => {
     expect(favourToShinyMultiplier(0)).toBe(1);
     expect(favourToShinyMultiplier(4)).toBe(1);
-    expect(favourToShinyMultiplier(5)).toBe(1.5);
+    expect(favourToShinyMultiplier(5)).toBe(2);
     expect(favourToShinyMultiplier(10)).toBe(2);
-    expect(favourToShinyMultiplier(15)).toBe(2.5);
+    expect(favourToShinyMultiplier(15)).toBe(3);
     expect(favourToShinyMultiplier(20)).toBe(3);
     // Cap holds beyond 20.
     expect(favourToShinyMultiplier(100)).toBe(FAVOUR_SHINY_MAX_MULT);

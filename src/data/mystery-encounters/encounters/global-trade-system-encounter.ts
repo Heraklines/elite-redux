@@ -546,9 +546,8 @@ export function generateTradeOption(alreadyUsedSpecies: PokemonSpecies[], origin
         !isLegendaryOrMythical
         && bstInRange
         && !EXCLUDED_TRADE_SPECIES.includes(s.speciesId)
-        && !isErGenericPoolBanned(s.speciesId, s.name) // ER (#126): in a roster challenge run, only offer/receive challenge-legal
-        && // species so a GTS trade can't inject an off-type/color/gen/tier mon.
-        isSpeciesAllowedByActiveChallenges(s)
+        && !isErGenericPoolBanned(s.speciesId, s.name) // ER (#126): in a roster challenge run, only offer/receive challenge-legal // species so a GTS trade can't inject an off-type/color/gen/tier mon.
+        && isSpeciesAllowedByActiveChallenges(s)
       );
     });
 

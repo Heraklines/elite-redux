@@ -10,6 +10,7 @@ import { applyCoopMeOutcome, consumeCoopMeOutcomeRollbackFatal } from "#data/eli
 import { openGuestMeEmbeddedShop } from "#data/elite-redux/coop/coop-biome-shop";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
+import { settleCoopFieldPresentationReady } from "#data/elite-redux/coop/coop-field-presentation";
 import {
   COOP_INTERACTION_LEAVE,
   type CoopInteractionChoice,
@@ -853,6 +854,7 @@ export class CoopReplayMePhase extends Phase {
         step: number;
         revision: number;
         continuation?: CoopMeRewardDestination["continuation"];
+        battleBoot?: CoopMeBattleDestination["boot"];
       } = {
     kind: "pending",
   };
@@ -1629,10 +1631,18 @@ export class CoopReplayMePhase extends Phase {
     }
     if (transaction.payload.terminal === "reward-settled") {
       const current = globalScene.phaseManager.getCurrentPhase();
+      const directTurnReady =
+        this.acceptedTerminal.kind === "battle-handoff"
+        && this.acceptedTerminal.battleBoot === "direct-turn"
+        && transaction.step === this.acceptedTerminal.step + 1
+        && current?.phaseName === "CoopFinalizeTurnPhase"
+        && transaction.payload.destination.kind === "reward"
+        && (globalScene.currentBattle?.turn ?? -2) + 1 === transaction.payload.destination.hostTurn;
       const ready =
-        this.acceptedTerminal.kind === "pending"
-        && transaction.step === 0
-        && this.isRewardSettlementSurfaceReady(current);
+        directTurnReady
+        || (this.acceptedTerminal.kind === "pending"
+          && transaction.step === 0
+          && this.isRewardSettlementSurfaceReady(current));
       if (!ready) {
         coopLog("me", "retained reward settlement deferred at lifecycle fence", {
           operationId: transaction.operationId,
@@ -1713,6 +1723,7 @@ export class CoopReplayMePhase extends Phase {
           operationId,
           step,
           revision: captureCoopActiveMysteryControl()?.revision ?? 0,
+          battleBoot: payload.destination.boot,
         };
         return true;
       }
@@ -1722,7 +1733,11 @@ export class CoopReplayMePhase extends Phase {
           return false;
         }
         if (rewardTerminal === "reward-settled") {
-          if (this.acceptedTerminal.kind !== "pending" || step !== 0) {
+          const directTurnSettlement =
+            this.acceptedTerminal.kind === "battle-handoff"
+            && this.acceptedTerminal.battleBoot === "direct-turn"
+            && step === this.acceptedTerminal.step + 1;
+          if (!directTurnSettlement && (this.acceptedTerminal.kind !== "pending" || step !== 0)) {
             return false;
           }
         } else if (this.acceptedTerminal.kind !== "battle-handoff" || step !== this.acceptedTerminal.step + 1) {
@@ -1757,13 +1772,22 @@ export class CoopReplayMePhase extends Phase {
     destination: CoopMeRewardDestination,
   ): boolean {
     const current = globalScene.phaseManager.getCurrentPhase();
+    const directTurnSettlement =
+      terminal === "reward-settled"
+      && this.acceptedTerminal.kind === "battle-handoff"
+      && this.acceptedTerminal.battleBoot === "direct-turn"
+      && current?.phaseName === "CoopFinalizeTurnPhase"
+      && (globalScene.currentBattle?.turn ?? -2) + 1 === destination.hostTurn;
     const detachedQuizPhantom =
-      terminal === "reward-settled" && current !== this && this.isRewardSettlementSurfaceReady(current);
+      terminal === "reward-settled"
+      && !directTurnSettlement
+      && current !== this
+      && this.isRewardSettlementSurfaceReady(current);
     const exactSurface =
       terminal === "battle-settled"
         ? current?.phaseName === "BattleEndPhase"
-        : this.isRewardSettlementSurfaceReady(current);
-    if (!exactSurface || globalScene.currentBattle?.turn !== destination.hostTurn) {
+        : directTurnSettlement || this.isRewardSettlementSurfaceReady(current);
+    if (!exactSurface || (!directTurnSettlement && globalScene.currentBattle?.turn !== destination.hostTurn)) {
       return false;
     }
     if (detachedQuizPhantom && !abortActiveCoopReplayTurnPhase("completed mirror quiz retained reward continuation")) {
@@ -1780,6 +1804,11 @@ export class CoopReplayMePhase extends Phase {
     // presentation/outcome arm owned by the pre-reward shell. This must NOT set `settled`: doing so makes
     // completeCommittedLeave's defensive leave a no-op and strands the guest counter one step behind.
     this.continuationHandedOff = true;
+    if (directTurnSettlement && globalScene.currentBattle != null) {
+      // The parked finalizer deliberately did not manufacture turn N+1. The terminal's complete result is
+      // the sole authority allowed to adopt the host's exact next TurnInit cursor.
+      globalScene.currentBattle.turn = destination.hostTurn;
+    }
     if (destination.continuation === "encounter") {
       if (this.battleEndDelegateOwnsContinuation) {
         // The Colosseum's detached board driver already owns the between-round surface and next terminal.
@@ -2443,8 +2472,13 @@ export class CoopReplayMePhase extends Phase {
         throw new Error("committed Mystery trainer battle has no authoritative trainer");
       }
       globalScene.phaseManager.clearPhaseQueue();
-      globalScene.phaseManager.pushNew("MysteryEncounterBattlePhase", committedDestination.disableSwitch);
+      if (committedDestination.boot === "direct-turn") {
+        globalScene.phaseManager.pushNew("TurnInitPhase");
+      } else {
+        globalScene.phaseManager.pushNew("MysteryEncounterBattlePhase", committedDestination.disableSwitch);
+      }
       coopLog("me", "guest queued committed ME battle destination", {
+        boot: committedDestination.boot,
         mode: committedDestination.encounterMode,
         disableSwitch: committedDestination.disableSwitch,
         enemies: globalScene.getEnemyParty().length,
@@ -2469,13 +2503,59 @@ export class CoopReplayMePhase extends Phase {
     // intro painted over the old option grid. More importantly, that stale handler is not an exact battle
     // presentation consumer, so the next command CONTROL_COMMIT remains deferred forever. Cross the real
     // asynchronous UI boundary first; only then may the queued MysteryEncounterBattlePhase become current.
-    void this.openModeBounded(UiMode.MESSAGE).then(opened => {
+    void this.openModeBounded(UiMode.MESSAGE).then(async opened => {
       if (
         opened === "superseded"
         || !this.boundaryStillLive()
         || globalScene.phaseManager.getCurrentPhase() !== currentPhase
       ) {
         return;
+      }
+      if (committedDestination.boot === "direct-turn") {
+        const battle = globalScene.currentBattle;
+        const remainsCurrent = (): boolean =>
+          this.boundaryStillLive()
+          && globalScene.currentBattle === battle
+          && globalScene.phaseManager.getCurrentPhase() === currentPhase;
+        try {
+          await settleCoopFieldPresentationReady(
+            {
+              side: "player",
+              seats: globalScene
+                .getPlayerParty()
+                .slice(0, battle.arrangement.playerCapacity)
+                .map((pokemon, slot) => ({ pokemon, slot })),
+              capacity: battle.arrangement.playerCapacity,
+              boundary: "me-battle-summon",
+              desired: "visible",
+              hideStale: true,
+              trainerDisposition: "hide-player",
+            },
+            remainsCurrent,
+          );
+          await settleCoopFieldPresentationReady(
+            {
+              side: "enemy",
+              seats: globalScene
+                .getEnemyParty()
+                .slice(0, battle.arrangement.enemyCapacity)
+                .map((pokemon, slot) => ({ pokemon, slot })),
+              capacity: battle.arrangement.enemyCapacity,
+              boundary: "me-battle-summon",
+              desired: "visible",
+              hideStale: true,
+              trainerDisposition: "hide-enemy",
+            },
+            remainsCurrent,
+          );
+        } catch (error) {
+          coopWarn("me", "direct-turn Mystery presentation could not become ready", error);
+          failCoopSharedSession("Direct-turn Mystery battle presentation could not become actionable");
+          return;
+        }
+        if (!remainsCurrent()) {
+          return;
+        }
       }
       currentPhase.end();
     });

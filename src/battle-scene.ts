@@ -7,6 +7,7 @@ import {
   BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT,
   MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT,
 } from "#app/constants";
+import { consumePendingDevGhostTeam } from "#app/dev-tools/registry";
 import type { GameMode } from "#app/game-mode";
 import { getGameMode } from "#app/game-mode";
 import { timedEventManager } from "#app/global-event-manager";
@@ -19,6 +20,7 @@ import type { Phase } from "#app/phase";
 import { PhaseManager } from "#app/phase-manager";
 import { FieldSpritePipeline } from "#app/pipelines/field-sprite";
 import { InvertPostFX } from "#app/pipelines/invert";
+import { RewardRateAuraPipeline } from "#app/pipelines/reward-rate-aura-pipeline";
 import { SpritePipeline } from "#app/pipelines/sprite";
 import { SceneBase } from "#app/scene-base";
 import { TurnCommandManager } from "#app/turn-command-manager";
@@ -29,7 +31,10 @@ import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
 import {
   type BattleFormat,
+  DOUBLE_FORMAT,
+  getBattleFormatById,
   legacyFormat,
+  SINGLE_FORMAT,
   TRIPLE_BATTLE_GHOST_RARITY,
   TRIPLE_BATTLE_RARITY,
   TRIPLE_FORMAT,
@@ -69,16 +74,30 @@ import {
   pinErBlackShinyGiftAbility,
   promoteToErBlackShinyInBattle,
 } from "#data/elite-redux/er-black-shinies";
+import {
+  getErEndlessCycle,
+  getErEndlessCycleWave,
+  getErEndlessEquivalentDepth,
+  getErEndlessNemesisRelicBudgetMultiplier,
+  getErEndlessRaidBossSegments,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  isErEndlessRaidWave,
+} from "#data/elite-redux/er-endless-continuation";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getLastGenericTrainerType, markGenericTrainerType } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import {
   applyGhostTrainerPresentation,
+  getErEndlessBossHeldItems,
+  getErGhostSnapshot,
   getErGhostSnapshotSpecies,
   ghostWavesForCurrentRun,
   hasErGhostOverride,
+  isErGhostEnemyPokemon,
   markTrainerAsGhost,
   maybePrefetchGhostTeams,
   takeGhostForWave,
@@ -89,16 +108,40 @@ import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { erGauntletActive, erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { resetErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import {
+  ER_RELIC_CONFIG,
+  type ErRelicKind,
   erCoinPurseBonusPercent,
   erMysteryCharmTargetBonus,
+  resetErEnemyRelicBattleState,
   resetErRelicBiomeState,
 } from "#data/elite-redux/er-relics";
+import { grantErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  getErMysteryEncounterTarget,
+  getErProgressionWave,
+  isErChapterStartWave,
+  isErSprintMode,
+} from "#data/elite-redux/er-run-pacing";
 import { chromaKeyErSpriteTexture } from "#data/elite-redux/er-sprite-chroma-key";
 import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-hook";
-import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
+import { ErWardStoneModifier, grantErWardStone } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import {
+  generateEndlessEnemyBoonLoadout,
+  generateMoodyEnemyBoonLoadout,
+  resetMoodyEnemyBoonLoadout,
+  setMoodyEnemyBoonLoadout,
+} from "#data/elite-redux/moody/moody-enemy";
+import { prepareMoodyFormationItemActivation } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyCoordinatorItemRule,
+  notifyMoodyCoordinatorPokemonPermanentlyRemoved,
+  prepareMoodyCoordinatorEnemyGeneration,
+  prepareMoodyCoordinatorItemActivation,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { notifyMoodyCoordinatorItemInventory } from "#data/elite-redux/moody/moody-runtime-item-adapter";
 import {
   getShowdownBattleFormat,
   getShowdownFieldOpponentManifest,
@@ -155,6 +198,7 @@ import type { Pokemon } from "#field/pokemon";
 import { EnemyPokemon, PlayerPokemon } from "#field/pokemon";
 import { PokemonSpriteSparkleHandler } from "#field/pokemon-sprite-sparkle-handler";
 import { Trainer } from "#field/trainer";
+import { materializeHeldModifierConfig } from "#modifiers/held-modifier-config";
 import type { Modifier, ModifierPredicate, TurnHeldItemTransferModifier } from "#modifiers/modifier";
 import {
   ConsumableModifier,
@@ -167,6 +211,7 @@ import {
   HealingBoosterModifier,
   ModifierBar,
   MultipleParticipantExpBonusModifier,
+  MysteryEventRateBoosterModifier,
   PersistentModifier,
   PokemonExpBoosterModifier,
   PokemonFormChangeItemModifier,
@@ -176,12 +221,14 @@ import {
   RememberMoveModifier,
 } from "#modifiers/modifier";
 import {
+  FormChangeItemModifierType,
   getDefaultModifierTypeForTier,
   getEnemyModifierTypesForWave,
   getLuckString,
   getLuckTextTint,
   getPartyLuckValue,
   type ModifierType,
+  ModifierTypeGenerator,
   PokemonHeldItemModifierType,
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -208,6 +255,7 @@ import type { Achv } from "#system/achv";
 import { achvs, ModifierAchv, MoneyAchv } from "#system/achv";
 import { GameData } from "#system/game-data";
 import { initGameSpeed } from "#system/game-speed";
+import { getModifierDataTypeFactory } from "#system/modifier-data";
 import type { PokemonData } from "#system/pokemon-data";
 import { MusicPreference } from "#system/settings";
 import type { Voucher } from "#system/voucher";
@@ -231,6 +279,7 @@ import { getDebugOverlay } from "#ui/llm-director-debug-overlay";
 import { PartyExpBar } from "#ui/party-exp-bar";
 import { PokeballTray } from "#ui/pokeball-tray";
 import { PokemonInfoContainer } from "#ui/pokemon-info-container";
+import { RewardRatePanel } from "#ui/reward-rate-panel";
 import { addTextObject, getTextColor, RAINBOW_TINT } from "#ui/text";
 import { TimeOfDayWidget } from "#ui/time-of-day-widget";
 import { UI } from "#ui/ui";
@@ -277,6 +326,42 @@ export interface InfoToggle {
  */
 const TRIPLE_ROLL_SEED_OFFSET = 0x74_72_70_6c; // "trpl"
 
+function applyPersistentModifierWithMoody(modifier: PersistentModifier, args: unknown[]): boolean {
+  if (!(modifier instanceof PokemonHeldItemModifier)) {
+    return (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  const pokemon = modifier.getPokemon();
+  if (pokemon == null) {
+    return false;
+  }
+  const plan = prepareMoodyFormationItemActivation(pokemon, modifier.type.id, "bespoke");
+  const coordinatorPlan = pokemon.isPlayer()
+    ? prepareMoodyCoordinatorItemActivation(pokemon, modifier.type.id, "consumed" in modifier)
+    : { preserveStack: false, repeatActivation: false, effectMultiplier: 1 };
+  const holders = args.filter((value): value is NumberHolder => value instanceof NumberHolder);
+  const before = holders.map(holder => holder.value);
+  if (coordinatorPlan.effectMultiplier <= 0) {
+    return false;
+  }
+  const applied = (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  if (!applied) {
+    return false;
+  }
+  holders.forEach((holder, index) => {
+    holder.value = before[index] + (holder.value - before[index]) * plan.multiplier * coordinatorPlan.effectMultiplier;
+  });
+  if (plan.repeatActivation) {
+    (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  if (coordinatorPlan.repeatActivation) {
+    (modifier.apply as (...values: unknown[]) => boolean)(...args);
+  }
+  if (coordinatorPlan.preserveStack && "consumed" in modifier) {
+    (modifier as PersistentModifier & { consumed: boolean }).consumed = false;
+  }
+  return true;
+}
+
 /**
  * The `BattleScene` is the primary scene for the game.
  *
@@ -312,6 +397,8 @@ export class BattleScene extends SceneBase {
   public showMissingRibbons = false;
   public showMovesetFlyout = true;
   public showArenaFlyout = true;
+  public showAbilityFlyouts = true;
+  public showMoodyEffectFlyouts = true;
   public showTimeOfDayWidget = true;
   /** ER: when false, the field stays at daytime brightness (no dusk/night darkening). */
   public dayNightTint = true;
@@ -438,6 +525,8 @@ export class BattleScene extends SceneBase {
   private scoreText: Phaser.GameObjects.Text;
   private luckLabelText: Phaser.GameObjects.Text;
   private luckText: Phaser.GameObjects.Text;
+  /** Compact Shiny/Candy/Voucher rate panel pinned under Luck during rewards. */
+  public rewardRatePanel: RewardRatePanel;
   private modifierBar: ModifierBar;
   private enemyModifierBar: ModifierBar;
   public arenaFlyout: ArenaFlyout;
@@ -629,6 +718,11 @@ export class BattleScene extends SceneBase {
     this.renderer.pipelines.add("Sprite", this.spritePipeline);
     this.fieldSpritePipeline = new FieldSpritePipeline(this.game);
     this.renderer.pipelines.add("FieldSprite", this.fieldSpritePipeline);
+    // Reward-rate panel rows share one aura pipeline; Canvas clients skip it
+    // entirely and the panel falls back to static grade tints.
+    if (this.renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer) {
+      this.renderer.pipelines.add("RewardRateAura", new RewardRateAuraPipeline(this.game));
+    }
 
     this.launchBattle();
   }
@@ -803,6 +897,8 @@ export class BattleScene extends SceneBase {
       .setOrigin(1, 0.5)
       .setVisible(false);
 
+    this.rewardRatePanel = new RewardRatePanel(this, this.scaledCanvas.width - 46, 0);
+
     this.arenaFlyout = new ArenaFlyout();
     // ER: a standalone time-of-day icon pinned top-left, shown only while the
     // day/night tint is off (the screen no longer darkens to signal night).
@@ -834,6 +930,7 @@ export class BattleScene extends SceneBase {
         this.scoreText,
         this.luckText,
         this.luckLabelText,
+        this.rewardRatePanel,
         this.arenaFlyout,
         this.timeOfDayCornerWidget,
         this.pokemonInfoContainer,
@@ -1221,7 +1318,7 @@ export class BattleScene extends SceneBase {
     // Trainer mons are exempt (champion configs legally pin megas); loaded
     // save data is exempt (round-trips whatever was already legal).
     // (TrainerSlot.NONE === 0; numeric compare keeps the type-only import)
-    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0) {
+    if ((trainerSlot as number) === 0 && !dataSource && pokemon.formIndex > 0 && pokemon.getFunMegaStone() == null) {
       const formKey = species.forms?.[pokemon.formIndex]?.formKey ?? "";
       if (/mega|primal|eternamax|gigantamax|gmax/i.test(formKey)) {
         console.warn(`ER #421: wild ${species.name} spawned at battle-only form "${formKey}" - resetting to base`);
@@ -1636,7 +1733,7 @@ export class BattleScene extends SceneBase {
 
   // TODO: Invert the chances for this
   private getDoubleBattleChance(newWaveIndex: number): number {
-    const doubleChance = new NumberHolder(newWaveIndex % 10 === 0 ? 32 : 8);
+    const doubleChance = new NumberHolder(this.gameMode.isBoss(newWaveIndex) ? 32 : 8);
     this.applyModifiers(DoubleBattleChanceBoosterModifier, true, doubleChance);
     for (const p of this.getPlayerField()) {
       // TODO: This passes `null` to `applyAbAttrs`
@@ -1675,7 +1772,7 @@ export class BattleScene extends SceneBase {
         return erEnd;
       }
     }
-    const isWaveIndexMultipleOfTen = !(currentBattle.waveIndex % 10);
+    const isWaveIndexMultipleOfTen = this.gameMode.isBoss(currentBattle.waveIndex);
     const isEndlessOrDaily = this.gameMode.hasShortBiomes || this.gameMode.isDaily;
     const isEndlessFifthWave = this.gameMode.hasShortBiomes && currentBattle.waveIndex % 5 === 0;
     const isWaveIndexMultipleOfFiftyMinusOne = currentBattle.waveIndex % 50 === 49;
@@ -1798,6 +1895,7 @@ export class BattleScene extends SceneBase {
     }
 
     const { waveIndex, battleType, trainer: trainerData, mysteryEncounterType: sessionMEType } = fromSession;
+    const savedFormat = getBattleFormatById(fromSession.battleFormat);
     // TODO: Remove fallback once we stop using `-1` as a default value for session data fields (which wastes space)
     const mysteryEncounterType = sessionMEType === -1 ? undefined : sessionMEType;
 
@@ -1833,12 +1931,17 @@ export class BattleScene extends SceneBase {
         break;
     }
 
+    if (savedFormat != null) {
+      fixedDouble = savedFormat !== SINGLE_FORMAT;
+    }
+
     return {
       battleType,
       mysteryEncounterType,
       waveIndex,
       trainerData,
       double: fixedDouble,
+      format: savedFormat,
     } satisfies NewBattleSavedProps;
   }
 
@@ -1855,7 +1958,10 @@ export class BattleScene extends SceneBase {
     // Story fixed battles (rival, evil teams, E4, champion) stay scripted.
     // takeGhostForWave is a no-op when the challenge is off (wave 5 is not a
     // scheduled ghost-gauntlet wave), so normal runs are untouched.
-    if (waveIndex === ClassicFixedBossWaves.TOWN_YOUNGSTER) {
+    if (
+      waveIndex === ClassicFixedBossWaves.TOWN_YOUNGSTER
+      || (isErSprintMode(this.gameMode.modeId) && waveIndex === 3)
+    ) {
       const ghost = takeGhostForWave(waveIndex, true);
       if (ghost !== null) {
         resolved.battleType = BattleType.TRAINER;
@@ -1892,6 +1998,7 @@ export class BattleScene extends SceneBase {
   private handleSavedBattle(resolved: NewBattleInitialProps, props: NewBattleSavedProps): void {
     resolved.battleType = props.battleType;
     resolved.double = props.double;
+    resolved.format = props.format;
     resolved.trainer = props.trainerData?.toTrainer();
     // Task C7: the versus GUEST reconstructs the host's session, whose trainer is authoritatively the
     // ENEMY side (the guest's OWN team) fielded behind the guest's own profile. On the guest's flipped
@@ -1959,6 +2066,12 @@ export class BattleScene extends SceneBase {
       resolved.trainer = opponent;
       return;
     }
+    if (isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex)) {
+      resolved.battleType = BattleType.WILD;
+      resolved.double = true;
+      resolved.format = TRIPLE_FORMAT;
+      return;
+    }
     // ER ghost gauntlet (#217): begin pre-fetching ghost teams well before the
     // endgame waves where they spawn (no-op except once, around wave 150).
     maybePrefetchGhostTeams(waveIndex);
@@ -1992,6 +2105,18 @@ export class BattleScene extends SceneBase {
           ?? ((coopAdoptedWaveTrainer ?? this.gameMode.isWaveTrainer(waveIndex))
             ? BattleType.TRAINER
             : BattleType.WILD));
+
+    // Dev-suite only: consume one exact ghost snapshot before normal encounter
+    // selection. The pending value is set by one dev scenario, cleared here,
+    // and absent in every ordinary run.
+    const devGhost = consumePendingDevGhostTeam();
+    if (devGhost !== null) {
+      resolved.battleType = BattleType.TRAINER;
+      const ghostTrainer = this.createGhostTrainer(devGhost);
+      this.field.add(ghostTrainer);
+      resolved.trainer = ghostTrainer;
+      return;
+    }
 
     // ER Elite/Hell: inject extra rival (May/Brendan) encounters between the
     // canonical rival waves. Done BEFORE the mystery-encounter check so the
@@ -2187,6 +2312,13 @@ export class BattleScene extends SceneBase {
       }
     }
 
+    // The opening wild encounter is always a single battle. This runs before
+    // lures, challenge forcing, and developer overrides so a fresh solo run can
+    // never begin by requiring multiple leads. Co-op still needs both seats.
+    if (battleType === BattleType.WILD && waveIndex === 1 && !this.gameMode.isCoop) {
+      return false;
+    }
+
     // TODO: enforce using the proper override depending on whether it's a trainer or a wild battle
     const doubleBattleOverride = this.doCheckDoubleOverride(waveIndex);
     if (doubleBattleOverride != null) {
@@ -2288,6 +2420,10 @@ export class BattleScene extends SceneBase {
       }
     }
 
+    if (props.battleType === BattleType.WILD && props.waveIndex === 1 && !this.gameMode.isCoop) {
+      return SINGLE_FORMAT;
+    }
+
     // Two-player co-op owns exactly the legacy binary topology. Resolve this before
     // Triples Only, the developer override, and the natural ER roll so a challenge
     // imported from another mode (or a diagnostic override left enabled) cannot create
@@ -2297,6 +2433,33 @@ export class BattleScene extends SceneBase {
     // retains its independently negotiated singles/doubles/triples format.
     if (this.gameMode.isCoop) {
       return legacyFormat(double);
+    }
+
+    // A resumed battle keeps the exact layout that was live when it was saved.
+    // Re-rolling here can turn a natural double/triple into a single, strand field
+    // occupants, and leave the restored turn with no valid progression path.
+    if (props.format != null) {
+      return props.format;
+    }
+
+    if (
+      hasErEndlessRift("format-roulette")
+      && (props.battleType === BattleType.WILD || props.battleType === BattleType.TRAINER)
+      && !isErEndlessRaidWave(props.waveIndex)
+    ) {
+      let roll = 0;
+      this.executeWithSeedOffset(
+        () => {
+          roll = randSeedInt(100);
+        },
+        props.waveIndex,
+        "er-endless-format-roulette",
+      );
+      const requestedWidth = roll < 35 ? 1 : roll < 75 ? 2 : 3;
+      const playerWidth = Math.max(1, Math.min(3, this.getPokemonAllowedInBattle().length));
+      const trainerWidth = props.trainer == null ? 3 : Math.max(1, Math.min(3, props.trainer.getPartyTemplate().size));
+      const width = Math.min(requestedWidth, playerWidth, trainerWidth);
+      return width === 3 ? TRIPLE_FORMAT : width === 2 ? DOUBLE_FORMAT : SINGLE_FORMAT;
     }
 
     // Triples Only is a direct format invariant for regular battles. Do not make it
@@ -2345,6 +2508,9 @@ export class BattleScene extends SceneBase {
     const { battleType, waveIndex, trainer } = props;
     // Only natural wild / trainer battles are eligible.
     if (battleType !== BattleType.WILD && battleType !== BattleType.TRAINER) {
+      return false;
+    }
+    if (battleType === BattleType.WILD && waveIndex === 1 && !this.gameMode.isCoop) {
       return false;
     }
     // Authoritative / challenge / co-op paths must never be surprised into a triple.
@@ -2884,6 +3050,8 @@ export class BattleScene extends SceneBase {
       return 0;
     }
 
+    const isEndlessRaid = isErEndlessContinuationActive() && isErEndlessRaidWave(waveIndex);
+
     if (this.gameMode.isDaily && this.gameMode.isWaveFinal(waveIndex)) {
       if (this.gameMode.dailyConfig?.boss?.segments != null) {
         return this.gameMode.dailyConfig.boss.segments;
@@ -2895,6 +3063,7 @@ export class BattleScene extends SceneBase {
     const mysteryGauntletBoss = erGauntletActive() && erGauntletWaveKind(waveIndex) === "boss";
     if (
       forceBoss
+      || isEndlessRaid
       || mysteryGauntletBoss
       || (species && (species.subLegendary || species.legendary || species.mythical))
     ) {
@@ -2918,7 +3087,7 @@ export class BattleScene extends SceneBase {
       this.executeWithSeedOffset(() => {
         isBoss =
           everyWaveBoss
-          || waveIndex % 10 === 0
+          || this.gameMode.isBoss(waveIndex)
           || (totalBossPct > 0 && randSeedInt(100) < totalBossPct)
           || (this.gameMode.hasRandomBosses
             && randSeedInt(100) < Math.min(Math.max(Math.ceil((waveIndex - 250) / 50), 0) * 2, 30));
@@ -2941,7 +3110,7 @@ export class BattleScene extends SceneBase {
       this.executeWithSeedOffset(() => {
         bars = minBars + randSeedInt(Math.max(1, maxBars - minBars + 1));
       }, waveIndex << 3);
-      return bars;
+      return isEndlessRaid ? getErEndlessRaidBossSegments(bars) : bars;
     }
 
     let ret = 2;
@@ -2954,7 +3123,7 @@ export class BattleScene extends SceneBase {
     }
     ret += Math.floor(waveIndex / 250);
 
-    return ret;
+    return isEndlessRaid ? getErEndlessRaidBossSegments(ret) : ret;
   }
 
   trySpreadPokerus(): void {
@@ -3130,6 +3299,9 @@ export class BattleScene extends SceneBase {
     if (!this.biomeWaveText.visible) {
       return null;
     }
+    if (isErEndlessContinuationActive()) {
+      return this.currentBattle?.waveIndex ?? null;
+    }
     const match = / - ([0-9]+)$/u.exec(this.biomeWaveText.text);
     if (match == null) {
       return null;
@@ -3144,11 +3316,17 @@ export class BattleScene extends SceneBase {
     if (!this.currentBattle) {
       return;
     }
-    const isBoss = !(this.currentBattle.waveIndex % 10);
+    const isBoss = this.gameMode.isBoss(this.currentBattle.waveIndex);
     const biomeString: string = getBiomeName(this.arena.biomeId);
     this.fieldUI.moveAbove(this.biomeWaveText, this.luckText);
+    const endless = isErEndlessContinuationActive();
+    const heading = endless
+      ? `${biomeString} - C${getErEndlessCycle(this.currentBattle.waveIndex)}:${getErEndlessCycleWave(this.currentBattle.waveIndex)}`
+      : `${biomeString} - ${this.currentBattle.waveIndex}`;
+    // Reward rates moved to the compact reward-rate panel; keep this to the heading.
+    this.rewardRatePanel?.refreshFromGame();
     this.biomeWaveText
-      .setText(biomeString + " - " + this.currentBattle.waveIndex.toString())
+      .setText(heading)
       .setColor(isBoss ? "#f89890" : "#ffffff")
       .setShadowColor(isBoss ? "#984038" : "#636363")
       .setVisible(true);
@@ -3193,7 +3371,7 @@ export class BattleScene extends SceneBase {
    * Displays the current luck value.
    * @param duration The time for this label to fade in, if it is not already visible.
    */
-  updateAndShowText(duration: number): void {
+  updateAndShowText(duration: number, showRewardRates = false): void {
     const labels = [this.luckLabelText, this.luckText];
     for (const label of labels) {
       label.setAlpha(0);
@@ -3206,8 +3384,16 @@ export class BattleScene extends SceneBase {
       this.luckText.setTint(...RAINBOW_TINT);
     }
     this.luckLabelText.setX(this.scaledCanvas.width - 2 - (this.luckText.displayWidth + 2));
+    // Reward rates belong exclusively to the post-battle reward shop. Keep
+    // this opt-in so future Luck displays cannot leak the panel into battle.
+    if (this.rewardRatePanel && showRewardRates) {
+      this.rewardRatePanel.refreshFromGame();
+      this.rewardRatePanel.setVisible(true).setAlpha(0);
+    } else {
+      this.rewardRatePanel?.setVisible(false).setAlpha(0);
+    }
     this.tweens.add({
-      targets: labels,
+      targets: this.rewardRatePanel && showRewardRates ? [...labels, this.rewardRatePanel] : labels,
       duration,
       alpha: 1,
       onComplete: () => {
@@ -3223,14 +3409,19 @@ export class BattleScene extends SceneBase {
       return;
     }
     const labels = [this.luckLabelText, this.luckText];
+    const targets: Phaser.GameObjects.GameObject[] = [...labels];
+    if (this.rewardRatePanel) {
+      targets.push(this.rewardRatePanel);
+    }
     this.tweens.add({
-      targets: labels,
+      targets,
       duration,
       alpha: 0,
       onComplete: () => {
         for (const label of labels) {
           label.setVisible(false);
         }
+        this.rewardRatePanel?.setVisible(false);
       },
     });
   }
@@ -3248,6 +3439,10 @@ export class BattleScene extends SceneBase {
     [this.luckLabelText, this.luckText].map(l =>
       l.setY((this.scoreText.visible ? this.scoreText : this.moneyText).y + 10),
     );
+    this.rewardRatePanel?.anchorUnderLuck(this.luckText);
+    if (this.rewardRatePanel?.visible) {
+      this.rewardRatePanel.refreshFromGame();
+    }
     const offsetY = (this.scoreText.visible ? this.scoreText : this.moneyText).y + 15;
     this.partyExpBar.setY(offsetY);
     this.candyBar.setY(offsetY + 15);
@@ -3856,7 +4051,8 @@ export class BattleScene extends SceneBase {
   }
 
   getWaveMoneyAmount(moneyMultiplier: number): number {
-    const waveIndex = this.currentBattle.waveIndex;
+    const runWave = this.currentBattle.waveIndex;
+    const waveIndex = this.gameMode.modeId === GameModes.CLASSIC ? getErProgressionWave(runWave) : runWave;
     const waveSetIndex = Math.ceil(waveIndex / 10) - 1;
     const moneyValue =
       Math.pow((waveSetIndex + 1 + (0.75 + (((waveIndex - 1) % 10) + 1) / 10)) * 100, 1 + 0.005 * waveSetIndex)
@@ -3885,14 +4081,49 @@ export class BattleScene extends SceneBase {
     this.validateAchvs(ModifierAchv, modifier);
     const modifiersToRemove: PersistentModifier[] = [];
     if (modifier instanceof PersistentModifier) {
-      if ((modifier as PersistentModifier).add(this.modifiers, !!virtual)) {
+      // In Fun Mega Mode an inactive stone means the player deliberately disabled it.
+      // Retire that stale modifier before installing a replacement; otherwise a same-stone
+      // replacement hits its one-stack cap and different stones accumulate conflicting toggles.
+      if (modifier instanceof PokemonFormChangeItemModifier && this.gameMode.isFun && getFunModeConfig().megaMode) {
+        const inactiveStones = this.modifiers.filter(
+          candidate =>
+            candidate instanceof PokemonFormChangeItemModifier
+            && candidate.pokemonId === modifier.pokemonId
+            && !candidate.active,
+        );
+        for (const inactiveStone of inactiveStones) {
+          this.removeModifier(inactiveStone);
+        }
+      }
+      let added = (modifier as PersistentModifier).add(this.modifiers, !!virtual);
+      if (!added && !virtual && modifier instanceof PokemonHeldItemModifier) {
+        const pokemon = modifier.getPokemon();
+        const matching = this.modifiers.find(
+          candidate =>
+            candidate instanceof PokemonHeldItemModifier
+            && candidate.pokemonId === modifier.pokemonId
+            && candidate.matchType(modifier),
+        ) as PokemonHeldItemModifier | undefined;
+        if (pokemon != null && matching != null) {
+          const rule = getMoodyCoordinatorItemRule(pokemon, modifier.type.id);
+          const extraCapacity = rule.ignoreStackCap ? Math.max(1, rule.extraCap) : rule.extraCap;
+          if (
+            extraCapacity > 0
+            && matching.stackCount + modifier.stackCount <= matching.getMaxStackCount() + extraCapacity
+          ) {
+            matching.stackCount += modifier.stackCount;
+            added = true;
+          }
+        }
+      }
+      if (added) {
         // The modifier was added: report success so purchase flows that gate on
         // the return value (e.g. SelectModifierPhase.applyModifier deducting the
         // cost) charge for it. Previously `success` stayed false for a normal
         // held item, so the ER biome market - the first place held items are
         // BOUGHT rather than handed out free - never took the player's money.
         success = true;
-        if (modifier instanceof PokemonFormChangeItemModifier) {
+        if (modifier instanceof PokemonFormChangeItemModifier && modifier.active) {
           const pokemon = this.getPokemonById(modifier.pokemonId);
           if (pokemon) {
             success = modifier.apply(pokemon, true);
@@ -3969,6 +4200,9 @@ export class BattleScene extends SceneBase {
         }
       }
     }
+    if (success && modifier instanceof PersistentModifier && !virtual) {
+      notifyMoodyCoordinatorItemInventory(this.modifiers);
+    }
     return success;
   }
 
@@ -3976,7 +4210,7 @@ export class BattleScene extends SceneBase {
     return new Promise(resolve => {
       const modifiersToRemove: PersistentModifier[] = [];
       if ((modifier as PersistentModifier).add(this.enemyModifiers, false)) {
-        if (modifier instanceof PokemonFormChangeItemModifier) {
+        if (modifier instanceof PokemonFormChangeItemModifier && modifier.active) {
           const pokemon = this.getPokemonById(modifier.pokemonId);
           if (pokemon) {
             modifier.apply(pokemon, true);
@@ -4027,8 +4261,45 @@ export class BattleScene extends SceneBase {
       return false;
     }
 
+    // Ghost inventory is a snapshot of another run, not loot. Any cross-side
+    // theft that would otherwise succeed destroys the requested quantity on
+    // the ghost instead of cloning it into the player's run.
+    if (source?.isEnemy() && target.isPlayer() && isErGhostEnemyPokemon(source)) {
+      if (!this.canTransferHeldItemModifier(itemModifier, target, transferQuantity)) {
+        return false;
+      }
+      const countTaken = Math.min(transferQuantity, itemModifier.stackCount);
+      if (countTaken <= 0) {
+        return false;
+      }
+      itemModifier.stackCount -= countTaken;
+      if (itemModifier.stackCount <= 0) {
+        this.removeModifier(itemModifier, true);
+      }
+      if (itemLost) {
+        applyAbAttrs("PostItemLostAbAttr", { pokemon: source, opponent: target });
+      }
+      if (!ignoreUpdate) {
+        this.updateModifiers(false, instant);
+      }
+      this.phaseManager.queueMessage(
+        `${source.getNameToRender()}'s ${itemModifier.type.name} faded away instead of being stolen!`,
+      );
+      return false;
+    }
+
     const newItemModifier = itemModifier.clone() as PokemonHeldItemModifier;
     newItemModifier.pokemonId = target.id;
+    // Form stones move as held inventory, not as an implicit transformation.
+    // Removing the source modifier deactivates its form; the recipient can then
+    // explicitly activate the transferred stone from the party screen.
+    if (
+      newItemModifier instanceof PokemonFormChangeItemModifier
+      && this.gameMode.isFun
+      && getFunModeConfig().megaMode
+    ) {
+      newItemModifier.active = false;
+    }
     // ER Ward Stones (#358): a stone stolen ONTO a player's mon arrives EMPTY
     // and must recharge over won waves (10 Minor / 15 Greater per the spec).
     if (newItemModifier instanceof ErWardStoneModifier && target.isPlayer() && source?.isEnemy()) {
@@ -4065,13 +4336,13 @@ export class BattleScene extends SceneBase {
           if (target.isPlayer()) {
             this.addModifier(newItemModifier, ignoreUpdate, playSound, false, instant);
             if (source && itemLost) {
-              applyAbAttrs("PostItemLostAbAttr", { pokemon: source });
+              applyAbAttrs("PostItemLostAbAttr", { pokemon: source, opponent: target });
             }
             return true;
           }
           this.addEnemyModifier(newItemModifier, ignoreUpdate, instant);
           if (source && itemLost) {
-            applyAbAttrs("PostItemLostAbAttr", { pokemon: source });
+            applyAbAttrs("PostItemLostAbAttr", { pokemon: source, opponent: target });
           }
           return true;
         }
@@ -4143,6 +4414,7 @@ export class BattleScene extends SceneBase {
   removePartyMemberModifiers(partyMemberIndex: number): Promise<void> {
     return new Promise(resolve => {
       const pokemonId = this.getPlayerParty()[partyMemberIndex].id;
+      notifyMoodyCoordinatorPokemonPermanentlyRemoved(pokemonId);
       const modifiersToRemove = this.modifiers.filter(
         m => m instanceof PokemonHeldItemModifier && (m as PokemonHeldItemModifier).pokemonId === pokemonId,
       );
@@ -4154,8 +4426,117 @@ export class BattleScene extends SceneBase {
     });
   }
 
+  private addErHeldItemLoadout(
+    enemy: EnemyPokemon,
+    heldItems: readonly [string, number, unknown[]?][],
+    seedKey: string,
+    seedOffset = 0,
+    protectInventory = false,
+  ): void {
+    for (const [itemIndex, [typeId, rawStack, generatedTypeArgs]] of heldItems.entries()) {
+      const factory = getModifierDataTypeFactory(typeId);
+      let type: ModifierType | null | undefined = factory?.();
+      if (type instanceof ModifierTypeGenerator) {
+        const generator = type;
+        this.executeWithSeedOffset(
+          () => {
+            type = generator.generateType([enemy], Array.isArray(generatedTypeArgs) ? generatedTypeArgs : undefined);
+          },
+          this.currentBattle.waveIndex + seedOffset * 100 + itemIndex,
+          seedKey,
+        );
+      }
+      if (!(type instanceof PokemonHeldItemModifierType)) {
+        console.warn(`[ghost] skipped unknown held-item modifier ${typeId}`);
+        continue;
+      }
+      type.id = typeId;
+      const modifier = type.newModifier(enemy);
+      const stack = Math.floor(Number(rawStack));
+      if (!(modifier instanceof PokemonHeldItemModifier) || !Number.isFinite(stack) || stack <= 0) {
+        continue;
+      }
+      modifier.stackCount = Math.min(stack, modifier.getMaxStackCount());
+      if (protectInventory) {
+        modifier.isTransferable = false;
+      }
+      void this.addEnemyModifier(modifier, true, true);
+    }
+  }
+
+  /** Add a ghost snapshot's inventory after normal enemy generation. */
+  private addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void {
+    const trainer = this.currentBattle.trainer;
+    const snapshot = trainer ? getErGhostSnapshot(trainer) : null;
+    if (!snapshot) {
+      return;
+    }
+    resetErEnemyRelicBattleState();
+    const relicBudgetMultiplier = getErEndlessNemesisRelicBudgetMultiplier(snapshot.endlessNemesisRank ?? 0);
+
+    for (let i = 0; i < party.length; i++) {
+      this.addErHeldItemLoadout(party[i], snapshot.party[i]?.heldItems ?? [], `${snapshot.id}:ghost-held-item`, i);
+    }
+
+    for (const [rawKind, rawStack, rawWeather] of snapshot.relics ?? []) {
+      if (!Object.hasOwn(ER_RELIC_CONFIG, rawKind)) {
+        console.warn(`[ghost] skipped unknown relic ${rawKind}`);
+        continue;
+      }
+      const kind = rawKind as ErRelicKind;
+      const typeId = `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+      const type = getModifierDataTypeFactory(typeId)?.();
+      if (type) {
+        type.id = typeId;
+      }
+      const modifier = type?.newModifier();
+      const stack = Math.floor(Number(rawStack));
+      if (!(modifier instanceof ErRelicModifier) || !Number.isFinite(stack) || stack <= 0) {
+        continue;
+      }
+      modifier.stackCount = Math.min(Math.ceil(stack * relicBudgetMultiplier), modifier.getMaxStackCount());
+      modifier.chosenWeather = Number.isFinite(rawWeather) ? rawWeather : null;
+      void this.addEnemyModifier(modifier, true, true);
+    }
+  }
+
+  /** Enemy relics are battle-scoped and have no Pokemon owner to self-prune against. */
+  private clearErEnemyRelics(): void {
+    const relics = this.enemyModifiers.filter(modifier => modifier instanceof ErRelicModifier);
+    for (const relic of relics) {
+      this.enemyModifiers.splice(this.enemyModifiers.indexOf(relic), 1);
+    }
+    resetErEnemyRelicBattleState();
+    if (relics.length > 0) {
+      this.updateModifiers(false, true);
+    }
+  }
+
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
+      this.clearErEnemyRelics();
+      if (isErEndlessContinuationActive()) {
+        const snapshot =
+          this.currentBattle.trainer && hasErGhostOverride(this.currentBattle.trainer)
+            ? getErGhostSnapshot(this.currentBattle.trainer)
+            : null;
+        setMoodyEnemyBoonLoadout(
+          generateEndlessEnemyBoonLoadout(
+            this.getEnemyParty(),
+            this.currentBattle.waveIndex,
+            snapshot?.endlessEchoStage === 3,
+            snapshot?.endlessNemesisRank ?? 0,
+            this.currentBattle.trainer?.config.isBoss === true
+              || this.gameMode.isBoss(this.currentBattle.waveIndex)
+              || this.getEnemyParty().some(pokemon => pokemon.isBoss()),
+          ),
+        );
+      } else if (this.gameMode.isFun && getFunModeConfig().moodyMode) {
+        prepareMoodyCoordinatorEnemyGeneration(this.getEnemyParty().some(pokemon => pokemon.isBoss()));
+        setMoodyEnemyBoonLoadout(generateMoodyEnemyBoonLoadout(this.getEnemyParty(), this.currentBattle.waveIndex));
+      } else {
+        resetMoodyEnemyBoonLoadout();
+      }
       if (this.currentBattle.isClassicFinalBoss) {
         return resolve();
       }
@@ -4182,6 +4563,20 @@ export class BattleScene extends SceneBase {
         }
       }
 
+      const endlessGhost =
+        isErEndlessContinuationActive()
+        && this.currentBattle.trainer != null
+        && hasErGhostOverride(this.currentBattle.trainer);
+      if (endlessGhost) {
+        const teamSize = Math.max(1, this.currentBattle.trainer!.getPartyTemplate().size);
+        chances += Math.ceil(Math.floor(getErEndlessEquivalentDepth(this.currentBattle.waveIndex) / 10) / teamSize);
+        const echoStage = getErGhostSnapshot(this.currentBattle.trainer!)?.endlessEchoStage;
+        const equipmentBonus = echoStage === 3 ? 0.5 : echoStage === 2 ? 0.25 : 0;
+        const nemesisRank = getErGhostSnapshot(this.currentBattle.trainer!)?.endlessNemesisRank ?? 0;
+        const nemesisEquipmentBonus = nemesisRank >= 4 ? 0.75 : nemesisRank >= 2 ? 0.5 : nemesisRank >= 1 ? 0.25 : 0;
+        chances += Math.ceil(chances * Math.max(equipmentBonus, nemesisEquipmentBonus));
+      }
+
       const party = this.getEnemyParty();
 
       if (this.currentBattle.trainer) {
@@ -4194,15 +4589,10 @@ export class BattleScene extends SceneBase {
       party.forEach((enemyPokemon: EnemyPokemon, i: number) => {
         if (heldModifiersConfigs && i < heldModifiersConfigs.length && heldModifiersConfigs[i]) {
           for (const mt of heldModifiersConfigs[i]) {
-            let modifier: PokemonHeldItemModifier;
-            if (mt.modifier instanceof PokemonHeldItemModifierType) {
-              modifier = mt.modifier.newModifier(enemyPokemon);
-            } else {
-              modifier = mt.modifier as PokemonHeldItemModifier;
-              modifier.pokemonId = enemyPokemon.id;
+            const modifier = materializeHeldModifierConfig(mt, enemyPokemon);
+            if (!modifier) {
+              continue;
             }
-            modifier.stackCount = mt.stackCount ?? 1;
-            modifier.isTransferable = mt.isTransferable ?? modifier.isTransferable;
             this.addEnemyModifier(modifier, true);
           }
         } else {
@@ -4222,6 +4612,9 @@ export class BattleScene extends SceneBase {
               count++;
             }
           }
+          if (this.gameMode.isFun && getFunModeConfig().itemChaos) {
+            count = Math.max(1, count);
+          }
           if (isBoss) {
             count = Math.max(count, Math.floor(chances / 2));
           }
@@ -4233,11 +4626,77 @@ export class BattleScene extends SceneBase {
             upgradeChance,
           ).map(mt => mt.newModifier(enemyPokemon).add(this.enemyModifiers, false));
         }
+        const funMegaStone = enemyPokemon.getFunMegaStone();
+        if (
+          this.gameMode.isFun
+          && getFunModeConfig().megaMode
+          && funMegaStone != null
+          && !this.enemyModifiers.some(
+            modifier =>
+              modifier instanceof PokemonFormChangeItemModifier
+              && modifier.pokemonId === enemyPokemon.id
+              && modifier.formChangeItem === funMegaStone,
+          )
+        ) {
+          const stoneModifier = new FormChangeItemModifierType(funMegaStone)
+            .withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM)
+            .newModifier(enemyPokemon);
+          if (stoneModifier instanceof PersistentModifier) {
+            void this.addEnemyModifier(stoneModifier, true, true);
+          }
+        }
         return true;
       });
       // ER: layer the soft ER → PokeRogue held-item conversion on top of the
       // baseline roll for any ER-roster trainer mons in the party.
       applyErTrainerHeldItems(party);
+      if (isErEndlessContinuationActive() && isErEndlessRaidWave(this.currentBattle.waveIndex)) {
+        for (let index = 0; index < party.length; index++) {
+          const enemy = party[index];
+          const existingWard = this.enemyModifiers.find(
+            modifier => modifier instanceof ErWardStoneModifier && modifier.pokemonId === enemy.id,
+          );
+          if (existingWard instanceof ErWardStoneModifier && existingWard.tier !== "prime") {
+            this.enemyModifiers.splice(this.enemyModifiers.indexOf(existingWard), 1);
+          }
+          grantErWardStone(enemy, "prime");
+          grantErResistBerries(enemy);
+          this.addErHeldItemLoadout(
+            enemy,
+            getErEndlessBossHeldItems(this.currentBattle.waveIndex, index),
+            `er-endless-raid-held-items:${this.currentBattle.waveIndex}:${index}`,
+            index,
+            true,
+          );
+        }
+      }
+      // Ghost snapshots are additive: preserve every generated item, ward,
+      // boss layer above, then restore the inventory captured with the team.
+      this.addErGhostSnapshotInventory(party);
+      if (endlessGhost) {
+        const extraRelicStacks = Math.floor(getErEndlessEquivalentDepth(this.currentBattle.waveIndex) / 100);
+        const relicKinds = Object.keys(ER_RELIC_CONFIG) as ErRelicKind[];
+        for (let index = 0; index < extraRelicStacks; index++) {
+          let kindIndex = 0;
+          this.executeWithSeedOffset(
+            () => {
+              kindIndex = randSeedInt(relicKinds.length);
+            },
+            this.currentBattle.waveIndex + index,
+            "er-endless-ghost-relic",
+          );
+          const kind = relicKinds[kindIndex];
+          const typeId = `ER_RELIC_${kind.replace(/([A-Z])/g, "_$1").toUpperCase()}`;
+          const type = getModifierDataTypeFactory(typeId)?.();
+          if (type) {
+            type.id = typeId;
+          }
+          const modifier = type?.newModifier();
+          if (modifier instanceof ErRelicModifier) {
+            void this.addEnemyModifier(modifier, true, true);
+          }
+        }
+      }
       // ER Factory (#439 §3): the production line - every WILD mon is GUARANTEED
       // to hold at least one item, with stacking chances for a 2nd/3rd. Tops up
       // each wild mon's baseline roll to the floor (never reduces a luckier roll).
@@ -4382,6 +4841,9 @@ export class BattleScene extends SceneBase {
           modifier.apply(pokemon, false);
         }
       }
+      if (!enemy) {
+        notifyMoodyCoordinatorItemInventory(this.modifiers);
+      }
       return true;
     }
 
@@ -4476,7 +4938,7 @@ export class BattleScene extends SceneBase {
   ): T[] {
     const appliedModifiers: T[] = [];
     for (const modifier of modifiers) {
-      if (modifier.apply(...args)) {
+      if (applyPersistentModifierWithMoody(modifier, args)) {
         console.log("Applied", modifier.type.name, player ? "" : "(enemy)");
         appliedModifiers.push(modifier);
       }
@@ -4501,7 +4963,7 @@ export class BattleScene extends SceneBase {
       (m): m is T => m instanceof modifierType && m.shouldApply(...args),
     );
     for (const modifier of modifiers) {
-      if (modifier.apply(...args)) {
+      if (applyPersistentModifierWithMoody(modifier, args)) {
         console.log("Applied", modifier.type.name, player ? "" : "(enemy)");
         return modifier;
       }
@@ -4510,12 +4972,11 @@ export class BattleScene extends SceneBase {
     return null;
   }
 
-  triggerPokemonFormChange(
+  /** Resolve the exact form edge the engine would queue for this trigger without mutating or scheduling it. */
+  resolvePokemonFormChange(
     pokemon: Pokemon,
     formChangeTriggerType: Constructor<SpeciesFormChangeTrigger>,
-    delayed = false,
-    modal = false,
-  ): boolean {
+  ): SpeciesFormChange | null {
     if (Object.hasOwn(pokemonFormChanges, pokemon.species.speciesId)) {
       // in case this is NECROZMA, determine which forms this
       const matchingFormChangeOpts = pokemonFormChanges[pokemon.species.speciesId].filter(
@@ -4540,22 +5001,33 @@ export class BattleScene extends SceneBase {
       } else {
         matchingFormChange = matchingFormChangeOpts[0];
       }
-      if (matchingFormChange) {
-        let phase: Phase;
-        if (pokemon.isPlayer() && !matchingFormChange.quiet) {
-          phase = this.phaseManager.create("FormChangePhase", pokemon, matchingFormChange, modal);
-        } else {
-          phase = this.phaseManager.create("QuietFormChangePhase", pokemon, matchingFormChange);
-        }
-        if (pokemon.isPlayer() && !matchingFormChange.quiet && modal) {
-          this.phaseManager.overridePhase(phase);
-        } else if (delayed) {
-          this.phaseManager.pushPhase(phase);
-        } else {
-          this.phaseManager.unshiftPhase(phase);
-        }
-        return true;
+      return matchingFormChange ?? null;
+    }
+    return null;
+  }
+
+  triggerPokemonFormChange(
+    pokemon: Pokemon,
+    formChangeTriggerType: Constructor<SpeciesFormChangeTrigger>,
+    delayed = false,
+    modal = false,
+  ): boolean {
+    const matchingFormChange = this.resolvePokemonFormChange(pokemon, formChangeTriggerType);
+    if (matchingFormChange) {
+      let phase: Phase;
+      if (pokemon.isPlayer() && !matchingFormChange.quiet) {
+        phase = this.phaseManager.create("FormChangePhase", pokemon, matchingFormChange, modal);
+      } else {
+        phase = this.phaseManager.create("QuietFormChangePhase", pokemon, matchingFormChange);
       }
+      if (pokemon.isPlayer() && !matchingFormChange.quiet && modal) {
+        this.phaseManager.overridePhase(phase);
+      } else if (delayed) {
+        this.phaseManager.pushPhase(phase);
+      } else {
+        this.phaseManager.unshiftPhase(phase);
+      }
+      return true;
     }
 
     return false;
@@ -4829,7 +5301,12 @@ export class BattleScene extends SceneBase {
     const partyMemberExp: number[] = [];
     // EXP value calculation is based off Pokemon.getExpValue
     if (useWaveIndexMultiplier) {
-      expValue = Math.floor((expValue * this.currentBattle.waveIndex) / 5 + 1);
+      const runWave = this.currentBattle.waveIndex;
+      const expWave = isErSprintMode(this.gameMode.modeId) ? getErProgressionWave(runWave) : runWave;
+      expValue = Math.floor((expValue * expWave) / 5 + 1);
+    }
+    if (isErSprintMode(this.gameMode.modeId)) {
+      expValue *= 2;
     }
 
     if (participantIds.size > 0) {
@@ -4845,7 +5322,8 @@ export class BattleScene extends SceneBase {
         const pId = partyMember.id;
         const participated = participantIds.has(pId);
         if (participated && pokemonDefeated) {
-          partyMember.addFriendship(FRIENDSHIP_GAIN_FROM_BATTLE);
+          const friendshipMultiplier = isErSprintMode(this.gameMode.modeId) ? 2 : 1;
+          partyMember.addFriendship(FRIENDSHIP_GAIN_FROM_BATTLE * friendshipMultiplier);
           const machoBraceModifier = partyMember.getHeldItems().find(m => m instanceof PokemonIncrementingStatModifier);
           if (machoBraceModifier && machoBraceModifier.stackCount < machoBraceModifier.getMaxStackCount()) {
             machoBraceModifier.stackCount++;
@@ -4945,6 +5423,13 @@ export class BattleScene extends SceneBase {
     const sessionEncounterRate = this.mysteryEncounterSaveData.encounterSpawnChance;
     const encounteredEvents = this.mysteryEncounterSaveData.encounteredEvents;
 
+    if (
+      isErSprintMode(this.gameMode.modeId)
+      && encounteredEvents.some(event => Math.floor((event.waveIndex - 1) / 5) === Math.floor((waveIndex - 1) / 5))
+    ) {
+      return false;
+    }
+
     // MEs can only spawn 3 or more waves after the previous ME, barring overrides
     const canSpawn =
       Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE !== null
@@ -4961,7 +5446,10 @@ export class BattleScene extends SceneBase {
     // flat per-wave weight, which the anti-variance would just cancel out), so the
     // whole run targets more MEs - ~every 5 waves at 1 charm - and every tier scales
     // up commensurately.
-    const effectiveTarget = AVERAGE_ENCOUNTERS_PER_RUN_TARGET + erMysteryCharmTargetBonus();
+    const baseTarget = isErSprintMode(this.gameMode.modeId)
+      ? getErMysteryEncounterTarget()
+      : AVERAGE_ENCOUNTERS_PER_RUN_TARGET;
+    const effectiveTarget = baseTarget + erMysteryCharmTargetBonus();
     const expectedEncountersByFloor =
       (effectiveTarget / (highestMysteryEncounterWave - lowestMysteryEncounterWave))
       * (waveIndex - lowestMysteryEncounterWave);
@@ -4974,17 +5462,21 @@ export class BattleScene extends SceneBase {
     // (Graveyard/Ruins ~2.2x) feel haunted, quiet ones (Sea/Plains ~0.7x) almost
     // never roll one. Multiplies the per-wave roll, so it composes with the Mystery
     // Charm run target. Skipped when a rate override is forcing the rate.
-    const successRate =
+    const successRate = new NumberHolder(
       Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE === null
         ? favoredEncounterRate * erBiomeEventRateMult(this.arena.biomeId)
-        : Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE;
+        : Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE,
+    );
+    if (Overrides.MYSTERY_ENCOUNTER_RATE_OVERRIDE === null) {
+      this.applyModifiers(MysteryEventRateBoosterModifier, true, successRate);
+    }
 
     let roll = 0;
     // Always rolls the check on the same offset to ensure no RNG changes from reloading session
     this.executeWithSeedOffset(() => {
       roll = randSeedInt(MYSTERY_ENCOUNTER_SPAWN_MAX_WEIGHT);
     }, waveIndex * 3000);
-    return roll < successRate;
+    return roll < successRate.value;
   }
 
   /**
@@ -5004,7 +5496,7 @@ export class BattleScene extends SceneBase {
       this.gameMode.hasMysteryEncounters
       && battleType === BattleType.WILD
       && !this.gameMode.isBoss(waveIndex)
-      && waveIndex % 10 !== 1
+      && !(isErSprintMode(this.gameMode.modeId) ? isErChapterStartWave(waveIndex) : waveIndex % 10 === 1)
       && hasOwnedCoopContinuation
       && isBetween(waveIndex, lowestMysteryEncounterWave, highestMysteryEncounterWave)
     );

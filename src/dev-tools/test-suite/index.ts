@@ -40,17 +40,23 @@
  */
 
 import {
+  clearDevEncounterPersistenceBypass,
   consumePendingDevBattleSetup,
   consumePendingDevCustomTrainerForce,
+  consumePendingDevEndlessOffer,
   consumePendingDevEnemyParty,
+  consumePendingDevGhostTeam,
   consumePendingDevPartySetup,
+  consumePendingDevPostCommandSetup,
   consumePendingDevShop,
   consumePendingDevStarterLevels,
   consumePendingDevStarters,
   type DevMenuCtx,
   registerDevMenu,
+  setDevEncounterPersistenceBypass,
   setPendingDevBattleSetup,
   setPendingDevPartySetup,
+  setPendingDevPostCommandSetup,
   setPendingDevShop,
   setPendingDevStarterLevels,
   setPendingDevStarters,
@@ -82,6 +88,7 @@ import {
 import {
   buildErCustomTrainerDevScenario,
   buildErCustomTrainerTeamScenario,
+  DEV_MENU_SCENARIOS,
   DEV_SCENARIOS,
   type DevScenario,
   resetDevOverrides,
@@ -349,9 +356,9 @@ function teardownThen(action: (ctx: DevMenuCtx) => void): void {
 /** The next not-yet-passed scenario after `after` (wraps; null if none remain). */
 function nextUnpassedScenario(after: DevScenario | null): DevScenario | null {
   const passed = new Set(combinedPassed());
-  const start = after ? DEV_SCENARIOS.findIndex(s => s.label === after.label) : -1;
-  for (let step = 1; step <= DEV_SCENARIOS.length; step++) {
-    const cand = DEV_SCENARIOS[(start + step) % DEV_SCENARIOS.length];
+  const start = after ? DEV_MENU_SCENARIOS.findIndex(s => s.label === after.label) : -1;
+  for (let step = 1; step <= DEV_MENU_SCENARIOS.length; step++) {
+    const cand = DEV_MENU_SCENARIOS[(start + step) % DEV_MENU_SCENARIOS.length];
     if (cand && cand.label !== after?.label && !passed.has(cand.label)) {
       return cand;
     }
@@ -641,6 +648,12 @@ function launchScenario(ctx: DevMenuCtx, scenario: DevScenario): boolean {
     if (scenario.onBattleStart) {
       setPendingDevBattleSetup(scenario.onBattleStart);
     }
+    if (scenario.onFirstTurnCommitted) {
+      setPendingDevPostCommandSetup(scenario.onFirstTurnCommitted);
+    }
+    if (scenario.bypassEncounterPersistence) {
+      setDevEncounterPersistenceBypass();
+    }
     if (scenario.shopItems && scenario.shopItems.length > 0) {
       // Guarantee these reward options in the first shop after the opening battle
       // ("start in the store, test a specific item").
@@ -679,7 +692,7 @@ function clampLabel(label: string): string {
 function openScenarioList(ctx: DevMenuCtx): void {
   // Hide scenarios passed by ANYONE on the team (local + shared remote set).
   const passedSet = new Set(combinedPassed());
-  const remaining = DEV_SCENARIOS.filter(s => !passedSet.has(s.label));
+  const remaining = DEV_MENU_SCENARIOS.filter(s => !passedSet.has(s.label));
   const localPassed = getPassed();
 
   const options = [
@@ -990,9 +1003,13 @@ registerDevMenu(ctx => {
   consumePendingDevStarters();
   consumePendingDevStarterLevels();
   consumePendingDevPartySetup();
+  consumePendingDevPostCommandSetup();
+  clearDevEncounterPersistenceBypass();
   consumePendingDevBattleSetup();
+  consumePendingDevEndlessOffer();
   consumePendingDevShop();
   consumePendingDevEnemyParty();
+  consumePendingDevGhostTeam();
   consumePendingDevCustomTrainerForce();
   scenarioBanner?.remove();
   scenarioBanner = null;
@@ -1004,6 +1021,49 @@ registerDevMenu(ctx => {
   // one whose battle is over) never leaks into a NORMAL run started from the title.
   // A fought forced trainer already self-clears on install; this covers backing out.
   setErCustomTrainerDevForce(null);
+  (
+    window as typeof window & {
+      __erLaunchDevScenarioByLabel?: (label: string) => boolean;
+      __erLaunchMoodyUiCaptureByLabel?: (label: string) => boolean;
+      __erAdvanceMoodyUiCapture?: () => boolean;
+      __erGetDevHarnessState?: () => { phaseName?: string; uiMode: string };
+    }
+  ).__erGetDevHarnessState = () => ({
+    phaseName: globalScene.phaseManager.getCurrentPhase()?.phaseName,
+    uiMode: UiMode[globalScene.ui.getMode()],
+  });
+  (
+    window as typeof window & {
+      __erLaunchDevScenarioByLabel?: (label: string) => boolean;
+    }
+  ).__erLaunchDevScenarioByLabel = label => {
+    const scenario = DEV_SCENARIOS.find(candidate => candidate.label === label);
+    return scenario == null ? false : launchScenario(ctx, scenario);
+  };
+  (
+    window as typeof window & {
+      __erLaunchMoodyUiCaptureByLabel?: (label: string) => boolean;
+    }
+  ).__erLaunchMoodyUiCaptureByLabel = label => {
+    const scenario = DEV_SCENARIOS.find(candidate => candidate.label === label);
+    if (scenario == null || !label.startsWith("UI: Moody ")) {
+      return false;
+    }
+    return launchScenario(ctx, { ...scenario, gameMode: GameModes.CLASSIC });
+  };
+  (
+    window as typeof window & {
+      __erAdvanceMoodyUiCapture?: () => boolean;
+    }
+  ).__erAdvanceMoodyUiCapture = () => {
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (phase?.phaseName !== "SelectFunModePhase") {
+      return false;
+    }
+    globalScene.phaseManager.unshiftNew("SelectStarterPhase");
+    phase.end();
+    return true;
+  };
   // Fast-iteration handoff: if the banner's Reset / Next / Pick button tore the
   // run down (teardownThen), run the staged action now that we have a FRESH
   // title launch ctx. Deferred so the title menu is fully built first; this is
@@ -1037,4 +1097,4 @@ registerDevMenu(ctx => {
 });
 
 // biome-ignore lint/suspicious/noConsole: dev-only status line
-console.log(`[dev-tools] loaded — ${DEV_SCENARIOS.length} scenarios + Send Logs button`);
+console.log(`[dev-tools] loaded — ${DEV_MENU_SCENARIOS.length} picker scenarios + Send Logs button`);

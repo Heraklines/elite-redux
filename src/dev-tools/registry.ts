@@ -24,6 +24,7 @@
 
 import Overrides from "#app/overrides";
 import { speciesStarterCosts } from "#balance/starters";
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { SHOWDOWN_ITEM_POOL } from "#data/elite-redux/showdown/showdown-item-pool";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { makeShowdownTeamPreset, type ShowdownTeamPreset } from "#data/elite-redux/showdown/showdown-team-preset";
@@ -200,6 +201,69 @@ export function isCoopBrowserAbilityCapsuleFixtureActive(): boolean {
   return new URLSearchParams(location.search).get("coopfixture") === "ability-capsule";
 }
 
+const COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS = new Set([
+  "TM_CASE",
+  "ER_LEARNERS_SHROOM",
+  "MEMORY_MUSHROOM",
+  "TM_COMMON",
+  "TM_GREAT",
+  "TM_ULTRA",
+  "ER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_RANDOMIZER",
+  "ABILITY_RANDOMIZER",
+  "MOVE_SLOT_EXPANDER",
+  "PP_UP",
+  "PP_MAX",
+  "ETHER",
+  "MAX_ETHER",
+  "ELIXIR",
+  "MAX_ELIXIR",
+  "MINT",
+  "TERA_SHARD",
+  "RARE_CANDY",
+  "RARER_CANDY",
+  "POTION",
+  "SUPER_POTION",
+  "HYPER_POTION",
+  "MAX_POTION",
+  "FULL_RESTORE",
+  "REVIVE",
+  "MAX_REVIVE",
+  "FULL_HEAL",
+  "SACRED_ASH",
+  "EVOLUTION_ITEM",
+  "RARE_EVOLUTION_ITEM",
+  "FORM_CHANGE_ITEM",
+  "RARE_FORM_CHANGE_ITEM",
+  "DNA_SPLICERS",
+  "ER_DEX_NAV",
+]);
+
+/** Whether this immutable bundle was built for the party-mutating reward matrix. */
+export function isCoopBrowserPartyRewardFixtureBuild(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return env?.VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards";
+}
+
+/**
+ * Return the closed reward id selected by the public two-browser matrix.
+ *
+ * Both the immutable build identity and exact URL tokens are required. A copied URL cannot alter a
+ * staging or production reward pool, and an arbitrary modifier id cannot be injected into the test build.
+ */
+export function getCoopBrowserPartyRewardFixtureId(): string | null {
+  if (!isCoopBrowserPartyRewardFixtureBuild() || typeof location === "undefined") {
+    return null;
+  }
+  const query = new URLSearchParams(location.search);
+  if (query.get("coopfixture") !== "party-mutating-rewards") {
+    return null;
+  }
+  const rewardId = query.get("partyreward");
+  return rewardId != null && COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS.has(rewardId) ? rewardId : null;
+}
+
 /** Whether this exact bundle was built for the public two-browser Showdown battle journey. */
 export function isCoopBrowserShowdownFixtureBuild(): boolean {
   const env = import.meta.env as unknown as Record<string, unknown> | undefined;
@@ -371,19 +435,27 @@ export function getCoopBrowserEvolutionFixtureStarters(): Starter[] | null {
   }));
 }
 
-/** Initial-save-only construction level for longitudinal interaction/navigation browser fixtures. */
+/** Initial-save-only construction level for exact interaction, navigation, and evolution browser fixtures. */
 export function getCoopBrowserLongitudinalFixtureStartingLevel(): number | null {
+  const partyRewardFixture = getCoopBrowserPartyRewardFixtureId();
   return isCoopBrowserEvolutionFixtureActive()
     ? 6
-    : isCoopBrowserRegisteredInteractionFixtureActive()
-        || isCoopBrowserCampaignSurvivalFixtureActive()
-        || isCoopBrowserNavigationFixtureActive()
-      ? 100
-      : null;
+    : partyRewardFixture === "RARE_EVOLUTION_ITEM"
+      ? 70
+      : partyRewardFixture === "EVOLUTION_ITEM"
+        ? 30
+        : isCoopBrowserRegisteredInteractionFixtureActive()
+            || isCoopBrowserCampaignSurvivalFixtureActive()
+            || isCoopBrowserNavigationFixtureActive()
+          ? 100
+          : null;
 }
 
-/** Initial-save-only purse for the four-hour navigation lane's repeated real biome-market purchases. */
+/** Initial-save-only purse for navigation markets and the paid Fun and Games interaction fixture. */
 export function getCoopBrowserNavigationFixtureStartingMoney(): number | null {
+  if (isCoopBrowserRegisteredInteractionFixtureActive()) {
+    return 100_000;
+  }
   return isCoopBrowserNavigationFixtureActive() ? 100_000 : null;
 }
 
@@ -457,6 +529,49 @@ export function getCoopBrowserAbilityCapsuleFixtureStarters(): Starter[] | null 
       ivs: new Array(6).fill(31),
     },
   ];
+}
+
+/**
+ * One full-moveset subject and one reserve per seat for the party-mutating reward matrix.
+ *
+ * The host deliberately targets combined party slot 1, which belongs to the guest. Four existing
+ * moves force TM Case, ordinary TM, Memory Mushroom, and Learner's Shroom through the nested
+ * owner-only forget picker that exposed the live successor bug. Item-specific subjects make evolution
+ * and form-change items legal; a reserve supplies deterministic healing/revival and DNA splice targets.
+ */
+export function getCoopBrowserPartyRewardFixtureStarters(): Starter[] | null {
+  const rewardId = getCoopBrowserPartyRewardFixtureId();
+  if (rewardId == null) {
+    return null;
+  }
+  const subjectSpecies =
+    rewardId === "EVOLUTION_ITEM"
+      ? SpeciesId.PIKACHU
+      : rewardId === "RARE_EVOLUTION_ITEM"
+        ? SpeciesId.KUBFU
+        : rewardId === "FORM_CHANGE_ITEM"
+          ? SpeciesId.SHAYMIN
+          : rewardId === "RARE_FORM_CHANGE_ITEM"
+            ? SpeciesId.GIRATINA
+            : SpeciesId.GARCHOMP;
+  // Elite Redux rewrites base Pikachu's stone edges to level evolutions, while Partner Pikachu retains
+  // its legitimate Thunder Stone edge. Preserve that exact form so the ordinary item lane exercises the
+  // real production selectFilter instead of relying on an evolution path the ER merge removed.
+  const subjectFormIndex = rewardId === "EVOLUTION_ITEM" ? 1 : 0;
+  const reserveSpecies = SpeciesId.CATERPIE;
+  const makeStarter = (speciesId: SpeciesId, formIndex = 0): Starter => ({
+    speciesId,
+    shiny: false,
+    variant: 0,
+    formIndex,
+    abilityIndex: 0,
+    passive: false,
+    nature: Nature.HARDY,
+    moveset: [MoveId.WATER_SPOUT, MoveId.TACKLE, MoveId.SPLASH, MoveId.PROTECT] as StarterMoveset,
+    pokerus: false,
+    ivs: new Array(6).fill(31),
+  });
+  return [makeStarter(subjectSpecies, subjectFormIndex), makeStarter(reserveSpecies)];
 }
 
 /**
@@ -618,6 +733,21 @@ export function consumePendingDevPartySetup(): (() => void) | null {
   return cb;
 }
 
+/** Run and consume the staged party setup without letting a dev fixture abort run creation. */
+export function runPendingDevPartySetup(): boolean {
+  const setup = consumePendingDevPartySetup();
+  if (!setup) {
+    return true;
+  }
+  try {
+    setup();
+    return true;
+  } catch (error) {
+    console.warn("[dev-tools] Party setup failed; continuing with the restored base party", error);
+    return false;
+  }
+}
+
 // --- Pending custom-trainer force (scenario -> SelectStarterPhase) ----------
 // Resetting a dev scenario rebuilds the title screen, whose cleanup correctly
 // clears any old force. Keep the next force pending until immediately before
@@ -690,6 +820,68 @@ export function consumePendingDevBattleSetup(): (() => void) | null {
   return cb;
 }
 
+// --- Pending post-command setup (scenario -> first TurnStartPhase) ----------
+// Unlike pendingBattleSetup, this fires only after the player and enemy commands
+// have been committed. It lets a dev scenario react to a real first move choice
+// without changing ordinary battle resolution.
+
+let pendingPostCommandSetup: (() => void) | null = null;
+
+/** Stage a callback to run once after the first turn's commands are committed. */
+export function setPendingDevPostCommandSetup(setup: () => void): void {
+  pendingPostCommandSetup = setup;
+}
+
+/** Take and clear the staged post-command callback. */
+export function consumePendingDevPostCommandSetup(): (() => void) | null {
+  const cb = pendingPostCommandSetup;
+  pendingPostCommandSetup = null;
+  return cb;
+}
+
+// --- Encounter persistence bypass (scenario -> EncounterPhase) --------------
+// Staging normally persists a new encounter before presenting it. Large dev
+// fixtures can be rejected by the cloud save API even though the battle itself
+// is valid, which makes EncounterPhase reset to the title before it renders.
+// Keep this opt-in and clear it on return to title so ordinary runs retain the
+// existing save gate while the throwaway scenario can continue into Endless.
+
+let devEncounterPersistenceBypassActive = false;
+
+/** Skip pre-presentation saves for the active throwaway dev-scenario run. */
+export function setDevEncounterPersistenceBypass(): void {
+  devEncounterPersistenceBypassActive = true;
+}
+
+/** Whether the active throwaway dev-scenario run bypasses encounter persistence. */
+export function isDevEncounterPersistenceBypassActive(): boolean {
+  return devEncounterPersistenceBypassActive;
+}
+
+/** Clear the bypass when the title screen is rebuilt. */
+export function clearDevEncounterPersistenceBypass(): void {
+  devEncounterPersistenceBypassActive = false;
+}
+
+// --- One-shot Endless offer (finale dev scenario -> GameOverPhase) -----------
+// Starting directly on the final wave skips parts of the normal run journey.
+// The dedicated Endless scenario arms this only after verifying that its battle
+// is the real classic finale, then GameOverPhase consumes it exactly once.
+
+let pendingDevEndlessOffer = false;
+
+/** Guarantee the Endless choice after the current dev finale is won. */
+export function setPendingDevEndlessOffer(): void {
+  pendingDevEndlessOffer = true;
+}
+
+/** Take and clear the dev-only Endless choice marker. */
+export function consumePendingDevEndlessOffer(): boolean {
+  const pending = pendingDevEndlessOffer;
+  pendingDevEndlessOffer = false;
+  return pending;
+}
+
 // --- Pending shop items (scenario → first SelectModifierPhase) ----------------
 // Lets a "start in the store, test a specific item" scenario guarantee specific
 // reward options in the NEXT reward/shop screen (e.g. a Rare Candy to evolve a
@@ -753,6 +945,24 @@ export function consumePendingDevEnemyParty(): DevEnemyMonSpec[] | null {
   const p = pendingDevEnemyParty;
   pendingDevEnemyParty = null;
   return p;
+}
+
+// --- Pending ghost encounter (scenario -> BattleScene) ----------------------
+// A complete snapshot can be staged for one non-fixed battle. BattleScene takes
+// and clears it before normal ghost selection, so it cannot affect a later wave.
+
+let pendingDevGhostTeam: GhostTeamSnapshot | null = null;
+
+/** Stage one exact ghost snapshot for the next dev battle. */
+export function setPendingDevGhostTeam(team: GhostTeamSnapshot): void {
+  pendingDevGhostTeam = team;
+}
+
+/** Take and clear the exact ghost snapshot staged by a dev scenario. */
+export function consumePendingDevGhostTeam(): GhostTeamSnapshot | null {
+  const team = pendingDevGhostTeam;
+  pendingDevGhostTeam = null;
+  return team;
 }
 
 // --- Lazy, env-gated loader --------------------------------------------------

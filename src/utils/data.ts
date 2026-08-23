@@ -1,5 +1,6 @@
 import { loggedInUser } from "#app/account";
 import { saveKey } from "#app/constants";
+import type { FunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { Starter, StarterAttributes } from "#types/save-data";
 import { AES, enc } from "crypto-js";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
@@ -236,4 +237,72 @@ export function saveLastChallenges(challenges: readonly { id: number; value: num
     return;
   }
   localStorage.setItem(lastChallengesKey(), JSON.stringify(active));
+}
+
+export type SavedFunModeConfig = Omit<FunModeConfig, "abilityRerollSeed">;
+
+const FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
+  "difficulty",
+  "randomizePokemon",
+  "randomizeTypes",
+  "randomizeAbilities",
+  "randomizeLevelUpMoves",
+  "megaMode",
+  "megaMixMode",
+  "shuffleStats",
+  "shuffleEvolutions",
+  "itemChaos",
+  "weatherRoulette",
+  "scrambleMoves",
+  "abilityAvalanche",
+  "moodyMode",
+];
+
+const LEGACY_FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
+  "randomizePokemon",
+  "randomizeTypes",
+  "randomizeAbilities",
+  "randomizeLevelUpMoves",
+  "megaMode",
+  "shuffleStats",
+];
+
+function lastFunModeKey(): string {
+  return `lastFunMode_${loggedInUser?.username}`;
+}
+
+/** The modifier choices used for the player's previous Fun Mode run. */
+export function loadLastFunModeConfig(): SavedFunModeConfig | null {
+  const raw = localStorage.getItem(lastFunModeKey());
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<SavedFunModeConfig> | null;
+    if (
+      !parsed
+      || !LEGACY_FUN_MODE_CONFIG_KEYS.every(key => typeof parsed[key] === "boolean")
+      || !FUN_MODE_CONFIG_KEYS.every(key =>
+        key === "difficulty"
+          ? parsed[key] == null || parsed[key] === "youngster" || parsed[key] === "hell"
+          : parsed[key] == null || typeof parsed[key] === "boolean",
+      )
+    ) {
+      return null;
+    }
+    return Object.fromEntries(
+      FUN_MODE_CONFIG_KEYS.map(key => [
+        key,
+        key === "difficulty" ? (parsed[key] === "hell" ? "hell" : "youngster") : parsed[key] === true,
+      ]),
+    ) as SavedFunModeConfig;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the modifier choices for a Fun Mode run without reusing its ability-reroll seed. */
+export function saveLastFunModeConfig(config: Readonly<FunModeConfig>): void {
+  const saved = Object.fromEntries(FUN_MODE_CONFIG_KEYS.map(key => [key, config[key]])) as SavedFunModeConfig;
+  localStorage.setItem(lastFunModeKey(), JSON.stringify(saved));
 }

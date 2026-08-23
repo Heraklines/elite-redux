@@ -15,6 +15,9 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { erRecordAchievementTurnStart } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { startMoodyFormationTurn } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeTurnStart } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { notifyMoodyCoordinatorTurnStart } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { BattleType } from "#enums/battle-type";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { MoveUseMode } from "#enums/move-use-mode";
@@ -163,6 +166,8 @@ export class TurnInitPhase extends FieldPhase {
 
   start() {
     super.start();
+    notifyMoodyRuntimeTurnStart();
+    notifyMoodyCoordinatorTurnStart();
 
     if (this.startAuthoritativeGuestInputTurn()) {
       return;
@@ -228,6 +233,7 @@ export class TurnInitPhase extends FieldPhase {
     });
 
     globalScene.eventTarget.dispatchEvent(new TurnInitEvent());
+    startMoodyFormationTurn();
 
     handleMysteryEncounterBattleStartEffects();
 

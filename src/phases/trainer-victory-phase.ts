@@ -2,13 +2,17 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { settleCoopTrainerPresentation } from "#data/elite-redux/coop/coop-field-presentation";
 import { isCoopMeOperationJournalActive } from "#data/elite-redux/coop/coop-me-operation";
 import { captureCoopActiveMysteryControl } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
+  completeCoopV2TrainerVictoryPresentation,
+  coopV2TrainerVictoryPresentationAddress,
   failCoopSharedSession,
   getCoopActiveWaveTransition,
   isCoopAuthoritativeGuest,
+  openCoopV2TrainerVictoryPresentation,
   resolveCoopRetainedWaveContinuationIdentity,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
@@ -22,12 +26,13 @@ import {
   snapshotCoopTrainerVictoryBoundary,
 } from "#data/elite-redux/coop/coop-trainer-victory-boundary";
 import { erRecordAchievementTrainerVictory } from "#data/elite-redux/er-achievement-tracker";
-import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErRewardRatesAtWave } from "#data/elite-redux/er-reward-rates";
 import { BiomeId } from "#enums/biome-id";
 import { TrainerType } from "#enums/trainer-type";
+import { AddVoucherModifierType } from "#modifiers/modifier-type";
 import { BattlePhase } from "#phases/battle-phase";
 import { achvs } from "#system/achv";
-import { vouchers } from "#system/voucher";
+import { VoucherType, vouchers } from "#system/voucher";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import { randSeedItem } from "#utils/common";
 import i18next from "i18next";
@@ -36,6 +41,7 @@ interface ResolvedTrainerVictoryBoundary {
   readonly authoritativeGuest: boolean;
   readonly victory: CoopTrainerVictoryBoundary;
   readonly liveTrainerMatches: boolean;
+  readonly orderedPresentationWave: number | null;
 }
 
 function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null {
@@ -45,7 +51,7 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     if (victory == null) {
       throw new Error("TrainerVictoryPhase started without a trainer battle");
     }
-    return { authoritativeGuest, victory, liveTrainerMatches: true };
+    return { authoritativeGuest, victory, liveTrainerMatches: true, orderedPresentationWave: null };
   }
 
   const ambientBattle = globalScene.currentBattle;
@@ -67,7 +73,27 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
       );
       return null;
     }
-    return { authoritativeGuest, victory, liveTrainerMatches };
+    return { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave: null };
+  }
+
+  const orderedPresentation = coopV2TrainerVictoryPresentationAddress();
+  if (orderedPresentation != null) {
+    const victory = getCoopTrainerVictoryBoundary(globalScene, orderedPresentation.wave);
+    if (victory == null || victory.sourceWave !== orderedPresentation.wave) {
+      failCoopSharedSession(
+        `The ordered trainer-victory presentation for wave ${orderedPresentation.wave} had no retained material.`,
+      );
+      return null;
+    }
+    const liveTrainerMatches =
+      ambientBattle?.waveIndex === victory.sourceWave
+      && ambientBattle.trainer?.config.trainerType === victory.trainerType;
+    return {
+      authoritativeGuest,
+      victory,
+      liveTrainerMatches,
+      orderedPresentationWave: orderedPresentation.wave,
+    };
   }
 
   const retainedIdentity = resolveCoopRetainedWaveContinuationIdentity(true);
@@ -111,7 +137,7 @@ function resolveTrainerVictoryBoundary(): ResolvedTrainerVictoryBoundary | null 
     );
     return null;
   }
-  return { authoritativeGuest, victory, liveTrainerMatches };
+  return { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave: null };
 }
 
 function queueTrainerVictoryRewards(victory: CoopTrainerVictoryBoundary): void {
@@ -120,10 +146,13 @@ function queueTrainerVictoryRewards(victory: CoopTrainerVictoryBoundary): void {
     globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierRewardFunc);
   }
 
-  // Per-account ER trainer vouchers: Youngster 0, Ace 1, Elite 2, Hell 3.
-  const erVoucherCount = { youngster: 0, ace: 1, elite: 2, hell: 3 }[getErDifficulty()];
-  for (let i = 0; i < erVoucherCount; i++) {
-    globalScene.phaseManager.unshiftNew("ModifierRewardPhase", modifierTypes.VOUCHER);
+  // One phase and account mutation regardless of the integer voucher payout.
+  const erVoucherCount = getErRewardRatesAtWave(victory.sourceWave).totalVoucher;
+  if (erVoucherCount > 0) {
+    globalScene.phaseManager.unshiftNew(
+      "ModifierRewardPhase",
+      () => new AddVoucherModifierType(VoucherType.REGULAR, erVoucherCount),
+    );
   }
 
   // Voucher validation remains per-account on both peers. Its repeat-win reward is suppressed in co-op by
@@ -225,8 +254,22 @@ export class TrainerVictoryPhase extends BattlePhase {
     if (resolved == null) {
       return;
     }
-    const { authoritativeGuest, victory, liveTrainerMatches } = resolved;
+    const { authoritativeGuest, victory, liveTrainerMatches, orderedPresentationWave } = resolved;
+    if (globalScene.gameMode.isCoop && !authoritativeGuest && !openCoopV2TrainerVictoryPresentation()) {
+      failCoopSharedSession("Could not open the ordered trainer-victory presentation.");
+      return;
+    }
     const finish = () => {
+      if (globalScene.gameMode.isCoop) {
+        // TrainerVictory deliberately reveals the defeated trainer on both clients. Make its terminal
+        // postcondition equally explicit: no following reward/menu/command surface may inherit a visible
+        // trainer or an entrance tween that can restore it on the next frame.
+        settleCoopTrainerPresentation("enemy");
+        coopLog("renderer", `trainer victory presentation settled sourceWave=${victory.sourceWave}`);
+      }
+      if (authoritativeGuest && orderedPresentationWave != null) {
+        completeCoopV2TrainerVictoryPresentation(orderedPresentationWave);
+      }
       this.end();
       if (authoritativeGuest) {
         clearCoopTrainerVictoryBoundary(globalScene, victory.sourceWave);

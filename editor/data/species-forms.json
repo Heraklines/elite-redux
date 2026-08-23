@@ -1,0 +1,362 @@
+[
+  {
+    "const": "SPECIES_METAGROSS__FORM_BATTLE_BOND",
+    "baseConst": "SPECIES_METAGROSS",
+    "name": "Battle Bond Metagross",
+    "aliases": ["Metagross Battle Bond", "Metagross (Battle Bond)"],
+    "slug": "metagross_battle_bond",
+    "id": 376,
+    "formIndex": 2,
+    "formKey": "battle-bond",
+    "dex": 376,
+    "bst": 700,
+    "abilities": {
+      "ability1": 5983,
+      "ability2": 297,
+      "hidden": 5034,
+      "innates": [5995, 5997, 210]
+    }
+  },
+  {
+    "const": "SPECIES_DURALUDON__FORM_MEGA",
+    "baseConst": "SPECIES_DURALUDON",
+    "name": "Mega Duraludon",
+    "aliases": ["Duraludon Mega", "Duraludon (Mega)"],
+    "slug": "duraludon_partner_mega",
+    "id": 884,
+    "formIndex": 2,
+    "formKey": "mega",
+    "dex": 884,
+    "bst": 635,
+    "abilities": {
+      "ability1": 240,
+      "ability2": 135,
+      "hidden": 5374,
+      "innates": [200, 178, 203]
+    }
+  },
+  {
+    "const": "SPECIES_FIDOUGH__FORM_MEGA",
+    "baseConst": "SPECIES_FIDOUGH",
+    "name": "Mega Fidough",
+    "aliases": ["Fidough Mega", "Fidough (Mega)"],
+    "slug": "fidough_partner_mega",
+    "id": 926,
+    "formIndex": 2,
+    "formKey": "mega",
+    "dex": 926,
+    "bst": 535,
+    "abilities": {
+      "ability1": 228,
+      "ability2": 5453,
+      "hidden": 5332,
+      "innates": [5970, 5356, 5969]
+    }
+  },
+  {
+    "const": "SPECIES_JUMPLUFF__FORM_MEGA",
+    "baseConst": "SPECIES_JUMPLUFF",
+    "name": "Mega Jumpluff",
+    "aliases": ["Jumpluff Mega", "Jumpluff (Mega)"],
+    "slug": "jumpluff_mega",
+    "id": 189,
+    "formIndex": 1,
+    "formKey": "mega",
+    "dex": 189,
+    "bst": 635,
+    "abilities": {
+      "ability1": 5944,
+      "ability2": 5944,
+      "hidden": 5944,
+      "innates": [5903, 5904, 5907]
+    }
+  },
+  {
+    "const": "SPECIES_MINUN__FORM_MEGA",
+    "baseConst": "SPECIES_MINUN",
+    "name": "Mega Minun",
+    "aliases": ["Minun Mega", "Minun (Mega)"],
+    "slug": "minun_mega",
+    "id": 312,
+    "formIndex": 1,
+    "formKey": "mega",
+    "dex": 312,
+    "bst": 545,
+    "abilities": {
+      "ability1": 262,
+      "ability2": 5924,
+      "hidden": 31,
+      "innates": [58, 5921, 5923]
+    }
+  },
+  {
+    "const": "SPECIES_PARASECT__FORM_MEGA",
+    "baseConst": "SPECIES_PARASECT",
+    "name": "Mega Parasect",
+    "aliases": ["Parasect Mega", "Parasect (Mega)"],
+    "slug": "parasect_mega",
+    "id": 47,
+    "formIndex": 1,
+    "formKey": "mega",
+    "dex": 47,
+    "bst": 615,
+    "abilities": {
+      "ability1": 5902,
+      "ability2": 23,
+      "hidden": 5352,
+      "innates": [5945, 5905, 5906]
+    }
+  },
+  {
+    "const": "SPECIES_PLUSLE__FORM_MEGA",
+    "baseConst": "SPECIES_PLUSLE",
+    "name": "Mega Plusle",
+    "aliases": ["Plusle Mega", "Plusle (Mega)"],
+    "slug": "plusle_mega",
+    "id": 311,
+    "formIndex": 1,
+    "formKey": "mega",
+    "dex": 311,
+    "bst": 545,
+    "abilities": {
+      "ability1": 5332,
+      "ability2": 5924,
+      "hidden": 132,
+      "innates": [57, 5921, 5922]
+    }
+  },
+  {
+    "const": "SPECIES_ELECTIVIRE__FORM_MEGA_X",
+    "baseConst": "SPECIES_ELECTIVIRE",
+    "name": "Mega X Electivire",
+    "aliases": ["Electivire Mega X", "Electivire (Mega X)"],
+    "slug": "electivire_mega_x",
+    "id": 466,
+    "formIndex": 1,
+    "formKey": "mega-x",
+    "dex": 466,
+    "bst": 640,
+    "abilities": {
+      "ability1": 255,
+      "ability2": 5057,
+      "hidden": 5279,
+      "innates": [5927, 5925, 5926]
+    }
+  },
+  {
+    "const": "SPECIES_HYDREIGON__FORM_MEGA_X",
+    "baseConst": "SPECIES_HYDREIGON",
+    "name": "Mega X Hydreigon",
+    "aliases": ["Hydreigon Mega X", "Hydreigon (Mega X)"],
+    "slug": "hydreigon_mega_x",
+    "id": 635,
+    "formIndex": 3,
+    "formKey": "mega-x",
+    "dex": 635,
+    "bst": 700,
+    "abilities": {
+      "ability1": 173,
+      "ability2": 173,
+      "hidden": 173,
+      "innates": [5931, 5930, 5933]
+    }
+  },
+  {
+    "const": "SPECIES_XERNEAS__FORM_MEGA",
+    "baseConst": "SPECIES_XERNEAS",
+    "name": "Mega Xerneas",
+    "aliases": ["Xerneas Mega", "Xerneas (Mega)"],
+    "slug": "xerneas_mega",
+    "id": 716,
+    "formIndex": 2,
+    "formKey": "mega",
+    "dex": 716,
+    "bst": 780,
+    "abilities": {
+      "ability1": 7,
+      "ability2": 7,
+      "hidden": 7,
+      "innates": [5913, 5912, 5935]
+    }
+  },
+  {
+    "const": "SPECIES_KINGDRA__FORM_MEGA_Y",
+    "baseConst": "SPECIES_KINGDRA",
+    "name": "Mega Y Kingdra",
+    "aliases": ["Kingdra Mega Y", "Kingdra (Mega Y)"],
+    "slug": "mega_kingdra_y",
+    "id": 230,
+    "formIndex": 3,
+    "formKey": "mega-y",
+    "dex": 230,
+    "bst": 640,
+    "abilities": {
+      "ability1": 207,
+      "ability2": 5275,
+      "hidden": 5288,
+      "innates": [262, 5478, 136]
+    }
+  },
+  {
+    "const": "SPECIES_LUXRAY__FORM_MEGA_Y",
+    "baseConst": "SPECIES_LUXRAY",
+    "name": "Mega Y Luxray",
+    "aliases": ["Luxray Mega Y", "Luxray (Mega Y)"],
+    "slug": "luxray_mega_y",
+    "id": 405,
+    "formIndex": 3,
+    "formKey": "mega-y",
+    "dex": 405,
+    "bst": 660,
+    "abilities": {
+      "ability1": 5096,
+      "ability2": 5000,
+      "hidden": 5376,
+      "innates": [5038, 5977, 5459]
+    }
+  },
+  {
+    "const": "SPECIES_SHUCKLE__FORM_MEGA_Y",
+    "baseConst": "SPECIES_SHUCKLE",
+    "name": "Mega Y Shuckle",
+    "aliases": ["Shuckle Mega Y", "Shuckle (Mega Y)"],
+    "slug": "shuckle_mega_y",
+    "id": 213,
+    "formIndex": 2,
+    "formKey": "mega-y",
+    "dex": 213,
+    "bst": 650,
+    "abilities": {
+      "ability1": 4,
+      "ability2": 5165,
+      "hidden": 5151,
+      "innates": [5910, 5911, 5734]
+    }
+  },
+  {
+    "const": "SPECIES_DRAGONITE__FORM_MEGA_Z",
+    "baseConst": "SPECIES_DRAGONITE",
+    "name": "Mega Z Dragonite",
+    "aliases": ["Dragonite Mega Z", "Dragonite (Mega Z)"],
+    "slug": "dragonite_mega_z",
+    "id": 149,
+    "formIndex": 3,
+    "formKey": "mega-z",
+    "dex": 149,
+    "bst": 700,
+    "abilities": {
+      "ability1": 5909,
+      "ability2": 5684,
+      "hidden": 192,
+      "innates": [5938, 5939, 5105]
+    }
+  },
+  {
+    "const": "SPECIES_LUCARIO__FORM_MEGA",
+    "baseConst": "SPECIES_LUCARIO",
+    "name": "Mega Z Lucario",
+    "aliases": ["Lucario Mega Z", "Lucario (Mega Z)"],
+    "slug": "lucario_mega_z",
+    "id": 448,
+    "formIndex": 1,
+    "formKey": "mega",
+    "dex": 448,
+    "bst": 625,
+    "abilities": {
+      "ability1": 5064,
+      "ability2": 107,
+      "hidden": 5160,
+      "innates": [5364, 5365, 5363]
+    }
+  },
+  {
+    "const": "SPECIES_SKARMORY__FORM_MEGA_Z",
+    "baseConst": "SPECIES_SKARMORY",
+    "name": "Mega Z Skarmory",
+    "aliases": ["Skarmory Mega Z", "Skarmory (Mega Z)"],
+    "slug": "skarmory_mega_z",
+    "id": 227,
+    "formIndex": 5,
+    "formKey": "mega-z",
+    "dex": 227,
+    "bst": 595,
+    "abilities": {
+      "ability1": 135,
+      "ability2": 5362,
+      "hidden": 5009,
+      "innates": [5908, 5511, 5942]
+    }
+  },
+  {
+    "const": "SPECIES_YVELTAL__FORM_MEGA_Z",
+    "baseConst": "SPECIES_YVELTAL",
+    "name": "Mega Z Yveltal",
+    "aliases": ["Yveltal Mega Z", "Yveltal (Mega Z)"],
+    "slug": "yveltal_mega_z",
+    "id": 717,
+    "formIndex": 2,
+    "formKey": "mega-z",
+    "dex": 717,
+    "bst": 780,
+    "abilities": {
+      "ability1": 5178,
+      "ability2": 5178,
+      "hidden": 5178,
+      "innates": [186, 5971, 5726]
+    }
+  },
+  {
+    "const": "SPECIES_FIDOUGH__FORM_PARTNER",
+    "baseConst": "SPECIES_FIDOUGH",
+    "name": "Partner Fidough",
+    "aliases": ["Fidough Partner", "Fidough (Partner)"],
+    "slug": "fidough_partner",
+    "id": 926,
+    "formIndex": 1,
+    "formKey": "partner",
+    "dex": 926,
+    "bst": 435,
+    "abilities": {
+      "ability1": 5290,
+      "ability2": 5215,
+      "hidden": 5332,
+      "innates": [273, 144, 53]
+    }
+  },
+  {
+    "const": "SPECIES_MEW__FORM_PRIMAL",
+    "baseConst": "SPECIES_MEW",
+    "name": "Primal Mew",
+    "aliases": ["Mew Primal", "Mew (Primal)"],
+    "slug": "mew_primal",
+    "id": 151,
+    "formIndex": 1,
+    "formKey": "primal",
+    "dex": 151,
+    "bst": 700,
+    "abilities": {
+      "ability1": 5932,
+      "ability2": 5932,
+      "hidden": 5932,
+      "innates": [5936, 5937, 5968]
+    }
+  },
+  {
+    "const": "SPECIES_REGIGIGAS__FORM_PRIMAL",
+    "baseConst": "SPECIES_REGIGIGAS",
+    "name": "Primal Regigigas",
+    "aliases": ["Regigigas Primal", "Regigigas (Primal)"],
+    "slug": "regigigas_primal",
+    "id": 486,
+    "formIndex": 1,
+    "formKey": "primal",
+    "dex": 486,
+    "bst": 770,
+    "abilities": {
+      "ability1": 5101,
+      "ability2": 100,
+      "hidden": 5057,
+      "innates": [5934, 5917, 5151]
+    }
+  }
+]

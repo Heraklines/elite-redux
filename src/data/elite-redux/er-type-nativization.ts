@@ -125,7 +125,7 @@ export const ER_TYPE_NATIVIZATION: readonly TypeNativizationEntry[] = [
   { species: "SPECIES_GURDURR", grant: ErAbilityId.METALLIC, grantedType: PokemonType.STEEL, replacement: AbilityId.IRON_FIST, needsMaintainerEntry: true, note: "Gurdurr native ability." },
   { species: "SPECIES_GIMMIGHOUL", grant: ErAbilityId.METALLIC, grantedType: PokemonType.STEEL, replacement: AbilityId.RUN_AWAY, needsMaintainerEntry: true, note: "Gimmighoul (chest)." },
   { species: "SPECIES_GIMMIGHOUL_ROAMING", grant: ErAbilityId.METALLIC, grantedType: PokemonType.STEEL, replacement: AbilityId.RUN_AWAY, needsMaintainerEntry: true, note: "Gimmighoul (roaming)." },
-  { species: "SPECIES_CHINGLING", grant: ErAbilityId.METALLIC, grantedType: PokemonType.STEEL, replacement: AbilityId.LEVITATE, needsMaintainerEntry: true, note: "Chimecho line signature." },
+  { species: "SPECIES_CHINGLING", grant: ErAbilityId.METALLIC, grantedType: PokemonType.STEEL, replacement: AbilityId.SOUNDPROOF, needsMaintainerEntry: true, note: "Avoids duplicating Chingling's existing Levitate innate; sound-themed replacement." },
   { species: "SPECIES_WOOLY_WORM", grant: ErAbilityId.METALLIC, grantedType: PokemonType.STEEL, replacement: AbilityId.SHIELD_DUST, needsMaintainerEntry: true, note: "Larva flavour." },
   { species: "SPECIES_PARASECT", grant: ErAbilityId.PHANTOM, grantedType: PokemonType.GHOST, replacement: ErAbilityId.JUMPSCARE },
   { species: "SPECIES_GARDEVOIR_REDUX", grant: ErAbilityId.PHANTOM, grantedType: PokemonType.GHOST, replacement: ER_GRIM_JAB_ABILITY_ID, note: "Gardevoir R." },

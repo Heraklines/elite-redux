@@ -48,6 +48,22 @@ describe("Abilities - No Guard", () => {
     expect(moveEffectPhase.hitCheck).toHaveReturnedWith([HitCheckResult.HIT, 1]);
   });
 
+  it("makes Focus Blast hit with an unsuppressed No Guard user", async () => {
+    game.override
+      .battleStyle("single")
+      .moveset(MoveId.FOCUS_BLAST)
+      .passiveAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyPassiveAbility(AbilityId.BALL_FETCH);
+    await game.classicMode.startBattle(SpeciesId.REGIELEKI);
+
+    game.move.select(MoveId.FOCUS_BLAST);
+    await game.setTurnOrder([BattlerIndex.PLAYER, BattlerIndex.ENEMY]);
+    await game.phaseInterceptor.to("MoveEffectPhase", false);
+    const moveEffectPhase = game.scene.phaseManager.getCurrentPhase() as MoveEffectPhase;
+    expect(moveEffectPhase.checkBypassAccAndInvuln(game.scene.getEnemyPokemon()!)).toBe(true);
+  });
+
   it("should guarantee double battle with any one LURE", async () => {
     game.override.startingModifier([{ name: "LURE" }]).startingWave(2);
 

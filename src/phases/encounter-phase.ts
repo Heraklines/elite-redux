@@ -1,7 +1,11 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { Battle } from "#app/battle";
 import { PLAYER_PARTY_MAX_SIZE, WEIGHT_INCREMENT_ON_SPAWN_MISS } from "#app/constants";
-import { consumePendingDevEnemyParty, type DevEnemyMonSpec } from "#app/dev-tools/registry";
+import {
+  consumePendingDevEnemyParty,
+  type DevEnemyMonSpec,
+  isDevEncounterPersistenceBypassActive,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
@@ -24,6 +28,7 @@ import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
+  preloadCoopFieldPresentationReady,
   settleCoopFieldPresentation,
   settleCoopFieldPresentationReady,
   settleCoopTrainerIntroTrays,
@@ -53,7 +58,19 @@ import type {
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
+import { pickErEndlessRaidBoss } from "#data/elite-redux/er-endless-bosses";
+import {
+  consumeErEndlessRift,
+  getErEndlessBonusSegmentBudget,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  isErEndlessRaidWave,
+  scaleErEndlessEncounterPressureBudget,
+} from "#data/elite-redux/er-endless-continuation";
+import { applyErEndlessBattleStart, prepareErEndlessBattleRuntime } from "#data/elite-redux/er-endless-rift-runtime";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { rollFunTerrain, rollFunWeather } from "#data/elite-redux/er-fun-mode";
+import { getErGhostSnapshot, hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import {
   erApplyCovenantHeal,
@@ -64,8 +81,17 @@ import {
   hasErRelic,
 } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
 import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import {
+  enforceMoodyRuntimeLead,
+  prepareMoodyRuntimeEncounter,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  applyMoodyCoordinatorWildEncounter,
+  prepareMoodyCoordinatorTrainerRoster,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import {
   maybeBeginSinglePlayerReplayRecording,
   maybeCaptureReplayCheckpoint,
@@ -198,6 +224,41 @@ export function materializeCoopAdoptedEnemyField(): number {
     hideStale: true,
     trainerDisposition: "hide-enemy",
   });
+}
+
+/**
+ * Actionable variant of {@linkcode materializeCoopAdoptedEnemyField}. The guest may not expose Command
+ * merely because reconstructed Pokemon containers exist: every active enemy seat must have completed its
+ * atlas load and own live sprite/info nodes first.
+ */
+export async function materializeCoopAdoptedEnemyFieldReady(
+  remainsCurrent: () => boolean = () => true,
+): Promise<number> {
+  if (!isCoopAuthoritativeGuest()) {
+    return 0;
+  }
+  const battle = globalScene.currentBattle;
+  if (battle == null) {
+    return 0;
+  }
+  const capacity = battle.arrangement.enemyCapacity;
+  const seats = globalScene
+    .getEnemyParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  settleCoopTrainerIntroTrays();
+  return settleCoopFieldPresentationReady(
+    {
+      side: "enemy",
+      seats,
+      capacity,
+      boundary: "encounter-summon",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "hide-enemy",
+    },
+    remainsCurrent,
+  );
 }
 
 /**
@@ -560,6 +621,7 @@ export class EncounterPhase extends BattlePhase {
 
   start() {
     super.start();
+    enforceMoodyRuntimeLead();
 
     // ReturnPhase is structural and therefore neutralized on the authoritative guest.
     // Its subsequent player SummonPhase never owns ShowTrainerPhase's exit there, so clear
@@ -693,6 +755,20 @@ export class EncounterPhase extends BattlePhase {
       if (!this.isCoopEnemyAdoptionBoundaryLive()) {
         return;
       }
+      // The complete state projector can restore the whole enemy surface before the authored encounter
+      // intro. Conceal it atomically until the wild reveal or trainer send-out callback; hiding only the info
+      // panel still leaked either bars-first or battler-before-trainer order depending on atlas timing.
+      settleCoopFieldPresentation({
+        side: "enemy",
+        seats: boundary.battle.enemyParty
+          .slice(0, boundary.battle.arrangement.enemyCapacity)
+          .map((pokemon, slot) => ({ pokemon, slot })),
+        capacity: boundary.battle.arrangement.enemyCapacity,
+        boundary: "wave-start-pre-intro",
+        desired: "hidden",
+        hideStale: true,
+        trainerDisposition: "hide-enemy",
+      });
       try {
         this.runEncounter();
         this.coopEnemyAdoptionComplete = true;
@@ -841,7 +917,14 @@ export class EncounterPhase extends BattlePhase {
       throw new Error("Authoritative encounter assets arrived after boundary replacement");
     }
     await materializeCoopLoadedPlayerFieldReady(stillCurrent);
-    materializeCoopAdoptedEnemyField();
+    await preloadCoopFieldPresentationReady(
+      {
+        side: "enemy",
+        seats: battle.enemyParty.slice(0, battle.arrangement.enemyCapacity).map((pokemon, slot) => ({ pokemon, slot })),
+        boundary: "wave-start-pre-intro",
+      },
+      stillCurrent,
+    );
     globalScene.updateGameInfo();
     if (!stillCurrent()) {
       throw new Error("Authoritative encounter presentation was superseded");
@@ -1108,7 +1191,11 @@ export class EncounterPhase extends BattlePhase {
     globalScene.eventTarget.dispatchEvent(new EncounterPhaseEvent());
 
     // Failsafe if players somehow skip floor 200 in classic mode
-    if (globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex > 200) {
+    if (
+      globalScene.gameMode.isClassic
+      && !isErEndlessContinuationActive()
+      && globalScene.currentBattle.waveIndex > (isErSprintMode(globalScene.gameMode.modeId) ? 100 : 200)
+    ) {
       globalScene.phaseManager.unshiftNew("GameOverPhase");
     }
 
@@ -1183,6 +1270,19 @@ export class EncounterPhase extends BattlePhase {
     // resizing it for a wild override) - that fielded fewer than 3 foes in-game ("3v1"). Pad
     // it to enemyCapacity here, AFTER all prior resizes, so the field always fills. Binary
     // (cap <= 2) is a no-op.
+    const fieldRosterSize = prepareMoodyRuntimeEncounter(battle.enemyLevels?.length ?? 0);
+    const moodyRosterSize = prepareMoodyCoordinatorTrainerRoster(
+      fieldRosterSize,
+      8,
+      battle.battleType === BattleType.TRAINER,
+      battle.trainer?.config.isBoss === true,
+    );
+    if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < moodyRosterSize) {
+      const fill = battle.enemyLevels.at(-1) ?? 1;
+      while (battle.enemyLevels.length < moodyRosterSize) {
+        battle.enemyLevels.push(fill);
+      }
+    }
     const enemyCapacity = battle.arrangement.enemyCapacity;
     if (!neutralEvaluator && !this.loaded && battle.enemyLevels && battle.enemyLevels.length < enemyCapacity) {
       const fill = battle.enemyLevels.at(-1) ?? battle.enemyLevels[0] ?? 1;
@@ -1212,6 +1312,21 @@ export class EncounterPhase extends BattlePhase {
           battle.enemyParty[e] = battle.trainer?.genPartyMember(e)!; // TODO:: is the bang correct here?
         } else {
           let enemySpecies = globalScene.randomSpecies(battle.waveIndex, level, true);
+          const endlessRaid = isErEndlessRaidWave(battle.waveIndex);
+          let endlessRaidFormIndex = 0;
+          if (endlessRaid) {
+            let roll = 0;
+            globalScene.executeWithSeedOffset(
+              () => {
+                roll = randSeedInt(0x7fffffff);
+              },
+              e,
+              `er-endless-raid-boss:${battle.waveIndex}`,
+            );
+            const bossChoice = pickErEndlessRaidBoss(roll);
+            enemySpecies = bossChoice.species;
+            endlessRaidFormIndex = bossChoice.formIndex;
+          }
           // Elite Redux: on Elite/Hell the classic final boss (Eternatus) is
           // replaced by a two-phase Cascoon → Primal Cascoon encounter.
           if (battle.isClassicFinalBoss) {
@@ -1222,6 +1337,7 @@ export class EncounterPhase extends BattlePhase {
           // If player has golden bug net, rolls 10% chance to replace non-boss wave wild species from the golden bug net bug pool
           if (
             globalScene.findModifier(m => m instanceof BoostBugSpawnModifier)
+            && !endlessRaid
             && !globalScene.gameMode.isBoss(battle.waveIndex)
             && globalScene.arena.biomeId !== BiomeId.END
             && randSeedInt(10) === 0
@@ -1232,8 +1348,24 @@ export class EncounterPhase extends BattlePhase {
             enemySpecies,
             level,
             TrainerSlot.NONE,
-            !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
+            endlessRaid || !!globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies),
           );
+          if (endlessRaid) {
+            const raidBoss = battle.enemyParty[e];
+            raidBoss.formIndex = Math.min(endlessRaidFormIndex, Math.max(0, raidBoss.species.forms.length - 1));
+            const abilityCount = raidBoss.getSpeciesForm().getAbilityCount();
+            raidBoss.abilityIndex = Math.min(raidBoss.abilityIndex, Math.max(0, abilityCount - 1));
+            raidBoss.generateAndPopulateMoveset();
+            if (isErFinalBossSpecies(raidBoss.species.speciesId)) {
+              battle.enemyParty[e].moveset = CASCOON_ANGELS_WRATH_MOVES.map(([, moveId]) => new PokemonMove(moveId));
+            }
+            raidBoss.generateName();
+            raidBoss.calculateStats();
+            raidBoss.hp = raidBoss.getMaxHp();
+            raidBoss.updateScale();
+            raidBoss.setBoss(true, globalScene.getEncounterBossSegments(battle.waveIndex, level, enemySpecies, true));
+          }
+          applyMoodyCoordinatorWildEncounter(battle.enemyParty[e]);
           if (globalScene.currentBattle.isClassicFinalBoss) {
             battle.enemyParty[e].ivs.fill(31);
           }
@@ -1322,6 +1454,81 @@ export class EncounterPhase extends BattlePhase {
       return true;
     });
 
+    if (isErEndlessContinuationActive()) {
+      const endlessGhostSnapshot =
+        battle.trainer && hasErGhostOverride(battle.trainer) ? getErGhostSnapshot(battle.trainer) : null;
+      if (endlessGhostSnapshot && hasErEndlessRift("grave-return")) {
+        const runtime = prepareErEndlessBattleRuntime();
+        if (runtime) {
+          runtime.graveReturnAvailable = true;
+        }
+      }
+      const bossBattle =
+        battle.trainer?.config.isBoss === true
+        || globalScene.gameMode.isBoss(battle.waveIndex)
+        || battle.enemyParty.some(pokemon => pokemon.isBoss());
+      const segmentBudget = scaleErEndlessEncounterPressureBudget(
+        getErEndlessBonusSegmentBudget(battle.waveIndex),
+        bossBattle,
+      );
+      const ranked = [...battle.enemyParty].toSorted((left, right) => {
+        const threat = (pokemon: EnemyPokemon) =>
+          pokemon.getSpeciesForm().baseTotal
+          + pokemon.getMoveset().reduce((sum, move) => sum + Math.max(0, move.getMove().power), 0);
+        return threat(right) - threat(left);
+      });
+      const echoStage = endlessGhostSnapshot?.endlessEchoStage;
+      const nemesisRank = endlessGhostSnapshot?.endlessNemesisRank ?? 0;
+      const echoSegmentIds = new Set(
+        echoStage === 2 || echoStage === 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : [],
+      );
+      const nemesisSegmentIds = new Set(nemesisRank >= 3 ? ranked.slice(0, 2).map(pokemon => pokemon.id) : []);
+      const allocations = new Map<number, number>();
+      for (let index = 0; index < segmentBudget && battle.enemyParty.length > 0; index++) {
+        let partyIndex = 0;
+        globalScene.executeWithSeedOffset(
+          () => {
+            partyIndex = randSeedInt(battle.enemyParty.length);
+          },
+          index,
+          `er-endless-segments:${battle.waveIndex}`,
+        );
+        const pokemon = battle.enemyParty[partyIndex];
+        allocations.set(pokemon.id, (allocations.get(pokemon.id) ?? 0) + 1);
+      }
+      for (const pokemon of battle.enemyParty) {
+        const extra =
+          (allocations.get(pokemon.id) ?? 0)
+          + (endlessGhostSnapshot && hasErEndlessRift("segment-bloom") ? 1 : 0)
+          + (echoSegmentIds.has(pokemon.id) ? 1 : 0)
+          + (nemesisSegmentIds.has(pokemon.id) ? 1 : 0)
+          + (nemesisRank >= 1 && pokemon === ranked[0] ? 2 : 0);
+        if (extra > 0) {
+          pokemon.setBoss(true, (pokemon.isBoss() ? Math.max(1, pokemon.bossSegments) : 1) + extra);
+        }
+      }
+      if (endlessGhostSnapshot) {
+        for (const id of [
+          "seventh-shadow",
+          "full-procession",
+          "counter-draft",
+          "segment-bloom",
+          "grave-return",
+        ] as const) {
+          consumeErEndlessRift(id);
+        }
+      }
+    }
+
+    if (isErEndlessContinuationActive()) {
+      consumeErEndlessRift("avalanche-surge");
+    }
+
+    applyErEndlessBattleStart();
+    for (const pokemon of [...globalScene.getPlayerParty(), ...globalScene.getEnemyParty()]) {
+      loadEnemyAssets.push(pokemon.loadAssets());
+    }
+
     // Co-op HOST (#633): the enemy party's IDENTITY is generated here, but its HELD ITEMS
     // are not attached until generateEnemyModifiers() runs in the loadEnemyAssets.then()
     // block below. So the broadcast (which must carry the host's held items so the guest
@@ -1363,7 +1570,12 @@ export class EncounterPhase extends BattlePhase {
     } else {
       const overridedBossSegments = Overrides.ENEMY_HEALTH_SEGMENTS_OVERRIDE > 1;
       // for double battles, reduce the health segments for boss Pokemon unless there is an override
-      if (!overridedBossSegments && battle.enemyParty.filter(p => p.isBoss()).length > 1) {
+      if (
+        !isErEndlessContinuationActive()
+        && !isErEndlessRaidWave(battle.waveIndex)
+        && !overridedBossSegments
+        && battle.enemyParty.filter(p => p.isBoss()).length > 1
+      ) {
         for (const enemyPokemon of battle.enemyParty) {
           // If the enemy pokemon is a boss and wasn't populated from data source, then update the number of segments
           if (enemyPokemon.isBoss() && !enemyPokemon.isPopulatedFromDataSource) {
@@ -1508,6 +1720,15 @@ export class EncounterPhase extends BattlePhase {
                   globalScene.disableMenu = false;
                   this.enterEncounterPresentation();
                   globalScene.resetSeed();
+                } else if (isDevEncounterPersistenceBypassActive()) {
+                  // A throwaway dev fixture can carry a deliberately huge restored
+                  // party that the staging save API rejects. Present that one battle
+                  // without persistence instead of treating the fixture as a broken
+                  // account save and resetting to the title. The marker is scoped
+                  // to this dev run and unavailable to normal runs.
+                  globalScene.disableMenu = false;
+                  this.enterEncounterPresentation();
+                  globalScene.resetSeed();
                 } else {
                   globalScene.gameData
                     .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
@@ -1557,12 +1778,23 @@ export class EncounterPhase extends BattlePhase {
                           );
                           return;
                         }
-                        // Last-resort terminal path: saveAll itself emits the retained launch abort while its
-                        // exact claim is still available. Never leave the guest waiting if an unexpected
-                        // serializer/storage/API exception escapes the transaction.
-                        coopWarn("launch", "first-save transaction threw before launch release", error);
+                        // This promise owns persistence, launch publication, and encounter presentation. An
+                        // exception in any of them must close an authoritative session through its retained
+                        // shared terminal; resetting only the host strands the guest at NewBattlePhase.
+                        coopWarn("launch", "encounter persistence/presentation transaction threw", error);
                         globalScene.gameData.cancelPendingFreshCoopSessionSlot();
                         globalScene.disableMenu = false;
+                        if (encounterRuntime != null && encounterController?.netcodeMode === "authoritative") {
+                          failCoopSharedSession(
+                            `Could not finish the authoritative encounter launch at wave ${battle.waveIndex}.`,
+                            {
+                              boundary: "surface",
+                              reasonCode: "continuation-failed",
+                              wave: battle.waveIndex,
+                            },
+                          );
+                          return;
+                        }
                         globalScene.reset(true);
                       }),
                     );
@@ -1728,35 +1960,62 @@ export class EncounterPhase extends BattlePhase {
     const enemyField = globalScene.getEnemyField();
 
     if (globalScene.currentBattle.battleType === BattleType.WILD) {
-      for (const enemyPokemon of enemyField) {
-        enemyPokemon.untint(100, "Sine.easeOut");
-        enemyPokemon.cry();
-        enemyPokemon.showInfo();
-        if (enemyPokemon.isShiny()) {
-          globalScene.validateAchv(achvs.SEE_SHINY);
-          erRecordAchievementShinyEncounter();
+      const revealWildEncounter = (): void => {
+        if (!isCurrent()) {
+          return;
         }
-      }
-      globalScene.updateFieldScale();
-      if (showEncounterMessage) {
+        for (const enemyPokemon of enemyField) {
+          enemyPokemon.untint(100, "Sine.easeOut");
+          enemyPokemon.cry();
+          enemyPokemon.showInfo();
+          if (enemyPokemon.isShiny()) {
+            globalScene.validateAchv(achvs.SEE_SHINY);
+            erRecordAchievementShinyEncounter();
+          }
+        }
+        globalScene.updateFieldScale();
+        if (showEncounterMessage) {
+          beginInteractiveWait();
+          try {
+            globalScene.ui.showText(
+              this.getEncounterMessage(),
+              null,
+              () => {
+                if (finishInteractiveWait()) {
+                  this.end();
+                }
+              },
+              1500,
+            );
+          } catch (error) {
+            setInteractiveWaiting(false);
+            throw error;
+          }
+        } else {
+          this.end();
+        }
+      };
+      if (isCoopAuthoritativeGuest()) {
+        // The compatibility party carrier can arrive before the adopted Pokemon's atlas/sprite nodes. Calling
+        // showInfo first exposed health bars while the body remained absent, especially on the first wild
+        // battle after a biome transition. Reveal the already-authored enemy field atomically and only then
+        // run the ordinary cry/message sequence; no fieldSetup, abilities, hazards, AI, or RNG execute here.
         beginInteractiveWait();
-        try {
-          globalScene.ui.showText(
-            this.getEncounterMessage(),
-            null,
-            () => {
-              if (finishInteractiveWait()) {
-                this.end();
-              }
-            },
-            1500,
-          );
-        } catch (error) {
-          setInteractiveWaiting(false);
-          throw error;
-        }
+        void materializeCoopAdoptedEnemyFieldReady(isCurrent)
+          .then(() => {
+            if (finishInteractiveWait()) {
+              revealWildEncounter();
+            }
+          })
+          .catch(error => {
+            if (isCurrent()) {
+              setInteractiveWaiting(false);
+              coopWarn("runtime", "authoritative wild field presentation failed closed", error);
+              failCoopSharedSession("Authoritative wild battlers could not become actionable");
+            }
+          });
       } else {
-        this.end();
+        revealWildEncounter();
       }
     } else if (globalScene.currentBattle.battleType === BattleType.TRAINER) {
       const trainer = globalScene.currentBattle.trainer;
@@ -1785,8 +2044,18 @@ export class EncounterPhase extends BattlePhase {
             // no fieldSetup/on-summon/RNG is run locally. The current presenter can still change field
             // membership, so replace this local seat derivation with an explicit host field manifest before
             // calling launch authority complete.
-            materializeCoopAdoptedEnemyField();
-            this.end();
+            void materializeCoopAdoptedEnemyFieldReady(isCurrent)
+              .then(() => {
+                if (isCurrent()) {
+                  this.end();
+                }
+              })
+              .catch(error => {
+                if (isCurrent()) {
+                  coopWarn("runtime", "authoritative trainer field presentation failed closed", error);
+                  failCoopSharedSession("Authoritative trainer battlers could not become actionable");
+                }
+              });
             return;
           }
           const availablePartyMembers = globalScene.getEnemyParty().filter(p => !p.isFainted()).length;
@@ -2288,6 +2557,11 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetWeatherIfNewBiome(): void {
+    const funWeather = globalScene.gameMode.isFun ? rollFunWeather() : null;
+    if (funWeather != null) {
+      globalScene.arena.trySetWeather(funWeather);
+      return;
+    }
     // ER biome identity (#439 §3): some biomes FORCE a baseline weather instead
     // of rolling the vanilla pool (e.g. Desert/Badlands sandstorm, Ice Cave snow,
     // Graveyard fog). No `user` -> permanent (turnsLeft 0), so it persists across
@@ -2316,6 +2590,11 @@ export class EncounterPhase extends BattlePhase {
    * wave in the same biome).
    */
   protected trySetTerrainIfNewBiome(): void {
+    const funTerrain = globalScene.gameMode.isFun ? rollFunTerrain() : null;
+    if (funTerrain != null) {
+      globalScene.arena.trySetTerrain(funTerrain, false, undefined, 0);
+      return;
+    }
     // ER biome identity (#439 §3): vanilla terrainPools are all empty, so biome
     // terrain only exists via this override (Power Plant electric, Grass/Jungle
     // grassy, Space psychic). turnsOverride 0 -> permanent, persists across waves.

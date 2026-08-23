@@ -14,6 +14,8 @@ import {
   getCoopController,
   getCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { queueMoodyBiomeTransitionReport } from "#data/elite-redux/moody/moody-live-ui-bridge";
+import { notifyMoodyCoordinatorBiomeTransition } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { UiMode } from "#enums/ui-mode";
 import { EncounterPhase, materializeCoopAdoptedEnemyField } from "#phases/encounter-phase";
 
@@ -238,6 +240,8 @@ export class NewBiomeEncounterPhase extends EncounterPhase {
     try {
       globalScene.playBgm(undefined, true);
       if (!this.coopEncounterPrepared) {
+        notifyMoodyCoordinatorBiomeTransition();
+        queueMoodyBiomeTransitionReport();
         for (const pokemon of globalScene.getPlayerParty()) {
           if (pokemon) {
             pokemon.resetBattleAndWaveData();

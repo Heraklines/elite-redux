@@ -6094,13 +6094,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // boost." Same shape as 273 Power Fists / 505 Mystic Blades — wire
       // the 1.3x on SLICING_MOVE. Def→SpDef target deferred.
       return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 })]);
-    case 967: {
-      // Hand Barnacles — "Multi-Headed + Water STAB." Multi-headed needs a
-      // hit-count primitive (deferred). Wire only Water STAB-add via the
-      // R9 StabAdd primitive: holder gets 1.5x on WATER moves regardless
-      // of self-type. Approximation; ER intent matches.
-      return ok([new StabAddAbAttr({ multiplier: 1.5, targetType: PokemonType.WATER })]);
-    }
+    case 967:
+      // Foggy Eye — "While in Fog, boost Ghost moves by 50% and resist
+      // Ghost moves." Uses real WeatherType.FOG.
+      return ok([
+        new MovePowerBoostAbAttr((user, _t, move) => {
+          const w = globalScene.arena.weather?.weatherType;
+          return isFogWeather(w) && user.getMoveType(move) === PokemonType.GHOST;
+        }, 1.5),
+        new DamageReductionAbAttr({
+          reduction: 0.5,
+          filter: { kind: "move-type", type: PokemonType.GHOST },
+        }),
+      ]);
     case 866:
       // Relic Stone — "Other battlers don't benefit from STAB." Field-aura
       // that suppresses opponent STAB. Needs a new field-suppression

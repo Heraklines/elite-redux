@@ -44,6 +44,23 @@ export interface StoredRecord {
   event: TelemetryEvent;
 }
 
+/** IndexedDB representation: large event trees are stored as one JSON string. */
+type IdbStoredRecord = Omit<StoredRecord, "event"> & { event?: TelemetryEvent; eventJson?: string };
+
+function readIdbStoredEvent(stored: IdbStoredRecord): TelemetryEvent | null {
+  if (stored.event != null) {
+    return stored.event;
+  }
+  if (stored.eventJson == null) {
+    return null;
+  }
+  try {
+    return JSON.parse(stored.eventJson) as TelemetryEvent;
+  } catch {
+    return null;
+  }
+}
+
 /** The durable-queue storage contract (both impls satisfy it). */
 export interface TelemetryStore {
   /** Append records (a debounced batch of freshly-captured events). */
@@ -161,8 +178,12 @@ export class IdbTelemetryStore implements TelemetryStore {
     const store = tx.objectStore(STORE_EVENTS);
     for (const r of records) {
       // Strip any pre-set key so autoIncrement assigns a fresh monotonic one.
-      const { key: _key, ...rest } = r;
-      store.add(rest);
+      const { key: _key, event, ...rest } = r;
+      // IndexedDB's structured clone of the full nested combat contract can
+      // monopolize slower mobile main threads, especially when a triple turn
+      // persists three records together. Strings take the fast clone path; the
+      // exact event is parsed only when a rare upload/recovery actually reads it.
+      store.add({ ...rest, eventJson: JSON.stringify(event) } satisfies IdbStoredRecord);
     }
     await new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve();
@@ -188,7 +209,14 @@ export class IdbTelemetryStore implements TelemetryStore {
           resolve();
           return;
         }
-        const rec = cursor.value as StoredRecord;
+        const stored = cursor.value as IdbStoredRecord;
+        const event = readIdbStoredEvent(stored);
+        if (event == null) {
+          cursor.continue();
+          return;
+        }
+        const { eventJson: _eventJson, ...recordFields } = stored;
+        const rec = { ...recordFields, event } as StoredRecord;
         if (rec.sessionId === sessionId) {
           out.push({ ...rec, key: cursor.primaryKey as number });
         }

@@ -5,6 +5,7 @@ import { EggTier } from "#enums/egg-type";
 import { SpeciesId } from "#enums/species-id";
 import { VariantTier } from "#enums/variant-tier";
 import { EggData } from "#system/egg-data";
+import { GameData } from "#system/game-data";
 import { GameManager } from "#test/framework/game-manager";
 import * as Utils from "#utils/common";
 import Phaser from "phaser";
@@ -63,12 +64,36 @@ describe("Egg Generation Tests", () => {
     expect(gachaSpeciesCount).toBeGreaterThan(0.4 * EGG_HATCH_COUNT);
     expect(gachaSpeciesCount).toBeLessThan(0.6 * EGG_HATCH_COUNT);
   });
-  it("should never be allowed to generate Eternatus via the legendary gacha", () => {
+  it("should keep Eternatus out of the rotating legendary gacha focus pool", () => {
     const validLegendaryGachaSpecies = getValidLegendaryGachaSpecies();
     for (const speciesId of validLegendaryGachaSpecies) {
       expect(speciesEggTiers[speciesId]).toBe(EggTier.LEGENDARY);
     }
     expect(validLegendaryGachaSpecies.includes(SpeciesId.ETERNATUS)).toBe(false);
+  });
+  it("should hatch Eternatus from the regular legendary egg pool", () => {
+    const scene = game.scene;
+
+    for (const [speciesId, tier] of Object.entries(speciesEggTiers)) {
+      if (tier === EggTier.LEGENDARY) {
+        scene.gameData.dexData[Number(speciesId)].caughtAttr = 1n;
+      }
+    }
+    scene.gameData.dexData[SpeciesId.ETERNATUS].caughtAttr = 0n;
+    scene.gameData.eggs = scene.gameData.eggs.filter(storedEgg => storedEgg.species !== SpeciesId.ETERNATUS);
+    scene.gameData.unlockPity[EggTier.LEGENDARY] = 9;
+
+    const egg = new Egg({
+      scene,
+      sourceType: EggSourceType.GACHA_MOVE,
+      tier: EggTier.LEGENDARY,
+      isShiny: false,
+      variantTier: VariantTier.STANDARD,
+    });
+
+    expect(egg.tier).toBe(EggTier.LEGENDARY);
+    expect(egg.species).toBe(SpeciesId.ETERNATUS);
+    expect(egg.generatePlayerPokemon().species.speciesId).toBe(SpeciesId.ETERNATUS);
   });
   it("should hatch an Arceus. Set from species", () => {
     const scene = game.scene;
@@ -478,6 +503,72 @@ describe("Egg Generation Tests", () => {
     expect(diffSpecies).toBe(false);
     expect(diffShiny).toBe(true);
     expect(diffAbility).toBe(true);
+  });
+
+  it("replays the same same-species egg after restoring the purchase counter", () => {
+    const createEgg = () =>
+      new Egg({
+        scene: game.scene,
+        species: SpeciesId.GIBLE,
+        sourceType: EggSourceType.SAME_SPECIES_EGG,
+      });
+
+    game.scene.gameData.sameSpeciesEggCounters = {};
+    const firstEgg = createEgg();
+    const firstPokemon = firstEgg.generatePlayerPokemon();
+    game.scene.gameData.sameSpeciesEggCounters = {};
+    const replayedEgg = createEgg();
+    const replayedPokemon = replayedEgg.generatePlayerPokemon();
+
+    expect({
+      id: replayedEgg.id,
+      shiny: replayedEgg.isShiny,
+      variant: replayedEgg.variantTier,
+      eggMove: replayedEgg.eggMoveIndex,
+      ability: replayedPokemon.abilityIndex,
+      ivs: replayedPokemon.ivs,
+      black: replayedPokemon.customPokemonData?.erBlackShiny ?? false,
+    }).toEqual({
+      id: firstEgg.id,
+      shiny: firstEgg.isShiny,
+      variant: firstEgg.variantTier,
+      eggMove: firstEgg.eggMoveIndex,
+      ability: firstPokemon.abilityIndex,
+      ivs: firstPokemon.ivs,
+      black: firstPokemon.customPokemonData?.erBlackShiny ?? false,
+    });
+  });
+
+  it("uses a different same-species sequence position for each purchase", () => {
+    game.scene.gameData.sameSpeciesEggCounters = {};
+    const firstEgg = new Egg({
+      scene: game.scene,
+      species: SpeciesId.GIBLE,
+      sourceType: EggSourceType.SAME_SPECIES_EGG,
+    });
+    const secondEgg = new Egg({
+      scene: game.scene,
+      species: SpeciesId.GIBLE,
+      sourceType: EggSourceType.SAME_SPECIES_EGG,
+    });
+
+    expect(secondEgg.id).not.toBe(firstEgg.id);
+    expect(game.scene.gameData.sameSpeciesEggCounters[SpeciesId.GIBLE]).toBe(2);
+  });
+
+  it("persists same-species counters and defaults legacy saves to an empty sequence", () => {
+    game.scene.gameData.sameSpeciesEggCounters = { [SpeciesId.GIBLE]: 12 };
+    const saved = game.scene.gameData.getSystemSaveData();
+    const serialized = JSON.stringify(saved, (_key, value) => (typeof value === "bigint" ? value.toString() : value));
+    const restored = GameData.fromRawSystem(serialized);
+    const { sameSpeciesEggCounters: _removed, ...legacySaved } = saved;
+    const legacySerialized = JSON.stringify(legacySaved, (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value,
+    );
+    const restoredLegacy = GameData.fromRawSystem(legacySerialized);
+
+    expect(restored.sameSpeciesEggCounters).toEqual({ [SpeciesId.GIBLE]: 12 });
+    expect(restoredLegacy.sameSpeciesEggCounters).toEqual({});
   });
 
   it("MAX_EGG_COUNT is exported as 10000", async () => {

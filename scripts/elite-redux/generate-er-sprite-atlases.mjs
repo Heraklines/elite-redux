@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+// SPDX-License-Identifier: AGPL-3.0-only
+
 // =============================================================================
 // Generate Phaser-atlas JSON files for ER custom-species sprites.
 //
@@ -17,12 +20,13 @@
 // Usage: node scripts/elite-redux/generate-er-sprite-atlases.mjs
 // =============================================================================
 
-import { readdirSync, existsSync, statSync, writeFileSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const ER_SPRITES_DIR = "assets/images/pokemon/elite-redux";
+const DEFAULT_ER_SPRITES_DIR = "assets/images/pokemon/elite-redux";
 
 /** Read a PNG header to extract (width, height). PNG dimensions live at bytes 16-24. */
+/** @param {string} path */
 function pngSize(path) {
   const buf = readFileSync(path);
   if (buf.length < 24 || buf[0] !== 0x89 || buf[1] !== 0x50) {
@@ -33,9 +37,12 @@ function pngSize(path) {
   return { width, height };
 }
 
+/** @param {string} pngPath */
 function makeAtlasJson(pngPath) {
   const size = pngSize(pngPath);
-  if (!size) return null;
+  if (!size) {
+    return null;
+  }
   const filename = pngPath.split(/[/\\]/).pop();
   // Pokerogue's Phaser atlas format uses "w"/"h" keys (not "width"/"height").
   const sz = { w: size.width, h: size.height };
@@ -47,9 +54,7 @@ function makeAtlasJson(pngPath) {
   // the next row's cell. Detect the doubled-height case and only use the
   // TOP half (frame 1) as the icon frame.
   const isStackedIcon = filename === "icon.png" && size.height === size.width * 2;
-  const frameRect = isStackedIcon
-    ? { x: 0, y: 0, w: size.width, h: size.width }
-    : { x: 0, y: 0, w: sz.w, h: sz.h };
+  const frameRect = isStackedIcon ? { x: 0, y: 0, w: size.width, h: size.width } : { x: 0, y: 0, w: sz.w, h: sz.h };
   const frameSize = isStackedIcon ? { w: size.width, h: size.width } : sz;
 
   return {
@@ -79,13 +84,15 @@ function makeAtlasJson(pngPath) {
 }
 
 function main() {
-  if (!existsSync(ER_SPRITES_DIR)) {
-    console.error(`Not found: ${ER_SPRITES_DIR}`);
+  const rootArg = process.argv.find(arg => arg.startsWith("--asset-root="));
+  const spritesDir = rootArg ? rootArg.slice("--asset-root=".length) : DEFAULT_ER_SPRITES_DIR;
+  if (!existsSync(spritesDir)) {
+    console.error(`Not found: ${spritesDir}`);
     process.exit(1);
   }
 
-  const slugs = readdirSync(ER_SPRITES_DIR).filter(d => {
-    const p = join(ER_SPRITES_DIR, d);
+  const slugs = readdirSync(spritesDir).filter(d => {
+    const p = join(spritesDir, d);
     try {
       return statSync(p).isDirectory();
     } catch {
@@ -98,21 +105,21 @@ function main() {
   let written = 0;
   let skipped = 0;
   for (const slug of slugs) {
-    const dir = join(ER_SPRITES_DIR, slug);
+    const dir = join(spritesDir, slug);
     const pngs = readdirSync(dir).filter(f => f.endsWith(".png"));
     for (const png of pngs) {
       const pngPath = join(dir, png);
       const jsonPath = pngPath.replace(/\.png$/, ".json");
-      // Skip if already exists (idempotent)
-      if (existsSync(jsonPath)) {
-        skipped++;
-        continue;
-      }
       const atlas = makeAtlasJson(pngPath);
       if (!atlas) {
         continue;
       }
-      writeFileSync(jsonPath, JSON.stringify(atlas, null, 2));
+      const serialized = JSON.stringify(atlas, null, 2);
+      if (existsSync(jsonPath) && readFileSync(jsonPath, "utf8").trim() === serialized.trim()) {
+        skipped++;
+        continue;
+      }
+      writeFileSync(jsonPath, serialized);
       written++;
     }
   }

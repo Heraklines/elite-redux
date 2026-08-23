@@ -135,6 +135,23 @@ const SAMPLE_SAVE = JSON.stringify({
   gameVersion: "1.11.19",
   trainerId: 12345,
 });
+const LEADERBOARD_STATS = {
+  version: 1,
+  achievementCount: 12,
+  achievementPoints: 345,
+  ribbons: 8,
+  sessionsWon: 5,
+  shinySpecies: 17,
+  blackShinySpecies: 2,
+  shinyCaught: 30,
+  shinyHatched: 44,
+  shinyLabEffects: 9,
+  uniqueRelics: 6,
+  eggsPulled: 100,
+  highestDamage: 123456,
+  highestHeal: 9876,
+  blackMarketRuns: 3,
+};
 
 describe("er-save-api — uncompressed saves + legacy GZ1 back-compat", () => {
   let sqlite: DatabaseSync;
@@ -188,6 +205,32 @@ describe("er-save-api — uncompressed saves + legacy GZ1 back-compat", () => {
     const get = await call("/savedata/system/get");
     expect(get.status).toBe(200);
     await expect(get.text()).resolves.toBe(SAMPLE_SAVE);
+  });
+
+  it("stores validated leaderboard stats during the existing system-save write", async () => {
+    const save = JSON.stringify({ ...JSON.parse(SAMPLE_SAVE), leaderboardStats: LEADERBOARD_STATS });
+    const response = await call("/savedata/system/update", { method: "POST", body: save });
+    expect(response.status).toBe(200);
+    const row = sqlite.prepare("SELECT leaderboard_stats FROM system_saves WHERE user_id = 1").get() as {
+      leaderboard_stats: string;
+    };
+    expect(JSON.parse(row.leaderboard_stats)).toEqual(LEADERBOARD_STATS);
+  });
+
+  it("does not replace valid leaderboard stats with malformed values", async () => {
+    const save = JSON.stringify({ ...JSON.parse(SAMPLE_SAVE), leaderboardStats: LEADERBOARD_STATS });
+    await call("/savedata/system/update", { method: "POST", body: save });
+    const malformed = JSON.stringify({
+      ...JSON.parse(SAMPLE_SAVE),
+      extra: "x".repeat(500),
+      leaderboardStats: { ...LEADERBOARD_STATS, highestDamage: -1 },
+    });
+    const response = await call("/savedata/system/update", { method: "POST", body: malformed });
+    expect(response.status).toBe(200);
+    const row = sqlite.prepare("SELECT leaderboard_stats FROM system_saves WHERE user_id = 1").get() as {
+      leaderboard_stats: string;
+    };
+    expect(JSON.parse(row.leaderboard_stats)).toEqual(LEADERBOARD_STATS);
   });
 
   it("still LOADS an existing LEGACY GZ1 compressed row (back-compat read)", async () => {

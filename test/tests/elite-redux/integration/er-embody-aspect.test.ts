@@ -16,6 +16,7 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { applyPostFormChangeAbAttrs } from "#abilities/apply-ab-attrs";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -80,5 +81,26 @@ describe.skipIf(!RUN_SCENARIOS)("ER Embody Aspect (#123)", () => {
 
   it("Embody Aspect (795): +1 Speed on entry (was the only un-collapsed variant)", async () => {
     await expectEntryBoost(795, Stat.SPD);
+  });
+
+  it("does not activate a second time when Disguise or another form changes", async () => {
+    const ability = await erId(796);
+    expect(ability).toBeDefined();
+    game.override
+      .battleStyle("single")
+      .ability(ability!)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset(MoveId.SPLASH);
+    await game.classicMode.startBattle(SpeciesId.MIMIKYU);
+    const player = game.field.getPlayerPokemon();
+
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    expect(player.getStatStage(Stat.ATK)).toBe(1);
+
+    applyPostFormChangeAbAttrs({ pokemon: player });
+    expect(game.scene.phaseManager.hasPhaseOfType("StatStageChangePhase")).toBe(false);
+    expect(player.getStatStage(Stat.ATK)).toBe(1);
   });
 });

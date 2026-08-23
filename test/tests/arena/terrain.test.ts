@@ -1,6 +1,7 @@
 import { allMoves } from "#app/data/data-lists";
 import { getTerrainName, TerrainType } from "#app/data/terrain";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -353,20 +354,31 @@ describe("Terrain -", () => {
       );
     });
 
+    it("should block an opposing spread move made priority by Flaming Soul", async () => {
+      game.override
+        .ability(ER_ID_MAP.abilities[351] as AbilityId)
+        .moveset(MoveId.ERUPTION)
+        .enemyMoveset(MoveId.SPLASH);
+      await game.classicMode.startBattle(ER_ID_MAP.species[2137] as SpeciesId);
+
+      const megaTyphlosion = game.field.getPlayerPokemon();
+      const groundedOpponent = game.field.getEnemyPokemon();
+      expect(allMoves[MoveId.ERUPTION].getPriority(megaTyphlosion)).toBe(1);
+
+      game.move.use(MoveId.ERUPTION);
+      await game.move.forceEnemyMove(MoveId.SPLASH);
+      await game.toEndOfTurn();
+
+      expect(megaTyphlosion).toHaveUsedMove({ move: MoveId.ERUPTION, result: MoveResult.FAIL });
+      expect(groundedOpponent).toHaveFullHp();
+    });
+
     it.each<{ category: string; move: MoveId; effect: () => void }>([
       {
         category: "Field-targeted",
         move: MoveId.RAIN_DANCE,
         effect: () => {
           expect(game).toHaveWeather(WeatherType.RAIN);
-        },
-      },
-      {
-        // TODO: Review if this is actually how it works in mainline
-        category: "Enemy-targeting spread",
-        move: MoveId.DARK_VOID,
-        effect: () => {
-          expect(game.field.getEnemyPokemon()).toHaveStatusEffect(StatusEffect.SLEEP);
         },
       },
     ])("should not block $category moves that become priority", async ({ move, effect }) => {

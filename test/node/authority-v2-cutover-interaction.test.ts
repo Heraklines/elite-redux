@@ -273,7 +273,74 @@ describe("Authority V2 interaction cutover", () => {
     ).toBeNull();
   });
 
-  it("authorizes only the exact same-turn command or Mystery frontier after Stormglass settles", () => {
+  it("preserves a terminal reward's next-wave command permission through its nested learn-move result", () => {
+    const value = envelope(
+      "LEARN_MOVE",
+      {
+        type: "decision",
+        partySlot: 1,
+        moveId: 257,
+        forgetSlot: 1,
+        maxMoveCount: 4,
+        allowNextWaveStart: true,
+      },
+      "TURN_RESOLVE",
+      1,
+      2,
+    );
+    const operationId = value.pendingOperation?.id;
+    const successor = successorOfCoopV2InteractionEnvelope("op:learnMove", value);
+    if (operationId == null || successor?.kind !== "AWAIT_SUCCESSOR") {
+      throw new Error("terminal reward learn-move result did not build its ordered successor wait");
+    }
+    expect(successor).toMatchObject({
+      afterOperationId: operationId,
+      wave: 1,
+      turn: 1,
+      allowNextWaveStart: true,
+    });
+    expect(
+      successorWaitAllows(successor, operationId, "CONTROL_COMMIT", "V2/CONTROL/e1/w2/t1", 1, {
+        kind: "command-open",
+        wave: 2,
+        turn: 1,
+      }),
+    ).toBe(true);
+    expect(
+      buildCoopV2InteractionEnvelopeEntry({
+        context: FRAME,
+        surfaceClass: "op:learnMove",
+        envelope: value,
+      })?.nextControl,
+    ).toEqual(successor);
+
+    const incomplete = envelope(
+      "LEARN_MOVE",
+      { type: "decision", partySlot: 1, moveId: 257, forgetSlot: 1, maxMoveCount: 4 },
+      "TURN_RESOLVE",
+    );
+    expect(successorOfCoopV2InteractionEnvelope("op:learnMove", incomplete)).toBeNull();
+    expect(
+      successorOfCoopV2InteractionEnvelope(
+        "op:learnMove",
+        envelope(
+          "LEARN_MOVE",
+          {
+            type: "decision",
+            partySlot: 1,
+            moveId: 257,
+            forgetSlot: 1,
+            maxMoveCount: 4,
+            allowNextWaveStart: true,
+            nextInteraction: { kind: "reward", wave: 1, turn: 1 },
+          },
+          "TURN_RESOLVE",
+        ),
+      ),
+    ).toBeNull();
+  });
+
+  it("authorizes only the exact command or pre-turn Mystery frontier after Stormglass settles", () => {
     const value = envelope("STORMGLASS", { weatherIndex: 0, weather: 1 }, "INTERACTION", 0, 9_800_000);
     const operationId = value.pendingOperation?.id;
     const successor = successorOfCoopV2InteractionEnvelope("op:stormglass", value);
@@ -285,7 +352,7 @@ describe("Authority V2 interaction cutover", () => {
       { materialKind: "command-open", wave: 1, turn: 1, operationId: null },
     ]);
     expect(successor.allowedInteractionAddresses).toEqual([
-      { surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: 1, turn: 1 },
+      { surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: 1, turn: 0 },
     ]);
     expect(
       successorWaitAllows(successor, operationId, "CONTROL_COMMIT", "command-1", 1, {
@@ -323,9 +390,9 @@ describe("Authority V2 interaction cutover", () => {
         successor,
         operationId,
         "INTERACTION_COMMIT",
-        "mystery-ME_PRESENT-1",
+        "mystery-ME_PRESENT-0",
         1,
-        mysteryMaterial("ME_PRESENT", 1),
+        mysteryMaterial("ME_PRESENT", 0),
       ),
     ).toBe(true);
     expect(
@@ -333,9 +400,9 @@ describe("Authority V2 interaction cutover", () => {
         successor,
         operationId,
         "INTERACTION_COMMIT",
-        "mystery-ME_BUTTON-1",
+        "mystery-ME_BUTTON-0",
         1,
-        mysteryMaterial("ME_BUTTON", 1),
+        mysteryMaterial("ME_BUTTON", 0),
       ),
     ).toBe(false);
     expect(
@@ -343,9 +410,9 @@ describe("Authority V2 interaction cutover", () => {
         successor,
         operationId,
         "INTERACTION_COMMIT",
-        "mystery-ME_PRESENT-0",
+        "mystery-ME_PRESENT-1",
         1,
-        mysteryMaterial("ME_PRESENT", 0),
+        mysteryMaterial("ME_PRESENT", 1),
       ),
     ).toBe(false);
   });
@@ -646,7 +713,14 @@ describe("Authority V2 interaction cutover", () => {
         payload: {
           terminal: "battle",
           outcome: { ...RESYNC, authoritativeState: battleState },
-          destination: { kind: "battle", hostTurn: 1, encounterMode: 0, trainer: null, disableSwitch: false },
+          destination: {
+            kind: "battle",
+            boot: "encounter-phase",
+            hostTurn: 1,
+            encounterMode: 0,
+            trainer: null,
+            disableSwitch: false,
+          },
         },
       },
       authoritativeState: battleState,
@@ -841,6 +915,8 @@ describe("Authority V2 interaction cutover", () => {
     );
     expect(successor).toMatchObject({
       kind: "AWAIT_SUCCESSOR",
+      allowedKinds: ["INTERACTION_COMMIT"],
+      allowNextWaveStart: false,
       allowedInteractionAddresses: [{ surfaceClass, operationKind, wave: 1, turn: 1 }],
     });
   });
@@ -854,6 +930,7 @@ describe("Authority V2 interaction cutover", () => {
         moveId: 33,
         forgetSlot: 0,
         maxMoveCount: 4,
+        allowNextWaveStart: false,
         nextInteraction: { kind: "mystery-terminal", wave: 1, turn: 0 },
       },
       "op:learnMove",
@@ -892,7 +969,18 @@ describe("Authority V2 interaction cutover", () => {
   it.each([
     ["REVIVAL", { type: "decision", fieldIndex: 0, partySlot: 1, speciesId: 25 }, "op:revival"],
     ["CATCH_FULL", { type: "decision", partySlot: 1 }, "op:catchFull"],
-    ["LEARN_MOVE", { type: "decision", partySlot: 0, moveId: 33, forgetSlot: 0, maxMoveCount: 4 }, "op:learnMove"],
+    [
+      "LEARN_MOVE",
+      {
+        type: "decision",
+        partySlot: 0,
+        moveId: 33,
+        forgetSlot: 0,
+        maxMoveCount: 4,
+        allowNextWaveStart: false,
+      },
+      "op:learnMove",
+    ],
     ["LEARN_MOVE_BATCH", { type: "decision", partySlot: 0, assignments: [[33, 0]], fallback: false }, "op:learnMove"],
   ] as const)("lets a settled TURN_RESOLVE %s decision return to the exact turn log", (kind, payload, surfaceClass) => {
     const successor = successorOfCoopV2InteractionEnvelope(surfaceClass, envelope(kind, payload, "TURN_RESOLVE"));

@@ -5,5 +5,5 @@
 
 [submodule "assets"]
 	path = assets
-	url = https://github.com/pagefaultgames/pokerogue-assets.git
+	url = https://github.com/Heraklines/er-assets.git
 	branch = beta

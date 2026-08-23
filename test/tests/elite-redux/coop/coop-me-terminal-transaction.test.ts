@@ -105,7 +105,11 @@ function trainerPresentation() {
 
 function battlePayload(
   wave: number,
-  options: { encounterMode?: number; disableSwitch?: boolean } = {},
+  options: {
+    encounterMode?: number;
+    disableSwitch?: boolean;
+    boot?: "encounter-phase" | "direct-turn";
+  } = {},
 ): CoopMeTerminalPayload {
   const encounterMode = options.encounterMode ?? 2;
   return {
@@ -113,6 +117,7 @@ function battlePayload(
     outcome: outcome(wave, 1),
     destination: {
       kind: "battle",
+      boot: options.boot ?? "encounter-phase",
       hostTurn: 3,
       encounterMode,
       trainer: encounterMode === 1 ? trainerPresentation() : null,
@@ -425,6 +430,10 @@ describe("complete retained Mystery terminal transaction", () => {
       "an embedded battle settlement admits a strict immutable progression cue",
     ).toBe(true);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 3, disableSwitch: true }))).toBe(true);
+    expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 0, boot: "direct-turn" }))).toBe(true);
+    const missingBoot = battlePayload(12);
+    delete (missingBoot.destination as { boot?: string }).boot;
+    expect(isCompleteCoopMeTerminalPayload(missingBoot), "battle boot is mandatory").toBe(false);
     expect(isCompleteCoopMeTerminalPayload(battlePayload(12, { encounterMode: 1 }))).toBe(true);
     expect(
       isCompleteCoopMeTerminalPayload({

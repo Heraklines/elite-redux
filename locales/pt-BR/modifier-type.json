@@ -373,8 +373,8 @@
       "description": "Aumenta drasticamente a chance de um Pokémon selvagem ser Shiny."
     },
     "ABILITY_CHARM": {
-      "name": "Amuleto de Habilidade",
-      "description": "Aumenta drasticamente a chance de um Pokémon selvagem ter uma Habilidade Oculta."
+      "name": "Amuleto de Evento Misterioso",
+      "description": "Duplica a chance de um evento misterioso aparecer."
     },
     "CATCHING_CHARM": {
       "name": "Amuleto de Captura",

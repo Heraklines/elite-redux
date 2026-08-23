@@ -1,5 +1,6 @@
 import { MAX_TERAS_PER_ARENA } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { getTypeRgb } from "#data/type";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
@@ -176,14 +177,6 @@ export class CommandUiHandler extends UiHandler {
     this.commandsContainer.setVisible(true);
     this.updateInfoHint();
 
-    let commandPhase: CommandPhase;
-    const currentPhase = globalScene.phaseManager.getCurrentPhase();
-    if (currentPhase.is("CommandPhase")) {
-      commandPhase = currentPhase;
-    } else {
-      commandPhase = globalScene.phaseManager.getStandbyPhase() as CommandPhase;
-    }
-
     if (this.canTera()) {
       this.teraButton.setVisible(true);
       this.teraButton.setFrame(PokemonType[globalScene.getField()[this.fieldIndex].getTeraType()].toLowerCase());
@@ -195,7 +188,14 @@ export class CommandUiHandler extends UiHandler {
     }
     this.toggleTeraButton();
 
-    const pokemonName = commandPhase.getPokemon().getNameToRender({ prependFormName: false });
+    // The UI mode already receives the exact field slot it is opening for. Reading the
+    // current/standby CommandPhase here could briefly resolve the previous slot while a
+    // triple's third prompt was being installed, producing an empty name in the prompt.
+    // Resolve from the displayed slot itself and keep a species-name fallback for malformed
+    // cosmetic names; command ownership still remains entirely in CommandPhase.
+    const commandPokemon = globalScene.getPlayerField()[this.fieldIndex];
+    const pokemonName =
+      commandPokemon?.getNameToRender({ prependFormName: false }) || commandPokemon?.species.getName() || "Pokémon";
     const messageHandler = this.getUi().getMessageHandler();
     messageHandler.bg.setVisible(true);
     messageHandler.commandWindow.setVisible(true);
@@ -311,6 +311,12 @@ export class CommandUiHandler extends UiHandler {
           } else if ((cursor === Command.FIGHT || cursor === Command.POKEMON) && this.canTera()) {
             success = this.setCursor(Command.TERA);
             this.toggleTeraButton();
+          } else if (
+            getFunModeConfig().moodyMode
+            && (cursor === Command.FIGHT || cursor === Command.POKEMON || cursor === Command.TERA)
+          ) {
+            ui.toggleMoodyTriggerFeed();
+            success = true;
           }
           break;
         case Button.RIGHT:
@@ -322,6 +328,9 @@ export class CommandUiHandler extends UiHandler {
           } else if (cursor === Command.BALL || cursor === Command.RUN) {
             // Step right from Ball/Run into the 3rd Reset column.
             success = this.setCursor(Command.RESET);
+          } else if (cursor === Command.RESET && getFunModeConfig().moodyMode) {
+            ui.toggleMoodyEnemyFeed();
+            success = true;
           }
           break;
       }

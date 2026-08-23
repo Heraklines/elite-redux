@@ -1,4 +1,5 @@
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
+import { modifierTypes } from "#data/data-lists";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -72,7 +73,6 @@ describe("Evolution", () => {
     nincada.abilityIndex = 2;
     nincada.metBiome = -1;
     nincada.gender = 1;
-
     await nincada.evolve(pokemonEvolutions[SpeciesId.NINCADA][0], nincada.getSpeciesForm());
     const [ninjask, shedinja] = game.scene.getPlayerParty();
     expect(ninjask.abilityIndex).toBe(2);
@@ -81,6 +81,21 @@ describe("Evolution", () => {
     expect(shedinja.gender).toBe(-1);
     // Regression test for https://github.com/pagefaultgames/pokerogue/issues/3842
     expect(shedinja.metBiome).toBe(-1);
+  });
+
+  it("should not duplicate Nincada's held items onto Shedinja in solo play", async () => {
+    await game.classicMode.runToSummon(SpeciesId.NINCADA);
+    const nincada = game.field.getPlayerPokemon();
+    await game.scene.addModifier(
+      modifierTypes.LEFTOVERS().withIdFromFunc(modifierTypes.LEFTOVERS).newModifier(nincada),
+      true,
+    );
+
+    await nincada.evolve(pokemonEvolutions[SpeciesId.NINCADA][0], nincada.getSpeciesForm());
+
+    const [ninjask, shedinja] = game.scene.getPlayerParty();
+    expect(ninjask.getHeldItems()).toHaveLength(1);
+    expect(shedinja.getHeldItems()).toHaveLength(0);
   });
 
   it("should increase both HP and max HP when evolving", async () => {

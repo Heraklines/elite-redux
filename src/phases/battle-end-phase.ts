@@ -1,5 +1,6 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { erShatteredPsycheEndBattle } from "#data/elite-redux/abilities/shattered-psyche";
 import {
   recoverUsedPokeballsAfterBattle,
   snapshotBattleMoneyGainMultiplier,
@@ -35,8 +36,11 @@ import {
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erAdvanceTacticalRecharges } from "#data/elite-redux/er-tactical-items";
+import { recordErTrainingCacheWave } from "#data/elite-redux/er-training-cache";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
-import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
+import { endMoodyFormationBattle } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeBattleEnd } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { notifyMoodyCoordinatorBattleEnd } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { LapsingPersistentModifier, LapsingPokemonHeldItemModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 import { removeQueuedPostVictoryCombatPhases } from "#phases/post-victory-queue-cleanup";
@@ -172,12 +176,19 @@ export class BattleEndPhase extends BattlePhase {
 
   start() {
     super.start();
+    notifyMoodyCoordinatorBattleEnd(this.isVictory);
+    notifyMoodyRuntimeBattleEnd(this.isVictory);
 
     // The party-count trays are encounter-intro / switch presentation only.
     // Ensure a delayed or interrupted summon animation cannot leave either tray
     // covering the reward shop after the battle has definitively ended.
     globalScene.pbTray.hide();
     globalScene.pbTrayEnemy.hide();
+
+    // Shattered Psyche is a temporary battle state, not a real faint/fusion.
+    // Restore both constituents before rewards, party eligibility checks, and
+    // the next encounter can observe the party.
+    erShatteredPsycheEndBattle();
 
     // Turn-settlement phases intentionally survive the first victory cleanup.
     // Some of them can materialize a stale TurnInit/Command tail only after the
@@ -191,10 +202,6 @@ export class BattleEndPhase extends BattlePhase {
       (phase: BattleEndPhase) => phase.isVictory,
     );
     globalScene.phaseManager.removeAllPhasesOfType("BattleEndPhase");
-    if (this.isVictory) {
-      recordTelemetryBattleTerminal("victory");
-    }
-
     const retainedBinding = this.retainedWaveBinding ?? getCoopWaveAdvanceRuntimeBinding();
     // A runtime always owns a wave-ledger binding, including during an ME battle. Only an actual staged
     // WAVE_ADVANCE boundary at construction makes this BattleEnd wave-owned. The retained DATA can consume
@@ -227,6 +234,7 @@ export class BattleEndPhase extends BattlePhase {
     this.applyLegacyCoopWaveEndProgression();
 
     snapshotBattleMoneyGainMultiplier();
+    endMoodyFormationBattle();
     this.recordLocalBattleStats();
 
     if (this.isVictory) {
@@ -240,6 +248,7 @@ export class BattleEndPhase extends BattlePhase {
       erAdvanceCommunityItemCharges();
       // ER Booster Energy: a spent charge recharges after 10 won waves.
       erAdvanceTacticalRecharges();
+      this.settleTrainingCache();
     }
 
     // Endless graceful end
@@ -314,11 +323,23 @@ export class BattleEndPhase extends BattlePhase {
     // Preserve it once on the guest while every shared mechanical mutation remains host-authoritative.
     if (!this.retainedLocalStatsRecorded) {
       this.recordLocalBattleStats();
+      if (this.isVictory) {
+        this.settleTrainingCache();
+      }
       this.retainedLocalStatsRecorded = true;
     }
     coopLog("progression", `GUEST retained WAVE_ADVANCE BattleEnd release wave=${this.retainedSourceWave}`);
     this.end();
     this.retainedBoundaryReleased = true;
+  }
+
+  private settleTrainingCache(): void {
+    const awards = recordErTrainingCacheWave(this.retainedSourceWave);
+    if (awards.length === 0) {
+      return;
+    }
+    const lines = awards.map(award => `${award.pokemonName} +${award.candy}`).join("\n");
+    globalScene.phaseManager.unshiftNew("MessagePhase", `HELL TRAINING CACHE\n\n${lines}`, null, true);
   }
 
   private recordLocalBattleStats(): void {

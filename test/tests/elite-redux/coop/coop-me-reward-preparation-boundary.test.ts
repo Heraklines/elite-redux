@@ -49,6 +49,31 @@ describe("Mystery battle reward preparation boundary", () => {
     expect(picker).toBeGreaterThan(noBattleCapture);
   });
 
+  it("releases both clients through one ordered trainer-victory tail after preparation", () => {
+    const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");
+    const rewardsPhase = source("src/phases/mystery-encounter-phases.ts");
+    const trainerVictory = source("src/phases/trainer-victory-phase.ts");
+    const victoryStart = utilities.indexOf("    const stagedAuthoritativeRewards =");
+    const victoryEnd = utilities.indexOf("      if (!encounter.doContinueEncounter)", victoryStart);
+    const orderedTail = utilities.slice(victoryStart, victoryEnd);
+
+    expect(victoryStart).toBeGreaterThanOrEqual(0);
+    expect(orderedTail.indexOf('"prepare-only"')).toBeGreaterThanOrEqual(0);
+    expect(orderedTail.indexOf('globalScene.phaseManager.pushNew("TrainerVictoryPhase")')).toBeGreaterThan(
+      orderedTail.indexOf('"prepare-only"'),
+    );
+    expect(orderedTail.indexOf('"open-prepared"')).toBeGreaterThan(
+      orderedTail.indexOf('globalScene.phaseManager.pushNew("TrainerVictoryPhase")'),
+    );
+    expect(rewardsPhase).toContain('this.meSettlementStage === "prepare-only"');
+    expect(rewardsPhase).toContain('this.meSettlementStage !== "open-prepared"');
+    expect(rewardsPhase).toMatch(
+      /this\.meSettlementStage === "prepare-only"[\s\S]*?this\.end\(\);[\s\S]*?return;[\s\S]*?encounter\.doEncounterRewards\(\)/u,
+    );
+    expect(trainerVictory).toContain('settleCoopTrainerPresentation("enemy")');
+    expect(trainerVictory).toMatch(/settleCoopTrainerPresentation\("enemy"\);[\s\S]*?this\.end\(\)/u);
+  });
+
   it("requires a retained no-battle state image before a typed raw reward carrier can open UI", () => {
     const replay = source("src/phases/coop-replay-me-phase.ts");
     const utilities = source("src/data/mystery-encounters/utils/encounter-phase-utils.ts");

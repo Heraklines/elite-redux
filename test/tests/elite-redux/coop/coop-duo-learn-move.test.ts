@@ -343,7 +343,10 @@ describe.skipIf(!RUN)(
         withClientSync(rig.guestCtx, () => rig.guestScene.ui.getMode()),
         "the guest owner panel stays visible until the immutable result applies",
       ).toBe(UiMode.LEARN_MOVE_BATCH);
-      expect(isCoopLearnMoveForwardInFlightEmpty(), "the V2 owner cannot retire its in-flight phase early").toBe(false);
+      expect(
+        isCoopLearnMoveForwardInFlightEmpty(),
+        "the V2 owner remains parked without populating the retired legacy forward-in-flight registry",
+      ).toBe(true);
       expect(
         withClientSync(rig.guestCtx, () =>
           projectedGuestPhase.settleCoopV2CommittedLearnMoveBatchResult(

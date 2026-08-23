@@ -23,7 +23,10 @@ import {
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
 import { ensureCoopAuthoritativeCommandPresentation } from "#data/elite-redux/coop/coop-presentation";
-import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import {
+  getCoopRendezvousWaitMs,
+  shouldAnnounceCoopSpectatorCommandArrival,
+} from "#data/elite-redux/coop/coop-rendezvous";
 import {
   cancelCoopV2DeferredCommandStart,
   coopHasPendingWaveAdvance,
@@ -57,6 +60,7 @@ import type {
   SerializedCommand,
 } from "#data/elite-redux/coop/coop-transport";
 import { sealCoopEntryPresentation } from "#data/elite-redux/coop/coop-turn-recorder";
+import { isErEndlessRaidWave } from "#data/elite-redux/er-endless-continuation";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -66,7 +70,6 @@ import {
   buildShowdownSwitchCommand,
 } from "#data/elite-redux/showdown/showdown-guest-command";
 import { broadcastShowdownSyncPlayerCommand } from "#data/elite-redux/showdown/showdown-sync-command";
-import { prepareTelemetryDecision, recordTelemetryDecision } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -356,6 +359,7 @@ export class CommandPhase extends FieldPhase {
     const { currentBattle, arena } = globalScene;
     return (
       arena.biomeId !== BiomeId.END
+      && !isErEndlessRaidWave(currentBattle.waveIndex)
       && (currentBattle.mysteryEncounter?.fleeAllowed ?? true)
       && currentBattle.battleType !== BattleType.TRAINER
       && currentBattle.mysteryEncounter?.encounterMode !== MysteryEncounterMode.TRAINER_BATTLE
@@ -619,8 +623,6 @@ export class CommandPhase extends FieldPhase {
           this.applyRelayedActionCommand(cmd);
           // #record-replay: capture the partner slot's relayed action command (no-op unless recording).
           recordCoopPartnerSlotCommand(this.fieldIndex, cmd);
-          // #player-telemetry: observe the co-op partner's decision (actor=partner). No-op unless recording.
-          recordTelemetryDecision(this.fieldIndex, cmd.command, cmd.cursor ?? 0, "partner");
           return;
         }
         // FIGHT: the RELAYED partner command, else the AI fallback (a null guest reply still produces a
@@ -633,8 +635,6 @@ export class CommandPhase extends FieldPhase {
           cursor: resolved.moveIndex,
           targets: resolved.turnMove.targets,
         });
-        // #player-telemetry: observe the co-op partner's resolved FIGHT (actor=partner). No-op unless recording.
-        recordTelemetryDecision(this.fieldIndex, resolved.command, resolved.moveIndex, "partner");
       });
     return true;
   }
@@ -967,6 +967,22 @@ export class CommandPhase extends FieldPhase {
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
 
+    // A solo multi-battle may still keep a fainted occupant in its field slot
+    // until replacement resolution. Skip that exact slot before the legacy
+    // lone-survivor redirect can turn it into a duplicate command for an ally.
+    if (!globalScene.gameMode.isCoop) {
+      const commandPokemon = globalScene.getPlayerField()[this.fieldIndex];
+      if (commandPokemon == null || !commandPokemon.isActive(true)) {
+        globalScene.currentBattle.turnCommands[this.fieldIndex] = {
+          command: Command.FIGHT,
+          move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+          skip: true,
+        };
+        this.end();
+        return;
+      }
+    }
+
     if (this.fieldIndex) {
       this.handleFieldIndexLogic();
     }
@@ -1004,8 +1020,11 @@ export class CommandPhase extends FieldPhase {
 
     // An authoritative guest must classify the host-owned slot as renderer-only BEFORE consulting the
     // checkpoint-carried move queue. Otherwise a host recharge sentinel can execute on the guest engine.
-    if (isAuthoritativeGuestPartnerSlot && this.tryCoopAutoResolve()) {
-      return;
+    if (isAuthoritativeGuestPartnerSlot) {
+      this.announceCoopSpectatorCommandArrival();
+      if (this.tryCoopAutoResolve()) {
+        return;
+      }
     }
 
     // Forced/queued commands on THIS client's owned slot still represent arrival at the reciprocal command
@@ -1091,6 +1110,41 @@ export class CommandPhase extends FieldPhase {
     if (!this.tryExecuteQueuedMove()) {
       this.openOwnCommandUi();
     }
+  }
+
+  /**
+   * A replica-only single-controller battle has no locally-owned CommandPhase from which to announce the
+   * reciprocal command point. Announce from the renderer-only partner slot after its presentation replay has
+   * reached the real phase. An incomplete ordinary multi-slot field is intentionally excluded: its absent
+   * slot may be waiting for a faint replacement and must keep the authority's command boundary closed. A
+   * direct-turn NO_BATTLE Mystery explicitly declares the exceptional one-controller geometry.
+   */
+  private announceCoopSpectatorCommandArrival(): void {
+    const controller = getCoopController();
+    const rendezvous = getCoopRendezvous();
+    if (controller?.role !== "guest" || rendezvous == null || !isCoopV2ControlCutoverActive()) {
+      return;
+    }
+    const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
+    const activeFieldOwners = globalScene.getPlayerField().map(pokemon => pokemon?.coopOwner ?? null);
+    // Fun & Games deliberately retains the co-op arrangement while constructing one player battler inline.
+    // Its NO_BATTLE CommandPhase is therefore an explicitly declared single-controller frontier, not an
+    // incomplete double that may still owe a replacement.
+    const singleControllerBattle =
+      globalScene.currentBattle.mysteryEncounter?.encounterMode === MysteryEncounterMode.NO_BATTLE;
+    if (
+      !shouldAnnounceCoopSpectatorCommandArrival(
+        controller.role,
+        playerCapacity,
+        activeFieldOwners,
+        singleControllerBattle,
+      )
+    ) {
+      return;
+    }
+    const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;
+    coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (Authority V2 spectator renderer)`);
+    rendezvous.arrive(point);
   }
 
   /**
@@ -1202,9 +1256,6 @@ export class CommandPhase extends FieldPhase {
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
   private openOwnCommandUi(): void {
-    // Precompute the immutable solo contract before input opens. This is a hard no-op for co-op,
-    // Showdown, tournaments and telemetry-disabled builds.
-    prepareTelemetryDecision(this.fieldIndex);
     if (
       globalScene.currentBattle.isBattleMysteryEncounter()
       && globalScene.currentBattle.mysteryEncounter?.skipToFightInput
@@ -1914,6 +1965,7 @@ export class CommandPhase extends FieldPhase {
    *
    * The player cannot flee if:
    * - The player is in the {@linkcode BiomeId.END | End} biome
+   * - The player is in an Elite Redux Endless raid battle
    * - The player is in a trainer battle
    * - The player is in a mystery encounter that disallows fleeing
    * - The player's pokemon is trapped by an ability or effect
@@ -1922,7 +1974,7 @@ export class CommandPhase extends FieldPhase {
   private handleRunCommand(): boolean {
     const { currentBattle, arena } = globalScene;
     const mysteryEncounterFleeAllowed = currentBattle.mysteryEncounter?.fleeAllowed ?? true;
-    if (arena.biomeId === BiomeId.END || !mysteryEncounterFleeAllowed) {
+    if (arena.biomeId === BiomeId.END || isErEndlessRaidWave(currentBattle.waveIndex) || !mysteryEncounterFleeAllowed) {
       this.queueShowText("battle:noEscapeForce");
       return false;
     }
@@ -2045,13 +2097,6 @@ export class CommandPhase extends FieldPhase {
       // Fires AFTER the co-op broadcast above (behavior-preserving) and is a hard no-op in co-op (the
       // co-op relay taps own that path) + when not recording - so solo / co-op are both unaffected.
       recordSinglePlayerCommand(this.fieldIndex, command, cursor);
-      // #player-telemetry: capture this client's OWN committed decision as a (state, action) pair in
-      // every player mode; the recorder partitions solo/co-op/showdown/tournament sessions.
-      const automaticCombatCommand =
-        (command === Command.FIGHT || command === Command.TERA) && (move != null || cursor < 0);
-      if (!automaticCombatCommand) {
-        recordTelemetryDecision(this.fieldIndex, command, cursor, "self");
-      }
       this.end();
     }
 

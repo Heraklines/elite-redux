@@ -44,6 +44,7 @@ import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type"
 import { SpeciesId } from "../../../src/enums/species-id";
 import { TrainerType } from "../../../src/enums/trainer-type";
 import { TrainerVariant } from "../../../src/enums/trainer-variant";
+import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
   applyResultReport,
   finalizeExpiredLoneReport,
@@ -718,15 +719,18 @@ async function handleSystemUpdate(
   if (guard) {
     return guard;
   }
+  await ensureLeaderboardStatsColumn(env);
   // Store uncompressed (lazy migration): a legacy "GZ1:" row is replaced with
   // plaintext here on its next write; reads stay back-compat via decompressSave.
   const stored = data;
   const trainerId = Number.parseInt(url.searchParams.get("trainerId") ?? "", 10);
   const secretId = Number.parseInt(url.searchParams.get("secretId") ?? "", 10);
+  const leaderboardStats = extractLeaderboardStats(data);
   await env.DB.prepare(
-    `INSERT INTO system_saves (user_id, data, trainer_id, secret_id, updated_at)
-       VALUES (?1, ?2, ?3, ?4, ?5)
-       ON CONFLICT(user_id) DO UPDATE SET data = ?2, trainer_id = ?3, secret_id = ?4, updated_at = ?5`,
+    `INSERT INTO system_saves (user_id, data, trainer_id, secret_id, updated_at, leaderboard_stats)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+       ON CONFLICT(user_id) DO UPDATE SET data = ?2, trainer_id = ?3, secret_id = ?4, updated_at = ?5,
+         leaderboard_stats = COALESCE(?6, leaderboard_stats)`,
   )
     .bind(
       auth.uid,
@@ -734,9 +738,21 @@ async function handleSystemUpdate(
       Number.isFinite(trainerId) ? trainerId : null,
       Number.isFinite(secretId) ? secretId : null,
       Date.now(),
+      leaderboardStats,
     )
     .run();
   return text("", 200, cors);
+}
+
+let leaderboardStatsColumnPromise: Promise<void> | null = null;
+
+function ensureLeaderboardStatsColumn(env: Env): Promise<void> {
+  leaderboardStatsColumnPromise ??= (async () => {
+    try {
+      await env.DB.prepare("ALTER TABLE system_saves ADD COLUMN leaderboard_stats TEXT").run();
+    } catch {}
+  })();
+  return leaderboardStatsColumnPromise;
 }
 
 function parseSlot(url: URL): number | null {
@@ -2147,7 +2163,7 @@ async function handleRunCreate(
     ghostSourceRunId?: unknown;
     /** ER Ghost Trainer Editor: the uploader's authored presentation blob (additive/optional). */
     presentation?: unknown;
-    /** ER (relics): the run's active relics at capture, records-only (additive/optional). */
+    /** ER (relics): the run's active relics at capture (additive/optional). */
     relics?: unknown;
     /** ER ghost notifications: every ghost this run fought (additive/optional). */
     ghostsFought?: unknown;
@@ -2191,9 +2207,9 @@ async function handleRunCreate(
   const presentationStr =
     run.presentation && typeof run.presentation === "object" ? JSON.stringify(run.presentation) : null;
   const presentationBlob = presentationStr && presentationStr.length <= 4096 ? presentationStr : null;
-  // ER (relics): the run's active relics at capture. RECORDS-ONLY - stored verbatim
-  // (opaque JSON, size-capped) for analytics; the encountering client NEVER reads or
-  // applies these to the fielded ghost. Old clients omit `relics` -> stays null.
+  // ER (relics): the run's active relics at capture. Stored verbatim (opaque JSON,
+  // size-capped); sampled ghosts receive this blob so the client can restore it.
+  // Old clients omit `relics` and remain eligible for non-inventory ghost battles.
   const relicsStr = Array.isArray(run.relics) ? JSON.stringify(run.relics) : null;
   const relicsBlob = relicsStr && relicsStr.length <= 2048 ? relicsStr : null;
   await ensureRunStatColumns(env);
@@ -2385,6 +2401,173 @@ async function ensureRunSampleIndex(env: Env): Promise<void> {
   }
 }
 
+let ghostPerformanceTablesReady = false;
+async function ensureGhostPerformanceTables(env: Env): Promise<void> {
+  if (ghostPerformanceTablesReady) {
+    return;
+  }
+  await env.DB.batch([
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS ghost_encounter_result_events (
+         event_id TEXT PRIMARY KEY,
+         source_run_id TEXT NOT NULL,
+         reporter_user_id INTEGER NOT NULL,
+         result TEXT NOT NULL,
+         player_kos INTEGER NOT NULL,
+         player_hp_removed REAL NOT NULL,
+         turns_survived INTEGER NOT NULL,
+         created_at INTEGER NOT NULL
+       )`,
+    ),
+    env.DB.prepare(
+      `CREATE TABLE IF NOT EXISTS ghost_run_performance (
+         source_run_id TEXT PRIMARY KEY,
+         appearances INTEGER NOT NULL DEFAULT 0,
+         wins INTEGER NOT NULL DEFAULT 0,
+         player_kos_sum INTEGER NOT NULL DEFAULT 0,
+         hp_removed_sum REAL NOT NULL DEFAULT 0,
+         turns_sum INTEGER NOT NULL DEFAULT 0,
+         updated_at INTEGER NOT NULL
+       )`,
+    ),
+    env.DB.prepare(
+      "CREATE INDEX IF NOT EXISTS idx_ghost_performance_wins ON ghost_run_performance (wins, appearances)",
+    ),
+  ]);
+  ghostPerformanceTablesReady = true;
+}
+
+type GhostPerformanceRow = {
+  source_run_id: string;
+  appearances: number;
+  wins: number;
+  player_kos_sum: number;
+  hp_removed_sum: number;
+  turns_sum: number;
+};
+
+function ghostPerformancePayload(row: GhostPerformanceRow, topPerformer: boolean): Record<string, unknown> {
+  const appearances = Math.max(0, row.appearances);
+  const divisor = Math.max(1, appearances);
+  const averagePlayerKos = Math.max(0, row.player_kos_sum) / divisor;
+  const averagePlayerHpRemoved = Math.max(0, row.hp_removed_sum) / divisor;
+  const averageTurnsSurvived = Math.max(0, row.turns_sum) / divisor;
+  const posteriorWinRate = (Math.max(0, row.wins) + 0.5) / (appearances + 10);
+  const closeFightScore = 0.6 * Math.min(1, averagePlayerKos / 6) + 0.4 * Math.min(1, averagePlayerHpRemoved);
+  return {
+    appearances,
+    wins: Math.max(0, row.wins),
+    averagePlayerKos,
+    averagePlayerHpRemoved,
+    averageTurnsSurvived,
+    dangerScore: Math.max(0, Math.min(1, 0.75 * posteriorWinRate + 0.25 * closeFightScore)),
+    ...(topPerformer ? { topPerformer: true } : {}),
+  };
+}
+
+async function attachGhostPerformance(env: Env, teams: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  if (teams.length === 0) {
+    return teams;
+  }
+  await ensureGhostPerformanceTables(env);
+  const ids = teams.map(team => String(team.id ?? "")).filter(Boolean);
+  const performance: GhostPerformanceRow[] = [];
+  for (let offset = 0; offset < ids.length; offset += 90) {
+    const chunk = ids.slice(offset, offset + 90);
+    const placeholders = chunk.map((_, index) => `?${index + 1}`).join(", ");
+    const rows = await env.DB.prepare(
+      `SELECT source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum
+         FROM ghost_run_performance WHERE source_run_id IN (${placeholders})`,
+    )
+      .bind(...chunk)
+      .all<GhostPerformanceRow>();
+    performance.push(...(rows.results ?? []));
+  }
+  const topRows =
+    (
+      await env.DB.prepare(
+        `SELECT source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum
+       FROM ghost_run_performance
+      WHERE appearances >= 3
+      ORDER BY (
+        0.75 * ((wins + 0.5) / (appearances + 10.0))
+        + 0.25 * (
+          0.6 * MIN(1.0, (player_kos_sum * 1.0 / appearances) / 6.0)
+          + 0.4 * MIN(1.0, hp_removed_sum * 1.0 / appearances)
+        )
+      ) DESC
+      LIMIT 10`,
+      ).all<GhostPerformanceRow>()
+    ).results ?? [];
+  const top = new Set(topRows.map(row => row.source_run_id));
+  const byId = new Map(performance.map(row => [row.source_run_id, row]));
+  return teams.map(team => {
+    const id = String(team.id ?? "");
+    const row = byId.get(id);
+    return row == null ? team : { ...team, endlessPerformance: ghostPerformancePayload(row, top.has(id)) };
+  });
+}
+
+async function handleGhostResult(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const raw = await readSaveBody(request);
+  if (raw == null) {
+    return text("Ghost result too large.", 413, cors);
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return text("Invalid ghost result.", 400, cors);
+  }
+  const eventId = typeof body.eventId === "string" ? body.eventId.slice(0, 220) : "";
+  const sourceRunId = typeof body.sourceSnapshotId === "string" ? body.sourceSnapshotId.slice(0, 160) : "";
+  const result = body.result === "ghost-win" || body.result === "player-win" ? body.result : null;
+  if (!eventId || !sourceRunId || !result) {
+    return text("Ghost result is missing identity or outcome.", 400, cors);
+  }
+  const source = await env.DB.prepare(
+    "SELECT id FROM runs WHERE id = ?1 AND user_id != ?2 AND outcome = 'victory' LIMIT 1",
+  )
+    .bind(sourceRunId, auth.uid)
+    .first<{ id: string }>();
+  if (!source) {
+    return text("Unknown ghost source.", 404, cors);
+  }
+  const playerKos = Math.max(0, Math.min(8, Math.floor(Number(body.playerKos) || 0)));
+  const playerHpRemoved = Math.max(0, Math.min(1, Number(body.playerHpRemoved) || 0));
+  const turnsSurvived = Math.max(0, Math.min(1000, Math.floor(Number(body.turnsSurvived) || 0)));
+  await ensureGhostPerformanceTables(env);
+  const inserted = await env.DB.prepare(
+    `INSERT OR IGNORE INTO ghost_encounter_result_events
+       (event_id, source_run_id, reporter_user_id, result, player_kos, player_hp_removed, turns_survived, created_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+  )
+    .bind(eventId, sourceRunId, auth.uid, result, playerKos, playerHpRemoved, turnsSurvived, Date.now())
+    .run();
+  if ((inserted.meta.changes ?? 0) > 0) {
+    await env.DB.prepare(
+      `INSERT INTO ghost_run_performance
+         (source_run_id, appearances, wins, player_kos_sum, hp_removed_sum, turns_sum, updated_at)
+       VALUES (?1, 1, ?2, ?3, ?4, ?5, ?6)
+       ON CONFLICT(source_run_id) DO UPDATE SET
+         appearances = appearances + 1,
+         wins = wins + excluded.wins,
+         player_kos_sum = player_kos_sum + excluded.player_kos_sum,
+         hp_removed_sum = hp_removed_sum + excluded.hp_removed_sum,
+         turns_sum = turns_sum + excluded.turns_sum,
+         updated_at = excluded.updated_at`,
+    )
+      .bind(sourceRunId, result === "ghost-win" ? 1 : 0, playerKos, playerHpRemoved, turnsSurvived, Date.now())
+      .run();
+  }
+  return json({ ok: true, recorded: (inserted.meta.changes ?? 0) > 0 }, 200, cors);
+}
+
 /**
  * ER ghost notifications: the battles where the CALLER's ghost fought another
  * player, since `?since=<ts>` (the client tracks last-seen locally — no write).
@@ -2498,7 +2681,31 @@ type RunSampleRow = {
   opponent_team: string | null;
   challenges: string | null;
   presentation?: string | null;
+  relics?: string | null;
 };
+
+function runSampleRowToGhost(row: RunSampleRow, fallbackDifficulty = ""): Record<string, unknown> | null {
+  try {
+    return {
+      id: row.id,
+      sourceUserId: String(row.user_id),
+      trainerName: row.username ?? "Trainer",
+      difficulty: row.difficulty ?? fallbackDifficulty,
+      mode: row.mode ?? undefined,
+      waveReached: row.wave ?? 0,
+      isVictory: row.outcome === "victory",
+      timestamp: row.created_at,
+      party: JSON.parse(row.player_team),
+      opponentName: row.opponent_name ?? undefined,
+      opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+      challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
+      presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
+      relics: row.relics ? JSON.parse(row.relics) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Endless contamination guard (CORRECTNESS): a classic/challenge run ends at wave 200
@@ -2507,6 +2714,7 @@ type RunSampleRow = {
  * tag. No classic run exceeds 200, so this never drops a legitimate team.
  */
 export const GHOST_SAMPLE_MAX_WAVE = 200;
+const GHOST_SAMPLE_MAX_COUNT = 240;
 /** Modes that must never seed the ghost pool (endless/daily contamination). */
 const NON_GHOST_MODES_SQL = "'endless', 'spliced_endless', 'daily'";
 
@@ -2518,6 +2726,8 @@ async function enumerateEligibleRunCandidates(
   minWave: number,
   maxWave: number,
   pageSize: number,
+  requireSavedItems = false,
+  victoriesOnly = false,
 ): Promise<RunSampleCandidate[]> {
   const candidates: RunSampleCandidate[] = [];
   let cursorWave = minWave - 1;
@@ -2527,6 +2737,8 @@ async function enumerateEligibleRunCandidates(
       `SELECT rowid AS rid, wave, user_id AS userId FROM runs
          WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
            AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+           ${requireSavedItems ? "AND player_team LIKE '%\"heldItems\":%'" : ""}
+           ${victoriesOnly ? "AND outcome = 'victory'" : ""}
            AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
          ORDER BY wave, rowid LIMIT ?6`,
     )
@@ -2602,7 +2814,7 @@ async function handleRunSample(
 ): Promise<Response> {
   const difficulty = url.searchParams.get("difficulty") ?? "";
   const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
-  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 20) : 8;
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), GHOST_SAMPLE_MAX_COUNT) : 8;
   // Only sample runs that reached at least `minWave` — a run that ended at wave W
   // must never be fielded as a ghost trainer past wave W (its team is only proven
   // viable up to where it died).
@@ -2612,6 +2824,8 @@ async function handleRunSample(
   const maxWave = Number.isFinite(maxWaveParsed)
     ? Math.min(Math.max(maxWaveParsed, minWave), GHOST_SAMPLE_MAX_WAVE)
     : GHOST_SAMPLE_MAX_WAVE;
+  const requireSavedItems = url.searchParams.get("requireSavedItems") === "1";
+  const victoriesOnly = url.searchParams.get("victoriesOnly") === "1";
   if (minWave > GHOST_SAMPLE_MAX_WAVE) {
     return json({ teams: [] }, 200, cors);
   }
@@ -2638,12 +2852,20 @@ async function handleRunSample(
   // pagination, maximise distinct uploaders, then fetch only the selected rows.
   // This avoids both shallow-row bias and prolific-uploader domination.
   const cols =
-    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation";
+    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
   // Index the (wave, rowid) keyset walk. Cheap no-op once created; lazy so an
   // already-deployed prod DB gains it without a manual migration (mirrors
   // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
   await ensureRunSampleIndex(env);
-  const eligible = await enumerateEligibleRunCandidates(env, auth.uid, minWave, maxWave, 2000);
+  const eligible = await enumerateEligibleRunCandidates(
+    env,
+    auth.uid,
+    minWave,
+    maxWave,
+    2000,
+    requireSavedItems,
+    victoriesOnly,
+  );
   const byUploader = new Map<number, RunSampleCandidate[]>();
   for (const candidate of eligible) {
     const group = byUploader.get(candidate.userId) ?? [];
@@ -2678,39 +2900,61 @@ async function handleRunSample(
     }
   }
   const chosen = chosenCandidates.map(candidate => candidate.rid);
-  let results: RunSampleRow[] = [];
-  if (chosen.length > 0) {
-    const placeholders = chosen.map((_, i) => `?${i + 1}`).join(", ");
+  const results: RunSampleRow[] = [];
+  for (let offset = 0; offset < chosen.length; offset += 90) {
+    const chunk = chosen.slice(offset, offset + 90);
+    const placeholders = chunk.map((_, i) => `?${i + 1}`).join(", ");
     const fetched = await env.DB.prepare(`SELECT ${cols} FROM runs WHERE rowid IN (${placeholders})`)
-      .bind(...chosen)
+      .bind(...chunk)
       .all<RunSampleRow>();
-    results = fetched.results ?? [];
+    results.push(...(fetched.results ?? []));
   }
-  const teams = (results ?? [])
-    .map(row => {
-      try {
-        return {
-          id: row.id,
-          sourceUserId: String(row.user_id),
-          trainerName: row.username ?? "Trainer",
-          difficulty: row.difficulty ?? difficulty,
-          mode: row.mode ?? undefined,
-          waveReached: row.wave ?? 0,
-          isVictory: row.outcome === "victory",
-          timestamp: row.created_at,
-          party: JSON.parse(row.player_team),
-          opponentName: row.opponent_name ?? undefined,
-          opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
-          challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
-          // ER Ghost Trainer Editor: pass the authored presentation through to the
-          // encountering client (which sanitises it before applying). Bad JSON -> omit.
-          presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
-        };
-      } catch {
-        return null;
-      }
-    })
-    .filter(t => t !== null);
+  const teams = await attachGhostPerformance(
+    env,
+    (results ?? []).map(row => runSampleRowToGhost(row, difficulty)).filter(t => t !== null),
+  );
+  return json({ teams }, 200, cors);
+}
+
+/** Other victorious, item-bearing runs from the owner of one opaque source run. */
+async function handleRunLineage(
+  url: URL,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  const sourceRunId = (url.searchParams.get("sourceRunId") ?? "").trim();
+  const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
+  const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 4) : 4;
+  if (!sourceRunId || sourceRunId.length > 160) {
+    return json({ teams: [] }, 200, cors);
+  }
+  const source = await env.DB.prepare(
+    `SELECT user_id FROM runs
+       WHERE id = ?1 AND user_id != ?2 AND outcome = 'victory'
+         AND wave <= ?3 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+       LIMIT 1`,
+  )
+    .bind(sourceRunId, auth.uid, GHOST_SAMPLE_MAX_WAVE)
+    .first<{ user_id: number }>();
+  if (source == null) {
+    return json({ teams: [] }, 200, cors);
+  }
+  const cols =
+    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
+  const { results } = await env.DB.prepare(
+    `SELECT ${cols} FROM runs
+       WHERE user_id = ?1 AND id != ?2 AND outcome = 'victory' AND wave <= ?3
+         AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+         AND player_team LIKE '%"heldItems":%'
+       ORDER BY created_at DESC LIMIT ?4`,
+  )
+    .bind(source.user_id, sourceRunId, GHOST_SAMPLE_MAX_WAVE, count)
+    .all<RunSampleRow>();
+  const teams = await attachGhostPerformance(
+    env,
+    (results ?? []).map(row => runSampleRowToGhost(row)).filter(team => team !== null),
+  );
   return json({ teams }, 200, cors);
 }
 
@@ -2741,7 +2985,7 @@ async function handleRunDeadliest(
   const filterDifficulty = difficulty && difficulty !== "any";
   const { results } = await env.DB.prepare(
     `SELECT r.id, r.username, r.outcome, r.difficulty, r.wave, r.created_at, r.player_team,
-            r.opponent_name, r.opponent_team, r.presentation, COUNT(*) AS kills
+            r.opponent_name, r.opponent_team, r.presentation, r.relics, COUNT(*) AS kills
        FROM runs k
        JOIN runs r ON r.id = k.ghost_source_run_id
        WHERE k.killed_by_ghost = 1 AND k.ghost_source_run_id IS NOT NULL
@@ -2763,6 +3007,7 @@ async function handleRunDeadliest(
       opponent_name: string | null;
       opponent_team: string | null;
       presentation: string | null;
+      relics: string | null;
       kills: number;
     }>();
   const teams = (results ?? [])
@@ -2780,6 +3025,7 @@ async function handleRunDeadliest(
           opponentName: row.opponent_name ?? undefined,
           opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
           presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
+          relics: row.relics ? JSON.parse(row.relics) : undefined,
         };
       } catch {
         return null;
@@ -2878,8 +3124,8 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
     // title/dialogue/FX) JSON blob. Additive + nullable; opaque to the worker
     // (the encountering client sanitises it before applying).
     "presentation TEXT",
-    // ER (relics): the run's active relics at capture. RECORDS-ONLY JSON blob
-    // (analytics); never read back / applied to a fielded ghost. Additive + nullable.
+    // ER (relics): the run's active relics at capture. Sampled inventory-qualified
+    // ghosts read this back so their complete saved loadout can be reconstructed.
     "relics TEXT",
   ]) {
     try {
@@ -5184,6 +5430,12 @@ export default {
       }
       if (pathname === "/savedata/run/sample" && method === "GET") {
         return await handleRunSample(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/lineage" && method === "GET") {
+        return await handleRunLineage(url, auth, env, cors);
+      }
+      if (pathname === "/savedata/run/ghost-result" && method === "POST") {
+        return await handleGhostResult(request, auth, env, cors);
       }
       if (pathname === "/savedata/run/deadliest" && method === "GET") {
         return await handleRunDeadliest(url, auth, env, cors);

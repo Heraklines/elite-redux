@@ -1093,6 +1093,13 @@ async function handleSaveCustomTrainers(body: SaveBody, target: EditableFile, en
   const result = await commitCustomTrainersWithRetry({
     read: () => readRepoJson(path, target.label, env),
     merge: existing => mergeCustomTrainersDelta(existing, delta, baselines),
+    // Validate the entire post-merge file, not only the submitted delta. This
+    // prevents an older invalid baseline entry from surviving another editor
+    // commit and then disappearing from the runtime/dev-scenario catalog.
+    validate: merged => {
+      const fullCatalog = target.validate(merged);
+      return fullCatalog.ok ? null : `merged custom trainer catalog is invalid: ${fullCatalog.error}`;
+    },
     serialize: merged => `${JSON.stringify(sortKeysDeep(merged), null, 2)}\n`,
     isUnchanged: (merged, existing) => stableStringify(merged) === stableStringify(existing),
     write: async (content, sha) => {
@@ -1535,16 +1542,7 @@ async function updateTrainerSpriteCatalog(
       return { ok: false, error: "sprite catalog contains invalid JSON" };
     }
     const key = body.key as string;
-    catalog[key] = {
-      label: (body.label as string).trim(),
-      spriteKey: key,
-      genders: body.genders === true,
-      kind: (body.kind || "other").trim(),
-      tags: body.tags || [],
-      author: (body.author || "").trim(),
-      license: body.license,
-      sourceUrl: (body.sourceUrl || "").trim(),
-    };
+    catalog[key] = trainerSpriteCatalogEntry(body);
     const putRes = await fetch(api, {
       method: "PUT",
       headers: { ...ghHeaders(env), "Content-Type": "application/json" },
@@ -1563,6 +1561,20 @@ async function updateTrainerSpriteCatalog(
     }
   }
   return { ok: false, error: "sprite catalog changed repeatedly; retry the upload" };
+}
+
+function trainerSpriteCatalogEntry(body: TrainerSpriteUploadBody) {
+  const key = body.key as string;
+  return {
+    label: (body.label as string).trim(),
+    spriteKey: key,
+    genders: body.genders === true,
+    kind: (body.kind || "other").trim(),
+    tags: body.tags || [],
+    author: (body.author || "").trim(),
+    license: body.license,
+    sourceUrl: (body.sourceUrl || "").trim(),
+  };
 }
 
 async function handleTrainerSpriteUpload(body: TrainerSpriteUploadBody, env: Env): Promise<Response> {
@@ -1635,7 +1647,17 @@ async function handleTrainerSpriteUpload(body: TrainerSpriteUploadBody, env: Env
       return json({ ok: false, error: deploy.error, assetsCommitted: true, catalogCommitted: true }, 502, env);
     }
   }
-  return json({ ok: true, assetsCommit: assets.commit, catalogCommit: catalog.commit, key }, 200, env);
+  return json(
+    {
+      ok: true,
+      assetsCommit: assets.commit,
+      catalogCommit: catalog.commit,
+      key,
+      entry: { key, ...trainerSpriteCatalogEntry(body) },
+    },
+    200,
+    env,
+  );
 }
 
 const MEDIA_UPLOAD_PART_BYTES = 8 * 1024 * 1024;

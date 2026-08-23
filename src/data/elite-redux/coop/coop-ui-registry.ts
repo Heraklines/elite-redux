@@ -153,6 +153,8 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // Pre-run / lobby-era selection (the co-op roster is assembled separately, coop-roster.ts, and
   // the guest boots from the host's launch session, applyCoopLaunchSession).
   [UiMode.CHALLENGE_SELECT]: "local-only",
+  [UiMode.FUN_MODE_SELECT]: "local-only",
+  [UiMode.FUN_ABILITY_REVIEW]: "local-only",
   [UiMode.COMMUNITY_CHALLENGES]: "local-only",
   [UiMode.COMMUNITY_CHALLENGE_CREATE]: "local-only",
   [UiMode.COMMUNITY_CHALLENGE_TEXT]: "local-only",
@@ -225,6 +227,21 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // Showdown Sync guest command surface: versus-only and driven locally by the guest; only the
   // serialized command crosses the Showdown relay. It is never part of a shared co-op interaction.
   [UiMode.SHOWDOWN_SYNC_COMMAND]: "local-only",
+
+  // Endless Rift Ledger is a read-only projection of already-serialized run state.
+  [UiMode.ENDLESS_RIFT_LEDGER]: "local-only",
+
+  // Fun Mode "Moody Mode" screens. REVIEW (conservative): the post-boss boon DRAFT is a shared-run
+  // reward surface (like MODIFIER_SELECT) and the co-op owner/watcher wiring is not part of this
+  // bounded UI task - classify "local-only" so the staging tripwire still fires if it leaks into a
+  // partner-owned interaction unmirrored. The LEDGER is a read-only per-client view of run state.
+  [UiMode.MOODY_BOON_SELECT]: "local-only",
+  [UiMode.MOODY_LEDGER]: "local-only",
+  [UiMode.MOODY_CURSE_SELECT]: "local-only",
+  [UiMode.MOODY_TARGET_PICKER]: "local-only",
+  [UiMode.MOODY_CHOICE]: "local-only",
+  [UiMode.MOODY_ENEMY_PANEL]: "local-only",
+  [UiMode.MOODY_SECTION_REPORT]: "local-only",
 };
 
 /**
@@ -284,6 +301,28 @@ export const COOP_UI_LOCAL_AUTHORITATIVE_COMMIT_MODES: ReadonlySet<UiMode> = new
 /** The classification of a mode, or `undefined` only if a runtime out-of-range mode is somehow passed. */
 export function coopUiClassOf(mode: UiMode): CoopUiClass | undefined {
   return COOP_UI_REGISTRY[mode];
+}
+
+/**
+ * Whether the current input belongs to a strictly local pause-menu overlay.
+ *
+ * Authority V2 deliberately freezes a shared interaction whenever its exact phase/handler control is not
+ * installed. Opening the local pause menu temporarily replaces that handler without replacing the ordered
+ * reward/shop/encounter control underneath it, so applying the freeze blindly makes the visible menu dead.
+ *
+ * Provenance matters: generic CONFIRM and OPTION_SELECT modes can commit shared mechanics. They are allowed
+ * here only when a real MENU ancestor exists and every descendant between that menu and the current mode is
+ * classified local-only. A mirrored descendant immediately closes the exemption.
+ */
+export function coopLocalOverlayInputAllowed(currentMode: UiMode, modeChain: readonly UiMode[]): boolean {
+  if (currentMode === UiMode.MENU) {
+    return true;
+  }
+  const menuIndex = modeChain.lastIndexOf(UiMode.MENU);
+  if (menuIndex < 0) {
+    return false;
+  }
+  return [...modeChain.slice(menuIndex + 1), currentMode].every(mode => coopUiClassOf(mode) === "local-only");
 }
 
 /**

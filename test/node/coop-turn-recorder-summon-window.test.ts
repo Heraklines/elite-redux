@@ -1,14 +1,20 @@
 import {
   beginCoopRecording,
+  beginCoopTransitionRecording,
   endCoopRecording,
   recordCoopEvent,
+  releaseCoopTransitionPresentation,
   sealCoopEntryPresentation,
+  setCoopLiveEmitter,
+  setCoopPresentationObserver,
   snapshotCoopRecordedPresentation,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { afterEach, describe, expect, it } from "vitest";
 
 describe("co-op turn recorder summon window", () => {
   afterEach(() => {
+    setCoopPresentationObserver(null);
+    setCoopLiveEmitter(null);
     endCoopRecording();
   });
 
@@ -104,5 +110,49 @@ describe("co-op turn recorder summon window", () => {
       seq: 1,
       events: [{ k: "message", text: "current wave" }],
     });
+  });
+
+  it("carries unpublished Mystery transition presentation into the next adjacent battle", () => {
+    const observed: Array<{ turn: number; seq: number; event: unknown }> = [];
+    const emitted: Array<{ turn: number; seq: number; event: unknown }> = [];
+    setCoopPresentationObserver(observation => {
+      if (observation.stage === "authority-recorded") {
+        observed.push(observation);
+      }
+    });
+    setCoopLiveEmitter((turn, seq, event) => emitted.push({ turn, seq, event }));
+
+    beginCoopTransitionRecording(1, "epoch-a:6");
+    recordCoopEvent({ k: "message", text: "The pointed stones disappeared!" });
+    expect(observed).toEqual([]);
+    expect(emitted).toEqual([]);
+
+    beginCoopTransitionRecording(1, "epoch-a:7");
+    recordCoopEvent({ k: "message", text: "The foe appeared!" });
+    releaseCoopTransitionPresentation();
+
+    expect(observed.map(({ turn, seq, event }) => ({ turn, seq, event }))).toEqual([
+      { turn: 1, seq: 0, event: { k: "message", text: "The pointed stones disappeared!" } },
+      { turn: 1, seq: 1, event: { k: "message", text: "The foe appeared!" } },
+    ]);
+    expect(emitted).toEqual(observed.map(({ turn, seq, event }) => ({ turn, seq, event })));
+    expect(sealCoopEntryPresentation()).toEqual([
+      { k: "message", text: "The pointed stones disappeared!" },
+      { k: "message", text: "The foe appeared!" },
+    ]);
+  });
+
+  it("never carries a published or non-adjacent recording into a transition", () => {
+    beginCoopTransitionRecording(1, "epoch-a:6");
+    recordCoopEvent({ k: "message", text: "published" });
+    releaseCoopTransitionPresentation();
+    beginCoopTransitionRecording(1, "epoch-a:7");
+    expect(sealCoopEntryPresentation()).toEqual([]);
+
+    endCoopRecording();
+    beginCoopTransitionRecording(1, "epoch-a:7");
+    recordCoopEvent({ k: "message", text: "wrong session" });
+    beginCoopTransitionRecording(1, "epoch-b:8");
+    expect(sealCoopEntryPresentation()).toEqual([]);
   });
 });

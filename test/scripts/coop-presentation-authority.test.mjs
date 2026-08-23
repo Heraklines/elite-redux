@@ -778,6 +778,13 @@ test("presentation liveness uses an exact runtime wall scheduler rather than the
   assert.match(watchdog, /const scene = globalScene/u);
   assert.match(watchdog, /streamer\.scheduleAuthorityRetry\(callback, ms\)/u);
   assert.match(watchdog, /generation !== coopSessionGeneration\(\) \|\| getCoopBattleStreamer\(\) !== streamer/u);
+  assert.match(watchdog, /COOP_PRESENTATION_STALL_MS = 30_000/u);
+  assert.match(watchdog, /let lastProgressAt = startedAt/u);
+  assert.match(
+    watchdog,
+    /if \(frame > lastFrame\) \{[\s\S]+lastProgressAt = sampledAt;[\s\S]+sampledAt - lastProgressAt >= stallMs/u,
+    "one throttled five-second sample cannot permanently fail a presentation that later resumes",
+  );
   assert.match(watchdog, /DEFAULT_COOP_PRESENTATION_HARD_WALL_MS = 120_000/u);
   assert.match(
     browser,
@@ -836,7 +843,11 @@ test("the production turn boundary is owned by a runtime mutation ledger, not a 
     manager,
     /if \(this\.coopMutationLedgerRequired\) \{[\s\S]+authoritative co-op phase \$\{phase\.phaseName\} has no scene-bound mutation ledger/u,
   );
-  assert.match(manager, /shiftPhase\(\)[\s\S]+settleCoopMutationPhase\(this\.currentPhase\)/u);
+  assert.match(
+    manager,
+    /shiftPhase\(completingPhase\?: Phase\)[\s\S]+if \(completingPhase != null && completingPhase !== this\.currentPhase\)[\s\S]+return;[\s\S]+settleCoopMutationPhase\(this\.currentPhase\)/u,
+    "a stale asynchronous predecessor completion returns before it can settle or shift the authoritative modal",
+  );
   assert.match(runtime, /mutationLedger:\s*new CoopMutationLedger\(\)/u);
   assert.match(
     runtime,
@@ -853,6 +864,33 @@ test("the production turn boundary is owned by a runtime mutation ledger, not a 
   assert.match(commit, /const mutationAfter = runtime\.mutationLedger\.snapshot\(\)/u);
   assert.match(commit, /mutationAfter\.generation !== mutationBefore\.generation/u);
   assert.doesNotMatch(commit, /const UNSETTLED_TURN_MUTATORS/u);
+});
+
+test("detached battle launchers advance only the phase captured before asynchronous construction", () => {
+  const starter = read("src/phases/select-starter-phase.ts");
+  const classic = read("test/helpers/classic-mode-helper.ts");
+  const challenge = read("test/helpers/challenge-mode-helper.ts");
+  const manager = read("test/framework/game-manager.ts");
+  const devTools = read("src/dev-tools.ts");
+
+  assert.match(
+    starter,
+    /initBattleFromCurrentPhase\([\s\S]+const completingPhaseManager = globalScene\.phaseManager[\s\S]+const completingPhase = completingPhaseManager\.getCurrentPhase\(\)[\s\S]+this\.initBattle\([\s\S]+completingPhase,[\s\S]+completingPhaseManager/u,
+  );
+  assert.match(starter, /completingPhase: Phase = this/u);
+  assert.match(starter, /completingPhaseManager = globalScene\.phaseManager/u);
+  assert.match(
+    starter,
+    /if \(completingPhase === this\) \{[\s\S]+this\.end\(\)[\s\S]+\} else \{[\s\S]+completingPhaseManager\.shiftPhase\(completingPhase\)/u,
+  );
+  for (const [name, launcher] of [
+    ["classic helper", classic],
+    ["challenge helper", challenge],
+    ["game manager", manager],
+    ["developer tools", devTools],
+  ]) {
+    assert.match(launcher, /initBattleFromCurrentPhase\(/u, `${name} uses the identity-safe detached entrypoint`);
+  }
 });
 
 test("V2 replacement animation drains before its checkpoint can install", () => {
@@ -984,7 +1022,16 @@ test("protocol 62 binds every structured presentation cue and authenticated rejo
   assert.match(exp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "field"/u);
   assert.match(partyExp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+display: "party"/u);
   assert.match(levelUp, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "levelUp"/u);
-  assert.match(evolution, /recordCoopWaveProgressionPresentation\(\{[\s\S]+k: "evolution"/u);
+  assert.match(
+    evolution,
+    /const presentation = \{[\s\S]+k: "evolution"[\s\S]+prePokemon:[\s\S]+postPokemon:[\s\S]+as const satisfies Extract<CoopWaveProgressionPresentationV2/u,
+    "evolution captures one complete immutable presentation result before either consumer can act",
+  );
+  assert.match(
+    evolution,
+    /recordCoopWaveProgressionPresentation\(presentation, this\.coopOwningRuntime\);[\s\S]+this\.coopSettleRewardEvolution\([\s\S]+presentation,/u,
+    "the presentation recorder and retained interaction settlement consume the same typed result",
+  );
   assert.match(runtime, /progression,[\s\S]+commitHostWave/u);
   const replayGate = runtime.indexOf("if (!transaction.progressionReady)");
   const stateApply = runtime.indexOf("applyCoopAuthoritativeBattleState(immutableState, true)", replayGate);
@@ -1004,6 +1051,11 @@ test("protocol 62 binds every structured presentation cue and authenticated rejo
     "embedded Mystery progression drains before ME terminal DATA applies",
   );
   assert.match(progressionReplay, /PROGRESSION_STEP_WATCHDOG_MS/u);
+  assert.match(
+    progressionReplay,
+    /shiftPhaseThroughCoopAuthorityCommit\(this,[\s\S]*this\.onComplete\(!this\.presentationFailed\)/u,
+    "retained presentation completion retries V2 after selecting, but before starting, the local successor",
+  );
   assert.match(
     waveAdapter,
     /readonly prePokemon: Readonly<Record<string, unknown>>;[\s\S]+readonly postPokemon: Readonly<Record<string, unknown>>;/u,
@@ -1074,7 +1126,11 @@ test("protocol 62 binds every structured presentation cue and authenticated rejo
     /const cleanupTimeout = setTimeout\(resolve, EVOLUTION_CLEANUP_WATCHDOG_MS\)[\s\S]+clearTimeout\(cleanupTimeout\)/u,
     "a damaged UI cannot turn evolution cleanup itself into an unbounded wave wait",
   );
-  assert.match(progressionReplay, /this\.end\(\);[\s\S]+this\.onComplete\(\)/u);
+  assert.doesNotMatch(
+    progressionReplay,
+    /this\.end\(\);[\s\S]+this\.onComplete\(\)/u,
+    "retained completion cannot start a local successor before the V2 completion callback projects control",
+  );
 });
 
 test("every co-op renderer boundary triggers the production two-browser journey", () => {

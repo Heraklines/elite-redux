@@ -2,6 +2,8 @@ import type { InfoToggle } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { hasLibrary } from "#data/elite-redux/abilities/library";
 import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getMoodyModeState, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
 import { getTypeDamageMultiplierColor } from "#data/type";
 import { BattleType } from "#enums/battle-type";
 import { Button } from "#enums/buttons";
@@ -17,6 +19,11 @@ import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
 import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { LibraryPanel } from "#ui/library-panel";
+import {
+  buildMoodyMoveStateLabels,
+  buildMoodyMoveTileSuffix,
+  getMoodyMovePresentation,
+} from "#ui/moody/moody-live-presentation";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { addTextObject, getTextColor } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
@@ -55,6 +62,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   private dmgCalcHeader: Phaser.GameObjects.Text;
   private dmgCalcBody: Phaser.GameObjects.Text;
   private panelCycleHint: Phaser.GameObjects.Text;
+  /** Binding detail for the highlighted move; hidden outside Moody Mode. */
+  private moodyMoveBindingText: Phaser.GameObjects.Text;
   private moveInfoOverlay: MoveInfoOverlay;
 
   /** ER: the in-battle "Pokémon Stats" info overlay, also openable from move select (info/STATS key). */
@@ -153,6 +162,14 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       .setAlpha(0.75)
       .setVisible(false);
 
+    this.moodyMoveBindingText = addTextObject(18, -46, "", TextStyle.MOVE_INFO_CONTENT, {
+      fontSize: "28px",
+      fixedWidth: 205 * 6,
+      maxLines: 1,
+    })
+      .setOrigin(0, 0.5)
+      .setVisible(false);
+
     this.moveInfoContainer.add([
       this.panelCycleHint,
       this.typeIcon,
@@ -165,6 +182,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       this.accuracyText,
       this.dmgCalcHeader,
       this.dmgCalcBody,
+      this.moodyMoveBindingText,
     ]);
 
     // prepare move overlay — sits ABOVE the fight bar with a visible window
@@ -353,7 +371,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   private getMoveCellCount(): number {
     const phase = globalScene.phaseManager.getCurrentPhase();
     if (phase?.is("CommandPhase")) {
-      return phase.getPokemon().getMaxMoveCount();
+      const pokemon = phase.getPokemon();
+      return Math.min(8, Math.max(pokemon.getMaxMoveCount(), pokemon.getMoveset().length));
     }
     return 4;
   }
@@ -365,7 +384,12 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
    * within the move window. Keyed off {@linkcode getMoveCellCount}.
    */
   private getMoveGridMetrics(): { rowSpacing: number; yShift: number } {
-    return this.getMoveCellCount() > 4 ? { rowSpacing: 12, yShift: -8 } : { rowSpacing: 16, yShift: 0 };
+    const count = this.getMoveCellCount();
+    return count > 6
+      ? { rowSpacing: 10, yShift: -10 }
+      : count > 4
+        ? { rowSpacing: 12, yShift: -8 }
+        : { rowSpacing: 16, yShift: 0 };
   }
 
   /** @returns TextStyle according to percentage of PP remaining */
@@ -394,6 +418,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     this.setInfoVis(hasMove);
 
     if (!hasMove) {
+      this.moodyMoveBindingText.setVisible(false);
       return;
     }
 
@@ -408,6 +433,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     const accuracy = pokemonMove.getMove().accuracy;
     const maxPP = pokemonMove.getMovePp();
     const pp = maxPP - pokemonMove.ppUsed;
+    this.refreshMoodyMoveBinding(pokemon, pokemonMove, pp);
 
     const ppLeftStr = padInt(pp, 2, "  ");
     const ppMaxStr = padInt(maxPP, 2, "  ");
@@ -426,6 +452,37 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     });
 
     this.applyPanelMode(pokemon, pokemonMove);
+  }
+
+  private refreshMoodyMoveBinding(pokemon: Pokemon, pokemonMove: PokemonMove, pp: number): void {
+    const enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode;
+    const state = enabled ? getMoodyModeState() : null;
+    const runtimeMove = getMoodyMovePresentation(pokemon.id, pokemonMove.moveId);
+    if (state == null && runtimeMove == null) {
+      this.moodyMoveBindingText.setVisible(false);
+      return;
+    }
+    const partySlot = globalScene.getPlayerParty().findIndex(member => member.id === pokemon.id);
+    const bindings = (state?.boons ?? []).filter(boon => {
+      const target = boon.target;
+      return (
+        target?.moveIds?.includes(pokemonMove.moveId) === true
+        && (target.pokemonIds?.includes(pokemon.id) === true
+          || (partySlot >= 0 && target.partySlots?.includes(partySlot) === true))
+      );
+    });
+    const runtimeLabels = buildMoodyMoveStateLabels(runtimeMove);
+    if (bindings.length === 0 && runtimeLabels.length === 0) {
+      this.moodyMoveBindingText.setVisible(false);
+      return;
+    }
+    const labels = bindings.slice(0, 2).map(boon => {
+      const name = MOODY_BOON_BY_ID.get(boon.boonId)?.name ?? boon.boonId;
+      const stateLabel = boon.dormant ? "dormant" : pp === 0 ? "spent" : pp === 1 ? "ready" : "bound";
+      return `${name}${boon.rank > 1 ? ` ${boon.rank}` : ""} (${stateLabel})`;
+    });
+    const overflow = bindings.length > 2 ? ` +${bindings.length - 2}` : "";
+    this.moodyMoveBindingText.setText(`MOOD: ${[...labels, ...runtimeLabels].join(" / ")}${overflow}`).setVisible(true);
   }
 
   /**
@@ -566,7 +623,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     // Number of move cells to render: 4 normally, more if this Pokémon has been
     // granted extra slots by ER's "5th move slot" consumable. Laid out 2-per-row
     // so a 5th move starts a third row.
-    const cellCount = pokemon.getMaxMoveCount();
+    const cellCount = Math.min(8, Math.max(pokemon.getMaxMoveCount(), moveset.length));
     const { rowSpacing, yShift } = this.getMoveGridMetrics();
     for (let moveIndex = 0; moveIndex < cellCount; moveIndex++) {
       const moveText = addTextObject(
@@ -579,7 +636,11 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
       if (moveIndex < moveset.length) {
         const pokemonMove = moveset[moveIndex]!; // TODO is the bang correct?
         moveText
-          .setText(pokemonMove.getName())
+          .setText(
+            `${pokemonMove.getName()}${buildMoodyMoveTileSuffix(
+              getMoodyMovePresentation(pokemon.id, pokemonMove.moveId),
+            )}`,
+          )
           .setName(pokemonMove.getName())
           .setColor(this.getMoveColor(pokemon, pokemonMove) ?? moveText.style.color);
       }
@@ -660,6 +721,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
 
   clearMoves() {
     this.movesContainer.removeAll(true);
+    this.moodyMoveBindingText.setVisible(false);
 
     const opponents = (globalScene.phaseManager.getCurrentPhase() as CommandPhase).getPokemon().getOpponents();
     opponents.forEach(opponent => {

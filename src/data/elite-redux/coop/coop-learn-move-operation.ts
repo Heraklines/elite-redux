@@ -373,13 +373,31 @@ export function commitCoopLearnMoveBatchDecision(
   return commit(params, binding) != null;
 }
 
-function retryKey(payload: LearnDecision): string {
-  return `${kindOf(payload)}:${payload.partySlot}:${JSON.stringify(payload)}`;
+/**
+ * Retry identity is the human decision at its exact battle address, not successor metadata authored later by
+ * the authority. V2 can append `nextInteraction` while committing the same accepted proposal; including that
+ * field left the guest's legacy compatibility timer alive after the ordered result had already been applied.
+ */
+function retryKey(payload: LearnDecision, wave: number, turn: number): string {
+  const decision =
+    "moveId" in payload
+      ? {
+          partySlot: payload.partySlot,
+          moveId: payload.moveId,
+          forgetSlot: payload.forgetSlot,
+          maxMoveCount: payload.maxMoveCount,
+        }
+      : {
+          partySlot: payload.partySlot,
+          assignments: payload.assignments,
+          fallback: payload.fallback,
+        };
+  return `${kindOf(payload)}:w${wave}:t${turn}:${JSON.stringify(decision)}`;
 }
 function arm(
   payload: LearnDecision,
-  _wave: number,
-  _turn: number,
+  wave: number,
+  turn: number,
   resend: () => void,
   binding?: CoopLearnMoveOperationBinding | null,
 ): void {
@@ -388,7 +406,7 @@ function arm(
   }
   assertBindingRole(binding, "guest");
   const s = state(binding);
-  const key = retryKey(payload);
+  const key = retryKey(payload, wave, turn);
   if (s.retries.has(key)) {
     return;
   }
@@ -429,8 +447,8 @@ export function armCoopLearnMoveBatchIntentResend(
 ): void {
   arm(params.payload, params.wave, params.turn, params.resend, binding);
 }
-function cancel(s: LearnMoveOpState, payload: LearnDecision, _wave: number, _turn: number): void {
-  const key = retryKey(payload);
+function cancel(s: LearnMoveOpState, payload: LearnDecision, wave: number, turn: number): void {
+  const key = retryKey(payload, wave, turn);
   const timer = s.retries.get(key);
   if (timer != null) {
     clearTimeout(timer);
@@ -452,7 +470,9 @@ function valid(value: unknown, kind: CoopOperationKind): value is LearnPayload {
       && (m.type === "prompt"
         ? m.returnPlan === undefined || isCoopNestedInteractionReturnPlan(m.returnPlan)
         : m.type === "decision"
-          && (m.nextInteraction === undefined || isCoopInteractionSuccessorRef(m.nextInteraction)))
+          && typeof m.allowNextWaveStart === "boolean"
+          && (m.nextInteraction === undefined || isCoopInteractionSuccessorRef(m.nextInteraction))
+          && !(m.allowNextWaveStart && m.nextInteraction !== undefined))
     );
   }
   const b = p as CoopLearnMoveBatchPayload;

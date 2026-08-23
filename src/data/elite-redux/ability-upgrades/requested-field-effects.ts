@@ -5,7 +5,6 @@
  */
 
 import { globalScene } from "#app/global-scene";
-import { allAbilities } from "#data/data-lists";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -117,9 +116,18 @@ export function isSuppressedByRequestedFieldAbility(pokemon: Pokemon, abilityId:
   if (abilityId === lunarAffinity) {
     return false;
   }
-  const abilityName = allAbilities[abilityId]?.name ?? "";
+  // Ability applicability is itself part of active-source resolution. Never
+  // read the localized display name here: i18next may resolve nested ability
+  // labels while `collectAbilitySources()` is still on the stack, re-entering
+  // this function until the battle black-screens with a stack overflow.
+  //
+  // AbilityId's reverse enum key is the stable, non-localized identity for both
+  // vanilla and runtime-registered ER abilities. Token boundaries also avoid
+  // treating SLOW_START / COSTAR as a "Star" ability.
+  const abilityKey = AbilityId[abilityId] ?? "";
   return (
-    /(?:lunar|moon|star)/i.test(abilityName) && activeFieldHasRawDraftAbility(711, holder => holder.isOpponent(pokemon))
+    /(?:^|_)(?:LUNAR|MOON|STAR)(?:_|$)/.test(abilityKey)
+    && activeFieldHasRawDraftAbility(711, holder => holder.isOpponent(pokemon))
   );
 }
 

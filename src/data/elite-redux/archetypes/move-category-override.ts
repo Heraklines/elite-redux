@@ -24,6 +24,7 @@
 import { AbAttr } from "#abilities/ab-attrs";
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
+import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 
 export interface MoveCategoryOverrideOptions {
@@ -47,7 +48,11 @@ export class MoveCategoryOverrideAbAttr extends AbAttr {
    * The damage category to force for the given move, or `null` when this
    * ability does not override the move's category.
    */
-  public resolveCategory(move: Move): MoveCategory | null {
-    return move.hasFlag(this.flag) ? this.category : null;
+  public resolveCategory(move: Move, user?: Pokemon | null): MoveCategory | null {
+    const matches =
+      user === undefined || user === null
+        ? move.hasFlag(this.flag)
+        : move.doesFlagEffectApply({ flag: this.flag, user });
+    return matches ? this.category : null;
   }
 }

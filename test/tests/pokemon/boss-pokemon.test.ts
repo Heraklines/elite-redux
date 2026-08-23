@@ -1,3 +1,4 @@
+import { initializeErEndlessContinuation, resetErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { resetErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { AbilityId } from "#enums/ability-id";
 import { MoveId } from "#enums/move-id";
@@ -34,7 +35,23 @@ describe("Boss Pokemon / Shields", () => {
       .ability(AbilityId.NO_GUARD);
   });
 
-  afterEach(() => resetErDifficulty());
+  afterEach(() => {
+    resetErDifficulty();
+    resetErEndlessContinuation();
+  });
+
+  it("doubles the ordinary wild boss segments on Endless raid waves", () => {
+    initializeErEndlessContinuation(200, "raid-segments");
+
+    const rattata = getPokemonSpecies(SpeciesId.RATTATA);
+    const mewtwo = getPokemonSpecies(SpeciesId.MEWTWO);
+    expect(game.scene.getEncounterBossSegments(250, 50, rattata, true)).toBe(
+      game.scene.getEncounterBossSegments(251, 50, rattata, true) * 2,
+    );
+    expect(game.scene.getEncounterBossSegments(250, 100, mewtwo, true)).toBe(
+      game.scene.getEncounterBossSegments(251, 100, mewtwo, true) * 2,
+    );
+  });
 
   it("Mystery Gauntlet structurally forces boss segments only on its boss waves", () => {
     setErDifficulty("mystery");

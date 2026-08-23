@@ -132,12 +132,10 @@ describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)"
     expect(names).toContain("Sheer Force");
   });
 
-  it("3. Lunar Affinity suppression resolves raw field sources without re-entering hasAbility", () => {
+  it("3. Lunar Affinity suppression uses canonical ability identity without translation recursion", () => {
     const lunarAffinity = ER_ID_MAP.abilities[711] as AbilityId;
-    const lunarNamedAbility = allAbilities.find(
-      ability => ability?.id !== lunarAffinity && /(?:lunar|moon|star)/i.test(ability?.name ?? ""),
-    );
-    expect(lunarNamedAbility, "a suppressible lunar/moon/star ability exists").toBeDefined();
+    const lunarNamedAbility = allAbilities[AbilityId.VICTORY_STAR];
+    expect(lunarNamedAbility).toBeDefined();
 
     const subject = {} as Pokemon;
     const holder = {
@@ -149,8 +147,20 @@ describe.skipIf(!RUN)("ER type-nativization maintainer corrections (2026-07-17)"
       },
     } as unknown as Pokemon;
     vi.spyOn(game.scene, "getField").mockReturnValue([holder]);
+    const nameSpy = vi.spyOn(lunarNamedAbility!, "name", "get").mockImplementation(() => {
+      throw new Error("ability suppression must not translate display names");
+    });
 
     expect(isSuppressedByRequestedFieldAbility(subject, lunarNamedAbility!.id)).toBe(true);
+    expect(isSuppressedByRequestedFieldAbility(subject, AbilityId.SLOW_START)).toBe(false);
+    expect(nameSpy).not.toHaveBeenCalled();
+  });
+
+  it("Chingling replaces Metallic with Soundproof instead of duplicating Levitate", () => {
+    const names = abilityNamesOf("SPECIES_CHINGLING");
+    expect(names.filter(name => name === "Levitate")).toHaveLength(1);
+    expect(names).toContain("Soundproof");
+    expect(names).not.toContain("Metallic");
   });
 
   it("Aura Break suppression resolves raw field sources without re-entering hasAbility", () => {

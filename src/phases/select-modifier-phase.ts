@@ -1,6 +1,11 @@
-import { consumePendingDevShop, isCoopBrowserAbilityCapsuleFixtureActive } from "#app/dev-tools/registry";
+import {
+  consumePendingDevShop,
+  getCoopBrowserPartyRewardFixtureId,
+  isCoopBrowserAbilityCapsuleFixtureActive,
+} from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { EvolutionItem, pokemonEvolutions } from "#data/balance/pokemon-evolutions";
 import { modifierTypes } from "#data/data-lists";
 import type { CoopNextControl } from "#data/elite-redux/coop/authority-v2/contract";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
@@ -13,9 +18,11 @@ import {
 import type {
   CoopInteractionSuccessorRef,
   CoopNestedInteractionReturnPlan,
+  CoopRewardActionPayload,
   CoopRewardPresentationPayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
+import { settleCoopPartyReorderPresentationReady } from "#data/elite-redux/coop/coop-party-reorder-presentation";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   adoptRewardWatcherChoice,
@@ -68,21 +75,31 @@ import {
   erMerchantsSealRerollMultiplier,
   erScrapMagnetExtraRewards,
 } from "#data/elite-redux/er-relics";
+import {
+  applyMoodyCoordinatorRewardOptions,
+  getMoodyCoordinatorRecyclerSelectionCount,
+  getMoodyCoordinatorRewardReplacementRule,
+  recycleMoodyCoordinatorRewardOptions,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { BattleType } from "#enums/battle-type";
 import { FormChangeItem } from "#enums/form-change-item";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
-import type { ModifierTier } from "#enums/modifier-tier";
+import { ModifierTier } from "#enums/modifier-tier";
+import { Nature } from "#enums/nature";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { Modifier } from "#modifiers/modifier";
 import {
   ErGreaterAbilityRandomizerModifier,
+  EvolutionItemModifier,
   ExtraModifierModifier,
   HealShopCostModifier,
+  isPlayerManagedHeldItemTransferable,
   PokemonFormChangeItemModifier,
   PokemonHeldItemModifier,
   TempExtraModifierModifier,
@@ -90,24 +107,32 @@ import {
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
   ErAbilityCapsuleModifierType,
+  ErDexNavModifierType,
   ErGreaterAbilityCapsuleModifierType,
   ErGreaterAbilityRandomizerModifierType,
+  ErGreaterMoveRandomizerModifierType,
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
+  EvolutionItemModifierType,
+  FormChangeItemModifierType,
   FusePokemonModifierType,
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
+  getUniqueModifierTypeOptions,
   PokemonAbilityModifierType,
   PokemonAddMoveSlotModifierType,
   PokemonModifierType,
   PokemonMoveModifierType,
+  PokemonNatureChangeModifierType,
   PokemonPpRestoreModifierType,
   PokemonPpUpModifierType,
   RememberMoveModifierType,
   regenerateModifierPoolThresholds,
+  TerastallizeModifierType,
   TmModifierType,
 } from "#modifiers/modifier-type";
 import { BattlePhase } from "#phases/battle-phase";
+import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { ModifierSelectUiHandler } from "#ui/modifier-select-ui-handler";
 import { SHOP_OPTIONS_ROW_LIMIT } from "#ui/modifier-select-ui-handler";
 import { PartyOption, PartyUiHandler, PartyUiMode } from "#ui/party-ui-handler";
@@ -115,6 +140,79 @@ import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
 export type ModifierSelectCallback = (rowCursor: number, cursor: number) => boolean;
+
+export interface RewardRerollTierPolicy {
+  tiers: (ModifierTier | undefined)[] | undefined;
+  allowLuckUpgrades: boolean;
+}
+
+/**
+ * Locked rerolls preserve every slot exactly. Unlocked rerolls remain free to
+ * change ordinary tiers, but a Master/Luxury reward can never downgrade.
+ */
+export function resolveRewardRerollTierPolicy(
+  lockTiers: boolean,
+  rerollCount: number,
+  previousTiers?: ModifierTier[],
+): RewardRerollTierPolicy {
+  if (lockTiers) {
+    return { tiers: previousTiers, allowLuckUpgrades: false };
+  }
+  if (rerollCount > 0 && previousTiers?.some(tier => tier >= ModifierTier.MASTER)) {
+    return {
+      tiers: previousTiers.map(tier => (tier >= ModifierTier.MASTER ? tier : undefined)),
+      allowLuckUpgrades: true,
+    };
+  }
+  return { tiers: undefined, allowLuckUpgrades: true };
+}
+
+const COOP_BROWSER_PARTY_REWARD_TYPES: Readonly<Record<string, () => ModifierTypeFunc>> = {
+  // `modifierTypes` is populated by initModifierTypes() after module evaluation. Keep every registry
+  // lookup late-bound: capturing these properties here freezes `undefined` into the matrix. Return the
+  // original registry function—not a wrapper that constructs its result—so guaranteed reward generation
+  // can recover the canonical id before serializing the authoritative presentation.
+  TM_CASE: () => modifierTypes.TM_CASE,
+  ER_LEARNERS_SHROOM: () => modifierTypes.ER_LEARNERS_SHROOM,
+  MEMORY_MUSHROOM: () => modifierTypes.MEMORY_MUSHROOM,
+  TM_COMMON: () => modifierTypes.TM_COMMON,
+  TM_GREAT: () => modifierTypes.TM_GREAT,
+  TM_ULTRA: () => modifierTypes.TM_ULTRA,
+  ER_ABILITY_CAPSULE: () => modifierTypes.ER_ABILITY_CAPSULE,
+  ER_GREATER_ABILITY_CAPSULE: () => modifierTypes.ER_GREATER_ABILITY_CAPSULE,
+  ER_GREATER_ABILITY_RANDOMIZER: () => modifierTypes.ER_GREATER_ABILITY_RANDOMIZER,
+  ABILITY_RANDOMIZER: () => modifierTypes.ABILITY_RANDOMIZER,
+  MOVE_SLOT_EXPANDER: () => modifierTypes.MOVE_SLOT_EXPANDER,
+  PP_UP: () => modifierTypes.PP_UP,
+  PP_MAX: () => modifierTypes.PP_MAX,
+  ETHER: () => modifierTypes.ETHER,
+  MAX_ETHER: () => modifierTypes.MAX_ETHER,
+  ELIXIR: () => modifierTypes.ELIXIR,
+  MAX_ELIXIR: () => modifierTypes.MAX_ELIXIR,
+  MINT: () => () => new PokemonNatureChangeModifierType(Nature.ADAMANT).withIdFromFunc(modifierTypes.MINT),
+  TERA_SHARD: () => () => new TerastallizeModifierType(PokemonType.FIRE).withIdFromFunc(modifierTypes.TERA_SHARD),
+  RARE_CANDY: () => modifierTypes.RARE_CANDY,
+  RARER_CANDY: () => modifierTypes.RARER_CANDY,
+  POTION: () => modifierTypes.POTION,
+  SUPER_POTION: () => modifierTypes.SUPER_POTION,
+  HYPER_POTION: () => modifierTypes.HYPER_POTION,
+  MAX_POTION: () => modifierTypes.MAX_POTION,
+  FULL_RESTORE: () => modifierTypes.FULL_RESTORE,
+  REVIVE: () => modifierTypes.REVIVE,
+  MAX_REVIVE: () => modifierTypes.MAX_REVIVE,
+  FULL_HEAL: () => modifierTypes.FULL_HEAL,
+  SACRED_ASH: () => modifierTypes.SACRED_ASH,
+  EVOLUTION_ITEM: () => () =>
+    new EvolutionItemModifierType(EvolutionItem.THUNDER_STONE).withIdFromFunc(modifierTypes.EVOLUTION_ITEM),
+  RARE_EVOLUTION_ITEM: () => () =>
+    new EvolutionItemModifierType(EvolutionItem.SCROLL_OF_WATERS).withIdFromFunc(modifierTypes.RARE_EVOLUTION_ITEM),
+  FORM_CHANGE_ITEM: () => () =>
+    new FormChangeItemModifierType(FormChangeItem.GRACIDEA).withIdFromFunc(modifierTypes.FORM_CHANGE_ITEM),
+  RARE_FORM_CHANGE_ITEM: () => () =>
+    new FormChangeItemModifierType(FormChangeItem.GRISEOUS_CORE).withIdFromFunc(modifierTypes.RARE_FORM_CHANGE_ITEM),
+  DNA_SPLICERS: () => modifierTypes.DNA_SPLICERS,
+  ER_DEX_NAV: () => modifierTypes.ER_DEX_NAV,
+};
 
 /** Construction-time provenance for the reward phase's co-op address. */
 export type SelectModifierCoopContinuation =
@@ -233,6 +331,8 @@ export class SelectModifierPhase extends BattlePhase {
   private isCopy: boolean;
 
   private typeOptions: ModifierTypeOption[];
+  private selectedRewardCursor = -1;
+  private modifierSelectCallback: ModifierSelectCallback | null = null;
 
   /**
    * One roll cache per option on this reward surface. Continuation copies share the
@@ -275,6 +375,12 @@ export class SelectModifierPhase extends BattlePhase {
   protected coopPendingAuthorityOperationId: string | null = null;
   /** Exact nested picker opened by the pending result; cleared at every new intent and successful commit. */
   private coopPendingAuthorityNextInteraction: CoopInteractionSuccessorRef | undefined;
+  /** Exact mechanics-free replay material queued by the pending authoritative reward result. */
+  private coopPendingAuthorityPresentation:
+    | NonNullable<NonNullable<CoopRewardActionPayload["result"]>["presentation"]>
+    | undefined;
+  /** A terminal item evolution cannot commit until EvolutionPhase supplies its exact immutable post-image. */
+  private coopPendingEvolutionSettlementOperationId: string | null = null;
   /** Runtime captured while this phase is installed; survives async UI callbacks without ambient rebinding. */
   protected coopRewardOperationBinding: CoopRewardOperationBinding | null = null;
   /** Prevents duplicate durable-result wait loops when a retained intent is re-clicked/replayed. */
@@ -332,6 +438,9 @@ export class SelectModifierPhase extends BattlePhase {
    */
   protected coopProveV2RewardOperationComplete(operationId: string | null | undefined): void {
     if (operationId == null || operationId.length === 0) {
+      return;
+    }
+    if (this.coopPendingEvolutionSettlementOperationId === operationId) {
       return;
     }
     this.coopV2ControlOperationId = operationId;
@@ -459,6 +568,8 @@ export class SelectModifierPhase extends BattlePhase {
     coopContinuation: SelectModifierCoopContinuation = { kind: "ambient" },
     coopRewardSurface?: CoopRewardSurfaceIdentity,
     coopRewardPresentationGeneration = 0,
+    private readonly baseOptionCount = 3,
+    private freePicksRemaining = 1,
   ) {
     super();
 
@@ -591,6 +702,24 @@ export class SelectModifierPhase extends BattlePhase {
       };
     }
 
+    const coopBrowserPartyRewardId = getCoopBrowserPartyRewardFixtureId();
+    const coopBrowserPartyRewardType =
+      coopBrowserPartyRewardId == null ? null : (COOP_BROWSER_PARTY_REWARD_TYPES[coopBrowserPartyRewardId]?.() ?? null);
+    if (
+      coopController != null
+      && !coopIsWatcher
+      && coopBrowserPartyRewardType != null
+      && this.coopRewardWave() === 1
+      && this.coopRewardSurface == null
+      && !this.rerollCount
+      && !this.isCopy
+    ) {
+      this.customModifierSettings = {
+        guaranteedModifierTypeFuncs: [modifierTypes.POKEBALL, coopBrowserPartyRewardType],
+        fillRemaining: false,
+      };
+    }
+
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
     // single-mon party's mega stone). consumePendingDevShop() returns null in
@@ -626,7 +755,29 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op WATCHER (#633 Fix #2): do NOT roll the pool - that would consume luck-divergent
     // seeded draws and shift this client's RNG cursor away from the owner's. Start empty;
     // startCoopWatch() fills typeOptions from the owner's streamed list before the screen opens.
-    this.typeOptions = coopIsWatcher ? [] : this.getModifierTypeOptions(modifierCount);
+    if (coopIsWatcher) {
+      this.typeOptions = [];
+    } else if (this.freePicksRemaining > 1) {
+      // Keep true nested pickers off the first of multiple picks because they retain a
+      // continuation copy of this phase. Ordinary Pokemon-targeted rewards are safe:
+      // their party callback returns here, consumes one pick, and rearms this screen.
+      // Excluding every PokemonModifierType reduced Sprint's pool mostly to balls,
+      // vouchers, money, and global charms.
+      const immediateOptions: ModifierTypeOption[] = [];
+      for (let attempt = 0; attempt < 8 && immediateOptions.length < modifierCount; attempt++) {
+        const eligible = this.getModifierTypeOptions(modifierCount + 5).filter(
+          option => !this.modifierQueuesContinuation(option.type),
+        );
+        immediateOptions.splice(
+          0,
+          immediateOptions.length,
+          ...getUniqueModifierTypeOptions([...immediateOptions, ...eligible]),
+        );
+      }
+      this.typeOptions = immediateOptions.slice(0, modifierCount);
+    } else {
+      this.typeOptions = this.getModifierTypeOptions(modifierCount);
+    }
 
     const modifierSelectCallback = (rowCursor: number, cursor: number) => {
       if (rowCursor < 0 || cursor < 0) {
@@ -684,6 +835,8 @@ export class SelectModifierPhase extends BattlePhase {
               return this.openCheckTeamScreen(modifierSelectCallback);
             case 3:
               return this.toggleRerollLock();
+            case 4:
+              return this.openMoodyRecycler(modifierSelectCallback);
             default:
               return false;
           }
@@ -696,6 +849,7 @@ export class SelectModifierPhase extends BattlePhase {
         }
       }
     };
+    this.modifierSelectCallback = modifierSelectCallback;
     this.coopModifierSelectCallback = modifierSelectCallback;
 
     // Co-op (#633): only the player whose alternating turn it is drives the reward
@@ -812,6 +966,7 @@ export class SelectModifierPhase extends BattlePhase {
       return true;
     }
     const modifierType = this.typeOptions[cursor].type;
+    this.selectedRewardCursor = cursor;
     // Co-op (#633): capture the free-reward pick so it is relayed to the watcher once
     // any party target / sub-option is resolved (or immediately for a non-party item).
     this.coopBeginPending("reward", cursor, 1);
@@ -905,7 +1060,16 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Reroll rewards
   private rerollModifiers() {
-    const rerollCost = this.getRerollCost(globalScene.lockModifierTiers);
+    const replacementRule = getMoodyCoordinatorRewardReplacementRule(
+      "reroll",
+      this.getRerollCost(globalScene.lockModifierTiers),
+      0,
+    );
+    const rerollCost = replacementRule.cost;
+    if (replacementRule.disabled) {
+      globalScene.ui.playError();
+      return false;
+    }
     if (rerollCost < 0 || globalScene.money < rerollCost) {
       globalScene.ui.playError();
       return false;
@@ -942,6 +1106,9 @@ export class SelectModifierPhase extends BattlePhase {
       false,
       { kind: "inherited", address: this.coopSourceAddress },
       this.coopRewardSurface,
+      0,
+      this.baseOptionCount,
+      this.freePicksRemaining,
     );
     globalScene.ui.clearText();
     if (operationId != null && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)) {
@@ -962,6 +1129,50 @@ export class SelectModifierPhase extends BattlePhase {
     // own reward/skip interaction). No-op unless recording / in co-op.
     recordSinglePlayerInteraction("reroll", COOP_INTERACTION_REROLL);
     globalScene.playSound("se/buy");
+    return true;
+  }
+
+  public recycleMoodyRewards(destroyedIndices: readonly number[]): boolean {
+    const recycled = recycleMoodyCoordinatorRewardOptions(this.typeOptions, destroyedIndices);
+    if (!recycled) {
+      globalScene.ui.playError();
+      return false;
+    }
+    const handler = globalScene.ui.getHandler() as { setModifiers?: (options: ModifierTypeOption[]) => void };
+    handler.setModifiers?.(this.typeOptions);
+    return true;
+  }
+
+  private openMoodyRecycler(modifierSelectCallback: ModifierSelectCallback): boolean {
+    const sacrificeCount = getMoodyCoordinatorRecyclerSelectionCount();
+    if (this.typeOptions.length <= sacrificeCount) {
+      globalScene.ui.playError();
+      return false;
+    }
+    void globalScene.ui
+      .requestMoodyRecycler({
+        kind: "recycler",
+        title: "RECYCLER",
+        prompt: `Destroy ${sacrificeCount === 1 ? "one offer" : `${sacrificeCount} offers`}. The remaining offers receive improved weighting.`,
+        confirmLabel: "destroy and reroll",
+        cancellable: true,
+        minSelections: sacrificeCount,
+        maxSelections: sacrificeCount,
+        options: this.typeOptions.map((option, index) => ({
+          id: String(index),
+          label: option.type.name,
+          description: `Base tier: ${ModifierTier[option.type.tier] ?? option.type.tier}`,
+          consequenceLines: ["This offer is destroyed permanently.", "The other reward offers are improved."],
+        })),
+      })
+      .then(result => {
+        const indices = result.action === "confirm" ? result.selectedIds.map(Number).filter(Number.isSafeInteger) : [];
+        if (indices.length === sacrificeCount) {
+          this.recycleMoodyRewards(indices);
+        }
+        this.resetModifierSelect(modifierSelectCallback);
+      })
+      .catch(() => this.resetModifierSelect(modifierSelectCallback));
     return true;
   }
 
@@ -1019,12 +1230,26 @@ export class SelectModifierPhase extends BattlePhase {
    * Hard no-op off the pinned owner / outside co-op (coopRelaySend gates on isLocalOwnerAtCounter).
    * `op` is a COOP_CHECK_OP_*; `data` is its payload (slots / codepoints / form index).
    */
-  public coopReportCheckMutation(op: number, data: number[]): void {
-    if (!this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check")) {
+  public coopReportCheckMutation(op: number, data: number[], presentationReady?: Promise<unknown>): void {
+    const publish = (): void => {
+      if (this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check")) {
+        return;
+      }
       const operationId = this.coopPendingAuthorityOperationId;
       this.coopProveV2RewardOperationComplete(operationId);
       this.coopCommitPendingAuthorityResult(operationId);
+    };
+    if (presentationReady == null) {
+      publish();
+      return;
     }
+    void presentationReady.then(
+      () => this.coopResumeOnOwningRuntime(publish),
+      error =>
+        this.coopResumeOnOwningRuntime(() =>
+          failCoopSharedSession(`Check Team reorder could not install its authoritative field: ${String(error)}`),
+        ),
+    );
   }
 
   // Transfer modifiers among party pokemon
@@ -1071,7 +1296,10 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     const itemModifiers = globalScene.findModifiers(
-      m => m instanceof PokemonHeldItemModifier && m.isTransferable && m.pokemonId === party[fromSlotIndex].id,
+      m =>
+        m instanceof PokemonHeldItemModifier
+        && isPlayerManagedHeldItemTransferable(m)
+        && m.pokemonId === party[fromSlotIndex].id,
     ) as PokemonHeldItemModifier[];
     const itemModifier = itemModifiers[itemIndex];
     if (itemModifier == null) {
@@ -1131,6 +1359,8 @@ export class SelectModifierPhase extends BattlePhase {
       || modifierType instanceof ErAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+      || modifierType instanceof ErGreaterMoveRandomizerModifierType
+      || modifierType instanceof ErDexNavModifierType
     );
   }
 
@@ -1147,6 +1377,7 @@ export class SelectModifierPhase extends BattlePhase {
       modifierType instanceof ErAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityCapsuleModifierType
       || modifierType instanceof ErGreaterAbilityRandomizerModifierType
+      || modifierType instanceof ErDexNavModifierType
     ) {
       return { kind: "ability", wave, turn };
     }
@@ -1180,13 +1411,24 @@ export class SelectModifierPhase extends BattlePhase {
     cost: number,
     offerKey: string,
   ): boolean {
+    const v2ProjectsAbilitySurface =
+      getCoopController()?.role === "guest"
+      && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
+    // Dex Nav has no Pokemon target and its relayed reward payload therefore carries slot=-1. It must be
+    // classified before the ordinary target guard; otherwise the replica returns `continuation=false`,
+    // advances into NewBattlePhase, and races the still-open authoritative two-pick surface.
+    if (modifierType instanceof ErDexNavModifierType) {
+      if (!v2ProjectsAbilitySurface) {
+        const { seq, watcher } = this.coopAbilityContext();
+        globalScene.phaseManager.unshiftNew("ErDexNavPhase", 0, seq, watcher);
+      }
+      globalScene.phaseManager.unshiftPhase(this.copy());
+      return true;
+    }
     const target = globalScene.getPlayerParty()[slotIndex];
     if (target == null) {
       return false;
     }
-    const v2ProjectsAbilitySurface =
-      getCoopController()?.role === "guest"
-      && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability);
 
     let queued = true;
     if (modifierType instanceof TmModifierType) {
@@ -1256,8 +1498,66 @@ export class SelectModifierPhase extends BattlePhase {
    * @param playSound - Whether the 'obtain modifier' sound should be played when adding the modifier.
    */
   protected applyModifier(modifier: Modifier, cost = -1, playSound = false): boolean {
+    if (modifier instanceof EvolutionItemModifier) {
+      // A free reward consumes its parent and is allowed to enter wave N+1. Paid market applications retain
+      // the current shop, so they must not inherit that broader successor edge through an evolve-move picker.
+      modifier.coopAllowNextWaveStart = globalScene.gameMode.isCoop && cost === -1;
+      const operationId = this.coopPendingAuthorityOperationId;
+      if (
+        cost === -1
+        && operationId != null
+        && getCoopController()?.role === "host"
+        && isCoopV2InteractionCutoverActive(this.coopRewardOperationBinding?.durability)
+      ) {
+        this.coopPendingEvolutionSettlementOperationId = operationId;
+        modifier.coopRewardOperationId = operationId;
+        modifier.coopSettleRewardEvolution = (presentation, requiresLearnMoveDecision) => {
+          if (this.coopPendingEvolutionSettlementOperationId !== operationId) {
+            failCoopSharedSession(`Evolution reward ${operationId} lost its exact settlement owner`);
+            return false;
+          }
+          this.coopPendingEvolutionSettlementOperationId = null;
+          this.coopPendingAuthorityPresentation = structuredClone(presentation);
+          this.coopPendingAuthorityNextInteraction = requiresLearnMoveDecision
+            ? { kind: "learn-move", wave: this.coopRewardWave(), turn: this.coopRewardTurn() }
+            : undefined;
+          // Evolution is the action's real asynchronous terminal. Record that exact phase-owned proof
+          // before asking the authority log to reserve the result and its successor atomically; the live
+          // seam deliberately rejects a complete-looking post-image whose consumer has not yet settled.
+          this.coopProveV2RewardOperationComplete(operationId);
+          const committed = this.coopCommitPendingAuthorityResult(operationId);
+          if (committed) {
+            this.coopAdvanceInteraction();
+          }
+          return committed;
+        };
+      }
+    }
+    const formTarget =
+      modifier instanceof PokemonFormChangeItemModifier
+        ? globalScene.getPlayerParty().find(pokemon => pokemon.id === modifier.pokemonId)
+        : undefined;
+    const preFormIndex = formTarget?.formIndex;
     const result = globalScene.addModifier(modifier, false, playSound, undefined, undefined, cost);
     this.coopPendingAuthorityNextInteraction = result ? this.coopModifierFollowUp(modifier) : undefined;
+    this.coopPendingAuthorityPresentation = undefined;
+    if (result && formTarget != null && preFormIndex != null) {
+      const formChange = globalScene.resolvePokemonFormChange(formTarget, SpeciesFormChangeItemTrigger);
+      const targetFormIndex =
+        formChange == null ? -1 : formTarget.species.forms.findIndex(form => form.formKey === formChange.formKey);
+      if (targetFormIndex >= 0 && targetFormIndex !== preFormIndex) {
+        this.coopPendingAuthorityPresentation = {
+          k: "formChange",
+          bi: formTarget.getBattlerIndex(),
+          actor: { side: "player", pokemonId: formTarget.id },
+          speciesId: formTarget.species.speciesId,
+          preFormIndex,
+          formIndex: targetFormIndex,
+          presentation: "evolution",
+          animate: true,
+        };
+      }
+    }
     // Causal reward trace: record the exact generated identity + resolved holder and whether the engine
     // accepted it on EACH side. A type-id-only log cannot distinguish two BERRY variants, and the live
     // wave-15 divergence was exactly one host-only berry hidden behind shifted sorted modifier arrays.
@@ -1293,6 +1593,17 @@ export class SelectModifierPhase extends BattlePhase {
     const queuesContinuation = this.modifierQueuesContinuation(modifier.type);
     if (queuesContinuation) {
       globalScene.phaseManager.unshiftPhase(this.copy());
+    }
+
+    if (cost === -1 && result && this.freePicksRemaining > 1 && !queuesContinuation) {
+      this.freePicksRemaining--;
+      if (this.selectedRewardCursor >= 0 && this.selectedRewardCursor < this.typeOptions.length) {
+        this.typeOptions.splice(this.selectedRewardCursor, 1);
+      }
+      this.selectedRewardCursor = -1;
+      globalScene.ui.clearText();
+      this.resetModifierSelect(this.modifierSelectCallback ?? (() => false));
+      return true;
     }
 
     if (cost !== -1 && !(modifier.type instanceof RememberMoveModifierType)) {
@@ -1342,6 +1653,12 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopEndMirror();
       globalScene.ui.clearText();
       const finish = (): void => {
+        if (this.coopPendingEvolutionSettlementOperationId === operationId) {
+          // EvolutionPhase must run before the host result can exist. Retire this input owner without
+          // advancing the interaction; the exact async settlement callback commits and advances once.
+          this.coopEndOwningPhaseIfCurrent("deferred evolution reward settlement");
+          return;
+        }
         this.coopProveV2RewardOperationComplete(operationId);
         if (!this.coopCommitPendingAuthorityResult(operationId)) {
           return;
@@ -1465,6 +1782,50 @@ export class SelectModifierPhase extends BattlePhase {
     offerKey: string,
   ): void {
     const pokemonModifierType = modifierType as PokemonModifierType;
+    const partyRewardFixtureId = getCoopBrowserPartyRewardFixtureId();
+    if (
+      modifierType instanceof EvolutionItemModifierType
+      && (partyRewardFixtureId === "EVOLUTION_ITEM" || partyRewardFixtureId === "RARE_EVOLUTION_ITEM")
+    ) {
+      // Exact-build browser evidence for a fixture that must exercise the real production filter. Keep
+      // the diagnostic next to that filter so an invalid subject, item enum, form, or evolution edge is
+      // distinguishable from a co-op relay failure without granting the harness any game-state access.
+      console.info(
+        `[coop-browser:evolution-item-legality] ${JSON.stringify({
+          rewardId: partyRewardFixtureId,
+          modifierItem: modifierType.evolutionItem,
+          modifierItemName: EvolutionItem[modifierType.evolutionItem],
+          remainingRuntimeItemEdges: Object.entries(pokemonEvolutions).flatMap(([sourceSpeciesId, evolutions]) =>
+            evolutions
+              .filter(evolution => evolution.evoItem !== EvolutionItem.NONE)
+              .map(evolution => ({
+                sourceSpeciesId: Number(sourceSpeciesId),
+                targetSpeciesId: evolution.speciesId,
+                item: evolution.evoItem,
+                itemName: EvolutionItem[evolution.evoItem],
+                level: evolution.level,
+                preFormKey: evolution.preFormKey,
+                evoFormKey: evolution.evoFormKey,
+              })),
+          ),
+          party: globalScene.getPlayerParty().map(pokemon => ({
+            speciesId: pokemon.species.speciesId,
+            level: pokemon.level,
+            formKey: pokemon.getFormKey(),
+            filterResult: pokemonModifierType.selectFilter?.(pokemon) ?? null,
+            edges: (pokemonEvolutions[pokemon.species.speciesId] ?? []).map(evolution => ({
+              speciesId: evolution.speciesId,
+              level: evolution.level,
+              item: evolution.evoItem,
+              itemName: EvolutionItem[evolution.evoItem],
+              preFormKey: evolution.preFormKey,
+              validatesModifierItem: evolution.validate(pokemon, false, modifierType.evolutionItem),
+              validatesOwnItem: evolution.validate(pokemon, false, evolution.evoItem),
+            })),
+          })),
+        })}`,
+      );
+    }
     const isMoveModifier = modifierType instanceof PokemonMoveModifierType;
     const isAbilityModifier = modifierType instanceof PokemonAbilityModifierType;
     const isTmModifier = modifierType instanceof TmModifierType;
@@ -1533,7 +1894,7 @@ export class SelectModifierPhase extends BattlePhase {
 
   // Function that determines how many reward slots are available
   private getModifierCount(): number {
-    const modifierCountHolder = new NumberHolder(3);
+    const modifierCountHolder = new NumberHolder(this.baseOptionCount);
     globalScene.applyModifiers(ExtraModifierModifier, true, modifierCountHolder);
     globalScene.applyModifiers(TempExtraModifierModifier, true, modifierCountHolder);
 
@@ -1558,7 +1919,7 @@ export class SelectModifierPhase extends BattlePhase {
     // customModifierSettings reward (mystery encounters, the Bargain, fixed battles, LLM
     // victory bundles). Capture them before the override and re-add after (paired with
     // the fill change in getPlayerModifierTypeOptions so the extra slots are generated).
-    const earnedExtraRewards = Math.max(0, modifierCountHolder.value - 3);
+    const earnedExtraRewards = Math.max(0, modifierCountHolder.value - this.baseOptionCount);
 
     // If custom modifiers are specified, overrides default item count
     if (this.customModifierSettings) {
@@ -1580,6 +1941,13 @@ export class SelectModifierPhase extends BattlePhase {
   // Function that resets the reward selection screen,
   // e.g. after pressing cancel in the party ui or while learning a move
   protected resetModifierSelect(modifierSelectCallback: ModifierSelectCallback) {
+    // Sprint rewards can grant multiple free picks on one SelectModifierPhase. After
+    // pick one the UI is still in MODIFIER_SELECT, but its one-shot action callback
+    // has already been consumed. Clear that active handler so setMode's same-mode
+    // path rebuilds the remaining offers and rearms input instead of soft-locking.
+    if (globalScene.ui.getMode() === UiMode.MODIFIER_SELECT) {
+      globalScene.ui.getHandler().clear();
+    }
     void globalScene.ui
       .setMode(
         UiMode.MODIFIER_SELECT,
@@ -1592,6 +1960,10 @@ export class SelectModifierPhase extends BattlePhase {
         // The retained wave's DATA already landed in the queued BattleEndPhase. Record readiness only
         // after this real public shop handler has committed, never when a phase object is constructed.
         this.notifyCoopContinuationSurfaceReady();
+        // Relative cursor replay cannot repair a different account-local shopCursorTarget, nor the
+        // owner-only CHECK_TEAM child that leaves the watcher parked on the old top-level cursor.
+        // Once the real handler is actionable, publish its absolute cosmetic state in the same FIFO.
+        getCoopUiMirror()?.relayOwnerState(UiMode.MODIFIER_SELECT);
       });
   }
 
@@ -1665,12 +2037,19 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   getModifierTypeOptions(modifierCount: number): ModifierTypeOption[] {
-    return getPlayerModifierTypeOptions(
+    const rerollTierPolicy = resolveRewardRerollTierPolicy(
+      globalScene.lockModifierTiers,
+      this.rerollCount,
+      this.modifierTiers,
+    );
+    const options = getPlayerModifierTypeOptions(
       modifierCount,
       globalScene.getPlayerParty(),
-      globalScene.lockModifierTiers ? this.modifierTiers : undefined,
+      rerollTierPolicy.tiers,
       this.customModifierSettings,
+      rerollTierPolicy.allowLuckUpgrades,
     );
+    return this.rerollCount === 0 ? applyMoodyCoordinatorRewardOptions(options) : options;
   }
 
   /**
@@ -1741,6 +2120,9 @@ export class SelectModifierPhase extends BattlePhase {
       true,
       { kind: "inherited", address: this.coopSourceAddress },
       this.coopRewardSurface,
+      this.coopRewardPresentationGeneration,
+      this.baseOptionCount,
+      this.freePicksRemaining,
     );
     // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
     // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out
@@ -1831,6 +2213,7 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     this.coopPendingAuthorityNextInteraction = undefined;
+    this.coopPendingAuthorityPresentation = undefined;
     // Past the co-op + pinned-owner fence: this client OWNS this shop interaction and is the
     // relay source. Log the exact preparation (seq + label + choice + payload) so a retained result or
     // compatibility carrier can be matched against it in the captured log. Hot-ish (per reward action) -
@@ -2022,11 +2405,15 @@ export class SelectModifierPhase extends BattlePhase {
     if (operationId == null || !isCoopRewardRetainedResultMode(this.coopRewardOperationBinding)) {
       return true;
     }
+    if (this.coopPendingEvolutionSettlementOperationId === operationId) {
+      return false;
+    }
     if (getCoopController()?.role !== "host") {
       return false;
     }
     const committed = commitRewardAuthoritativeResult(operationId, undefined, this.coopRewardOperationBinding, {
       nextInteraction: this.coopPendingAuthorityNextInteraction,
+      presentation: this.coopPendingAuthorityPresentation,
       continuation: {
         surface: "reward",
         pinned: this.coopInteractionStart,
@@ -2045,6 +2432,8 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopPendingAuthorityOperationId = null;
     }
     this.coopPendingAuthorityNextInteraction = undefined;
+    this.coopPendingAuthorityPresentation = undefined;
+    this.coopPendingEvolutionSettlementOperationId = null;
     return true;
   }
 
@@ -2954,6 +3343,9 @@ export class SelectModifierPhase extends BattlePhase {
           false,
           { kind: "inherited", address: this.coopSourceAddress },
           this.coopRewardSurface,
+          0,
+          this.baseOptionCount,
+          this.freePicksRemaining,
         );
         globalScene.ui.clearText();
         const messageReady = this.coopOwningScene.ui.setMode(UiMode.MESSAGE);
@@ -3083,7 +3475,23 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopRelayedMoney = -1;
       if (projectionOnly) {
         this.coopResumeOwnerShopAfterProjection();
-        this.coopProveV2RewardOperationComplete(decision?.operationId);
+        const presentationReady = this.settleRelayedCheckPresentation(data[1], data.slice(2));
+        if (presentationReady == null) {
+          this.coopProveV2RewardOperationComplete(decision?.operationId);
+        } else {
+          // The immutable state has already installed the authoritative party permutation. The CHECK op
+          // still owns its visual projection: await the real battle atlas/info surface before acknowledging
+          // controlInstalled, otherwise the next action can retire this entry while one seat is blank.
+          void presentationReady.then(
+            () => this.coopResumeOnOwningRuntime(() => this.coopProveV2RewardOperationComplete(decision?.operationId)),
+            error =>
+              this.coopResumeOnOwningRuntime(() =>
+                failCoopSharedSession(
+                  `Check Team reorder could not project the authoritative watcher field: ${String(error)}`,
+                ),
+              ),
+          );
+        }
       } else {
         this.applyRelayedCheckOp(data[1], data.slice(2));
         this.coopProveV2RewardOperationComplete(decision?.operationId);
@@ -3121,7 +3529,24 @@ export class SelectModifierPhase extends BattlePhase {
     if (ultraNecrozmaModifiers.length > 0) {
       return ultraNecrozmaModifiers;
     }
-    if (mods.find(m => m.active)) {
+    const activeCalyriteModifiers = mods.filter(m => m.active && m.formChangeItem === FormChangeItem.CALYRITE);
+    if (activeCalyriteModifiers.length > 0) {
+      return activeCalyriteModifiers;
+    }
+    const activeCalyrexRider = mods.some(
+      m =>
+        m.active
+        && (m.formChangeItem === FormChangeItem.ICY_REINS_OF_UNITY
+          || m.formChangeItem === FormChangeItem.SHADOW_REINS_OF_UNITY),
+    );
+    if (activeCalyrexRider) {
+      mods = mods.filter(
+        m =>
+          m.active
+          || m.formChangeItem === FormChangeItem.CALYRITE
+          || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z,
+      );
+    } else if (mods.find(m => m.active)) {
       mods = mods.filter(m => m.active || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z);
     } else if (mon.species.speciesId === SpeciesId.NECROZMA) {
       mods = mods.filter(m => m.formChangeItem !== FormChangeItem.ULTRANECROZIUM_Z);
@@ -3143,6 +3568,9 @@ export class SelectModifierPhase extends BattlePhase {
         const [src, dst] = rest;
         if (src < party.length && dst < party.length) {
           [party[src], party[dst]] = [party[dst], party[src]];
+          void this.settleRelayedCheckPresentation(op, rest)?.catch(error => {
+            coopWarn("party", `WATCHER party-reorder presentation retained old field: ${String(error)}`);
+          });
         }
         return;
       }
@@ -3213,5 +3641,27 @@ export class SelectModifierPhase extends BattlePhase {
         return;
       }
     }
+  }
+
+  /** Project a relayed CHECK mutation whose authoritative DATA was already applied. */
+  private settleRelayedCheckPresentation(op: number, rest: number[]): Promise<number> | null {
+    if (op !== COOP_CHECK_OP_REORDER) {
+      return null;
+    }
+    const [src, dst] = rest;
+    const party = globalScene.getPlayerParty();
+    const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
+    if (
+      !Number.isSafeInteger(src)
+      || !Number.isSafeInteger(dst)
+      || src < 0
+      || dst < 0
+      || src >= party.length
+      || dst >= party.length
+      || (src >= fieldSize && dst >= fieldSize)
+    ) {
+      return null;
+    }
+    return settleCoopPartyReorderPresentationReady(globalScene, fieldSize);
   }
 }

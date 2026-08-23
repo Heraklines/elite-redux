@@ -635,7 +635,7 @@ export const REQUESTED_ABILITY_UPGRADES = [
     operation: "add",
     group: "status-control",
     requestedEffect:
-      "Affected targets use Struggle for one turn unless switched; Psychic, Dark, Superheavy, and Heavy Metal are immune.",
+      "The opposing lead uses Struggle for one turn unless switched; Psychic, Dark, Superheavy, and Heavy Metal are immune.",
   },
   {
     name: "Spiteful",

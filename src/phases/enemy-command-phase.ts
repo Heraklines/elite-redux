@@ -9,6 +9,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import { applyMoodyCoordinatorCommittedEnemyAction } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
@@ -19,7 +20,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
-import type { EnemyPokemon } from "#field/pokemon";
+import { type EnemyPokemon, withPokemonActiveAbilitySourceCache } from "#field/pokemon";
 import { FieldPhase } from "#phases/field-phase";
 
 /**
@@ -85,6 +86,12 @@ export class EnemyCommandPhase extends FieldPhase {
     // local perspective, so both peers await the opponent and apply that choice to their enemy side.
     if (isShowdownSyncSession() || (isVersusSession() && getCoopController()?.role === "host")) {
       void this.resolveVersusEnemyCommand();
+      return;
+    }
+
+    const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
+    if (enemyPokemon != null && applyMoodyCoordinatorCommittedEnemyAction(enemyPokemon, this.fieldIndex)) {
+      this.end();
       return;
     }
 
@@ -239,6 +246,12 @@ export class EnemyCommandPhase extends FieldPhase {
 
   /** Roll the enemy AI's command for this slot (the vanilla / co-op-host / disconnect-fallback path). */
   private resolveEnemyAiCommand(): void {
+    withPokemonActiveAbilitySourceCache(() => this.resolveEnemyAiCommandWithCachedAbilities());
+  }
+
+  /** Evaluate one immutable command decision without repeatedly rebuilding every battler's ability set. */
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: This is the existing complete enemy decision tree.
+  private resolveEnemyAiCommandWithCachedAbilities(): void {
     const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
 
     const battle = globalScene.currentBattle;
@@ -271,7 +284,12 @@ export class EnemyCommandPhase extends FieldPhase {
     if (trainer && enemyPokemon.getMoveQueue().length === 0) {
       const opponents = enemyPokemon.getOpponents();
 
-      if (!enemyPokemon.isTrapped()) {
+      // A trainer may voluntarily switch each active seat at most once in a row.
+      // Once that cap is reached, skip the expensive bench evaluation and fall
+      // through to getNextMove(), which performs the normal move + target AI
+      // calculation. Any attack below ends the consecutive-switch streak.
+      const consecutiveSwitchCap = battle.getBattlerCount();
+      if (!enemyPokemon.isTrapped() && battle.enemySwitchCounter < consecutiveSwitchCap) {
         // ER smarter AI (Elite/Hell): use the best-move matchup metric for both
         // the bench and the active mon, and a tuned (lower) switch threshold so
         // the AI swaps to a real counter more readily. Inactive -> vanilla.
@@ -331,7 +349,7 @@ export class EnemyCommandPhase extends FieldPhase {
       skip: this.skipTurn,
     };
 
-    globalScene.currentBattle.enemySwitchCounter = Math.max(globalScene.currentBattle.enemySwitchCounter - 1, 0);
+    globalScene.currentBattle.enemySwitchCounter = 0;
 
     this.end();
   }

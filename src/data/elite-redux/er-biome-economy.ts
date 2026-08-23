@@ -201,7 +201,7 @@ export const ER_SHOP_CATEGORY_POOL: Record<ErShopCategory, (keyof typeof modifie
   // redundant end-of-biome filler. Only the permanent PP upgrades remain.
   PP: ["PP_UP", "PP_MAX"],
   VITAMIN: ["BASE_STAT_BOOSTER"],
-  ARCANE: ["ABILITY_RANDOMIZER", "MOVE_SLOT_EXPANDER", "ER_OMNI_GEM"],
+  ARCANE: ["ABILITY_RANDOMIZER", "MOVE_RANDOMIZER", "MOVE_SLOT_EXPANDER", "ER_OMNI_GEM"],
   KEYSTONE: ["MEGA_BRACELET"],
 };
 
@@ -287,6 +287,7 @@ export const ER_SHOP_EXPLICIT_ITEM_TIER: Partial<Record<keyof typeof modifierTyp
   // the premium/rare items they are, instead of inheriting a noisy pool tier.
   MEGA_BRACELET: ModifierTier.ROGUE, // the mega key item: 1 in stock, big spend
   ABILITY_RANDOMIZER: ModifierTier.ROGUE,
+  MOVE_RANDOMIZER: ModifierTier.ULTRA,
   MOVE_SLOT_EXPANDER: ModifierTier.ROGUE,
   ER_OMNI_GEM: ModifierTier.ULTRA,
   BASE_STAT_BOOSTER: ModifierTier.ULTRA, // vitamins: permanent, 2 in stock

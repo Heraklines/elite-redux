@@ -13,7 +13,8 @@ export type EntryHazardTagType =
   | ArenaTagType.HOT_COALS
   | ArenaTagType.FOAMY_WEB
   | ArenaTagType.CREEPING_THORNS
-  | ArenaTagType.ER_INFESTATION_TRAP;
+  | ArenaTagType.ER_INFESTATION_TRAP
+  | ArenaTagType.ER_DRILL_BITS;
 
 /** Subset of {@linkcode ArenaTagType}s that create {@link https://bulbapedia.bulbagarden.net/wiki/Category:Screen-creating_moves | screens}. */
 export type ArenaScreenTagType = ArenaTagType.REFLECT | ArenaTagType.LIGHT_SCREEN | ArenaTagType.AURORA_VEIL;
@@ -30,7 +31,8 @@ export type RoomArenaTagType =
   | ArenaTagType.TRICK_ROOM
   | ArenaTagType.INVERSE_ROOM
   | ArenaTagType.MAGIC_ROOM
-  | ArenaTagType.WONDER_ROOM;
+  | ArenaTagType.WONDER_ROOM
+  | ArenaTagType.SWIRLY_ROOM;
 
 /** Subset of {@linkcode ArenaTagType}s that are **not** able to persist across turns, and should therefore not be serialized in {@linkcode SessionSaveData}. */
 export type NonSerializableArenaTagType = ArenaTagType.NONE | TurnProtectArenaTagType | ArenaTagType.ION_DELUGE;

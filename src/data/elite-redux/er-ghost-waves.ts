@@ -13,6 +13,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { Challenges } from "#enums/challenges";
 
 // Ghost-wave schedule. Chosen to avoid fixed battles (rivals 8/16/25/42/55/76/
@@ -35,9 +36,17 @@ const GHOST_WAVES: Readonly<Record<ErDifficulty, readonly number[]>> = {
   mystery: [63, 87, 113, 137, 163, 176, 178, 192, 193, 194, 196, 197, 199],
 };
 
+const SPRINT_GHOST_WAVES: Readonly<Record<ErDifficulty, readonly number[]>> = {
+  youngster: [],
+  ace: [],
+  elite: [44, 69, 79, 84, 96, 99],
+  hell: [34, 44, 54, 59, 69, 79, 84, 88, 89, 96, 97, 99],
+  mystery: [],
+};
+
 /** The ordered ghost waves for the current run's difficulty. */
 export function ghostWavesForCurrentRun(): readonly number[] {
-  return GHOST_WAVES[getErDifficulty()] ?? [];
+  return (isErSprintRun() ? SPRINT_GHOST_WAVES : GHOST_WAVES)[getErDifficulty()] ?? [];
 }
 
 /** Whether `waveIndex` is a ghost-trainer wave for the current difficulty. */

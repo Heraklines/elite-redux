@@ -4,6 +4,10 @@ import { globalScene } from "#app/global-scene";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { submitBugReport } from "#data/elite-redux/er-bug-report";
+import { isErEndlessContinuationActive } from "#data/elite-redux/er-endless-continuation";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getMoodyEnemyBoonLoadout } from "#data/elite-redux/moody/moody-enemy";
+import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { AdminMode, getAdminModeName } from "#enums/admin-mode";
 import { Button } from "#enums/buttons";
 import { GameDataType } from "#enums/game-data-type";
@@ -13,6 +17,7 @@ import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-s
 import type { AwaitableUiHandler } from "#ui/awaitable-ui-handler";
 import { BgmBar } from "#ui/bgm-bar";
 import { MessageUiHandler } from "#ui/message-ui-handler";
+import { getMoodyLivePresentationSnapshot } from "#ui/moody/moody-live-presentation";
 import { addTextObject, getTextStyleOptions } from "#ui/text";
 import { addWindow, WindowVariant } from "#ui/ui-theme";
 import { fixedInt, sessionIdKey } from "#utils/common";
@@ -32,6 +37,9 @@ enum MenuOptions {
   COMMUNITY,
   SAVE_AND_QUIT,
   LOG_OUT,
+  MOODY_LEDGER,
+  MOODY_ENEMY,
+  ENDLESS_RIFT_LEDGER,
   // Showdown 1v1 (D4): concede the duel. Appended LAST so excluding it (every non-showdown context)
   // never shifts another option's index, keeping the processInput adjustedCursor mapping intact.
   FORFEIT,
@@ -48,6 +56,8 @@ const erSourceUrl = "https://github.com/Heraklines/elite-redux";
 const isOauthConfigured = (value: string | undefined) => !!value && value !== "placeholder" && value !== "1234567890";
 
 export class MenuUiHandler extends MessageUiHandler {
+  private static readonly VISIBLE_MENU_ROWS = 9;
+
   private readonly textPadding = 8;
   private readonly defaultMessageBoxWidth = 220;
   private readonly defaultWordWrapWidth = 1224;
@@ -60,6 +70,10 @@ export class MenuUiHandler extends MessageUiHandler {
   protected optionSelectText: Phaser.GameObjects.Text;
 
   private cursorObj: Phaser.GameObjects.Image | null;
+  private menuScrollUpArrow: Phaser.GameObjects.Image | null = null;
+  private menuScrollDownArrow: Phaser.GameObjects.Image | null = null;
+  private menuScrollTop = 0;
+  private menuLabels: string[] = [];
 
   private excludedMenus: () => ConditionalMenu[];
   private menuOptions: MenuOptions[];
@@ -92,6 +106,12 @@ export class MenuUiHandler extends MessageUiHandler {
       // A unilateral save-and-title transition destroys only one side of a shared run. Co-op
       // persistence/resume must cross the two-player transaction boundary instead.
       { condition: globalScene.gameMode.isCoop, options: [MenuOptions.SAVE_AND_QUIT] },
+      {
+        condition: !(globalScene.gameMode.isFun && getFunModeConfig().moodyMode && getMoodyModeState() != null),
+        options: [MenuOptions.MOODY_LEDGER, MenuOptions.MOODY_ENEMY],
+      },
+      { condition: getMoodyEnemyBoonLoadout() == null, options: [MenuOptions.MOODY_ENEMY] },
+      { condition: !isErEndlessContinuationActive(), options: [MenuOptions.ENDLESS_RIFT_LEDGER] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -154,24 +174,35 @@ export class MenuUiHandler extends MessageUiHandler {
         condition: !(globalScene.gameMode.isShowdown && globalScene.currentBattle != null),
         options: [MenuOptions.FORFEIT],
       },
+      {
+        condition: !(globalScene.gameMode.isFun && getFunModeConfig().moodyMode && getMoodyModeState() != null),
+        options: [MenuOptions.MOODY_LEDGER, MenuOptions.MOODY_ENEMY],
+      },
+      { condition: getMoodyEnemyBoonLoadout() == null, options: [MenuOptions.MOODY_ENEMY] },
+      { condition: !isErEndlessContinuationActive(), options: [MenuOptions.ENDLESS_RIFT_LEDGER] },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
       return !this.excludedMenus().some(exclusion => exclusion.condition && exclusion.options.includes(m));
     });
 
+    this.menuLabels = this.menuOptions.map(o =>
+      o === MenuOptions.FORFEIT
+        ? i18next.t("menuUiHandler:forfeit", { defaultValue: "Forfeit" })
+        : o === MenuOptions.MOODY_LEDGER
+          ? "Moody Ledger"
+          : o === MenuOptions.MOODY_ENEMY
+            ? "Enemy Mood"
+            : o === MenuOptions.ENDLESS_RIFT_LEDGER
+              ? "Rift Ledger"
+              : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
+    );
     this.optionSelectText = addTextObject(
       0,
       0,
-      this.menuOptions
-        .map(o =>
-          o === MenuOptions.FORFEIT
-            ? i18next.t("menuUiHandler:forfeit", { defaultValue: "Forfeit" })
-            : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
-        )
-        .join("\n"),
+      this.menuLabels.join("\n"),
       TextStyle.WINDOW,
-      { maxLines: this.menuOptions.length },
+      { maxLines: MenuUiHandler.VISIBLE_MENU_ROWS },
     );
     this.optionSelectText.setLineSpacing(12);
 
@@ -185,10 +216,27 @@ export class MenuUiHandler extends MessageUiHandler {
     this.menuBg.setOrigin(0, 0);
 
     this.optionSelectText.setPositionRelative(this.menuBg, 10 + 24 * this.scale, 6);
+    this.optionSelectText.setText(this.menuLabels.slice(0, MenuUiHandler.VISIBLE_MENU_ROWS).join("\n"));
 
     this.menuContainer.add(this.menuBg);
 
     this.menuContainer.add(this.optionSelectText);
+
+    this.menuScrollUpArrow?.destroy();
+    this.menuScrollDownArrow?.destroy();
+    this.menuScrollUpArrow = globalScene.add
+      .image(this.menuBg.x + this.menuBg.width - 7, 8, "cursor")
+      .setScale(0.42)
+      .setAngle(-90)
+      .setAlpha(0.8)
+      .setVisible(false);
+    this.menuScrollDownArrow = globalScene.add
+      .image(this.menuBg.x + this.menuBg.width - 7, this.menuBg.height - 9, "cursor")
+      .setScale(0.42)
+      .setAngle(90)
+      .setAlpha(0.8)
+      .setVisible(false);
+    this.menuContainer.add([this.menuScrollUpArrow, this.menuScrollDownArrow]);
 
     ui.add(this.menuContainer);
 
@@ -581,6 +629,7 @@ export class MenuUiHandler extends MessageUiHandler {
     });
 
     this.menuContainer.setVisible(true);
+    this.menuScrollTop = 0;
     this.setCursor(0);
 
     this.getUi().moveTo(this.menuContainer, this.getUi().length - 1);
@@ -645,6 +694,33 @@ export class MenuUiHandler extends MessageUiHandler {
       // never affects the mapping of any other option).
       if (this.menuOptions[this.cursor] === MenuOptions.FORFEIT) {
         this.forfeitShowdown();
+        ui.playSelect();
+        return true;
+      }
+      if (this.menuOptions[this.cursor] === MenuOptions.MOODY_LEDGER) {
+        ui.setOverlayMode(UiMode.MOODY_LEDGER);
+        ui.playSelect();
+        return true;
+      }
+      if (this.menuOptions[this.cursor] === MenuOptions.MOODY_ENEMY) {
+        const loadout = getMoodyEnemyBoonLoadout();
+        if (loadout != null) {
+          const fogOfWar = getMoodyModeState()?.curses.some(curse => curse.curseId === "fog-of-war") === true;
+          ui.setOverlayMode(UiMode.MOODY_ENEMY_PANEL, {
+            boons: loadout.boons,
+            rosterSize: Math.max(1, globalScene.getEnemyParty().length),
+            hiddenReserves: true,
+            fogOfWar,
+            ...(getMoodyLivePresentationSnapshot()?.observedEnemyBoonInstanceIds == null
+              ? {}
+              : { observedInstanceIds: new Set(getMoodyLivePresentationSnapshot()!.observedEnemyBoonInstanceIds) }),
+          });
+          ui.playSelect();
+          return true;
+        }
+      }
+      if (this.menuOptions[this.cursor] === MenuOptions.ENDLESS_RIFT_LEDGER) {
+        ui.setOverlayMode(UiMode.ENDLESS_RIFT_LEDGER);
         ui.playSelect();
         return true;
       }
@@ -918,6 +994,25 @@ export class MenuUiHandler extends MessageUiHandler {
   setCursor(cursor: number): boolean {
     const ret = super.setCursor(cursor);
 
+    if (this.cursor < this.menuScrollTop) {
+      this.menuScrollTop = this.cursor;
+    } else if (this.cursor >= this.menuScrollTop + MenuUiHandler.VISIBLE_MENU_ROWS) {
+      this.menuScrollTop = this.cursor - MenuUiHandler.VISIBLE_MENU_ROWS + 1;
+    }
+    this.menuScrollTop = Math.max(
+      0,
+      Math.min(this.menuScrollTop, Math.max(0, this.menuOptions.length - MenuUiHandler.VISIBLE_MENU_ROWS)),
+    );
+    this.optionSelectText?.setText(
+      this.menuLabels
+        .slice(this.menuScrollTop, this.menuScrollTop + MenuUiHandler.VISIBLE_MENU_ROWS)
+        .join("\n"),
+    );
+    this.menuScrollUpArrow?.setVisible(this.menuScrollTop > 0);
+    this.menuScrollDownArrow?.setVisible(
+      this.menuScrollTop + MenuUiHandler.VISIBLE_MENU_ROWS < this.menuOptions.length,
+    );
+
     if (!this.cursorObj) {
       this.cursorObj = globalScene.add.image(0, 0, "cursor");
       this.cursorObj.setOrigin(0, 0);
@@ -925,7 +1020,11 @@ export class MenuUiHandler extends MessageUiHandler {
     }
 
     this.cursorObj.setScale(this.scale * 6);
-    this.cursorObj.setPositionRelative(this.menuBg, 7, 6 + (18 + this.cursor * 96) * this.scale);
+    this.cursorObj.setPositionRelative(
+      this.menuBg,
+      7,
+      6 + (18 + (this.cursor - this.menuScrollTop) * 96) * this.scale,
+    );
 
     return ret;
   }

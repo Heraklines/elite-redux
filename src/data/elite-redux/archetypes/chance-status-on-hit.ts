@@ -166,6 +166,12 @@ export interface ChanceStatusOnHitOptions {
    * independent rolls). Leave `effects` non-empty or provide at least one tag.
    */
   readonly tags?: readonly BattlerTagType[];
+  /**
+   * When true, offensive procs require the triggering attack to be a critical
+   * hit. The defensive variant ignores this option.
+   * @defaultValue `false`
+   */
+  readonly critRequired?: boolean;
 }
 
 /**
@@ -652,6 +658,7 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
   private readonly contactRequired: boolean;
   private readonly contactExcluded: boolean;
   private readonly filter: ChanceStatusFilter | undefined;
+  private readonly critRequired: boolean;
   // Status procs don't use a first-turn override; declared (always undefined)
   // so the shared chance-roll expression type-checks.
   private readonly firstTurnChance: number | undefined = undefined;
@@ -677,6 +684,7 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     this.contactExcluded = opts.contactExcluded ?? false;
     this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && !this.contactExcluded);
     this.filter = opts.filter;
+    this.critRequired = opts.critRequired ?? false;
   }
 
   /** The configured proc chance (0-100). */
@@ -724,6 +732,9 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
       return false;
     }
     if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
+      return false;
+    }
+    if (this.critRequired && !target.turnData?.attacksReceived?.[0]?.critical) {
       return false;
     }
     {

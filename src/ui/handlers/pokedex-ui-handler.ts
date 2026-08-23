@@ -778,7 +778,7 @@ export class PokedexUiHandler extends MessageUiHandler {
   initStarterPrefs(species: PokemonSpecies): StarterAttributes {
     const starterAttributes = this.starterPreferences[species.speciesId];
     const dexEntry = this.gameData.dexData[species.speciesId];
-    const starterData = this.gameData.starterData[species.speciesId];
+    const starterData = this.gameData.getStarterDataEntry(species.speciesId);
 
     // no preferences or Pokemon wasn't caught, return empty attribute (ER: a
     // custom species with no dex entry has nothing to restore — guard the read).
@@ -1505,13 +1505,10 @@ export class PokedexUiHandler extends MessageUiHandler {
         (this.gameData.dexData[species.speciesId]?.caughtAttr || BigInt(0))
         & (this.gameData.dexData[this.getStarterSpeciesId(species.speciesId)]?.caughtAttr || BigInt(0))
         & species.getFullUnlocksData();
-      const starterData = this.gameData.starterData[starterId];
-      // ER: some species (data gaps / non-starter custom forms like mega
-      // species) have no starterData; their downstream .passiveAttr/.eggMoves/
-      // .valueReduction reads would crash the whole Pokédex grid. Skip them.
-      if (!starterData) {
-        continue;
-      }
+      // Runtime-registered ER species can be added after the initial account
+      // starter-data table is built. Materialize their normal root entry here
+      // instead of silently omitting the species from the Pokédex grid.
+      const starterData = this.gameData.getStarterDataEntry(starterId);
       const isStarterProgressable = Object.hasOwn(speciesEggMoves, starterId);
 
       // Name filter

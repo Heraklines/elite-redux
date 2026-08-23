@@ -23,24 +23,38 @@ function party() {
   ];
 }
 
-function rigAt(wave, biomeId = 2, trainerVisible = false) {
+function rigAt(wave, biomeId = 2, trainerVisible = false, guestPresentation = null) {
   const records = [];
-  const observation = {
+  const baseObservation = {
     operationClass: "command",
     address: { epoch: 7, wave, turn: 1 },
     partySlots: party(),
     arena: { biomeId, weather: 0, terrain: 0 },
-    presentation: { trainerVisible },
+    presentation: {
+      trainerVisible,
+      enemyTrainerVisible: false,
+      enemyTrainerAlpha: 0,
+      enemyTrainerPresented: false,
+    },
     displayedWave: wave,
   };
-  const makeClient = label => ({
-    label,
-    evidence: {
-      events: [],
-      findLastSemanticSurface: () => ({ observation }),
-      record: (kind, detail) => records.push({ label, kind, detail }),
-    },
-  });
+  const makeClient = label => {
+    const observation =
+      label === "guest-seat" && guestPresentation != null
+        ? {
+            ...baseObservation,
+            presentation: { ...baseObservation.presentation, ...guestPresentation },
+          }
+        : baseObservation;
+    return {
+      label,
+      evidence: {
+        events: [],
+        findLastSemanticSurface: () => ({ observation }),
+        record: (kind, detail) => records.push({ label, kind, detail }),
+      },
+    };
+  };
   return { clients: { host: makeClient("host-seat"), guest: makeClient("guest-seat") }, records };
 }
 
@@ -68,6 +82,24 @@ test("navigation command frontier requires paired arena and trainer cleanup pari
   assert.deepEqual(frontier.arena, { biomeId: 8, weather: 0, terrain: 0 });
   assert.equal(frontier.presentation.trainerVisible, false);
   assert.equal(coverage.commandFrontiers.length, 1);
+});
+
+test("navigation command frontier compares rendered trainer presentation, not a transparent sprite's stale flag", () => {
+  const transparent = { commandFrontiers: [] };
+  const transparentRig = rigAt(5, 0, false, {
+    enemyTrainerVisible: true,
+    enemyTrainerAlpha: 0,
+    enemyTrainerPresented: false,
+  });
+  assert.doesNotThrow(() => recordNavigationCommandFrontier(transparentRig, transparent, 5));
+
+  const rendered = { commandFrontiers: [] };
+  const renderedRig = rigAt(5, 0, false, {
+    enemyTrainerVisible: true,
+    enemyTrainerAlpha: 1,
+    enemyTrainerPresented: true,
+  });
+  assert.throws(() => recordNavigationCommandFrontier(renderedRig, rendered, 5), /presentation diverged/u);
 });
 
 function completeCoverage() {
@@ -185,8 +217,8 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(starterHandler, /!options\.allowOverValueLimit && !this\.tryUpdateValue\(cost, true\)/u);
   assert.match(
     starterPhase,
-    /const navigationFixtureActive = isCoopBrowserNavigationFixtureActive\(\)[\s\S]*cost:\s*navigationFixtureActive\s*\?\s*0\s*:\s*globalScene\.gameData\.getSpeciesStarterValue\(s\.speciesId\)/u,
-    "the exact navigation fixture must survive the real co-op roster budget after visible starter confirmation",
+    /const navigationFixtureActive = isCoopBrowserNavigationFixtureActive\(\)[\s\S]*const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId\(\) != null[\s\S]*cost:\s*navigationFixtureActive \|\| partyRewardFixtureActive\s*\?\s*0\s*:\s*globalScene\.gameData\.getSpeciesStarterValue\(s\.speciesId\)/u,
+    "the exact navigation fixture must retain its roster-budget exemption when another exact fixture shares the envelope boundary",
   );
   assert.match(
     starterHandler,
@@ -207,7 +239,11 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(crossroads, /label: "Stay",\s*semanticId: "stay"/u);
   assert.match(crossroads, /label: "Leave",\s*semanticId: "leave"/u);
   assert.match(observer, /level: pokemon\.level/u);
-  assert.match(observer, /trainerVisible: globalScene\.trainer\?\.visible === true/u);
+  assert.match(observer, /function coopBrowserPresentationSnapshot\(\)/u);
+  assert.match(observer, /trainerVisible: playerTrainer\?\.visible === true/u);
+  assert.match(observer, /enemyTrainerVisible/u);
+  assert.match(observer, /enemyTrainerAlpha/u);
+  assert.match(observer, /enemyTrainerPresented/u);
   assert.match(workflow, /navigation-depth-30' && 240/u);
   assert.match(workflow, /COOP_UI_CAMPAIGN_HARD_TIMEOUT_MS:[^\n]*13800000/u);
   assert.match(workflow, /COOP_UI_REQUIRE_NAVIGATION_DEPTH:[^\n]*navigation-depth-30/u);
@@ -220,8 +256,8 @@ test("the journey is exact-build gated, initial-save only, four-hour bounded, an
   assert.match(campaign, /startHeartbeat\(\(\) => campaignLiveSnapshot/u);
   assert.match(
     campaign,
-    /cycleIndex: policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0 \? turn - 1 : 0/u,
-    "the navigation and market drivers must cycle the observer-proven coverage set across a real multi-turn battle",
+    /const cycleCampaignMoves =[\s\S]*policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0 \|\| policy\.mysteryGauntlet\.required;[\s\S]*cycleIndex: cycleCampaignMoves \? turn - 1 : 0/u,
+    "navigation, market, and Mystery drivers must cycle the observer-proven coverage set across a real multi-turn battle",
   );
   assert.match(
     campaign,

@@ -344,6 +344,32 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     ).toHaveLength(4);
   });
 
+  it("fails an unexpected authoritative encounter transaction through the shared terminal", () => {
+    const encounterSource = readFileSync(
+      join(__dirname, "..", "..", "..", "..", "src", "phases", "encounter-phase.ts"),
+      "utf8",
+    );
+    const catchStart = encounterSource.indexOf(
+      'coopWarn("launch", "encounter persistence/presentation transaction threw", error)',
+    );
+    const catchEnd = encounterSource.indexOf("private incrementMysteryEncounterChance", catchStart);
+    const transactionFailure = encounterSource.slice(catchStart, catchEnd);
+
+    expect(catchStart, "the persisted encounter transaction has an explicit failure boundary").toBeGreaterThanOrEqual(
+      0,
+    );
+    expect(transactionFailure, "an authoritative host notifies and closes both peers").toContain(
+      "failCoopSharedSession(",
+    );
+    expect(
+      transactionFailure.indexOf("failCoopSharedSession("),
+      "shared failure precedes the solo reset fallback",
+    ).toBeLessThan(transactionFailure.indexOf("globalScene.reset(true)"));
+    expect(transactionFailure, "the shared terminal path cannot fall through into a host-only reset").toContain(
+      "return;",
+    );
+  });
+
   it("routes turn and replacement publication through one all-or-nothing authority capture", () => {
     const root = join(__dirname, "..", "..", "..", "..", "src");
     const turnEnd = readFileSync(join(root, "phases", "coop-turn-commit-phase.ts"), "utf8");

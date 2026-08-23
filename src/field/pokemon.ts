@@ -1,4 +1,4 @@
-import type { PreAttackModifyDamageAbAttrParams } from "#abilities/ab-attrs";
+import type { PreDefendModifyDamageAbAttrParams } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import {
   applyAbAttrs,
@@ -17,11 +17,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import type { FORCED_RIVAL_SIGNATURE_MOVES } from "#balance/moves/signature-moves";
-import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import {
   FusionSpeciesFormEvolution,
   pokemonEvolutions,
   pokemonPrevolutions,
+  SpeciesFormEvolution,
   validateShedinjaEvo,
 } from "#balance/pokemon-evolutions";
 import { BASE_HIDDEN_ABILITY_RATE, BASE_SHINY_CHANCE, SHINY_EPIC_CHANCE, SHINY_VARIANT_CHANCE } from "#balance/rates";
@@ -35,7 +35,7 @@ import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
 import { EntryHazardTag, isMagicRoomActive, isWonderRoomActive, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
-import { fieldSpriteOffset } from "#data/battle-format";
+import { fieldSpriteOffset, fieldSpriteScale } from "#data/battle-format";
 import {
   AutotomizedTag,
   BattlerTag,
@@ -53,10 +53,17 @@ import {
   TarShotTag,
   TypeImmuneTag,
 } from "#data/battler-tags";
+import { getBerryEffectFunc } from "#data/berry";
 import { getDailyEventSeedBoss, isDailyForcedWaveHiddenAbility } from "#data/daily-seed/daily-run";
 import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { isDamageNullified } from "#data/damage-nullification";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { erBadSpliceOnLeaveField } from "#data/elite-redux/abilities/bad-splice";
+import {
+  hasMultiHeadedAttr,
+  isSwirlyRoomActive,
+  resolveSwirlyRoomCategory,
+} from "#data/elite-redux/abilities/barbaracle-mechanics";
 import { erFaultCurrentOnLeaveField, erOverloadedSelfLocked } from "#data/elite-redux/abilities/charge-stack";
 import { erApplyChivalry } from "#data/elite-redux/abilities/chivalry";
 import {
@@ -64,6 +71,13 @@ import {
   dualTypePrimeSecondType,
   dualTypeStabBonus,
 } from "#data/elite-redux/abilities/dual-type-move";
+import {
+  ER_ELECTRODYNAMICS_ABILITY_ID,
+  ER_SERFDOM_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+// biome-ignore lint/suspicious/noImportCycles: Battle hooks must run at the universal damage/typing chokepoints.
+import { applyBoobyTrapHealing } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
+import { isElectrodynamicsPosition, isRaichuTerrainGrounded } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import { erTryLastHost } from "#data/elite-redux/abilities/last-host";
 import { erLibraryCastIsSpecial, erLibraryDamageMultiplier } from "#data/elite-redux/abilities/library";
 import { erTryLifePreserver } from "#data/elite-redux/abilities/life-preserver";
@@ -83,7 +97,10 @@ import {
   erOmniformOriginalIdentity,
   resolveOmniformUnlockOwnerIdentity,
 } from "#data/elite-redux/abilities/omniform-registry";
-import { erShatteredPsycheOnLeaveField } from "#data/elite-redux/abilities/shattered-psyche";
+import {
+  erShatteredPsycheIsAbsorbed,
+  erShatteredPsycheOnLeaveField,
+} from "#data/elite-redux/abilities/shattered-psyche";
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import {
@@ -119,6 +136,24 @@ import { erBlackSpritePath, erBlackSpritePathFromBase } from "#data/elite-redux/
 import { erTryApplyOmniGem } from "#data/elite-redux/er-community-items";
 import { erTryApplyGem } from "#data/elite-redux/er-elemental-gems";
 import {
+  getErEndlessEnemyAvalancheCount,
+  getErEndlessPlayerAvalancheCount,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  isErEndlessRaidWave,
+  recordErEndlessGhostPlayerDamage,
+} from "#data/elite-redux/er-endless-continuation";
+import {
+  applyErEndlessCalculatedDamage,
+  applyErEndlessDirectDamage,
+  applyErEndlessHealing,
+  applyErEndlessTypeEffectiveness,
+  getErEndlessEffectiveTypes,
+  getErEndlessStatusStatMultiplier,
+  onErEndlessStatusInflicted,
+  queueErEndlessRaidReserve,
+} from "#data/elite-redux/er-endless-rift-runtime";
+import {
   chooseMoveIndex,
   damageToScore,
   ER_HAZARD_MOVE_IDS,
@@ -137,6 +172,26 @@ import {
 } from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
+  applyFunMegaStatDelta,
+  getFunEnemyMegaChance,
+  getFunMegaMixEffects,
+  getFunMegaStoneItems,
+  getFunRealMegaChoices,
+  isFunPseudoMegaActive,
+  shuffleFunStats,
+} from "#data/elite-redux/er-fun-mega-mode";
+import {
+  extendEndlessAbilityAvalancheIds,
+  getEndlessAbilityAvalancheIds,
+  getFunAbilityAvalancheIds,
+  getFunEvolutionTarget,
+  getFunModeConfig,
+  getFunRandomAbilityId,
+  getFunRandomLevelMoves,
+  getFunRandomTypes,
+  rollFunRandomSpecies,
+} from "#data/elite-redux/er-fun-mode";
+import {
   erBloodPactDealMultiplier,
   erBloodPactTakeMultiplier,
   erCapacitorElectricMultiplier,
@@ -147,12 +202,8 @@ import {
   erTwinLinkMultiplier,
 } from "#data/elite-redux/er-relics";
 import { applyErResistBerry } from "#data/elite-redux/er-resist-berries";
-import {
-  erYoungsterFreeInnateSlots,
-  getErDifficulty,
-  getErDifficultyShinyMultiplier,
-} from "#data/elite-redux/er-run-difficulty";
-import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
+import { erYoungsterFreeInnateSlots, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { applyErAtlasFrameRate } from "#data/elite-redux/er-sprite-anim";
 import {
@@ -175,6 +226,39 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
+import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
+import {
+  absorbMoodyFormationBarrier,
+  applyMoodyFormationLethalClamp,
+  notifyMoodyFormationStatusEffectCured,
+  shouldMoodyFormationPreventStatusEffect,
+  shouldMoodyFormationPreventVolatile,
+} from "#data/elite-redux/moody/moody-formation-game-adapter";
+import {
+  getMoodyRuntimeMoveTypeOverride,
+  notifyMoodyRuntimeDamageApplied,
+  notifyMoodyRuntimeHeal,
+  notifyMoodyRuntimeStatusApplied,
+  notifyMoodyRuntimeStatusCured,
+  notifyMoodyRuntimeVolatileApplied,
+  shouldMoodyRuntimePreventStatus,
+  shouldMoodyRuntimePreventVolatile,
+} from "#data/elite-redux/moody/moody-runtime-field-engine";
+import {
+  applyMoodyCoordinatorTypeEffectiveness,
+  getMoodyCoordinatorExtraAbilityIds,
+  getMoodyCoordinatorHpDebt,
+  getMoodyCoordinatorMaxHpMultiplier,
+  notifyMoodyCoordinatorBossSegmentBroken,
+  notifyMoodyCoordinatorHealingUsed,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import {
+  applyMoodyDamageCalculation,
+  getMoodyAccuracyMultiplier,
+  getMoodyHealingMultiplier,
+  getMoodyStatMultiplier,
+  grantMoodyItemSetHealingBarrier,
+} from "#data/elite-redux/moody/moody-scene-adapter";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -214,6 +298,7 @@ import { Challenges } from "#enums/challenges";
 import { DexAttr } from "#enums/dex-attr";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { FieldPosition } from "#enums/field-position";
+import type { FormChangeItem } from "#enums/form-change-item";
 import { HitResult } from "#enums/hit-result";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { MoveCategory } from "#enums/move-category";
@@ -238,7 +323,7 @@ import {
 } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
-import type { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import {
@@ -249,9 +334,9 @@ import {
   EnemyDamageReducerModifier,
   EnemyFusionChanceModifier,
   EvoTrackerModifier,
-  HiddenAbilityRateBoosterModifier,
   PokemonBaseStatFlatModifier,
   PokemonBaseStatTotalModifier,
+  PokemonFormChangeItemModifier,
   PokemonFriendshipBoosterModifier,
   PokemonHeldItemModifier,
   PokemonIncrementingStatModifier,
@@ -269,6 +354,8 @@ import { effectiveBattlerId, getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
+  getErShinyLabBattleFxFrameMs,
+  getErShinyLabBattleFxInitialDelayMs,
   getErShinyLabNamePrefixForPokemon,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpriteFxLookForPokemon,
@@ -325,7 +412,6 @@ import { cachedFetch } from "#utils/fetch-utils";
 import { isSlotActive } from "#utils/passive-utils";
 import { decodeNickname, getFusedSpeciesName, getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { inSpeedOrder } from "#utils/speed-order-generator";
-import { ValueHolder } from "#utils/value-holder";
 import { QuantizerCelebi } from "@material/material-color-utilities";
 import i18next from "i18next";
 import Phaser from "phaser";
@@ -336,7 +422,39 @@ export interface PokemonAbilitySource {
   readonly ability: Ability;
   readonly passive: boolean;
   readonly passiveSlot?: number;
+  /** Whether this source was added by post-clear Endless Ability Avalanche. */
+  readonly endlessAvalanche?: boolean;
 }
+
+type ActiveAbilitySourceCache = WeakMap<Pokemon, Map<boolean, readonly PokemonAbilitySource[]>>;
+
+/**
+ * Reuse active-ability resolution while a caller performs a read-only batch of
+ * combat simulations against one immutable field state. Damage previews ask the
+ * same battlers about their abilities many times; resolving every innate and
+ * every field-suppression gate again for each simulated target was the dominant
+ * double/triple-battle telemetry cost.
+ *
+ * The cache is deliberately scoped to the synchronous callback. Ordinary battle
+ * code never retains it across a state change, and nested preview batches share
+ * the outer scope.
+ */
+export function withPokemonActiveAbilitySourceCache<T>(read: () => T): T {
+  if (activeAbilitySourceCache) {
+    return read();
+  }
+  activeAbilitySourceCache = new WeakMap();
+  try {
+    return read();
+  } finally {
+    activeAbilitySourceCache = null;
+  }
+}
+
+let activeAbilitySourceCache: ActiveAbilitySourceCache | null = null;
+const funAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
+const endlessAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
+const endlessAvalancheAbilityIndexes = new WeakMap<Pokemon, Map<AbilityId, number>>();
 
 export abstract class Pokemon extends Phaser.GameObjects.Container {
   /**
@@ -453,6 +571,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   private tintSprite: Phaser.GameObjects.Sprite | null = null;
   private erShinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
   private erShinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
+  private erShinyLabFxPendingRefresh: Phaser.Time.TimerEvent | null = null;
 
   /**
    * The set of all TMs that have been used on this Pokémon
@@ -478,6 +597,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ivs?: number[],
     nature?: Nature,
     dataSource?: Pokemon | PokemonData,
+    trainerOwned = false,
   ) {
     super(globalScene, x, y);
 
@@ -580,7 +700,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
       if (level > 1) {
         const fused = new BooleanHolder(globalScene.gameMode.isSplicedOnly);
-        if (!fused.value && this.isEnemy() && !this.hasTrainer()) {
+        // EnemyPokemon.trainerSlot is assigned only after super() returns, so
+        // virtual hasTrainer() is necessarily false here. Use the constructor
+        // ownership hint to keep trainer/ghost teams out of wild fusion rolls.
+        if (!fused.value && this.isEnemy() && !trainerOwned) {
           globalScene.applyModifier(EnemyFusionChanceModifier, false, fused);
           // ER Laboratory (#439 §3): the experiment biome biases the WILD fusion
           // roll - ~half of wild encounters here come out as fusions. Only the
@@ -739,7 +862,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns Whether this Pokemon is allowed to partake in battle.
    */
   public isAllowedInBattle(): boolean {
-    return !this.isFainted() && this.isAllowedInChallenge();
+    return !this.isFainted() && !erShatteredPsycheIsAbsorbed(this) && this.isAllowedInChallenge();
   }
 
   /**
@@ -797,16 +920,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   /** Generate `abilityIndex` based on species and hidden ability if not pre-defined. */
   private generateAbilityIndex(): number {
-    const hiddenAbilityChance = new ValueHolder(BASE_HIDDEN_ABILITY_RATE);
-    // Ability Charms should only affect wild Pokemon
-    // TODO: move this `if` check into the ability charm code
-    if (!this.hasTrainer()) {
-      globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-    }
-
-    // Neither RNG roll depends on the outcome of the other, so that Ability Charms do not affect RNG.
     const regularAbility = this.species.ability2 === this.species.ability1 ? 0 : randSeedInt(2);
-    const useHiddenAbility = this.species.abilityHidden ? !randSeedInt(hiddenAbilityChance.value) : false;
+    const useHiddenAbility = this.species.abilityHidden ? !randSeedInt(BASE_HIDDEN_ABILITY_RATE) : false;
 
     return useHiddenAbility ? 2 : regularAbility;
   }
@@ -950,13 +1065,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     // Load the assets for the species form
     const formIndex = useIllusion ? illusion!.formIndex : this.formIndex;
+    const hasAuthoredBlackAtlas =
+      isErBlackShiny(this) && this.getBattleSpriteAtlasPath(false, ignoreOverride).startsWith("black/");
+    const speciesForm = this.getSpeciesForm(false, useIllusion);
     loadPromises.push(
-      this.getSpeciesForm(false, useIllusion).loadAssets(
-        this.getGender(useIllusion) === Gender.FEMALE,
-        formIndex,
-        this.isShiny(useIllusion),
-        this.getVariant(useIllusion),
-      ),
+      hasAuthoredBlackAtlas
+        ? speciesForm.loadNonSpriteAssets(formIndex)
+        : speciesForm.loadAssets(
+            this.getGender(useIllusion) === Gender.FEMALE,
+            formIndex,
+            this.isShiny(useIllusion),
+            this.getVariant(useIllusion),
+          ),
     );
 
     // Showdown 1v1 (C5): the versus GUEST's OWN team (authoritatively ENEMY instances) renders BACK
@@ -1530,6 +1650,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getSpriteScale(): number {
     const formKey = this.getFormKey();
+    const arrangement = globalScene?.currentBattle?.arrangement;
+    const capacity = arrangement ? (this.isPlayer() ? arrangement.playerCapacity : arrangement.enemyCapacity) : 1;
+    const layoutScale = fieldSpriteScale(this.species.speciesId, formKey, capacity);
     if (
       this.isMax() === true
       || formKey === "segin-starmobile"
@@ -1539,14 +1662,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       || formKey === "caph-starmobile"
     ) {
       // G-Max and starmobiles have flat 1.5x scale
-      return 1.5;
+      return 1.5 * layoutScale;
     }
 
     // TODO: Rather than using -1 as a default... why don't we just change it to 1????????
     if (this.customPokemonData.spriteScale <= 0) {
-      return 1;
+      return layoutScale;
     }
-    return this.customPokemonData.spriteScale;
+    return this.customPokemonData.spriteScale * layoutScale;
   }
 
   /** Resets the pokemon's field sprite properties, including position, alpha, and scale */
@@ -1629,16 +1752,42 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   playAnim(): void {
     if (this.tryPlaySprite(this.getSprite(), this.getTintSprite(), this.getBattleSpriteKey())) {
-      this.refreshErShinyLabBattleFx();
+      this.scheduleErShinyLabBattleFxRefresh();
     }
+  }
+
+  private scheduleErShinyLabBattleFxRefresh(): void {
+    const look = getErShinyLabSpriteFxLookForPokemon(this);
+    if (!hasErShinyLabExactSpriteFx(look)) {
+      this.refreshErShinyLabBattleFx();
+      return;
+    }
+    this.erShinyLabFxPendingRefresh?.remove();
+    const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 1;
+    const delay = getErShinyLabBattleFxInitialDelayMs(battlerCount, this.getBattlerIndex());
+    if (delay <= 0) {
+      this.erShinyLabFxPendingRefresh = null;
+      this.refreshErShinyLabBattleFx();
+      return;
+    }
+    this.erShinyLabFxPendingRefresh = globalScene.time.delayedCall(fixedInt(delay), () => {
+      this.erShinyLabFxPendingRefresh = null;
+      if (this.active && this.visible && this.isOnField()) {
+        this.refreshErShinyLabBattleFx();
+      }
+    });
   }
 
   private startErShinyLabBattleFxTimer(): void {
     if (this.erShinyLabFxTimer) {
       return;
     }
+    const sourceFrameMs = getErShinyLabBattleFxFrameMs(
+      globalScene.currentBattle?.getBattlerCount() ?? 1,
+      isErBlackShiny(this),
+    );
     this.erShinyLabFxTimer = globalScene.time.addEvent({
-      delay: 100,
+      delay: fixedInt(sourceFrameMs),
       loop: true,
       callback: () => {
         if (!this.active || !this.visible || !this.isOnField()) {
@@ -1652,6 +1801,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   private stopErShinyLabBattleFxTimer(): void {
     this.erShinyLabFxTimer?.remove();
     this.erShinyLabFxTimer = null;
+    this.erShinyLabFxPendingRefresh?.remove();
+    this.erShinyLabFxPendingRefresh = null;
   }
 
   private restoreErShinyLabTintSprite(): void {
@@ -1689,7 +1840,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       ...getErShinyLabPokemonBattleSource(this, this.isPlayer(), undefined, look),
       frame: this.getSprite().frame?.name,
     };
-    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime())) {
+    const effectFrameMs = getErShinyLabBattleFxFrameMs(globalScene.currentBattle?.getBattlerCount() ?? 1);
+    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime(effectFrameMs, 4_000))) {
       this.erShinyLabFxOverlay.copyTextureTo(this.tintSprite);
       this.getSprite().setVisible(false);
       this.startErShinyLabBattleFxTimer();
@@ -1825,11 +1977,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The numeric value of the desired {@linkcode Stat}.
    */
   getStat(stat: PermanentStat, bypassSummonData = true): number {
-    if (!bypassSummonData) {
-      // 0 = no override
-      return this.summonData.stats[stat] || this.stats[stat];
-    }
-    return this.stats[stat];
+    const rawStat = bypassSummonData ? this.stats[stat] : this.summonData.stats[stat] || this.stats[stat];
+    return Math.max(
+      1,
+      Math.floor(rawStat * getMoodyStatMultiplier(this, stat) * getErEndlessStatusStatMultiplier(this, stat)),
+    );
   }
 
   /**
@@ -1907,6 +2059,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
     critStage.value += fieldCritBonus;
+    const jackpotSides = (globalScene.currentBattle as unknown as { erJackpotSides?: Set<boolean> } | undefined)
+      ?.erJackpotSides;
+    if (jackpotSides?.has(source.isPlayer())) {
+      critStage.value += 1;
+    }
 
     // ER Pretentious: the attacker's accumulated KO crit-stacks. Scanned by name.
     for (const attr of source.getAllActiveAbilityAttrs()) {
@@ -1935,7 +2092,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   getMoveCategory(target: Pokemon, move: Move): MoveCategory {
     const moveCategory = new NumberHolder(move.category);
     applyMoveAttrs("VariableMoveCategoryAttr", this, target, move, moveCategory);
-    return moveCategory.value;
+    return resolveSwirlyRoomCategory(moveCategory.value as MoveCategory, isSwirlyRoomActive());
   }
 
   /**
@@ -2158,8 +2315,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
   }
 
-  calculateBaseStats(): number[] {
-    const baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+  calculateBaseStats(includeVitamins = true): number[] {
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    let baseStats = this.getSpeciesForm(true).baseStats.slice(0);
+    if (this.isFunPseudoMega() && funMegaStone != null) {
+      baseStats = applyFunMegaStatDelta(baseStats, funMegaStone);
+    }
+    if (getFunModeConfig().shuffleStats) {
+      baseStats = shuffleFunStats(baseStats, this.id, this.isMega() ? funMegaStone : undefined);
+    }
     applyChallenges(ChallengeType.FLIP_STAT, this, baseStats);
     // Shuckle Juice
     globalScene.applyModifiers(PokemonBaseStatTotalModifier, this.isPlayer(), this, baseStats);
@@ -2177,8 +2341,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         baseStats[s] = Math.ceil(baseStats[s] / 2);
       }
     }
-    // Vitamins
-    globalScene.applyModifiers(BaseStatModifier, this.isPlayer(), this, baseStats);
+    if (includeVitamins) {
+      globalScene.applyModifiers(BaseStatModifier, this.isPlayer(), this, baseStats);
+    }
 
     // ER Bog Witch curse (#508): a permanent "anti-vitamin" - one base stat is
     // cut 10% until the curse is lifted at the Cleansing Font. -1 = uncursed.
@@ -2225,7 +2390,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   // TODO: Convert this into a getter
   getMaxHp(): number {
-    return this.getStat(Stat.HP);
+    return Math.max(
+      1,
+      Math.floor(this.getStat(Stat.HP) * getMoodyCoordinatorMaxHpMultiplier(this)) - getMoodyCoordinatorHpDebt(this.id),
+    );
   }
 
   /** Returns the amount of hp currently missing from this {@linkcode Pokemon} (max - current) */
@@ -2370,7 +2538,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (globalScene.gameMode.isCoop && this.customPokemonData?.coopLuck != null) {
       return this.customPokemonData.coopLuck;
     }
-    const base = this.luck + (this.isFusion() ? this.fusionLuck : 0);
+    const jackpotLuck = (this.waveData as unknown as { erJackpotLuck?: boolean }).erJackpotLuck ? 1 : 0;
+    const base = this.luck + (this.isFusion() ? this.fusionLuck : 0) + jackpotLuck;
     // ER (#432): a Black Shiny is the rarest shiny tier and grants a flat
     // Luck 5 (a regular shiny caps at 3). DERIVED here, never stored - the
     // save keeps its ordinary variant/luck fields untouched, so this is
@@ -2464,7 +2633,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * and the fight/summary UIs in place of a hardcoded `4`.
    */
   public getMaxMoveCount(): number {
-    return 4 + (this.customPokemonData?.bonusMoveSlots ?? 0);
+    const permanentSlots = this.customPokemonData?.bonusMoveSlots ?? 0;
+    const pentaPunchSlot = this.getAllActiveAbilityAttrs().some(
+      attr => attr.constructor.name === "PentaPunchMarkerAbAttr",
+    )
+      ? 1
+      : 0;
+    return 4 + Math.max(permanentSlots, pentaPunchSlot);
   }
 
   /**
@@ -2568,7 +2743,28 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return [teraType];
     }
 
-    const types = new Set(this.getBaseTypes(ignoreOverride, useIllusion));
+    const baseTypes = this.getBaseTypes(ignoreOverride, useIllusion);
+    const shouldUseRandomTypes =
+      globalScene.gameMode.isFun
+      && getFunModeConfig().randomizeTypes
+      && (ignoreOverride || this.summonData.types.length === 0);
+    let types = new Set(shouldUseRandomTypes ? getFunRandomTypes(this.id, baseTypes) : baseTypes);
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    if (
+      globalScene.gameMode.isFun
+      && getFunModeConfig().megaMixMode
+      && funMegaStone != null
+      && this.isFunPseudoMega()
+    ) {
+      const mixEffects = getFunMegaMixEffects(funMegaStone, [...types]);
+      if (mixEffects?.addedType != null) {
+        types.add(mixEffects.addedType);
+      }
+    }
+
+    if (isErEndlessContinuationActive()) {
+      types = new Set(getErEndlessEffectiveTypes(this, [...types]));
+    }
 
     // become UNKNOWN if no types are present, or remove it if other types are present.
     // TODO: Move this after the added type checks once Roost is refactored to check removed types correctly
@@ -2701,6 +2897,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         return allAbilities[eventBoss.ability];
       }
     }
+    if (globalScene.gameMode.isFun) {
+      const randomized = getFunRandomAbilityId(this.id, this.abilityIndex);
+      if (randomized != null) {
+        return allAbilities[randomized];
+      }
+    }
     let abilityId = this.getSpeciesForm(ignoreOverride).getAbility(this.abilityIndex);
     if (abilityId === AbilityId.NONE) {
       abilityId = this.species.ability1;
@@ -2742,6 +2944,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const eventBoss = getDailyEventSeedBoss();
       if (eventBoss?.passive != null) {
         return allAbilities[eventBoss.passive];
+      }
+    }
+
+    if (globalScene.gameMode.isFun) {
+      const randomized = getFunRandomAbilityId(this.id, 3);
+      if (randomized != null) {
+        return allAbilities[randomized];
       }
     }
 
@@ -2790,7 +2999,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
-    const derivedIds = this.resolveDerivedPassiveIds();
+    let derivedIds = this.resolveDerivedPassiveIds();
+    if (globalScene.gameMode.isFun && getFunModeConfig().randomizeAbilities) {
+      derivedIds = derivedIds.map((abilityId, slot) => {
+        if (abilityId === AbilityId.NONE) {
+          return AbilityId.NONE;
+        }
+        return getFunRandomAbilityId(this.id, slot + 3) ?? abilityId;
+      }) as [AbilityId, AbilityId, AbilityId];
+    }
 
     if (slot0 === null) {
       slot0 = derivedIds[0] === AbilityId.NONE ? null : allAbilities[derivedIds[0]];
@@ -2803,7 +3020,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const customSlot1 = this.getAbilityOverrideForSlot(2);
     const customSlot2 = this.getAbilityOverrideForSlot(3);
     const slot1Id = customSlot1 ?? transformOverride?.[1] ?? derivedIds[1];
-    const slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
+    let slot2Id = customSlot2 ?? transformOverride?.[2] ?? derivedIds[2];
+    const funMegaStone = this.customPokemonData.erFunMegaStone;
+    const mixEffects =
+      globalScene.gameMode.isFun && getFunModeConfig().megaMixMode && funMegaStone != null && this.isFunPseudoMega()
+        ? getFunMegaMixEffects(funMegaStone)
+        : null;
+    if (mixEffects != null) {
+      if (transformOverride?.[0] == null) {
+        slot0 = mixEffects.innate1 === AbilityId.NONE ? null : allAbilities[mixEffects.innate1];
+      }
+      if (transformOverride?.[2] == null) {
+        slot2Id = mixEffects.innate3;
+      }
+    }
     if (transformOverride?.[0] != null) {
       slot0 = transformOverride[0] === AbilityId.NONE ? null : allAbilities[transformOverride[0]];
     }
@@ -2812,14 +3042,81 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       slot1Id === AbilityId.NONE ? null : allAbilities[slot1Id],
       slot2Id === AbilityId.NONE ? null : allAbilities[slot2Id],
     ];
+    const presentIds = new Set(slots.flatMap(ability => (ability ? [ability.id] : [])));
+    const appendUniqueAbility = (ability: Ability | null | undefined): boolean => {
+      if (!ability || presentIds.has(ability.id)) {
+        return false;
+      }
+      slots.push(ability);
+      presentIds.add(ability.id);
+      return true;
+    };
+    const legacyTemporaryPassiveId = this.summonData.passiveAbility;
+    if (legacyTemporaryPassiveId != null) {
+      const temporary = allAbilities[legacyTemporaryPassiveId];
+      appendUniqueAbility(temporary);
+    }
+    for (const abilityId of getMoodyCoordinatorExtraAbilityIds(this.id)) {
+      appendUniqueAbility(allAbilities[abilityId]);
+    }
+    if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
+      const excludedIds = [this.getAbility().id, ...presentIds];
+      const avalancheIds = new Set<AbilityId>();
+      for (const avalancheId of getFunAbilityAvalancheIds(
+        this.id,
+        globalScene.currentBattle?.waveIndex ?? 1,
+        excludedIds,
+      )) {
+        const avalancheAbility = allAbilities[avalancheId];
+        if (appendUniqueAbility(avalancheAbility)) {
+          avalancheIds.add(avalancheId);
+        }
+      }
+      funAvalancheAbilityIds.set(this, avalancheIds);
+    } else {
+      funAvalancheAbilityIds.delete(this);
+    }
+    if (isErEndlessContinuationActive()) {
+      const excludedIds = [this.getAbility().id, ...presentIds];
+      const wave = globalScene.currentBattle?.waveIndex ?? 1;
+      const count = this.isPlayer() ? getErEndlessPlayerAvalancheCount(wave) : getErEndlessEnemyAvalancheCount(wave);
+      const avalancheIds = new Set<AbilityId>();
+      const avalancheIndexes = new Map<AbilityId, number>();
+      const canonicalIds = extendEndlessAbilityAvalancheIds(
+        this.id,
+        count,
+        this.customPokemonData.erEndlessAvalancheAbilities,
+        excludedIds,
+      );
+      if (
+        canonicalIds.length !== this.customPokemonData.erEndlessAvalancheAbilities.length
+        || canonicalIds.some(
+          (abilityId, index) => abilityId !== this.customPokemonData.erEndlessAvalancheAbilities[index],
+        )
+      ) {
+        this.customPokemonData.erEndlessAvalancheAbilities = canonicalIds;
+      }
+      const activeIds = hasErEndlessRift("avalanche-reroll")
+        ? getEndlessAbilityAvalancheIds(this.id, count, excludedIds, Math.imul(wave, 0x45d9f3b))
+        : canonicalIds.slice(0, count);
+      for (const avalancheId of activeIds) {
+        const avalancheAbility = allAbilities[avalancheId];
+        if (appendUniqueAbility(avalancheAbility)) {
+          avalancheIndexes.set(avalancheId, avalancheIndexes.size);
+          avalancheIds.add(avalancheId);
+        }
+      }
+      endlessAvalancheAbilityIds.set(this, avalancheIds);
+      endlessAvalancheAbilityIndexes.set(this, avalancheIndexes);
+    } else {
+      endlessAvalancheAbilityIds.delete(this);
+      endlessAvalancheAbilityIndexes.delete(this);
+    }
     // ER Black Shinies (#349): append the active GIFT abilities — this mon's
     // own gift plus any on-field black-shiny ally's gift. Flowing them through
     // the passive list makes combat + every abilities screen pick them up.
     for (const giftId of getErSharedGiftAbilityIdsFor(this)) {
-      const gift = allAbilities[giftId];
-      if (gift && !slots.some(a => a?.id === gift.id)) {
-        slots.push(gift);
-      }
+      appendUniqueAbility(allAbilities[giftId]);
     }
     return slots;
   }
@@ -2833,31 +3130,42 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const sources: PokemonAbilitySource[] = [];
     const seenIds = new Set<AbilityId>();
     const active = this.getAbility(ignoreOverride);
-    if (!activeOnly || this.canApplyAbility(false, 0, ignoreFaint, ignoreMentalPollution)) {
+    if (!activeOnly || this.canApplyAbilitySource(active, false, 0, ignoreFaint, ignoreMentalPollution)) {
       seenIds.add(active.id);
       sources.push({ ability: active, passive: false });
     }
 
     const passiveAbilities = this.getPassiveAbilities();
+    const endlessIds = endlessAvalancheAbilityIds.get(this);
+    const endlessIndexes = endlessAvalancheAbilityIndexes.get(this);
+    const rotatingAvalanche = hasErEndlessRift("rotating-avalanche");
+    const activeAvalancheGroup = Math.max(0, (globalScene.currentBattle?.turn ?? 1) - 1) % 4;
     const enemySlotLimit = getEnemyPassiveSlotLimit(this);
     for (let slot = 0; slot < passiveAbilities.length; slot++) {
       const ability = passiveAbilities[slot];
       if (!ability) {
         continue;
       }
-      const isGiftSlot = slot >= 3;
+      const isEndlessAvalanche = endlessIds?.has(ability.id) === true;
+      if (rotatingAvalanche && isEndlessAvalanche) {
+        const avalancheIndex = endlessIndexes?.get(ability.id) ?? -1;
+        if (avalancheIndex < 0 || avalancheIndex % 4 !== activeAvalancheGroup) {
+          continue;
+        }
+      }
+      const isAlwaysOnExtraSlot = slot >= 3;
       const isFormChangeDriver = this.abilityDrivesFormChange(ability);
-      if (!isGiftSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
+      if (!isAlwaysOnExtraSlot && slot >= enemySlotLimit && !isFormChangeDriver) {
         continue;
       }
-      if (activeOnly && !this.canApplyAbility(true, slot, ignoreFaint, ignoreMentalPollution)) {
+      if (activeOnly && !this.canApplyAbilitySource(ability, true, slot, ignoreFaint, ignoreMentalPollution)) {
         continue;
       }
       if (seenIds.has(ability.id)) {
         continue;
       }
       seenIds.add(ability.id);
-      sources.push({ ability, passive: true, passiveSlot: slot });
+      sources.push({ ability, passive: true, passiveSlot: slot, endlessAvalanche: isEndlessAvalanche });
     }
 
     return sources;
@@ -2877,7 +3185,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * and unlock gates so a disabled earlier slot cannot mask a later duplicate.
    */
   public getActiveAbilitySources(ignoreOverride = false): readonly PokemonAbilitySource[] {
-    return this.collectAbilitySources(ignoreOverride, true);
+    const cached = activeAbilitySourceCache?.get(this)?.get(ignoreOverride);
+    if (cached) {
+      return cached;
+    }
+    const sources = this.collectAbilitySources(ignoreOverride, true);
+    if (activeAbilitySourceCache) {
+      let byOverride = activeAbilitySourceCache.get(this);
+      if (!byOverride) {
+        byOverride = new Map();
+        activeAbilitySourceCache.set(this, byOverride);
+      }
+      byOverride.set(ignoreOverride, sources);
+    }
+    return sources;
   }
 
   /**
@@ -3005,6 +3326,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return this.getActiveAbilitySources().flatMap(source => source.ability.attrs);
   }
 
+  public isEndlessAvalancheAbility(abilityId: AbilityId): boolean {
+    this.getPassiveAbilities();
+    return endlessAvalancheAbilityIds.get(this)?.has(abilityId) === true;
+  }
+
+  /** Runtime-added Ability Avalanche sources from Fun Mode or Endless. */
+  public getAvalancheAbilityIds(): ReadonlySet<AbilityId> {
+    this.getPassiveAbilities();
+    return new Set([...(funAvalancheAbilityIds.get(this) ?? []), ...(endlessAvalancheAbilityIds.get(this) ?? [])]);
+  }
+
   /**
    * Set this Pokémon's temporary ability, activating it if it normally activates on summon
    *
@@ -3059,12 +3391,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /** Mark the Pokémon's ability as revealed. */
-  public revealAbility(passive = false, passiveSlot = 0): void {
+  public revealAbility(passive = false, passiveSlot = 0, resolvedAbilityId?: AbilityId): void {
     this.waveData.abilityRevealed = true;
-    const ability = passive ? this.getPassiveAbilities()[passiveSlot] : this.getAbility();
-    if (ability) {
+    const abilityId =
+      resolvedAbilityId ?? (passive ? this.getPassiveAbilities()[passiveSlot]?.id : this.getAbility().id);
+    if (abilityId != null) {
       const source = passive ? (passiveSlot >= 3 ? "gift" : "innate") : "active";
-      this.waveData.revealedAbilityKeys.add(`${source}:${passive ? passiveSlot : -1}:${ability.id}`);
+      this.waveData.revealedAbilityKeys.add(`${source}:${passive ? passiveSlot : -1}:${abilityId}`);
     }
   }
 
@@ -3302,6 +3635,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ability) {
       return false;
     }
+    return this.canApplyAbilitySource(ability, passive, passiveSlot, ignoreFaint, ignoreMentalPollution);
+  }
+
+  /** Apply the normal eligibility gates to an ability already resolved by the caller. */
+  public canApplyAbilitySource(
+    ability: Ability,
+    passive: boolean,
+    passiveSlot: number,
+    ignoreFaint: boolean,
+    ignoreMentalPollution: boolean,
+  ): boolean {
     // ER Giratina's Bargain - Curiosity (#544): a slot the player LOCKED via the
     // Curiosity gamble is dead for the rest of the run. The ER ability-slot index
     // is 0 for the active ability and `passiveSlot + 1` for an innate slot
@@ -3320,18 +3664,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // (Battle Bond is deliberately EXCLUDED from that exemption — it is a power
     // spike, not passive identity, so a locked Battle Bond innate does nothing.)
     const drivesFormChange = passive && this.abilityDrivesFormChange(ability);
-    // ER Black Shinies (#349): the GIFT slot (>= 3) is exempt from hasPassive
-    // and from candy unlock gates — it is always live (suppression below still
-    // applies, so Neutralizing Gas / ER Frisk affect it like any ability).
-    const isGiftSlot = passive && passiveSlot >= 3;
-    if (passive && !isGiftSlot && !this.hasPassive() && !drivesFormChange) {
+    // Runtime-added slots (Ability Avalanche and Black Shiny gifts) are exempt
+    // from base-innate unlock gates, but still respect ability suppression.
+    const isAlwaysOnExtraSlot = passive && passiveSlot >= 3;
+    if (passive && !isAlwaysOnExtraSlot && !this.hasPassive() && !drivesFormChange) {
       return false;
     }
     // ER 3-passive model: gate each innate slot individually for the player by its
     // candy unlock + enable state. Skipped when a passive override forces passives
     // on (tests/dev) or the slot drives a form change. Enemy slot gating is by
     // level, applied in applyAbAttrsInternal.
-    if (passive && !isGiftSlot && this.isPlayer() && !drivesFormChange) {
+    if (passive && !isAlwaysOnExtraSlot && this.isPlayer() && !drivesFormChange) {
       const overridden =
         Overrides.HAS_PASSIVE_ABILITY_OVERRIDE === true || Overrides.PASSIVE_ABILITY_OVERRIDE !== AbilityId.NONE;
       if (!overridden) {
@@ -3369,6 +3712,21 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
     if (isSuppressedByRequestedFieldAbility(this, ability.id)) {
+      return false;
+    }
+    if (
+      this.getMoveset().some(move => move.getMove().type === PokemonType.DARK)
+      && globalScene
+        .getField(true)
+        .some(
+          holder =>
+            holder !== this
+            && !holder.isFainted()
+            && holder
+              .getAbilitySources()
+              .some(source => source.ability.id === (FAKEMON_PITCH_RUNTIME_ABILITY_IDS.DEADLY_SENTENCING as AbilityId)),
+        )
+    ) {
       return false;
     }
     if (this.isTransformed() && ability.hasAttr("NoTransformAbilityAbAttr")) {
@@ -3501,9 +3859,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * requested suppression, and ability conditions remain authoritative.
    */
   private hasActiveMentalPollution(): boolean {
-    return this.collectAbilitySources(false, true, false, true).some(source =>
-      source.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
+    const source = this.collectAbilitySources(false, false).find(candidate =>
+      candidate.ability.hasAttr("SuppressFieldAbilitiesWhenEnragedAbAttr"),
     );
+    return source
+      ? this.canApplyAbilitySource(source.ability, source.passive, source.passiveSlot ?? 0, false, true)
+      : false;
   }
 
   /** Return post-summon priorities for every currently active ability source. */
@@ -3571,12 +3932,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
     return (
-      !!this.getTag(GroundedTag)
-      || (!this.isOfType(PokemonType.FLYING, true, true)
-        && !this.hasAbility(AbilityId.LEVITATE) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
-        && !this.hasAbilityWithAttr("FloatAbAttr")
-        && !this.getTag(BattlerTagType.FLOATING)
-        && !this.getTag(SemiInvulnerableTag))
+      !isElectrodynamicsPosition(this)
+      && (!!this.getTag(GroundedTag)
+        || (!this.isOfType(PokemonType.FLYING, true, true)
+          && !this.hasAbility(AbilityId.LEVITATE) // Elite Redux: `FloatAbAttr` (Hover, Fey Flight, …) ungrounds like Levitate.
+          && !this.hasAbilityWithAttr("FloatAbAttr")
+          && !this.getTag(BattlerTagType.FLOATING)
+          && !this.getTag(SemiInvulnerableTag)))
     );
   }
 
@@ -3667,7 +4029,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       && (move.id === MoveId.TERA_BLAST
         || (move.id === MoveId.TERA_STARSTORM && moveTypeHolder.value === PokemonType.STELLAR))
     ) {
-      return moveTypeHolder.value as PokemonType;
+      return getMoodyRuntimeMoveTypeOverride(this, moveTypeHolder.value as PokemonType);
     }
 
     globalScene.arena.applyTags(ArenaTagType.ION_DELUGE, moveTypeHolder);
@@ -3684,7 +4046,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       moveTypeHolder.value = primedType;
     }
 
-    return moveTypeHolder.value as PokemonType;
+    return getMoodyRuntimeMoveTypeOverride(this, moveTypeHolder.value as PokemonType);
   }
 
   /**
@@ -3871,6 +4233,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // (the engine's ground immunity below only covers Flying types + Levitate; the
     // balloon must grant it directly). Iron Ball wins if both are held (isGrounded
     // is then true, so this is skipped).
+    if (moveType === PokemonType.GROUND && isElectrodynamicsPosition(this)) {
+      return 0;
+    }
     if (moveType === PokemonType.GROUND && !this.isGrounded() && erTacticalAirBalloonUngrounds(this)) {
       return 0;
     }
@@ -3905,6 +4270,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (move) {
       applyMoveAttrs("MoveTypeChartOverrideAttr", source ?? null, this, move, multi, types, moveType);
     }
+
+    multi.value = applyErEndlessTypeEffectiveness(source, this, moveType, multi.value);
 
     // ER dual-type PRIME (Negative Feedback 5923): fold the primed move's SECOND
     // type (Fairy) into the effectiveness product. Move-instance DualTypeMoveAttr
@@ -3946,6 +4313,31 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // ER Desert Spirit: in sand, Ground moves hit airborne (0x → 1x).
         if (attr?.constructor?.name === "WeatherGroundAirborneAbAttr") {
           (attr as unknown as { fire: (mt: PokemonType, h: NumberHolder) => void }).fire(moveType, multi);
+        }
+        if (move && attr?.constructor?.name === "MiracleBladeTypeChartAbAttr") {
+          (
+            attr as unknown as {
+              fire: (
+                m: Move,
+                defenderTypes: readonly PokemonType[],
+                h: NumberHolder,
+                mt?: PokemonType,
+                u?: Pokemon | null,
+              ) => void;
+            }
+          ).fire(move, types, multi, moveType, source);
+        }
+        if (move && typeof (attr as { getSecondaryMoveType?: unknown }).getSecondaryMoveType === "function") {
+          const secondary = (
+            attr as unknown as { getSecondaryMoveType: (m: Move) => PokemonType | undefined }
+          ).getSecondaryMoveType(move);
+          if (secondary !== undefined) {
+            multi.value *= this.getAttackTypeEffectiveness(secondary, {
+              source,
+              ignoreSourceAbility: true,
+              simulated,
+            });
+          }
         }
       }
 
@@ -4012,7 +4404,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     ) {
       multi.value = 1;
     }
-    return multi.value as TypeDamageMultiplier;
+    return applyMoodyCoordinatorTypeEffectiveness(source, this, multi.value, simulated) as TypeDamageMultiplier;
   }
 
   /**
@@ -4209,6 +4601,28 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
+    if (globalScene.gameMode.isFun && getFunModeConfig().shuffleEvolutions) {
+      return valid.map((evolution, index) => {
+        const target = getFunEvolutionTarget(this.id, this.species.speciesId, index);
+        if (!target) {
+          return evolution;
+        }
+        const form = target.species.forms[target.formIndex] as { formKey?: string } | undefined;
+        const shuffled = new SpeciesFormEvolution(
+          target.species.speciesId,
+          evolution.preFormKey,
+          form?.formKey || null,
+          evolution.level,
+          evolution.item,
+          evolution.condition?.data ?? null,
+          evolution.evoLevelThreshold,
+        );
+        return evolution instanceof FusionSpeciesFormEvolution
+          ? new FusionSpeciesFormEvolution(evolution.primarySpeciesId, shuffled)
+          : shuffled;
+      });
+    }
+
     return valid;
   }
 
@@ -4349,7 +4763,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       Pokemon.getUniqueMoves(levelMoves, ret);
     }
 
-    return ret;
+    return globalScene.gameMode.isFun ? getFunRandomLevelMoves(this.id, ret) : ret;
   }
 
   /**
@@ -4435,12 +4849,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (this.isPlayer() || !this.hasTrainer()) {
         // Apply shiny modifiers only to Player or wild mons
         globalScene.applyModifiers(ShinyRateBoosterModifier, true, shinyThreshold);
-        // ER: challenge "Favour" raises shiny odds (up to 3x) on a challenge run.
-        shinyThreshold.value *= getRunShinyMultiplier();
-        // ER (#368/#402): WILD shiny odds scale with run difficulty (Elite 1.5x,
-        // Hell 2x) and stack with the boosts above (challenge-capped at 6x).
+        // ER: wild run rewards use the single integer depth/Favour/Endless resolver.
         if (this.isEnemy() && !this.hasTrainer()) {
-          shinyThreshold.value *= getErDifficultyShinyMultiplier();
+          shinyThreshold.value *= getCurrentErRewardRates().totalShiny;
         }
       }
     } else {
@@ -4558,10 +4969,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return;
     }
 
-    const hiddenAbilityChance = new ValueHolder(haThreshold);
-    globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-
-    if (!randSeedInt(hiddenAbilityChance.value)) {
+    if (!randSeedInt(haThreshold)) {
       this.abilityIndex = 2;
     }
   }
@@ -4571,12 +4979,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param forStarter - Whether this fusion is being generated for a starter Pokémon; default `false`
    */
   public generateFusionSpecies(forStarter?: boolean): void {
-    const hiddenAbilityChance = new ValueHolder(BASE_HIDDEN_ABILITY_RATE);
-    if (!this.hasTrainer()) {
-      globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-    }
-
-    const hasHiddenAbility = !randSeedInt(hiddenAbilityChance.value);
+    const hasHiddenAbility = !randSeedInt(BASE_HIDDEN_ABILITY_RATE);
     const randAbilityIndex = randSeedInt(2);
 
     const filter = forStarter
@@ -5071,7 +5474,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     // ER Zoom Lens (held by the attacker): +20% accuracy when the target has
     // already acted this turn.
-    return (accuracyMultiplier.value / evasionMultiplier.value) * erTacticalZoomLensMultiplier(this, target);
+    return (
+      (accuracyMultiplier.value / evasionMultiplier.value)
+      * erTacticalZoomLensMultiplier(this, target)
+      * getMoodyAccuracyMultiplier(this, target, sourceMove)
+    );
   }
 
   /**
@@ -5091,7 +5498,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     isCritical = false,
     simulated = true,
   }: GetBaseDamageParams): number {
-    const isPhysical = moveCategory === MoveCategory.PHYSICAL;
+    const isPhysical = hasErEndlessRift("category-flip")
+      ? moveCategory === MoveCategory.SPECIAL
+      : moveCategory === MoveCategory.PHYSICAL;
 
     /** A base damage multiplier based on the source's level */
     const levelMultiplier = (2 * source.level) / 5 + 2;
@@ -5123,7 +5532,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ignoreSourceAbility) {
       const subAttrs = source.getAllActiveAbilityAttrs();
       for (const attr of subAttrs) {
-        if (attr?.constructor?.name === "AttackStatSubstituteAbAttr") {
+        if (typeof (attr as unknown as { resolveStat?: unknown })?.resolveStat === "function") {
           const sub = (
             attr as unknown as { resolveStat: (m: Move, p: boolean, s: Pokemon) => EffectiveStat | null }
           ).resolveStat(move, isPhysical, source);
@@ -5358,10 +5767,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // defense, no burn halving, Light-Screen-blocked).
     if (!ignoreSourceAbility) {
       for (const attr of source.getAllActiveAbilityAttrs()) {
-        if (attr?.constructor?.name === "MoveCategoryOverrideAbAttr") {
-          const overridden = (attr as unknown as { resolveCategory: (m: Move) => MoveCategory | null }).resolveCategory(
-            move,
-          );
+        if (typeof (attr as unknown as { resolveCategory?: unknown })?.resolveCategory === "function") {
+          const overridden = (
+            attr as unknown as { resolveCategory: (m: Move, u: Pokemon) => MoveCategory | null }
+          ).resolveCategory(move, source);
           if (overridden != null) {
             variableCategory.value = overridden;
           }
@@ -5383,6 +5792,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         variableCategory.value = MoveCategory.SPECIAL;
       }
     }
+    variableCategory.value = resolveSwirlyRoomCategory(variableCategory.value as MoveCategory, isSwirlyRoomActive());
     const moveCategory = variableCategory.value as MoveCategory;
 
     /** The move's type after type-changing effects are applied */
@@ -5405,7 +5815,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     /** Combined damage multiplier from field effects such as weather, terrain, etc. */
     const arenaAttackTypeMultiplier = new NumberHolder(
-      globalScene.arena.getAttackTypeMultiplier(moveType, source.isGrounded()),
+      globalScene.arena.getAttackTypeMultiplier(
+        moveType,
+        isRaichuTerrainGrounded(source, globalScene.arena.terrainType),
+      ),
     );
     applyMoveAttrs("IgnoreWeatherTypeDebuffAttr", source, this, move, arenaAttackTypeMultiplier);
     // ER Utility Umbrella (held by the attacker): the holder ignores the sun's /
@@ -5540,7 +5953,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // full damage on every strike, so without this Multi-Headed hit 2-3× at 100%.
     // Scoped to Multi-Headed holders only — Multi-Lens, Parental Bond and ordinary
     // multi-hit moves are untouched.
-    if (source.hasAbility(ErAbilityId.MULTI_HEADED as unknown as AbilityId)) {
+    if (
+      hasMultiHeadedAttr(source.getAllActiveAbilityAttrs())
+      && move.id !== MoveId.COUNTER
+      && move.id !== MoveId.MIRROR_COAT
+    ) {
       const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
       if (strikeIndex > 0) {
         multiStrikeEnhancementMultiplier.value *= source.turnData.hitCount <= 2 ? 0.25 : strikeIndex === 1 ? 0.2 : 0.15;
@@ -5687,13 +6104,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * Blood Pact = +20% on ALL of the team's hits. All return 1 when their relic
      * isn't held or the condition isn't met.
      */
-    const erRelicMultiplier = source.isPlayer()
-      ? erMoraleBannerMultiplier()
-        * erTwinLinkMultiplier(moveType)
-        * erMoltenCoreFireMultiplier(moveType)
-        * erCapacitorElectricMultiplier(moveType)
-        * erBloodPactDealMultiplier()
-      : 1;
+    const sourceIsPlayer = source.isPlayer();
+    const erRelicMultiplier =
+      erMoraleBannerMultiplier(sourceIsPlayer)
+      * erTwinLinkMultiplier(moveType, sourceIsPlayer)
+      * erMoltenCoreFireMultiplier(moveType, sourceIsPlayer)
+      * erCapacitorElectricMultiplier(moveType, sourceIsPlayer)
+      * erBloodPactDealMultiplier(sourceIsPlayer);
 
     /**
      * ER relics (#439): Blood Pact's double edge - while held, the player's mons
@@ -5701,7 +6118,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * relic isn't held. Multiplies with the offensive bonus only on the rare
      * player-vs-player hit.
      */
-    const erRelicDefenderMultiplier = this.isPlayer() ? erBloodPactTakeMultiplier() : 1;
+    const erRelicDefenderMultiplier = erBloodPactTakeMultiplier(this.isPlayer());
 
     /**
      * ER Library (5928): a repeated use of a move recorded in a Library holder's
@@ -5709,6 +6126,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
      * is not a repeat of a recorded move on the defender's side.
      */
     const erLibraryMultiplier = erLibraryDamageMultiplier(this, move);
+
+    // Mega Golurk Y's Reduction Rune caps surrounding attackers' weakness
+    // multiplier at 1.5x (ordinary weakness) or 2x (4x and above).
+    const reductionRuneMultiplier =
+      typeMultiplier > 1
+      && globalScene
+        .getField(true)
+        .some(
+          holder =>
+            holder !== source
+            && holder.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "ReductionRuneAbAttr"),
+        )
+        ? typeMultiplier >= 4
+          ? 2 / typeMultiplier
+          : 1.5 / typeMultiplier
+        : 1;
 
     damage.value = toDmgValue(
       baseDamage
@@ -5729,8 +6162,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * mistyTerrainMultiplier
         * erRelicMultiplier
         * erRelicDefenderMultiplier
-        * erLibraryMultiplier,
+        * erLibraryMultiplier
+        * reductionRuneMultiplier,
     );
+    if (
+      this.status?.effect === StatusEffect.BURN
+      && globalScene
+        .getField(true)
+        .some(
+          holder =>
+            !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId),
+        )
+    ) {
+      damage.value = toDmgValue(damage.value * (4 / 3));
+    }
     damage.value = toDmgValue(damage.value * getRequestedFieldDamageMultiplier(source, this, move));
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage
@@ -5812,7 +6257,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage.value = toDmgValue(damage.value * 1.3);
     }
 
-    const abAttrParams: PreAttackModifyDamageAbAttrParams = {
+    const abAttrParams: PreDefendModifyDamageAbAttrParams = {
       pokemon: this,
       opponent: source,
       move,
@@ -5858,6 +6303,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     if (opponentDamageBoostSuppressionCeiling !== null) {
       damage.value = Math.min(damage.value, opponentDamageBoostSuppressionCeiling);
+    }
+
+    if (isDamageNullified(damage)) {
+      damage.value = 0;
+    } else {
+      damage.value = applyMoodyDamageCalculation(source, this, move, damage.value, simulated);
+      damage.value = applyErEndlessCalculatedDamage(source, this, move, damage.value);
     }
 
     // debug message for when damage is applied
@@ -5972,6 +6424,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
       if (surviveDamage.value) {
         damage = this.hp - 1;
+        if (this.status?.effect === StatusEffect.FAINT) {
+          this.clearStatus(false, false);
+        }
         // catalog-v2 (#900) IMMORTAL_OBJECT: a RELIC (not an ability) prevented this faint.
         if (erRelicSaved) {
           erRecordAchievementRelicSurvive(this);
@@ -6105,6 +6560,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!isIndirectDamage && source && damage > 0) {
       damage -= erApplySoulmateRedirect(this, damage);
     }
+    if (!isIndirectDamage) {
+      damage = applyErEndlessDirectDamage(this, source, damage);
+    }
+    damage = absorbMoodyFormationBarrier(this, damage);
+    damage = applyMoodyFormationLethalClamp(this, damage, !isIndirectDamage && source != null);
     // ER Life Preserver (ability 5916): once per battle, a DIRECT attack that
     // would faint this Pokemon is clamped to leave it at 1 HP if a living ally
     // carries the ability — and the attacker is Drenched. Direct hits only
@@ -6119,6 +6579,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage = this.hp - 1;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase, result, isCritical);
+    if (this.isPlayer() && damage > 0) {
+      recordErEndlessGhostPlayerDamage(damage);
+    }
+    notifyMoodyRuntimeDamageApplied(source, this, damage, !isIndirectDamage);
     erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
     damagePhase.updateAmount(damage);
@@ -6129,6 +6593,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!source || source.turnData.hitCount <= 1) {
       applyAbAttrs("PostDamageAbAttr", { pokemon: this, damage, source });
     }
+    if (damage > 0) {
+      applyBoobyTrapHealing(this, damage);
+    }
     return damage;
   }
 
@@ -6137,9 +6604,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @param amount - The amount of HP to restore
    * @returns The true amount of HP restored; may be less than `amount` if `amount` would overheal
    */
-  public heal(amount: number): number {
+  public heal(amount: number, revive = false): number {
+    const requestedAmount = amount;
+    amount = Math.floor(amount * getMoodyHealingMultiplier(this));
+    amount = applyErEndlessHealing(this, amount, revive).amount;
     const healAmount = Math.min(amount, this.getMaxHp() - this.hp);
     this.hp += healAmount;
+    notifyMoodyRuntimeHeal(this, requestedAmount, healAmount);
+    notifyMoodyCoordinatorHealingUsed(this, healAmount);
+    grantMoodyItemSetHealingBarrier(this, healAmount);
     // Healing is an HP presentation boundary just like damage. Record the authoritative post-heal
     // value at the universal mutation seam so moves, berries, terrain, abilities, drain effects, and
     // linked-heal mechanics cannot silently jump only on the guest's end-of-turn checkpoint. Emit before
@@ -6195,9 +6668,29 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       SpeciesFormKey.PRIMAL,
     ] as string[];
     return (
-      megaForms.includes(this.getFormKey())
+      this.isFunPseudoMega()
+      || megaForms.includes(this.getFormKey())
       || (!!this.getFusionFormKey() && megaForms.includes(this.getFusionFormKey()!))
     );
+  }
+
+  public isFunPseudoMega(): boolean {
+    const recordedStone = this.customPokemonData.erFunMegaStone;
+    const hasHeldStone =
+      recordedStone != null
+      && globalScene.findModifier(
+        modifier =>
+          modifier instanceof PokemonFormChangeItemModifier
+          && modifier.pokemonId === this.id
+          && modifier.formChangeItem === recordedStone
+          && modifier.active,
+        this.isPlayer(),
+      ) != null;
+    return isFunPseudoMegaActive(this.customPokemonData.erFunPseudoMega === true, recordedStone, hasHeldStone);
+  }
+
+  public getFunMegaStone(): FormChangeItem | undefined {
+    return this.customPokemonData.erFunMegaStone;
   }
 
   private formUsesDerivedAbilities(formKey: string | null | undefined): boolean {
@@ -6308,6 +6801,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    if (shouldMoodyRuntimePreventVolatile(this, tagType)) {
+      return false;
+    }
+    if (shouldMoodyFormationPreventVolatile(this, tagType)) {
+      return false;
+    }
+
     // ER Ward Stones (#358): block external CC tags (flinch / confusion /
     // infatuation / the ER statuses) before they attach, one charge per block.
     if (
@@ -6343,6 +6843,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (newTag.canAdd(this)) {
       this.summonData.tags.push(newTag);
       newTag.onAdd(this);
+      notifyMoodyRuntimeVolatileApplied(this, tagType);
       if (
         (tagType === BattlerTagType.CONFUSED || tagType === BattlerTagType.ER_ENRAGE)
         && this.hasAbility(AbilityId.BERSERK)
@@ -6800,6 +7301,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     const key = this.species.getCryKey(this.formIndex);
+    if (!globalScene.cache.audio.exists(key)) {
+      callback();
+      return;
+    }
     const crySoundConfig = { rate: 0.85, detune: 0 };
     if (this.isPlayer()) {
       // If fainting is permanent, emphasize impact
@@ -6829,14 +7334,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       delay: fixedInt(delay),
       repeat: -1,
       callback: () => {
-        frameThreshold = sprite.anims.msPerFrame / crySoundConfig.rate;
-        frameProgress += delay;
-        while (frameProgress > frameThreshold) {
-          if (sprite.anims.duration) {
-            sprite.anims.nextFrame();
-            tintSprite?.anims.nextFrame();
+        const msPerFrame = sprite.anims.msPerFrame;
+        if (Number.isFinite(msPerFrame) && msPerFrame > 0) {
+          frameThreshold = msPerFrame / crySoundConfig.rate;
+          frameProgress += delay;
+          while (frameProgress > frameThreshold) {
+            if (sprite.anims.duration) {
+              sprite.anims.nextFrame();
+              tintSprite?.anims.nextFrame();
+            }
+            frameProgress -= frameThreshold;
           }
-          frameProgress -= frameThreshold;
         }
         if (cry && !cry.pendingRemove) {
           cry.setRate(crySoundConfig.rate * 0.99);
@@ -6918,14 +7426,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       repeat: -1,
       callback: () => {
         ++i;
-        frameThreshold = sprite.anims.msPerFrame / rate;
-        frameProgress += delay;
-        while (frameProgress > frameThreshold) {
-          if (sprite.anims.duration) {
-            sprite.anims.nextFrame();
-            tintSprite?.anims.nextFrame();
+        const msPerFrame = sprite.anims.msPerFrame;
+        if (Number.isFinite(msPerFrame) && msPerFrame > 0) {
+          frameThreshold = msPerFrame / rate;
+          frameProgress += delay;
+          while (frameProgress > frameThreshold) {
+            if (sprite.anims.duration) {
+              sprite.anims.nextFrame();
+              tintSprite?.anims.nextFrame();
+            }
+            frameProgress -= frameThreshold;
           }
-          frameProgress -= frameThreshold;
         }
         if (i === transitionIndex && fusionCryKey) {
           SoundFade.fadeOut(globalScene, cry, fixedInt(Math.ceil((duration / rate) * 0.2)));
@@ -7114,7 +7625,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         isImmune = !ignoreTypeImmunity && this.isOfType(PokemonType.ELECTRIC);
         break;
       case StatusEffect.SLEEP:
-        isImmune = this.isGrounded() && globalScene.arena.terrainType === TerrainType.ELECTRIC;
+        isImmune =
+          (globalScene.arena.terrainType === TerrainType.ELECTRIC
+            && isRaichuTerrainGrounded(this, TerrainType.ELECTRIC))
+          || (this.hasAbility(ER_ELECTRODYNAMICS_ABILITY_ID as AbilityId) && isElectrodynamicsPosition(this));
         reason = TerrainType.ELECTRIC;
         break;
       case StatusEffect.FREEZE: {
@@ -7220,13 +7734,24 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return false;
     }
 
+    if (shouldMoodyRuntimePreventStatus(this, effect, sourcePokemon)) {
+      return false;
+    }
+    if (shouldMoodyFormationPreventStatusEffect(this, effect)) {
+      return false;
+    }
+
     // ER: the vanilla FREEZE status does not exist — it is replaced by Frostbite
     // (an ER battler tag). Any attempt to freeze a Pokemon (vanilla Ice moves,
     // abilities, etc.) instead inflicts ER_FROSTBITE, which carries its own
     // immunity rules (Ice-types, already-frostbitten) in the tag's canAdd. This
     // single intercept catches every freeze source so "FRZ" never appears.
     if (effect === StatusEffect.FREEZE) {
-      return this.addTag(BattlerTagType.ER_FROSTBITE, 0, undefined, sourcePokemon?.id);
+      const applied = this.addTag(BattlerTagType.ER_FROSTBITE, 0, undefined, sourcePokemon?.id);
+      if (applied) {
+        onErEndlessStatusInflicted(this, sourcePokemon, effect);
+      }
+      return applied;
     }
 
     if (
@@ -7274,6 +7799,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       sourceText,
       overrideMessage,
     );
+
+    if (
+      effect === StatusEffect.BURN
+      && sourcePokemon?.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "AmaterasuMarkerAbAttr")
+    ) {
+      (this.waveData as unknown as { amaterasuBurnSourceId?: number }).amaterasuBurnSourceId = sourcePokemon.id;
+    }
+
+    onErEndlessStatusInflicted(this, sourcePokemon, effect);
 
     return true;
   }
@@ -7371,6 +7905,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     this.status = new Status(effect, 0, sleepTurnsRemaining);
+    notifyMoodyRuntimeStatusApplied(this, effect);
     if (effect !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
       recordCoopEvent({
         k: "status",
@@ -7410,6 +7945,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   resetStatus(revive = true, confusion = false, reloadAssets = false, asPhase = true): void {
     const lastStatus = this.status?.effect;
+    if (lastStatus === StatusEffect.BURN) {
+      const sourceId = (this.waveData as unknown as { amaterasuBurnSourceId?: number }).amaterasuBurnSourceId;
+      // Once Amaterasu inflicts the burn it remains unhealable for this battle,
+      // even if the source switches out or faints. waveData resets at the next
+      // encounter, so ordinary between-battle status cleanup still works.
+      if (sourceId !== undefined) {
+        return;
+      }
+    }
     if (!revive && lastStatus === StatusEffect.FAINT) {
       return;
     }
@@ -7431,6 +7975,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   public clearStatus(confusion: boolean, reloadAssets: boolean) {
     const lastStatus = this.status?.effect;
     this.status = null;
+    if (lastStatus != null) {
+      notifyMoodyRuntimeStatusCured(this, lastStatus);
+      notifyMoodyFormationStatusEffectCured(this, lastStatus);
+    }
     if (lastStatus != null && lastStatus !== StatusEffect.FAINT && this.isOnField() && isCoopRecording()) {
       recordCoopEvent({
         k: "status",
@@ -7518,10 +8066,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // the fresh summonData, the way vanilla status (which lives outside summonData)
     // persists. A fainted mon keeps no status, so only carry it while alive.
     const bleedTag = this.isFainted() ? undefined : this.getTag(BattlerTagType.ER_BLEED);
+    const slabCurseTag = this.isFainted() ? undefined : this.getTag(BattlerTagType.ER_SLAB_CURSE);
     this.summonData = new PokemonSummonData();
     this.tempSummonData = new PokemonTempSummonData();
     if (bleedTag) {
       this.summonData.tags.push(bleedTag);
+    }
+    if (slabCurseTag) {
+      this.summonData.tags.push(slabCurseTag);
     }
     this.updateInfo();
   }
@@ -8162,7 +8714,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Should be `false` for all item loss occurring outside of battle (MEs, etc.).
    * @returns Whether the item was removed successfully.
    */
-  public loseHeldItem(heldItem: PokemonHeldItemModifier, forBattle = true): boolean {
+  public loseHeldItem(heldItem: PokemonHeldItemModifier, forBattle = true, opponent?: Pokemon): boolean {
     // TODO: What does a -1 pokemon id mean?
     if (heldItem.pokemonId !== -1 && heldItem.pokemonId !== this.id) {
       return false;
@@ -8173,7 +8725,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       globalScene.removeModifier(heldItem, this.isEnemy());
     }
     if (forBattle) {
-      applyAbAttrs("PostItemLostAbAttr", { pokemon: this });
+      applyAbAttrs("PostItemLostAbAttr", { pokemon: this, ...(opponent === undefined ? {} : { opponent }) });
       // ER Fetch (er move 969) consumed-item ledger: record a NON-BERRY,
       // re-grantable held item that was just lost IN BATTLE (knocked off,
       // a consumed one-time item like White/Power Herb, etc.) so Fetch can
@@ -8186,9 +8738,37 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           this.battleData.lostItems.push({ typeId });
         }
       }
+      this.tryReceiveSymbiosisItem();
     }
 
     return true;
+  }
+
+  /** Transfer one adjacent Symbiosis holder's item after this Pokemon loses one. */
+  private tryReceiveSymbiosisItem(): void {
+    if (!this.isActive(true) || this.isFainted()) {
+      return;
+    }
+    for (const donor of this.getAdjacentAllies()) {
+      if (!donor.isActive(true) || donor.isFainted()) {
+        continue;
+      }
+      const source = donor.getActiveAbilitySources().find(entry => entry.ability.id === AbilityId.SYMBIOSIS);
+      if (!source) {
+        continue;
+      }
+      const item = donor
+        .getHeldItems()
+        .find(candidate => candidate.isTransferable && globalScene.canTransferHeldItemModifier(candidate, this));
+      if (!item) {
+        continue;
+      }
+      if (globalScene.tryTransferHeldItemModifier(item, this, false, 1, true)) {
+        globalScene.phaseManager.queueAbilityDisplay(donor, source.passive, true, source.passiveSlot ?? 0);
+        globalScene.phaseManager.queueAbilityDisplay(donor, source.passive, false, source.passiveSlot ?? 0);
+        return;
+      }
+    }
   }
 
   /**
@@ -8196,14 +8776,37 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * Only tracks things that proc _every_ time a berry is eaten.
    * @param berryType - The type of berry being eaten.
    * @param updateHarvest - Whether to track the berry for harvest; default `true`.
+   * @param notifyCommensality - Whether adjacent Serfdom allies also eat the berry.
+   * @param trackForCudChew - Whether to track this consumption for turn-end berry replay.
    */
-  public recordEatenBerry(berryType: BerryType, updateHarvest = true) {
+  public recordEatenBerry(
+    berryType: BerryType,
+    updateHarvest = true,
+    notifyCommensality = true,
+    trackForCudChew = true,
+  ) {
     this.battleData.hasEatenBerry = true;
     if (updateHarvest) {
       // Only track for harvest if we actually consumed the berry
       this.battleData.berriesEaten.push(berryType);
     }
-    this.turnData.berriesEaten.push(berryType);
+    if (trackForCudChew) {
+      this.turnData.berriesEaten.push(berryType);
+    }
+
+    if (!notifyCommensality) {
+      return;
+    }
+    for (const ally of this.getAdjacentAllies()) {
+      if (
+        !ally.isActive(true)
+        || !ally.getActiveAbilitySources().some(source => source.ability.id === (ER_SERFDOM_ABILITY_ID as AbilityId))
+      ) {
+        continue;
+      }
+      getBerryEffectFunc(berryType)(ally);
+      ally.recordEatenBerry(berryType, false, false, false);
+    }
   }
 
   /**
@@ -8662,7 +9265,13 @@ export class PlayerPokemon extends Pokemon {
           globalScene.removeModifier(evotracker);
         }
       }
-      if (!globalScene.gameMode.isDaily || this.metBiome > -1) {
+      // Evolution Shuffle deliberately replaces the real evolution with an unrelated
+      // species/form for this run. Recording that post-image as an account catch leaks
+      // the runtime mon's IVs, shiny tier, form, nature, abilities, and (separately)
+      // Black-Shiny ownership into a line the player never acquired. Keep the shuffled
+      // result on the run Pokemon, but do not treat it as permanent dex/starter progress.
+      const isFunShuffledEvolution = globalScene.gameMode.isFun && getFunModeConfig().shuffleEvolutions;
+      if ((!globalScene.gameMode.isDaily || this.metBiome > -1) && !isFunShuffledEvolution) {
         globalScene.gameData.updateSpeciesDexIvs(this.species.speciesId, this.ivs);
         globalScene.gameData.setPokemonSeen(this, false);
         coopAllowAccountWrite("own-evolution", () => globalScene.gameData.setPokemonCaught(this, false)).then(() =>
@@ -8694,10 +9303,10 @@ export class PlayerPokemon extends Pokemon {
    * same index — so a Redux Kadabra (index 1) carried into Alakazam (index 1 =
    * "mega") would become Mega Alakazam.
    *
-   * Logic: if the carried form is fine (exists and is not battle-only), keep it.
-   * Otherwise prefer a NON-battle-only form whose key matches the pre-evolution
-   * form key (Redux -> Redux, e.g. Kadabra Redux -> Alakazam Redux), then fall
-   * back to the canonical base form ("").
+   * Logic: first prefer a NON-battle-only form whose key matches the
+   * pre-evolution form key (Redux -> Redux, e.g. Kadabra Redux -> Alakazam
+   * Redux). If the target has no matching semantic key, keep a safe carried
+   * index; otherwise fall back to the canonical base form ("").
    */
   private resolveSafeEvolvedFormIndex(
     species: PokemonSpecies | null,
@@ -8718,15 +9327,18 @@ export class PlayerPokemon extends Pokemon {
     if (!forms || forms.length === 0) {
       return carriedIndex;
     }
-    const carried = forms[carriedIndex];
-    if (carried && !battleOnlyFormKeys.includes(carried.formKey)) {
-      return carriedIndex;
-    }
+    // Form indexes are only meaningful within one species. A Redux Doublade's
+    // numeric slot can point at an unrelated ordinary Aegislash form, so match
+    // the semantic key before accepting the carried index.
     if (preferredFormKey) {
       const preferred = forms.findIndex(f => f.formKey === preferredFormKey && !battleOnlyFormKeys.includes(f.formKey));
       if (preferred >= 0) {
         return preferred;
       }
+    }
+    const carried = forms[carriedIndex];
+    if (carried && !battleOnlyFormKeys.includes(carried.formKey)) {
+      return carriedIndex;
     }
     const normalIndex = forms.findIndex(f => f.formKey === "");
     return normalIndex >= 0 ? normalIndex : 0;
@@ -8796,15 +9408,21 @@ export class PlayerPokemon extends Pokemon {
 
         globalScene.getPlayerParty().push(newPokemon);
         newPokemon.evolve(isFusion ? new FusionSpeciesFormEvolution(this.id, newEvolution) : newEvolution, evoSpecies);
-        const modifiers = globalScene.findModifiers(
-          m => m instanceof PokemonHeldItemModifier && m.pokemonId === this.id,
-          true,
-        ) as PokemonHeldItemModifier[];
-        modifiers.forEach(m => {
-          const clonedModifier = m.clone() as PokemonHeldItemModifier;
-          clonedModifier.pokemonId = newPokemon.id;
-          globalScene.addModifier(clonedModifier, true);
-        });
+        // In solo play the original held items stay with the evolved Ninjask.
+        // Cloning them onto Shedinja duplicated every stack in the account's run.
+        // Keep the existing co-op snapshot behavior byte-for-byte outside this
+        // solo bug fix; co-op is intentionally not part of this triage pass.
+        if (globalScene.gameMode.isCoop) {
+          const modifiers = globalScene.findModifiers(
+            m => m instanceof PokemonHeldItemModifier && m.pokemonId === this.id,
+            true,
+          ) as PokemonHeldItemModifier[];
+          modifiers.forEach(m => {
+            const clonedModifier = m.clone() as PokemonHeldItemModifier;
+            clonedModifier.pokemonId = newPokemon.id;
+            globalScene.addModifier(clonedModifier, true);
+          });
+        }
         globalScene.updateModifiers(true);
       }
     }
@@ -8978,19 +9596,45 @@ export class EnemyPokemon extends Pokemon {
     dataSource?: PokemonData,
     forRival = false,
   ) {
+    let generatedFormIndex: number | undefined;
+    let generatedFunMegaStone: FormChangeItem | undefined;
+    let generatedFunPseudoMega = false;
+    if (!dataSource && globalScene.gameMode.isFun) {
+      const randomized = rollFunRandomSpecies();
+      if (randomized) {
+        species = randomized.species;
+        generatedFormIndex = randomized.formIndex;
+      }
+      if (
+        getFunModeConfig().megaMode
+        && randSeedFloat() < getFunEnemyMegaChance(globalScene.currentBattle?.waveIndex ?? 1)
+      ) {
+        const baseFormIndex = generatedFormIndex ?? 0;
+        const realMegas = getFunRealMegaChoices(species, baseFormIndex);
+        if (realMegas.length > 0) {
+          const mega = randSeedItem(realMegas);
+          generatedFormIndex = mega.formIndex;
+          generatedFunMegaStone = mega.item;
+        } else {
+          generatedFunMegaStone = randSeedItem(getFunMegaStoneItems());
+          generatedFunPseudoMega = generatedFunMegaStone != null;
+        }
+      }
+    }
     super(
       236,
       84,
       species,
       level,
       dataSource?.abilityIndex,
-      dataSource?.formIndex,
+      dataSource?.formIndex ?? generatedFormIndex,
       dataSource?.gender,
       !shinyLock && dataSource ? dataSource.shiny : false,
       !shinyLock && dataSource ? dataSource.variant : undefined,
       undefined,
       dataSource ? dataSource.nature : undefined,
       dataSource,
+      trainerSlot !== TrainerSlot.NONE,
     );
 
     this.trainerSlot = trainerSlot;
@@ -9002,6 +9646,13 @@ export class EnemyPokemon extends Pokemon {
     // round-trip change only the guest from `undefined/undefined` to `0/0`, despite identical gameplay
     // semantics.  `setBoss(false)` is the class's own neutral-state initializer and consumes no RNG.
     this.setBoss(boss, dataSource?.bossSegments);
+
+    if (!dataSource && generatedFunMegaStone != null) {
+      this.customPokemonData.erFunMegaStone = generatedFunMegaStone;
+      this.customPokemonData.erFunPseudoMega = generatedFunPseudoMega;
+      this.calculateStats();
+      this.hp = this.getMaxHp();
+    }
 
     if (Overrides.ENEMY_STATUS_OVERRIDE) {
       this.status = new Status(Overrides.ENEMY_STATUS_OVERRIDE, 0, 4);
@@ -9029,7 +9680,9 @@ export class EnemyPokemon extends Pokemon {
       // Youngster). Over-ceiling species devolve or swap BEFORE the moveset
       // is generated, so the final mon's kit matches its final species.
       // Saved battles (dataSource) are restored untouched.
-      enforceErEliteBstCurve(this);
+      if (!isErEndlessContinuationActive() && (!globalScene.gameMode.isFun || !getFunModeConfig().randomizePokemon)) {
+        enforceErEliteBstCurve(this);
+      }
       this.generateAndPopulateMoveset(forRival);
       if (shinyLock || Overrides.ENEMY_SHINY_OVERRIDE === false) {
         this.shiny = false;
@@ -9163,6 +9816,10 @@ export class EnemyPokemon extends Pokemon {
   }
 
   override generateAndPopulateMoveset(useRivalSignatures = false, formIndex?: number): void {
+    if (globalScene.gameMode.isFun && getFunModeConfig().randomizeLevelUpMoves) {
+      super.generateAndPopulateMoveset(useRivalSignatures);
+      return;
+    }
     switch (true) {
       case this.species.speciesId === SpeciesId.SMEARGLE:
         this.moveset = [
@@ -9680,16 +10337,6 @@ export class EnemyPokemon extends Pokemon {
 
           const chosenMove = sortedMovePool[chosenMoveIndex];
 
-          // biome-ignore format: For some reason this gets broken into multiple lines
-          console.log("Move Pool:", movePool.map((m) => m.getName()));
-          console.log("Move Scores:", moveScores);
-          // biome-ignore format: For some reason this gets broken into multiple lines
-          console.log("Sorted Move Pool:", sortedMovePool.map((m) => m.getName()));
-          console.log("Chosen Move:", chosenMove.getName());
-          if (erAi.active) {
-            console.log(`ER AI: ${erAi.kind} brain (sharpness ${erAi.sharpness})`);
-          }
-
           return {
             move: chosenMove.moveId,
             targets: moveTargets[chosenMove.moveId],
@@ -9921,6 +10568,29 @@ export class EnemyPokemon extends Pokemon {
     // TODO: Rewrite this bespoke logic to improve clarity
     while (this.bossSegmentIndex > 0 && segmentIndex - 1 < this.bossSegmentIndex) {
       this.bossSegmentIndex--;
+      if (isErEndlessRaidWave(globalScene.currentBattle.waveIndex) && globalScene.getEnemyParty()[0] === this) {
+        const brokenSegments = this.bossSegments - 1 - this.bossSegmentIndex;
+        queueErEndlessRaidReserve(brokenSegments);
+        const stages = this.getStatStages();
+        if (brokenSegments % 2 === 0) {
+          for (let index = 0; index < stages.length; index++) {
+            stages[index] = Math.max(0, stages[index]);
+          }
+          if (this.status) {
+            this.resetStatus(false, true, false, false);
+          }
+        } else {
+          const negative = stages.flatMap((stage, index) => (stage < 0 ? [index] : []));
+          if (negative.length > 0) {
+            const index = negative[randSeedInt(negative.length)];
+            stages[index]++;
+          }
+        }
+      }
+      const breaker = globalScene.getPlayerField()[globalScene.currentBattle.lastPlayerInvolved];
+      if (breaker != null) {
+        notifyMoodyCoordinatorBossSegmentBroken(breaker, this);
+      }
 
       // Continue, _not_ break here, to ensure that each segment is still broken
       if (!doStatBoost) {

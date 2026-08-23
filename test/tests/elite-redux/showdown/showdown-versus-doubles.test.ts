@@ -132,7 +132,7 @@ describe.skipIf(!RUN)("Showdown versus DOUBLES / TRIPLES - two-engine multi-slot
       );
       const starters = generateStarters(game.scene, hostSpecies);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     });
     // Stop before CommandPhase starts. Mandatory versus authority is installed by buildShowdownDuo below;
     // letting this orphan host CommandPhase run first correctly terminalizes the shared battle and clears

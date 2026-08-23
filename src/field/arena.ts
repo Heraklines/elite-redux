@@ -6,9 +6,10 @@ import { pokemonEvolutions, pokemonPrevolutions } from "#balance/pokemon-evoluti
 import { NIGHT_TIME } from "#constants/game-constants";
 import type { ArenaTag, ArenaTagTypeMap } from "#data/arena-tag";
 import { EntryHazardTag, getArenaTag } from "#data/arena-tag";
-import { biomeBgmLoopPoints } from "#data/biome-bgm-loop-points";
+import { getBiomeBgmLoopPoint } from "#data/biome-bgm-loop-points";
 import { getDailyForcedWaveBiomePoolTier } from "#data/daily-seed/daily-run";
 import { allBiomes } from "#data/data-lists";
+import { isRaichuTerrainMoveCancelled } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
   getEncounterSpeciesWeightMultiplier,
   isToxicTerrainProtected,
@@ -21,6 +22,8 @@ import { getErBiomeStartWave } from "#data/elite-redux/er-biome-structure";
 import { withoutImmediateTrainerRepeat } from "#data/elite-redux/er-generic-trainer-run-state";
 import { getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
+import { notifyMoodyRuntimeWeatherTransition } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { notifyMoodyCoordinatorEnemyFieldEffect } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { SpeciesFormChangeRevertWeatherFormTrigger, SpeciesFormChangeWeatherTrigger } from "#data/form-change-triggers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { PositionalTag } from "#data/positional-tags/positional-tag";
@@ -70,6 +73,7 @@ import type { NonEmptyTuple } from "type-fest";
 const ER_EARLY_HIGH_BST_THRESHOLD = 600;
 /** Wave before which the Ace/Elite high-BST wild gate applies. */
 const ER_EARLY_HIGH_BST_WAVE = 55;
+let applyingMoodyMirrorEffect = false;
 
 // ER (#19): BST-proportional legendary wave gate. A LEGEND-like wild of base-stat
 // total BST may not appear until clamp(FLOOR + (BST - ANCHOR)*SLOPE, FLOOR, CEIL).
@@ -256,7 +260,7 @@ export class Arena {
 
   /** A float representing the loop point of the current biome's bgm in seconds */
   public get bgmLoopPoint(): number {
-    return biomeBgmLoopPoints[getBiomeKey(this.biomeId)];
+    return getBiomeBgmLoopPoint(getBiomeKey(this.biomeId));
   }
 
   public get bgTerrainColorRatioForBiome(): number {
@@ -484,6 +488,12 @@ export class Arena {
       ? new Weather(weather, weatherDuration.value, weatherDuration.value, user?.id ?? null, user?.isPlayer() ?? null)
       : null;
 
+    notifyMoodyRuntimeWeatherTransition(
+      oldWeatherType,
+      weather,
+      oldWeatherType !== WeatherType.NONE && oldWeatherType !== weather,
+    );
+
     if (
       [WeatherType.HAIL, WeatherType.SNOW].includes(oldWeatherType)
       && ![WeatherType.HAIL, WeatherType.SNOW].includes(weather)
@@ -525,6 +535,10 @@ export class Arena {
         tag => "weatherTypes" in tag && !(tag.weatherTypes as WeatherType[]).find(w => w === weather),
       );
       applyAbAttrs("PostWeatherChangeAbAttr", { pokemon, weather });
+    }
+
+    if (weather !== WeatherType.NONE) {
+      notifyMoodyCoordinatorEnemyFieldEffect(user, "weather", { weather, turns: weatherDuration.value });
     }
 
     return true;
@@ -703,6 +717,10 @@ export class Arena {
       erApplyTerrainSeeds(pokemon);
     }
 
+    if (terrain !== TerrainType.NONE) {
+      notifyMoodyCoordinatorEnemyFieldEffect(user, "terrain", { terrain, turns: terrainDuration.value });
+    }
+
     return true;
   }
 
@@ -757,7 +775,10 @@ export class Arena {
   }
 
   public isMoveTerrainCancelled(user: Pokemon, targets: BattlerIndex[], move: Move): boolean {
-    return !!this.terrain && this.terrain.isMoveTerrainCancelled(user, targets, move);
+    return (
+      isRaichuTerrainMoveCancelled(user, targets, move)
+      || (!!this.terrain && this.terrain.isMoveTerrainCancelled(user, targets, move))
+    );
   }
 
   // #endregion
@@ -1152,6 +1173,26 @@ export class Arena {
       this.eventTarget.dispatchEvent(
         new TagAddedEvent(newTag.tagType, newTag.side, newTag.turnCount, newTag.maxDuration, layers, maxLayers),
       );
+      if (!applyingMoodyMirrorEffect && side !== ArenaTagSide.BOTH) {
+        const source = globalScene.getPokemonById(sourceId);
+        const mirror = notifyMoodyCoordinatorEnemyFieldEffect(
+          source,
+          newTag instanceof EntryHazardTag ? "hazard" : "side-condition",
+          { tagType, turnCount, sourceMove: sourceMove ?? null, sourceId, side },
+        );
+        if (mirror.copy) {
+          const mirroredSide = side === ArenaTagSide.PLAYER ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER;
+          applyingMoodyMirrorEffect = true;
+          try {
+            this.addTag(tagType, turnCount, sourceMove, sourceId, mirroredSide, quiet);
+            if (mirror.removeFromEnemy) {
+              this.removeTagOnSide(tagType, side, true);
+            }
+          } finally {
+            applyingMoodyMirrorEffect = false;
+          }
+        }
+      }
     }
 
     return true;

@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { pokemonEvolutions, pokemonPrevolutions } from "#balance/pokemon-evolutions";
+import { getFunEvolutionTarget, getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { EvoLevelThresholdKind } from "#enums/evo-level-threshold-kind";
 import { PartyMemberStrength } from "#enums/party-member-strength";
@@ -164,6 +165,15 @@ export function determineEnemySpecies(
 
   const randomLevel = randSeedIntRange(choice, Math.round(choice * multiplier));
   if (randomLevel <= level) {
+    if (globalScene.gameMode.isFun && getFunModeConfig().shuffleEvolutions) {
+      const waveIndex = globalScene.currentBattle?.waveIndex ?? 0;
+      const target = getFunEvolutionTarget(
+        Math.imul(species.speciesId + 1, 131) ^ Math.imul(level + 1, 17) ^ Math.imul(waveIndex + 1, 0x41),
+        species.speciesId,
+        0,
+      );
+      return (target?.species.speciesId ?? evoSpecies) as SpeciesId;
+    }
     return determineEnemySpecies(
       getPokemonSpecies(evoSpecies),
       level,

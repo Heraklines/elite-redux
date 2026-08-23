@@ -2,6 +2,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { modifierTypes } from "#data/data-lists";
+import { coopHostStreamMeBattleParty, coopMeOwnerRelayBattleHandoff } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { FieldPosition } from "#enums/field-position";
@@ -143,6 +144,22 @@ export const FunAndGamesEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
         hideShowmanIntroSprite();
         await summonPlayerPokemon();
         await showWobbuffetHealthBar();
+
+        // Unlike every ordinary battle-spawning Mystery option, Fun and Games constructs both battlers
+        // inline and never enters initBattleWithEnemyConfig. Publish that complete state as a mechanical
+        // ME_TERMINAL before the first CommandPhase can open; ME_PICK is only a proposal/telemetry record
+        // and cannot authorize combat. The direct-turn discriminator tells the renderer to enter TurnInit
+        // without replaying a second MysteryEncounterBattlePhase over the already-authored presentation.
+        coopHostStreamMeBattleParty();
+        if (
+          !(await coopMeOwnerRelayBattleHandoff({
+            encounterMode: encounter.encounterMode,
+            disableSwitch: true,
+            boot: "direct-turn",
+          }))
+        ) {
+          return false;
+        }
 
         return true;
       })

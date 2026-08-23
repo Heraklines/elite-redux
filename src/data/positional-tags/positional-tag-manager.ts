@@ -1,7 +1,7 @@
 import { loadPositionalTag, type ToSerializedPosTag } from "#data/positional-tags/load-positional-tag";
 import type { PositionalTag } from "#data/positional-tags/positional-tag";
 import type { BattlerIndex } from "#enums/battler-index";
-import type { PositionalTagType } from "#enums/positional-tag-type";
+import { PositionalTagType } from "#enums/positional-tag-type";
 
 /** A manager for the {@linkcode PositionalTag}s in the arena. */
 export class PositionalTagManager {
@@ -40,7 +40,11 @@ export class PositionalTagManager {
   public activateAllTags(): void {
     const leftoverTags: PositionalTag[] = [];
     for (const tag of this.tags) {
-      // Check for silent removal, immediately removing invalid tags.
+      // Electrodynamics installs a permanent marker for this battler slot.
+      if (tag.tagType === PositionalTagType.ELECTRODYNAMICS_POSITION) {
+        leftoverTags.push(tag);
+        continue;
+      }
       if (--tag.turnCount > 0) {
         // tag still cooking
         leftoverTags.push(tag);

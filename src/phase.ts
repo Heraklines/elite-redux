@@ -30,7 +30,7 @@ export abstract class Phase {
     if (this.isRetired()) {
       return;
     }
-    globalScene.phaseManager.shiftPhase();
+    globalScene.phaseManager.shiftPhase(this);
   }
 
   /**

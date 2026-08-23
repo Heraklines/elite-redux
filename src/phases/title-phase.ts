@@ -33,8 +33,10 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
+import { resetFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { loadEliteReduxCustomIconsInBackground } from "#data/elite-redux/er-ios-icon-preload";
 import { shouldUseMobileBootMitigations } from "#data/elite-redux/er-mobile-performance";
+import { resetMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
 import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { syncShowdownPendingSettlements } from "#data/elite-redux/showdown/showdown-escrow-client";
@@ -72,8 +74,6 @@ import {
   type TournamentDeepLink,
 } from "#data/elite-redux/showdown/tournament-notifications";
 import { isTournamentPairingCurrent, opponentOf } from "#data/elite-redux/showdown/tournament-types";
-import { recordTelemetryRunAbandonment } from "#data/elite-redux/telemetry/telemetry-hooks";
-import { endTelemetrySession } from "#data/elite-redux/telemetry/telemetry-recorder";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -132,6 +132,10 @@ export function areShowdownTournamentsEnabled(
   search = typeof window === "undefined" ? "" : window.location.search,
   buildEnabled = SHOWDOWN_TOURNAMENTS_BUILD_ENABLED,
 ): boolean {
+  // Production omits the build flag and must stay closed even when a player supplies a test URL override.
+  if (!buildEnabled) {
+    return false;
+  }
   return isShowdownFeatureEnabled(
     search,
     SHOWDOWN_TOURNAMENTS_OVERRIDE_PARAM,
@@ -179,11 +183,6 @@ export class TitlePhase extends Phase {
 
   async start(): Promise<void> {
     super.start();
-
-    // The title is the universal terminal boundary for completed/abandoned runs. This is idempotent and
-    // ensures a short solo run is flushed even when it never crossed a periodic telemetry threshold.
-    recordTelemetryRunAbandonment();
-    endTelemetrySession();
 
     // #ios-stability: we reached the title — boot completed cleanly. This is the milestone whose
     // ABSENCE (in a persisted trail read back after a reload) means the previous session crashed on boot.
@@ -402,6 +401,16 @@ export class TitlePhase extends Phase {
                 return true;
               }
               this.openShowdownTournaments(setModeAndEnd);
+              return true;
+            },
+          });
+          options.push({
+            semanticId: "fun-mode",
+            label: GameMode.getModeName(GameModes.FUN),
+            handler: () => {
+              resetFunModeConfig();
+              resetMoodyModeState();
+              setModeAndEnd(GameModes.FUN);
               return true;
             },
           });
@@ -2274,7 +2283,9 @@ export class TitlePhase extends Phase {
       // ER Community Challenge: a community card already carries its full ruleset
       // (applied above), so skip the challenge-select screen and go straight to
       // starter-select - just like a coop guest mirroring the host's config.
-      if (
+      if (this.gameMode === GameModes.FUN) {
+        globalScene.phaseManager.pushNew("SelectFunModePhase");
+      } else if (
         (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP)
         && !isCoopGuest
         && !this.pendingCommunityConfig // B7 item 14a: a VERSUS (showdown) session goes Title/lobby -> SelectStarterPhase directly, never // the challenge picker. A correctly-launched versus run has gameMode SHOWDOWN (already excluded // here), but guard on the session KIND too so a versus run can never surface the picker even if // its gameMode were ever misread as COOP. Co-op (kind "coop") is unaffected.
@@ -2324,22 +2335,20 @@ export class TitlePhase extends Phase {
     if (this.loaded) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 
-      globalScene.phaseManager.pushNew("SummonPhase", 0, true, true);
-      if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-        globalScene.phaseManager.pushNew("SummonPhase", 1, true, true);
+      const battlerCount = globalScene.currentBattle.getBattlerCount();
+      for (let i = 0; i < Math.min(battlerCount, availablePartyMembers); i++) {
+        globalScene.phaseManager.pushNew("SummonPhase", i, true, true);
       }
 
       if (
         globalScene.currentBattle.battleType !== BattleType.TRAINER
         && (globalScene.currentBattle.waveIndex > 1 || !globalScene.gameMode.isDaily)
+        && availablePartyMembers > battlerCount
       ) {
         // Format-capacity, not `double ? 2 : 1` (a loaded TRIPLE got one prompt max):
         // a switch prompt per field slot whenever a benched spare exists.
-        const battlerCount = globalScene.currentBattle.getBattlerCount();
-        if (availablePartyMembers > battlerCount) {
-          for (let i = 0; i < battlerCount; i++) {
-            globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
-          }
+        for (let i = 0; i < battlerCount; i++) {
+          globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
         }
       }
     }

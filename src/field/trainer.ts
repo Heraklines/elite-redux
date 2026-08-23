@@ -3,6 +3,7 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
 import { isErSmartSwitching } from "#data/elite-redux/er-enemy-ai";
+import { isErBattleFormCustomSpecies } from "#data/elite-redux/er-generic-pool-bans";
 import type { GhostApproachEffect } from "#data/elite-redux/er-ghost-profile";
 import { applyErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -458,7 +459,11 @@ export class Trainer extends Phaser.GameObjects.Container {
             ret = this.config.partyMemberFuncs[index](level, strength);
             return;
           }
-          if (Object.hasOwn(this.config.partyMemberFuncs, index - template.size)) {
+          // The wrapped lookup is only for an authored double trainer's second
+          // half. Triple-format padding must fall through to normal species
+          // generation; wrapping a two-member rival template made slot 3 call
+          // slot 1's starter generator again.
+          if (this.isDouble() && Object.hasOwn(this.config.partyMemberFuncs, index - template.size)) {
             ret = this.config.partyMemberFuncs[index - template.size](level, template.getStrength(index));
             return;
           }
@@ -622,7 +627,12 @@ export class Trainer extends Phaser.GameObjects.Container {
       }
       baseSpecies = getPokemonSpecies(rolledSpecies);
     } else {
-      baseSpecies = globalScene.randomSpecies(battle.waveIndex, level, false, this.config.speciesFilter);
+      baseSpecies = globalScene.randomSpecies(
+        battle.waveIndex,
+        level,
+        false,
+        species => this.config.speciesFilter(species) && !isErBattleFormCustomSpecies(species.speciesId, species.name),
+      );
     }
 
     let ret = getPokemonSpecies(
@@ -632,7 +642,15 @@ export class Trainer extends Phaser.GameObjects.Container {
 
     console.log(ret.getName());
 
-    if (Object.hasOwn(pokemonPrevolutions, baseSpecies.speciesId) && ret.speciesId !== baseSpecies.speciesId) {
+    if (
+      isErBattleFormCustomSpecies(baseSpecies.speciesId, baseSpecies.name)
+      || isErBattleFormCustomSpecies(ret.speciesId, ret.name)
+    ) {
+      // Generic trainers may never roll standalone Mega/Primal/etc records.
+      // Static/editor-authored trainers bypass this generator and remain free
+      // to explicitly field those forms.
+      retry = true;
+    } else if (Object.hasOwn(pokemonPrevolutions, baseSpecies.speciesId) && ret.speciesId !== baseSpecies.speciesId) {
       retry = true;
     } else if (template.isBalanced(battle.enemyParty.length)) {
       const partyMemberTypes = battle.enemyParty.flatMap(p => p.getTypes(true));
@@ -670,6 +688,19 @@ export class Trainer extends Phaser.GameObjects.Container {
     if (retry && (attempt ?? 0) < 10) {
       console.log("Rerolling party member...");
       ret = this.genNewPartyMemberSpecies(level, strength, (attempt ?? 0) + 1);
+    } else if (retry) {
+      // A pathological configured pool can contain nothing but battle forms.
+      // Never leak one after the retry budget: use the normal legal trainer
+      // species pool as the final deterministic fallback.
+      const fallbackBase = globalScene.randomSpecies(
+        battle.waveIndex,
+        level,
+        false,
+        species => this.config.speciesFilter(species) && !isErBattleFormCustomSpecies(species.speciesId, species.name),
+      );
+      ret = getPokemonSpecies(
+        fallbackBase.getTrainerSpeciesForLevel(level, true, strength, template.evoLevelThresholdKind),
+      );
     }
 
     return ret;
@@ -715,8 +746,10 @@ export class Trainer extends Phaser.GameObjects.Container {
       .slice(globalScene.currentBattle.getBattlerCount())
       .filter(p => p.isAllowedInBattle())
       .filter(p => !trainerSlot || p.trainerSlot === trainerSlot);
+    // Stable for the entire scoring pass; computing/filtering it once avoids
+    // repeating the same field walk for every reserve in doubles/triples.
+    const playerField = globalScene.getPlayerField().filter(p => p.isAllowedInBattle());
     const partyMemberScores = nonFaintedLegalPartyMembers.map(p => {
-      const playerField = globalScene.getPlayerField().filter(p => p.isAllowedInBattle());
       let score = 0;
 
       if (playerField.length > 0) {

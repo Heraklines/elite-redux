@@ -355,8 +355,10 @@ jobs:
                 profile: "animations-skipped-depth", artifact: "depth", waves: $depthWaves,
                 difficulty: "youngster", difficulty_option: "youngster", require_mystery: "0",
                 proxy_assets: "1",
-                reward_mode: $depthRewardMode, campaign_timeout_ms: "2700000",
-                process_timeout: "48m", job_timeout_minutes: 55
+                reward_mode: $depthRewardMode,
+                campaign_timeout_ms: (if ($depthWaves | tonumber) > 4 then "4800000" else "2700000" end),
+                process_timeout: (if ($depthWaves | tonumber) > 4 then "83m" else "48m" end),
+                job_timeout_minutes: (if ($depthWaves | tonumber) > 4 then 90 else 55 end)
               },
               {
                 profile: "mystery-gauntlet", artifact: "mystery", waves: $mysteryWaves,

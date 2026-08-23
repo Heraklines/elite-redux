@@ -9,6 +9,7 @@ import { Phase } from "#app/phase";
 import { terminateCoopAuthoritySession } from "#data/elite-redux/coop/coop-authority-terminal";
 import { captureCoopAuthoritativeCarrier } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   captureCoopDeferredWaveOutcomeForTurnCommit,
   coopSessionGeneration,
@@ -18,6 +19,9 @@ import {
   isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import { BattleType } from "#enums/battle-type";
+import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { StatusEffect } from "#enums/status-effect";
 
 /**
@@ -150,6 +154,19 @@ export class CoopTurnCommitPhase extends Phase {
         return;
       }
       const deferredWaveOutcome = captureCoopDeferredWaveOutcomeForTurnCommit(carrier.authoritativeState.wave);
+      const mysteryEncounter = globalScene.currentBattle?.mysteryEncounter;
+      const mysteryTurnsRemaining = mysteryEncounter?.misc?.turnsRemaining;
+      // Fun and Games is the one Mystery surface that enters ordinary turns without changing its
+      // encounterMode away from NO_BATTLE. Its Wobbuffet is supposed to survive; after the third command the
+      // host's next TurnInit closes the minigame instead of opening turn four. Capture that engine-owned fact
+      // here so V2 waits for the exact ME_TERMINAL rather than re-deriving COMMAND from two living parties.
+      const mysteryTerminalAfterTurn =
+        mysteryEncounter?.encounterType === MysteryEncounterType.FUN_AND_GAMES
+        && mysteryEncounter.encounterMode === MysteryEncounterMode.NO_BATTLE
+        && coopMeHandoffBattleStarted()
+        && typeof mysteryTurnsRemaining === "number"
+        && Number.isSafeInteger(mysteryTurnsRemaining)
+        && mysteryTurnsRemaining <= 0;
       const retained = streamer.emitTurn(
         controller.sessionEpoch,
         carrier.authoritativeState.wave,
@@ -161,8 +178,14 @@ export class CoopTurnCommitPhase extends Phase {
         carrier.fullField,
         carrier.authoritativeState,
         {
-          mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true,
+          // Fun and Games deliberately remains NO_BATTLE, so the generic predicate is false even though its
+          // finite direct-turn handoff is still owned by the retained Mystery transaction.
+          mysteryBattle: globalScene.currentBattle?.isBattleMysteryEncounter() === true || mysteryTerminalAfterTurn,
+          ...(mysteryTerminalAfterTurn ? { mysteryTerminalAfterTurn: true } : {}),
           ...(deferredWaveOutcome == null ? {} : { deferredWaveOutcome }),
+          ...(deferredWaveOutcome === "win" && globalScene.currentBattle?.battleType === BattleType.TRAINER
+            ? { trainerVictoryPresentation: true }
+            : {}),
           pendingMutationTokens: mutationAfter.pendingTokens,
         },
       );

@@ -16,6 +16,7 @@ import { coopMeHandoffBattleStarted, coopMeInProgress } from "#data/elite-redux/
 import type { CoopMutationLedger, CoopMutationToken } from "#data/elite-redux/coop/coop-mutation-ledger";
 import { coopRendererGateNeutralizes } from "#data/elite-redux/coop/coop-renderer-gate";
 import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
+import type { AbilityId } from "#enums/ability-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import type { Pokemon } from "#field/pokemon";
 import { AddEnemyBuffModifierPhase } from "#phases/add-enemy-buff-modifier-phase";
@@ -73,6 +74,9 @@ import { EggSummaryPhase } from "#phases/egg-summary-phase";
 import { EncounterPhase } from "#phases/encounter-phase";
 import { EndCardPhase } from "#phases/end-card-phase";
 import { EndEvolutionPhase } from "#phases/end-evolution-phase";
+import { EndlessContinuationPhase } from "#phases/endless-continuation-phase";
+import { EndlessOfferPhase } from "#phases/endless-offer-phase";
+import { EndlessRiftPulsePhase } from "#phases/endless-rift-pulse-phase";
 import { EnemyCommandPhase } from "#phases/enemy-command-phase";
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
 import { ErClosedCircuitBurstPhase } from "#phases/er-closed-circuit-burst-phase";
@@ -80,6 +84,7 @@ import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { ErGreaterAbilityCapsulePhase } from "#phases/er-greater-ability-capsule-phase";
 import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-randomizer-phase";
+import { ErGreaterMoveRandomizerPhase } from "#phases/er-greater-move-randomizer-phase";
 import { ErOmniformTransformWaitPhase } from "#phases/er-omniform-transform-wait-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { ErShatteredPsycheBonusPhase } from "#phases/er-shattered-psyche-bonus-phase";
@@ -108,6 +113,16 @@ import { LoginPhase } from "#phases/login-phase";
 import { MessagePhase } from "#phases/message-phase";
 import { ModifierRewardPhase } from "#phases/modifier-reward-phase";
 import { MoneyRewardPhase } from "#phases/money-reward-phase";
+import {
+  MoodyCoordinatorChoicePhase,
+  MoodyCoordinatorConfirmPhase,
+  MoodyCoordinatorOperationPhase,
+  MoodyCoordinatorPokemonChoicePhase,
+} from "#phases/moody-coordinator-choice-phase";
+import { MoodyCoordinatorEchoCleanupPhase, MoodyCoordinatorEchoPhase } from "#phases/moody-coordinator-echo-phase";
+import { MoodyFormationChoicePhase } from "#phases/moody-formation-choice-phase";
+import { MoodyRuntimeChoicePhase } from "#phases/moody-runtime-choice-phase";
+import { MoodySectionReportPhase } from "#phases/moody-section-report-phase";
 import { MoveAnimPhase } from "#phases/move-anim-phase";
 import { MoveChargePhase } from "#phases/move-charge-phase";
 import { MoveEffectPhase } from "#phases/move-effect-phase";
@@ -145,13 +160,16 @@ import { RibbonModifierRewardPhase } from "#phases/ribbon-modifier-reward-phase"
 import { ScanIvsPhase } from "#phases/scan-ivs-phase";
 import { SelectBiomePhase } from "#phases/select-biome-phase";
 import { SelectChallengePhase } from "#phases/select-challenge-phase";
+import { SelectFunModePhase } from "#phases/select-fun-mode-phase";
 import { SelectGenderPhase } from "#phases/select-gender-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { SelectMoodyBoonPhase } from "#phases/select-moody-boon-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { SelectTargetPhase } from "#phases/select-target-phase";
 import { ShiftSummonPhase } from "#phases/shift-summon-phase";
 import { ShinySparklePhase } from "#phases/shiny-sparkle-phase";
 import { ShowAbilityPhase } from "#phases/show-ability-phase";
+import { ShowMoodyEffectPhase } from "#phases/show-moody-effect-phase";
 import { ShowPartyExpBarPhase } from "#phases/show-party-exp-bar-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
 import { ShowdownEnemyFaintSwitchPhase } from "#phases/showdown-enemy-faint-switch-phase";
@@ -200,6 +218,7 @@ const PHASES = Object.freeze({
   ErAbilityCapsulePhase,
   ErGreaterAbilityCapsulePhase,
   ErGreaterAbilityRandomizerPhase,
+  ErGreaterMoveRandomizerPhase,
   ErClosedCircuitBurstPhase,
   ErOmniformTransformWaitPhase,
   ErShatteredPsycheBonusPhase,
@@ -253,6 +272,9 @@ const PHASES = Object.freeze({
   EggSummaryPhase,
   EncounterPhase,
   EndCardPhase,
+  EndlessContinuationPhase,
+  EndlessOfferPhase,
+  EndlessRiftPulsePhase,
   EndEvolutionPhase,
   EnemyCommandPhase,
   ErDexNavPhase,
@@ -275,6 +297,14 @@ const PHASES = Object.freeze({
   LoadMoveAnimPhase,
   LoginPhase,
   MessagePhase,
+  MoodyFormationChoicePhase,
+  MoodyCoordinatorChoicePhase,
+  MoodyCoordinatorConfirmPhase,
+  MoodyCoordinatorOperationPhase,
+  MoodyCoordinatorPokemonChoicePhase,
+  MoodyCoordinatorEchoCleanupPhase,
+  MoodyCoordinatorEchoPhase,
+  MoodySectionReportPhase,
   ModifierRewardPhase,
   MoneyRewardPhase,
   MoveAnimPhase,
@@ -312,13 +342,17 @@ const PHASES = Object.freeze({
   ScanIvsPhase,
   SelectBiomePhase,
   SelectChallengePhase,
+  SelectFunModePhase,
   SelectGenderPhase,
   SelectModifierPhase,
+  SelectMoodyBoonPhase,
+  MoodyRuntimeChoicePhase,
   SelectStarterPhase,
   SelectTargetPhase,
   ShiftSummonPhase,
   ShinySparklePhase,
   ShowAbilityPhase,
+  ShowMoodyEffectPhase,
   ShowdownEnemyFaintSwitchPhase,
   ShowdownResultPhase,
   ShowPartyExpBarPhase,
@@ -370,6 +404,17 @@ export class PhaseManager {
   private currentPhase: Phase;
   /** The phase put on standby if {@linkcode overridePhase} is called */
   private standbyPhase: Phase | null = null;
+  /** A suspended predecessor may finish asynchronously, but may not displace the modal above it. */
+  private completedStandbyPhase: Phase | null = null;
+  /**
+   * Exact phase objects that crossed the scheduler's one production/test start seam.
+   *
+   * Ordinary temporary overrides restore an already-running standby phase and must not restart it. An
+   * Authority V2 modal can instead be installed over a successor that was deliberately selected but kept
+   * unstarted until its ordered result arrived. The object identity, rather than its phase name, distinguishes
+   * those two cases when the modal closes.
+   */
+  private readonly startedPhases = new WeakSet<Phase>();
   /**
    * Runtime-owned authoritative-mutation leases, keyed by the exact phase object that acquired them.
    * A phase remains live across awaits, UI interruption, and modal overrides, so its token is released only
@@ -501,6 +546,7 @@ export class PhaseManager {
       this.standbyPhase.retire();
     }
     this.standbyPhase = null;
+    this.completedStandbyPhase = null;
   }
 
   /** Freeze phase progression at the current surface while a co-op shared terminal is retained. */
@@ -608,7 +654,12 @@ export class PhaseManager {
     ) {
       return false;
     }
+    if (this.standbyPhase != null && this.standbyPhase !== predecessor) {
+      this.settleCoopMutationPhase(this.standbyPhase);
+      this.standbyPhase.retire();
+    }
     this.standbyPhase = predecessor;
+    this.completedStandbyPhase = null;
     this.currentPhase = successor;
     this.startCurrentPhase();
     return true;
@@ -639,6 +690,7 @@ export class PhaseManager {
 
     const predecessor = this.standbyPhase;
     this.standbyPhase = null;
+    this.completedStandbyPhase = null;
     this.settleCoopMutationPhase(phase);
     phase.retire();
     this.settleCoopMutationPhase(predecessor);
@@ -665,7 +717,16 @@ export class PhaseManager {
    * @privateRemarks
    * This is called by {@linkcode Phase.end} by default, and should not be called by other methods.
    */
-  public shiftPhase(): void {
+  public shiftPhase(completingPhase?: Phase): void {
+    // An asynchronous presentation callback can resolve after Authority V2 has installed a modal over that
+    // exact phase. Its completion belongs to the suspended predecessor; it must be remembered for the modal's
+    // eventual return edge, but it may never shift the current modal or restore itself underneath the UI.
+    if (completingPhase != null && completingPhase !== this.currentPhase) {
+      if (completingPhase === this.standbyPhase) {
+        this.completedStandbyPhase = completingPhase;
+      }
+      return;
+    }
     if (this.coopTerminalProgressionFrozen) {
       return;
     }
@@ -677,9 +738,18 @@ export class PhaseManager {
     }
     this.settleCoopMutationPhase(this.currentPhase);
     if (this.standbyPhase) {
-      this.currentPhase = this.standbyPhase;
+      const standby = this.standbyPhase;
       this.standbyPhase = null;
-      return;
+      if (this.completedStandbyPhase !== standby) {
+        this.completedStandbyPhase = null;
+        this.currentPhase = standby;
+        return;
+      }
+      // The predecessor already reached its natural terminal while suspended. Consume that deferred shift
+      // now instead of resurrecting a dead replay with the modal's PARTY/menu handler still on screen.
+      this.completedStandbyPhase = null;
+      this.settleCoopMutationPhase(standby);
+      standby.retire();
     }
 
     let nextPhase = this.phaseQueue.getNextPhase();
@@ -705,7 +775,10 @@ export class PhaseManager {
    * successor open before its immutable Authority V2 entry exists. This seam separates those two scheduler
    * edges without exposing the phase tree: `commitAfterClose` runs after `phase` is no longer current, but
    * before a newly dequeued successor starts. Returning false leaves that successor unstarted so the shared
-   * terminal path can fail closed; a parked standby is restored exactly as ordinary `shiftPhase` does.
+   * terminal path can fail closed. A parked standby is restored without restarting an ordinary predecessor,
+   * while an Authority V2 successor that was deliberately parked before its first start begins only after the
+   * commit succeeds. The commit may atomically replace and start the selected successor (for example, by
+   * projecting a buffered V2 modal). In that case this method must not start the replacement a second time.
    */
   public shiftPhaseThroughCoopAuthorityCommit(phase: Phase, commitAfterClose: () => boolean): boolean {
     if (this.currentPhase !== phase || this.coopTerminalProgressionFrozen || this.coopRecoveryProgressionFrozen()) {
@@ -713,9 +786,38 @@ export class PhaseManager {
     }
     this.settleCoopMutationPhase(phase);
     if (this.standbyPhase) {
-      this.currentPhase = this.standbyPhase;
+      const selectedSuccessor = this.standbyPhase;
+      const standbyCompleted = this.completedStandbyPhase === selectedSuccessor;
       this.standbyPhase = null;
-      return commitAfterClose();
+      this.completedStandbyPhase = null;
+      if (standbyCompleted) {
+        this.settleCoopMutationPhase(selectedSuccessor);
+        selectedSuccessor.retire();
+        let nextPhase = this.phaseQueue.getNextPhase();
+        if (nextPhase?.is("DynamicPhaseMarker")) {
+          nextPhase = this.dynamicQueueManager.popNextPhase(nextPhase.phaseType);
+        }
+        if (nextPhase == null) {
+          this.turnStart();
+        } else {
+          this.currentPhase = nextPhase;
+        }
+      } else {
+        this.currentPhase = selectedSuccessor;
+      }
+      const selectedAfterClose = this.currentPhase;
+      const successorWasStarted = this.startedPhases.has(selectedAfterClose);
+      const startSelectedSuccessor = commitAfterClose();
+      if (this.currentPhase !== selectedAfterClose) {
+        return true;
+      }
+      if (!startSelectedSuccessor) {
+        return false;
+      }
+      if (!successorWasStarted) {
+        this.startCurrentPhase();
+      }
+      return true;
     }
 
     let nextPhase = this.phaseQueue.getNextPhase();
@@ -727,7 +829,12 @@ export class PhaseManager {
     } else {
       this.currentPhase = nextPhase;
     }
-    if (!commitAfterClose()) {
+    const selectedSuccessor = this.currentPhase;
+    const startSelectedSuccessor = commitAfterClose();
+    if (this.currentPhase !== selectedSuccessor) {
+      return true;
+    }
+    if (!startSelectedSuccessor) {
       return false;
     }
     this.startCurrentPhase();
@@ -757,6 +864,9 @@ export class PhaseManager {
    */
   public prepareCurrentPhaseForStart(): void {
     const phase = this.currentPhase;
+    if (phase != null) {
+      this.startedPhases.add(phase);
+    }
     if (phase == null || phase.is("CoopTurnCommitPhase") || this.coopMutationTokens.has(phase)) {
       return;
     }
@@ -795,6 +905,7 @@ export class PhaseManager {
     }
 
     this.standbyPhase = this.currentPhase;
+    this.completedStandbyPhase = null;
     this.currentPhase = phase;
     this.startCurrentPhase();
 
@@ -885,10 +996,33 @@ export class PhaseManager {
    *   sources. Defaults to slot 0 for legacy callers. Ignored when `passive` is
    *   `false` or `show` is `false` (hide doesn't read the slot).
    */
-  public queueAbilityDisplay(pokemon: Pokemon, passive: boolean, show: boolean, passiveSlot = 0): void {
+  public queueAbilityDisplay(
+    pokemon: Pokemon,
+    passive: boolean,
+    show: boolean,
+    passiveSlot = 0,
+    resolvedAbilityId?: AbilityId,
+  ): void {
+    // In ordinary solo play, disabling banners must remove their scheduling cost,
+    // not merely hide the tween after hundreds of Show/Hide phases were queued.
+    // Networked modes retain phases because those are ordered replay boundaries.
+    if (!globalScene.showAbilityFlyouts && !globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown) {
+      if (show) {
+        pokemon.revealAbility(passive, passiveSlot, resolvedAbilityId);
+      }
+      return;
+    }
     this.unshiftPhase(
       show ? new ShowAbilityPhase(pokemon.getBattlerIndex(), passive, passiveSlot) : new HideAbilityPhase(),
     );
+  }
+
+  /** Queue one trainer-owned Moody effect through the normal ability-bar presentation lane. */
+  public queueMoodyEffectDisplay(cue: ConstructorParameters<typeof ShowMoodyEffectPhase>[0]): void {
+    if (!globalScene.showMoodyEffectFlyouts) {
+      return;
+    }
+    this.unshiftPhase(new ShowMoodyEffectPhase(cue), new HideAbilityPhase());
   }
 
   /**

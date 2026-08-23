@@ -235,6 +235,10 @@ if (
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "navigation-depth-30"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "evolution-sync"')
   || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "showdown-battle"')
+  || !fixtureRegistry.includes('env?.VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"')
+  || !/getCoopBrowserPartyRewardFixtureId\(\)[\s\S]*!isCoopBrowserPartyRewardFixtureBuild\(\)[\s\S]*query\.get\("coopfixture"\) !== "party-mutating-rewards"[\s\S]*COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS\.has\(rewardId\)/u.test(
+    fixtureRegistry,
+  )
   || !fixtureRegistry.includes('get("coopfixture")')
   || !starterHandler.includes("getCoopBrowserCommanderFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserFaintFixtureStarters()")
@@ -242,12 +246,16 @@ if (
   || !starterHandler.includes("getCoopBrowserCampaignFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserNavigationFixtureStarters()")
   || !starterHandler.includes("getCoopBrowserEvolutionFixtureStarters()")
+  || !starterHandler.includes("getCoopBrowserPartyRewardFixtureStarters()")
   || !starterHandler.includes("allowUncaught: true")
-  || !starterHandler.includes("allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters")
+  || !/allowOverValueLimit:\s*coopBrowserStarters === coopBrowserNavigationStarters\s*\|\|\s*coopBrowserStarters === coopBrowserPartyRewardStarters/u.test(
+    starterHandler,
+  )
   || !starterHandler.includes("!options.allowOverValueLimit && !this.tryUpdateValue(cost, true)")
   || !selectStarterPhase.includes("const navigationFixtureActive = isCoopBrowserNavigationFixtureActive()")
-  || !selectStarterPhase.includes(
-    "cost: navigationFixtureActive ? 0 : globalScene.gameData.getSpeciesStarterValue(s.speciesId)",
+  || !selectStarterPhase.includes("const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId() != null")
+  || !/cost:\s*navigationFixtureActive \|\| partyRewardFixtureActive\s*\? 0\s*:\s*globalScene\.gameData\.getSpeciesStarterValue\(s\.speciesId\)/u.test(
+    selectStarterPhase,
   )
 ) {
   failures.push("Browser gameplay checkpoints must require the exact build+URL gate at their visible setup UI");
@@ -370,10 +378,15 @@ if (
     "campaign battle selection must use the strongest read-only visible move and public keys, with explicit alternates and exact key overrides retained",
   );
 }
+// Mutation continuations are validated after the picker closes and wave-2 command opens, while
+// evolution/fusion can also reorder the roster. Keep the stable party projection on every
+// addressed gameplay surface instead of limiting it to PARTY/COMMAND with a UI-mode allowlist.
 if (
   !browserEntry.includes("hp: pokemon.hp")
   || !browserEntry.includes("maxHp: pokemon.getMaxHp()")
-  || !browserEntry.includes('uiMode === "PARTY" || semantic.operationClass === "command"')
+  || !browserEntry.includes("modifierStacks: observedPokemonModifierStacks(pokemon.id)")
+  || !browserEntry.includes("const partySlots =")
+  || !browserEntry.includes("? globalScene.getPlayerParty().map((pokemon, slot) => {")
   || !campaign.includes("export function chooseRewardPartyTargetSlot(")
   || !campaign.includes("export function rewardPartyTargetCandidates(")
   || !campaign.includes('observation?.surfaceId === "reward-shop"')

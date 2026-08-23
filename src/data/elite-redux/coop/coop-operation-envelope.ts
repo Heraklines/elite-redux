@@ -22,8 +22,10 @@
 // top and is individually flag-gated (§5).
 // =============================================================================
 
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type {
   CoopAuthoritativeBattleStateV1,
+  CoopBattleEvent,
   CoopInteractionOutcome,
   CoopRewardSurfaceIdentity,
   CoopSerializedRewardOption,
@@ -235,6 +237,15 @@ export interface CoopRewardActionPayload {
   /** Complete reward-surface state after this action; proposals omit it, committed results require it. */
   readonly result?: {
     readonly lockModifierTiers: boolean;
+    /**
+     * Exact authority-resolved visual mutation queued by this reward. The interaction commit carries the
+     * event itself so the replica never guesses a form edge from its local modifier catalog, and material
+     * completion remains ordered behind the mechanics-free replay.
+     */
+    readonly presentation?:
+      | Extract<CoopBattleEvent, { readonly k: "formChange" }>
+      | Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>
+      | undefined;
     /** Exact nested picker opened by this result, when one exists. */
     readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
     /**
@@ -408,6 +419,8 @@ export type CoopLearnMovePayload =
       readonly maxMoveCount: number;
       /** Exact interaction resumed after this concrete accept/decline result. */
       readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
+      /** True only when this accepted nested reward consumes its parent and may enter wave N+1. */
+      readonly allowNextWaveStart: boolean;
     };
 
 export type CoopLearnMoveBatchPayload =
@@ -576,6 +589,12 @@ export interface CoopMeRewardDestination {
 export type CoopMeTerminalDestination =
   | {
       readonly kind: "battle";
+      /**
+       * Exact renderer boot owned by this transaction. Ordinary Mystery battles run their presentation-only
+       * encounter phase; Fun and Games has already built both battlers inside the option and enters TurnInit
+       * directly. A receiver must never infer this distinction from `encounterMode` or local encounter code.
+       */
+      readonly boot: "encounter-phase" | "direct-turn";
       /** Host turn-space at the instant the spawned battle becomes executable. */
       readonly hostTurn: number;
       /** Exact {@linkcode MysteryEncounterMode}; the guest must never infer it from its reconstructed party. */

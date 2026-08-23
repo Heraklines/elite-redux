@@ -192,6 +192,42 @@ describe.skipIf(!RUN)("combat contract live harness", () => {
     expect(report.preparedCommitMedianMs).toBeLessThan(10);
   });
 
+  it.each([
+    ["single", [SpeciesId.CHARIZARD]],
+    ["double", [SpeciesId.CHARIZARD, SpeciesId.PIKACHU]],
+    ["triple", [SpeciesId.CHARIZARD, SpeciesId.PIKACHU, SpeciesId.EEVEE]],
+  ] as const)("profiles the complete damaging-candidate preparation for a %s field", async (format, party) => {
+    game.override.startingWave(2).battleStyle(format).moveset(MoveId.TACKLE).enemyMoveset(MoveId.SPLASH);
+    await game.classicMode.startBattle(...party);
+
+    expect(game.scene.getPlayerField()).toHaveLength(party.length);
+    expect(game.scene.getEnemyField()).toHaveLength(party.length);
+
+    const samples: number[] = [];
+    let candidateCount = 0;
+    for (let sample = 0; sample < 5; sample++) {
+      const started = performance.now();
+      // Production now shares this immutable pre-turn observation across every
+      // active actor while retaining actor-specific candidate enumeration.
+      snapshotErCombatObservation(game.scene);
+      candidateCount = 0;
+      for (let actorSlot = 0; actorSlot < party.length; actorSlot++) {
+        candidateCount += enumerateErCombatCandidates(game.scene, actorSlot).length;
+      }
+      samples.push(performance.now() - started);
+    }
+    samples.sort((left, right) => left - right);
+    const report = {
+      format,
+      activeSlots: party.length,
+      candidateCount,
+      preparationMedianMs: samples[Math.floor(samples.length / 2)],
+    };
+    console.log(`[combat-telemetry-multibattle-benchmark] ${JSON.stringify(report)}`);
+    expect(candidateCount).toBeGreaterThanOrEqual(party.length);
+    expect(report.preparationMedianMs).toBeLessThan(1_000);
+  });
+
   it("maps the real Baton switch flag without calling a chooser", async () => {
     await game.classicMode.startBattle(SpeciesId.CHARIZARD, SpeciesId.PIKACHU);
     const actor = game.scene.getPlayerField()[0];

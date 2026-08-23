@@ -11,26 +11,17 @@
 // timing, from the top of TurnStartPhase), the holder fuses TWO of its opponents
 // into ONE temporary entity:
 //   - DOUBLES: the two enemy field mons fuse into one, with COMBINED HP (both
-//     mons' hp and maxHP summed). The absorbed mon leaves the field (a real
-//     FaintPhase - the only field removal the co-op checkpoint fully models),
-//     and the fused entity takes BOTH mons' actions each turn (its own move plus
-//     the absorbed mon's move, delivered by ErShatteredPsycheBonusPhase).
+//     mons' hp and maxHP summed). The absorbed mon becomes temporarily
+//     unavailable without entering the faint pipeline, and the fused entity
+//     takes both mons' already-committed actions that turn.
 //   - SINGLES: the active opponent fuses with a SEEDED-random pick from the enemy
 //     bench (randBattleSeedInt only - the co-op determinism requirement, never
 //     Math.random). With NO bench mon the ability does nothing and is NOT
 //     consumed (it may still fire on a later turn once a bench mon exists).
 //
-// UN-FUSE: when the fused entity leaves the field (faint / battle end), its
-// current HP is split back PROPORTIONALLY to each constituent's original max HP,
-// the entity's own max HP is restored, and the blended look is cleared. The
-// absorbed constituent is not re-summoned (the fusion lasts until the entity
-// leaves the field), so the only co-op field mutation is the initial FaintPhase.
-//
-// CO-OP SAFETY: this runs HOST/SOLO ONLY (the guest diverts the whole turn to
-// CoopReplayTurnPhase before the trigger). Every effect is expressed through
-// state the per-turn checkpoint already reconciles (hp / maxHp / fainted) or a
-// streamed phase cue (FaintPhase, MovePhase); the fusion fields and the un-fuse
-// ledger are host-local cosmetics that never cross the wire.
+// UN-FUSE: when the fused entity leaves the field or the battle ends, its
+// current HP is split back PROPORTIONALLY to each constituent's original max HP.
+// Both constituents and any pre-existing DNA-fusion identity are restored.
 //
 // REUSES the existing fusion infrastructure - the `fusionSpecies`/`fusionFormIndex`/
 // ... fields the DNA Splicer path populates - for the blended sprite/name, rather
@@ -67,30 +58,68 @@ export class ShatteredPsycheAbAttr extends AbAttr {
 
 /** Per-battle (per-wave) once-only guard. Host-local; never serialized. */
 let shatteredPsycheWaveKey = "";
+let shatteredPsycheBattle: object | undefined;
 const shatteredPsycheFiredHolders = new Set<number>();
 
 /** Un-fuse bookkeeping for a fused entity, keyed by the entity's pokemon id. */
 interface FusionRecord {
+  /** The entity carrying the temporary fusion. */
+  readonly primary: Pokemon;
   /** The fused entity's ORIGINAL max HP (its own contribution). */
   readonly primaryMax: number;
   /** The absorbed constituent's original max HP (its contribution). */
   readonly constituentMax: number;
-  /** The absorbed constituent's pokemon id. */
-  readonly constituentId: number;
+  /** The absorbed constituent. Battle-local only; never serialized. */
+  readonly constituent: Pokemon;
+  /** Whether the constituent occupied a field seat before it was absorbed. */
+  readonly constituentWasOnField: boolean;
+  /** Complete pre-existing DNA-fusion identity of the primary. */
+  readonly primaryFusion: FusionIdentity;
 }
 const shatteredPsycheLedger = new Map<number, FusionRecord>();
+/** Temporarily absorbed Pokemon are alive, but must not be targetable or selectable as reserves. */
+const shatteredPsycheAbsorbed = new WeakSet<Pokemon>();
+
+interface FusionIdentity {
+  readonly species: Pokemon["fusionSpecies"];
+  readonly formIndex: number;
+  readonly abilityIndex: number;
+  readonly shiny: boolean;
+  readonly variant: Pokemon["fusionVariant"];
+  readonly gender: Pokemon["fusionGender"];
+  readonly luck: number;
+  readonly customPokemonData: Pokemon["fusionCustomPokemonData"];
+}
+
+/** Whether a living party member is temporarily contained inside a Shattered Psyche fusion. */
+export function erShatteredPsycheIsAbsorbed(pokemon: Pokemon): boolean {
+  return shatteredPsycheAbsorbed.has(pokemon);
+}
 
 /** Read-only holder/fusion state for combat-policy observations. */
 export function erShatteredPsycheState(pokemon: Pokemon):
   | {
       fired: boolean;
       wave: number;
-      fusion: FusionRecord | null;
+      fusion: {
+        primaryMax: number;
+        constituentMax: number;
+        constituentId: number;
+      } | null;
     }
   | undefined {
   const wave = globalScene.currentBattle?.waveIndex ?? -1;
-  const fired = shatteredPsycheWaveKey === String(wave) && shatteredPsycheFiredHolders.has(pokemon.id);
-  const fusion = shatteredPsycheWaveKey === String(wave) ? (shatteredPsycheLedger.get(pokemon.id) ?? null) : null;
+  const sameBattle = shatteredPsycheBattle === globalScene.currentBattle;
+  const fired = sameBattle && shatteredPsycheWaveKey === String(wave) && shatteredPsycheFiredHolders.has(pokemon.id);
+  const record =
+    sameBattle && shatteredPsycheWaveKey === String(wave) ? (shatteredPsycheLedger.get(pokemon.id) ?? null) : null;
+  const fusion = record
+    ? {
+        primaryMax: record.primaryMax,
+        constituentMax: record.constituentMax,
+        constituentId: record.constituent.id,
+      }
+    : null;
   return fired || fusion ? { fired, wave, fusion } : undefined;
 }
 
@@ -146,21 +175,41 @@ function applyFusionLook(primary: Pokemon, constituent: Pokemon): void {
   primary.fusionVariant = constituent.variant;
   primary.fusionGender = constituent.gender;
   primary.fusionLuck = constituent.luck;
+  primary.fusionCustomPokemonData = constituent.customPokemonData;
+  primary.generateName();
 }
 
-/** Clear a blended look (on un-fuse). */
-function clearFusionLook(primary: Pokemon): void {
-  primary.fusionSpecies = null;
-  primary.fusionFormIndex = 0;
-  primary.fusionAbilityIndex = 0;
-  primary.fusionShiny = false;
-  primary.fusionVariant = 0;
+function snapshotFusionIdentity(primary: Pokemon): FusionIdentity {
+  return {
+    species: primary.fusionSpecies,
+    formIndex: primary.fusionFormIndex,
+    abilityIndex: primary.fusionAbilityIndex,
+    shiny: primary.fusionShiny,
+    variant: primary.fusionVariant,
+    gender: primary.fusionGender,
+    luck: primary.fusionLuck,
+    customPokemonData: primary.fusionCustomPokemonData,
+  };
+}
+
+/** Restore the exact DNA-fusion identity that existed before the forced fusion. */
+function restoreFusionIdentity(primary: Pokemon, identity: FusionIdentity): void {
+  primary.fusionSpecies = identity.species;
+  primary.fusionFormIndex = identity.formIndex;
+  primary.fusionAbilityIndex = identity.abilityIndex;
+  primary.fusionShiny = identity.shiny;
+  primary.fusionVariant = identity.variant;
+  primary.fusionGender = identity.gender;
+  primary.fusionLuck = identity.luck;
+  primary.fusionCustomPokemonData = identity.customPokemonData;
+  primary.generateName();
+  primary.calculateStats();
 }
 
 /** Living, benched (off-field) enemy party members `holder` could absorb in singles. */
 function enemyBench(holder: Pokemon): Pokemon[] {
   const party = holder.isPlayer() ? globalScene.getEnemyParty() : globalScene.getPlayerParty();
-  return party.filter(p => p != null && !p.isFainted() && !p.isOnField());
+  return party.filter(p => p?.isAllowedInBattle() && !p.isOnField());
 }
 
 /**
@@ -190,34 +239,50 @@ function tryFuseOpponents(holder: Pokemon): boolean {
   } else {
     return false;
   }
-  if (!primary || !constituent || primary === constituent) {
+  if (
+    !primary
+    || !constituent
+    || primary === constituent
+    || shatteredPsycheLedger.has(primary.id)
+    || shatteredPsycheAbsorbed.has(primary)
+    || shatteredPsycheAbsorbed.has(constituent)
+  ) {
     return false;
   }
 
   const primaryMax = primary.getMaxHp();
   const constituentMax = constituent.getMaxHp();
   const bonusMove = pickConstituentMove(constituent, holder, constituentOnField);
+  const primaryFusion = snapshotFusionIdentity(primary);
 
   // Combined HP: sum both mons' current + max HP onto the primary.
   primary.setStat(Stat.HP, primaryMax + constituentMax);
   primary.hp = Math.min(primaryMax + constituentMax, primary.hp + Math.max(0, constituent.hp));
   applyFusionLook(primary, constituent);
-  shatteredPsycheLedger.set(primary.id, { primaryMax, constituentMax, constituentId: constituent.id });
+  shatteredPsycheLedger.set(primary.id, {
+    primary,
+    primaryMax,
+    constituentMax,
+    constituent,
+    constituentWasOnField: constituentOnField,
+    primaryFusion,
+  });
+  shatteredPsycheAbsorbed.add(constituent);
 
-  // Remove the absorbed constituent.
+  // Temporarily retire the absorbed constituent without sending it through
+  // FaintPhase. A synthetic faint used to award a KO, run VictoryPhase, replace
+  // trainer slots, move held items, and tear down UI even though the Pokemon was
+  // still part of the combined entity.
   if (constituentOnField) {
-    // On-field: skip its queued action, then remove it via a real FaintPhase
-    // (the only field removal the co-op checkpoint fully models).
     const slot = constituent.getBattlerIndex();
     const cmd = globalScene.currentBattle.turnCommands[slot];
     if (cmd) {
       cmd.skip = true;
     }
-    constituent.hp = 0;
-    globalScene.phaseManager.unshiftNew("FaintPhase", slot, true);
-  } else {
-    // Off-field bench mon (not in the field checksum): flag it defeated.
-    constituent.hp = 0;
+    constituent.switchOutStatus = true;
+    constituent.setVisible(false);
+    constituent.getSprite()?.setVisible(false);
+    constituent.hideInfo();
   }
 
   // Refresh the fused entity's HP bar / name to the combined values.
@@ -241,13 +306,16 @@ export function erShatteredPsycheMaybeFuse(): void {
     return;
   }
   const waveKey = String(battle.waveIndex);
-  if (shatteredPsycheWaveKey !== waveKey) {
+  if (shatteredPsycheBattle !== battle) {
+    // Defensive boundary recovery for interrupted/legacy phase queues. Normally
+    // BattleEndPhase restores these before rewards and before newBattle().
+    erShatteredPsycheEndBattle();
+    shatteredPsycheBattle = battle;
     shatteredPsycheWaveKey = waveKey;
     shatteredPsycheFiredHolders.clear();
-    shatteredPsycheLedger.clear();
   }
   for (const holder of globalScene.getField()) {
-    if (!holder || !holder.isActive(true) || shatteredPsycheFiredHolders.has(holder.id)) {
+    if (!holder?.isActive(true) || shatteredPsycheFiredHolders.has(holder.id)) {
       continue;
     }
     if (!carriesShatteredPsyche(holder)) {
@@ -270,8 +338,32 @@ export function erShatteredPsycheOnLeaveField(pokemon: Pokemon): void {
     return;
   }
   shatteredPsycheLedger.delete(pokemon.id);
-  const { primaryHp } = splitFusedHp(pokemon.hp, rec.primaryMax, rec.constituentMax);
+  const { primaryHp, constituentHp } = splitFusedHp(pokemon.hp, rec.primaryMax, rec.constituentMax);
+  restoreFusionIdentity(pokemon, rec.primaryFusion);
   pokemon.setStat(Stat.HP, rec.primaryMax);
   pokemon.hp = Math.max(0, Math.min(rec.primaryMax, primaryHp));
-  clearFusionLook(pokemon);
+  rec.constituent.hp = Math.max(0, Math.min(rec.constituentMax, constituentHp));
+  shatteredPsycheAbsorbed.delete(rec.constituent);
+
+  if (rec.constituentWasOnField && rec.constituent.active) {
+    rec.constituent.switchOutStatus = false;
+    rec.constituent.setVisible(true);
+    rec.constituent.setAlpha(1);
+    rec.constituent.getSprite()?.setVisible(true);
+    rec.constituent.showInfo();
+    rec.constituent.updateInfo(true);
+  }
+  pokemon.updateInfo(true);
+}
+
+/** Restore every outstanding forced fusion before post-battle rewards and teardown. */
+export function erShatteredPsycheEndBattle(): void {
+  for (const [primaryId, rec] of [...shatteredPsycheLedger.entries()]) {
+    if (rec.primary.active) {
+      erShatteredPsycheOnLeaveField(rec.primary);
+      continue;
+    }
+    shatteredPsycheAbsorbed.delete(rec.constituent);
+    shatteredPsycheLedger.delete(primaryId);
+  }
 }

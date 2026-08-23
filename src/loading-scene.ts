@@ -215,6 +215,7 @@ export class LoadingScene extends SceneBase {
       .loadImage("champion_ribbon", "ui", "champion_ribbon.png")
       .loadImage("champion_ribbon_emerald", "ui", "champion_ribbon_emerald.png")
       .loadImage("icon_spliced", "ui")
+      .loadImage("icon_fun_mega", "elite-redux/ui", "pseudo-mega-symbol.png")
       .loadImage("icon_lock", "ui", "icon_lock.png")
       .loadImage("icon_stop", "ui", "icon_stop.png")
       .loadImage("icon_tera", "ui")

@@ -1873,4 +1873,8 @@ export enum MoveId {
   UPPER_HAND,
   /**{@link https://bulbapedia.bulbagarden.net/wiki/Malignant_Chain_(move) | Source} */
   MALIGNANT_CHAIN,
+  /** Mega Barbaracle Y — swaps Physical and Special move categories. */
+  SWIRLY_ROOM = 6000,
+  /** Temporal Skull signature — 150 BP Bone move with recharge. */
+  IVORY_IMPACT = 6001,
 }

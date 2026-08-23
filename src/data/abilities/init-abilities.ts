@@ -62,6 +62,7 @@ import {
   IncreasePpAbAttr,
   InfiltratorAbAttr,
   IntimidateImmunityAbAttr,
+  isComatoseLike,
   LowHpMoveTypePowerBoostAbAttr,
   MaxMultiHitAbAttr,
   MoneyAbAttr,
@@ -594,20 +595,10 @@ export function initAbilities() {
       .build(),
     new AbBuilder(AbilityId.GUTS, 3) //
       .attr(BypassBurnDamageReductionAbAttr)
-      .conditionalAttr(
-        pokemon => !!pokemon.status || pokemon.hasAbility(AbilityId.COMATOSE),
-        StatMultiplierAbAttr,
-        Stat.ATK,
-        1.5,
-      )
+      .conditionalAttr(pokemon => !!pokemon.status || isComatoseLike(pokemon), StatMultiplierAbAttr, Stat.ATK, 1.5)
       .build(),
     new AbBuilder(AbilityId.MARVEL_SCALE, 3) //
-      .conditionalAttr(
-        pokemon => !!pokemon.status || pokemon.hasAbility(AbilityId.COMATOSE),
-        StatMultiplierAbAttr,
-        Stat.DEF,
-        1.5,
-      )
+      .conditionalAttr(pokemon => !!pokemon.status || isComatoseLike(pokemon), StatMultiplierAbAttr, Stat.DEF, 1.5)
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.LIQUID_OOZE, 3) //
@@ -766,12 +757,7 @@ export function initAbilities() {
         Stat.SPD,
         2,
       )
-      .conditionalAttr(
-        pokemon => !!pokemon.status || pokemon.hasAbility(AbilityId.COMATOSE),
-        StatMultiplierAbAttr,
-        Stat.SPD,
-        1.5,
-      )
+      .conditionalAttr(pokemon => !!pokemon.status || isComatoseLike(pokemon), StatMultiplierAbAttr, Stat.SPD, 1.5)
       .build(),
     new AbBuilder(AbilityId.NORMALIZE, 4) //
       .attr(MoveTypeChangeAbAttr, PokemonType.NORMAL, anyTypeMoveConversionCondition)
@@ -812,7 +798,6 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.KLUTZ, 4, 1) //
-      .unimplemented()
       .build(),
     new AbBuilder(AbilityId.MOLD_BREAKER, 4) //
       .attr(PostSummonMessageAbAttr, (pokemon: Pokemon) =>
@@ -1287,7 +1272,6 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.SYMBIOSIS, 6) //
-      .unimplemented()
       .build(),
     new AbBuilder(AbilityId.TOUGH_CLAWS, 6) //
       .attr(MovePowerBoostAbAttr, (_user, _target, move) => move.hasFlag(MoveFlags.MAKES_CONTACT), 1.3)

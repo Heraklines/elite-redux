@@ -263,9 +263,6 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       const chosenIndex = this.unskippedIndices[this.fullCursor];
       const option = this.config?.options[chosenIndex];
       if (option?.handler()) {
-        // #player-telemetry: emit the committed choice (index + label). No listener unless a telemetry
-        // build subscribed, so this is behavior-preserving.
-        globalScene.ui.emit("er-telemetry-choice", chosenIndex, option.label);
         if (option.keepOpen) {
           // ER: a kept-open option (e.g. external community links, Import Session)
           // must not be re-fired by a held / auto-repeating ACTION key — that
@@ -287,9 +284,6 @@ export abstract class AbstractOptionSelectUiHandler extends UiHandler {
       const submitIndex = this.unskippedIndices[this.fullCursor];
       const option = this.config?.options[submitIndex];
       if (option?.handler()) {
-        // #player-telemetry: emit the committed choice (index + label). No listener unless a telemetry
-        // build subscribed, so this is behavior-preserving.
-        globalScene.ui.emit("er-telemetry-choice", submitIndex, option.label);
         if (option.keepOpen) {
           // ER: a kept-open option (e.g. external community links, Import Session)
           // must not be re-fired by a held / auto-repeating ACTION key — that

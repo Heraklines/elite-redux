@@ -65,6 +65,8 @@ import {
   restoreErCustomTrainerTracking,
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
+import { getErEndlessSaveData, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
+import { getFunModeConfig, resetFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import {
   getLastGenericTrainerType,
@@ -78,12 +80,20 @@ import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifier
 import { getErReduxCounterpartId, migrateErReduxDexHijack } from "#data/elite-redux/er-redux-dex-redirect";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
-import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
-import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { getCurrentErRewardRates } from "#data/elite-redux/er-reward-rates";
+import { getErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getErRunPacing, restoreErSprintVoucherCredit, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { getErTrainingCacheSaveData, restoreErTrainingCacheState } from "#data/elite-redux/er-training-cache";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
+import {
+  getMoodyModeSaveData,
+  initializeMoodyModeState,
+  resetMoodyModeState,
+  restoreMoodyModeState,
+} from "#data/elite-redux/moody/moody-state";
 import { swapSessionData } from "#data/elite-redux/showdown/showdown-side-swap";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import {
@@ -134,6 +144,7 @@ import {
 import { ChallengeData } from "#system/challenge-data";
 import { EggData } from "#system/egg-data";
 import { GameStats } from "#system/game-stats";
+import { buildLeaderboardSaveStats } from "#system/leaderboard-save-stats";
 import { defaultDirectorState, type LLMDirectorState, mergeDirectorState } from "#system/llm-director/director-state";
 import { ModifierData as PersistentModifierData } from "#system/modifier-data";
 import { notificationManager } from "#system/notifications/notification-manager";
@@ -548,6 +559,7 @@ export class GameData {
   public eggs: Egg[];
   public eggPity: number[];
   public unlockPity: number[];
+  public sameSpeciesEggCounters: Record<number, number>;
   /** ER Shiny Lab: global achievement/challenge availability bitset. */
   public erShinyLabAvailableEffects: number[] = [];
   /** ER Ghost Trainer Editor: the player's authored ghost presentation profile. */
@@ -620,6 +632,7 @@ export class GameData {
     this.eggs = [];
     this.eggPity = [0, 0, 0, 0];
     this.unlockPity = [0, 0, 0, 0];
+    this.sameSpeciesEggCounters = {};
     this.erShinyLabAvailableEffects = [];
     this.ghostProfile = null;
     this.spentAchvPoints = 0;
@@ -642,6 +655,7 @@ export class GameData {
       dexData: this.dexData,
       starterData: this.starterData,
       gameStats: this.gameStats,
+      leaderboardStats: buildLeaderboardSaveStats(this.achvUnlocks, this.dexData, this.starterData, this.gameStats),
       unlocks: this.unlocks,
       achvUnlocks: this.achvUnlocks,
       voucherUnlocks: this.voucherUnlocks,
@@ -651,6 +665,7 @@ export class GameData {
       timestamp: Date.now(),
       eggPity: this.eggPity.slice(0),
       unlockPity: this.unlockPity.slice(0),
+      sameSpeciesEggCounters: { ...this.sameSpeciesEggCounters },
       autoEggRestock: this.autoEggRestock,
       llmDirectorState: this.llmDirectorState,
       showdownAppliedSettlements: this.showdownAppliedSettlements.slice(0),
@@ -663,6 +678,13 @@ export class GameData {
       trainerFx: this.trainerFx,
       erTitles: this.erTitles.slice(0),
     };
+  }
+
+  public nextSameSpeciesEggSeed(speciesId: SpeciesId): string {
+    const savedCounter = this.sameSpeciesEggCounters[speciesId];
+    const counter = Number.isSafeInteger(savedCounter) && savedCounter >= 0 ? savedCounter : 0;
+    this.sameSpeciesEggCounters[speciesId] = counter + 1;
+    return `same-species:${this.trainerId}:${this.secretId}:${speciesId}:${counter}`;
   }
 
   /**
@@ -1413,6 +1435,15 @@ export class GameData {
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];
+    this.sameSpeciesEggCounters = {};
+    if (systemData.sameSpeciesEggCounters && typeof systemData.sameSpeciesEggCounters === "object") {
+      for (const [rawSpeciesId, rawCounter] of Object.entries(systemData.sameSpeciesEggCounters)) {
+        const speciesId = Number(rawSpeciesId);
+        if (Number.isInteger(speciesId) && speciesId > 0 && Number.isSafeInteger(rawCounter) && rawCounter >= 0) {
+          this.sameSpeciesEggCounters[speciesId] = rawCounter;
+        }
+      }
+    }
 
     // Grant the free 2 Legendary eggs once (idempotent; no-op if already given).
     this.grantFreeLegendaryEggsOnce();
@@ -1956,6 +1987,7 @@ export class GameData {
       score: globalScene.score,
       waveIndex: globalScene.currentBattle.waveIndex,
       battleType: globalScene.currentBattle.battleType,
+      battleFormat: globalScene.currentBattle.format.id,
       trainer:
         globalScene.currentBattle.battleType === BattleType.TRAINER
           ? new TrainerData(globalScene.currentBattle.trainer)
@@ -1969,6 +2001,12 @@ export class GameData {
       // ER: persist the run difficulty so a reload keeps using the chosen ER
       // trainer roster tier (otherwise it resets to "ace" = vanilla trainers).
       erDifficulty: getErDifficulty(),
+      erRunPacing: getErRunPacing(),
+      erEndlessState: getErEndlessSaveData(),
+      erRewardEconomyVersion: 1,
+      erTrainingCache: getErTrainingCacheSaveData(),
+      funModeConfig: globalScene.gameMode.isFun ? { ...getFunModeConfig() } : undefined,
+      moodyModeState: globalScene.gameMode.isFun && getFunModeConfig().moodyMode ? getMoodyModeSaveData() : undefined,
       // ER: persist the set of trainers already fought this run, so reloading
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
@@ -2024,14 +2062,42 @@ export class GameData {
 
     console.log("Getting Session Slot id: %d", slotId);
 
-    // Check local storage for the cached session data
-    if (bypassLogin || localStorage.getItem(getSessionDataLocalStorageKey(slotId))) {
-      const sessionData = localStorage.getItem(getSessionDataLocalStorageKey(slotId));
-      if (!sessionData) {
-        console.error("No session data found!");
-        return;
+    const localKey = getSessionDataLocalStorageKey(slotId);
+    const localEncrypted = localStorage.getItem(localKey);
+
+    // Offline/guest saves have no cloud replica to reconcile.
+    if (bypassLogin && localEncrypted != null) {
+      return this.parseSessionData(decrypt(localEncrypted, true));
+    }
+
+    // A logged-in solo cache is not automatically authoritative: another
+    // device may have pushed a newer checkpoint into the same cloud slot.
+    // Reconcile by the save timestamp before Continue can load stale bytes.
+    // Protected co-op replicas deliberately retain their separate CAS path.
+    if (localEncrypted != null) {
+      const localRaw = decrypt(localEncrypted, false);
+      const localSession = this.parseSessionData(localRaw);
+      if (classifySessionProtection(localRaw) !== "solo") {
+        return localSession;
       }
-      return this.parseSessionData(decrypt(sessionData, bypassLogin));
+
+      const cloudRead = await this.readCoopCas(slotId);
+      if (!cloudRead.ok || classifySessionProtection(cloudRead.rawSavedata) !== "solo") {
+        return localSession;
+      }
+      const cloudSession = this.parseSessionData(cloudRead.rawSavedata);
+      if ((cloudSession.timestamp ?? 0) <= (localSession.timestamp ?? 0)) {
+        return localSession;
+      }
+
+      const encryptedCloud = encrypt(cloudRead.rawSavedata, false);
+      const cached = await this.withSessionPersistenceLease(async () => {
+        if (localStorage.getItem(localKey) !== localEncrypted) {
+          return false;
+        }
+        return trySetLocalStorageItem(localKey, encryptedCloud) && localStorage.getItem(localKey) === encryptedCloud;
+      }, false);
+      return cached === true ? cloudSession : localSession;
     }
 
     // Ask the server API for the save data and store it in localstorage
@@ -2042,7 +2108,6 @@ export class GameData {
     }
     const response = cloudRead.rawSavedata;
 
-    const localKey = getSessionDataLocalStorageKey(slotId);
     const protectedCoop = classifySessionProtection(response) !== "solo";
     const cached = await this.withSessionPersistenceLease(async () => {
       if (localStorage.getItem(localKey) != null) {
@@ -5127,6 +5192,22 @@ export class GameData {
     }
 
     globalScene.gameMode = getGameMode(fromSession.gameMode || GameModes.CLASSIC);
+    if (globalScene.gameMode.isFun) {
+      if (fromSession.funModeConfig) {
+        setFunModeConfig(fromSession.funModeConfig);
+      } else {
+        resetFunModeConfig();
+      }
+      if (getFunModeConfig().moodyMode) {
+        if (!restoreMoodyModeState(fromSession.moodyModeState)) {
+          initializeMoodyModeState(fromSession.seed);
+        }
+      } else {
+        resetMoodyModeState();
+      }
+    } else {
+      resetMoodyModeState();
+    }
     if (fromSession.challenges) {
       globalScene.gameMode.challenges = fromSession.challenges.map(c => c.toChallenge());
     }
@@ -5136,6 +5217,10 @@ export class GameData {
     // per-run "already encountered" ER trainer set from the save so a continued
     // run keeps its no-repeat history (older saves have no keys → fresh pool).
     setErDifficulty(fromSession.erDifficulty ?? "ace");
+    setErRunPacing(fromSession.erRunPacing ?? "normal");
+    restoreErEndlessContinuation(fromSession.erEndlessState);
+    restoreErSprintVoucherCredit(fromSession.erSprintVoucherCredit);
+    restoreErTrainingCacheState(fromSession.erTrainingCache, fromSession.waveIndex);
     restoreErRunTrainerTracking(fromSession.erUsedTrainerKeys);
     restoreGenericTrainerTracking(fromSession.erLastGenericTrainerType);
     restoreErCustomTrainerTracking(fromSession.erUsedCustomTrainerKeys, fromSession.erUsedCustomTrainerWindows);
@@ -6765,6 +6850,13 @@ export class GameData {
    */
   public getRootStarterSpeciesId(speciesId: number): SpeciesId {
     const baseId = erMegaTargetToBaseSpeciesId(speciesId) ?? speciesId;
+    // ER imports Spiky-eared Pichu as a standalone compatibility species. The
+    // rebuilt prevolution table can therefore point ordinary Pikachu/Raichu at
+    // that removed-form id (10194) instead of the playable vanilla Pichu bucket.
+    // Starter progress for every ordinary Pikachu form still belongs to Pichu.
+    if (baseId === SpeciesId.PIKACHU || baseId === SpeciesId.RAICHU || baseId === SpeciesId.ALOLA_RAICHU) {
+      return SpeciesId.PICHU;
+    }
     return getPokemonSpecies(baseId)?.getRootSpeciesId() ?? (baseId as SpeciesId);
   }
 
@@ -6801,11 +6893,7 @@ export class GameData {
       // ER: fold a custom MEGA form's stray bucket into its base too (mega has no
       // prevolution, so getRootSpeciesId returns itself - resolve mega->base first
       // so an already-split save (base candy X, mega candy Y) heals to base X+Y).
-      const megaBase = erMegaTargetToBaseSpeciesId(speciesId);
-      const rootId =
-        megaBase === undefined
-          ? species.getRootSpeciesId()
-          : (getPokemonSpecies(megaBase)?.getRootSpeciesId() ?? megaBase);
+      const rootId = this.getRootStarterSpeciesId(speciesId);
       if (rootId === speciesId) {
         continue;
       }
@@ -6880,6 +6968,9 @@ export class GameData {
    * @param incrementCount
    * @param fromEgg
    * @param showMessage
+   * @param grantPermanentProgress Whether this acquisition may update persistent
+   * starter-select/dex unlocks. When false, the Pokemon still awards its normal
+   * catch candy but does not alter collection data.
    * @returns `true` if Pokemon catch unlocked a new starter, `false` if Pokemon catch did not unlock a starter
    */
   // TODO: This return value is exclusively used inside Weird Dream (which manually displays the "new starter unlocked" message),
@@ -6890,6 +6981,7 @@ export class GameData {
     incrementCount = true,
     fromEgg = false,
     showMessage = true,
+    grantPermanentProgress = true,
   ): Promise<boolean> {
     // #807 B (default-deny account writes): during a CO-OP session, caught-registration only
     // proceeds from explicitly allowlisted scopes (own catch, scoped share apply, own adopt
@@ -6905,6 +6997,19 @@ export class GameData {
     // Spearow's location" hijack. The run mon itself is untouched.
     const reduxCounterpartId = getErReduxCounterpartId(pokemon.species.speciesId, pokemon.getFormKey());
     const dexSpecies = reduxCounterpartId === undefined ? pokemon.species : getPokemonSpecies(reduxCounterpartId);
+
+    // Fun Mode's Random Pokemon catches, and shiny catches while Item Chaos is
+    // enabled, are usable for the current run but are not permanent collection
+    // unlocks. Preserve the ordinary catch-candy payout without touching dex,
+    // starter, or aggregate collection counters.
+    if (!grantPermanentProgress) {
+      if (incrementCount) {
+        const shinyBonus = pokemon.isShiny() ? 5 * Math.pow(2, pokemon.variant ?? 0) : 1;
+        const candy = shinyBonus * (pokemon.isBoss() ? 2 : 1);
+        this.addStarterCandy(dexSpecies.getRootSpeciesId(), candy);
+      }
+      return false;
+    }
 
     // If incrementCount === false (not a catch scenario), only update the pokemon's dex data if the Pokemon has already been marked as caught in dex
     // Prevents form changes, nature changes, etc. from unintentionally updating the dex data of a "rental" pokemon
@@ -7064,8 +7169,13 @@ export class GameData {
       if (!hasPrevolution && (!globalScene.gameMode.isDaily || hasNewAttr || fromEgg)) {
         // TODO: remove `?? 0`, `pokemon.variant` shouldn't be able to be nullish
         const shinyBonus = pokemon.isShiny() ? 5 * Math.pow(2, pokemon.variant ?? 0) : 1;
-        const eggOrBossBonus = fromEgg || pokemon.isBoss() ? 2 : 1;
-        this.addStarterCandy(species.speciesId, shinyBonus * eggOrBossBonus, fromEgg);
+        // Preserve the old integer egg payouts after retiring the global x1.35
+        // multiplier: ordinary/T1/T2/T3 eggs awarded 3/14/27/54 candy.
+        const eggCandyByShinyBonus: Readonly<Record<number, number>> = { 1: 3, 5: 14, 10: 27, 20: 54, 40: 108 };
+        const candy = fromEgg
+          ? (eggCandyByShinyBonus[shinyBonus] ?? shinyBonus * 3)
+          : shinyBonus * (pokemon.isBoss() ? 2 : 1);
+        this.addStarterCandy(species.speciesId, candy, fromEgg);
       }
     }
 
@@ -7153,7 +7263,7 @@ export class GameData {
    *   does NOT inherit the run's challenge-favour multiplier (see below).
    * @returns Whether the candy count was incremented
    */
-  public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false): boolean {
+  public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false, showCandyBar = true): boolean {
     // ER: route a custom MEGA form id to its base so the candy lands on the base
     // bucket AND the candy bar (which does a raw starterData[id] read) is handed
     // an id whose bucket getStarterDataEntry just guaranteed.
@@ -7165,22 +7275,10 @@ export class GameData {
       return false;
     }
 
-    // Elite Redux candy buffs: a flat ~35% across-the-board boost, plus the
-    // current run's challenge-favour candy multiplier (same curve as shiny, up
-    // to 3×). A positive gain never rounds down to 0.
-    //
-    // The favour multiplier is a RUN-scoped reward for handicapping yourself in
-    // a challenge run, so it only applies to candy earned IN the run (catches,
-    // bosses, classic wins, friendship). Egg-hatch candy comes from eggs that
-    // were stockpiled outside the run, so it must NOT inherit the favour bonus —
-    // otherwise hatching a backlog of eggs during a trivial high-favour challenge
-    // would farm triple candy. Egg hatches still keep the always-on flat 35%.
+    // Run candy uses the same integer depth/Favour/Endless/Fun total displayed
+    // by the reward-rate panel. Egg/explicit grants remain unscaled.
     if (count > 0) {
-      const favourMultiplier = fromEgg ? 1 : getRunCandyMultiplier();
-      // #402: the lower difficulties' dedicated perk is CANDY (Youngster 2x,
-      // Ace 1.5x). Run-scoped like favour, so egg-hatch backlogs are excluded.
-      const difficultyMultiplier = fromEgg ? 1 : getErDifficultyCandyMultiplier();
-      count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * favourMultiplier * difficultyMultiplier));
+      count *= fromEgg ? 1 : getCurrentErRewardRates().totalCandy;
     }
 
     // The ROOT id, not speciesId: the candy bar does a raw starterData[id] read, and
@@ -7189,7 +7287,9 @@ export class GameData {
     // crashes the bar (`candyCount` of undefined) whenever that id has no bucket of
     // its own - the wave-won achievement candy-grant black-screen class - and would
     // display the wrong count even when it doesn't crash.
-    globalScene.candyBar.showStarterSpeciesCandy(this.getRootStarterSpeciesId(baseId), count);
+    if (showCandyBar) {
+      globalScene.candyBar.showStarterSpeciesCandy(this.getRootStarterSpeciesId(baseId), count);
+    }
     starterEntry.candyCount = Math.min(candyCount + count, MAX_STARTER_CANDY_COUNT);
 
     return true;

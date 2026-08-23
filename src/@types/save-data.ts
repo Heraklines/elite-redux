@@ -2,12 +2,17 @@ import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
 import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-control-plane";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
+import type { ErEndlessSaveData } from "#data/elite-redux/er-endless-continuation";
+import type { FunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import type { ErRunPacing } from "#data/elite-redux/er-run-pacing";
 import type { ErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import type { TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
+import type { ErTrainingCacheSaveData } from "#data/elite-redux/er-training-cache";
+import type { MoodyModeSaveData } from "#data/elite-redux/moody/moody-types";
 import type { ShowdownTeamPreset } from "#data/elite-redux/showdown/showdown-team-preset";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
@@ -39,6 +44,7 @@ export interface SystemSaveData {
   dexData: DexData;
   starterData: StarterData;
   gameStats: GameStats;
+  leaderboardStats?: LeaderboardSaveStats;
   unlocks: Unlocks;
   achvUnlocks: AchvUnlocks;
   voucherUnlocks: VoucherUnlocks;
@@ -48,6 +54,7 @@ export interface SystemSaveData {
   timestamp: number;
   eggPity: number[];
   unlockPity: number[];
+  sameSpeciesEggCounters?: Record<number, number>;
   /** Optional for back-compat with saves created before the auto-restock feature. */
   autoEggRestock?: AutoEggRestockSettings;
   /** Optional for back-compat with saves created before the LLM Director feature. */
@@ -97,6 +104,24 @@ export interface SystemSaveData {
   erTitles?: string[];
 }
 
+export interface LeaderboardSaveStats {
+  version: number;
+  achievementCount: number;
+  achievementPoints: number;
+  ribbons: number;
+  sessionsWon: number;
+  shinySpecies: number;
+  blackShinySpecies: number;
+  shinyCaught: number;
+  shinyHatched: number;
+  shinyLabEffects: number;
+  uniqueRelics: number;
+  eggsPulled: number;
+  highestDamage: number;
+  highestHeal: number;
+  blackMarketRuns: number;
+}
+
 export interface SessionSaveData {
   seed: string;
   playTime: number;
@@ -114,6 +139,12 @@ export interface SessionSaveData {
   // TODO: This enum being inside save data is basically useless, being inferrable from the presence or absence of `trainer` and `mysteryEncounterType`.
   // Remove this later on to reduce save size and improve clarity.
   battleType: Exclude<BattleType, BattleType.CLEAR>;
+  /**
+   * The resolved active-battle layout. Natural doubles/triples cannot be safely
+   * re-rolled from the trainer or enemy party on reload, so persist the trusted
+   * format registry id. Absent on legacy saves, which retain the old inference.
+   */
+  battleFormat?: string;
   // TODO: This being nullable NEEDS to be reflected in the type signature
   trainer: TrainerData;
   gameVersion: string;
@@ -138,6 +169,20 @@ export interface SessionSaveData {
    * backwards compatibility with pre-existing saves (treated as "ace").
    */
   erDifficulty?: ErDifficulty;
+  /** Classic's selected run length. Absent on legacy saves, which are Normal. */
+  erRunPacing?: ErRunPacing;
+  /** Post-clear Endless Rift state. The original mode and pacing remain unchanged. */
+  erEndlessState?: ErEndlessSaveData;
+  /** Fractional account-voucher progress used only by Classic Sprint. */
+  erSprintVoucherCredit?: number;
+  /** Integer depth-scaled reward economy marker. */
+  erRewardEconomyVersion?: 1;
+  /** Hell's per-segment party-presence ledger and claimed cache milestones. */
+  erTrainingCache?: ErTrainingCacheSaveData;
+  /** Fun Mode randomizer toggles. Absent on every non-Fun and legacy save. */
+  funModeConfig?: FunModeConfig;
+  /** Moody Mode's run-local boon, curse, progression, and threat ledger. */
+  moodyModeState?: MoodyModeSaveData;
   /**
    * ER: stableKeys of trainers already encountered this run, so the difficulty's
    * trainer pool doesn't repeat across a save/load. Optional for backwards

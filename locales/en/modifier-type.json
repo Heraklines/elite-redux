@@ -246,7 +246,7 @@
     "BATON": { "name": "Baton", "description": "Allows passing along effects when switching Pokémon, which also bypasses traps." },
 
     "SHINY_CHARM": { "name": "Shiny Charm", "description": "Dramatically increases the chance of a wild Pokémon being Shiny." },
-    "ABILITY_CHARM": { "name": "Ability Charm", "description": "Dramatically increases the chance of a wild Pokémon having a Hidden Ability." },
+    "ABILITY_CHARM": { "name": "Mystery Event Charm", "description": "Doubles the chance of a Mystery Encounter appearing." },
     "CATCHING_CHARM": { "name": "Catching Charm", "description": "Increases the chance of getting a critical catch."},
 
     "IV_SCANNER": { "name": "IV Scanner", "description": "Enables scanning the IVs of wild Pokémon." },
@@ -295,6 +295,19 @@
     "description": "Pick a Pokémon's ability or innate, then choose one of four random abilities to replace it.",
     "pickAbility": "Four powers, drawn at random. Choose the one to graft into the chosen slot.",
     "chooseSameMon": "Choose the same Pokémon."
+  },
+  "moveRandomizer": {
+    "name": "Move Randomizer",
+    "description": "Choose a move slot. Replaces it with a random move matching one of the Pokémon's current types."
+  },
+  "erGreaterMoveRandomizer": {
+    "name": "Greater Move Randomizer",
+    "description": "Choose a move slot and a category. Replaces it with a random move of that category matching one of the Pokémon's current types.",
+    "categories": {
+      "physical": "Physical",
+      "special": "Special",
+      "status": "Status"
+    }
   },
   "SpeciesBoosterItem": {
     "LIGHT_BALL": { "name": "Light Ball", "description": "It’s a mysterious orb that boosts Pikachu’s Attack and Sp. Atk stats." },

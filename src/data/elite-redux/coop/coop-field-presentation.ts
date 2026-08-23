@@ -8,6 +8,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene } from "#app/global-scene";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { installCoopPartyReorderPresentationProjector } from "#data/elite-redux/coop/coop-party-reorder-presentation";
 import { FieldPosition } from "#enums/field-position";
 // biome-ignore lint/suspicious/noImportCycles: Presentation projection needs runtime class identity for field-child and enemy checks.
 import { EnemyPokemon, Pokemon } from "#field/pokemon";
@@ -18,6 +19,7 @@ export type CoopPresentationBoundary =
   | "launch-ready"
   | "encounter-summon"
   | "me-battle-summon"
+  | "party-reorder"
   | "replacement-applied"
   | "turn-finalize"
   | "resync-stable"
@@ -585,10 +587,14 @@ function settleCoopFieldPresentationInternal(
   request: CoopFieldPresentationRequest,
   assetsAlreadyLoaded: boolean,
 ): number {
-  const wanted = new Set(request.seats.map(seat => seat.pokemon.id));
+  // Match the exact retained actor objects, not their serialized ids. Recovery can reconstruct a fresh
+  // Pokemon carrying the same authoritative id while an interrupted presentation leaves the predecessor
+  // in Phaser's field container. Treating that predecessor as wanted produces two visible copies of one
+  // battler and makes later slot/presentation proofs ambiguous.
+  const wanted = new Set(request.seats.map(seat => seat.pokemon));
   if (request.hideStale) {
     for (const stale of getActuallyFieldedCoopPokemon(request.side)) {
-      if (!wanted.has(stale.id)) {
+      if (!wanted.has(stale)) {
         hidePokemonPresentation(stale);
       }
     }
@@ -681,6 +687,101 @@ export async function settleCoopFieldPresentationReady(
     }
   }
   return changed;
+}
+
+/**
+ * Reconcile the player field after an out-of-battle Check Team reorder.
+ *
+ * The party permutation is already authoritative when this begins. Keep the previous visual field intact
+ * while every newly promoted battler materializes, then replace the complete field in one projection. This
+ * prevents a slow atlas load from exposing a blank player side and gives the owner and watcher the same
+ * presentation path without replaying summon mechanics, abilities, tags, forms, or RNG.
+ */
+export async function settleCoopPartyReorderPresentationReady(scene: BattleScene, capacity: number): Promise<number> {
+  const battle = scene.currentBattle;
+  if (globalScene !== scene || battle == null || !Number.isSafeInteger(capacity) || capacity < 1) {
+    throw new Error("Co-op party-reorder presentation has no live battle field");
+  }
+  const seats = scene
+    .getPlayerParty()
+    .slice(0, capacity)
+    .map((pokemon, slot) => ({ pokemon, slot }));
+  const expectedIds = seats.map(({ pokemon }) => pokemon.id);
+
+  return settleCoopFieldPresentationReady(
+    {
+      side: "player",
+      seats,
+      capacity,
+      boundary: "party-reorder",
+      desired: "visible",
+      hideStale: true,
+      trainerDisposition: "unchanged",
+    },
+    () =>
+      scene.currentBattle === battle
+      && expectedIds.every((pokemonId, slot) => scene.getPlayerParty()[slot]?.id === pokemonId),
+  );
+}
+
+installCoopPartyReorderPresentationProjector(settleCoopPartyReorderPresentationReady);
+
+/**
+ * Load and initialize an authoritative field surface while keeping it completely concealed. New-biome and
+ * authored encounter intros use this to overlap atlas work with the transition without flashing health bars
+ * or battlers before the actual reveal callback.
+ */
+export async function preloadCoopFieldPresentationReady(
+  request: Pick<CoopFieldPresentationRequest, "side" | "seats" | "boundary">,
+  remainsCurrent: () => boolean = () => true,
+): Promise<void> {
+  const scene = globalScene;
+  const battle = scene.currentBattle;
+  const seats = request.seats.map(seat => ({ pokemon: seat.pokemon, pokemonId: seat.pokemon.id }));
+  const lifetimeIsLive = (): boolean => {
+    if (globalScene !== scene || scene.currentBattle !== battle || !remainsCurrent()) {
+      return false;
+    }
+    const party = request.side === "player" ? scene.getPlayerParty() : scene.getEnemyParty();
+    return seats.every(
+      ({ pokemon, pokemonId }) => pokemon.id === pokemonId && party.some(candidate => candidate === pokemon),
+    );
+  };
+  if (!lifetimeIsLive()) {
+    throw new Error(`Co-op ${request.boundary} presentation lifetime was stale before hidden preload`);
+  }
+
+  for (const { pokemon } of seats) {
+    ensureCoopPokemonPresentationNodes(pokemon);
+    hidePokemonPresentation(pokemon);
+  }
+  const loads = await Promise.allSettled(seats.map(({ pokemon }) => pokemon.loadAssets(false)));
+  if (loads.some(result => result.status === "rejected")) {
+    throw new Error(`Co-op ${request.boundary} presentation could not preload every requested battler atlas`);
+  }
+  if (!lifetimeIsLive()) {
+    throw new Error(`Co-op ${request.boundary} hidden presentation preload outlived its boundary`);
+  }
+  for (const { pokemon } of seats) {
+    try {
+      pokemon.playAnim();
+    } catch {
+      /* readiness inspection below reports an incomplete live key */
+    }
+    hidePokemonPresentation(pokemon);
+    const readiness = inspectCoopPokemonPresentationReadiness(pokemon);
+    if (
+      !readiness.spritePresent
+      || !readiness.infoPresent
+      || !readiness.textureCached
+      || !readiness.animationCached
+      || !readiness.exactLiveKey
+    ) {
+      throw new Error(
+        `Co-op ${request.boundary} hidden preload exposed an incomplete battler asset: ${JSON.stringify(readiness)}`,
+      );
+    }
+  }
 }
 
 function settlePokeballTrayHidden(tray: PokeballTray): boolean {

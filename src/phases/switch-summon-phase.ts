@@ -15,7 +15,11 @@ import { getActiveCoopV2ReplacementCutover } from "#data/elite-redux/coop/author
 import { failCoopSharedSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
+import { completeErEndlessSwitch, prepareErEndlessSwitch } from "#data/elite-redux/er-endless-rift-runtime";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
+import { notifyMoodyFormationSwitch } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeEntry } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { notifyMoodyCoordinatorDirectPairSwitch } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballTintColor } from "#data/pokeball";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -263,9 +267,8 @@ export class SwitchSummonPhase extends SummonPhase {
     // replacements, U-turn/forced switches, baton pass, and the opening lead are
     // all excluded. Applied to the incoming mon after its fieldSetup(true) below.
     const bondedCharmStages: ErBondedCharmSnapshot =
-      this.player
-      && this.switchType === SwitchType.SWITCH
-      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON
+      this.switchType === SwitchType.SWITCH
+      && (!this.player || globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON)
         ? erBondedCharmSnapshot(this.lastPokemon)
         : [];
     const saltCircleSource =
@@ -282,6 +285,13 @@ export class SwitchSummonPhase extends SummonPhase {
     ) {
       markChivalryRedirect(switchedInPokemon, this.lastPokemon);
     }
+
+    const voluntaryMoodySwitch =
+      this.switchType === SwitchType.SWITCH
+      && globalScene.currentBattle.turnCommands[this.fieldIndex]?.command === Command.POKEMON;
+    const endlessTransfer = prepareErEndlessSwitch(this.lastPokemon, voluntaryMoodySwitch);
+    notifyMoodyFormationSwitch(this.lastPokemon, switchedInPokemon, voluntaryMoodySwitch);
+    notifyMoodyCoordinatorDirectPairSwitch(this.lastPokemon, switchedInPokemon, voluntaryMoodySwitch);
 
     if (this.lastPokemon.isOnField()) {
       this.lastPokemon.leaveField(this.switchType === SwitchType.SWITCH);
@@ -372,6 +382,8 @@ export class SwitchSummonPhase extends SummonPhase {
       // survive. No-op for an empty snapshot (relic absent / not a voluntary
       // player switch).
       erBondedCharmApply(switchedInPokemon, bondedCharmStages);
+      completeErEndlessSwitch(this.lastPokemon, switchedInPokemon, endlessTransfer);
+      notifyMoodyRuntimeEntry(switchedInPokemon, this.switchType !== SwitchType.INITIAL_SWITCH);
       this.summon();
     };
 

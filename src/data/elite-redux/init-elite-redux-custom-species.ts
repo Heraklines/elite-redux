@@ -229,6 +229,8 @@ function mapGenderRatio(erGender: number): number | null {
 export class ErCustomSpecies extends PokemonSpecies {
   /** Fallback display name from the ER draft (set pre-construction). */
   private static readonly _draftNames = new Map<number, string>();
+  /** Fallback category from a hand-authored pitch species definition. */
+  private static readonly _draftCategories = new Map<number, string>();
   /** Pokerogue speciesId → ER sprite slug (e.g. 10000 → "phantowl"). */
   private static readonly _spriteSlugs = new Map<number, string>();
   /**
@@ -263,12 +265,15 @@ export class ErCustomSpecies extends PokemonSpecies {
    */
   override localize(): void {
     this.name = ErCustomSpecies._draftNames.get(this.speciesId) ?? "Unknown";
-    this.category = "??? Pokémon";
+    this.category = ErCustomSpecies._draftCategories.get(this.speciesId) ?? "??? Pokémon";
   }
 
-  /** Stash the draft name keyed by pokerogue species id before construction. */
-  static registerDraftName(id: number, name: string): void {
+  /** Stash the draft name and optional category before construction/localization. */
+  static registerDraftName(id: number, name: string, category?: string): void {
     ErCustomSpecies._draftNames.set(id, name);
+    if (category !== undefined) {
+      ErCustomSpecies._draftCategories.set(id, category);
+    }
   }
 
   /** Register the ER sprite slug for a pokerogue species id. */
@@ -532,6 +537,30 @@ export class ErCustomSpecies extends PokemonSpecies {
     // gated by spriteOnly — so ER custom shiny tiers render correctly.
     return super.loadAssets(female, formIndex, shiny, variant, startLoad, back, true);
   }
+
+  override async loadNonSpriteAssets(formIndex?: number): Promise<void> {
+    const alias = ErCustomSpecies._spriteAliases.get(this.speciesId);
+    if (alias !== undefined) {
+      return getPokemonSpecies(alias).loadNonSpriteAssets(0);
+    }
+    const slug = ErCustomSpecies._spriteSlugs.get(this.speciesId);
+    if (slug) {
+      const iconKey = `er_icon__${slug}`;
+      if (!globalScene.textures.exists(iconKey)) {
+        globalScene.loadPokemonAtlas(
+          iconKey,
+          ErCustomSpecies.getIconAtlasSourcePath(this.speciesId) ?? `elite-redux/${slug}/icon`,
+        );
+      }
+    }
+    const cryFile = ErCustomSpecies._cryUrls.get(this.speciesId);
+    if (cryFile) {
+      const cryKey = this.getCryKey(formIndex);
+      if (!globalScene.cache.audio.exists(cryKey)) {
+        globalScene.load.audio(cryKey, cryFile);
+      }
+    }
+  }
 }
 
 /**
@@ -558,6 +587,8 @@ export function getErCryFile(speciesId: number): string | undefined {
 export interface ErEditorMonSpec {
   speciesId: number;
   name: string;
+  /** Optional species category; legacy editor registrations default to ??? Pokémon. */
+  category?: string;
   /**
    * er-assets sprite directory slug (images/pokemon/elite-redux/<slug>/). Optional
    * when {@linkcode spriteAlias} is set (the sprite/icon then reuses a vanilla base).
@@ -605,7 +636,7 @@ export function registerErEditorMon(spec: ErEditorMonSpec): boolean {
   if (allSpecies.some(s => s.speciesId === spec.speciesId)) {
     return false;
   }
-  ErCustomSpecies.registerDraftName(spec.speciesId, spec.name);
+  ErCustomSpecies.registerDraftName(spec.speciesId, spec.name, spec.category);
   const baseTotal = spec.baseStats.reduce((sum, n) => sum + n, 0);
   const species = new ErCustomSpecies(
     spec.speciesId,
@@ -613,7 +644,7 @@ export function registerErEditorMon(spec: ErEditorMonSpec): boolean {
     false,
     false,
     false,
-    "??? Pokémon",
+    spec.category ?? "??? Pokémon",
     spec.type1,
     spec.type2,
     1.0,

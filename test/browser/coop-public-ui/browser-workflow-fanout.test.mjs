@@ -53,6 +53,19 @@ for (const { file, fanout } of workflows) {
   });
 }
 
+test("the full gate cannot starve its sealed browser transport behind asset checkout", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/coop-gate-sharded.yml"), "utf8");
+  const browser = jobBlock(workflow, "browser");
+  const timeout = browser.match(/timeout-minutes:\s*(\d+)/u);
+  assert.ok(timeout, "the browser transport has an explicit wall-clock ceiling");
+  assert.ok(
+    Number(timeout[1]) >= 25,
+    "the wall-clock ceiling includes the measured worst-case asset checkout plus the sealed checkpoint",
+  );
+  assert.match(browser, /submodules: recursive/u, "the measured asset checkout remains part of this job");
+  assert.match(browser, /Run two-context sealed-production transport checkpoint/u);
+});
+
 test("browser build gates report every blocking Biome diagnostic without legacy lint noise", async () => {
   for (const { file } of workflows) {
     const workflow = await readFile(resolve(root, file), "utf8");
@@ -291,7 +304,12 @@ test("journey starter fixtures require both the exact build and exact per-page U
   );
   assert.match(
     starterHandler,
-    /const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters\(\)[\s\S]*getCoopBrowserCommanderFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserFaintFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserGameOverFixtureStarters\(\)[\s\S]*\?\? getCoopBrowserRegisteredInteractionFixtureStarters\(\)[\s\S]*\?\? coopBrowserNavigationStarters[\s\S]*globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{[\s\S]*allowUncaught: true,[\s\S]*allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters/u,
+    /const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters\(\)[\s\S]*const coopBrowserPartyRewardStarters = getCoopBrowserPartyRewardFixtureStarters\(\)[\s\S]*const coopBrowserStarters =[\s\S]*\?\? coopBrowserPartyRewardStarters[\s\S]*\?\? coopBrowserNavigationStarters/u,
+    "the visible starter UI resolves the exact-gated navigation and party-reward fixtures",
+  );
+  assert.match(
+    starterHandler,
+    /globalScene\.gameMode\.isCoop[\s\S]*seedTeamFromStarters\(coopBrowserStarters, \{[\s\S]*allowUncaught: true,[\s\S]*allowOverValueLimit:[\s\S]*coopBrowserStarters === coopBrowserNavigationStarters[\s\S]*\|\| coopBrowserStarters === coopBrowserPartyRewardStarters/u,
     "only the normal visible co-op starter UI consumes the exact-gated fixture",
   );
 });
@@ -341,6 +359,366 @@ test("Ability Capsule journey forces and proves the nested reward Summary route 
   assert.match(campaign, /campaign-ability-capsule-coverage/u);
   assert.match(campaign, /cursorMirrors\.some\(event => event\.navigationSteps < 1\)/u);
   assert.match(selectModifier, /modifierTypes\.POKEBALL, modifierTypes\.ER_ABILITY_CAPSULE/u);
+});
+
+test("party-mutating reward matrix drives every non-held mutation and nested item workflow into wave two", async () => {
+  const [
+    workflow,
+    registry,
+    selectModifier,
+    selectStarter,
+    starterHandler,
+    config,
+    harness,
+    policy,
+    campaign,
+    browserEntry,
+    greaterAbilityCapsulePhase,
+    operationEnvelope,
+    rewardOperation,
+    coopRuntime,
+    battleScene,
+    modifier,
+    evolutionPhase,
+    learnMovePhase,
+  ] = await Promise.all([
+    readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
+    readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-modifier-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/select-starter-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/ui/handlers/starter-select-ui-handler.ts"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign-policy.mjs"), "utf8"),
+    readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
+    readFile(resolve(root, "scripts/coop-browser-entry.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/er-greater-ability-capsule-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-operation-envelope.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-reward-operation.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/coop/coop-runtime.ts"), "utf8"),
+    readFile(resolve(root, "src/battle-scene.ts"), "utf8"),
+    readFile(resolve(root, "src/modifier/modifier.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/evolution-phase.ts"), "utf8"),
+    readFile(resolve(root, "src/phases/learn-move-phase.ts"), "utf8"),
+  ]);
+
+  assert.match(workflow, /options:[\s\S]*- party-mutating-rewards/u);
+  assert.match(
+    workflow,
+    /COOP_UI_BOOT_TIMEOUT_MS: \$\{\{ inputs\.journey == 'party-mutating-rewards' && '420000' \|\| '300000' \}\}/u,
+    "only the measured high-fanout reward matrix receives extra immutable-asset boot headroom",
+  );
+  assert.match(workflow, /party_reward_ids:[\s\S]*Optional closed JSON subset/u);
+  assert.match(
+    workflow,
+    /party_reward_id: \$\{\{ fromJSON\(inputs\.journey == 'party-mutating-rewards' && inputs\.party_reward_ids != '' && inputs\.party_reward_ids/u,
+    "a demonstrated red subset must be rerunnable without spending 36 browsers again",
+  );
+  assert.match(
+    workflow,
+    /render_profile:[\s\S]*default: animations-skipped-depth[\s\S]*animations-on-surface[\s\S]*COOP_UI_RENDER_PROFILE: \$\{\{ inputs\.render_profile \|\| 'animations-skipped-depth' \}\}/u,
+    "a focused item journey must be dispatchable with animations enabled without changing its public input path",
+  );
+  assert.match(
+    workflow,
+    /group: coop-public-ui-\$\{\{ github\.ref \}\}-\$\{\{ inputs\.journey[\s\S]*\$\{\{ inputs\.render_profile \|\| 'animations-skipped-depth' \}\}/u,
+    "animations-on presentation qualification must not queue behind the independent fast mechanical profile",
+  );
+  const exactVariantRewardIds = new Set([
+    "MINT",
+    "TERA_SHARD",
+    "EVOLUTION_ITEM",
+    "RARE_EVOLUTION_ITEM",
+    "FORM_CHANGE_ITEM",
+    "RARE_FORM_CHANGE_ITEM",
+  ]);
+  for (const rewardId of [
+    "TM_CASE",
+    "ER_LEARNERS_SHROOM",
+    "MEMORY_MUSHROOM",
+    "TM_COMMON",
+    "TM_GREAT",
+    "TM_ULTRA",
+    "ER_ABILITY_CAPSULE",
+    "ER_GREATER_ABILITY_CAPSULE",
+    "ER_GREATER_ABILITY_RANDOMIZER",
+    "ABILITY_RANDOMIZER",
+    "MOVE_SLOT_EXPANDER",
+    "PP_UP",
+    "PP_MAX",
+    "ETHER",
+    "MAX_ETHER",
+    "ELIXIR",
+    "MAX_ELIXIR",
+    "MINT",
+    "TERA_SHARD",
+    "RARE_CANDY",
+    "RARER_CANDY",
+    "POTION",
+    "SUPER_POTION",
+    "HYPER_POTION",
+    "MAX_POTION",
+    "FULL_RESTORE",
+    "REVIVE",
+    "MAX_REVIVE",
+    "FULL_HEAL",
+    "SACRED_ASH",
+    "EVOLUTION_ITEM",
+    "RARE_EVOLUTION_ITEM",
+    "FORM_CHANGE_ITEM",
+    "RARE_FORM_CHANGE_ITEM",
+    "DNA_SPLICERS",
+    "ER_DEX_NAV",
+  ]) {
+    assert.match(workflow, new RegExp(`party_reward_id:[\\s\\S]*${rewardId}`, "u"));
+    assert.match(registry, new RegExp(`COOP_BROWSER_PARTY_REWARD_FIXTURE_IDS[\\s\\S]*${rewardId}`, "u"));
+    assert.match(selectModifier, new RegExp(`COOP_BROWSER_PARTY_REWARD_TYPES[\\s\\S]*${rewardId}`, "u"));
+    assert.match(
+      selectModifier,
+      new RegExp(`${rewardId}: \\(\\) =>`, "u"),
+      `${rewardId} must resolve after initModifierTypes instead of capturing the empty registry at module load`,
+    );
+    if (!exactVariantRewardIds.has(rewardId)) {
+      assert.match(
+        selectModifier,
+        new RegExp(`${rewardId}: \\(\\) => modifierTypes\\.${rewardId},`, "u"),
+        `${rewardId} must preserve its original registry function so the presentation has a canonical id`,
+      );
+    }
+  }
+  assert.match(config, /"party-mutating-rewards"/u);
+  assert.match(browserEntry, /function safeAbilitySlotActivity\(pokemon: Pokemon\): boolean\[\]/u);
+  assert.match(browserEntry, /abilitySlotActivity: safeAbilitySlotActivity\(pokemon\)/u);
+  assert.match(browserEntry, /runUnlockedAbilitySlots:/u);
+  assert.doesNotMatch(
+    campaign,
+    /changed = changed \|\| abilityChoices\.length/u,
+    "an ability picker click is not proof that its Pokémon mutation committed",
+  );
+  assert.match(
+    selectModifier,
+    /modifierQueuesContinuation[\s\S]*modifierType instanceof ErDexNavModifierType/u,
+    "Dex Nav must retain the reward continuation until its nested result commits",
+  );
+  assert.match(
+    selectModifier,
+    /coopModifierFollowUp[\s\S]*modifierType instanceof ErDexNavModifierType[\s\S]*return \{ kind: "ability", wave, turn \}/u,
+    "Dex Nav's reward result must authorize its typed ability successor before wave progression",
+  );
+  assert.match(
+    selectModifier,
+    /v2ProjectsAbilitySurface[\s\S]*if \(modifierType instanceof ErDexNavModifierType\)[\s\S]*unshiftNew\("ErDexNavPhase", 0, seq, watcher\)[\s\S]*unshiftPhase\(this\.copy\(\)\)[\s\S]*return true;[\s\S]*const target = globalScene\.getPlayerParty\(\)\[slotIndex\]/u,
+    "the targetless Dex Nav reward must retain its nested continuation before the ordinary Pokemon target guard",
+  );
+  assert.match(
+    registry,
+    /isCoopBrowserPartyRewardFixtureBuild\(\)[\s\S]*VITE_COOP_BROWSER_FIXTURE === "party-mutating-rewards"/u,
+  );
+  assert.match(registry, /getCoopBrowserPartyRewardFixtureId\(\)[\s\S]*get\("partyreward"\)/u);
+  assert.match(
+    registry,
+    /getCoopBrowserPartyRewardFixtureStarters\(\)[\s\S]*SpeciesId\.GARCHOMP[\s\S]*MoveId\.WATER_SPOUT[\s\S]*MoveId\.TACKLE[\s\S]*MoveId\.SPLASH[\s\S]*MoveId\.PROTECT/u,
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserLongitudinalFixtureStartingLevel\(\)[\s\S]*partyRewardFixture === "RARE_EVOLUTION_ITEM"[\s\S]*\? 70/u,
+    "the rare evolution fixture retains a high-level legal Kubfu while exercising Scroll of Waters",
+  );
+  assert.match(
+    registry,
+    /partyRewardFixture === "EVOLUTION_ITEM"[\s\S]*\? 30/u,
+    "the ordinary evolution fixture retains a deterministic legal Partner Pikachu",
+  );
+  assert.match(
+    selectModifier,
+    /\[coop-browser:evolution-item-legality\][\s\S]*remainingRuntimeItemEdges[\s\S]*validatesModifierItem[\s\S]*validatesOwnItem/u,
+    "an evolution fixture rejection must identify the exact modifier, all post-ER item edges, and target verdict",
+  );
+  assert.match(
+    selectModifier,
+    /EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.THUNDER_STONE[\s\S]*RARE_EVOLUTION_ITEM: \(\) => \(\) =>[\s\S]*EvolutionItem\.SCROLL_OF_WATERS/u,
+    "the exact fixtures must use item edges that remain reachable after the ER evolution rewrite",
+  );
+  assert.match(
+    registry,
+    /rewardId === "EVOLUTION_ITEM"[\s\S]*SpeciesId\.PIKACHU[\s\S]*rewardId === "RARE_EVOLUTION_ITEM"[\s\S]*SpeciesId\.KUBFU/u,
+  );
+  assert.match(
+    registry,
+    /const subjectFormIndex = rewardId === "EVOLUTION_ITEM" \? 1 : 0;[\s\S]*makeStarter\(subjectSpecies, subjectFormIndex\)/u,
+    "the ordinary fixture must retain Partner Pikachu form 1 rather than base Pikachu's rewritten level edge",
+  );
+  assert.match(starterHandler, /getCoopBrowserPartyRewardFixtureStarters\(\)/u);
+  assert.match(
+    starterHandler,
+    /coopBrowserStarters === coopBrowserPartyRewardStarters/u,
+    "the exact test fixture must retain its declared reserve despite the ordinary starter point budget",
+  );
+  assert.match(
+    selectStarter,
+    /const partyRewardFixtureActive = getCoopBrowserPartyRewardFixtureId\(\) != null;[\s\S]*navigationFixtureActive \|\| partyRewardFixtureActive[\s\S]*\? 0/u,
+    "the exact party-mutation fixture must also retain its reserve in the mirrored roster envelope",
+  );
+  assert.match(
+    harness,
+    /this\.config\.journey === "party-mutating-rewards"[\s\S]*set\("coopfixture", "party-mutating-rewards"\)[\s\S]*set\("partyreward", this\.config\.partyRewardId\)/u,
+  );
+  assert.match(harness, /expectedPartyRewardFixtureSpecies\(this\.config\.partyRewardId\)/u);
+  assert.match(
+    harness,
+    /PIKACHU_SPECIES_ID = 25[\s\S]*EVOLUTION_ITEM: PIKACHU_SPECIES_ID[\s\S]*RARE_EVOLUTION_ITEM: KUBFU_SPECIES_ID/u,
+    "the browser roster oracle must distinguish the Partner Pikachu and rare Kubfu evolution fixtures",
+  );
+  assert.match(policy, /COOP_UI_PARTY_REWARD_ID/u);
+  assert.match(policy, /partyRewardLearnMoveIds/u);
+  assert.match(policy, /nestedDirectRewardIds/u);
+  assert.match(workflow, /party-mutating-rewards" \]\]; then[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u);
+  assert.match(campaign, /driveLearnMoveAccept/u);
+  assert.match(browserEntry, /summaryHandler\.summaryUiMode === SummaryUiMode\.LEARN_MOVE/u);
+  assert.match(browserEntry, /"learn-move:cancel"/u);
+  assert.match(campaign, /replacementMoveId[\s\S]*?selectOptionById\(owner,[\s\S]*?surfaceId: "learn-move:confirm"/u);
+  assert.match(campaign, /selectedOptionId === "learn-move:cancel"/u);
+  assert.match(campaign, /learn-move replacement confirmation or immediate commit/u);
+  assert.match(campaign, /transitioned\.observation\.phase !== "LearnMovePhase"/u);
+  assert.match(campaign, /campaign-learn-move-confirm-replacement/u);
+  assert.match(campaign, /observation\.phase === "ErGreaterAbilityCapsulePhase" && options\.includes\("slot:1"\)/u);
+  assert.match(
+    greaterAbilityCapsulePhase,
+    /if \(this\.coopIsWatcher\)[\s\S]*this\.coopSurfaceGeneration \+= 1;[\s\S]*notifyCoopV2InteractionSurfaceReady/u,
+    "the passive Greater Capsule watcher must allocate a valid surface generation before publishing readiness",
+  );
+  assert.match(
+    greaterAbilityCapsulePhase,
+    /private coopSurfaceGeneration = 0;[\s\S]*public coopV2SurfaceGeneration\(\): number[\s\S]*private openChoice[\s\S]*this\.coopSurfaceGeneration \+= 1;/u,
+    "the Greater Capsule owner workflow must expose distinct nested picker appearances",
+  );
+  assert.match(campaign, /finishRewardFusion/u);
+  assert.match(campaign, /targetId: "party-option:splice"/u);
+  assert.match(campaign, /DNA Splicers secondary target action or immediate fusion commit/u);
+  assert.match(campaign, /resolution: "immediate"/u);
+  assert.match(campaign, /campaign-party-mutating-reward-coverage/u);
+  assert.match(
+    campaign,
+    /PARTY_REWARD_PRESENTATION_SURFACES[\s\S]*EVOLUTION_ITEM[\s\S]*battle:evolution[\s\S]*FORM_CHANGE_ITEM[\s\S]*battle:form-change/u,
+    "animations-on item coverage must name the evolution-style presentation classes it owns",
+  );
+  assert.match(
+    campaign,
+    /assertPartyRewardPresentationParity[\s\S]*renderProfile !== "animations-on-surface"[\s\S]*client\.evidence\.events\.slice\(from\)[\s\S]*event\.kind === "browser-surface2"[\s\S]*campaign-party-reward-presentation-proof/u,
+    "the exact item action must be followed by a fresh semantic cutscene on both real browsers",
+  );
+  assert.match(
+    campaign,
+    /presentationCursors: Object\.fromEntries\([\s\S]*client\.evidence\.cursor\(\)[\s\S]*assertPartyRewardPresentationParity\([\s\S]*targetAction\.presentationCursors/u,
+    "unrelated earlier battle presentation cannot satisfy the item-specific oracle",
+  );
+  assert.match(
+    selectModifier,
+    /modifier instanceof EvolutionItemModifier[\s\S]*coopAllowNextWaveStart = globalScene\.gameMode\.isCoop && cost === -1/u,
+    "only a terminal free evolution reward may inherit the wave-crossing successor permit",
+  );
+  assert.match(
+    modifier,
+    /EvolutionItemModifier[\s\S]*coopAllowNextWaveStart = false[\s\S]*"EvolutionPhase"[\s\S]*this\.coopAllowNextWaveStart/u,
+    "the evolution modifier must carry its exact parent-boundary permit into the queued evolution",
+  );
+  assert.match(
+    evolutionPhase,
+    /this\.coopAllowNextWaveStart[\s\S]*"LearnMovePhase"[\s\S]*LearnMoveType\.LEARN_MOVE[\s\S]*this\.coopAllowNextWaveStart/u,
+    "an evolve-move picker must inherit the terminal reward's successor permit",
+  );
+  assert.match(
+    selectModifier,
+    /coopPendingEvolutionSettlementOperationId[\s\S]*coopSettleRewardEvolution[\s\S]*coopPendingEvolutionSettlementOperationId = null[\s\S]*coopPendingAuthorityPresentation = structuredClone\(presentation\)[\s\S]*coopProveV2RewardOperationComplete\(operationId\)[\s\S]*coopCommitPendingAuthorityResult\(operationId\)/u,
+    "an evolution reward must capture its asynchronous post-image and record exact terminal proof before committing",
+  );
+  assert.match(
+    evolutionPhase,
+    /installCoopV2TerminalSuccessor[\s\S]*proveCoopRewardEvolutionSettlement[\s\S]*coopSettleRewardEvolution[\s\S]*this\.postEvolve\(evolvedPokemon\)/u,
+    "the live EvolutionPhase must install and prove the delayed reward successor before releasing children",
+  );
+  assert.match(
+    evolutionPhase,
+    /v2ControlLedger\.latestControl[\s\S]*v2ControlLedger\.sourceEntryOf\(successor\)[\s\S]*successor\?\.kind === "AWAIT_SUCCESSOR"[\s\S]*successor\.afterOperationId === operationId[\s\S]*successor\.wave === this\.coopRewardSourceWave[\s\S]*successor\.turn === this\.coopRewardSourceTurn[\s\S]*v2ControlLedger\.isMaterialApplied\(successor\)[\s\S]*sourceEntry\.operationId === operationId/u,
+    "the authority EvolutionPhase may recover its post-commit successor only from the exact material-applied ledger claim",
+  );
+  assert.match(
+    evolutionPhase,
+    /shouldQueueCoopEvolutionReplicaNextWaveBridge[\s\S]*authorityRole === "replica" && allowNextWaveStart[\s\S]*runtime\?\.controller\.authorityRole[\s\S]*terminal\.successor\.allowNextWaveStart/u,
+    "only the replica renderer may replace ordinary progression with the signed evolution successor bridge",
+  );
+  assert.match(
+    coopRuntime,
+    /settleEvolutionReplay[\s\S]*mayStartSelectedSuccessor[\s\S]*terminalWait = runtime\.v2ControlLedger\.latestControl[\s\S]*terminalWait\?\.kind === "AWAIT_SUCCESSOR"[\s\S]*terminalWait\.afterOperationId === op\.id[\s\S]*terminalWait\.allowNextWaveStart/u,
+    "a delayed nested learn-move entry must keep the replica's unsigned local successor unstarted",
+  );
+  assert.match(
+    learnMovePhase,
+    /nextInteraction == null[\s\S]*this\.coopParentAllowsNextWaveStart/u,
+    "the retained learn-move result must authorize wave N+1 when its item-evolution parent did",
+  );
+  assert.match(campaign, /targetAction\.partySlot !== targetAction\.beforePartySlot\?\.slot/u);
+  assert.match(campaign, /targetAction\.beforePartySlot\?\.coopOwner !== "guest"/u);
+  assert.match(campaign, /function latestPartyMaterialObservation\(client, minWave\)/u);
+  assert.match(campaign, /observation\.surfaceId !== "unclassified"/u);
+  assert.match(campaign, /assertPairedPartyMaterialFrontier\(configuredId, finalObservations\)/u);
+  assert.doesNotMatch(
+    campaign,
+    /never reached a wave-2 command with the target visible/u,
+    "a wave-2 Mystery surface is a valid post-mutation material frontier before CommandPhase",
+  );
+  assert.match(browserEntry, /maxMoveCount: pokemon\.getMaxMoveCount\(\)/u);
+  assert.match(browserEntry, /fusionSpeciesId: pokemon\.fusionSpecies\?\.speciesId \?\? null/u);
+  assert.match(browserEntry, /statusEffect: pokemon\.status\?\.effect \?\? null/u);
+  assert.match(browserEntry, /innateAbilityIds: safeInnateIds\(pokemon\)/u);
+  assert.match(browserEntry, /moves: pokemon\.getMoveset\(\)\.map/u);
+  assert.match(browserEntry, /modifierStacks: observedPokemonModifierStacks\(pokemon\.id\)/u);
+  assert.match(browserEntry, /uiMode === "ER_BARGAIN"[\s\S]*er-bargain-picker:option:/u);
+  assert.match(campaign, /dexNav OWNER relay OUTCOME/u);
+  assert.match(campaign, /dexChoices\.length !== 2/u);
+  assert.match(
+    campaign,
+    /const priorChoiceIds = new Set\([\s\S]*event\.kind === "campaign-ability-choice"[\s\S]*event\.phase === driver\.abilityPhase[\s\S]*chooseAbilityInteractionOption\(surface\.observation, priorChoiceIds\)/u,
+    "every repeated nested ability picker must exclude choices already submitted in that exact phase",
+  );
+  assert.match(
+    campaign,
+    /party-option:ability-slot-\$\{slot\}[\s\S]*!excludedOptionIds\.has\(optionId\)/u,
+    "Greater Capsule cannot reuse its first innate while selecting the required second slot",
+  );
+  assert.match(
+    browserEntry,
+    /phase === "FormChangePhase" \|\| phase === "CoopFormChangeCutsceneReplayPhase"[\s\S]*surfaceId: "battle:form-change"/u,
+  );
+  assert.match(
+    campaign,
+    /"battle:form-change"[\s\S]*new Set\(\["FormChangePhase", "CoopFormChangeCutsceneReplayPhase"\]\)/u,
+  );
+  assert.match(
+    operationEnvelope,
+    /readonly presentation\?:[\s\S]*Extract<CoopBattleEvent, \{ readonly k: "formChange" \}>[\s\S]*CoopWaveProgressionPresentationV2[\s\S]*readonly k: "evolution"/u,
+    "the immutable reward result must carry exact form-change or evolution presentation material",
+  );
+  assert.match(
+    battleScene,
+    /resolvePokemonFormChange\([\s\S]*return matchingFormChange \?\? null;[\s\S]*triggerPokemonFormChange\([\s\S]*this\.resolvePokemonFormChange/u,
+    "presentation capture and ordinary mechanics must share the exact engine form-edge resolver",
+  );
+  assert.match(
+    selectModifier,
+    /coopPendingAuthorityPresentation[\s\S]*resolvePokemonFormChange\(formTarget, SpeciesFormChangeItemTrigger\)[\s\S]*presentation: "evolution"[\s\S]*commitRewardAuthoritativeResult\([\s\S]*presentation: this\.coopPendingAuthorityPresentation/u,
+    "the authority must bind the queued form edge to the same reward result that produced it",
+  );
+  assert.match(
+    rewardOperation,
+    /isStrictCoopBattleEvent\(presentation\)[\s\S]*isValidWaveProgressionPresentation\(presentation\)[\s\S]*presentation: structuredClone\(presentation\)/u,
+    "malformed presentation material cannot enter a reward commit",
+  );
+  assert.match(
+    coopRuntime,
+    /v2RewardPresentationOutcomes[\s\S]*coopPresentationOutcome\(pending\)[\s\S]*unshiftNew\("CoopFormChangeReplayPhase", structuredClone\(presentation\), outcomeToken\)[\s\S]*settleCoopPresentationOutcome[\s\S]*"CoopWaveProgressionReplayPhase"[\s\S]*return false;/u,
+    "the replica must withhold material completion until its mechanics-free replay reaches a bounded terminal",
+  );
 });
 
 test("evolution-sync journey proves both real-browser evolution prompts before wave two", async () => {
@@ -447,8 +825,8 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   );
   assert.match(
     browserEntry,
-    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set\(\["SelectModifierPhase:EVOLUTION_SCENE"\]\)/u,
-    "the observer suppresses only the sampled reward-phase/evolution-UI teardown pair",
+    /NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set\(\[[\s\S]*"SelectModifierPhase:EVOLUTION_SCENE"[\s\S]*"LearnMovePhase:EVOLUTION_SCENE"[\s\S]*\]\)/u,
+    "the observer suppresses sampled reward and learn-move phase handoffs while evolution UI still owns the screen",
   );
   assert.match(
     browserEntry,
@@ -458,8 +836,8 @@ test("evolution-sync journey proves both real-browser evolution prompts before w
   assert.match(journeys, /"evolution-sync": evolutionSync/u);
 });
 
-test("registered-interaction journey reaches Revival mid-turn and Stormglass at the next wave through public UI", async () => {
-  const [workflow, config, harness, commandPhase, campaign, registry, starterCosts] = await Promise.all([
+test("registered-interaction journey reaches Revival, Stormglass, and its Mystery successor through public UI", async () => {
+  const [workflow, config, harness, commandPhase, campaign, registry, starterCosts, gauntlet] = await Promise.all([
     readFile(resolve(root, ".github/workflows/coop-public-ui-journey.yml"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/config.mjs"), "utf8"),
     readFile(resolve(root, "test/browser/coop-public-ui/public-ui-harness.mjs"), "utf8"),
@@ -467,6 +845,7 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
     readFile(resolve(root, "test/browser/coop-public-ui/campaign.mjs"), "utf8"),
     readFile(resolve(root, "src/dev-tools/registry.ts"), "utf8"),
     readFile(resolve(root, "src/data/balance/starters.ts"), "utf8"),
+    readFile(resolve(root, "src/data/elite-redux/er-mystery-gauntlet.ts"), "utf8"),
   ]);
   assert.match(workflow, /- registered-interactions/u);
   assert.match(config, /"registered-interactions"/u);
@@ -476,11 +855,31 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
   );
   assert.match(
     workflow,
-    /== "registered-interactions"[\s\S]*export COOP_UI_CAMPAIGN_WAVES=1/u,
-    "the focused occurrence journey overrides the retained 20-wave market contract only in its process",
+    /COOP_UI_DIFFICULTY_ID:.*registered-interactions.*'mystery'.*'ace'[\s\S]*COOP_UI_DIFFICULTY_OPTION_ID:.*registered-interactions.*'mystery'.*'ace'/u,
+    "the focused journey selects the real Mystery difficulty through the same public option driver",
+  );
+  assert.match(
+    workflow,
+    /VITE_DEV_TOOLS:.*inputs\.journey == 'registered-interactions'.*'1'.*'0'/u,
+    "the focused journey's sealed bundle exposes staging's dev-gated Mystery picker and no other journey does",
+  );
+  assert.match(
+    workflow,
+    /== "registered-interactions"[\s\S]*export COOP_UI_CAMPAIGN_WAVES=2/u,
+    "the focused occurrence journey remains alive through a same-wave embedded battle and the completed Mystery terminal",
   );
   assert.match(workflow, /== "market-wide-lens" \|\| .* == "registered-interactions"[\s\S]*run-campaign\.mjs/u);
   assert.match(harness, /journey === "registered-interactions"[\s\S]*"registered-owner"[\s\S]*"registered-partner"/u);
+  assert.match(
+    gauntlet,
+    /VITE_COOP_BROWSER_FIXTURE === "registered-interactions"[\s\S]*registered-owner[\s\S]*registered-partner[\s\S]*MysteryEncounterType\.FUN_AND_GAMES/u,
+    "the exact registered journey forces the exceptional direct-turn Mystery battle",
+  );
+  assert.match(
+    registry,
+    /getCoopBrowserNavigationFixtureStartingMoney[\s\S]*isCoopBrowserRegisteredInteractionFixtureActive\(\)[\s\S]*return 100_000/u,
+    "the paid Mystery option is enabled only through exact initial-save fixture money",
+  );
   const fixtureStart = registry.indexOf("export function getCoopBrowserRegisteredInteractionFixtureStarters");
   const fixtureEnd = registry.indexOf("\n}\n\n/**", fixtureStart);
   const fixture = registry.slice(fixtureStart, fixtureEnd);
@@ -516,7 +915,23 @@ test("registered-interaction journey reaches Revival mid-turn and Stormglass at 
   );
   assert.match(
     campaign,
-    /registeredInteractionCoverage\.revival\.length !== 1[\s\S]*registeredInteractionCoverage\.stormglass\.length !== 1[\s\S]*campaign-registered-interactions/u,
+    /policy\.mysteryGauntlet\.required \|\| policy\.navigation\.required \|\| policy\.registeredInteractions\.required[\s\S]*createRegisteredSurfaceProgressBudget/u,
+    "each proven public Mystery action extends only the bounded registered-surface budget",
+  );
+  assert.match(
+    campaign,
+    /interactionAddresses:op%3Ame:ME_PRESENT:w2:t0/u,
+    "the browser oracle requires the exact pre-turn Mystery successor address",
+  );
+  assert.match(
+    campaign,
+    /registeredInteractionCoverage\.revival\.length !== 1[\s\S]*registeredInteractionCoverage\.stormglass\.length !== 1[\s\S]*stormglassMysterySuccessor == null[\s\S]*completedMysterySuccessor == null[\s\S]*campaign-registered-interactions/u,
+    "the journey cannot pass until the t0 Mystery successor is admitted and its real terminal reaches a later wave",
+  );
+  assert.match(
+    campaign,
+    /completedMysterySuccessor\.mysteryEncounterType !== 27/u,
+    "an arbitrary no-battle Mystery completion cannot satisfy the Wobbuffet regression",
   );
 });
 

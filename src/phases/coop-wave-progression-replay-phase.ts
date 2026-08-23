@@ -382,20 +382,30 @@ export class CoopWaveProgressionReplayPhase extends Phase {
 
   private readonly wave: number;
   private readonly events: readonly CoopWaveProgressionPresentationV2[];
-  private readonly onComplete: () => void;
+  /** Return false to keep a newly selected local successor parked until the ordered V2 callback activates. */
+  private readonly onComplete: (succeeded: boolean) => boolean;
+  private readonly onRetired: () => void;
   private readonly renderControllers = new Set<AbortController>();
   private completed = false;
+  private presentationFailed = false;
 
-  constructor(wave: number, events: readonly CoopWaveProgressionPresentationV2[], onComplete: () => void) {
+  constructor(
+    wave: number,
+    events: readonly CoopWaveProgressionPresentationV2[],
+    onComplete: (succeeded: boolean) => boolean,
+    onRetired: () => void = () => undefined,
+  ) {
     super();
     this.wave = wave;
     this.events = structuredClone(events);
     this.onComplete = onComplete;
+    this.onRetired = onRetired;
   }
 
   public override start(): void {
     super.start();
     this.renderAll().catch(error => {
+      this.presentationFailed = true;
       coopWarn("progression", `GUEST retained presentation batch failed wave=${this.wave}; releasing DATA`, error);
       this.finish();
     });
@@ -426,6 +436,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
           return;
         }
         const reason = error instanceof Error ? error.message : String(error);
+        this.presentationFailed = true;
         observeCoopWaveProgressionPresentation({
           stage: "renderer-failed",
           wave: this.wave,
@@ -816,10 +827,22 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     }
     this.completed = true;
     coopLog("progression", `GUEST retained presentation complete wave=${this.wave} events=${this.events.length}`);
-    // Restore the parked BattleEndPhase first. The callback retries the exact V2 entry against that real
-    // boundary, so DATA can never apply while this cosmetic override is still current.
-    this.end();
-    this.onComplete();
+    // Select the parked/queued boundary without starting it, then let the completion callback retry the exact
+    // V2 entry. A buffered successor may atomically replace that selected shell; the scheduler detects that
+    // replacement and never starts either the obsolete local tail or the projected modal twice.
+    const shifted = globalScene.phaseManager.shiftPhaseThroughCoopAuthorityCommit(this, () =>
+      this.onComplete(!this.presentationFailed),
+    );
+    if (!shifted) {
+      if (globalScene.phaseManager.getCurrentPhase() === this) {
+        coopWarn(
+          "progression",
+          `GUEST retained presentation could not close its exact scheduler boundary wave=${this.wave}`,
+        );
+      } else {
+        coopLog("progression", `GUEST retained presentation parked its ordered successor wave=${this.wave}`);
+      }
+    }
   }
 
   /** Cancel detached UI work when recovery or a newer authority entry destructively replaces this phase. */
@@ -827,6 +850,7 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     if (this.isRetired()) {
       return;
     }
+    const notifyRetired = !this.completed;
     // Fence end() before abort rejects the outstanding Promise.race and schedules its continuation.
     super.retire();
     this.completed = true;
@@ -836,5 +860,8 @@ export class CoopWaveProgressionReplayPhase extends Phase {
     this.renderControllers.clear();
     globalScene.ui.setMode(UiMode.MESSAGE).catch(() => undefined);
     globalScene.partyExpBar.hide().catch(() => undefined);
+    if (notifyRetired) {
+      this.onRetired();
+    }
   }
 }

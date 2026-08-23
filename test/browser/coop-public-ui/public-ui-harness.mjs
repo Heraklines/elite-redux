@@ -18,7 +18,7 @@ import {
   selectOptionById,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
-import { delay, EvidenceSink, waitForPublicInputDispatch } from "./evidence.mjs";
+import { delay, EvidenceSink, waitForPublicInputDispatch, waitForPublicInputFrameSettle } from "./evidence.mjs";
 import {
   isAcceptedRendererPresentationReceipt,
   latestMoveAnimationsAttestation,
@@ -82,6 +82,18 @@ const MEWTWO_SPECIES_ID = 150;
 const ZACIAN_SPECIES_ID = 888;
 const ZAMAZENTA_SPECIES_ID = 889;
 const GARCHOMP_SPECIES_ID = 445;
+const PIKACHU_SPECIES_ID = 25;
+const KUBFU_SPECIES_ID = 891;
+const PARTY_REWARD_SUBJECT_SPECIES_IDS = Object.freeze({
+  EVOLUTION_ITEM: PIKACHU_SPECIES_ID,
+  RARE_EVOLUTION_ITEM: KUBFU_SPECIES_ID,
+  FORM_CHANGE_ITEM: 492,
+  RARE_FORM_CHANGE_ITEM: 487,
+});
+
+function expectedPartyRewardFixtureSpecies(rewardId) {
+  return [PARTY_REWARD_SUBJECT_SPECIES_IDS[rewardId] ?? GARCHOMP_SPECIES_ID, CATERPIE_SPECIES_ID];
+}
 // Exact-SHA run 29802798087 measured a 94.35s CPU-dilated gap between the guest entering its
 // correctly parked command watcher and the host emitting Explosion's next authoritative HP/faint
 // events. The former 90s watchdog aborted four seconds before that real causal progress and the
@@ -363,6 +375,37 @@ function findOwnedCommandOrTerminal(client, from) {
     return ownedSemantic;
   }
   return client.evidence.find(LOCAL_COMMAND, from) ?? null;
+}
+
+/**
+ * Stable identity for one actionable CommandPhase instance.
+ *
+ * Opening FIGHT replaces the top-level COMMAND surface without creating another
+ * battler command. Conversely, a surviving seat can legitimately receive two
+ * CommandPhase instances at the same turn address when it owns both active
+ * battlers. The runtime-owned phase instance is therefore the discriminator;
+ * surfaceId/uiMode is deliberately excluded from the returned identity.
+ */
+function commandPhaseIdentity(client, event) {
+  const observation = event?.kind === "browser-surface2" ? event.observation : null;
+  const address = observation?.address;
+  const actionableCommand =
+    (observation?.surfaceId === "command:command"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "COMMAND")
+    || (observation?.surfaceId === "command:fight"
+      && observation.phase === "CommandPhase"
+      && observation.uiMode === "FIGHT");
+  if (
+    !actionableCommand
+    || !Number.isSafeInteger(address?.epoch)
+    || !Number.isSafeInteger(address?.wave)
+    || !Number.isSafeInteger(address?.turn)
+    || !Number.isSafeInteger(observation?.phaseInstance)
+  ) {
+    return null;
+  }
+  return `${client.label}:${address.epoch}:${address.wave}:${address.turn}:${observation.phaseInstance}`;
 }
 
 /**
@@ -840,10 +883,10 @@ function commandFrontierProjection(client, event) {
     return null;
   }
   const owner =
-    observation.surfaceId === "command:command"
+    ((observation.surfaceId === "command:command" && observation.uiMode === "COMMAND")
+      || (observation.surfaceId === "command:fight" && observation.uiMode === "FIGHT"))
     && observation.operationClass === "command"
     && observation.phase === "CommandPhase"
-    && observation.uiMode === "COMMAND"
     && observation.seatsWithInput?.includes(client.publicSeat);
   const watcher =
     rendererWatcher
@@ -1140,6 +1183,12 @@ export class PublicUiClient {
       entryUrl.searchParams.set("coopfixture", this.label === "host-seat" ? "registered-owner" : "registered-partner");
     } else if (this.config.journey === "ability-capsule") {
       entryUrl.searchParams.set("coopfixture", "ability-capsule");
+    } else if (this.config.journey === "party-mutating-rewards") {
+      if (this.config.partyRewardId == null) {
+        throw new Error("party-mutating-rewards requires COOP_UI_PARTY_REWARD_ID");
+      }
+      entryUrl.searchParams.set("coopfixture", "party-mutating-rewards");
+      entryUrl.searchParams.set("partyreward", this.config.partyRewardId);
     } else if (this.config.journey === "navigation-depth-30" || this.config.journey === "market-wide-lens") {
       entryUrl.searchParams.set("coopfixture", "navigation-depth-30");
     } else if (this.config.journey === "evolution-sync") {
@@ -1631,36 +1680,24 @@ export class PublicUiClient {
           await this.page.keyboard.up(key);
         }
       }
-      await waitForPublicInputDispatch(this.evidence, {
+      const dispatchReceipt = await waitForPublicInputDispatch(this.evidence, {
         from: echoCursor,
         domKeysBefore,
       });
-      // Optimization brief R1c: per-input acknowledgment. Wait for the game's OWN
-      // input-echo (uiMode/cursor/phase change observed AFTER this press) instead of a
-      // fixed sleep. A press that legitimately changes nothing (menu-edge arrow) falls
-      // back to the legacy fixed delay - robustness floor, not speed ceiling.
+      // A single input can synchronously close one MESSAGE and open the next inside the SAME Phaser
+      // update. An active-handler echo from that new prompt is not yet safe input authority: a second
+      // key in the same update is discarded by production's input guards. Wait for the observer's exact
+      // post-dispatch frame receipt instead of sleeping or trusting a UI-name change. This preserves the
+      // optimized event-driven path while matching the earliest instant a human's next key can be consumed.
       if (this.config.inputAcks) {
         const ackStartedMs = Date.now();
-        try {
-          await this.evidence.waitForCondition(
-            sink => {
-              for (let i = echoCursor; i < sink.events.length; i++) {
-                // Only an ACTIVE-handler echo acknowledges the press: an echo emitted
-                // mid-transition (handler not yet accepting input) must NOT release the
-                // next key - that outran the Settings submenu on CI and dropped keys.
-                if (sink.events[i].kind === "browser-input-echo" && sink.events[i].observation?.active === true) {
-                  return sink.events[i];
-                }
-              }
-              return;
-            },
-            { timeoutMs: Math.max(150, this.config.actionDelayMs * 2), description: `input echo for ${purpose}` },
-          );
-          this.evidence.recordInputAck(Date.now() - ackStartedMs, false);
-        } catch {
-          // No visible change within the window: legacy-pace this press and move on.
-          this.evidence.recordInputAck(Date.now() - ackStartedMs, true);
-        }
+        await waitForPublicInputFrameSettle(this.evidence, {
+          from: dispatchReceipt.index + 1,
+          domKeys: dispatchReceipt.observation.domKeys,
+          keydownFrame: dispatchReceipt.observation.keydownFrame,
+          timeoutMs: Math.max(5_000, this.config.actionDelayMs * 10),
+        });
+        this.evidence.recordInputAck(Date.now() - ackStartedMs, false);
       } else {
         await delay(this.config.actionDelayMs);
       }
@@ -3609,6 +3646,7 @@ export class DuoPublicUiRig {
     evolutionFixture = false,
     registeredInteractionsFixture = false,
     abilityCapsuleFixture = false,
+    partyRewardFixture = false,
   } = {}) {
     if (!this.host) {
       throw new Error("startFreshRun requires a paired public host (call pair() first)");
@@ -3707,7 +3745,9 @@ export class DuoPublicUiRig {
                             : [BULBASAUR_SPECIES_ID]
                           : abilityCapsuleFixture
                             ? [GARCHOMP_SPECIES_ID]
-                            : null;
+                            : partyRewardFixture
+                              ? expectedPartyRewardFixtureSpecies(this.config.partyRewardId)
+                              : null;
           const result =
             expectedSeededSpecies == null
               ? await confirmDefaultStarterTeam(client, {
@@ -4422,14 +4462,16 @@ export class DuoPublicUiRig {
   }
 
   /**
-   * Submit one reciprocal co-op command round in the order the real UIs become actionable.
+   * Submit one co-op command round in the order the real owned battler slots become actionable.
    *
    * The second player's CommandPhase is intentionally gated by the first player's public choice.
    * Waiting for both clients before sending either choice therefore deadlocks a healthy game. This
-   * driver observes one owned semantic command surface, submits only that client's configured public
-   * key sequence, then observes and submits the partner's surface. No scene/runtime state is read or
-   * mutated; the returned cursors exclude these command surfaces so the post-turn outcome cannot
-   * mistake the just-submitted round for the next one.
+   * driver observes one owned semantic command surface and submits only that client's configured public
+   * key sequence. A depleted partner can leave two active battlers assigned to the same remaining seat, so
+   * that same browser may legitimately receive another CommandPhase at the same address before collection
+   * closes. Consume each distinct public surface exactly once; do not assume one command per browser. No
+   * scene/runtime state is read or mutated, and the returned cursors exclude these command surfaces so the
+   * post-turn outcome cannot mistake the just-submitted round for the next one.
    */
   async driveSequentialCommandRound(initialFrom, keys, purpose, { driveCommand = null } = {}) {
     const clients = Object.values(this.clients);
@@ -4448,6 +4490,9 @@ export class DuoPublicUiRig {
     const pending = new Set(clients.map(client => client.label));
     const outcomeCursors = {};
     const commandEvents = {};
+    const commandEventHistory = Object.fromEntries(clients.map(client => [client.label, []]));
+    const consumedCommandEvents = new Set();
+    const consumedCommandPhases = new Set();
     const progressBudget = createPublicBattleProgressBudget(this, from, this.config.timeoutMs);
     let advanceBattlePrompt = null;
     let promptCommandAddress = null;
@@ -4574,15 +4619,45 @@ export class DuoPublicUiRig {
 
       let droveCommand = false;
       for (const client of clients) {
-        if (!pending.has(client.label)) {
-          continue;
-        }
         const event = findOwnedCommandOrTerminal(client, from[client.label] ?? 0);
         if (event == null) {
           continue;
         }
         if (event.kind !== "browser-surface2" && !LOCAL_COMMAND.test(event.text ?? "")) {
           throw new Error(`${client.label}: shared session terminated before ${purpose}: ${event.text}`);
+        }
+        const commandEventKey = `${client.label}:${event.index}`;
+        if (consumedCommandEvents.has(commandEventKey)) {
+          continue;
+        }
+        const phaseIdentity = commandPhaseIdentity(client, event);
+        if (phaseIdentity != null && consumedCommandPhases.has(phaseIdentity)) {
+          // Animations-on Fun & Games run 30885322016: navigating the first owner's top-level
+          // COMMAND surface emitted a later command:fight observation for the SAME CommandPhase.
+          // The append-only scanner mistook that submenu for a second battler owner and waited for
+          // an impossible reciprocal frontier even though both engines had already advanced to the
+          // next turn. Retire only this alias observation. A genuine second battler has a distinct
+          // runtime phaseInstance and remains actionable at the same authority address.
+          consumedCommandEvents.add(commandEventKey);
+          from[client.label] = event.index + 1;
+          client.evidence.record("sequential-command-submenu-superseded", {
+            purpose,
+            commandEventIndex: event.index,
+            phaseIdentity,
+            surfaceId: event.observation.surfaceId,
+          });
+          droveCommand = true;
+          break;
+        }
+        const commandAddress = event.observation?.address;
+        if (
+          submittedCommandAddress != null
+          && commandAddress != null
+          && !sameAddress(commandAddress, submittedCommandAddress)
+        ) {
+          // This belongs to the caller's next round. The exact-address battle-progress event that closed the
+          // current collection remains in postSubmissionCursors and is consumed by the closure proof below.
+          continue;
         }
         if (pending.size === 1 && submittedCommandAddress != null) {
           await this.assertPresentationLedgerAtSharedCommand(
@@ -4592,6 +4667,11 @@ export class DuoPublicUiRig {
           );
         }
         commandEvents[client.label] = event;
+        commandEventHistory[client.label].push(event);
+        consumedCommandEvents.add(commandEventKey);
+        if (phaseIdentity != null) {
+          consumedCommandPhases.add(phaseIdentity);
+        }
         outcomeCursors[client.label] = client.evidence.cursor();
         await client.checkpoint(`${purpose}-${client.label}-command`);
         const beforeSubmissionCursors = Object.fromEntries(
@@ -4608,7 +4688,9 @@ export class DuoPublicUiRig {
           await driveCommand(client, `${purpose}-${client.label}`, event);
         }
         pending.delete(client.label);
-        const commandAddress = event.observation?.address;
+        // Re-scan strictly after this consumed surface. The same browser can own the next live battler,
+        // while an unchanged append-only observation must never be driven twice.
+        from[client.label] = event.index + 1;
         if (
           pending.size > 0
           && Number.isSafeInteger(commandAddress?.epoch)
@@ -4678,6 +4760,7 @@ export class DuoPublicUiRig {
       client.evidence.record("sequential-command-proof", {
         purpose,
         commandEventIndex: commandEvents[client.label]?.index ?? null,
+        commandEventIndexes: commandEventHistory[client.label].map(event => event.index),
         skippedAfterCollectionClosed:
           commandEvents[client.label] == null && (commandCollectionClosed != null || supersedingOutcome != null),
         collectionClosedEventIndex: commandCollectionClosed?.event.index ?? null,
@@ -4703,9 +4786,11 @@ export class DuoPublicUiRig {
                 const address = observation?.address;
                 if (
                   event.kind !== "browser-surface2"
-                  || observation?.surfaceId !== "command:command"
+                  || !(
+                    (observation?.surfaceId === "command:command" && observation.uiMode === "COMMAND")
+                    || (observation?.surfaceId === "command:fight" && observation.uiMode === "FIGHT")
+                  )
                   || observation.phase !== "CommandPhase"
-                  || observation.uiMode !== "COMMAND"
                   || observation.ready?.handlerActive !== true
                   || observation.localSeat !== client.publicSeat
                   || !observation.seatsWithInput?.includes(client.publicSeat)
@@ -4738,6 +4823,7 @@ export class DuoPublicUiRig {
     }
     return {
       commandEvents,
+      commandEventHistory,
       outcomeCursors,
       presentationCursors:
         presentationCursors ?? Object.fromEntries(clients.map(client => [client.label, from[client.label] ?? 0])),

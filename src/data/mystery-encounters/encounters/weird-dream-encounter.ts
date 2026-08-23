@@ -18,7 +18,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
-import { HiddenAbilityRateBoosterModifier, PokemonFormChangeItemModifier } from "#modifiers/modifier";
+import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import type { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
@@ -42,7 +42,7 @@ import { trainerConfigs } from "#trainers/trainer-config";
 import { TrainerPartyTemplate } from "#trainers/trainer-party-template";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
 import { isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
-import { NumberHolder, randSeedInt, randSeedShuffle } from "#utils/common";
+import { randSeedInt, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
 
@@ -524,10 +524,7 @@ async function postProcessTransformedPokemon(
   if (newPokemon.species.abilityHidden) {
     const hiddenIndex = newPokemon.species.ability2 ? 2 : 1;
     if (newPokemon.abilityIndex < hiddenIndex) {
-      const hiddenAbilityChance = new NumberHolder(256);
-      globalScene.applyModifiers(HiddenAbilityRateBoosterModifier, true, hiddenAbilityChance);
-
-      const hasHiddenAbility = !randSeedInt(hiddenAbilityChance.value);
+      const hasHiddenAbility = !randSeedInt(256);
 
       if (hasHiddenAbility) {
         newPokemon.abilityIndex = hiddenIndex;

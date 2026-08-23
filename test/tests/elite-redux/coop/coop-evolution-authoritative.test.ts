@@ -11,6 +11,8 @@
 // and the exact PokemonData wire-image round trip. It deliberately makes no obsolete resync claim.
 
 import type { AnySound } from "#app/battle-scene";
+import { Phase } from "#app/phase";
+import { PhaseManager } from "#app/phase-manager";
 import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import {
   isCoopAuthoritativeGuestGated,
@@ -19,6 +21,7 @@ import {
 import { isCoopLocalPresentationInputSurface } from "#data/elite-redux/coop/coop-local-presentation-input";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { SpeciesId } from "#enums/species-id";
+import { shouldQueueCoopEvolutionReplicaNextWaveBridge } from "#phases/evolution-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -26,6 +29,15 @@ import { fadeOutSoundIfActive } from "#utils/sound-fade";
 import Phaser from "phaser";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+class RecordingMessagePhase extends Phase {
+  public readonly phaseName = "MessagePhase";
+  public starts = 0;
+
+  public override start(): void {
+    this.starts += 1;
+  }
+}
 
 describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", () => {
   afterEach(() => {
@@ -69,7 +81,90 @@ describe("co-op authoritative evolution gate (#633 B6) - cycle-free predicate", 
   it("leases only the local evolution scene, never the mechanically shared branch picker", () => {
     expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "EVOLUTION_SCENE")).toBe(true);
     expect(isCoopLocalPresentationInputSurface("CoopWaveProgressionReplayPhase", "EVOLUTION_SCENE")).toBe(true);
+    expect(isCoopLocalPresentationInputSurface("FormChangePhase", "EVOLUTION_SCENE")).toBe(true);
+    expect(isCoopLocalPresentationInputSurface("CoopFormChangeCutsceneReplayPhase", "EVOLUTION_SCENE")).toBe(true);
     expect(isCoopLocalPresentationInputSurface("EvolutionPhase", "OPTION_SELECT")).toBe(false);
+    expect(isCoopLocalPresentationInputSurface("FormChangePhase", "OPTION_SELECT")).toBe(false);
+  });
+
+  it("queues a signed next-wave bridge only on the replica renderer", () => {
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge("replica", true)).toBe(true);
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge("authority", true)).toBe(false);
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge("replica", false)).toBe(false);
+    expect(shouldQueueCoopEvolutionReplicaNextWaveBridge(null, true)).toBe(false);
+  });
+
+  it("does not double-start a V2 modal projected while an ordered successor is still closed", () => {
+    const phaseManager = new PhaseManager();
+    const retainedReplay = new RecordingMessagePhase();
+    const ordinarySuccessor = new RecordingMessagePhase();
+    const projectedModal = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = retainedReplay;
+    phaseManager.pushPhase(ordinarySuccessor);
+
+    expect(
+      phaseManager.shiftPhaseThroughCoopAuthorityCommit(retainedReplay, () => {
+        expect(phaseManager.getCurrentPhase()).toBe(ordinarySuccessor);
+        expect(ordinarySuccessor.starts).toBe(0);
+        return phaseManager.replaceWithCoopAuthoritativeModal(ordinarySuccessor, projectedModal);
+      }),
+    ).toBe(true);
+
+    expect(phaseManager.getCurrentPhase()).toBe(projectedModal);
+    expect(phaseManager.getStandbyPhase()).toBe(ordinarySuccessor);
+    expect(ordinarySuccessor.starts).toBe(0);
+    expect(projectedModal.starts).toBe(1);
+  });
+
+  it("starts a retained successor exactly once after its projected V2 modal commits", () => {
+    const phaseManager = new PhaseManager();
+    const retainedReplay = new RecordingMessagePhase();
+    const ordinarySuccessor = new RecordingMessagePhase();
+    const projectedModal = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = retainedReplay;
+    phaseManager.pushPhase(ordinarySuccessor);
+
+    expect(
+      phaseManager.shiftPhaseThroughCoopAuthorityCommit(retainedReplay, () =>
+        phaseManager.replaceWithCoopAuthoritativeModal(ordinarySuccessor, projectedModal),
+      ),
+    ).toBe(true);
+    expect(ordinarySuccessor.starts).toBe(0);
+    expect(projectedModal.starts).toBe(1);
+
+    expect(phaseManager.shiftPhaseThroughCoopAuthorityCommit(projectedModal, () => true)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(ordinarySuccessor);
+    expect(phaseManager.getStandbyPhase()).toBeNull();
+    expect(ordinarySuccessor.starts).toBe(1);
+    expect(projectedModal.starts).toBe(1);
+  });
+
+  it("does not restart an ordinary predecessor when a temporary modal returns to it", () => {
+    const phaseManager = new PhaseManager();
+    const ordinaryPredecessor = new RecordingMessagePhase();
+    const temporaryModal = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = ordinaryPredecessor;
+    phaseManager.prepareCurrentPhaseForStart();
+    ordinaryPredecessor.start();
+
+    expect(phaseManager.overridePhase(temporaryModal)).toBe(true);
+    expect(temporaryModal.starts).toBe(1);
+    expect(phaseManager.shiftPhaseThroughCoopAuthorityCommit(temporaryModal, () => true)).toBe(true);
+    expect(phaseManager.getCurrentPhase()).toBe(ordinaryPredecessor);
+    expect(ordinaryPredecessor.starts).toBe(1);
+    expect(temporaryModal.starts).toBe(1);
+  });
+
+  it("keeps a selected local successor unstarted while a delayed ordered entry is still absent", () => {
+    const phaseManager = new PhaseManager();
+    const retainedReplay = new RecordingMessagePhase();
+    const ordinarySuccessor = new RecordingMessagePhase();
+    (phaseManager as unknown as { currentPhase: Phase }).currentPhase = retainedReplay;
+    phaseManager.pushPhase(ordinarySuccessor);
+
+    expect(phaseManager.shiftPhaseThroughCoopAuthorityCommit(retainedReplay, () => false)).toBe(false);
+    expect(phaseManager.getCurrentPhase()).toBe(ordinarySuccessor);
+    expect(ordinarySuccessor.starts).toBe(0);
   });
 });
 

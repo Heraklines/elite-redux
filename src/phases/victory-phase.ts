@@ -7,6 +7,7 @@ import {
   beginCoopWaveProgressionCapture,
   broadcastCoopWaveResolved,
   captureCoopAutomaticVictorySealIdentity,
+  didCompleteCoopV2TrainerVictoryPresentation,
   failCoopSharedSession,
   getCoopActiveWaveTransition,
   getCoopController,
@@ -21,7 +22,25 @@ import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tra
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
-import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import {
+  hasErEndlessRift,
+  isErEndlessCycleBoundaryAfterWave,
+  isErEndlessRaidWave,
+  shouldErEndlessRiftPulseAfterWave,
+} from "#data/elite-redux/er-endless-continuation";
+import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { hasErGhostOverride, reportErEndlessGhostEncounter } from "#data/elite-redux/er-ghost-teams";
+import { resetErMapNodes } from "#data/elite-redux/er-map-nodes";
+import {
+  getErProgressionWave,
+  getErStorySourceWave,
+  isErCheckpointWave,
+  isErMajorCheckpointWave,
+  isErSprintMode,
+} from "#data/elite-redux/er-run-pacing";
+import { isMoodyAutomaticBiomeHealingEnabled } from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { isMoodyBoonRewardWave } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -72,6 +91,9 @@ export class VictoryPhase extends PokemonPhase {
 
   start() {
     super.start();
+    if (!this.isExpOnly) {
+      restoreErEndlessBattleOverlays();
+    }
 
     // A retained normal-wave Victory can run after a speculative next Battle has already been installed.
     // Its immutable WAVE_ADVANCE statement—not that mutable ambient object—owns encounter classification.
@@ -152,12 +174,15 @@ export class VictoryPhase extends PokemonPhase {
     const retainedResolvedVictory =
       this.coopSourceWave != null
       && (retainedSourceTransition?.outcome === "win" || retainedSourceTransition?.outcome === "capture");
-    if (
-      retainedResolvedVictory
-      || !globalScene
-        .getEnemyParty()
-        .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)))
-    ) {
+    const endlessRaid = isErEndlessRaidWave(globalScene.currentBattle.waveIndex);
+    const endlessRaidBossDefeated = endlessRaid && globalScene.getEnemyParty()[0]?.isFainted(true) === true;
+    const ordinaryEnemySideDefeated = !globalScene
+      .getEnemyParty()
+      .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)));
+    if (retainedResolvedVictory || endlessRaidBossDefeated || (!endlessRaid && ordinaryEnemySideDefeated)) {
+      if (globalScene.currentBattle.trainer && hasErGhostOverride(globalScene.currentBattle.trainer)) {
+        reportErEndlessGhostEncounter("player-win");
+      }
       removeQueuedPostVictoryCombatPhases();
       // Co-op (#633, authoritative wave-advance handshake): this is the real WIN / wave-clear
       // branch (not the exp-only / mystery-encounter paths, which returned above). The host is
@@ -189,7 +214,7 @@ export class VictoryPhase extends PokemonPhase {
       if (globalScene.gameMode.isCoop) {
         const willSelectModifier =
           (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(currentWaveIndex))
-          && currentWaveIndex % 10 !== 0;
+          && !globalScene.gameMode.isBoss(currentWaveIndex);
         const coopRole = getCoopController()?.role ?? "none";
         console.info(
           `[coop-diag] VictoryPhase win-branch role=${coopRole} battleType=${BattleType[globalScene.currentBattle.battleType]} queuesTrainerVictory=${isTrainerWin} queuesSelectModifier=${willSelectModifier} wave=${currentWaveIndex}`,
@@ -207,7 +232,7 @@ export class VictoryPhase extends PokemonPhase {
       // run (the tournament end-of-match freeze).
       if (!gameMode.isShowdown) {
         globalScene.phaseManager.pushNew("BattleEndPhase", true, automaticVictorySeal);
-        if (isTrainerWin) {
+        if (isTrainerWin && !didCompleteCoopV2TrainerVictoryPresentation(currentWaveIndex)) {
           globalScene.phaseManager.pushNew("TrainerVictoryPhase");
         }
       }
@@ -222,14 +247,17 @@ export class VictoryPhase extends PokemonPhase {
         let waveModifierRewardSettings: CustomModifierSettings | undefined;
         if (tailControl.eggLapse) {
           globalScene.phaseManager.pushNew("EggLapsePhase");
+          if (isErSprintMode(gameMode.modeId)) {
+            globalScene.phaseManager.pushNew("EggLapsePhase");
+          }
         }
         if (gameMode.isClassic) {
-          switch (currentWaveIndex) {
+          switch (getErStorySourceWave(currentWaveIndex)) {
             case ClassicFixedBossWaves.RIVAL_1:
             case ClassicFixedBossWaves.RIVAL_2:
               // Get event modifiers for this wave
               timedEventManager
-                .getFixedBattleEventRewards(currentWaveIndex)
+                .getFixedBattleEventRewards(getErStorySourceWave(currentWaveIndex))
                 .map(r => globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes[r]));
               break;
             case ClassicFixedBossWaves.EVIL_BOSS_2:
@@ -238,7 +266,10 @@ export class VictoryPhase extends PokemonPhase {
               break;
           }
         }
-        if (currentWaveIndex % 10) {
+        const sprintClassic = isErSprintMode(gameMode.modeId);
+        const checkpointWave = sprintClassic ? isErCheckpointWave(currentWaveIndex) : !(currentWaveIndex % 10);
+        const progressionWave = sprintClassic ? getErProgressionWave(currentWaveIndex) : currentWaveIndex;
+        if (!checkpointWave) {
           // ER (#217): a cross-player GHOST-team trainer rolls a per-victory reward
           // TIER for the whole reward screen (60% Great, 10% Common, 30% Ultra),
           // BEFORE luck (luck still upgrades from there). Reuses the rival/boss
@@ -257,18 +288,18 @@ export class VictoryPhase extends PokemonPhase {
           if (gameMode.isEndless && currentWaveIndex === 10) {
             globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_SHARE);
           }
-          if (gameMode.isClassic && currentWaveIndex === 10) {
+          if (gameMode.isClassic && progressionWave === 10) {
             globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_CHARM);
           }
-          if (currentWaveIndex <= 750 && (currentWaveIndex <= 500 || currentWaveIndex % 30 === superExpWave)) {
+          if (progressionWave <= 750 && (progressionWave <= 500 || progressionWave % 30 === superExpWave)) {
             globalScene.phaseManager.pushNew(
               "ModifierRewardPhase",
-              currentWaveIndex % 30 !== superExpWave || currentWaveIndex > 250
+              progressionWave % 30 !== superExpWave || progressionWave > 250
                 ? modifierTypes.EXP_CHARM
                 : modifierTypes.SUPER_EXP_CHARM,
             );
           }
-          if (currentWaveIndex <= 150 && !(currentWaveIndex % 50)) {
+          if (progressionWave <= 150 && !(progressionWave % 50)) {
             globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.GOLDEN_POKEBALL);
           }
           if (gameMode.isEndless && !(currentWaveIndex % 50)) {
@@ -297,8 +328,9 @@ export class VictoryPhase extends PokemonPhase {
         const erRouting = erBiomeRoutingActive();
         // The authoritative guest must NEVER derive this boundary locally. A one-bit disagreement here is
         // the wave-10 split: one queue opens SelectBiomePhase while the other advances without the map.
-        const biomeEnding = tailControl.biomeChange;
-        const fireBiomeShop = !(currentWaveIndex % 10) && !gameMode.isDaily;
+        const endlessCycleBoundary = isErEndlessCycleBoundaryAfterWave(currentWaveIndex);
+        const biomeEnding = tailControl.biomeChange || endlessCycleBoundary;
+        const fireBiomeShop = checkpointWave && !gameMode.isDaily && !hasErEndlessRift("no-sanctuary");
         const raiseCrossroads =
           !biomeEnding
           && erRouting
@@ -317,7 +349,15 @@ export class VictoryPhase extends PokemonPhase {
         // The mid-biome x0 heal is an automatic shared mutation. It must drain before the retained victory
         // image is sealed; previously it ran after the interactive market and therefore could never be part
         // of the wave's authoritative boundary.
-        if (erRouting && fireBiomeShop && !biomeEnding && !isCoopAuthoritativeGuest()) {
+        if (
+          erRouting
+          && fireBiomeShop
+          && !biomeEnding
+          && !sprintClassic
+          && !isCoopAuthoritativeGuest()
+          && !hasErEndlessRift("no-sanctuary")
+          && isMoodyAutomaticBiomeHealingEnabled()
+        ) {
           globalScene.phaseManager.pushNew("PartyHealPhase", false);
         }
 
@@ -325,7 +365,7 @@ export class VictoryPhase extends PokemonPhase {
           globalScene.phaseManager.pushNew("CoopVictorySealPhase", automaticVictorySeal);
         }
         queuePostVictoryPresentation?.();
-        if (currentWaveIndex % 10) {
+        if (!checkpointWave) {
           globalScene.phaseManager.pushNew(
             "SelectModifierPhase",
             undefined,
@@ -333,7 +373,29 @@ export class VictoryPhase extends PokemonPhase {
             waveModifierRewardSettings,
             false,
             { kind: "wave-boundary" },
+            undefined,
+            0,
+            sprintClassic ? 5 : 3,
+            sprintClassic ? 2 : 1,
           );
+        } else if (sprintClassic) {
+          const fixedRewardSettings = gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings;
+          const checkpointTier = isErMajorCheckpointWave(currentWaveIndex) ? ModifierTier.ULTRA : ModifierTier.GREAT;
+          globalScene.phaseManager.pushNew(
+            "SelectModifierPhase",
+            undefined,
+            undefined,
+            fixedRewardSettings ?? {
+              guaranteedModifierTiers: new Array(3).fill(checkpointTier),
+              fillRemaining: false,
+            },
+            false,
+            { kind: "wave-boundary" },
+          );
+        }
+
+        if (isMoodyBoonRewardWave(currentWaveIndex) && gameMode.isFun && getFunModeConfig().moodyMode) {
+          globalScene.phaseManager.pushNew("SelectMoodyBoonPhase", currentWaveIndex);
         }
 
         if (fireBiomeShop) {
@@ -355,7 +417,10 @@ export class VictoryPhase extends PokemonPhase {
           }
         }
 
-        if (biomeEnding) {
+        if (endlessCycleBoundary) {
+          resetErMapNodes();
+          globalScene.phaseManager.pushNew("SwitchBiomePhase", BiomeId.TOWN);
+        } else if (biomeEnding) {
           globalScene.phaseManager.pushNew("SelectBiomePhase", currentWaveIndex, postBattleSettlementTurn);
         } else if (raiseCrossroads) {
           // ER (#486): not a biome end, but a 5-wave Crossroads tick - raise the
@@ -383,6 +448,9 @@ export class VictoryPhase extends PokemonPhase {
           );
         }
 
+        if (shouldErEndlessRiftPulseAfterWave(currentWaveIndex)) {
+          globalScene.phaseManager.pushNew("EndlessRiftPulsePhase", currentWaveIndex);
+        }
         globalScene.phaseManager.pushNew("NewBattlePhase");
       } else if (gameMode.isShowdown) {
         if (automaticVictorySeal != null) {

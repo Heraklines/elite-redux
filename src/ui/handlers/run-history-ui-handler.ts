@@ -372,6 +372,9 @@ class RunEntryContainer extends Phaser.GameObjects.Container {
       case GameModes.CHALLENGE:
         mode = i18next.t("gameMode:challenge");
         break;
+      case GameModes.FUN:
+        mode = "Fun Mode";
+        break;
     }
     gameModeLabel.appendText(mode, false);
     if (data.gameMode === GameModes.SPLICED_ENDLESS) {

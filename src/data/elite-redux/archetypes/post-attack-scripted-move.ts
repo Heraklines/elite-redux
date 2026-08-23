@@ -133,10 +133,23 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     if (this.opts.categoryFilter !== undefined && move.category !== this.opts.categoryFilter) {
       return false;
     }
-    if (this.opts.typeFilter !== undefined && !this.opts.typeFilter.includes(move.type)) {
-      return false;
+    if (this.opts.typeFilter !== undefined) {
+      const triggeredTypes = new Set<PokemonType>([move.type]);
+      for (const attr of pokemon.getAllActiveAbilityAttrs()) {
+        if ("getTriggeredMoveTypes" in attr && typeof attr.getTriggeredMoveTypes === "function") {
+          for (const type of attr.getTriggeredMoveTypes(move)) {
+            triggeredTypes.add(type);
+          }
+        }
+      }
+      if (!this.opts.typeFilter.some(type => triggeredTypes.has(type))) {
+        return false;
+      }
     }
-    if (this.opts.flagFilter !== undefined && !move.hasFlag(this.opts.flagFilter)) {
+    if (
+      this.opts.flagFilter !== undefined
+      && !move.doesFlagEffectApply({ flag: this.opts.flagFilter, user: pokemon, target: opponent })
+    ) {
       return false;
     }
     return true;

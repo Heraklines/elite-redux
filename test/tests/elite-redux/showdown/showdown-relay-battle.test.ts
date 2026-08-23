@@ -63,7 +63,7 @@ async function startShowdown(
     beginShowdownBattle(opponent, opponent, relay);
     const starters = generateStarters(game.scene, playerSpecies);
     game.scene.phaseManager.pushNew("EncounterPhase", false);
-    new SelectStarterPhase().initBattle(starters);
+    new SelectStarterPhase().initBattleFromCurrentPhase(starters);
   });
   await game.phaseInterceptor.to("CommandPhase");
 }

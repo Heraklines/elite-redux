@@ -77,6 +77,8 @@ interface DelayedAttackArgs extends PositionalTagBaseArgs {
   readonly sourceId: number;
   /** The {@linkcode MoveId} that created this attack. */
   readonly sourceMove: MoveId;
+  /** Optional candidate moves; the strongest effective move is selected when triggered. */
+  readonly sourceMoves?: MoveId[] | undefined;
 }
 
 /**
@@ -89,22 +91,30 @@ export class DelayedAttackTag extends PositionalTag implements DelayedAttackArgs
 
   public readonly sourceMove: MoveId;
   public readonly sourceId: number;
+  public readonly sourceMoves?: MoveId[] | undefined;
 
-  public constructor({ sourceId, turnCount, targetIndex, sourceMove }: DelayedAttackArgs) {
+  public constructor({ sourceId, turnCount, targetIndex, sourceMove, sourceMoves }: DelayedAttackArgs) {
     super({ turnCount, targetIndex });
     this.sourceId = sourceId;
     this.sourceMove = sourceMove;
+    this.sourceMoves = sourceMoves;
   }
 
   public override trigger(): void {
     // Bangs are justified as the `shouldTrigger` method will queue the tag for removal
     // if the source or target no longer exist
     const target = this.getTarget()!;
+    const source = globalScene.getPokemonById(this.sourceId)!;
+    const sourceMove = (this.sourceMoves ?? [this.sourceMove]).reduce((best, candidate) => {
+      const bestDamage = target.getAttackDamage({ source, move: allMoves[best], simulated: true }).damage;
+      const candidateDamage = target.getAttackDamage({ source, move: allMoves[candidate], simulated: true }).damage;
+      return candidateDamage > bestDamage ? candidate : best;
+    });
 
     globalScene.phaseManager.queueMessage(
       i18next.t("moveTriggers:tookMoveAttack", {
         pokemonName: getPokemonNameWithAffix(target),
-        moveName: allMoves[this.sourceMove].name,
+        moveName: allMoves[sourceMove].name,
       }),
     );
 
@@ -114,7 +124,7 @@ export class DelayedAttackTag extends PositionalTag implements DelayedAttackArgs
       // instead of relying on pokemon getter jank
       this.sourceId,
       [this.targetIndex],
-      allMoves[this.sourceMove],
+      allMoves[sourceMove],
       MoveUseMode.DELAYED_ATTACK,
     );
   }
@@ -171,5 +181,20 @@ export class WishTag extends PositionalTag implements WishArgs {
     // TODO: Verify whether Wish shows a message if the Pokemon it would affect is KO'd on the turn of activation
     const target = this.getTarget();
     return !!target && !target.isFainted();
+  }
+}
+
+/** Persistent slot marker installed by Electrodynamics. */
+export class ElectrodynamicsPositionTag extends PositionalTag {
+  public override readonly tagType = PositionalTagType.ELECTRODYNAMICS_POSITION;
+
+  constructor({ turnCount, targetIndex }: PositionalTagBaseArgs) {
+    super({ turnCount, targetIndex });
+  }
+
+  public override trigger(): void {}
+
+  public override shouldTrigger(): boolean {
+    return false;
   }
 }

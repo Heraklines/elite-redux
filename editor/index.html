@@ -173,6 +173,21 @@
       .ctr-vitamin input { grid-column: 2; grid-row: 1 / span 2; width: 46px; min-width: 0; padding: 4px; }
       .ctr-sprite-preview { display: inline-flex; gap: 8px; align-items: flex-end; vertical-align: bottom; margin-left: 8px; min-height: 48px; }
       .ctr-sprite-frame { background-color: var(--panel2); border: 1px solid var(--line); border-radius: 4px; image-rendering: pixelated; color: var(--muted); font-size: 12px; display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; }
+      .ctr-pokemon-frame { display: inline-block; flex: 0 0 auto; background-position: center; background-repeat: no-repeat; image-rendering: pixelated; }
+      .ctr-species-combo { display: inline-block; position: relative; width: 220px; vertical-align: middle; }
+      .ctr-species-combo > input { width: 100%; }
+      .ctr-species-drop { position: absolute; z-index: 80; left: 0; right: 0; top: calc(100% + 3px); display: none; max-height: 280px; overflow-y: auto; background: var(--panel2); border: 1px solid var(--accent); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+      .ctr-species-drop.open { display: block; }
+      .ctr-species-drop.above { top: auto; bottom: calc(100% + 3px); }
+      .ctr-species-opt { display: block; width: 100%; padding: 7px 9px; text-align: left; background: var(--panel2); border: 0; border-bottom: 1px solid var(--line); border-radius: 0; color: var(--text); }
+      .ctr-species-opt:hover, .ctr-species-opt:focus { background: var(--accent); color: white; }
+      .ctr-species-opt span, .ctr-species-opt small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .ctr-species-opt small { color: var(--muted); margin-top: 2px; }
+      .ctr-species-opt:hover small, .ctr-species-opt:focus small { color: white; }
+      .ctr-card-body { display: flex; gap: 8px; align-items: center; width: 100%; }
+      .ctr-card-head { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .ctr-card-team { display: flex; gap: 2px; align-items: center; min-width: 0; }
+      .ctr-card-mon { display: inline-grid; place-items: center; width: 28px; height: 28px; overflow: hidden; background: var(--panel2); border: 1px solid var(--line); }
       .ctr-warn { color: var(--warn, #d68910); font-size: 12px; margin-top: 8px; line-height: 1.5; }
       .ctr-note { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
       /* Major-section separators (Identity / Spawn gates / Team). */
@@ -240,6 +255,9 @@
       .asset-track { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); }
       .asset-track strong, .asset-track small { display: block; overflow-wrap: anywhere; }
       .asset-track small { color: var(--muted); }
+      .asset-sprite-track { grid-template-columns: minmax(72px, auto) minmax(0, 1fr) auto; min-height: 72px; }
+      .asset-sprite-thumbs { display: flex; gap: 4px; align-items: end; min-width: 68px; min-height: 58px; }
+      .asset-sprite-thumb { display: block; flex: none; min-width: 28px; min-height: 42px; overflow: hidden; background-color: #0d0d14; border: 1px solid var(--line); border-radius: 5px; }
       .license { display: inline-block; margin-left: 5px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 10px; text-transform: uppercase; }
       .license.cc-by, .license.cc0, .license.original { color: var(--ok); border-color: var(--ok); }
       .license.youtube-standard, .license.unknown { color: var(--warn); border-color: var(--warn); }
@@ -248,7 +266,11 @@
       .sprite-preview img { max-width: 100%; max-height: 220px; image-rendering: pixelated; object-fit: contain; }
       .asset-jobs { display: grid; gap: 5px; margin-top: 10px; }
       .asset-job { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
-      @media (max-width: 820px) { .asset-grid { grid-template-columns: 1fr; } }
+      @media (max-width: 820px) {
+        .asset-grid { grid-template-columns: 1fr; }
+        .asset-sprite-track { grid-template-columns: 72px minmax(0, 1fr); }
+        .asset-sprite-track > button { grid-column: 1 / -1; }
+      }
       /* Trainer sprite-gender radio picker. */
       .ctr-gender { font-size: 12px; display: inline-flex; gap: 8px; align-items: center; }
       .ctr-gender label { margin-right: 0; }

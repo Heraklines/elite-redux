@@ -33,6 +33,7 @@ import {
   resetObservedCoopGuestPhases,
   setCoopRendererGateEnforced,
   setCoopStrictTailsMode,
+  withCoopOrderedControlPhasePermit,
 } from "#data/elite-redux/coop/coop-renderer-gate";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
@@ -262,5 +263,23 @@ describe("co-op renderer ALLOWLIST gate (#633, accepted-review item 2)", () => {
     expect(getCoopRendererNeutralizedLog()).toEqual(["MovePhase", "FaintPhase"]);
     resetCoopRendererNeutralizedLog();
     expect(getCoopRendererNeutralizedLog()).toEqual([]);
+  });
+
+  it("admits exactly one boundary renderer synchronously authorized by an ordered CONTROL_COMMIT", () => {
+    setCoopAuthoritativeGuestPredicate(() => true);
+    setCoopRendererGateEnforced(true);
+    setCoopStrictTailsMode(true);
+
+    expect(coopRendererGateNeutralizes("TrainerVictoryPhase"), "ambient trainer tails remain blocked").toBe(true);
+    expect(
+      withCoopOrderedControlPhasePermit("TrainerVictoryPhase", () =>
+        coopRendererGateNeutralizes("TrainerVictoryPhase"),
+      ),
+      "the exact synchronously constructed V2 consumer is admitted",
+    ).toBe(false);
+    expect(
+      coopRendererGateNeutralizes("TrainerVictoryPhase"),
+      "the permit is consumed and cannot authorize a later ambient duplicate",
+    ).toBe(true);
   });
 });

@@ -27,6 +27,7 @@
 
 import { BattlerIndex } from "#enums/battler-index";
 import { FieldPosition } from "#enums/field-position";
+import { SpeciesId } from "#enums/species-id";
 
 /** Structured battler identity. Used by topology/adjacency/new code only - NEVER as a map key (the flat BattlerIndex stays the key). */
 export interface BattlerId {
@@ -237,6 +238,15 @@ export const DOUBLE_FORMAT: BattleFormat = makeFormat("double", 2, 2, BattlerInd
 /** Triple battle (3v3). Player @0,1,2, enemy @3,4,5. */
 export const TRIPLE_FORMAT: BattleFormat = makeFormat("triple", 3, 3, BattlerIndex.ENEMY + 1);
 
+const BATTLE_FORMATS_BY_ID = new Map(
+  [SINGLE_FORMAT, DOUBLE_FORMAT, TRIPLE_FORMAT].map(format => [format.id, format] as const),
+);
+
+/** Resolve a serialized battle-format id without ever trusting save data to define topology. */
+export function getBattleFormatById(id: string | undefined): BattleFormat | undefined {
+  return id == null ? undefined : BATTLE_FORMATS_BY_ID.get(id);
+}
+
 /** The legacy binary formats, by their `double` boolean. */
 export function legacyFormat(double: boolean): BattleFormat {
   return double ? DOUBLE_FORMAT : SINGLE_FORMAT;
@@ -315,6 +325,15 @@ export function fieldSpriteOffset(position: FieldPosition, capacity: number, pla
     default:
       return [0, 0];
   }
+}
+
+/**
+ * Form-specific field scaling needed only when a three-wide layout has less room per lane.
+ * Ash-Greninja's unusually wide battle frame otherwise overlaps both neighbours and is clipped
+ * at the screen edge. Singles and doubles deliberately retain the authored 1x presentation.
+ */
+export function fieldSpriteScale(speciesId: number, formKey: string, capacity: number): number {
+  return capacity >= 3 && speciesId === SpeciesId.GRENINJA && formKey === "ash" ? 0.75 : 1;
 }
 
 /**

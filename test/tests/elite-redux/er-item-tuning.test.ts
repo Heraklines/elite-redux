@@ -90,4 +90,37 @@ describe("ER item tuning (er-item-tuning.json loader)", () => {
     expect(result.skipped).toBe(1);
     expect(result.weightsApplied).toBe(0);
   });
+
+  it("collapses duplicate reward-pool entries while applying tuning", () => {
+    const loadedDice = findEntry("ER_LOADED_DICE")!;
+    modifierPool[ModifierTier.MASTER].push(loadedDice.entry);
+    expect(
+      Object.values(modifierPool)
+        .flat()
+        .filter(entry => entry.modifierType.id === "ER_LOADED_DICE"),
+    ).toHaveLength(2);
+
+    applyErItemTuning({ ER_LOADED_DICE: { tier: "ULTRA", weight: 4 } });
+
+    const matches = Object.entries(modifierPool).flatMap(([tier, entries]) =>
+      entries
+        .filter(poolEntry => poolEntry.modifierType.id === "ER_LOADED_DICE")
+        .map(poolEntry => ({ tier: Number(tier), poolEntry })),
+    );
+    expect(matches).toHaveLength(1);
+    expect(matches[0].tier).toBe(ModifierTier.ULTRA);
+  });
+
+  it("ships DNA Splicers as one Ultra Ball-tier reward", () => {
+    applyErItemTuning();
+
+    const matches = Object.entries(modifierPool).flatMap(([tier, entries]) =>
+      entries
+        .filter(poolEntry => poolEntry.modifierType.id === "DNA_SPLICERS")
+        .map(poolEntry => ({ tier: Number(tier), poolEntry })),
+    );
+    expect(matches).toHaveLength(1);
+    expect(matches[0].tier).toBe(ModifierTier.ULTRA);
+    expect(matches[0].poolEntry.weight).toBe(2);
+  });
 });

@@ -19,6 +19,7 @@ import {
   COOP_UI_REGISTRY,
   COOP_UI_TRIPWIRE_EXEMPT,
   coopAuthorityContinuationSurface,
+  coopLocalOverlayInputAllowed,
   coopUiClassOf,
   coopUnmirroredTripwireReason,
 } from "#data/elite-redux/coop/coop-ui-registry";
@@ -100,6 +101,31 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
     for (const mode of COOP_UI_TRIPWIRE_EXEMPT) {
       expect(COOP_UI_REGISTRY[mode], `${UiMode[mode]} is exempt so it must be local-only`).toBe("local-only");
     }
+  });
+
+  describe("coopLocalOverlayInputAllowed (pause/settings provenance)", () => {
+    it("allows the pause menu over a shared reward surface", () => {
+      expect(coopLocalOverlayInputAllowed(UiMode.MENU, [UiMode.MODIFIER_SELECT])).toBe(true);
+    });
+
+    it("allows settings and nested local chrome only below a real pause-menu ancestor", () => {
+      expect(coopLocalOverlayInputAllowed(UiMode.SETTINGS, [UiMode.MODIFIER_SELECT, UiMode.MENU])).toBe(true);
+      expect(coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT, UiMode.MENU, UiMode.SETTINGS])).toBe(
+        true,
+      );
+    });
+
+    it("does not exempt generic or settings chrome without pause-menu provenance", () => {
+      expect(coopLocalOverlayInputAllowed(UiMode.SETTINGS, [UiMode.MODIFIER_SELECT])).toBe(false);
+      expect(coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT])).toBe(false);
+    });
+
+    it("fails closed when a mirrored surface appears below the pause menu", () => {
+      expect(coopLocalOverlayInputAllowed(UiMode.CONFIRM, [UiMode.MODIFIER_SELECT, UiMode.MENU, UiMode.PARTY])).toBe(
+        false,
+      );
+      expect(coopLocalOverlayInputAllowed(UiMode.MODIFIER_SELECT, [UiMode.MENU])).toBe(false);
+    });
   });
 
   it("publishes protocol-33 continuation only for real command/shared-input surfaces", () => {

@@ -17,7 +17,7 @@ export class DamageNumberHandler {
   }
 
   add(
-    target: Pokemon,
+    target: Pokemon | undefined,
     amount: number,
     result: DamageResult | HitResult.HEAL = HitResult.EFFECTIVE,
     critical = false,
@@ -26,11 +26,16 @@ export class DamageNumberHandler {
       return;
     }
 
+    const sprite = target?.getSprite();
+    if (!target || !sprite) {
+      return;
+    }
+
     const battlerIndex = target.getBattlerIndex();
     const baseScale = target.getSpriteScale() / 6;
     const damageNumber = addTextObject(
       target.x,
-      -globalScene.scaledCanvas.height + target.y - target.getSprite().height / 2,
+      -globalScene.scaledCanvas.height + target.y - sprite.height / 2,
       formatStat(amount, true),
       TextStyle.SUMMARY,
     );

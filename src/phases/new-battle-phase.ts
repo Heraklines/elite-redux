@@ -10,8 +10,14 @@ import {
   isAuthoritativeBattleSession,
   retryCoopV2PendingAuthorityAtSafeBoundary,
 } from "#data/elite-redux/coop/coop-runtime";
-import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  beginCoopTransitionRecording,
+  releaseCoopTransitionPresentation,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import { startMoodyFormationBattle } from "#data/elite-redux/moody/moody-formation-game-adapter";
+import { notifyMoodyRuntimeBiomeTransition } from "#data/elite-redux/moody/moody-runtime-field-engine";
+import { shouldMoodyCoordinatorForceElitePursuit } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { BattleType } from "#enums/battle-type";
 import type { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
@@ -42,6 +48,27 @@ export interface CoopCommittedBiomeEncounterQueue {
   getQueuedPhaseNames(): string[];
   removeAllPhasesOfType(name: "NextEncounterPhase"): void;
   pushNew(name: "NewBiomeEncounterPhase"): unknown;
+}
+
+export interface CoopProjectedEncounterPresentationQueue {
+  pushNew(name: "ShowTrainerPhase", coopProjectedPresentation: true): unknown;
+  pushNew(name: "NextEncounterPhase" | "NewBiomeEncounterPhase"): unknown;
+}
+
+/**
+ * Install the guest's immutable destination presentation in the same visible order as the authority.
+ * ShowTrainerPhase is presentation-only on the renderer; the following encounter phase still owns all
+ * enemy adoption and field readiness. Keeping the ordering in one helper makes the positive trainer cue
+ * independently testable without granting the guest any mechanical ReturnPhase authority.
+ */
+export function queueCoopProjectedEncounterPresentationTail(
+  queue: CoopProjectedEncounterPresentationQueue,
+  params: { readonly entersCommittedBiome: boolean; readonly showPlayerTrainer: boolean },
+): void {
+  if (params.showPlayerTrainer) {
+    queue.pushNew("ShowTrainerPhase", true);
+  }
+  queue.pushNew(params.entersCommittedBiome ? "NewBiomeEncounterPhase" : "NextEncounterPhase");
 }
 
 interface CoopCommittedBiomeEncounterPermit {
@@ -483,7 +510,19 @@ export class NewBattlePhase extends BattlePhase {
       && !biomePermit.encounterAdopted
       && biomePermit.nextWave === command.wave
       && biomePermit.destinationBiomeId === globalScene.arena.biomeId;
-    globalScene.phaseManager.pushNew(entersCommittedBiome ? "NewBiomeEncounterPhase" : "NextEncounterPhase");
+    const destinationBattle = globalScene.currentBattle;
+    if (destinationBattle == null) {
+      return false;
+    }
+    const resetsArenaPresentation =
+      entersCommittedBiome
+      || destinationBattle.isClassicFinalBoss
+      || destinationBattle.battleType === BattleType.TRAINER
+      || destinationBattle.battleType === BattleType.MYSTERY_ENCOUNTER;
+    queueCoopProjectedEncounterPresentationTail(globalScene.phaseManager, {
+      entersCommittedBiome,
+      showPlayerTrainer: resetsArenaPresentation && !globalScene.trainer.visible,
+    });
     this.end();
     return globalScene.phaseManager.getCurrentPhase() !== this;
   }
@@ -525,14 +564,15 @@ export class NewBattlePhase extends BattlePhase {
     const controller = getCoopController();
     if (sourceWave >= 0 && isAuthoritativeBattleSession() && controller?.role === "host") {
       // `newBattle()` advances currentBattle before it narrates expiring arena tags. If the prior battle
-      // ended through a replacement-only tail, its recorder can still be open at the old turn. Recording
-      // that narration there makes the live emitter combine the NEW wave with the OLD turn; the renderer
-      // correctly rejects the cross-address packet and silently misses lines such as Sticky Web expiring.
-      // Open the destination entry prefix first. InitEncounter/Summon/TurnStart use this same scope and
-      // preserve it, so every transition cue is ordered ahead of the destination command frontier.
-      beginCoopRecording(1, `${controller.sessionEpoch}:${sourceWave + 1}`);
+      // enters a non-battle Mystery surface, that surface has no replay pump or command frontier. Open a
+      // deferred destination prefix first: real battles release it below, while adjacent Mystery surfaces
+      // carry it until the next signed command can durably own every cue. InitEncounter/Summon/TurnStart
+      // use this same scope and preserve it.
+      beginCoopTransitionRecording(1, `${controller.sessionEpoch}:${sourceWave + 1}`);
     }
     globalScene.newBattle();
+    notifyMoodyRuntimeBiomeTransition();
+    startMoodyFormationBattle();
 
     if (!this.routeCommittedHostBiomeEncounter(sourceWave)) {
       return;
@@ -547,6 +587,13 @@ export class NewBattlePhase extends BattlePhase {
     // Runs after newBattle() has built the wave but before EncounterPhase's
     // genPartyMember, so we can convert the wave into the authored trainer.
     installErCustomTrainerForCurrentWave();
+    const moodyWave = globalScene.currentBattle?.waveIndex ?? 0;
+    if (
+      globalScene.currentBattle?.battleType === BattleType.WILD
+      && shouldMoodyCoordinatorForceElitePursuit(moodyWave, globalScene.gameMode.isBoss(moodyWave))
+    ) {
+      this.convertWildToTrainer(moodyWave, undefined);
+    }
 
     // After newBattle has populated the upcoming wave's enemy levels, consume
     // any pending LLM Director inter-beat override for that wave. v1 applies
@@ -572,6 +619,13 @@ export class NewBattlePhase extends BattlePhase {
         console.info(`[llm-director] Unshifting LLMDirectorBeatPhase for wave ${wave}`);
         globalScene.phaseManager.unshiftNew("LLMDirectorBeatPhase", wave);
       }
+    }
+
+    if (controller?.role === "host" && globalScene.currentBattle?.battleType !== BattleType.MYSTERY_ENCOUNTER) {
+      // Real battle entry has a retained CONTROL_COMMIT consumer. Non-battle Mystery surfaces deliberately
+      // keep cleanup narration deferred so the next adjacent battle can carry it instead of emitting an
+      // unconsumable best-effort packet at the selector wave.
+      releaseCoopTransitionPresentation();
     }
 
     this.end();

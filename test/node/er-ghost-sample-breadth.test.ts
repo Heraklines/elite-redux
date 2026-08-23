@@ -149,6 +149,13 @@ const PLAYER_TEAM = JSON.stringify([
   },
 ]);
 
+const INVENTORY_TEAM = JSON.stringify([
+  {
+    ...JSON.parse(PLAYER_TEAM)[0],
+    heldItems: [["LEFTOVERS", 1]],
+  },
+]);
+
 const CALLER_UID = 1;
 const MIN_WAVE = 100;
 
@@ -305,6 +312,40 @@ describe("er-save-api — ghost sample considers ALL eligible runs (de-restricti
       expect(team.waveReached).toBeGreaterThanOrEqual(MIN_WAVE);
       expect(team.waveReached).toBeLessThanOrEqual(120);
     }
+  });
+
+  it("returns a broad Endless batch instead of silently capping the pool at 20", async () => {
+    vi.spyOn(Math, "random").mockImplementation(mulberry32(0xe11d1e55));
+    const teams = await callSample(80);
+    expect(teams).toHaveLength(80);
+    expect(new Set(teams).size).toBe(80);
+  });
+
+  it("inventory-qualified samples require held items and include relics when present", async () => {
+    const rows = sqlite
+      .prepare("SELECT id FROM runs WHERE user_id != ? AND wave >= ? AND wave <= 200 LIMIT 3")
+      .all(CALLER_UID, MIN_WAVE) as { id: string }[];
+    sqlite
+      .prepare("UPDATE runs SET player_team = ?, relics = ? WHERE id = ?")
+      .run(INVENTORY_TEAM, JSON.stringify([["bloodPact", 1, null]]), rows[0].id);
+    sqlite.prepare("UPDATE runs SET relics = ? WHERE id = ?").run(JSON.stringify([["bloodPact", 1, null]]), rows[1].id);
+    sqlite.prepare("UPDATE runs SET player_team = ? WHERE id = ?").run(INVENTORY_TEAM, rows[2].id);
+
+    const request = new Request(
+      `https://save.test/savedata/run/sample?difficulty=hell&count=20&minWave=${MIN_WAVE}&requireSavedItems=1`,
+      { method: "GET", headers: { Authorization: authorization, Accept: "application/json" } },
+    );
+    const res = await saveWorker.fetch(request, { DB: database, SESSION_SECRET: secret } as never);
+    expect(res.status).toBe(200);
+    const data = (await res.json()) as {
+      teams: { id: string; party: { heldItems?: [string, number][] }[]; relics?: [string, number, null][] }[];
+    };
+    expect(data.teams).toHaveLength(2);
+    const byId = new Map(data.teams.map(team => [team.id, team]));
+    expect(byId.get(rows[0].id)?.party[0].heldItems).toEqual([["LEFTOVERS", 1]]);
+    expect(byId.get(rows[0].id)?.relics).toEqual([["bloodPact", 1, null]]);
+    expect(byId.get(rows[2].id)?.party[0].heldItems).toEqual([["LEFTOVERS", 1]]);
+    expect(byId.get(rows[2].id)?.relics).toBeUndefined();
   });
 
   it("the /savedata/run/sample route draws across the FULL pool — every eligible run reachable, no ineligible ever", async () => {

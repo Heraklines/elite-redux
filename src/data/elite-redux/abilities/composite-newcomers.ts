@@ -40,6 +40,43 @@ import type { AbAttr } from "#abilities/ab-attrs";
 import type { Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
 import {
+  ER_BEJEWELED_ABILITY_ID,
+  ER_BLAZE_RELEASE_ABILITY_ID,
+  ER_BODHISATTVA_ABILITY_ID,
+  ER_CRANISPHERE_ABILITY_ID,
+  ER_CRUSHING_ANTLERS_ABILITY_ID,
+  ER_CRYOGENESIS_ABILITY_ID,
+  ER_CURSED_SPIRIT_ABILITY_ID,
+  ER_DAYDREAMER_ABILITY_ID,
+  ER_DIRTY_SNOWBALL_ABILITY_ID,
+  ER_EBB_AND_FLOW_ABILITY_ID,
+  ER_EXOSUIT_ABILITY_ID,
+  ER_FLUTTERING_SPIRIT_ABILITY_ID,
+  ER_FOURTH_DEGREE_ABILITY_ID,
+  ER_FREE_SPIRIT_ABILITY_ID,
+  ER_IN_THE_CLOUDS_ABILITY_ID,
+  ER_IN_THE_ROUGH_ABILITY_ID,
+  ER_KAGUTSUCHI_ABILITY_ID,
+  ER_KYOKUSHIN_ABILITY_ID,
+  ER_LINGERING_MUSK_ABILITY_ID,
+  ER_MAGISTRATE_ABILITY_ID,
+  ER_MONK_ABILITY_ID,
+  ER_MOONARCH_ABILITY_ID,
+  ER_NUCLEUS_ABILITY_ID,
+  ER_PAPER_TALISMAN_ABILITY_ID,
+  ER_PHOTOVOLTAIC_ABILITY_ID,
+  ER_PUNGENCY_ABILITY_ID,
+  ER_SOLAR_PANEL_ABILITY_ID,
+  ER_SPIRITUAL_SABER_ABILITY_ID,
+  ER_SPLASH_DAMAGE_ABILITY_ID,
+  ER_STRONG_HEADED_ABILITY_ID,
+  ER_SWORDS_NATURE_ABILITY_ID,
+  ER_THICK_SKULLED_ABILITY_ID,
+  ER_TWO_CHAMBERED_ABILITY_ID,
+  ER_VORACITY_ABILITY_ID,
+  ER_WORLD_EATER_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import {
   ER_DRAGONFRUIT_ABILITY_ID,
   ER_FREE_CLIMB_ABILITY_ID,
   ER_GRIEVOUS_SPEAR_ABILITY_ID,
@@ -145,7 +182,9 @@ const DUAL_WIELD = 5169; // Minigun constituent (ER custom)
 // composite so the composite drives the adaptive transform AND keeps the base
 // innate's own effect. The remaining constituents are each base eeveelution's
 // FIRST innate (verified live from the ER-patched kit at authoring time).
-const OMNIFORM = 5929;
+/** Lightweight Omniform id for composite metadata consumers. */
+export const ER_OMNIFORM_COMPOSITE_PART_ID = 5929;
+const OMNIFORM = ER_OMNIFORM_COMPOSITE_PART_ID;
 const FLUFFY = 218; // base Eevee innate[0] (also Nimbeon innate[0])
 const STAMINA = 192; // Ryuveon innate[0] (vanilla)
 const STAINLESS_STEEL = 5530; // Titaneon innate[0] (ER custom)
@@ -165,6 +204,24 @@ const DRACONIZE = 5149; // ER custom (Normal moves become Dragon, Dragon empower
 const ENVENOM = 5553; // ER custom (poison-on-attack)
 const FOGGY_EYE = 5666; // ER custom
 const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
+const PERMAFROST = 5055;
+const FREEZING_POINT = 5222;
+const EQUINOX = 5160;
+const OVERRULE = 5516;
+const DREAM_WHIMSY = 5413;
+const WISHMAKER = 5226;
+const AERODYNAMICS = 5020;
+const SWORD_OF_RUIN = AbilityId.SWORD_OF_RUIN;
+const HUNTERS_HORN = 5195;
+const ROCKY_PAYLOAD = 276;
+const LETS_ROLL = 5031;
+const LIQUIFIED = 5049;
+const EMANATE_FAKEMON = 5190;
+const SOLAR_POWER = AbilityId.SOLAR_POWER;
+const BLADES_ESSENCE = 5242;
+const AEGIS_WARD = 5697;
+const HAND_BARNACLES = 5668;
+const BRAIN_OVER_BRAWN = 6080;
 
 /**
  * The manual-composite registry, keyed by pokerogue ability id. This is the
@@ -172,6 +229,84 @@ const MOUNTAINEER = 5052; // ER custom (immune to Rock moves + Stealth Rock)
  * (attrs) and `getErCompositeDetailedDescription` (constituent detail text).
  */
 export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>> = {
+  [ER_CRYOGENESIS_ABILITY_ID]: {
+    id: ER_CRYOGENESIS_ABILITY_ID,
+    name: "Cryogenesis",
+    description: "Permafrost + Freezing Point.",
+    constituents: [PERMAFROST, FREEZING_POINT],
+  },
+  [ER_MAGISTRATE_ABILITY_ID]: {
+    id: ER_MAGISTRATE_ABILITY_ID,
+    name: "Magistrate",
+    description: "Equinox + Overrule.",
+    constituents: [EQUINOX, OVERRULE],
+  },
+  [ER_DAYDREAMER_ABILITY_ID]: {
+    id: ER_DAYDREAMER_ABILITY_ID,
+    name: "Daydreamer",
+    description: "Dream Whimsy + Wishmaker.",
+    constituents: [DREAM_WHIMSY, WISHMAKER],
+  },
+  [ER_FREE_SPIRIT_ABILITY_ID]: {
+    id: ER_FREE_SPIRIT_ABILITY_ID,
+    name: "Free Spirit",
+    description: "Serene Grace + Levitate.",
+    constituents: [AbilityId.SERENE_GRACE, AbilityId.LEVITATE],
+  },
+  [ER_FLUTTERING_SPIRIT_ABILITY_ID]: {
+    id: ER_FLUTTERING_SPIRIT_ABILITY_ID,
+    name: "Fluttering Spirit",
+    description: "Aerilate + Aerodynamics.",
+    constituents: [AbilityId.AERILATE, AERODYNAMICS],
+  },
+  [ER_IN_THE_CLOUDS_ABILITY_ID]: {
+    id: ER_IN_THE_CLOUDS_ABILITY_ID,
+    name: "In the Clouds",
+    description: "Unaware + Cloud Nine.",
+    constituents: [AbilityId.UNAWARE, AbilityId.CLOUD_NINE],
+  },
+  [ER_THICK_SKULLED_ABILITY_ID]: {
+    id: ER_THICK_SKULLED_ABILITY_ID,
+    name: "Thick Skulled",
+    description: "Rock Head + Thick Fat.",
+    constituents: [AbilityId.ROCK_HEAD, AbilityId.THICK_FAT],
+  },
+  [ER_SWORDS_NATURE_ABILITY_ID]: {
+    id: ER_SWORDS_NATURE_ABILITY_ID,
+    name: "Sword's Nature",
+    description: "Sword of Ruin + Keen Edge.",
+    constituents: [SWORD_OF_RUIN, KEEN_EDGE],
+  },
+  [ER_CRUSHING_ANTLERS_ABILITY_ID]: {
+    id: ER_CRUSHING_ANTLERS_ABILITY_ID,
+    name: "Crushing Antlers",
+    description: "Hunter's Horn + Rapier: horn and Keen Edge moves receive both abilities' effects.",
+    constituents: [HUNTERS_HORN, KEEN_EDGE],
+  },
+  [ER_DIRTY_SNOWBALL_ABILITY_ID]: {
+    id: ER_DIRTY_SNOWBALL_ABILITY_ID,
+    name: "Dirty Snowball",
+    description: "Rocky Payload + Let's Roll.",
+    constituents: [ROCKY_PAYLOAD, LETS_ROLL],
+  },
+  [ER_SOLAR_PANEL_ABILITY_ID]: {
+    id: ER_SOLAR_PANEL_ABILITY_ID,
+    name: "Solar Panel",
+    description: "Drought + Steelworker.",
+    constituents: [AbilityId.DROUGHT, AbilityId.STEELWORKER],
+  },
+  [ER_PHOTOVOLTAIC_ABILITY_ID]: {
+    id: ER_PHOTOVOLTAIC_ABILITY_ID,
+    name: "Photovoltaic",
+    description: "Solar Power + Electric type graft.",
+    constituents: [SOLAR_POWER],
+  },
+  [ER_NUCLEUS_ABILITY_ID]: {
+    id: ER_NUCLEUS_ABILITY_ID,
+    name: "Nucleus",
+    description: "Liquified + Emanate.",
+    constituents: [LIQUIFIED, EMANATE_FAKEMON],
+  },
   [ER_GLYCOLYSIS_ABILITY_ID]: {
     id: ER_GLYCOLYSIS_ABILITY_ID,
     name: "Glycolysis",
@@ -346,6 +481,30 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     description: "Stainless Steel + Omniform.",
     constituents: [STAINLESS_STEEL, OMNIFORM],
   },
+  [ER_SPIRITUAL_SABER_ABILITY_ID]: {
+    id: ER_SPIRITUAL_SABER_ABILITY_ID,
+    name: "Spiritual Saber",
+    description: "Blade's Essence + Keen Edge moves make no contact.",
+    constituents: [BLADES_ESSENCE],
+  },
+  [ER_PAPER_TALISMAN_ABILITY_ID]: {
+    id: ER_PAPER_TALISMAN_ABILITY_ID,
+    name: "Paper Talisman",
+    description: "Fluffy + Aegis Ward.",
+    constituents: [FLUFFY, AEGIS_WARD],
+  },
+  [ER_EBB_AND_FLOW_ABILITY_ID]: {
+    id: ER_EBB_AND_FLOW_ABILITY_ID,
+    name: "Ebb and Flow",
+    description: "Tidal Rush + High Tide.",
+    constituents: [5281, 5233],
+  },
+  [ER_MOONARCH_ABILITY_ID]: {
+    id: ER_MOONARCH_ABILITY_ID,
+    name: "Moonarch",
+    description: "Queenly Majesty + Moon Spirit.",
+    constituents: [AbilityId.QUEENLY_MAJESTY, 5209],
+  },
   // -----------------------------------------------------------------------
   // Type-nativization (Pass A) composite replacements (5955-5962). Each is the
   // union of its two constituents' attrs, resolved by the same wire pass.
@@ -397,6 +556,108 @@ export const MANUAL_COMPOSITE_PARTS: Readonly<Record<number, ManualCompositeDef>
     name: "Free Climb",
     description: "Unburden + Mountaineer.",
     constituents: [AbilityId.UNBURDEN, MOUNTAINEER],
+  },
+  [ER_BODHISATTVA_ABILITY_ID]: {
+    id: ER_BODHISATTVA_ABILITY_ID,
+    name: "Bodhisattva",
+    description: "Hand Barnacles + Brain Over Brawn.",
+    constituents: [HAND_BARNACLES, BRAIN_OVER_BRAWN],
+  },
+  [ER_MONK_ABILITY_ID]: {
+    id: ER_MONK_ABILITY_ID,
+    name: "Monk",
+    description: "Inner Focus + an empowered, disruption-proof Focus Punch.",
+    constituents: [AbilityId.INNER_FOCUS],
+  },
+  [ER_LINGERING_MUSK_ABILITY_ID]: {
+    id: ER_LINGERING_MUSK_ABILITY_ID,
+    name: "Lingering Musk",
+    description: "Lingering Aroma + delayed end-of-turn fainting.",
+    constituents: [AbilityId.LINGERING_AROMA],
+  },
+  [ER_PUNGENCY_ABILITY_ID]: {
+    id: ER_PUNGENCY_ABILITY_ID,
+    name: "Pungency",
+    description: "Stench + Aftermath.",
+    constituents: [AbilityId.STENCH, AbilityId.AFTERMATH],
+  },
+  [ER_TWO_CHAMBERED_ABILITY_ID]: {
+    id: ER_TWO_CHAMBERED_ABILITY_ID,
+    name: "Two-Chambered",
+    description: "Dual Wield + Splash Damage.",
+    constituents: [5169, ER_SPLASH_DAMAGE_ABILITY_ID],
+  },
+  [ER_STRONG_HEADED_ABILITY_ID]: {
+    id: ER_STRONG_HEADED_ABILITY_ID,
+    name: "Strong-Headed",
+    description: "Multi-Headed + Moxie.",
+    constituents: [5085, AbilityId.MOXIE],
+  },
+  [ER_KYOKUSHIN_ABILITY_ID]: {
+    id: ER_KYOKUSHIN_ABILITY_ID,
+    name: "Kyokushin",
+    description: "Roundhouse + Mixed Martial Arts.",
+    constituents: [5139, 5514],
+  },
+  [ER_CURSED_SPIRIT_ABILITY_ID]: {
+    id: ER_CURSED_SPIRIT_ABILITY_ID,
+    name: "Cursed Spirit",
+    description: "Ill Will + Avenger.",
+    constituents: [5285, 5030],
+  },
+  [ER_CRANISPHERE_ABILITY_ID]: {
+    id: ER_CRANISPHERE_ABILITY_ID,
+    name: "Cranisphere",
+    description: "Bone Zone + a one-turn first Skull Bash.",
+    constituents: [5091],
+  },
+  [ER_EXOSUIT_ABILITY_ID]: {
+    id: ER_EXOSUIT_ABILITY_ID,
+    name: "Exosuit",
+    description: "Battle Armor + Unburden.",
+    constituents: [AbilityId.BATTLE_ARMOR, AbilityId.UNBURDEN],
+  },
+  [ER_VORACITY_ABILITY_ID]: {
+    id: ER_VORACITY_ABILITY_ID,
+    name: "Voracity",
+    description: "Unnerve + Gluttony.",
+    constituents: [AbilityId.UNNERVE, AbilityId.GLUTTONY],
+  },
+  [ER_WORLD_EATER_ABILITY_ID]: {
+    id: ER_WORLD_EATER_ABILITY_ID,
+    name: "World-Eater",
+    description: "Devourer + Jaws of Carnage.",
+    constituents: [5249, 5174],
+  },
+  [ER_BLAZE_RELEASE_ABILITY_ID]: {
+    id: ER_BLAZE_RELEASE_ABILITY_ID,
+    name: "Blaze Release",
+    description: "Immolate + Amaterasu.",
+    constituents: [5017, 6106],
+  },
+  [ER_KAGUTSUCHI_ABILITY_ID]: {
+    id: ER_KAGUTSUCHI_ABILITY_ID,
+    name: "Kagutsuchi",
+    description: "Mythical Arrows + Fourth Degree.",
+    constituents: [5308, 6107],
+  },
+  [ER_FOURTH_DEGREE_ABILITY_ID]: {
+    id: ER_FOURTH_DEGREE_ABILITY_ID,
+    name: "Fourth Degree",
+    description: "Sniper + critical hits burn.",
+    constituents: [AbilityId.SNIPER],
+  },
+  [ER_BEJEWELED_ABILITY_ID]: {
+    id: ER_BEJEWELED_ABILITY_ID,
+    name: "Bejeweled",
+    description: "Crystallize + Stellarize.",
+    constituents: [5018, 6053],
+  },
+  [ER_IN_THE_ROUGH_ABILITY_ID]: {
+    id: ER_IN_THE_ROUGH_ABILITY_ID,
+    name: "In the Rough",
+    description: "Crystalline Armor + Rough Skin.",
+    constituents: [5588, AbilityId.ROUGH_SKIN],
   },
 };
 
@@ -464,12 +725,21 @@ export function wireEliteReduxManualComposites(): WireManualCompositesResult {
         collected.push(attr);
       }
     }
+    // Keep bespoke riders wired directly onto a composite (e.g. Photovoltaic's
+    // type graft, Spiritual Saber's contact override, and the BerNerd compound
+    // abilities). Constituent-derived attrs are rebuilt below, so only ctor
+    // shapes absent from the resolved parts are preserved.
+    const constituentCtorNames = new Set(collected.map(attr => attr.constructor.name));
+    const preservedBespokeAttrs = ability.attrs.filter(attr => !constituentCtorNames.has(attr.constructor.name));
     if (collected.length === 0) {
       continue;
     }
     const attrs = (ability as unknown as { attrs: AbAttr[] }).attrs;
     attrs.length = 0;
     for (const attr of collected) {
+      attrs.push(attr);
+    }
+    for (const attr of preservedBespokeAttrs) {
       attrs.push(attr);
     }
     // A part with a PostFaint attr only fires if the ability bypasses the faint

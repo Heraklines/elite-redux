@@ -222,9 +222,17 @@ export class MockText implements MockGameObject {
     return this;
   }
 
+  setFixedSize(_width: number, _height: number): this {
+    return this;
+  }
+
   setFontSize(_fontSize): this {
     // Sets the font size of this Game Object.
     // return this.phaserText.setFontSize(fontSize);
+    return this;
+  }
+
+  setMaxLines(_lines: number): this {
     return this;
   }
 

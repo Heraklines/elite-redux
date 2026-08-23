@@ -238,6 +238,24 @@ describe("Authority V2 turn successor classification", () => {
     expect(
       deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
         mysteryBattle: false,
+        deferredWaveOutcome: "win",
+        trainerVictoryPresentation: true,
+      }),
+    ).toEqual({
+      ...expected,
+      allowedControlAddresses: [
+        ...expected.allowedControlAddresses,
+        {
+          materialKind: "trainer-victory-open",
+          wave: 4,
+          turn: 2,
+          operationId: null,
+        },
+      ],
+    });
+    expect(
+      deferredCoopV2WaveSuccessorWait(operationId, 7, 4, 1, {
+        mysteryBattle: false,
       }),
     ).toBeNull();
     expect(() =>
@@ -1105,6 +1123,37 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     ]);
     expect(guestStream.consumeLiveEvents(3, 1)).toEqual([]);
     expect(guestStream.consumeLiveEvents(2, 2)).toEqual([]);
+    hostStream.dispose();
+    guestStream.dispose();
+  });
+
+  it("holds live replacement entry effects behind their immutable checkpoint", async () => {
+    const { host, guest } = createLoopbackPair();
+    const current = { epoch: 7, wave: 1, turn: 2 };
+    const hostStream = new CoopBattleStreamer(host, { authorityContext: () => current });
+    const guestStream = new CoopBattleStreamer(guest, { authorityContext: () => current });
+    const replacementWake = guestStream.awaitTurnOrLiveEvent(2, 0, 1, true);
+    let settled = false;
+    void replacementWake.then(() => {
+      settled = true;
+    });
+
+    hostStream.emitEvent(7, 1, 2, 0, { k: "message", text: "Chikorita was caught in a sticky web!" });
+    await flushWire();
+    expect(settled, "a latency hint cannot beat the already-admitted replacement transaction").toBe(false);
+
+    sendCompleteCheckpoint(
+      hostStream,
+      "replacement",
+      emptyCheckpoint(),
+      "deadbeefdeadbeef",
+      emptyAuthoritativeState(1, 2),
+    );
+    await expect(replacementWake).resolves.toEqual({ kind: "checkpoint" });
+    expect(
+      guestStream.consumeLiveEventsFrom(2, 0, 1),
+      "the immutable replacement renderer still owns and deduplicates the retained entry prefix",
+    ).toEqual([{ k: "message", text: "Chikorita was caught in a sticky web!" }]);
     hostStream.dispose();
     guestStream.dispose();
   });

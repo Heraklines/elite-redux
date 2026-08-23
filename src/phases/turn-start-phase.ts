@@ -1,7 +1,9 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
+import { consumePendingDevPostCommandSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import { spatialMagicResolveTurnCommands } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { erShatteredPsycheMaybeFuse } from "#data/elite-redux/abilities/shattered-psyche";
 import { ConditionalDamageAbAttr } from "#data/elite-redux/archetypes/conditional-damage";
 import {
@@ -10,7 +12,6 @@ import {
   isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
-import { recordTelemetryJointActionsCommitted } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { erIsSelfSwitchMove } from "#data/moves/move";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -212,10 +213,6 @@ export class TurnStartPhase extends FieldPhase {
   start() {
     super.start();
 
-    // Solo telemetry only: preserve the complete committed joint action before switches/moves mutate
-    // field ownership. The hook hard-gates co-op, Showdown and tournament sessions.
-    recordTelemetryJointActionsCommitted();
-
     // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the GUEST is a pure
     // renderer - it diverts the WHOLE turn resolution to CoopReplayTurnPhase (which
     // awaits the host's authoritative outcome stream + applies the checkpoint) and
@@ -256,6 +253,19 @@ export class TurnStartPhase extends FieldPhase {
     // - once turnCommands are fully populated (both CommandPhase and
     // EnemyCommandPhase have run) but before the move phases are queued.
     erShatteredPsycheMaybeFuse();
+
+    // Dev scenarios may need to react only after a real first-turn choice was
+    // committed. The callback is consume-once and absent in normal play.
+    const devPostCommandSetup = consumePendingDevPostCommandSetup();
+    if (devPostCommandSetup) {
+      try {
+        devPostCommandSetup();
+      } catch (err) {
+        // biome-ignore lint/suspicious/noConsole: dev-only diagnostic
+        console.warn("[dev-tools] post-command setup threw:", err);
+      }
+    }
+    spatialMagicResolveTurnCommands();
 
     const field = globalScene.getField();
     const moveOrder = this.getCommandOrder();

@@ -115,6 +115,22 @@ test("runtime and focused two-engine coverage reject raw, wrong, duplicate, and 
     proofFastPath >= 0 && direct > proofFastPath && legacyEcho > direct,
     "V2 completes a proven redelivery or returns through the exact phase consumer before legacy echo code",
   );
+  const batchMarker = learnMaterializer.indexOf('if (op?.kind !== "LEARN_MOVE_BATCH")');
+  const batchPromptStart = learnMaterializer.indexOf('if (payload.type === "prompt") {', batchMarker);
+  const batchPromptCutover = learnMaterializer.indexOf("if (isCoopV2InteractionCutoverActive", batchPromptStart);
+  const batchPromptEnd = learnMaterializer.indexOf("if (isCoopV2InteractionCutoverActive", batchPromptCutover + 1);
+  const batchPrompt = learnMaterializer.slice(batchPromptStart, batchPromptEnd);
+  assert.ok(
+    batchMarker >= 0
+      && batchPromptStart > batchMarker
+      && batchPromptCutover > batchPromptStart
+      && batchPromptEnd > batchPromptCutover,
+  );
+  assert.match(batchPrompt, /isCoopV2InteractionCutoverActive\(runtime\.durability\)[\s\S]*return true/u);
+  assert.ok(
+    batchPrompt.indexOf("return true") < batchPrompt.indexOf("materializeCommittedInteractionOutcome("),
+    "V2 batch prompt material cannot queue a legacy panel behind its central projector",
+  );
 
   assert.match(duo, /guest owner remains on the exact projected phase after sending its raw proposal/u);
   assert.match(duo, /a wrong result identity cannot close the parked owner/u);

@@ -28,6 +28,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { erBattleEntrantOrdinal, erBattleOnce } from "#data/elite-redux/er-relic-battle-state";
+import {
+  getErEndlessRelicNumericMultiplier,
+  isErEndlessRelicSuppressed,
+} from "#data/elite-redux/er-endless-rift-runtime";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -106,7 +110,6 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
   mysteryCharm: {
     name: "Mystery Charm",
     description: "Mystery encounters appear far more often while you hold this charm (about one every 5 waves).",
-    // A purple-tinted Ability Charm (the hidden-ability charm), recolored for MEs.
     icon: "ability_charm",
     tint: 0xc080f8,
     maxStack: 1,
@@ -364,21 +367,24 @@ const MERCHANTS_SEAL_EXTRA_SLOTS = 1;
  *  nothing is worth exactly the base payout in expectation (i.e. pointless). */
 const GAMBLERS_COIN_WIN_PCT = 55;
 
-/** Total stacks of the given relic the player currently holds (team-wide). */
-export function getErRelicStacks(kind: ErRelicKind): number {
+/** Total stacks of the given relic held by one side (team-wide). */
+export function getErRelicStacks(kind: ErRelicKind, forPlayer = true): number {
+  if (isErEndlessRelicSuppressed(kind, forPlayer)) {
+    return 0;
+  }
   let stacks = 0;
   for (const mod of globalScene?.findModifiers(
     m => m instanceof ErRelicModifier && (m as ErRelicModifier).kind === kind,
-    true,
+    forPlayer,
   ) ?? []) {
     stacks += (mod as ErRelicModifier).getStackCount();
   }
   return stacks;
 }
 
-/** True when the player currently holds at least one of the given relic. */
-export function hasErRelic(kind: ErRelicKind): boolean {
-  return getErRelicStacks(kind) > 0;
+/** True when one side currently holds at least one of the given relic. */
+export function hasErRelic(kind: ErRelicKind, forPlayer = true): boolean {
+  return getErRelicStacks(kind, forPlayer) > 0;
 }
 
 /**
@@ -393,27 +399,28 @@ export function hasErRelic(kind: ErRelicKind): boolean {
  * hp-clamping mutation a party-targeted Potion uses) and refresh their info bar.
  */
 export function erApplyFieldMedic(): void {
-  if (!hasErRelic("fieldMedic")) {
-    return;
-  }
   const turn = globalScene.currentBattle?.turn ?? 0;
   if (turn < 1 || turn % FIELD_MEDIC_TURN_CADENCE !== 0) {
     return;
   }
-  const party = globalScene.getPlayerParty();
-  // Slots 2 and 3 only (party indices 1 and 2) - the back-row reserves.
-  for (const index of [1, 2]) {
-    const pokemon = party[index];
-    if (!pokemon || pokemon.isFainted() || pokemon.isFullHp()) {
+  for (const forPlayer of [true, false]) {
+    if (!hasErRelic("fieldMedic", forPlayer)) {
       continue;
     }
-    const healed = pokemon.heal(toDmgValue(pokemon.getMaxHp() / FIELD_MEDIC_HEAL_DENOM));
-    if (healed > 0) {
-      pokemon.updateInfo();
-      // ER custom relic - English-only (shared locales submodule). Silent on the
-      // field log would be fine for a benched mon, but a brief named note helps
-      // testers see the heal fire.
-      globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} was tended by the Field Medic!`);
+    const party = forPlayer ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+    // Slots 2 and 3 only (party indices 1 and 2) - the back-row reserves.
+    for (const index of [1, 2]) {
+      const pokemon = party[index];
+      if (!pokemon || pokemon.isFainted() || pokemon.isFullHp()) {
+        continue;
+      }
+      const healed = pokemon.heal(
+        toDmgValue((pokemon.getMaxHp() / FIELD_MEDIC_HEAL_DENOM) * getErEndlessRelicNumericMultiplier()),
+      );
+      if (healed > 0) {
+        pokemon.updateInfo();
+        globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} was tended by the Field Medic!`);
+      }
     }
   }
 }
@@ -494,22 +501,34 @@ export function erCollectorsAlbumRecordCatch(rootSpeciesId: SpeciesId): void {
 // =============================================================================
 
 /** True once any player Pokémon has fainted in the CURRENT biome (Morale Banner). */
-let MORALE_BANNER_BROKEN = false;
+type RelicSide = "player" | "enemy";
+const relicSide = (forPlayer: boolean): RelicSide => (forPlayer ? "player" : "enemy");
+const MORALE_BANNER_BROKEN: Record<RelicSide, boolean> = { player: false, enemy: false };
 /** True once Second Wind has saved a Pokémon in the CURRENT biome (one-shot). */
-let SECOND_WIND_USED = false;
+const SECOND_WIND_USED: Record<RelicSide, boolean> = { player: false, enemy: false };
 /** True once Anchor's last-stand full heal has fired in the CURRENT biome (one-shot). */
-let ANCHOR_USED = false;
+const ANCHOR_USED: Record<RelicSide, boolean> = { player: false, enemy: false };
 /** waveIndex -> rolled Scrap Magnet extra-reward result, cached so rerolls/copies are stable. */
 let SCRAP_MAGNET_ROLLED_WAVE = -1;
 let SCRAP_MAGNET_ROLL_RESULT = false;
 
 /** Clear all per-biome relic flags. Called from `BattleScene.newArena`. */
 export function resetErRelicBiomeState(): void {
-  MORALE_BANNER_BROKEN = false;
-  SECOND_WIND_USED = false;
-  ANCHOR_USED = false;
+  MORALE_BANNER_BROKEN.player = false;
+  MORALE_BANNER_BROKEN.enemy = false;
+  SECOND_WIND_USED.player = false;
+  SECOND_WIND_USED.enemy = false;
+  ANCHOR_USED.player = false;
+  ANCHOR_USED.enemy = false;
   SCRAP_MAGNET_ROLLED_WAVE = -1;
   SCRAP_MAGNET_ROLL_RESULT = false;
+}
+
+/** Enemy relic owners are battle-scoped; a new ghost must not inherit usage. */
+export function resetErEnemyRelicBattleState(): void {
+  MORALE_BANNER_BROKEN.enemy = false;
+  SECOND_WIND_USED.enemy = false;
+  ANCHOR_USED.enemy = false;
 }
 
 /**
@@ -517,8 +536,13 @@ export function resetErRelicBiomeState(): void {
  * faint-free condition for the rest of this biome. Called from FaintPhase for
  * player Pokémon (no-op for enemies / when no relevant relic is held).
  */
+export function erRelicRecordFaint(forPlayer: boolean): void {
+  MORALE_BANNER_BROKEN[relicSide(forPlayer)] = true;
+}
+
+/** Player-side compatibility wrapper for existing callers and tests. */
 export function erRelicRecordPlayerFaint(): void {
-  MORALE_BANNER_BROKEN = true;
+  erRelicRecordFaint(true);
 }
 
 /**
@@ -526,11 +550,11 @@ export function erRelicRecordPlayerFaint(): void {
  * relic is held and NO player Pokémon has fainted yet this biome, else 1.
  * Queried from {@linkcode Pokemon.getAttackDamage} for player attackers.
  */
-export function erMoraleBannerMultiplier(): number {
-  if (MORALE_BANNER_BROKEN || !hasErRelic("moraleBanner")) {
+export function erMoraleBannerMultiplier(forPlayer = true): number {
+  if (MORALE_BANNER_BROKEN[relicSide(forPlayer)] || !hasErRelic("moraleBanner", forPlayer)) {
     return 1;
   }
-  return 1 + MORALE_BANNER_PERCENT / 100;
+  return 1 + (MORALE_BANNER_PERCENT / 100) * getErEndlessRelicNumericMultiplier();
 }
 
 /**
@@ -538,8 +562,8 @@ export function erMoraleBannerMultiplier(): number {
  * 1 and 2), or null if those slots don't exist or share no type. Twin Link's
  * bonus applies to moves of this type.
  */
-function erTwinLinkSharedType(): PokemonType | null {
-  const party = globalScene?.getPlayerParty?.() ?? [];
+function erTwinLinkSharedType(forPlayer: boolean): PokemonType | null {
+  const party = forPlayer ? (globalScene?.getPlayerParty?.() ?? []) : (globalScene?.getEnemyParty?.() ?? []);
   const second = party[1];
   const third = party[2];
   if (!second || !third) {
@@ -560,31 +584,35 @@ function erTwinLinkSharedType(): PokemonType | null {
  * by party slots 2 and 3. Returns 1.15 for matching move types while the relic
  * is held, else 1. Queried from {@linkcode Pokemon.getAttackDamage}.
  */
-export function erTwinLinkMultiplier(moveType: PokemonType): number {
-  if (!hasErRelic("twinLink")) {
+export function erTwinLinkMultiplier(moveType: PokemonType, forPlayer = true): number {
+  if (!hasErRelic("twinLink", forPlayer)) {
     return 1;
   }
-  const shared = erTwinLinkSharedType();
+  const shared = erTwinLinkSharedType(forPlayer);
   if (shared === null || shared !== moveType) {
     return 1;
   }
-  return 1 + TWIN_LINK_PERCENT / 100;
+  return 1 + (TWIN_LINK_PERCENT / 100) * getErEndlessRelicNumericMultiplier();
 }
 
 /**
  * Molten Core (relic): the Caldera's heart. Team-wide +20% damage on FIRE-type
  * moves while held. Queried from {@linkcode Pokemon.getAttackDamage}.
  */
-export function erMoltenCoreFireMultiplier(moveType: PokemonType): number {
-  return moveType === PokemonType.FIRE && hasErRelic("moltenCore") ? 1.2 : 1;
+export function erMoltenCoreFireMultiplier(moveType: PokemonType, forPlayer = true): number {
+  return moveType === PokemonType.FIRE && hasErRelic("moltenCore", forPlayer)
+    ? 1 + 0.2 * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
  * Capacitor (relic): stored reactor charge. Team-wide +20% damage on ELECTRIC-type
  * moves while held. Queried from {@linkcode Pokemon.getAttackDamage}.
  */
-export function erCapacitorElectricMultiplier(moveType: PokemonType): number {
-  return moveType === PokemonType.ELECTRIC && hasErRelic("capacitor") ? 1.2 : 1;
+export function erCapacitorElectricMultiplier(moveType: PokemonType, forPlayer = true): number {
+  return moveType === PokemonType.ELECTRIC && hasErRelic("capacitor", forPlayer)
+    ? 1 + 0.2 * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
@@ -593,8 +621,10 @@ export function erCapacitorElectricMultiplier(moveType: PokemonType): number {
  * player-attacker relic multipliers in {@linkcode Pokemon.getAttackDamage} (gated to
  * a player SOURCE there). Returns 1 when the relic isn't held.
  */
-export function erBloodPactDealMultiplier(): number {
-  return hasErRelic("bloodPact") ? 1 + BLOOD_PACT_DEAL_PERCENT / 100 : 1;
+export function erBloodPactDealMultiplier(forPlayer = true): number {
+  return hasErRelic("bloodPact", forPlayer)
+    ? 1 + (BLOOD_PACT_DEAL_PERCENT / 100) * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
@@ -604,8 +634,10 @@ export function erBloodPactDealMultiplier(): number {
  * when the relic isn't held. The double-edge: it stacks multiplicatively with the
  * offensive bonus on a player-vs-player hit, which only happens in odd modes.
  */
-export function erBloodPactTakeMultiplier(): number {
-  return hasErRelic("bloodPact") ? 1 + BLOOD_PACT_TAKE_PERCENT / 100 : 1;
+export function erBloodPactTakeMultiplier(forPlayer = true): number {
+  return hasErRelic("bloodPact", forPlayer)
+    ? 1 + (BLOOD_PACT_TAKE_PERCENT / 100) * getErEndlessRelicNumericMultiplier()
+    : 1;
 }
 
 /**
@@ -616,10 +648,12 @@ export function erBloodPactTakeMultiplier(): number {
  * {@linkcode Pokemon.damage}.
  */
 export function erTrySecondWind(pokemon: Pokemon): boolean {
-  if (SECOND_WIND_USED || !pokemon.isPlayer() || pokemon.hp < 1 || !hasErRelic("secondWind")) {
+  const forPlayer = pokemon.isPlayer();
+  const side = relicSide(forPlayer);
+  if (SECOND_WIND_USED[side] || pokemon.hp < 1 || !hasErRelic("secondWind", forPlayer)) {
     return false;
   }
-  SECOND_WIND_USED = true;
+  SECOND_WIND_USED[side] = true;
   // ER custom relic - English-only (shared locales submodule).
   globalScene.phaseManager.queueMessage(`${pokemon.getNameToRender()} held on with its Second Wind!`);
   return true;
@@ -632,10 +666,11 @@ export function erTrySecondWind(pokemon: Pokemon): boolean {
  * second revive). Called from {@linkcode Pokemon.damage} after Second Wind.
  */
 export function erTryPharaohAnkh(pokemon: Pokemon): boolean {
-  if (!pokemon.isPlayer() || pokemon.hp < 1 || !hasErRelic("pharaohAnkh")) {
+  const forPlayer = pokemon.isPlayer();
+  if (pokemon.hp < 1 || !hasErRelic("pharaohAnkh", forPlayer)) {
     return false;
   }
-  if (!erBattleOnce("pharaohAnkh")) {
+  if (!erBattleOnce(`pharaohAnkh:${relicSide(forPlayer)}`)) {
     return false; // already saved a mon this battle (persists across reload)
   }
   globalScene.phaseManager.queueMessage(
@@ -652,11 +687,13 @@ export function erTryPharaohAnkh(pokemon: Pokemon): boolean {
  * per-battle state is tracked. No-op when the relic isn't held or there is no living
  * active player mon. In doubles the spec's "your active mon" targets the slot-0 lead.
  */
-export function erMomentumEngineOnEnemyKo(): void {
-  if (!hasErRelic("momentumEngine")) {
+export function erMomentumEngineOnFoeKo(faintedWasPlayer: boolean): void {
+  const beneficiaryIsPlayer = !faintedWasPlayer;
+  if (!hasErRelic("momentumEngine", beneficiaryIsPlayer)) {
     return;
   }
-  const active = globalScene.getPlayerField().find(p => p?.isActive(true));
+  const field = beneficiaryIsPlayer ? globalScene.getPlayerField() : globalScene.getEnemyField();
+  const active = field.find(p => p?.isActive(true));
   if (!active) {
     return;
   }
@@ -671,17 +708,23 @@ export function erMomentumEngineOnEnemyKo(): void {
   globalScene.phaseManager.queueMessage(`The Momentum Engine drives ${active.getNameToRender()} faster!`);
 }
 
+/** Player-side compatibility wrapper for existing callers and tests. */
+export function erMomentumEngineOnEnemyKo(): void {
+  erMomentumEngineOnFoeKo(false);
+}
+
 /**
  * Anchor (relic): called from FaintPhase after a player faint resolves. If the
  * relic is held, hasn't fired yet this biome, and the ONLY surviving legal
  * player Pokémon is the slot 6 mon (party index 5), fully heal that mon (a last
  * stand). One-shot per biome. No-op otherwise.
  */
-export function erTryAnchorLastStand(): void {
-  if (ANCHOR_USED || !hasErRelic("anchor")) {
+export function erTryAnchorLastStand(forPlayer = true): void {
+  const side = relicSide(forPlayer);
+  if (ANCHOR_USED[side] || !hasErRelic("anchor", forPlayer)) {
     return;
   }
-  const party = globalScene.getPlayerParty();
+  const party = forPlayer ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
   const anchorMon = party[5];
   if (!anchorMon || anchorMon.isFainted()) {
     return;
@@ -690,7 +733,7 @@ export function erTryAnchorLastStand(): void {
   if (survivors.length !== 1 || survivors[0] !== anchorMon) {
     return;
   }
-  ANCHOR_USED = true;
+  ANCHOR_USED[side] = true;
   anchorMon.hp = anchorMon.getMaxHp();
   anchorMon.resetStatus(true);
   anchorMon.updateInfo();
@@ -722,8 +765,8 @@ export function erScrapMagnetExtraRewards(): number {
  * Pokémon ignore residual sandstorm/hail chip damage. Queried from
  * WeatherEffectPhase's per-Pokémon immunity check (gated on isPlayer there).
  */
-export function erWeathervaneBlocksWeatherDamage(): boolean {
-  return hasErRelic("weathervane");
+export function erWeathervaneBlocksWeatherDamage(forPlayer = true): boolean {
+  return hasErRelic("weathervane", forPlayer);
 }
 
 /** Weather choices Stormglass may set (5-turn timed weathers; primal/immutable
@@ -738,10 +781,10 @@ export const STORMGLASS_WEATHER_CHOICES: readonly { label: string; weather: Weat
 ];
 
 /** The held Stormglass relic instance (the chosen-weather carrier), or undefined. */
-function getStormglassModifier(): ErRelicModifier | undefined {
+function getStormglassModifier(forPlayer = true): ErRelicModifier | undefined {
   return globalScene?.findModifier(
     m => m instanceof ErRelicModifier && (m as ErRelicModifier).kind === "stormglass",
-    true,
+    forPlayer,
   ) as ErRelicModifier | undefined;
 }
 
@@ -777,7 +820,9 @@ export function setStormglassWeather(weather: WeatherType): void {
  * if the relic isn't held.
  */
 function erEnsureStormglassWeather(): WeatherType | null {
-  const mod = getStormglassModifier();
+  // The player's choice wins a direct conflict. Otherwise a ghost's captured
+  // Stormglass weather is allowed to shape the encounter it belongs to.
+  const mod = getStormglassModifier(true) ?? getStormglassModifier(false);
   if (!mod) {
     return null;
   }
@@ -837,7 +882,7 @@ export type ErBondedCharmSnapshot = [BattleStat, number][];
  * mon isn't the player's, so the caller can apply unconditionally.
  */
 export function erBondedCharmSnapshot(outgoing: Pokemon): ErBondedCharmSnapshot {
-  if (!hasErRelic("bondedCharm") || !outgoing.isPlayer()) {
+  if (!hasErRelic("bondedCharm", outgoing.isPlayer())) {
     return [];
   }
   const snapshot: ErBondedCharmSnapshot = [];
@@ -859,7 +904,7 @@ export function erBondedCharmSnapshot(outgoing: Pokemon): ErBondedCharmSnapshot 
  * switch, or the opening lead. No-op for an empty snapshot.
  */
 export function erBondedCharmApply(incoming: Pokemon, snapshot: ErBondedCharmSnapshot): void {
-  if (snapshot.length === 0 || !incoming.isPlayer()) {
+  if (snapshot.length === 0) {
     return;
   }
   for (const [stat, stage] of snapshot) {
@@ -997,7 +1042,11 @@ export function erApplyCovenantHeal(): void {
     return;
   }
   const wave = globalScene.currentBattle?.waveIndex ?? 0;
-  if (wave < COVENANT_WAVE_CADENCE || wave % COVENANT_WAVE_CADENCE !== 0 || wave % 10 === 0) {
+  if (
+    wave < COVENANT_WAVE_CADENCE
+    || wave % COVENANT_WAVE_CADENCE !== 0
+    || globalScene.gameMode.isBoss(wave)
+  ) {
     return;
   }
   if (wave === COVENANT_LAST_WAVE) {
@@ -1030,7 +1079,8 @@ export function erApplyCovenantHeal(): void {
  * (the reported "Cursed Idol -50% applies again if I rejoin" bug).
  */
 export function erApplyCursedIdol(pokemon: Pokemon): void {
-  if (!hasErRelic("cursedIdol") || !pokemon.isPlayer()) {
+  const forPlayer = pokemon.isPlayer();
+  if (!hasErRelic("cursedIdol", forPlayer)) {
     return;
   }
   // #609: record entrants in FIELD-SLOT order, NOT the speed-ordered
@@ -1041,15 +1091,17 @@ export function erApplyCursedIdol(pokemon: Pokemon): void {
   // lead got the Substitute and the player's actual lead (slot 0) got drained.
   // A lone switch-in is just the only on-field mon not yet recorded, so it still
   // lands on its correct (later) ordinal.
-  const field: Pokemon[] = globalScene.getPlayerField().filter(p => p?.isActive(true));
+  const field: Pokemon[] = (forPlayer ? globalScene.getPlayerField() : globalScene.getEnemyField()).filter(p =>
+    p?.isActive(true),
+  );
   for (const mon of field.includes(pokemon) ? field : [...field, pokemon]) {
-    applyCursedIdolEntrant(mon);
+    applyCursedIdolEntrant(mon, forPlayer);
   }
 }
 
 /** Apply the Cursed Idol entry effect to one mon, gated to once-per-mon-per-battle. */
-function applyCursedIdolEntrant(pokemon: Pokemon): void {
-  const { ordinal, firstTime } = erBattleEntrantOrdinal("cursedIdol", pokemon.id);
+function applyCursedIdolEntrant(pokemon: Pokemon, forPlayer: boolean): void {
+  const { ordinal, firstTime } = erBattleEntrantOrdinal(`cursedIdol:${relicSide(forPlayer)}`, pokemon.id);
   if (!firstTime) {
     return; // already processed this mon this battle (e.g. a reload re-summon)
   }

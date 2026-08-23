@@ -46,6 +46,8 @@ export interface AttackStatSubstituteOptions {
    * Attack as the offensive stat (Equinox). Overrides physicalStat/specialStat.
    */
   readonly useHigherOffense?: boolean;
+  /** When true, all attacks use the LOWER of Attack / Special Attack. */
+  readonly useLowerOffense?: boolean;
   /** Optional exact move allowlist. */
   readonly moveIds?: readonly MoveId[];
 }
@@ -56,6 +58,7 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
   private readonly contactOnly: boolean;
   private readonly flag: MoveFlags | undefined;
   private readonly useHigherOffense: boolean;
+  private readonly useLowerOffense: boolean;
   private readonly moveIds: readonly MoveId[] | undefined;
 
   constructor(options: AttackStatSubstituteOptions) {
@@ -65,6 +68,10 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
     this.contactOnly = options.contactOnly ?? false;
     this.flag = options.flag;
     this.useHigherOffense = options.useHigherOffense ?? false;
+    this.useLowerOffense = options.useLowerOffense ?? false;
+    if (this.useHigherOffense && this.useLowerOffense) {
+      throw new Error("[AttackStatSubstituteAbAttr] higher/lower offense modes are mutually exclusive");
+    }
     this.moveIds = options.moveIds;
   }
 
@@ -84,6 +91,9 @@ export class AttackStatSubstituteAbAttr extends AbAttr {
     }
     if (this.useHigherOffense) {
       return source.getStat(Stat.ATK, false) >= source.getStat(Stat.SPATK, false) ? Stat.ATK : Stat.SPATK;
+    }
+    if (this.useLowerOffense) {
+      return source.getStat(Stat.ATK, false) <= source.getStat(Stat.SPATK, false) ? Stat.ATK : Stat.SPATK;
     }
     return (isPhysical ? this.physicalStat : this.specialStat) ?? null;
   }

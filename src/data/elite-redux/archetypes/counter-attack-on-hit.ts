@@ -25,6 +25,7 @@
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+// biome-ignore lint/suspicious/noImportCycles: the established scripted-move helper cycle predates this filter-only extension.
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveCategory } from "#enums/move-category";
 import type { MoveFlags } from "#enums/move-flags";
@@ -45,6 +46,8 @@ export interface CounterAttackFilter {
    * @defaultValue `false` — counters fire on any damaging hit.
    */
   readonly contactRequired?: boolean;
+  /** When true, only non-contact damaging moves trigger the counter. */
+  readonly contactExcluded?: boolean;
   /** When set, only moves with this flag trigger the counter. */
   readonly flag?: MoveFlags;
 }
@@ -96,6 +99,9 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
     this.power = options.power;
     this.chance = options.chance ?? 100;
     this.filter = options.filter ?? {};
+    if (this.filter.contactRequired && this.filter.contactExcluded) {
+      throw new Error("[CounterAttackOnHitAbAttr] contactRequired/contactExcluded are mutually exclusive");
+    }
     this.category = options.category;
     this.healMultiplier = options.healMultiplier;
     if (!(this.chance >= 0 && this.chance <= 100)) {
@@ -127,6 +133,9 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
       return false;
     }
     if (this.filter.contactRequired && !move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
+      return false;
+    }
+    if (this.filter.contactExcluded && move.hasFlag(1 /* MoveFlags.MAKES_CONTACT */)) {
       return false;
     }
     if (this.filter.flag !== undefined && !move.hasFlag(this.filter.flag)) {

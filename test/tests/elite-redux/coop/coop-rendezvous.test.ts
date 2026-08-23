@@ -11,7 +11,7 @@
 // =============================================================================
 
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import { CoopRendezvous, shouldAnnounceCoopSpectatorCommandArrival } from "#data/elite-redux/coop/coop-rendezvous";
 import { coopMachineWaitLabels } from "#data/elite-redux/coop/coop-stall-probe";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
@@ -49,6 +49,27 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
   });
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("announces a fully materialized one-controller spectator without bypassing a missing replacement slot", () => {
+    expect(shouldAnnounceCoopSpectatorCommandArrival("guest", 1, ["host"])).toBe(true);
+    expect(
+      shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host"], true),
+      "Fun & Games retains the two-slot co-op arrangement but explicitly declares a one-controller battle",
+    ).toBe(true);
+    expect(shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host", "guest"])).toBe(false);
+    expect(
+      shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host"]),
+      "an incomplete double field can still owe the guest's replacement",
+    ).toBe(false);
+    expect(
+      shouldAnnounceCoopSpectatorCommandArrival("guest", 2, ["host", "guest"], true),
+      "a malformed single-controller declaration cannot bless an extra active battler",
+    ).toBe(false);
+    expect(
+      shouldAnnounceCoopSpectatorCommandArrival("guest", 1, [null]),
+      "unknown ownership is not proof of spectator readiness",
+    ).toBe(false);
   });
 
   it("both arrive at a point -> both sides resolve both-arrived (neither timed out)", async () => {

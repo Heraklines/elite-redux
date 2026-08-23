@@ -35,6 +35,7 @@ import { globalScene } from "#app/global-scene";
 import {
   fetchDeadliestGhosts,
   type GhostTeamSnapshot,
+  getErGhostMemberCustomData,
   isErGhostTeamLegal,
   sampleGhostSnapshots,
 } from "#data/elite-redux/er-ghost-teams";
@@ -49,6 +50,7 @@ import { teamStrength } from "#data/elite-redux/er-trainer-runtime-hook";
 import type { ErTrainerRegistryEntry } from "#data/elite-redux/init-elite-redux-trainers";
 import { ER_TRAINER_REGISTRY } from "#data/elite-redux/init-elite-redux-trainers";
 import type { Gender } from "#data/gender";
+import { CustomPokemonData } from "#data/pokemon-data";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
@@ -76,6 +78,8 @@ interface RoundMember {
   shiny?: boolean;
   variant?: number;
   passive?: boolean;
+  /** Cross-player cosmetic/t4 state; absent for non-ghost and legacy rounds. */
+  ghostCustomData?: ReturnType<typeof getErGhostMemberCustomData>;
 }
 
 /** One challenger in the rolled gauntlet. All fields are JSON-serialisable. */
@@ -219,6 +223,7 @@ function ghostMember(m: GhostTeamSnapshot["party"][number]): RoundMember {
     shiny: m.shiny,
     variant: m.variant,
     passive: m.passive,
+    ghostCustomData: getErGhostMemberCustomData(m),
   };
 }
 
@@ -427,6 +432,9 @@ function toPokemonConfig(m: RoundMember, level: number): EnemyPokemonConfig {
   }
   if (m.passive !== undefined) {
     cfg.passive = m.passive;
+  }
+  if (m.ghostCustomData) {
+    cfg.customPokemonData = new CustomPokemonData(m.ghostCustomData);
   }
   return cfg;
 }

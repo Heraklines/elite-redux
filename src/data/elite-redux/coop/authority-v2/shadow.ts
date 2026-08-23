@@ -46,13 +46,16 @@ import {
   buildCommandOpenEntry,
   buildInteractionOpenEntry,
   buildReplacementOpenEntry,
+  buildTrainerVictoryOpenEntry,
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   type CoopReplacementOpenMaterialV2,
+  type CoopTrainerVictoryOpenMaterialV2,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import {
   armReplacementOwnerWindowAfterControlProof as armReplacementOwnerWindowAfterControlProofOnContext,
   buildReplacementCommitEntry,
+  decodeReplacementCommitMaterial,
   type ReplacementAuthorityCarrier,
   type ReplacementProposal,
   type ReplacementResolutionMode,
@@ -821,6 +824,30 @@ export class CoopAuthorityV2Shadow {
     });
   }
 
+  /** Commit the exact action-only trainer-victory bridge before the settled wave entry exists. */
+  tapTrainerVictoryOpen(input: {
+    readonly operationId: string;
+    readonly material: CoopTrainerVictoryOpenMaterialV2;
+    readonly successor: Extract<CoopNextControl, { kind: "AWAIT_SUCCESSOR" }>;
+    readonly subsumes?: readonly number[];
+  }): CoopAuthorityEntry | null {
+    this.lastObservedWave = input.material.wave;
+    this.lastObservedTurn = input.material.turn;
+    return this.runTap("CONTROL_COMMIT", () => {
+      const entry = this.commit(
+        buildTrainerVictoryOpenEntry({
+          context: this.frameContext,
+          operationId: input.operationId,
+          material: input.material,
+          successor: input.successor,
+          ...(input.subsumes == null ? {} : { subsumes: input.subsumes }),
+        }),
+      );
+      this.logParity("CONTROL_COMMIT", entry.revision, true, "materialDigest", "surface=trainer-victory-open");
+      return entry;
+    });
+  }
+
   /** Tap the faint-switch authority commit. Builds a REPLACEMENT_COMMIT via the faint adapter + records parity. */
   tapReplacementCommit(input: CoopV2ShadowReplacementTap): CoopAuthorityEntry | null {
     this.lastObservedWave = input.proposal.sourceAddress.wave;
@@ -1438,6 +1465,35 @@ export class CoopAuthorityV2Shadow {
       }
     }
     return completed;
+  }
+
+  /**
+   * Whether the ordered replica ledger is already holding the exact replacement whose post-summon
+   * presentation belongs to `turn`.
+   *
+   * This is deliberately a boolean address query, not an alternate material carrier. The V2 log remains the
+   * only ordering owner and the retained checkpoint remains the only thing allowed to apply the replacement.
+   * The renderer uses this proof solely to keep latency-hint `battleEvent` copies from overtaking the
+   * immutable REPLACEMENT_COMMIT that names and installs their actor.
+   */
+  hasPendingReplicaReplacementForTurn(epoch: number, wave: number, turn: number): boolean {
+    if (this.disposed) {
+      return false;
+    }
+    for (const entry of this.pendingReplicaEntries.values()) {
+      const image = decodeReplacementCommitMaterial(entry);
+      if (image == null || image.sourceAddress.epoch !== epoch || image.sourceAddress.wave !== wave) {
+        continue;
+      }
+      const carrier = image.authorityCarrier;
+      if (
+        image.sourceAddress.turn === turn
+        || (carrier?.epoch === epoch && carrier.wave === wave && carrier.turn === turn)
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // -------------------------------------------------------------------------

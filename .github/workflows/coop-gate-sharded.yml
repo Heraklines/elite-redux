@@ -226,7 +226,11 @@ jobs:
     needs: browser-build
     name: Browser-native production WebRTC handshake and rejoin
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Run 30794206320 measured an 11m46s immutable asset-submodule checkout before this job's own
+    # checkpoints began. A known-green sealed-production transport checkpoint then needs about 4m31s.
+    # Preserve the checkpoints' strict internal no-progress bounds, but do not let transient checkout time
+    # consume their execution budget and manufacture an aggregate cancellation.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v6
         with:

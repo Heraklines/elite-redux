@@ -42,9 +42,8 @@
 //     none of the C1b targets need it; revisit if a future ER ability does.
 // =============================================================================
 
-import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { isComatoseLike, MovePowerBoostAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { BATTLE_STATS, type BattleStat } from "#enums/stat";
@@ -265,7 +264,7 @@ export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
         // its own Comatose. So a Comatose OPPONENT no longer wrongly grants 2x.
         return globalScene
           .getField(true)
-          .some(p => p.status?.effect === StatusEffect.SLEEP || (p === pokemon && p.hasAbility(AbilityId.COMATOSE)));
+          .some(p => p.status?.effect === StatusEffect.SLEEP || (p === pokemon && isComatoseLike(p)));
     }
   }
 

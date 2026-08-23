@@ -35,7 +35,12 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
 import { Stat } from "#enums/stat";
-import type { EnemyPokemon, PlayerPokemon, Pokemon } from "#field/pokemon";
+import {
+  type EnemyPokemon,
+  type PlayerPokemon,
+  type Pokemon,
+  withPokemonActiveAbilitySourceCache,
+} from "#field/pokemon";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
 import { getMoveTargets } from "#moves/move-utils";
@@ -963,6 +968,7 @@ function candidateDerivedFeatures(
   targetMode: "resolved" | "random",
   tera: boolean,
   perspective: ErCombatPerspective,
+  chartMultiplier: number,
 ): ErCombatMoveCandidate["derived"] {
   const move = allMoves[moveId];
   const resolvedTargets =
@@ -992,7 +998,6 @@ function candidateDerivedFeatures(
     return targetMode === "random" ? Math.floor(total / previews.length) : total;
   };
   const expectedDamageMax = combine(preview => preview.max);
-  const chartMultiplier = baseTypeMultiplier(scene, actor, moveId, targets, perspective);
   const hitRange = previews.length > 0 ? previewHitRange(previews[0].hits) : null;
   const multiplierFor = (target: Pokemon): number | null =>
     safe(
@@ -1004,7 +1009,6 @@ function candidateDerivedFeatures(
         }),
       null,
     );
-  const engineTypeMultiplier = resolvedTargets.length === 1 ? multiplierFor(resolvedTargets[0].mon) : null;
   const targetOutcomes = resolvedTargets.map(({ target, mon }, index) => {
     const preview = previews[index];
     const multiplier = multiplierFor(mon);
@@ -1017,6 +1021,7 @@ function candidateDerivedFeatures(
       immunityReason: move.category !== MoveCategory.STATUS && multiplier === 0 ? "revealed-engine-immunity" : null,
     };
   });
+  const engineTypeMultiplier = targetOutcomes.length === 1 ? targetOutcomes[0].engineTypeMultiplier : null;
   const choiceItem = actor.getHeldItems().find(item => item.type.id.includes("CHOICE"));
   const chargingMove = move as Move & { chargeAttrs?: unknown[] };
   return {
@@ -1077,6 +1082,7 @@ function appendMoveCandidates(
   for (const { move, moveSlot } of moveRows) {
     const { targetMode, sets } = moveTargetSets(scene, actor, move.moveId, perspective);
     for (const targets of sets) {
+      const chartMultiplier = baseTypeMultiplier(scene, actor, move.moveId, targets, perspective);
       const shared = {
         kind: "move" as const,
         actorSlot,
@@ -1084,14 +1090,23 @@ function appendMoveCandidates(
         moveId: move.moveId,
         targetMode,
         targets,
-        baseTypeMultiplier: baseTypeMultiplier(scene, actor, move.moveId, targets, perspective),
+        baseTypeMultiplier: chartMultiplier,
         currentStab: actor.getTypes().includes(actor.getMoveType(allMoves[move.moveId])),
       };
       candidates.push(
         withCanonicalCombatCandidateId({
           ...shared,
           tera: false,
-          derived: candidateDerivedFeatures(scene, actor, move.moveId, targets, targetMode, false, perspective),
+          derived: candidateDerivedFeatures(
+            scene,
+            actor,
+            move.moveId,
+            targets,
+            targetMode,
+            false,
+            perspective,
+            chartMultiplier,
+          ),
         }),
       );
       if (canTera && moveSlot >= 0) {
@@ -1099,7 +1114,16 @@ function appendMoveCandidates(
           withCanonicalCombatCandidateId({
             ...shared,
             tera: true,
-            derived: candidateDerivedFeatures(scene, actor, move.moveId, targets, targetMode, true, perspective),
+            derived: candidateDerivedFeatures(
+              scene,
+              actor,
+              move.moveId,
+              targets,
+              targetMode,
+              true,
+              perspective,
+              chartMultiplier,
+            ),
           }),
         );
       }
@@ -1177,15 +1201,18 @@ export function enumerateErCombatCandidates(
   if (!actor?.isActive(true) || actor.isFainted()) {
     return [];
   }
-  const candidates: ErCombatCandidate[] = [];
-  const teraAlreadyPlanned = perspective === "player" && earlier.some(choice => choice.kind === "move" && choice.tera);
-  const canTera =
-    perspective === "player"
-      ? canTerastallize(actor as PlayerPokemon)
-        && scene.arena.playerTerasUsed + +teraAlreadyPlanned < MAX_TERAS_PER_ARENA
-      : safe(() => !!scene.currentBattle.trainer?.shouldTera(actor as EnemyPokemon), false);
-  appendMoveCandidates(scene, actor, actorSlot, canTera, candidates, perspective);
-  appendSwitchCandidates(scene, actor, actorSlot, earlier, candidates, perspective);
-  appendShiftCandidates(scene, actorSlot, candidates, perspective);
-  return candidates;
+  return withPokemonActiveAbilitySourceCache(() => {
+    const candidates: ErCombatCandidate[] = [];
+    const teraAlreadyPlanned =
+      perspective === "player" && earlier.some(choice => choice.kind === "move" && choice.tera);
+    const canTera =
+      perspective === "player"
+        ? canTerastallize(actor as PlayerPokemon)
+          && scene.arena.playerTerasUsed + +teraAlreadyPlanned < MAX_TERAS_PER_ARENA
+        : safe(() => !!scene.currentBattle.trainer?.shouldTera(actor as EnemyPokemon), false);
+    appendMoveCandidates(scene, actor, actorSlot, canTera, candidates, perspective);
+    appendSwitchCandidates(scene, actor, actorSlot, earlier, candidates, perspective);
+    appendShiftCandidates(scene, actorSlot, candidates, perspective);
+    return candidates;
+  });
 }

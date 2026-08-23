@@ -146,7 +146,7 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       beginShowdownBattle(own, [magikarp()]);
       const starters = own.map(manifestToStarter);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters, true, undefined, own);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters, true, undefined, own);
     });
     await game.phaseInterceptor.to("CommandPhase");
 
@@ -228,7 +228,7 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       beginShowdownBattle(own, [magikarp(), magikarp()]);
       const starters = own.map(manifestToStarter);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters, true, undefined, own);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters, true, undefined, own);
     });
     await game.phaseInterceptor.to("CommandPhase");
 
@@ -287,7 +287,7 @@ describe.skipIf(!RUN)("Showdown Sync - local-perspective dual-engine simulation"
       beginShowdownBattle(own, [magikarp(), magikarp(), magikarp()]);
       const starters = own.map(manifestToStarter);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters, true, undefined, own);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters, true, undefined, own);
     });
     await game.phaseInterceptor.to("CommandPhase");
 

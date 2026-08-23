@@ -355,7 +355,7 @@ export type CoopNextControl =
        * only that edge; it never grants TURN_COMMIT or lets a local phase choose a successor.
        */
       readonly allowedControlAddresses?: readonly {
-        readonly materialKind: "command-open" | "interaction-open" | "replacement-open";
+        readonly materialKind: "command-open" | "interaction-open" | "replacement-open" | "trainer-victory-open";
         readonly wave: number;
         readonly turn: number;
         /** Exact entry id when predictable; null is an explicit wildcard at this complete material address. */

@@ -106,7 +106,7 @@ export async function build({ dump, outDir, flags }) {
   // id-map.mjs uses the raw human-readable `name` field directly (abilities
   // have no `NAME` constant prefix to strip). Mirror that here.
   const abilityEntries = abilityRaws.map(a => ({ id: a.id, name: a.name ?? "" }));
-  const { map } = buildIdMapForCategory(abilityEntries, abilitiesEnum, CUSTOM_ID_START);
+  const { map } = buildIdMapForCategory(abilityEntries, abilitiesEnum, CUSTOM_ID_START, undefined, [[5900, 6999]]);
 
   // Two-pass: count collisions (ER ships e.g. two "As One" entries; the 4
   // "Embody Aspect"s), then emit with id-suffix disambiguation when needed.

@@ -8,6 +8,7 @@ import {
   getCoopBrowserFaintFixtureStarters,
   getCoopBrowserGameOverFixtureStarters,
   getCoopBrowserNavigationFixtureStarters,
+  getCoopBrowserPartyRewardFixtureStarters,
   getCoopBrowserRegisteredInteractionFixtureStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
@@ -37,17 +38,27 @@ import {
   countErBlackShinyStarters,
   ER_BLACK_SHINY_LUCK,
   ER_BLACK_SHINY_TINT,
+  enforceErBlackShinyStarterLimit,
   getErBlackShinySpriteSource,
   isErBlackShinyStarterSelection,
+  reconcileErBlackShinyStarterSelection,
 } from "#data/elite-redux/er-black-shinies";
 import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
+import { resetErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { resetGenericTrainerTracking } from "#data/elite-redux/er-generic-trainer-run-state";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import {
+  type ErRunPacing,
+  resetErSprintVoucherCredit,
+  setErRunPacing,
+  supportsErSprintPacing,
+} from "#data/elite-redux/er-run-pacing";
 import { buildErShinyLabConfig } from "#data/elite-redux/er-shiny-lab-config";
 import {
   decodeErShinyLabLoadout,
@@ -63,6 +74,7 @@ import {
   renderErShinyLabLook,
 } from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { resetErTrainingCacheState } from "#data/elite-redux/er-training-cache";
 import { copyTextToClipboard } from "#data/elite-redux/showdown/showdown-clipboard";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
@@ -117,6 +129,7 @@ import {
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
   readErShinyLabSpriteSourcePixels,
+  resetErShinyLabSpriteFxTexture,
 } from "#sprites/er-shiny-lab-sprite-fx";
 import type { Variant } from "#sprites/variant";
 import {
@@ -1778,12 +1791,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         }
       }
       const coopBrowserNavigationStarters = getCoopBrowserNavigationFixtureStarters();
+      const coopBrowserPartyRewardStarters = getCoopBrowserPartyRewardFixtureStarters();
       const coopBrowserStarters =
         getCoopBrowserCommanderFixtureStarters()
         ?? getCoopBrowserFaintFixtureStarters()
         ?? getCoopBrowserGameOverFixtureStarters()
         ?? getCoopBrowserRegisteredInteractionFixtureStarters()
         ?? getCoopBrowserAbilityCapsuleFixtureStarters()
+        ?? coopBrowserPartyRewardStarters
         ?? coopBrowserNavigationStarters
         ?? getCoopBrowserEvolutionFixtureStarters()
         ?? getCoopBrowserCampaignFixtureStarters();
@@ -1793,7 +1808,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // registry requires both the exact dedicated build flag and this client's exact URL fixture.
         this.seedTeamFromStarters(coopBrowserStarters, {
           allowUncaught: true,
-          allowOverValueLimit: coopBrowserStarters === coopBrowserNavigationStarters,
+          allowOverValueLimit:
+            coopBrowserStarters === coopBrowserNavigationStarters
+            || coopBrowserStarters === coopBrowserPartyRewardStarters,
         });
       }
 
@@ -4016,6 +4033,36 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   /**
+   * Rebuild the selected Black Shiny tier from the saved Starter itself.
+   *
+   * `seedTeamFromStarters` already reconstructs every dex-backed appearance bit from the saved
+   * starter, but the Black tier lives outside the dex bitfield. Leaving it behind makes a saved t4
+   * depend on whichever per-species preference happens to be current, which can silently demote it
+   * to its underlying epic/red shiny (or promote a saved red shiny back to black).
+   */
+  private restoreSavedBlackShinySelection(saved: Starter): void {
+    if (saved.erBlackShiny === undefined) {
+      return; // Legacy saved teams retain the pre-existing preference fallback.
+    }
+
+    const { starterDataEntry } = this.getSpeciesData(saved.speciesId);
+    const erBlackShiny = !!starterDataEntry.erBlackShiny && isErBlackShinyStarterSelection(saved);
+    for (const preferences of [this.starterPreferences, this.originalStarterPreferences]) {
+      let attributes = preferences[saved.speciesId];
+      if (!attributes) {
+        attributes = {};
+        preferences[saved.speciesId] = attributes;
+      }
+      attributes.erBlackShiny = erBlackShiny;
+      if (erBlackShiny) {
+        // Keep the saved t4 invariant coherent if stale preferences point at another look.
+        attributes.shiny = true;
+        attributes.variant = 2;
+      }
+    }
+  }
+
+  /**
    * Showdown field-legality gate for a PICK (Task B6). Returns the rejection message when the
    * mon may not be fielded, else null. Delegates the thresholds + strings to the shared
    * `showdownFieldLegalityReason` (the SAME verdict the validator enforces) so the UI and the
@@ -4671,6 +4718,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     species: PokemonSpecies,
     props: { female: boolean; formIndex: number; shiny: boolean; variant: number },
   ): void {
+    // Party slots are reused as starters are added, removed, or reordered. Drop
+    // the prior slot occupant's generated-FX source before rendering the new
+    // species so an FX cache/source miss cannot restore a stale icon.
+    resetErShinyLabSpriteFxTexture(icon);
     const renderStage = this.showdownRenderStage(species.speciesId);
     const iconSpecies = renderStage?.species ?? species;
     const iconFormIndex = renderStage?.formIndex ?? props.formIndex;
@@ -5866,7 +5917,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // Initiates the small up and down idle animation
         this.iconAnimHandler.addOrUpdate(icon, PokemonIconAnimMode.PASSIVE);
 
-        const starterIndex = this.starterSpecies.indexOf(species);
+        const starterIndex = this.starterSpecies.findIndex(selected => selected.speciesId === species.speciesId);
 
         const props = globalScene.gameData.getSpeciesDexAttrProps(species, defaultDexAttr);
 
@@ -6054,7 +6105,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   private resetStarterIconSlot(index: number): void {
     const icon = this.starterIcons[index];
-    clearErShinyLabSpriteFxTexture(icon, false);
+    resetErShinyLabSpriteFxTexture(icon, false);
     icon.setTexture("pokemon_icons_0").setFrame("unknown");
   }
 
@@ -6758,7 +6809,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       );
 
       if (forSeen ? this.speciesStarterDexEntry?.seenAttr : this.speciesStarterDexEntry?.caughtAttr) {
-        const starterIndex = this.starterSpecies.indexOf(species);
+        const starterIndex = this.starterSpecies.findIndex(selected => selected.speciesId === species.speciesId);
         const selectedProps = globalScene.gameData.getSpeciesDexAttrProps(species, this.dexAttrCursor);
 
         if (starterIndex > -1) {
@@ -7332,6 +7383,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             globalScene.phaseManager.clearPhaseQueue();
             globalScene.phaseManager.pushNew("SelectChallengePhase");
             globalScene.phaseManager.pushNew("EncounterPhase");
+          } else if (globalScene.gameMode.isFun) {
+            globalScene.phaseManager.clearPhaseQueue();
+            globalScene.phaseManager.pushNew("SelectFunModePhase");
+            globalScene.phaseManager.pushNew("EncounterPhase");
           } else {
             globalScene.phaseManager.toTitleScreen();
           }
@@ -7440,6 +7495,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               item: e.saved.showdownItem,
             });
           }
+          this.restoreSavedBlackShinySelection(e.saved);
           this.addToParty(
             e.species,
             e.dexAttr,
@@ -7470,6 +7526,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (this.starterSpecies.length === 0) {
       return false;
     }
+
+    // A selected party slot can outlive the preview object used to cycle its
+    // appearance (forms and reconstructed species are not guaranteed to share
+    // object identity). Reconcile the explicit t4 preference at the launch
+    // boundary so a visibly selected Black Shiny cannot enter as its underlying
+    // epic/red variant. Variant 2 alone is deliberately insufficient here.
+    this.starters = enforceErBlackShinyStarterLimit(
+      this.starters.map(starter =>
+        reconcileErBlackShinyStarterSelection(
+          starter,
+          !!this.getSpeciesData(starter.speciesId).starterDataEntry.erBlackShiny,
+          this.starterPreferences[starter.speciesId],
+        ),
+      ),
+    );
 
     const ui = this.getUi();
 
@@ -7508,11 +7579,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         ui.setModeWithoutClear(
           UiMode.CONFIRM,
           () => {
-            const startRun = (difficulty: ErDifficulty) => {
+            const startRun = (difficulty: ErDifficulty, pacing: ErRunPacing = "normal") => {
               // ER: lock in the chosen run difficulty (drives the ER trainer
               // roster tier for the whole run) and reset the per-run "already
               // encountered" ER trainer set so the new run starts fresh.
               setErDifficulty(difficulty);
+              setErRunPacing(supportsErSprintPacing(globalScene.gameMode.modeId) ? pacing : "normal");
+              resetErSprintVoucherCredit();
+              resetErTrainingCacheState();
               // Co-op (#633): the HOST publishes the authoritative run config
               // (difficulty + challenges) so the guest mirrors it - the run stays
               // coherent (both players get the same difficulty + challenge set).
@@ -7525,6 +7599,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               if (coopHost?.role === "host") {
                 coopHost.broadcastRunConfig({
                   difficulty,
+                  pacing,
                   challenges: globalScene.gameMode.challenges.map(c => ({
                     id: c.id,
                     value: c.value,
@@ -7541,6 +7616,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               resetGenericTrainerTracking();
               resetErCustomTrainerTracking();
               resetErGhostRunState();
+              resetErEndlessContinuation();
               resetErMapNodes();
               // ER (#486): dev/testing seed - pre-stock Treasure-Map fragments
               // AFTER the reset so a scenario can test the X-Marks-the-Spot payout.
@@ -7561,6 +7637,38 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // ER: pick a run difficulty (Youngster / Ace / Elite / Hell)
             // before launching. Hovering a mode shows what it does (#368) in
             // the message box under the option list.
+            const choosePacing = (difficulty: ErDifficulty) => {
+              if (!supportsErSprintPacing(globalScene.gameMode.modeId)) {
+                startRun(difficulty, "normal");
+                return;
+              }
+              // Use the independent nested option handler. Reusing OPTION_SELECT here
+              // lets the difficulty handler clear the newly-opened pacing menu as its
+              // own ACTION cleanup finishes, leaving starter select input-blocked.
+              ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, {
+                supportHover: true,
+                options: [
+                  {
+                    semanticId: "normal",
+                    label: i18next.t("starterSelectUiHandler:pacingNormal"),
+                    onHover: () => this.showText(i18next.t("starterSelectUiHandler:pacingNormalDesc")),
+                    handler: () => {
+                      startRun(difficulty, "normal");
+                      return true;
+                    },
+                  },
+                  {
+                    semanticId: "sprint",
+                    label: i18next.t("starterSelectUiHandler:pacingSprint"),
+                    onHover: () => this.showText(i18next.t("starterSelectUiHandler:pacingSprintDesc")),
+                    handler: () => {
+                      startRun(difficulty, "sprint");
+                      return true;
+                    },
+                  },
+                ],
+              });
+            };
             const difficultyOption = (difficulty: ErDifficulty, key: string) => ({
               semanticId: key.toLowerCase(),
               label: i18next.t(`starterSelectUiHandler:difficulty${key}`),
@@ -7572,7 +7680,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 this.showText(i18next.t(`starterSelectUiHandler:difficulty${key}Desc`));
               },
               handler: () => {
-                startRun(difficulty);
+                choosePacing(difficulty);
                 return true;
               },
             });
@@ -7593,6 +7701,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               const showdownCallback = this.starterSelectCallback;
               this.starterSelectCallback = null;
               showdownCallback?.(showdownStarters);
+              return;
+            }
+            if (globalScene.gameMode.isFun) {
+              startRun(getFunModeConfig().difficulty);
               return;
             }
             // ER Community Challenge: a launched community card forces its run
@@ -7632,7 +7744,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                   globalScene.setSeed(cfg.seed);
                   globalScene.resetSeed();
                 }
-                startRun(cfg.difficulty as ErDifficulty);
+                startRun(cfg.difficulty as ErDifficulty, cfg.pacing ?? "normal");
                 return true;
               };
               if (!applyHostConfig()) {

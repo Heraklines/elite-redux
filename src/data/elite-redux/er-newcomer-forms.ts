@@ -29,21 +29,28 @@
 // be constructed yet (they are resolved at battle time from `allAbilities`).
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import {
   installErFormSpriteRedirect,
   installErSpeciesFormSpriteDispatch,
 } from "#data/elite-redux/er-form-sprite-redirect";
+import { ErCustomSpecies } from "#data/elite-redux/init-elite-redux-custom-species";
 import { PokemonForm } from "#data/pokemon-species";
-import { pokemonFormChanges, SpeciesFormChange } from "#data/pokemon-forms";
-import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
+import { pokemonFormChanges, SpeciesFormChange, SpeciesFormChangeCondition } from "#data/pokemon-forms";
+import {
+  SpeciesFormChangeItemTrigger,
+  SpeciesFormChangeManualTrigger,
+} from "#data/pokemon-forms/form-change-triggers";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import type { LevelMoves } from "#types/pokemon-level-moves";
+import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_LAST_HOST_ABILITY_ID } from "#data/elite-redux/abilities/last-host";
@@ -58,6 +65,33 @@ import {
   ER_TITAN_ABILITY_ID,
   ER_BRAIN_FOOD_ABILITY_ID,
 } from "#data/elite-redux/abilities/composite-newcomers";
+import {
+  ER_ASTRAL_PROJECT_ABILITY_ID,
+  ER_CONTAMINATED_ABILITY_ID,
+  ER_CRYOGENESIS_ABILITY_ID,
+  ER_DAYDREAMER_ABILITY_ID,
+  ER_DECAY_ABILITY_ID,
+  ER_EULOGY_ABILITY_ID,
+  ER_FLUTTERING_SPIRIT_ABILITY_ID,
+  ER_FREE_SPIRIT_ABILITY_ID,
+  ER_HEAD_FIRST_ABILITY_ID,
+  ER_IRRADIATED_FIST_ABILITY_ID,
+  ER_METALLOSIS_ABILITY_ID,
+  ER_NUCLEUS_ABILITY_ID,
+  ER_ORACLE_ABILITY_ID,
+  ER_PENTA_PUNCH_ABILITY_ID,
+  ER_PHOTOVOLTAIC_ABILITY_ID,
+  ER_PROPHETIC_ABILITY_ID,
+  ER_SOUTHERN_CROSS_PUNCH_ABILITY_ID,
+  ER_SPLIT_MIND_ABILITY_ID,
+  ER_STARCROSSED_ABILITY_ID,
+  ER_THIRD_EYE_ABILITY_ID,
+} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
+import { ER_FORMLESS_FIST_ABILITY_ID } from "#data/elite-redux/abilities/type-nativization-abilities";
+import {
+  ER_LILLIGANT_VERDANT_SPECIES_ID,
+  ER_POWER_PLANT_SPECIES_ID,
+} from "#data/elite-redux/er-fakemon-pitch-species";
 
 /** ER-custom / newcomer ability ids are real `allAbilities` keys; narrow the type. */
 const ab = (id: number): AbilityId => id as AbilityId;
@@ -127,8 +161,8 @@ const BRUTE_FORCE = 5459; // ER
  * as a real `PokemonForm` with the stats/typing/kit below.
  */
 export interface NewcomerFormDef {
-  /** Existing pokerogue species the form is attached to. */
-  readonly baseSpecies: SpeciesId;
+  /** Vanilla or append-only custom species id the form is attached to. */
+  readonly baseSpecies: SpeciesId | number;
   /** pokerogue form key (`mega` / `mega-x` / `mega-y` / `primal`). Must be free on the base. */
   readonly formKey: string;
   /** Display name of the injected form. */
@@ -145,8 +179,13 @@ export interface NewcomerFormDef {
   readonly innates: readonly [AbilityId, AbilityId, AbilityId];
   /** Mega stone / primal orb that triggers the form (a FormChangeItem enum value). */
   readonly item?: FormChangeItem;
+  /** Register a one-way manual battle-form edge instead of an item edge. */
+  readonly manualTrigger?: boolean;
   readonly preFormKeys?: readonly string[];
+  /** Whether this form may be selected as a starter; omitted forms stay excluded. */
   readonly isStarterSelectable?: boolean;
+  /** Optional gender condition for mutually-exclusive item edges. */
+  readonly gender?: Gender;
   readonly replaceExisting?: boolean;
   /**
    * Extra level-1 learnset moves to append to the BASE species (learnsets are
@@ -402,6 +441,39 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     isStarterSelectable: true,
   },
   {
+    baseSpecies: SpeciesId.ROWLET,
+    formKey: "partner",
+    formName: "Partner",
+    slug: "rowlet_partner",
+    types: [PokemonType.GRASS, PokemonType.FLYING, PokemonType.FIRE],
+    stats: [68, 40, 100, 138, 67, 122],
+    actives: [ab(5984), ab(6105), AbilityId.SUPER_LUCK],
+    innates: [ab(5292), ab(6108), ab(6109)],
+    isStarterSelectable: true,
+  },
+  {
+    baseSpecies: SpeciesId.ONIX,
+    formKey: "partner",
+    formName: "Partner",
+    slug: "onix_partner",
+    types: [PokemonType.STELLAR, PokemonType.ICE],
+    stats: [65, 90, 170, 30, 160, 20],
+    actives: [ab(5025), ab(5267), ab(6110)],
+    innates: [ab(6111), ab(6112), ab(5064)],
+    isStarterSelectable: true,
+  },
+  {
+    baseSpecies: SpeciesId.GIMMIGHOUL,
+    formKey: "partner",
+    formName: "Partner",
+    slug: "gimmighoul_partner",
+    types: [PokemonType.GHOST, PokemonType.STEEL],
+    stats: [75, 40, 129, 133, 80, 78],
+    actives: [ab(5421), ab(5165), ab(6113)],
+    innates: [ab(6114), AbilityId.GOOD_AS_GOLD, ab(6115)],
+    isStarterSelectable: true,
+  },
+  {
     baseSpecies: SpeciesId.FIDOUGH,
     formKey: "mega",
     formName: "Mega",
@@ -454,6 +526,223 @@ export const ER_NEWCOMER_FORMS: readonly NewcomerFormDef[] = [
     actives: [ab(HYPER_AGGRESSIVE), ab(ELECTRO_SURGE), ab(MOSH_PIT)],
     innates: [ab(FIGHTING_SPIRIT), ab(TWO_FACED_UNLEASHED), ab(BRUTE_FORCE)],
     item: FormChangeItem.LUXRAYITE_Y,
+  },
+  // ===================== DISCORD FAKEMON PITCH ROSTER (2026-08) =====================
+  {
+    baseSpecies: SpeciesId.CRYOGONAL,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "cryogonal_mega",
+    types: [PokemonType.ICE],
+    stats: [80, 50, 90, 115, 175, 105],
+    actives: [ab(5100), ab(5187), ab(5007)],
+    innates: [ab(5086), ab(5680), ab(ER_CRYOGENESIS_ABILITY_ID)],
+    item: FormChangeItem.CRYOGONALITE,
+  },
+  {
+    baseSpecies: SpeciesId.JIRACHI,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "jirachi_mega",
+    types: [PokemonType.STEEL, PokemonType.PSYCHIC],
+    stats: [100, 125, 125, 125, 125, 100],
+    actives: [ab(ER_PROPHETIC_ABILITY_ID), AbilityId.REGENERATOR, ab(5025)],
+    innates: [ab(5560), ab(ER_DAYDREAMER_ABILITY_ID), ab(ER_FREE_SPIRIT_ABILITY_ID)],
+    item: FormChangeItem.JIRACHITE,
+  },
+  {
+    baseSpecies: SpeciesId.LEDIAN,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "ledian_mega",
+    types: [PokemonType.BUG, PokemonType.FIGHTING],
+    stats: [55, 135, 80, 65, 130, 125],
+    actives: [AbilityId.MOXIE, ab(ER_PENTA_PUNCH_ABILITY_ID), ab(ER_SOUTHERN_CROSS_PUNCH_ABILITY_ID)],
+    innates: [ab(ER_STARCROSSED_ABILITY_ID), ab(ER_ASTRAL_PROJECT_ABILITY_ID), ab(ER_FLUTTERING_SPIRIT_ABILITY_ID)],
+    item: FormChangeItem.LEDIANITE,
+  },
+  {
+    baseSpecies: SpeciesId.RAMPARDOS,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "rampardos_mega",
+    types: [PokemonType.ROCK, PokemonType.DARK],
+    stats: [97, 185, 105, 65, 80, 83],
+    actives: [ab(5101), AbilityId.ANGER_POINT, ab(ER_HEAD_FIRST_ABILITY_ID)],
+    innates: [AbilityId.NEUROFORCE, ab(5459), AbilityId.MOLD_BREAKER],
+    item: FormChangeItem.RAMPARDOSITE,
+  },
+  {
+    baseSpecies: SpeciesId.REUNICLUS,
+    formKey: "mega-x",
+    formName: "Mega X",
+    slug: "reuniclus_mega_x",
+    types: [PokemonType.PSYCHIC],
+    stats: [110, 125, 92, 60, 110, 143],
+    actives: [ab(ER_IRRADIATED_FIST_ABILITY_ID), ab(ER_IRRADIATED_FIST_ABILITY_ID), ab(ER_IRRADIATED_FIST_ABILITY_ID)],
+    innates: [ab(5724), ab(ER_NUCLEUS_ABILITY_ID), ab(ER_FORMLESS_FIST_ABILITY_ID)],
+    item: FormChangeItem.REUNICLUSITE_X,
+  },
+  {
+    baseSpecies: SpeciesId.XATU,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "xatu_mega",
+    types: [PokemonType.PSYCHIC, PokemonType.FLYING],
+    stats: [82, 100, 110, 130, 110, 111],
+    actives: [ab(ER_SPLIT_MIND_ABILITY_ID), ab(5043), ab(ER_EULOGY_ABILITY_ID)],
+    innates: [ab(ER_ORACLE_ABILITY_ID), ab(ER_THIRD_EYE_ABILITY_ID), AbilityId.KEEN_EYE],
+    item: FormChangeItem.XATUNITE,
+  },
+  {
+    baseSpecies: SpeciesId.ZANGOOSE,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "zangoose_mega",
+    types: [PokemonType.NORMAL, PokemonType.STEEL, PokemonType.POISON],
+    stats: [73, 115, 115, 60, 115, 115],
+    actives: [AbilityId.TOXIC_BOOST, AbilityId.TOXIC_BOOST, AbilityId.TOXIC_BOOST],
+    innates: [ab(ER_METALLOSIS_ABILITY_ID), ab(ER_CONTAMINATED_ABILITY_ID), ab(ER_DECAY_ABILITY_ID)],
+    item: FormChangeItem.ZANGOOSEITE,
+  },
+  // Power Plant's Live Current is a battle form, not a separate obtainable species.
+  {
+    baseSpecies: ER_POWER_PLANT_SPECIES_ID as SpeciesId,
+    formKey: "live-current",
+    formName: "Live Current",
+    slug: "power_plant_live_current",
+    types: [PokemonType.GRASS, PokemonType.FIRE, PokemonType.ELECTRIC],
+    stats: [120, 40, 80, 130, 80, 120],
+    actives: [AbilityId.FLASH_FIRE, ab(5350), ab(5197)],
+    innates: [AbilityId.QUARK_DRIVE, ab(ER_PHOTOVOLTAIC_ABILITY_ID), ab(5363)],
+    manualTrigger: true,
+  },
+  // Discord fakemon-pitch source-backed forms (2026-08).
+  {
+    baseSpecies: SpeciesId.CALYREX,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "calyrex_chariot_mega",
+    types: [PokemonType.GRASS, PokemonType.PSYCHIC, PokemonType.ICE, PokemonType.GHOST],
+    stats: [100, 155, 135, 155, 135, 100],
+    actives: [ab(5158), ab(231), AbilityId.STAMINA],
+    innates: [ab(6054), ab(6055), ab(5259)],
+    item: FormChangeItem.CALYRITE,
+    preFormKeys: ["ice", "shadow"],
+  },
+  {
+    baseSpecies: SpeciesId.HYPNO,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "hypno_mega",
+    types: [PokemonType.PSYCHIC],
+    stats: [95, 73, 124, 120, 150, 73],
+    actives: [ab(6056), AbilityId.BAD_DREAMS, AbilityId.PSYCHIC_SURGE],
+    innates: [ab(6057), ab(5043), ab(6058)],
+    item: FormChangeItem.HYPNITE,
+  },
+  {
+    baseSpecies: SpeciesId.ALOLA_RAICHU,
+    formKey: "mega-male",
+    formName: "Mega Male",
+    slug: "raichu_alolan_mega_male",
+    types: [PokemonType.ELECTRIC, PokemonType.PSYCHIC],
+    stats: [60, 125, 80, 105, 95, 125],
+    actives: [ab(6059), ab(6059), ab(6059)],
+    innates: [ab(6061), ab(6062), ab(6063)],
+    item: FormChangeItem.ALORAICHUNITE,
+    gender: Gender.MALE,
+  },
+  {
+    baseSpecies: SpeciesId.ALOLA_RAICHU,
+    formKey: "mega-female",
+    formName: "Mega Female",
+    slug: "raichu_alolan_mega_female",
+    types: [PokemonType.ELECTRIC, PokemonType.PSYCHIC],
+    stats: [60, 105, 70, 115, 95, 145],
+    actives: [ab(6060), ab(6060), ab(6060)],
+    innates: [ab(6061), ab(6062), ab(6063)],
+    item: FormChangeItem.ALORAICHUNITE,
+    gender: Gender.FEMALE,
+  },
+  {
+    baseSpecies: SpeciesId.BARBARACLE,
+    formKey: "mega-y",
+    formName: "Mega Y",
+    slug: "barbaracle_mega_y",
+    types: [PokemonType.ROCK, PokemonType.PSYCHIC],
+    stats: [72, 88, 130, 140, 106, 64],
+    actives: [ab(6075), AbilityId.LIMBER, AbilityId.PSYCHIC_SURGE],
+    innates: [ab(6076), ab(6077), AbilityId.SOLID_ROCK],
+    item: FormChangeItem.BARBARACITE_Y,
+    learnMoves: [MoveId.SWIRLY_ROOM],
+  },
+  {
+    baseSpecies: ER_LILLIGANT_VERDANT_SPECIES_ID,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "lilligant_verdant_mega",
+    types: [PokemonType.WATER, PokemonType.FAIRY, PokemonType.GHOST],
+    stats: [90, 50, 101, 129, 120, 110],
+    actives: [ab(6071), ab(6078), ab(6072)],
+    innates: [ab(5596), ab(6073), ab(6074)],
+    item: FormChangeItem.LILLIGANITE_VERDANT,
+  },
+  {
+    baseSpecies: SpeciesId.UXIE,
+    formKey: "primal",
+    formName: "Corrupted",
+    slug: "uxie_corrupted",
+    types: [PokemonType.PSYCHIC, PokemonType.DARK],
+    stats: [75, 125, 130, 125, 130, 95],
+    actives: [ab(5224), AbilityId.MOODY, ab(5158)],
+    innates: [ab(5464), ab(5314), ab(5475)],
+    item: FormChangeItem.DISTORTED_CHAIN,
+  },
+  {
+    baseSpecies: SpeciesId.GOLURK,
+    formKey: "mega-y",
+    formName: "Mega Y",
+    slug: "golurk_mega_y",
+    types: [PokemonType.GROUND, PokemonType.GHOST, PokemonType.FIGHTING],
+    stats: [89, 159, 110, 105, 110, 40],
+    actives: [ab(6081), AbilityId.SHEER_FORCE, AbilityId.SHADOW_SHIELD],
+    innates: [ab(6116), ab(6082), ab(6083)],
+    item: FormChangeItem.GOLURKITE_Y,
+    preFormKeys: [""],
+  },
+  {
+    baseSpecies: SpeciesId.SKUNTANK,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "skuntank_mega",
+    types: [PokemonType.DARK, PokemonType.POISON, PokemonType.FIRE],
+    stats: [103, 61, 97, 143, 91, 104],
+    actives: [ab(5509), AbilityId.CORROSION, ab(5535)],
+    innates: [ab(6084), ab(6085), ab(6086)],
+    item: FormChangeItem.SKUNTANKITE,
+  },
+  {
+    baseSpecies: SpeciesId.DODRIO,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "dodrio_mega",
+    types: [PokemonType.NORMAL, PokemonType.FLYING, PokemonType.GROUND, PokemonType.FIGHTING],
+    stats: [90, 130, 100, 70, 80, 140],
+    actives: [AbilityId.VITAL_SPIRIT, AbilityId.LIMBER, AbilityId.BIG_PECKS],
+    innates: [ab(6087), ab(6088), ab(6089)],
+    item: FormChangeItem.DODRIONITE,
+  },
+  {
+    baseSpecies: SpeciesId.PYUKUMUKU,
+    formKey: "mega",
+    formName: "Mega",
+    slug: "pyukumuku_mega",
+    types: [PokemonType.WATER],
+    stats: [105, 60, 250, 30, 250, 5],
+    actives: [AbilityId.CORROSION, AbilityId.PERISH_BODY, ab(5064)],
+    innates: [ab(6104), AbilityId.UNAWARE, ab(5085)],
+    item: FormChangeItem.PYUKUMUKUNITE,
   },
 ];
 
@@ -527,6 +816,10 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
   baseMut.formIndex = 0;
   baseMut.generation = species.generation;
   (species.forms as unknown as PokemonForm[]).push(baseForm);
+  const spriteSlug = ErCustomSpecies.getSpriteSlug(species.speciesId);
+  if (spriteSlug !== undefined) {
+    installErFormSpriteRedirect(baseForm, spriteSlug);
+  }
 }
 
 /**
@@ -543,24 +836,68 @@ function seedBaseForm(species: ReturnType<typeof getPokemonSpecies>): void {
  * form key so the mega is offered whatever form the base is currently in.
  */
 function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerFormsResult): void {
-  if (def.item === undefined) {
+  if (def.item === undefined && !def.manualTrigger) {
     return;
   }
   if (!pokemonFormChanges[def.baseSpecies]) {
     pokemonFormChanges[def.baseSpecies] = [];
   }
   const list = pokemonFormChanges[def.baseSpecies] as SpeciesFormChange[];
-  const species = getPokemonSpecies(def.baseSpecies);
+  const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
   const baseKeys = (species?.forms ?? [])
     .map(f => f.formKey ?? "")
     .filter(k => k !== def.formKey && !/mega|primal/.test(k));
   const preKeys = def.preFormKeys ?? (baseKeys.length > 0 ? [...new Set(baseKeys)] : [""]);
   for (const preKey of preKeys) {
-    if (list.some(fc => fc.preFormKey === preKey && fc.formKey === def.formKey)) {
-      continue;
+    const hasForwardEdge = list.some(fc => fc.preFormKey === preKey && fc.formKey === def.formKey);
+    if (!hasForwardEdge) {
+      const trigger = def.manualTrigger
+        ? new SpeciesFormChangeManualTrigger()
+        : new SpeciesFormChangeItemTrigger(def.item!);
+      const conditions = def.gender === undefined
+        ? []
+        : [new SpeciesFormChangeCondition(pokemon => pokemon.gender === def.gender)];
+      list.push(new SpeciesFormChange(def.baseSpecies as SpeciesId, preKey, def.formKey, trigger, false, ...conditions));
+      result.edgesRegistered++;
     }
-    list.push(new SpeciesFormChange(def.baseSpecies, preKey, def.formKey, new SpeciesFormChangeItemTrigger(def.item)));
-    result.edgesRegistered++;
+
+    // Calyrex keeps the rider's Reins modifier active while CALYRITE is
+    // active. Explicit, rider-conditioned inactive edges prevent
+    // initPokemonForms from creating two indistinguishable generic reverses.
+    if (
+      def.baseSpecies === SpeciesId.CALYREX
+      && def.formKey === "mega"
+      && def.item === FormChangeItem.CALYRITE
+      && (preKey === "ice" || preKey === "shadow")
+    ) {
+      const riderItem = preKey === "ice"
+        ? FormChangeItem.ICY_REINS_OF_UNITY
+        : FormChangeItem.SHADOW_REINS_OF_UNITY;
+      const hasReverseEdge = list.some(fc => fc.preFormKey === def.formKey && fc.formKey === preKey);
+      if (!hasReverseEdge) {
+        const riderCondition = new SpeciesFormChangeCondition(pokemon =>
+          !!globalScene.findModifier(
+            modifier =>
+              modifier instanceof PokemonFormChangeItemModifier
+              && modifier.pokemonId === pokemon.id
+              && modifier.formChangeItem === riderItem
+              && modifier.active,
+            pokemon.isPlayer(),
+          ),
+        );
+        list.push(
+          new SpeciesFormChange(
+            def.baseSpecies as SpeciesId,
+            def.formKey,
+            preKey,
+            new SpeciesFormChangeItemTrigger(FormChangeItem.CALYRITE, false),
+            false,
+            riderCondition,
+          ),
+        );
+        result.edgesRegistered++;
+      }
+    }
   }
 }
 
@@ -572,7 +909,7 @@ function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerForm
 export function injectNewcomerForms(): InjectNewcomerFormsResult {
   const result: InjectNewcomerFormsResult = { injected: 0, skippedExisting: 0, edgesRegistered: 0, errors: [] };
   for (const def of ER_NEWCOMER_FORMS) {
-    const species = getPokemonSpecies(def.baseSpecies);
+    const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
     if (!species) {
       result.errors.push(`newcomer form ${def.formName}: base species ${def.baseSpecies} not found`);
       continue;

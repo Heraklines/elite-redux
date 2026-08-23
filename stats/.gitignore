@@ -4,6 +4,7 @@ data/_runs.json
 data/_showdown.json
 data/species-stats.json
 data/usage-tiers.json
+data/leaderboards.json
 
 # Build output + local screenshots
 _stats_deploy/

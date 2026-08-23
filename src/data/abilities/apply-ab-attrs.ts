@@ -1,5 +1,9 @@
 import type { Ability } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
+import {
+  canApplyErEndlessAvalancheTrigger,
+  recordErEndlessAvalancheTrigger,
+} from "#data/elite-redux/er-endless-rift-runtime";
 import type {
   AbAttrBaseParams,
   AbAttrMap,
@@ -50,23 +54,42 @@ interface ApplyAbAttrConfig<T extends AbAttrString> {
    * Any {@linkcode AbAttr}s for which this returns `false` will be skipped during attribute application.
    */
   attrFilter?: AbAttrPredicate<T>;
+  /** The caller already obtained this source from getActiveAbilitySources(). */
+  sourceAlreadyActive?: boolean;
+  /** The already-resolved source, avoiding another passive-list lookup. */
+  sourceAbility?: Ability;
+  /** Classification carried by getActiveAbilitySources for Endless rift hooks. */
+  sourceIsEndlessAvalanche?: boolean;
 }
 
 function applySingleAbAttrs<T extends AbAttrString>(
   attrType: T,
   params: AbAttrParamMap[T],
-  { attrFilter = () => true, messages }: ApplyAbAttrConfig<T> = {},
+  {
+    attrFilter = () => true,
+    messages,
+    sourceAlreadyActive = false,
+    sourceAbility,
+    sourceIsEndlessAvalanche,
+  }: ApplyAbAttrConfig<T> = {},
 ) {
   const { simulated = false, passive = false, pokemon } = params;
   // ER 3-passive: resolve the requested slot. Default to slot 0 for callers
   // that set `passive: true` without specifying a slot (legacy behavior).
   const slot = params.passiveSlot ?? 0;
-  if (!pokemon.canApplyAbility(passive, slot)) {
-    return;
+  if (!sourceAlreadyActive) {
+    const sourceActive = sourceAbility
+      ? pokemon.canApplyAbilitySource(sourceAbility, passive, slot, false, false)
+      : pokemon.canApplyAbility(passive, slot);
+    if (!sourceActive) {
+      return;
+    }
   }
 
   let ability: Ability;
-  if (passive) {
+  if (sourceAbility) {
+    ability = sourceAbility;
+  } else if (passive) {
     const slotAbility = pokemon.getPassiveAbilities()[slot];
     if (!slotAbility) {
       // Empty slot — nothing to apply. Do NOT fall back to getPassiveAbility(),
@@ -76,22 +99,24 @@ function applySingleAbAttrs<T extends AbAttrString>(
       return;
     }
     ability = slotAbility;
-    // Defensive: avoid double-firing when this passive slot matches the active ability.
-    // For dispatches that arrive via applyAbAttrsInternal, this is redundant with the
-    // seenIds dedup in the loop above — but applySingleAbAttrs is also reachable
-    // directly (e.g. applyOnGainAbAttrs, applyPostFormChangeAbAttrs, applyOnLoseAbAttrs)
-    // with `passive: true`, so we keep this guard to preserve the legacy
-    // "no double-fire when active === passive" invariant for all entry points.
-    if (ability.id === pokemon.getAbility().id) {
-      return;
-    }
   } else {
     ability = pokemon.getAbility();
+  }
+  // Direct single-slot callers do not pass through the source-list dedup.
+  if (passive && ability.id === pokemon.getAbility().id) {
+    return;
   }
   const attrs = ability.getAttrs(attrType);
 
   for (const attr of attrs) {
     if (!attrFilter(attr)) {
+      continue;
+    }
+    const discreteAvalancheTrigger = attr.showAbility === true;
+    if (
+      !simulated
+      && !canApplyErEndlessAvalancheTrigger(pokemon, ability.id, discreteAvalancheTrigger, sourceIsEndlessAvalanche)
+    ) {
       continue;
     }
 
@@ -108,7 +133,7 @@ function applySingleAbAttrs<T extends AbAttrString>(
     let abShown = false;
 
     if (attr.showAbility && !simulated) {
-      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, true, slot);
+      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, true, slot, ability.id);
       abShown = true;
     }
 
@@ -123,9 +148,21 @@ function applySingleAbAttrs<T extends AbAttrString>(
 
     // The `as any` cast here uses the same reasoning as above.
     attr.apply(params as any);
+    if (
+      !simulated
+      && recordErEndlessAvalancheTrigger(
+        pokemon,
+        ability.id,
+        attr.constructor.name,
+        discreteAvalancheTrigger,
+        sourceIsEndlessAvalanche,
+      )
+    ) {
+      attr.apply(params as any);
+    }
 
     if (abShown) {
-      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, false, slot);
+      globalScene.phaseManager.queueAbilityDisplay(pokemon, passive, false, slot, ability.id);
     }
 
     if (!simulated) {
@@ -155,7 +192,15 @@ function applyAbAttrsInternal<T extends CallableAbAttrString>(
   for (const source of params.pokemon.getActiveAbilitySources()) {
     params.passive = source.passive;
     params.passiveSlot = source.passiveSlot;
-    applySingleAbAttrs(attrType, params, config);
+    // Real dispatches re-check dynamic suppression between sources, but use the
+    // already-resolved ability instead of rebuilding the entire Avalanche list.
+    // Simulations are read-only and can reuse the source-list result directly.
+    applySingleAbAttrs(attrType, params, {
+      ...config,
+      sourceAlreadyActive: params.simulated === true,
+      sourceAbility: source.ability,
+      sourceIsEndlessAvalanche: source.endlessAvalanche === true,
+    });
   }
 
   // Restore passive/passiveSlot if they were undefined on entry to allow re-use of parameter objects
@@ -196,11 +241,18 @@ export function applyPostSummonPassiveAbAttrs(pokemon: AbAttrBaseParams["pokemon
     if (!source.passive) {
       continue;
     }
-    applySingleAbAttrs("PostSummonAbAttr", {
-      pokemon,
-      passive: true,
-      passiveSlot: source.passiveSlot,
-    } as AbAttrParamMap["PostSummonAbAttr"]);
+    applySingleAbAttrs(
+      "PostSummonAbAttr",
+      {
+        pokemon,
+        passive: true,
+        passiveSlot: source.passiveSlot,
+      } as AbAttrParamMap["PostSummonAbAttr"],
+      {
+        sourceAbility: source.ability,
+        sourceIsEndlessAvalanche: source.endlessAvalanche === true,
+      },
+    );
   }
 }
 
@@ -238,7 +290,9 @@ export function applyPostFormChangeAbAttrs(params: Omit<AbAttrBaseParams, "passi
   const { pokemon } = params;
   const { formChangeAbilitiesApplied } = pokemon.turnData;
   const attrFilter = (attr: AbAttrMap["PostSummonAbAttr"]) =>
-    !attr.is("PostSummonFormChangeAbAttr") && !attr.is("PostSummonFormChangeByWeatherAbAttr");
+    attr.shouldActivateOnFormChange()
+    && !attr.is("PostSummonFormChangeAbAttr")
+    && !attr.is("PostSummonFormChangeByWeatherAbAttr");
 
   for (const source of pokemon.getActiveAbilitySources()) {
     if (formChangeAbilitiesApplied.has(source.ability.id)) {
@@ -250,7 +304,11 @@ export function applyPostFormChangeAbAttrs(params: Omit<AbAttrBaseParams, "passi
       passive: source.passive,
       passiveSlot: source.passiveSlot,
     } as AbAttrParamMap["PostSummonAbAttr"];
-    applySingleAbAttrs("PostSummonAbAttr", sourceParams, { attrFilter });
+    applySingleAbAttrs("PostSummonAbAttr", sourceParams, {
+      attrFilter,
+      sourceAbility: source.ability,
+      sourceIsEndlessAvalanche: source.endlessAvalanche === true,
+    });
   }
 }
 

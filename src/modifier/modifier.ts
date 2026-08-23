@@ -8,12 +8,19 @@ import { getBerryEffectFunc, getBerryPredicate } from "#data/berry";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { erIsHeldItemSuppressed } from "#data/elite-redux/abilities/item-suppression";
 import { claimCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
+import type { CoopWaveProgressionPresentationV2 } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { getErEndlessHeldItemCandidateIndex, hasErEndlessRift } from "#data/elite-redux/er-endless-continuation";
+import { applyErEndlessHealing } from "#data/elite-redux/er-endless-rift-runtime";
+import { canUseFunMegaStone, getFunRealMegaChange } from "#data/elite-redux/er-fun-mega-mode";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
+import { randomizePokemonMove } from "#data/elite-redux/er-move-randomizer";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
 import { clearErAilments, hasErAilment } from "#data/elite-redux/er-status-cure";
+import { isMoodyCoordinatorReviveAllowed } from "#data/elite-redux/moody/moody-coordinator-combat-state";
 import { getLevelTotalExp } from "#data/exp";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
@@ -25,6 +32,7 @@ import { BerryType } from "#enums/berry-type";
 import { Color, ShadowColor } from "#enums/color";
 import type { FormChangeItem } from "#enums/form-change-item";
 import { LearnMoveType } from "#enums/learn-move-type";
+import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import type { PokeballType } from "#enums/pokeball";
@@ -73,6 +81,9 @@ export const modifierSortFunc = (a: Modifier, b: Modifier): number => {
 export class ModifierBar extends Phaser.GameObjects.Container {
   private player: boolean;
   private modifierCache: PersistentModifier[];
+  private modifierPresentationSignature = "";
+  private readonly modifierIdentity = new WeakMap<PersistentModifier, number>();
+  private nextModifierIdentity = 1;
 
   constructor(enemy?: boolean) {
     super(globalScene, 1 + (enemy ? 302 : 0), 2);
@@ -87,8 +98,6 @@ export class ModifierBar extends Phaser.GameObjects.Container {
    * @param hideHeldItems - If set to "true", only modifiers not assigned to a Pokémon are displayed
    */
   updateModifiers(modifiers: PersistentModifier[], hideHeldItems = false) {
-    this.removeAll(true);
-
     const visibleIconModifiers = modifiers.filter(m => m.isIconVisible());
     const nonPokemonSpecificModifiers = visibleIconModifiers
       .filter(m => !(m as PokemonHeldItemModifier).pokemonId)
@@ -100,6 +109,33 @@ export class ModifierBar extends Phaser.GameObjects.Container {
     const sortedVisibleIconModifiers = hideHeldItems
       ? nonPokemonSpecificModifiers
       : nonPokemonSpecificModifiers.concat(pokemonSpecificModifiers);
+
+    const presentationSignature = `${hideHeldItems}:${sortedVisibleIconModifiers
+      .map(modifier => {
+        let identity = this.modifierIdentity.get(modifier);
+        if (identity === undefined) {
+          identity = this.nextModifierIdentity++;
+          this.modifierIdentity.set(modifier, identity);
+        }
+        const holder = modifier instanceof PokemonHeldItemModifier ? modifier.getPokemon() : undefined;
+        const holderAppearance = holder
+          ? `${holder.species.speciesId}:${holder.formIndex}:${holder.shiny}:${holder.variant}:${holder.fusionSpecies?.speciesId ?? ""}:${holder.fusionFormIndex}:${holder.fusionShiny}:${holder.fusionVariant}:${holder.customPokemonData?.erBlackShiny ?? false}`
+          : "";
+        return `${identity}:${modifier.type.id}:${modifier.stackCount}:${modifier.virtualStackCount}:${holderAppearance}`;
+      })
+      .join("|")}`;
+
+    // Updating stats can call this several times without changing the modifier
+    // presentation. Rebuilding every Phaser icon is especially expensive in
+    // long runs with large held-item inventories, so leave an identical bar in
+    // place. Object identity is part of the key to keep tooltip closures fresh
+    // after loading a save into replacement modifier instances.
+    if (presentationSignature === this.modifierPresentationSignature) {
+      this.modifierCache = modifiers;
+      return;
+    }
+
+    this.removeAll(true);
 
     sortedVisibleIconModifiers.forEach((modifier: PersistentModifier, i: number) => {
       const icon = modifier.getIcon();
@@ -128,6 +164,7 @@ export class ModifierBar extends Phaser.GameObjects.Container {
     }
 
     this.modifierCache = modifiers;
+    this.modifierPresentationSignature = presentationSignature;
   }
 
   updateModifierOverflowVisibility(ignoreLimit: boolean) {
@@ -730,6 +767,9 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     if (!pokemon || !(this.pokemonId === -1 || pokemon.id === this.pokemonId)) {
       return false;
     }
+    if (hasErEndlessRift("empty-hands") && !(this instanceof PokemonFormChangeItemModifier)) {
+      return false;
+    }
     // ER Frisk / Supersweet Syrup "disable held item" rider: the ER_ITEM_DISABLED
     // tag locks only the holder's FIRST item (not all - mons hold many here), so
     // suppress THIS item's effect only when it is the locked one. Mega Stones /
@@ -740,6 +780,12 @@ export abstract class PokemonHeldItemModifier extends PersistentModifier {
     // ER Negative Feedback (5923): a seeded held item is suppressed (no effect,
     // not removed) until end of the following turn.
     if (erIsHeldItemSuppressed(pokemon, this.type?.id)) {
+      return false;
+    }
+    // Klutz suppresses every held-item effect on its holder. Form-change items
+    // are identity triggers rather than battle bonuses and remain functional,
+    // matching ER's Mega Stone exception.
+    if (pokemon.hasAbility(AbilityId.KLUTZ) && !(this instanceof PokemonFormChangeItemModifier)) {
       return false;
     }
     return true;
@@ -887,6 +933,10 @@ export class BaseStatModifier extends PokemonHeldItemModifier {
 
   getArgs(): any[] {
     return super.getArgs().concat(this.stat);
+  }
+
+  getStat(): PermanentStat {
+    return this.stat;
   }
 
   /**
@@ -1983,6 +2033,9 @@ export class PokemonInstantReviveModifier extends PokemonHeldItemModifier {
    * @returns always `true`
    */
   override apply(pokemon: Pokemon): boolean {
+    if (!isMoodyCoordinatorReviveAllowed(pokemon.id)) {
+      return false;
+    }
     // Restore the Pokemon to half HP
     globalScene.phaseManager.unshiftNew(
       "PokemonHealPhase",
@@ -2181,7 +2234,11 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
    * @returns `true` if the {@linkcode PokemonHpRestoreModifier} should be applied
    */
   override shouldApply(playerPokemon?: PlayerPokemon, multiplier?: number): boolean {
-    return super.shouldApply(playerPokemon) && (this.fainted || (multiplier != null && typeof multiplier === "number"));
+    return (
+      super.shouldApply(playerPokemon)
+      && (!this.fainted || playerPokemon == null || isMoodyCoordinatorReviveAllowed(playerPokemon.id))
+      && (this.fainted || (multiplier != null && typeof multiplier === "number"))
+    );
   }
 
   /**
@@ -2191,6 +2248,9 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
    * @returns `true` if hp was restored
    */
   override apply(pokemon: Pokemon, multiplier: number): boolean {
+    if (this.fainted && !isMoodyCoordinatorReviveAllowed(pokemon.id)) {
+      return false;
+    }
     if (!pokemon.hp === this.fainted) {
       let restorePoints = this.restorePoints;
       if (!this.fainted) {
@@ -2206,14 +2266,12 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
         // a plain Potion counts. The item still restores its HP normally.
         pokemon.removeTag(BattlerTagType.ER_BLEED);
       }
-      pokemon.hp = Math.min(
-        pokemon.hp
-          + Math.max(
-            Math.ceil(Math.max(Math.floor(this.restorePercent * 0.01 * pokemon.getMaxHp()), restorePoints)),
-            1,
-          ),
-        pokemon.getMaxHp(),
+      const requested = Math.max(
+        Math.ceil(Math.max(Math.floor(this.restorePercent * 0.01 * pokemon.getMaxHp()), restorePoints)),
+        1,
       );
+      const restored = this.fainted ? applyErEndlessHealing(pokemon, requested, true).amount : requested;
+      pokemon.hp = Math.min(pokemon.hp + restored, pokemon.getMaxHp());
       // #900 Guardian Angel: reviving a co-op partner's fainted mon (pure local observer).
       // Lazily imported (fire-and-forget) so modifier.ts's module graph does NOT statically
       // pull the co-op/showdown chain, which would cycle back here (er-resist-berries extends
@@ -2352,6 +2410,23 @@ export class PokemonNatureChangeModifier extends ConsumablePokemonModifier {
     playerPokemon.setCustomNature(this.nature);
     globalScene.gameData.unlockSpeciesNature(playerPokemon.species, this.nature);
 
+    return true;
+  }
+}
+
+export class PokemonRandomizeMoveModifier extends ConsumablePokemonMoveModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    return randomizePokemonMove(playerPokemon, this.moveIndex);
+  }
+}
+
+export class ErGreaterMoveRandomizerModifier extends ConsumablePokemonMoveModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    globalScene.phaseManager.unshiftNew(
+      "ErGreaterMoveRandomizerPhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+      this.moveIndex,
+    );
     return true;
   }
 }
@@ -2578,6 +2653,10 @@ export class ErRelicModifier extends PersistentModifier {
 
   override add(modifiers: PersistentModifier[], virtual: boolean): boolean {
     const result = super.add(modifiers, virtual);
+    const enemyModifiers = new Set(globalScene.findModifiers(() => true, false));
+    if (modifiers.some(modifier => enemyModifiers.has(modifier))) {
+      return result;
+    }
     // catalog-v2 (#900) MUSEUM_QUALITY: acquiring a relic KIND (deduped in the persisted set). Lazy
     // import so the modifier module's static graph never pulls the achievement layer; fully guarded.
     try {
@@ -2974,6 +3053,17 @@ export class RememberMoveModifier extends ConsumablePokemonModifier {
 
 export class EvolutionItemModifier extends ConsumablePokemonModifier {
   public declare type: EvolutionItemModifierType;
+  /** Exact V2 successor permit supplied by the reward surface that constructed this consumable. */
+  public coopAllowNextWaveStart = false;
+  /** Exact retained reward operation whose immutable result must wait for the asynchronous evolution. */
+  public coopRewardOperationId: string | null = null;
+  /** Authority-only settlement hook. It captures the evolved post-image; it never runs on a replica replay. */
+  public coopSettleRewardEvolution:
+    | ((
+        presentation: Extract<CoopWaveProgressionPresentationV2, { readonly k: "evolution" }>,
+        requiresLearnMoveDecision: boolean,
+      ) => boolean)
+    | null = null;
   /**
    * Applies {@linkcode EvolutionItemModifier}
    * @param playerPokemon The {@linkcode PlayerPokemon} that should evolve via item
@@ -2996,7 +3086,17 @@ export class EvolutionItemModifier extends ConsumablePokemonModifier {
     }
 
     if (matchingEvolution) {
-      globalScene.phaseManager.unshiftNew("EvolutionPhase", playerPokemon, matchingEvolution, playerPokemon.level - 1);
+      globalScene.phaseManager.unshiftNew(
+        "EvolutionPhase",
+        playerPokemon,
+        matchingEvolution,
+        playerPokemon.level - 1,
+        true,
+        [],
+        this.coopAllowNextWaveStart,
+        this.coopRewardOperationId,
+        this.coopSettleRewardEvolution,
+      );
       return true;
     }
 
@@ -3367,6 +3467,7 @@ export class PokemonMultiHitModifier extends PokemonHeldItemModifier {
     moveId: MoveId,
     count: NumberHolder | null = null,
     damageMultiplier: NumberHolder | null = null,
+    target: Pokemon | null = null,
   ): boolean {
     const move = allMoves[moveId];
     /**
@@ -3378,7 +3479,7 @@ export class PokemonMultiHitModifier extends PokemonHeldItemModifier {
      * - Multi-target moves are not boosted *unless* they can only hit a single Pokemon
      * - Fling, Uproar, Rollout, Ice Ball, and Endeavor are not boosted
      */
-    if (!move.canBeMultiStrikeEnhanced(pokemon)) {
+    if (!move.canBeMultiStrikeEnhanced(pokemon, false, target)) {
       return false;
     }
 
@@ -3467,6 +3568,48 @@ export class PokemonFormChangeItemModifier extends PokemonHeldItemModifier {
    * @returns `true` if the form change item was applied
    */
   override apply(pokemon: Pokemon, active: boolean): boolean {
+    if (globalScene.gameMode.isFun && getFunModeConfig().megaMode) {
+      if (active) {
+        if (pokemon.customPokemonData.erFunMegaStone === this.formChangeItem) {
+          if (pokemon.customPokemonData.erFunPseudoMega) {
+            const hpRatio = pokemon.getMaxHp() > 0 ? pokemon.hp / pokemon.getMaxHp() : 1;
+            pokemon.calculateStats();
+            pokemon.hp = Math.max(1, Math.min(pokemon.getMaxHp(), Math.ceil(pokemon.getMaxHp() * hpRatio)));
+            void pokemon.updateInfo();
+          }
+          return true;
+        }
+        const realMega = getFunRealMegaChange(pokemon, this.formChangeItem);
+        if (!realMega && !canUseFunMegaStone(pokemon, this.formChangeItem)) {
+          return false;
+        }
+        pokemon.customPokemonData.erFunMegaStone = this.formChangeItem;
+        pokemon.customPokemonData.erFunPseudoMega = !realMega;
+        if (!realMega) {
+          const hpRatio = pokemon.getMaxHp() > 0 ? pokemon.hp / pokemon.getMaxHp() : 1;
+          pokemon.calculateStats();
+          pokemon.hp = Math.max(1, Math.min(pokemon.getMaxHp(), Math.ceil(pokemon.getMaxHp() * hpRatio)));
+          void pokemon.updateInfo();
+          return true;
+        }
+      } else if (pokemon.customPokemonData.erFunMegaStone === this.formChangeItem) {
+        const wasPseudo = pokemon.customPokemonData.erFunPseudoMega;
+        pokemon.customPokemonData.erFunMegaStone = undefined;
+        pokemon.customPokemonData.erFunPseudoMega = false;
+        if (wasPseudo) {
+          const hpRatio = pokemon.getMaxHp() > 0 ? pokemon.hp / pokemon.getMaxHp() : 1;
+          pokemon.calculateStats();
+          pokemon.hp = Math.max(1, Math.min(pokemon.getMaxHp(), Math.ceil(pokemon.getMaxHp() * hpRatio)));
+          void pokemon.updateInfo();
+          return true;
+        }
+      } else {
+        // An already-disabled Fun Mega stone is only being held. Removing or
+        // transferring it must not invoke the ordinary form-change registry.
+        return true;
+      }
+    }
+
     const switchActive = this.active && !active;
 
     if (switchActive) {
@@ -3485,6 +3628,14 @@ export class PokemonFormChangeItemModifier extends PokemonHeldItemModifier {
   getMaxHeldItemCount(_pokemon: Pokemon): number {
     return 1;
   }
+}
+
+/** Form stones are movable inventory in Fun Mega Mode without becoming stealable in battle. */
+export function isPlayerManagedHeldItemTransferable(modifier: PokemonHeldItemModifier): boolean {
+  return (
+    modifier.isTransferable
+    || (modifier instanceof PokemonFormChangeItemModifier && globalScene.gameMode.isFun && getFunModeConfig().megaMode)
+  );
 }
 
 export class MoneyRewardModifier extends ConsumableModifier {
@@ -3608,30 +3759,27 @@ export class MoneyInterestModifier extends PersistentModifier {
   }
 }
 
-export class HiddenAbilityRateBoosterModifier extends PersistentModifier {
+export class MysteryEventRateBoosterModifier extends PersistentModifier {
   match(modifier: Modifier): boolean {
-    return modifier instanceof HiddenAbilityRateBoosterModifier;
+    return modifier instanceof MysteryEventRateBoosterModifier;
   }
 
-  clone(): HiddenAbilityRateBoosterModifier {
-    return new HiddenAbilityRateBoosterModifier(this.type, this.stackCount);
+  clone(): MysteryEventRateBoosterModifier {
+    return new MysteryEventRateBoosterModifier(this.type, this.stackCount);
   }
 
-  /**
-   * Applies {@linkcode HiddenAbilityRateBoosterModifier}
-   * @param boost {@linkcode NumberHolder} holding the boost value
-   * @returns always `true`
-   */
   override apply(boost: NumberHolder): boolean {
-    boost.value *= Math.pow(2, -1 - this.getStackCount());
+    boost.value *= 2;
 
     return true;
   }
 
   getMaxStackCount(): number {
-    return 4;
+    return 1;
   }
 }
+
+export const HiddenAbilityRateBoosterModifier = MysteryEventRateBoosterModifier;
 
 export class ShinyRateBoosterModifier extends PersistentModifier {
   match(modifier: Modifier): boolean {
@@ -3839,10 +3987,27 @@ export abstract class HeldItemTransferModifier extends PokemonHeldItemModifier {
       if (itemModifiers.length === 0) {
         break;
       }
-      const randItemIndex = pokemon.randBattleSeedInt(itemModifiers.length);
+      const randomIndex = pokemon.randBattleSeedInt(itemModifiers.length);
+      const poolType = targetPokemon.isPlayer()
+        ? ModifierPoolType.PLAYER
+        : targetPokemon.hasTrainer()
+          ? ModifierPoolType.TRAINER
+          : ModifierPoolType.WILD;
+      const randItemIndex = getErEndlessHeldItemCandidateIndex(
+        itemModifiers,
+        randomIndex,
+        modifier => modifier.type.getOrInferTier(poolType) ?? 0,
+        modifier => modifier.stackCount,
+        modifier => modifier.type.id,
+      );
       const randItem = itemModifiers[randItemIndex];
+      const stackBefore = randItem.stackCount;
       if (globalScene.tryTransferHeldItemModifier(randItem, pokemon, false)) {
         transferredModifierTypes.push(randItem.type);
+        itemModifiers.splice(randItemIndex, 1);
+      } else if (randItem.stackCount < stackBefore && randItem.stackCount <= 0) {
+        // Ghost theft destroys the item and intentionally reports no transfer.
+        // Remove the exhausted local candidate so multi-steal items can proceed.
         itemModifiers.splice(randItemIndex, 1);
       }
     }
@@ -4553,6 +4718,7 @@ const ModifierClassMap = Object.freeze({
   MoneyRewardModifier,
   DamageMoneyRewardModifier,
   MoneyInterestModifier,
+  MysteryEventRateBoosterModifier,
   HiddenAbilityRateBoosterModifier,
   ShinyRateBoosterModifier,
   CriticalCatchChanceBoosterModifier,

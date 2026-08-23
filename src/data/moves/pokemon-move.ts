@@ -5,6 +5,8 @@
  */
 
 import { allMoves } from "#data/data-lists";
+import { canUseErEndlessMove } from "#data/elite-redux/er-endless-rift-runtime";
+import { isMoodyFormationMoveDisabled } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { ChallengeType } from "#enums/challenge-type";
 import { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
@@ -70,8 +72,12 @@ export class PokemonMove {
       return [false, i18next.t("battle:moveNotImplemented", { moveName: moveName.replace(" (N)", "") })];
     }
 
-    if (!ignorePp && this.isOutOfPp()) {
+    if (!ignorePp && !canUseErEndlessMove(pokemon, move, this.isOutOfPp())) {
       return [false, i18next.t("battle:moveNoPp", { moveName: move.name })];
+    }
+
+    if (isMoodyFormationMoveDisabled(pokemon, this.moveId)) {
+      return [false, i18next.t("battle:moveDisabled", { moveName: move.name })];
     }
 
     if (forSelection) {

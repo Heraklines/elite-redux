@@ -694,12 +694,12 @@ export function erRecordShinyLabLoadout(
 
 /**
  * Observer for Signature Style: winning a BOSS wave with a Pokemon that wears a named
- * Shiny Lab preset AND the name effect. Called from the wave-won hook; gated to boss
- * waves (every 10th). Reads each party mon's persisted Shiny Lab save directly.
+ * Shiny Lab preset AND the name effect. Called from the wave-won hook; gated to the
+ * active mode's boss waves. Reads each party mon's persisted Shiny Lab save directly.
  */
 export function erRecordSignatureStyleBossWin(): void {
   try {
-    if (globalScene.currentBattle.waveIndex % 10 !== 0) {
+    if (!globalScene.gameMode.isBoss(globalScene.currentBattle.waveIndex)) {
       return;
     }
     const gameData = globalScene.gameData;

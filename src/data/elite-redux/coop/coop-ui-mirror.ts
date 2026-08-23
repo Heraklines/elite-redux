@@ -31,8 +31,26 @@ import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-tra
 export interface CoopUiMirrorEngine {
   /** The currently-active UiMode (a `UiMode` enum int). */
   getMode(): number;
-  /** Replay one relayed owner button into the LOCAL active handler (watcher side). */
-  applyButton(button: number): void;
+  /**
+   * Replay one relayed owner button into the LOCAL active handler (watcher side).
+   * Returning `false` means the exact handler is present but not actionable yet; the
+   * mirror retains the FIFO entry and retries it after the renderer becomes ready.
+   * `void` remains accepted for engine-free compatibility surfaces that always apply.
+   */
+  applyButton(button: number): boolean | void;
+  /** Capture the active handler's absolute cosmetic state, when that handler supports it. */
+  captureState?(): readonly number[] | null;
+  /** Install an absolute cosmetic state on the watcher. `false` means the handler is not ready yet. */
+  applyState?(state: readonly number[]): boolean | void;
+}
+
+/** Reserved `uiInput.button` value for an absolute cosmetic-state checkpoint. */
+export const COOP_UI_MIRROR_STATE = -1;
+
+interface MirrorInput {
+  button: number;
+  mode: number;
+  state: readonly number[] | undefined;
 }
 
 type MirrorRole = "owner" | "watcher";
@@ -49,6 +67,10 @@ interface MirrorSession {
 
 /** Hard cap on buffered pre-session / future-session cursor buttons (cosmetic; oldest dropped). */
 const EARLY_BUFFER_CAP = 512;
+/** Renderer-ready retry cadence for an exact, mode-bound cosmetic input. */
+const WATCHER_READY_RETRY_MS = 50;
+/** Owner-side retry cadence while a freshly reopened handler is still animating. */
+const OWNER_STATE_READY_RETRY_MS = 50;
 
 /**
  * Rides a {@linkcode CoopTransport} to relay/replay cosmetic cursor input for a
@@ -75,10 +97,13 @@ export class CoopUiMirror {
   private engine: CoopUiMirrorEngine | null = null;
   private session: MirrorSession | null = null;
   /** Watcher: in-order inbox for the ACTIVE session, keyed by index `n`. */
-  private readonly inbox = new Map<number, { button: number; mode: number }>();
+  private readonly inbox = new Map<number, MirrorInput>();
   /** Buttons that arrived before our session began (or for a not-yet-active seq). */
-  private early: { seq: number; n: number; button: number; mode: number }[] = [];
+  private early: ({ seq: number; n: number } & MirrorInput)[] = [];
   private readonly offMessage: () => void;
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private ownerStateRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private deferredInputKey: string | null = null;
 
   constructor(transport: CoopTransport) {
     this.transport = transport;
@@ -98,8 +123,13 @@ export class CoopUiMirror {
     // reached. Treat an identical begin as a resume; a genuinely new interaction/reroll has a different seq.
     if (this.session?.role === role && this.session.mode === mode && this.session.seq === seq) {
       coopLog("interaction", `uiMirror resumeSession role=${role} mode=${mode} seq=${seq} n=${this.session.n}`);
+      if (role === "watcher") {
+        this.drain();
+      }
       return;
     }
+    this.clearRetryTimer();
+    this.clearOwnerStateRetryTimer();
     try {
       uiMirrorSessionHook?.(true, role);
     } catch {
@@ -112,7 +142,7 @@ export class CoopUiMirror {
       // Adopt anything that arrived before we opened, then drain in order.
       for (const e of this.early) {
         if (e.seq === seq) {
-          this.inbox.set(e.n, { button: e.button, mode: e.mode });
+          this.inbox.set(e.n, { button: e.button, mode: e.mode, state: e.state });
         }
       }
       this.early = this.early.filter(e => e.seq !== seq);
@@ -129,6 +159,9 @@ export class CoopUiMirror {
     }
     this.session = null;
     this.inbox.clear();
+    this.deferredInputKey = null;
+    this.clearRetryTimer();
+    this.clearOwnerStateRetryTimer();
   }
 
   /** Whether the mirror governs input for `currentMode` (false unless bound + matching). */
@@ -158,6 +191,45 @@ export class CoopUiMirror {
     this.transport.send({ t: "uiInput", seq: s.seq, n: s.n++, button, mode: modeBefore });
   }
 
+  /**
+   * OWNER: checkpoint the exact cursor state after a shared handler is (re)installed.
+   * Relative button replay cannot recover from different per-account cursor preferences or
+   * an owner-only nested screen; this ordered, cosmetic snapshot makes the next button start
+   * from the same visible location without becoming a mechanical authority path.
+   */
+  relayOwnerState(modeBefore: number): void {
+    const s = this.session;
+    if (s == null || s.role !== "owner") {
+      return;
+    }
+    const state = this.engine?.captureState?.();
+    if (state == null) {
+      this.clearOwnerStateRetryTimer();
+      this.ownerStateRetryTimer = setTimeout(() => {
+        this.ownerStateRetryTimer = null;
+        if (this.session === s && this.engine?.getMode() === modeBefore) {
+          this.relayOwnerState(modeBefore);
+        }
+      }, OWNER_STATE_READY_RETRY_MS);
+      return;
+    }
+    this.clearOwnerStateRetryTimer();
+    if (isCoopDebug()) {
+      coopLog(
+        "interaction",
+        `uiMirror OWNER state seq=${s.seq} n=${s.n} mode=${modeBefore} state=[${state.join(",")}]`,
+      );
+    }
+    this.transport.send({
+      t: "uiInput",
+      seq: s.seq,
+      n: s.n++,
+      button: COOP_UI_MIRROR_STATE,
+      mode: modeBefore,
+      state: [...state],
+    });
+  }
+
   /** Stop listening and clear all state. */
   dispose(): void {
     this.offMessage();
@@ -165,6 +237,9 @@ export class CoopUiMirror {
     this.inbox.clear();
     this.early = [];
     this.engine = null;
+    this.deferredInputKey = null;
+    this.clearRetryTimer();
+    this.clearOwnerStateRetryTimer();
   }
 
   private handle(msg: CoopMessage): void {
@@ -173,12 +248,12 @@ export class CoopUiMirror {
     }
     const s = this.session;
     if (s != null && s.role === "watcher" && msg.seq === s.seq) {
-      this.inbox.set(msg.n, { button: msg.button, mode: msg.mode });
+      this.inbox.set(msg.n, { button: msg.button, mode: msg.mode, state: msg.state });
       this.drain();
       return;
     }
     // Not our active session yet (we may open it momentarily) - buffer, bounded.
-    this.early.push({ seq: msg.seq, n: msg.n, button: msg.button, mode: msg.mode });
+    this.early.push({ seq: msg.seq, n: msg.n, button: msg.button, mode: msg.mode, state: msg.state });
     if (this.early.length > EARLY_BUFFER_CAP) {
       this.early.shift();
     }
@@ -195,24 +270,46 @@ export class CoopUiMirror {
       if (next === undefined) {
         break; // gap or empty -> wait for the missing index
       }
-      this.inbox.delete(s.n);
-      s.n += 1;
       // Resync barrier: only replay if the watcher's screen is still where the owner
       // was when they pressed it. If it drifted, drop the visual; the authoritative
       // choice-commit will snap the screen to the correct result.
       const liveMode = engine.getMode();
       if (liveMode === next.mode) {
-        if (isCoopDebug()) {
-          coopLog("interaction", `uiMirror WATCHER apply n=${s.n - 1} button=${next.button} mode=${next.mode}`);
-        }
         // DEFENSE-IN-DEPTH (#852): the mirror is COSMETIC (see the module header) - the
         // authoritative outcome is the choice-commit. A render/handler error while replaying a
         // relayed cursor button (e.g. a UI reader touching an unbuilt object) must NEVER kill the
         // watcher client: swallow it LOUDLY and keep the session alive. The screen continues with a
         // degraded (frozen-cursor) mirror; the choice-commit + anti-hang machinery heal the rest.
         try {
-          engine.applyButton(next.button);
+          const applied =
+            next.button === COOP_UI_MIRROR_STATE && next.state != null
+              ? engine.applyState?.(next.state)
+              : engine.applyButton(next.button);
+          if (applied === false) {
+            // The owner can become actionable before a CPU-dilated watcher finishes the same reward
+            // animation. Consuming this FIFO entry here permanently freezes the watcher's cursor.
+            // Retain the exact entry and retry only while this same mode-bound session remains live.
+            const deferredInputKey = `${s.seq}:${s.n}`;
+            if (isCoopDebug() && this.deferredInputKey !== deferredInputKey) {
+              coopLog("interaction", `uiMirror WATCHER DEFER n=${s.n} button=${next.button} mode=${next.mode}`);
+            }
+            this.deferredInputKey = deferredInputKey;
+            this.scheduleDrainRetry();
+            break;
+          }
+          this.inbox.delete(s.n);
+          s.n += 1;
+          this.deferredInputKey = null;
+          if (isCoopDebug()) {
+            coopLog("interaction", `uiMirror WATCHER apply n=${s.n - 1} button=${next.button} mode=${next.mode}`);
+          }
+          if (this.session !== s) {
+            break;
+          }
         } catch (e) {
+          this.inbox.delete(s.n);
+          s.n += 1;
+          this.deferredInputKey = null;
           coopWarn(
             "interaction",
             `uiMirror WATCHER applyButton threw (handled, session kept alive) n=${s.n - 1} button=${next.button} mode=${next.mode}`,
@@ -220,12 +317,44 @@ export class CoopUiMirror {
           );
         }
       } else if (isCoopDebug()) {
+        this.inbox.delete(s.n);
+        s.n += 1;
+        this.deferredInputKey = null;
         // Cosmetic drift drop (harmless; the choice-commit heals the screen) - still log it.
         coopLog(
           "interaction",
           `uiMirror WATCHER DROP n=${s.n - 1} button=${next.button} ownerMode=${next.mode} liveMode=${liveMode} (cursor drift)`,
         );
+      } else {
+        this.inbox.delete(s.n);
+        s.n += 1;
+        this.deferredInputKey = null;
       }
+    }
+  }
+
+  private scheduleDrainRetry(): void {
+    if (this.retryTimer != null) {
+      return;
+    }
+    this.retryTimer = setTimeout(() => {
+      this.retryTimer = null;
+      this.drain();
+    }, WATCHER_READY_RETRY_MS);
+  }
+
+  private clearRetryTimer(): void {
+    if (this.retryTimer == null) {
+      return;
+    }
+    clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+  }
+
+  private clearOwnerStateRetryTimer(): void {
+    if (this.ownerStateRetryTimer != null) {
+      clearTimeout(this.ownerStateRetryTimer);
+      this.ownerStateRetryTimer = null;
     }
   }
 }

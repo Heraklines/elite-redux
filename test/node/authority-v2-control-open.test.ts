@@ -8,17 +8,21 @@ import {
   buildCommandOpenEntry,
   buildInteractionOpenEntry,
   buildReplacementOpenEntry,
+  buildTrainerVictoryOpenEntry,
   type CoopCommandOpenMaterialV2,
   type CoopInteractionOpenMaterialV2,
   type CoopReplacementOpenMaterialV2,
+  type CoopTrainerVictoryOpenMaterialV2,
   classifyReplacementOpenCursor,
   commandOpenControlAddressesClaim,
   commandOpenMaterialDigest,
   decodeCommandOpenEntry,
   decodeInteractionOpenEntry,
   decodeReplacementOpenEntry,
+  decodeTrainerVictoryOpenEntry,
   interactionOpenMaterialDigest,
   replacementOpenMaterialDigest,
+  trainerVictoryOpenMaterialDigest,
 } from "#data/elite-redux/coop/authority-v2/adapters/control-open";
 import { isValidAuthorityEntry } from "#data/elite-redux/coop/authority-v2/authority-entry";
 import type {
@@ -146,6 +150,33 @@ function replacementMaterial(overrides: Partial<CoopReplacementOpenMaterialV2> =
     turn: 1,
     authoritativeState: state(),
     control: replacementControl(),
+    ...overrides,
+  };
+}
+
+function trainerVictoryMaterial(
+  overrides: Partial<CoopTrainerVictoryOpenMaterialV2> = {},
+): CoopTrainerVictoryOpenMaterialV2 {
+  return {
+    kind: "trainer-victory-open",
+    wave: 4,
+    turn: 2,
+    authoritativeState: state({ wave: 4, turn: 2 }),
+    trainerVictory: {
+      sourceWave: 4,
+      trainerType: 11,
+      moneyMultiplier: 1.5,
+      modifierRewardTypeIds: ["VOUCHER"],
+      isBoss: false,
+      hasCharSprite: true,
+      victoryBgm: "victory_trainer",
+      trainerSpriteKey: "ace_trainer",
+      trainerName: "Ace Ada",
+      trainerDialogueName: "Ada",
+      victoryMessages: ["A clean victory."],
+      biomeId: 3,
+      isErGhost: false,
+    },
     ...overrides,
   };
 }
@@ -381,6 +412,66 @@ describe("authority-v2 explicit command-open boundary", () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it("orders both renderers through trainer victory before the later settled wave entry", () => {
+    const operationId = "V2/CONTROL/TRAINER_VICTORY/e3/w4/t2/trainer11";
+    const successor = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: operationId,
+      epoch: context.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      allowedKinds: ["WAVE_ADVANCE", "TERMINAL_COMMIT"] as const,
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+    const open = trainerVictoryMaterial();
+    const committed = {
+      ...buildTrainerVictoryOpenEntry({ context, operationId, material: open, successor }),
+      revision: 6,
+    } satisfies CoopAuthorityEntry;
+    const resolvingTurnWait = {
+      kind: "AWAIT_SUCCESSOR" as const,
+      afterOperationId: "TURN/e3/w4/t1",
+      epoch: context.sessionEpoch,
+      wave: 4,
+      turn: 2,
+      allowedKinds: ["CONTROL_COMMIT", "WAVE_ADVANCE"] as const,
+      allowedControlAddresses: [
+        { materialKind: "replacement-open" as const, wave: 4, turn: 2, operationId: null },
+        { materialKind: "trainer-victory-open" as const, wave: 4, turn: 2, operationId: null },
+      ],
+      allowNextWaveStart: false,
+      expectedOperationId: null,
+    };
+
+    expect(committed.material.digest).toBe(trainerVictoryOpenMaterialDigest(open));
+    expect(committed.nextControl).toEqual(successor);
+    expect(isValidAuthorityEntry(committed)).toBe(true);
+    expect(controlAllowsSuccessorEntry(resolvingTurnWait, resolvingTurnWait.afterOperationId, committed)).toBe(true);
+    expect(
+      controlAllowsSuccessorEntry(
+        {
+          ...resolvingTurnWait,
+          allowedControlAddresses: [resolvingTurnWait.allowedControlAddresses[0]],
+        },
+        resolvingTurnWait.afterOperationId,
+        committed,
+      ),
+    ).toBe(false);
+    expect(decodeTrainerVictoryOpenEntry(committed)).toEqual(open);
+    expect(
+      decodeTrainerVictoryOpenEntry({
+        ...committed,
+        material: {
+          ...committed.material,
+          payload: trainerVictoryMaterial({
+            trainerVictory: { ...open.trainerVictory, sourceWave: 5 },
+          }),
+        },
+      }),
+    ).toBeNull();
   });
 
   it("rejects a Crossroads control whose recovery capsule or exact result address drifts", () => {

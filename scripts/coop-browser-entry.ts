@@ -20,13 +20,16 @@ const [
   {
     coopHostEngineDialogueMessageAdvanceAllowed,
     coopHostMeNarrationAwaitingGuestAck,
+    coopMePostBattleContinuationActive,
     getCoopNetcodeMode,
     getCoopRuntime,
     isCoopV2InteractionHumanInputFrozen,
   },
   { isCoopLocalPresentationInputSurface },
+  { coopLocalOverlayInputAllowed },
   { coopMeBespokeHostDrives, coopMeHandoffBattleStarted, coopMeInProgress, coopMeInteractionStartValue },
   { setCoopPresentationObserver },
+  { setCoopPlayerTrainerTransitionObserver },
   { setCoopWaveProgressionPresentationObserver },
   { setCoopPresentationHardWallMsForTest },
   { BattlerTagType },
@@ -45,8 +48,10 @@ const [
   import("../src/data/elite-redux/coop/coop-battle-checksum"),
   import("../src/data/elite-redux/coop/coop-runtime"),
   import("../src/data/elite-redux/coop/coop-local-presentation-input"),
+  import("../src/data/elite-redux/coop/coop-ui-registry"),
   import("../src/data/elite-redux/coop/coop-me-pin-state"),
   import("../src/data/elite-redux/coop/coop-turn-recorder"),
+  import("../src/data/elite-redux/coop/coop-trainer-transition-observer"),
   import("../src/data/elite-redux/coop/coop-wave-progression-observer"),
   import("../src/phases/coop-presentation-watchdog"),
   import("../src/enums/battler-tag-type"),
@@ -60,6 +65,7 @@ const [
   import("../src/enums/status-effect"),
   import("../src/enums/ui-mode"),
 ]);
+const { SummaryUiMode } = await import("../src/ui/handlers/summary-ui-handler");
 
 // The exact browser uses the same callbacks and 5s no-progress fence as production, but hosted SwiftShader
 // advances one asset frame per ~333ms instead of a real player's ~16ms. A valid long move such as Explosion
@@ -101,7 +107,68 @@ const DIGEST_PARTS_PREFIX = "[coop-browser:digest-parts] ";
 const PRESENTATION_PREFIX = "[coop-browser:presentation] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
+const TRAINER_TRANSITION_PREFIX = "[coop-browser:trainer-transition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
+
+/** Pixel-adjacent trainer state carried on every semantic UI observation in the sealed CI bundle. */
+function coopBrowserPresentationSnapshot() {
+  const playerTrainer = globalScene.trainer;
+  const enemyTrainer = globalScene.currentBattle?.trainer;
+  const enemyTrainerVisible = enemyTrainer?.visible === true;
+  const enemyTrainerAlpha = enemyTrainer?.alpha ?? 0;
+  const expectedPlayerFieldIds = globalScene
+    .getPlayerParty()
+    .slice(0, globalScene.currentBattle?.arrangement.playerCapacity ?? 0)
+    .filter(pokemon => !pokemon.isFainted())
+    .map(pokemon => pokemon.id);
+  const playerField = globalScene.field
+    .getAll()
+    .flatMap(candidate => {
+      const pokemon = candidate as Pokemon;
+      try {
+        if (!pokemon.isPlayer()) {
+          return [];
+        }
+        const sprite = pokemon.getSprite();
+        const info = pokemon.getBattleInfo();
+        return [
+          {
+            pokemonId: pokemon.id,
+            partySlot: globalScene.getPlayerParty().indexOf(pokemon),
+            visible: pokemon.visible === true,
+            alpha: pokemon.alpha,
+            spriteVisible: sprite?.visible === true,
+            spriteAlpha: sprite?.alpha ?? null,
+            infoVisible: info?.visible === true,
+            infoAlpha: info?.alpha ?? null,
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) => left.partySlot - right.partySlot || left.pokemonId - right.pokemonId);
+  const readyPlayerFieldIds = playerField
+    .filter(
+      pokemon =>
+        pokemon.visible
+        && pokemon.alpha > 0
+        && pokemon.spriteVisible
+        && (pokemon.spriteAlpha ?? 0) > 0
+        && pokemon.infoVisible
+        && (pokemon.infoAlpha ?? 0) > 0,
+    )
+    .map(pokemon => pokemon.pokemonId);
+  return {
+    trainerVisible: playerTrainer?.visible === true,
+    enemyTrainerVisible,
+    enemyTrainerAlpha,
+    enemyTrainerPresented: enemyTrainerVisible && enemyTrainerAlpha > 0.001,
+    expectedPlayerFieldIds,
+    playerField,
+    playerFieldReady: JSON.stringify(readyPlayerFieldIds) === JSON.stringify(expectedPlayerFieldIds),
+  } as const;
+}
 
 // Exact ordered presentation ledger. The authority callback runs synchronously after assigning the
 // event's immutable per-turn sequence; the renderer callback runs only when the matching presentation
@@ -162,6 +229,21 @@ setCoopPresentationObserver(observation => {
       }),
     );
   }
+});
+
+setCoopPlayerTrainerTransitionObserver(observation => {
+  const runtime = getCoopRuntime();
+  if (runtime == null || runtime.controller.role !== "guest") {
+    return;
+  }
+  console.info(
+    `${TRAINER_TRANSITION_PREFIX}${JSON.stringify({
+      version: 1,
+      role: runtime.controller.role,
+      epoch: runtime.controller.sessionEpoch,
+      ...observation,
+    })}`,
+  );
 });
 
 // Post-battle EXP, level, and evolution cues live in the retained WAVE_ADVANCE transaction rather than
@@ -243,6 +325,45 @@ function safeInnateIds(pokemon: Pokemon): number[] {
   }
 }
 
+/** Read-only active/innate applicability at slots 0..3, including permanent and run-only unlock gates. */
+function safeAbilitySlotActivity(pokemon: Pokemon): boolean[] {
+  try {
+    return [pokemon.canApplyAbility(), ...[0, 1, 2].map(slot => pokemon.canApplyAbility(true, slot))];
+  } catch {
+    return [];
+  }
+}
+
+/** Stable read-only projection of persistent modifiers attached to one party member. */
+function observedPokemonModifierStacks(pokemonId: number) {
+  return globalScene.modifiers
+    .flatMap(modifier => {
+      const projected = modifier as unknown as {
+        type?: { id?: string };
+        pokemonId?: number;
+        stackCount?: number;
+        getStackCount?: () => number;
+      };
+      if (projected.pokemonId !== pokemonId || typeof projected.type?.id !== "string") {
+        return [];
+      }
+      const stack = typeof projected.getStackCount === "function" ? projected.getStackCount() : projected.stackCount;
+      return [
+        {
+          typeId: projected.type.id,
+          className: modifier.constructor.name,
+          quantity: Number.isSafeInteger(stack) ? Math.max(0, stack ?? 0) : 0,
+        },
+      ];
+    })
+    .toSorted(
+      (left, right) =>
+        left.typeId.localeCompare(right.typeId)
+        || left.className.localeCompare(right.className)
+        || left.quantity - right.quantity,
+    );
+}
+
 function observedPokemon(pokemon: Pokemon, slot: number) {
   return {
     slot,
@@ -276,6 +397,7 @@ function observedPokemon(pokemon: Pokemon, slot: number) {
               pokemon.status.effect === StatusEffect.SLEEP ? (pokemon.status.sleepTurnsRemaining ?? null) : null,
           },
     fainted: pokemon.isFainted(),
+    modifierStacks: observedPokemonModifierStacks(pokemon.id),
     statStages: [...pokemon.summonData.statStages],
     moves: pokemon.moveset.map(move => ({
       move: move.moveId,
@@ -633,8 +755,13 @@ const COOP_REVIVAL_PHASES = new Set(["RevivalBlessingPhase", "CoopGuestRevivalPh
 // makes a successful public journey fail merely because the read-only observer sampled the handoff.
 const NON_INTERACTIVE_SEMANTIC_TRANSITION_PHASES = new Set(["EndEvolutionPhase"]);
 // SelectModifierPhase owns the reward UI, but the engine assigns it before EVOLUTION_SCENE has
-// finished closing. That exact phase/UI pair is a teardown sample, not an actionable reward surface.
-const NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set(["SelectModifierPhase:EVOLUTION_SCENE"]);
+// finished closing. A reward evolution can likewise queue LearnMovePhase while the preceding evolution
+// cutscene is still the visible handler. These exact phase/UI pairs are teardown samples, not actionable
+// reward/learn-move surfaces; the observer must wait for the real MODIFIER_SELECT/SUMMARY handler.
+const NON_INTERACTIVE_SEMANTIC_TRANSITION_PAIRS = new Set([
+  "SelectModifierPhase:EVOLUTION_SCENE",
+  "LearnMovePhase:EVOLUTION_SCENE",
+]);
 
 /**
  * Resolve surfaces whose owner is part of the immutable operation, rather than the alternating
@@ -741,6 +868,14 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       return { surfaceId: "auth:login-or-register", operationClass: "authentication", ownerModel: "local" };
     case "TITLE":
       return { surfaceId: "title-menu", operationClass: "navigation", ownerModel: "local" };
+    case "MENU":
+      return { surfaceId: "pause-menu", operationClass: "local-overlay", ownerModel: "local" };
+    case "SETTINGS":
+    case "SETTINGS_DISPLAY":
+    case "SETTINGS_AUDIO":
+    case "SETTINGS_GAMEPAD":
+    case "SETTINGS_KEYBOARD":
+      return { surfaceId: "pause-settings", operationClass: "local-overlay", ownerModel: "local" };
     case "COMMAND":
     case "FIGHT":
     case "BALL":
@@ -844,6 +979,9 @@ function classifySemanticSurface(phase: string, uiMode: string): SemanticSurface
       // Evolution is rendered twice from one authoritative result: EvolutionPhase owns the real
       // mutation and CoopWaveProgressionReplayPhase owns the mechanics-free retained presentation.
       // Both use EvolutionSceneUiHandler and both deliberately arm their own local completion prompt.
+      if (phase === "FormChangePhase" || phase === "CoopFormChangeCutsceneReplayPhase") {
+        return { surfaceId: "battle:form-change", operationClass: "battle-progress", ownerModel: "local" };
+      }
       return phase === "EvolutionPhase" || phase === "CoopWaveProgressionReplayPhase"
         ? { surfaceId: "battle:evolution", operationClass: "battle-progress", ownerModel: "local" }
         : null;
@@ -1122,9 +1260,63 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
       };
     }
   }
+  if (uiMode === "SUMMARY") {
+    const summaryHandler = handler as unknown as {
+      summaryUiMode?: unknown;
+      moveCursor?: unknown;
+      pokemon?: Pokemon;
+    };
+    if (
+      summaryHandler.summaryUiMode === SummaryUiMode.LEARN_MOVE
+      && Number.isSafeInteger(summaryHandler.moveCursor)
+      && summaryHandler.pokemon != null
+    ) {
+      const moveCursor = summaryHandler.moveCursor as number;
+      const moves = summaryHandler.pokemon.getMoveset();
+      const optionIds = [...moves.map((move, index) => `move:${move.moveId}:slot:${index}`), "learn-move:cancel"];
+      const selectedOptionId =
+        moveCursor >= 0 && moveCursor < moves.length
+          ? optionIds[moveCursor]
+          : moveCursor === summaryHandler.pokemon.getMaxMoveCount()
+            ? "learn-move:cancel"
+            : `learn-move:cursor:${moveCursor}`;
+      return {
+        selectedOptionId,
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
   if (uiMode === "MODIFIER_SELECT") {
-    const modOptions = (handler as unknown as { options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }> })
-      .options;
+    const modifierHandler = handler as unknown as {
+      rowCursor?: number;
+      options?: Array<{ modifierTypeOption?: { type?: { id?: string } } }>;
+      rerollButtonContainer?: { visible?: boolean };
+      transferButtonContainer?: { visible?: boolean };
+      checkButtonContainer?: { visible?: boolean };
+      lockRarityButtonContainer?: { visible?: boolean };
+    };
+    if (modifierHandler.rowCursor === 0) {
+      const actionByCursor = new Map<number, string>([
+        [0, "reward-action:reroll"],
+        [1, "reward-action:manage-items"],
+        [2, "reward-action:check-team"],
+        [3, "reward-action:lock-rarities"],
+      ]);
+      const optionIds = [
+        ...(modifierHandler.rerollButtonContainer?.visible === true ? ["reward-action:reroll"] : []),
+        ...(modifierHandler.transferButtonContainer?.visible === true ? ["reward-action:manage-items"] : []),
+        ...(modifierHandler.checkButtonContainer?.visible === true ? ["reward-action:check-team"] : []),
+        ...(modifierHandler.lockRarityButtonContainer?.visible === true ? ["reward-action:lock-rarities"] : []),
+      ];
+      return {
+        selectedOptionId:
+          selectedIndex == null ? null : (actionByCursor.get(selectedIndex) ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+    const modOptions = modifierHandler.options;
     if (Array.isArray(modOptions)) {
       const optionIds = modOptions.map((option, index) => option?.modifierTypeOption?.type?.id ?? `slot:${index}`);
       return {
@@ -1164,6 +1356,28 @@ function readSelection(handler: { getCursor(): number }, uiMode: string): Select
             : selectedIndex == null
               ? null
               : (optionIds[selectedIndex] ?? `cursor:${selectedIndex}`),
+        optionIds,
+        optionCount: optionIds.length,
+      };
+    }
+  }
+  if (uiMode === "ER_BARGAIN") {
+    const bargainHandler = handler as unknown as {
+      picker?: { options?: unknown[] } | null;
+    };
+    const pickerOptions = bargainHandler.picker?.options;
+    if (Array.isArray(pickerOptions) && pickerOptions.length > 0) {
+      // The Curiosity/Greater Ability Randomizer picker renders localized labels, so publish
+      // stable ordinals for its actual ability rows. Deliberately omit the trailing Cancel row:
+      // landing there must remain a visible driver failure instead of being mistaken for a choice.
+      const optionIds = pickerOptions.map((_option, index) => `er-bargain-picker:option:${index}`);
+      return {
+        selectedOptionId:
+          selectedIndex != null && selectedIndex >= 0 && selectedIndex < optionIds.length
+            ? optionIds[selectedIndex]
+            : selectedIndex == null
+              ? null
+              : "er-bargain-picker:cancel",
         optionIds,
         optionCount: optionIds.length,
       };
@@ -1555,16 +1769,37 @@ function observeSemanticSurface(): void {
       );
       const partySlots = globalScene.getPlayerParty().map((pokemon, slot) => ({
         slot,
+        pokemonId: pokemon.id,
         speciesId: pokemon.species.speciesId,
+        formIndex: pokemon.formIndex,
+        fusionSpeciesId: pokemon.fusionSpecies?.speciesId ?? null,
+        fusionFormIndex: pokemon.fusionSpecies == null ? null : pokemon.fusionFormIndex,
         coopOwner: pokemon.coopOwner ?? null,
         active: pokemon.isActive(true),
         fainted: pokemon.isFainted(),
         hp: pokemon.hp,
         maxHp: pokemon.getMaxHp(),
         level: pokemon.level,
+        exp: pokemon.exp,
+        statusEffect: pokemon.status?.effect ?? null,
+        abilityIndex: pokemon.abilityIndex,
         abilityId: pokemon.getAbility().id,
+        innateAbilityIds: safeInnateIds(pokemon),
+        abilitySlotActivity: safeAbilitySlotActivity(pokemon),
+        runUnlockedAbilitySlots: [...pokemon.customPokemonData.erRunUnlockedAbilitySlots].sort((a, b) => a - b),
         abilityActive: pokemon.canApplyAbility(),
         abilitySuppressed: pokemon.summonData.abilitySuppressed,
+        nature: pokemon.getNature(),
+        teraType: pokemon.teraType,
+        maxMoveCount: pokemon.getMaxMoveCount(),
+        bonusMoveSlots: pokemon.customPokemonData.bonusMoveSlots,
+        modifierStacks: observedPokemonModifierStacks(pokemon.id),
+        moves: pokemon.getMoveset().map(move => ({
+          moveId: move.moveId,
+          ppUsed: move.ppUsed,
+          ppUp: move.ppUp,
+          maxPpOverride: move.maxPpOverride ?? null,
+        })),
         pauseEvolutions: pokemon.pauseEvolutions,
         allowedInBattle: pokemon.isAllowedInBattle(),
         replacementEligible: false,
@@ -1600,16 +1835,14 @@ function observeSemanticSurface(): void {
         // The passive renderer must satisfy the same visible-HUD proof contract as an
         // actionable command surface. Omitting this field makes an otherwise valid
         // command watcher fail closed in the public two-browser oracle.
-        displayedWave: globalScene.getDisplayedBiomeWaveIndex(),
+        displayedWave: globalScene.getDisplayedBiomeWaveIndex() ?? null,
         mysteryEncounterType: battle.mysteryEncounter?.encounterType ?? null,
         arena: {
           biomeId: globalScene.arena?.biomeId ?? null,
           weather: globalScene.arena?.weather?.weatherType ?? 0,
           terrain: globalScene.arena?.terrain?.terrainType ?? 0,
         },
-        presentation: {
-          trainerVisible: globalScene.trainer?.visible === true,
-        },
+        presentation: coopBrowserPresentationSnapshot(),
         stateDigest,
         uiMode,
       } as const;
@@ -1819,7 +2052,7 @@ function observeSemanticSurface(): void {
     const moveSlots = readFightMoveSlots(uiMode);
     const starterGridCandidates = uiMode === "STARTER_SELECT" ? readStarterGridCandidates(handler) : null;
     const partySlots =
-      uiMode === "PARTY" || semantic.operationClass === "command"
+      runtime != null && battle != null
         ? globalScene.getPlayerParty().map((pokemon, slot) => {
             const active = pokemon.isActive(true);
             const fainted = pokemon.isFainted();
@@ -1830,16 +2063,37 @@ function observeSemanticSurface(): void {
               runtime?.controller.isVersusSession() === true || (localRole != null && coopOwner === localRole);
             return {
               slot,
+              pokemonId: pokemon.id,
               speciesId: pokemon.species.speciesId,
+              formIndex: pokemon.formIndex,
+              fusionSpeciesId: pokemon.fusionSpecies?.speciesId ?? null,
+              fusionFormIndex: pokemon.fusionSpecies == null ? null : pokemon.fusionFormIndex,
               coopOwner,
               active,
               fainted,
               hp: pokemon.hp,
               maxHp: pokemon.getMaxHp(),
               level: pokemon.level,
+              exp: pokemon.exp,
+              statusEffect: pokemon.status?.effect ?? null,
+              abilityIndex: pokemon.abilityIndex,
               abilityId: pokemon.getAbility().id,
+              innateAbilityIds: safeInnateIds(pokemon),
+              abilitySlotActivity: safeAbilitySlotActivity(pokemon),
+              runUnlockedAbilitySlots: [...pokemon.customPokemonData.erRunUnlockedAbilitySlots].sort((a, b) => a - b),
               abilityActive: pokemon.canApplyAbility(),
               abilitySuppressed: pokemon.summonData.abilitySuppressed,
+              nature: pokemon.getNature(),
+              teraType: pokemon.teraType,
+              maxMoveCount: pokemon.getMaxMoveCount(),
+              bonusMoveSlots: pokemon.customPokemonData.bonusMoveSlots,
+              modifierStacks: observedPokemonModifierStacks(pokemon.id),
+              moves: pokemon.getMoveset().map(move => ({
+                moveId: move.moveId,
+                ppUsed: move.ppUsed,
+                ppUp: move.ppUp,
+                maxPpOverride: move.maxPpOverride ?? null,
+              })),
               pauseEvolutions: pokemon.pauseEvolutions,
               allowedInBattle,
               replacementEligible: reserve && !active && !fainted && allowedInBattle && ownedReplacement,
@@ -1914,6 +2168,7 @@ function observeSemanticSurface(): void {
         netcodeMode: getCoopNetcodeMode(),
         meInProgress: coopMeInProgress(),
         meHandoffBattleStarted: coopMeHandoffBattleStarted(),
+        mePostBattleContinuationActive: coopMePostBattleContinuationActive(),
         meBespokeHostDrives: coopMeBespokeHostDrives(),
       });
     const interactiveMysteryPhase =
@@ -1928,9 +2183,17 @@ function observeSemanticSurface(): void {
       && interactiveMysteryPhase
       && coopHostMeNarrationAwaitingGuestAck(runtime);
     const localPresentationInput = isCoopLocalPresentationInputSurface(phase, uiMode);
+    // Production admits only a provenance-checked local pause/settings branch while its shared V2
+    // control remains installed underneath. Project the same decision so a two-browser journey cannot
+    // call a visible but frozen overlay actionable (the live wave-13 reward-menu softlock).
+    const localOverlayInput = coopLocalOverlayInputAllowed(ui.getMode(), ui.getModeChain());
     const v2SurfaceInputBlocked =
-      v2InputFrozen && !localPresentationInput && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
-    const inputBlocked = v2SurfaceInputBlocked || handlerInputBlocked === true ? true : handlerInputBlocked;
+      v2InputFrozen
+      && !localPresentationInput
+      && !localOverlayInput
+      && (!hostEngineDialogueAdvance || hostEngineDialogueBlockedByAck);
+    const inputBlocked =
+      v2SurfaceInputBlocked || handlerInputBlocked === true ? true : localOverlayInput ? false : handlerInputBlocked;
     const phaseAuthorityOperationId = (currentPhase as unknown as { coopV2ControlOperationId?: unknown })
       .coopV2ControlOperationId;
     const authorityAddress =
@@ -1962,7 +2225,10 @@ function observeSemanticSurface(): void {
       Number.isSafeInteger(promptGeneration) && (promptGeneration ?? 0) > 0
         ? (promptGeneration as number)
         : semanticPhaseInstance;
-    const displayedWave = globalScene.getDisplayedBiomeWaveIndex();
+    // Transitional UI modes (for example EVOLUTION_SCENE before its first visible HUD paint) legitimately
+    // have no parsed wave yet. Emit the schema's explicit null instead of letting JSON.stringify omit the
+    // required field and manufacture a fatal browser-evidence event.
+    const displayedWave = globalScene.getDisplayedBiomeWaveIndex() ?? null;
     const phasePartyIndex = (currentPhase as unknown as { partyIndex?: unknown }).partyIndex;
     const interactionTargetPartySlot =
       semantic.operationClass === "ability" && Number.isSafeInteger(phasePartyIndex) && (phasePartyIndex as number) >= 0
@@ -1986,12 +2252,14 @@ function observeSemanticSurface(): void {
     ].join("|");
     const stateDigest = coop && battle != null ? semanticMechanicalDigest(semanticDigestKey).digest : null;
 
+    const presentation = coopBrowserPresentationSnapshot();
     const probeKey = [
       semanticDigestKey,
       teamSpeciesIds?.join(",") ?? "",
       moveSlots == null ? "" : JSON.stringify(moveSlots),
       starterGridCandidates == null ? "" : JSON.stringify(starterGridCandidates),
       partySlots == null ? "" : JSON.stringify(partySlots),
+      JSON.stringify(presentation),
       stateDigest,
     ].join("|");
     const now = Date.now();
@@ -2039,9 +2307,7 @@ function observeSemanticSurface(): void {
         weather: globalScene.arena?.weather?.weatherType ?? 0,
         terrain: globalScene.arena?.terrain?.terrainType ?? 0,
       },
-      presentation: {
-        trainerVisible: globalScene.trainer?.visible === true,
-      },
+      presentation,
       // Every co-op UI-to-relay surface carries the same broad mechanical fingerprint used at
       // battle continuation boundaries. A Mystery/shop/prompt desync can no longer heal before
       // the next command and disappear from the two-browser evidence.
@@ -2267,22 +2533,43 @@ setInterval(() => {
 let lastHealthDomKeys = 0;
 let lastHealthFrame = -1;
 let lastHealthDownKeys = 0;
+let pendingInputSettleFrame = -1;
 let inputHealthSeq = 0;
 setInterval(() => {
   try {
     const snapshot = inputLayerSnapshot();
     const frameAdvancing = snapshot.frame !== lastHealthFrame;
     const domKeysChanged = snapshot.domKeys !== lastHealthDomKeys;
+    if (domKeysChanged) {
+      // A raw key can synchronously advance MESSAGE A into MESSAGE B inside one Phaser update. The
+      // browser driver must not spend B's key in that same update: production's input guards can quite
+      // correctly discard it, while an append-only semantic observer would otherwise mark B consumed
+      // forever. Keep one read-only receipt armed until the game's OWN frame counter crosses the keydown
+      // frame. This is pacing evidence only; it neither schedules nor advances the scene.
+      pendingInputSettleFrame = snapshot.keydownFrame;
+    }
     const heldFrameAdvanced = snapshot.downKeys > 0 && frameAdvancing;
     const holdStateChanged = snapshot.downKeys !== lastHealthDownKeys;
+    const inputFrameSettled =
+      pendingInputSettleFrame >= 0 && snapshot.downKeys === 0 && snapshot.frame > pendingInputSettleFrame;
     lastHealthFrame = snapshot.frame;
-    if (!domKeysChanged && !heldFrameAdvanced && !holdStateChanged) {
+    if (!domKeysChanged && !heldFrameAdvanced && !holdStateChanged && !inputFrameSettled) {
       return;
     }
     lastHealthDomKeys = snapshot.domKeys;
     lastHealthDownKeys = snapshot.downKeys;
     inputHealthSeq += 1;
-    console.info(`[coop-browser:input-health] ${JSON.stringify({ seq: inputHealthSeq, ...snapshot, frameAdvancing })}`);
+    console.info(
+      `[coop-browser:input-health] ${JSON.stringify({
+        seq: inputHealthSeq,
+        ...snapshot,
+        frameAdvancing,
+        inputFrameSettled,
+      })}`,
+    );
+    if (inputFrameSettled) {
+      pendingInputSettleFrame = -1;
+    }
   } catch {
     /* diagnostics only - never fail the observer */
   }

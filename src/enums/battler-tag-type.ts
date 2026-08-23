@@ -61,6 +61,7 @@ export enum BattlerTagType {
   IGNORE_FLYING = "IGNORE_FLYING",
   SALT_CURED = "SALT_CURED",
   CURSED = "CURSED",
+  ER_SLAB_CURSE = "ER_SLAB_CURSE",
   CHARGED = "CHARGED",
   ROOSTED = "ROOSTED",
   FLOATING = "FLOATING",
@@ -220,4 +221,12 @@ export enum BattlerTagType {
    * Attack (via a separate StatMultiplier) plus the move lock, per the 2.65 dex.
    */
   ER_SAGE_POWER_LOCK = "ER_SAGE_POWER_LOCK",
+  /** Fakemon pitch ability states. All lapse naturally when summonData resets on switch. */
+  ER_BLIND_JUSTICE = "ER_BLIND_JUSTICE",
+  ER_CONFECTED = "ER_CONFECTED",
+  ER_IRRADIATED_TOXIC = "ER_IRRADIATED_TOXIC",
+  ER_IRRADIATED_LOCK = "ER_IRRADIATED_LOCK",
+  ER_BREACHED = "ER_BREACHED",
+  ER_EMBEDDED = "ER_EMBEDDED",
+  ER_DECAY_POISON = "ER_DECAY_POISON",
 }

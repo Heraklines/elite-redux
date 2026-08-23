@@ -210,7 +210,7 @@ test("journey workflow enables the continuous two-parity contract and trace-off 
   );
   assert.match(
     campaign,
-    /cycleIndex:\s+policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0\s+\? turn - 1\s+: 0/u,
+    /const cycleCampaignMoves =[\s\S]*policy\.navigation\.required \|\| policy\.market\.requiredPurchases > 0 \|\| policy\.mysteryGauntlet\.required;[\s\S]*cycleIndex: cycleCampaignMoves \? turn - 1 : 0/u,
     "the market campaign cycles its sealed coverage moves instead of looping forever on an immunity",
   );
   assert.match(

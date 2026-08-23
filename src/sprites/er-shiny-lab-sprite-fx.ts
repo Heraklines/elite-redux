@@ -41,7 +41,11 @@ type PokemonLike = {
   formIndex: number;
   variant: Variant;
   shiny: boolean;
-  customPokemonData?: { erShinyLab?: ErShinyLabSavedLook | undefined; erShinyLabSuppressLocal?: boolean } | null;
+  customPokemonData?: {
+    erShinyLab?: ErShinyLabSavedLook | undefined;
+    erShinyLabSuppressLocal?: boolean;
+    erBlackShiny?: boolean | undefined;
+  } | null;
   summonData?: { illusion?: { formIndex?: number; variant?: Variant } | null };
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string;
   getBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string;
@@ -68,8 +72,8 @@ interface SpriteFxData {
   key?: string | null;
   sourceKey?: string | null;
   sourceFrame?: string | number | null;
-  sourceOriginX?: number;
-  sourceOriginY?: number;
+  sourceOriginX?: number | undefined;
+  sourceOriginY?: number | undefined;
   state?: string | undefined;
 }
 
@@ -83,14 +87,33 @@ interface ApplySpriteFxOptions {
 
 interface RenderedTextureApplyOptions {
   keyPrefix: string;
-  sourceWidth: number;
-  sourceHeight: number;
+  sourceBoxX: number;
+  sourceBoxY: number;
+  sourceBoxWidth: number;
+  sourceBoxHeight: number;
   sourceOriginX: number;
   sourceOriginY: number;
   cacheKey?: string;
 }
 
-type CachedSourcePixels = ErShinyLabSourcePixels & { frame: Phaser.Textures.Frame };
+type CachedSourcePixels = ErShinyLabSourcePixels & {
+  frame: Phaser.Textures.Frame;
+  sourceBoxX: number;
+  sourceBoxY: number;
+  sourceBoxWidth: number;
+  sourceBoxHeight: number;
+};
+
+export interface SourceFrameGeometry {
+  width: number;
+  height: number;
+  drawX: number;
+  drawY: number;
+  sourceBoxX: number;
+  sourceBoxY: number;
+  sourceBoxWidth: number;
+  sourceBoxHeight: number;
+}
 
 interface RenderTextureCacheEntry {
   textureKey: string;
@@ -99,6 +122,7 @@ interface RenderTextureCacheEntry {
 }
 
 const ER_SHINY_LAB_RENDER_TEXTURE_CACHE_MAX = 240;
+const ER_SHINY_LAB_SOURCE_PIXEL_CACHE_MAX = 192;
 const sourcePixelCache = new Map<string, CachedSourcePixels>();
 const renderTextureCache = new Map<string, RenderTextureCacheEntry>();
 const renderTextureKeyToCacheKey = new Map<string, string>();
@@ -220,9 +244,54 @@ function sourcePixelCacheKey(source: ErShinyLabSpriteSourceRef, frame: Phaser.Te
     frame.cutHeight,
     frame.width,
     frame.height,
+    frame.realWidth,
+    frame.realHeight,
     frame.x,
     frame.y,
   ].join("|");
+}
+
+export function getErShinyLabSourceFrameGeometry(frame: {
+  cutWidth?: number;
+  cutHeight?: number;
+  width?: number;
+  height?: number;
+  realWidth?: number;
+  realHeight?: number;
+  x?: number;
+  y?: number;
+}): SourceFrameGeometry {
+  const cutWidth = Math.max(0, Math.floor(frame.cutWidth ?? frame.width ?? 0));
+  const cutHeight = Math.max(0, Math.floor(frame.cutHeight ?? frame.height ?? 0));
+  const frameX = Math.floor(frame.x ?? 0);
+  const frameY = Math.floor(frame.y ?? 0);
+  const sourceBoxWidth = Math.max(0, Math.floor(frame.realWidth ?? frame.width ?? cutWidth));
+  const sourceBoxHeight = Math.max(0, Math.floor(frame.realHeight ?? frame.height ?? cutHeight));
+  const minX = Math.min(0, frameX);
+  const minY = Math.min(0, frameY);
+  const maxX = Math.max(sourceBoxWidth, frameX + cutWidth);
+  const maxY = Math.max(sourceBoxHeight, frameY + cutHeight);
+  return {
+    width: Math.max(0, maxX - minX),
+    height: Math.max(0, maxY - minY),
+    drawX: frameX - minX,
+    drawY: frameY - minY,
+    sourceBoxX: minX === 0 ? 0 : -minX,
+    sourceBoxY: minY === 0 ? 0 : -minY,
+    sourceBoxWidth,
+    sourceBoxHeight,
+  };
+}
+
+function cacheSourcePixels(cacheKey: string, pixels: CachedSourcePixels): void {
+  sourcePixelCache.set(cacheKey, pixels);
+  while (sourcePixelCache.size > ER_SHINY_LAB_SOURCE_PIXEL_CACHE_MAX) {
+    const oldestKey = sourcePixelCache.keys().next().value;
+    if (oldestKey === undefined) {
+      return;
+    }
+    sourcePixelCache.delete(oldestKey);
+  }
 }
 
 function renderTextureCacheKey(
@@ -235,9 +304,7 @@ function renderTextureCacheKey(
   return `${erShinyLabSpriteFxStateKey(source, look)}|pad=${pad}|t=${finiteTime.toFixed(2)}`;
 }
 
-export function readErShinyLabSpriteSourcePixels(
-  source: ErShinyLabSpriteSourceRef,
-): (ErShinyLabSourcePixels & { frame: Phaser.Textures.Frame }) | null {
+export function readErShinyLabSpriteSourcePixels(source: ErShinyLabSpriteSourceRef): CachedSourcePixels | null {
   try {
     if (typeof document === "undefined" || !globalScene.textures.exists(source.key)) {
       return null;
@@ -251,15 +318,15 @@ export function readErShinyLabSpriteSourcePixels(
     const cacheKey = sourcePixelCacheKey(source, frame);
     const cached = sourcePixelCache.get(cacheKey);
     if (cached) {
+      sourcePixelCache.delete(cacheKey);
+      sourcePixelCache.set(cacheKey, cached);
       return cached;
     }
 
     const cutWidth = Math.floor(frame.cutWidth ?? frame.width ?? image.width ?? 0);
     const cutHeight = Math.floor(frame.cutHeight ?? frame.height ?? image.height ?? 0);
-    const drawX = Math.floor(frame.x ?? 0);
-    const drawY = Math.floor(frame.y ?? 0);
-    const width = Math.max(Math.floor(frame.width ?? cutWidth), drawX + cutWidth, cutWidth);
-    const height = Math.max(Math.floor(frame.height ?? cutHeight), drawY + cutHeight, cutHeight);
+    const geometry = getErShinyLabSourceFrameGeometry(frame);
+    const { width, height, drawX, drawY } = geometry;
     if (width <= 0 || height <= 0) {
       return null;
     }
@@ -273,8 +340,17 @@ export function readErShinyLabSpriteSourcePixels(
     }
     ctx.clearRect(0, 0, width, height);
     ctx.drawImage(image, frame.cutX ?? 0, frame.cutY ?? 0, cutWidth, cutHeight, drawX, drawY, cutWidth, cutHeight);
-    const pixels = { width, height, data: ctx.getImageData(0, 0, width, height).data, frame };
-    sourcePixelCache.set(cacheKey, pixels);
+    const pixels = {
+      width,
+      height,
+      data: ctx.getImageData(0, 0, width, height).data,
+      frame,
+      sourceBoxX: geometry.sourceBoxX,
+      sourceBoxY: geometry.sourceBoxY,
+      sourceBoxWidth: geometry.sourceBoxWidth,
+      sourceBoxHeight: geometry.sourceBoxHeight,
+    };
+    cacheSourcePixels(cacheKey, pixels);
     return pixels;
   } catch {
     return null;
@@ -366,8 +442,10 @@ function applyRenderedTextureToSprite(
   if (!key) {
     return null;
   }
-  const originX = (rendered.padding + options.sourceOriginX * options.sourceWidth) / rendered.width;
-  const originY = (rendered.padding + options.sourceOriginY * options.sourceHeight) / rendered.height;
+  const originX =
+    (rendered.padding + options.sourceBoxX + options.sourceOriginX * options.sourceBoxWidth) / rendered.width;
+  const originY =
+    (rendered.padding + options.sourceBoxY + options.sourceOriginY * options.sourceBoxHeight) / rendered.height;
   sprite.setTexture(key).setOrigin(originX, originY);
   return key;
 }
@@ -414,19 +492,36 @@ export function getErShinyLabSavedLookForSpecies(speciesId: number, shiny: boole
 export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
   species: { speciesId: number };
   shiny: boolean;
-  customPokemonData?: { erShinyLab?: ErShinyLabSavedLook | undefined; erShinyLabSuppressLocal?: boolean } | null;
+  customPokemonData?: {
+    erShinyLab?: ErShinyLabSavedLook | undefined;
+    erShinyLabSuppressLocal?: boolean;
+    erBlackShiny?: boolean | undefined;
+  } | null;
 }): ErShinyLabSpriteFxLook | null {
   if (!pokemon.shiny) {
     return null;
   }
   const carriedLook = decodeErShinyLabSavedLook(pokemon.customPokemonData?.erShinyLab);
-  if (carriedLook) {
-    return carriedLook;
+  const look =
+    carriedLook
+    ?? (pokemon.customPokemonData?.erShinyLabSuppressLocal
+      ? null
+      : getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny));
+  if (!look?.loadout.palette || !pokemon.customPokemonData?.erBlackShiny) {
+    return look;
   }
-  if (pokemon.customPokemonData?.erShinyLabSuppressLocal) {
-    return null;
-  }
-  return getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny);
+
+  // Starter Select renders t4 from the authored black atlas and deliberately
+  // suppresses species palettes. Apply the same rule after launch: a saved or
+  // locally equipped red-shiny palette must not recolor a selected Black Shiny.
+  // Surface, aura, parameter, and name effects remain equipped.
+  return {
+    ...look,
+    loadout: {
+      ...look.loadout,
+      palette: null,
+    },
+  };
 }
 
 /**
@@ -547,11 +642,38 @@ export function erShinyLabSpriteFxStateKey(
   ].join("|");
 }
 
-export function getErShinyLabSpriteFxTime(): number {
+export function getErShinyLabBattleFxFrameMs(battlerCount: number, preserveSourceAnimation = false): number {
+  if (preserveSourceAnimation) {
+    return 100;
+  }
+  if (battlerCount >= 3) {
+    return 500;
+  }
+  if (battlerCount >= 2) {
+    return 250;
+  }
+  return 125;
+}
+
+/** Spread CPU-rendered overlays across frames when both triple sides summon together. */
+export function getErShinyLabBattleFxInitialDelayMs(battlerCount: number, battlerIndex: number): number {
+  if (battlerCount < 3) {
+    return 0;
+  }
+  const activeSlots = battlerCount * 2;
+  const slot = ((Math.floor(battlerIndex) % activeSlots) + activeSlots) % activeSlots;
+  return slot * 24;
+}
+
+export function getErShinyLabSpriteFxTime(frameMs = 100, loopMs = 0): number {
   const now =
     globalScene.time?.now
     ?? (typeof performance !== "undefined" && Number.isFinite(performance.now()) ? performance.now() : Date.now());
-  return Math.floor(now / 100) / 10;
+  const boundedFrameMs = Math.max(1, Math.floor(frameMs));
+  const frame = Math.floor(now / boundedFrameMs);
+  const loopFrames = Math.floor(loopMs / boundedFrameMs);
+  const displayFrame = loopFrames > 0 ? frame % loopFrames : frame;
+  return (displayFrame * boundedFrameMs) / 1000;
 }
 
 function baseVariantForPalette(look: ErShinyLabSpriteFxLook | null | undefined, variant: Variant): Variant {
@@ -657,6 +779,21 @@ export function clearErShinyLabSpriteFxTexture(sprite: Phaser.GameObjects.Sprite
   releaseGeneratedTexture(oldKey);
 }
 
+/**
+ * Fully retires a generated mini-sprite texture before the same UI slot is
+ * reused for another Pokemon. `clearErShinyLabSpriteFxTexture` deliberately
+ * remembers its source for recurring animation refreshes; reusable party slots
+ * must forget that source or a failed render can restore the previous species.
+ */
+export function resetErShinyLabSpriteFxTexture(sprite: Phaser.GameObjects.Sprite, restoreSource = true): void {
+  const data = spriteFxData(sprite);
+  clearErShinyLabSpriteFxTexture(sprite, restoreSource);
+  data.sourceKey = null;
+  data.sourceFrame = null;
+  data.sourceOriginX = undefined;
+  data.sourceOriginY = undefined;
+}
+
 export function applyErShinyLabSpriteFxTexture(
   sprite: Phaser.GameObjects.Sprite,
   look: ErShinyLabSpriteFxLook,
@@ -696,8 +833,10 @@ export function applyErShinyLabSpriteFxTexture(
   const sourceOriginY = data.sourceOriginY ?? sprite.originY;
   const key = applyRenderedTextureToSprite(sprite, rendered, {
     keyPrefix: options.keyPrefix,
-    sourceWidth: sourcePixels.width,
-    sourceHeight: sourcePixels.height,
+    sourceBoxX: sourcePixels.sourceBoxX,
+    sourceBoxY: sourcePixels.sourceBoxY,
+    sourceBoxWidth: sourcePixels.sourceBoxWidth,
+    sourceBoxHeight: sourcePixels.sourceBoxHeight,
     sourceOriginX,
     sourceOriginY,
     cacheKey: renderTextureCacheKey(source, look, renderPad, options.time ?? 0),
@@ -778,8 +917,10 @@ export class ErShinyLabSpriteFxOverlay {
     const oldKey = this.key;
     const key = applyRenderedTextureToSprite(this.sprite, rendered, {
       keyPrefix: this.keyPrefix,
-      sourceWidth: sourcePixels.width,
-      sourceHeight: sourcePixels.height,
+      sourceBoxX: sourcePixels.sourceBoxX,
+      sourceBoxY: sourcePixels.sourceBoxY,
+      sourceBoxWidth: sourcePixels.sourceBoxWidth,
+      sourceBoxHeight: sourcePixels.sourceBoxHeight,
       sourceOriginX: this.baseSprite.originX,
       sourceOriginY: this.baseSprite.originY,
       cacheKey: state,

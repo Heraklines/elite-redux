@@ -67,6 +67,33 @@ export async function waitForPublicInputDispatch(evidence, { from, domKeysBefore
   );
 }
 
+/** Wait until the game's own loop has crossed the frame that consumed this exact public key. */
+export async function waitForPublicInputFrameSettle(evidence, { from, domKeys, keydownFrame, timeoutMs = 5_000 }) {
+  let scanned = Math.max(0, from);
+  return evidence.waitForCondition(
+    sink => {
+      for (; scanned < sink.events.length; scanned += 1) {
+        const event = sink.events[scanned];
+        const observation = event?.kind === "browser-input-health" ? event.observation : null;
+        if (
+          observation == null
+          || observation.domKeys !== domKeys
+          || observation.downKeys !== 0
+          || observation.inputFrameSettled !== true
+          || observation.frameAdvancing !== true
+          || !Number.isFinite(observation.frame)
+          || observation.frame <= keydownFrame
+        ) {
+          continue;
+        }
+        return event;
+      }
+      return;
+    },
+    { timeoutMs, description: "public keyboard dispatch to cross one real Phaser frame" },
+  );
+}
+
 const SURFACE_PREFIX = "[coop-browser:surface] ";
 const SURFACE2_PREFIX = "[coop-browser:surface2] ";
 const BINDING_PREFIX = "[coop-browser:binding] ";
@@ -75,6 +102,7 @@ const MARKET_PREFIX = "[coop-browser:market] ";
 const COMMANDER_PREFIX = "[coop-browser:commander] ";
 const PRESENTATION_EVENT_PREFIX = "[coop-browser:presentation-event] ";
 const TRAINER_POSTCONDITION_PREFIX = "[coop-browser:trainer-postcondition] ";
+const TRAINER_TRANSITION_PREFIX = "[coop-browser:trainer-transition] ";
 const PROGRESSION_EVENT_PREFIX = "[coop-browser:progression-event] ";
 const SURFACES = new Set(["command", "replacement", "reward", "starter"]);
 
@@ -932,6 +960,51 @@ export function trainerPostconditionView(text) {
   return Object.freeze({ ...value, event: Object.freeze({ ...value.event }) });
 }
 
+/** Parse the exact positive player-trainer cue emitted by the signed guest encounter tail. */
+export function trainerTransitionView(text) {
+  if (!text.startsWith(TRAINER_TRANSITION_PREFIX)) {
+    return null;
+  }
+  let value;
+  try {
+    value = JSON.parse(text.slice(TRAINER_TRANSITION_PREFIX.length));
+  } catch (error) {
+    throw new Error("built browser emitted malformed trainer-transition JSON", { cause: error });
+  }
+  if (
+    !value
+    || typeof value !== "object"
+    || value.version !== 1
+    || value.role !== "guest"
+    || !Number.isSafeInteger(value.epoch)
+    || value.epoch <= 0
+    || !Number.isSafeInteger(value.wave)
+    || value.wave <= 1
+    || typeof value.trainerVisible !== "boolean"
+    || typeof value.trainerAlpha !== "number"
+    || !Number.isFinite(value.trainerAlpha)
+    || value.trainerPresented !== (value.trainerVisible && value.trainerAlpha > 0.001)
+    || value.trainerPresented !== true
+    || !Array.isArray(value.playerField)
+    || value.playerField.length === 0
+    || value.playerField.some(
+      pokemon =>
+        !Number.isSafeInteger(pokemon?.pokemonId)
+        || pokemon.pokemonId < 0
+        || pokemon.onField !== true
+        || pokemon.pokemonVisible !== false
+        || pokemon.spriteVisible !== false
+        || pokemon.infoVisible !== false,
+    )
+  ) {
+    throw new Error("built browser emitted an invalid trainer-transition observation");
+  }
+  return Object.freeze({
+    ...value,
+    playerField: Object.freeze(value.playerField.map(pokemon => Object.freeze({ ...pokemon }))),
+  });
+}
+
 /** Parse one exact retained wave-progression authority/renderer receipt. */
 export function progressionEventView(text) {
   if (!text.startsWith(PROGRESSION_EVENT_PREFIX)) {
@@ -973,6 +1046,10 @@ function recordBrowserObservations(sink, text) {
   const trainerPostcondition = trainerPostconditionView(text);
   if (trainerPostcondition != null) {
     sink.record("browser-trainer-postcondition", { observation: trainerPostcondition });
+  }
+  const trainerTransition = trainerTransitionView(text);
+  if (trainerTransition != null) {
+    sink.record("browser-trainer-transition", { observation: trainerTransition });
   }
   const progressionEvent = progressionEventView(text);
   if (progressionEvent != null) {
@@ -1060,6 +1137,40 @@ export function semanticSurfaceView(text) {
   const nullableDisplayedWave = wave => wave === null || (Number.isSafeInteger(wave) && wave > 0);
   const nullableStateDigest = digest =>
     digest === null || (typeof digest === "string" && /^[0-9a-f]{16}$/iu.test(digest) && digest !== CHECKSUM_SENTINEL);
+  const presentation = value?.presentation;
+  const playerField = presentation?.playerField;
+  const expectedPlayerFieldIds = presentation?.expectedPlayerFieldIds;
+  const validPlayerFieldEntry = entry =>
+    entry
+    && typeof entry === "object"
+    && Number.isSafeInteger(entry.pokemonId)
+    && entry.pokemonId >= 0
+    && Number.isSafeInteger(entry.partySlot)
+    && entry.partySlot >= 0
+    && typeof entry.visible === "boolean"
+    && typeof entry.alpha === "number"
+    && Number.isFinite(entry.alpha)
+    && typeof entry.spriteVisible === "boolean"
+    && (entry.spriteAlpha === null || (typeof entry.spriteAlpha === "number" && Number.isFinite(entry.spriteAlpha)))
+    && typeof entry.infoVisible === "boolean"
+    && (entry.infoAlpha === null || (typeof entry.infoAlpha === "number" && Number.isFinite(entry.infoAlpha)));
+  const derivedPlayerFieldReady =
+    Array.isArray(playerField)
+    && Array.isArray(expectedPlayerFieldIds)
+    && JSON.stringify(
+      playerField
+        .filter(
+          entry =>
+            validPlayerFieldEntry(entry)
+            && entry.visible
+            && entry.alpha > 0
+            && entry.spriteVisible
+            && (entry.spriteAlpha ?? 0) > 0
+            && entry.infoVisible
+            && (entry.infoAlpha ?? 0) > 0,
+        )
+        .map(entry => entry.pokemonId),
+    ) === JSON.stringify(expectedPlayerFieldIds);
   if (
     !value
     || typeof value !== "object"
@@ -1099,6 +1210,21 @@ export function semanticSurfaceView(text) {
     || !nullableMysteryEncounterType(value.mysteryEncounterType)
     || !nullableDisplayedWave(value.displayedWave)
     || !nullableStateDigest(value.stateDigest)
+    || (presentation != null
+      && (typeof presentation !== "object"
+        || typeof presentation.trainerVisible !== "boolean"
+        || typeof presentation.enemyTrainerVisible !== "boolean"
+        || typeof presentation.enemyTrainerAlpha !== "number"
+        || !Number.isFinite(presentation.enemyTrainerAlpha)
+        || typeof presentation.enemyTrainerPresented !== "boolean"
+        || presentation.enemyTrainerPresented
+          !== (presentation.enemyTrainerVisible && presentation.enemyTrainerAlpha > 0.001)
+        || !Array.isArray(expectedPlayerFieldIds)
+        || expectedPlayerFieldIds.some(pokemonId => !Number.isSafeInteger(pokemonId) || pokemonId < 0)
+        || !Array.isArray(playerField)
+        || playerField.some(entry => !validPlayerFieldEntry(entry))
+        || typeof presentation.playerFieldReady !== "boolean"
+        || presentation.playerFieldReady !== derivedPlayerFieldReady))
     || (value.coop && value.address.wave > 0 && (value.address.epoch < 1 || value.stateDigest === null))
     || (value.coop
       && (value.localSeat === null
@@ -1114,6 +1240,15 @@ export function semanticSurfaceView(text) {
     address: Object.freeze({ ...value.address }),
     seatsWithInput: Object.freeze([...value.seatsWithInput]),
     ready: Object.freeze({ ...value.ready }),
+    ...(value.presentation == null
+      ? {}
+      : {
+          presentation: Object.freeze({
+            ...value.presentation,
+            expectedPlayerFieldIds: Object.freeze([...value.presentation.expectedPlayerFieldIds]),
+            playerField: Object.freeze(value.presentation.playerField.map(entry => Object.freeze({ ...entry }))),
+          }),
+        }),
     ...(Array.isArray(value.connectionGenerations)
       ? { connectionGenerations: Object.freeze([...value.connectionGenerations]) }
       : {}),
@@ -1162,6 +1297,9 @@ export class EvidenceSink {
     this.events = [];
     this.failures = [];
     this.expectedSharedTerminalAfterGameOver = null;
+    // Once this client exposes TrainerVictory, its very next public surface must prove the defeated
+    // trainer is hidden. This catches the one-frame-later tween resurrection that state-only checks miss.
+    this.pendingTrainerVictoryCleanup = false;
     this.heartbeatOwnershipLossObserved = false;
     this.networkState = { account: null, lobby: null, coopRunStatus: null, apiFailure: null };
     this.writeTail = Promise.resolve();
@@ -1475,6 +1613,16 @@ export class EvidenceSink {
     );
   }
 
+  /** Find the signed guest's positive player-trainer cue at one destination wave. */
+  findTrainerTransition({ epoch = null, wave = null } = {}) {
+    return this.events.find(
+      event =>
+        event.kind === "browser-trainer-transition"
+        && (epoch == null || event.observation.epoch === epoch)
+        && (wave == null || event.observation.wave === wave),
+    );
+  }
+
   /** Latest render-profile observation regardless of value (proves the Settings menu is open). */
   findLastRenderProfileObservation(from = 0) {
     return this.events
@@ -1736,6 +1884,20 @@ export class EvidenceSink {
           const observed = this.record("browser-surface2", { observation: semantic });
           if (semantic.surfaceId === "unclassified" || semantic.surfaceId === "observer-fault") {
             this.failures.push(observed);
+          }
+          if (semantic.phase === "TrainerVictoryPhase") {
+            this.pendingTrainerVictoryCleanup = true;
+          } else if (this.pendingTrainerVictoryCleanup) {
+            this.pendingTrainerVictoryCleanup = false;
+            if (semantic.presentation?.enemyTrainerPresented) {
+              const staleTrainer = this.record("browser-trainer-victory-cleanup-invalid", {
+                phase: semantic.phase,
+                surfaceId: semantic.surfaceId,
+                address: semantic.address,
+                presentation: semantic.presentation,
+              });
+              this.failures.push(staleTrainer);
+            }
           }
         }
       } catch (error) {

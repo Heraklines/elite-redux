@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS system_saves (
   data       TEXT    NOT NULL,
   trainer_id INTEGER,
   secret_id  INTEGER,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  leaderboard_stats TEXT
 );
 
 -- Up to 5 session (run) saves per user, one per slot. Composite PK keeps an
@@ -83,13 +84,39 @@ CREATE TABLE IF NOT EXISTS runs (
   -- ER Ghost Trainer Editor: the uploader's authored presentation (sprite/name/
   -- title/dialogue/FX) JSON blob, applied by the encountering client. Nullable +
   -- additive (existing DBs get it via the lazy ALTER in ensureRunStatColumns).
-  presentation        TEXT
+  presentation        TEXT,
+  -- ER (relics): the run's active relics at capture. This is nullable for old
+  -- clients and is added lazily to existing DBs by ensureRunStatColumns.
+  relics              TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
 -- Ghost-pool fetch (handleRunSample) walks the (wave, rowid) keyset over EVERY
 -- eligible run; a (wave) index carries rowid implicitly so `ORDER BY wave, rowid`
 -- is served straight from it and only the eligible wave band is scanned.
 CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave);
+
+-- Idempotent, anonymized Endless ghost performance. The worker also creates
+-- these lazily so existing deployments require no manual migration.
+CREATE TABLE IF NOT EXISTS ghost_encounter_result_events (
+  event_id          TEXT PRIMARY KEY,
+  source_run_id     TEXT NOT NULL,
+  reporter_user_id  INTEGER NOT NULL,
+  result            TEXT NOT NULL,
+  player_kos        INTEGER NOT NULL,
+  player_hp_removed REAL NOT NULL,
+  turns_survived    INTEGER NOT NULL,
+  created_at        INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS ghost_run_performance (
+  source_run_id    TEXT PRIMARY KEY,
+  appearances     INTEGER NOT NULL DEFAULT 0,
+  wins            INTEGER NOT NULL DEFAULT 0,
+  player_kos_sum  INTEGER NOT NULL DEFAULT 0,
+  hp_removed_sum  REAL NOT NULL DEFAULT 0,
+  turns_sum       INTEGER NOT NULL DEFAULT 0,
+  updated_at      INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_ghost_performance_wins ON ghost_run_performance (wins, appearances);
 
 -- Shared dev TEST-SUITE progress (staging only). So the QA team doesn't re-run
 -- each other's scenarios: every Pass / Fail / Send-Logs from the in-game test

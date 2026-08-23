@@ -90,8 +90,8 @@ export class GameManager {
 
     // TODO: Figure out a way to optimize and re-use the same game manager for each test
 
-    // Re-use an existing `globalScene` if present, or else create a new scene from scratch.
-    if (globalScene) {
+    // Re-use only a real scene. No-isolate unit tests may leave a structural globalScene stub behind.
+    if (globalScene instanceof BattleScene) {
       this.scene = globalScene;
       this.phaseInterceptor = new PhaseInterceptor(this.scene);
       this.resetScene();
@@ -218,7 +218,7 @@ export class GameManager {
       const starters = generateStarters(this.scene, species);
       const selectStarterPhase = new SelectStarterPhase();
       this.scene.phaseManager.pushPhase(new EncounterPhase(false));
-      selectStarterPhase.initBattle(starters);
+      selectStarterPhase.initBattleFromCurrentPhase(starters);
     });
 
     // This will consider all battle entry dialog as seens and skip them
@@ -254,7 +254,7 @@ export class GameManager {
         const starters = generateStarters(this.scene, speciesIds);
         const selectStarterPhase = new SelectStarterPhase();
         this.scene.phaseManager.pushPhase(new EncounterPhase(false));
-        selectStarterPhase.initBattle(starters);
+        selectStarterPhase.initBattleFromCurrentPhase(starters);
       },
       () => this.isCurrentPhase("EncounterPhase"),
     );

@@ -13,17 +13,20 @@ import {
   assertAsymmetricLearnMoveProjection,
   assertRetainedEvolutionPresentationParity,
   chooseUntriedRewardOption,
+  classifyLearnMovePickerProgress,
   clientsAwaitingTurnProgress,
   createAnimationProgressBudget,
   createBattlePromptAdvancer,
   currentPairedBattleKind,
   driveBattleFallback,
+  driveLearnMoveDecline,
   findRegisteredSurface,
   findSharedSuccessorWavePresentation,
   hasPassiveBattleProgressSurface,
   hasProvisionalCommandWatcherSurface,
   hasProvisionalMysteryNarrationSurface,
   isExplicitEmptyRewardShop,
+  resetRewardRetrySurfaceLedger,
   resolveSurfaceOwner,
   waitForOutcomeBounded,
 } from "./campaign.mjs";
@@ -32,9 +35,58 @@ import { DuoPublicUiRig, PublicUiClient } from "./public-ui-harness.mjs";
 
 const root = resolve(import.meta.dirname, "../../..");
 
+test("learn-move accept pumps the finite native narration before requiring the Summary picker", () => {
+  const address = { epoch: 19, wave: 1, turn: 2 };
+  const base = {
+    address,
+    localSeat: 0,
+    ownerSeat: null,
+    seatsWithInput: [0],
+    ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: null },
+  };
+  assert.equal(
+    classifyLearnMovePickerProgress(
+      { ...base, surfaceId: "battle:message", phase: "LearnMovePhase", uiMode: "MESSAGE" },
+      address,
+      0,
+    ),
+    "advance",
+  );
+  assert.equal(
+    classifyLearnMovePickerProgress(
+      {
+        ...base,
+        surfaceId: "learn-move:confirm",
+        phase: "LearnMovePhase",
+        uiMode: "SUMMARY",
+        ownerSeat: 0,
+      },
+      address,
+      0,
+    ),
+    "ready",
+  );
+  assert.equal(
+    classifyLearnMovePickerProgress(
+      {
+        ...base,
+        surfaceId: "battle:message",
+        phase: "LearnMovePhase",
+        uiMode: "MESSAGE",
+        address: { ...address, turn: 3 },
+      },
+      address,
+      0,
+    ),
+    "wait",
+  );
+});
+
 class FakeEvidence {
-  constructor(texts = []) {
-    this.events = texts.map((text, index) => ({ index, text }));
+  constructor(entries = []) {
+    this.events = entries.map((entry, index) =>
+      typeof entry === "string" ? { index, text: entry } : { index, ...entry },
+    );
   }
 
   find(pattern, from = 0) {
@@ -150,15 +202,36 @@ function evolutionRig(hostLines, guestLines) {
 }
 
 test("retained evolution proof requires exact authority/renderer identity and depth coverage", () => {
-  const host = "[coop:progression] HOST progression capture wave=17 seq=3 k=evolution slot=0 species=1->2";
-  const guest = "[coop:progression] GUEST retained evolution complete wave=17 slot=0 species=1->2";
-  assert.deepEqual(assertRetainedEvolutionPresentationParity(evolutionRig([host], [guest]), { targetWaves: 30 }), {
-    authority: ["17:0:1->2"],
-    renderer: ["17:0:1->2"],
-    required: true,
+  const lifecycle = (stage, role, toSpeciesId = 2) => ({
+    kind: "browser-progression-event",
+    observation: {
+      stage,
+      role,
+      wave: 17,
+      event: { k: "evolution", partySlot: 0, fromSpeciesId: 1, toSpeciesId },
+    },
   });
+  const authority = lifecycle("authority-recorded", "host");
+  const renderer = lifecycle("renderer-completed", "guest");
+  // Deliberately reverse the harness labels: the lifecycle role, not the account label, owns the proof.
+  assert.deepEqual(
+    assertRetainedEvolutionPresentationParity(evolutionRig([renderer], [authority]), { targetWaves: 30 }),
+    {
+      authority: ["17:0:1->2"],
+      renderer: ["17:0:1->2"],
+      required: true,
+    },
+  );
   assert.throws(
-    () => assertRetainedEvolutionPresentationParity(evolutionRig([host], []), { targetWaves: 30 }),
+    () => assertRetainedEvolutionPresentationParity(evolutionRig([], [authority]), { targetWaves: 30 }),
+    /presentation mismatch/u,
+  );
+  assert.throws(
+    () =>
+      assertRetainedEvolutionPresentationParity(
+        evolutionRig([lifecycle("renderer-completed", "guest", 3)], [authority]),
+        { targetWaves: 30 },
+      ),
     /presentation mismatch/u,
   );
   assert.throws(
@@ -336,6 +409,50 @@ test("between-wave completion accepts both semantic command frontiers without le
   assert.equal(allClientsAtCurrentCommandFrontier(clients, { "seat-0": 0, "seat-1": 0 }), true);
 });
 
+test("between-wave completion accepts a skip-to-fight Mystery owner and its exact watcher", () => {
+  const address = { epoch: 73, wave: 2, turn: 1 };
+  const digest = "fun-and-games-command";
+  const owner = fakeClient("owner");
+  owner.publicSeat = 0;
+  owner.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:fight",
+      operationClass: "command",
+      phase: "CommandPhase",
+      uiMode: "FIGHT",
+      address,
+      stateDigest: digest,
+      localSeat: 0,
+      seatsWithInput: [0],
+      ready: { handlerActive: true },
+    },
+  });
+  const watcher = fakeClient("watcher");
+  watcher.publicSeat = 1;
+  watcher.evidence.events.push({
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "command:watcher",
+      operationClass: "command",
+      phase: "CoopReplayTurnPhase",
+      uiMode: "MESSAGE",
+      address,
+      stateDigest: digest,
+      localSeat: 1,
+      seatsWithInput: [],
+      ready: { handlerActive: false, awaitingActionInput: false, inputBlocked: true },
+    },
+  });
+
+  const clients = [owner, watcher];
+  const cursors = { owner: 0, watcher: 0 };
+  assert.equal(allClientsAtOwnedCommandFrontier([owner], { owner: 0 }), true);
+  assert.equal(allClientsAtCurrentCommandFrontier(clients, cursors), true);
+});
+
 test("between-wave completion accepts an exact partner-command wait after one half is wiped", () => {
   const waiting = fakeClient("waiting");
   waiting.publicSeat = 0;
@@ -465,6 +582,113 @@ test("a one-sided next-wave command does not preempt its partner's current learn
     true,
     "only the host's later current command projection admits the shared frontier proof",
   );
+});
+
+test("a projected learn-move decline accepts its committed successor without inventing a second confirmation", async () => {
+  const owner = fakeClient("owner");
+  const address = { epoch: 7, wave: 1, turn: 2 };
+  const ownerEvent = {
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "learn-move:confirm",
+      operationClass: "learn-move",
+      ownerModel: "interaction",
+      coop: true,
+      address,
+      localSeat: 1,
+      ownerSeat: 1,
+      seatsWithInput: [1],
+      phase: "CoopReplayLearnMovePhase",
+      phaseInstance: 24,
+      surfaceGeneration: null,
+      uiMode: "SUMMARY",
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  };
+  owner.evidence.events.push(ownerEvent);
+  owner.press = async (key, purpose) => {
+    owner.presses.push({ key, purpose });
+    if (key === "Backspace") {
+      owner.evidence.events.push({
+        index: owner.evidence.events.length,
+        kind: "browser-surface2",
+        observation: {
+          surfaceId: "battle:message",
+          operationClass: "battle-progress",
+          ownerModel: "local",
+          coop: true,
+          address: { epoch: 7, wave: 2, turn: 1 },
+          localSeat: 1,
+          seatsWithInput: [1],
+          phase: "NewBattlePhase",
+          phaseInstance: 25,
+          uiMode: "MESSAGE",
+          ready: { handlerActive: true, awaitingActionInput: false, inputBlocked: true },
+        },
+      });
+    }
+  };
+
+  await driveLearnMoveDecline({ config: { timeoutMs: 50 } }, owner, {
+    authority: ownerEvent.observation,
+    ownerEvent,
+  });
+
+  assert.deepEqual(owner.presses, [{ key: "Backspace", purpose: "campaign-learn-move-decline-replacement" }]);
+});
+
+test("an ordinary learn-move decline confirms a fresh stop-teaching prompt exactly once", async () => {
+  const owner = fakeClient("owner");
+  const address = { epoch: 7, wave: 1, turn: 2 };
+  const ownerEvent = {
+    index: 0,
+    kind: "browser-surface2",
+    observation: {
+      surfaceId: "learn-move:confirm",
+      operationClass: "learn-move",
+      ownerModel: "interaction",
+      coop: true,
+      address,
+      localSeat: 0,
+      ownerSeat: 0,
+      seatsWithInput: [0],
+      phase: "LearnMovePhase",
+      phaseInstance: 30,
+      surfaceGeneration: 1,
+      uiMode: "SUMMARY",
+      ready: { handlerActive: true, awaitingActionInput: null, inputBlocked: null },
+    },
+  };
+  owner.evidence.events.push(ownerEvent);
+  owner.press = async (key, purpose) => {
+    owner.presses.push({ key, purpose });
+    if (key === "Backspace") {
+      owner.evidence.events.push({
+        index: owner.evidence.events.length,
+        kind: "browser-surface2",
+        observation: {
+          ...ownerEvent.observation,
+          phaseInstance: 31,
+          surfaceGeneration: 2,
+          uiMode: "CONFIRM",
+          selectedOptionId: "confirm:no",
+          optionIds: ["confirm:yes", "confirm:no"],
+          ready: { handlerActive: true, awaitingActionInput: true, inputBlocked: false },
+        },
+      });
+    }
+  };
+
+  await driveLearnMoveDecline({ config: { timeoutMs: 50 } }, owner, {
+    authority: ownerEvent.observation,
+    ownerEvent,
+  });
+
+  assert.deepEqual(owner.presses, [
+    { key: "Backspace", purpose: "campaign-learn-move-decline-replacement" },
+    { key: "Space", purpose: "campaign-learn-move-stop:1" },
+  ]);
 });
 
 function fakeClient(label, texts = []) {
@@ -921,6 +1145,21 @@ test("an explicit empty reward pool is a real Continue surface, not an exhausted
   assert.equal(isExplicitEmptyRewardShop({ selectedOptionId: "REVIVE", optionIds: ["REVIVE"], optionCount: 1 }), false);
 });
 
+test("an exhausted party reward releases both nested appearances before selecting a second item", () => {
+  const clients = [{ label: "authority" }, { label: "renderer" }];
+  const handled = new Map([
+    ["reward:authority", "reward-one"],
+    ["reward:renderer", "reward-one-watcher"],
+    ["reward-target:authority", "party-one"],
+    ["reward-target:renderer", "party-one-watcher"],
+    ["mystery-encounter:authority", "unrelated-surface"],
+  ]);
+
+  resetRewardRetrySurfaceLedger(handled, clients);
+
+  assert.deepEqual([...handled], [["mystery-encounter:authority", "unrelated-surface"]]);
+});
+
 test("a legacy phase marker stops registering a semantic surface after a later phase supersedes it", () => {
   const authority = fakeClient("authority", [
     "Start Phase EggLapsePhase",
@@ -1211,10 +1450,55 @@ test("successor-address faint narration advances only after the browser observes
   assert.equal(await advance(), false, "one faint prompt generation receives exactly one action");
 });
 
-test("successor-address trainer victory advances only after the browser observes BattleEndPhase", async () => {
+test("paired immediate-successor command control authorizes its current turn-start message", async () => {
   const authority = fakeClient("authority");
   const renderer = fakeClient("renderer");
   const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 2, turn: 1 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 2, turn: 1 });
+  const advance = createBattlePromptAdvancer(rig, from, {}, "post-turn-command-frontier", {
+    expectedCommandAddress: "7:2:1",
+  });
+
+  authority.evidence.pushBattleReadiness("battle:message", "MessagePhase", true, 30, true, {
+    epoch: 7,
+    wave: 2,
+    turn: 2,
+  });
+  assert.equal(await advance(), false, "one browser advancing early cannot authorize a future-turn prompt");
+
+  renderer.evidence.pushBattleReadiness("command:watcher", "CoopReplayTurnPhase", false, 31, true, {
+    epoch: 7,
+    wave: 2,
+    turn: 2,
+  });
+  assert.equal(
+    await advance(),
+    true,
+    "the exact current N+1 message is actionable once its peer is the paired N+1 command watcher",
+  );
+  assert.deepEqual(
+    authority.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.deepEqual(renderer.presses, [], "the passive command watcher never receives speculative input");
+  assert.equal(await advance(), false, "the successor prompt generation receives one action only");
+});
+
+test("successor-address trainer victory survives authority-first human input skew", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const pressOrder = [];
+  authority.press = async function press(key, purpose) {
+    this.presses.push({ key, purpose });
+    pressOrder.push(this.label);
+  };
+  renderer.press = async function press(key, purpose) {
+    this.presses.push({ key, purpose });
+    pressOrder.push(this.label);
+  };
+  const rig = { host: authority, clients: { authority, renderer }, trainerVictoryStaggerMs: 0 };
   const from = { authority: 0, renderer: 0 };
   authority.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
   renderer.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
@@ -1235,12 +1519,27 @@ test("successor-address trainer victory advances only after the browser observes
     wave: 5,
     turn: 6,
   });
-  assert.equal(await advance(), true, "the exact trainer-victory prompt is a real human-action surface");
+  assert.equal(await advance(), false, "one-sided trainer victory cannot advance while its partner is parked");
+
+  // The authoritative renderer never executes BattleEndPhase. Its exact signed trainer-victory-open
+  // projection starts TrainerVictoryPhase directly; requiring a local structural marker would make the
+  // real two-browser driver ignore a healthy actionable prompt forever.
+  renderer.evidence.pushBattleReadiness("battle:message", "TrainerVictoryPhase", true, 31, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the exact paired trainer-victory prompts survive a staggered drive");
+  assert.deepEqual(pressOrder, ["authority", "renderer"], "the journey reproduces authority-first human skew");
   assert.deepEqual(
     authority.presses.map(entry => entry.key),
     ["Space"],
   );
-  assert.equal(await advance(), false, "one trainer-victory prompt generation receives exactly one action");
+  assert.deepEqual(
+    renderer.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(await advance(), false, "the paired trainer-victory generation receives exactly one action per browser");
 });
 
 test("successor-address trainer settlement drains money and modifier reward prompts", async () => {
@@ -1280,6 +1579,47 @@ test("successor-address trainer settlement drains money and modifier reward prom
     ["Space", "Space"],
   );
   assert.equal(await advance(), false, "each trainer-settlement prompt generation receives exactly one action");
+});
+
+test("the retained renderer drains account-local trainer rewards only after its exact V2 projection", async () => {
+  const authority = fakeClient("authority");
+  const renderer = fakeClient("renderer");
+  const rig = { host: authority, clients: { authority, renderer } };
+  const from = { authority: 0, renderer: 0 };
+  authority.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  renderer.evidence.pushCommandSurface({ epoch: 7, wave: 5, turn: 5 });
+  const advance = createBattlePromptAdvancer(rig, from, {}, "retained-renderer-trainer-settlement", {
+    expectedCommandAddress: "7:5:5",
+  });
+
+  renderer.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 50, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), false, "a renderer-local successor prompt has no authority from its phase name alone");
+
+  renderer.evidence.pushConsole("[coop:v2-control] projected ordered trainer victory rev=25 wave=4 turn=6");
+  renderer.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 51, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), false, "a trainer-victory projection from another wave remains fail-closed");
+
+  renderer.evidence.pushConsole("[coop:v2-control] projected ordered trainer victory rev=25 wave=5 turn=6");
+  renderer.evidence.pushBattleReadiness("battle:message", "ModifierRewardPhase", true, 52, true, {
+    epoch: 7,
+    wave: 5,
+    turn: 6,
+  });
+  assert.equal(await advance(), true, "the exact retained trainer-victory projection authorizes its voucher popup");
+  assert.deepEqual(authority.presses, [], "the authority has no prompt and receives no speculative input");
+  assert.deepEqual(
+    renderer.presses.map(entry => entry.key),
+    ["Space"],
+  );
+  assert.equal(await advance(), false, "the exact renderer prompt generation receives one action only");
 });
 
 test("battle prompt consumption survives helper recreation and stale ready surfaces never spend input", async () => {

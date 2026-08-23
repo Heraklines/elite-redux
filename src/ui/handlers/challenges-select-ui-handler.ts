@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import type { Challenge } from "#data/challenge";
-import { favourToShinyMultiplier, getRunShinyFavour } from "#data/elite-redux/er-shiny-favour";
+import { favourToIntegerRewardMultiplier, getRunFavourCap, getRunShinyFavour } from "#data/elite-redux/er-shiny-favour";
 import { Button } from "#enums/buttons";
 import { Challenges } from "#enums/challenges";
 import { Color, ShadowColor } from "#enums/color";
@@ -448,7 +448,7 @@ export class GameChallengesUiHandler extends UiHandler {
       return;
     }
     const favour = getRunShinyFavour();
-    const multiplier = favourToShinyMultiplier(favour);
+    const multiplier = favourToIntegerRewardMultiplier(favour, getRunFavourCap());
     const show = favour > 0;
     this.favourIcon.setVisible(show);
     this.favourCandyIcon.setVisible(show);
@@ -457,7 +457,7 @@ export class GameChallengesUiHandler extends UiHandler {
       // The favour multiplier applies equally to shiny odds AND candy gain, so a
       // single rate covers both; the shiny-star + candy icons to its left echo
       // what's boosted. Right-aligned: text first, then icons leftward.
-      this.favourText.setText(`Favour ${favour}  Shiny/Candy x${multiplier.toFixed(1)}`);
+      this.favourText.setText(`Favour ${favour}  Shiny/Candy x${multiplier}`);
       this.favourIcon.setX(this.favourText.x - this.favourText.displayWidth - 3);
       this.favourCandyIcon.setX(this.favourIcon.x - this.favourIcon.displayWidth - 2);
     }

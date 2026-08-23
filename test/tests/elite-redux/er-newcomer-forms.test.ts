@@ -24,13 +24,18 @@ import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allAbilities } from "#data/data-lists";
 import { isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { ER_NEWCOMER_FORMS } from "#data/elite-redux/er-newcomer-forms";
+import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { AbilityId } from "#enums/ability-id";
+import { FormChangeItem } from "#enums/form-change-item";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
+import type { PokemonFormChangeItemModifier } from "#modifiers/modifier";
+import { FormChangeItemModifierType } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
+import { PartyUiHandler } from "#ui/handlers/party-ui-handler";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -52,9 +57,9 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
 
   it("every wired form's active + innate kit resolves to real abilities, with correct stats/typing", () => {
     for (const def of ER_NEWCOMER_FORMS) {
-      const species = getPokemonSpecies(def.baseSpecies);
+      const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
       const form = species.forms.find(f => f.formKey === def.formKey);
-      expect(form, `${def.formName} form injected on ${SpeciesId[def.baseSpecies]}`).toBeDefined();
+      expect(form, `${def.formName} form injected on ${SpeciesId[def.baseSpecies as SpeciesId]}`).toBeDefined();
       if (!form) {
         continue;
       }
@@ -90,7 +95,7 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
         continue;
       }
       expect(isErMegaStone(def.item), `${def.formName} stone is an ER mega stone`).toBe(true);
-      const species = getPokemonSpecies(def.baseSpecies);
+      const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
       // The live non-mega base form keys the edge's preFormKey must match (both the
       // Pokedex form list and the reward generator key on preFormKey === current
       // form key). Hardcoding "" broke Xerneas (base forms neutral/active).
@@ -132,10 +137,12 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     expect(moves.some(([, moveId]) => moveId === MoveId.LEAF_BLADE)).toBe(true);
   });
 
-  it("covers all 20 newcomer and Alpha forms incl. the additive mega-z rows", () => {
-    // 17 batch-1/Alpha forms + 3 batch-2 forms (Metagross Battle Bond,
-    // Yveltal Mega Z, Mega Luxray Y).
-    expect(ER_NEWCOMER_FORMS).toHaveLength(20);
+  it("covers all 42 newcomer, Partner, and Alpha forms incl. the additive mega-z rows", () => {
+    // 28 existing newcomer/Alpha/Discord/Power Plant forms plus Mega Calyrex,
+    // Mega Hypno, gender-split Mega Alolan Raichu, Mega Barbaracle Y, Mega
+    // Verdant Lilligant, Mega Lilligant Verdant, and Corrupted Uxie.
+    // The BerNerd batch adds Partner Rowlet/Onix/Gimmighoul and four megas.
+    expect(ER_NEWCOMER_FORMS).toHaveLength(42);
 
     // Mega Skarmory Z is ADDITIVE: it does not disturb the existing ER Mega
     // Skarmory Y, and lands on a distinct `mega-z` formIndex.
@@ -174,8 +181,171 @@ describe.skipIf(!RUN)("ER newcomer mega form-injection seam", () => {
     const megaEdge = (pokemonFormChanges[SpeciesId.FIDOUGH] ?? []).find(fc => fc.formKey === "mega");
     expect(megaEdge?.preFormKey).toBe("partner");
 
+    for (const [speciesId, slug] of [
+      [SpeciesId.ROWLET, "rowlet_partner"],
+      [SpeciesId.ONIX, "onix_partner"],
+      [SpeciesId.GIMMIGHOUL, "gimmighoul_partner"],
+    ] as const) {
+      const species = getPokemonSpecies(speciesId);
+      const partnerFormIndex = species.forms.findIndex(form => form.formKey === "partner");
+      expect(partnerFormIndex, `${slug} partner form`).toBeGreaterThan(0);
+      expect(species.forms[partnerFormIndex].isStarterSelectable).toBe(true);
+      expect(species.getSpriteAtlasPath(false, partnerFormIndex)).toBe(`elite-redux/${slug}/front`);
+      expect(species.getSpriteAtlasPath(false, partnerFormIndex, false, 0, true)).toBe(`elite-redux/${slug}/back`);
+      expect(species.getIconAtlasKey(partnerFormIndex)).toBe(`er_icon__${slug}`);
+      // Cycling back to form 0 must restore the ordinary species sprite path.
+      expect(species.getSpriteAtlasPath(false, 0)).not.toContain(slug);
+    }
+
     const lucarioZ = getPokemonSpecies(SpeciesId.LUCARIO).forms.find(f => f.formKey === "mega");
     expect(lucarioZ?.formName).toBe("Mega Z");
     expect(lucarioZ?.type2).toBe(PokemonType.ELECTRIC);
+  });
+  it("matches the source-backed form contracts and preserves Barbaracle's generic mega", () => {
+    const expected = [
+      {
+        slug: "calyrex_chariot_mega",
+        formName: "Mega",
+        baseSpecies: SpeciesId.CALYREX,
+        formKey: "mega",
+        types: [PokemonType.GRASS, PokemonType.PSYCHIC, PokemonType.ICE, PokemonType.GHOST],
+        stats: [100, 155, 135, 155, 135, 100],
+        actives: [5158, 231, AbilityId.STAMINA],
+        innates: [6054, 6055, 5259],
+        item: FormChangeItem.CALYRITE,
+        preFormKeys: ["ice", "shadow"],
+      },
+      {
+        slug: "hypno_mega",
+        baseSpecies: SpeciesId.HYPNO,
+        formKey: "mega",
+        types: [PokemonType.PSYCHIC],
+        stats: [95, 73, 124, 120, 150, 73],
+        actives: [6056, AbilityId.BAD_DREAMS, AbilityId.PSYCHIC_SURGE],
+        innates: [6057, 5043, 6058],
+        item: FormChangeItem.HYPNITE,
+      },
+      {
+        slug: "raichu_alolan_mega_male",
+        baseSpecies: SpeciesId.ALOLA_RAICHU,
+        formKey: "mega-male",
+        types: [PokemonType.ELECTRIC, PokemonType.PSYCHIC],
+        stats: [60, 125, 80, 105, 95, 125],
+        actives: [6059, 6059, 6059],
+        innates: [6061, 6062, 6063],
+        item: FormChangeItem.ALORAICHUNITE,
+        gender: Gender.MALE,
+      },
+      {
+        slug: "raichu_alolan_mega_female",
+        baseSpecies: SpeciesId.ALOLA_RAICHU,
+        formKey: "mega-female",
+        types: [PokemonType.ELECTRIC, PokemonType.PSYCHIC],
+        stats: [60, 105, 70, 115, 95, 145],
+        actives: [6060, 6060, 6060],
+        innates: [6061, 6062, 6063],
+        item: FormChangeItem.ALORAICHUNITE,
+        gender: Gender.FEMALE,
+      },
+      {
+        slug: "barbaracle_mega_y",
+        baseSpecies: SpeciesId.BARBARACLE,
+        formKey: "mega-y",
+        types: [PokemonType.ROCK, PokemonType.PSYCHIC],
+        stats: [72, 88, 130, 140, 106, 64],
+        actives: [6075, AbilityId.LIMBER, AbilityId.PSYCHIC_SURGE],
+        innates: [6076, 6077, AbilityId.SOLID_ROCK],
+        item: FormChangeItem.BARBARACITE_Y,
+      },
+      {
+        slug: "lilligant_verdant_mega",
+        baseSpecies: 70057,
+        formKey: "mega",
+        types: [PokemonType.WATER, PokemonType.FAIRY, PokemonType.GHOST],
+        stats: [90, 50, 101, 129, 120, 110],
+        actives: [6071, 6078, 6072],
+        innates: [5596, 6073, 6074],
+        item: FormChangeItem.LILLIGANITE_VERDANT,
+      },
+      {
+        slug: "uxie_corrupted",
+        baseSpecies: SpeciesId.UXIE,
+        formKey: "primal",
+        types: [PokemonType.PSYCHIC, PokemonType.DARK],
+        stats: [75, 125, 130, 125, 130, 95],
+        actives: [5224, AbilityId.MOODY, 5158],
+        innates: [5464, 5314, 5475],
+        item: FormChangeItem.DISTORTED_CHAIN,
+      },
+    ] as const;
+
+    for (const contract of expected) {
+      const def = ER_NEWCOMER_FORMS.find(candidate => candidate.slug === contract.slug);
+      expect(def, `${contract.slug} definition`).toBeDefined();
+      expect(def).toMatchObject(contract);
+    }
+
+    const barbaracle = getPokemonSpecies(SpeciesId.BARBARACLE);
+    expect(
+      barbaracle.forms.some(form => form.formKey === "mega"),
+      "generic Barbaracle mega remains",
+    ).toBe(true);
+  });
+
+  it("keeps Alolan Raichu stone edges mutually exclusive by gender", () => {
+    const edges = pokemonFormChanges[SpeciesId.ALOLA_RAICHU] ?? [];
+    const raichuEdges = edges.filter(fc => fc.formKey === "mega-male" || fc.formKey === "mega-female");
+    expect(raichuEdges).toHaveLength(2);
+    expect(raichuEdges.map(fc => fc.formKey).sort()).toEqual(["mega-female", "mega-male"]);
+    const male = raichuEdges.find(fc => fc.formKey === "mega-male");
+    const female = raichuEdges.find(fc => fc.formKey === "mega-female");
+    expect(male?.conditions).toHaveLength(1);
+    expect(female?.conditions).toHaveLength(1);
+    if (!male || !female) {
+      return;
+    }
+    const maleCondition = male.conditions[0].predicate;
+    const femaleCondition = female.conditions[0].predicate;
+    expect(maleCondition({ gender: Gender.MALE } as never)).toBe(true);
+    expect(maleCondition({ gender: Gender.FEMALE } as never)).toBe(false);
+    expect(femaleCondition({ gender: Gender.FEMALE } as never)).toBe(true);
+    expect(femaleCondition({ gender: Gender.MALE } as never)).toBe(false);
+  });
+
+  it("registers Mega Calyrex from both rider preforms", () => {
+    const megaEdges = (pokemonFormChanges[SpeciesId.CALYREX] ?? []).filter(fc => fc.formKey === "mega");
+    expect(megaEdges.map(fc => fc.preFormKey)).toEqual(["ice", "shadow"]);
+  });
+
+  it("registers rider-specific inactive Mega Calyrex reverts", () => {
+    const edges = pokemonFormChanges[SpeciesId.CALYREX] ?? [];
+    const reverses = edges.filter(fc => fc.preFormKey === "mega" && (fc.formKey === "ice" || fc.formKey === "shadow"));
+    expect(reverses.map(fc => fc.formKey).sort()).toEqual(["ice", "shadow"]);
+    for (const reverse of reverses) {
+      const trigger = reverse.findTrigger(SpeciesFormChangeItemTrigger) as SpeciesFormChangeItemTrigger | undefined;
+      expect(trigger?.item).toBe(FormChangeItem.CALYRITE);
+      expect(trigger?.active).toBe(false);
+      expect(reverse.conditions).toHaveLength(1);
+    }
+  });
+  it("hides Reins toggles while active Calyrite owns the Mega form", async () => {
+    await game.classicMode.startBattle(SpeciesId.CALYREX);
+    const calyrex = game.field.getPlayerPokemon();
+    const reins = new FormChangeItemModifierType(FormChangeItem.ICY_REINS_OF_UNITY).newModifier(calyrex);
+    const calyrite = new FormChangeItemModifierType(FormChangeItem.CALYRITE).newModifier(calyrex);
+    (calyrite as PokemonFormChangeItemModifier).active = false;
+    await game.scene.addModifier(reins);
+    await game.scene.addModifier(calyrite);
+
+    const partyUi = new PartyUiHandler();
+    expect(partyUi.getFormChangeItemsModifiers(calyrex).map(modifier => modifier.formChangeItem)).toEqual([
+      FormChangeItem.ICY_REINS_OF_UNITY,
+      FormChangeItem.CALYRITE,
+    ]);
+
+    (calyrite as PokemonFormChangeItemModifier).active = true;
+    expect(partyUi.getFormChangeItemsModifiers(calyrex).map(modifier => modifier.formChangeItem)).toEqual([
+      FormChangeItem.CALYRITE,
+    ]);
   });
 });

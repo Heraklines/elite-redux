@@ -85,6 +85,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private messageMode: UiMode;
   private readonly learnMoveType: LearnMoveType;
   private readonly cost: number;
+  /**
+   * Exact parent-boundary permit inherited from an item evolution.
+   *
+   * A reward result is allowed to cross into wave N+1, but an evolve-move picker becomes the newer
+   * mechanical predecessor before that command opens. The picker must carry the same permit forward when
+   * it has no typed nested return; otherwise the correctly ordered wave-N+1 CONTROL_COMMIT is rejected.
+   */
+  private readonly coopParentAllowsNextWaveStart: boolean;
   /** Stable selectors for every authoritative picker callback / await tail owned by this phase. */
   private coopOperationBinding: CoopLearnMoveOperationBinding | null = null;
   private coopRelay: CoopInteractionRelay | null = null;
@@ -113,6 +121,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     readonly wave: number;
     readonly turn: number;
     readonly interactionCounter: number;
+    readonly allowNextWaveStart: boolean;
     readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
   } | null = null;
   /** Guest-owner proposal retained until the matching immutable result closes this exact phase. */
@@ -180,11 +189,13 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     moveId: MoveId,
     learnMoveType: LearnMoveType = LearnMoveType.LEARN_MOVE,
     cost = -1,
+    coopParentAllowsNextWaveStart = false,
   ) {
     super(partyMemberIndex);
     this.moveId = moveId;
     this.learnMoveType = learnMoveType;
     this.cost = cost;
+    this.coopParentAllowsNextWaveStart = coopParentAllowsNextWaveStart;
   }
 
   start() {
@@ -281,9 +292,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   ): boolean {
     const pokemon = this.getPokemon();
     const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    const acceptsGuestOwnedPicker = ownerIsGuest && monOwner === "guest";
     const acceptsHostOwnedWatcher = !ownerIsGuest && this.coopAwaitingHostOwnedPresentation && monOwner === "host";
     const valid =
-      (ownerIsGuest || acceptsHostOwnedWatcher)
+      (acceptsGuestOwnedPicker || acceptsHostOwnedWatcher)
       && partySlot === this.partyMemberIndex
       && moveId === this.moveId
       && maxMoveCount === pokemon.getMaxMoveCount()
@@ -304,7 +316,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   }
 
   /**
-   * Bind a host-owned V2 presentation to this exact phase while it is still queued.
+   * Bind a V2 presentation to this exact phase while it is still queued.
    *
    * A reward commit queues the same LearnMovePhase on both clients before the following
    * learn-move prompt enters the ordered log. On a slow guest that prompt can be projected
@@ -312,7 +324,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
    * reward-continuation phase become the sole watcher when it starts; spawning a replay phase
    * in front of it would consume the result and then leave this copy to reopen a dead picker.
    */
-  public stageCoopV2HostOwnedLearnMovePresentation(
+  public stageCoopV2LearnMovePresentation(
     operationId: string,
     partySlot: number,
     moveId: number,
@@ -321,10 +333,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   ): boolean {
     const pokemon = this.getPokemon();
     const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    const expectedOwner: CoopRole = ownerIsGuest ? "guest" : "host";
     if (
       this.coopRuntimeBound
-      || ownerIsGuest
-      || monOwner !== "host"
+      || monOwner !== expectedOwner
       || partySlot !== this.partyMemberIndex
       || moveId !== this.moveId
       || maxMoveCount !== pokemon.getMaxMoveCount()
@@ -334,7 +346,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       return false;
     }
     this.coopV2ControlOperationId = operationId;
-    this.coopAwaitingHostOwnedPresentation = true;
+    this.coopAwaitingHostOwnedPresentation = !ownerIsGuest;
     return true;
   }
 
@@ -391,6 +403,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       forgetSlot >= 0 && forgetSlot < maxMoveCount
         ? this.coopNestedReturnPlan?.onCommit
         : this.coopNestedReturnPlan?.onCancel;
+    const allowNextWaveStart =
+      nextInteraction == null
+      && (this.coopParentAllowsNextWaveStart
+        || (forgetSlot >= 0 && forgetSlot < maxMoveCount && this.coopNestedReturnPlan != null));
     const pending = this.coopPendingV2Decision;
     if (pending != null) {
       return (
@@ -398,6 +414,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         && pending.ownerRole === ownerRole
         && pending.forgetSlot === forgetSlot
         && pending.maxMoveCount === maxMoveCount
+        && pending.allowNextWaveStart === allowNextWaveStart
         && JSON.stringify(pending.nextInteraction ?? null) === JSON.stringify(nextInteraction ?? null)
       );
     }
@@ -409,6 +426,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       wave: this.coopSourceWave,
       turn: this.coopSourceTurn,
       interactionCounter: this.coopInteractionCounter?.() ?? -1,
+      allowNextWaveStart,
       ...(nextInteraction == null ? {} : { nextInteraction: structuredClone(nextInteraction) }),
     };
     return true;
@@ -489,6 +507,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
               moveId: this.moveId,
               forgetSlot: pending.forgetSlot,
               maxMoveCount: pending.maxMoveCount,
+              allowNextWaveStart: pending.allowNextWaveStart,
               ...(pending.nextInteraction == null ? {} : { nextInteraction: structuredClone(pending.nextInteraction) }),
             },
             ownerRole: pending.ownerRole,
@@ -583,6 +602,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
             moveId: this.moveId,
             forgetSlot: moveIndex,
             maxMoveCount: this.getPokemon().getMaxMoveCount(),
+            allowNextWaveStart: false,
           },
           ownerRole: "host",
           localRole: "host",
@@ -919,45 +939,26 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     const continuation = this.prepareCoopV2LearnMoveContinuation(forgetSlot, maxMoveCount);
     coopLog("v2-proposal", `committed learn-move result ${operationId} applied; closing exact queued picker`);
     const scene = globalScene;
-    void scene.ui
-      .setModeBoundedWhen(
-        this.messageMode,
-        2_000,
-        () =>
-          getCoopRuntime() === runtime
-          && globalScene === scene
-          && scene.phaseManager.getCurrentPhase() === this
-          && isCoopLearnMoveAuthorityV2Active(this.coopOperationBinding)
-          && this.coopV2ControlOperationId != null
-          && coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId) === operationId,
-      )
-      .then(result => {
-        runWhenCoopRuntimeActive(runtime, () => {
-          if (result === "superseded" || globalScene !== scene || scene.phaseManager.getCurrentPhase() !== this) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} lost its exact queued phase`);
-            return;
-          }
-          getCoopUiMirror()?.endSession();
-          clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
-          super.end();
-          if (scene.phaseManager.getCurrentPhase() === this) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} did not close its queued phase`);
-            return;
-          }
-          if (!settleCoopV2InteractionOperation(operationId, runtime)) {
-            failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its queued terminal`);
-            return;
-          }
-          if (continuation.removed) {
-            runtime.controller.advanceInteractionFromAuthoritativeCommit(continuation.interactionCounter);
-          }
-        });
-      })
-      .catch(() => {
-        runWhenCoopRuntimeActive(runtime, () => {
-          failCoopSharedSession(`Committed learn-move result ${operationId} could not close its queued picker`);
-        });
-      });
+    // The immutable result is being applied in this phase's exact runtime/scene call stack. Waiting for a
+    // fade promise here creates a second, ambient-runtime continuation after the replica projector has
+    // returned `materialDeferred`; under real two-browser delivery that tail can remain queued forever
+    // while the authority enters the next wave. Retire only the still-current SUMMARY presentation and
+    // complete the scheduler edge synchronously, just like destructive form-change presentation release.
+    scene.ui.retirePresentationMode(UiMode.SUMMARY, this.messageMode);
+    getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(this.partyMemberIndex);
+    super.end();
+    if (scene.phaseManager.getCurrentPhase() === this) {
+      failCoopSharedSession(`Committed learn-move result ${operationId} did not close its queued phase`);
+      return true;
+    }
+    if (!settleCoopV2InteractionOperation(operationId, runtime)) {
+      failCoopSharedSession(`Committed learn-move result ${operationId} could not prove its queued terminal`);
+      return true;
+    }
+    if (continuation.removed) {
+      runtime.controller.advanceInteractionFromAuthoritativeCommit(continuation.interactionCounter);
+    }
     return true;
   }
 
@@ -1038,7 +1039,14 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     } else if (
       !commitCoopLearnMoveDecision(
         {
-          payload: { type: "decision", partySlot: slot, moveId: this.moveId, forgetSlot, maxMoveCount },
+          payload: {
+            type: "decision",
+            partySlot: slot,
+            moveId: this.moveId,
+            forgetSlot,
+            maxMoveCount,
+            allowNextWaveStart: false,
+          },
           ownerRole: "guest",
           localRole: "host",
           wave,
@@ -1098,6 +1106,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         moveId: this.moveId,
         forgetSlot: moveIndex,
         maxMoveCount: pokemon.getMaxMoveCount(),
+        allowNextWaveStart: false,
       };
       const decisionOperationId =
         this.coopV2ControlOperationId == null ? null : coopLearnMoveDecisionOperationId(this.coopV2ControlOperationId);

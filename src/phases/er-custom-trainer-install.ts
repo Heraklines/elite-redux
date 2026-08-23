@@ -57,11 +57,11 @@ export function installErCustomTrainerForCurrentWave(): void {
   }
   const wave = battle.waveIndex;
   // Never hijack scripted content: mystery encounters, fixed battles, or the
-  // canonical boss waves (`% 10 === 0`) keep their vanilla/ER progression.
+  // active mode's boss waves keep their vanilla/ER progression.
   if (
     battle.battleType === BattleType.MYSTERY_ENCOUNTER
     || globalScene.gameMode.isFixedBattle(wave)
-    || wave % 10 === 0
+    || globalScene.gameMode.isBoss(wave)
   ) {
     return;
   }

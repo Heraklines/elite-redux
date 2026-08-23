@@ -172,6 +172,18 @@ function patchErPledge(move: MutableMove, rules: readonly ErPledgeRule[], descri
 }
 
 const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map([
+  // Confirmed ER metadata corrections from the seven-day player report.
+  [MoveId.SHELL_SIDE_ARM, move => orFlag(move, MoveFlags.PULSE_MOVE)],
+  [
+    MoveId.SKULL_BASH,
+    move => {
+      orFlag(move, MoveFlags.BONE_BASED);
+      if (move.chargeAttrs) {
+        move.chargeAttrs = move.chargeAttrs.filter(attr => !(attr instanceof StatStageChangeAttr));
+        move.chargeAttrs.push(new StatStageChangeAttr([Stat.ATK], 1, true));
+      }
+    },
+  ],
   // =====================================================================
   // TOTAL rewrites — 4 OHKO nerfs
   // =====================================================================
@@ -1389,7 +1401,10 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       addAttrUnique(
         move,
         new MovePowerMultiplierAttr((user, _target, m) =>
-          user.turnData.attacksReceived.some(r => r.damage > 0) ? 40 / m.power : 1,
+          user.turnData.attacksReceived.some(r => r.damage > 0)
+          && !user.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "MonkFocusPunchAbAttr")
+            ? 40 / m.power
+            : 1,
         ),
       );
     },

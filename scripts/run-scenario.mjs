@@ -33,6 +33,7 @@ import { spawnSync } from "node:child_process";
  *   --no-miss        force every move to hit
  *   --no-crit        force no crits (deterministic stat stages)
  *   --real-rng       restore the real seeded randBattleSeedInt (probabilistic procs)
+ *   --moody-audit    run the exhaustive Moody catalog through the same real-game CLI harness
  *
  * Examples:
  *   node scripts/run-scenario.mjs demo
@@ -55,7 +56,8 @@ if (argv.length === 0 || argv[0] === "--help" || argv[0] === "-h") {
   process.exit(argv.length === 0 ? 1 : 0);
 }
 
-const scenario = argv[0];
+const moodyAudit = argv[0] === "moody-audit";
+const scenario = moodyAudit ? "demo" : argv[0];
 let turns;
 let move;
 let waves;
@@ -128,6 +130,9 @@ const env = {
   ER_SCENARIO: "1", // wire ER abilities/species/difficulty in the headless game
   ER_RUN_SCENARIO: scenario,
 };
+if (moodyAudit) {
+  env.ER_RUN_MOODY_AUDIT = "1";
+}
 if (turns) {
   env.ER_RUN_TURNS = turns;
 }

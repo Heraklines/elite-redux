@@ -6,6 +6,8 @@ import { erApplyPendingRevives } from "#data/elite-redux/archetypes/post-faint-d
 import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording, isCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyPendingSwitchInBoost } from "#data/elite-redux/empower-switch-in";
+import { isErChapterStartWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import { notifyMoodyFormationEntry } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { erApplyPendingSafePassage } from "#data/elite-redux/safe-passage";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
@@ -211,6 +213,11 @@ export class SummonPhase extends PartyMemberPokemonPhase {
             pokemon.showInfo();
             pokemon.playAnim();
             pokemon.setVisible(true);
+            // A between-wave party reorder hides the former field occupant by
+            // setting both visible=false and alpha=0. U-turn can later summon
+            // that same object; restoring visibility alone leaves it fully
+            // transparent even though the switch completed successfully.
+            pokemon.setAlpha(1);
             pokemon.getSprite().setVisible(true);
             pokemon.setScale(0.5);
             pokemon.tint(getPokeballTintColor(pokemon.getPokeball(true)));
@@ -330,7 +337,9 @@ export class SummonPhase extends PartyMemberPokemonPhase {
     if (
       !this.loaded
       || [BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)
-      || globalScene.currentBattle.waveIndex % 10 === 1
+      || (globalScene.gameMode.isClassic && isErSprintRun()
+        ? isErChapterStartWave(globalScene.currentBattle.waveIndex)
+        : globalScene.currentBattle.waveIndex % 10 === 1)
     ) {
       // SummonPhase opens the co-op turn recorder before its entry chain. Keep any resulting material
       // form change inside this causal subtree so it settles before the immutable turn commit. Other
@@ -344,6 +353,7 @@ export class SummonPhase extends PartyMemberPokemonPhase {
   queuePostSummon(): void {
     const pokemon = this.getPokemon();
     pokemon.turnData.summonedThisTurn = true;
+    notifyMoodyFormationEntry(pokemon);
     if (pokemon.isEnemy()) {
       // ER exposes the active ability and every innate for a fielded opponent. Keep the
       // policy visibility model aligned with that entry disclosure, including sources

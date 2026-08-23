@@ -114,6 +114,9 @@ let ABILS_RICH = []; // [{id, name, description}]
 // The Pokedex Editor's species universe = ALL registered species (evolutions +
 // forms too), NOT just the starter pool in SPECIES, so any evolution is editable.
 let POKEDEX_SPECIES = []; // [{const, name, slug, id, dex}]
+// Recently-added megas/partners share a base species ID. They are separate
+// Custom Trainer choices carrying an exact formIndex, not Pokedex override keys.
+let TRAINER_SPECIES_FORMS = []; // [{const, baseConst, name, slug, id, formIndex, abilities}]
 let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
@@ -138,6 +141,10 @@ const trainerAtlasCache = new Map();
 // In-flight atlas fetches (CDN url → Promise), so N cards/cells sharing a class
 // fire ONE fetch, not N concurrent ones (caps concurrency on the trainer list).
 const trainerAtlasInflight = new Map();
+// Animated Pokemon art can be a tall multi-frame TexturePacker sheet. Cache the
+// atlas metadata so previews crop one frame instead of shrinking the whole sheet.
+const pokemonAtlasCache = new Map();
+const pokemonAtlasInflight = new Map();
 // Edit state keyed by species CONST (joined to data via SPECIES[i].id), so the
 // committed override JSON is human-readable and consistent with the other tabs.
 const learn = { current: {}, baseline: {} }; // const → [[level, moveId], ...]
@@ -1148,13 +1155,151 @@ async function saveMon() {
 // const/id → species object, filled in init() (avoids O(n²) lookups in render).
 const spByConst = new Map();
 const spById = new Map();
+const spByBattleIdentity = new Map(); // `${speciesId}:${formIndex}` -> base/form picker entry
+const spBySearchKey = new Map(); // normalized display name/alias/CONST -> picker entry
+
+function battleIdentityKey(speciesId, formIndex) {
+  return `${speciesId}:${Number.isInteger(formIndex) ? formIndex : 0}`;
+}
+
+function ctrSpeciesEntryForIdentity(speciesId, formIndex) {
+  return spByBattleIdentity.get(battleIdentityKey(speciesId, formIndex)) || spById.get(speciesId) || null;
+}
+
+function speciesSearchKey(value) {
+  return String(value || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function speciesSearchValues(species) {
+  const values = [species?.name, ...(Array.isArray(species?.aliases) ? species.aliases : []), species?.const].filter(
+    Boolean,
+  );
+  const parenthetical = String(species?.name || "").match(/^(.+?) \((.+)\)$/);
+  if (parenthetical) {
+    values.push(`${parenthetical[2]} ${parenthetical[1]}`, `${parenthetical[1]} ${parenthetical[2]}`);
+  }
+  return [...new Set(values)];
+}
+
+function registerSpeciesSearchEntry(species) {
+  for (const value of speciesSearchValues(species)) {
+    spBySearchKey.set(speciesSearchKey(value), species);
+  }
+}
+
+function resolveSpeciesInput(value) {
+  const direct = spByConst.get(
+    String(value || "")
+      .trim()
+      .toUpperCase(),
+  );
+  return direct || spBySearchKey.get(speciesSearchKey(value)) || null;
+}
+
+function speciesDatalistOptionsHtml(speciesEntries) {
+  return speciesEntries
+    .flatMap(species =>
+      speciesSearchValues(species).map(
+        value =>
+          `<option value="${esc(value)}" label="${esc(value === species.const ? species.name : species.const)}"></option>`,
+      ),
+    )
+    .join("");
+}
+
+function matchingSpeciesEntries(query, limit = 24) {
+  const queryKey = speciesSearchKey(query);
+  if (!queryKey) {
+    return [];
+  }
+  const queryTokens = queryKey.split(" ");
+  const ranked = [];
+  for (const species of spByConst.values()) {
+    const keys = speciesSearchValues(species).map(speciesSearchKey);
+    let score = 99;
+    for (const key of keys) {
+      if (key === queryKey) {
+        score = Math.min(score, 0);
+      } else if (key.startsWith(queryKey)) {
+        score = Math.min(score, 1);
+      } else if (key.includes(queryKey)) {
+        score = Math.min(score, 2);
+      } else if (queryTokens.every(token => key.includes(token))) {
+        score = Math.min(score, 3);
+      }
+    }
+    if (score < 99) {
+      ranked.push({ species, score });
+    }
+  }
+  return ranked
+    .sort((a, b) => a.score - b.score || a.species.name.localeCompare(b.species.name))
+    .slice(0, limit)
+    .map(entry => entry.species);
+}
+
+function isRuntimeSpeciesForm(species) {
+  return Boolean(species?.baseConst && Number.isInteger(species?.formIndex) && species.formIndex > 0);
+}
+
+function pokedexSpeciesUniverse() {
+  const seen = new Set();
+  return [...POKEDEX_SPECIES, ...TRAINER_SPECIES_FORMS].filter(species => {
+    if (!species?.const || seen.has(species.const)) {
+      return false;
+    }
+    seen.add(species.const);
+    return true;
+  });
+}
+
+function openCtrSpeciesDrop(input) {
+  const drop = input.parentElement?.querySelector(".ctr-species-drop");
+  if (!drop) {
+    return;
+  }
+  const matches = matchingSpeciesEntries(input.value);
+  const fusion = input.classList.contains("ctr-fusion-species");
+  drop.innerHTML = matches
+    .map(species => {
+      const form = Number.isInteger(species.formIndex) ? `Form ${species.formIndex}` : "Base species";
+      return `<button type="button" class="ctr-species-opt" role="option" data-idx="${input.dataset.idx}" data-species="${esc(species.const)}" data-fusion="${fusion ? "1" : "0"}">
+        <span>${esc(species.name)}</span><small>${esc(species.const)} · ${form}</small>
+      </button>`;
+    })
+    .join("");
+  drop.classList.toggle("open", matches.length > 0);
+  if (matches.length > 0) {
+    const inputRect = input.getBoundingClientRect();
+    const menuHeight = Math.min(280, drop.scrollHeight);
+    drop.classList.toggle("above", inputRect.bottom + menuHeight > window.innerHeight && inputRect.top > menuHeight);
+  } else {
+    drop.classList.remove("above");
+  }
+}
+
+function closeCtrSpeciesDrops() {
+  document.querySelectorAll(".ctr-species-drop.open").forEach(drop => drop.classList.remove("open"));
+}
 
 /** The Pokedex tabs' species list: ALL species, filtered by the header search, sorted. */
 function pokedexList() {
-  const f = ($("#search").value || "").trim().toLowerCase();
+  const f = speciesSearchKey($("#search").value);
+  const tokens = f.split(" ").filter(Boolean);
+  const universe = pokedexSpeciesUniverse();
   const list = f
-    ? POKEDEX_SPECIES.filter(s => s.name.toLowerCase().includes(f) || s.const.toLowerCase().includes(f))
-    : POKEDEX_SPECIES;
+    ? universe.filter(s =>
+        speciesSearchValues(s).some(value => {
+          const key = speciesSearchKey(value);
+          return key.includes(f) || tokens.every(token => key.includes(token));
+        }),
+      )
+    : universe;
   const byDex = $("#sort").value === "dex";
   return [...list].sort((a, b) =>
     byDex ? (a.dex ?? 99999) - (b.dex ?? 99999) || a.name.localeCompare(b.name) : a.name.localeCompare(b.name),
@@ -1289,13 +1434,14 @@ function evoChainHtml(s) {
 function pdHeadHtml(s) {
   const sprite = s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
   const dirty = pdDirty(s.const, activeTab);
+  const runtimeForm = isRuntimeSpeciesForm(s);
   return `<div class="pd-head">
     <img src="${sprite}" alt="" onerror="this.style.visibility='hidden'" />
     <div>
       <div class="pd-title">${esc(s.name)} <small>#${s.dex ?? "—"} · ${esc(s.const)}</small></div>
     </div>
-    ${dirty ? '<span class="badge edited">modified</span>' : ""}
-    <button type="button" class="pd-revert" data-pdrevert="${s.const}"${dirty ? "" : " disabled"}>↺ Revert</button>
+    ${runtimeForm ? '<span class="badge">battle form</span>' : dirty ? '<span class="badge edited">modified</span>' : ""}
+    ${runtimeForm ? "" : `<button type="button" class="pd-revert" data-pdrevert="${s.const}"${dirty ? "" : " disabled"}>↺ Revert</button>`}
   </div>
   ${evoChainHtml(s)}`;
 }
@@ -1308,30 +1454,33 @@ function renderLearnsets(root) {
     return;
   }
   const s = spByConst.get(pdSelected);
+  const runtimeForm = isRuntimeSpeciesForm(s);
   const rows = (learn.current[pdSelected] || [])
     .map(([lvl, mv], idx) => ({ lvl, mv, idx }))
     .sort((a, b) => a.lvl - b.lvl || a.idx - b.idx);
   const rowsHtml = rows
     .map(
       r => `<div class="ls-row" data-idx="${r.idx}">
-        <input class="ls-level" type="number" min="1" max="100" value="${r.lvl}" data-idx="${r.idx}" />
+        <input class="ls-level" type="number" min="1" max="100" value="${r.lvl}" data-idx="${r.idx}"${runtimeForm ? " disabled" : ""} />
         <span class="ls-move">${r.lvl === 1 ? '<span class="ls-lv1">START</span> ' : ""}${moveLabel(moveById.get(r.mv))}</span>
-        <button type="button" class="ls-del" data-idx="${r.idx}" title="Remove">✕</button>
+        ${runtimeForm ? "" : `<button type="button" class="ls-del" data-idx="${r.idx}" title="Remove">✕</button>`}
       </div>`,
     )
     .join("");
   main.innerHTML = `${pdHeadHtml(s)}
-    <div class="pd-cols">
+    <div class="pd-cols${runtimeForm ? " pd-runtime-form" : ""}">
       <div class="pd-col">
-        <div class="pd-col-head">Learnable ${paletteControlsHtml(true)}</div>
-        <div class="pal" id="pal">${paletteHtml()}</div>
+        <div class="pd-col-head">${runtimeForm ? "Inherited from base species" : `Learnable ${paletteControlsHtml(true)}`}</div>
+        ${runtimeForm ? '<div class="pd-empty">This battle form uses its base species level-up pool.</div>' : `<div class="pal" id="pal">${paletteHtml()}</div>`}
       </div>
       <div class="pd-col">
         <div class="pd-col-head">Current learnset (${rows.length})</div>
         <div class="ls-list" data-drop="learn">${rowsHtml || '<div class="pd-empty">No level-up moves. Click or drag a move from the left to add one.</div>'}</div>
       </div>
     </div>`;
-  filterPalette();
+  if (!runtimeForm) {
+    filterPalette();
+  }
 }
 
 function renderTMs(root) {
@@ -1342,6 +1491,7 @@ function renderTMs(root) {
     return;
   }
   const s = spByConst.get(pdSelected);
+  const runtimeForm = isRuntimeSpeciesForm(s);
   const ids = (tms.current[pdSelected] || []).slice().sort((a, b) => {
     const ma = moveById.get(a);
     const mb = moveById.get(b);
@@ -1351,22 +1501,24 @@ function renderTMs(root) {
     .map(
       id => `<div class="tm-row" data-moveid="${id}">
         <span class="tm-move">${moveLabel(moveById.get(id))}</span>
-        <button type="button" class="tm-del" data-moveid="${id}" title="Remove">✕</button>
+        ${runtimeForm ? "" : `<button type="button" class="tm-del" data-moveid="${id}" title="Remove">✕</button>`}
       </div>`,
     )
     .join("");
   main.innerHTML = `${pdHeadHtml(s)}
-    <div class="pd-cols">
+    <div class="pd-cols${runtimeForm ? " pd-runtime-form" : ""}">
       <div class="pd-col">
-        <div class="pd-col-head">All moves ${paletteControlsHtml(false)}</div>
-        <div class="pal" id="pal">${paletteHtml()}</div>
+        <div class="pd-col-head">${runtimeForm ? "Inherited from base species" : `All moves ${paletteControlsHtml(false)}`}</div>
+        ${runtimeForm ? '<div class="pd-empty">This battle form uses its base species TM pool.</div>' : `<div class="pal" id="pal">${paletteHtml()}</div>`}
       </div>
       <div class="pd-col">
         <div class="pd-col-head">TM-learnable (${ids.length})</div>
         <div class="tm-list" data-drop="tm">${listHtml || '<div class="pd-empty">No TM moves. Click or drag a move from the left to add one.</div>'}</div>
       </div>
     </div>`;
-  filterPalette();
+  if (!runtimeForm) {
+    filterPalette();
+  }
 }
 
 const ABIL_SLOT_LABEL = {
@@ -1378,14 +1530,14 @@ const ABIL_SLOT_LABEL = {
   innate2: "Innate 3",
 };
 
-function abilSlotHtml(cur, slot) {
+function abilSlotHtml(cur, slot, readOnly = false) {
   const a = abilById.get(getAbilSlot(cur, slot));
   const isInnate = slot.startsWith("innate");
   return `<div class="abil-slot${slot === "hidden" || isInnate ? " hidden-slot" : ""}">
     <label>${ABIL_SLOT_LABEL[slot]}</label>
     <div class="combo">
-      <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}" />
-      <div class="abil-drop" data-slot="${slot}"></div>
+      <input class="abil-input" data-slot="${slot}" placeholder="Search name or description…" autocomplete="off" value="${esc(a ? a.name : "")}"${readOnly ? " disabled" : ""} />
+      ${readOnly ? "" : `<div class="abil-drop" data-slot="${slot}"></div>`}
     </div>
     <div class="abil-cur">
       <div class="acur-name">${a ? esc(a.name) : "<span style='color:var(--muted)'>none</span>"}</div>
@@ -1403,8 +1555,9 @@ function renderAbilities(root) {
   }
   const s = spByConst.get(pdSelected);
   const cur = abil.current[pdSelected] || EMPTY_ABIL;
-  const abilities = ["ability1", "ability2", "hidden"].map(slot => abilSlotHtml(cur, slot)).join("");
-  const innates = ["innate0", "innate1", "innate2"].map(slot => abilSlotHtml(cur, slot)).join("");
+  const runtimeForm = isRuntimeSpeciesForm(s);
+  const abilities = ["ability1", "ability2", "hidden"].map(slot => abilSlotHtml(cur, slot, runtimeForm)).join("");
+  const innates = ["innate0", "innate1", "innate2"].map(slot => abilSlotHtml(cur, slot, runtimeForm)).join("");
   main.innerHTML = `${pdHeadHtml(s)}
     <div class="abil-group-title">Abilities</div>
     <div class="abil-slots">${abilities}</div>
@@ -1442,8 +1595,8 @@ function closeAbilDrops() {
 // =============================================================================
 
 // Trainer-class sprite picker: a curated set of TrainerType enum NAMES known to
-// ship a BW sprite (images/trainer/<name>.png in er-assets). Free text is also
-// accepted; the game falls back to a default sprite for an unknown class.
+// ship a BW sprite (images/trainer/<name>.png in er-assets). The editor uses a
+// closed select: display-only sprite labels must never be saved as TrainerTypes.
 const TRAINER_CLASS_OPTIONS = [
   "ACE_TRAINER",
   "BEAUTY",
@@ -2088,10 +2241,11 @@ function ctrLiveToEdit(entry) {
 
 /** Map ONE live member's fields (species by id) to edit fields (species by CONST). */
 function ctrLiveMemberFieldsToEdit(m) {
-  const idToConst = id => spById.get(id)?.const ?? "";
+  const idToConst = (id, formIndex) => ctrSpeciesEntryForIdentity(id, formIndex)?.const ?? "";
+  const formIndex = Number.isInteger(m.formIndex) ? m.formIndex : 0;
   return {
-    species: idToConst(m.species),
-    formIndex: Number.isInteger(m.formIndex) ? m.formIndex : 0,
+    species: idToConst(m.species, formIndex),
+    formIndex,
     level: typeof m.level === "number" ? m.level : null,
     moves: [...(m.moves || []), "", "", "", ""].slice(0, 4),
     abilitySlot: [0, 1, 2].includes(m.abilitySlot) ? m.abilitySlot : 0,
@@ -2099,7 +2253,7 @@ function ctrLiveMemberFieldsToEdit(m) {
     fusion:
       m.fusion && Number.isInteger(m.fusion.species)
         ? {
-            species: idToConst(m.fusion.species),
+            species: idToConst(m.fusion.species, m.fusion.formIndex),
             formIndex: Number.isInteger(m.fusion.formIndex) ? m.fusion.formIndex : 0,
             abilitySlot: [0, 1, 2].includes(m.fusion.abilitySlot) ? m.fusion.abilitySlot : 0,
           }
@@ -2196,7 +2350,8 @@ function ctrWarnings(t) {
 /** Label for one ability slot (0/1/2) of a species CONST: "0 · Pressure".
  *  Falls back to the bare slot number when the species/ability doesn't resolve. */
 function ctrAbilLabel(speciesConst, slot) {
-  const ab = speciesConst ? abil.current[speciesConst] : null;
+  const species = speciesConst ? spByConst.get(speciesConst) : null;
+  const ab = species?.abilities || (speciesConst ? abil.current[species.baseConst || speciesConst] : null);
   if (!ab) {
     return String(slot);
   }
@@ -2214,7 +2369,8 @@ function ctrAbilOptions(speciesConst, selected) {
 
 /** The authored factory sets for a species CONST (empty when the species has none). */
 function factorySetsFor(speciesConst) {
-  return speciesConst ? factoryByConst.get(speciesConst) || [] : [];
+  const species = speciesConst ? spByConst.get(speciesConst) : null;
+  return speciesConst ? factoryByConst.get(species?.baseConst || speciesConst) || [] : [];
 }
 
 /** A short "MOVE_A / MOVE_B / …" summary of a set's moves (for the option tooltip). */
@@ -2230,8 +2386,10 @@ function setMovesSummary(set) {
  * species itself when there is no evo data (e.g. the jsdom smoke harness).
  */
 function ctrPreEvoLineConsts(speciesConst) {
-  const consts = new Set([speciesConst]);
-  const startId = spByConst.get(speciesConst)?.id;
+  const selected = spByConst.get(speciesConst);
+  const baseConst = selected?.baseConst || speciesConst;
+  const consts = new Set([baseConst]);
+  const startId = selected?.id;
   if (startId === undefined) {
     return consts;
   }
@@ -2655,11 +2813,12 @@ function ctrFusedName(speciesAName, speciesBName) {
   return `${speciesAPrefix || speciesBPrefix}${fragA}${fragB}${speciesBSuffix || speciesASuffix}`;
 }
 
-/** A species CONST's front-sprite CDN url (same slug path the game/editor mon
- *  previews use), or "" when the species/slug can't be resolved. */
-function ctrSpeciesSpriteUrl(speciesConst) {
-  const s = speciesConst ? spByConst.get(speciesConst) : null;
-  return s && s.slug ? `${SPRITE_BASE}/${s.slug}/front.png` : "";
+/** Placeholder painted from the first frame in a Pokemon's front atlas. */
+function ctrPokemonFrameHtml(speciesConst, targetSize) {
+  const species = speciesConst ? spByConst.get(speciesConst) : null;
+  return species?.slug
+    ? `<span class="ctr-pokemon-frame" data-ctrpokemon="${esc(species.slug)}" data-ctrpokemon-size="${targetSize}" aria-label="${esc(species.name || speciesConst)}"></span>`
+    : '<span class="dyn">?</span>';
 }
 
 /** Fusion preview: the two base + fusion battle sprites side by side + the fused
@@ -2676,12 +2835,8 @@ function ctrFusionPreviewHtml(m) {
     return "";
   }
   const fused = ctrFusedName(base.name || m.species, other.name || fus.species);
-  const img = url =>
-    url
-      ? `<img src="${esc(url)}" style="width:56px;height:56px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
-      : '<span class="dyn">?</span>';
   return `<div class="ctr-fusion-preview">
-    <div class="ctr-fusion-sprites">${img(ctrSpeciesSpriteUrl(m.species))}<span class="ctr-fusion-plus">+</span>${img(ctrSpeciesSpriteUrl(fus.species))}</div>
+    <div class="ctr-fusion-sprites">${ctrPokemonFrameHtml(m.species, 56)}<span class="ctr-fusion-plus">+</span>${ctrPokemonFrameHtml(fus.species, 56)}</div>
     <div class="ctr-fusion-name">Fused name: <b>${esc(fused)}</b></div>
     <div class="hint">Approximation: in-game fusion also blends palettes.</div>
   </div>`;
@@ -2775,7 +2930,7 @@ function ctrMemberHtml(m, i) {
   return `<fieldset class="ctr-member open">
     <legend>${summary} <button type="button" class="ctr-mem-del" data-idx="${i}" title="Remove this member">✕</button></legend>
     ${slotCtrls}
-    <label>Species <input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="SPECIES_…" spellcheck="false" style="width:170px" /></label>
+    <label>Species <span class="ctr-species-combo"><input class="ctr-species" list="species-list" data-idx="${i}" value="${esc(m.species || "")}" placeholder="Search Pokemon" spellcheck="false" autocomplete="off" aria-autocomplete="list" /><span class="ctr-species-drop" role="listbox"></span></span></label>
     <label>Form <input type="number" class="ctr-form" data-idx="${i}" value="${m.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
     <label>Ability slot <select class="ctr-abil" data-idx="${i}">${ctrAbilOptions(m.species, m.abilitySlot)}</select></label>
     <label title="Uncheck to set an explicit level">Wave-scale level <input type="checkbox" class="ctr-scale" data-idx="${i}"${scale ? " checked" : ""} /></label>
@@ -2803,7 +2958,7 @@ function ctrMemberHtml(m, i) {
       <label>Fusion <input type="checkbox" class="ctr-fusion-on" data-idx="${i}"${fus ? " checked" : ""} /></label>
       ${
         fus
-          ? `<input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="fusion SPECIES_…" spellcheck="false" style="width:170px" />
+          ? `<span class="ctr-species-combo"><input class="ctr-fusion-species" list="species-list" data-idx="${i}" value="${esc(fus.species || "")}" placeholder="Search fusion Pokemon" spellcheck="false" autocomplete="off" aria-autocomplete="list" /><span class="ctr-species-drop" role="listbox"></span></span>
           <label>Form <input type="number" class="ctr-fusion-form" data-idx="${i}" value="${fus.formIndex || 0}" min="0" max="60" style="width:56px" /></label>
           <label>Ability slot <select class="ctr-fusion-abil" data-idx="${i}">${ctrAbilOptions(fus.species, fus.abilitySlot)}</select></label>`
           : ""
@@ -2822,10 +2977,75 @@ function ctrMemberHtml(m, i) {
 function firstAtlasFrame(atlas) {
   const tx = atlas && Array.isArray(atlas.textures) ? atlas.textures[0] : null;
   const fr = tx && Array.isArray(tx.frames) ? tx.frames[0] : null;
-  if (!tx || !fr || !fr.frame || tx.size === 0) {
-    return null;
+  if (tx && fr && fr.frame && tx.size?.w > 0 && tx.size?.h > 0) {
+    return { crop: fr.frame, sheet: tx.size };
   }
-  return { crop: fr.frame, sheet: tx.size };
+  // Staff uploads use TexturePacker's hash format while bundled trainer sheets
+  // use Phaser's multi-atlas format. Both are valid runtime assets.
+  const hashFrames = atlas && atlas.frames && typeof atlas.frames === "object" ? Object.values(atlas.frames) : [];
+  const hashFrame = hashFrames.find(frame => frame && frame.frame);
+  return hashFrame && atlas.meta?.size?.w > 0 && atlas.meta?.size?.h > 0
+    ? { crop: hashFrame.frame, sheet: atlas.meta.size }
+    : null;
+}
+
+function fetchPokemonAtlas(slug) {
+  const url = `${SPRITE_BASE}/${slug}/front.json`;
+  if (pokemonAtlasCache.has(url)) {
+    return Promise.resolve(pokemonAtlasCache.get(url));
+  }
+  if (pokemonAtlasInflight.has(url)) {
+    return pokemonAtlasInflight.get(url);
+  }
+  const request = fetch(url)
+    .then(response => (response.ok ? response.json() : null))
+    .catch(() => null)
+    .then(atlas => {
+      pokemonAtlasCache.set(url, atlas);
+      pokemonAtlasInflight.delete(url);
+      return atlas;
+    });
+  pokemonAtlasInflight.set(url, request);
+  return request;
+}
+
+/** Crop the first frame from a static or animated Pokemon front atlas. */
+function renderPokemonFrame(slug, el, targetSize) {
+  const paint = atlas => {
+    if (!el.isConnected) {
+      return;
+    }
+    const size = Number(targetSize) || 64;
+    const info = firstAtlasFrame(atlas);
+    el.style.width = `${size}px`;
+    el.style.height = `${size}px`;
+    el.style.backgroundImage = `url("${SPRITE_BASE}/${slug}/front.png")`;
+    el.style.backgroundRepeat = "no-repeat";
+    el.style.imageRendering = "pixelated";
+    if (!info) {
+      el.style.backgroundSize = "contain";
+      el.style.backgroundPosition = "center";
+      return;
+    }
+    const { crop, sheet } = info;
+    const scale = Math.min(size / crop.w, size / crop.h);
+    const left = (size - crop.w * scale) / 2 - crop.x * scale;
+    const top = (size - crop.h * scale) / 2 - crop.y * scale;
+    el.style.backgroundSize = `${sheet.w * scale}px ${sheet.h * scale}px`;
+    el.style.backgroundPosition = `${left}px ${top}px`;
+  };
+  const url = `${SPRITE_BASE}/${slug}/front.json`;
+  if (pokemonAtlasCache.has(url)) {
+    paint(pokemonAtlasCache.get(url));
+    return;
+  }
+  fetchPokemonAtlas(slug).then(paint);
+}
+
+function paintCustomTrainerPokemonFrames(root) {
+  for (const el of root.querySelectorAll("[data-ctrpokemon]")) {
+    renderPokemonFrame(el.dataset.ctrpokemon, el, Number(el.dataset.ctrpokemonSize));
+  }
 }
 
 /** Fetch (and cache) a trainer atlas json, sharing ONE in-flight request per url. */
@@ -2851,7 +3071,8 @@ function fetchTrainerAtlas(url) {
 /** Crop one trainer sprite's first frame into `el` via CSS background. Scaled 2x by
  *  default; pass `{ targetH }` to fit a specific pixel height (e.g. the list card). */
 function renderTrainerFrame(file, el, opts) {
-  const url = `${TRAINER_SPRITE_BASE}/${file}.json`;
+  const baseUrl = opts?.baseUrl || TRAINER_SPRITE_BASE;
+  const url = `${baseUrl}/${file}.json`;
   const paint = atlas => {
     if (!el.isConnected) {
       return;
@@ -2866,7 +3087,7 @@ function renderTrainerFrame(file, el, opts) {
     const scale = opts && opts.targetH ? opts.targetH / crop.h : 2;
     el.style.width = `${crop.w * scale}px`;
     el.style.height = `${crop.h * scale}px`;
-    el.style.backgroundImage = `url("${TRAINER_SPRITE_BASE}/${file}.png")`;
+    el.style.backgroundImage = `url("${baseUrl}/${file}.png")`;
     el.style.backgroundSize = `${sheet.w * scale}px ${sheet.h * scale}px`;
     el.style.backgroundPosition = `-${crop.x * scale}px -${crop.y * scale}px`;
     el.style.backgroundRepeat = "no-repeat";
@@ -2918,7 +3139,7 @@ function updateCtrSpritePreview() {
     frame.className = "ctr-sprite-frame";
     box.innerHTML = "";
     box.appendChild(frame);
-    renderTrainerFrame(file, frame);
+    renderTrainerFrame(file, frame, { baseUrl: uploaded.assetBase });
     return;
   }
   const input = document.getElementById("ctr-class");
@@ -3062,10 +3283,7 @@ function ctrPreviewPanelHtml(t) {
   const idx = Math.max(0, Math.min(ctrFocusIdx, team.length - 1));
   const m = team[idx] || null;
   const spName = m && m.species ? spByConst.get(m.species)?.name || m.species : "(empty)";
-  const spriteUrl = m ? ctrSpeciesSpriteUrl(m.species) : "";
-  const memberSprite = spriteUrl
-    ? `<img src="${esc(spriteUrl)}" style="width:64px;height:64px;image-rendering:pixelated" onerror="this.style.visibility='hidden'" />`
-    : '<span class="dyn">no sprite</span>';
+  const memberSprite = m?.species ? ctrPokemonFrameHtml(m.species, 64) : '<span class="dyn">no sprite</span>';
   const shiny = m ? ctrNormShiny(m.shiny) : ctrNormShiny(null);
   const fusionPreview = m ? ctrFusionPreviewHtml(m) : "";
   // Battle-music now-playing indicator: the chosen track + a live "playing" tag.
@@ -3107,14 +3325,16 @@ function ctrCardSpriteFile(t) {
   return entry.genders ? `${entry.sprite}_${t.gender === "f" ? "f" : "m"}` : entry.sprite;
 }
 
+function ctrCardSpriteBase(t) {
+  return trainerSpriteByKey.get(t.trainerSprite || "")?.assetBase || "";
+}
+
 /** One small team-member icon for a list card: the downscaled front sprite (same
  *  slug resolution the fusion preview uses). Weighted slot -> the FIRST possibility.
  *  Empty/unresolvable species -> an empty neutral box (never a broken image). */
 function ctrCardMonIcon(m) {
   const sp = (Array.isArray(m.variants) && m.variants[0] && m.variants[0].species) || m.species || "";
-  const url = ctrSpeciesSpriteUrl(sp);
-  const img = url ? `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.style.display='none'" />` : "";
-  return `<span class="ctr-card-mon" title="${esc(sp || "empty slot")}">${img}</span>`;
+  return `<span class="ctr-card-mon" title="${esc(sp || "empty slot")}">${sp ? ctrPokemonFrameHtml(sp, 28) : ""}</span>`;
 }
 
 function renderCustomTrainers(root) {
@@ -3126,11 +3346,12 @@ function renderCustomTrainers(root) {
       const t = ctr.current[k];
       const dirty = !jsonEq(ctr.current[k], ctr.baseline[k]);
       const spriteFile = ctrCardSpriteFile(t);
+      const spriteBase = ctrCardSpriteBase(t);
       const monIcons = (Array.isArray(t.team) ? t.team : []).map(ctrCardMonIcon).join("");
       return `<button type="button" class="ctr-open${k === ctrSelected ? " on" : ""}${dirty ? " dirty" : ""}" data-ctropen="${esc(k)}">
         <span class="ctr-card-head">${esc(t.name || k)} <small>#${t.id}</small></span>
         <span class="ctr-card-body">
-          <span class="ctr-card-sprite"${spriteFile ? ` data-ctrsprite="${esc(spriteFile)}"` : ""}></span>
+          <span class="ctr-card-sprite"${spriteFile ? ` data-ctrsprite="${esc(spriteFile)}"${spriteBase ? ` data-ctrsprite-base="${esc(spriteBase)}"` : ""}` : ""}></span>
           <span class="ctr-card-team">${monIcons}</span>
         </span>
       </button>`;
@@ -3184,11 +3405,20 @@ function renderCustomTrainers(root) {
       sprite =>
         `<option value="${esc(sprite.key)}"${t.trainerSprite === sprite.key ? " selected" : ""}>${esc(sprite.label || prettify(sprite.key))}</option>`,
     ).join("");
+    const currentTrainerClass = (t.trainerClass || "").trim().toUpperCase();
+    const invalidTrainerClassOption =
+      currentTrainerClass && !trainerClassByName.has(currentTrainerClass)
+        ? `<option value="${esc(currentTrainerClass)}" selected disabled>INVALID: ${esc(currentTrainerClass)} — choose a runtime class</option>`
+        : "";
+    const trainerClassOptions = TRAINER_CLASSES.map(
+      trainerClass =>
+        `<option value="${esc(trainerClass.name)}"${currentTrainerClass === trainerClass.name ? " selected" : ""}>${esc(prettify(trainerClass.name))}</option>`,
+    ).join("");
     form = `<div class="ctr-form">
       <fieldset class="ctr-sec"><legend>Identity</legend>
         <label>Name <input type="text" id="ctr-name" maxlength="24" value="${esc(t.name || "")}" style="width:200px" /></label>
         <label>Id <input type="text" id="ctr-id" value="${t.id}" readonly tabindex="-1" style="width:80px;opacity:.6" /></label>
-        <label>Sprite / class <input type="text" id="ctr-class" list="trainerclass-list" value="${esc(t.trainerClass || "")}" style="width:170px" spellcheck="false" /></label>
+        <label>Battle class <select id="ctr-class" style="width:190px">${invalidTrainerClassOption}${trainerClassOptions}</select></label>
         <label title="Optional uploaded appearance. Battle behavior still comes from Sprite / class.">Uploaded art
           <select id="ctr-sprite"><option value="">(class sprite)</option>${spriteSel}</select>
         </label>
@@ -3270,8 +3500,9 @@ function renderCustomTrainers(root) {
   // Paint each list card's trainer sprite (lazy CDN atlas crop, ~44px tall). The
   // per-url in-flight cache means many cards sharing a class fire ONE fetch.
   for (const el of root.querySelectorAll("[data-ctrsprite]")) {
-    renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44 });
+    renderTrainerFrame(el.dataset.ctrsprite, el, { targetH: 44, baseUrl: el.dataset.ctrspriteBase });
   }
+  paintCustomTrainerPokemonFrames(root);
 }
 
 // ---- Custom Trainers: input + click handling -------------------------------
@@ -3330,11 +3561,20 @@ function onCustomTrainerInput(el) {
     ctrEnsureSlot(m);
     m.variants[m.cur].weight = clampCtrWeight(Number(el.value));
   } else if (el.classList.contains("ctr-species") && m) {
-    m.species = el.value.trim().toUpperCase();
-    el.value = m.species;
-    el.style.borderColor = m.species === "" || spByConst.has(m.species) ? "" : ERR;
+    const selected = resolveSpeciesInput(el.value);
+    m.species = selected?.const || el.value.trim().toUpperCase();
+    if (selected) {
+      m.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
+    }
+    el.style.borderColor = m.species === "" || selected ? "" : ERR;
+    openCtrSpeciesDrop(el);
   } else if (el.classList.contains("ctr-form") && m) {
     m.formIndex = Number(el.value) || 0;
+    const speciesId = spByConst.get(m.species)?.id;
+    const selected = ctrSpeciesEntryForIdentity(speciesId, m.formIndex);
+    if (selected) {
+      m.species = selected.const;
+    }
   } else if (el.classList.contains("ctr-level") && m) {
     m.level = el.value === "" ? null : Number(el.value);
   } else if (el.classList.contains("ctr-move") && m) {
@@ -3375,11 +3615,20 @@ function onCustomTrainerInput(el) {
     m.shiny = ctrNormShiny(m.shiny);
     m.shiny.name = el.value;
   } else if (el.classList.contains("ctr-fusion-species") && m && m.fusion) {
-    m.fusion.species = el.value.trim().toUpperCase();
-    el.value = m.fusion.species;
-    el.style.borderColor = m.fusion.species === "" || spByConst.has(m.fusion.species) ? "" : ERR;
+    const selected = resolveSpeciesInput(el.value);
+    m.fusion.species = selected?.const || el.value.trim().toUpperCase();
+    if (selected) {
+      m.fusion.formIndex = Number.isInteger(selected.formIndex) ? selected.formIndex : 0;
+    }
+    el.style.borderColor = m.fusion.species === "" || selected ? "" : ERR;
+    openCtrSpeciesDrop(el);
   } else if (el.classList.contains("ctr-fusion-form") && m && m.fusion) {
     m.fusion.formIndex = Number(el.value) || 0;
+    const speciesId = spByConst.get(m.fusion.species)?.id;
+    const selected = ctrSpeciesEntryForIdentity(speciesId, m.fusion.formIndex);
+    if (selected) {
+      m.fusion.species = selected.const;
+    }
   } else {
     return false;
   }
@@ -3600,6 +3849,60 @@ function ctrResetMemberUiState() {
   ctrFocusIdx = 0;
 }
 
+function selectCtrSpeciesOption(option) {
+  const t = ctrCur();
+  const idx = Number(option.dataset.idx);
+  const member = t?.team[idx];
+  const species = spByConst.get(option.dataset.species);
+  if (!member || !species) {
+    return false;
+  }
+  const formIndex = Number.isInteger(species.formIndex) ? species.formIndex : 0;
+  if (option.dataset.fusion === "1") {
+    if (!member.fusion) {
+      return false;
+    }
+    member.fusion.species = species.const;
+    member.fusion.formIndex = formIndex;
+  } else {
+    member.species = species.const;
+    member.formIndex = formIndex;
+    ctrSetSel.set(idx, -1);
+  }
+  ctrFocusIdx = idx;
+  render();
+  return true;
+}
+
+function onCustomTrainerSpeciesPointerDown(e) {
+  const option = e.target.closest?.(".ctr-species-opt");
+  if (!option) {
+    return false;
+  }
+  e.preventDefault?.();
+  return selectCtrSpeciesOption(option);
+}
+
+function onCustomTrainerSpeciesKeyDown(e) {
+  const input = e.target;
+  if (!input.classList?.contains("ctr-species") && !input.classList?.contains("ctr-fusion-species")) {
+    return false;
+  }
+  const drop = input.parentElement?.querySelector(".ctr-species-drop.open");
+  if (e.key === "Escape") {
+    closeCtrSpeciesDrops();
+    return true;
+  }
+  if ((e.key === "Enter" || e.key === "ArrowDown") && drop) {
+    const first = drop.querySelector(".ctr-species-opt");
+    if (first) {
+      e.preventDefault();
+      return selectCtrSpeciesOption(first);
+    }
+  }
+  return false;
+}
+
 function onCustomTrainerClick(e) {
   const open = e.target.closest("[data-ctropen]");
   if (open) {
@@ -3775,6 +4078,55 @@ function assetLicenseBadge(value) {
   return `<span class="license ${esc(license)}">${esc(license)}</span>`;
 }
 
+function trainerSpriteFiles(sprite) {
+  const key = sprite.spriteKey || sprite.key;
+  return sprite.genders ? [`${key}_m`, `${key}_f`] : [key];
+}
+
+function upsertTrainerSprite(entry, assetsCommit) {
+  if (!entry || !/^[a-z0-9_]{2,64}$/.test(entry.key || "")) {
+    return;
+  }
+  const sprite = {
+    ...entry,
+    spriteKey: entry.spriteKey || entry.key,
+    ...(assetsCommit
+      ? { assetBase: `https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${assetsCommit}/images/trainer` }
+      : {}),
+  };
+  const existing = TRAINER_SPRITES.findIndex(value => value.key === sprite.key);
+  if (existing >= 0) {
+    TRAINER_SPRITES.splice(existing, 1, sprite);
+  } else {
+    TRAINER_SPRITES.push(sprite);
+  }
+  TRAINER_SPRITES.sort((a, b) => String(a.label || a.key).localeCompare(String(b.label || b.key)));
+  trainerSpriteByKey.set(sprite.key, sprite);
+}
+
+function trainerSpriteCatalogHtml(sprite) {
+  const previews = trainerSpriteFiles(sprite)
+    .map(
+      file =>
+        `<span class="asset-sprite-thumb" data-asset-sprite-preview="${esc(file)}"${sprite.assetBase ? ` data-asset-sprite-base="${esc(sprite.assetBase)}"` : ""}></span>`,
+    )
+    .join("");
+  return `<div class="asset-track asset-sprite-track">
+    <div class="asset-sprite-thumbs">${previews}</div>
+    <div><strong>${esc(sprite.label || sprite.key)} ${assetLicenseBadge(sprite.license)}</strong><small>${esc([sprite.kind, ...(sprite.tags || [])].filter(Boolean).join(" | "))}</small>${sprite.author ? `<small>Artist: ${esc(sprite.author)}</small>` : ""}</div>
+    <button type="button" data-asset-sprite="${esc(sprite.key)}" title="Use this art in Custom Trainers">Use</button>
+  </div>`;
+}
+
+function paintTrainerSpriteCatalog(root) {
+  for (const el of root.querySelectorAll("[data-asset-sprite-preview]")) {
+    renderTrainerFrame(el.dataset.assetSpritePreview, el, {
+      targetH: 54,
+      baseUrl: el.dataset.assetSpriteBase,
+    });
+  }
+}
+
 function renderAssets(root) {
   const tracks = BGM_LIST.map(track => {
     const title = track.title || prettify(track.key);
@@ -3882,10 +4234,11 @@ function renderAssets(root) {
         <button type="button" id="asset-upload-sprite" class="primary">Process and upload</button>
       </div>
       <h2 style="margin-top:18px">Uploaded art</h2>
-      <div class="asset-catalog">${TRAINER_SPRITES.map(sprite => `<div class="asset-track"><div><strong>${esc(sprite.label || sprite.key)} ${assetLicenseBadge(sprite.license)}</strong><small>${esc([sprite.kind, ...(sprite.tags || [])].filter(Boolean).join(" | "))}</small></div><button type="button" data-asset-sprite="${esc(sprite.key)}" title="Open Custom Trainers">Use</button></div>`).join("") || '<span class="dyn">No uploaded trainer art.</span>'}</div>
+      <div class="asset-catalog">${TRAINER_SPRITES.map(trainerSpriteCatalogHtml).join("") || '<span class="dyn">No uploaded trainer art.</span>'}</div>
     </section>
   </div>`;
   paintPreparedTrainerSprites();
+  paintTrainerSpriteCatalog(root);
 }
 
 function paintPreparedTrainerSprites() {
@@ -4225,7 +4578,7 @@ async function uploadMediaFile() {
     await refreshMediaJobs();
   } catch (error) {
     await abortMediaUpload(password, session);
-    setMediaUploadProgress(0, "Upload failed");
+    setMediaUploadProgress(0, `Upload failed: ${error.message || error}`);
     throw error;
   }
 }
@@ -4297,7 +4650,22 @@ async function uploadTrainerSprite() {
   if (!response.ok) {
     throw new Error(result.error || `HTTP ${response.status}`);
   }
-  setStatus(`Trainer sprite ${result.key} uploaded. It appears after the editor refreshes.`);
+  upsertTrainerSprite(
+    result.entry || {
+      key: result.key,
+      spriteKey: result.key,
+      label: body.label,
+      genders: body.genders,
+      kind: body.kind,
+      tags: body.tags,
+      author: body.author,
+      license: body.license,
+      sourceUrl: body.sourceUrl,
+    },
+    result.assetsCommit,
+  );
+  setStatus(`Trainer sprite ${result.key} uploaded and added to the live catalog.`);
+  render();
 }
 
 function onAssetsClick(event) {
@@ -4313,6 +4681,10 @@ function onAssetsClick(event) {
   }
   const use = event.target.closest("[data-asset-sprite]");
   if (use) {
+    const trainer = ctrCur();
+    if (trainer && trainerSpriteByKey.has(use.dataset.assetSprite)) {
+      trainer.trainerSprite = use.dataset.assetSprite;
+    }
     activeTab = "customtrainers";
     document
       .querySelectorAll("nav.tabs button")
@@ -5510,6 +5882,7 @@ async function init() {
       tmLive,
       abLive,
       allSpeciesData,
+      speciesFormsData,
       evosData,
       ctrLive,
       ctrConfigLive,
@@ -5546,6 +5919,8 @@ async function init() {
       fetchJson(`${RAW_BASE}/er-species-abilities.json${bust}`, {}),
       // Pokedex editor: the FULL species universe (evolutions/forms) + evo graph.
       fetchJson("./data/all-species.json", []),
+      // Exact form choices used only by Custom Trainer team/fusion selectors.
+      fetchJson("./data/species-forms.json", []),
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
       fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
@@ -5601,6 +5976,7 @@ async function init() {
     // Pokedex universe = ALL species (evolutions/forms); fall back to the starter
     // list if the fuller dump isn't present yet. EVOS powers the chain navigator.
     POKEDEX_SPECIES = Array.isArray(allSpeciesData) && allSpeciesData.length > 0 ? allSpeciesData : SPECIES;
+    TRAINER_SPECIES_FORMS = Array.isArray(speciesFormsData) ? speciesFormsData : [];
     EVOS = evosData && typeof evosData === "object" ? evosData : {};
     for (const m of MOVES_RICH) {
       moveById.set(m.id, m);
@@ -5609,9 +5985,15 @@ async function init() {
       abilById.set(a.id, a);
       abilIdByNormalizedName.set(a.name.trim().toLowerCase(), a.id);
     }
+    spByConst.clear();
+    spById.clear();
+    spByBattleIdentity.clear();
+    spBySearchKey.clear();
     for (const s of POKEDEX_SPECIES) {
       spByConst.set(s.const, s);
       spById.set(s.id, s);
+      spByBattleIdentity.set(battleIdentityKey(s.id, 0), s);
+      registerSpeciesSearchEntry(s);
       const base = (lsData[s.id] || []).map(([lvl, mv]) => [lvl, mv]);
       learn.current[s.const] = Array.isArray(lsLive[s.const]) ? lsLive[s.const].map(([lvl, mv]) => [lvl, mv]) : base;
       const tmBase = (tmData[s.id] || []).slice();
@@ -5629,6 +6011,31 @@ async function init() {
         ability2: o.ability2 ?? abBase.ability2 ?? 0,
         hidden: o.hidden ?? abBase.hidden ?? 0,
         innates: [oi[0] || 0, oi[1] || 0, oi[2] || 0],
+      };
+    }
+    for (const form of TRAINER_SPECIES_FORMS) {
+      if (!form || !form.const || !Number.isInteger(form.id) || !Number.isInteger(form.formIndex)) {
+        continue;
+      }
+      spByConst.set(form.const, form);
+      spByBattleIdentity.set(battleIdentityKey(form.id, form.formIndex), form);
+      registerSpeciesSearchEntry(form);
+      const base =
+        spByConst.get(form.baseConst) || spByBattleIdentity.get(battleIdentityKey(form.id, 0)) || spById.get(form.id);
+      const baseConst = base?.const;
+      learn.current[form.const] = JSON.parse(JSON.stringify(learn.current[baseConst] || []));
+      tms.current[form.const] = JSON.parse(JSON.stringify(tms.current[baseConst] || []));
+      const formAbilities =
+        form.abilities && typeof form.abilities === "object" ? form.abilities : abil.current[baseConst];
+      abil.current[form.const] = {
+        ability1: Number(formAbilities?.ability1) || 0,
+        ability2: Number(formAbilities?.ability2) || 0,
+        hidden: Number(formAbilities?.hidden) || 0,
+        innates: [
+          Number(formAbilities?.innates?.[0]) || 0,
+          Number(formAbilities?.innates?.[1]) || 0,
+          Number(formAbilities?.innates?.[2]) || 0,
+        ],
       };
     }
     learn.baseline = JSON.parse(JSON.stringify(learn.current));
@@ -5803,15 +6210,15 @@ async function init() {
     adl.id = "abilities-list";
     adl.innerHTML = ABILS_RICH.map(a => `<option value="${esc(a.name)}"></option>`).join("");
     document.body.appendChild(adl);
-    // Custom Trainers: species picker (full universe), trainer-class + held-item pickers.
+    // Custom Trainers: species picker (full universe). Trainer classes use a
+    // closed select in the form so a display-only sprite label can never be
+    // committed as a runtime TrainerType again.
     const sdl = document.createElement("datalist");
     sdl.id = "species-list";
-    sdl.innerHTML = POKEDEX_SPECIES.map(s => `<option value="${s.const}">${esc(s.name)}</option>`).join("");
+    sdl.innerHTML = speciesDatalistOptionsHtml(
+      [...POKEDEX_SPECIES, ...TRAINER_SPECIES_FORMS].sort((a, b) => a.name.localeCompare(b.name)),
+    );
     document.body.appendChild(sdl);
-    const tcdl = document.createElement("datalist");
-    tcdl.id = "trainerclass-list";
-    tcdl.innerHTML = TRAINER_CLASSES.map(t => `<option value="${t.name}">${prettify(t.name)}</option>`).join("");
-    document.body.appendChild(tcdl);
     // NB: the held-item datalist (#helditems-list) is rendered INSIDE the Custom
     // Trainers section (heldItemsDatalistHtml) so it reflects the full grouped
     // HELD_ITEMS catalog loaded above — no global body-level datalist here.
@@ -5833,6 +6240,16 @@ async function init() {
     const content = $("#content");
     content.addEventListener("input", onInput);
     content.addEventListener("click", onClick);
+    content.addEventListener("pointerdown", e => {
+      if (activeTab === "customtrainers") {
+        onCustomTrainerSpeciesPointerDown(e);
+      }
+    });
+    content.addEventListener("keydown", e => {
+      if (activeTab === "customtrainers") {
+        onCustomTrainerSpeciesKeyDown(e);
+      }
+    });
     // `change` fires once per completed edit (blur / pick from list) → one undo step,
     // and on the Trainers tab it refreshes the default/overridden badges.
     content.addEventListener("change", e => {
@@ -5877,11 +6294,23 @@ async function init() {
       if (e.target.classList && e.target.classList.contains("abil-input")) {
         openAbilDrop(e.target.dataset.slot, e.target.value);
       }
+      if (
+        e.target.classList
+        && (e.target.classList.contains("ctr-species") || e.target.classList.contains("ctr-fusion-species"))
+      ) {
+        openCtrSpeciesDrop(e.target);
+      }
     });
     content.addEventListener("focusout", e => {
       // Delay so a click on an option registers before the dropdown closes.
       if (e.target.classList && e.target.classList.contains("abil-input")) {
         setTimeout(closeAbilDrops, 150);
+      }
+      if (
+        e.target.classList
+        && (e.target.classList.contains("ctr-species") || e.target.classList.contains("ctr-fusion-species"))
+      ) {
+        setTimeout(closeCtrSpeciesDrops, 150);
       }
     });
     let dragMoveId = null;

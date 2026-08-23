@@ -18,8 +18,13 @@ import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementCatch, erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
+import { shouldGrantFunCaptureProgress } from "#data/elite-redux/er-fun-mode";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
-import { recordTelemetryBattleTerminal } from "#data/elite-redux/telemetry/telemetry-hooks";
+import {
+  commitMoodyCoordinatorCaptureSuccess,
+  getMoodyCoordinatorCatchRateMultiplier,
+} from "#data/elite-redux/moody/moody-runtime-game-adapter";
+import { getMoodyCaptureMultiplier } from "#data/elite-redux/moody/moody-scene-adapter";
 import { Gender } from "#data/gender";
 import {
   doPokeballBounceAnim,
@@ -101,7 +106,11 @@ export class AttemptCapturePhase extends PokemonPhase {
     const statusMultiplier = pokemon.status ? getStatusEffectCatchRateMultiplier(pokemon.status.effect) : 1;
     const shinyMultiplier = pokemon.isShiny() ? timedEventManager.getShinyCatchMultiplier() : 1;
     const modifiedCatchRate = Math.round(
-      (((_3m - _2h) * catchRate * pokeballMultiplier) / _3m) * statusMultiplier * shinyMultiplier,
+      (((_3m - _2h) * catchRate * pokeballMultiplier) / _3m)
+        * statusMultiplier
+        * shinyMultiplier
+        * getMoodyCaptureMultiplier(pokemon)
+        * getMoodyCoordinatorCatchRateMultiplier(pokemon),
     );
     const shakeProbability = Math.round(65536 / Math.pow(255 / modifiedCatchRate, 0.1875)); // Formula taken from gen 6
     const criticalCaptureChance = getCriticalCaptureChance(modifiedCatchRate);
@@ -355,7 +364,6 @@ export class AttemptCapturePhase extends PokemonPhase {
       null,
       () => {
         const end = () => {
-          recordTelemetryBattleTerminal("capture");
           // Co-op (#633, authoritative wave-advance handshake): the host caught the wild enemy,
           // which clears the wave. Signal the guest renderer so it runs the same post-battle tail
           // (it removes the captured enemy without a FaintPhase, so it never queues that tail
@@ -410,7 +418,12 @@ export class AttemptCapturePhase extends PokemonPhase {
         Promise.all([
           pokemon.hideInfo(),
           // #807 B: the local player's OWN catch is an allowlisted account write.
-          coopAllowAccountWrite("own-catch", () => globalScene.gameData.setPokemonCaught(pokemon)),
+          coopAllowAccountWrite("own-catch", async () => {
+            const grantPermanentProgress =
+              !globalScene.gameMode.isFun || shouldGrantFunCaptureProgress(pokemon.isShiny());
+            await globalScene.gameData.setPokemonCaught(pokemon, true, false, true, grantPermanentProgress);
+            await commitMoodyCoordinatorCaptureSuccess(pokemon);
+          }),
         ]).then(() => {
           if (!addStatus.value) {
             removePokemon();

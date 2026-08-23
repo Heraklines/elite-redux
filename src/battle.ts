@@ -11,6 +11,7 @@ import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erNotorietyOverLevel } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { getErEndlessEquivalentDepth, isErEndlessRaidWave } from "#data/elite-redux/er-endless-continuation";
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { applyErHellEnemyLevelScaling } from "#data/elite-redux/er-run-difficulty";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -166,6 +167,13 @@ export class Battle {
     if (this.enemyLevels && this.enemyLevels.length < this._arrangement.enemyCapacity) {
       const fill = this.enemyLevels.at(-1) ?? this.getLevelForWave();
       while (this.enemyLevels.length < this._arrangement.enemyCapacity) {
+        this.enemyLevels.push(fill);
+      }
+    }
+    if (this.enemyLevels && isErEndlessRaidWave(this.waveIndex)) {
+      const reserveCount = 2 + Math.floor(getErEndlessEquivalentDepth(this.waveIndex) / 200);
+      const fill = this.enemyLevels.at(-1) ?? this.getLevelForWave();
+      while (this.enemyLevels.length < this._arrangement.enemyCapacity + reserveCount) {
         this.enemyLevels.push(fill);
       }
     }
@@ -631,6 +639,14 @@ export class Battle {
     Phaser.Math.RND.state(state);
     globalScene.rngSeedOverride = tempSeedOverride;
     return ret;
+  }
+
+  public captureDeterministicRngState(): string | null {
+    return this.battleSeedState;
+  }
+
+  public restoreDeterministicRngState(state: string | null): void {
+    this.battleSeedState = state;
   }
 
   /**

@@ -45,6 +45,7 @@ import {
   coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
   getCoopController,
+  hasPendingCoopV2ReplacementMaterialForReplay,
   isCoopAuthoritativeGuest,
   isCoopV2CommandEntryPresentationActive,
   readRetainedCoopV2CommandEntryPresentation,
@@ -391,7 +392,7 @@ export class CoopReplayTurnPhase extends Phase {
       return;
     }
     this.settleOwnedResources();
-    (this.ownerPhaseManager ?? globalScene.phaseManager).shiftPhase();
+    (this.ownerPhaseManager ?? globalScene.phaseManager).shiftPhase(this);
   }
 
   /** Whether this renderer has installed the exact-address turn/live-event continuation wait. */
@@ -533,7 +534,15 @@ export class CoopReplayTurnPhase extends Phase {
           this.end();
           return;
         }
-        const increment = streamer.consumeLiveEventsFrom(this.turn, this.rendered, this.sourceWave);
+        // A REPLACEMENT_COMMIT can be admitted before its compatibility checkpoint reaches the battle
+        // streamer. The host also emits its post-summon entry effects as low-latency live hints. Rendering
+        // those hints first makes actor-addressed events (Sticky Web/stat changes/abilities) target a mon
+        // that has not been installed yet. The ordered V2 entry is exact proof that these events must remain
+        // behind its immutable switch/material/presentation transaction.
+        const holdLiveBehindReplacement = hasPendingCoopV2ReplacementMaterialForReplay(this.sourceWave, this.turn);
+        const increment = holdLiveBehindReplacement
+          ? []
+          : streamer.consumeLiveEventsFrom(this.turn, this.rendered, this.sourceWave);
         if (increment.length > 0) {
           coopLog(
             "replay",
@@ -591,7 +600,12 @@ export class CoopReplayTurnPhase extends Phase {
         // Install the exact waiter before publishing readiness. A half-wiped/automatic guest has no
         // command UI to report, but this live replay pump is still the real next-turn continuation.
         // The dedicated surface cannot release an old/wrong address and never pretends input exists.
-        const authorityWait = streamer.awaitTurnOrLiveEvent(this.turn, this.rendered, this.sourceWave);
+        const authorityWait = streamer.awaitTurnOrLiveEvent(
+          this.turn,
+          this.rendered,
+          this.sourceWave,
+          holdLiveBehindReplacement,
+        );
         this.awaitingAuthority = true;
         streamer.notifyContinuationSurface("rendererWait");
         const raced = await authorityWait;

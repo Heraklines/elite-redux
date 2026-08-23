@@ -106,7 +106,7 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
       beginShowdownBattle([magikarp()], opponent);
       const starters = generateStarters(game.scene, [SpeciesId.PIKACHU]);
       game.scene.phaseManager.pushNew("EncounterPhase", false);
-      new SelectStarterPhase().initBattle(starters);
+      new SelectStarterPhase().initBattleFromCurrentPhase(starters);
     });
     await game.phaseInterceptor.to("CommandPhase", false);
     // The host OHKOs the guest's frail team: PIKACHU + THUNDERBOLT is 4x on Magikarp (Water/Flying).

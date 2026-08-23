@@ -23,7 +23,10 @@
 
 import { ER_NEWCOMER_FORMS } from "#data/elite-redux/er-newcomer-forms";
 import { pokemonFormChanges } from "#data/pokemon-forms";
+import { SpeciesFormChangeItemTrigger } from "#data/pokemon-forms/form-change-triggers";
+import { FormChangeItem } from "#enums/form-change-item";
 import { SpeciesFormKey } from "#enums/species-form-key";
+import type { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -48,7 +51,7 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
       if (def.item === undefined) {
         continue;
       }
-      const species = getPokemonSpecies(def.baseSpecies);
+      const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
       // The form keys a live/party base mon can actually be in (exclude injected megas).
       const baseKeys = new Set(species.forms.map(f => f.formKey ?? "").filter(k => !/mega|primal/.test(k)));
       if (baseKeys.size === 0) {
@@ -74,7 +77,7 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
 
   it('Mega Xerneas edge originates from a named base form (neutral/active), not ""', () => {
     const xerneas = ER_NEWCOMER_FORMS.find(
-      d => d.formKey === "mega" && getPokemonSpecies(d.baseSpecies).name === "Xerneas",
+      d => d.formKey === "mega" && getPokemonSpecies(d.baseSpecies as SpeciesId).name === "Xerneas",
     );
     expect(xerneas, "Xerneas mega entry present").toBeDefined();
     if (!xerneas) {
@@ -94,16 +97,70 @@ describe.skipIf(!RUN)("ER newcomer forms reachability (dex + reward pool)", () =
     expect(zForms.length).toBeGreaterThan(0);
   });
 
+  it("appends the ten newcomer form-change items in save-sensitive order", () => {
+    expect([
+      FormChangeItem.CALYRITE,
+      FormChangeItem.HYPNITE,
+      FormChangeItem.ALORAICHUNITE,
+      FormChangeItem.BARBARACITE_Y,
+      FormChangeItem.LILLIGANITE_VERDANT,
+      FormChangeItem.DISTORTED_CHAIN,
+      FormChangeItem.GOLURKITE_Y,
+      FormChangeItem.SKUNTANKITE,
+      FormChangeItem.DODRIONITE,
+      FormChangeItem.PYUKUMUKUNITE,
+    ]).toEqual([
+      FormChangeItem.CALYRITE,
+      FormChangeItem.CALYRITE + 1,
+      FormChangeItem.CALYRITE + 2,
+      FormChangeItem.CALYRITE + 3,
+      FormChangeItem.CALYRITE + 4,
+      FormChangeItem.CALYRITE + 5,
+      FormChangeItem.CALYRITE + 6,
+      FormChangeItem.CALYRITE + 7,
+      FormChangeItem.CALYRITE + 8,
+      FormChangeItem.CALYRITE + 9,
+    ]);
+  });
+
+  it("maps each source-backed form item to only its intended target form", () => {
+    const sourceBackedFormSlug: Record<string, true> = {
+      calyrex_chariot_mega: true,
+      hypno_mega: true,
+      raichu_alolan_mega_male: true,
+      raichu_alolan_mega_female: true,
+      barbaracle_mega_y: true,
+      lilligant_verdant_mega: true,
+      uxie_corrupted: true,
+    };
+    const added = ER_NEWCOMER_FORMS.filter(def => def.item !== undefined && sourceBackedFormSlug[def.slug] === true);
+    const allEdges = Object.values(pokemonFormChanges).flat();
+    for (const def of added) {
+      const targets = allEdges
+        .filter(fc => {
+          const trigger = fc.findTrigger(SpeciesFormChangeItemTrigger) as
+            | { item?: FormChangeItem; active?: boolean }
+            | undefined;
+          return trigger?.item === def.item && trigger?.active === true;
+        })
+        .map(fc => `${fc.speciesId}:${fc.formKey}`);
+      const intendedTargets = added
+        .filter(candidate => candidate.item === def.item)
+        .map(candidate => `${candidate.baseSpecies}:${candidate.formKey}`);
+      expect(new Set(targets), `${def.slug} item target`).toEqual(new Set(intendedTargets));
+    }
+  });
+
   // #287: every newcomer form must render a sprite on the DEX PAGE, which resolves
   // through the SPECIES-level `species.getSpriteAtlasPath/getSpriteKey(formIndex)`.
   // Without `installErSpeciesFormSpriteDispatch(species)`, bases in neither the
   // vendor-mega nor redux sweep (Minun, Plusle) built a vanilla `{id}-mega` path
   // that 404s -> spriteless. This asserts the species-level path is redirected to
-  // the ER slug for ALL 12 forms.
+  // the ER slug for ALL 35 forms.
   it("every newcomer form resolves its SPECIES-level sprite atlas to the ER slug (dex-page render path)", () => {
     const broken: string[] = [];
     for (const def of ER_NEWCOMER_FORMS) {
-      const species = getPokemonSpecies(def.baseSpecies);
+      const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
       const formIndex = species.forms.findIndex(f => f.formKey === def.formKey);
       if (formIndex < 0) {
         broken.push(`${def.formName}: form ${def.formKey} not injected onto ${species.name}`);

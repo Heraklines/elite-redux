@@ -28,12 +28,28 @@
 // =============================================================================
 
 import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
+import {
+  advanceErEndlessGhostRoute,
+  beginErEndlessGhostEncounter,
+  beginErEndlessGhostRoute,
+  canUseErEndlessGhost,
+  finalizeErEndlessGhostEncounter,
+  getErEndlessEquivalentDepth,
+  getErEndlessGhostRoute,
+  getErEndlessNemesisRank,
+  getErEndlessReturningNemesisId,
+  hasErEndlessRift,
+  isErEndlessContinuationActive,
+  recordErEndlessGhost,
+} from "#data/elite-redux/er-endless-continuation";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
+import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies";
 import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import { getErProgressionWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import {
   type GhostDialogueContext,
   type GhostTrainerProfile,
@@ -54,16 +70,20 @@ import {
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
+import { allAbilities, modifierTypes } from "#data/data-lists";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
+import { AbilityId } from "#enums/ability-id";
 import type { Nature } from "#enums/nature";
-import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatModifier, ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
-import type { EnemyPokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
+import { PERMANENT_STATS, Stat, type PermanentStat } from "#enums/stat";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { Variant } from "#sprites/variant";
 import { sessionIdKey } from "#utils/common";
@@ -86,11 +106,24 @@ export interface GhostMember {
   variant: number;
   passive: boolean;
   moves: number[];
+  /**
+   * Run-scoped Ability Randomizer overrides for active + innate slots 1-3.
+   * `-1` means that slot still uses its species/form-derived ability.
+   */
+  abilityOverrides?: [number, number, number, number] | undefined;
+  /** Whether the stored overrides remain active on form-derived Mega/G-max forms. */
+  abilityOverridesForm?: boolean | undefined;
+  /** ER Black Shiny: t4 identity is distinct from the ordinary red/t3 variant. */
+  erBlackShiny?: boolean | undefined;
+  /** The owner's three curated GIFT choices, preserved without rerolling. */
+  erGiftAbilities?: number[] | undefined;
+  /** Active entry in {@linkcode erGiftAbilities}. */
+  erGiftIndex?: number | undefined;
   /** ER (Graveyard ME): the items this member was holding, as
-   * [modifierTypeId, stackCount] pairs. Omitted when none / for legacy
+   * [modifierTypeId, stackCount, generatedTypeArgs?] tuples. Omitted when none / for legacy
    * snapshots captured before item recording (those fall back to a random
    * Ultra-tier item or berry when a memento is granted). */
-  heldItems?: [string, number][] | undefined;
+  heldItems?: [string, number, unknown[]?][] | undefined;
   /**
    * ER Shiny Lab: compact equipped look for cross-player ghosts. The viewer
    * clamps every id before applying so malformed snapshots become plain.
@@ -101,6 +134,78 @@ export interface GhostMember {
    * name for other players (e.g. "Glittering Rayquaza"). Omitted when unnamed.
    */
   erShinyLabName?: string | undefined;
+}
+
+/** JSON-safe CustomPokemonData fields carried by a reconstructed ghost member. */
+export interface ErGhostMemberCustomData {
+  ability: AbilityId | -1;
+  passive: AbilityId | -1;
+  passive2: AbilityId | -1;
+  passive3: AbilityId | -1;
+  abilityOverridesForm: boolean;
+  erBlackShiny: boolean;
+  erGiftAbilities: number[];
+  erGiftIndex: number;
+  erShinyLab?: ErShinyLabSavedLook | undefined;
+  erShinyLabName?: string | undefined;
+  erShinyLabSuppressLocal: true;
+}
+
+function sanitizeGhostAbilityOverride(value: unknown): AbilityId | -1 {
+  return Number.isSafeInteger(value)
+      && (value as number) > AbilityId.NONE
+      && allAbilities[value as number]?.id === value
+    ? value as AbilityId
+    : -1;
+}
+
+function getSanitizedGhostAbilityOverrides(member: GhostMember): [AbilityId | -1, AbilityId | -1, AbilityId | -1, AbilityId | -1] {
+  const values = Array.isArray(member.abilityOverrides) ? member.abilityOverrides : [];
+  return [
+    sanitizeGhostAbilityOverride(values[0]),
+    sanitizeGhostAbilityOverride(values[1]),
+    sanitizeGhostAbilityOverride(values[2]),
+    sanitizeGhostAbilityOverride(values[3]),
+  ];
+}
+
+/**
+ * Sanitize the persistent custom state of an untrusted cross-player member.
+ * Ability overrides must resolve to live abilities. Black is accepted only with
+ * the same shiny+variant invariant used locally; GIFT ids are restricted to the
+ * approved pool and never rerolled for ghosts.
+ */
+export function getErGhostMemberCustomData(member: GhostMember): ErGhostMemberCustomData {
+  const [ability, passive, passive2, passive3] = getSanitizedGhostAbilityOverrides(member);
+  const hasAbilityOverride = ability !== -1 || passive !== -1 || passive2 !== -1 || passive3 !== -1;
+  const erBlackShiny = member.erBlackShiny === true && member.shiny === true && member.variant === 2;
+  const erGiftAbilities = erBlackShiny && Array.isArray(member.erGiftAbilities)
+    ? [...new Set(member.erGiftAbilities)]
+      .filter(id => Number.isInteger(id) && ER_BLACK_SHINY_ABILITY_POOL.includes(id))
+      .slice(0, 3)
+    : [];
+  const requestedGiftIndex = Number.isInteger(member.erGiftIndex) ? member.erGiftIndex! : 0;
+  const erGiftIndex = erGiftAbilities.length > 0
+    ? Math.max(0, Math.min(erGiftAbilities.length - 1, requestedGiftIndex))
+    : 0;
+  const erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
+  const erShinyLabName = erShinyLab
+    ? sanitizeErShinyLabPresetName(member.erShinyLabName) || undefined
+    : undefined;
+
+  return {
+    ability,
+    passive,
+    passive2,
+    passive3,
+    abilityOverridesForm: hasAbilityOverride && member.abilityOverridesForm === true,
+    erBlackShiny,
+    erGiftAbilities,
+    erGiftIndex,
+    erShinyLab,
+    erShinyLabName,
+    erShinyLabSuppressLocal: true,
+  };
 }
 
 export interface GhostTeamSnapshot {
@@ -133,8 +238,7 @@ export interface GhostTeamSnapshot {
   challenges?: [number, number][] | undefined;
   /**
    * ER (relics): the run's active ER relics at capture, as [kind, stackCount, chosenWeather]
-   * snapshots. RECORDS-ONLY - persisted to the `runs.relics` blob for analytics. Relics are
-   * the uploader's own run buffs and are NEVER reconstructed or applied to the fielded ghost.
+   * snapshots. Persisted to the `runs.relics` blob and restored on fielded ghosts.
    */
   relics?: [string, number, number | null][] | undefined;
   /** ER (Colosseum): true when a GHOST trainer dealt the run-ending defeat -
@@ -151,6 +255,20 @@ export interface GhostTeamSnapshot {
    * through sanitizeGhostProfile before applying (it arrives from an untrusted peer).
    */
   presentation?: GhostTrainerProfile | undefined;
+  /** Transient Endless route metadata; never uploaded as part of a completed run. */
+  endlessEchoStage?: 1 | 2 | 3 | undefined;
+  /** Aggregate, anonymized battle performance attached by the run-history worker. */
+  endlessPerformance?: {
+    appearances: number;
+    wins: number;
+    averagePlayerKos: number;
+    averagePlayerHpRemoved: number;
+    averageTurnsSurvived: number;
+    dangerScore: number;
+    topPerformer?: boolean | undefined;
+  } | undefined;
+  /** Hidden per-save relationship level; intentionally never rendered. */
+  endlessNemesisRank?: number | undefined;
 }
 
 const MAX_PARTY = 6;
@@ -158,10 +276,19 @@ const MAX_PARTY = 6;
 const LOCAL_STORE_CAP = 100;
 /** Cross-player samples retained for network-loss fallback. */
 const SHARED_CACHE_CAP = 240;
+const ENDLESS_GHOST_SAMPLE_SIZE = 240;
+const ENDLESS_GHOST_REFILL_INTERVAL = 40;
+const ENDLESS_GHOST_POOL_CAP = 600;
 /** Preferred source-run proximity; +40 is used only when this band is empty. */
 const GHOST_PRIMARY_WAVE_WINDOW = 20;
 /** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
 const PREFETCH_LEAD_WAVES = 15;
+/** Late Hell runs replace half of ordinary trainer encounters with ghosts. */
+const LATE_HELL_GHOST_RATE_DENOMINATOR = 2;
+const LATE_HELL_GHOST_START_WAVE: Readonly<Record<"normal" | "sprint", number>> = {
+  normal: 100,
+  sprint: 50,
+};
 /**
  * A ghost team fielded at wave W is preferentially drawn from a run that ended
  * within this many waves of W. Widened 20 -> 40 (#422 follow-up): the high ghost
@@ -272,6 +399,69 @@ export function isErGhostTeamLegal(snapshot: GhostTeamSnapshot): boolean {
   }
 }
 
+/** Late-Hell ghosts must carry real saved held items, not a legacy bare roster. */
+export function hasErGhostSavedItems(snapshot: GhostTeamSnapshot): boolean {
+  return snapshot.party.some(member =>
+    (member.heldItems ?? []).some(
+      ([typeId, stack]) => typeof typeId === "string" && typeId.length > 0 && Number.isFinite(stack) && stack > 0,
+    ),
+  );
+}
+
+type ErGhostHeldItem = [string, number, unknown[]?];
+
+function heldItemStackTotal(items: readonly ErGhostHeldItem[]): number {
+  return items.reduce((sum, [, rawStack]) => {
+    const stack = Math.floor(Number(rawStack));
+    return sum + (Number.isFinite(stack) && stack > 0 ? stack : 0);
+  }, 0);
+}
+
+function stableGhostItemIndex(key: string, length: number): number {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < key.length; index++) {
+    hash = Math.imul(hash ^ key.charCodeAt(index), 0x01000193) >>> 0;
+  }
+  return length > 0 ? hash % length : 0;
+}
+
+/**
+ * Pick a large real ghost inventory for an Endless raid boss. Individual
+ * 10-stack members are preferred; a qualifying team's combined inventory is
+ * the fallback for old snapshots that spread their items across all six mons.
+ */
+export function selectErEndlessBossHeldItems(
+  snapshots: readonly GhostTeamSnapshot[],
+  selectionKey: string,
+  minimumStacks = 10,
+): ErGhostHeldItem[] {
+  const legalVictories = snapshots.filter(
+    snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot),
+  );
+  const memberLoadouts = legalVictories.flatMap(snapshot =>
+    snapshot.party
+      .map(member => member.heldItems ?? [])
+      .filter(items => heldItemStackTotal(items) >= minimumStacks),
+  );
+  const teamLoadouts = legalVictories
+    .map(snapshot => snapshot.party.flatMap(member => member.heldItems ?? []))
+    .filter(items => heldItemStackTotal(items) >= minimumStacks);
+  const candidates = memberLoadouts.length > 0 ? memberLoadouts : teamLoadouts;
+  const selected = candidates[stableGhostItemIndex(selectionKey, candidates.length)] ?? [];
+  return selected.map(([typeId, stack, args]): ErGhostHeldItem =>
+    Array.isArray(args) ? [typeId, stack, structuredClone(args)] : [typeId, stack]
+  );
+}
+
+/** Saved ghost loadout for one Endless raid party slot. */
+export function getErEndlessBossHeldItems(waveIndex: number, partyIndex: number): ErGhostHeldItem[] {
+  seedGhostPoolFromSharedCache();
+  return selectErEndlessBossHeldItems(
+    prefetched ?? [],
+    `${globalScene.seed}:${waveIndex}:${partyIndex}:endless-raid-items`,
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Env + local storage helpers.
 // -----------------------------------------------------------------------------
@@ -310,6 +500,8 @@ async function sampleRunsFromServer(
   count: number,
   minWave: number,
   maxWave = 200,
+  requireSavedItems = false,
+  victoriesOnly = false,
 ): Promise<GhostTeamSnapshot[]> {
   const base = serverBase();
   const token = getCookie(sessionIdKey);
@@ -320,7 +512,7 @@ async function sampleRunsFromServer(
   }
   try {
     const res = await fetch(
-      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}`,
+      `${base}/savedata/run/sample?difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}${victoriesOnly ? "&victoriesOnly=1" : ""}`,
       { method: "GET", headers: { Accept: "application/json", Authorization: token } },
     );
     if (!res.ok) {
@@ -335,6 +527,49 @@ async function sampleRunsFromServer(
     console.warn("[er-ghost] server sample fetch failed:", err);
     return [];
   }
+}
+
+const endlessLineageRequests = new Set<string>();
+
+async function fetchEndlessLineage(sourceRunId: string, count = 4): Promise<GhostTeamSnapshot[]> {
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function" || endlessLineageRequests.has(sourceRunId)) {
+    return [];
+  }
+  endlessLineageRequests.add(sourceRunId);
+  try {
+    const response = await fetch(
+      `${base}/savedata/run/lineage?sourceRunId=${encodeURIComponent(sourceRunId)}&count=${count}`,
+      { method: "GET", headers: { Accept: "application/json", Authorization: token } },
+    );
+    if (!response.ok) {
+      return [];
+    }
+    const data = await response.json();
+    return (Array.isArray(data) ? data : (data?.teams ?? []))
+      .filter(isValidSnapshot)
+      .filter(snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot));
+  } catch {
+    return [];
+  }
+}
+
+export function reportErEndlessGhostEncounter(result: "player-win" | "ghost-win"): void {
+  const report = finalizeErEndlessGhostEncounter(result, globalScene.currentBattle?.turn ?? 0);
+  if (!report) {
+    return;
+  }
+  const base = serverBase();
+  const token = getCookie(sessionIdKey);
+  if (bypassLogin || !base || !token || typeof fetch !== "function") {
+    return;
+  }
+  void fetch(`${base}/savedata/run/ghost-result`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: token },
+    body: JSON.stringify(report),
+  }).catch(() => undefined);
 }
 
 /**
@@ -511,6 +746,25 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
   const heldItems = serializeHeldItems(p, isPlayer);
   const erShinyLab = serializeShinyLabLook(p);
   const erShinyLabName = serializeShinyLabName(p);
+  const erBlackShiny = p?.customPokemonData?.erBlackShiny === true && p?.shiny === true && p?.variant === 2;
+  const erGiftAbilities = erBlackShiny && Array.isArray(p?.customPokemonData?.erGiftAbilities)
+    ? [...new Set<number>(p.customPokemonData.erGiftAbilities)]
+      .filter(id => Number.isInteger(id) && ER_BLACK_SHINY_ABILITY_POOL.includes(id))
+      .slice(0, 3)
+    : [];
+  const requestedGiftIndex = Number.isInteger(p?.customPokemonData?.erGiftIndex)
+    ? p.customPokemonData.erGiftIndex
+    : 0;
+  const erGiftIndex = erGiftAbilities.length > 0
+    ? Math.max(0, Math.min(erGiftAbilities.length - 1, requestedGiftIndex))
+    : 0;
+  const abilityOverrides = [
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.ability),
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.passive),
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.passive2),
+    sanitizeGhostAbilityOverride(p?.customPokemonData?.passive3),
+  ] as [AbilityId | -1, AbilityId | -1, AbilityId | -1, AbilityId | -1];
+  const hasAbilityOverride = abilityOverrides.some(abilityId => abilityId !== -1);
   return {
     speciesId: p?.species?.speciesId ?? 0,
     formIndex: p?.formIndex ?? 0,
@@ -523,6 +777,12 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     variant: p?.variant ?? 0,
     passive: !!p?.passive,
     moves,
+    ...(hasAbilityOverride ? {
+      abilityOverrides,
+      abilityOverridesForm: p?.customPokemonData?.abilityOverridesForm === true,
+    } : {}),
+    ...(erBlackShiny ? { erBlackShiny: true } : {}),
+    ...(erGiftAbilities.length > 0 ? { erGiftAbilities, erGiftIndex } : {}),
     ...(heldItems.length > 0 ? { heldItems } : {}),
     ...(erShinyLab ? { erShinyLab } : {}),
     ...(erShinyLabName ? { erShinyLabName } : {}),
@@ -580,9 +840,8 @@ function serializeShinyLabLook(p: any): ErShinyLabSavedLook | undefined {
   return normalizeErShinyLabSavedLook(encodeErShinyLabPreset({ loadout, params }));
 }
 
-/** Serialise a member's held items as [modifierTypeId, stackCount] pairs, or [] when
- * none. Best-effort and never throws - item data is non-essential to the snapshot. */
-function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
+/** Serialise a member's held items, including generated-type arguments when needed. */
+function serializeHeldItems(p: any, isPlayer: boolean): [string, number, unknown[]?][] {
   try {
     const id = p?.id;
     if (id == null) {
@@ -590,16 +849,21 @@ function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
     }
     return globalScene
       .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === id, isPlayer)
-      .map(m => [(m as PokemonHeldItemModifier).type.id, (m as PokemonHeldItemModifier).getStackCount()] as [string, number])
+      .map(m => {
+        const modifier = m as PokemonHeldItemModifier;
+        const type = modifier.type as { id: string; getPregenArgs?: () => unknown[] };
+        const generatedTypeArgs = typeof type.getPregenArgs === "function" ? type.getPregenArgs() : undefined;
+        return Array.isArray(generatedTypeArgs) && generatedTypeArgs.length > 0
+          ? ([type.id, modifier.getStackCount(), generatedTypeArgs] as [string, number, unknown[]])
+          : ([type.id, modifier.getStackCount()] as [string, number]);
+      })
       .filter(([typeId]) => !!typeId);
   } catch {
     return [];
   }
 }
 
-/** Serialise the run's active ER relics as [kind, stackCount, chosenWeather] snapshots.
- * RECORDS-ONLY: persisted for analytics; NEVER reconstructed or applied to a fielded ghost
- * (markTrainerAsGhost ignores this field entirely). Best-effort and never throws. */
+/** Serialise active ER relics as [kind, stackCount, chosenWeather] snapshots. */
 function serializeRelics(): [string, number, number | null][] {
   try {
     return globalScene
@@ -626,7 +890,11 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   // run is the "endless contamination" bug. Daily is a separate, throwaway mode. Only
   // classic / classic-challenge teams are valid ghosts. (The worker /sample query
   // ALSO filters these, so already-uploaded endless rows are excluded server-side.)
-  if (globalScene?.gameMode?.isEndless || globalScene?.gameMode?.isDaily) {
+  if (
+    globalScene?.gameMode?.isEndless
+    || globalScene?.gameMode?.isDaily
+    || isErEndlessContinuationActive()
+  ) {
     return null;
   }
   const party = globalScene?.getPlayerParty?.() ?? [];
@@ -655,8 +923,7 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     opponentParty,
     starters: captureRunStarterLines(),
     challenges: captureRunChallenges(),
-    // ER (relics): records-only snapshot of the run's relics; persisted to runs.relics
-    // for analytics. NEVER applied to the fielded ghost (markTrainerAsGhost ignores it).
+    // Fielded ghosts restore these relics in addition to normal encounter buffs.
     relics: serializeRelics(),
     killedByGhost: killerGhost != null || undefined,
     ghostSourceName: killerGhost?.trainerName,
@@ -813,6 +1080,9 @@ export function recordGhostTeamOnGameOver(isVictory: boolean): void {
 // -----------------------------------------------------------------------------
 let prefetched: GhostTeamSnapshot[] | null = null;
 let prefetchStarted = false;
+let endlessGhostPoolFetch: Promise<void> | null = null;
+let endlessGhostPoolRetryAfter = 0;
+let endlessGhostPicksSinceRefill = 0;
 const usedGhostIds = new Set<string>();
 const usedGhostUploaders = new Set<string>();
 const usedGhostTeamFingerprints = new Set<string>();
@@ -830,20 +1100,24 @@ function ghostUploaderKey(snapshot: GhostTeamSnapshot): string {
 /** Stable semantic team hash: cosmetic variants do not make an otherwise identical team new. */
 export function ghostTeamFingerprint(snapshot: GhostTeamSnapshot): string {
   const semanticParty = snapshot.party
-    .map(member =>
-      JSON.stringify([
+    .map(member => {
+      const abilityOverrides = getSanitizedGhostAbilityOverrides(member);
+      const hasAbilityOverride = abilityOverrides.some(abilityId => abilityId !== -1);
+      return JSON.stringify([
         member.speciesId,
         member.formIndex,
         member.abilityIndex,
         member.nature,
         member.passive,
+        abilityOverrides,
+        hasAbilityOverride && member.abilityOverridesForm === true,
         Array.isArray(member.ivs) ? member.ivs : [],
         Array.isArray(member.moves) ? member.moves.slice().sort((a, b) => a - b) : [],
         Array.isArray(member.heldItems)
           ? member.heldItems.slice().sort((a, b) => String(a[0]).localeCompare(String(b[0])))
           : [],
-      ]),
-    )
+      ]);
+    })
     .sort();
   const value = JSON.stringify(semanticParty);
   let a = 0x811c9dc5;
@@ -873,6 +1147,46 @@ function mergeGhostPool(teams: GhostTeamSnapshot[], persist = false): void {
     return true;
   });
   onGhostPoolPublished?.(prefetched);
+}
+
+function requestErEndlessGhostPool(): Promise<void> {
+  if (coopGhostFetchSuppressed?.()) {
+    prefetchStarted = true;
+    return Promise.resolve();
+  }
+  if ((prefetched?.length ?? 0) >= ENDLESS_GHOST_POOL_CAP || endlessGhostPoolRetryAfter > Date.now()) {
+    return Promise.resolve();
+  }
+  if (endlessGhostPoolFetch) {
+    return endlessGhostPoolFetch;
+  }
+  prefetchStarted = true;
+  endlessGhostPoolFetch = fetchGhostTeams(
+    getErDifficulty(),
+    ENDLESS_GHOST_SAMPLE_SIZE,
+    0,
+    200,
+    true,
+    true,
+  )
+    .then(teams => {
+      if (teams.length === 0) {
+        endlessGhostPoolRetryAfter = Date.now() + 15_000;
+        return;
+      }
+      endlessGhostPoolRetryAfter = 0;
+      const remaining = Math.max(0, ENDLESS_GHOST_POOL_CAP - (prefetched?.length ?? 0));
+      mergeGhostPool(teams.slice(0, remaining), true);
+    })
+    .catch(error => {
+      endlessGhostPoolRetryAfter = Date.now() + 15_000;
+      // biome-ignore lint/suspicious/noConsole: included in Send Logs diagnostics.
+      console.warn("[er-ghost] Endless pool refresh failed:", error);
+    })
+    .finally(() => {
+      endlessGhostPoolFetch = null;
+    });
+  return endlessGhostPoolFetch;
 }
 
 function seedGhostPoolFromSharedCache(): void {
@@ -975,10 +1289,21 @@ async function fetchGhostTeams(
   count: number,
   minWave: number,
   maxWave = 200,
+  requireSavedItems = false,
+  victoriesOnly = false,
 ): Promise<GhostTeamSnapshot[]> {
   // Preferred: the authenticated shared pool (other players' runs that got deep
   // enough — `minWave` keeps shallow runs out of late ghost waves).
-  const fromServer = await sampleRunsFromServer(difficulty, count, minWave, maxWave);
+  const fromServer = (await sampleRunsFromServer(
+    difficulty,
+    count,
+    minWave,
+    maxWave,
+    requireSavedItems,
+    victoriesOnly,
+  )).filter(snapshot =>
+    (!requireSavedItems || hasErGhostSavedItems(snapshot)) && (!victoriesOnly || snapshot.isVictory),
+  );
   if (fromServer.length > 0) {
     saveSharedGhostCache(fromServer);
     return fromServer;
@@ -988,12 +1313,16 @@ async function fetchGhostTeams(
     try {
       const sep = url.includes("?") ? "&" : "?";
       const res = await fetch(
-        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}`,
+        `${url}${sep}difficulty=${encodeURIComponent(difficulty)}&count=${count}&minWave=${minWave}&maxWave=${maxWave}${requireSavedItems ? "&requireSavedItems=1" : ""}${victoriesOnly ? "&victoriesOnly=1" : ""}`,
         { method: "GET", headers: { Accept: "application/json" } },
       );
       if (res.ok) {
         const data = await res.json();
-        const list = (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot);
+        const list = (Array.isArray(data) ? data : (data?.teams ?? []))
+          .filter(isValidSnapshot)
+          .filter(snapshot =>
+            (!requireSavedItems || hasErGhostSavedItems(snapshot)) && (!victoriesOnly || snapshot.isVictory),
+          );
         if (list.length > 0) {
           saveSharedGhostCache(list as GhostTeamSnapshot[]);
           return list as GhostTeamSnapshot[];
@@ -1010,9 +1339,21 @@ async function fetchGhostTeams(
     snapshot =>
       snapshot.waveReached >= minWave
       && snapshot.waveReached <= maxWave
-      && ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty),
+      && (victoriesOnly || ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty))
+      && (!requireSavedItems || hasErGhostSavedItems(snapshot))
+      && (!victoriesOnly || snapshot.isVictory),
   );
   return cached.slice(-count);
+}
+
+/** Preload the all-difficulty victorious-item pool before Endless enters its first encounter. */
+export async function prepareErEndlessGhostPool(): Promise<void> {
+  seedGhostPoolFromSharedCache();
+  const local = loadLocalGhostTeams().filter(
+    snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot),
+  );
+  mergeGhostPool(local);
+  await requestErEndlessGhostPool();
 }
 
 /**
@@ -1024,16 +1365,17 @@ function requestGhostBand(
   minWave: number,
   maxWave: number,
   count: number,
+  requireSavedItems = false,
 ): void {
   if (minWave > maxWave) {
     return;
   }
-  const key = `${difficulty}:${minWave}:${maxWave}`;
+  const key = `${difficulty}:${minWave}:${maxWave}:${requireSavedItems ? "saved-items" : "any"}`;
   if (requestedGhostBands.has(key) || (ghostBandRetryAfter.get(key) ?? 0) > Date.now()) {
     return;
   }
   requestedGhostBands.add(key);
-  void fetchGhostTeams(difficulty, count, minWave, maxWave)
+  void fetchGhostTeams(difficulty, count, minWave, maxWave, requireSavedItems)
     .then(teams => {
       if (teams.length === 0) {
         requestedGhostBands.delete(key);
@@ -1064,9 +1406,30 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   }
   seedGhostPoolFromSharedCache();
 
+  if (isErEndlessContinuationActive()) {
+    if (!prefetchStarted || endlessGhostPoolRetryAfter > 0) {
+      void requestErEndlessGhostPool();
+    }
+    if (hasErEndlessRift("parallel-lives") || hasErEndlessRift("echo-hunt")) {
+      const source = (prefetched ?? []).find(snapshot =>
+        snapshot.isVictory
+        && hasErGhostSavedItems(snapshot)
+        && !endlessLineageRequests.has(snapshot.id),
+      );
+      if (source) {
+        void fetchEndlessLineage(source.id).then(teams => mergeGhostPool(teams, true));
+      }
+    }
+    return;
+  }
+
   const targets: number[] = [];
-  if (isErGhostChallengeActive()) {
-    const currentBucket = Math.floor((Math.max(1, waveIndex) - 1) / 10) * 10 + 1;
+  const eligibilityWave = isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
+  const pacing = isErSprintRun() ? "sprint" : "normal";
+  const lateHellPrefetch =
+    getErDifficulty() === "hell" && waveIndex > LATE_HELL_GHOST_START_WAVE[pacing] - PREFETCH_LEAD_WAVES;
+  if (isErGhostChallengeActive() || lateHellPrefetch) {
+    const currentBucket = Math.floor((Math.max(1, eligibilityWave) - 1) / 10) * 10 + 1;
     targets.push(currentBucket);
     if (currentBucket + 10 <= 200) {
       targets.push(currentBucket + 10);
@@ -1076,7 +1439,7 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
       ghostWave => ghostWave >= waveIndex && ghostWave - waveIndex <= PREFETCH_LEAD_WAVES,
     );
     if (next != null) {
-      targets.push(next);
+      targets.push(isErSprintRun() ? getErProgressionWave(next) : next);
     }
   }
 
@@ -1089,9 +1452,44 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   for (const target of targets) {
     const primaryEnd = Math.min(200, target + GHOST_PRIMARY_WAVE_WINDOW);
     const fallbackEnd = Math.min(200, target + ER_GHOST_WAVE_WINDOW);
-    requestGhostBand(difficulty, target, primaryEnd, 20);
-    requestGhostBand(difficulty, primaryEnd + 1, fallbackEnd, 10);
+    requestGhostBand(difficulty, target, primaryEnd, 20, lateHellPrefetch);
+    requestGhostBand(difficulty, primaryEnd + 1, fallbackEnd, 10, lateHellPrefetch);
   }
+}
+
+/**
+ * Deterministic late-Hell replacement roll. Ordinary trainer encounters after
+ * wave 100 (normal) or 50 (Sprint) become ghosts half the time. The explicit
+ * Ghost Trainers challenge bypasses this helper because it already replaces
+ * every trainer encounter.
+ */
+export function shouldUseLateHellGhostTrainer(
+  waveIndex: number,
+  seed: string = String(globalScene?.seed ?? ""),
+): boolean {
+  if (getErDifficulty() !== "hell") {
+    return false;
+  }
+  const pacing = isErSprintRun() ? "sprint" : "normal";
+  if (waveIndex <= LATE_HELL_GHOST_START_WAVE[pacing]) {
+    return false;
+  }
+  const key = `${seed}:late-hell-ghost:${waveIndex}:${pacing}`;
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % LATE_HELL_GHOST_RATE_DENOMINATOR === 0;
+}
+
+/** Whether every ghost considered for this wave must have saved held items. */
+export function shouldRequireLateHellGhostItems(waveIndex: number): boolean {
+  if (getErDifficulty() !== "hell") {
+    return false;
+  }
+  const pacing = isErSprintRun() ? "sprint" : "normal";
+  return waveIndex > LATE_HELL_GHOST_START_WAVE[pacing];
 }
 
 /** The uploader of the most recently fielded ghost - the picker avoids
@@ -1153,7 +1551,80 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
   for (let i = 0; i < key.length; i++) {
     h = (h * 31 + key.charCodeAt(i)) >>> 0;
   }
+  if (isErEndlessContinuationActive()) {
+    const depth = getErEndlessEquivalentDepth(waveIndex);
+    const weights = pool.map(snapshot =>
+      1 + Math.min(1, depth / 500) * 2 * Math.max(0, Math.min(1, snapshot.endlessPerformance?.dangerScore ?? 0)),
+    );
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    let roll = (h / 0x1_0000_0000) * total;
+    for (let index = 0; index < pool.length; index++) {
+      roll -= weights[index];
+      if (roll < 0) {
+        return pool[index];
+      }
+    }
+  }
   return pool[h % pool.length];
+}
+
+function augmentErEndlessGhost(
+  snapshot: GhostTeamSnapshot,
+  waveIndex: number,
+  echoStage?: 1 | 2 | 3,
+): GhostTeamSnapshot {
+  const donorCount = hasErEndlessRift("full-procession")
+    ? 2
+    : hasErEndlessRift("seventh-shadow") || echoStage === 3 || (snapshot.endlessNemesisRank ?? 0) >= 2
+      ? 1
+      : 0;
+  const nemesisRank = snapshot.endlessNemesisRank ?? 0;
+  const totalDonors = nemesisRank >= 3 ? Math.max(2, donorCount) : donorCount;
+  const replaceOne = hasErEndlessRift("counter-draft") || nemesisRank >= 3;
+  if (totalDonors === 0 && !replaceOne && echoStage == null && nemesisRank === 0) {
+    return snapshot;
+  }
+  const result = structuredClone(snapshot);
+  result.endlessEchoStage = echoStage;
+  const donorTeams = (prefetched ?? []).filter(candidate =>
+    candidate.id !== snapshot.id
+    && candidate.isVictory
+    && hasErGhostSavedItems(candidate)
+    && isErGhostTeamLegal(candidate),
+  );
+  const donorMembers = donorTeams.flatMap(candidate => candidate.party);
+  if (donorMembers.length === 0) {
+    return result;
+  }
+  const usedSpecies = new Set(result.party.map(member => member.speciesId));
+  const chooseDonor = (slot: number): GhostMember => {
+    const distinct = donorMembers.filter(member => !usedSpecies.has(member.speciesId));
+    const pool = distinct.length > 0 ? distinct : donorMembers;
+    const key = `${globalScene.seed}:endless-donor:${waveIndex}:${snapshot.id}:${slot}`;
+    let hash = 2166136261;
+    for (const char of key) {
+      hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+    }
+    const donor = structuredClone(pool[(hash >>> 0) % pool.length]);
+    usedSpecies.add(donor.speciesId);
+    return donor;
+  };
+  if (replaceOne && result.party.length > 0) {
+    let replaceIndex = 0;
+    let lowestBst = Number.POSITIVE_INFINITY;
+    result.party.forEach((member, index) => {
+      const bst = getPokemonSpecies(member.speciesId)?.baseTotal ?? 0;
+      if (bst < lowestBst) {
+        lowestBst = bst;
+        replaceIndex = index;
+      }
+    });
+    result.party[replaceIndex] = chooseDonor(10);
+  }
+  for (let slot = 0; slot < totalDonors && result.party.length < 8; slot++) {
+    result.party.push(chooseDonor(slot));
+  }
+  return result;
 }
 
 /** Fixed carrier for the staging-only Mystery schedule; deliberately independent of network/account pools. */
@@ -1188,12 +1659,106 @@ function mysteryGauntletGhost(): GhostTeamSnapshot {
  * Stable within a run: the same wave always yields the same ghost.
  */
 export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostTeamSnapshot | null {
+  if (isErEndlessContinuationActive()) {
+    if (!trainerWave) {
+      return null;
+    }
+    const existing = ghostByWave.get(waveIndex);
+    if (existing) {
+      return existing;
+    }
+    const allEligible = (prefetched ?? []).filter(snapshot => {
+      const uploader = ghostUploaderKey(snapshot);
+      const fingerprint = ghostTeamFingerprint(snapshot);
+      return snapshot.isVictory
+        && hasErGhostSavedItems(snapshot)
+        && isErGhostTeamLegal(snapshot)
+        && canUseErEndlessGhost(snapshot.id, uploader, fingerprint);
+    });
+    const returningNemesisId = getErEndlessReturningNemesisId();
+    const returningNemesis = returningNemesisId == null
+      ? undefined
+      : (prefetched ?? []).find(snapshot =>
+          snapshot.id === returningNemesisId
+          && snapshot.isVictory
+          && hasErGhostSavedItems(snapshot)
+          && isErGhostTeamLegal(snapshot),
+        );
+    let route = getErEndlessGhostRoute();
+    if (route == null && hasErEndlessRift("parallel-lives")) {
+      const byUploader = new Map<string, GhostTeamSnapshot[]>();
+      for (const snapshot of allEligible) {
+        const key = ghostUploaderKey(snapshot);
+        const group = byUploader.get(key) ?? [];
+        group.push(snapshot);
+        byUploader.set(key, group);
+      }
+      const candidates = [...byUploader.entries()].filter(([, snapshots]) => snapshots.length >= 3);
+      if (candidates.length > 0) {
+        const [sourceUserId, snapshots] = candidates[waveIndex % candidates.length];
+        beginErEndlessGhostRoute({
+          riftId: "parallel-lives",
+          sourceUserId,
+          sourceSnapshotId: snapshots[0].id,
+          snapshotIds: snapshots.slice(0, 3).map(snapshot => snapshot.id),
+        });
+        route = getErEndlessGhostRoute();
+      }
+    }
+    if (route == null && hasErEndlessRift("echo-hunt")) {
+      const source = pickGhost(allEligible, waveIndex);
+      if (source) {
+        beginErEndlessGhostRoute({
+          riftId: "echo-hunt",
+          sourceUserId: ghostUploaderKey(source),
+          sourceSnapshotId: source.id,
+          snapshotIds: [source.id, source.id, source.id],
+        });
+        route = getErEndlessGhostRoute();
+      }
+    }
+    const routeSnapshotId = route?.snapshotIds[route.encounterIndex];
+    const routed = routeSnapshotId == null
+      ? undefined
+      : (prefetched ?? []).find(snapshot => snapshot.id === routeSnapshotId);
+    const next = returningNemesis ?? routed ?? pickGhost(allEligible, waveIndex);
+    if (!next) {
+      return null;
+    }
+    const uploader = ghostUploaderKey(next);
+    const fingerprint = ghostTeamFingerprint(next);
+    recordErEndlessGhost(next.id, uploader, fingerprint);
+    endlessGhostPicksSinceRefill++;
+    if (endlessGhostPicksSinceRefill >= ENDLESS_GHOST_REFILL_INTERVAL) {
+      endlessGhostPicksSinceRefill = 0;
+      void requestErEndlessGhostPool();
+    }
+    const echoStage = route?.riftId === "echo-hunt"
+      ? (Math.min(3, route.encounterIndex + 1) as 1 | 2 | 3)
+      : undefined;
+    const ranked = structuredClone(next);
+    ranked.endlessNemesisRank = getErEndlessNemesisRank(next.id);
+    const augmented = augmentErEndlessGhost(ranked, waveIndex, echoStage);
+    if (route != null) {
+      advanceErEndlessGhostRoute();
+    }
+    ghostByWave.set(waveIndex, augmented);
+    lastGhostUploader = next.trainerName ?? "";
+    beginErEndlessGhostEncounter(
+      next.id,
+      globalScene.getPlayerParty().reduce((sum, pokemon) => sum + pokemon.getMaxHp(), 0),
+      next.endlessPerformance?.topPerformer === true,
+    );
+    return augmented;
+  }
   // ER (#422): with the Ghost Trainers challenge active, EVERY trainer wave
   // is a ghost wave (the caller says whether this wave fields a trainer).
   // MYSTERY GAUNTLET (#814): the scripted ghost wave always fields a ghost when one
   // is available, regardless of the endgame wave table or the challenge.
   const gauntletGhost = erGauntletActive() && erGauntletWaveKind(waveIndex) === "ghost";
-  if (!gauntletGhost && !isErGhostWave(waveIndex) && !(trainerWave && isErGhostChallengeActive())) {
+  const challengeGhost = trainerWave && isErGhostChallengeActive();
+  const lateHellGhost = trainerWave && !challengeGhost && shouldUseLateHellGhostTrainer(waveIndex);
+  if (!gauntletGhost && !isErGhostWave(waveIndex) && !challengeGhost && !lateHellGhost) {
     if (trainerWave && ghostByWave.size > 0) {
       // Tripwire for the live "silent wave miss" reports: a ghost was already
       // fielded THIS RUN (so it must be a challenge run), yet the challenge
@@ -1225,12 +1790,16 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     return scripted;
   }
   const pool = prefetched ?? [];
+  const eligibilityWave = isErSprintRun() ? getErProgressionWave(waveIndex) : waveIndex;
   // A source run must have ended at or after this wave. Prefer an unseen source
   // within +20; allow +40 only when primary is empty. Snapshot ids, source
   // accounts, and semantic team hashes are never recycled during a run. If both
   // bands are empty, the caller fields a normal trainer.
   const challengeMode = isErGhostChallengeActive();
-  const legal = pool.filter(snapshot => isErGhostTeamLegal(snapshot));
+  const requireSavedItems = shouldRequireLateHellGhostItems(waveIndex);
+  const legal = pool.filter(
+    snapshot => isErGhostTeamLegal(snapshot) && (!requireSavedItems || hasErGhostSavedItems(snapshot)),
+  );
   const unseen = legal.filter(snapshot => {
     return (
       !usedGhostIds.has(snapshot.id)
@@ -1240,13 +1809,13 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   });
   const primary = unseen.filter(
     snapshot =>
-      snapshot.waveReached >= waveIndex
-      && snapshot.waveReached <= waveIndex + GHOST_PRIMARY_WAVE_WINDOW,
+      snapshot.waveReached >= eligibilityWave
+      && snapshot.waveReached <= eligibilityWave + GHOST_PRIMARY_WAVE_WINDOW,
   );
   const fallback = unseen.filter(
     snapshot =>
-      snapshot.waveReached >= waveIndex
-      && snapshot.waveReached <= waveIndex + ER_GHOST_WAVE_WINDOW,
+      snapshot.waveReached >= eligibilityWave
+      && snapshot.waveReached <= eligibilityWave + ER_GHOST_WAVE_WINDOW,
   );
   const next = pickGhost(primary.length > 0 ? primary : fallback, waveIndex);
   if (!next) {
@@ -1274,6 +1843,9 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
 export function resetErGhostRunState(): void {
   prefetched = null;
   prefetchStarted = false;
+  endlessGhostPoolFetch = null;
+  endlessGhostPoolRetryAfter = 0;
+  endlessGhostPicksSinceRefill = 0;
   usedGhostIds.clear();
   usedGhostUploaders.clear();
   usedGhostTeamFingerprints.clear();
@@ -1304,6 +1876,9 @@ export function getErGhostRepeatLedger(): ErGhostRepeatLedgerSaveData {
 export function restoreErGhostRepeatLedger(data: ErGhostRepeatLedgerSaveData | undefined): void {
   prefetched = null;
   prefetchStarted = false;
+  endlessGhostPoolFetch = null;
+  endlessGhostPoolRetryAfter = 0;
+  endlessGhostPicksSinceRefill = 0;
   ghostByWave.clear();
   requestedGhostBands.clear();
   ghostBandRetryAfter.clear();
@@ -1439,6 +2014,127 @@ export function setPrefetchedGhostTeamsForTests(teams: GhostTeamSnapshot[]): voi
 // Spawn — build a ghost Trainer + its team.
 // -----------------------------------------------------------------------------
 const GHOST_BY_TRAINER = new WeakMap<Trainer, GhostTeamSnapshot>();
+const ENDLESS_GHOST_VITAMINS = new WeakMap<Trainer, number[][]>();
+
+function getRoleVector(stats: readonly number[]): readonly [number, number, number] {
+  const total = Math.max(1, stats.reduce((sum, value) => sum + value, 0));
+  const offense = Math.max(1, stats[Stat.ATK] + stats[Stat.SPATK]);
+  return [
+    (stats[Stat.ATK] - stats[Stat.SPATK]) / offense,
+    stats[Stat.SPD] / total,
+    (stats[Stat.HP] + stats[Stat.DEF] + stats[Stat.SPDEF]) / total,
+  ];
+}
+
+function roleDistance(left: readonly number[], right: readonly number[]): number {
+  return left.reduce((sum, value, index) => sum + (value - right[index]) ** 2, 0);
+}
+
+function distributeVitamins(member: GhostMember, total: number): number[] {
+  const species = getPokemonSpecies(member.speciesId);
+  const result = PERMANENT_STATS.map(() => 0);
+  if (!species || total <= 0) {
+    return result;
+  }
+  const weights = species.baseStats.map(value => Math.max(1, value));
+  const weightTotal = weights.reduce((sum, value) => sum + value, 0);
+  const credit = PERMANENT_STATS.map(() => 0);
+  let remaining = total;
+  while (remaining > 0 && PERMANENT_STATS.some(stat => result[stat] < Math.max(0, member.ivs[stat] ?? 0))) {
+    let chosen: PermanentStat | null = null;
+    for (const stat of PERMANENT_STATS) {
+      if (result[stat] >= Math.max(0, member.ivs[stat] ?? 0)) {
+        continue;
+      }
+      credit[stat] += weights[stat];
+      if (chosen == null || credit[stat] > credit[chosen]) {
+        chosen = stat;
+      }
+    }
+    if (chosen == null) {
+      break;
+    }
+    result[chosen]++;
+    credit[chosen] -= weightTotal;
+    remaining--;
+  }
+  return result;
+}
+
+function buildEndlessGhostVitaminPlan(snapshot: GhostTeamSnapshot): number[][] {
+  const playerParty = globalScene.getPlayerParty();
+  const vitaminByPokemon = new Map<number, number[]>();
+  for (const pokemon of playerParty) {
+    vitaminByPokemon.set(pokemon.id, PERMANENT_STATS.map(() => 0));
+  }
+  for (const modifier of globalScene.findModifiers(candidate => candidate instanceof BaseStatModifier, true)) {
+    const vitamin = modifier as BaseStatModifier;
+    const profile = vitaminByPokemon.get(vitamin.pokemonId);
+    if (profile) {
+      profile[vitamin.getStat()] += vitamin.getStackCount();
+    }
+  }
+  const players = playerParty.map(pokemon => ({
+    role: getRoleVector(pokemon.getSpeciesForm().baseStats),
+    total: (vitaminByPokemon.get(pokemon.id) ?? []).reduce((sum, value) => sum + value, 0),
+  }));
+  const unused = new Set(players.map((_player, index) => index));
+  return snapshot.party.map(member => {
+    if (players.length === 0) {
+      return PERMANENT_STATS.map(() => 0);
+    }
+    const species = getPokemonSpecies(member.speciesId);
+    const role = getRoleVector(species?.baseStats ?? [1, 1, 1, 1, 1, 1]);
+    const candidates = unused.size > 0 ? [...unused] : players.map((_player, index) => index);
+    const match = candidates.reduce((best, index) =>
+      roleDistance(role, players[index].role) < roleDistance(role, players[best].role) ? index : best,
+    candidates[0]);
+    unused.delete(match);
+    return distributeVitamins(member, players[match].total);
+  });
+}
+
+function applyEndlessGhostVitamins(trainer: Trainer, enemy: EnemyPokemon, memberIndex: number): void {
+  const snapshot = GHOST_BY_TRAINER.get(trainer);
+  if (!snapshot || !isErEndlessContinuationActive()) {
+    return;
+  }
+  let plan = ENDLESS_GHOST_VITAMINS.get(trainer);
+  if (!plan) {
+    plan = buildEndlessGhostVitaminPlan(snapshot);
+    ENDLESS_GHOST_VITAMINS.set(trainer, plan);
+  }
+  for (const stat of PERMANENT_STATS) {
+    const count = plan[memberIndex]?.[stat] ?? 0;
+    if (count <= 0) {
+      continue;
+    }
+    const type = new BaseStatBoosterModifierType(stat).withIdFromFunc(modifierTypes.BASE_STAT_BOOSTER);
+    const modifier = type.newModifier(enemy) as BaseStatModifier | null;
+    if (modifier) {
+      modifier.stackCount = count;
+      globalScene.addEnemyModifier(modifier, true, true);
+    }
+  }
+  enemy.calculateStats();
+}
+
+function getEndlessGhostLevel(fallback: number, runWave: number): number {
+  if (!isErEndlessContinuationActive()) {
+    return fallback;
+  }
+  const playerTopLevel = globalScene.getPlayerParty().reduce(
+    (highest, pokemon) => pokemon.isAllowedInBattle() ? Math.max(highest, pokemon.level) : highest,
+    0,
+  );
+  if (playerTopLevel <= 0) {
+    return fallback;
+  }
+  const baseOffset = getErDifficulty() === "youngster" ? 2 : getErDifficulty() === "ace" ? 1 : 0;
+  const depth = getErEndlessEquivalentDepth(runWave);
+  const offset = Math.ceil(baseOffset * Math.max(0, 20 - depth) / 20);
+  return Math.max(1, playerTopLevel - offset);
+}
 
 /**
  * Build the placeholder-token context from the ENCOUNTERING player's side, at the
@@ -1469,7 +2165,7 @@ export function buildGhostDialogueCtx(): GhostDialogueContext {
 /** Flag a freshly-built Trainer as a ghost, and size its party to the snapshot. */
 export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot): void {
   GHOST_BY_TRAINER.set(trainer, snapshot);
-  const size = Math.min(snapshot.party.length, MAX_PARTY);
+  const size = Math.min(snapshot.party.length, isErEndlessContinuationActive() ? 8 : MAX_PARTY);
   // Shadow the instance method so getPartyLevels / genParty field exactly the
   // ghost's team size (the shared trainer config is left untouched).
   trainer.getPartyTemplate = () => new TrainerPartyTemplate(size, PartyMemberStrength.STRONGER);
@@ -1567,6 +2263,12 @@ export function hasErGhostOverride(trainer: Trainer): boolean {
   return GHOST_BY_TRAINER.has(trainer);
 }
 
+/** Whether a Pokemon belongs to the enemy side of the active ghost battle. */
+export function isErGhostEnemyPokemon(pokemon: Pokemon | null | undefined): boolean {
+  const trainer = globalScene?.currentBattle?.trainer;
+  return !!pokemon?.isEnemy() && !!trainer && GHOST_BY_TRAINER.has(trainer);
+}
+
 /**
  * The full ghost snapshot backing this trainer, or `null` when it is not an ER ghost.
  * The ghost identity lives ONLY in the in-memory {@linkcode GHOST_BY_TRAINER} WeakMap,
@@ -1610,7 +2312,8 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
       return null;
     }
     const battle = globalScene.currentBattle;
-    const currentWave = battle?.waveIndex ?? snapshot.waveReached;
+    const runWave = battle?.waveIndex ?? snapshot.waveReached;
+    const currentWave = isErSprintRun() ? getErProgressionWave(runWave) : runWave;
     // ER (#422): a team fielded from BEYOND the fairness window (challenge widening
     // / last resort) gets its members devolved - one stage per overshoot band, two
     // past +20, base form past +60 - so a deep team's fully evolved mons don't sweep
@@ -1631,7 +2334,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
         species = prev;
       }
     }
-    const level = battle?.enemyLevels?.[index] ?? member.level;
+    const level = getEndlessGhostLevel(battle?.enemyLevels?.[index] ?? member.level, runWave);
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
     // addEnemyPokemon runs the universal BST gate. Ghost selection's +40-wave
     // window is not sufficient on its own: the uploader may already own a
@@ -1659,10 +2362,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     enemy.shiny = member.shiny;
     enemy.variant = member.variant as Variant;
     enemy.passive = member.passive;
-    enemy.customPokemonData.erShinyLabSuppressLocal = true;
-    enemy.customPokemonData.erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
-    enemy.customPokemonData.erShinyLabName =
-      member.shiny && member.erShinyLab ? sanitizeErShinyLabPresetName(member.erShinyLabName) || undefined : undefined;
+    Object.assign(enemy.customPokemonData, getErGhostMemberCustomData(member));
     if (member.moves.length > 0 && speciesMatchesStored) {
       const moves = member.moves.map(id => new PokemonMove(id));
       enemy.moveset = moves;
@@ -1671,6 +2371,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     // else: keep the level-appropriate moveset addEnemyPokemon already generated for the
     // final (devolved or BST-swapped) species.
     enemy.generateName();
+    applyEndlessGhostVitamins(trainer, enemy, index);
     return enemy;
   } catch {
     return null;

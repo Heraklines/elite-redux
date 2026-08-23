@@ -120,7 +120,7 @@ export class WeatherEffectPhase extends CommonAnimPhase {
             !pokemon
             || pokemon.getTypes(true, true).filter(t => this.weather?.isTypeDamageImmune(t)).length > 0
             || pokemon.switchOutStatus // ER relic (#439): Weathervane - player mons ignore residual // sandstorm/hail chip damage while the relic is held.
-            || (pokemon.isPlayer() && erWeathervaneBlocksWeatherDamage())
+            || erWeathervaneBlocksWeatherDamage(pokemon.isPlayer())
             || erTacticalBlocksWeatherDamage(pokemon); // ER Safety Goggles
           if (!immune) {
             inflictDamage(pokemon);

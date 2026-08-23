@@ -886,9 +886,14 @@ export abstract class EntryHazardTag extends SerializableArenaTag {
       return false;
     }
 
-    // ER Shield Dust (19): total immunity to ALL entry hazards on switch-in.
-    // Scanned by name (registration-free marker) so any hazard subclass honors it.
+    // Registration-free marker names keep hazard attrs independent of the dispatcher.
     if (pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "EntryHazardImmunityAbAttr")) {
+      return false;
+    }
+    if (
+      this.groundedOnly
+      && pokemon.getAllActiveAbilityAttrs().some(a => a?.constructor?.name === "GroundedEntryHazardImmunityAbAttr")
+    ) {
       return false;
     }
 
@@ -1590,6 +1595,24 @@ export class WonderRoomTag extends RoomArenaTag {
     return "";
   }
 }
+/**
+ * Mega Barbaracle Y — Swirly Room. While active, the damage category of every
+ * damaging move is swapped without mutating the move singleton.
+ */
+export class SwirlyRoomTag extends RoomArenaTag {
+  public readonly tagType = ArenaTagType.SWIRLY_ROOM;
+  constructor(turnCount: number, sourceMove?: MoveId, sourceId?: number) {
+    super(turnCount, sourceMove ?? MoveId.SWIRLY_ROOM, sourceId);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+}
 
 /**
  * True while an ER Wonder Room ({@linkcode WonderRoomTag}) is active on the
@@ -2210,6 +2233,31 @@ export class ErEntryTrapTag extends EntryHazardTag {
   }
 }
 
+/** Elite Redux Bitter Drill's persistent grounded entry hazard. */
+export class ErDrillBitsTag extends EntryHazardTag {
+  public override readonly tagType = ArenaTagType.ER_DRILL_BITS;
+
+  public override get maxLayers(): number {
+    return 1;
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  protected override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    if (simulated) {
+      return true;
+    }
+    pokemon.addTag(BattlerTagType.ER_EMBEDDED, 0, MoveId.NONE, this.sourceId);
+    return true;
+  }
+}
+
 // TODO: swap `sourceMove` and `sourceId` and make `sourceMove` an optional parameter
 export function getArenaTag(
   tagType: ArenaTagType,
@@ -2251,6 +2299,8 @@ export function getArenaTag(
       return new CreepingThornsTag(sourceId, side);
     case ArenaTagType.ER_INFESTATION_TRAP:
       return new ErEntryTrapTag(sourceId, side);
+    case ArenaTagType.ER_DRILL_BITS:
+      return new ErDrillBitsTag(MoveId.NONE, sourceId, side);
     case ArenaTagType.SEDIMENT_BLOOM:
       return new SedimentBloomTag(sourceId, side);
     case ArenaTagType.GRAVE_MARKER:
@@ -2269,6 +2319,8 @@ export function getArenaTag(
       return new MagicRoomTag(turnCount, sourceId);
     case ArenaTagType.WONDER_ROOM:
       return new WonderRoomTag(turnCount, sourceId);
+    case ArenaTagType.SWIRLY_ROOM:
+      return new SwirlyRoomTag(turnCount, sourceMove, sourceId);
     case ArenaTagType.GRAVITY:
       return new GravityTag(turnCount, sourceId);
     case ArenaTagType.REFLECT:
@@ -2331,18 +2383,20 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.NO_CRIT]: NoCritTag;
   [ArenaTagType.TOXIC_SPIKES]: ToxicSpikesTag;
   [ArenaTagType.HOT_COALS]: HotCoalsTag;
-  [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
-  [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
   [ArenaTagType.ER_INFESTATION_TRAP]: ErEntryTrapTag;
+  [ArenaTagType.ER_DRILL_BITS]: ErDrillBitsTag;
+  [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
   [ArenaTagType.SEDIMENT_BLOOM]: SedimentBloomTag;
   [ArenaTagType.GRAVE_MARKER]: GraveMarkerTag;
   [ArenaTagType.ER_WEATHER_LOCK]: ErWeatherLockTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;
+  [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
   [ArenaTagType.TRICK_ROOM]: TrickRoomTag;
   [ArenaTagType.INVERSE_ROOM]: InverseRoomTag;
   [ArenaTagType.MAGIC_ROOM]: MagicRoomTag;
   [ArenaTagType.WONDER_ROOM]: WonderRoomTag;
+  [ArenaTagType.SWIRLY_ROOM]: SwirlyRoomTag;
   [ArenaTagType.GRAVITY]: GravityTag;
   [ArenaTagType.REFLECT]: ReflectTag;
   [ArenaTagType.LIGHT_SCREEN]: LightScreenTag;

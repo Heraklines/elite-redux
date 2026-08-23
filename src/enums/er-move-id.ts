@@ -198,6 +198,8 @@ export const ErMoveId = {
   OBSCURED_SHOT: 5184,
   BLITZ_ARROW: 5185,
   RUMBLE_KICK: 5186,
+  SWIRLY_ROOM: 6000,
+  IVORY_IMPACT: 6001,
 } as const;
 
 export type ErMoveIdKey = keyof typeof ErMoveId;

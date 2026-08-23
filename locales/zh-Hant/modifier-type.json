@@ -373,8 +373,8 @@
       "description": "顯著增加野生寶可夢的閃光概率。"
     },
     "ABILITY_CHARM": {
-      "name": "特性護符",
-      "description": "顯著增加野生寶可夢有隱藏特性的概率。"
+      "name": "神秘事件護符",
+      "description": "使神秘事件出現的機率翻倍。"
     },
     "CATCHING_CHARM": {
       "name": "防晃護符",

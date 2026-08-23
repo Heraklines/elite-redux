@@ -122,6 +122,54 @@ const allowedMarketModes = new Set(["leave", "target-held"]);
 const allowedModes = new Set(["gating", "shakedown", "nightly"]);
 const allowedRenderProfiles = new Set(["animations-on-surface", "animations-skipped-depth", "mystery-gauntlet"]);
 const allowedGameSpeeds = new Set([2, 3, 4, 5, 7, 10]);
+const allowedPartyRewardIds = new Set([
+  "TM_CASE",
+  "ER_LEARNERS_SHROOM",
+  "MEMORY_MUSHROOM",
+  "TM_COMMON",
+  "TM_GREAT",
+  "TM_ULTRA",
+  "ER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_CAPSULE",
+  "ER_GREATER_ABILITY_RANDOMIZER",
+  "ABILITY_RANDOMIZER",
+  "MOVE_SLOT_EXPANDER",
+  "PP_UP",
+  "PP_MAX",
+  "ETHER",
+  "MAX_ETHER",
+  "ELIXIR",
+  "MAX_ELIXIR",
+  "MINT",
+  "TERA_SHARD",
+  "RARE_CANDY",
+  "RARER_CANDY",
+  "POTION",
+  "SUPER_POTION",
+  "HYPER_POTION",
+  "MAX_POTION",
+  "FULL_RESTORE",
+  "REVIVE",
+  "MAX_REVIVE",
+  "FULL_HEAL",
+  "SACRED_ASH",
+  "EVOLUTION_ITEM",
+  "RARE_EVOLUTION_ITEM",
+  "FORM_CHANGE_ITEM",
+  "RARE_FORM_CHANGE_ITEM",
+  "DNA_SPLICERS",
+  "ER_DEX_NAV",
+]);
+const partyRewardLearnMoveIds = new Set([
+  "TM_CASE",
+  "ER_LEARNERS_SHROOM",
+  "MEMORY_MUSHROOM",
+  "TM_COMMON",
+  "TM_GREAT",
+  "TM_ULTRA",
+]);
+const directPartyRewardIds = new Set(["RARER_CANDY", "SACRED_ASH"]);
+const nestedDirectRewardIds = new Set(["ER_DEX_NAV"]);
 
 /** Read every campaign-only knob (base gameplay config still comes from loadConfig). */
 export function loadCampaignPolicy() {
@@ -159,6 +207,10 @@ export function loadCampaignPolicy() {
   const mysteryRequired = envBoolean("COOP_UI_REQUIRE_MYSTERY_GAUNTLET", false);
   const registeredInteractionsRequired = envBoolean("COOP_UI_REQUIRE_REGISTERED_INTERACTIONS", false);
   const abilityCapsuleRequired = envBoolean("COOP_UI_REQUIRE_ABILITY_CAPSULE", false);
+  const partyRewardId = envTrim("COOP_UI_PARTY_REWARD_ID") || null;
+  if (partyRewardId != null && !allowedPartyRewardIds.has(partyRewardId)) {
+    throw new Error(`COOP_UI_PARTY_REWARD_ID must be one of ${[...allowedPartyRewardIds].join(", ")}`);
+  }
   const navigationRequired = envBoolean("COOP_UI_REQUIRE_NAVIGATION_DEPTH", false);
   const crossroadsRoute = envKeys("COOP_UI_CROSSROADS_ROUTE", ["stay", "leave", "stay", "leave"]);
   if (crossroadsRoute.length === 0 || crossroadsRoute.some(choice => choice !== "stay" && choice !== "leave")) {
@@ -190,6 +242,18 @@ export function loadCampaignPolicy() {
     abilityCapsule: {
       required: abilityCapsuleRequired,
       inspectSummary: envBoolean("COOP_UI_REWARD_INSPECT_SUMMARY", false),
+    },
+    partyMutatingReward: {
+      required: partyRewardId != null,
+      rewardId: partyRewardId,
+      // The Greater Ability Randomizer live report entered Check Team from this exact reward
+      // and reordered an active mon. Make that UI -> relay -> party -> field-presentation path
+      // mandatory in its real two-browser journey instead of proving only the reward itself.
+      checkTeamReorder: partyRewardId === "ER_GREATER_ABILITY_RANDOMIZER",
+      acceptLearnMove: partyRewardId != null && partyRewardLearnMoveIds.has(partyRewardId),
+      direct:
+        partyRewardId != null && (directPartyRewardIds.has(partyRewardId) || nestedDirectRewardIds.has(partyRewardId)),
+      nestedDirect: partyRewardId != null && nestedDirectRewardIds.has(partyRewardId),
     },
     navigation: {
       required: navigationRequired,
@@ -365,6 +429,7 @@ export function buildDispatchTable(policy) {
       owner: { marker: REWARD_OWNER },
       keys: [],
       partySlot: policy.rewardTargetSlot,
+      forcePartySlot: policy.partyMutatingReward.required,
       inspectSummary: policy.abilityCapsule.inspectSummary,
     },
     {

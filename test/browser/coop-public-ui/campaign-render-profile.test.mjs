@@ -7,7 +7,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { buildDispatchTable, loadCampaignPolicy } from "./campaign-policy.mjs";
-import { EvidenceSink, isCapturedApiUrl, waitForPublicInputDispatch } from "./evidence.mjs";
+import {
+  EvidenceSink,
+  isCapturedApiUrl,
+  waitForPublicInputDispatch,
+  waitForPublicInputFrameSettle,
+} from "./evidence.mjs";
 
 function withRenderProfile(value, callback) {
   const previous = process.env.COOP_UI_RENDER_PROFILE;
@@ -178,6 +183,7 @@ test("every gameplay co-op journey visibly applies its requested settings before
 
   const gameplayJourneys = [
     "fresh-wave2",
+    "reward-pause-settings",
     "fresh-resume",
     "reverse-resume",
     "faint-replacement",
@@ -211,15 +217,17 @@ test("public keys release before waiting for the exact production input dispatch
   assert.match(harness, /findLastInputHealth\(this\.pageCursor\)/u);
   assert.match(harness, /findLastInputEcho\(this\.pageCursor\)/u);
   assert.match(harness, /findLastInputDispatch\(this\.pageCursor\)/u);
+  assert.match(harness, /waitForPublicInputFrameSettle\(this\.evidence/u);
   assert.doesNotMatch(harness, /keyboard\.press\(key, \{ delay: Math\.min\(this\.config\.actionDelayMs, 100\) \}\)/u);
   const inputDispatchWait = evidence.slice(
     evidence.indexOf("export async function waitForPublicInputDispatch"),
-    evidence.indexOf("const SURFACE_PREFIX"),
+    evidence.indexOf("export async function waitForPublicInputFrameSettle"),
   );
   assert.match(inputDispatchWait, /browser-input-dispatch[\s\S]+controllerType/u);
   assert.doesNotMatch(inputDispatchWait, /browser-input-health|browser-input-echo|requestAnimationFrame/u);
   assert.match(observer, /inputController\?\.events[\s\S]+source\.on\("input_down", observeInputDown\)/u);
   assert.match(observer, /\[coop-browser:input-dispatch\][\s\S]+inputLayerSnapshot\(\)/u);
+  assert.match(observer, /pendingInputSettleFrame[\s\S]+inputFrameSettled/u);
 });
 
 test("public input pacing accepts only the exact keyboard dispatch for this DOM keydown", async () => {
@@ -246,6 +254,47 @@ test("public input pacing cannot accept frame or UI changes without a game dispa
   sink.record("browser-input-health", { observation: { domKeys: 8, frame: 102 } });
   sink.record("browser-input-echo", { observation: { domKeys: 8, active: true, cursor: 1 } });
   await assert.rejects(waiting, /public keyboard key to produce one game input dispatch/u);
+});
+
+test("public input pacing waits for the exact key to cross a later Phaser frame", async () => {
+  const sink = new EvidenceSink("input-frame-settle", ".");
+  attachConsoleOnly(sink);
+  const waiting = waitForPublicInputFrameSettle(sink, {
+    from: 0,
+    domKeys: 8,
+    keydownFrame: 101,
+    timeoutMs: 1_000,
+  });
+  sink.record("browser-input-health", {
+    observation: {
+      domKeys: 8,
+      downKeys: 0,
+      frame: 101,
+      frameAdvancing: false,
+      inputFrameSettled: false,
+    },
+  });
+  sink.record("browser-input-health", {
+    observation: {
+      domKeys: 9,
+      downKeys: 0,
+      frame: 102,
+      frameAdvancing: true,
+      inputFrameSettled: true,
+    },
+  });
+  sink.record("browser-input-health", {
+    observation: {
+      domKeys: 8,
+      downKeys: 0,
+      frame: 102,
+      frameAdvancing: true,
+      inputFrameSettled: true,
+    },
+  });
+  const proof = await waiting;
+  assert.equal(proof.observation.domKeys, 8);
+  assert.equal(proof.observation.frame, 102);
 });
 
 test("browser render-profile markers are validated and indexed as evidence", () => {

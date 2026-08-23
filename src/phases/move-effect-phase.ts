@@ -36,6 +36,7 @@ import {
   erRecordAchievementMoveResolution,
 } from "#data/elite-redux/er-achievement-tracker";
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
+import { applyErEndlessContagion, recordErEndlessMoveOutcome } from "#data/elite-redux/er-endless-rift-runtime";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
 import {
@@ -46,6 +47,8 @@ import {
   erPopAirBalloonOnHit,
   erTransferStickyBarbOnHit,
 } from "#data/elite-redux/er-tactical-items";
+import { getMoodyCoordinatorSpectralPower } from "#data/elite-redux/moody/moody-coordinator-combat-state";
+import { notifyMoodyFormationMoveResolved } from "#data/elite-redux/moody/moody-formation-game-adapter";
 import { SpeciesFormChangePostMoveTrigger } from "#data/form-change-triggers";
 import type { TypeDamageMultiplier } from "#data/type";
 import { AbilityId } from "#enums/ability-id";
@@ -151,6 +154,10 @@ export class MoveEffectPhase extends PokemonPhase {
    */
   private erStartedPrimed = false;
 
+  private isMoodyCoordinatorSpectral(user = this.getUserPokemon()): boolean {
+    return this.useMode === MoveUseMode.FOLLOW_UP && getMoodyCoordinatorSpectralPower(user.id) !== 1;
+  }
+
   /**
    * @param useMode - The {@linkcode MoveUseMode} corresponding to how this move was used.
    */
@@ -234,10 +241,14 @@ export class MoveEffectPhase extends PokemonPhase {
         && !move.doesFlagEffectApply({ flag: MoveFlags.IGNORE_ABILITIES, user, target: opponent })
         && suppressesOpponentDamageBoosts(opponent);
       // Assume single target for multi hit
-      applyMoveAttrs("MultiHitAttr", user, opponent ?? null, move, hitCount, suppressesMultiHitAbilities);
+      if (!this.isMoodyCoordinatorSpectral(user)) {
+        applyMoveAttrs("MultiHitAttr", user, opponent ?? null, move, hitCount, suppressesMultiHitAbilities);
+      }
       // If Parental Bond is applicable, add another hit
       const addStrikeParams = { pokemon: user, move, hitCount, opponent };
-      if (suppressesMultiHitAbilities) {
+      if (this.isMoodyCoordinatorSpectral(user)) {
+        hitCount.value = 1;
+      } else if (suppressesMultiHitAbilities) {
         applyFilteredAbAttrs("AddSecondStrikeAbAttr", addStrikeParams, bypassesOpponentMultiHitSuppression);
       } else {
         applyAbAttrs("AddSecondStrikeAbAttr", addStrikeParams);
@@ -247,7 +258,7 @@ export class MoveEffectPhase extends PokemonPhase {
         applyAbAttrs("AllAttacksMultiHitAbAttr", { pokemon: user, move, hitCount, opponent });
       }
       // If Multi-Lens is applicable, add hits equal to the number of held Multi-Lenses
-      globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount);
+      globalScene.applyModifiers(PokemonMultiHitModifier, user.isPlayer(), user, move.id, hitCount, null, opponent);
       // ER multi-hit COUNT override (Giant Shuriken 960: Water Shuriken hits
       // exactly once). Scanned by name — registration-free, same pattern as the
       // MoveCategoryOverrideAbAttr scan in Pokemon.getAttackDamage. Runs LAST
@@ -431,7 +442,7 @@ export class MoveEffectPhase extends PokemonPhase {
    */
   private postAnimCallback(user: Pokemon, targets: Pokemon[]) {
     // Add to the move history entry
-    if (this.firstHit && this.useMode !== MoveUseMode.DELAYED_ATTACK) {
+    if (this.firstHit && this.useMode !== MoveUseMode.DELAYED_ATTACK && !this.isMoodyCoordinatorSpectral(user)) {
       user.pushMoveHistory(this.moveHistoryEntry);
       if (!isVirtual(this.useMode)) {
         recordSignatureExecutedMove(user, this.move);
@@ -452,8 +463,18 @@ export class MoveEffectPhase extends PokemonPhase {
       user.stellarTypesBoosted.push(moveType);
     }
 
-    if (this.lastHit) {
+    if (this.lastHit && !this.isMoodyCoordinatorSpectral(user)) {
       this.triggerMoveEffects(MoveEffectTrigger.POST_TARGET, user, null);
+      const outcome =
+        this.moveHistoryEntry.result === MoveResult.SUCCESS
+          ? "hit"
+          : this.moveHistoryEntry.result === MoveResult.MISS
+            ? "miss"
+            : this.moveHistoryEntry.result === MoveResult.FAIL
+              ? "failed"
+              : "immune";
+      notifyMoodyFormationMoveResolved(user, this.move, outcome);
+      recordErEndlessMoveOutcome(user, this.move, outcome, targets[0]);
     }
 
     this.updateSubstitutes();
@@ -795,6 +816,11 @@ export class MoveEffectPhase extends PokemonPhase {
   protected applyMoveEffects(target: Pokemon, effectiveness: TypeDamageMultiplier, firstTarget: boolean): void {
     const user = this.getUserPokemon();
 
+    if (this.isMoodyCoordinatorSpectral(user)) {
+      this.applyMove(user, target, effectiveness);
+      return;
+    }
+
     this.triggerMoveEffects(MoveEffectTrigger.PRE_APPLY, user, target);
 
     const result = this.applyMove(user, target, effectiveness);
@@ -860,7 +886,9 @@ export class MoveEffectPhase extends PokemonPhase {
      * Apply stat changes from {@linkcode move} and gives it to {@linkcode source}
      * before damage calculation
      */
-    applyMoveAttrs("StatChangeBeforeDmgCalcAttr", user, target, this.move);
+    if (!this.isMoodyCoordinatorSpectral(user)) {
+      applyMoveAttrs("StatChangeBeforeDmgCalcAttr", user, target, this.move);
+    }
 
     // Mold Breaker & co. also ignore the target's damage-MODIFYING abilities
     // (Multiscale, Thick Fat, Filter/Solid Rock, Fluffy, Heatproof, Ice Scales,
@@ -882,7 +910,7 @@ export class MoveEffectPhase extends PokemonPhase {
     const typeBoost = user.findTag(
       (t): t is TypeBoostTag => t instanceof TypeBoostTag && t.boostedType === user.getMoveType(this.move),
     );
-    if (typeBoost?.oneUse) {
+    if (typeBoost?.oneUse && !this.isMoodyCoordinatorSpectral(user)) {
       user.removeTag(typeBoost.tagType);
     }
 
@@ -945,10 +973,12 @@ export class MoveEffectPhase extends PokemonPhase {
     // ER Sheer Force (125): moves it power-boosts (those with a secondary effect,
     // move.chance >= 1) do NOT incur Life Orb recoil.
     const sheerForceSuppressesRecoil = user.hasAbility(AbilityId.SHEER_FORCE) && this.move.chance >= 1;
-    if (!sheerForceSuppressesRecoil) {
+    if (!sheerForceSuppressesRecoil && !this.isMoodyCoordinatorSpectral(user)) {
       applyErLifeOrbRecoil(user, finalDmg);
     }
-    applyErRockyHelmet(user, target, this.move, finalDmg);
+    if (!this.isMoodyCoordinatorSpectral(user)) {
+      applyErRockyHelmet(user, target, this.move, finalDmg);
+    }
 
     target.turnData.attacksReceived.unshift({
       move: this.move.id,
@@ -959,20 +989,22 @@ export class MoveEffectPhase extends PokemonPhase {
       sourceBattlerIndex: user.getBattlerIndex(),
     });
 
-    if (user.isPlayer() && target.isEnemy()) {
+    if (user.isPlayer() && target.isEnemy() && !this.isMoodyCoordinatorSpectral(user)) {
       globalScene.applyModifiers(DamageMoneyRewardModifier, true, user, new NumberHolder(finalDmg));
     }
 
-    erRecordAchievementMoveDamage(
-      user,
-      target,
-      this.move,
-      this.useMode,
-      finalDmg,
-      isCritical,
-      targetHpBefore,
-      result === HitResult.SUPER_EFFECTIVE,
-    );
+    if (!this.isMoodyCoordinatorSpectral(user)) {
+      erRecordAchievementMoveDamage(
+        user,
+        target,
+        this.move,
+        this.useMode,
+        finalDmg,
+        isCritical,
+        targetHpBefore,
+        result === HitResult.SUPER_EFFECTIVE,
+      );
+    }
 
     return [result, finalDmg, isCritical];
   }
@@ -1019,6 +1051,31 @@ export class MoveEffectPhase extends PokemonPhase {
 
     target.destroySubstitute();
     target.lapseTag(BattlerTagType.COMMANDED);
+
+    // Free Aim carries remaining strikes onto the best surviving opponent.
+    // Re-run the same KO-first / damage-second choice used by MovePhase so a
+    // multi-hit arrow or kicking move does not waste its remaining hits on the
+    // battler it just knocked out.
+    if (
+      user.turnData.hitsLeft > 1
+      && user.getAllActiveAbilityAttrs().some(attr => attr.constructor.name === "FreeAimAbAttr")
+    ) {
+      const candidates = user.getOpponents(true).filter(opponent => !opponent.isFainted() && opponent !== target);
+      candidates.sort((a, b) => {
+        const aDamage = a.getAttackDamage({ source: user, move: this.move, simulated: true }).damage;
+        const bDamage = b.getAttackDamage({ source: user, move: this.move, simulated: true }).damage;
+        return (
+          Number(bDamage >= b.hp) - Number(aDamage >= a.hp)
+          || bDamage - aDamage
+          || a.getBattlerIndex() - b.getBattlerIndex()
+        );
+      });
+      if (candidates[0]) {
+        this.targets = [candidates[0].getBattlerIndex()];
+        this.lastHit = false;
+        return;
+      }
+    }
 
     // Force `lastHit` to be true if this is a multi hit move with hits left
     // `hitsLeft` must be left as-is in order for the message displaying the number of hits
@@ -1089,6 +1146,7 @@ export class MoveEffectPhase extends PokemonPhase {
     // vanilla status-token path above is enemy-only).
     if (dealsDamage && this.move.is("AttackMove")) {
       const makesContact = this.move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user, target });
+      applyErEndlessContagion(user, target, makesContact, dealsDamage);
       erApplyCommunityOnHitItems(user, target, makesContact);
       // ER reactive held items (Cell Battery / Absorb Bulb / Snowball / Luminous
       // Moss / Weakness Policy): the struck holder raises a stat once, then it's

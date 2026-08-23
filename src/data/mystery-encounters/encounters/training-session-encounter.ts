@@ -36,6 +36,14 @@ import i18next from "i18next";
 /** The i18n namespace for the encounter */
 const namespace = "mysteryEncounters/trainingSession";
 
+/** Detach a trainee from both party and live field without destroying the reusable Pokemon object. */
+export function removePokemonForTraining(playerPokemon: PlayerPokemon): void {
+  if (playerPokemon.isOnField()) {
+    playerPokemon.leaveField(true, true, false);
+  }
+  globalScene.removePokemonFromPlayerParty(playerPokemon, false);
+}
+
 /**
  * Training Session encounter.
  * @see {@link https://github.com/pagefaultgames/pokerogue/issues/3802 | GitHub Issue #3802}
@@ -105,7 +113,7 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
         const segments = Math.min(2 + Math.floor(globalScene.currentBattle.waveIndex / 50), 5);
         const modifiers = new ModifiersHolder();
         const config = getEnemyConfig(playerPokemon, segments, modifiers);
-        globalScene.removePokemonFromPlayerParty(playerPokemon, false);
+        removePokemonForTraining(playerPokemon);
 
         const onBeforeRewardsPhase = () => {
           encounter.setDialogueToken("stat1", "-");
@@ -220,7 +228,7 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
         const segments = Math.min(2 + Math.floor(globalScene.currentBattle.waveIndex / 40), 6);
         const modifiers = new ModifiersHolder();
         const config = getEnemyConfig(playerPokemon, segments, modifiers);
-        globalScene.removePokemonFromPlayerParty(playerPokemon, false);
+        removePokemonForTraining(playerPokemon);
 
         const onBeforeRewardsPhase = () => {
           queueEncounterMessage(`${namespace}:option.2.finished`);
@@ -312,7 +320,7 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
         const modifiers = new ModifiersHolder();
         const config = getEnemyConfig(playerPokemon, segments, modifiers);
         config.pokemonConfigs![0].tags = [BattlerTagType.MYSTERY_ENCOUNTER_POST_SUMMON];
-        globalScene.removePokemonFromPlayerParty(playerPokemon, false);
+        removePokemonForTraining(playerPokemon);
 
         const onBeforeRewardsPhase = () => {
           queueEncounterMessage(`${namespace}:option.3.finished`);

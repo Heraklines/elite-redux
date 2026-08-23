@@ -20,6 +20,7 @@
 // author state or advance its ordinal.
 // =============================================================================
 
+import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import { isCoopV2InteractionCutoverActive } from "#data/elite-redux/coop/authority-v2/cutover-interaction";
 import {
   applyCoopOperationAuthorityState,
@@ -27,6 +28,7 @@ import {
   reapplyCoopOperationAuthorityState,
 } from "#data/elite-redux/coop/coop-authority-state-hooks";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopApplyOutcome, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
@@ -78,6 +80,7 @@ import type {
   CoopRole,
   CoopSerializedRewardOption,
 } from "#data/elite-redux/coop/coop-transport";
+import { observeCoopWaveProgressionPresentation } from "#data/elite-redux/coop/coop-wave-progression-observer";
 
 /** The two shop surfaces this adapter serves: the reward screen (#1) and the biome market (#5). */
 export type CoopShopSurface = "reward" | "market";
@@ -795,6 +798,8 @@ export interface CoopRewardSurfaceResultState {
   readonly remainingStock?: readonly number[];
   /** Exact nested interaction synchronously queued by this result, when one exists. */
   readonly nextInteraction?: CoopInteractionSuccessorRef | undefined;
+  /** Exact ordered visual mutation produced by the committed reward, when one exists. */
+  readonly presentation?: NonNullable<CoopRewardActionPayload["result"]>["presentation"];
   /**
    * Exact phase-local surface that remains executable after this result. Required for non-terminal
    * retained actions and deliberately absent for terminal results.
@@ -1003,6 +1008,19 @@ export function commitRewardAuthoritativeResult(
     );
     return null;
   }
+  // A reward-owned evolution is retained by INTERACTION_COMMIT after the ordinary WAVE_ADVANCE capture
+  // has already closed. Publish the same read-only authority receipt used by the browser presentation
+  // oracle only after this exact immutable result enters the negotiated log. Without this seam the real
+  // replica renderer completed the cutscene, but the oracle compared it against an empty host ledger.
+  const progressionPresentation = surfaceResult?.presentation;
+  if (progressionPresentation != null && isValidWaveProgressionPresentation(progressionPresentation)) {
+    observeCoopWaveProgressionPresentation({
+      stage: "authority-recorded",
+      wave: prepared.wave,
+      seq: 0,
+      event: progressionPresentation,
+    });
+  }
   advancePreparedWatcher(prepared);
   coopLog(
     "reward",
@@ -1067,12 +1085,22 @@ function buildCompleteRewardResultPayload(
 ): CoopRewardActionPayload | null {
   const action = payload as CoopRewardActionPayload;
   const nextInteraction = surfaceResult?.nextInteraction;
+  const presentation = surfaceResult?.presentation;
   if (
-    nextInteraction !== undefined
-    && (!isCoopInteractionSuccessorRef(nextInteraction)
-      || nextInteraction.wave !== prepared.wave
-      || nextInteraction.turn !== prepared.turn
-      || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability"))
+    (nextInteraction !== undefined
+      && (!isCoopInteractionSuccessorRef(nextInteraction)
+        || nextInteraction.wave !== prepared.wave
+        || nextInteraction.turn !== prepared.turn
+        || (nextInteraction.kind !== "learn-move" && nextInteraction.kind !== "ability")))
+    || (presentation !== undefined
+      && !(
+        (isStrictCoopBattleEvent(presentation)
+          && presentation.k === "formChange"
+          && presentation.actor.side === "player"
+          && presentation.presentation === "evolution"
+          && presentation.animate === true)
+        || (isValidWaveProgressionPresentation(presentation) && presentation.k === "evolution")
+      ))
   ) {
     return null;
   }
@@ -1087,6 +1115,7 @@ function buildCompleteRewardResultPayload(
     result: {
       lockModifierTiers,
       ...(nextInteraction === undefined ? {} : { nextInteraction: structuredClone(nextInteraction) }),
+      ...(presentation === undefined ? {} : { presentation: structuredClone(presentation) }),
       ...(continuation == null
         ? {}
         : {

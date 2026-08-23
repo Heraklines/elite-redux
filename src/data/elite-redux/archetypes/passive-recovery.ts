@@ -49,11 +49,10 @@
 //       status: StatusEffect.SLEEP } })`
 // =============================================================================
 
-import { PostTurnHealAbAttr } from "#abilities/ab-attrs";
+import { isComatoseLike, PostTurnHealAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { TerrainType } from "#data/terrain";
-import { AbilityId } from "#enums/ability-id";
 import type { PokemonType } from "#enums/pokemon-type";
 import { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
@@ -208,7 +207,7 @@ export class PassiveRecoveryAbAttr extends PostTurnHealAbAttr {
       case "status":
         // Comatose is a permanent sleep substitute (no `status` object), so a
         // SLEEP-gated recovery (Sweet Dreams) must also fire for Comatose holders.
-        if (condition.status === StatusEffect.SLEEP && pokemon.hasAbility(AbilityId.COMATOSE)) {
+        if (condition.status === StatusEffect.SLEEP && isComatoseLike(pokemon)) {
           return true;
         }
         return pokemon.status?.effect === condition.status;

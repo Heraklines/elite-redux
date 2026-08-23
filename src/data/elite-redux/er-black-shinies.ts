@@ -104,6 +104,27 @@ export function isErBlackShinyStarterSelection(
   return starter.erBlackShiny === true && starter.shiny === true && starter.variant === 2;
 }
 
+/**
+ * Reconcile a cached starter with the player's explicit Black-tier selection.
+ *
+ * The Black tier shares variant 2 with the ordinary epic/red shiny, so it must
+ * never be inferred from variant alone. Starter Select keeps the explicit tier
+ * choice in its per-species preferences; this helper copies that choice onto
+ * the finalized Starter without allowing a stale flag to promote a red pick.
+ */
+export function reconcileErBlackShinyStarterSelection<T extends ErBlackShinyStarterState>(
+  starter: T,
+  blackUnlocked: boolean,
+  selection: ErBlackShinyStarterState | null | undefined,
+): T {
+  const erBlackShiny =
+    blackUnlocked
+    && selection?.erBlackShiny === true
+    && starter.shiny === true
+    && starter.variant === 2;
+  return starter.erBlackShiny === erBlackShiny ? starter : { ...starter, erBlackShiny };
+}
+
 /** Number of Black Shinies in a starter team. */
 export function countErBlackShinyStarters(
   starters: readonly ErBlackShinyStarterState[],
@@ -295,8 +316,10 @@ export function getErSharedGiftAbilityIdsFor(pokemon: Pokemon): number[] {
   }
   try {
     if (pokemon.isOnField?.()) {
-      const ally = pokemon.getAlly?.();
-      if (ally && ally !== pokemon && ally.isOnField() && isErBlackShiny(ally)) {
+      for (const ally of pokemon.getAllies?.() ?? []) {
+        if (!ally.isOnField() || !isErBlackShiny(ally)) {
+          continue;
+        }
         const gift = getErActiveGiftAbilityId(ally);
         if (gift !== null && !ids.includes(gift)) {
           ids.push(gift);

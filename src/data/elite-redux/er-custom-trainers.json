@@ -104,7 +104,7 @@
     ],
     "trainerClass": "YOUNGSTER",
     "victoryDialogue": "Told ya!",
-    "weight": 100
+    "weight": 30
   },
   "TRAINER_70002": {
     "battleBgm": "battle_kanto_gym",
@@ -264,19 +264,20 @@
       }
     ],
     "trainerClass": "BROCK",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70003": {
     "battleType": "single",
     "challenge": "none",
     "defeatDialogue": "Whoa, you're tough!",
     "difficulties": [
+      "elite",
       "hell"
     ],
     "endless": false,
     "id": 70003,
     "introDialogue": "Some say I'm not ready. Look at me now, I'm Calvin, and I'm a wall before the League! Ready for a real challenge?",
-    "maxWave": 180,
+    "maxWave": 199,
     "minWave": 180,
     "name": "Calvin",
     "team": [
@@ -396,7 +397,7 @@
     ],
     "trainerClass": "YOUNGSTER",
     "victoryDialogue": "Throughout Heaven and Earth, I alone am the Honored One...",
-    "weight": 20
+    "weight": 5
   },
   "TRAINER_70004": {
     "battleBgm": "battle_kanto_gym",
@@ -502,7 +503,7 @@
       }
     ],
     "trainerClass": "MISTY",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70005": {
     "battleBgm": "battle_kanto_gym",
@@ -581,7 +582,7 @@
     ],
     "trainerClass": "LT_SURGE",
     "victoryDialogue": "50 years too early to fight me kid!",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70006": {
     "battleBgm": "battle_kanto_gym",
@@ -736,7 +737,7 @@
       }
     ],
     "trainerClass": "ERIKA",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70007": {
     "battleBgm": "battle_kanto_gym",
@@ -882,7 +883,7 @@
     ],
     "trainerClass": "KOGA",
     "trainerEffect": "shadowaura",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70008": {
     "battleBgm": "battle_kanto_gym",
@@ -995,7 +996,7 @@
       }
     ],
     "trainerClass": "SABRINA",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70009": {
     "battleBgm": "battle_kanto_gym",
@@ -1218,7 +1219,7 @@
       }
     ],
     "trainerClass": "BLAINE",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70010": {
     "battleBgm": "battle_kanto_gym",
@@ -1481,7 +1482,7 @@
     ],
     "trainerClass": "GIOVANNI",
     "victoryDialogue": "Seems like you got full hard mode XD",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70011": {
     "battleBgm": "battle_bb_elite",
@@ -1601,7 +1602,7 @@
         "insanity": {
           "ability": 5285,
           "innates": [
-            5045,
+            5951,
             301,
             130
           ]
@@ -1658,7 +1659,7 @@
     "trainerClass": "HEX_MANIAC",
     "trainerEffect": "smoke",
     "victoryDialogue": "...",
-    "weight": 50
+    "weight": 10
   },
   "TRAINER_70012": {
     "battleBgm": "battle_hoenn_gym",
@@ -1958,7 +1959,7 @@
     ],
     "trainerClass": "MYSTERIOUS_SISTERS",
     "victoryDialogue": "I guess you were OUR worst nightmare...",
-    "weight": 5
+    "weight": 10
   },
   "TRAINER_70014": {
     "battleBgm": "battle_star_admin",
@@ -2207,7 +2208,7 @@
     ],
     "trainerClass": "WAITER",
     "victoryDialogue": "Very good sir have a reward on me.",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70015": {
     "battleType": "single",
@@ -2526,7 +2527,7 @@
       }
     ],
     "trainerClass": "ALLISTER",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70016": {
     "battleType": "single",
@@ -2541,7 +2542,7 @@
     "id": 70016,
     "maxWave": 150,
     "minWave": 70,
-    "name": "Suggest a name 001",
+    "name": "Ryan",
     "team": [
       {
         "abilitySlot": 0,
@@ -2654,7 +2655,7 @@
       }
     ],
     "trainerClass": "BIRD_KEEPER",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70017": {
     "battleType": "double",
@@ -2669,7 +2670,7 @@
     "id": 70017,
     "maxWave": 170,
     "minWave": 70,
-    "name": "Suggest a name 002",
+    "name": "Seth",
     "team": [
       {
         "abilitySlot": 0,
@@ -2813,7 +2814,7 @@
       }
     ],
     "trainerClass": "MUSICIAN",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70018": {
     "battleType": "single",
@@ -2827,7 +2828,7 @@
     "id": 70018,
     "maxWave": 25,
     "minWave": 5,
-    "name": "Suggest a name 003",
+    "name": "Sheldon",
     "team": [
       {
         "abilitySlot": 0,
@@ -2989,7 +2990,7 @@
       }
     ],
     "trainerClass": "SCHOOL_KID",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70019": {
     "battleBgm": "battle_trainer_afd",
@@ -3467,7 +3468,7 @@
     "trainerClass": "BREEDER",
     "trainerEffect": "holyrays",
     "victoryDialogue": "I see you also know about bonds and hard work",
-    "weight": 40
+    "weight": 10
   },
   "TRAINER_70020": {
     "battleType": "triple",
@@ -3482,7 +3483,7 @@
     "id": 70020,
     "maxWave": 125,
     "minWave": 50,
-    "name": "Suggest a name 004",
+    "name": "Ace",
     "team": [
       {
         "abilitySlot": 1,
@@ -3697,7 +3698,7 @@
       }
     ],
     "trainerClass": "ACE_TRAINER",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70021": {
     "battleType": "single",
@@ -3714,7 +3715,7 @@
     "introDialogue": "We trained in the Way of the Psychic Fist.",
     "maxWave": 180,
     "minWave": 100,
-    "name": "Suggest a name 005",
+    "name": "Kai",
     "team": [
       {
         "abilitySlot": 1,
@@ -4003,7 +4004,7 @@
     ],
     "trainerClass": "BLACK_BELT",
     "victoryDialogue": "Back to training.",
-    "weight": 100
+    "weight": 10
   },
   "TRAINER_70022": {
     "battleBgm": "battle_sinnoh_champion",
@@ -4158,7 +4159,7 @@
         }
       }
     ],
-    "trainerClass": "WIELDER",
+    "trainerClass": "CYNTHIA",
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
@@ -4332,7 +4333,7 @@
         }
       }
     ],
-    "trainerClass": "WIELDER",
+    "trainerClass": "CYNTHIA",
     "trainerEffect": "holyrays",
     "trainerSprite": "volo",
     "victoryDialogue": "Why? Why you?! Why do you have the blessing of Arceus?!",
@@ -4448,7 +4449,7 @@
         }
       }
     ],
-    "trainerClass": "SBCLEADER",
+    "trainerClass": "GIOVANNI",
     "trainerSprite": "jacinthe_1",
     "victoryDialogue": "The agony of defeat is nothing compared to the joy of witnessing such magnificent might!",
     "weight": 5
@@ -4555,7 +4556,7 @@
         "species": 995
       }
     ],
-    "trainerClass": "POKESTAR",
+    "trainerClass": "SCIENTIST",
     "trainerSprite": "pokestar_invader_alien",
     "victoryDialogue": "...We have to leave this planet with the mothership...",
     "weight": 5
@@ -4687,7 +4688,7 @@
         "species": 10097
       }
     ],
-    "trainerClass": "CHAMPION",
+    "trainerClass": "RED",
     "trainerSprite": "red_masters_ex",
     "victoryDialogue": "...",
     "weight": 5
@@ -4819,7 +4820,7 @@
         "species": 70001
       }
     ],
-    "trainerClass": "TRAINER",
+    "trainerClass": "COLRESS",
     "trainerSprite": "trainer_n_masters_ex_1",
     "victoryDialogue": "Your Pokémon... It was just saying how much it likes you—and how it's happy to be with you.",
     "weight": 1

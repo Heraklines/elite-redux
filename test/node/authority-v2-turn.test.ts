@@ -268,7 +268,7 @@ describe("buildTurnCommitEntry - shape + digest", () => {
     ).toThrow("not bound to the resolved turn");
   });
 
-  it("accepts only the exact turn-N+1 replacement-or-wave successor for a deferred normal victory", () => {
+  it("accepts only the exact turn-N+1 replacement/trainer-presentation-or-wave successor", () => {
     const wait = {
       kind: "AWAIT_SUCCESSOR" as const,
       afterOperationId: "turn-op-1",
@@ -279,6 +279,12 @@ describe("buildTurnCommitEntry - shape + digest", () => {
       allowedControlAddresses: [
         {
           materialKind: "replacement-open" as const,
+          wave: 3,
+          turn: 6,
+          operationId: null,
+        },
+        {
+          materialKind: "trainer-victory-open" as const,
           wave: 3,
           turn: 6,
           operationId: null,
@@ -296,6 +302,16 @@ describe("buildTurnCommitEntry - shape + digest", () => {
         capture: CAPTURE_WITH_COMPANIONS,
         nextCommandFrontier: null,
         nextSuccessorWait: { ...wait, turn: 5 },
+      }),
+    ).toThrow("not bound to the resolved turn");
+    expect(() =>
+      buildCommitted({
+        capture: CAPTURE_WITH_COMPANIONS,
+        nextCommandFrontier: null,
+        nextSuccessorWait: {
+          ...wait,
+          allowedControlAddresses: [wait.allowedControlAddresses[1]],
+        },
       }),
     ).toThrow("not bound to the resolved turn");
     expect(() =>

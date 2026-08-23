@@ -23,8 +23,11 @@
 
 import { settleCoopFieldPresentationReady } from "#data/elite-redux/coop/coop-field-presentation";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
 import type { Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
+import { installHeadlessPlayerAtlasCompletionModel } from "#test/tools/coop-duo-harness";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -119,5 +122,26 @@ describe.runIf(process.env.ER_SCENARIO === "1")("co-op launch presentation with 
     expect(consoleError, "a retired presentation is not a missing-asset error").not.toHaveBeenCalled();
 
     consoleError.mockRestore();
+  });
+
+  it("models the completed atlas for a Pokemon created after the HEADLESS scene model was installed", async () => {
+    await game.classicMode.startBattle(SpeciesId.GOLDEEN);
+    installHeadlessPlayerAtlasCompletionModel(game.scene);
+
+    // Authority V2 reconstructs a missing party identity and immediately begins its atlas load inside one
+    // material-apply continuation. A phase-boundary-only scan cannot observe that object in time. Creating
+    // through the same BattleScene chokepoint must therefore install the completion adapter synchronously.
+    const pokemon = game.scene.addEnemyPokemon(getPokemonSpecies(SpeciesId.MAGIKARP), 5, TrainerSlot.NONE);
+    await pokemon.loadAssets(false);
+
+    const key = pokemon.getBattleSpriteKey();
+    const sprite = pokemon.getSprite() as unknown as {
+      texture: { key: string };
+      anims: { currentAnim?: { key: string } };
+    };
+    expect(game.scene.textures.exists(key), "the newly-created exact atlas is cache-resident").toBe(true);
+    expect(game.scene.anims.exists(key), "the newly-created exact animation is cache-resident").toBe(true);
+    expect(sprite.texture.key, "the live sprite left the HEADLESS substitute key").toBe(key);
+    expect(sprite.anims.currentAnim?.key, "the live animation uses the exact dynamic key").toBe(key);
   });
 });

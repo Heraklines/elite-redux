@@ -1,7 +1,7 @@
 import { pokerogueApi } from "#api/api";
 import { clientSessionId } from "#app/account";
+import { consumePendingDevEndlessOffer } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
-import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
@@ -24,9 +24,16 @@ import {
   setCommunityRunState,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
-import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
+import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import {
+  hasErGhostOverride,
+  recordGhostTeamOnGameOver,
+  reportErEndlessGhostEncounter,
+} from "#data/elite-redux/er-ghost-teams";
+import { isErSprintMode } from "#data/elite-redux/er-run-pacing";
+import { getMoodyModeState } from "#data/elite-redux/moody/moody-state";
 import { localShowdownResult } from "#data/elite-redux/showdown/showdown-sync-command";
-import { recordTelemetryRunOutcome } from "#data/elite-redux/telemetry/telemetry-hooks";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattleType } from "#enums/battle-type";
 import { Challenges } from "#enums/challenges";
@@ -38,7 +45,7 @@ import { Unlockables } from "#enums/unlockables";
 import type { Pokemon } from "#field/pokemon";
 import { BattlePhase } from "#phases/battle-phase";
 import type { EndCardPhase } from "#phases/end-card-phase";
-import { achvs, ChallengeAchv } from "#system/achv";
+import { achvs, ChallengeAchv, isEvioliteEligiblePokemon } from "#system/achv";
 import { ArenaData } from "#system/arena-data";
 import { ChallengeData } from "#system/challenge-data";
 import { applyEffects } from "#system/llm-director/consequence-effects";
@@ -62,6 +69,7 @@ export class GameOverPhase extends BattlePhase {
 
   private isVictory: boolean;
   private readonly firstRibbons: PokemonSpecies[] = [];
+  private moodyRecapShown = false;
 
   constructor(isVictory = false) {
     super();
@@ -71,6 +79,7 @@ export class GameOverPhase extends BattlePhase {
 
   start() {
     super.start();
+    restoreErEndlessBattleOverlays();
 
     // Showdown 1v1 (C3): a versus match NEVER runs the classic game-over (no save / ribbons /
     // achievements / cloud). Route the player's loss (or an unexpected showdown game-over) to the
@@ -80,10 +89,25 @@ export class GameOverPhase extends BattlePhase {
       return this.end();
     }
 
+    // Dev-only finale harnesses run on a throwaway slot that may not exist on the
+    // save API. Do not send that synthetic clear through `newclear`: a rejected
+    // request reloads the page before the Endless prompt can open. The marker is
+    // armed only by the dedicated final-boss scenario after it validates the real
+    // classic finale, and is consumed here exactly once.
+    if (this.isVictory && consumePendingDevEndlessOffer()) {
+      globalScene.phaseManager.clearPhaseQueue();
+      globalScene.phaseManager.pushNew("EndlessOfferPhase");
+      this.end();
+      return;
+    }
+
     globalScene.phaseManager.hideAbilityBar();
 
     // Failsafe if players somehow skip floor 200 in classic mode
-    if (globalScene.gameMode.isClassic && globalScene.currentBattle.waveIndex > 200) {
+    if (
+      globalScene.gameMode.isClassic
+      && globalScene.currentBattle.waveIndex > (isErSprintMode(globalScene.gameMode.modeId) ? 100 : 200)
+    ) {
       this.isVictory = true;
     }
 
@@ -107,8 +131,9 @@ export class GameOverPhase extends BattlePhase {
     }
     // Otherwise, continue standard Game Over logic
 
-    // This is now a genuine run terminal: Showdown returned above and the Mystery Encounter guard did not resume play.
-    recordTelemetryRunOutcome(this.isVictory);
+    if (!this.isVictory && globalScene.currentBattle.trainer && hasErGhostOverride(globalScene.currentBattle.trainer)) {
+      reportErEndlessGhostEncounter("ghost-win");
+    }
 
     // The ME hook above is allowed to turn a battle loss back into a live encounter. Only a true terminal
     // can prove continuationReady; otherwise the retained battle transaction must remain owned by the
@@ -231,6 +256,16 @@ export class GameOverPhase extends BattlePhase {
   }
 
   handleGameOver(): void {
+    if (
+      !this.moodyRecapShown
+      && globalScene.gameMode.isFun
+      && getFunModeConfig().moodyMode
+      && getMoodyModeState() != null
+    ) {
+      this.moodyRecapShown = true;
+      void globalScene.ui.showMoodyRunRecap(globalScene.seed).then(() => this.handleGameOver());
+      return;
+    }
     const doGameOver = (newClear: boolean) => {
       globalScene.disableMenu = true;
       globalScene.time.delayedCall(1000, () => {
@@ -304,7 +339,11 @@ export class GameOverPhase extends BattlePhase {
               // down its OWN runtime when its OWN GameOverPhase reaches here. No-op for solo (clearCoopRuntime
               // early-returns when there is no active session).
               clearCoopRuntime();
-              globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
+              if (this.shouldOfferEndlessContinuation()) {
+                globalScene.phaseManager.pushNew("EndlessOfferPhase", endCardPhase);
+              } else {
+                globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
+              }
               this.end();
             });
           };
@@ -380,6 +419,17 @@ export class GameOverPhase extends BattlePhase {
     } else {
       doGameOver(false);
     }
+  }
+
+  private shouldOfferEndlessContinuation(): boolean {
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    const standardOffer =
+      !globalScene.gameMode.isEndless
+      && !globalScene.gameMode.isDaily
+      && !globalScene.gameMode.isShowdown
+      && !globalScene.gameMode.isCoop
+      && globalScene.gameMode.isWaveFinal(wave);
+    return this.isVictory && standardOffer;
   }
 
   /**
@@ -460,7 +510,7 @@ export class GameOverPhase extends BattlePhase {
       }
       if (
         !globalScene.gameData.unlocks[Unlockables.EVIOLITE]
-        && globalScene.getPlayerParty().some(p => p.getSpeciesForm(true).speciesId in pokemonEvolutions)
+        && globalScene.getPlayerParty().some(isEvioliteEligiblePokemon)
       ) {
         globalScene.phaseManager.unshiftNew("UnlockPhase", Unlockables.EVIOLITE);
       }

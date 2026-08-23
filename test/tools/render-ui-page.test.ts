@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
+import { SpeciesEvolution } from "#balance/pokemon-evolutions";
 import { allAbilities, allMoves, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
@@ -36,11 +37,15 @@ import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import { ErGemModifier, erGemItemType } from "#data/elite-redux/er-elemental-gems";
+import { restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
+import { DEFAULT_FUN_MODE_CONFIG, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { advanceErMoneyStreaks, erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { ErReactiveItemModifier, erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
+import type { ErRewardRateBreakdown } from "#data/elite-redux/er-reward-rates";
+import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
@@ -68,21 +73,27 @@ import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { EggTier } from "#enums/egg-type";
+import { FormChangeItem } from "#enums/form-change-item";
 import { GameModes } from "#enums/game-modes";
+import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
+import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import {
   type ErTmCaseModifierType,
+  FormChangeItemModifierType,
   getPlayerShopModifierTypeOptionsForWave,
   ModifierTypeOption,
 } from "#modifiers/modifier-type";
 import { PokemonMove } from "#moves/pokemon-move";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { getEvolutionChoiceLabel } from "#phases/evolution-phase";
 import { playErTransformMorph } from "#sprites/er-form-transform-fx";
 import { achvs } from "#system/achv";
 import { VoucherType } from "#system/voucher";
@@ -104,10 +115,12 @@ import { BattleInfoOverlay } from "#ui/battle-info-overlay";
 import { buildIvChartData, StatsContainer } from "#ui/containers/stats-container";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
+import { RewardRatePanel } from "#ui/reward-rate-panel";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
 import { buildShowdownTeamMenuDemoConfig } from "#ui/showdown-team-menu-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
+import { addTextObject } from "#ui/text";
 import { buildTournamentBracketDemoConfig } from "#ui/tournament-bracket-ui-handler";
 import { buildTournamentListDemoConfig } from "#ui/tournament-list-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
@@ -171,6 +184,8 @@ interface Recipe {
    */
   steps?: Button[];
   expectThrow?: boolean;
+  /** Render/assert a diagnostic page without creating a committed pixel baseline. */
+  skipGolden?: boolean;
   /**
    * Stepped-animation mode: capture this many successive LIVE frames (no freeze) as
    * `<page>-frameNN.png` after the page is built + input fired. Turns the still into a
@@ -438,6 +453,84 @@ async function startBattleWithMixedHeldItems(game: GameManager) {
     true,
   );
   return mon;
+}
+
+function makeFunMegaStoneType(stone: FormChangeItem): FormChangeItemModifierType {
+  const type = new FormChangeItemModifierType(stone);
+  type.id = "FORM_CHANGE_ITEM";
+  type.setTier(ModifierTier.ULTRA);
+  return type;
+}
+
+function hideUnrasterizedFunMegaIcon(root: Phaser.GameObjects.Container): void {
+  const pending: Phaser.GameObjects.GameObject[] = [...root.list];
+  while (pending.length > 0) {
+    const object = pending.pop() as Phaser.GameObjects.GameObject & { list?: Phaser.GameObjects.GameObject[] };
+    if (object.name === "icon_fun_mega" && "setVisible" in object) {
+      (object as typeof object & { setVisible(visible: boolean): unknown }).setVisible(false);
+    }
+    if (object.list) {
+      pending.push(...object.list);
+    }
+  }
+}
+
+async function startBattleWithFunPseudoMega(
+  game: GameManager,
+  options: { fullMix?: boolean; shuffleStats?: boolean } = {},
+) {
+  await game.classicMode.startBattle(SpeciesId.PIKACHU);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("fun Mega render recipe: no player pokemon after startBattle");
+  }
+  game.scene.gameMode = getGameMode(GameModes.FUN);
+  setFunModeConfig({
+    ...DEFAULT_FUN_MODE_CONFIG,
+    randomizePokemon: false,
+    randomizeTypes: false,
+    randomizeAbilities: false,
+    randomizeLevelUpMoves: false,
+    megaMode: true,
+    megaMixMode: options.fullMix === true,
+    shuffleStats: options.shuffleStats === true,
+  });
+  const stone = FormChangeItem.GARCHOMPITE;
+  const type = makeFunMegaStoneType(stone);
+  const modifier = new PokemonFormChangeItemModifier(type, mon.id, stone, true);
+  game.scene.addModifier(modifier, true, false, false, true);
+  game.scene.getModifierBar().updateModifiers(game.scene.modifiers);
+  return { mon, stone, type };
+}
+
+async function startBattleWithAbilityAvalanche(game: GameManager, waveIndex = 120) {
+  await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("Ability Avalanche render recipe: no player pokemon after startBattle");
+  }
+  game.scene.gameMode = getGameMode(GameModes.FUN);
+  setErDifficulty("youngster");
+  setFunModeConfig({
+    ...DEFAULT_FUN_MODE_CONFIG,
+    randomizePokemon: false,
+    randomizeTypes: false,
+    randomizeAbilities: false,
+    randomizeLevelUpMoves: false,
+    abilityAvalanche: true,
+  });
+  game.scene.currentBattle.waveIndex = waveIndex;
+  mon.id = 0xa11a0001;
+  const enemy = game.scene.getEnemyPokemon();
+  if (enemy) {
+    enemy.id = 0xa11a0002;
+  }
+  return mon;
+}
+
+function addDemoFusion(mon: Awaited<ReturnType<typeof startBattleWithFunPseudoMega>>["mon"]): void {
+  mon.fusionSpecies = getPokemonSpecies(SpeciesId.BULBASAUR);
+  mon.fusionFormIndex = 0;
 }
 
 function bargainArgs(): any[] {
@@ -1669,6 +1762,47 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN],
   },
+  "starter-select-sprint-transition": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: game => [
+      {
+        options: [
+          {
+            label: i18next.t("starterSelectUiHandler:difficultyYoungster"),
+            handler: () => {
+              void game.scene.ui.setOverlayMode(UiMode.MENU_OPTION_SELECT, {
+                options: [
+                  { label: i18next.t("starterSelectUiHandler:pacingNormal"), handler: () => true },
+                  { label: i18next.t("starterSelectUiHandler:pacingSprint"), handler: () => true },
+                ],
+              });
+              return true;
+            },
+          },
+        ],
+      },
+    ],
+    // Select Youngster. The parent clears after its callback; DOWN must still
+    // navigate the independently registered pacing handler to Sprint.
+    steps: [Button.ACTION, Button.DOWN],
+  },
+  "fun-mode-mega-full": {
+    render: game => {
+      setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG });
+      return shimUiAndShow(game, UiMode.FUN_MODE_SELECT, []);
+    },
+    steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.ACTION, Button.ACTION],
+  },
+  "fun-ability-review-rerolled": {
+    mode: UiMode.FUN_ABILITY_REVIEW,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+      return [game.scene.getPlayerParty(), () => {}];
+    },
+    // Reroll once; the final still must show the START button selected.
+    steps: [Button.ACTION],
+    diffTolerance: 0,
+  },
   // The party SUMMARY screen on its ER ABILITIES page, with a BLACK SHINY (#349) lead so the
   // violet-italic GIFT row ("Gift 1/3") + its "R" key-badge cycle prompt are present. steps
   // fires R (Button.CYCLE_SHINY):
@@ -1700,6 +1834,76 @@ const RECIPES: Record<string, Recipe> = {
       return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
     },
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  "summary-fun-pseudo-mega": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
+    },
+    afterShow: handler => {
+      handler.megaIcon?.setVisible(false);
+      const type = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      handler.getUi().showTooltip(type.name, type.getDescription(), true);
+    },
+    diffTolerance: 40000,
+  },
+  "summary-effective-base-stats": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game, { shuffleStats: true });
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
+    },
+    steps: [Button.ACTION, Button.ACTION],
+    diffTolerance: 40000,
+  },
+  "summary-fun-pseudo-mega-fusion-icons": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game);
+      addDemoFusion(mon);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, 2 /* Page.STATS */];
+    },
+    diffTolerance: 40000,
+  },
+  "summary-ability-avalanche": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithAbilityAvalanche(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 40000,
+  },
+  "summary-ability-avalanche-scrolled": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithAbilityAvalanche(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN],
+    diffTolerance: 40000,
+  },
+  "endless-rift-ledger": {
+    mode: UiMode.ENDLESS_RIFT_LEDGER,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+      restoreErEndlessContinuation({
+        version: 1,
+        enteredAtWave: 200,
+        seed: "rift-ledger-render",
+        pulse: 8,
+        ghostEncounters: 3,
+        activeRifts: [
+          { id: "ability-echo", pulsesRemaining: 2, acquiredAtDepth: 5 },
+          { id: "healing-lock", pulsesRemaining: 3, acquiredAtDepth: 10 },
+          { id: "parallel-lives", pulsesRemaining: 1, acquiredAtDepth: 15 },
+        ],
+        ghostHistory: [],
+      });
+      game.scene.currentBattle.waveIndex = 220;
+      return [];
+    },
+    diffTolerance: 40000,
   },
   // Production IV-chart repro: HP=0 and Defense=0 sit on either side of Attack=31.
   // A fill-only polygon has zero area there, so the number rendered but the spoke did not.
@@ -1867,6 +2071,35 @@ const RECIPES: Record<string, Recipe> = {
       (game.scene as any).ui.setActiveHandler?.(overlay);
     },
   },
+  "battle-info-ability-avalanche": {
+    mode: UiMode.COMMAND,
+    prepare: async game => {
+      await startBattleWithAbilityAvalanche(game);
+      return [];
+    },
+    render: game => {
+      const overlay = new BattleInfoOverlay();
+      overlay.open();
+      overlay.handleInput(Button.RIGHT);
+      (game.scene as any).ui.setActiveHandler?.(overlay);
+    },
+  },
+  "battle-info-ability-avalanche-scrolled": {
+    mode: UiMode.COMMAND,
+    prepare: async game => {
+      await startBattleWithAbilityAvalanche(game);
+      return [];
+    },
+    render: game => {
+      const overlay = new BattleInfoOverlay();
+      overlay.open();
+      overlay.handleInput(Button.RIGHT);
+      (overlay as BattleInfoOverlay & { processInput: (button: Button) => boolean }).processInput = button =>
+        overlay.handleInput(button);
+      (game.scene as any).ui.setActiveHandler?.(overlay);
+    },
+    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN],
+  },
   // Showdown construction-time vanilla mega. A vanilla-species mega built AT its mega
   // formIndex directly at battle build (addPlayerPokemon(formIndex=1), no mid-run form
   // change) - the same path the showdown teambuilder fields a picked mega stage. The PNG
@@ -1916,6 +2149,29 @@ const RECIPES: Record<string, Recipe> = {
           { name: "ER_CLEAR_AMULET" },
         ]);
       await game.classicMode.startBattle(SpeciesId.SNORLAX);
+      return [];
+    },
+  },
+  "battle-fun-pseudo-mega-item": {
+    captureActive: true,
+    field: true,
+    modifierBars: true,
+    prepare: async game => {
+      await startBattleWithFunPseudoMega(game);
+      return [];
+    },
+    render: (game, ctx) => {
+      hideUnrasterizedFunMegaIcon(ctx.fieldRoot);
+      const type = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      game.scene.ui.showTooltip(type.name, type.getDescription(), true);
+    },
+  },
+  "battle-fun-pseudo-mega-fusion-icons": {
+    captureActive: true,
+    field: true,
+    prepare: async game => {
+      const { mon } = await startBattleWithFunPseudoMega(game);
+      addDemoFusion(mon);
       return [];
     },
   },
@@ -2006,6 +2262,30 @@ const RECIPES: Record<string, Recipe> = {
     // open so the final PNG shows all 5 options legibly. The full confirm-and-record path
     // (ACTION -> setStormglassWeather) is exercised by er-stormglass-picker.test.ts.
     steps: [Button.DOWN],
+  },
+  // Exact regional evolution picker. Its geometry assertion uses the real
+  // canvas-backed text metrics (the ordinary headless UI mocks report width 0).
+  "evolution-regional-choice": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: () => [
+      {
+        options: [
+          new SpeciesEvolution(SpeciesId.TYPHLOSION, 36, null, null),
+          new SpeciesEvolution(SpeciesId.HISUI_TYPHLOSION, 36, null, null),
+          new SpeciesEvolution(SpeciesId.SAMUROTT, 36, null, null),
+          new SpeciesEvolution(SpeciesId.HISUI_SAMUROTT, 36, null, null),
+        ].map(evolution => ({
+          label: getEvolutionChoiceLabel(evolution),
+          handler: () => true,
+        })),
+      },
+    ],
+    afterShow: handler => {
+      expect(handler.optionSelectText.displayWidth).toBeGreaterThan(0);
+      expect(handler.optionSelectBg.width).toBeGreaterThanOrEqual(handler.optionSelectText.displayWidth + 24);
+    },
+    steps: [Button.DOWN],
+    skipGolden: true,
   },
   // The ER Ability Capsule top-level choice (maintainer request). ErAbilityCapsulePhase
   // shows this OPTION_SELECT first: "Change ability" (cycle) / "Unlock an innate for the
@@ -2134,6 +2414,133 @@ const RECIPES: Record<string, Recipe> = {
       // magenta placeholder box in the harness (same as the accepted stormglass-picker
       // golden) whose presence/position varies with the shared texture cache across the
       // batch. Leaving it at its default keeps the 4 revealed tiles clean + deterministic.
+      ui.setActiveHandler?.(handler);
+    },
+    diffTolerance: 2000,
+  },
+  "modifier-select-reward-rates": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      return [];
+    },
+    render: (game, ctx) => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const options = [
+        new ModifierTypeOption(modifierTypes.POTION(), 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+        new ModifierTypeOption(modifierTypes.ETHER(), 0),
+        new ModifierTypeOption(modifierTypes.REVIVE(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      ui.setActiveHandler?.(handler);
+
+      const rates: ErRewardRateBreakdown = {
+        difficulty: "hell",
+        equivalentWave: 200,
+        tier: 10,
+        baseShiny: 8,
+        baseCandy: 11,
+        baseVoucher: 11,
+        favourMultiplier: 3,
+        endlessBonus: 0,
+        totalCap: 50,
+        totalShiny: 24,
+        totalCandy: 33,
+        totalVoucher: 11,
+      };
+      const hud = ctx.scene.add.container(0, 0).setScale(6);
+      const luckValue = addTextObject(318, 17, "B+", TextStyle.PARTY, { fontSize: "36px" }).setOrigin(1, 0.5);
+      const luckLabel = addTextObject(316 - luckValue.displayWidth, 17, "Luck:", TextStyle.PARTY, {
+        fontSize: "36px",
+      }).setOrigin(1, 0.5);
+      luckValue.setTint(0xf8d84a);
+      const panel = new RewardRatePanel(ctx.scene, 274, 23.5);
+      panel.refreshFromGame(rates);
+      panel.setVisible(true).setAlpha(1);
+      hud.add([luckLabel, luckValue, panel]);
+      ctx.fieldRoot.add(hud);
+    },
+    diffTolerance: 2000,
+  },
+  "modifier-select-fun-mega": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await startBattleWithFunPseudoMega(game);
+      return [];
+    },
+    render: (game, ctx) => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const megaStone = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      const options = [
+        new ModifierTypeOption(megaStone, 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+        new ModifierTypeOption(modifierTypes.ETHER(), 0),
+        new ModifierTypeOption(modifierTypes.REVIVE(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      handler.setCursor(0);
+      handler.cursorObj?.setVisible(false);
+      hideUnrasterizedFunMegaIcon(ctx.fieldRoot);
+      ui.setActiveHandler?.(handler);
+    },
+    diffTolerance: 2000,
+  },
+  "modifier-select-fun-mega-full": {
+    mode: UiMode.MODIFIER_SELECT,
+    field: true,
+    prepare: async game => {
+      await startBattleWithFunPseudoMega(game, { fullMix: true });
+      return [];
+    },
+    render: (game, ctx) => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const megaStone = makeFunMegaStoneType(FormChangeItem.GARCHOMPITE);
+      const options = [
+        new ModifierTypeOption(megaStone, 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+        new ModifierTypeOption(modifierTypes.ETHER(), 0),
+        new ModifierTypeOption(modifierTypes.REVIVE(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      handler.setCursor(0);
+      handler.cursorObj?.setVisible(false);
+      hideUnrasterizedFunMegaIcon(ctx.fieldRoot);
       ui.setActiveHandler?.(handler);
     },
     diffTolerance: 2000,
@@ -2616,6 +3023,11 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     }
 
     repointGlobalScene(game.scene, ctx);
+    const renderUi: any = game.scene.ui;
+    renderUi.moveTo ??= () => renderUi;
+    if (typeof renderUi.length !== "number") {
+      renderUi.length = 0;
+    }
     await sleep(0);
 
     // Capture Phaser's `Texture "items" has no frame "<key>"` warning - emitted exactly when
@@ -2759,7 +3171,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
 
     // --- Golden-image regression gate -------------------------------------------------
     // Skip the SIMULATE_MISSING variant and crash-repro recipes (not stable baselines).
-    if (!SIMULATE_MISSING && !recipe.expectThrow && !recipe.captureActive) {
+    if (!SIMULATE_MISSING && !recipe.expectThrow && !recipe.captureActive && !recipe.skipGolden) {
       const baseline = join(BASELINE_DIR, `${PAGE}.png`);
       if (UPDATE_BASELINE || !existsSync(baseline)) {
         mkdirSync(BASELINE_DIR, { recursive: true });

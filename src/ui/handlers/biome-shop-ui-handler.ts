@@ -23,7 +23,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { ER_BIOME_SHOP_SLOTS } from "#data/elite-redux/er-biome-economy";
+import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
 import { addItemIconSprite } from "#data/elite-redux/er-item-icon";
+import { queryMoodySceneEffects } from "#data/elite-redux/moody/moody-scene-adapter";
+import { getMoodyModeState, MOODY_BOON_BY_ID } from "#data/elite-redux/moody/moody-state";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
@@ -198,6 +201,7 @@ export class BiomeShopUiHandler extends UiHandler {
   private leaveText: Phaser.GameObjects.Text;
   private leaveIcon: Phaser.GameObjects.Sprite;
   private cursorObj: Phaser.GameObjects.Rectangle;
+  private moodyMarketText: Phaser.GameObjects.Text;
 
   /** One {icon, price, qty} trio per stocked slot. */
   private cells: { icon: Phaser.GameObjects.Sprite; price: Phaser.GameObjects.Text; qty: Phaser.GameObjects.Text }[] =
@@ -265,6 +269,15 @@ export class BiomeShopUiHandler extends UiHandler {
     this.itemNameText.setOrigin(0.5, 0);
     this.shopContainer.add(this.itemNameText);
 
+    this.moodyMarketText = addTextObject(100, 20, "", TextStyle.PARTY, {
+      fontSize: "26px",
+      fixedWidth: 210 * 6,
+      maxLines: 1,
+    })
+      .setOrigin(0, 0)
+      .setVisible(false);
+    this.shopContainer.add(this.moodyMarketText);
+
     // Focused item's description, wrapped, just under the grid.
     this.descText = addTextObject(208, 150, "", TextStyle.PARTY, {
       fontSize: "40px",
@@ -313,6 +326,7 @@ export class BiomeShopUiHandler extends UiHandler {
       this.cursor = 0;
       this.moveCursorTo(0);
       this.refresh();
+      this.refreshMoodyMarketContext();
       this.updateLeaveHint();
 
       this.shopContainer.setVisible(true);
@@ -327,6 +341,7 @@ export class BiomeShopUiHandler extends UiHandler {
     this.active = true;
     this.moveCursorTo(this.cursor);
     this.refresh();
+    this.refreshMoodyMarketContext();
     this.updateLeaveHint();
     return true;
   }
@@ -514,6 +529,27 @@ export class BiomeShopUiHandler extends UiHandler {
     this.restyleCells();
   }
 
+  private refreshMoodyMarketContext(): void {
+    const enabled = globalScene.gameMode?.isFun === true && getFunModeConfig().moodyMode;
+    const state = enabled ? getMoodyModeState() : null;
+    if (state == null) {
+      this.moodyMarketText.setVisible(false);
+      return;
+    }
+    const marketBoons = state.boons.filter(boon => {
+      const kind = MOODY_BOON_BY_ID.get(boon.boonId)?.targetKind;
+      return !boon.dormant && kind === "economy";
+    });
+    const multiplier = queryMoodySceneEffects({ economy: { event: "market-purchase" } })?.shopPriceMultiplier ?? 1;
+    const names = marketBoons
+      .slice(0, 2)
+      .map(boon => MOODY_BOON_BY_ID.get(boon.boonId)?.name ?? boon.boonId)
+      .join(" / ");
+    const multiplierLabel = multiplier === 1 ? "" : `prices x${multiplier.toFixed(2)}`;
+    const text = [names, multiplierLabel].filter(part => part.length > 0).join(" - ");
+    this.moodyMarketText.setText(text.length > 0 ? `MOOD: ${text}` : "").setVisible(text.length > 0);
+  }
+
   /**
    * Per-slot visuals. A slot is "lit" (full colour, no tint) when it is either
    * the HOVERED slot - so you can always read what the cursor is on, even an
@@ -605,6 +641,7 @@ export class BiomeShopUiHandler extends UiHandler {
 
   clear(): void {
     super.clear();
+    this.moodyMarketText.setVisible(false);
     this.shopContainer.setVisible(false);
     this.cursorObj.setVisible(false);
     for (const cell of this.cells) {

@@ -1,4 +1,9 @@
-import { DelayedAttackTag, type PositionalTag, WishTag } from "#data/positional-tags/positional-tag";
+import {
+  DelayedAttackTag,
+  ElectrodynamicsPositionTag,
+  type PositionalTag,
+  WishTag,
+} from "#data/positional-tags/positional-tag";
 import { PositionalTagType } from "#enums/positional-tag-type";
 import type { Constructor } from "#types/common";
 import type { ObjectValues } from "#types/type-helpers";
@@ -43,8 +48,8 @@ export function loadPositionalTag<T extends PositionalTagType>({
 const posTagConstructorMap = Object.freeze({
   [PositionalTagType.DELAYED_ATTACK]: DelayedAttackTag,
   [PositionalTagType.WISH]: WishTag,
+  [PositionalTagType.ELECTRODYNAMICS_POSITION]: ElectrodynamicsPositionTag,
 }) satisfies {
-  // NB: This `satisfies` block ensures that all tag types have corresponding entries in the map.
   [k in PositionalTagType]: Constructor<PositionalTag & { tagType: k }>;
 };
 

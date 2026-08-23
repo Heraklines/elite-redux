@@ -49,6 +49,7 @@ import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { dispatchMoveArchetype, PitfallTrapAndAlwaysHitAttr } from "#data/elite-redux/move-archetype-dispatcher";
 import {
+  AddArenaTagAttr,
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
   AddTypeAttr,
@@ -78,6 +79,7 @@ import {
   MultiHitPowerIncrementAttr,
   PhotonGeyserCategoryAttr,
   PsychoShiftEffectAttr,
+  RechargeAttr,
   RemoveArenaTrapAttr,
   RemoveScreensAttr,
   SelfStatusMove,
@@ -95,6 +97,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ChargeAnim } from "#enums/move-anims-common";
 import { MoveCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
 import { MultiHitType } from "#enums/multi-hit-type";
@@ -111,6 +114,7 @@ import i18next from "i18next";
  * Mirrors the value in `scripts/elite-redux/builders/id-map.mjs` and
  * `er-move-id-enum.mjs`.
  */
+const RESERVED_MANUAL_MOVE_BAND = { min: 6000, max: 6999 } as const;
 const VANILLA_ID_CUTOFF = 5000;
 
 /** Aggregated result of a single `initEliteReduxCustomMoves()` run. */
@@ -411,6 +415,41 @@ class ErCustomSelfStatusMove extends SelfStatusMove {
   }
 }
 
+function buildSwirlyRoomMove(): Move {
+  ErCustomStatusMove.registerDraft(
+    MoveId.SWIRLY_ROOM,
+    "Swirly Room",
+    "Swaps the category of Physical and Special moves for 5 turns.",
+    "Swaps the category of Physical and Special moves for 5 turns.",
+  );
+  return new ErCustomStatusMove(MoveId.SWIRLY_ROOM, PokemonType.PSYCHIC, -1, 5, -1, 0, 9)
+    .attr(AddArenaTagAttr, ArenaTagType.SWIRLY_ROOM, 5)
+    .ignoresProtect()
+    .target(MoveTarget.BOTH_SIDES);
+}
+
+function buildIvoryImpactMove(): Move {
+  ErCustomAttackMove.registerDraft(
+    MoveId.IVORY_IMPACT,
+    "Ivory Impact",
+    "The user crashes into the target with ancient bone, then must recharge.",
+    "The user crashes into the target with ancient bone, then must recharge.",
+  );
+  const move = new ErCustomAttackMove(
+    MoveId.IVORY_IMPACT,
+    PokemonType.NORMAL,
+    MoveCategory.PHYSICAL,
+    150,
+    100,
+    5,
+    -1,
+    0,
+    9,
+  ).attr(RechargeAttr);
+  applyErArchetypeToMove(move, MoveFlags.BONE_BASED, []);
+  return move;
+}
+
 /** Count the number of set bits in a (non-negative integer) bitmask. */
 function popcount(mask: number): number {
   // The ER MoveFlags enum has < 32 bits, so a simple Brian-Kernighan loop is fine.
@@ -460,6 +499,13 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     if (pokerogueId === undefined) {
       continue;
     }
+    if (
+      pokerogueId >= RESERVED_MANUAL_MOVE_BAND.min
+      && pokerogueId <= RESERVED_MANUAL_MOVE_BAND.max
+      && pokerogueId !== MoveId.SWIRLY_ROOM
+    ) {
+      continue;
+    }
     if (pokerogueId < VANILLA_ID_CUTOFF) {
       // Vanilla — already in allMoves from initMoves().
       continue;
@@ -488,6 +534,28 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     }
   }
 
+  if (existingIds.has(MoveId.SWIRLY_ROOM)) {
+    result.customsAlreadyPresent++;
+  } else {
+    try {
+      (allMoves as Move[])[MoveId.SWIRLY_ROOM] = buildSwirlyRoomMove();
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Failed to construct manual move "Swirly Room": ${msg}`);
+    }
+  }
+  if (existingIds.has(MoveId.IVORY_IMPACT)) {
+    result.customsAlreadyPresent++;
+  } else {
+    try {
+      (allMoves as Move[])[MoveId.IVORY_IMPACT] = buildIvoryImpactMove();
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Failed to construct manual move "Ivory Impact": ${msg}`);
+    }
+  }
   return result;
 }
 
@@ -982,6 +1050,7 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     // ---- Bleed / fear riders (ER tags), gated by Move.chance ----
     case 956: // Rip and Tear — lowers foe Speed + can't be used twice
       // (50% bleed comes from its chance-status BLEED row).
+      move.bitingMove();
       move.attr(StatStageChangeAttr, [Stat.SPD], -1);
       move.restriction(consecutiveUseRestriction);
       break;
@@ -1026,7 +1095,10 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     // ---- "Can't be used twice in a row" (consecutive-use restriction) ----
     case 859: // Hacksaw
     case 893: // Blue Moon (crimson)
-    case 963: // Spectral Serenade (every-other turn)
+    case 963: // Spectral Serenade (sound-based, every-other turn)
+      move.soundBased();
+      move.restriction(consecutiveUseRestriction);
+      break;
     case 964: // Merculight (may fail if used in succession)
     case 1000: // Blue Moon (azure)
       move.restriction(consecutiveUseRestriction);

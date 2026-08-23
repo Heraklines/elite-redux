@@ -166,7 +166,14 @@ describe("co-op learn-move operation migration", () => {
     const oldBinding = captureCoopLearnMoveOperationBinding("guest");
     setCoopRuntime(replacementGuest);
     const replacementBinding = captureCoopLearnMoveOperationBinding("guest");
-    const payload = { type: "decision" as const, partySlot: SLOT, moveId: 57, forgetSlot: 1, maxMoveCount: 4 };
+    const payload = {
+      type: "decision" as const,
+      partySlot: SLOT,
+      moveId: 57,
+      forgetSlot: 1,
+      maxMoveCount: 4,
+      allowNextWaveStart: false,
+    };
     let oldTicks = 0;
     let replacementTicks = 0;
 
@@ -243,7 +250,14 @@ describe("co-op learn-move operation migration", () => {
     const hostBinding = captureCoopLearnMoveOperationBinding("host");
     setCoopRuntime(guestRuntime);
     const guestBinding = captureCoopLearnMoveOperationBinding("guest");
-    const payload = { type: "decision" as const, partySlot: SLOT, moveId: 57, forgetSlot: 1, maxMoveCount: 4 };
+    const payload = {
+      type: "decision" as const,
+      partySlot: SLOT,
+      moveId: 57,
+      forgetSlot: 1,
+      maxMoveCount: 4,
+      allowNextWaveStart: false,
+    };
     const send = () =>
       guestRuntime.interactionRelay.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT, "learnMove", 1);
     let delivered = 0;
@@ -264,7 +278,13 @@ describe("co-op learn-move operation migration", () => {
     setCoopRuntime(hostRuntime);
     expect(
       commitCoopLearnMoveDecision(
-        { payload, ownerRole: "guest", localRole: "host", wave: WAVE, turn: TURN },
+        {
+          payload: { ...payload, nextInteraction: { kind: "reward", wave: WAVE, turn: TURN } },
+          ownerRole: "guest",
+          localRole: "host",
+          wave: WAVE,
+          turn: TURN,
+        },
         hostBinding,
       ),
     ).toBe(true);

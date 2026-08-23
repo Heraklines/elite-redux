@@ -8,6 +8,7 @@ import {
   confirmDefaultStarterTeam,
   isActionableSemanticObservation,
   selectOptionById,
+  waitForActionableSemanticSurface,
   waitForSemanticSurface,
 } from "./campaign-nav.mjs";
 import { loadCampaignPolicy } from "./campaign-policy.mjs";
@@ -399,6 +400,124 @@ async function freshWave2(rig) {
   await freshThroughWave2(rig);
 }
 
+function sameBattleAddress(left, right) {
+  return left?.epoch === right?.epoch && left?.wave === right?.wave && left?.turn === right?.turn;
+}
+
+/**
+ * Reproduce the live wave-13 freeze with only public keys: open the local pause/settings branch while
+ * one seat owns an exact shared reward, prove its cursor moves and Escape unwinds both overlays, then
+ * resume the same reward and reach the next two-browser command frontier.
+ */
+async function rewardPauseSettings(rig) {
+  await rig.pair(rig.config.requesterSeat);
+  await rig.startFreshRun();
+  await rig.driveWaveToReward();
+
+  const clients = Object.values(rig.clients);
+  const owner = await rig.host.evidence.waitForCondition(
+    () =>
+      clients.find(client => {
+        const event = client.evidence.findLastSemanticSurface(0, "reward-shop");
+        const observation = event?.observation;
+        return (
+          observation?.localSeat === client.publicSeat
+          && observation.ownerSeat === client.publicSeat
+          && observation.seatsWithInput?.includes(client.publicSeat)
+          && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+        );
+      }),
+    { timeoutMs: rig.config.timeoutMs, description: "actionable shared reward owner before pause overlay" },
+  );
+  const watcher = clients.find(client => client !== owner);
+  if (watcher == null) {
+    throw new Error("reward pause/settings journey requires two browser clients");
+  }
+  const rewardBefore = owner.evidence.findLastSemanticSurface(0, "reward-shop");
+  const watcherBefore = watcher.evidence.findLastSemanticSurface(0, "reward-shop");
+  if (rewardBefore == null || watcherBefore == null) {
+    throw new Error("reward pause/settings journey did not observe both reward projections");
+  }
+
+  const menuCursor = owner.evidence.cursor();
+  await owner.press("Escape", "reward-open-local-pause-menu");
+  const pauseMenu = await waitForActionableSemanticSurface(owner, "pause-menu", {
+    fromCursor: menuCursor,
+    timeoutMs: rig.config.timeoutMs,
+  });
+  if (pauseMenu.observation.operationClass !== "local-overlay" || pauseMenu.observation.ownerModel !== "local") {
+    throw new Error(`${owner.label}: pause menu was not projected as local-only input`);
+  }
+
+  const settingsCursor = owner.evidence.cursor();
+  await owner.press("Space", "reward-pause-open-game-settings");
+  const settings = await waitForActionableSemanticSurface(owner, "pause-settings", {
+    fromCursor: settingsCursor,
+    timeoutMs: rig.config.timeoutMs,
+  });
+  await owner.checkpoint("reward-pause-settings-open");
+
+  const movedCursor = owner.evidence.cursor();
+  await owner.press("ArrowDown", "reward-pause-settings-move-cursor");
+  const movedSettings = await owner.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(movedCursor, "pause-settings");
+      return event?.observation.selectedOptionId !== settings.observation.selectedOptionId
+        && isActionableSemanticObservation(event?.observation, { requireExplicitUnblocked: true })
+        ? event
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "actionable moved settings cursor during shared reward" },
+  );
+
+  const menuReturnCursor = owner.evidence.cursor();
+  await owner.press("Escape", "reward-pause-settings-back-to-menu");
+  await waitForActionableSemanticSurface(owner, "pause-menu", {
+    fromCursor: menuReturnCursor,
+    timeoutMs: rig.config.timeoutMs,
+  });
+
+  const rewardReturnCursor = owner.evidence.cursor();
+  await owner.press("Escape", "reward-close-local-pause-menu");
+  const rewardAfter = await owner.evidence.waitForCondition(
+    sink => {
+      const event = sink.findLastSemanticSurface(rewardReturnCursor, "reward-shop");
+      const observation = event?.observation;
+      return observation?.ownerSeat === owner.publicSeat
+        && observation.seatsWithInput?.includes(owner.publicSeat)
+        && isActionableSemanticObservation(observation, { requireExplicitUnblocked: true })
+        ? event
+        : null;
+    },
+    { timeoutMs: rig.config.timeoutMs, description: "same actionable shared reward after closing local overlays" },
+  );
+  if (
+    !sameBattleAddress(rewardBefore.observation.address, rewardAfter.observation.address)
+    || rewardBefore.observation.stateDigest !== rewardAfter.observation.stateDigest
+    || rewardBefore.observation.selectedOptionId !== rewardAfter.observation.selectedOptionId
+  ) {
+    throw new Error(`${owner.label}: local pause/settings changed or replaced the underlying reward authority`);
+  }
+  const watcherAfter = watcher.evidence.findLastSemanticSurface(0, "reward-shop");
+  if (
+    watcherAfter == null
+    || !sameBattleAddress(watcherBefore.observation.address, watcherAfter.observation.address)
+    || watcherAfter.observation.ownerSeat !== owner.publicSeat
+    || watcherAfter.observation.seatsWithInput?.includes(watcher.publicSeat)
+  ) {
+    throw new Error(`${watcher.label}: local owner overlay disturbed the reward watcher projection`);
+  }
+  owner.evidence.record("reward-pause-settings-proof", {
+    address: rewardAfter.observation.address,
+    ownerSeat: owner.publicSeat,
+    settingsCursorBefore: settings.observation.selectedOptionId,
+    settingsCursorAfter: movedSettings.observation.selectedOptionId,
+    rewardSelection: rewardAfter.observation.selectedOptionId,
+  });
+  await owner.checkpoint("reward-restored-after-pause-settings");
+  await rig.leaveRewardsAndReachWave2();
+}
+
 function requireEvolutionPromptProof(client, phase) {
   const surface = client.evidence.events.find(
     event =>
@@ -723,6 +842,7 @@ async function resumeScanIsolation(rig) {
 const journeys = {
   probe,
   "fresh-wave2": freshWave2,
+  "reward-pause-settings": rewardPauseSettings,
   "fresh-resume": freshResume,
   "same-tab-rejoin": sameTabRejoin,
   "reverse-resume": reverseResume,

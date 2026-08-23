@@ -20,10 +20,14 @@
 // reliable spawn. ER_SCENARIO=1 gated.
 // =============================================================================
 
+import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import {
+  captureGhostTeam,
   type GhostTeamSnapshot,
+  getErGhostMemberCustomData,
   hasErGhostOverride,
+  resetErGhostRunState,
   setPrefetchedGhostTeamsForTests,
 } from "#data/elite-redux/er-ghost-teams";
 import { AbilityId } from "#enums/ability-id";
@@ -85,11 +89,13 @@ describe.skipIf(!RUN)("ER Ghost Trainer Editor - authored presentation surfaces 
   });
 
   beforeEach(() => {
+    resetErGhostRunState();
     game = new GameManager(phaserGame);
     game.override.battleStyle("single").startingWave(5).startingLevel(10).ability(AbilityId.BALL_FETCH);
   });
 
   afterEach(() => {
+    resetErGhostRunState();
     setPrefetchedGhostTeamsForTests([]);
     for (const c of game.scene.gameMode?.challenges ?? []) {
       c.value = 0;
@@ -133,5 +139,131 @@ describe.skipIf(!RUN)("ER Ghost Trainer Editor - authored presentation surfaces 
     expect(defeat).toContain("Snorlax"); // {lead} -> Snorlax
     expect(defeat).toContain("was never enough");
     expect(defeat).not.toMatch(/\{(player|lead|ace|slayer)\}/);
+  });
+
+  it("captures black-shiny identity and the owner's selected GIFT", async () => {
+    const giftAbilities = ER_BLACK_SHINY_ABILITY_POOL.slice(0, 3);
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const source = game.scene.getPlayerParty()[0];
+    source.shiny = true;
+    source.variant = 2;
+    source.customPokemonData.erBlackShiny = true;
+    source.customPokemonData.erGiftAbilities = [...giftAbilities];
+    source.customPokemonData.erGiftIndex = 1;
+
+    const captured = captureGhostTeam(false);
+    expect(captured?.party[0]).toMatchObject({
+      shiny: true,
+      variant: 2,
+      erBlackShiny: true,
+      erGiftAbilities: giftAbilities,
+      erGiftIndex: 1,
+    });
+  });
+
+  it("captures Ability Randomizer overrides for the active ability and all three innates", async () => {
+    const abilityOverrides = [
+      AbilityId.BALL_FETCH,
+      AbilityId.SOUNDPROOF,
+      AbilityId.LEVITATE,
+      AbilityId.INTIMIDATE,
+    ] as const;
+    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    const source = game.scene.getPlayerParty()[0];
+    source.customPokemonData.ability = abilityOverrides[0];
+    source.customPokemonData.passive = abilityOverrides[1];
+    source.customPokemonData.passive2 = abilityOverrides[2];
+    source.customPokemonData.passive3 = abilityOverrides[3];
+    source.customPokemonData.abilityOverridesForm = true;
+
+    const captured = captureGhostTeam(false);
+    expect(captured?.party[0]).toMatchObject({
+      abilityOverrides,
+      abilityOverridesForm: true,
+    });
+  });
+
+  it("rejects malformed cross-player ability overrides instead of applying unknown abilities", () => {
+    const custom = getErGhostMemberCustomData({
+      ...SNAPSHOT.party[0],
+      abilityOverrides: [999999, AbilityId.SOUNDPROOF, 1.5, -1],
+      abilityOverridesForm: true,
+    });
+
+    expect(custom).toMatchObject({
+      ability: -1,
+      passive: AbilityId.SOUNDPROOF,
+      passive2: -1,
+      passive3: -1,
+      abilityOverridesForm: true,
+    });
+  });
+
+  it("reconstructs black-shiny identity and the owner's selected GIFT", async () => {
+    const giftAbilities = ER_BLACK_SHINY_ABILITY_POOL.slice(0, 3);
+    const blackSnapshot: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "ghost-black-shiny-1",
+      party: [
+        {
+          ...SNAPSHOT.party[0],
+          shiny: true,
+          variant: 2,
+          erBlackShiny: true,
+          erGiftAbilities: [...giftAbilities],
+          erGiftIndex: 1,
+        },
+      ],
+    };
+    setPrefetchedGhostTeamsForTests([blackSnapshot]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.MAGIKARP);
+
+    const reconstructed = game.scene.getEnemyParty()[0];
+    expect(reconstructed.shiny).toBe(true);
+    expect(reconstructed.variant).toBe(2);
+    expect(reconstructed.customPokemonData.erBlackShiny).toBe(true);
+    expect(reconstructed.customPokemonData.erGiftAbilities).toEqual(giftAbilities);
+    expect(reconstructed.customPokemonData.erGiftIndex).toBe(1);
+    expect(reconstructed.getLuck()).toBe(5);
+  });
+
+  it("reconstructs Ability Randomizer overrides without rerolling them", async () => {
+    const abilityOverrides = [
+      AbilityId.BALL_FETCH,
+      AbilityId.SOUNDPROOF,
+      AbilityId.LEVITATE,
+      AbilityId.INTIMIDATE,
+    ] as const;
+    const randomizedSnapshot: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "ghost-randomized-abilities-1",
+      party: [
+        {
+          ...SNAPSHOT.party[0],
+          abilityOverrides: [...abilityOverrides],
+          abilityOverridesForm: true,
+        },
+      ],
+    };
+    setPrefetchedGhostTeamsForTests([randomizedSnapshot]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.MAGIKARP);
+
+    const reconstructed = game.scene.getEnemyParty()[0];
+    expect(reconstructed.customPokemonData).toMatchObject({
+      ability: abilityOverrides[0],
+      passive: abilityOverrides[1],
+      passive2: abilityOverrides[2],
+      passive3: abilityOverrides[3],
+      abilityOverridesForm: true,
+    });
+    expect(reconstructed.getAbility().id).toBe(abilityOverrides[0]);
+    expect(
+      reconstructed
+        .getPassiveAbilities()
+        .slice(0, 3)
+        .map(ability => ability?.id),
+    ).toEqual(abilityOverrides.slice(1));
   });
 });

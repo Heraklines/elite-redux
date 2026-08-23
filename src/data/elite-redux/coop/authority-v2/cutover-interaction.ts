@@ -28,6 +28,7 @@
 // from the raw relay choice.
 // =============================================================================
 
+import { isValidWaveProgressionPresentation } from "#data/elite-redux/coop/authority-v2/adapters/wave-terminal";
 import type {
   CoopAuthorityEntry,
   CoopFrameContextV2,
@@ -36,6 +37,7 @@ import type {
 import { controlsEqual, validateNextControl } from "#data/elite-redux/coop/authority-v2/next-control";
 import type { CoopAuthorityV2Shadow } from "#data/elite-redux/coop/authority-v2/shadow";
 import { isCompleteCoopOperationAuthorityState } from "#data/elite-redux/coop/coop-authority-state-validator";
+import { isStrictCoopBattleEvent } from "#data/elite-redux/coop/coop-battle-event-validator";
 import type { CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
 import { isCoopMeIntroVisualPresentation } from "#data/elite-redux/coop/coop-me-presentation";
 import {
@@ -177,6 +179,13 @@ function rewardPayload(value: unknown): boolean {
     && terminalMatchesAction
     && isPlainObject(value.result)
     && typeof value.result.lockModifierTiers === "boolean"
+    && (value.result.presentation === undefined
+      || (isStrictCoopBattleEvent(value.result.presentation)
+        && value.result.presentation.k === "formChange"
+        && value.result.presentation.actor.side === "player"
+        && value.result.presentation.presentation === "evolution"
+        && value.result.presentation.animate === true)
+      || (isValidWaveProgressionPresentation(value.result.presentation) && value.result.presentation.k === "evolution"))
     && (value.result.nextInteraction === undefined || isCoopInteractionSuccessorRef(value.result.nextInteraction))
     && (!continuing || rewardPresentationPayload(value.result.continuation, "reward"))
   );
@@ -371,7 +380,9 @@ export const COOP_V2_INTERACTION_REGISTRY = {
           && integer(payload.moveId)
           && integer(payload.forgetSlot)
           && integer(payload.maxMoveCount)
-          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction)),
+          && typeof payload.allowNextWaveStart === "boolean"
+          && (payload.nextInteraction === undefined || isCoopInteractionSuccessorRef(payload.nextInteraction))
+          && !(payload.allowNextWaveStart && payload.nextInteraction !== undefined),
       ),
   },
   LEARN_MOVE_BATCH: {
@@ -833,8 +844,11 @@ export function successorOfCoopV2InteractionEnvelope(
       // reward picks, rerolls, and terminal skips close it and must await a separately-authored successor.
       if (isPlainObject(payload?.result) && isCoopInteractionSuccessorRef(payload.result.nextInteraction)) {
         return wait(
-          ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
-          payload?.terminal === true,
+          ["INTERACTION_COMMIT"],
+          // A typed nested successor is the only legal next control. Letting the reward terminal also
+          // authorize wave N+1 made a fast NewBattlePhase race the nested picker; Dex Nav then retired the
+          // already-started battle shell and stranded the replica in its previous replay turn.
+          false,
           [interactionAddressOf(payload.result.nextInteraction)],
         );
       }
@@ -917,10 +931,13 @@ export function successorOfCoopV2InteractionEnvelope(
     }
     case "LEARN_MOVE":
     case "LEARN_MOVE_BATCH": {
+      if (!COOP_V2_INTERACTION_REGISTRY[operation.kind].validatePayload(operation.payload)) {
+        return null;
+      }
       if (payload?.type !== "prompt") {
         return wait(
           ["TURN_COMMIT", "INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
-          false,
+          operation.kind === "LEARN_MOVE" && payload?.allowNextWaveStart === true,
           isCoopInteractionSuccessorRef(payload?.nextInteraction)
             ? [interactionAddressOf(payload.nextInteraction)]
             : undefined,
@@ -1046,15 +1063,16 @@ export function successorOfCoopV2InteractionEnvelope(
       return wait(["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"], true);
     case "STORMGLASS":
       // Stormglass settles before the encounter's first actionable surface is authored. A normal battle
-      // opens its command picker at this exact wave/turn; Mystery difficulty instead opens ME_PRESENT at
-      // the same exact address. Keep both alternatives explicit so an unrelated interaction, control kind,
-      // wave, or turn still fails closed.
+      // opens its command picker at this exact wave/turn. Mystery difficulty instead opens ME_PRESENT in
+      // the protocol's pre-turn transaction domain (turn 0), even after NewBattlePhase has advanced the
+      // local battle shell to turn 1. Keep both alternatives explicit so an unrelated interaction, control
+      // kind, wave, or turn still fails closed.
       return successorWait(
         envelope,
         ["INTERACTION_COMMIT", "CONTROL_COMMIT", "WAVE_ADVANCE", "TERMINAL_COMMIT"],
         false,
         envelope,
-        [{ surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: envelope.wave, turn: envelope.turn }],
+        [{ surfaceClass: "op:me", operationKind: "ME_PRESENT", wave: envelope.wave, turn: 0 }],
         [{ materialKind: "command-open", wave: envelope.wave, turn: envelope.turn, operationId: null }],
       );
     case "FAINT_SWITCH":

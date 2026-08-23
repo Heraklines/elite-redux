@@ -190,6 +190,12 @@ input:-internal-autofill-selected {
   display: flex;
 }
 
+/* ER World Map: expose the R action as a named touch button only while the
+   command menu can safely open the read-only map overlay. */
+#touchControls:not(.config-mode):not([data-ui-mode="COMMAND"]) #apadMap {
+  display: none;
+}
+
 /* Show #apadInfo only in battle */
 #touchControls:not([data-ui-mode="COMMAND"]):not([data-ui-mode="FIGHT"]):not(
     [data-ui-mode="BALL"]
@@ -239,7 +245,8 @@ input:-internal-autofill-selected {
     [data-ui-mode="POKEDEX_PAGE"],
     [data-ui-mode="RUN_INFO"],
     [data-ui-mode="SHOWDOWN_TEAM_MENU"],
-    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"],
+    [data-ui-mode="MOODY_LEDGER"]
   )
   #apadCycleForm,
 #touchControls:not(.config-mode):not(
@@ -248,7 +255,8 @@ input:-internal-autofill-selected {
     [data-ui-mode="POKEDEX_PAGE"],
     [data-ui-mode="RUN_INFO"],
     [data-ui-mode="SHOWDOWN_TEAM_MENU"],
-    [data-ui-mode="SHOWDOWN_SET_EDITOR"]
+    [data-ui-mode="SHOWDOWN_SET_EDITOR"],
+    [data-ui-mode="MOODY_LEDGER"]
   )
   #apadCycleShiny,
 #touchControls:not(.config-mode):not(

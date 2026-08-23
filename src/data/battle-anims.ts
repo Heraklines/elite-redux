@@ -445,6 +445,11 @@ const ER_ANIMS_SUBDIR = "./battle-anims-er";
  * @internal Exported only for tests.
  */
 export function getMoveAnimUrl(move: MoveId): string | null {
+  // Manual signature move: reuse the shipped Bone Rush animation until it has
+  // dedicated art instead of probing a guaranteed-missing custom atlas.
+  if (move === MoveId.IVORY_IMPACT) {
+    return "./battle-anims/bone-rush.json";
+  }
   if (move >= ER_CUSTOM_MOVE_ID_CUTOFF) {
     // Build a reverse-lookup of ErMoveId once and cache. ErMoveId is a
     // `const` object, not a TS reverse-mapped enum, so we have to invert
@@ -1128,7 +1133,10 @@ export abstract class BattleAnim {
               };
               setSpritePriority(frame.priority);
             }
-            moveSprite.setFrame(frame.graphicFrame);
+            const hasGraphicFrame = moveSprite.texture.has(String(frame.graphicFrame));
+            if (hasGraphicFrame) {
+              moveSprite.setFrame(frame.graphicFrame);
+            }
             //console.log(AnimFocus[frame.focus]);
 
             const graphicFrameData = frameData.get(frame.target)!.get(graphicIndex)!; // TODO: are those bangs correct?
@@ -1137,7 +1145,7 @@ export abstract class BattleAnim {
             moveSprite.setScale(graphicFrameData.scaleX, graphicFrameData.scaleY);
 
             moveSprite.setAlpha(frame.opacity / 255);
-            moveSprite.setVisible(frame.visible);
+            moveSprite.setVisible(frame.visible && hasGraphicFrame);
             moveSprite.setBlendMode(
               frame.blendType === AnimBlendType.NORMAL
                 ? Phaser.BlendModes.NORMAL
@@ -1390,7 +1398,10 @@ export abstract class BattleAnim {
             };
             setSpritePriority(frame.priority);
           }
-          moveSprite.setFrame(frame.graphicFrame);
+          const hasGraphicFrame = moveSprite.texture.has(String(frame.graphicFrame));
+          if (hasGraphicFrame) {
+            moveSprite.setFrame(frame.graphicFrame);
+          }
 
           const graphicFrameData = frameData.get(frame.target)?.get(graphicIndex);
           if (graphicFrameData) {
@@ -1399,7 +1410,7 @@ export abstract class BattleAnim {
             moveSprite.setScale(graphicFrameData.scaleX, graphicFrameData.scaleY);
 
             moveSprite.setAlpha(frame.opacity / 255);
-            moveSprite.setVisible(frame.visible);
+            moveSprite.setVisible(frame.visible && hasGraphicFrame);
             moveSprite.setBlendMode(
               frame.blendType === AnimBlendType.NORMAL
                 ? Phaser.BlendModes.NORMAL

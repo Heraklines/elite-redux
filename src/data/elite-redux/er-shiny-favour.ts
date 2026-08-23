@@ -87,6 +87,9 @@ export function getChallengeFavour(challenge: Challenge): number {
 
 /** Total favour from all active challenges on the current run. */
 export function getRunShinyFavour(): number {
+  if (globalScene.gameMode?.isFun) {
+    return 0;
+  }
   const challenges = globalScene.gameMode?.challenges ?? [];
   return challenges.reduce((sum, c) => sum + getChallengeFavour(c), 0);
 }
@@ -97,8 +100,15 @@ export function getRunShinyFavour(): number {
  * (e.g. 0→×1, 5→×1.5, 10→×2, 15→×2.5, 20+→×3.)
  */
 export function favourToShinyMultiplier(favour: number, maxMult?: number): number {
-  const steps = Math.floor(Math.max(0, favour) / erBalanceNum("er.favour.perStep"));
-  return Math.min(maxMult ?? erBalanceNum("er.favour.maxMult"), 1 + erBalanceNum("er.favour.stepBonus") * steps);
+  return favourToIntegerRewardMultiplier(favour, maxMult ?? erBalanceNum("er.favour.maxMult"));
+}
+
+/** Convert Challenge Favour into the integer reward multiplier used by every reward path. */
+export function favourToIntegerRewardMultiplier(favour: number, cap: number): number {
+  return Math.min(
+    Math.max(1, Math.floor(cap)),
+    1 + Math.floor((Math.max(0, Math.floor(favour)) + 5) / 10),
+  );
 }
 
 /**

@@ -283,11 +283,18 @@ export function prepareTelemetryDecision(fieldIndex: number): void {
       return;
     }
     globalScene.getEnemyField().forEach(mon => combatKnownOpponentEntityIds.add(mon.id));
-    const observation = snapshotErCombatObservation(globalScene, {
-      perspective: "player",
-      knownOpponentEntityIds: combatKnownOpponentEntityIds,
-      previousActions: combatActionHistory,
-    });
+    // Every active player slot in a double/triple chooses against the same
+    // pre-turn field image. Reuse that immutable observation after slot 0 is
+    // committed instead of rebuilding the complete party/ability/item state
+    // for slots 1 and 2. Candidate legality remains per-slot below because
+    // earlier switch/Tera choices can reserve options for later actors.
+    const observation =
+      combatPendingObservation
+      ?? snapshotErCombatObservation(globalScene, {
+        perspective: "player",
+        knownOpponentEntityIds: combatKnownOpponentEntityIds,
+        previousActions: combatActionHistory,
+      });
     const candidates = enumerateErCombatCandidates(globalScene, fieldIndex, combatEarlierChoices, "player");
     combatPreparedDecisions.set(fieldIndex, { jointActionId, observation, candidates });
   } catch {

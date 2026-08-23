@@ -60,7 +60,18 @@ interface EditorHarness {
   };
   spByConst: Map<string, unknown>;
   spById: Map<number, unknown>;
+  spByBattleIdentity: Map<string, unknown>;
+  spBySearchKey: Map<string, unknown>;
+  registerSpeciesSearchEntry(species: Record<string, unknown>): void;
+  speciesDatalistOptionsHtml(species: Record<string, unknown>[]): string;
+  pokedexList(): Record<string, any>[];
+  POKEDEX_SPECIES: Record<string, any>[];
+  TRAINER_SPECIES_FORMS: Record<string, any>[];
+  onCustomTrainerSpeciesPointerDown(e: { target: Element; preventDefault(): void }): boolean;
+  pokemonAtlasCache: Map<string, unknown>;
+  renderPokemonFrame(slug: string, el: HTMLElement, targetSize: number): void;
   trainerClassByName: Map<string, { name: string; sprite: string; genders: boolean }>;
+  TRAINER_CLASSES: { name: string; sprite: string; genders: boolean }[];
   trainerSpriteByKey: Map<string, { key: string; spriteKey: string; label: string; genders: boolean }>;
   SHINY_EFFECTS: { palette: any[]; surface: any[]; around: any[] };
   shinyEffectById: Map<string, { id: string; label: string; accent: string; category: string }>;
@@ -106,6 +117,8 @@ function addSpecies(constKey: string, id: number, name: string): void {
   const entry = { const: constKey, name, id, dex: id, bst: 500, slug: name.toLowerCase() };
   ct.spByConst.set(constKey, entry);
   ct.spById.set(id, entry);
+  ct.spByBattleIdentity.set(`${id}:0`, entry);
+  ct.registerSpeciesSearchEntry(entry);
 }
 
 /** Create + select a fresh trainer via the real "＋ New trainer" click; returns its key. */
@@ -137,12 +150,15 @@ beforeAll(() => {
       blankCtrTrainer, ctrIsMoveToken, ctrSlotOdds, ctrMoveIllegal, ctrFusedName, ctrLiveToEdit,
       ctrBuildBaselines, hashCtrTrainerEntry, markCustomTrainersSaved,
       render, onCustomTrainerInput, onCustomTrainerChange, onCustomTrainerClick, buildDeltas,
-      ctr, ctrConfig, spByConst, spById, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
+      ctr, ctrConfig, spByConst, spById, spByBattleIdentity, spBySearchKey, registerSpeciesSearchEntry, speciesDatalistOptionsHtml, pokedexList, onCustomTrainerSpeciesPointerDown, pokemonAtlasCache, renderPokemonFrame, trainerClassByName, trainerSpriteByKey, SHINY_EFFECTS, shinyEffectById, TRAINER_FX, trainerFxById, MOVE_SET, moveNameToEnumKey, legalMovesFor, learn, tms, moveById, abilById, abilIdByNormalizedName, ctrOpenMembers, ctrSetSel, legalMovesCache, egg,
       get ctrSelected(){ return ctrSelected; }, set ctrSelected(v){ ctrSelected = v; },
       get CTR_LIVE(){ return CTR_LIVE; }, set CTR_LIVE(v){ CTR_LIVE = v; },
       get HELD_ITEMS(){ return HELD_ITEMS; }, set HELD_ITEMS(v){ HELD_ITEMS = v; },
       get CHALLENGE_VALUES(){ return CHALLENGE_VALUES; }, set CHALLENGE_VALUES(v){ CHALLENGE_VALUES = v; },
       get CHALLENGE_PRESETS(){ return CHALLENGE_PRESETS; }, set CHALLENGE_PRESETS(v){ CHALLENGE_PRESETS = v; },
+      get TRAINER_CLASSES(){ return TRAINER_CLASSES; }, set TRAINER_CLASSES(v){ TRAINER_CLASSES = v; },
+      get POKEDEX_SPECIES(){ return POKEDEX_SPECIES; }, set POKEDEX_SPECIES(v){ POKEDEX_SPECIES = v; },
+      get TRAINER_SPECIES_FORMS(){ return TRAINER_SPECIES_FORMS; }, set TRAINER_SPECIES_FORMS(v){ TRAINER_SPECIES_FORMS = v; },
       setTab(v){ activeTab = v; },
     };`;
   const dom = new JSDOM(HARNESS_HTML, { runScripts: "outside-only", pretendToBeVisual: true });
@@ -156,6 +172,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   // Reset editor state between tests (module state is shared across the file).
+  (q("#search") as HTMLInputElement).value = "";
   ct.ctr.current = {};
   ct.ctr.baseline = {};
   ct.CTR_LIVE = {};
@@ -173,6 +190,11 @@ beforeEach(() => {
   ct.abilIdByNormalizedName.clear();
   ct.spByConst.clear();
   ct.spById.clear();
+  ct.spByBattleIdentity.clear();
+  ct.POKEDEX_SPECIES = [];
+  ct.TRAINER_SPECIES_FORMS = [];
+  ct.spBySearchKey.clear();
+  ct.pokemonAtlasCache.clear();
   ct.MOVE_SET.clear();
   addSpecies("SPECIES_PIKACHU", 25, "Pikachu");
   addSpecies("SPECIES_RAICHU", 26, "Raichu");
@@ -191,9 +213,14 @@ beforeEach(() => {
     ct.abilIdByNormalizedName.set(ability.name.toLowerCase(), ability.id);
   }
   // Trainer-class sprite catalog: ACE_TRAINER ships both m/f sprites; HIKER a single one.
+  ct.TRAINER_CLASSES = [
+    { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true },
+    { name: "HIKER", sprite: "hiker", genders: false },
+  ];
   ct.trainerClassByName.clear();
-  ct.trainerClassByName.set("ACE_TRAINER", { name: "ACE_TRAINER", sprite: "ace_trainer", genders: true });
-  ct.trainerClassByName.set("HIKER", { name: "HIKER", sprite: "hiker", genders: false });
+  for (const trainerClass of ct.TRAINER_CLASSES) {
+    ct.trainerClassByName.set(trainerClass.name, trainerClass);
+  }
   ct.trainerSpriteByKey.clear();
   // Shiny Lab effect registry fixture (a couple per category).
   ct.SHINY_EFFECTS.palette.length = 0;
@@ -250,6 +277,123 @@ beforeEach(() => {
 });
 
 describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
+  it("includes every runtime form in the shared Pokedex search using display-name aliases", () => {
+    ct.POKEDEX_SPECIES = [{ const: "SPECIES_CALYREX", name: "Calyrex", id: 898, dex: 898 }];
+    ct.TRAINER_SPECIES_FORMS = [
+      {
+        const: "SPECIES_CALYREX__FORM_MEGA",
+        baseConst: "SPECIES_CALYREX",
+        name: "Mega Calyrex",
+        aliases: ["Calyrex Mega", "Calyrex (Mega)"],
+        id: 898,
+        dex: 898,
+        formIndex: 3,
+      },
+      {
+        const: "SPECIES_HYPNO__FORM_MEGA",
+        baseConst: "SPECIES_HYPNO",
+        name: "Mega Hypno",
+        aliases: ["Hypno Mega", "Hypno (Mega)"],
+        id: 97,
+        dex: 97,
+        formIndex: 1,
+      },
+      {
+        const: "SPECIES_ALOLA_RAICHU__FORM_MEGA_MALE",
+        baseConst: "SPECIES_ALOLA_RAICHU",
+        name: "Mega Male Raichu",
+        aliases: ["Raichu Mega Male", "Raichu (Mega Male)"],
+        id: 2026,
+        dex: 26,
+        formIndex: 1,
+      },
+      {
+        const: "SPECIES_ALOLA_RAICHU__FORM_MEGA_FEMALE",
+        baseConst: "SPECIES_ALOLA_RAICHU",
+        name: "Mega Female Raichu",
+        aliases: ["Raichu Mega Female", "Raichu (Mega Female)"],
+        id: 2026,
+        dex: 26,
+        formIndex: 2,
+      },
+    ];
+
+    const search = q("#search") as HTMLInputElement;
+    for (const [query, expected] of [
+      ["calyrex mega", "SPECIES_CALYREX__FORM_MEGA"],
+      ["hypno mega", "SPECIES_HYPNO__FORM_MEGA"],
+      ["raichu mega male", "SPECIES_ALOLA_RAICHU__FORM_MEGA_MALE"],
+      ["raichu mega female", "SPECIES_ALOLA_RAICHU__FORM_MEGA_FEMALE"],
+    ]) {
+      search.value = query;
+      expect(ct.pokedexList().map(species => species.const)).toContain(expected);
+    }
+  });
+
+  it("selects, saves, and reloads an exact newcomer form while cropping its animated atlas", () => {
+    addSpecies("SPECIES_JUMPLUFF", 189, "Jumpluff");
+    const mega = {
+      const: "SPECIES_JUMPLUFF__FORM_MEGA",
+      baseConst: "SPECIES_JUMPLUFF",
+      name: "Mega Jumpluff",
+      aliases: ["Jumpluff Mega", "Jumpluff (Mega)"],
+      slug: "jumpluff_mega",
+      id: 189,
+      formIndex: 1,
+      bst: 560,
+      abilities: { ability1: 153, ability2: 3, hidden: 5, innates: [0, 0, 0] },
+    };
+    ct.spByConst.set(mega.const, mega);
+    ct.spByBattleIdentity.set("189:1", mega);
+    ct.registerSpeciesSearchEntry(mega);
+    const datalist = ct.speciesDatalistOptionsHtml([mega]);
+    expect(datalist).toContain('value="Mega Jumpluff"');
+    expect(datalist).toContain('value="Jumpluff Mega"');
+
+    const key = newTrainer();
+    const speciesInput = q('.ctr-species[data-idx="0"]') as HTMLInputElement;
+    speciesInput.value = "Mega Jumpluff";
+    ct.onCustomTrainerInput(speciesInput);
+    // Keep the user's text intact and show an editor-rendered result menu.
+    expect(speciesInput.value).toBe("Mega Jumpluff");
+    const customDrop = q(".ctr-species-drop");
+    expect(customDrop?.classList.contains("open")).toBe(true);
+    const customChoice = [...customDrop!.querySelectorAll(".ctr-species-opt")].find(option =>
+      option.textContent?.includes("Mega Jumpluff"),
+    );
+    expect(customChoice).not.toBeUndefined();
+    let prevented = false;
+    ct.onCustomTrainerSpeciesPointerDown({
+      target: customChoice!,
+      preventDefault: () => {
+        prevented = true;
+      },
+    });
+    expect(prevented).toBe(true);
+    const member = ct.ctr.current[key].team[0];
+    expect(member.species).toBe(mega.const);
+    expect(member.formIndex).toBe(1);
+    expect((q('.ctr-species[data-idx="0"]') as HTMLInputElement).value).toBe(mega.const);
+    expect(q('.ctr-abil[data-idx="0"] option')?.textContent).toContain("Moxie");
+
+    const saved = (ct.buildDeltas().deltas["custom-trainers"] as Record<string, any>)[key];
+    expect(saved.team[0]).toMatchObject({ species: 189, formIndex: 1 });
+    const reloaded = ct.ctrLiveToEdit({ id: 70123, name: "Form", trainerClass: "ACE_TRAINER", team: saved.team });
+    expect(reloaded.team[0]).toMatchObject({ species: mega.const, formIndex: 1 });
+
+    const atlasUrl = `https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/pokemon/elite-redux/${mega.slug}/front.json`;
+    ct.pokemonAtlasCache.set(atlasUrl, {
+      textures: [{ size: { w: 64, h: 2816 }, frames: [{ frame: { x: 0, y: 0, w: 64, h: 64 } }] }],
+    });
+    const frame = win.document.createElement("span");
+    win.document.body.appendChild(frame);
+    ct.renderPokemonFrame(mega.slug, frame, 64);
+    expect(frame.style.width).toBe("64px");
+    expect(frame.style.height).toBe("64px");
+    expect(frame.style.backgroundSize).toBe("64px 2816px");
+    expect(frame.style.backgroundPosition).toBe("0px 0px");
+  });
+
   it("weighted toggle reveals the possibility stepper; add/remove and stepper SWAP the member form", () => {
     newTrainer();
     const key = ct.ctrSelected!;
@@ -1229,10 +1373,10 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     ct.onCustomTrainerChange(fusSp);
     expect(t.team[0].fusion.species).toBe("SPECIES_RAICHU");
 
-    // The preview renders: two sprite <img>s + the game-generated fused name.
+    // The preview renders two cropped sprite frames plus the game-generated fused name.
     const preview = q(".ctr-fusion-preview");
     expect(preview).not.toBeNull();
-    expect(preview!.querySelectorAll("img").length).toBe(2);
+    expect(preview!.querySelectorAll(".ctr-pokemon-frame").length).toBe(2);
     const expectedName = ct.ctrFusedName("Pikachu", "Raichu");
     expect(preview!.querySelector(".ctr-fusion-name")!.textContent).toContain(expectedName);
     // The fused-name derivation matches the game's fragment blend (deterministic).
@@ -1257,7 +1401,7 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
       return [...p.querySelectorAll(".ctr-preview-h")].map(h => h.textContent).find(x => /Slot \d/.test(x || "")) || "";
     };
     expect(memberHeader()).toContain("Pikachu");
-    expect(panel!.querySelector(".ctr-preview-mon img")).not.toBeNull();
+    expect(panel!.querySelector(".ctr-preview-mon .ctr-pokemon-frame")).not.toBeNull();
 
     // Add a 2nd member -> it becomes the focused one; the panel follows.
     ct.onCustomTrainerClick({ target: q("#ctr-add-member")! });
@@ -1288,10 +1432,10 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     // The old "Nmon" member COUNT is gone.
     expect(card.textContent).not.toMatch(/\dmon\b/);
 
-    // One member ICON per team member, each an <img> (species resolved -> a sprite).
+    // One cropped sprite frame per resolved team member.
     const icons = card.querySelectorAll(".ctr-card-mon");
     expect(icons.length).toBe(3);
-    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(3);
+    expect(card.querySelectorAll(".ctr-card-mon .ctr-pokemon-frame").length).toBe(3);
     // The trainer's own sprite node is present (ACE_TRAINER ships gendered sprites,
     // so it carries the atlas file to paint lazily).
     const sprite = card.querySelector(".ctr-card-sprite") as HTMLElement;
@@ -1309,15 +1453,14 @@ describe("Custom Trainers editor — round-4 smoke (jsdom)", () => {
     expect(firstIcon.title).toBe("SPECIES_PIKACHU"); // possibility 0, not the edited cur
   });
 
-  it("empty-species slot renders a neutral icon box with NO img (never a broken image)", () => {
+  it("empty-species slot renders a neutral icon box with no sprite frame", () => {
     const key = newTrainer("Blank Slot");
     // Leave the lead's species empty (blank trainer default).
     ct.render();
     const card = q(`[data-ctropen="${key}"]`)!;
     const icons = card.querySelectorAll(".ctr-card-mon");
     expect(icons.length).toBe(1);
-    // No <img> for an unresolvable species: the box stands in as the placeholder.
-    expect(card.querySelectorAll(".ctr-card-mon img").length).toBe(0);
+    expect(card.querySelectorAll(".ctr-card-mon .ctr-pokemon-frame").length).toBe(0);
   });
 
   it("serializes a reusable uploaded sprite key without changing the trainer class", () => {

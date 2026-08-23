@@ -281,6 +281,8 @@ export interface CommitWithRetryOptions {
   merge: (existing: Record<string, unknown>) => CustomTrainersMergeResult;
   /** Serialize the merged map to the exact file text to commit. */
   serialize: (merged: Record<string, unknown>) => string;
+  /** Validate the COMPLETE merged catalog before any write; return an error to fail closed. */
+  validate?: (merged: Record<string, unknown>) => string | null;
   /** sha-conditional PUT; `conflict: true` on a 409 (someone else committed first). */
   write: (content: string, sha: string | undefined) => Promise<CustomTrainersWrite>;
   /** Skip the write entirely when the merge is a no-op (nothing to commit). */
@@ -315,6 +317,10 @@ export async function commitCustomTrainersWithRetry(opts: CommitWithRetryOptions
       return { ok: false, error: read.error };
     }
     const { merged, idRemap, keyRemap, conflicts } = opts.merge(read.existing);
+    const validationError = opts.validate?.(merged) ?? null;
+    if (validationError != null) {
+      return { ok: false, error: validationError };
+    }
     if (opts.isUnchanged?.(merged, read.existing)) {
       // Nothing to commit (e.g. every touched trainer conflicted). Surface the
       // conflicts without a pointless empty commit.

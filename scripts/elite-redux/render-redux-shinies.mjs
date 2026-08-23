@@ -405,13 +405,14 @@ export async function renderSpeciesRedux(slug, dir) {
 /**
  * Drive renderSpeciesRedux over every species directory under ASSET_ROOT.
  *
- * @param {{ limit?: number, slugFilter?: string }} [opts]
+ * @param {{ limit?: number, slugFilter?: string, assetRoot?: string }} [opts]
  */
 export async function renderAllRedux(opts = {}) {
-  if (!existsSync(ASSET_ROOT)) {
-    throw new Error(`asset root missing: ${ASSET_ROOT}`);
+  const assetRoot = opts.assetRoot ? resolve(opts.assetRoot) : ASSET_ROOT;
+  if (!existsSync(assetRoot)) {
+    throw new Error(`asset root missing: ${assetRoot}`);
   }
-  const entries = await readdir(ASSET_ROOT, { withFileTypes: true });
+  const entries = await readdir(assetRoot, { withFileTypes: true });
   let slugs = entries.filter(e => e.isDirectory()).map(e => e.name);
   slugs.sort();
   if (opts.slugFilter) {
@@ -431,7 +432,7 @@ export async function renderAllRedux(opts = {}) {
 
   for (const slug of slugs) {
     processed++;
-    const dir = join(ASSET_ROOT, slug);
+    const dir = join(assetRoot, slug);
     const result = await renderSpeciesRedux(slug, dir);
     totalWritten += result.written;
     totalSkipped += result.skipped;
@@ -459,11 +460,12 @@ export async function renderAllRedux(opts = {}) {
  * Parse CLI flags. Supports:
  *   --limit=N      process at most N species
  *   --slug=NAME    process exactly one species
+ *   --asset-root=PATH process an external er-assets checkout
  *
  * @param {string[]} argv
  */
 export function parseRenderFlags(argv) {
-  /** @type {{ limit?: number, slugFilter?: string }} */
+  /** @type {{ limit?: number, slugFilter?: string, assetRoot?: string }} */
   const out = {};
   for (const arg of argv) {
     const limit = arg.match(/^--limit=(\d+)$/);
@@ -474,6 +476,11 @@ export function parseRenderFlags(argv) {
     const slug = arg.match(/^--slug=(.+)$/);
     if (slug) {
       out.slugFilter = slug[1];
+      continue;
+    }
+    const assetRoot = arg.match(/^--asset-root=(.+)$/);
+    if (assetRoot) {
+      out.assetRoot = assetRoot[1];
     }
   }
   return out;
@@ -482,7 +489,8 @@ export function parseRenderFlags(argv) {
 async function main() {
   const t0 = Date.now();
   const flags = parseRenderFlags(process.argv.slice(2));
-  console.log(`[er:render-redux-shinies] scanning ${ASSET_ROOT}`);
+  const assetRoot = flags.assetRoot ? resolve(flags.assetRoot) : ASSET_ROOT;
+  console.log(`[er:render-redux-shinies] scanning ${assetRoot}`);
   if (flags.limit) {
     console.log(`[er:render-redux-shinies] limit=${flags.limit}`);
   }

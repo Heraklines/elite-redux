@@ -6,6 +6,12 @@ import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
 import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
+import {
+  applyErFakemonPitchEggMoves,
+  applyErFakemonPitchLearnsets,
+  applyErFakemonPitchTmCompatibility,
+  injectErFakemonPitchSpecies,
+} from "#data/elite-redux/er-fakemon-pitch-species";
 import { registerErFinalBossFormChange } from "#data/elite-redux/er-final-boss";
 import { applyNewcomerLearnsetAdditions, injectNewcomerForms } from "#data/elite-redux/er-newcomer-forms";
 import {
@@ -124,6 +130,10 @@ function initPhaseErSpecies(): void {
   }
   console.info(
     `[er-newcomer-species] registered ${newcomerSpeciesResult.speciesRegistered} species (skipped ${newcomerSpeciesResult.speciesAlreadyPresent}), ${newcomerSpeciesResult.evolutionEdges} evo edges, ${newcomerSpeciesResult.omniformMappings} Omniform mappings`,
+  );
+  const pitchSpeciesResult = injectErFakemonPitchSpecies();
+  console.info(
+    `[er-fakemon-pitches] registered ${pitchSpeciesResult.registered} species (skipped ${pitchSpeciesResult.skipped}), ${pitchSpeciesResult.evolutionEdges} evo edges`,
   );
 }
 
@@ -337,6 +347,8 @@ function initPhaseErMovesetsEvos(): void {
   // the dump so the CLONED pre-evo/base source learnsets are final.
   const newcomerSpeciesLearn = applyErNewcomerSpeciesLearnsets();
   console.info(`[er-newcomer-species] wired ${newcomerSpeciesLearn} species learnsets`);
+  const pitchSpeciesLearn = applyErFakemonPitchLearnsets();
+  console.info(`[er-fakemon-pitches] wired ${pitchSpeciesLearn} species learnsets`);
   // Elite Redux Phase B6: wire ER per-species level evolution requirements
   // into pokerogue's `pokemonEvolutions` table (kinds 0/3/4 — LEVEL,
   // LEVEL_MALE, LEVEL_FEMALE). Form changes (kinds 1/2/5 — MEGA, PRIMAL,
@@ -392,6 +404,8 @@ function initPhaseErTiersFinal(): void {
   );
   const newcomerEggMoves = applyErNewcomerSpeciesEggMoves();
   console.info(`[er-newcomer-species] wired egg moves for ${newcomerEggMoves} standalone newcomer species`);
+  const pitchEggMoves = applyErFakemonPitchEggMoves();
+  console.info(`[er-fakemon-pitches] wired egg moves for ${pitchEggMoves} base species`);
 
   // Elite Redux: editor-created custom mons (er-custom-mons.json). Runs after
   // the egg-move pass so every balance table it writes exists; invalid entries
@@ -434,6 +448,8 @@ function initPhaseErTiersFinal(): void {
   // is complete.
   const newcomerSpeciesTms = applyErNewcomerSpeciesTmCompatibility();
   console.info(`[er-newcomer-species] wired ${newcomerSpeciesTms} species TM sets`);
+  const pitchSpeciesTms = applyErFakemonPitchTmCompatibility();
+  console.info(`[er-fakemon-pitches] wired ${pitchSpeciesTms} species TM sets`);
 
   // Type-nativization sweep (Pass A): remove every type-grant ability from its
   // holder, give the granted type NATIVELY (setExtraTypes), and put the per-mon

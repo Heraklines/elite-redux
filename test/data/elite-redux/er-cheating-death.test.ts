@@ -39,4 +39,17 @@ describe("ER ability - Cheating Death (nullify first 2 hits)", () => {
     expect(hit(attr, pokemon, 30, true)).toBe(0); // simulated -> shows 0
     expect(attr.used(pokemon)).toBe(0); // but charge not spent
   });
+
+  it("restores all charges when the persistent party member enters a new battle", () => {
+    let battle: object = {};
+    const attr = new NullifyFirstNHitsAbAttr(1, () => battle);
+    const pokemon = { id: 4 } as any;
+
+    expect(hit(attr, pokemon, 50)).toBe(0);
+    expect(hit(attr, pokemon, 50)).toBe(50);
+
+    battle = {};
+    expect(attr.used(pokemon)).toBe(0);
+    expect(hit(attr, pokemon, 50)).toBe(0);
+  });
 });

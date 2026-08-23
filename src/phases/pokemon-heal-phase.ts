@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import type { HealBlockTag } from "#data/battler-tags";
 import { erRecordAchievementHeal } from "#data/elite-redux/er-achievement-tracker";
+import { shouldMoodyRuntimeProcessFullHpHeal } from "#data/elite-redux/moody/moody-runtime-field-engine";
 import { getStatusEffectHealText } from "#data/status-effect";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -77,7 +78,11 @@ export class PokemonHealPhase extends CommonAnimPhase {
 
     const hasMessage = !!this.message;
     const canRestorePP = this.fullRestorePP && pokemon.getMoveset().some(mv => mv.ppUsed > 0);
-    const healOrDamage = !pokemon.isFullHp() || this.hpHealed < 0 || canRestorePP;
+    const healOrDamage =
+      !pokemon.isFullHp()
+      || this.hpHealed < 0
+      || canRestorePP
+      || (this.hpHealed > 0 && shouldMoodyRuntimeProcessFullHpHeal(pokemon));
     const healBlock = pokemon.getTag(BattlerTagType.HEAL_BLOCK) as HealBlockTag;
     let lastStatusEffect = StatusEffect.NONE;
 
@@ -116,7 +121,7 @@ export class PokemonHealPhase extends CommonAnimPhase {
       if (this.preventFullHeal && pokemon.hp + healAmount.value >= pokemon.getMaxHp()) {
         healAmount.value = pokemon.getMaxHp() - pokemon.hp - 1;
       }
-      healAmount.value = pokemon.heal(healAmount.value);
+      healAmount.value = pokemon.heal(healAmount.value, this.revive);
       if (healAmount.value) {
         globalScene.damageNumberHandler.add(pokemon, healAmount.value, HitResult.HEAL);
       }
