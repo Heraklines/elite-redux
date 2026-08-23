@@ -2481,26 +2481,19 @@ impl GameKernel {
             ReplicaTailProofDisposition::Rejected { reason } => {
                 Ok(self.enter_terminal(format!("tail proof rejected: {reason}")))
             }
-            ReplicaTailProofDisposition::Completed { step } => {
-                let duplicate_complete_probe = matches!(
-                    &step.admission,
-                    ReplicaAdmission::Duplicate {
-                        resume: ReplicaResume::ControlInstalled,
-                    }
-                );
-                match &step.admission {
-                    ReplicaAdmission::Rejected { reason } => {
-                        Ok(self
-                            .enter_terminal(format!("tail proof candidate rejected: {reason:?}")))
-                    }
-                    ReplicaAdmission::Admitted { .. }
-                    | ReplicaAdmission::Duplicate { .. }
-                    | ReplicaAdmission::Gap { .. } => self.map_replica_actions_with_probe_mode(
-                        step.actions,
-                        duplicate_complete_probe,
-                    ),
+            ReplicaTailProofDisposition::Completed { step } => match &step.admission {
+                ReplicaAdmission::Rejected { reason } => {
+                    Ok(self.enter_terminal(format!("tail proof candidate rejected: {reason:?}")))
                 }
-            }
+                ReplicaAdmission::Duplicate {
+                    resume: er_protocol::ReplicaResume::ControlInstalled,
+                } => self.map_replica_actions_with_probe_mode(step.actions, true),
+                ReplicaAdmission::Admitted { .. }
+                | ReplicaAdmission::Duplicate { .. }
+                | ReplicaAdmission::Gap { .. } => {
+                    self.map_replica_actions_with_probe_mode(step.actions, false)
+                }
+            },
         }
     }
 

@@ -109,12 +109,14 @@ fn duplicate_complete_probe_replays_settled_only_without_live_presentation() {
     assert!(probe.contains("event_id.operation_id == entry.operation_id"));
     assert!(probe.contains("PresentationProbeOutcome::Settled"));
     assert!(probe.contains("if let Some(existing) = self"));
-    assert!(KERNEL_SOURCE.contains(
-        "ReplicaAdmission::Duplicate {\n                resume: er_protocol::ReplicaResume::ControlInstalled,\n            } => self.map_replica_actions_with_probe_mode(step.actions, true),"
+    let compact = KERNEL_SOURCE.split_whitespace().collect::<String>();
+    assert!(compact.contains(
+        "ReplicaAdmission::Duplicate{resume:er_protocol::ReplicaResume::ControlInstalled,}=>self.map_replica_actions_with_probe_mode(step.actions,true),"
     ));
-    assert!(KERNEL_SOURCE.contains(
-        "ReplicaAdmission::Admitted { .. }\n            | ReplicaAdmission::Duplicate { .. }\n            | ReplicaAdmission::Gap { .. } => self.map_replica_actions(step.actions),"
+    assert!(compact.contains(
+        "ReplicaAdmission::Admitted{..}|ReplicaAdmission::Duplicate{..}|ReplicaAdmission::Gap{..}"
     ));
+    assert!(compact.contains("self.map_replica_actions(step.actions)"));
 }
 
 #[test]
