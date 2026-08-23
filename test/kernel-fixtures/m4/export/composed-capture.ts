@@ -506,9 +506,19 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
     press(game, "Space", tape, transitions);
     await sleep();
   }
-  if (game.scene.ui.getMode() === UiMode.MESSAGE) {
+  for (let attempt = 0; attempt < 6 && game.scene.ui.getMode() === UiMode.MESSAGE; attempt += 1) {
     press(game, "Space", tape, transitions);
     await sleep();
+  }
+  const phaseName = String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "");
+  if (phaseName !== "CommandPhase") {
+    const handler = game.scene.ui.getHandler() as AnyRecord;
+    const options = Array.isArray(handler?.options) ? handler.options : [];
+    gap(
+      "REWARD_ACCEPTANCE_UNOBSERVABLE",
+      "src/phases/select-modifier-phase.ts:SelectModifierPhase",
+      `accepting the rerolled reward left phase=${phaseName} mode=${String(game.scene.ui.getMode())} rowCursor=${String(handler?.rowCursor)} cursor=${String(handler?.cursor)} awaitingActionInput=${String(handler?.awaitingActionInput)} options=${options.length} rows=${JSON.stringify(handler?.shopOptionsRows ?? null)}`,
+    );
   }
   await game.phaseInterceptor.to("CommandPhase");
 }
