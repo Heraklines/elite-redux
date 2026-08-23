@@ -26,6 +26,24 @@ const SECONDARY_STAGE_ID: &str =
     "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/data/moves/move.ts:4934";
 const MULTI_HIT_COUNT_ID: &str =
     "3b534099919efae827019d4a3f3c4ab0ecd6d67b:src/data/moves/move.ts:3375";
+const M5_ABILITY_CHANCE_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:ability-chance";
+const M5_ITEM_CHANCE_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:item-chance";
+const M5_STATUS_DURATION_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:status-duration";
+const M5_VOLATILE_DURATION_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:volatile-duration";
+const M5_RANDOM_TARGET_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-target";
+const M5_RANDOM_MOVE_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-move";
+const M5_RANDOM_ITEM_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-item";
+const M5_RANDOM_STAT_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-stat";
+const M5_RANDOM_SELECTOR_ID: &str =
+    "328824692f95b1aa1b38af85b54a6b72d9259eb4:rust/mechanics:random-selector";
 
 /// Semantically distinct M3 random streams.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
@@ -56,6 +74,14 @@ pub enum RngReason {
     SecondaryEffect,
     MultiHitCount,
     AbilityChance,
+    ItemChance,
+    StatusDuration,
+    VolatileDuration,
+    RandomTarget,
+    RandomMove,
+    RandomItem,
+    RandomStat,
+    RandomSelector,
 }
 
 /// Closed source identity at the pinned TypeScript oracle commit.
@@ -115,6 +141,29 @@ impl RngCallsiteId {
 
     pub fn multi_hit_count() -> Self {
         Self(MULTI_HIT_COUNT_ID.to_owned())
+    }
+
+    pub fn mechanics(reason: RngReason) -> Self {
+        let value = match reason {
+            RngReason::AbilityChance => M5_ABILITY_CHANCE_ID,
+            RngReason::ItemChance => M5_ITEM_CHANCE_ID,
+            RngReason::StatusDuration => M5_STATUS_DURATION_ID,
+            RngReason::VolatileDuration => M5_VOLATILE_DURATION_ID,
+            RngReason::RandomTarget => M5_RANDOM_TARGET_ID,
+            RngReason::RandomMove => M5_RANDOM_MOVE_ID,
+            RngReason::RandomItem => M5_RANDOM_ITEM_ID,
+            RngReason::RandomStat => M5_RANDOM_STAT_ID,
+            RngReason::RandomSelector => M5_RANDOM_SELECTOR_ID,
+            RngReason::SpeedTie => SPEED_TIE_ID,
+            RngReason::ParalysisActivation => PARALYSIS_ACTIVATION_ID,
+            RngReason::Accuracy => ACCURACY_ID,
+            RngReason::CriticalHit => CRITICAL_HIT_ID,
+            RngReason::DamageVariance => DAMAGE_VARIANCE_ID,
+            RngReason::SecondaryEffect => SECONDARY_STATUS_ID,
+            RngReason::MultiHitCount => MULTI_HIT_COUNT_ID,
+            RngReason::BattleSeedCharacter => BATTLE_SEED_CHARACTER_ID,
+        };
+        Self(value.to_owned())
     }
 
     /// Returns the pinned oracle commit embedded in every accepted identity.
@@ -464,6 +513,32 @@ fn callsite_spec(value: &str) -> Option<(RngReason, u8)> {
             Some((RngReason::SecondaryEffect, stream_bit(RngStream::Battle)))
         }
         MULTI_HIT_COUNT_ID => Some((RngReason::MultiHitCount, stream_bit(RngStream::Battle))),
+        M5_ABILITY_CHANCE_ID => Some((
+            RngReason::AbilityChance,
+            stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
+        )),
+        M5_ITEM_CHANCE_ID => Some((
+            RngReason::ItemChance,
+            stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
+        )),
+        M5_STATUS_DURATION_ID => Some((RngReason::StatusDuration, stream_bit(RngStream::Battle))),
+        M5_VOLATILE_DURATION_ID => {
+            Some((RngReason::VolatileDuration, stream_bit(RngStream::Battle)))
+        }
+        M5_RANDOM_TARGET_ID => Some((RngReason::RandomTarget, stream_bit(RngStream::Battle))),
+        M5_RANDOM_MOVE_ID => Some((
+            RngReason::RandomMove,
+            stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
+        )),
+        M5_RANDOM_ITEM_ID => Some((
+            RngReason::RandomItem,
+            stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
+        )),
+        M5_RANDOM_STAT_ID => Some((RngReason::RandomStat, stream_bit(RngStream::Battle))),
+        M5_RANDOM_SELECTOR_ID => Some((
+            RngReason::RandomSelector,
+            stream_bit(RngStream::Battle) | stream_bit(RngStream::Run),
+        )),
         _ => None,
     }
 }

@@ -2,8 +2,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use er_mechanics::{
     ArithmeticOperator, ComparisonOperator, ConditionNode, ConditionNodeId, MechanicsProgramV1,
-    PresenceKind, Relation, ValueField, ValueNode, ValueNodeId,
+    MechanicsRngReason, MechanicsRngStream, PresenceKind, Relation, ValueField, ValueNode,
+    ValueNodeId,
 };
+use er_rng::audit::{RngCallsiteId, RngReason};
+use er_rng::battle::RngRuntime;
 use er_types::SafeU53;
 use er_types::mechanics::{MechanicScope, MechanicSourceId};
 use thiserror::Error;
@@ -23,12 +26,39 @@ pub fn evaluate_condition(
     root: ConditionNodeId,
     facts: &ConditionFacts,
 ) -> Result<bool, ConditionEvaluationError> {
+    let mut rng = None;
+    evaluate_condition_inner(program, root, facts, &mut rng)
+}
+
+pub fn evaluate_condition_with_rng(
+    program: &MechanicsProgramV1,
+    root: ConditionNodeId,
+    facts: &ConditionFacts,
+    rng: &mut RngRuntime,
+) -> Result<bool, ConditionEvaluationError> {
+    let mut rng = Some(rng);
+    evaluate_condition_inner(program, root, facts, &mut rng)
+}
+
+fn evaluate_condition_inner(
+    program: &MechanicsProgramV1,
+    root: ConditionNodeId,
+    facts: &ConditionFacts,
+    rng: &mut Option<&mut RngRuntime>,
+) -> Result<bool, ConditionEvaluationError> {
     program
         .validate()
         .map_err(|_| ConditionEvaluationError::InvalidProgram)?;
     let mut condition_cache = BTreeMap::new();
     let mut value_cache = BTreeMap::new();
-    condition_value(program, root, facts, &mut condition_cache, &mut value_cache)
+    condition_value(
+        program,
+        root,
+        facts,
+        &mut condition_cache,
+        &mut value_cache,
+        rng,
+    )
 }
 
 fn condition_value(
@@ -37,6 +67,7 @@ fn condition_value(
     facts: &ConditionFacts,
     conditions: &mut BTreeMap<ConditionNodeId, bool>,
     values: &mut BTreeMap<ValueNodeId, i64>,
+    rng: &mut Option<&mut RngRuntime>,
 ) -> Result<bool, ConditionEvaluationError> {
     if let Some(value) = conditions.get(&id) {
         return Ok(*value);
@@ -49,19 +80,19 @@ fn condition_value(
         ConditionNode::Always => true,
         ConditionNode::Never => false,
         ConditionNode::Not { child } => {
-            !condition_value(program, *child, facts, conditions, values)?
+            !condition_value(program, *child, facts, conditions, values, rng)?
         }
         ConditionNode::All { children } => {
             let mut matched = true;
             for child in children {
-                matched &= condition_value(program, *child, facts, conditions, values)?;
+                matched &= condition_value(program, *child, facts, conditions, values, rng)?;
             }
             matched
         }
         ConditionNode::Any { children } => {
             let mut matched = false;
             for child in children {
-                matched |= condition_value(program, *child, facts, conditions, values)?;
+                matched |= condition_value(program, *child, facts, conditions, values, rng)?;
             }
             matched
         }
@@ -85,10 +116,53 @@ fn condition_value(
         ConditionNode::Presence { presence, id } => facts.presence.contains(&(*presence, *id)),
         ConditionNode::SourceIs { source } => facts.source.as_ref() == Some(source),
         ConditionNode::ScopeIs { scope } => facts.scope == Some(*scope),
-        ConditionNode::Chance { .. } => return Err(ConditionEvaluationError::ChanceRequiresRng),
+        ConditionNode::Chance {
+            numerator,
+            denominator,
+            stream,
+            reason,
+        } => {
+            let runtime = rng
+                .as_deref_mut()
+                .ok_or(ConditionEvaluationError::ChanceRequiresRng)?;
+            let reason = rng_reason(*reason);
+            let cardinality = SafeU53::new(u64::from(*denominator))
+                .map_err(|_| ConditionEvaluationError::Overflow)?;
+            let callsite = RngCallsiteId::mechanics(reason);
+            let draw = match stream {
+                MechanicsRngStream::Battle => {
+                    runtime.battle_rand_seed_int(cardinality, SafeU53::ZERO, reason, callsite)
+                }
+                MechanicsRngStream::Run => {
+                    runtime.run_rand_seed_int(cardinality, SafeU53::ZERO, reason, callsite)
+                }
+            }
+            .map_err(|error| ConditionEvaluationError::Rng(error.to_string()))?;
+            draw.get() < u64::from(*numerator)
+        }
     };
     conditions.insert(id, result);
     Ok(result)
+}
+
+const fn rng_reason(reason: MechanicsRngReason) -> RngReason {
+    match reason {
+        MechanicsRngReason::Accuracy => RngReason::Accuracy,
+        MechanicsRngReason::CriticalHit => RngReason::CriticalHit,
+        MechanicsRngReason::DamageVariance => RngReason::DamageVariance,
+        MechanicsRngReason::SecondaryEffect => RngReason::SecondaryEffect,
+        MechanicsRngReason::SpeedTie => RngReason::SpeedTie,
+        MechanicsRngReason::MultiHitCount => RngReason::MultiHitCount,
+        MechanicsRngReason::AbilityChance => RngReason::AbilityChance,
+        MechanicsRngReason::ItemChance => RngReason::ItemChance,
+        MechanicsRngReason::StatusDuration => RngReason::StatusDuration,
+        MechanicsRngReason::VolatileDuration => RngReason::VolatileDuration,
+        MechanicsRngReason::RandomTarget => RngReason::RandomTarget,
+        MechanicsRngReason::RandomMove => RngReason::RandomMove,
+        MechanicsRngReason::RandomItem => RngReason::RandomItem,
+        MechanicsRngReason::RandomStat => RngReason::RandomStat,
+        MechanicsRngReason::RandomSelector => RngReason::RandomSelector,
+    }
 }
 
 fn value(
@@ -164,7 +238,7 @@ fn value(
     Ok(result)
 }
 
-#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+#[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum ConditionEvaluationError {
     #[error("mechanics program failed validation")]
     InvalidProgram,
@@ -182,4 +256,6 @@ pub enum ConditionEvaluationError {
     InvalidClamp,
     #[error("chance condition requires the exact RNG executor")]
     ChanceRequiresRng,
+    #[error("exact RNG draw failed: {0}")]
+    Rng(String),
 }
