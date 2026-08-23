@@ -452,14 +452,16 @@ class DeterministicGzipWriter:
                 "name": self.path.name,
                 "sha256": file_sha256(self.path),
                 "bytes": self.path.stat().st_size,
+                "uncompressedBytes": self.uncompressed_bytes,
                 "records": self.records,
+                "oversizedRecords": int(
+                    self.records == 1 and self.uncompressed_bytes > self.max_uncompressed_bytes
+                ),
             }
         )
 
     def write(self, record: dict[str, Any]) -> None:
         payload = f"{json.dumps(record, sort_keys=True, separators=(',', ':'))}\n".encode()
-        if len(payload) > self.max_uncompressed_bytes:
-            raise ValueError("one curated record exceeds the configured upload shard size")
         if self.records and self.uncompressed_bytes + len(payload) > self.max_uncompressed_bytes:
             self._close_part()
             self._open()

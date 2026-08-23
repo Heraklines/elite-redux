@@ -172,6 +172,28 @@ class ContractV4CurationTest(unittest.TestCase):
             self.assertEqual(restored, records)
             self.assertGreater(len(descriptors), 1)
 
+    def test_curated_writer_preserves_one_oversized_episode_as_its_own_part(self) -> None:
+        records = [
+            {"episodeId": "small-before", "payload": "a" * 8},
+            {"episodeId": "long-run", "payload": "b" * 512},
+            {"episodeId": "small-after", "payload": "c" * 8},
+        ]
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            writer = DeterministicGzipWriter(root / "critic-all-outcomes-train.jsonl.gz", max_uncompressed_bytes=128)
+            for record in records:
+                writer.write(record)
+            descriptors = writer.close()
+
+            self.assertEqual([row["records"] for row in descriptors], [1, 1, 1])
+            self.assertEqual([row["oversizedRecords"] for row in descriptors], [0, 1, 0])
+            self.assertGreater(descriptors[1]["uncompressedBytes"], 128)
+            restored = []
+            for descriptor in descriptors:
+                with gzip.open(root / descriptor["name"], "rt", encoding="utf-8") as handle:
+                    restored.extend(json.loads(line) for line in handle)
+            self.assertEqual(restored, records)
+
     def test_cross_split_run_lineage_is_quarantined_before_policy_selection(self) -> None:
         train = episode("train-clone", source_for("train"), "copied-seed", 10)
         validation = episode("validation-clone", source_for("validation"), "copied-seed", 11)
