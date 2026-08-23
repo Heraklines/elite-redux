@@ -457,6 +457,64 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
+  m5-performance:
+    name: M5 performance regression
+    needs:
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out Rust benchmark
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Run release executor benchmarks
+        working-directory: rust
+        run: cargo test --release -p er-testkit --bench m5_runtime_benchmark -- --nocapture
+
+  m5-system-audit:
+    name: M5 classification and bypass audit
+    needs:
+      - m5-source-lock
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact system candidate
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: Regenerate complete classifications
+        run: |
+          set -euo pipefail
+          node scripts/generate-kernel-m5-classification.mjs
+          git diff --exit-code -- \
+            rust/fixtures/m5/classification-manifest-v1.json \
+            rust/fixtures/m5/bespoke-manifest-v1.json \
+            rust/fixtures/m5/capability-report-v1.json
+
+      - name: Require exact catalog closure
+        run: |
+          set -euo pipefail
+          test "$(jq -r '.unclassified_count' rust/fixtures/m5/capability-report-v1.json)" = 0
+          test "$(jq -r '.source_count' rust/fixtures/m5/capability-report-v1.json)" = 1953
+          test "$(jq -r '.entries | length' rust/fixtures/m5/classification-manifest-v1.json)" = 1953
+
+      - name: Run final bypass tests
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-mechanics --test program_validation
+          cargo test -p er-battle --test m5_properties
+          cargo test -p er-testkit --test m5_atomic_executor
+
   m5-g17-foundation:
     name: M5 G17 foundation aggregate
     needs:
@@ -498,3 +556,19 @@ jobs:
     steps:
       - name: Attest every admitted family primitive
         run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G19 families"
+
+  m5-g20-qualification:
+    name: M5 G20 exact-SHA qualification
+    needs:
+      - m5-g19-family
+      - m5-performance
+      - m5-system-audit
+      - m5-executor-parity
+      - m5-m4-regression
+      - m5-oracle-classification
+      - m5-source-lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest complete M5 qualification
+        run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G20 qualification"
