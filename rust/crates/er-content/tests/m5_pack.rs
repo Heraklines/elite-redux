@@ -89,11 +89,8 @@ fn pack() -> BattleContentPackV2 {
             unsupported_reason: None,
         }]),
         bespoke: Vec::new(),
-        type_chart: er_content::pack::TypeChart {
-            entries: Vec::new(),
-        },
+        type_chart: er_content::pack::selected_type_chart(),
     };
-    pack.content_hash = pack.compute_content_hash().expect("hash");
     pack
 }
 

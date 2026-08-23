@@ -502,11 +502,11 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
   }
   press(game, "Space", tape, transitions);
   await sleep();
-  if (game.scene.ui.getMode() === UiMode.PARTY) {
-    press(game, "Space", tape, transitions);
-    await sleep();
-  }
-  for (let attempt = 0; attempt < 6 && game.scene.ui.getMode() === UiMode.MESSAGE; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const mode = game.scene.ui.getMode();
+    if (mode !== UiMode.PARTY && mode !== UiMode.MESSAGE) {
+      break;
+    }
     press(game, "Space", tape, transitions);
     await sleep();
   }
