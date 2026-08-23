@@ -91,18 +91,21 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts
           node scripts/export-kernel-m5-source-catalog.mjs \
             --oracle-root "$RUNNER_TEMP/m5-oracle" \
             --oracle-sha "$M5_ORACLE_SHA" \
-            --output "$GITHUB_WORKSPACE/artifacts/m5-source-catalog-v1.json"
+            --output "$RUNNER_TEMP/m5-source-catalog-v1.json" \
+            2>&1 | tee "$RUNNER_TEMP/m5-source-catalog.log"
 
       - name: Upload source catalog
+        if: always()
         uses: actions/upload-artifact@v6
         with:
           name: m5-source-catalog
-          path: artifacts/m5-source-catalog-v1.json
-          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/m5-source-catalog-v1.json
+            ${{ runner.temp }}/m5-source-catalog.log
+          if-no-files-found: warn
           retention-days: 30
 
   m5-oracle-refresh:
@@ -189,9 +192,11 @@ jobs:
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/m5-${{ matrix.fixture }}-oracle"
           if [[ "${{ matrix.fixture }}" == "m3" ]]; then
-            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m5-m3-oracle"
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m5-m3-oracle" \
+              2>&1 | tee "$RUNNER_TEMP/m5-m3-oracle.log"
           else
-            node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m5-m4-oracle"
+            node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m5-m4-oracle" \
+              2>&1 | tee "$RUNNER_TEMP/m5-m4-oracle.log"
           fi
 
       - name: Upload refreshed fixtures or typed gaps
@@ -199,7 +204,9 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: m5-${{ matrix.fixture }}-oracle-refresh
-          path: ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle
+          path: |
+            ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle
+            ${{ runner.temp }}/m5-${{ matrix.fixture }}-oracle.log
           if-no-files-found: warn
           retention-days: 30
 
