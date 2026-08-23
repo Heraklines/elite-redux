@@ -9,10 +9,13 @@ use er_content::pack::m5_pack::{
     BattleContentPackV2, ClassificationEntryV1, ClassificationKind, ClassificationManifestV1,
 };
 use er_mechanics::{
-    BindingKind, HookBinding, MechanicInstanceTemplate, MechanicOperation, MechanicStatePayload,
-    MechanicsProgramV1, ProgramBudget, ProgramRange, SelectorArena, SelectorNode,
+    BindingKind, HookBinding, HpOperationKind, ItemOperationKind, MechanicInstanceTemplate,
+    MechanicOperation, MechanicStatePayload, MechanicsProgramV1, PresentationCueKind,
+    ProgramBudget, ProgramRange, SelectorArena, SelectorNode, StageOperationKind,
+    StatusOperationKind, ValueNode,
 };
 use er_rng::battle::RngRuntime;
+use er_state::mechanic_state::HeldItemStateV1;
 use er_state::migration::M4_ORACLE_SHA;
 use er_state::migration_v3::migrate_game_v2_to_v3;
 use er_testkit::m4_fixture::assemble_game_state;
@@ -47,21 +50,53 @@ fn pack() -> BattleContentPackV2 {
             selector_root: None,
             operations: ProgramRange {
                 start: 0,
-                length: 1,
+                length: 6,
             },
         }],
         conditions: Default::default(),
         selectors: SelectorArena(vec![SelectorNode::SelfPokemon]),
-        values: Vec::new(),
-        operations: vec![MechanicOperation::CreateInstance {
-            owners: er_mechanics::SelectorNodeId::ZERO,
-            template: MechanicInstanceTemplate {
-                program_id: MechanicsProgramId::new(safe(1)),
-                remaining_turns: Some(2),
-                counters: Vec::new(),
-                payload: MechanicStatePayload::Counter { value: safe(1) },
+        values: vec![
+            ValueNode::Unsigned { value: 10 },
+            ValueNode::Signed { value: 1 },
+        ],
+        operations: vec![
+            MechanicOperation::Hp {
+                operation: HpOperationKind::Damage,
+                targets: er_mechanics::SelectorNodeId::ZERO,
+                amount: er_mechanics::ValueNodeId::ZERO,
             },
-        }],
+            MechanicOperation::Status {
+                operation: StatusOperationKind::Apply,
+                targets: er_mechanics::SelectorNodeId::ZERO,
+                status_id: safe(6),
+                duration: None,
+            },
+            MechanicOperation::StatStage {
+                operation: StageOperationKind::Add,
+                targets: er_mechanics::SelectorNodeId::ZERO,
+                stat_id: 0,
+                stages: er_mechanics::ValueNodeId::new(1),
+            },
+            MechanicOperation::CreateInstance {
+                owners: er_mechanics::SelectorNodeId::ZERO,
+                template: MechanicInstanceTemplate {
+                    program_id: MechanicsProgramId::new(safe(1)),
+                    remaining_turns: Some(2),
+                    counters: Vec::new(),
+                    payload: MechanicStatePayload::Counter { value: safe(1) },
+                },
+            },
+            MechanicOperation::Item {
+                operation: ItemOperationKind::Consume,
+                targets: er_mechanics::SelectorNodeId::ZERO,
+                item_id: safe(99),
+            },
+            MechanicOperation::Presentation {
+                cue: PresentationCueKind::Ability,
+                subjects: er_mechanics::SelectorNodeId::ZERO,
+                detail_id: Some(safe(22)),
+            },
+        ],
         budget: ProgramBudget::ceiling(),
     };
     let mut pack = BattleContentPackV2 {
@@ -100,13 +135,23 @@ fn hook_commit_is_atomic_and_creates_one_restorable_instance() -> Result<(), Box
         RunContentPackHash::new(hash('b'))?,
         M4_ORACLE_SHA,
     )?;
-    let (state, _) = migrate_game_v2_to_v3(&v2, hash('c'))?;
+    let (mut state, _) = migrate_game_v2_to_v3(&v2, hash('c'))?;
     let pokemon = state
         .base
         .player_party
         .first()
         .ok_or("fixture party is empty")?
         .id;
+    state.pokemon_extensions[0]
+        .held_items
+        .push(HeldItemStateV1 {
+            item_id: safe(99),
+            registry_key: "TEST_ORB".to_owned(),
+            source_ordinal: SourceOrdinal::ZERO,
+            consumed: false,
+            charges: 1,
+        });
+    let before_hp = state.base.player_party[0].hp;
     let pack = pack();
     let ordered = collect_mechanic_sources(
         &pack,
@@ -140,7 +185,27 @@ fn hook_commit_is_atomic_and_creates_one_restorable_instance() -> Result<(), Box
             .len(),
         1
     );
-    assert_eq!(transition.mutations.len(), 1);
+    assert_eq!(transition.mutations.len(), 5);
+    assert_eq!(transition.presentation.len(), 1);
+    assert_eq!(
+        transition.after_state.base.player_party[0].hp,
+        before_hp - 10
+    );
+    assert_eq!(
+        transition.after_state.base.player_party[0].status.kind,
+        er_types::battle_model::StatusKind::Burn
+    );
+    assert_eq!(
+        transition.after_state.base.player_party[0]
+            .stat_stages
+            .attack,
+        1
+    );
+    assert!(transition.after_state.pokemon_extensions[0].held_items[0].consumed);
+    assert_eq!(
+        transition.after_state.pokemon_extensions[0].held_items[0].charges,
+        0
+    );
     transition.after_state.validate()?;
     Ok(())
 }
