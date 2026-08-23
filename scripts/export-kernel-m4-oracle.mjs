@@ -359,6 +359,33 @@ function firstByteDivergence(left, right) {
   return left.length === right.length ? null : length;
 }
 
+function firstJsonDifference(left, right, path = "$") {
+  if (Object.is(left, right)) return null;
+  if (Array.isArray(left) && Array.isArray(right)) {
+    const length = Math.max(left.length, right.length);
+    for (let index = 0; index < length; index += 1) {
+      if (index >= left.length || index >= right.length) {
+        return `${path}[${index}]: ${JSON.stringify(left[index])} != ${JSON.stringify(right[index])}`;
+      }
+      const difference = firstJsonDifference(left[index], right[index], `${path}[${index}]`);
+      if (difference) return difference;
+    }
+    return null;
+  }
+  if (left && right && typeof left === "object" && typeof right === "object") {
+    const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].sort();
+    for (const key of keys) {
+      if (!(key in left) || !(key in right)) {
+        return `${path}.${key}: ${JSON.stringify(left[key])} != ${JSON.stringify(right[key])}`;
+      }
+      const difference = firstJsonDifference(left[key], right[key], `${path}.${key}`);
+      if (difference) return difference;
+    }
+    return null;
+  }
+  return `${path}: ${JSON.stringify(left)} != ${JSON.stringify(right)}`;
+}
+
 function compareTrees(left, right, expected) {
   for (const relativePath of expected) {
     const leftBytes = readFileSync(resolve(left, relativePath));
@@ -367,7 +394,11 @@ function compareTrees(left, right, expected) {
     if (offset !== null) {
       const leftByte = offset < leftBytes.length ? `0x${leftBytes[offset].toString(16).padStart(2, "0")}` : "EOF";
       const rightByte = offset < rightBytes.length ? `0x${rightBytes[offset].toString(16).padStart(2, "0")}` : "EOF";
-      fail(`fresh-process output differs at ${relativePath}, first byte ${offset}: ${leftByte} != ${rightByte}`);
+      const structural = firstJsonDifference(
+        JSON.parse(leftBytes.toString("utf8")),
+        JSON.parse(rightBytes.toString("utf8")),
+      );
+      fail(`fresh-process output differs at ${relativePath}, first byte ${offset}: ${leftByte} != ${rightByte}; ${structural}`);
     }
   }
 }
