@@ -11,6 +11,7 @@ pub mod error;
 pub mod faint;
 pub mod js_math;
 pub mod legality;
+pub mod mechanics;
 pub mod move_effect;
 pub mod move_pipeline;
 pub mod outcome;

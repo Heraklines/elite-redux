@@ -115,6 +115,7 @@ version = "0.1.0"
 dependencies = [
  "er-canonical",
  "er-content",
+ "er-mechanics",
  "er-rng",
  "er-state",
  "er-types",

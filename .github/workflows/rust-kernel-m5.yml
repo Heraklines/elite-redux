@@ -123,6 +123,7 @@ jobs:
             cargo check -p er-types -p er-mechanics -p er-content -p er-content-compiler -p er-state
             cargo test -p er-mechanics --test program_validation
             cargo test -p er-content --test m5_pack
+            cargo test -p er-battle --test m5_mechanic_sources
           } 2>&1 | tee "$RUNNER_TEMP/m5-ir-foundation.log"
 
       - name: Publish IR foundation failure annotation
