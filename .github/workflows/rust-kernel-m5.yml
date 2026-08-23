@@ -119,8 +119,9 @@ jobs:
         run: |
           set -euo pipefail
           cargo fmt --all -- --check
-          cargo check -p er-types -p er-mechanics
+          cargo check -p er-types -p er-mechanics -p er-content
           cargo test -p er-mechanics --test program_validation
+          cargo test -p er-content --test m5_pack
 
   m5-source-catalog:
     name: M5 source catalog

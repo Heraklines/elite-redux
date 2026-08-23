@@ -26,6 +26,8 @@ pub mod m4_moves;
 pub mod m4_pack;
 #[path = "m4_species.rs"]
 pub mod m4_species;
+#[path = "m5_pack.rs"]
+pub mod m5_pack;
 pub use m4_pack::{selected_m4_capability_manifest, selected_m4_content_pack};
 
 /// The immutable M4 oracle identity for the extended selected slice.
