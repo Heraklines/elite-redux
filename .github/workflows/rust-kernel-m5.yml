@@ -182,10 +182,44 @@ jobs:
         shell: bash
         run: |
           diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-m4-regression.log" 2>/dev/null | grep -aE "^error|panicked|FAILED|test result" -A5 | tail -c 3500 || true)"
+
           diagnostic="${diagnostic//'%'/'%25'}"
           diagnostic="${diagnostic//$'\r'/'%0D'}"
           diagnostic="${diagnostic//$'\n'/'%0A'}"
           echo "::error title=M0-M4 Rust regression failure::$diagnostic"
+  m5-executor-parity:
+    name: M5 G18 executor parity
+    needs:
+      - m5-source-lock
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Check out Rust executor
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Install Wasm target
+        run: rustup target add wasm32-unknown-unknown
+
+      - name: Verify native executor contracts
+        working-directory: rust
+        run: |
+          set -euo pipefail
+          cargo test -p er-battle --test m5_mechanic_sources
+          cargo test -p er-battle --test m5_executor
+          cargo test -p er-testkit --test m5_atomic_executor
+
+      - name: Verify Wasm executor graph
+        working-directory: rust
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-unknown
+        run: cargo check -p er-types -p er-rng -p er-mechanics -p er-content -p er-state -p er-battle -p er-wasm
 
   m5-source-catalog:
     name: M5 source catalog
@@ -440,3 +474,15 @@ jobs:
         run: |
           set -euo pipefail
           printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G17 foundation"
+
+  m5-g18-executor:
+    name: M5 G18 executor aggregate
+    needs:
+      - m5-g17-foundation
+      - m5-executor-parity
+      - m5-m4-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest exact-SHA G18 executor
+        run: printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G18 executor"
