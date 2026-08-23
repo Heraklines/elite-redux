@@ -119,3 +119,18 @@ fn rejects_unknown_operations_in_program_json() {
     let dynamic = r#"{"kind":"EXECUTE_SCRIPT","script":"damage *= 2"}"#;
     assert!(serde_json::from_str::<MechanicOperation>(dynamic).is_err());
 }
+
+#[test]
+fn every_frozen_family_is_unique_and_query_owned() {
+    let unique: std::collections::BTreeSet<_> =
+        er_mechanics::ADMITTED_FAMILIES.into_iter().collect();
+    assert_eq!(unique.len(), er_mechanics::ADMITTED_FAMILIES.len());
+    assert_eq!(
+        er_mechanics::query_family(MechanicQuery::Damage),
+        er_mechanics::MechanicFamily::DamageTypeCritical
+    );
+    assert_eq!(
+        er_mechanics::query_family(MechanicQuery::ItemEligibility),
+        er_mechanics::MechanicFamily::HeldItemLifecycle
+    );
+}

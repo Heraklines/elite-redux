@@ -4,6 +4,7 @@
 //! `er-battle`; source extraction and compilation belong to offline tooling.
 
 pub mod condition;
+pub mod families;
 pub mod ids;
 pub mod operation;
 pub mod program;
@@ -11,6 +12,7 @@ pub mod selector;
 pub mod value;
 
 pub use condition::*;
+pub use families::*;
 pub use ids::*;
 pub use operation::*;
 pub use program::*;
