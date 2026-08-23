@@ -179,6 +179,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-mechanics"
+version = "0.1.0"
+dependencies = [
+ "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "er-protocol"
 version = "0.1.0"
 dependencies = [

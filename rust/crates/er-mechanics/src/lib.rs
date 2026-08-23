@@ -1,0 +1,18 @@
+//! Closed, versioned M5 mechanics intermediate representation.
+//!
+//! This crate owns immutable DTOs and validation only. Execution belongs to
+//! `er-battle`; source extraction and compilation belong to offline tooling.
+
+pub mod condition;
+pub mod ids;
+pub mod operation;
+pub mod program;
+pub mod selector;
+pub mod value;
+
+pub use condition::*;
+pub use ids::*;
+pub use operation::*;
+pub use program::*;
+pub use selector::*;
+pub use value::*;

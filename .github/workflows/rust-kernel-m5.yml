@@ -54,6 +54,74 @@ jobs:
           git diff --exit-code "$M4_FINAL_SHA" "$GITHUB_SHA" -- src rust/source-lock.toml
           git diff --check "$M4_FINAL_SHA" "$GITHUB_SHA"
 
+  m5-contract-freeze:
+    name: M5 G16 contract freeze
+    needs: m5-source-lock
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out contract surface
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/contracts/
+            /rust/fixtures/m4/m4-final-qualification.json
+            /rust/fixtures/m5/source-catalog-v1.json
+            /scripts/check-kernel-m5-contract.mjs
+          submodules: false
+
+      - name: Validate exact M5 contracts and catalog
+        env:
+          M5_ATTESTATION_PATH: artifacts/m5-g16-attestation.json
+        run: node scripts/check-kernel-m5-contract.mjs
+
+      - name: Upload G16 attestation
+        uses: actions/upload-artifact@v6
+        with:
+          name: m5-g16-attestation
+          path: artifacts/m5-g16-attestation.json
+          if-no-files-found: error
+          retention-days: 30
+
+  m5-ir-foundation:
+    name: M5 mechanics IR foundation
+    needs:
+      - m5-source-lock
+      - m5-contract-freeze
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out Rust foundation
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Cache Rust foundation
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m5-ir-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m5-ir-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Check and test closed mechanics IR
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check -p er-types -p er-mechanics
+          cargo test -p er-mechanics --test program_validation
+
   m5-source-catalog:
     name: M5 source catalog
     runs-on: ubuntu-latest

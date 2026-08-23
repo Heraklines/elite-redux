@@ -8,6 +8,7 @@ pub mod battle_model;
 pub mod battle_ui;
 pub mod ids;
 pub mod input;
+pub mod mechanics;
 pub mod protocol;
 pub mod run_control;
 pub mod run_ids;
@@ -20,6 +21,7 @@ pub mod ui_menu;
 pub use authority::*;
 pub use ids::*;
 pub use input::*;
+pub use mechanics::*;
 pub use protocol::*;
 pub use run_control::{
     BiomeMarketControl, BiomeSelectControl, CrossroadsControl, GameControl, GameControlPlan,
