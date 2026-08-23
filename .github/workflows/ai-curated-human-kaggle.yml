@@ -282,6 +282,30 @@ jobs:
           for path in files:
               if path.name == "failure.json":
                   print(json.dumps({"failure": json.loads(path.read_text(encoding="utf-8"))}, indent=2))
+              elif path.name == "report.json":
+                  report = json.loads(path.read_text(encoding="utf-8"))
+                  data = report.get("data", {})
+                  print(json.dumps({
+                      "trainingSummary": {
+                          "path": path.relative_to(root).as_posix(),
+                          "model": report.get("model"),
+                          "contractSchemaVersion": report.get("contractSchemaVersion"),
+                          "featureSchemaVersion": report.get("featureSchemaVersion"),
+                          "contractFeatureCount": report.get("contractFeatureCount"),
+                          "modelFeatureCount": len(report.get("inputFeatureIndices") or []),
+                          "numericFeatureProfile": report.get("numericFeatureProfile"),
+                          "parameters": report.get("parameters"),
+                          "seed": report.get("seed"),
+                          "device": report.get("device"),
+                          "trainDecisions": data.get("trainDecisions"),
+                          "validationDecisions": data.get("validationDecisions"),
+                          "trainSourcePartitions": len(data.get("trainSourcePartitions") or []),
+                          "validationSourcePartitions": len(data.get("validationSourcePartitions") or []),
+                          "splitStrategy": data.get("splitStrategy"),
+                          "sourcePolicies": data.get("sourcePolicies"),
+                          "validation": report.get("validation"),
+                      }
+                  }, sort_keys=True))
               elif path.suffix == ".log":
                   lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
                   print(json.dumps({"kernelLogTail": lines[-240:]}, indent=2))
