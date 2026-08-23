@@ -137,6 +137,51 @@ jobs:
           diagnostic="${diagnostic//$'\n'/'%0A'}"
           echo "::error title=M5 mechanics IR foundation failure::$diagnostic"
 
+  m5-m4-regression:
+    name: M0-M4 Rust regression
+    needs:
+      - m5-source-lock
+      - m5-ir-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Check out complete Rust workspace
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+
+      - name: Cache complete Rust regression
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m5-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m5-regression-${{ runner.os }}-${{ runner.arch }}-
+
+      - name: Run M0-M4 workspace regression
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --workspace --all-targets 2>&1 | tee "$RUNNER_TEMP/m5-m4-regression.log"
+
+      - name: Publish regression failure annotation
+        if: failure()
+        shell: bash
+        run: |
+          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-m4-regression.log" 2>/dev/null | grep -aE "^error|panicked|FAILED|test result" -A5 | tail -c 3500 || true)"
+          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="${diagnostic//$'\r'/'%0D'}"
+          diagnostic="${diagnostic//$'\n'/'%0A'}"
+          echo "::error title=M0-M4 Rust regression failure::$diagnostic"
+
   m5-source-catalog:
     name: M5 source catalog
     runs-on: ubuntu-latest
@@ -371,3 +416,22 @@ jobs:
             ${{ runner.temp }}/m5-oracle-classification.log
           if-no-files-found: warn
           retention-days: 30
+
+  m5-g17-foundation:
+    name: M5 G17 foundation aggregate
+    needs:
+      - m5-source-lock
+      - m5-contract-freeze
+      - m5-ir-foundation
+      - m5-m4-regression
+      - m5-source-catalog
+      - m5-oracle-refresh
+      - m5-oracle-classification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Attest exact-SHA G17 foundation
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "M5 exact SHA $GITHUB_SHA passed G17 foundation"
