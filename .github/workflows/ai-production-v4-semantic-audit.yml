@@ -55,7 +55,7 @@ jobs:
     if: github.repository == 'Heraklines/elite-redux' && !inputs.run_gameplay_analysis
     name: Audit production contract-v4 semantics remotely
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 480
     steps:
       - uses: actions/checkout@v6
         with:
