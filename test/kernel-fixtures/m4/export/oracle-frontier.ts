@@ -33,6 +33,21 @@ function jsonValue(value: unknown, path: string, fail: FrontierFailure): JsonVal
   fail("LIVE_VALUE_UNOBSERVABLE", "test/kernel-fixtures/m4/export/oracle-frontier.ts", `${path} has unsupported type`);
 }
 
+function stripPresentationOnlyPokemonState(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const entry of value) stripPresentationOnlyPokemonState(entry);
+    return;
+  }
+  if (value === null || typeof value !== "object") return;
+  const record = value as AnyRecord;
+  const custom = record.customPokemonData;
+  if (custom != null && typeof custom === "object" && !Array.isArray(custom)) {
+    delete custom.erShinyLab;
+    delete custom.erShinyLabName;
+  }
+  for (const entry of Object.values(record)) stripPresentationOnlyPokemonState(entry);
+}
+
 function rngState(state: unknown, path: string, fail: FrontierFailure): JsonObject {
   if (typeof state !== "string") fail("RNG_STATE_UNOBSERVABLE", "Phaser.Math.RandomDataGenerator.state", `${path} is absent`);
   const parts = state.split(",");
@@ -87,6 +102,10 @@ function canonicalState(game: GameManager, fail: FrontierFailure): JsonObject {
   const scene = game.scene as AnyRecord;
   const battle = scene.currentBattle as AnyRecord | undefined;
   const canonicalSaveData = JSON.parse(JSON.stringify(saveData)) as AnyRecord;
+  // Carried Shiny Lab looks are renderer-only and may be rolled after the
+  // mechanical encounter frontier. Exclude only those per-Pokémon cosmetic
+  // fields; persistent Shiny Lab save progression remains observable.
+  stripPresentationOnlyPokemonState(canonicalSaveData);
   delete canonicalSaveData.playTime;
   delete canonicalSaveData.timestamp;
   return {
