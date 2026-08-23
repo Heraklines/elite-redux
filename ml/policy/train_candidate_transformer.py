@@ -568,6 +568,17 @@ def vocabulary_hash(vocabulary: list[str]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def numeric_feature_indices(feature_names: list[str], profile: str) -> list[int]:
+    if profile == "full":
+        return list(range(len(feature_names)))
+    if profile == "semantic":
+        retained = [index for index, name in enumerate(feature_names) if "_hash_" not in name]
+        if not retained:
+            raise ValueError("semantic numeric feature profile removed every feature")
+        return retained
+    raise ValueError(f"unsupported numeric feature profile {profile!r}")
+
+
 def load_fixed_token_vocabulary(
     path: Path,
     required_vocabulary: list[str],
@@ -671,6 +682,7 @@ def make_examples(
     full_feature_count: int | None = None,
     terminal_scope: str = "episode",
     unknown_policy_weight: float = 0.0,
+    retained_feature_indices: list[int] | None = None,
 ) -> list[DecisionExample]:
     if history_length < 0:
         raise ValueError("history_length must be non-negative")
@@ -702,22 +714,40 @@ def make_examples(
             if has_explicit_presence
             else None
         )
-        resolved_feature_count = full_feature_count if full_feature_count is not None else features.shape[1]
-        explicit_feature_indices = decision.get("trainingFeatureIndices")
-        if explicit_feature_indices is None and features.shape[1] == resolved_feature_count:
+        if retained_feature_indices is not None:
+            retained = np.asarray(retained_feature_indices, dtype=np.int64)
+            source_feature_count = full_feature_count if full_feature_count is not None else features.shape[1]
+            if (
+                features.shape[1] != source_feature_count
+                or retained.ndim != 1
+                or not retained.size
+                or len(set(retained.tolist())) != len(retained)
+                or np.any(retained < 0)
+                or np.any(retained >= source_feature_count)
+            ):
+                raise ValueError(f"decision {decision['decisionId']} has invalid retained feature indices")
+            features = features[:, retained]
+            if feature_presence is not None:
+                feature_presence = feature_presence[:, retained]
+            resolved_feature_count = len(retained_feature_indices)
             feature_indices = None
         else:
-            feature_indices = np.asarray(
-                explicit_feature_indices if explicit_feature_indices is not None else range(features.shape[1]),
-                dtype=np.int64,
-            )
-            if (
-                feature_indices.shape != (features.shape[1],)
-                or len(set(feature_indices.tolist())) != len(feature_indices)
-                or np.any(feature_indices < 0)
-                or np.any(feature_indices >= resolved_feature_count)
-            ):
-                raise ValueError(f"decision {decision['decisionId']} has invalid training feature indices")
+            resolved_feature_count = full_feature_count if full_feature_count is not None else features.shape[1]
+            explicit_feature_indices = decision.get("trainingFeatureIndices")
+            if explicit_feature_indices is None and features.shape[1] == resolved_feature_count:
+                feature_indices = None
+            else:
+                feature_indices = np.asarray(
+                    explicit_feature_indices if explicit_feature_indices is not None else range(features.shape[1]),
+                    dtype=np.int64,
+                )
+                if (
+                    feature_indices.shape != (features.shape[1],)
+                    or len(set(feature_indices.tolist())) != len(feature_indices)
+                    or np.any(feature_indices < 0)
+                    or np.any(feature_indices >= resolved_feature_count)
+                ):
+                    raise ValueError(f"decision {decision['decisionId']} has invalid training feature indices")
         domain_name = decision.get("trainingDomain", "elite-redux")
         if domain_name not in DOMAIN_TO_ID:
             raise ValueError(f"unsupported training domain {domain_name}")
@@ -1236,13 +1266,18 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     rollout_selection = er_selection.rollout_selection
     er_terminals = er_selection.terminals
     er_terminal_scope = er_corpus.terminal_scope
-    feature_count = er_corpus.feature_count
-    if feature_count != len(feature_names):
+    contract_feature_count = er_corpus.feature_count
+    if contract_feature_count != len(feature_names):
         raise ValueError("ER decision width does not match the dictionary feature-name contract")
+    numeric_profile = getattr(args, "numeric_feature_profile", "full")
+    retained_numeric_indices = numeric_feature_indices(feature_names, numeric_profile)
+    feature_count = len(retained_numeric_indices)
     transfer_decisions: list[dict[str, Any]] = []
     transfer_terminals: list[dict[str, Any]] = []
     if args.transfer_data is not None:
         transfer_decisions, transfer_terminals = load_transfer_records(args.transfer_data, feature_names)
+    if transfer_decisions and feature_count != contract_feature_count:
+        raise ValueError("compact numeric feature profiles do not support cross-domain transfer records")
     transfer_tokens: set[str] = set()
     for decision in transfer_decisions:
         for row in decision["candidateTokenGroups"]:
@@ -1287,9 +1322,10 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         args.loss_policy_weight,
         token_to_id,
         args.history_length,
-        feature_count,
+        contract_feature_count,
         terminal_scope=er_terminal_scope,
         unknown_policy_weight=args.unknown_policy_weight,
+        retained_feature_indices=retained_numeric_indices,
     )
     transfer_examples = (
         make_examples(
@@ -1298,7 +1334,7 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
             args.loss_policy_weight,
             token_to_id,
             args.history_length,
-            feature_count,
+            contract_feature_count,
             terminal_scope="episode",
             unknown_policy_weight=args.unknown_policy_weight,
         )
@@ -1375,6 +1411,8 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
     if args.amp and not amp_enabled:
         raise ValueError("--amp requires a CUDA device")
     model = CandidateSetTransformer(config, feature_mean, feature_std).to(device)
+    if initial_config is not None and initial_config.get("inputFeatureIndices") != retained_numeric_indices:
+        raise ValueError("initial model numeric feature selection does not match the current training profile")
     initialized_from = (
         initialize_from_checkpoint(
             model,
@@ -1527,6 +1565,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "model": "er-domain-candidate-transformer-v4",
         "contractSchemaVersion": contract_schema_version,
         "featureSchemaVersion": feature_schema_version,
+        "contractFeatureCount": contract_feature_count,
+        "inputFeatureIndices": retained_numeric_indices,
+        "numericFeatureProfile": numeric_profile,
         "architecture": asdict(config),
         "tokenGroups": list(TOKEN_GROUP_NAMES),
         "domains": list(DOMAIN_NAMES),
@@ -1594,6 +1635,9 @@ def train(args: argparse.Namespace) -> dict[str, Any]:
         "model": report["model"],
         "contractSchemaVersion": contract_schema_version,
         "featureSchemaVersion": feature_schema_version,
+        "contractFeatureCount": contract_feature_count,
+        "inputFeatureIndices": retained_numeric_indices,
+        "numericFeatureProfile": numeric_profile,
         "architecture": asdict(config),
         "dictionaryHash": dictionary_coverage["sha256"],
         "tokenGroups": list(TOKEN_GROUP_NAMES),
@@ -1619,6 +1663,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--transfer-mode", choices=("pretrain", "joint"), default="pretrain")
     parser.add_argument("--transfer-pretrain-epochs", type=int, default=8)
     parser.add_argument("--dictionary", type=Path, required=True)
+    parser.add_argument(
+        "--numeric-feature-profile",
+        choices=("full", "semantic"),
+        default="semantic",
+        help="semantic omits hashed categorical duplicates already represented by exact tokens",
+    )
     parser.add_argument(
         "--dictionary-supplement",
         type=Path,

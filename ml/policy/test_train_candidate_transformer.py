@@ -25,6 +25,7 @@ from train_candidate_transformer import (
     load_fixed_token_vocabulary,
     load_transfer_records,
     make_examples,
+    numeric_feature_indices,
     scan_er_corpus,
     scan_selected_er_decisions,
     train,
@@ -447,6 +448,45 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
             token_to_id=token_to_id,
         )[0]
         self.assertEqual(example.policy_weight, 0.25)
+
+    def test_semantic_numeric_profile_removes_hashed_token_duplicates(self) -> None:
+        indices = numeric_feature_indices(
+            ["actor_hp_ratio", "actor_species_hash_0", "move_power_ratio", "target_item_hash_0"],
+            "semantic",
+        )
+        self.assertEqual(indices, [0, 2])
+        decision = {
+            "decisionId": "semantic-decision",
+            "episodeId": "semantic-episode",
+            "policySource": "human-v1",
+            "policyTarget": True,
+            "candidates": [{"id": "move:a", "kind": "move"}],
+            "candidateFeatures": [{"candidateId": "move:a", "values": [0.1, 1.0, 0.3, 1.0]}],
+            "candidateTokenGroups": [{
+                "candidateId": "move:a",
+                "groups": {
+                    "actor": ["species:6:0"],
+                    "targets": ["item:LEFTOVERS"],
+                    "destination": [],
+                    "field": [],
+                    "action": ["action:move"],
+                },
+            }],
+            "chosenCandidateId": "move:a",
+        }
+        _, token_to_id = build_token_vocabulary([decision], {})
+        example = make_examples(
+            [decision],
+            [],
+            loss_policy_weight=1.0,
+            token_to_id=token_to_id,
+            full_feature_count=4,
+            unknown_policy_weight=1.0,
+            retained_feature_indices=indices,
+        )[0]
+        self.assertEqual(example.features.tolist(), [[0.10000000149011612, 0.30000001192092896]])
+        self.assertEqual(example.full_feature_count, 2)
+        self.assertIsNone(example.feature_indices)
 
     def test_v3_role_tokens_survive_vocabulary_example_and_collation(self) -> None:
         candidates = [

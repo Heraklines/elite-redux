@@ -244,6 +244,12 @@ jobs:
                           raise SystemExit("fresh human baseline unexpectedly resumed a checkpoint")
                       if report.get("tokenVocabularySource") != "derived":
                           raise SystemExit("fresh human baseline did not seal its corpus-derived vocabulary")
+                      if (
+                          report.get("numericFeatureProfile") != "semantic"
+                          or report.get("contractFeatureCount") != data["dictionaryCoverage"]["features"]
+                          or len(report.get("inputFeatureIndices", [])) != report["architecture"]["feature_count"]
+                      ):
+                          raise SystemExit("human baseline did not preserve the semantic numeric feature contract")
                   elif candidate_kind == "checkpoint":
                       allowed_sources = {
                           "checkpoint-tree-v1",
@@ -280,6 +286,7 @@ jobs:
                   candidate["data"]["dictionaryCoverage"]["features"],
                   candidate["data"]["identity"],
                   candidate["architecture"],
+                  candidate.get("inputFeatureIndices"),
               )
               for report in reports[1:]:
                   identity = (
@@ -290,6 +297,7 @@ jobs:
                       report["data"]["dictionaryCoverage"]["features"],
                       report["data"]["identity"],
                       report["architecture"],
+                      report.get("inputFeatureIndices"),
                   )
                   if identity != candidate_identity:
                       raise SystemExit("candidate ensemble members do not share one sealed model contract")

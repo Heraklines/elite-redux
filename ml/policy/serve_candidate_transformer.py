@@ -40,6 +40,8 @@ class CandidatePolicyBundle:
     domains: tuple[str, ...]
     contract_schema_version: int
     feature_schema_version: int
+    contract_feature_count: int
+    input_feature_indices: tuple[int, ...]
 
 
 def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
@@ -54,6 +56,17 @@ def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
     if not isinstance(architecture, dict):
         raise ValueError("neural policy config is missing architecture")
     model_config = CandidateTransformerConfig(**architecture)
+    contract_feature_count = config.get("contractFeatureCount", model_config.feature_count)
+    input_feature_indices = config.get("inputFeatureIndices", list(range(model_config.feature_count)))
+    if (
+        not isinstance(contract_feature_count, int)
+        or contract_feature_count < model_config.feature_count
+        or not isinstance(input_feature_indices, list)
+        or len(input_feature_indices) != model_config.feature_count
+        or any(not isinstance(index, int) or index < 0 or index >= contract_feature_count for index in input_feature_indices)
+        or len(set(input_feature_indices)) != len(input_feature_indices)
+    ):
+        raise ValueError("neural policy config has an invalid numeric feature selection")
     token_vocabulary = config.get("tokenVocabulary")
     if (
         not isinstance(token_vocabulary, list)
@@ -89,6 +102,8 @@ def load_bundle(model_dir: Path) -> CandidatePolicyBundle:
         domains=DOMAIN_NAMES,
         contract_schema_version=contract_identity[0],
         feature_schema_version=contract_identity[1],
+        contract_feature_count=contract_feature_count,
+        input_feature_indices=tuple(input_feature_indices),
     )
 
 
@@ -117,6 +132,9 @@ def load_ensemble(model_dir: Path) -> list[CandidatePolicyBundle]:
     configurations = {bundle.model.config for bundle in models}
     if len(configurations) != 1:
         raise ValueError("neural ensemble members use different architectures")
+    numeric_contracts = {(bundle.contract_feature_count, bundle.input_feature_indices) for bundle in models}
+    if len(numeric_contracts) != 1:
+        raise ValueError("neural ensemble members use different numeric feature selections")
     contract_identities = {
         (bundle.contract_schema_version, bundle.feature_schema_version) for bundle in models
     }
@@ -166,27 +184,31 @@ def score_candidates(
         raise ValueError("neural ensemble is empty")
     if not isinstance(rows, list) or not rows:
         raise ValueError("candidateFeatures must be a non-empty array")
-    feature_count = bundles[0].model.config.feature_count
-    if any(not isinstance(row, list) or len(row) != feature_count for row in rows):
-        raise ValueError(f"every candidate feature row must contain {feature_count} values")
-    features = torch.tensor(rows, dtype=torch.float32).unsqueeze(0)
+    bundle = bundles[0]
+    feature_count = bundle.model.config.feature_count
+    contract_feature_count = bundle.contract_feature_count
+    if any(not isinstance(row, list) or len(row) != contract_feature_count for row in rows):
+        raise ValueError(f"every candidate feature row must contain {contract_feature_count} values")
+    compact_rows = [[row[index] for index in bundle.input_feature_indices] for row in rows]
+    features = torch.tensor(compact_rows, dtype=torch.float32).unsqueeze(0)
     if not bool(torch.isfinite(features).all()):
         raise ValueError("candidate features must be finite")
     mask = torch.ones((1, len(rows)), dtype=torch.bool)
     if feature_presence is None:
-        feature_presence = [[True] * feature_count for _ in rows]
+        feature_presence = [[True] * contract_feature_count for _ in rows]
     if (
         not isinstance(feature_presence, list)
         or len(feature_presence) != len(rows)
         or any(
             not isinstance(row, list)
-            or len(row) != feature_count
+            or len(row) != contract_feature_count
             or any(not isinstance(value, bool) for value in row)
             for row in feature_presence
         )
     ):
         raise ValueError("featurePresence must be a boolean matrix matching candidateFeatures")
-    presence = torch.tensor(feature_presence, dtype=torch.bool).unsqueeze(0)
+    compact_presence = [[row[index] for index in bundle.input_feature_indices] for row in feature_presence]
+    presence = torch.tensor(compact_presence, dtype=torch.bool).unsqueeze(0)
     if domain not in bundles[0].domains:
         raise ValueError(f"unknown policy domain {domain}")
     domain_ids = torch.tensor([bundles[0].domains.index(domain)], dtype=torch.long)
@@ -245,8 +267,9 @@ def encode_history(
     if any(not isinstance(step, dict) for step in retained):
         raise ValueError("every history step must be an object")
     feature_count = bundle.model.config.feature_count
+    contract_feature_count = bundle.contract_feature_count
     max_candidates = max(1, max((len(step.get("candidateFeatures", [])) for step in retained), default=0))
-    encoded_steps: list[tuple[torch.Tensor, torch.Tensor, int, torch.Tensor, int]] = []
+    encoded_steps: list[tuple[torch.Tensor, torch.Tensor, int, torch.Tensor, int, torch.Tensor]] = []
     for step in retained:
         rows = step.get("candidateFeatures")
         groups = step.get("candidateTokenGroups")
@@ -255,21 +278,22 @@ def encode_history(
         step_domain = step.get("domain", default_domain)
         if not isinstance(rows, list) or not rows:
             raise ValueError("history candidateFeatures must be a non-empty array")
-        if any(not isinstance(row, list) or len(row) != feature_count for row in rows):
-            raise ValueError(f"every history candidate feature row must contain {feature_count} values")
-        row_tensor = torch.tensor(rows, dtype=torch.float32)
+        if any(not isinstance(row, list) or len(row) != contract_feature_count for row in rows):
+            raise ValueError(f"every history candidate feature row must contain {contract_feature_count} values")
+        compact_rows = [[row[index] for index in bundle.input_feature_indices] for row in rows]
+        row_tensor = torch.tensor(compact_rows, dtype=torch.float32)
         if not bool(torch.isfinite(row_tensor).all()):
             raise ValueError("history candidate features must be finite")
         if not isinstance(chosen_index, int) or chosen_index < 0 or chosen_index >= len(rows):
             raise ValueError("history chosenIndex is outside the candidate set")
         if step_presence is None:
-            step_presence = [[True] * feature_count for _ in rows]
+            step_presence = [[True] * contract_feature_count for _ in rows]
         if (
             not isinstance(step_presence, list)
             or len(step_presence) != len(rows)
             or any(
                 not isinstance(row, list)
-                or len(row) != feature_count
+                or len(row) != contract_feature_count
                 or any(not isinstance(value, bool) for value in row)
                 for row in step_presence
             )
@@ -283,12 +307,16 @@ def encode_history(
                 step_token_ids,
                 step_token_mask,
                 chosen_index,
-                torch.tensor(step_presence, dtype=torch.bool),
+                torch.tensor(
+                    [[row[index] for index in bundle.input_feature_indices] for row in step_presence],
+                    dtype=torch.bool,
+                ),
                 bundle.domains.index(step_domain),
+                row_tensor,
             )
         )
 
-    max_tokens = max(1, max((int(tokens.shape[-1]) for tokens, _, _, _, _ in encoded_steps), default=0))
+    max_tokens = max(1, max((int(tokens.shape[-1]) for tokens, _, _, _, _, _ in encoded_steps), default=0))
     history_length = bundle.model.config.history_length
     features = torch.zeros((1, history_length, max_candidates, feature_count), dtype=torch.float32)
     feature_presence = torch.zeros_like(features, dtype=torch.bool)
@@ -303,11 +331,10 @@ def encode_history(
     domain_ids = torch.zeros((1, history_length), dtype=torch.long)
     offset = history_length - len(retained)
     for index, (step, encoded) in enumerate(zip(retained, encoded_steps), offset):
-        rows = torch.tensor(step["candidateFeatures"], dtype=torch.float32)
+        step_tokens, step_token_mask, chosen_index, step_presence, domain_id, rows = encoded
         count = rows.shape[0]
         features[0, index, :count] = rows
         candidate_mask[0, index, :count] = True
-        step_tokens, step_token_mask, chosen_index, step_presence, domain_id = encoded
         feature_presence[0, index, :count] = step_presence
         token_count = step_tokens.shape[-1]
         token_ids[0, index, :count, :, :token_count] = step_tokens[0]
@@ -328,7 +355,8 @@ def serve(model_dir: Path) -> None:
                 "model": MODEL_NAME if len(models) == 1 else ENSEMBLE_NAME,
                 "members": len(models),
                 "featureSchemaVersion": models[0].feature_schema_version,
-                "featureCount": models[0].model.config.feature_count,
+                "featureCount": models[0].contract_feature_count,
+                "modelFeatureCount": models[0].model.config.feature_count,
                 "historyLength": models[0].model.config.history_length,
                 "contractSchemaVersion": models[0].contract_schema_version,
                 "tokenGroups": list(TOKEN_GROUP_NAMES),

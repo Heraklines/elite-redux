@@ -77,6 +77,34 @@ class CandidateTransformerSidecarTests(unittest.TestCase):
             bundle = load_bundle(root)
             self.assertEqual((bundle.contract_schema_version, bundle.feature_schema_version), (4, 4))
 
+    def test_compact_model_selects_features_from_full_runtime_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.make_bundle(root, (4, 4))
+            config_path = root / "config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            config["contractFeatureCount"] = 6
+            config["inputFeatureIndices"] = [0, 2, 4, 5]
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+
+            bundle = load_bundle(root)
+            groups = [{"actor": [], "targets": [], "destination": [], "field": [], "action": ["action:move"]}]
+            scores, value = score_candidates(
+                bundle,
+                [[0.0, 1000.0, 2.0, -1000.0, 4.0, 5.0]],
+                groups,
+                [{
+                    "candidateFeatures": [[1.0, 1000.0, 3.0, -1000.0, 5.0, 6.0]],
+                    "candidateTokenGroups": groups,
+                    "chosenIndex": 0,
+                }],
+            )
+            self.assertEqual(bundle.contract_feature_count, 6)
+            self.assertEqual(bundle.input_feature_indices, (0, 2, 4, 5))
+            self.assertEqual(len(scores), 1)
+            self.assertGreaterEqual(value, 0.0)
+            self.assertLessEqual(value, 1.0)
+
     def test_rejects_unsupported_contract_pair(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)

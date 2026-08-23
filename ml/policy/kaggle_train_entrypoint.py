@@ -260,6 +260,8 @@ def build_training_command(
         "1",
         "--unknown-policy-weight",
         "1",
+        "--numeric-feature-profile",
+        "semantic",
         "--fast-kernels",
     ]
     if dictionary_supplement.is_file():
