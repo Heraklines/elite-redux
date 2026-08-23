@@ -98,6 +98,13 @@ function compareText(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function normalizeLineEndings(value) {
+  if (typeof value === "string") return value.replace(/\r\n?/gu, "\n");
+  if (Array.isArray(value)) return value.map(normalizeLineEndings);
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, normalizeLineEndings(entry)]));
+}
+
 function writeJson(root, name, value) {
   const path = resolve(root, name);
   mkdirSync(dirname(path), { recursive: true });
@@ -306,7 +313,7 @@ if (!statSync(input.oracleRoot).isDirectory() || git(input.oracleRoot, "rev-pars
 if (git(input.oracleRoot, "status", "--porcelain", "--untracked-files=all") !== "") fail("oracle checkout must be clean");
 if (existsSync(input.outputRoot) && !statSync(input.outputRoot).isDirectory()) fail("output root is not a directory");
 mkdirSync(input.outputRoot, { recursive: true });
-const raw = JSON.parse(readFileSync(input.rawCatalog, "utf8"));
+const raw = normalizeLineEndings(JSON.parse(readFileSync(input.rawCatalog, "utf8")));
 if (raw.schema_version !== 1 || raw.oracle_sha !== input.oracleSha) fail("raw catalog mismatch");
 raw.source_files = raw.source_files.map(entry => {
   const source = readFileSync(resolve(input.oracleRoot, entry.path), "utf8").replace(/\r\n?/gu, "\n");
