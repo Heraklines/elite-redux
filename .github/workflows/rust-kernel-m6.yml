@@ -152,8 +152,10 @@ jobs:
             --oracle-sha "$M6_ORACLE_SHA" \
             --raw-catalog "$GITHUB_WORKSPACE/artifacts/source-catalog/m6-source-catalog-v2.json" \
             --output-root "$RUNNER_TEMP/m6-semantic-b"
-          diff -ru "$RUNNER_TEMP/m6-semantic-a" "$RUNNER_TEMP/m6-semantic-b"
-          diff -ru rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
+      - name: Verify static fresh-process determinism
+        run: diff -ru "$RUNNER_TEMP/m6-semantic-a" "$RUNNER_TEMP/m6-semantic-b"
+      - name: Verify committed static semantic catalog
+        run: diff -ru rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
       - name: Apply runtime semantic test overlay
         run: |
           set -euo pipefail
