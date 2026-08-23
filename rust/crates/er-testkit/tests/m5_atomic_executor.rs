@@ -124,8 +124,7 @@ fn pack() -> BattleContentPackV2 {
     pack
 }
 
-#[test]
-fn hook_commit_is_atomic_and_creates_one_restorable_instance() -> Result<(), Box<dyn Error>> {
+fn migrated_state() -> Result<er_state::migration_v3::GameStateV3, Box<dyn Error>> {
     let fixture: serde_json::Value = serde_json::from_str(include_str!(
         "../../../fixtures/m4/oracle/run-segments/classic-composed-wave-9-through-11-v1.json"
     ))?;
@@ -135,7 +134,12 @@ fn hook_commit_is_atomic_and_creates_one_restorable_instance() -> Result<(), Box
         RunContentPackHash::new(hash('b'))?,
         M4_ORACLE_SHA,
     )?;
-    let (mut state, _) = migrate_game_v2_to_v3(&v2, hash('c'))?;
+    Ok(migrate_game_v2_to_v3(&v2, hash('c'))?.0)
+}
+
+#[test]
+fn hook_commit_is_atomic_and_creates_one_restorable_instance() -> Result<(), Box<dyn Error>> {
+    let mut state = migrated_state()?;
     let pokemon = state
         .base
         .player_party
@@ -207,5 +211,82 @@ fn hook_commit_is_atomic_and_creates_one_restorable_instance() -> Result<(), Box
         0
     );
     transition.after_state.validate()?;
+    Ok(())
+}
+
+#[test]
+fn generated_content_solo_campaign_applies_intimidate() -> Result<(), Box<dyn Error>> {
+    let state = migrated_state()?;
+    let pokemon = state.base.player_party[0].id;
+    let pack = er_content::pack::selected_m5_bootstrap_pack()?;
+    let ordered = collect_mechanic_sources(
+        &pack,
+        vec![ActiveMechanicSource {
+            source: MechanicSourceId::numeric(MechanicSourceKind::ActiveAbility, safe(22)),
+            scope: MechanicScope::Pokemon { pokemon },
+            side: None,
+            field_position: None,
+            source_ordinal: SourceOrdinal::ZERO,
+        }],
+    )?;
+    let plan = plan_hook(&pack, &ordered, MechanicHook::AfterSummon)?;
+    let mut selector_facts = SelectorFacts::default();
+    selector_facts.seeds.insert(
+        SelectorSeed::Opponents,
+        vec![MechanicScope::Pokemon { pokemon }],
+    );
+    let transition = execute_hook(
+        &pack,
+        &plan,
+        &state,
+        &ConditionFacts::default(),
+        &selector_facts,
+        &RngRuntime::from_run_seed("generated-solo"),
+    )?;
+    assert_eq!(state.base.player_party[0].stat_stages.attack, 0);
+    assert_eq!(
+        transition.after_state.base.player_party[0]
+            .stat_stages
+            .attack,
+        -1
+    );
+    assert_eq!(transition.presentation.len(), 1);
+    Ok(())
+}
+
+#[test]
+fn generated_content_coop_recovery_replays_identically() -> Result<(), Box<dyn Error>> {
+    let state = migrated_state()?;
+    let pokemon = state.base.player_party[0].id;
+    let pack = er_content::pack::selected_m5_bootstrap_pack()?;
+    let ordered = collect_mechanic_sources(
+        &pack,
+        vec![ActiveMechanicSource {
+            source: MechanicSourceId::numeric(MechanicSourceKind::ActiveAbility, safe(22)),
+            scope: MechanicScope::Pokemon { pokemon },
+            side: None,
+            field_position: None,
+            source_ordinal: SourceOrdinal::ZERO,
+        }],
+    )?;
+    let plan = plan_hook(&pack, &ordered, MechanicHook::AfterSummon)?;
+    let mut selectors = SelectorFacts::default();
+    selectors.seeds.insert(
+        SelectorSeed::Opponents,
+        vec![MechanicScope::Pokemon { pokemon }],
+    );
+    let host = execute_hook(
+        &pack,
+        &plan,
+        &state,
+        &ConditionFacts::default(),
+        &selectors,
+        &RngRuntime::from_run_seed("generated-coop"),
+    )?;
+    let recovered: er_state::migration_v3::GameStateV3 =
+        serde_json::from_slice(&serde_json::to_vec(&host.after_state)?)?;
+    recovered.validate()?;
+    assert_eq!(recovered, host.after_state);
+    assert_eq!(state.base.player_party[0].stat_stages.attack, 0);
     Ok(())
 }
