@@ -1,0 +1,17 @@
+{
+  "milestone": "M5",
+  "sha": "200caaee1697fe40a293f0a5da76af8b11f3cea9",
+  "gate_run_id": 32655233460,
+  "source_lock": "success",
+  "contract_freeze": "success",
+  "m0_m4_regression": "success",
+  "source_catalog": "success",
+  "oracle_refresh_m3": "success",
+  "oracle_refresh_m4": "success",
+  "oracle_classification": "success",
+  "ir_foundation": "success",
+  "executor_parity": "success",
+  "classification_audit": "success",
+  "performance": "success",
+  "g20_aggregate": "success"
+}
