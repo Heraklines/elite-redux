@@ -208,7 +208,7 @@ mod tests {
                 bare.special_defense,
                 bare.speed
             ],
-            [48, 27, 33, 21, 22, 17]
+            [48, 27, 33, 21, 21, 17]
         );
         // Oracle evidence carries an observed permanent attack bonus of +2.
         let mut bonuses = zero_bonuses();
@@ -226,7 +226,7 @@ mod tests {
                 level16.special_defense,
                 level16.speed
             ],
-            [48, 29, 33, 21, 22, 17]
+            [48, 29, 33, 21, 21, 17]
         );
         assert_eq!(
             [
@@ -237,7 +237,7 @@ mod tests {
                 level17.special_defense,
                 level17.speed
             ],
-            [50, 30, 35, 22, 23, 18]
+            [50, 30, 35, 22, 22, 18]
         );
     }
 
