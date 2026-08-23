@@ -263,6 +263,7 @@ name = "er-state"
 version = "0.1.0"
 dependencies = [
  "er-canonical",
+ "er-mechanics",
  "er-rng",
  "er-types",
  "serde",

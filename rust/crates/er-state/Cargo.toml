@@ -8,6 +8,7 @@ publish = false
 [dependencies]
 er-canonical = { path = "../er-canonical" }
 er-rng = { path = "../er-rng" }
+er-mechanics = { path = "../er-mechanics" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 serde_json.workspace = true
