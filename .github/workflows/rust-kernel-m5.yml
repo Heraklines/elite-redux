@@ -152,6 +152,8 @@ jobs:
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
           submodules: false
 
       - name: Cache complete Rust regression
