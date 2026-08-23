@@ -61,7 +61,7 @@ fn fixture_move() -> MoveDefinition {
         effect_chance: EffectChance::None,
         priority: 0,
         target: MoveTarget::NearOther,
-        flags: Vec::new(),
+        flags: vec![er_types::battle_model::MoveFlag::Contact],
         effects: vec![er_types::battle_model::MoveEffectDefinition::Damage],
         capability: CapabilityStatus::Supported,
     }
