@@ -66,8 +66,71 @@ fn fixture_state() -> Result<(GameStateV2, ContentPackHash, RunContentPackHash)>
     ))
 }
 
+fn benchmark_encounter(state: &GameStateV2) -> Result<EncounterPlan> {
+    let fixture: serde_json::Value = serde_json::from_str(ENCOUNTER_FIXTURE)?;
+    let enemy_value = fixture["final"]["canonical"]["save_data"]["enemyParty"]
+        .as_array()
+        .and_then(|party| party.first())
+        .ok_or("captured enemy missing")?;
+    let enemy_id = PokemonId::new(safe(enemy_value["id"].as_u64().ok_or("captured enemy ID")?));
+    let mut enemy = er_testkit::m4_fixture::convert_pokemon(enemy_value, enemy_id, None)?;
+    enemy.hp = 1;
+    enemy.max_hp = 1;
+    enemy.stats.hp = 1;
+    let wave = er_types::battle_ids::WaveIndex::new(safe(state.run.wave.get().get() + 1))?;
+    let enemy_slot =
+        er_types::battle_ids::FieldSlot::new(er_types::battle_ids::BattleSide::Enemy, 0)?;
+    let player_slot =
+        er_types::battle_ids::FieldSlot::new(er_types::battle_ids::BattleSide::Player, 0)?;
+    let mut commands = Vec::new();
+    for index in 0..1_u64 {
+        let turn = er_types::battle_ids::TurnIndex::new(safe(index + 1))?;
+        let cursor = safe(index);
+        commands.push(er_types::battle_command::ScriptedEnemyBattleCommandV1::new(
+            er_types::battle_command::scripted_enemy_command_operation_id(
+                state.run.next_battle_id,
+                wave,
+                turn,
+                enemy_slot,
+                cursor,
+            )?,
+            state.run.next_battle_id,
+            wave,
+            turn,
+            cursor,
+            enemy_id,
+            enemy_slot,
+            er_types::battle_command::BattleCommand::fight(
+                enemy_id,
+                er_types::battle_ids::MoveSlotIndex::new(1)?,
+                er_types::battle_command::BattleTargetSelection::selected(vec![player_slot])?,
+            )?,
+        )?);
+    }
+    Ok(EncounterPlan {
+        schema_version: ENCOUNTER_PLAN_SCHEMA_VERSION,
+        encounter_id: er_types::run_ids::EncounterId::new(safe(1)),
+        run_id: state.run.run_id,
+        wave,
+        biome: BiomeId::new(safe(1)),
+        format: BattleFormat::single(),
+        enemy_party: vec![enemy],
+        enemy_leads: vec![enemy_id],
+        player_leads: vec![state.player_party[0].id],
+        scripted_policy: ScriptedEnemyPolicyV1::new(SafeU53::ZERO, commands)?,
+        battle_seed: "m4-benchmark-encounter".to_owned(),
+        generation_audit: Vec::new(),
+        source: EncounterPlanSource::OracleCaptureRequired,
+        content_hash: Some(state.run_content_hash.clone()),
+    })
+}
+
 fn raw_kernel() -> Result<(GameKernel, SeatId)> {
     let (mut state, _, _) = fixture_state()?;
+    state.run.wave = er_types::battle_ids::WaveIndex::new(safe(1))?;
+    for move_slot in state.player_party[0].moves.iter_mut().flatten() {
+        move_slot.max_pp_override = Some(10_000);
+    }
     let owner = SeatId::new(safe(1));
     let surface_id = RunSurfaceId::new(safe(1));
     let interaction = RunInteractionSequence::new(SafeU53::ZERO);
@@ -133,19 +196,45 @@ fn raw_kernel() -> Result<(GameKernel, SeatId)> {
                 key: PhysicalKey::ArrowUp,
                 button: GameButton::Up,
             },
+            KeyBinding {
+                key: PhysicalKey::Space,
+                button: GameButton::Submit,
+            },
         ],
         gamepad: Vec::new(),
         initial_repeat_delay_ms: safe(250),
         repeat_interval_ms: safe(250),
     };
-    let kernel = GameKernel::new_run_with_control(
+    let encounter = benchmark_encounter(&state)?;
+    let kernel = GameKernel::new_run_with_control_and_encounter(
         state,
         selected_m4_game_content_bundle()?,
         input_map,
         plan,
+        encounter,
     )
     .map_err(std::io::Error::other)?;
     Ok((kernel, owner))
+}
+
+fn benchmark_press(
+    kernel: &mut GameKernel,
+    owner: SeatId,
+    key: PhysicalKey,
+) -> Result<Vec<er_types::KernelEffect>> {
+    let mut effects = Vec::new();
+    for event in [
+        RawInputEvent::KeyDown {
+            code: key.clone(),
+            printable: matches!(key, PhysicalKey::Space),
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        },
+        RawInputEvent::KeyUp { code: key },
+    ] {
+        effects.extend(kernel.step(KernelInput::RawInput { seat: owner, event })?);
+    }
+    Ok(effects)
 }
 
 fn transition_material(
@@ -410,6 +499,99 @@ fn m4_wave_transitions_10000() -> Result {
         json!({
             "id": "wave-transitions-10000",
             "transitions": 10000,
+            "execution_ms": started.elapsed().as_millis(),
+            "checksum": checksum
+        })
+    );
+    Ok(())
+}
+
+fn run_complete_batch(count: usize) -> std::result::Result<(u64, u64), String> {
+    let execute = || -> Result<(u64, u64)> {
+        let mut checksum = 0_u64;
+        let mut raw_events = 0_u64;
+        for _run in 0..count {
+            let (mut kernel, owner) = raw_kernel()?;
+            for key in [
+                PhysicalKey::ArrowDown,
+                PhysicalKey::Space,
+                PhysicalKey::Space,
+            ] {
+                let _ = benchmark_press(&mut kernel, owner, key)?;
+                raw_events += 2;
+            }
+            for _step in 0..2_000 {
+                let state = kernel.run_state().ok_or("benchmark run state missing")?;
+                if state.run.stage == RunStage::Complete {
+                    break;
+                }
+                if state.run.stage != RunStage::Battle {
+                    return Err(
+                        format!("unexpected benchmark run stage {:?}", state.run.stage).into(),
+                    );
+                }
+                let mut effects = Vec::new();
+                effects.extend(benchmark_press(&mut kernel, owner, PhysicalKey::Enter)?);
+                effects.extend(benchmark_press(&mut kernel, owner, PhysicalKey::Enter)?);
+                raw_events += 4;
+                let presentations = effects
+                    .iter()
+                    .filter_map(|effect| match effect {
+                        er_types::KernelEffect::PresentBattle { event, .. } => Some(event.clone()),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>();
+                for event in presentations {
+                    let _ = kernel.step(KernelInput::BattlePresentationOutcome {
+                        endpoint: owner,
+                        event_id: event.event_id,
+                        outcome: er_types::battle_ui::PresentationSettlementOutcome::Settled,
+                    })?;
+                }
+            }
+            let final_state = kernel.run_state().ok_or("final run state missing")?;
+            if final_state.run.stage != RunStage::Complete
+                || final_state.run.wave.get().get() != 200
+            {
+                return Err("200-wave run did not complete".into());
+            }
+            checksum = checksum.wrapping_add(final_state.run.wave.get().get());
+            let _ = kernel.dispose("200-wave benchmark complete");
+            if kernel.live_resources() != er_types::LiveResourceSnapshot::default() {
+                return Err("200-wave run leaked resources".into());
+            }
+        }
+        Ok((checksum, raw_events))
+    };
+    execute().map_err(|error| error.to_string())
+}
+
+#[test]
+fn m4_complete_runs_200_waves_100() -> Result {
+    let started = Instant::now();
+    let results = std::thread::scope(|scope| {
+        (0..4)
+            .map(|_| scope.spawn(|| run_complete_batch(25)))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|worker| {
+                worker
+                    .join()
+                    .map_err(|_| "200-wave benchmark worker panicked".to_owned())?
+            })
+            .collect::<std::result::Result<Vec<_>, String>>()
+    })?;
+    let checksum = results.iter().map(|result| result.0).sum::<u64>();
+    let raw_events = results.iter().map(|result| result.1).sum::<u64>();
+    std::hint::black_box(checksum);
+    println!(
+        "{}",
+        json!({
+            "id": "complete-runs-200-waves-100",
+            "runs": 100,
+            "workers": 4,
+            "waves_each": 200,
+            "events": raw_events,
             "execution_ms": started.elapsed().as_millis(),
             "checksum": checksum
         })

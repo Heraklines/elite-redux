@@ -107,6 +107,29 @@ impl RunRuntime {
         self.state = prepared.after_state;
         Ok(())
     }
+
+    pub fn complete_final_victory(&mut self) -> Result<(), RunRuntimeError> {
+        let battle = self
+            .state
+            .battle
+            .as_ref()
+            .ok_or(RunRuntimeError::InvalidAfterState)?;
+        if self.state.run.stage != RunStage::AwaitingWaveAdvance
+            || !battle.settlement.settled
+            || battle.outcome != er_types::battle_model::BattleOutcome::Victory
+        {
+            return Err(RunRuntimeError::InvalidAfterState);
+        }
+        let mut completed = self.state.clone();
+        completed.battle = None;
+        completed.run.stage = RunStage::Complete;
+        completed.run.outcome = er_types::run_model::RunOutcome::Victory;
+        completed
+            .validate()
+            .map_err(|_| RunRuntimeError::InvalidAfterState)?;
+        self.state = completed;
+        Ok(())
+    }
     pub fn prepare_action_material(
         &self,
         action: &er_types::run_model::RunSurfaceAction,

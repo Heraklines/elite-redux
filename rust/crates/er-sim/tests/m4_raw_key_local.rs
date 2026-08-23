@@ -513,25 +513,17 @@ fn physical_keys_commit_crossroads_and_select_biome() -> Result<(), Box<dyn Erro
         battle_after.enemy_party[0].hp < enemy_hp_before,
         "raw battle input did not resolve through V2 mechanics"
     );
-    assert_eq!(
-        battle_after.outcome,
-        er_types::battle_model::BattleOutcome::Victory,
-        "raw wave-11 battle did not reach victory"
-    );
     let run_after = kernel
         .run_state()
-        .ok_or("run state missing after victory settlement")?;
-    assert_eq!(
-        run_after.run.stage,
-        er_types::run_model::RunStage::AwaitingWaveAdvance
-    );
+        .ok_or("run state missing after continuous wave advance")?;
     assert!(
-        run_after
-            .battle
-            .as_ref()
-            .ok_or("settled battle missing")?
-            .settlement
-            .settled
+        run_after.run.wave.get().get() > 11,
+        "settled wave did not advance into the next encounter"
+    );
+    assert_eq!(run_after.run.stage, er_types::run_model::RunStage::Battle);
+    assert_eq!(
+        battle_after.outcome,
+        er_types::battle_model::BattleOutcome::Ongoing
     );
     assert!(
         kernel

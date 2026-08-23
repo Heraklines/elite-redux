@@ -309,6 +309,147 @@ fn local_run_battle_protocol(authority: SeatId) -> Result<BattleProtocolConfig, 
     })
 }
 
+fn next_repeated_encounter(
+    template: &er_run::encounter_plan::EncounterPlan,
+    state: &er_state::game_v2::GameStateV2,
+) -> Result<er_run::encounter_plan::EncounterPlan, KernelError> {
+    let next_wave_value =
+        state
+            .run
+            .wave
+            .get()
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| KernelError::Canonical {
+                reason: "next wave overflowed".to_owned(),
+            })?;
+    let wave =
+        er_types::battle_ids::WaveIndex::new(SafeU53::new(next_wave_value).map_err(|error| {
+            KernelError::Canonical {
+                reason: error.to_string(),
+            }
+        })?)
+        .map_err(|error| KernelError::Canonical {
+            reason: error.to_string(),
+        })?;
+    let encounter_value = template
+        .encounter_id
+        .get()
+        .get()
+        .checked_add(next_wave_value)
+        .ok_or_else(|| KernelError::Canonical {
+            reason: "encounter allocator overflowed".to_owned(),
+        })?;
+    let mut plan = template.clone();
+    plan.encounter_id =
+        er_types::run_ids::EncounterId::new(SafeU53::new(encounter_value).map_err(|error| {
+            KernelError::Canonical {
+                reason: error.to_string(),
+            }
+        })?);
+    plan.wave = wave;
+    plan.player_leads = vec![
+        state
+            .player_party
+            .first()
+            .ok_or_else(|| KernelError::Canonical {
+                reason: "repeated encounter has no player lead".to_owned(),
+            })?
+            .id,
+    ];
+    plan.battle_seed = format!("{}:wave:{next_wave_value}", template.battle_seed);
+    let enemy = plan
+        .enemy_leads
+        .first()
+        .copied()
+        .ok_or_else(|| KernelError::Canonical {
+            reason: "repeated encounter has no enemy lead".to_owned(),
+        })?;
+    let enemy_slot =
+        er_types::battle_ids::FieldSlot::new(er_types::battle_ids::BattleSide::Enemy, 0).map_err(
+            |error| KernelError::Canonical {
+                reason: error.to_string(),
+            },
+        )?;
+    let player_slot =
+        er_types::battle_ids::FieldSlot::new(er_types::battle_ids::BattleSide::Player, 0).map_err(
+            |error| KernelError::Canonical {
+                reason: error.to_string(),
+            },
+        )?;
+    let command_count = if plan
+        .enemy_party
+        .first()
+        .is_some_and(|enemy| enemy.max_hp <= 1)
+    {
+        1_u64
+    } else {
+        64_u64
+    };
+    let mut commands = Vec::with_capacity(command_count as usize);
+    for index in 0..command_count {
+        let turn =
+            er_types::battle_ids::TurnIndex::new(SafeU53::new(index + 1).map_err(|error| {
+                KernelError::Canonical {
+                    reason: error.to_string(),
+                }
+            })?)
+            .map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })?;
+        let cursor = SafeU53::new(index).map_err(|error| KernelError::Canonical {
+            reason: error.to_string(),
+        })?;
+        let operation = er_types::battle_command::scripted_enemy_command_operation_id(
+            state.run.next_battle_id,
+            wave,
+            turn,
+            enemy_slot,
+            cursor,
+        )
+        .map_err(|error| KernelError::Canonical {
+            reason: error.to_string(),
+        })?;
+        commands.push(
+            er_types::battle_command::ScriptedEnemyBattleCommandV1::new(
+                operation,
+                state.run.next_battle_id,
+                wave,
+                turn,
+                cursor,
+                enemy,
+                enemy_slot,
+                er_types::battle_command::BattleCommand::fight(
+                    enemy,
+                    er_types::battle_ids::MoveSlotIndex::new(1).map_err(|error| {
+                        KernelError::Canonical {
+                            reason: error.to_string(),
+                        }
+                    })?,
+                    er_types::battle_command::BattleTargetSelection::selected(vec![player_slot])
+                        .map_err(|error| KernelError::Canonical {
+                            reason: error.to_string(),
+                        })?,
+                )
+                .map_err(|error| KernelError::Canonical {
+                    reason: error.to_string(),
+                })?,
+            )
+            .map_err(|error| KernelError::Canonical {
+                reason: error.to_string(),
+            })?,
+        );
+    }
+    plan.scripted_policy =
+        er_types::battle_command::ScriptedEnemyPolicyV1::new(SafeU53::ZERO, commands).map_err(
+            |error| KernelError::Canonical {
+                reason: error.to_string(),
+            },
+        )?;
+    plan.generation_audit.clear();
+    Ok(plan)
+}
+
 #[derive(Clone, Debug)]
 enum CommandPlan {
     EmptyLocalPartition,
@@ -668,10 +809,83 @@ impl GameKernel {
         if let Some(battle) = staged_battle {
             self.battle = Some(Box::new(battle));
         }
-        if encounter_consumed {
-            self.run_encounter = None;
-        }
         Ok(())
+    }
+
+    fn continue_after_settled_battle(&mut self) -> Result<(), KernelError> {
+        let Some(run) = self.run.as_ref() else {
+            return Ok(());
+        };
+        if run.state().run.stage != er_types::run_model::RunStage::AwaitingWaveAdvance
+            || !self.live_resources.battle_presentations.is_empty()
+        {
+            return Ok(());
+        }
+        let owner = run
+            .state()
+            .battle
+            .as_ref()
+            .ok_or_else(|| KernelError::Battle {
+                reason: "settled run battle is missing".to_owned(),
+            })?
+            .authority_seat;
+        if run.state().run.wave.get().get() >= 200 {
+            let run = self.run.as_mut().expect("run checked above");
+            run.complete_final_victory()
+                .map_err(|error| KernelError::Battle {
+                    reason: error.to_string(),
+                })?;
+            let plan = er_game::run_runtime::project_terminal_or_wait_control(
+                run.state(),
+                "run/complete",
+                owner,
+                er_types::battle_ids::MenuInstanceId::new(
+                    SafeU53::new(1).expect("menu one is safe"),
+                ),
+            )
+            .map_err(|error| KernelError::Battle {
+                reason: error.to_string(),
+            })?;
+            self.run_menu = Some(er_game::run_menu::RunMenuReducer::new(plan).map_err(
+                |error| KernelError::Battle {
+                    reason: error.to_string(),
+                },
+            )?);
+            self.battle = None;
+            self.scheduler = KernelScheduler::new();
+            self.live_resources = LiveResourceSnapshot::default();
+            return Ok(());
+        }
+        let template = self
+            .run_encounter
+            .as_ref()
+            .ok_or_else(|| KernelError::Battle {
+                reason: "repeated encounter template is missing".to_owned(),
+            })?;
+        let next_plan = next_repeated_encounter(template, run.state())?;
+        let control = self
+            .run_menu
+            .as_ref()
+            .ok_or_else(|| KernelError::Battle {
+                reason: "settled battle control is missing".to_owned(),
+            })?
+            .plan();
+        let material = er_game::run_transition::prepare_wave_advance_transition(
+            run.state(),
+            run.content().as_ref(),
+            &next_plan,
+            control,
+        )
+        .map_err(|error| KernelError::Battle {
+            reason: error.to_string(),
+        })?;
+        let bytes =
+            er_run::encode_run_material(&material).map_err(|error| KernelError::Battle {
+                reason: error.to_string(),
+            })?;
+        self.run_encounter = Some(next_plan);
+        self.scheduler = KernelScheduler::new();
+        self.apply_run_material_bytes(&bytes)
     }
 
     pub fn step(&mut self, input: KernelInput) -> Result<Vec<KernelEffect>, KernelError> {
@@ -718,6 +932,7 @@ impl GameKernel {
                     .retain(|effect| !matches!(effect, KernelEffect::EnterSharedTerminal { .. }));
             }
             self.live_resources = resources;
+            self.continue_after_settled_battle()?;
             return Ok(effects);
         }
         if self.run.is_some() {

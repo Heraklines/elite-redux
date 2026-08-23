@@ -206,3 +206,69 @@ fn published_lechonk_encounter_is_admitted_by_expanded_slice() -> Result<(), Box
     );
     Ok(())
 }
+
+#[test]
+fn settled_victory_advances_through_canonical_wave_material() -> Result<(), Box<dyn Error>> {
+    let (state, plan, content) = state_and_plan()?;
+    let mut won = start_battle_v2(&state, &plan, SeatId::new(safe(1)), content.as_ref())?;
+    let (source_battle_id, source_wave) = {
+        let battle = won.battle.as_mut().ok_or("started battle missing")?;
+        battle.enemy_party[0].hp = 0;
+        battle.enemy_party[0].fainted = true;
+        battle.outcome = er_types::battle_model::BattleOutcome::Victory;
+        battle
+            .participation
+            .defeated_enemies
+            .push(er_state::battle_v2::DefeatedEnemyRecord {
+                pokemon: battle.enemy_party[0].id,
+                owner_seat: None,
+            });
+        (battle.battle_id, battle.wave)
+    };
+    let settled = er_run::settlement::prepare_battle_settlement(
+        &won,
+        &er_run::settlement::BattleSettlementInput {
+            source_battle_id,
+            wave: source_wave,
+        },
+    )?;
+    let mut next_plan = plan.clone();
+    next_plan.wave = er_types::battle_ids::WaveIndex::new(safe(plan.wave.get().get() + 1))?;
+    next_plan.battle_seed = "next-wave-seed".to_owned();
+    let control = er_types::run_control::GameControlPlan::new(
+        vec![er_types::run_control::SeatControlPlan {
+            seat: SeatId::new(safe(1)),
+            owner: true,
+            control_id: "run/wave/next".to_owned(),
+            menu_instance_id: er_types::battle_ids::MenuInstanceId::new(safe(1)),
+            actionable_after: er_types::run_control::PresentationBarrier::NonBlocking,
+            control: er_types::run_control::GameControl::Complete(RunOutcome::Victory),
+        }],
+        "run/wave/control".to_owned(),
+        er_types::battle_ids::MenuInstanceId::new(safe(2)),
+    )?;
+    let material = er_game::run_transition::prepare_wave_advance_transition(
+        &settled.after_state,
+        content.as_ref(),
+        &next_plan,
+        &control,
+    )?;
+    let bytes = er_run::encode_run_material(&material)?;
+    let decoded = er_run::decode_run_material(&bytes)?;
+    let mut runtime = er_game::run_runtime::RunRuntime::new(settled.after_state, content.clone())?;
+    runtime.apply(&decoded)?;
+    assert_eq!(runtime.state().run.wave, next_plan.wave);
+    assert_eq!(runtime.state().run.stage, RunStage::Battle);
+    assert_eq!(
+        runtime
+            .state()
+            .battle
+            .as_ref()
+            .ok_or("next battle missing")?
+            .battle_id
+            .get()
+            .get(),
+        2
+    );
+    Ok(())
+}

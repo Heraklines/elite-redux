@@ -10,7 +10,8 @@ use er_run::move_learning::apply_learn_move_decision;
 use er_run::reward::{MarketStockView, buy_stock, pay_for_offer};
 use er_run::run_material::{
     AuthorityRunMaterial, RUN_INTERACTION_MATERIAL_VERSION, RUN_MATERIAL_M3_PARITY_ORACLE_SHA,
-    RunInteractionMaterialV1, RunMaterialHeader,
+    RunInteractionMaterialV1, RunMaterialHeader, WAVE_ADVANCE_MATERIAL_VERSION,
+    WaveAdvanceMaterialV1,
 };
 use er_run::transition::{GameContentBundle, RunMutation, RunPresentationEvent};
 use er_state::digest_v2::MechanicalStateDigestV2;
@@ -1243,4 +1244,161 @@ pub fn prepare_move_replace_transition(
             surface_after_digest: Some(surface_digest),
         },
     ))
+}
+
+pub fn prepare_wave_advance_transition(
+    before: &GameStateV2,
+    content: &GameContentBundle,
+    encounter: &EncounterPlan,
+    current_control: &GameControlPlan,
+) -> Result<AuthorityRunMaterial, RunTransitionPreparationError> {
+    let source = before
+        .battle
+        .as_ref()
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    if before.run.stage != RunStage::AwaitingWaveAdvance
+        || !source.settlement.settled
+        || source.outcome != er_types::battle_model::BattleOutcome::Victory
+        || encounter.run_id != before.run.run_id
+        || encounter.biome != before.run.biome.biome
+    {
+        return Err(RunTransitionPreparationError::MissingEncounter);
+    }
+    let next_wave = before
+        .run
+        .wave
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    if encounter.wave.get().get() != next_wave {
+        return Err(RunTransitionPreparationError::MissingEncounter);
+    }
+    let owner = current_control.owner_seat();
+    let source_battle_id = source.battle_id;
+    let mut battle_frontier = before.clone();
+    battle_frontier.battle = None;
+    battle_frontier.run.wave = encounter.wave;
+    battle_frontier.run.stage = RunStage::Complete;
+    battle_frontier.run.outcome = RunOutcome::Victory;
+    battle_frontier
+        .validate()
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+    let after = start_battle_v2(&battle_frontier, encounter, owner, content)
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?;
+    let battle = after
+        .battle
+        .as_ref()
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    let player_slot = FieldSlot::new(BattleSide::Player, 0)
+        .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let actor = battle
+        .field
+        .occupant(&battle.format, player_slot)
+        .map_err(|error| RunTransitionPreparationError::InvalidState(error.to_string()))?
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    let actor_state = after
+        .player_party
+        .iter()
+        .find(|pokemon| pokemon.id == actor)
+        .ok_or(RunTransitionPreparationError::MissingEncounter)?;
+    let fight = actor_state
+        .moves
+        .iter()
+        .enumerate()
+        .filter_map(|(index, slot)| slot.map(|slot| (index, slot)))
+        .filter_map(|(index, slot)| {
+            content
+                .battle
+                .moves
+                .iter()
+                .find(|definition| definition.id == slot.move_id)
+                .filter(|definition| slot.pp_used < definition.base_pp)
+                .map(|_| index)
+        })
+        .map(|index| {
+            OfferedMoveCommand::new(
+                MoveSlotIndex::try_from(index as u64).map_err(|error| {
+                    RunTransitionPreparationError::InvalidIdentity(error.to_string())
+                })?,
+                vec![BattleTargetSelection::Implicit],
+            )
+            .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let offer = BattleCommandOffer::new(fight, Vec::new())
+        .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let menu_instance = current_control.next_menu_instance_id;
+    let next_menu_value = menu_instance
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or(RunTransitionPreparationError::AllocatorOverflow)?;
+    let control_id = current_control.next_control_id.clone();
+    let root = build_command_root_control(
+        menu_instance,
+        owner,
+        control_id.clone(),
+        actor,
+        player_slot,
+        &offer,
+        CommandRootSelection::Fight,
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let next_control = GameControlPlan::new(
+        vec![SeatControlPlan {
+            seat: owner,
+            owner: true,
+            control_id: control_id.clone(),
+            menu_instance_id: menu_instance,
+            actionable_after: current_control.seats[0].actionable_after,
+            control: GameControl::Battle(BattleControl::CommandRoot(root)),
+        }],
+        format!("{control_id}/next"),
+        MenuInstanceId::new(
+            SafeU53::new(next_menu_value)
+                .map_err(|_| RunTransitionPreparationError::AllocatorOverflow)?,
+        ),
+    )
+    .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+    let before_digest = MechanicalStateDigestV2::compute(before)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    let after_digest = MechanicalStateDigestV2::compute(&after)
+        .map_err(|error| RunTransitionPreparationError::Digest(error.to_string()))?;
+    let operation_id =
+        OperationId::new(format!("V2/WAVE/e1/w{}/tick1", before.run.wave.get().get()))
+            .map_err(|error| RunTransitionPreparationError::InvalidIdentity(error.to_string()))?;
+
+    Ok(AuthorityRunMaterial::WaveAdvance(WaveAdvanceMaterialV1 {
+        schema_version: WAVE_ADVANCE_MATERIAL_VERSION,
+        header: RunMaterialHeader {
+            m4_oracle_sha: content.run.m4_oracle_sha.clone(),
+            m3_parity_oracle_sha: RUN_MATERIAL_M3_PARITY_ORACLE_SHA.to_owned(),
+            battle_content_hash: before.battle_content_hash.clone(),
+            run_content_hash: before.run_content_hash.clone(),
+            operation_id,
+            run_id: before.run.run_id,
+            wave: encounter.wave,
+            before_digest,
+            after_digest,
+            before_state: before.clone(),
+            after_state: after,
+            next_control,
+        },
+        source_battle_id,
+        mutations: vec![
+            RunMutation::StageChanged {
+                before: RunStage::AwaitingWaveAdvance,
+                after: RunStage::Battle,
+            },
+            RunMutation::WaveAdvanced {
+                before: before.run.wave,
+                after: encounter.wave,
+            },
+        ],
+        presentation: vec![RunPresentationEvent::WaveStarted {
+            wave: encounter.wave,
+        }],
+        rng_audit: encounter.generation_audit.clone(),
+    }))
 }
