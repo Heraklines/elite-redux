@@ -133,7 +133,11 @@ fn is_lower_hex(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn require_prefixed_hex(field: &str, value: &str, prefix: &str) -> Result<(), BattlePackLoadError> {
+fn require_prefixed_hex(
+    field: &'static str,
+    value: &str,
+    prefix: &str,
+) -> Result<(), BattlePackLoadError> {
     let body = value
         .strip_prefix(prefix)
         .ok_or_else(|| BattlePackLoadError::DigestFormat {
