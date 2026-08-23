@@ -185,7 +185,9 @@ jobs:
           test -n "$KAGGLE_USERNAME"
           test -n "$KAGGLE_KEY"
           dataset_slug="$KAGGLE_USERNAME/$AI_DATASET_NAME"
+          previous_version=0
           if kaggle datasets status "$dataset_slug" >/dev/null 2>&1; then
+            previous_version=$(kaggle datasets status "$dataset_slug" --format json | jq -er '.current_version_number')
             kaggle datasets version \
               --path "$RUNNER_TEMP/ai-kaggle-dataset" \
               --message "curated v4 $DATASET_ID from $GITHUB_SHA"
@@ -193,15 +195,18 @@ jobs:
             kaggle datasets create --path "$RUNNER_TEMP/ai-kaggle-dataset"
           fi
           dataset_status=""
+          dataset_version=0
           for _ in $(seq 1 90); do
-            dataset_status=$(kaggle datasets status "$dataset_slug" 2>/dev/null | tail -n 1 || true)
-            if [[ "$dataset_status" == "ready" ]]; then
+            dataset_state=$(kaggle datasets status "$dataset_slug" --format json 2>/dev/null || true)
+            dataset_status=$(jq -er '.status' <<<"$dataset_state" 2>/dev/null || true)
+            dataset_version=$(jq -er '.current_version_number' <<<"$dataset_state" 2>/dev/null || echo 0)
+            if [[ "$dataset_status" == "ready" && "$dataset_version" -gt "$previous_version" ]]; then
               break
             fi
             sleep 10
           done
-          if [[ "$dataset_status" != "ready" ]]; then
-            echo "::error::Private Kaggle dataset did not become ready (status: ${dataset_status:-unavailable})"
+          if [[ "$dataset_status" != "ready" || "$dataset_version" -le "$previous_version" ]]; then
+            echo "::error::Private Kaggle dataset did not publish a newer ready version (status: ${dataset_status:-unavailable}, previous: $previous_version, current: $dataset_version)"
             exit 1
           fi
           kaggle kernels push --path "$RUNNER_TEMP/ai-kaggle-kernel"
