@@ -209,6 +209,73 @@ function inferEffect(attribute) {
   return "UNRESOLVED_EFFECT";
 }
 
+function attributeClassName(node, sourceFile) {
+  if (ts.isIdentifier(node)) return node.text;
+  if (ts.isNewExpression(node)) return node.expression.getText(sourceFile);
+  return node.getText(sourceFile);
+}
+
+function semanticResolution(hook, effect, values, implementation) {
+  return callbackPresent(values)
+    || hook === "UNRESOLVED_HOOK"
+    || effect === "UNRESOLVED_EFFECT"
+    || implementation == null
+    ? "BESPOKE_GAP"
+    : "RESOLVED_OPERANDS";
+}
+
+function rngDomain(site) {
+  if (site.call === "Math.random") return "FORBIDDEN_NONDETERMINISTIC";
+  const path = site.source.path.toLowerCase();
+  if (path.includes("/coop/") && path.includes("-ai")) return "BATTLE_POLICY";
+  if (/(achievement|bargain|biome|economy|loot|map-event|mega-tier|quiz|relic|reward|trainer\\.ts)/u.test(path)) {
+    return "RUN_MECHANICAL";
+  }
+  return "BATTLE_MECHANICAL";
+}
+
+function rngReason(site) {
+  const context = `${site.source.path} ${site.call} ${site.arguments.join(" ")}`.toLowerCase();
+  if (context.includes("accuracy") || context.includes("hitcheck")) return "ACCURACY";
+  if (context.includes("crit")) return "CRITICAL_HIT";
+  if (context.includes("damage") || context.includes("roll")) return "DAMAGE_VARIANCE";
+  if (context.includes("speed") || context.includes("tie")) return "SPEED_TIE";
+  if (context.includes("multihit") || context.includes("multi-hit") || context.includes("hitcount")) return "MULTI_HIT_COUNT";
+  if (context.includes("target")) return "TARGET_SELECTION";
+  if (context.includes("move")) return "MOVE_SELECTION";
+  if (context.includes("ability") || context.includes("ab-attr")) return "ABILITY_CHANCE";
+  if (context.includes("item") || context.includes("berry") || context.includes("modifier")) return "ITEM_CHANCE";
+  if (/(status|tag|poison|burn|paraly|sleep|freeze)/u.test(context)) return "STATUS_OR_VOLATILE";
+  if (context.includes("form") || context.includes("transform")) return "FORM_OR_TRANSFORM";
+  return "SOURCE_IDENTIFIED_BESPOKE";
+}
+
+function gapCluster(unit) {
+  const sourceKind = unit.id.source.kind;
+  const context = canonicalText({
+    source: unit.id.source,
+    hook: unit.semantic.hook,
+    effect: unit.semantic.effect,
+    implementation: unit.semantic.implementation?.name ?? null,
+  }).toUpperCase();
+  if (sourceKind === "HELD_ITEM" || context.includes("BERRY") || context.includes("ITEM")) return "ITEM_BERRY_LIFECYCLE";
+  if (context.includes("SUBSTITUTE")) return "SUBSTITUTE_PROXY_HP";
+  if (/(FUTURE|DELAY|SCHEDULE)/u.test(context)) return "DELAYED_SCHEDULED_EFFECT";
+  if (/(CHARGE|RECHARGE)/u.test(context)) return "CHARGE_RECHARGE_LOCK";
+  if (/(PROTECT|ENDURE|GUARD)/u.test(context)) return "PROTECT_ENDURE_GUARD";
+  if (/(SWITCH|TARGET|TRAP|REDIRECT|PIVOT|COMMANDER)/u.test(context)) return "SWITCH_TRAP_REDIRECT";
+  if (/(TRANSFORM|FORM|STANCE|TERA|MEGA)/u.test(context)) return "TRANSFORM_FORM_COPY";
+  if (/(DAMAGE|COUNTER|MIRROR COAT|METAL BURST)/u.test(context)) return "SPECIAL_DAMAGE_COUNTER";
+  if (/(MOVE COPY|COPY MOVE|RANDOM MOVE|METRONOME)/u.test(context)) return "MOVE_COPY_CALL_SELECTION";
+  if (/(SUPPRESS|IMMUN)/u.test(context)) return "SUPPRESSION_UNUSUAL_IMMUNITY";
+  if (/(BOSS|ER CUSTOM|ELITE REDUX)/u.test(context)) return "BOSS_CUSTOM_ER";
+  if (sourceKind === "WEATHER" || sourceKind === "TERRAIN" || sourceKind === "ARENA_TAG") return "WEATHER_TERRAIN_FIELD";
+  if (sourceKind === "MAJOR_STATUS" || sourceKind === "BATTLER_TAG" || sourceKind === "POSITIONAL_TAG" || /(STATUS|TAG)/u.test(context)) {
+    return "STATUS_VOLATILE_TAG";
+  }
+  return "CUSTOM_DISPATCH";
+}
+
 function callbackPresent(operands) {
   return operands.some(value => value.kind === "CALLBACK_PROVENANCE"
     || value.kind === "ARRAY" && callbackPresent(value.values)
@@ -216,7 +283,7 @@ function callbackPresent(operands) {
 }
 
 function enumMembers(path, enumName) {
-  const source = readFileSync(path, "utf8");
+  const source = readFileSync(path, "utf8").replace(/\r\n?/gu, "\n");
   const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const declaration = file.statements.find(statement => ts.isEnumDeclaration(statement) && statement.name.text === enumName);
   if (!declaration) return [];
@@ -261,7 +328,7 @@ function addUnit(source, unitKind, provenance, semantic) {
   units.push({ id, provenance, semantic });
 }
 
-function addIntrinsic(kind, entries, unitKind, registry = false) {
+function addIntrinsic(kind, entries, unitKind, registry = false, resolved = false) {
   for (const entry of entries) {
     const source = registry || entry.numeric_id == null
       ? sourceIdentity(kind, null, entry.key ?? entry.member)
@@ -271,13 +338,15 @@ function addIntrinsic(kind, entries, unitKind, registry = false) {
       target: { kind: "SOURCE" },
       effect: { kind: "INTRINSIC_DEFINITION" },
       operands: [],
-      resolution: "RESOLVED_INTRINSIC",
+      resolution: resolved ? "RESOLVED_INTRINSIC" : "BESPOKE_GAP",
     });
   }
 }
 
-addIntrinsic("MOVE", raw.moves, "INTRINSIC_MOVE_RULE");
-for (const role of ["ACTIVE_ABILITY", "PASSIVE_ABILITY"]) addIntrinsic(role, raw.abilities, role === "ACTIVE_ABILITY" ? "ABILITY_ATTRIBUTE" : "PASSIVE_ATTRIBUTE");
+addIntrinsic("MOVE", raw.moves, "INTRINSIC_MOVE_RULE", false, true);
+for (const role of ["ACTIVE_ABILITY", "PASSIVE_ABILITY"]) {
+  addIntrinsic(role, raw.abilities, role === "ACTIVE_ABILITY" ? "ABILITY_ATTRIBUTE" : "PASSIVE_ATTRIBUTE", false, true);
+}
 addIntrinsic("HELD_ITEM", raw.modifier_types, "MODIFIER_BEHAVIOR", true);
 addIntrinsic("MAJOR_STATUS", raw.statuses, "STATUS_BEHAVIOR");
 addIntrinsic("WEATHER", raw.weather, "WEATHER_BEHAVIOR");
@@ -290,6 +359,8 @@ const speciesEnum = enumMembers(resolve(input.oracleRoot, "src/enums/species-id.
 const speciesIdByMember = new Map(speciesEnum.map(entry => [entry.key, entry.id]));
 const speciesDescriptors = new Map();
 const formDescriptors = [];
+const classDefinitions = new Map(raw.mechanic_classes.map(definition => [definition.name, definition]));
+const mappedAttachments = new Set();
 const files = [...new Set([
   ...raw.source_files.map(entry => resolve(input.oracleRoot, entry.path)),
   resolve(input.oracleRoot, "src/data/balance/pokemon-species.ts"),
@@ -297,7 +368,7 @@ const files = [...new Set([
   resolve(input.oracleRoot, "src/init/init-species.ts"),
 ])].filter(path => existsSync(path)).sort();
 for (const path of files) {
-  const sourceText = readFileSync(path, "utf8");
+  const sourceText = readFileSync(path, "utf8").replace(/\r\n?/gu, "\n");
   const sourceFile = ts.createSourceFile(path, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
   const visit = node => {
     if (
@@ -408,9 +479,16 @@ for (const path of files) {
           const numericId = memberIds.get(`${ref.owner}/${ref.member}`);
           if (Number.isSafeInteger(numericId)) {
             const operands = node.arguments.slice(attributeIndex + 1).map(value => operand(value, sourceFile));
+            const condition = method === "conditionalAttr"
+              ? operand(node.arguments[0], sourceFile)
+              : { kind: "ALWAYS" };
             const location = sourceLocation(sourceFile, node, input.oracleRoot);
-            const attributeName = attribute.getText(sourceFile);
+            const attributeName = attributeClassName(attribute, sourceFile);
             const conditional = method === "conditionalAttr";
+            const hook = inferHook(attributeName);
+            const effect = inferEffect(attributeName);
+            const implementation = classDefinitions.get(attributeName) ?? null;
+            mappedAttachments.add(`${location.path}:${location.line}:${location.column}:${method}:${attributeName}`);
             const roles = ref.kind === "ABILITY" ? ["ACTIVE_ABILITY", "PASSIVE_ABILITY"] : ["MOVE"];
             for (const role of roles) {
               addUnit(
@@ -418,11 +496,13 @@ for (const path of files) {
                 role === "MOVE" ? (conditional ? "CONDITIONAL_MOVE_ATTRIBUTE" : "MOVE_ATTRIBUTE") : role === "ACTIVE_ABILITY" ? "ABILITY_ATTRIBUTE" : "PASSIVE_ATTRIBUTE",
                 { ...location, attribute: attributeName, method },
                 {
-                  hook: inferHook(attributeName),
+                  hook,
                   target: { kind: "SOURCE_DEFINED" },
-                  effect: { kind: inferEffect(attributeName), attribute: attributeName },
+                  condition,
+                  effect: { kind: effect, attribute: attributeName },
                   operands,
-                  resolution: callbackPresent(operands) ? "BESPOKE_GAP" : "RESOLVED_OPERANDS",
+                  implementation,
+                  resolution: semanticResolution(hook, effect, [condition, ...operands], implementation),
                 },
               );
             }
@@ -433,6 +513,24 @@ for (const path of files) {
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+}
+
+for (const attachment of raw.attribute_attachments) {
+  const key = `${attachment.source.path}:${attachment.source.line}:${attachment.source.column}:${attachment.method}:${attachment.attribute}`;
+  if (mappedAttachments.has(key)) continue;
+  const hook = inferHook(attachment.attribute);
+  const effect = inferEffect(attachment.attribute);
+  const implementation = classDefinitions.get(attachment.attribute) ?? null;
+  const source = sourceIdentity("BESPOKE", null, key);
+  addUnit(source, "FIXED_DISPATCH_BEHAVIOR", attachment.source, {
+    hook,
+    target: { kind: "CALLSITE_DEFINED" },
+    condition: { kind: attachment.method === "conditionalAttr" ? "CALLBACK_PROVENANCE" : "ALWAYS" },
+    effect: { kind: effect, attribute: attachment.attribute },
+    operands: [{ kind: "INTEGER", value: attachment.argument_count }],
+    implementation,
+    resolution: "BESPOKE_GAP",
+  });
 }
 
 for (const site of raw.dispatch_sites) {
@@ -496,13 +594,7 @@ units.sort((left, right) => {
 const gaps = units.filter(unit => unit.semantic.resolution === "BESPOKE_GAP");
 const clusters = new Map();
 for (const unit of gaps) {
-  const effect = unit.semantic.effect.kind;
-  const cluster = effect.includes("SWITCH") || effect.includes("TARGET") ? "SWITCH_TRAP_REDIRECT"
-    : effect.includes("DAMAGE") ? "SPECIAL_DAMAGE"
-    : effect.includes("STATUS") || effect.includes("TAG") ? "STATUS_TAG_STATE"
-    : effect.includes("TYPE") || effect.includes("FORM") ? "TRANSFORM_FORM_COPY"
-    : unit.id.unit_kind === "MODIFIER_BEHAVIOR" ? "ITEM_BERRY_LIFECYCLE"
-    : "CUSTOM_DISPATCH";
+  const cluster = gapCluster(unit);
   const values = clusters.get(cluster) ?? [];
   values.push(unit.id);
   clusters.set(cluster, values);
@@ -516,6 +608,18 @@ for (const unit of units) {
   }
   resolvedSources.find(entry => identityKey(entry.source) === key).behavior_unit_count += 1;
 }
+const rngSites = raw.rng_sites.map((site, ordinal) => ({
+  id: {
+    ordinal,
+    provenance_hash: hash(site),
+  },
+  source: site.source,
+  call: site.call,
+  arguments: site.arguments,
+  domain: rngDomain(site),
+  reason: rngReason(site),
+}));
+
 const rawV2 = {
   ...raw,
   schema_version: 2,
@@ -532,6 +636,7 @@ const semantic = {
   trigger_order: { authority: "M6_ORACLE_EXTRACTED", evidence: "docs/plans/rust-kernel/m6-trigger-order.md" },
   query_order: { authority: "M6_ORACLE_EXTRACTED", evidence: "docs/plans/rust-kernel/m6-query-order.md" },
   targeting_contract: { authority: "M6_ORACLE_EXTRACTED", evidence: "docs/plans/rust-kernel/m6-targeting.md" },
+  rng_sites: rngSites,
 };
 const witnessPlans = units.map(unit => ({
   behavior_unit: unit.id,
@@ -547,4 +652,5 @@ writeJson(input.outputRoot, "behavior-unit-manifest-v1.json", { schema_version: 
 writeJson(input.outputRoot, "primitive-gap-manifest-v1.json", { schema_version: 1, oracle_sha: input.oracleSha, gap_count: gaps.length, gaps: gaps.map(unit => ({ id: unit.id, semantic: unit.semantic })) });
 writeJson(input.outputRoot, "bespoke-clusters-v1.json", { schema_version: 1, oracle_sha: input.oracleSha, clusters: [...clusters].sort(([left], [right]) => compareText(left, right)).map(([cluster, behavior_units]) => ({ cluster, behavior_units })) });
 writeJson(input.outputRoot, "oracle-witness-plan-v1.json", { schema_version: 1, oracle_sha: input.oracleSha, witness_count: witnessPlans.length, witnesses: witnessPlans });
+writeJson(input.outputRoot, "rng-site-manifest-v1.json", { schema_version: 1, oracle_sha: input.oracleSha, site_count: rngSites.length, sites: rngSites });
 console.log(`M6 semantic exporter: ${resolvedSources.length} sources, ${units.length} behavior units, ${gaps.length} gaps, ${clusters.size} bespoke clusters`);
