@@ -308,6 +308,10 @@ if (existsSync(input.outputRoot) && !statSync(input.outputRoot).isDirectory()) f
 mkdirSync(input.outputRoot, { recursive: true });
 const raw = JSON.parse(readFileSync(input.rawCatalog, "utf8"));
 if (raw.schema_version !== 1 || raw.oracle_sha !== input.oracleSha) fail("raw catalog mismatch");
+raw.source_files = raw.source_files.map(entry => {
+  const source = readFileSync(resolve(input.oracleRoot, entry.path), "utf8").replace(/\r\n?/gu, "\n");
+  return { ...entry, sha256: hash(source) };
+});
 
 const memberIds = new Map();
 for (const kind of ["moves", "abilities"]) {
