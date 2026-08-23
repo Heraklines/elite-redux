@@ -389,6 +389,33 @@ function enumMembers(path, enumName) {
 
 const input = parseArgs(process.argv.slice(2));
 if (!/^[0-9a-f]{40}$/u.test(input.oracleSha)) fail("oracle SHA is invalid");
+
+function constObjectMembers(path, objectName) {
+  const source = readFileSync(path, "utf8").replace(/\r\n?/gu, "\n");
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        !ts.isIdentifier(declaration.name)
+        || declaration.name.text !== objectName
+        || !declaration.initializer
+      ) continue;
+      const initializer = ts.isAsExpression(declaration.initializer)
+        ? declaration.initializer.expression
+        : declaration.initializer;
+      if (!ts.isObjectLiteralExpression(initializer)) return [];
+      return initializer.properties.map((property, ordinal) => {
+        if (!ts.isPropertyAssignment(property)) fail(`${objectName} contains a non-property member`);
+        const key = property.name.getText(file).replace(/^['"]|['"]$/gu, "");
+        const value = operand(property.initializer, file);
+        if (value.kind !== "SAFE_INTEGER") fail(`${objectName}.${key} is not a safe integer`);
+        return { id: value.value, key, ordinal, source: sourceLocation(file, property, input.oracleRoot) };
+      });
+    }
+  }
+  return [];
+}
 if (!statSync(input.oracleRoot).isDirectory() || git(input.oracleRoot, "rev-parse", "HEAD") !== input.oracleSha) {
   fail("oracle checkout mismatch");
 }
@@ -450,7 +477,10 @@ addIntrinsic("BATTLER_TAG", raw.battler_tags, "BATTLER_TAG_BEHAVIOR", true);
 addIntrinsic("ARENA_TAG", raw.arena_tags, "ARENA_TAG_BEHAVIOR", true);
 addIntrinsic("POSITIONAL_TAG", raw.positional_tags, "POSITIONAL_TAG_BEHAVIOR", true);
 
-const speciesEnum = enumMembers(resolve(input.oracleRoot, "src/enums/species-id.ts"), "SpeciesId");
+const speciesEnum = [
+  ...enumMembers(resolve(input.oracleRoot, "src/enums/species-id.ts"), "SpeciesId"),
+  ...constObjectMembers(resolve(input.oracleRoot, "src/enums/er-species-id.ts"), "ErSpeciesId"),
+].sort((left, right) => left.id - right.id || compareText(left.key, right.key));
 const speciesIdByMember = new Map(speciesEnum.map(entry => [entry.key, entry.id]));
 const speciesDescriptors = new Map();
 const formDescriptors = [];

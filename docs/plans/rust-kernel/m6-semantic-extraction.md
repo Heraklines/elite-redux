@@ -10,7 +10,7 @@
 
 ## Frozen inventory
 
-`rust/fixtures/m6/semantic-catalog-v1.json` contains 4,350 source identities and 6,362 behavior units:
+`rust/fixtures/m6/semantic-catalog-v1.json` contains 5,231 source identities and 7,243 behavior units:
 
 | Source kind | Identities | Behavior units |
 |---|---:|---:|
@@ -24,15 +24,17 @@
 | Battler tag | 123 | 123 |
 | Arena tag | 42 | 42 |
 | Positional tag | 3 | 3 |
-| Species | 1,082 | 1,082 |
+| Species | 1,963 | 1,963 |
 | Form | 534 | 534 |
 | Unattached attribute, fixed dispatch, or RNG callsite | 780 | 780 |
+
+Species identities include all 1,082 vanilla `SpeciesId` members and 881 `ErSpeciesId` object members. Custom species whose constructor metadata is assembled dynamically remain explicit metadata gaps until the runtime catalog is compiled into closed definitions.
 
 Resolution totals:
 
 - `RESOLVED_INTRINSIC`: 1,544.
 - `RESOLVED_OPERANDS`: 0.
-- `BESPOKE_GAP`: 4,818.
+- `BESPOKE_GAP`: 5,699.
 - Unclassified identities or units: zero.
 
 No attribute operand is considered compiler-ready at G21. Literal and symbolic descriptors preserve evidence, but every attribute remains a gap until an audited per-attribute schema freezes its exact hook, condition, operand types, and operation.
@@ -100,13 +102,13 @@ Runtime reflection does not make a callback portable. A callback remains a bespo
 
 ## Bespoke closure boundary
 
-The 4,818 current gaps are grouped mechanically as:
+The 5,699 current gaps are grouped mechanically as:
 
 | Cluster | Gap count |
 |---|---:|
 | Boss/custom ER | 1 |
 | Charge/recharge lock | 12 |
-| Custom dispatch | 2,395 |
+| Custom dispatch | 3,276 |
 | Delayed/scheduled effect | 4 |
 | Item/berry lifecycle | 323 |
 | Protect/endure/guard | 42 |
