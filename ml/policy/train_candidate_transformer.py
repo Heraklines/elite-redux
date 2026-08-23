@@ -144,7 +144,11 @@ def er_jsonl_files(path: Path) -> list[Path]:
         candidate
         for candidate in candidates
         if candidate.is_file()
-        and (candidate.name.endswith(".jsonl") or candidate.name.endswith(".jsonl.gz"))
+        and (
+            candidate.name.endswith(".jsonl")
+            or candidate.name.endswith(".jsonl.gz")
+            or candidate.name.endswith(".jsonl.gzpack")
+        )
     )
 
 
@@ -152,7 +156,7 @@ def iter_er_jsonl_records(path: Path) -> Iterator[tuple[dict[str, Any], Path, in
     for file in er_jsonl_files(path):
         input_handle = (
             gzip.open(file, "rt", encoding="utf-8")
-            if file.name.endswith(".gz")
+            if file.name.endswith(".gz") or file.name.endswith(".gzpack")
             else file.open("r", encoding="utf-8")
         )
         with input_handle as handle:

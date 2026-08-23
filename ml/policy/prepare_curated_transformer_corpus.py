@@ -110,7 +110,7 @@ def assemble(
     policy_outputs: list[str] = []
     for split in SPLITS:
         source = curated_dir / f"{policy_dataset}-{split}.jsonl.gz"
-        destination = output_dir / source.name
+        destination = output_dir / f"{source.name}pack"
         shutil.copyfile(source, destination)
         policy_outputs.append(destination.name)
         for decision in iter_gzip_jsonl(source):
@@ -146,7 +146,7 @@ def assemble(
                 if previous != normalized:
                     raise ValueError(f"conflicting terminal records for battle {stable_battle_id}")
 
-    terminal_path = output_dir / "completed-battle-terminals.jsonl.gz"
+    terminal_path = output_dir / "completed-battle-terminals.jsonl.gzpack"
     with terminal_path.open("wb") as raw:
         with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as compressed:
             for stable_battle_id in sorted(terminals):

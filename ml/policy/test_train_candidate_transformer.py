@@ -112,7 +112,7 @@ class CandidateTransformerTrainingPipelineTest(unittest.TestCase):
             root = Path(directory)
             data = root / "data"
             data.mkdir()
-            with gzip.open(data / "records.jsonl.gz", "wt", encoding="utf-8") as handle:
+            with gzip.open(data / "records.jsonl.gzpack", "wt", encoding="utf-8") as handle:
                 handle.write("".join(json.dumps(record) + "\n" for record in records))
             dictionary_path = root / "dictionary.json"
             dictionary_path.write_bytes(dictionary_bytes)

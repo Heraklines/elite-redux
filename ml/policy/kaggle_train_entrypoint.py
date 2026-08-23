@@ -345,7 +345,9 @@ def run_training(
         if path.is_file()
     )
     has_er_data = any(
-        path.name.endswith(".jsonl") or path.name.endswith(".jsonl.gz")
+        path.name.endswith(".jsonl")
+        or path.name.endswith(".jsonl.gz")
+        or path.name.endswith(".jsonl.gzpack")
         for path in data_dir.rglob("*")
         if path.is_file()
     )

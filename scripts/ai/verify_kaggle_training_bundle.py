@@ -42,15 +42,18 @@ def verify_contents(
             "training bundle is missing ensemble packaging sources: "
             + ", ".join(missing_packaging_sources)
         )
+    for archived_path, entry in manifest_files.items():
+        archived = read_bytes(archived_path)
+        if sha256(archived) != entry.get("sha256"):
+            raise ValueError(f"bundle manifest hash mismatch: {archived_path}")
+        if len(archived) != entry.get("bytes"):
+            raise ValueError(f"bundle manifest byte count mismatch: {archived_path}")
     for source_path in source_paths:
         local_path = repository_root / source_path
         if not local_path.is_file():
             raise ValueError(f"checked-out training source is missing: {source_path}")
         archived = read_bytes(source_path)
         archived_sha = sha256(archived)
-        manifest_sha = manifest_files[source_path].get("sha256")
-        if archived_sha != manifest_sha:
-            raise ValueError(f"bundle manifest hash mismatch: {source_path}")
         if archived_sha != sha256(local_path.read_bytes()):
             raise ValueError(f"private dataset contains stale training source: {source_path}")
     return {

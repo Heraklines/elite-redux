@@ -87,7 +87,7 @@ async function readCombatContractIdentity(paths) {
   });
   for (const path of ordered) {
     const source = createReadStream(path);
-    const stream = path.endsWith(".gz") ? source.pipe(createGunzip()) : source;
+    const stream = path.endsWith(".gz") || path.endsWith(".gzpack") ? source.pipe(createGunzip()) : source;
     stream.setEncoding("utf8");
     const lines = createInterface({ input: stream, crlfDelay: Number.POSITIVE_INFINITY });
     try {
@@ -165,7 +165,9 @@ if (initModelRoot) {
   }
   initModelPaths = [configPath, weightsPath];
 }
-const decisionPaths = (await walk(dataRoot)).filter(path => path.endsWith(".jsonl") || path.endsWith(".jsonl.gz"));
+const decisionPaths = (await walk(dataRoot)).filter(
+  path => path.endsWith(".jsonl") || path.endsWith(".jsonl.gz") || path.endsWith(".jsonl.gzpack"),
+);
 if (decisionPaths.length === 0) {
   throw new Error(`no JSONL decision shards found under ${dataRoot}`);
 }

@@ -75,8 +75,8 @@ class PrepareCuratedTransformerCorpusTest(unittest.TestCase):
             self.assertEqual(report["matchedBattleTerminals"], 2)
             self.assertEqual(report["unknownOutcomeBattles"], 2)
             self.assertFalse(report["heldOutSplitIncluded"])
-            self.assertFalse((output / "policy-all-test.jsonl.gz").exists())
-            with gzip.open(output / "completed-battle-terminals.jsonl.gz", "rt", encoding="utf-8") as handle:
+            self.assertFalse((output / "policy-all-test.jsonl.gzpack").exists())
+            with gzip.open(output / "completed-battle-terminals.jsonl.gzpack", "rt", encoding="utf-8") as handle:
                 terminals = [json.loads(line) for line in handle]
             self.assertEqual(len(terminals), 2)
             self.assertTrue(all(row["kind"] == "battle_terminal" for row in terminals))
