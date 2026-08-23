@@ -165,6 +165,17 @@ const fn rng_reason(reason: MechanicsRngReason) -> RngReason {
     }
 }
 
+pub fn evaluate_value(
+    program: &MechanicsProgramV1,
+    root: ValueNodeId,
+    facts: &ConditionFacts,
+) -> Result<i64, ConditionEvaluationError> {
+    program
+        .validate()
+        .map_err(|_| ConditionEvaluationError::InvalidProgram)?;
+    value(program, root, facts, &mut BTreeMap::new())
+}
+
 fn value(
     program: &MechanicsProgramV1,
     id: ValueNodeId,

@@ -1,5 +1,7 @@
 use er_content::pack::m5_pack::BattleContentPackV2;
-use er_mechanics::{BindingKind, MechanicOperation};
+use er_mechanics::{
+    BindingKind, ConditionNodeId, MechanicOperation, QueryValueKind, SelectorNodeId,
+};
 use er_types::mechanics::{HookOrdinal, MechanicHook, MechanicQuery, MechanicsProgramId};
 use thiserror::Error;
 
@@ -11,6 +13,9 @@ pub struct PlannedMechanicOperation {
     pub program_id: MechanicsProgramId,
     pub hook_ordinal: HookOrdinal,
     pub operation_ordinal: u16,
+    pub condition_root: Option<ConditionNodeId>,
+    pub selector_root: Option<SelectorNodeId>,
+    pub query_value_kind: Option<QueryValueKind>,
     pub operation: MechanicOperation,
 }
 
@@ -103,6 +108,12 @@ where
                     source_index,
                     program_id,
                     hook_ordinal: binding.hook_ordinal,
+                    condition_root: binding.condition_root,
+                    selector_root: binding.selector_root,
+                    query_value_kind: match binding.binding {
+                        BindingKind::Query { value_kind, .. } => Some(value_kind),
+                        BindingKind::Trigger { .. } => None,
+                    },
                     operation_ordinal,
                     operation: operation.clone(),
                 });
