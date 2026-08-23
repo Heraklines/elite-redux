@@ -10,7 +10,7 @@
 
 ## Frozen inventory
 
-`rust/fixtures/m6/semantic-catalog-v1.json` contains 5,231 source identities and 7,243 behavior units:
+`rust/fixtures/m6/semantic-catalog-v1.json` contains 5,286 source identities and 7,298 behavior units:
 
 | Source kind | Identities | Behavior units |
 |---|---:|---:|
@@ -24,17 +24,17 @@
 | Battler tag | 123 | 123 |
 | Arena tag | 42 | 42 |
 | Positional tag | 3 | 3 |
-| Species | 1,963 | 1,963 |
+| Species | 2,018 | 2,018 |
 | Form | 534 | 534 |
 | Unattached attribute, fixed dispatch, or RNG callsite | 780 | 780 |
 
-Species identities include all 1,082 vanilla `SpeciesId` members and 881 `ErSpeciesId` object members. Custom species whose constructor metadata is assembled dynamically remain explicit metadata gaps until the runtime catalog is compiled into closed definitions.
+Species identities include all 1,082 vanilla `SpeciesId` members, 881 `ErSpeciesId` object members, and 55 hand-authored newcomer/fakemon numeric declarations. Declared custom species not present in the final runtime registry remain explicit metadata gaps; every runtime-registered custom species must appear in this static superset.
 
 Resolution totals:
 
 - `RESOLVED_INTRINSIC`: 1,544.
 - `RESOLVED_OPERANDS`: 0.
-- `BESPOKE_GAP`: 5,699.
+- `BESPOKE_GAP`: 5,754.
 - Unclassified identities or units: zero.
 
 No attribute operand is considered compiler-ready at G21. Literal and symbolic descriptors preserve evidence, but every attribute remains a gap until an audited per-attribute schema freezes its exact hook, condition, operand types, and operation.
@@ -102,13 +102,13 @@ Runtime reflection does not make a callback portable. A callback remains a bespo
 
 ## Bespoke closure boundary
 
-The 5,699 current gaps are grouped mechanically as:
+The 5,754 current gaps are grouped mechanically as:
 
 | Cluster | Gap count |
 |---|---:|
 | Boss/custom ER | 1 |
 | Charge/recharge lock | 12 |
-| Custom dispatch | 3,276 |
+| Custom dispatch | 3,331 |
 | Delayed/scheduled effect | 4 |
 | Item/berry lifecycle | 323 |
 | Protect/endure/guard | 42 |

@@ -29,7 +29,20 @@ function exactValues(label, actual, expected) {
   }
 }
 
-exactValues("species identities", runtime.species.map(entry => entry.id), raw.species.map(entry => entry.id));
+function requireSubset(label, actual, expectedSuperset) {
+  const expected = new Set(expectedSuperset.map(String));
+  const missing = [...new Set(actual.map(String))].filter(value => !expected.has(value)).sort(compareText);
+  if (missing.length > 0) fail(`${label} is absent from static catalog: ${JSON.stringify(missing.slice(0, 20))}`);
+}
+
+const runtimeSpeciesIds = runtime.species.map(entry => entry.id);
+const staticSpeciesIds = raw.species.map(entry => entry.id);
+exactValues(
+  "vanilla species identities",
+  runtimeSpeciesIds.filter(id => id < 10_000),
+  staticSpeciesIds.filter(id => id < 10_000),
+);
+requireSubset("runtime custom species identities", runtimeSpeciesIds.filter(id => id >= 10_000), staticSpeciesIds);
 exactValues("move identities", runtime.moves.map(entry => entry.id), raw.moves.map(entry => entry.numeric_id));
 exactValues("ability identities", runtime.abilities.map(entry => entry.id), raw.abilities.map(entry => entry.numeric_id));
 exactValues("modifier identities", runtime.modifiers.map(entry => entry.key), raw.modifier_types.map(entry => entry.key));

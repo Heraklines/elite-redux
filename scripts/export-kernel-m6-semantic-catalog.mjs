@@ -416,6 +416,31 @@ function constObjectMembers(path, objectName) {
   }
   return [];
 }
+
+function numericDeclarations(path, suffix) {
+  const source = readFileSync(path, "utf8").replace(/\r\n?/gu, "\n");
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const entries = [];
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        !ts.isIdentifier(declaration.name)
+        || !declaration.name.text.endsWith(suffix)
+        || !declaration.initializer
+      ) continue;
+      const value = operand(declaration.initializer, file);
+      if (value.kind !== "SAFE_INTEGER") continue;
+      entries.push({
+        id: value.value,
+        key: declaration.name.text,
+        ordinal: entries.length,
+        source: sourceLocation(file, declaration, input.oracleRoot),
+      });
+    }
+  }
+  return entries;
+}
 if (!statSync(input.oracleRoot).isDirectory() || git(input.oracleRoot, "rev-parse", "HEAD") !== input.oracleSha) {
   fail("oracle checkout mismatch");
 }
@@ -480,6 +505,8 @@ addIntrinsic("POSITIONAL_TAG", raw.positional_tags, "POSITIONAL_TAG_BEHAVIOR", t
 const speciesEnum = [
   ...enumMembers(resolve(input.oracleRoot, "src/enums/species-id.ts"), "SpeciesId"),
   ...constObjectMembers(resolve(input.oracleRoot, "src/enums/er-species-id.ts"), "ErSpeciesId"),
+  ...numericDeclarations(resolve(input.oracleRoot, "src/data/elite-redux/er-newcomer-species.ts"), "_SPECIES_ID"),
+  ...numericDeclarations(resolve(input.oracleRoot, "src/data/elite-redux/er-fakemon-pitch-species.ts"), "_SPECIES_ID"),
 ].sort((left, right) => left.id - right.id || compareText(left.key, right.key));
 const speciesIdByMember = new Map(speciesEnum.map(entry => [entry.key, entry.id]));
 const speciesDescriptors = new Map();
