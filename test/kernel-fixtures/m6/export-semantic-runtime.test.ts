@@ -7,7 +7,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { PositionalTagType } from "#enums/positional-tag-type";
 import { StatusEffect } from "#enums/status-effect";
-import { TerrainType } from "#enums/terrain-type";
+import { TerrainType } from "#data/terrain";
 import { WeatherType } from "#enums/weather-type";
 import Phaser from "phaser";
 import { describe, it } from "vitest";
