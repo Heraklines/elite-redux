@@ -2077,9 +2077,9 @@ function fakemonPitchShowcaseScenario(
   names: string,
 ): DevScenario {
   return {
-    label: `Roster: new Pokemon ${number}/8`,
+    label: `Roster: new Pokemon ${number}/10`,
     description:
-      `New fakemon-pitch roster showcase ${number}/8.\n`
+      `New Pokemon roster showcase ${number}/10.\n`
       + `PLAYER: ${names}.\n`
       + "DO: open Check Team and battle info, then inspect sprites, forms, typings, moves, and abilities.\n"
       + "EXPECT: all six player slots and the opponent use additions from the new roster.",
@@ -2103,23 +2103,6 @@ function fakemonPitchShowcaseScenario(
       });
       return members.map(fakemonPitchStarter);
     },
-  };
-}
-
-function bernerdRosterShowcaseScenario(
-  number: number,
-  members: readonly FakemonPitchShowcaseMember[],
-  enemy: FakemonPitchShowcaseMember,
-  names: string,
-): DevScenario {
-  return {
-    ...fakemonPitchShowcaseScenario(number, members, enemy, names),
-    label: `Roster: BerNerd additions ${number}/2`,
-    description:
-      `BerNerd roster showcase ${number}/2.\n`
-      + `PLAYER: ${names}.\n`
-      + "DO: inspect the party, cycle the Partner forms where present, and test the listed signature mechanics.\n"
-      + "EXPECT: the dedicated sprites, typing, stats, abilities, innates, moves, and form identities remain intact.",
   };
 }
 
@@ -2228,8 +2211,8 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
     pitchSpecies(ER_DIPPOWDOWN_SPECIES_ID),
     "Mega Barbaracle Y, Mega Lilligant Verdant, Corrupted Uxie, Tremburr, Gurdurur, Conkapitator",
   ),
-  bernerdRosterShowcaseScenario(
-    1,
+  fakemonPitchShowcaseScenario(
+    9,
     [
       pitchSpecies(ER_VANTARROW_SPECIES_ID),
       pitchSpecies(ER_CHROMIGHTY_SPECIES_ID),
@@ -2243,8 +2226,8 @@ const FAKEMON_PITCH_SHOWCASE_SCENARIOS: DevScenario[] = [
     pitchSpecies(SpeciesId.SKUNTANK, "mega"),
     "Vantarrow, Chromighty, Temporal Skull, Quakersby, Guzzlord M, Mega Golurk Y",
   ),
-  bernerdRosterShowcaseScenario(
-    2,
+  fakemonPitchShowcaseScenario(
+    10,
     [
       pitchSpecies(SpeciesId.SKUNTANK, "mega"),
       pitchSpecies(SpeciesId.DODRIO, "mega"),
@@ -21893,16 +21876,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
  * Builder and custom-trainer testers are registered separately by index.ts.
  */
 const DEV_MENU_SCENARIO_LABELS = new Set([
-  "Roster: new Pokemon 1/8",
-  "Roster: new Pokemon 2/8",
-  "Roster: new Pokemon 3/8",
-  "Roster: new Pokemon 4/8",
-  "Roster: new Pokemon 5/8",
-  "Roster: new Pokemon 6/8",
-  "Roster: new Pokemon 7/8",
-  "Roster: new Pokemon 8/8",
-  "Roster: BerNerd additions 1/2",
-  "Roster: BerNerd additions 2/2",
+  "Roster: new Pokemon 1/10",
+  "Roster: new Pokemon 2/10",
+  "Roster: new Pokemon 3/10",
+  "Roster: new Pokemon 4/10",
+  "Roster: new Pokemon 5/10",
+  "Roster: new Pokemon 6/10",
+  "Roster: new Pokemon 7/10",
+  "Roster: new Pokemon 8/10",
+  "Roster: new Pokemon 9/10",
+  "Roster: new Pokemon 10/10",
   "Endless: final boss auto-KO",
   "Endless: deep Hell ghost (wave 401)",
 ]);

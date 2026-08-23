@@ -37,11 +37,7 @@ import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
-const SCENARIO_LABELS = [
-  ...Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`),
-  "Roster: BerNerd additions 1/2",
-  "Roster: BerNerd additions 2/2",
-];
+const SCENARIO_LABELS = Array.from({ length: 10 }, (_, index) => `Roster: new Pokemon ${index + 1}/10`);
 const PITCH_SPRITE_SLUGS = new Map(ER_FAKEMON_PITCH_SPECIES.map(({ id, slug }) => [id, slug]));
 
 type ExpectedShowcasePokemon = Readonly<{
@@ -68,7 +64,7 @@ const expectedFormPokemon = (speciesId: number, formKey: string): ExpectedShowca
 });
 
 const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
-  "Roster: new Pokemon 6/8": {
+  "Roster: new Pokemon 6/10": {
     player: [
       expectedPokemon(ER_MISHAMANUS_SPECIES_ID),
       expectedPokemon(ER_FALINKS_CONVERGENT_SPECIES_ID),
@@ -79,7 +75,7 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
     ],
     enemy: expectedPokemon(ER_PARTNER_VAPOREON_SPECIES_ID),
   },
-  "Roster: new Pokemon 7/8": {
+  "Roster: new Pokemon 7/10": {
     player: [
       expectedPokemon(ER_TAGELA_SPECIES_ID),
       expectedPokemon(ER_INTANGROWTH_SPECIES_ID),
@@ -90,7 +86,7 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
     ],
     enemy: expectedPokemon(ER_LILLIGANT_VERDANT_SPECIES_ID),
   },
-  "Roster: new Pokemon 8/8": {
+  "Roster: new Pokemon 8/10": {
     player: [
       expectedPokemon(SpeciesId.BARBARACLE, 2, "mega-y"),
       expectedPokemon(ER_LILLIGANT_VERDANT_SPECIES_ID, 1, "mega"),
@@ -101,7 +97,7 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
     ],
     enemy: expectedPokemon(ER_DIPPOWDOWN_SPECIES_ID),
   },
-  "Roster: BerNerd additions 1/2": {
+  "Roster: new Pokemon 9/10": {
     player: [
       expectedPokemon(ER_VANTARROW_SPECIES_ID),
       expectedPokemon(ER_CHROMIGHTY_SPECIES_ID),
@@ -112,7 +108,7 @@ const EXPECTED_SHOWCASES: Readonly<Record<string, ExpectedShowcase>> = {
     ],
     enemy: expectedFormPokemon(SpeciesId.SKUNTANK, "mega"),
   },
-  "Roster: BerNerd additions 2/2": {
+  "Roster: new Pokemon 10/10": {
     player: [
       expectedFormPokemon(SpeciesId.SKUNTANK, "mega"),
       expectedFormPokemon(SpeciesId.DODRIO, "mega"),
@@ -171,7 +167,7 @@ describe.skipIf(!RUN)("fakemon roster dev scenarios", () => {
   });
   it("keeps all showcase labels unique and registered", () => {
     expect(SCENARIO_LABELS.slice(0, 8)).toEqual(
-      Array.from({ length: 8 }, (_, index) => `Roster: new Pokemon ${index + 1}/8`),
+      Array.from({ length: 10 }, (_, index) => `Roster: new Pokemon ${index + 1}/10`),
     );
     expect(new Set(SCENARIO_LABELS).size).toBe(10);
     expect(Object.keys(EXPECTED_SHOWCASES)).toEqual(SCENARIO_LABELS.slice(5));
