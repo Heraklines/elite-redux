@@ -129,8 +129,7 @@ jobs:
         if: failure()
         shell: bash
         run: |
-          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-ir-foundation.log" 2>/dev/null | grep -aE "^error|warning: unused|panicked|FAILED|test result" | tail -n 40 | tail -c 3500 || true)"
-          diagnostic="${diagnostic//'%'/'%25'}"
+          diagnostic="$(sed -e 's/\x1b\[[0-9;]*m//g' "$RUNNER_TEMP/m5-ir-foundation.log" 2>/dev/null | grep -aE "^error" -A6 | tail -c 3500 || true)"
           diagnostic="${diagnostic//$'\r'/'%0D'}"
           diagnostic="${diagnostic//$'\n'/'%0A'}"
           echo "::error title=M5 mechanics IR foundation failure::$diagnostic"

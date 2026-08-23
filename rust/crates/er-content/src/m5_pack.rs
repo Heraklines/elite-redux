@@ -5,8 +5,9 @@
 use std::collections::BTreeSet;
 
 use er_canonical::{CanonicalError, content_digest};
-use er_mechanics::{MechanicsProgramId, MechanicsProgramV1, ProgramValidationError};
+use er_mechanics::{MechanicsProgramV1, ProgramValidationError};
 use er_types::battle_model::CapabilityStatus;
+use er_types::mechanics::{MechanicSourceId, MechanicsProgramId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -181,7 +182,7 @@ impl BattleContentPackV2 {
             type_chart: &self.type_chart,
         };
         let digest =
-            content_digest(&input).map_err(|source| BattlePackLoadError::Canonical { source })?;
+            content_digest(&input).map_err(BattlePackLoadError::Canonical)?;
         Ok(format!("{CONTENT_HASH_PREFIX}{digest}"))
     }
 

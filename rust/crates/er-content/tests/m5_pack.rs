@@ -12,7 +12,9 @@ use er_types::battle_ids::MoveId;
 use er_types::battle_model::{
     CapabilityStatus, EffectChance, MoveAccuracy, MoveCategory, MovePower, MoveTarget, PokemonType,
 };
-use er_types::mechanics::{HookOrdinal, MechanicQuery, MechanicSourceId, MechanicSourceKind};
+use er_types::mechanics::{
+    HookOrdinal, MechanicQuery, MechanicSourceId, MechanicSourceKind, MechanicsProgramId,
+};
 
 fn safe(value: u64) -> SafeU53 {
     SafeU53::new(value).expect("fixture id")

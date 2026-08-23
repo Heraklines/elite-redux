@@ -1822,15 +1822,12 @@ type StackFrame = { full: string; method: string; source: string; line: number }
 function stackFrames(stack: string): StackFrame[] {
   const frames: StackFrame[] = [];
   for (const line of stack.split("\n")) {
-    const match = /\bat\s+(?:(.+?)\s+\()?(?:((?:src|test|scripts)[\\/][^()\s]+?):(\d+):\d+\))?/u.exec(line);
+    const match = /\bat\s+(.+?)\s+\((?:.*?[\\/])?((?:src|test|scripts)[\\/][^()\s]+?):(\d+):\d+\)/u.exec(line);
     if (match == null) {
       continue;
     }
-    const full = match[1] ?? "<anonymous>";
-    const source = match[2]?.replaceAll("\\", "/");
-    if (source == null || (!source.startsWith("src/") && !source.startsWith("test/") && !source.startsWith("scripts/"))) {
-      continue;
-    }
+    const full = match[1];
+    const source = match[2].replaceAll("\\", "/");
     const method = full.includes(".") ? full.slice(full.lastIndexOf(".") + 1) : full;
     frames.push({ full, method, source, line: Number(match[3]) });
   }
