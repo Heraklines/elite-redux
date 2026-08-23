@@ -23,7 +23,7 @@ const { decompressFromBase64 } = lzString;
 const DEFAULT_EXPORT_URL = "https://er-ai-telemetry-export.heraklines.workers.dev/v1/export";
 const PAGE_SIZE = 100;
 const PAGE_TIMEOUT_MS = 120_000;
-const MAX_PAGE_ATTEMPTS = 4;
+const MAX_PAGE_ATTEMPTS = 8;
 const DEFAULT_AUDIT_SHARDS = 128;
 
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: Audit CLI validation keeps privacy-sensitive outputs explicit.
