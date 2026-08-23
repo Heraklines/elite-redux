@@ -257,6 +257,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # A commit message containing "qualification" promotes the focused train to
+  # the complete regression, oracle, benchmark, and exact-SHA aggregate.
   m4-m3-regression-core:
     name: M3 regression core
     needs:
