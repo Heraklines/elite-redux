@@ -53,8 +53,11 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install pinned Kaggle client
-        run: python -m pip install kaggle==2.2.4
+      - name: Install pinned policy and Kaggle clients
+        run: >-
+          python -m pip install
+          --requirement ml/policy/requirements.txt
+          kaggle==2.2.4
       - name: Resolve requested curated dataset and training budget
         env:
           EVENT_NAME: ${{ github.event_name }}
