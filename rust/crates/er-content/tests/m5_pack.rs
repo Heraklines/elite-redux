@@ -5,7 +5,7 @@ use er_content::pack::m5_pack::{
 };
 use er_mechanics::{
     BindingKind, ExactRatio, HookBinding, MechanicOperation, MechanicsProgramV1, ProgramBudget,
-    ProgramRange, QueryModifier, QueryValueKind, ValueNode, ValueNodeId,
+    ProgramRange, QueryModifier, QueryValueKind,
 };
 use er_types::SafeU53;
 use er_types::battle_ids::MoveId;
@@ -40,7 +40,7 @@ fn program(id: u64) -> MechanicsProgramV1 {
         }],
         conditions: Default::default(),
         selectors: Default::default(),
-        values: vec![ValueNode::Unsigned { value: 120 }],
+        values: Vec::new(),
         operations: vec![MechanicOperation::Query {
             modifier: QueryModifier::Multiply {
                 ratio: ExactRatio::new(3, 2).expect("ratio"),
