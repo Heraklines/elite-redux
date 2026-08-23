@@ -84,8 +84,10 @@ for (const [key, path] of files) assertEqual(canonicalSha256(path), required(con
 const raw = readJson("rust/fixtures/m6/raw-source-catalog-v2.json");
 assertEqual(raw.species.length, required(contract, "species_count"), "species count");
 assertEqual(raw.forms.length, required(contract, "form_count"), "form count");
-assertEqual(raw.moves.length, required(contract, "move_count"), "move count");
-assertEqual(raw.abilities.length, required(contract, "active_ability_count"), "ability count");
+const uniqueNumericCount = entries => new Set(entries.map(entry => entry.numeric_id).filter(Number.isSafeInteger)).size;
+assertEqual(raw.moves.length, required(contract, "move_declaration_count"), "move declaration count");
+assertEqual(uniqueNumericCount(raw.moves), required(contract, "move_count"), "unique move count");
+assertEqual(uniqueNumericCount(raw.abilities), required(contract, "active_ability_count"), "unique ability count");
 assertEqual(raw.modifier_types.length, required(contract, "held_item_modifier_count"), "held-item modifier count");
 
 const semantic = readJson("rust/fixtures/m6/semantic-catalog-v1.json");

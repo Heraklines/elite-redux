@@ -10,13 +10,13 @@
 
 ## Frozen inventory
 
-`rust/fixtures/m6/semantic-catalog-v1.json` contains 5,286 source identities and 7,298 behavior units:
+`rust/fixtures/m6/semantic-catalog-v1.json` contains 6,943 source identities and 8,957 behavior units:
 
 | Source kind | Identities | Behavior units |
 |---|---:|---:|
-| Move | 922 | 1,902 |
-| Active ability | 311 | 827 |
-| Passive ability | 311 | 827 |
+| Move | 1,109 | 2,091 |
+| Active ability | 1,046 | 1,562 |
+| Passive ability | 1,046 | 1,562 |
 | Held item / modifier | 215 | 215 |
 | Major status | 8 | 8 |
 | Weather | 13 | 13 |
@@ -30,9 +30,11 @@
 
 Species identities include all 1,082 vanilla `SpeciesId` members, 881 `ErSpeciesId` object members, and 55 hand-authored newcomer/fakemon numeric declarations. Declared custom species not present in the final runtime registry remain explicit metadata gaps; every runtime-registered custom species must appear in this static superset.
 
+Move extraction contains 1,111 declarations and 1,109 unique numeric identities; aliases share one canonical behavior source. `ErMoveId` and `ErAbilityId` const-object members are catalogued alongside vanilla enums. Runtime-registered custom move/ability IDs must be present in these static supersets.
+
 Resolution totals:
 
-- `RESOLVED_INTRINSIC`: 1,544.
+- `RESOLVED_INTRINSIC`: 3,203.
 - `RESOLVED_OPERANDS`: 0.
 - `BESPOKE_GAP`: 5,754.
 - Unclassified identities or units: zero.

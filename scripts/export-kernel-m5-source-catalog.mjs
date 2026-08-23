@@ -413,6 +413,30 @@ function unwrapObjectLiteral(initializer) {
   }
   return null;
 }
+function catalogConstCatalog(sourceFile, node, oracleRoot, output) {
+  if (!ts.isIdentifier(node.name) || !node.initializer) return;
+  const catalogName = ENUM_CATALOGS.get(node.name.text);
+  if (!catalogName) return;
+  const initializer = ts.isAsExpression(node.initializer) ? node.initializer.expression : node.initializer;
+  if (!ts.isObjectLiteralExpression(initializer)) return;
+  const values = new Map();
+  initializer.properties.forEach((property, ordinal) => {
+    if (!ts.isPropertyAssignment(property)) return;
+    const name = nodeName(property.name, sourceFile);
+    let value = evaluateEnumExpression(property.initializer, values, sourceFile);
+    if (!Number.isSafeInteger(value)) value = null;
+    if (value !== null) values.set(name, value);
+    output[catalogName].push({
+      enum_name: node.name.text,
+      member: name,
+      numeric_id: value,
+      initializer: property.initializer.getText(sourceFile),
+      ordinal,
+      source: location(sourceFile, property, oracleRoot),
+    });
+  });
+}
+
 
 function catalogModifierRegistry(sourceFile, node, oracleRoot, output) {
   if (!ts.isIdentifier(node.name) || node.name.text !== "modifierTypeInitObj" || !node.initializer) {
@@ -445,6 +469,7 @@ function visitSourceFile(sourceFile, oracleRoot, output) {
       catalogAttributeAttachment(sourceFile, node, oracleRoot, output);
       catalogDispatchAndRngSite(sourceFile, node, oracleRoot, output);
     } else if (ts.isVariableDeclaration(node)) {
+      catalogConstCatalog(sourceFile, node, oracleRoot, output);
       catalogModifierRegistry(sourceFile, node, oracleRoot, output);
     }
     ts.forEachChild(node, visit);

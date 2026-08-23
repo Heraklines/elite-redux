@@ -43,8 +43,14 @@ exactValues(
   staticSpeciesIds.filter(id => id < 10_000),
 );
 requireSubset("runtime custom species identities", runtimeSpeciesIds.filter(id => id >= 10_000), staticSpeciesIds);
-exactValues("move identities", runtime.moves.map(entry => entry.id), raw.moves.map(entry => entry.numeric_id));
-exactValues("ability identities", runtime.abilities.map(entry => entry.id), raw.abilities.map(entry => entry.numeric_id));
+const runtimeMoveIds = runtime.moves.map(entry => entry.id);
+const staticMoveIds = raw.moves.map(entry => entry.numeric_id);
+exactValues("vanilla move identities", runtimeMoveIds.filter(id => id < 5_000), staticMoveIds.filter(id => id < 5_000));
+requireSubset("runtime custom move identities", runtimeMoveIds.filter(id => id >= 5_000), staticMoveIds);
+const runtimeAbilityIds = runtime.abilities.map(entry => entry.id);
+const staticAbilityIds = raw.abilities.map(entry => entry.numeric_id);
+exactValues("vanilla ability identities", runtimeAbilityIds.filter(id => id < 5_000), staticAbilityIds.filter(id => id < 5_000));
+requireSubset("runtime custom ability identities", runtimeAbilityIds.filter(id => id >= 5_000), staticAbilityIds);
 exactValues("modifier identities", runtime.modifiers.map(entry => entry.key), raw.modifier_types.map(entry => entry.key));
 for (const [runtimeKey, rawKey] of [
   ["statuses", "statuses"],

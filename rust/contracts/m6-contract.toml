@@ -30,26 +30,27 @@ kernel_determinism_digest_version = 4
 pair_determinism_digest_version = 4
 battle_content_hash_version = 3
 
-raw_source_catalog_sha256 = "2b1d0151a5b9943e622805ec2a382d33a70ff44a0a49e15c22964e44f52f62b8"
-semantic_catalog_sha256 = "10707d04824f658e92884f726fcc45fc6e7db087495ed39ed7ac843e3e9c26a6"
-behavior_unit_manifest_sha256 = "297d8046dfd0dc8acacfda7febacd2a95c3c82b62386dc6736285a1803ff6cfd"
+raw_source_catalog_sha256 = "88375257d93da85e702ba93366b6eeba0c49c44da5babdc07af03d5d5a728c68"
+semantic_catalog_sha256 = "366c6c7fcbae65c7e65fff466b3e6a0ab1d3f37c1a86847294039995d27dd630"
+behavior_unit_manifest_sha256 = "70b45fcbe1ca69fbb7d299493c09848502b10b93db6890698a1efe7c41ceded4"
 primitive_gap_manifest_sha256 = "ce351dbad3cfefbbe0735f52ef857911015cb2fcdf32fbbfa45e849822ec2cb5"
 bespoke_cluster_manifest_sha256 = "f514b6bc519163deccd4aacaba278b0780ff7afbac23acb578059e67b5d4a18f"
-oracle_witness_plan_sha256 = "e5198717088ce71ca37e0232446b38b924535c413bf82aba868793b46ad714cb"
+oracle_witness_plan_sha256 = "d6b836f2d7aea6f1fedf52d5008ecd094e86a941998b0e094995260877e6c993"
 rng_site_manifest_sha256 = "01a7dbaa370db405052d0c81bf500079726d2e57806c631c91cc3609a61bc34b"
 
-source_identity_count = 5286
-behavior_unit_count = 7298
-resolved_intrinsic_count = 1544
+source_identity_count = 6943
+behavior_unit_count = 8957
+resolved_intrinsic_count = 3203
 resolved_operand_count = 0
 primitive_gap_count = 5754
 bespoke_cluster_count = 13
 rng_site_count = 273
 species_count = 2018
 form_count = 534
-move_count = 922
-active_ability_count = 311
-passive_ability_count = 311
+move_count = 1109
+move_declaration_count = 1111
+active_ability_count = 1046
+passive_ability_count = 1046
 held_item_modifier_count = 215
 
 classification_policy = "every-identity-and-behavior-unit-has-exactly-one-compiled-bespoke-unsupported-status"
