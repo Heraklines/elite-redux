@@ -91,6 +91,7 @@ fn pack() -> BattleContentPackV2 {
         bespoke: Vec::new(),
         type_chart: er_content::pack::selected_type_chart(),
     };
+    pack.content_hash = pack.compute_content_hash().expect("hash");
     pack
 }
 

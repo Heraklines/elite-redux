@@ -502,9 +502,18 @@ async function driveReward(game: GameManager, tape: RawTapeEntry[], transitions:
   }
   press(game, "Space", tape, transitions);
   await sleep();
-  for (let attempt = 0; attempt < 8; attempt += 1) {
+  for (let attempt = 0; attempt < 12; attempt += 1) {
     const mode = game.scene.ui.getMode();
-    if (mode !== UiMode.PARTY && mode !== UiMode.MESSAGE) {
+    const phaseName = String(game.scene.phaseManager.getCurrentPhase()?.phaseName ?? "");
+    if (phaseName === "CommandPhase") {
+      break;
+    }
+    const interactive =
+      mode === UiMode.PARTY
+      || mode === UiMode.MESSAGE
+      || phaseName === "ErAbilityCapsulePhase"
+      || phaseName === "SelectModifierPhase";
+    if (!interactive) {
       break;
     }
     press(game, "Space", tape, transitions);
