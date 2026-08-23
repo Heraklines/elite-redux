@@ -125,3 +125,18 @@ fn program_slot_mismatch_is_rejected() {
         Err(BattlePackLoadError::ProgramIndex { index: 2, .. })
     ));
 }
+
+#[test]
+fn generated_bootstrap_pack_closes_the_complete_catalog() {
+    let pack = er_content::pack::selected_m5_bootstrap_pack().expect("bootstrap pack");
+    let compiled = pack
+        .classifications
+        .0
+        .iter()
+        .filter(|entry| entry.kind == ClassificationKind::Compiled)
+        .count();
+    assert_eq!(pack.classifications.0.len(), 1_953);
+    assert_eq!(compiled, 2);
+    assert_eq!(pack.programs.iter().flatten().count(), 2);
+    pack.validate().expect("validated generated pack");
+}

@@ -26,9 +26,12 @@ pub mod m4_moves;
 pub mod m4_pack;
 #[path = "m4_species.rs"]
 pub mod m4_species;
+#[path = "m5_bootstrap.rs"]
+pub mod m5_bootstrap;
 #[path = "m5_pack.rs"]
 pub mod m5_pack;
 pub use m4_pack::{selected_m4_capability_manifest, selected_m4_content_pack};
+pub use m5_bootstrap::selected_m5_bootstrap_pack;
 
 /// The immutable M4 oracle identity for the extended selected slice.
 pub const M4_ORACLE_GAME_SHA: &str = "45c89493e7edec9c4da247a98cd7858b1f015c09";

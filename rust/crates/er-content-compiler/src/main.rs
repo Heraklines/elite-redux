@@ -50,6 +50,8 @@ enum CompilerError {
     ClassificationVersion,
     #[error("bespoke manifest version must be 1")]
     BespokeVersion,
+    #[error("classification or bespoke manifest identity does not match the source catalog")]
+    ManifestIdentity,
     #[error("source catalog oracle SHA is invalid")]
     OracleSha,
     #[error("source catalog numeric identity is unresolved")]
@@ -172,6 +174,8 @@ struct SourceCatalog {
 #[serde(deny_unknown_fields)]
 struct ClassificationInput {
     schema_version: u32,
+    oracle_sha: String,
+    source_catalog_sha256: String,
     entries: Vec<ClassificationEntryV1>,
 }
 
@@ -179,6 +183,7 @@ struct ClassificationInput {
 #[serde(deny_unknown_fields)]
 struct BespokeInput {
     schema_version: u32,
+    oracle_sha: String,
     entries: Vec<BespokeEntryV1>,
 }
 
@@ -225,12 +230,17 @@ where
     })
 }
 
-fn numeric_source(
+fn catalog_source(
     kind: MechanicSourceKind,
     entry: &CatalogNumericEntry,
 ) -> Result<MechanicSourceId, CompilerError> {
-    let id = entry.numeric_id.ok_or(CompilerError::UnresolvedCatalogId)?;
-    Ok(MechanicSourceId::numeric(kind, id))
+    if let Some(id) = entry.numeric_id {
+        return Ok(MechanicSourceId::numeric(kind, id));
+    }
+    if entry.member.is_empty() {
+        return Err(CompilerError::UnresolvedCatalogId);
+    }
+    Ok(MechanicSourceId::registry(kind, entry.member.clone()))
 }
 
 fn insert_source(
@@ -249,7 +259,7 @@ fn catalog_sources(catalog: &SourceCatalog) -> Result<BTreeSet<MechanicSourceId>
     for entry in &catalog.moves {
         insert_source(
             &mut sources,
-            numeric_source(MechanicSourceKind::Move, entry)?,
+            catalog_source(MechanicSourceKind::Move, entry)?,
         )?;
     }
     for entry in &catalog.abilities {
@@ -278,7 +288,7 @@ fn catalog_sources(catalog: &SourceCatalog) -> Result<BTreeSet<MechanicSourceId>
         (MechanicSourceKind::PositionalTag, &catalog.positional_tags),
     ] {
         for entry in entries {
-            insert_source(&mut sources, numeric_source(kind, entry)?)?;
+            insert_source(&mut sources, catalog_source(kind, entry)?)?;
         }
     }
     Ok(sources)
@@ -348,6 +358,12 @@ fn compile(args: &Args) -> Result<(), CompilerError> {
     if classifications.schema_version != CLASSIFICATION_VERSION {
         return Err(CompilerError::ClassificationVersion);
     }
+    if classifications.oracle_sha != catalog.oracle_sha
+        || classifications.source_catalog_sha256
+            != source_catalog_digest.trim_start_matches("sha256:")
+    {
+        return Err(CompilerError::ManifestIdentity);
+    }
     classifications
         .entries
         .sort_by(|left, right| left.subject.cmp(&right.subject));
@@ -356,6 +372,9 @@ fn compile(args: &Args) -> Result<(), CompilerError> {
     let bespoke: BespokeInput = read_json(&args.bespoke)?;
     if bespoke.schema_version != BESPOKE_VERSION {
         return Err(CompilerError::BespokeVersion);
+    }
+    if bespoke.oracle_sha != catalog.oracle_sha {
+        return Err(CompilerError::ManifestIdentity);
     }
     let content: ContentInput = read_json(&args.content)?;
 
