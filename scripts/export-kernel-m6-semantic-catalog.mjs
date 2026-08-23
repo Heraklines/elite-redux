@@ -497,10 +497,46 @@ function tsFilesUnder(directory) {
   return files;
 }
 
+function abilityIdObjectMembers(path) {
+  const source = readFileSync(path, "utf8").replace(/\r\n?/gu, "\n");
+  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const entries = [];
+  for (const statement of file.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (
+        !ts.isIdentifier(declaration.name)
+        || !declaration.name.text.endsWith("_ABILITY_IDS")
+        || !declaration.initializer
+      ) continue;
+      const initializer = ts.isAsExpression(declaration.initializer)
+        ? declaration.initializer.expression
+        : declaration.initializer;
+      if (!ts.isObjectLiteralExpression(initializer)) continue;
+      for (const property of initializer.properties) {
+        if (!ts.isPropertyAssignment(property)) continue;
+        const value = operand(property.initializer, file);
+        if (value.kind !== "SAFE_INTEGER") continue;
+        entries.push({
+          id: value.value,
+          key: `${declaration.name.text}.${property.name.getText(file).replace(/^['"]|['"]$/gu, "")}`,
+          ordinal: entries.length,
+          source: sourceLocation(file, property, input.oracleRoot),
+        });
+      }
+    }
+  }
+  return entries;
+}
+
 function appendManualAbilities(raw, oracleRoot) {
   const existing = new Set(raw.abilities.map(entry => entry.numeric_id));
   for (const path of tsFilesUnder(resolve(oracleRoot, "src/data/elite-redux")).sort(compareText)) {
-    for (const entry of numericDeclarations(path, "_ABILITY_ID")) {
+    const manual = [
+      ...numericDeclarations(path, "_ABILITY_ID"),
+      ...abilityIdObjectMembers(path),
+    ];
+    for (const entry of manual) {
       if (entry.id < 5_000 || existing.has(entry.id)) continue;
       existing.add(entry.id);
       raw.abilities.push({

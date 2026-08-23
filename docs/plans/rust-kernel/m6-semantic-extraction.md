@@ -10,13 +10,13 @@
 
 ## Frozen inventory
 
-`rust/fixtures/m6/semantic-catalog-v1.json` contains 7,370 source identities and 9,384 behavior units:
+`rust/fixtures/m6/semantic-catalog-v1.json` contains 7,374 source identities and 9,388 behavior units:
 
 | Source kind | Identities | Behavior units |
 |---|---:|---:|
 | Move | 1,110 | 2,092 |
-| Active ability | 1,259 | 1,775 |
-| Passive ability | 1,259 | 1,775 |
+| Active ability | 1,261 | 1,777 |
+| Passive ability | 1,261 | 1,777 |
 | Held item / modifier | 215 | 215 |
 | Major status | 8 | 8 |
 | Weather | 13 | 13 |
@@ -30,11 +30,11 @@
 
 Species identities include all 1,082 vanilla `SpeciesId` members, 881 `ErSpeciesId` object members, and 55 hand-authored newcomer/fakemon numeric declarations. Declared custom species not present in the final runtime registry remain explicit metadata gaps; every runtime-registered custom species must appear in this static superset.
 
-Move extraction contains 1,112 declarations and 1,110 unique numeric identities; ability extraction contains 1,259 unique numeric identities including hand-authored `ER_*_ABILITY_ID` constants across the elite-redux tree. Aliases share one canonical behavior source. `ErMoveId`, `ErAbilityId`, and hand-authored vanilla-rebalance/newcomer constants (for example `FOREWARN_FUTURE_SIGHT_ID`) are catalogued alongside vanilla enums. Runtime-registered custom move/ability IDs must be present in these static supersets.
+Move extraction contains 1,112 declarations and 1,110 unique numeric identities; ability extraction contains 1,261 unique numeric identities including hand-authored `ER_*_ABILITY_ID` constants and `*_ABILITY_IDS` runtime-ID objects across the elite-redux tree. Aliases share one canonical behavior source. `ErMoveId`, `ErAbilityId`, and hand-authored vanilla-rebalance/newcomer constants (for example `FOREWARN_FUTURE_SIGHT_ID`) are catalogued alongside vanilla enums. Runtime-registered custom move/ability IDs must be present in these static supersets.
 
 Resolution totals:
 
-- `RESOLVED_INTRINSIC`: 3,630.
+- `RESOLVED_INTRINSIC`: 3,634.
 - `RESOLVED_OPERANDS`: 0.
 - `BESPOKE_GAP`: 5,754.
 - Unclassified identities or units: zero.
