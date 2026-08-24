@@ -429,3 +429,82 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M6 exact SHA $GITHUB_SHA passed oracle bootstrap"
+
+  m6-g22-foundation:
+    name: M6 G22 foundation
+    needs: m6-g21-oracle-bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+            m6-g21-${{ runner.os }}-${{ runner.arch }}-
+      - name: Check and test complete M6A foundation
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo check --workspace --all-targets
+          cargo test -p er-types m6
+          cargo test -p er-mechanics
+          cargo test -p er-content --test m6_catalog --test m6_pack
+          cargo test -p er-content-compiler --lib
+          cargo test -p er-state mechanic_state_v2
+          cargo test -p er-testkit --test m6_foundation --test m6_bypass --test m6_migration
+
+  m6-m0-m5-regression:
+    name: M0-M5 Rust regression
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6-g22-regression-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml') }}-${{ hashFiles('rust/Cargo.lock') }}
+          restore-keys: |
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+            m6-g21-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run complete M0-M5 Rust regression
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --workspace --all-targets
+
+  m6-g22-aggregate:
+    name: M6 G22 foundation aggregate
+    needs:
+      - m6-g22-foundation
+      - m6-m0-m5-regression
+      - m6-source-lock
+      - m6-oracle-classification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M6 exact SHA $GITHUB_SHA passed G22 foundation and M0-M5 regression"
