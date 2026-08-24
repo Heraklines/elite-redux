@@ -11,6 +11,7 @@ pub mod m6;
 pub mod operation;
 pub mod program;
 pub mod selector;
+pub mod selector_operation_v2;
 pub mod v2;
 pub mod value;
 
@@ -21,8 +22,8 @@ pub use m6::*;
 pub use operation::*;
 pub use program::*;
 pub use selector::*;
-pub use value::*;
 pub use v2::{
-    compare_ordered_sources, AbilitySourceRank, MechanicHookV2, MechanicQueryV2,
-    OrderedMechanicSource, OrderedSourceClass, OrderedSourceError,
+    AbilitySourceRank, MechanicHookV2, MechanicQueryV2, OrderedMechanicSource, OrderedSourceClass,
+    OrderedSourceError, compare_ordered_sources,
 };
+pub use value::*;
