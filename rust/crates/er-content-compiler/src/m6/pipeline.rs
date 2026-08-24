@@ -54,7 +54,7 @@ pub const OPERAND_SCHEMA_MISSING_REASON: &str = "OPERAND_SCHEMA_MISSING";
 
 /// Compile options. The only tunable is where positive program-ID
 /// allocation starts; allocation order itself is frozen.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct CompilerOptions {
     /// First allocated program ID. Must be a positive safe integer; IDs then
     /// increase by one per compiled source identity in frozen source order.
@@ -67,6 +67,12 @@ impl CompilerOptions {
         Self {
             first_program_id: 1,
         }
+    }
+}
+
+impl Default for CompilerOptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

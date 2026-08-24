@@ -2,7 +2,7 @@ use std::error::Error;
 
 use er_content::m6_catalog::{CatalogResolution, SemanticCatalogV1};
 use er_content_compiler::m6::{
-    BespokeAssignment, CompilerOptions, IntrinsicRule, SemanticCatalogInput,
+    BespokeAssignment, CompilerOptions, IntrinsicRule, SemanticCatalogInput, SemanticCompileError,
     SemanticCompileRequest, ValidatedSemanticCatalog, compile_semantics,
 };
 use er_types::{BehaviorUnitId, BespokeMechanicId, CatalogHash};
@@ -107,8 +107,9 @@ fn missing_bespoke_assignment_fails_at_first_unit() -> Result<(), Box<dyn Error>
         options: CompilerOptions::default(),
     })
     .expect_err("unassigned bespoke gap must fail");
-    let message = error.to_string();
-    assert!(message.contains("bespoke"));
-    assert!(message.contains("src/"));
+    let SemanticCompileError::UnassignedBespokeGap { context } = error else {
+        panic!("expected first unassigned bespoke gap");
+    };
+    assert!(context.provenance_path.contains("src/"));
     Ok(())
 }
