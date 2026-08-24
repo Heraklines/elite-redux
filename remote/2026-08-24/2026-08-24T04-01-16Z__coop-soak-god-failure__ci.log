@@ -1,0 +1,472 @@
+{
+  "invariant": "lockstep",
+  "seed": 20260824,
+  "wave": 26,
+  "detail": "reward shop did not advance both counters once (before=30 host=30 guest=30)",
+  "replay": "SOAK_SEED=20260824",
+  "phaseState": {
+    "hostPhase": "ErDexNavPhase",
+    "guestPhase": "ErDexNavPhase",
+    "hostInteractionCounter": 30,
+    "guestInteractionCounter": 30,
+    "hostWave": 26,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1832047519,
+        "battlerIndex": 0,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1169,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 401110306,
+        "battlerIndex": 1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1074651446,
+        "battlerIndex": 2,
+        "speciesId": 595,
+        "speciesName": "Joltik",
+        "hp": 0,
+        "maxHp": 51,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 324,
+            "ppUsed": 0
+          },
+          {
+            "id": 84,
+            "ppUsed": 0
+          },
+          {
+            "id": 422,
+            "ppUsed": 0
+          },
+          {
+            "id": 202,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3102017578,
+        "battlerIndex": 3,
+        "speciesId": 732,
+        "speciesName": "Trumbeak",
+        "hp": 0,
+        "maxHp": 53,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 814,
+            "ppUsed": 0
+          },
+          {
+            "id": 119,
+            "ppUsed": 0
+          },
+          {
+            "id": 915,
+            "ppUsed": 0
+          },
+          {
+            "id": 481,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1832047519,
+        "battlerIndex": -1,
+        "speciesId": 493,
+        "speciesName": "Arceus",
+        "hp": 1169,
+        "maxHp": 1865,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 401110306,
+        "battlerIndex": -1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1074651446,
+        "battlerIndex": -1,
+        "speciesId": 595,
+        "speciesName": "Joltik",
+        "hp": 0,
+        "maxHp": 51,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 324,
+            "ppUsed": 0
+          },
+          {
+            "id": 84,
+            "ppUsed": 0
+          },
+          {
+            "id": 422,
+            "ppUsed": 0
+          },
+          {
+            "id": 202,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 3102017578,
+        "battlerIndex": -1,
+        "speciesId": 732,
+        "speciesName": "Trumbeak",
+        "hp": 0,
+        "maxHp": 53,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 814,
+            "ppUsed": 0
+          },
+          {
+            "id": 119,
+            "ppUsed": 0
+          },
+          {
+            "id": 915,
+            "ppUsed": 0
+          },
+          {
+            "id": 481,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260824 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=34 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[890:2065/2065]",
+    "wave 1: reward shop owner=host take-nonparty",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2: host slot move=85 guest slot move=85",
+    "wave 2 turn 1: progress enemyHp=[263:0/14,19:0/15] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3 turn 1: host SWITCH -> party[2]",
+    "wave 3: host slot move=85 guest slot move=247",
+    "wave 3 turn 1: progress enemyHp=[664:16/16,265:0/16] playerHp=[493:1630/1865,384:1715/1715]",
+    "wave 3 turn 2: replay guest crossed cmd:3:2 through real public COMMAND=opened",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=247 guest slot move=53",
+    "wave 4 turn 1: progress enemyHp=[921:0/16,175:0/18] playerHp=[493:1164/1865,384:1713/1715]",
+    "wave 4: reward shop owner=guest leave",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=34 guest slot move=85",
+    "wave 5 turn 1: progress enemyHp=[504:0/18,13:0/18] playerHp=[493:928/1865,384:1713/1715]",
+    "wave 5: reward shop owner=host take-nonparty",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1830445033341828:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest crossed cmd:6:1 through real public COMMAND=opened",
+    "wave 6: BIOME 0->1",
+    "wave 6: host slot move=85 guest slot move=85",
+    "wave 6 turn 1: progress enemyHp=[915:0/19,661:0/21] playerHp=[493:695/1865,384:1713/1715]",
+    "wave 6: reward shop owner=host take-nonparty",
+    "wave 7 turn 1: replay guest crossed cmd:7:1 through real public COMMAND=opened",
+    "wave 7 turn 1: host SWITCH -> party[2]",
+    "wave 7: host slot move=85 guest slot move=85",
+    "wave 7 turn 1: progress enemyHp=[261:22/22,263:0/22] playerHp=[890:2065/2065,384:1713/1715]",
+    "wave 7 turn 2: replay guest crossed cmd:7:2 through real public COMMAND=opened",
+    "wave 7: reward shop owner=guest take-nonparty",
+    "wave 8 turn 1: replay guest crossed cmd:8:1 through real public COMMAND=opened",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=34 guest slot move=34",
+    "wave 8 turn 1: progress enemyHp=[653:0/24,519:0/26] playerHp=[890:2065/2065,384:1713/1715]",
+    "wave 8: reward shop owner=host leave",
+    "wave 9 turn 1: replay guest crossed cmd:9:1 through real public COMMAND=opened",
+    "wave 9 turn 1: host SWITCH -> party[2]",
+    "wave 9: host slot move=247 guest slot move=85",
+    "wave 9 turn 1: progress enemyHp=[41:24/24,399:0/26] playerHp=[493:1865/1865,384:1712/1715]",
+    "wave 9 turn 2: replay guest crossed cmd:9:2 through real public COMMAND=opened",
+    "wave 9: reward shop owner=guest take-nonparty",
+    "wave 10 turn 1: replay guest crossed cmd:10:1 through real public COMMAND=opened",
+    "wave 10: host slot move=85 guest slot move=34",
+    "wave 10 turn 1: progress enemyHp=[427:0/26,52:0/26] playerHp=[493:1865/1865,384:1712/1715]",
+    "wave 10: biome market owner=host leave",
+    "wave 10: drained 1 milestone reward continuation(s)",
+    "wave 10: guest chose Crossroads Leave through public UI",
+    "wave 10: guest drove World Map via public UI=true and both consumed 1830445033341828:1:BIOME_PICK:9700011",
+    "wave 11 turn 1: replay guest crossed cmd:11:1 through real public COMMAND=opened",
+    "wave 11: BIOME 1->2",
+    "wave 11: host slot move=85 guest slot move=247",
+    "wave 11 turn 1: progress enemyHp=[546:0/24,548:0/25] playerHp=[493:1865/1865,384:1715/1715]",
+    "wave 11: reward shop owner=host leave",
+    "wave 12 turn 1: replay guest crossed cmd:12:1 through real public COMMAND=opened",
+    "wave 12: host slot move=34 guest slot move=53",
+    "wave 12 turn 1: progress enemyHp=[548:0/25,543:0/23] playerHp=[493:1865/1865,384:1715/1715]",
+    "wave 12: reward shop owner=guest take-nonparty",
+    "wave 13 turn 1: replay guest crossed cmd:13:1 through real public COMMAND=opened",
+    "wave 13 turn 1: host SWITCH -> party[2]",
+    "wave 13: host slot move=247 guest slot move=85",
+    "wave 13 turn 1: progress enemyHp=[268:30/30,268:0/30] playerHp=[890:2065/2065,384:1713/1715]",
+    "wave 13 turn 2: replay guest crossed cmd:13:2 through real public COMMAND=opened",
+    "wave 13: reward shop owner=host leave",
+    "wave 14 turn 1: replay guest crossed cmd:14:1 through real public COMMAND=opened",
+    "wave 14: host slot move=34 guest slot move=34",
+    "wave 14 turn 1: progress enemyHp=[108:0/37,268:0/30] playerHp=[890:2065/2065,384:1713/1715]",
+    "wave 14: reward shop owner=guest take-nonparty",
+    "wave 15 turn 1: replay guest crossed cmd:15:1 through real public COMMAND=opened",
+    "wave 15: host slot move=53 guest slot move=247",
+    "wave 15 turn 1: progress enemyHp=[302:0/34,546:0/31] playerHp=[890:2065/2065,384:1713/1715]",
+    "wave 15: reward shop owner=host leave",
+    "wave 15: guest chose Crossroads Leave through public UI",
+    "wave 15: guest drove World Map via public UI=true and both consumed 1830445033341828:1:BIOME_PICK:9700017",
+    "wave 16 turn 1: replay guest crossed cmd:16:1 through real public COMMAND=opened",
+    "wave 16: BIOME 2->3",
+    "wave 16: host slot move=34 guest slot move=53",
+    "wave 16 turn 1: progress enemyHp=[46:0/34,167:0/33] playerHp=[890:2065/2065,384:1713/1715]",
+    "wave 16: reward shop owner=host leave",
+    "wave 17 turn 1: replay guest crossed cmd:17:1 through real public COMMAND=opened",
+    "wave 17 turn 1: host SWITCH -> party[2]",
+    "wave 17: host slot move=247 guest slot move=53",
+    "wave 17 turn 1: progress enemyHp=[167:31/31,401:0/30] playerHp=[493:1748/1865,384:1713/1715]",
+    "wave 17 turn 2: replay guest crossed cmd:17:2 through real public COMMAND=opened",
+    "wave 17: reward shop owner=guest take-nonparty",
+    "wave 18 turn 1: replay guest crossed cmd:18:1 through real public COMMAND=opened",
+    "wave 18: host slot move=53 guest slot move=34",
+    "wave 18 turn 1: progress enemyHp=[167:0/33,753:0/35] playerHp=[493:1514/1865,384:1713/1715]",
+    "wave 18: reward shop owner=host take-nonparty",
+    "wave 19 turn 1: replay guest crossed cmd:19:1 through real public COMMAND=opened",
+    "wave 19: host slot move=85 guest slot move=247",
+    "wave 19 turn 1: progress enemyHp=[401:0/36,167:0/35] playerHp=[493:1397/1865,384:1713/1715]",
+    "wave 19: reward shop owner=guest take-nonparty",
+    "wave 20 turn 1: replay guest crossed cmd:20:1 through real public COMMAND=opened",
+    "wave 20: host slot move=34 guest slot move=53",
+    "wave 20 turn 1: progress enemyHp=[919:0/35,290:38/38] playerHp=[493:1280/1865,384:1713/1715]",
+    "wave 20 turn 2: replay guest crossed cmd:20:2 through real public COMMAND=opened",
+    "wave 20: biome market owner=host leave",
+    "wave 20: drained 1 milestone reward continuation(s)",
+    "wave 20: guest chose Crossroads Leave through public UI",
+    "wave 20: guest drove World Map via public UI=true and both consumed 1830445033341828:1:BIOME_PICK:9700023",
+    "wave 21 turn 1: replay guest crossed cmd:21:1 through real public COMMAND=opened",
+    "wave 21: BIOME 3->5",
+    "wave 21: host slot move=247 guest slot move=85",
+    "wave 21 turn 1: progress enemyHp=[825:37/37,204:40/40] playerHp=[493:1865/1865,384:1715/1715]",
+    "wave 21 turn 2: replay guest crossed cmd:21:2 through real public COMMAND=opened",
+    "wave 21 turn 3: replay guest crossed cmd:21:3 through real public COMMAND=opened",
+    "wave 21 turn 4: replay guest crossed cmd:21:4 through real public COMMAND=opened",
+    "wave 21: reward shop owner=host take-nonparty",
+    "wave 22 turn 1: replay guest crossed cmd:22:1 through real public COMMAND=opened",
+    "wave 22: TRAINER (random)",
+    "wave 22: host slot move=53 guest slot move=34",
+    "wave 22 turn 1: progress enemyHp=[171:0/59,170:0/46] playerHp=[493:1865/1865,384:1715/1715]",
+    "wave 22 turn 2: replay guest crossed cmd:22:2 through real public COMMAND=opened",
+    "wave 22: reward shop owner=guest leave",
+    "wave 23 turn 1: replay guest crossed cmd:23:1 through real public COMMAND=opened",
+    "wave 23: host slot move=85 guest slot move=247",
+    "wave 23 turn 1: progress enemyHp=[543:0/38,15:0/49] playerHp=[493:1865/1865,384:1715/1715]",
+    "wave 23: reward shop owner=host leave",
+    "wave 24 turn 1: replay guest crossed cmd:24:1 through real public COMMAND=opened",
+    "wave 24: host slot move=34 guest slot move=53",
+    "wave 24 turn 1: guest SWITCH -> party[3]",
+    "wave 24 turn 1: progress enemyHp=[204:44/44,285:50/50] playerHp=[493:1749/1865,150:1722/1725]",
+    "wave 24 turn 2: replay guest crossed cmd:24:2 through real public COMMAND=opened",
+    "wave 24: reward shop owner=guest take-nonparty",
+    "wave 25 turn 1: replay guest crossed cmd:25:1 through real public COMMAND=opened",
+    "wave 25: TRAINER (fixed)",
+    "wave 25: host slot move=247 guest slot move=34",
+    "wave 25 turn 1: progress enemyHp=[654:0/54,520:0/60] playerHp=[493:1517/1865,150:1722/1725]",
+    "wave 25 turn 2: replay guest crossed cmd:25:2 through real public COMMAND=opened",
+    "wave 25: reward shop owner=host take-nonparty",
+    "wave 25: guest chose Crossroads Leave through public UI",
+    "wave 25: guest drove World Map via public UI=true and both consumed 1830445033341828:1:BIOME_PICK:9700029",
+    "wave 26 turn 1: replay guest crossed cmd:26:1 through real public COMMAND=opened",
+    "wave 26: BIOME 5->27",
+    "wave 26: host slot move=53 guest slot move=85",
+    "wave 26 turn 1: guest SWITCH -> party[3]",
+    "wave 26 turn 1: progress enemyHp=[595:0/51,732:53/53] playerHp=[493:1285/1865,384:1715/1715]",
+    "wave 26 turn 2: replay guest crossed cmd:26:2 through real public COMMAND=opened",
+    "wave 26: reward shop owner=host take-nonparty"
+  ]
+}
