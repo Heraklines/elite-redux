@@ -4,6 +4,7 @@
 //! `er-battle`; source extraction and compilation belong to offline tooling.
 
 pub mod condition;
+pub mod condition_v2;
 pub mod families;
 pub mod ids;
 pub mod m6;
@@ -20,5 +21,8 @@ pub use m6::*;
 pub use operation::*;
 pub use program::*;
 pub use selector::*;
-pub use v2::*;
 pub use value::*;
+pub use v2::{
+    compare_ordered_sources, AbilitySourceRank, MechanicHookV2, MechanicQueryV2,
+    OrderedMechanicSource, OrderedSourceClass, OrderedSourceError,
+};
