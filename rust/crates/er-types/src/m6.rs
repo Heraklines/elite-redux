@@ -86,6 +86,167 @@ impl<'de> Deserialize<'de> for ProvenanceHash {
 #[error("provenance hash must be 64 lowercase hexadecimal characters")]
 pub struct ProvenanceHashError;
 
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct OracleSha(String);
+
+impl OracleSha {
+    pub fn parse(value: impl Into<String>) -> Result<Self, M6StringIdentityError> {
+        let value = value.into();
+        if value.len() != 40
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(M6StringIdentityError::OracleSha);
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for OracleSha {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::parse(String::deserialize(deserializer)?).map_err(D::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct CatalogHash(String);
+
+impl CatalogHash {
+    pub fn parse(value: impl Into<String>) -> Result<Self, M6StringIdentityError> {
+        let value = value.into();
+        if value.len() != 64
+            || !value
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(M6StringIdentityError::CatalogHash);
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for CatalogHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::parse(String::deserialize(deserializer)?).map_err(D::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct BattleContentPackHashV3(String);
+
+impl BattleContentPackHashV3 {
+    pub const PREFIX: &'static str = "blake3-v3:";
+
+    pub fn parse(value: impl Into<String>) -> Result<Self, M6StringIdentityError> {
+        let value = value.into();
+        let Some(body) = value.strip_prefix(Self::PREFIX) else {
+            return Err(M6StringIdentityError::BattleContentHash);
+        };
+        if body.len() != 64
+            || !body
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        {
+            return Err(M6StringIdentityError::BattleContentHash);
+        }
+        Ok(Self(value))
+    }
+
+    pub fn from_digest(digest: impl std::fmt::Display) -> Self {
+        Self(format!("{}{digest}", Self::PREFIX))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for BattleContentPackHashV3 {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::parse(String::deserialize(deserializer)?).map_err(D::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
+#[serde(transparent)]
+pub struct FormId(String);
+
+impl FormId {
+    pub fn parse(value: impl Into<String>) -> Result<Self, M6StringIdentityError> {
+        let value = value.into();
+        if value.is_empty() {
+            return Err(M6StringIdentityError::FormId);
+        }
+        Ok(Self(value))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<'de> Deserialize<'de> for FormId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        Self::parse(String::deserialize(deserializer)?).map_err(D::Error::custom)
+    }
+}
+
+ordinal!(PresentationCueId);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BespokeMechanicId {
+    BossCustomEr,
+    ChargeRechargeLock,
+    CustomDispatch,
+    DelayedScheduledEffect,
+    ItemBerryLifecycle,
+    ProtectEndureGuard,
+    SpecialDamageCounter,
+    StatusVolatileTag,
+    SubstituteProxyHp,
+    SuppressionUnusualImmunity,
+    SwitchTrapRedirect,
+    TransformFormCopy,
+    WeatherTerrainField,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
+pub enum M6StringIdentityError {
+    #[error("oracle SHA must be 40 lowercase hexadecimal characters")]
+    OracleSha,
+    #[error("catalog hash must be 64 lowercase hexadecimal characters")]
+    CatalogHash,
+    #[error("battle-content hash must be `blake3-v3:` plus 64 lowercase hexadecimal characters")]
+    BattleContentHash,
+    #[error("form identity must not be empty")]
+    FormId,
+}
+
 fn deserialize_registry_key<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: Deserializer<'de>,
@@ -303,7 +464,12 @@ mod tests {
     #[test]
     fn provenance_hash_requires_exact_lowercase_sha256_shape() {
         let valid = "0123456789abcdef".repeat(4);
-        assert_eq!(ProvenanceHash::parse(&valid).unwrap().as_str(), valid);
+        assert_eq!(
+            ProvenanceHash::parse(&valid)
+                .expect("valid fixture provenance hash")
+                .as_str(),
+            valid
+        );
         assert!(ProvenanceHash::parse(valid.to_uppercase()).is_err());
         assert!(ProvenanceHash::parse("0".repeat(63)).is_err());
         assert!(ProvenanceHash::parse("g".repeat(64)).is_err());
@@ -314,6 +480,25 @@ mod tests {
         assert!(serde_json::from_str::<ProvenanceHash>("\"invalid\"").is_err());
         let valid = format!("\"{}\"", "a".repeat(64));
         assert!(serde_json::from_str::<ProvenanceHash>(&valid).is_ok());
+    }
+
+    #[test]
+    fn m6_content_identity_strings_fail_closed() {
+        assert!(OracleSha::parse("a".repeat(40)).is_ok());
+        assert!(OracleSha::parse("A".repeat(40)).is_err());
+        assert!(CatalogHash::parse("b".repeat(64)).is_ok());
+        assert!(CatalogHash::parse("b".repeat(63)).is_err());
+        assert!(
+            BattleContentPackHashV3::parse(format!(
+                "{}{}",
+                BattleContentPackHashV3::PREFIX,
+                "c".repeat(64)
+            ))
+            .is_ok()
+        );
+        assert!(BattleContentPackHashV3::parse("c".repeat(64)).is_err());
+        assert!(FormId::parse("25:1:mega").is_ok());
+        assert!(FormId::parse("").is_err());
     }
 
     #[test]

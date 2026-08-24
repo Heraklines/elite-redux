@@ -216,6 +216,9 @@ impl ConditionArenaV2 {
         // Iterative DFS with color marking: 0 unseen, 1 in-stack, 2 done.
         let mut color = vec![0u8; self.0.len()];
         for root in roots {
+            if usize::from(*root) >= self.0.len() {
+                return Err(ConditionArenaErrorV2::RootOutOfBounds);
+            }
             let mut stack = vec![(*root, 0usize)];
             while let Some((node, depth)) = stack.pop() {
                 if depth > Self::MAX_DEPTH {
@@ -262,6 +265,8 @@ pub enum ConditionArenaErrorV2 {
     },
     #[error("condition node {index} references out of bounds")]
     ReferenceOutOfBounds { index: usize },
+    #[error("condition root is out of bounds")]
+    RootOutOfBounds,
     #[error("condition arena contains a cycle")]
     Cycle,
     #[error("condition arena depth exceeds the frozen ceiling")]

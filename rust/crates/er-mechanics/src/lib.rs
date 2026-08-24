@@ -10,6 +10,7 @@ pub mod ids;
 pub mod m6;
 pub mod operation;
 pub mod program;
+pub mod program_v2;
 pub mod selector;
 pub mod selector_operation_v2;
 pub mod v2;
@@ -21,6 +22,9 @@ pub use ids::*;
 pub use m6::*;
 pub use operation::*;
 pub use program::*;
+pub use program_v2::{
+    HookBindingV2, MechanicsProgramV2, MechanicsProgramV2Error, RngSiteBindingV1,
+};
 pub use selector::*;
 pub use v2::{
     AbilitySourceRank, MechanicHookV2, MechanicQueryV2, OrderedMechanicSource, OrderedSourceClass,

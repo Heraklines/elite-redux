@@ -262,7 +262,7 @@ impl OrderedMechanicSource {
             }
             BehaviorUnitKind::PassiveAttribute => {
                 self.source_class == OrderedSourceClass::PassiveAbility
-                    && matches!(self.source_rank, 1..=3 | 4)
+                    && matches!(self.source_rank, 1..=4)
             }
             BehaviorUnitKind::ModifierBehavior => self.source_class == OrderedSourceClass::HeldItem,
             BehaviorUnitKind::StatusBehavior => {

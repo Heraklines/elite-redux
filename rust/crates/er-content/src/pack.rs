@@ -30,6 +30,8 @@ pub mod m4_species;
 pub mod m5_bootstrap;
 #[path = "m5_pack.rs"]
 pub mod m5_pack;
+#[path = "m6_pack.rs"]
+pub mod m6_pack;
 pub use m4_pack::{selected_m4_capability_manifest, selected_m4_content_pack};
 pub use m5_bootstrap::selected_m5_bootstrap_pack;
 
