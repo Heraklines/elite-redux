@@ -12,6 +12,7 @@ pub mod mechanic_state;
 pub mod mechanic_state_v2;
 pub mod migration;
 pub mod migration_v3;
+pub mod migration_v4;
 pub mod pokemon;
 pub mod pokemon_v2;
 pub mod run_v2;

@@ -50,22 +50,12 @@ pub struct GuardChainEntryV2 {
 }
 
 /// Transform/illusion/form/stance overlay state for one battler scope.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct TransformOverlayStateV2 {
     pub active: bool,
     pub overlay_species: Option<SafeU53>,
     pub overlay_form_key: Option<String>,
-}
-
-impl Default for TransformOverlayStateV2 {
-    fn default() -> Self {
-        Self {
-            active: false,
-            overlay_species: None,
-            overlay_form_key: None,
-        }
-    }
 }
 
 /// One mechanic instance in canonical V4 state. Extends V1 with its owning
@@ -244,26 +234,21 @@ impl MechanicStateStoreV2 {
         Ok(())
     }
 
-    /// Deterministic V3→V4 migration: preserves every V1 instance's address,
-    /// program, owner, target, IDs, and creation ordinal exactly. New V4-only
-    /// fields start at proven-neutral defaults. The migration never drops an
-    /// instance and never reorders.
+    /// Deterministic V3→V4 store migration. The caller supplies an explicit
+    /// per-instance program/behavior binding derived from validated V3
+    /// content; source-only guessing is forbidden because one source may own
+    /// several behavior units.
     pub fn migrate_from_v1(
         v1: &MechanicStateStoreV1,
-        behavior_unit_for_source: impl Fn(
-            &er_types::mechanics::MechanicSourceId,
-        ) -> Option<BehaviorUnitId>,
+        binding_for_instance: impl Fn(
+            &crate::mechanic_state::MechanicInstanceStateV1,
+        ) -> Option<(MechanicsProgramId, BehaviorUnitId)>,
     ) -> Result<Self, MechanicStateV2Error> {
         v1.validate().map_err(|error| match error {
             MechanicStateError::InvalidAddress => MechanicStateV2Error::InvalidAddress,
             MechanicStateError::ZeroProgramId => MechanicStateV2Error::ZeroProgramId,
             other => MechanicStateV2Error::SourceValidation(other.to_string()),
         })?;
-        for instance in &v1.instances {
-            if behavior_unit_for_source(&instance.address.source).is_none() {
-                return Err(MechanicStateV2Error::MigrationLostInstance);
-            }
-        }
         let mut migrated = Self {
             schema_version: M6_MECHANIC_STATE_SCHEMA_VERSION,
             ..Self::default()
@@ -271,13 +256,13 @@ impl MechanicStateStoreV2 {
         migrated.next_instance_id = v1.next_instance_id;
         migrated.next_creation_ordinal = v1.next_creation_ordinal;
         for instance in &v1.instances {
-            let unit = behavior_unit_for_source(&instance.address.source)
+            let (program_id, unit) = binding_for_instance(instance)
                 .ok_or(MechanicStateV2Error::MigrationLostInstance)?;
             migrated.instances.push(MechanicInstanceStateV2 {
                 address: instance.address.clone(),
-                program_id: instance.program_id,
-                owner: instance.owner.clone(),
-                stored_target: instance.stored_target.clone(),
+                program_id,
+                owner: instance.owner,
+                stored_target: instance.stored_target,
                 creation_ordinal: instance.creation_ordinal,
                 remaining_turns: instance.remaining_turns,
                 counters: instance.counters.clone(),
@@ -285,9 +270,9 @@ impl MechanicStateStoreV2 {
                 source_behavior_unit: unit,
             });
         }
-        // Instance ordering must be identical to V1 (it already is by copy).
-        for window in migrated.instances.windows(2) {
-            if window[0].address >= window[1].address {
+        for (before, after) in v1.instances.iter().zip(&migrated.instances) {
+            if before.address != after.address || before.creation_ordinal != after.creation_ordinal
+            {
                 return Err(MechanicStateV2Error::MigrationReorderedInstances);
             }
         }
@@ -300,9 +285,7 @@ impl MechanicStateStoreV2 {
 mod tests {
     use super::*;
     use er_types::SafeU53;
-    use er_types::mechanics::{
-        MechanicAddress, MechanicSourceId, MechanicSourceKind,
-    };
+    use er_types::mechanics::{MechanicAddress, MechanicSourceId, MechanicSourceKind};
     use er_types::{BehaviorUnitKind, BehaviorUnitOrdinal, ProvenanceHash};
 
     fn behavior_unit() -> BehaviorUnitId {
@@ -354,9 +337,19 @@ mod tests {
                 counters: Vec::new(),
                 payload: er_mechanics::MechanicStatePayload::Empty,
             });
-        let mapping =
-            |id: &MechanicSourceId| (id.kind == MechanicSourceKind::Move).then(behavior_unit);
+        let mapping = |instance: &crate::mechanic_state::MechanicInstanceStateV1| {
+            (instance.address.source.kind == MechanicSourceKind::Move).then(|| {
+                (
+                    MechanicsProgramId::try_from_u64(2).expect("valid fixture program ID"),
+                    behavior_unit(),
+                )
+            })
+        };
         let v2 = MechanicStateStoreV2::migrate_from_v1(&v1, mapping).expect("migration succeeds");
+        assert_eq!(
+            v2.instances[0].program_id,
+            MechanicsProgramId::try_from_u64(2).expect("valid fixture program ID")
+        );
         assert_eq!(v2.instances.len(), 1);
         assert_eq!(v2.next_instance_id, v1.next_instance_id);
         assert_eq!(v2.validate(), Ok(()));
@@ -367,6 +360,12 @@ mod tests {
         let v1 = MechanicStateStoreV1::default();
         let result = MechanicStateStoreV2::migrate_from_v1(&v1, |_| None);
         assert!(result.is_ok()); // no instances to map; empty migration is lossless
-        assert_eq!(result.unwrap().instances.len(), 0);
+        assert_eq!(
+            result
+                .expect("empty migration must succeed")
+                .instances
+                .len(),
+            0
+        );
     }
 }

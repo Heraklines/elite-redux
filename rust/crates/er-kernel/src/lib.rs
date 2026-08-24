@@ -10,6 +10,7 @@ pub mod kernel;
 pub mod snapshot;
 pub mod snapshot_v3;
 pub mod snapshot_v4;
+pub mod snapshot_v5;
 pub mod ui_reducer;
 
 pub use battle_kernel::BattleInitializationError;
