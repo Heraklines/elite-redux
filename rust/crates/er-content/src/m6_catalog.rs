@@ -148,19 +148,33 @@ pub struct ImplementationClassEvidence {
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum CatalogOperand {
     Always {},
-    Array { values: Vec<CatalogOperand> },
-    Boolean { value: bool },
+    Array {
+        values: Vec<CatalogOperand>,
+    },
+    Boolean {
+        value: bool,
+    },
     CallbackProvenance {
         syntax_kind: String,
         provenance_hash: ProvenanceHash,
         source: SourceLocation,
     },
-    JsNumberBits { bits: String },
+    JsNumberBits {
+        bits: String,
+    },
     Null {},
-    Object { entries: Vec<CatalogOperandEntry> },
-    SafeInteger { value: i64 },
-    SourceExpressionGap { arguments: Vec<String> },
-    String { value: String },
+    Object {
+        entries: Vec<CatalogOperandEntry>,
+    },
+    SafeInteger {
+        value: i64,
+    },
+    SourceExpressionGap {
+        arguments: Vec<String>,
+    },
+    String {
+        value: String,
+    },
     SymbolProvenance {
         owner: String,
         member: String,
@@ -294,7 +308,12 @@ impl SemanticCatalogV1 {
                 actual: self.schema_version,
             });
         }
-        if self.oracle_sha.len() != 40 || !self.oracle_sha.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase()) {
+        if self.oracle_sha.len() != 40
+            || !self
+                .oracle_sha
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+        {
             return Err(CatalogLoadError::OracleShaFormat);
         }
         if !is_lower_hex_64(&self.raw_catalog_hash) {
@@ -343,15 +362,18 @@ impl SemanticCatalogV1 {
 
     /// Loads and validates a semantic catalog from canonical JSON bytes.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, CatalogLoadError> {
-        let catalog: Self =
-            serde_json::from_slice(bytes).map_err(|error| CatalogLoadError::Json(error.to_string()))?;
+        let catalog: Self = serde_json::from_slice(bytes)
+            .map_err(|error| CatalogLoadError::Json(error.to_string()))?;
         catalog.validate()?;
         Ok(catalog)
     }
 
     /// The declared total behavior-unit count implied by the source entries.
     pub fn declared_behavior_unit_total(&self) -> u64 {
-        self.sources.iter().map(|entry| entry.behavior_unit_count).sum()
+        self.sources
+            .iter()
+            .map(|entry| entry.behavior_unit_count)
+            .sum()
     }
 }
 

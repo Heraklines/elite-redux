@@ -1,7 +1,7 @@
 use std::fs;
 
 use er_content::m6_catalog::{
-    CatalogLoadError, CatalogResolution, SemanticCatalogV1, SEMANTIC_CATALOG_SCHEMA_VERSION,
+    CatalogLoadError, CatalogResolution, SEMANTIC_CATALOG_SCHEMA_VERSION, SemanticCatalogV1,
 };
 
 fn frozen_catalog_bytes() -> Vec<u8> {
@@ -21,10 +21,10 @@ fn frozen_semantic_catalog_loads_and_validates() {
         u64::try_from(catalog.behavior_units.len()).unwrap(),
         catalog.declared_behavior_unit_total()
     );
-    assert!(catalog
-        .behavior_units
-        .iter()
-        .all(|unit| matches!(unit.semantic.resolution, CatalogResolution::ResolvedIntrinsic | CatalogResolution::BespokeGap)));
+    assert!(catalog.behavior_units.iter().all(|unit| matches!(
+        unit.semantic.resolution,
+        CatalogResolution::ResolvedIntrinsic | CatalogResolution::BespokeGap
+    )));
 }
 
 #[test]
