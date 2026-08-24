@@ -25,14 +25,17 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use er_content::m6_catalog::{CatalogBehaviorUnit, CatalogProvenance, CatalogResolution};
+use er_content::m6_catalog::{
+    CatalogBehaviorUnit, CatalogProvenance, CatalogResolution, CatalogRngBindingStatus,
+};
 use er_content::pack::m6_pack::{
-    BehaviorClassificationEntryV2, BehaviorClassificationKindV2,
+    BESPOKE_MANIFEST_SCHEMA_VERSION_V2, BehaviorClassificationEntryV2,
     BehaviorClassificationManifestV2, BespokeManifestEntryV2, BespokeManifestV2,
-    BESPOKE_MANIFEST_SCHEMA_VERSION_V2,
 };
 use er_types::mechanics::MechanicsProgramId;
-use er_types::{BehaviorSourceId, BehaviorUnitId, BespokeMechanicId, SafeU53};
+use er_types::{
+    BehaviorClassificationKindV2, BehaviorSourceId, BehaviorUnitId, BespokeMechanicId, SafeU53,
+};
 use thiserror::Error;
 
 use crate::m6::catalog::ValidatedSemanticCatalog;
@@ -383,9 +386,7 @@ pub fn compile_semantics(
                         BehaviorCompileOutcome::IntrinsicRuleMissing
                     }
                 }
-                CatalogResolution::ResolvedOperands => {
-                    BehaviorCompileOutcome::OperandSchemaMissing
-                }
+                CatalogResolution::ResolvedOperands => BehaviorCompileOutcome::OperandSchemaMissing,
                 CatalogResolution::BespokeGap => match routed.get(&unit.id) {
                     Some(mechanic) => BehaviorCompileOutcome::BespokeCluster(*mechanic),
                     None => {
@@ -462,8 +463,9 @@ pub fn compile_semantics(
         .catalog
         .rng_sites()
         .iter()
-        .filter(|site| site.binding_status == er_types::m6::CatalogRngBindingStatus::BespokeGap)
+        .filter(|site| site.binding_status == CatalogRngBindingStatus::BespokeGap)
         .count();
+    let program_count = programs.len();
 
     Ok(SemanticCompileOutput {
         classifications: BehaviorClassificationManifestV2(classifications),
@@ -477,11 +479,7 @@ pub fn compile_semantics(
             schema_version: SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION,
             oracle_sha: request.catalog.oracle_sha().to_owned(),
             raw_catalog_hash: request.catalog.raw_catalog_hash().to_owned(),
-            semantic_catalog_hash: request
-                .catalog
-                .semantic_catalog_hash()
-                .as_str()
-                .to_owned(),
+            semantic_catalog_hash: request.catalog.semantic_catalog_hash().as_str().to_owned(),
             source_count: request.catalog.sources().len(),
             behavior_unit_count: units.len(),
             resolved_intrinsic_count: resolutions.resolved_intrinsic,
@@ -490,7 +488,7 @@ pub fn compile_semantics(
             compiled_unit_count,
             bespoke_unit_count,
             unsupported_unit_count,
-            program_count: programs.len(),
+            program_count,
             intrinsic_rule_count: request.intrinsic_rules.len(),
             rng_site_count: request.catalog.rng_sites().len(),
             rng_site_unresolved_count,

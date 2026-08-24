@@ -7,7 +7,7 @@
 
 use er_canonical::{CanonicalError, fixture_digest};
 use er_content::m6_catalog::{CatalogLoadError, CatalogSourceEntry, SemanticCatalogV1};
-use er_types::m6::CatalogHash;
+use er_types::m6::{CatalogHash, M6StringIdentityError};
 use thiserror::Error;
 
 /// Frozen M6 oracle SHA from `rust/contracts/m6-contract.toml`.
@@ -17,27 +17,16 @@ pub const M6_ORACLE_SHA: &str = "3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7";
 pub enum CatalogValidationError {
     #[error("semantic catalog failed structural validation: {0}")]
     Structural(#[from] CatalogLoadError),
-    #[error(
-        "semantic catalog oracle SHA mismatch: expected {expected}, actual {actual}"
-    )]
+    #[error("semantic catalog oracle SHA mismatch: expected {expected}, actual {actual}")]
     OracleShaMismatch {
         expected: &'static str,
         actual: String,
     },
-    #[error(
-        "semantic catalog raw-catalog hash mismatch: expected {expected}, actual {actual}"
-    )]
-    RawCatalogHashMismatch {
-        expected: String,
-        actual: String,
-    },
-    #[error(
-        "semantic catalog declares {declared} behavior units but carries {actual}"
-    )]
+    #[error("semantic catalog raw-catalog hash mismatch: expected {expected}, actual {actual}")]
+    RawCatalogHashMismatch { expected: String, actual: String },
+    #[error("semantic catalog declares {declared} behavior units but carries {actual}")]
     BehaviorUnitClosure { declared: u64, actual: usize },
-    #[error(
-        "source {index} declares {declared} behavior units but carries {actual}"
-    )]
+    #[error("source {index} declares {declared} behavior units but carries {actual}")]
     SourceUnitClosure {
         index: usize,
         declared: u64,
@@ -45,6 +34,8 @@ pub enum CatalogValidationError {
     },
     #[error("semantic catalog digest failed: {0}")]
     Digest(#[from] CanonicalError),
+    #[error("semantic catalog hash has an invalid typed shape: {0}")]
+    Hash(#[from] M6StringIdentityError),
 }
 
 /// Typed compiler input: the semantic catalog plus the exact raw-catalog
@@ -122,8 +113,7 @@ impl ValidatedSemanticCatalog {
             }
         }
 
-        let semantic_catalog_hash =
-            CatalogHash::parse(fixture_digest(&input.catalog)?)?;
+        let semantic_catalog_hash = CatalogHash::parse(fixture_digest(&input.catalog)?)?;
         Ok(Self {
             catalog: input.catalog,
             semantic_catalog_hash,

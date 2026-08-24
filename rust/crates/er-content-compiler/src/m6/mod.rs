@@ -29,8 +29,7 @@ pub use catalog::{
 };
 pub use pipeline::{
     BehaviorCompilation, BehaviorCompileOutcome, BespokeAssignment, CompileFailureContext,
-    CompilerOptions, IntrinsicRule, ProgramAllocation, SemanticCompileError,
+    CompilerOptions, INTRINSIC_RULE_MISSING_REASON, IntrinsicRule, OPERAND_SCHEMA_MISSING_REASON,
+    ProgramAllocation, SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION, SemanticCompileError,
     SemanticCompileOutput, SemanticCompileReport, SemanticCompileRequest, compile_semantics,
-    OPERAND_SCHEMA_MISSING_REASON, INTRINSIC_RULE_MISSING_REASON,
-    SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION,
 };
