@@ -281,6 +281,7 @@ dependencies = [
  "er-battle",
  "er-canonical",
  "er-content",
+ "er-content-compiler",
  "er-mechanics",
  "er-kernel",
  "er-protocol",
