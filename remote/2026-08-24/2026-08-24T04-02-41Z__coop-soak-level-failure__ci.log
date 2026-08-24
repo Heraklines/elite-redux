@@ -1,0 +1,181 @@
+{
+  "invariant": "lockstep",
+  "seed": 20260824,
+  "wave": 1,
+  "detail": "reward shop did not advance both counters once (before=0 host=0 guest=0)",
+  "replay": "SOAK_SEED=20260824",
+  "phaseState": {
+    "hostPhase": "ErDexNavPhase",
+    "guestPhase": "ErDexNavPhase",
+    "hostInteractionCounter": 0,
+    "guestInteractionCounter": 0,
+    "hostWave": 1,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 1003636364,
+        "battlerIndex": 0,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 303,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 1292114401,
+        "battlerIndex": 2,
+        "speciesId": 16,
+        "speciesName": "Pidgey",
+        "hp": 0,
+        "maxHp": 14,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 211,
+            "ppUsed": 0
+          },
+          {
+            "id": 28,
+            "ppUsed": 0
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 1003636364,
+        "battlerIndex": -1,
+        "speciesId": 143,
+        "speciesName": "Snorlax",
+        "hp": 303,
+        "maxHp": 303,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 262,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 1292114401,
+        "battlerIndex": -1,
+        "speciesId": 16,
+        "speciesName": "Pidgey",
+        "hp": 0,
+        "maxHp": 14,
+        "fainted": true,
+        "status": 7,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 314,
+            "ppUsed": 0
+          },
+          {
+            "id": 211,
+            "ppUsed": 0
+          },
+          {
+            "id": 28,
+            "ppUsed": 0
+          },
+          {
+            "id": 64,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260824 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=85 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[143:303/303]",
+    "wave 1: reward shop owner=host take-nonparty"
+  ]
+}

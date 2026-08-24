@@ -1,0 +1,189 @@
+[log] [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[warn] [coop:heal] playerModifier ADD typeId=MAP stack=1 (guest lacked it) -> added
+[log] [coop:adopt] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[log] [coop:adopt] biomeOverstayAnchor host=null -> restored (#837/#504)
+[log] [coop:adopt] erBiomeStructure host length=22 startWave=1 -> restored (#841 item 5)
+[log] [coop:adopt] erRelicBattleState host wave=1 -> restored (#837)
+[log] [coop:adopt] erLastGenericTrainerType host=none -> restored
+[log] [coop:adopt] erMapState host nodes=0 travelTarget=- fragments=0 -> restored (#865/#841 item 1)
+[log] [coop:adopt] erPendingNodes host count=4 revealed=2 -> restored (#865)
+[log] [coop:resync] guest apply authoritativeState tick=1 wave=1 turn=1 party=6/1 field=2
+[log] [coop:resync] presentation settle boundary=resync-stable side=player desired=visible ids=[1003636364] changed=0 phase=LoginPhase
+[log] [coop:resync] presentation settle boundary=resync-stable side=enemy desired=visible ids=[1292114401] changed=0 phase=LoginPhase
+[log] [coop:replay] guest RECV entry presentation wave=1 stateTick=2 events=0 buffered
+[log] [coop:replay] guest RECV enemyPartySync wave=1 count=1 -> buffered (no waiter)
+[log] [coop:replay] guest RECV entry presentation wave=1 stateTick=2 events=0 buffered
+[log] [coop:replay] guest RECV enemyPartySync wave=1 count=1 -> buffered (no waiter)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:replay] guest RECV entry presentation wave=1 stateTick=2 events=0 buffered
+[log] [coop:replay] guest RECV enemyPartySync wave=1 count=1 -> buffered (no waiter)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:checksum] capture digest=7dc509aef6d661fb field=2 biome=0 seed=coop-soak-20260824 weather=0 terrain=0 money=0 party=[143,94,149,248,376,445] partyLevels=[65,65,65,65,65,65] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp143/hp303-303/st0/ab5031/form0/tera0:0/boss0:0 bi2:sp16/hp14-14/st0/ab62/form0/tera0:2/boss0:0]
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:replay] guest RECV turnResolution e=1830445198858232 wave=1 turn=1 events=5 checksum=b90db55c86228fca -> buffered (no waiter)
+[log] [coop:replay] guest RECV waveResolved wave=1 outcome=win transition=WAVE_VICTORY/next2/biome0/egg1/wild
+[log] [coop:runtime] recv waveResolved wave=1 outcome=win role=guest netcode=authoritative
+[log] [coop:runtime] ignore raw waveResolved for correctness wave=1 outcome=win; awaiting retained transaction
+[log] [coop:v2-replica] admit rev=1 kind=WAVE_ADVANCE result=admitted frontier=1/0/0
+[log] [coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[log] [coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[log] [coop:transport] send guest t=authorityReceipt t=authorityReceipt
+[log] [coop:v2-replica] apply rev=1 kind=WAVE_ADVANCE resume=admitted outcome=applied control=AWAIT_SUCCESSOR/WSHADOW%2FADV%2Fw1/e1830445198858232/w1/t1/INTERACTION_COMMIT/interactionAddresses:*/controlAddresses:*/nextWave:1/next:* frontier=1/1/1
+[log] [coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[log] [coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[log] [coop:transport] recv host t=authorityReceipt t=authorityReceipt handlers=1
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:replay] guest replay turn=1: live pump start mode=turn
+[log] [coop:transport] send guest t=requestTurnCommit e=1830445198858232 wave=1 turn=1 rev=pending
+[log] [coop:transport] send guest t=requestTurnCommit e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:replay] guest awaitTurn turn=1 RESOLVE (buffered race) events=5
+[log] [coop:transport] recv host t=requestTurnCommit e=1830445198858232 wave=1 turn=1 rev=pending handlers=1
+[log] [coop:transport] send host t=turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca
+[log] [coop:transport] recv host t=requestTurnCommit e=1830445198858232 wave=1 turn=1 rev=7 handlers=1
+[log] [coop:transport] send host t=turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca
+[log] [coop:transport] recv guest t=turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca handlers=1
+[log] [coop:transport] recv guest t=turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca handlers=1
+[log] [coop:replay] guest consume live events turn=1 count=0
+[log] [coop:replay] guest replay turn=1: RESOLVE renderedLive=0 remaining=5 batch=5
+[log] [coop:replay] guest replay turn=1: rendering 5 event(s)
+[log] [coop:replay] guest replay turn=1: present k=moveUsed
+[log] [coop:replay] guest replay turn=1: present k=moveAnim
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:replay] guest replay turn=1: present k=hp
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:replay] guest replay turn=1: present k=faint
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:replay] guest replay turn=1: present k=message
+[log] [coop:replay] guest replay turn=1: rendered phases [moveUsed=1 moveAnim=1 hp=1 faint=1 message=1]
+[log] [coop:replay] guest replay turn=1: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:stream] guest IGNORE idempotent turn duplicate e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:stream] guest IGNORE idempotent turn duplicate e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:replay] present move bi=0 moveId=85 targets=1
+[log] [coop:replay] present hp bi=2 14->0/14
+[log] [coop:replay] present faint bi=2 narrate=true
+[log] [coop:checkpoint] guest apply field=2 weather=0 terrain=0 arenaTags=0
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:adopt] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[log] [coop:adopt] biomeOverstayAnchor host=null -> restored (#837/#504)
+[log] [coop:adopt] erBiomeStructure host length=22 startWave=1 -> restored (#841 item 5)
+[log] [coop:adopt] erRelicBattleState host wave=1 -> restored (#837)
+[log] [coop:adopt] erLastGenericTrainerType host=none -> restored
+[log] [coop:adopt] erMapState host nodes=0 travelTarget=- fragments=0 -> restored (#865/#841 item 1)
+[log] [coop:adopt] erPendingNodes host count=4 revealed=2 -> restored (#865)
+[log] [coop:resync] guest apply authoritativeState tick=7 wave=1 turn=1 party=6/1 field=2
+[log] [coop:resync] presentation settle boundary=resync-stable side=player desired=visible ids=[1003636364] changed=0 phase=CoopFinalizeTurnPhase
+[log] [coop:resync] presentation settle boundary=wave-start-pre-intro side=enemy desired=visible ids=[] changed=0 phase=CoopFinalizeTurnPhase
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:checksum] capture digest=b90db55c86228fca field=2 biome=0 seed=coop-soak-20260824 weather=0 terrain=0 money=0 party=[143,94,149,248,376,445] partyLevels=[65,65,65,65,65,65] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp143/hp303-303/st0/ab5031/form0/tera0:0/boss0:0 bi2:sp16/hp0-14/st7/ab62/form0/tera0:2/boss0:0]
+[log] [coop:transport] send guest t=turnCommitAck e=1830445198858232 wave=1 turn=1 rev=7 stage=materialApplied checksum=b90db55c86228fca
+[log] [coop:stream] guest ACK turn stage=materialApplied e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:checksum] guest finalize materialApplied e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:transport] recv host t=turnCommitAck e=1830445198858232 wave=1 turn=1 rev=7 stage=materialApplied checksum=b90db55c86228fca handlers=1
+[log] [coop:stream] host ACCEPT turn ACK stage=materialApplied key=1830445198858232:1:1:7
+[log] [coop:transport] send guest t=turnCommitAck e=1830445198858232 wave=1 turn=1 rev=7 stage=presentationReady checksum=b90db55c86228fca
+[log] [coop:stream] guest ACK turn stage=presentationReady e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:checksum] guest finalize presentationReady e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:replay] guest finalize turn=1: END (checkpoint applied, turn-end queued)
+[log] [coop:transport] recv host t=turnCommitAck e=1830445198858232 wave=1 turn=1 rev=7 stage=presentationReady checksum=b90db55c86228fca handlers=1
+[log] [coop:stream] host ACCEPT turn ACK stage=presentationReady key=1830445198858232:1:1:7
+[log] [coop:stream] guest admitted WAVE_ADVANCE continuation e=1830445198858232 wave=1
+[log] [coop:runtime] wave-advance JOURNAL bootstrap wave=1 outcome=win (ACK withheld)
+[log] [coop:runtime] wave-advance JOURNAL queued safe-boundary wake wave=1 unparkedReplay=0
+[log] [coop:runtime] wave-advance op JOURNAL cursor-advanced id=1830445198858232:0:WAVE_ADVANCE:1 rev=1 dataApplied=false continuationReady=false (DATA applies at BattleEnd; retained ACK awaits DATA + destination continuation)
+[log] [coop:transport] send guest t=coopAck cls=op:global seq=1
+[log] [coop:replay] guest RECV waveEndState wave=1 tick=8
+[log] [coop:runtime] ignore raw waveEndState for correctness wave=1 tick=8
+[log] [coop:relay] RECV rewardOptions key=0:0 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[log] [coop:rendezvous] RECV arrival point=shop:1:0 -> BUFFER (no waiter yet) role=guest
+[log] [coop:transport] recv host t=coopAck cls=op:global seq=1 handlers=1
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:runtime] consume wave-advance wave=1 outcome=win transition=WAVE_VICTORY/next2/biome0/egg1/wild (lastResolved -1 -> 1)
+[log] [coop:replay] guest wave-advance outcome=win wave=1 next=WAVE_VICTORY/wave2 biomeChange=false eggLapse=true victoryKind=wild battleType=WILD queues=VictoryPhase (host-stated)
+[warn] [coop:replay] guest wave-advance wave=1: replacing speculative future queue [CommandPhase,TurnStartPhase]
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:progression] GUEST applyPartyExp SKIP wave=1 koMon=Pidgey (awaiting host waveEndState)
+[log] [coop-diag] VictoryPhase win-branch role=guest battleType=WILD queuesTrainerVictory=false queuesSelectModifier=true wave=1
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop-diag] VictoryTail role=guest wave=1 source=host-stated trainer=false egg=true biomeShop=false biomeChange=false crossroads=false nextWave=2
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:adopt] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[log] [coop:adopt] biomeOverstayAnchor host=null -> restored (#837/#504)
+[log] [coop:adopt] erBiomeStructure host length=22 startWave=1 -> restored (#841 item 5)
+[log] [coop:adopt] erRelicBattleState host wave=1 -> restored (#837)
+[log] [coop:adopt] erLastGenericTrainerType host=none -> restored
+[log] [coop:adopt] erMapState host nodes=0 travelTarget=- fragments=0 -> restored (#865/#841 item 1)
+[log] [coop:adopt] erPendingNodes host count=4 revealed=2 -> restored (#865)
+[log] [coop:resync] guest apply authoritativeState tick=8 wave=1 turn=2 party=6/1 field=2
+[log] [coop:resync] presentation settle boundary=resync-stable side=player desired=visible ids=[1003636364] changed=0 phase=BattleEndPhase
+[log] [coop:resync] presentation settle boundary=wave-start-pre-intro side=enemy desired=visible ids=[] changed=0 phase=BattleEndPhase
+[log] [coop:runtime] wave-advance retained DATA boundary admitted wave=1
+[log] [coop:progression] retained WAVE_ADVANCE DATA applied wave=1 tick=8
+[log] [coop:progression] GUEST retained WAVE_ADVANCE BattleEnd release wave=1
+[log] [coop:transport] recv guest t=envelope t=envelope handlers=1
+[log] [coop:transport] send guest t=coopAck cls=op:global seq=1
+[log] [coop:transport] recv host t=coopAck cls=op:global seq=1 handlers=1
+[log] [coop:progression] GUEST automatic victory settlement admitted wave=1 turn=2
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:checksum] capture digest=b90db55c86228fca field=2 biome=0 seed=coop-soak-20260824 weather=0 terrain=0 money=0 party=[143,94,149,248,376,445] partyLevels=[65,65,65,65,65,65] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp143/hp303-303/st0/ab5031/form0/tera0:0/boss0:0 bi2:sp16/hp0-14/st7/ab62/form0/tera0:2/boss0:0]
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=guest -> false
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:reward] owner/watcher decision: pinnedStart=0 liveCounter=0 parity=0 role=guest pick=WATCHER option=ADOPT spoof=false
+[log] [coop:rendezvous] ARRIVE point=shop:1:0 (send) role=guest
+[log] [coop:transport] send guest t=rendezvous point=shop:1:0
+[log] [coop:reward] WATCHER waits for partner's reward picks (start=0 role=guest wave=1)
+[log] [coop:reward] WATCHER awaiting owner reward options (start=0 reroll=0 localCount=0)
+[log] [coop:relay] AWAIT rewardOptions key=0:0 timeoutMs=1200000 -> BUFFER-HIT resolve count=3
+[log] [coop:transport] recv host t=rendezvous point=shop:1:0 handlers=1
+[log] [coop:shop] reconstructRewardOptions OK count=3 ids=[ER_DEX_NAV,TEMP_STAT_STAGE_BOOSTER,RARE_CANDY]
+[log] [coop:reward] WATCHER ADOPTED owner reward options (was=0 now=3 ids=[ER_DEX_NAV,TEMP_STAT_STAGE_BOOSTER,RARE_CANDY])
+[log] [coop:transport] send guest t=turnCommitAck e=1830445198858232 wave=1 turn=1 rev=7 stage=continuationReady checksum=b90db55c86228fca
+[log] [coop:stream] guest ACK turn stage=continuationReady e=1830445198858232 wave=1 turn=1 rev=7
+[log] [coop:stream] guest continuation surface=sharedInput e=1830445198858232 wave=1 turn=2 waiting=1 released=1
+[log] [coop:transport] recv host t=turnCommitAck e=1830445198858232 wave=1 turn=1 rev=7 stage=continuationReady checksum=b90db55c86228fca handlers=1
+[log] [coop:progression] retained WAVE_ADVANCE continuationReady wave=1
+[log] [coop:transport] send guest t=coopAck cls=op:global seq=1
+[log] [coop:transport] send guest t=coopAck cls=op:global seq=1
+[log] [coop:transport] send guest t=coopAck cls=op:global seq=1
+[log] [coop:interaction] mirror begin role=watcher mirrorSeq=0 interactionStart=0 reroll=0
+[log] [coop:interaction] uiMirror beginSession role=watcher mode=6 seq=0 early=0
+[log] [coop:transport] recv host t=coopAck cls=op:global seq=1 handlers=1
+[log] [coop:transport] recv host t=coopAck cls=op:global seq=1 handlers=1
+[log] [coop:transport] recv host t=coopAck cls=op:global seq=1 handlers=1
+[log] [coop:relay] AWAIT interactionChoice seq=0 timeoutMs=1200000 expected=[reward,shop,skip,reroll,check,transfer,lock] -> network-wait
+[log] [coop:rendezvous] RECV arrival point=shop:1:0 -> DUPLICATE (already seen) role=guest
+[log] [coop:relay] DELIVER interactionChoice seq=0 -> waiter kind=reward choice=0 data=[0]
+[log] [coop:relay] AWAIT interactionChoice seq=0 RESOLVE kind=reward choice=0 data=[0]
+[log] [coop:adopt] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[log] [coop:adopt] biomeOverstayAnchor host=null -> restored (#837/#504)
+[log] [coop:adopt] erBiomeStructure host length=22 startWave=1 -> restored (#841 item 5)
+[log] [coop:adopt] erRelicBattleState host wave=1 -> restored (#837)
+[log] [coop:adopt] erLastGenericTrainerType host=none -> restored
+[log] [coop:adopt] erMapState host nodes=0 travelTarget=- fragments=0 -> restored (#865/#841 item 1)
+[log] [coop:adopt] erPendingNodes host count=4 revealed=2 -> restored (#865)
+[log] [coop:resync] guest apply authoritativeState tick=9 wave=1 turn=2 party=6/1 field=2
+[log] [coop:resync] presentation settle boundary=resync-stable side=player desired=visible ids=[1003636364] changed=0 phase=SelectModifierPhase
+[log] [coop:resync] presentation settle boundary=wave-start-pre-intro side=enemy desired=visible ids=[] changed=0 phase=SelectModifierPhase
+[log] [coop:relay] DELIVER interactionChoice seq=0 -> BUFFER inbox depth=1 kind=reward choice=0 data=[0]
+[log] [coop:reward] shop authoritative RESULT applied-before-render kind=REWARD id=1830445198858232:0:REWARD:0 rev=2 tick=9
+[log] [coop:transport] send guest t=coopAck cls=op:global seq=2
+[warn] [coop:reward] WATCHER op-gate rejected relayed action (await-journal) seq=0 choice=0 - keep awaiting terminal (Wave-2d)
+[log] [coop:transport] recv host t=coopAck cls=op:global seq=2 handlers=1
+[log] [coop:relay] AWAIT interactionChoice seq=0 timeoutMs=1200000 -> BUFFER-HIT resolve kind=reward choice=0 data=[0]
+[log] [coop:reward] reward op WATCHER materialize retained choice=0 terminal=true skippedObsolete=0 id=1830445198858232:0:REWARD:0
+[log] [coop:reward] WATCHER applying relayed action seq=0 act=REWARD choice=0 data=[0]
+[log] [coop:ability] abilityContext threaded seq=0 role=watcher (picker routes outcome on this seq)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[log] [coop:v2-interaction] terminal proof recorded op=1830445198858232:0:REWARD:0 role=guest seat=1 duplicate=0 ambient=1
+[log] [coop:v2-interaction] phase terminal proof op=1830445198858232:0:REWARD:0 route=constructor-fallback accepted=1
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)

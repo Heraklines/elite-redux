@@ -1,0 +1,222 @@
+[log] [coop-soak] SEED=20260824 WAVES=55 - replay this run with:  SOAK_SEED=20260824 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[log] Wave Seed: coop-soak-20260824 0
+[log] %cStart Phase: TitlePhase color:green
+[log] %cStart Phase: EncounterPhase color:green
+[log] %cStart Phase: SummonPhase color:green
+[log] %cStart Phase: ToggleDoublePositionPhase color:green
+[log] %cStart Phase: CheckSwitchPhase color:green
+[log] %cStart Phase: InitEncounterPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: ShowAbilityPhase color:green
+[log] %cStart Phase: MovePhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: MoveEffectPhase color:green
+[log] %cStart Phase: StatStageChangePhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: MoveEndPhase color:green
+[log] %cStart Phase: HideAbilityPhase color:green
+[log] %cStart Phase: PostSummonPhase color:green
+[log] %cStart Phase: TurnInitPhase color:green
+[log] %cStart Phase: CommandPhase color:green
+[log] [coop:transport] state host connecting -> connected
+[log] [coop:transport] state guest connecting -> connected
+[log] [coop:stream] streamer CONSTRUCT timeout=1200000ms recoveryTimeout=12000ms onMessage registered
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[log] [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[log] [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[log] [coop:turn] host recorder: REGISTER live emitter (was=false)
+[log] [coop:stream] streamer CONSTRUCT timeout=1200000ms recoveryTimeout=12000ms onMessage registered
+[log] [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[log] [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[log] [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[log] [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[log] [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[log] [coop:turn] host recorder: REGISTER live emitter (was=true)
+[log] [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Host version=er-coop-62 tiebreak=0.80571276249562
+[log] [coop:transport] send host t=hello role=host v=er-coop-62 epoch=1830445198858232 tiebreak=0.80571276249562
+[log] [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=6a0fba06314a62eb(1110) movesName=27e4bf14fb453c94(1110) movesets=687a57d7e2d3680a(1962) abilitiesData=22697d8cbc3d5a60(1261) abilitiesName=bd4ca2bf2639373b(1261)
+[log] [coop-fp] local moveMap=e9b828360aafb9e2(1032) movesData=6a0fba06314a62eb(1110) movesName=27e4bf14fb453c94(1110) movesets=687a57d7e2d3680a(1962) abilitiesData=22697d8cbc3d5a60(1261) abilitiesName=bd4ca2bf2639373b(1261)
+[log] [coop:transport] send host t=dataFingerprint fp
+[log] [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=Guest version=er-coop-62 tiebreak=0.2384606662532086
+[log] [coop:transport] send guest t=hello role=guest v=er-coop-62 epoch=0 tiebreak=0.2384606662532086
+[log] [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=6a0fba06314a62eb(1110) movesName=27e4bf14fb453c94(1110) movesets=687a57d7e2d3680a(1962) abilitiesData=22697d8cbc3d5a60(1261) abilitiesName=bd4ca2bf2639373b(1261)
+[log] [coop-fp] local moveMap=e9b828360aafb9e2(1032) movesData=6a0fba06314a62eb(1110) movesName=27e4bf14fb453c94(1110) movesets=687a57d7e2d3680a(1962) abilitiesData=22697d8cbc3d5a60(1261) abilitiesName=bd4ca2bf2639373b(1261)
+[log] [coop:transport] send guest t=dataFingerprint fp
+[log] [coop:transport] recv guest t=hello role=host v=er-coop-62 epoch=1830445198858232 tiebreak=0.80571276249562 handlers=1
+[log] [coop:launch] hello recv partner=Host partnerRole=host (local role=guest; no conflict)
+[log] [coop:launch] RUN IDENTITY host-hello-new-epoch-same-run run=e8aee3b1-f98c-4f4a-8ad6-6c291ad5241c checkpointRev=0
+[log] [coop:launch] EPOCH ADOPT epoch=1830445198858232 from same-run host hello
+[log] [coop:v2-recovery] hard epoch boundary 0->1830445198858232; retired prior authoritative log
+[log] [coop:transport] send guest t=hello role=guest v=er-coop-62 epoch=1830445198858232 tiebreak=0.2384606662532086
+[log] [coop:session] capabilities NEGOTIATED local=[authority.v2shadow,durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] peer=[authority.v2shadow,durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce] -> effective=[authority.v2shadow,durability.journal,opSurface.abilityPicker,opSurface.bargain,opSurface.biome,opSurface.catchFull,opSurface.colosseum,opSurface.faintSwitch,opSurface.learnMove,opSurface.me.v2,opSurface.revival,opSurface.reward,opSurface.stormglass,opSurface.wave,renderer.allowlistEnforce]
+[log] [coop:v2-shadow] harness built role=replica seat=1 session=e8aee3b1-f98c-4f4a-8ad6-6c291ad5241c
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv guest t=dataFingerprint fp handlers=1
+[log] [coop:checksum] MATCH - data tables identical across clients
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv host t=hello role=guest v=er-coop-62 epoch=0 tiebreak=0.2384606662532086 handlers=1
+[log] [coop:launch] hello recv partner=Guest partnerRole=guest (local role=host; no conflict)
+[log] [coop:v2-shadow] harness built role=authority seat=0 session=e8aee3b1-f98c-4f4a-8ad6-6c291ad5241c
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv host t=dataFingerprint fp handlers=1
+[log] [coop:checksum] MATCH - data tables identical across clients
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:transport] recv host t=hello role=guest v=er-coop-62 epoch=1830445198858232 tiebreak=0.2384606662532086 handlers=1
+[log] [coop:launch] hello recv partner=Guest partnerRole=guest (local role=host; no conflict)
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:replay] host SEND enemyPartySync wave=1 count=1 meType=-1 battleType=0 entryPresentation=0
+[log] [coop:transport] send host t=enemyPartySync wave=1 enemies=1 battleType=0
+[log] [coop:turn] host recorder: begin turn=1 scope=1830445198858232:1 (no prior open recording)
+[log] [coop:transport] recv guest t=enemyPartySync wave=1 enemies=1 battleType=0 handlers=1
+[log] [coop:transport] send host t=enemyPartySync wave=1 enemies=1 battleType=0
+[log] [coop:replay] host RE-BROADCAST wave-start authority wave=1 after post-summon boundary stateChanged=false presentation=0 (#920)
+[log] [coop:rendezvous] next-command barrier ARRIVE+AWAIT cmd:1:1 slot=0
+[log] [coop:rendezvous] ARRIVE point=cmd:1:1 (send) role=host
+[log] [coop:transport] send host t=rendezvous point=cmd:1:1
+[log] [coop:rendezvous] AWAIT point=cmd:1:1 timeoutMs=2000 -> network-wait role=host
+[log] [coop:transport] recv guest t=enemyPartySync wave=1 enemies=1 battleType=0 handlers=1
+[log] [coop:transport] recv guest t=rendezvous point=cmd:1:1 handlers=1
+[log] [coop:rendezvous] RECV arrival point=cmd:1:1 -> BUFFER (no waiter yet) role=guest
+[log] [coop:transport] send host t=enemyPartySync wave=1 enemies=1 battleType=0
+[log] [coop:replay] host RE-BROADCAST wave-start authority wave=1 after post-summon boundary stateChanged=false presentation=0 (#920)
+[log] [coop:rendezvous] next-command barrier ARRIVE+AWAIT cmd:1:1 slot=0
+[log] [coop:rendezvous] AWAIT point=cmd:1:1 timeoutMs=2000 -> network-wait role=host
+[warn] [coop:rendezvous] AWAIT point=cmd:1:1 SUPERSEDE stale waiter -> resolved timedOut role=host
+[warn] [coop:rendezvous] RENDEZVOUS ABORT point=cmd:1:1 - waiter torn down without partner arrival role=host
+[log] [coop:transport] recv guest t=enemyPartySync wave=1 enemies=1 battleType=0 handlers=1
+[warn] [coop:rendezvous] next-command barrier cmd:1:1 ABORTED during teardown/recovery - command UI remains closed
+[log] [coop-soak:wave-start] {"seed":20260824,"wave":1,"wavesRequested":55,"wavesCompleted":0,"elapsedMs":1367,"hostPhase":"CommandPhase","guestPhase":"TurnInitPhase"}
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:checksum] capture digest=7dc509aef6d661fb field=2 biome=0 seed=coop-soak-20260824 weather=0 terrain=0 money=0 party=[143,94,149,248,376,445] partyLevels=[65,65,65,65,65,65] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp143/hp303-303/st0/ab5031/form0/tera0:0/boss0:0 bi2:sp16/hp14-14/st0/ab62/form0/tera0:2/boss0:0]
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=1 command=0 cursor=3 moveId=85 targets=[2]
+[log] [coop:transport] send host t=command fi=0 owner=host turn=1 cmd=0 cursor=3 move=85
+[log] [coop:transport] recv guest t=command fi=0 owner=host turn=1 cmd=0 cursor=3 move=85 handlers=1
+[log] [coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[log] %cStart Phase: EnemyCommandPhase color:green
+[log] %cStart Phase: TurnStartPhase color:green
+[log] [coop-diag] turn-start authoritative guard mode=authoritative role=host turn=1 diverts=false
+[log] [coop:turn] host recorder: preserve recording scope=1830445198858232:1 turn=1 events=0 seq=0
+[log] %cStart Phase: MovePhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=0 k=moveUsed total=1 live=true
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: MoveEffectPhase color:green
+[log] [coop:turn] host recorder: append turn=1 seq=1 k=moveAnim total=2 live=true
+[log] [coop:turn] host recorder: append turn=1 seq=2 k=hp total=3 live=true
+[log] [coop:turn] host recorder: append turn=1 seq=3 k=faint total=4 live=true
+[log] [coop:turn] host recorder: append turn=1 seq=4 k=message total=5 live=true
+[log] %cStart Phase: DamageAnimPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: FaintPhase color:green
+[log] %cStart Phase: MessagePhase color:green
+[log] %cStart Phase: VictoryPhase color:green
+[log] [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=21 koMon=Pidgey
+[log] [coop:account] account-write scope OPEN (achievement-egg-reward) depth=1
+[log] [coop:transport] send host t=authorityEntry t=authorityEntry
+[log] [coop:v2-shadow] PARITY kind=WAVE_ADVANCE rev=1 match=true field=-
+[log] [coop:runtime] defer raw waveResolved wave=1 outcome=win until its material turnResolution is retained
+[log] [coop-diag] VictoryPhase win-branch role=host battleType=WILD queuesTrainerVictory=false queuesSelectModifier=true wave=1
+[log] [coop-diag] VictoryTail role=host wave=1 source=legacy-local trainer=false egg=true biomeShop=false biomeChange=false crossroads=false nextWave=2
+[log] [coop:transport] recv guest t=authorityEntry t=authorityEntry handlers=1
+[log] %cStart Phase: MoveEndPhase color:green
+[log] %cStart Phase: MovePhase color:green
+[log] %cStart Phase: MoveEndPhase color:green
+[log] %cStart Phase: CheckInterludePhase color:green
+[log] %cStart Phase: WeatherEffectPhase color:green
+[log] %cStart Phase: PositionalTagPhase color:green
+[log] %cStart Phase: BerryPhase color:green
+[log] %cStart Phase: CheckStatusEffectPhase color:green
+[log] %cStart Phase: TurnEndPhase color:green
+[log] %cStart Phase: CoopTurnCommitPhase color:green
+[log] [coop:turn] host recorder: finalize turn=1 events=5 seq=5
+[log] [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=0 mons=[bi0:sp143/hp303-303/st0/fnt0 bi2:sp16/hp0-14/st7/fnt1]
+[log] [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=0 arenaTags=0 mons=[bi0:sp143/hp303-303/st0/fnt0 bi2:sp16/hp0-14/st7/fnt1]
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:replay] host SEND turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca
+[log] [coop:transport] send host t=turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca
+[warn] [coop:v2-shadow] FAULT tap(TURN_COMMIT): AuthorityLog.commit: TURN_COMMIT is not authorized by predecessor control after WSHADOW/ADV/w1
+[log] [coop:runtime] send waveResolved wave=1 outcome=win (host)
+[log] [coop:replay] host SEND waveResolved wave=1 outcome=win transition=WAVE_VICTORY/next2/biome0/egg1/wild
+[log] [coop:transport] send host t=waveResolved wave=1 outcome=win captureParty=- cap=-
+[log] [coop:transport] recv guest t=turnResolution e=1830445198858232 wave=1 turn=1 rev=7 events=5 checksum=b90db55c86228fca handlers=1
+[log] [coop:transport] recv guest t=waveResolved wave=1 outcome=win captureParty=- cap=- handlers=1
+[log] [38;2;255;127;80mPhaseInterceptor.to: Stopping on completion of CoopTurnCommitPhase[39m
+[log] %cStart Phase: BattleEndPhase color:green
+[log] [coop:progression] HOST automatic victory settlement deferred wave=1 sourceTurn=1 settlementTurn=2
+[log] [coop:v2-authority] receipt rev=1 op=WSHADOW/ADV/w1 stage=admitted sender=1 generation=0 advanced retired=false waiting=[1] subsumed=[]
+[log] [coop:v2-authority] receipt rev=1 op=WSHADOW/ADV/w1 stage=materialApplied sender=1 generation=0 advanced retired=false waiting=[1] subsumed=[]
+[log] [coop:v2-authority] receipt rev=1 op=WSHADOW/ADV/w1 stage=controlInstalled sender=1 generation=0 advanced retired=true waiting=[] subsumed=[]
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] %cStart Phase: EggLapsePhase color:green
+[log] %cStart Phase: CoopVictorySealPhase color:green
+[log] [coop:transport] send host t=envelope t=envelope
+[log] [coop:runtime] wave-advance op HOST commit wave=1 outcome=win next=WAVE_VICTORY rev=1 id=1830445198858232:0:WAVE_ADVANCE:1 (Wave-2f)
+[log] [coop:runtime] settled WAVE_ADVANCE committed wave=1 tick=8 next=WAVE_VICTORY/wave2
+[log] [coop:runtime] send waveEndState wave=1 tick=8 (host)
+[log] [coop:replay] host SEND waveEndState wave=1 tick=8 party=6
+[log] [coop:transport] send host t=waveEndState t=waveEndState
+[log] [coop:progression] HOST automatic victory settlement sealed wave=1 sourceTurn=1 settlementTurn=2 tick=8
+[log] [coop:transport] recv guest t=envelope t=envelope handlers=1
+[log] [coop:transport] recv guest t=waveEndState t=waveEndState handlers=1
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:reward] owner/watcher decision: pinnedStart=0 liveCounter=0 parity=0 role=host pick=OWNER option=ROLL spoof=false
+[log] [coop:shop] serializeRewardOptions count=3 ids=[ER_DEX_NAV,TEMP_STAT_STAGE_BOOSTER,RARE_CANDY] tiers=[2,0,0]
+[log] [coop:reward] OWNER streams reward options (start=0 reroll=0 count=3 ids=[ER_DEX_NAV,TEMP_STAT_STAGE_BOOSTER,RARE_CANDY])
+[log] [coop:relay] SEND rewardOptions seq=0 reroll=0 count=3 ids=[ER_DEX_NAV,TEMP_STAT_STAGE_BOOSTER,RARE_CANDY]
+[log] [coop:transport] send host t=rewardOptions seq=0 reroll=0 options=3
+[log] [coop:rendezvous] ARRIVE point=shop:1:0 (send) role=host
+[log] [coop:transport] send host t=rendezvous point=shop:1:0
+[log] [coop:reward] OWNER drives reward screen (start=0 role=host spoof=false adoptsOptions=false wave=1)
+[log] [coop:rendezvous] shop-pick-commit barrier AWAIT shop:1:0
+[log] [coop:rendezvous] AWAIT point=shop:1:0 timeoutMs=2000 -> network-wait role=host
+[log] [coop:transport] recv guest t=rewardOptions seq=0 reroll=0 options=3 handlers=1
+[log] [coop:transport] recv guest t=rendezvous point=shop:1:0 handlers=1
+[log] [coop:durability] operation delivery RETRY key=op:global:1:1830445198858232:1:2:1830445198858232:0:WAVE_ADVANCE:1 attempt=1/8
+[log] [coop:transport] send host t=envelope t=envelope
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:checksum] capture digest=b90db55c86228fca field=2 biome=0 seed=coop-soak-20260824 weather=0 terrain=0 money=0 party=[143,94,149,248,376,445] partyLevels=[65,65,65,65,65,65] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp143/hp303-303/st0/ab5031/form0/tera0:0/boss0:0 bi2:sp16/hp0-14/st7/ab62/form0/tera0:2/boss0:0]
+[log] [coop:rendezvous] RECV arrival point=shop:1:0 -> deliver-to-waiter role=host
+[log] [coop:transport] send host t=rendezvous point=shop:1:0
+[log] [coop:rendezvous] AWAIT point=shop:1:0 RESOLVE both-arrived role=host
+[log] [coop:stream] host ACCEPT turn ACK stage=continuationReady key=1830445198858232:1:1:7
+[log] [coop:stream] host RELEASE retained turn after continuationReady key=1830445198858232:1:1:7
+[log] [coop:durability] host RELEASE contiguous acknowledged authority cls=op:global seq=1
+[log] [coop:transport] recv guest t=rendezvous point=shop:1:0 handlers=1
+[log] [coop:interaction] mirror begin role=owner mirrorSeq=0 interactionStart=0 reroll=0
+[log] [coop:interaction] uiMirror beginSession role=owner mode=6 seq=0 early=0
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[log] [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[log] [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[log] [coop:relay] OWNER prepare seq=0 kind=reward choice=0 data=[0] role=host
+[log] [coop:reward] reward op INTENT prepared label=reward id=1830445198858232:0:REWARD:0
+[log] [coop:relay] OWNER send raw seq=0 kind=reward choice=0 role=host
+[log] [coop:relay] SEND interactionChoice seq=0 kind=reward kind=? choice=0 data=[0]
+[log] [coop:transport] send host t=interactionChoice seq=0 kind=reward choice=0
+[warn] [coop:v2-shadow] FAULT tap(INTERACTION_COMMIT): AuthorityLog.commit: INTERACTION_COMMIT is not authorized by predecessor control after WSHADOW/ADV/w1
+[log] [coop:ability] abilityContext threaded seq=0 role=owner (picker routes outcome on this seq)
+[log] [coop:reward] APPLY_RESULT pin=0 side=owner type=ER_DEX_NAV class=ErDexNavModifier pregen=[] holderSlot=-1 holderId=-1 stack=-1 accepted=true cost=-1
+[log] [coop:shop] serializeRewardOptions count=3 ids=[ER_DEX_NAV,TEMP_STAT_STAGE_BOOSTER,RARE_CANDY] tiers=[2,0,0]
+[log] [coop:transport] send host t=envelope t=envelope
+[log] [coop:reward] reward authoritative RESULT retained rev=2 tick=9 id=1830445198858232:0:REWARD:0
+[log] [coop:transport] recv guest t=interactionChoice seq=0 kind=reward choice=0 handlers=1
+[log] [coop:transport] recv guest t=envelope t=envelope handlers=1
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=host)
+[log] [coop:interaction] interactionCounter() read -> 0 (role=guest)
