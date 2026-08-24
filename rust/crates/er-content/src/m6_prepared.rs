@@ -25,10 +25,10 @@ use er_types::{
 };
 use thiserror::Error;
 
-use crate::m6_pack::{
+use crate::pack::m6_pack::{
     AbilityDefinitionV3, BattleContentPackV3, FormDefinitionV1, HeldItemDefinitionV3,
-    M6PackLoadError, MoveDefinitionV3, SpeciesDefinitionV3, StatusDefinitionV2,
-    TagDefinitionV2, TerrainDefinitionV2, WeatherDefinitionV2,
+    M6PackLoadError, MoveDefinitionV3, SpeciesDefinitionV3, StatusDefinitionV2, TagDefinitionV2,
+    TerrainDefinitionV2, WeatherDefinitionV2,
 };
 
 /// One binding site participating in a hook or query invocation.
@@ -133,15 +133,12 @@ const fn query_slot(query: MechanicQueryV2) -> usize {
 /// references, unclassified behavior units, dangling program/bespoke/RNG-site
 /// references, and broken ordering are rejected through the frozen pack
 /// validation before construction succeeds.
-pub fn prepare_content(
-    pack: BattleContentPackV3,
-) -> Result<PreparedBattleContentV3, ContentError> {
+pub fn prepare_content(pack: BattleContentPackV3) -> Result<PreparedBattleContentV3, ContentError> {
     // One total validation pass proves identity closure, reference closure,
     // classification closure, RNG ownership, and the embedded content hash.
     pack.validate().map_err(ContentError::Pack)?;
 
-    let mut hooks: [Vec<HookBindingRef>; HOOK_SOURCE_SLOTS] =
-        std::array::from_fn(|_| Vec::new());
+    let mut hooks: [Vec<HookBindingRef>; HOOK_SOURCE_SLOTS] = std::array::from_fn(|_| Vec::new());
     let mut queries: [Vec<HookBindingRef>; QUERY_SOURCE_SLOTS] =
         std::array::from_fn(|_| Vec::new());
 
@@ -151,12 +148,14 @@ pub fn prepare_content(
         };
         // Pack validation already proved program.id equals its slot; the slot
         // conversion only guards the platform index width.
-        let program_slot = u32::try_from(slot_index)
-            .map_err(|_| ContentError::IndexOverflow { value: slot_index as u64 })?;
+        let program_slot = u32::try_from(slot_index).map_err(|_| ContentError::IndexOverflow {
+            value: slot_index as u64,
+        })?;
         for (binding_index, binding) in program.bindings.iter().enumerate() {
-            let binding_index = u32::try_from(binding_index).map_err(|_| {
-                ContentError::IndexOverflow { value: binding_index as u64 }
-            })?;
+            let binding_index =
+                u32::try_from(binding_index).map_err(|_| ContentError::IndexOverflow {
+                    value: binding_index as u64,
+                })?;
             let reference = HookBindingRef {
                 program: program.id,
                 program_slot,
@@ -235,20 +234,17 @@ impl PreparedBattleContentV3 {
 
     /// Resolves one species definition by direct numeric-ID indexing.
     pub fn species(&self, id: SpeciesId) -> Result<&SpeciesDefinitionV3, ContentError> {
-        numeric_definition("species", &self.pack.species, id.get())
+        numeric_definition("species", &self.pack.species, id.get().get())
     }
 
     /// Resolves one move definition by direct numeric-ID indexing.
     pub fn move_definition(&self, id: MoveId) -> Result<&MoveDefinitionV3, ContentError> {
-        numeric_definition("moves", &self.pack.moves, id.get())
+        numeric_definition("moves", &self.pack.moves, id.get().get())
     }
 
     /// Resolves one ability definition by direct numeric-ID indexing.
-    pub fn ability_definition(
-        &self,
-        id: AbilityId,
-    ) -> Result<&AbilityDefinitionV3, ContentError> {
-        numeric_definition("abilities", &self.pack.abilities, id.get())
+    pub fn ability_definition(&self, id: AbilityId) -> Result<&AbilityDefinitionV3, ContentError> {
+        numeric_definition("abilities", &self.pack.abilities, id.get().get())
     }
 
     /// Resolves one major status definition by direct numeric-ID indexing.
@@ -382,9 +378,10 @@ impl PreparedBattleContentV3 {
         source: &BehaviorSourceId,
     ) -> Result<&[MechanicsProgramId], ContentError> {
         match source {
-            BehaviorSourceId::Move { numeric_id } => {
-                Ok(self.move_definition(MoveId::new(*numeric_id))?.mechanic_programs.as_slice())
-            }
+            BehaviorSourceId::Move { numeric_id } => Ok(self
+                .move_definition(MoveId::new(*numeric_id))?
+                .mechanic_programs
+                .as_slice()),
             BehaviorSourceId::ActiveAbility { numeric_id }
             | BehaviorSourceId::PassiveAbility { numeric_id } => Ok(self
                 .ability_definition(AbilityId::new(*numeric_id))?
@@ -406,18 +403,21 @@ impl PreparedBattleContentV3 {
             BehaviorSourceId::Terrain { numeric_id } => {
                 Ok(self.terrain(*numeric_id)?.mechanic_programs.as_slice())
             }
-            BehaviorSourceId::SideCondition { registry_key } => {
-                Ok(self.side_condition(registry_key)?.mechanic_programs.as_slice())
-            }
+            BehaviorSourceId::SideCondition { registry_key } => Ok(self
+                .side_condition(registry_key)?
+                .mechanic_programs
+                .as_slice()),
             BehaviorSourceId::ArenaTag { registry_key } => {
                 Ok(self.arena_tag(registry_key)?.mechanic_programs.as_slice())
             }
-            BehaviorSourceId::PositionalTag { registry_key } => {
-                Ok(self.positional_tag(registry_key)?.mechanic_programs.as_slice())
-            }
-            BehaviorSourceId::Species { numeric_id } => {
-                Ok(self.species(SpeciesId::new(*numeric_id))?.mechanic_programs.as_slice())
-            }
+            BehaviorSourceId::PositionalTag { registry_key } => Ok(self
+                .positional_tag(registry_key)?
+                .mechanic_programs
+                .as_slice()),
+            BehaviorSourceId::Species { numeric_id } => Ok(self
+                .species(SpeciesId::new(*numeric_id))?
+                .mechanic_programs
+                .as_slice()),
             BehaviorSourceId::Form { registry_key } => {
                 let form_id =
                     FormId::parse(registry_key).map_err(|_| ContentError::UnknownRegistryKey {
@@ -500,19 +500,18 @@ pub enum ContentError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::m6_pack::{
-        AbilitySlotDefinitionV1, BehaviorClassificationEntryV2,
-        BehaviorClassificationManifestV2, BespokeManifestV2, FieldContentV1,
+    use crate::pack::m6_pack::{
+        AbilitySlotDefinitionV1, BehaviorClassificationEntryV2, BehaviorClassificationManifestV2,
+        BespokeManifestV2, FieldContentV1,
     };
     use crate::pack::selected_type_chart;
     use crate::species::SpeciesBaseStats;
+    use er_mechanics::ProgramRange;
     use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
     use er_mechanics::m6::ProgramBudgetV2;
     use er_mechanics::selector_operation_v2::{MechanicOperationV2, SelectorArenaV2};
-    use er_mechanics::ProgramRange;
     use er_types::battle_model::{
-        EffectChance, MoveAccuracy, MoveCategory, MovePower, MoveTarget, PokemonType,
-        PokemonTyping,
+        EffectChance, MoveAccuracy, MoveCategory, MovePower, MoveTarget, PokemonType, PokemonTyping,
     };
     use er_types::{
         BehaviorClassificationKindV2, BehaviorUnitId, BehaviorUnitKind, BehaviorUnitOrdinal,
@@ -530,12 +529,11 @@ mod tests {
             },
             unit_kind: BehaviorUnitKind::IntrinsicMoveRule,
             ordinal: BehaviorUnitOrdinal::ZERO,
-            provenance_hash: ProvenanceHash::parse("0".repeat(64))
-                .expect("fixture must be valid"),
+            provenance_hash: ProvenanceHash::parse("0".repeat(64)).expect("fixture must be valid"),
         }
     }
 
-    fn binding(hook: MechanicHookV2, owner: BehaviorUnitId, start: u32) -> HookBindingV2 {
+    fn binding(hook: MechanicHookV2, owner: BehaviorUnitId, start: u16) -> HookBindingV2 {
         HookBindingV2 {
             hook,
             authored_priority: 0,
@@ -650,7 +648,9 @@ mod tests {
                         active: AbilityId::try_from_u64(9).expect("fixture must be valid"),
                         passives: [None, None, None],
                     },
-                    form_ids: vec![FormId::parse("species:20:base").expect("fixture must be valid")],
+                    form_ids: vec![
+                        FormId::parse("species:20:base").expect("fixture must be valid"),
+                    ],
                     mechanic_programs: Vec::new(),
                 }),
             ],
@@ -662,8 +662,7 @@ mod tests {
                 weight_override: None,
                 ability_override: None,
                 mechanic_programs: Vec::new(),
-                transformation_policy:
-                    crate::m6_pack::FormTransformationPolicyV1::Static,
+                transformation_policy: crate::pack::m6_pack::FormTransformationPolicyV1::Static,
             }],
             moves: vec![
                 None,
@@ -766,12 +765,16 @@ mod tests {
             programs: vec![
                 None,
                 // Program 1: one trigger binding.
-                Some(program(1, unit_one, vec![binding(MechanicHookV2::BeforeMove, unit(1), 0)])),
+                Some(program(
+                    1,
+                    unit_one.clone(),
+                    vec![binding(MechanicHookV2::BeforeMove, unit(1), 0)],
+                )),
                 None,
                 // Program 3: accuracy query stage sorts before BeforeMove.
                 Some(program(
                     3,
-                    unit_three,
+                    unit_three.clone(),
                     vec![
                         binding(MechanicHookV2::AccuracyQuery, unit(3), 0),
                         binding(MechanicHookV2::BeforeMove, unit(3), 1),
@@ -782,16 +785,18 @@ mod tests {
                 BehaviorClassificationEntryV2 {
                     behavior_unit: unit_one,
                     kind: BehaviorClassificationKindV2::Compiled,
-                    programs: vec![MechanicsProgramId::try_from_u64(1)
-                        .expect("fixture must be valid")],
+                    programs: vec![
+                        MechanicsProgramId::try_from_u64(1).expect("fixture must be valid"),
+                    ],
                     bespoke: None,
                     unsupported_reason: None,
                 },
                 BehaviorClassificationEntryV2 {
                     behavior_unit: unit_three,
                     kind: BehaviorClassificationKindV2::Compiled,
-                    programs: vec![MechanicsProgramId::try_from_u64(3)
-                        .expect("fixture must be valid")],
+                    programs: vec![
+                        MechanicsProgramId::try_from_u64(3).expect("fixture must be valid"),
+                    ],
                     bespoke: None,
                     unsupported_reason: None,
                 },
@@ -809,7 +814,10 @@ mod tests {
         let fixture = pack();
         let expected_hash = fixture.content_hash.clone();
         let prepared = prepare_content(fixture).expect("fixture must be valid");
-        assert_eq!(prepared.schema_version(), M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION);
+        assert_eq!(
+            prepared.schema_version(),
+            M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION
+        );
         assert_eq!(prepared.content_hash(), &expected_hash);
         assert_eq!(prepared.pack(), &pack());
     }
@@ -825,7 +833,9 @@ mod tests {
         .expect("fixture must be valid");
         assert!(matches!(
             prepare_content(fixture),
-            Err(ContentError::Pack(M6PackLoadError::ContentHashMismatch { .. }))
+            Err(ContentError::Pack(
+                M6PackLoadError::ContentHashMismatch { .. }
+            ))
         ));
     }
 
@@ -836,8 +846,16 @@ mod tests {
         assert_eq!(
             prepared.hook_sources(MechanicHookV2::BeforeMove),
             &[
-                HookBindingRef { program: MechanicsProgramId::try_from_u64(1).expect("valid"), program_slot: 1, binding: 0 },
-                HookBindingRef { program: MechanicsProgramId::try_from_u64(3).expect("valid"), program_slot: 3, binding: 1 },
+                HookBindingRef {
+                    program: MechanicsProgramId::try_from_u64(1).expect("valid"),
+                    program_slot: 1,
+                    binding: 0
+                },
+                HookBindingRef {
+                    program: MechanicsProgramId::try_from_u64(3).expect("valid"),
+                    program_slot: 3,
+                    binding: 1
+                },
             ]
         );
         assert_eq!(
@@ -848,7 +866,11 @@ mod tests {
                 binding: 0,
             }]
         );
-        assert!(prepared.query_sources(MechanicQueryV2::CriticalRate).is_empty());
+        assert!(
+            prepared
+                .query_sources(MechanicQueryV2::CriticalRate)
+                .is_empty()
+        );
 
         let (program, binding) = prepared
             .resolve_binding(prepared.hook_sources(MechanicHookV2::BeforeMove)[1])
@@ -871,15 +893,32 @@ mod tests {
     fn numeric_lookups_resolve_directly_and_fail_typed() {
         let prepared = prepare_content(pack()).expect("fixture must be valid");
 
-        assert_eq!(prepared.species(SpeciesId::try_from_u64(20).expect("valid")).expect("present").id.get().get(), 20);
-        assert_eq!(prepared.move_definition(MoveId::try_from_u64(7).expect("valid")).expect("present").base_pp, 40);
+        assert_eq!(
+            prepared
+                .species(SpeciesId::try_from_u64(20).expect("valid"))
+                .expect("present")
+                .id
+                .get()
+                .get(),
+            20
+        );
+        assert_eq!(
+            prepared
+                .move_definition(MoveId::try_from_u64(7).expect("valid"))
+                .expect("present")
+                .base_pp,
+            40
+        );
         assert_eq!(prepared.status(safe(11)).expect("present").id.get(), 11);
         assert_eq!(prepared.weather(safe(13)).expect("present").id.get(), 13);
         assert_eq!(prepared.terrain(safe(15)).expect("present").id.get(), 15);
 
         assert!(matches!(
             prepared.species(SpeciesId::try_from_u64(21).expect("valid")),
-            Err(ContentError::UnknownNumericId { kind: "species", id: 21 })
+            Err(ContentError::UnknownNumericId {
+                kind: "species",
+                id: 21
+            })
         ));
         assert!(matches!(
             prepared.move_definition(MoveId::try_from_u64(6).expect("valid")),
@@ -892,15 +931,24 @@ mod tests {
         let prepared = prepare_content(pack()).expect("fixture must be valid");
 
         assert_eq!(
-            prepared.held_item("alpha-item").expect("present").registry_key,
+            prepared
+                .held_item("alpha-item")
+                .expect("present")
+                .registry_key,
             "alpha-item"
         );
         assert_eq!(
-            prepared.side_condition("beta-side").expect("present").registry_key,
+            prepared
+                .side_condition("beta-side")
+                .expect("present")
+                .registry_key,
             "beta-side"
         );
         assert_eq!(
-            prepared.battler_tag("zeta-tag").expect("present").registry_key,
+            prepared
+                .battler_tag("zeta-tag")
+                .expect("present")
+                .registry_key,
             "zeta-tag"
         );
         let form = prepared
@@ -910,11 +958,17 @@ mod tests {
 
         assert!(matches!(
             prepared.held_item("absent-item"),
-            Err(ContentError::UnknownRegistryKey { kind: "held_items", .. })
+            Err(ContentError::UnknownRegistryKey {
+                kind: "held_items",
+                ..
+            })
         ));
         assert!(matches!(
             prepared.battler_tag("absent-tag"),
-            Err(ContentError::UnknownRegistryKey { kind: "battler_tags", .. })
+            Err(ContentError::UnknownRegistryKey {
+                kind: "battler_tags",
+                ..
+            })
         ));
         assert!(matches!(
             prepared.form(&FormId::parse("species:20:other").expect("fixture must be valid")),
@@ -941,18 +995,35 @@ mod tests {
     fn source_programs_resolve_through_the_same_indexes() {
         let prepared = prepare_content(pack()).expect("fixture must be valid");
 
-        let move_source = BehaviorSourceId::Move { numeric_id: safe(7) };
-        assert!(prepared.source_programs(&move_source).expect("present").is_empty());
+        let move_source = BehaviorSourceId::Move {
+            numeric_id: safe(7),
+        };
+        assert!(
+            prepared
+                .source_programs(&move_source)
+                .expect("present")
+                .is_empty()
+        );
 
-        let program_source = BehaviorSourceId::Species { numeric_id: safe(20) };
-        assert!(prepared.source_programs(&program_source).expect("present").is_empty());
+        let program_source = BehaviorSourceId::Species {
+            numeric_id: safe(20),
+        };
+        assert!(
+            prepared
+                .source_programs(&program_source)
+                .expect("present")
+                .is_empty()
+        );
 
         let unknown = BehaviorSourceId::HeldItem {
             registry_key: "absent-item".to_owned(),
         };
         assert!(matches!(
             prepared.source_programs(&unknown),
-            Err(ContentError::UnknownRegistryKey { kind: "held_items", .. })
+            Err(ContentError::UnknownRegistryKey {
+                kind: "held_items",
+                ..
+            })
         ));
 
         let bespoke = BehaviorSourceId::Bespoke {
