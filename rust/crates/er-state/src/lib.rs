@@ -9,6 +9,7 @@ pub mod field;
 pub mod format;
 pub mod game_v2;
 pub mod mechanic_state;
+pub mod mechanic_state_v2;
 pub mod migration;
 pub mod migration_v3;
 pub mod pokemon;
