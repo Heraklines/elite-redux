@@ -10,6 +10,7 @@ pub mod m6;
 pub mod operation;
 pub mod program;
 pub mod selector;
+pub mod v2;
 pub mod value;
 
 pub use condition::*;
@@ -19,4 +20,5 @@ pub use m6::*;
 pub use operation::*;
 pub use program::*;
 pub use selector::*;
+pub use v2::*;
 pub use value::*;
