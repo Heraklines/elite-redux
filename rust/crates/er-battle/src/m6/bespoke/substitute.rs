@@ -27,9 +27,9 @@
 use er_state::bespoke_v2::substitute::{
     SubstituteProxyStateError, SubstituteProxyStateV2, SubstituteProxyStoreV2,
 };
+use er_types::SafeU53;
 use er_types::battle_ids::PokemonId;
 use er_types::m6::BehaviorUnitId;
-use er_types::SafeU53;
 use thiserror::Error;
 
 /// Rational HP-cost fraction mirroring the frozen `AddSubstituteAttr`
@@ -91,10 +91,7 @@ pub enum SubstituteClearReason {
 /// Typed creation decision.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SubstituteCreationOutcome {
-    Created {
-        cost: SafeU53,
-        proxy_hp: SafeU53,
-    },
+    Created { cost: SafeU53, proxy_hp: SafeU53 },
     Failed(SubstituteCreationFailure),
 }
 
@@ -104,10 +101,7 @@ pub enum SubstituteCreationFailure {
     /// A doll is already protecting this battler (`substituteOnOverlap`).
     ProxyAlreadyActive,
     /// `hp_current <= cost`; the strict-oracle eligibility failed.
-    InsufficientHp {
-        hp_current: SafeU53,
-        cost: SafeU53,
-    },
+    InsufficientHp { hp_current: SafeU53, cost: SafeU53 },
 }
 
 /// One atomic creation attempt.
@@ -127,9 +121,7 @@ pub struct SubstituteCreationTransition {
 pub enum SubstituteDamageOutcome {
     /// No doll applied (absent, bypassed, or non-owner targeting): the full
     /// damage reaches the owner's real HP.
-    PassedThrough {
-        damage_to_owner: SafeU53,
-    },
+    PassedThrough { damage_to_owner: SafeU53 },
     /// The doll absorbed the hit.
     Absorbed {
         proxy_hp_before: SafeU53,
@@ -269,8 +261,7 @@ pub fn create_substitute(
         .get()
         .checked_sub(cost.get())
         .ok_or(SubstituteMechanicError::Overflow)?;
-    let owner_hp_after =
-        SafeU53::new(hp_after).map_err(|_| SubstituteMechanicError::Overflow)?;
+    let owner_hp_after = SafeU53::new(hp_after).map_err(|_| SubstituteMechanicError::Overflow)?;
 
     let updated = store.clone().upsert(SubstituteProxyStateV2 {
         owner: request.owner,
@@ -328,12 +319,9 @@ pub fn intercept_damage(
         let damage_to_owner = incoming_damage;
         // Real HP floors at zero; faint handling stays with the battle
         // transition owner, exactly like `damageAndUpdate` in the oracle.
-        let owner_hp_after = SafeU53::new(
-            owner_hp_current
-                .get()
-                .saturating_sub(damage_to_owner.get()),
-        )
-        .map_err(|_| SubstituteMechanicError::Overflow)?;
+        let owner_hp_after =
+            SafeU53::new(owner_hp_current.get().saturating_sub(damage_to_owner.get()))
+                .map_err(|_| SubstituteMechanicError::Overflow)?;
         return Ok(SubstituteDamageTransition {
             outcome: SubstituteDamageOutcome::PassedThrough { damage_to_owner },
             target_effects_blocked: false,
@@ -442,7 +430,9 @@ mod tests {
 
     fn substitute_unit() -> BehaviorUnitId {
         BehaviorUnitId {
-            source: BehaviorSourceId::Move { numeric_id: hp(164) },
+            source: BehaviorSourceId::Move {
+                numeric_id: hp(164),
+            },
             unit_kind: BehaviorUnitKind::MoveAttribute,
             ordinal: BehaviorUnitOrdinal::new(0),
             provenance_hash: ProvenanceHash::parse(SUBSTITUTE_PROVENANCE).expect("provenance"),
@@ -569,8 +559,7 @@ mod tests {
         // exactly one hit: credited damage min(damage, 0) = 0, overkill =
         // full damage, broken, then removed by the break sweep.
         assert!(intercepts_hit(&created.store, owner(9), &direct_hit()));
-        let hit =
-            intercept_damage(&created.store, owner(9), &direct_hit(), hp(5), hp(2)).unwrap();
+        let hit = intercept_damage(&created.store, owner(9), &direct_hit(), hp(5), hp(2)).unwrap();
         assert_eq!(
             hit.outcome,
             SubstituteDamageOutcome::Absorbed {
@@ -592,8 +581,7 @@ mod tests {
             .unwrap()
             .store;
         // 10 < 25: the doll takes the full hit and survives with 15 HP.
-        let transition =
-            intercept_damage(&store, owner(5), &direct_hit(), hp(10), hp(55)).unwrap();
+        let transition = intercept_damage(&store, owner(5), &direct_hit(), hp(10), hp(55)).unwrap();
         assert_eq!(
             transition.outcome,
             SubstituteDamageOutcome::Absorbed {
@@ -622,8 +610,7 @@ mod tests {
             .store;
 
         // Exact equality breaks: the removal sweep keeps only `hp > 0`.
-        let equal = intercept_damage(&store, owner(5), &direct_hit(), hp(25), hp(55))
-            .unwrap();
+        let equal = intercept_damage(&store, owner(5), &direct_hit(), hp(25), hp(55)).unwrap();
         assert_eq!(
             equal.outcome,
             SubstituteDamageOutcome::Absorbed {
@@ -638,8 +625,7 @@ mod tests {
 
         // Overflow breaks and reports the excess past the doll.
         let recreated = create(&equal.store, 5, 80, 100).unwrap().store;
-        let above =
-            intercept_damage(&recreated, owner(5), &direct_hit(), hp(90), hp(55)).unwrap();
+        let above = intercept_damage(&recreated, owner(5), &direct_hit(), hp(90), hp(55)).unwrap();
         assert_eq!(
             above.outcome,
             SubstituteDamageOutcome::Absorbed {
@@ -727,23 +713,20 @@ mod tests {
             .store;
         let store = create(&store, 6, 80, 100).unwrap().store;
 
-        let switch_out =
-            clear_proxy(&store, owner(5), SubstituteClearReason::SwitchOut).unwrap();
+        let switch_out = clear_proxy(&store, owner(5), SubstituteClearReason::SwitchOut).unwrap();
         assert_eq!(switch_out.cleared.len(), 1);
         assert_eq!(switch_out.cleared[0].owner, owner(5));
         assert_eq!(switch_out.reason, SubstituteClearReason::SwitchOut);
         assert!(!switch_out.store.is_active(owner(5)));
         assert!(switch_out.store.is_active(owner(6)));
 
-        let faint =
-            clear_proxy(&switch_out.store, owner(6), SubstituteClearReason::Faint).unwrap();
+        let faint = clear_proxy(&switch_out.store, owner(6), SubstituteClearReason::Faint).unwrap();
         assert_eq!(faint.cleared.len(), 1);
         faint.store.validate().unwrap();
         assert!(faint.store.proxies.is_empty());
 
         // Clearing an absent doll is a deterministic no-op.
-        let noop =
-            clear_proxy(&faint.store, owner(5), SubstituteClearReason::SwitchOut).unwrap();
+        let noop = clear_proxy(&faint.store, owner(5), SubstituteClearReason::SwitchOut).unwrap();
         assert!(noop.cleared.is_empty());
         assert_eq!(noop.store, faint.store);
     }
@@ -816,8 +799,7 @@ mod tests {
             .unwrap()
             .store;
         assert_eq!(
-            intercept_damage(&store, owner(5), &direct_hit(), SafeU53::ZERO, hp(55))
-                .unwrap_err(),
+            intercept_damage(&store, owner(5), &direct_hit(), SafeU53::ZERO, hp(55)).unwrap_err(),
             SubstituteMechanicError::ZeroIncomingDamage
         );
 

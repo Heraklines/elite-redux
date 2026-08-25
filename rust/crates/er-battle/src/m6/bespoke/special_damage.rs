@@ -96,20 +96,33 @@ pub struct RetaliationProfileV2 {
 pub fn retaliation_profile(move_id: u16) -> Result<RetaliationProfileV2, SpecialDamageError> {
     let (multiplier, filter) = match move_id {
         MOVE_COUNTER => (
-            ExactRatioV2 { numerator: 2, denominator: 1 },
+            ExactRatioV2 {
+                numerator: 2,
+                denominator: 1,
+            },
             SpecialDamageFilter::Physical,
         ),
         MOVE_MIRROR_COAT => (
-            ExactRatioV2 { numerator: 2, denominator: 1 },
+            ExactRatioV2 {
+                numerator: 2,
+                denominator: 1,
+            },
             SpecialDamageFilter::Special,
         ),
         MOVE_METAL_BURST | MOVE_COMEUPPANCE => (
-            ExactRatioV2 { numerator: 3, denominator: 2 },
+            ExactRatioV2 {
+                numerator: 3,
+                denominator: 2,
+            },
             SpecialDamageFilter::Both,
         ),
         _ => return Err(SpecialDamageError::UnsupportedRetaliationMove(move_id)),
     };
-    Ok(RetaliationProfileV2 { move_id, multiplier, filter })
+    Ok(RetaliationProfileV2 {
+        move_id,
+        multiplier,
+        filter,
+    })
 }
 
 /// Typed view of the live field used for target selection. Sorted ascending,
@@ -165,18 +178,29 @@ pub enum CounterTargetSelection {
     Direct(u8),
     /// The recorded attacker left the field and the first active battler on
     /// the attacker's side was delivered instead (multi-battle fallback).
-    SideFallback { recorded_index: u8, delivered_index: u8 },
+    SideFallback {
+        recorded_index: u8,
+        delivered_index: u8,
+    },
 }
 
 impl CounterTargetSelection {
     pub fn delivered_index(&self) -> u8 {
         match *self {
-            Self::Direct(index) | Self::SideFallback { delivered_index: index, .. } => index,
+            Self::Direct(index)
+            | Self::SideFallback {
+                delivered_index: index,
+                ..
+            } => index,
         }
     }
     pub fn recorded_index(&self) -> u8 {
         match *self {
-            Self::Direct(index) | Self::SideFallback { recorded_index: index, .. } => index,
+            Self::Direct(index)
+            | Self::SideFallback {
+                recorded_index: index,
+                ..
+            } => index,
         }
     }
 }
@@ -219,7 +243,10 @@ pub fn select_counter_target(
     // oracle's `attacksReceived.find`.
     let record = *current_turn[0];
     if field.battler_count <= 1 || field.is_active(record.attacker_index) {
-        return Ok((record, CounterTargetSelection::Direct(record.attacker_index)));
+        return Ok((
+            record,
+            CounterTargetSelection::Direct(record.attacker_index),
+        ));
     }
     match field.first_active_on_same_side(record.attacker_index) {
         Some(delivered_index) => Ok((
@@ -250,8 +277,8 @@ pub fn compute_retaliation_amount(
     if multiplier.numerator < 0 {
         return Err(SpecialDamageError::InvalidRatio);
     }
-    let damage = i64::try_from(recorded_damage.get())
-        .map_err(|_| SpecialDamageError::ArithmeticOverflow)?;
+    let damage =
+        i64::try_from(recorded_damage.get()).map_err(|_| SpecialDamageError::ArithmeticOverflow)?;
     let scaled = damage
         .checked_mul(i64::from(multiplier.numerator))
         .ok_or(SpecialDamageError::ArithmeticOverflow)?;
@@ -301,8 +328,13 @@ pub fn execute_retaliation(
     request: RetaliationRequestV2<'_>,
 ) -> Result<(SpecialDamageStateV2, RetaliationTransitionV2), SpecialDamageError> {
     let profile = retaliation_profile(request.move_id)?;
-    let (record, selection) =
-        select_counter_target(state, request.owner_index, &profile, request.turn_index, &request.field)?;
+    let (record, selection) = select_counter_target(
+        state,
+        request.owner_index,
+        &profile,
+        request.turn_index,
+        &request.field,
+    )?;
     let retaliation_damage = compute_retaliation_amount(record.damage, profile.multiplier)?;
     let transition = RetaliationTransitionV2 {
         move_id: profile.move_id,
@@ -376,7 +408,12 @@ mod tests {
     const ENEMY_B: u8 = 3;
     const TURN: i64 = 11;
 
-    fn hit(attacker_index: u8, move_category: u8, damage: u64, turn_index: i64) -> StoredDamageRequestV2 {
+    fn hit(
+        attacker_index: u8,
+        move_category: u8,
+        damage: u64,
+        turn_index: i64,
+    ) -> StoredDamageRequestV2 {
         StoredDamageRequestV2 {
             attacker_index,
             move_category,
@@ -386,7 +423,10 @@ mod tests {
     }
 
     fn doubles_field(active: &[u8]) -> CounterFieldView<'_> {
-        CounterFieldView { active_indices: active, battler_count: 2 }
+        CounterFieldView {
+            active_indices: active,
+            battler_count: 2,
+        }
     }
 
     #[test]
@@ -457,15 +497,36 @@ mod tests {
     #[test]
     fn metal_burst_rounds_down_and_enforces_the_frozen_minimum() {
         assert_eq!(
-            compute_retaliation_amount(SafeU53::new(5).unwrap(), ExactRatioV2 { numerator: 3, denominator: 2 }).unwrap(),
+            compute_retaliation_amount(
+                SafeU53::new(5).unwrap(),
+                ExactRatioV2 {
+                    numerator: 3,
+                    denominator: 2
+                }
+            )
+            .unwrap(),
             7,
         );
         assert_eq!(
-            compute_retaliation_amount(SafeU53::new(1).unwrap(), ExactRatioV2 { numerator: 3, denominator: 2 }).unwrap(),
+            compute_retaliation_amount(
+                SafeU53::new(1).unwrap(),
+                ExactRatioV2 {
+                    numerator: 3,
+                    denominator: 2
+                }
+            )
+            .unwrap(),
             TO_DMG_VALUE_MINIMUM,
         );
         assert_eq!(
-            compute_retaliation_amount(SafeU53::new(0).unwrap(), ExactRatioV2 { numerator: 2, denominator: 1 }).unwrap(),
+            compute_retaliation_amount(
+                SafeU53::new(0).unwrap(),
+                ExactRatioV2 {
+                    numerator: 2,
+                    denominator: 1
+                }
+            )
+            .unwrap(),
             TO_DMG_VALUE_MINIMUM,
         );
     }
@@ -488,7 +549,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(transition.record.attacker_index, ENEMY_A);
-        assert_eq!(transition.selection, CounterTargetSelection::Direct(ENEMY_A));
+        assert_eq!(
+            transition.selection,
+            CounterTargetSelection::Direct(ENEMY_A)
+        );
         assert_eq!(transition.retaliation_damage, 60);
     }
 
@@ -578,11 +642,17 @@ mod tests {
                 move_id: MOVE_COUNTER,
                 owner_index: OWNER,
                 turn_index: TURN,
-                field: CounterFieldView { active_indices: &[OWNER], battler_count: 1 },
+                field: CounterFieldView {
+                    active_indices: &[OWNER],
+                    battler_count: 1,
+                },
             },
         )
         .unwrap();
-        assert_eq!(transition.selection, CounterTargetSelection::Direct(ENEMY_A));
+        assert_eq!(
+            transition.selection,
+            CounterTargetSelection::Direct(ENEMY_A)
+        );
     }
 
     #[test]
@@ -606,29 +676,44 @@ mod tests {
 
     #[test]
     fn accumulated_release_uses_the_same_frozen_rounding_rule() {
-        let opened = SpecialDamageStateV2::default().begin_accumulation(TURN).unwrap();
+        let opened = SpecialDamageStateV2::default()
+            .begin_accumulation(TURN)
+            .unwrap();
         let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).unwrap();
         let closed = hit_one.close_accumulation_turn().unwrap();
         let reopened = closed.open_next_accumulation_turn(TURN + 1).unwrap();
         let hit_two = reopened
             .record_attack(hit(ENEMY_B, 1, 25, TURN + 1))
             .unwrap();
-        let (successor, transition) =
-            execute_accumulated_release(&hit_two, ExactRatioV2 { numerator: 2, denominator: 1 })
-                .unwrap();
+        let (successor, transition) = execute_accumulated_release(
+            &hit_two,
+            ExactRatioV2 {
+                numerator: 2,
+                denominator: 1,
+            },
+        )
+        .unwrap();
         assert_eq!(transition.retaliation_damage, 110);
         assert!(!successor.accumulating);
         assert_eq!(successor.accumulated_damage.get(), 0);
         assert_eq!(
-            execute_accumulated_release(&successor, ExactRatioV2 { numerator: 2, denominator: 1 })
-                .unwrap_err(),
+            execute_accumulated_release(
+                &successor,
+                ExactRatioV2 {
+                    numerator: 2,
+                    denominator: 1
+                }
+            )
+            .unwrap_err(),
             SpecialDamageError::State(SpecialDamageStateError::NotAccumulating),
         );
     }
 
     #[test]
     fn reset_clears_every_family_state_surface() {
-        let opened = SpecialDamageStateV2::default().begin_accumulation(TURN).unwrap();
+        let opened = SpecialDamageStateV2::default()
+            .begin_accumulation(TURN)
+            .unwrap();
         let hit_one = opened.record_attack(hit(ENEMY_A, 0, 30, TURN)).unwrap();
         let cleared = hit_one.clear_record_window();
         assert!(cleared.records.is_empty());

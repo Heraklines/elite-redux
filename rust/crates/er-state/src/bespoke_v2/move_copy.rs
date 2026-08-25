@@ -283,8 +283,7 @@ impl MoveCopyStateV2 {
             .get()
             .checked_add(1)
             .ok_or(MoveCopyStateError::OrdinalsExhausted)?;
-        let next =
-            SafeU53::new(next_value).map_err(|_| MoveCopyStateError::OrdinalsExhausted)?;
+        let next = SafeU53::new(next_value).map_err(|_| MoveCopyStateError::OrdinalsExhausted)?;
 
         let index = self
             .actors

@@ -229,13 +229,21 @@ impl TransformFormCopyStateV2 {
 
     /// Position of `subject`'s entry, if registered.
     pub fn position_of(&self, subject: PokemonId) -> Option<usize> {
-        self.entries.iter().position(|entry| entry.subject == subject)
+        self.entries
+            .iter()
+            .position(|entry| entry.subject == subject)
     }
 
     /// Validated insert-or-replace preserving strict subject ordering.
-    pub fn upsert(&mut self, entry: TransformCopyEntryV2) -> Result<(), TransformFormCopyStateError> {
+    pub fn upsert(
+        &mut self,
+        entry: TransformCopyEntryV2,
+    ) -> Result<(), TransformFormCopyStateError> {
         entry.validate()?;
-        match self.entries.binary_search_by(|probe| probe.subject.cmp(&entry.subject)) {
+        match self
+            .entries
+            .binary_search_by(|probe| probe.subject.cmp(&entry.subject))
+        {
             Ok(index) => self.entries[index] = entry,
             Err(index) => self.entries.insert(index, entry),
         }
@@ -263,9 +271,7 @@ impl TransformFormCopyStateV2 {
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum TransformFormCopyStateError {
-    #[error(
-        "transform form-copy state schema version must be {expected}, got {actual}"
-    )]
+    #[error("transform form-copy state schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
     #[error("transform copy entries must be strictly ordered by unique subject")]
     EntriesOutOfOrder,

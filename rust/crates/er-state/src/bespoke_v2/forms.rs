@@ -27,8 +27,8 @@
 
 use er_types::SafeU53;
 use er_types::battle_ids::BattleSide;
-use er_types::mechanics::MechanicScope;
 use er_types::m6::M6_MECHANIC_STATE_SCHEMA_VERSION;
+use er_types::mechanics::MechanicScope;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -106,7 +106,9 @@ impl FormOverlayV2 {
                 Some(ordinal) if ordinal <= MAX_POKEMON_TYPE_ORDINAL => Ok(()),
                 _ => Err(FormsStateError::InvalidTeraTypeOrdinal),
             },
-            FormOverlayKindV2::Conditional | FormOverlayKindV2::Stance | FormOverlayKindV2::Mega => {
+            FormOverlayKindV2::Conditional
+            | FormOverlayKindV2::Stance
+            | FormOverlayKindV2::Mega => {
                 if self.tera_type_ordinal.is_some() {
                     return Err(FormsStateError::UnexpectedTeraType);
                 }
@@ -258,7 +260,10 @@ impl FormsStateV2 {
     ) -> Result<Self, FormsStateError> {
         let mut next = self.clone();
         let entry = FormsBattlerStateV2::new(scope, base)?;
-        match next.battlers.binary_search_by(|b| b.scope.cmp(&entry.scope)) {
+        match next
+            .battlers
+            .binary_search_by(|b| b.scope.cmp(&entry.scope))
+        {
             Ok(_) => return Err(FormsStateError::DuplicateScope),
             Err(position) => next.battlers.insert(position, entry),
         }
@@ -322,7 +327,13 @@ impl FormsStateV2 {
 
     /// Appends `cue` with the next deterministic ordinal. Caller must have
     /// validated the state beforehand.
-    pub fn push_cue(&mut self, kind: FormCueKindV2, scope: MechanicScope, from: Option<FormIdentityV2>, to: Option<FormIdentityV2>) -> FormPresentationCueV2 {
+    pub fn push_cue(
+        &mut self,
+        kind: FormCueKindV2,
+        scope: MechanicScope,
+        from: Option<FormIdentityV2>,
+        to: Option<FormIdentityV2>,
+    ) -> FormPresentationCueV2 {
         let ordinal = self.next_cue_ordinal;
         self.next_cue_ordinal = ordinal.saturating_add(1);
         let cue = FormPresentationCueV2 {
@@ -385,10 +396,7 @@ impl SpeciesFormRegistryV2 {
             .map(|id| SafeU53::new(id).map_err(|_| FormsStateError::ZeroSpecies))
             .collect::<Result<_, _>>()?;
         entries.sort();
-        if entries
-            .windows(2)
-            .any(|window| window[0] == window[1])
-        {
+        if entries.windows(2).any(|window| window[0] == window[1]) {
             return Err(FormsStateError::DuplicateSpeciesEntry);
         }
         Ok(Self { entries })
@@ -415,11 +423,7 @@ impl SpeciesFormRegistryV2 {
     }
 
     pub fn validate(&self) -> Result<(), FormsStateError> {
-        if self
-            .entries
-            .windows(2)
-            .any(|window| window[0] >= window[1])
-        {
+        if self.entries.windows(2).any(|window| window[0] >= window[1]) {
             return Err(FormsStateError::SpeciesRegistryOutOfOrder);
         }
         if self.entries.iter().any(|entry| *entry == SafeU53::ZERO) {
@@ -428,7 +432,6 @@ impl SpeciesFormRegistryV2 {
         Ok(())
     }
 }
-
 
 #[derive(Debug, Eq, Error, PartialEq)]
 pub enum FormsTransitionScopeError {

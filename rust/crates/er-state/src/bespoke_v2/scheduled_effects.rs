@@ -293,15 +293,9 @@ pub struct FieldConditionInstance {
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum FieldConditionKind {
-    Weather {
-        weather: WeatherId,
-    },
-    Terrain {
-        terrain: TerrainId,
-    },
-    ArenaTag {
-        tag: ArenaTagId,
-    },
+    Weather { weather: WeatherId },
+    Terrain { terrain: TerrainId },
+    ArenaTag { tag: ArenaTagId },
 }
 
 impl FieldConditionKind {

@@ -155,8 +155,8 @@ impl SpecialDamageStateV2 {
                 .get()
                 .checked_add(record.damage.get())
                 .ok_or(SpecialDamageStateError::AccumulatorOverflow)?;
-            next.accumulated_damage = SafeU53::new(sum)
-                .map_err(|_| SpecialDamageStateError::AccumulatorOverflow)?;
+            next.accumulated_damage =
+                SafeU53::new(sum).map_err(|_| SpecialDamageStateError::AccumulatorOverflow)?;
         }
         next.validate()?;
         Ok(next)
@@ -259,9 +259,7 @@ pub enum SpecialDamageStateError {
     RecordWindowFull,
     #[error("received-attack records must keep non-decreasing turn order")]
     RecordsOutOfOrder,
-    #[error(
-        "accumulating state rejected damage from outside its open accumulation turn"
-    )]
+    #[error("accumulating state rejected damage from outside its open accumulation turn")]
     StaleAccumulationTurn,
     #[error("Bide-style accumulation is not open")]
     NotAccumulating,
@@ -294,12 +292,15 @@ mod tests {
         let after_physical = base.record_attack(request(120, 0)).unwrap();
         let after_special = after_physical.record_attack(request(40, 1)).unwrap();
         assert_eq!(after_special.records.len(), 2);
-        assert_eq!(after_special.records[0].category, SpecialDamageCategory::Physical);
-        assert_eq!(after_special.records[1].category, SpecialDamageCategory::Special);
         assert_eq!(
-            after_special.records[0].damage,
-            SafeU53::new(120).unwrap(),
+            after_special.records[0].category,
+            SpecialDamageCategory::Physical
         );
+        assert_eq!(
+            after_special.records[1].category,
+            SpecialDamageCategory::Special
+        );
+        assert_eq!(after_special.records[0].damage, SafeU53::new(120).unwrap(),);
     }
 
     #[test]
@@ -314,7 +315,10 @@ mod tests {
             Err(SpecialDamageStateError::ZeroRecordDamage),
         );
         let seeded = base.record_attack(request(10, 0)).unwrap();
-        let stale = StoredDamageRequestV2 { turn_index: 6, ..request(10, 1) };
+        let stale = StoredDamageRequestV2 {
+            turn_index: 6,
+            ..request(10, 1)
+        };
         assert_eq!(
             seeded.record_attack(stale),
             Err(SpecialDamageStateError::RecordsOutOfOrder),
@@ -344,11 +348,16 @@ mod tests {
 
     #[test]
     fn accumulates_and_releases_bide_style_totals_exactly() {
-        let opened = SpecialDamageStateV2::default().begin_accumulation(TURN).unwrap();
+        let opened = SpecialDamageStateV2::default()
+            .begin_accumulation(TURN)
+            .unwrap();
         let first_hit = opened.record_attack(request(100, 0)).unwrap();
         let closed_first = first_hit.close_accumulation_turn().unwrap();
         let reopened = closed_first.open_next_accumulation_turn(TURN + 1).unwrap();
-        let second_turn = StoredDamageRequestV2 { turn_index: TURN + 1, ..request(30, 1) };
+        let second_turn = StoredDamageRequestV2 {
+            turn_index: TURN + 1,
+            ..request(30, 1)
+        };
         let second_hit = reopened.record_attack(second_turn).unwrap();
         let (released_state, released) = second_hit.release_accumulation().unwrap();
         assert_eq!(released, SafeU53::new(130).unwrap());
@@ -367,7 +376,9 @@ mod tests {
 
     #[test]
     fn clear_window_keeps_accumulator_and_reset_clears_everything() {
-        let opened = SpecialDamageStateV2::default().begin_accumulation(TURN).unwrap();
+        let opened = SpecialDamageStateV2::default()
+            .begin_accumulation(TURN)
+            .unwrap();
         let hit = opened.record_attack(request(55, 1)).unwrap();
         let cleared = hit.clear_record_window();
         assert!(cleared.records.is_empty());

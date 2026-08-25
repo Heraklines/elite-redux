@@ -19,10 +19,9 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use er_state::bespoke_v2::transform_imposter::{
-    TRANSFORM_COPIED_PP_CAP, TransformCopyEntryV2, TransformCopyTriggerV2,
-    TransformCopiedAbilitiesV2, TransformCopiedBattleStateV2, TransformCopiedGenderV2,
-    TransformCopiedMoveV2, TransformCopiedStatsV2, TransformFormCopyStateError,
-    TransformFormCopyStateV2,
+    TRANSFORM_COPIED_PP_CAP, TransformCopiedAbilitiesV2, TransformCopiedBattleStateV2,
+    TransformCopiedGenderV2, TransformCopiedMoveV2, TransformCopiedStatsV2, TransformCopyEntryV2,
+    TransformCopyTriggerV2, TransformFormCopyStateError, TransformFormCopyStateV2,
 };
 use er_types::SafeU53;
 use er_types::battle_ids::{AbilityId, FieldSlot, MoveId, PokemonId};
@@ -78,9 +77,7 @@ pub struct TransformImposterFactsV2 {
 
 /// Every battle-visible field the transform copy carries, in the fixed
 /// evidence order used by all successful plans.
-#[derive(
-    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize,
-)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TransformCopiedFieldV2 {
     Species,
@@ -232,13 +229,9 @@ pub fn apply_transform_copy(
     plan.copied
         .validate()
         .map_err(TransformImposterError::InvalidCopiedState)?;
-    let entry = TransformCopyEntryV2::active(
-        plan.subject,
-        plan.trigger,
-        plan.source,
-        plan.copied.clone(),
-    )
-    .map_err(TransformImposterError::InvalidCopiedState)?;
+    let entry =
+        TransformCopyEntryV2::active(plan.subject, plan.trigger, plan.source, plan.copied.clone())
+            .map_err(TransformImposterError::InvalidCopiedState)?;
 
     let mut next = state.clone();
     match next
@@ -371,9 +364,9 @@ pub enum TransformImposterError {
 
 #[cfg(test)]
 mod tests {
-    use er_types::battle_ids::BattleSide;
-    use super::*;
     use super::TransformTransitionKindV2 as Kind;
+    use super::*;
+    use er_types::battle_ids::BattleSide;
 
     const SUBJECT_ID: u64 = 10;
     const SOURCE_ID: u64 = 20;
@@ -383,6 +376,7 @@ mod tests {
         PokemonId::try_from_u64(value).expect("in-range pokemon id")
     }
 
+    fn slot(position: u8) -> FieldSlot {
         FieldSlot::new(BattleSide::Player, position).expect("valid slot")
     }
 
@@ -486,7 +480,10 @@ mod tests {
         assert_eq!(plan.source, pid(SOURCE_ID));
         assert_eq!(copied.species, species(6));
         assert_eq!(copied.form_key.as_str(), "1");
-        assert_eq!(copied.typing.primary, er_types::battle_model::PokemonType::Fire);
+        assert_eq!(
+            copied.typing.primary,
+            er_types::battle_model::PokemonType::Fire
+        );
         assert_eq!(copied.gender, TransformCopiedGenderV2::Male);
         assert_eq!(copied.abilities.active, ability(58));
         assert_eq!(copied.abilities.passives[0], Some(ability(66)));
@@ -541,10 +538,12 @@ mod tests {
         let round_tripped: TransformFormCopyStateV2 =
             serde_json::from_str(&serialized).expect("deserialize");
         assert_eq!(round_tripped, transition.state);
-        assert!(serde_json::from_str::<TransformFormCopyStateV2>(
-            &serialized.replace("\"active\":true", "\"active\":true,\"stale\":1"),
-        )
-        .is_err());
+        assert!(
+            serde_json::from_str::<TransformFormCopyStateV2>(
+                &serialized.replace("\"active\":true", "\"active\":true,\"stale\":1"),
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -671,10 +670,7 @@ mod tests {
         let mut illusioned_subject = base_subject.clone();
         illusioned_subject.behind_illusion = true;
         assert_eq!(
-            plan_transform_copy(&facts(
-                illusioned_subject,
-                Some(valid_target.clone())
-            )),
+            plan_transform_copy(&facts(illusioned_subject, Some(valid_target.clone()))),
             Err(TransformImposterError::SubjectIllusion)
         );
 
@@ -748,8 +744,8 @@ mod tests {
             Some(battler(SOURCE_ID, 42, 81)),
         ))
         .expect("second plan must succeed");
-        let second = apply_transform_copy(&first.state, &other_plan)
-            .expect("second apply must succeed");
+        let second =
+            apply_transform_copy(&first.state, &other_plan).expect("second apply must succeed");
         assert_eq!(second.evidence.kind, Kind::Applied);
         let subjects: Vec<u64> = second
             .state
@@ -757,7 +753,10 @@ mod tests {
             .iter()
             .map(|entry| entry.subject.get().get())
             .collect();
-        assert_eq!(subjects, vec![SUBJECT_ID.min(OTHER_ID), SUBJECT_ID.max(OTHER_ID)]);
+        assert_eq!(
+            subjects,
+            vec![SUBJECT_ID.min(OTHER_ID), SUBJECT_ID.max(OTHER_ID)]
+        );
         second.state.validate().expect("output state must validate");
     }
 }

@@ -106,11 +106,9 @@ fn prepared(
     state: &FormsStateV2,
     scope: &MechanicScope,
 ) -> Result<(FormsStateV2, usize), FormsTransitionError> {
-    state
-        .prepare_transition(scope)
-        .map_err(|err| match err {
-            FormsTransitionScopeError::UnknownScope => FormsTransitionError::UnknownBattlerScope,
-        })
+    state.prepare_transition(scope).map_err(|err| match err {
+        FormsTransitionScopeError::UnknownScope => FormsTransitionError::UnknownBattlerScope,
+    })
 }
 
 /// Validates the post-transition clone and packages it with the cues staged
@@ -131,10 +129,14 @@ fn finish(
 }
 
 fn require_identity(target: &FormIdentityV2) -> Result<(), FormsTransitionError> {
-    target.validate().map_err(FormsTransitionError::InvalidFormIdentity)
+    target
+        .validate()
+        .map_err(FormsTransitionError::InvalidFormIdentity)
 }
 
-fn active_overlay(battler: &er_state::bespoke_v2::forms::FormsBattlerStateV2) -> Option<FormOverlayKindV2> {
+fn active_overlay(
+    battler: &er_state::bespoke_v2::forms::FormsBattlerStateV2,
+) -> Option<FormOverlayKindV2> {
     battler.overlay.as_ref().map(|overlay| overlay.kind)
 }
 
@@ -204,7 +206,12 @@ pub fn stage_stance_request(
         target: target.clone(),
     });
     let from = Some(battler.current.clone());
-    next.push_cue(FormCueKindV2::StanceRequestStaged, *scope, from, Some(target));
+    next.push_cue(
+        FormCueKindV2::StanceRequestStaged,
+        *scope,
+        from,
+        Some(target),
+    );
     finish(next, FormsOutcomeV2::RequestStaged, cue_start)
 }
 
@@ -430,7 +437,6 @@ pub fn cleanup_on_switch(
     finish(next, FormsOutcomeV2::Applied, cue_start)
 }
 
-
 /// Battle-end cleanup: resets every battler to its stable base form and
 /// restores all one-time admissions. Already-pristine state is a no-op.
 pub fn cleanup_battle_end(state: &FormsStateV2) -> Result<FormsTransitionV2, FormsTransitionError> {
@@ -454,7 +460,12 @@ pub fn cleanup_battle_end(state: &FormsStateV2) -> Result<FormsTransitionV2, For
     }
     next.teras_used_player_side = 0;
     next.teras_used_enemy_side = 0;
-    next.push_cue(FormCueKindV2::BattleEndReset, MechanicScope::Battle, None, None);
+    next.push_cue(
+        FormCueKindV2::BattleEndReset,
+        MechanicScope::Battle,
+        None,
+        None,
+    );
     finish(next, FormsOutcomeV2::Applied, cue_start)
 }
 
@@ -489,9 +500,15 @@ mod tests {
     /// Castform (weather trio), registered in canonical scope order.
     fn seeded() -> FormsStateV2 {
         FormsStateV2::default()
-            .register_battler(field_scope(BattleSide::Enemy, 0), identity(SPECIES_CASTFORM, "forecast"))
+            .register_battler(
+                field_scope(BattleSide::Enemy, 0),
+                identity(SPECIES_CASTFORM, "forecast"),
+            )
             .expect("enemy registration")
-            .register_battler(field_scope(BattleSide::Player, 0), identity(SPECIES_AEGISLASH, "shield"))
+            .register_battler(
+                field_scope(BattleSide::Player, 0),
+                identity(SPECIES_AEGISLASH, "shield"),
+            )
             .expect("player registration")
     }
 
@@ -507,7 +524,10 @@ mod tests {
     #[test]
     fn register_rejects_duplicate_scope_and_unknown_lookups_are_none() {
         let state = seeded();
-        let duplicate = state.register_battler(field_scope(BattleSide::Player, 0), identity(SPECIES_AEGISLASH, "blade"));
+        let duplicate = state.register_battler(
+            field_scope(BattleSide::Player, 0),
+            identity(SPECIES_AEGISLASH, "blade"),
+        );
         assert_eq!(duplicate.unwrap_err(), FormsStateError::DuplicateScope);
         assert!(state.battler(&field_scope(BattleSide::Player, 2)).is_none());
     }
@@ -521,31 +541,53 @@ mod tests {
             .expect("stage");
         assert_eq!(staged.outcome, FormsOutcomeV2::RequestStaged);
         assert_eq!(staged.cues.len(), 1);
-        assert!(staged.state
-            .battler(&scope)
-            .expect("battler")
-            .pending_stance_request
-            .is_some());
+        assert!(
+            staged
+                .state
+                .battler(&scope)
+                .expect("battler")
+                .pending_stance_request
+                .is_some()
+        );
 
         // Identical resubmission: idempotent, no new cue, equal state.
-        let repeat = stage_stance_request(&staged.state, &scope, 7, identity(SPECIES_AEGISLASH, "blade"))
-            .expect("idempotent restage");
+        let repeat = stage_stance_request(
+            &staged.state,
+            &scope,
+            7,
+            identity(SPECIES_AEGISLASH, "blade"),
+        )
+        .expect("idempotent restage");
         assert_eq!(repeat.outcome, FormsOutcomeV2::RequestAlreadyStaged);
         assert_eq!(repeat.cues.len(), 0);
         assert_eq!(repeat.state, staged.state);
 
         // Same id, different target: conflict rejection.
-        let conflict = stage_stance_request(&staged.state, &scope, 7, identity(SPECIES_AEGISLASH, "shield"));
+        let conflict = stage_stance_request(
+            &staged.state,
+            &scope,
+            7,
+            identity(SPECIES_AEGISLASH, "shield"),
+        );
         assert_eq!(
             conflict.unwrap_err(),
-            FormsTransitionError::StanceRequestConflict { staged_request_id: 7 }
+            FormsTransitionError::StanceRequestConflict {
+                staged_request_id: 7
+            }
         );
 
         // Different id while pending: rejection naming the pending id.
-        let busy = stage_stance_request(&staged.state, &scope, 8, identity(SPECIES_AEGISLASH, "blade"));
+        let busy = stage_stance_request(
+            &staged.state,
+            &scope,
+            8,
+            identity(SPECIES_AEGISLASH, "blade"),
+        );
         assert_eq!(
             busy.unwrap_err(),
-            FormsTransitionError::StanceRequestPending { pending_request_id: 7 }
+            FormsTransitionError::StanceRequestPending {
+                pending_request_id: 7
+            }
         );
 
         // Resolve swaps the presented form under a Stance overlay.
@@ -568,7 +610,14 @@ mod tests {
             resolve_pending_stance(&resolved.state, &scope).unwrap_err(),
             FormsTransitionError::NoStancePending
         );
-        assert!(resolved.state.battler(&scope).expect("battler").pending_stance_request.is_none());
+        assert!(
+            resolved
+                .state
+                .battler(&scope)
+                .expect("battler")
+                .pending_stance_request
+                .is_none()
+        );
     }
 
     #[test]
@@ -577,23 +626,31 @@ mod tests {
         let scope = field_scope(BattleSide::Player, 0);
         // Cross-species stance target.
         assert_eq!(
-            stage_stance_request(&state, &scope, 1, identity(SPECIES_CASTFORM, "sunny")).unwrap_err(),
+            stage_stance_request(&state, &scope, 1, identity(SPECIES_CASTFORM, "sunny"))
+                .unwrap_err(),
             FormsTransitionError::StanceCrossSpecies
         );
         // Target equals the currently presented form.
         assert_eq!(
-            stage_stance_request(&state, &scope, 1, identity(SPECIES_AEGISLASH, "shield")).unwrap_err(),
+            stage_stance_request(&state, &scope, 1, identity(SPECIES_AEGISLASH, "shield"))
+                .unwrap_err(),
             FormsTransitionError::StanceTargetEqualsCurrent
         );
         // Zero request id.
         assert_eq!(
-            stage_stance_request(&state, &scope, 0, identity(SPECIES_AEGISLASH, "blade")).unwrap_err(),
+            stage_stance_request(&state, &scope, 0, identity(SPECIES_AEGISLASH, "blade"))
+                .unwrap_err(),
             FormsTransitionError::ZeroStanceRequestId
         );
         // Unknown scope.
         assert_eq!(
-            stage_stance_request(&state, &field_scope(BattleSide::Player, 2), 1, identity(SPECIES_AEGISLASH, "blade"))
-                .unwrap_err(),
+            stage_stance_request(
+                &state,
+                &field_scope(BattleSide::Player, 2),
+                1,
+                identity(SPECIES_AEGISLASH, "blade")
+            )
+            .unwrap_err(),
             FormsTransitionError::UnknownBattlerScope
         );
         // Nothing above mutated the seed.
@@ -605,23 +662,32 @@ mod tests {
         let state = seeded();
         let scope = field_scope(BattleSide::Enemy, 0);
 
-        let applied = apply_conditional_overlay(&state, &scope, identity(SPECIES_CASTFORM, "sunny"))
-            .expect("apply");
+        let applied =
+            apply_conditional_overlay(&state, &scope, identity(SPECIES_CASTFORM, "sunny"))
+                .expect("apply");
         assert_eq!(applied.outcome, FormsOutcomeV2::Applied);
-        assert_eq!(applied.state.battler(&scope).expect("b").current.form_key, "sunny");
+        assert_eq!(
+            applied.state.battler(&scope).expect("b").current.form_key,
+            "sunny"
+        );
 
         // Same target again: false condition, no mutation, no cue.
-        let repeat = apply_conditional_overlay(&applied.state, &scope, identity(SPECIES_CASTFORM, "sunny"))
-            .expect("repeat apply");
+        let repeat =
+            apply_conditional_overlay(&applied.state, &scope, identity(SPECIES_CASTFORM, "sunny"))
+                .expect("repeat apply");
         assert_eq!(repeat.outcome, FormsOutcomeV2::IdempotentNoOp);
         assert_eq!(repeat.cues.len(), 0);
         assert_eq!(repeat.state, applied.state);
 
         // A different weather replaces the reversible overlay.
-        let switched = apply_conditional_overlay(&applied.state, &scope, identity(SPECIES_CASTFORM, "rainy"))
-            .expect("switch weather");
+        let switched =
+            apply_conditional_overlay(&applied.state, &scope, identity(SPECIES_CASTFORM, "rainy"))
+                .expect("switch weather");
         assert_eq!(switched.outcome, FormsOutcomeV2::Applied);
-        assert_eq!(switched.state.battler(&scope).expect("b").current.form_key, "rainy");
+        assert_eq!(
+            switched.state.battler(&scope).expect("b").current.form_key,
+            "rainy"
+        );
 
         // Revert returns to the stable base form; reverting again is a no-op.
         let reverted = revert_conditional_overlay(&switched.state, &scope).expect("revert");
@@ -651,8 +717,11 @@ mod tests {
         );
         // Any overlay blocks a stance request while active.
         assert_eq!(
-            stage_stance_request(&mega.state, &scope, 3, identity(SPECIES_AEGISLASH, "blade")).unwrap_err(),
-            FormsTransitionError::OverlayActive { active: FormOverlayKindV2::Mega }
+            stage_stance_request(&mega.state, &scope, 3, identity(SPECIES_AEGISLASH, "blade"))
+                .unwrap_err(),
+            FormsTransitionError::OverlayActive {
+                active: FormOverlayKindV2::Mega
+            }
         );
 
         // Switch cleanup lapses the overlay but the admission stays consumed.
@@ -684,8 +753,12 @@ mod tests {
             FormsTransitionError::MegaTargetEqualsBase
         );
         assert_eq!(
-            admit_mega(&state, &field_scope(BattleSide::Enemy, 1), identity(SPECIES_AEGISLASH, "mega"))
-                .unwrap_err(),
+            admit_mega(
+                &state,
+                &field_scope(BattleSide::Enemy, 1),
+                identity(SPECIES_AEGISLASH, "mega")
+            )
+            .unwrap_err(),
             FormsTransitionError::UnknownBattlerScope
         );
     }
@@ -697,7 +770,10 @@ mod tests {
 
         let tera = admit_tera(&state, BattleSide::Player, &scope, 10).expect("tera");
         assert_eq!(tera.outcome, FormsOutcomeV2::Applied);
-        assert_eq!(tera.state.teras_used(BattleSide::Player), TERAS_PER_SIDE_MAX);
+        assert_eq!(
+            tera.state.teras_used(BattleSide::Player),
+            TERAS_PER_SIDE_MAX
+        );
         assert_eq!(
             tera.state.battler(&scope).expect("b").overlay,
             Some(FormOverlayV2 {
@@ -710,11 +786,14 @@ mod tests {
         // Budget exhausted for the whole side (evidence: MAX_TERAS_PER_ARENA=1).
         assert_eq!(
             admit_tera(&tera.state, BattleSide::Player, &scope, 10).unwrap_err(),
-            FormsTransitionError::TeraBudgetExhausted { side: BattleSide::Player }
+            FormsTransitionError::TeraBudgetExhausted {
+                side: BattleSide::Player
+            }
         );
         // The enemy side still owns its own budget.
         let enemy_scope = field_scope(BattleSide::Enemy, 0);
-        let enemy_tera = admit_tera(&tera.state, BattleSide::Enemy, &enemy_scope, 11).expect("enemy tera");
+        let enemy_tera =
+            admit_tera(&tera.state, BattleSide::Enemy, &enemy_scope, 11).expect("enemy tera");
         assert_eq!(enemy_tera.state.teras_used(BattleSide::Enemy), 1);
 
         // Tera PERSISTS through switch-out: resetTera() runs only on faint
@@ -731,10 +810,15 @@ mod tests {
             })
         );
         // The side budget stays consumed until battle end.
-        assert_eq!(cleaned.state.teras_used(BattleSide::Player), TERAS_PER_SIDE_MAX);
+        assert_eq!(
+            cleaned.state.teras_used(BattleSide::Player),
+            TERAS_PER_SIDE_MAX
+        );
         assert_eq!(
             admit_tera(&cleaned.state, BattleSide::Player, &scope, 10).unwrap_err(),
-            FormsTransitionError::TeraBudgetExhausted { side: BattleSide::Player }
+            FormsTransitionError::TeraBudgetExhausted {
+                side: BattleSide::Player
+            }
         );
     }
 
@@ -748,7 +832,9 @@ mod tests {
         let mega = admit_mega(&state, &player, identity(SPECIES_AEGISLASH, "mega")).expect("mega");
         assert_eq!(
             admit_tera(&mega.state, BattleSide::Player, &player, 0).unwrap_err(),
-            FormsTransitionError::OverlayActive { active: FormOverlayKindV2::Mega }
+            FormsTransitionError::OverlayActive {
+                active: FormOverlayKindV2::Mega
+            }
         );
 
         // Ordinal above MAX_POKEMON_TYPE_ORDINAL (STELLAR = 19) is illegal.
@@ -760,7 +846,9 @@ mod tests {
         // Side/scope agreement is checked before any mutation.
         assert_eq!(
             admit_tera(&state, BattleSide::Enemy, &player, 0).unwrap_err(),
-            FormsTransitionError::TeraSideMismatch { side: BattleSide::Enemy }
+            FormsTransitionError::TeraSideMismatch {
+                side: BattleSide::Enemy
+            }
         );
         // Non-field scopes cannot carry a side-scoped admission.
         assert_eq!(
@@ -768,11 +856,13 @@ mod tests {
             FormsTransitionError::ScopeNotFieldBattler
         );
         // A conditional overlay equally excludes Tera.
-        let rainy =
-            apply_conditional_overlay(&state, &enemy, identity(SPECIES_CASTFORM, "rainy")).expect("weather");
+        let rainy = apply_conditional_overlay(&state, &enemy, identity(SPECIES_CASTFORM, "rainy"))
+            .expect("weather");
         assert_eq!(
             admit_tera(&rainy.state, BattleSide::Enemy, &enemy, 0).unwrap_err(),
-            FormsTransitionError::OverlayActive { active: FormOverlayKindV2::Conditional }
+            FormsTransitionError::OverlayActive {
+                active: FormOverlayKindV2::Conditional
+            }
         );
         assert_eq!(rainy.state.teras_used(BattleSide::Enemy), 0);
     }
@@ -785,10 +875,22 @@ mod tests {
             .expect("stage");
         let cleaned = cleanup_on_switch(&staged.state, &scope).expect("cleanup");
         assert_eq!(cleaned.outcome, FormsOutcomeV2::Applied);
-        assert!(cleaned.state.battler(&scope).expect("b").pending_stance_request.is_none());
+        assert!(
+            cleaned
+                .state
+                .battler(&scope)
+                .expect("b")
+                .pending_stance_request
+                .is_none()
+        );
         // The discarded request id frees the scope for a fresh request.
-        let restaged = stage_stance_request(&cleaned.state, &scope, 9, identity(SPECIES_AEGISLASH, "blade"))
-            .expect("restage");
+        let restaged = stage_stance_request(
+            &cleaned.state,
+            &scope,
+            9,
+            identity(SPECIES_AEGISLASH, "blade"),
+        )
+        .expect("restage");
         assert_eq!(restaged.outcome, FormsOutcomeV2::RequestStaged);
     }
 
@@ -808,14 +910,16 @@ mod tests {
         assert_eq!(ended.outcome, FormsOutcomeV2::Applied);
         assert_eq!(ended.cues.len(), 1);
         assert_eq!(ended.state.teras_used(BattleSide::Enemy), 0);
-        assert!(ended
-            .state
-            .battlers
-            .iter()
-            .all(|battler| battler.overlay.is_none()
-                && battler.pending_stance_request.is_none()
-                && !battler.mega_used
-                && battler.current == battler.base));
+        assert!(
+            ended
+                .state
+                .battlers
+                .iter()
+                .all(|battler| battler.overlay.is_none()
+                    && battler.pending_stance_request.is_none()
+                    && !battler.mega_used
+                    && battler.current == battler.base)
+        );
         ended.state.validate().expect("pristine state validates");
 
         // Ending an already-pristine battle is a no-op without cues.
@@ -884,7 +988,10 @@ mod tests {
         // Duplicate scope registration is rejected up front.
         assert_eq!(
             state
-                .register_battler(field_scope(BattleSide::Player, 0), identity(SPECIES_AEGISLASH, "blade"))
+                .register_battler(
+                    field_scope(BattleSide::Player, 0),
+                    identity(SPECIES_AEGISLASH, "blade")
+                )
                 .unwrap_err(),
             FormsStateError::DuplicateScope
         );
@@ -927,7 +1034,8 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../../fixtures/m6/bespoke-clusters-v1.json"
         );
-        let raw = std::fs::read_to_string(fixture_path).expect("frozen bespoke clusters fixture exists");
+        let raw =
+            std::fs::read_to_string(fixture_path).expect("frozen bespoke clusters fixture exists");
         let fixture: serde_json::Value = serde_json::from_str(&raw).expect("fixture parses");
 
         let clusters = fixture["clusters"].as_array().expect("clusters array");
@@ -940,8 +1048,7 @@ mod tests {
         let species_units: Vec<&serde_json::Value> = units
             .iter()
             .filter(|unit| {
-                unit["source"]["kind"] == "SPECIES"
-                    && unit["unit_kind"] == "SPECIES_FORM_BEHAVIOR"
+                unit["source"]["kind"] == "SPECIES" && unit["unit_kind"] == "SPECIES_FORM_BEHAVIOR"
             })
             .collect();
 
@@ -951,13 +1058,22 @@ mod tests {
 
         let species_ids: Vec<u64> = species_units
             .iter()
-            .map(|unit| unit["source"]["numeric_id"].as_u64().expect("numeric species id"))
+            .map(|unit| {
+                unit["source"]["numeric_id"]
+                    .as_u64()
+                    .expect("numeric species id")
+            })
             .collect();
-        assert_eq!(species_ids.len(), species_ids.iter().collect::<std::collections::BTreeSet<_>>().len());
+        assert_eq!(
+            species_ids.len(),
+            species_ids
+                .iter()
+                .collect::<std::collections::BTreeSet<_>>()
+                .len()
+        );
 
-        let exemplars: std::collections::BTreeSet<u64> = [1u64, 2u64, 3u64, 70062u64]
-            .into_iter()
-            .collect();
+        let exemplars: std::collections::BTreeSet<u64> =
+            [1u64, 2u64, 3u64, 70062u64].into_iter().collect();
         assert!(exemplars.iter().all(|id| species_ids.contains(id)));
 
         // The canonical registry covers the entire subset losslessly.
@@ -979,10 +1095,15 @@ mod tests {
         state = stage_stance_request(&state, &player, 1, identity(SPECIES_AEGISLASH, "blade"))
             .expect("stage")
             .state;
-        state = resolve_pending_stance(&state, &player).expect("resolve").state;
+        state = resolve_pending_stance(&state, &player)
+            .expect("resolve")
+            .state;
         state = cleanup_on_switch(&state, &player).expect("cleanup").state;
 
-        let ordinals: Vec<u64> = presentation_cues(&state).iter().map(|cue| cue.ordinal).collect();
+        let ordinals: Vec<u64> = presentation_cues(&state)
+            .iter()
+            .map(|cue| cue.ordinal)
+            .collect();
         assert_eq!(ordinals, vec![1, 2, 3, 4]);
         let kinds: Vec<FormCueKindV2> = presentation_cues(&state)
             .iter()
@@ -1003,7 +1124,9 @@ mod tests {
     #[test]
     fn battler_entry_shape_is_canonical() {
         let state = seeded();
-        let battler = state.battler(&field_scope(BattleSide::Player, 0)).expect("b");
+        let battler = state
+            .battler(&field_scope(BattleSide::Player, 0))
+            .expect("b");
         assert!(matches!(battler, FormsBattlerStateV2 { .. }));
         assert_eq!(battler.base, battler.current);
         assert!(!battler.mega_used);

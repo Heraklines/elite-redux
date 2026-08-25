@@ -41,9 +41,9 @@ use er_state::bespoke_v2::item_lifecycle::{
     ConsumeLedgerEntryV2, ItemInstanceV2, ItemLifecycleStateError, ItemLifecycleStateV2,
     ItemSuppressionV2,
 };
+use er_types::SafeU53;
 use er_types::battle_ids::PokemonId;
 use er_types::mechanics::SourceOrdinal;
-use er_types::SafeU53;
 use thiserror::Error;
 
 /// Typed evidence plus the updated canonical state of one atomic transition.
@@ -306,12 +306,11 @@ fn next_instance_id(state: &ItemLifecycleStateV2) -> Result<u64, ItemLifecycleEr
 }
 
 fn advance_instance_id(id: u64) -> Result<u64, ItemLifecycleError> {
-    id.checked_add(1).ok_or(ItemLifecycleError::InstanceIdExhausted)
+    id.checked_add(1)
+        .ok_or(ItemLifecycleError::InstanceIdExhausted)
 }
 
-fn next_creation_ordinal(
-    state: &ItemLifecycleStateV2,
-) -> Result<SafeU53, ItemLifecycleError> {
+fn next_creation_ordinal(state: &ItemLifecycleStateV2) -> Result<SafeU53, ItemLifecycleError> {
     let ordinal = state.next_creation_ordinal;
     if ordinal == SafeU53::ZERO || ordinal >= SafeU53::MAX {
         Err(ItemLifecycleError::CreationOrdinalExhausted)
@@ -355,42 +354,40 @@ pub fn grant_item(
     let stacks_before = staged
         .find_instance(request.owner, &request.registry_key)
         .map_or(0, |instance| instance.stacks);
-    let stacks_after = stacks_before
-        .checked_add(request.stacks)
-        .ok_or(ItemLifecycleError::StackOverflow {
-            owner: request.owner,
-            registry_key: request.registry_key.clone(),
-        })?;
-    let (instance_id, merged) = match slot_position(
-        &staged.instances,
-        request.owner,
-        &request.registry_key,
-    ) {
-        Some(index) => {
-            staged.instances[index].stacks = stacks_after;
-            (staged.instances[index].instance_id, true)
-        }
-        None => {
-            let instance_id = next_instance_id(&staged)?;
-            let creation_ordinal = next_creation_ordinal(&staged)?;
-            staged.instances.push(ItemInstanceV2 {
-                instance_id,
+    let stacks_after =
+        stacks_before
+            .checked_add(request.stacks)
+            .ok_or(ItemLifecycleError::StackOverflow {
                 owner: request.owner,
                 registry_key: request.registry_key.clone(),
-                source_ordinal: request.source_ordinal,
-                creation_ordinal,
-                stacks: request.stacks,
-                charges: request.charges,
-                transferable: request.transferable,
-            });
-            // Canonical order is by instance ID; a fresh ID is always the
-            // largest, so appending keeps the vector sorted.
-            staged.next_instance_id = advance_instance_id(instance_id)?;
-            staged.next_creation_ordinal =
-                advance_creation_ordinal(staged.next_creation_ordinal)?;
-            (instance_id, false)
-        }
-    };
+            })?;
+    let (instance_id, merged) =
+        match slot_position(&staged.instances, request.owner, &request.registry_key) {
+            Some(index) => {
+                staged.instances[index].stacks = stacks_after;
+                (staged.instances[index].instance_id, true)
+            }
+            None => {
+                let instance_id = next_instance_id(&staged)?;
+                let creation_ordinal = next_creation_ordinal(&staged)?;
+                staged.instances.push(ItemInstanceV2 {
+                    instance_id,
+                    owner: request.owner,
+                    registry_key: request.registry_key.clone(),
+                    source_ordinal: request.source_ordinal,
+                    creation_ordinal,
+                    stacks: request.stacks,
+                    charges: request.charges,
+                    transferable: request.transferable,
+                });
+                // Canonical order is by instance ID; a fresh ID is always the
+                // largest, so appending keeps the vector sorted.
+                staged.next_instance_id = advance_instance_id(instance_id)?;
+                staged.next_creation_ordinal =
+                    advance_creation_ordinal(staged.next_creation_ordinal)?;
+                (instance_id, false)
+            }
+        };
     staged.validate()?;
     Ok(ItemTransition {
         state: staged,
@@ -496,24 +493,27 @@ pub fn consume_item(
         });
     }
     let mut staged = state.clone();
-    let index = slot_position(
-        &staged.instances,
-        request.owner,
-        &request.registry_key,
-    )
-    .ok_or(ItemLifecycleError::ItemAbsent {
-        owner: request.owner,
-        registry_key: request.registry_key.clone(),
-    })?;
-    let stacks_after_value = instance.stacks.checked_sub(1).ok_or(
-        ItemLifecycleError::InvalidState(ItemLifecycleStateError::ZeroStacks),
+    let index = slot_position(&staged.instances, request.owner, &request.registry_key).ok_or(
+        ItemLifecycleError::ItemAbsent {
+            owner: request.owner,
+            registry_key: request.registry_key.clone(),
+        },
     )?;
+    let stacks_after_value =
+        instance
+            .stacks
+            .checked_sub(1)
+            .ok_or(ItemLifecycleError::InvalidState(
+                ItemLifecycleStateError::ZeroStacks,
+            ))?;
     let charges_after = instance
         .charges
         .map(|charges| {
-            charges.checked_sub(1).ok_or(ItemLifecycleError::InvalidState(
-                ItemLifecycleStateError::ZeroCharges,
-            ))
+            charges
+                .checked_sub(1)
+                .ok_or(ItemLifecycleError::InvalidState(
+                    ItemLifecycleStateError::ZeroCharges,
+                ))
         })
         .transpose()?;
     // Spent out when the last charge burns or the last stack goes.
@@ -640,15 +640,11 @@ pub fn transfer_item(
         });
     }
     let mut staged = state.clone();
-    let source_index = slot_position(
-        &staged.instances,
-        request.from,
-        &request.registry_key,
-    )
-    .ok_or(ItemLifecycleError::ItemAbsent {
-        owner: request.from,
-        registry_key: request.registry_key.clone(),
-    })?;
+    let source_index = slot_position(&staged.instances, request.from, &request.registry_key)
+        .ok_or(ItemLifecycleError::ItemAbsent {
+            owner: request.from,
+            registry_key: request.registry_key.clone(),
+        })?;
     let stacks_before = staged.instances[source_index].stacks;
     let instance_id = staged.instances[source_index].instance_id;
     match slot_position(&staged.instances, request.to, &request.registry_key) {
@@ -708,15 +704,12 @@ pub fn knock_off_item(
         })?;
     let stacks_before = instance.stacks;
     let mut staged = state.clone();
-    let index = slot_position(
-        &staged.instances,
-        request.target,
-        &request.registry_key,
-    )
-    .ok_or(ItemLifecycleError::ItemAbsent {
-        owner: request.target,
-        registry_key: request.registry_key.clone(),
-    })?;
+    let index = slot_position(&staged.instances, request.target, &request.registry_key).ok_or(
+        ItemLifecycleError::ItemAbsent {
+            owner: request.target,
+            registry_key: request.registry_key.clone(),
+        },
+    )?;
     let instance = &staged.instances[index];
     let ordinal = staged.next_ledger_ordinal;
     staged.consume_ledger.push(ConsumeLedgerEntryV2 {
@@ -784,15 +777,11 @@ pub fn swap_items(
         }
     }
     let mut staged = state.clone();
-    let left_index = slot_position(
-        &staged.instances,
-        request.left,
-        &request.left_registry_key,
-    )
-    .ok_or(ItemLifecycleError::ItemAbsent {
-        owner: request.left,
-        registry_key: request.left_registry_key.clone(),
-    })?;
+    let left_index = slot_position(&staged.instances, request.left, &request.left_registry_key)
+        .ok_or(ItemLifecycleError::ItemAbsent {
+            owner: request.left,
+            registry_key: request.left_registry_key.clone(),
+        })?;
     let right_index = slot_position(
         &staged.instances,
         request.right,
@@ -826,11 +815,9 @@ pub fn suppress_item(
     let replaced_expiry = staged
         .find_suppression(request.holder, &request.registry_key)
         .map(|window| window.expiry_turn);
-    match staged
-        .suppressions
-        .iter_mut()
-        .position(|window| window.holder == request.holder && window.registry_key == request.registry_key)
-    {
+    match staged.suppressions.iter_mut().position(|window| {
+        window.holder == request.holder && window.registry_key == request.registry_key
+    }) {
         Some(index) => staged.suppressions[index].expiry_turn = request.expiry_turn,
         None => {
             let window = ItemSuppressionV2 {
@@ -838,12 +825,10 @@ pub fn suppress_item(
                 registry_key: request.registry_key.clone(),
                 expiry_turn: request.expiry_turn,
             };
-            let position = staged
-                .suppressions
-                .partition_point(|existing| {
-                    (existing.holder, existing.registry_key.as_str())
-                        < (request.holder, request.registry_key.as_str())
-                });
+            let position = staged.suppressions.partition_point(|existing| {
+                (existing.holder, existing.registry_key.as_str())
+                    < (request.holder, request.registry_key.as_str())
+            });
             staged.suppressions.insert(position, window);
         }
     }
@@ -906,7 +891,11 @@ mod tests {
         ItemLifecycleStateV2::default()
     }
 
-    fn grant_sitrus(state: &ItemLifecycleStateV2, owner: PokemonId, stacks: u16) -> ItemLifecycleStateV2 {
+    fn grant_sitrus(
+        state: &ItemLifecycleStateV2,
+        owner: PokemonId,
+        stacks: u16,
+    ) -> ItemLifecycleStateV2 {
         grant_item(
             state,
             &GrantRequest {
@@ -1035,7 +1024,10 @@ mod tests {
         .expect("second consume succeeds");
         assert!(matches!(
             second.evidence.outcome,
-            ConsumeOutcome::Consumed { ledger_ordinal: Some(_), .. }
+            ConsumeOutcome::Consumed {
+                ledger_ordinal: Some(_),
+                ..
+            }
         ));
         assert_eq!(second.evidence.stacks_after, None);
         assert!(second.state.instances.is_empty());
@@ -1201,12 +1193,9 @@ mod tests {
         )
         .expect("consume succeeds")
         .state;
-        let restored = restore_item(&eaten, &RestoreRequest { owner: alice() })
-            .expect("restore succeeds");
-        assert_eq!(
-            restored.evidence.registry_key,
-            "SITRUS_BERRY".to_owned()
-        );
+        let restored =
+            restore_item(&eaten, &RestoreRequest { owner: alice() }).expect("restore succeeds");
+        assert_eq!(restored.evidence.registry_key, "SITRUS_BERRY".to_owned());
         assert_eq!(restored.state.instances.len(), 1);
         assert_eq!(restored.state.instances[0].stacks, 1);
         assert_eq!(restored.state.consume_ledger.len(), 1);
@@ -1229,8 +1218,7 @@ mod tests {
                 mode: TransferMode::Steal,
             },
         )
-        .expect("transfer merges")
-        ;
+        .expect("transfer merges");
         assert!(moved.evidence.merged);
         assert_eq!(moved.state.instances.len(), 1);
         assert_eq!(moved.state.instances[0].owner, bob());
@@ -1308,8 +1296,14 @@ mod tests {
     #[test]
     fn swap_exchanges_ownership_in_one_atomic_step() {
         let state = grant_sitrus(&grant_oran(&empty(), bob()), alice(), 1);
-        let left_id = state.find_instance(alice(), "SITRUS_BERRY").expect("alice holds sitrus").instance_id;
-        let right_id = state.find_instance(bob(), "ORAN_BERRY").expect("bob holds oran").instance_id;
+        let left_id = state
+            .find_instance(alice(), "SITRUS_BERRY")
+            .expect("alice holds sitrus")
+            .instance_id;
+        let right_id = state
+            .find_instance(bob(), "ORAN_BERRY")
+            .expect("bob holds oran")
+            .instance_id;
         let swapped = swap_items(
             &state,
             &SwapRequest {

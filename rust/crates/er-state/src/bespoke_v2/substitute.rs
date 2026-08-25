@@ -10,9 +10,9 @@
 //! (`maxHp < 4`); such a doll still intercepts one hit and is then removed,
 //! exactly like the production `hp <= 0` removal sweep.
 
+use er_types::SafeU53;
 use er_types::battle_ids::PokemonId;
 use er_types::m6::{BehaviorUnitId, M6_MECHANIC_STATE_SCHEMA_VERSION};
-use er_types::SafeU53;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -108,7 +108,10 @@ impl SubstituteProxyStoreV2 {
         proxy: SubstituteProxyStateV2,
     ) -> Result<Self, SubstituteProxyStateError> {
         proxy.validate()?;
-        match self.proxies.binary_search_by(|probe| probe.owner.cmp(&proxy.owner)) {
+        match self
+            .proxies
+            .binary_search_by(|probe| probe.owner.cmp(&proxy.owner))
+        {
             Ok(index) => self.proxies[index] = proxy,
             Err(index) => self.proxies.insert(index, proxy),
         }
@@ -119,7 +122,10 @@ impl SubstituteProxyStoreV2 {
     /// consumes and returns the updated store plus the removed doll, if any.
     #[must_use]
     pub fn remove(mut self, owner: PokemonId) -> (Self, Option<SubstituteProxyStateV2>) {
-        match self.proxies.binary_search_by(|probe| probe.owner.cmp(&owner)) {
+        match self
+            .proxies
+            .binary_search_by(|probe| probe.owner.cmp(&owner))
+        {
             Ok(index) => {
                 let removed = self.proxies.remove(index);
                 (self, Some(removed))

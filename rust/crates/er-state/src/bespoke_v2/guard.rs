@@ -12,9 +12,9 @@
 //! `er-battle::m6::bespoke::guard`. State is closed and serializable: no
 //! callbacks, JSON payloads, or untyped identifiers.
 
+use er_types::SafeU53;
 use er_types::battle_ids::BattleSide;
 use er_types::mechanics::MechanicScope;
-use er_types::SafeU53;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -51,10 +51,7 @@ impl GuardKind {
     /// (King's Shield, Obstruct, Silk Trap) never block status-category
     /// moves; every other kind blocks damaging and status moves alike.
     pub const fn blocks_status(self) -> bool {
-        !matches!(
-            self,
-            Self::KingsShield | Self::Obstruct | Self::SilkTrap
-        )
+        !matches!(self, Self::KingsShield | Self::Obstruct | Self::SilkTrap)
     }
 
     /// Endure does not block incoming moves; it arms minimum-HP survival.
@@ -145,8 +142,7 @@ impl Default for GuardFamilyState {
             enduring_owners: Vec::new(),
             endure_token_owners: Vec::new(),
             sturdy_owners: Vec::new(),
-            next_creation_ordinal: SafeU53::new(1)
-                .expect("ordinal 1 fits the safe-integer domain"),
+            next_creation_ordinal: SafeU53::new(1).expect("ordinal 1 fits the safe-integer domain"),
         }
     }
 }
@@ -395,7 +391,10 @@ mod tests {
             owner: pokemon_scope(10),
             creation_ordinal: ordinal(1),
         });
-        assert_eq!(unordered.validate(), Err(GuardFamilyStateError::GuardsOutOfOrder));
+        assert_eq!(
+            unordered.validate(),
+            Err(GuardFamilyStateError::GuardsOutOfOrder)
+        );
 
         let mut beyond_next = GuardFamilyState::default();
         beyond_next.self_guards.push(ActiveSelfGuardEntry {
@@ -481,7 +480,9 @@ mod tests {
         assert!(state.has_side_guard(BattleSide::Enemy, SideGuardKind::QuickGuard));
         assert!(!state.has_side_guard(BattleSide::Player, SideGuardKind::QuickGuard));
         assert_eq!(
-            state.self_guard_for(&pokemon_scope(11)).map(|entry| entry.kind),
+            state
+                .self_guard_for(&pokemon_scope(11))
+                .map(|entry| entry.kind),
             Some(GuardKind::KingsShield)
         );
         assert!(state.has_survival_flag(&pokemon_scope(12), SurvivalFlag::Enduring));

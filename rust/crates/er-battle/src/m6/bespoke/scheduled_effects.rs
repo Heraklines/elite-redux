@@ -275,7 +275,10 @@ fn finish(
     log: Vec<ScheduledEffectsLogEntry>,
 ) -> Result<ScheduleOutcome, ScheduledEffectsError> {
     prepared.validate()?;
-    Ok(ScheduleOutcome { state: prepared, log })
+    Ok(ScheduleOutcome {
+        state: prepared,
+        log,
+    })
 }
 
 /// Schedules one delayed move effect (Future Sight / Doom Desire admission).
@@ -355,10 +358,7 @@ pub fn schedule_delayed_effect(
     let event_id = request.event_id;
     finish(
         prepared,
-        vec![ScheduledEffectsLogEntry::EffectScheduled {
-            event_id,
-            due_turn,
-        }],
+        vec![ScheduledEffectsLogEntry::EffectScheduled { event_id, due_turn }],
     )
 }
 
@@ -378,7 +378,9 @@ pub fn drain_due_events(
     unavailable: &UnavailableScopes,
 ) -> Result<DrainOutcome, ScheduledEffectsError> {
     let mut prepared = state.clone();
-    prepared.pending_events.retain(|event| event.due_turn > current_turn);
+    prepared
+        .pending_events
+        .retain(|event| event.due_turn > current_turn);
     let mut records = Vec::new();
     let mut log = Vec::new();
     for event in &state.pending_events {
@@ -513,7 +515,10 @@ fn finish_field(
     log: Vec<ScheduledEffectsLogEntry>,
 ) -> Result<FieldOutcome, ScheduledEffectsError> {
     prepared.validate()?;
-    Ok(FieldOutcome { state: prepared, log })
+    Ok(FieldOutcome {
+        state: prepared,
+        log,
+    })
 }
 
 /// Applies (or replaces) the active weather with fresh duration turns. A new
@@ -549,7 +554,9 @@ pub fn set_weather(
 pub fn clear_weather(state: &ScheduledEffectsState) -> Result<FieldOutcome, ScheduledEffectsError> {
     let mut prepared = state.clone();
     let cleared = prepared.weather.take().is_some();
-    let log = cleared.then(|| vec![ScheduledEffectsLogEntry::WeatherCleared]).unwrap_or_default();
+    let log = cleared
+        .then(|| vec![ScheduledEffectsLogEntry::WeatherCleared])
+        .unwrap_or_default();
     finish_field(prepared, log)
 }
 
@@ -586,7 +593,9 @@ pub fn set_terrain(
 pub fn clear_terrain(state: &ScheduledEffectsState) -> Result<FieldOutcome, ScheduledEffectsError> {
     let mut prepared = state.clone();
     let cleared = prepared.terrain.take().is_some();
-    let log = cleared.then(|| vec![ScheduledEffectsLogEntry::TerrainCleared]).unwrap_or_default();
+    let log = cleared
+        .then(|| vec![ScheduledEffectsLogEntry::TerrainCleared])
+        .unwrap_or_default();
     finish_field(prepared, log)
 }
 
@@ -601,17 +610,16 @@ pub fn apply_arena_tag(
     if tag == ArenaTagId::None {
         return Err(ScheduledEffectsError::ReservedNoneArenaTag);
     }
-    let replaced_previous = state
-        .arena_tags
-        .iter()
-        .any(|condition| condition.owner == request.owner && condition.kind.arena_tag() == Some(tag));
+    let replaced_previous = state.arena_tags.iter().any(|condition| {
+        condition.owner == request.owner && condition.kind.arena_tag() == Some(tag)
+    });
     let (condition, next_creation_ordinal) =
         prepare_condition(state, FieldConditionKind::ArenaTag { tag }, request.clone())?;
     let mut prepared = state.clone();
     prepared.next_creation_ordinal = next_creation_ordinal;
-    prepared
-        .arena_tags
-        .retain(|existing| !(existing.owner == request.owner && existing.kind.arena_tag() == Some(tag)));
+    prepared.arena_tags.retain(|existing| {
+        !(existing.owner == request.owner && existing.kind.arena_tag() == Some(tag))
+    });
     prepared.arena_tags.push(condition);
     prepared
         .arena_tags
@@ -655,23 +663,29 @@ pub fn lapse_field_conditions(
 ) -> Result<LapseOutcome, ScheduledEffectsError> {
     let mut prepared = state.clone();
     let mut log = Vec::new();
-    let mut lapse =
-        |condition: Option<FieldConditionInstance>, expired: ScheduledEffectsLogEntry| {
-            match condition {
-                Some(mut condition) => {
-                    condition.remaining_turns -= 1;
-                    if condition.remaining_turns == 0 {
-                        log.push(expired);
-                        None
-                    } else {
-                        Some(condition)
-                    }
+    let mut lapse = |condition: Option<FieldConditionInstance>,
+                     expired: ScheduledEffectsLogEntry| {
+        match condition {
+            Some(mut condition) => {
+                condition.remaining_turns -= 1;
+                if condition.remaining_turns == 0 {
+                    log.push(expired);
+                    None
+                } else {
+                    Some(condition)
                 }
-                None => None,
             }
-        };
-    prepared.weather = lapse(prepared.weather.take(), ScheduledEffectsLogEntry::WeatherExpired);
-    prepared.terrain = lapse(prepared.terrain.take(), ScheduledEffectsLogEntry::TerrainExpired);
+            None => None,
+        }
+    };
+    prepared.weather = lapse(
+        prepared.weather.take(),
+        ScheduledEffectsLogEntry::WeatherExpired,
+    );
+    prepared.terrain = lapse(
+        prepared.terrain.take(),
+        ScheduledEffectsLogEntry::TerrainExpired,
+    );
     for condition in &state.arena_tags {
         if condition.remaining_turns == 1 {
             if let Some(tag) = condition.kind.arena_tag() {
@@ -685,9 +699,14 @@ pub fn lapse_field_conditions(
     for condition in &mut prepared.arena_tags {
         condition.remaining_turns -= 1;
     }
-    prepared.arena_tags.retain(|condition| condition.remaining_turns > 0);
+    prepared
+        .arena_tags
+        .retain(|condition| condition.remaining_turns > 0);
     prepared.validate()?;
-    Ok(LapseOutcome { state: prepared, log })
+    Ok(LapseOutcome {
+        state: prepared,
+        log,
+    })
 }
 
 #[cfg(test)]
@@ -747,7 +766,9 @@ mod tests {
         DelayedEffectRequest {
             event_id,
             source_behavior_unit: future_sight_unit(),
-            owner: MechanicScope::Pokemon { pokemon: pokemon(1) },
+            owner: MechanicScope::Pokemon {
+                pokemon: pokemon(1),
+            },
             stored_target,
             delay_turns,
             delivery_hook: MechanicHookV2::ScheduledEvent,
@@ -789,10 +810,18 @@ mod tests {
         let mut state = schedule(&state, 5, late_ordinal).state; // due 7, ordinal 1
         state = schedule(&state, 5, early_turn).state; // due 6
         state = schedule(&state, 5, early_ordinal).state; // due 7, ordinal 3
-        let outcome =
-            drain_due_events(&state, 7, &SlotOccupants::default(), &UnavailableScopes::default())
-                .expect("drain");
-        let order: Vec<u64> = outcome.records.iter().map(|record| record.event_id).collect();
+        let outcome = drain_due_events(
+            &state,
+            7,
+            &SlotOccupants::default(),
+            &UnavailableScopes::default(),
+        )
+        .expect("drain");
+        let order: Vec<u64> = outcome
+            .records
+            .iter()
+            .map(|record| record.event_id)
+            .collect();
         // Frozen order: due turn first (event 1), then creation ordinal among
         // the two simultaneous events (event 3 created first, then event 2).
         assert_eq!(order, vec![1, 3, 2]);
@@ -823,14 +852,16 @@ mod tests {
         )
         .state;
         // The original target left; a replacement now occupies the slot.
-        let occupants = SlotOccupants::new(vec![(enemy_slot(0), Some(pokemon(9)))])
-            .expect("occupants");
-        let outcome = drain_due_events(&state, 2, &occupants, &UnavailableScopes::default())
-            .expect("drain");
+        let occupants =
+            SlotOccupants::new(vec![(enemy_slot(0), Some(pokemon(9)))]).expect("occupants");
+        let outcome =
+            drain_due_events(&state, 2, &occupants, &UnavailableScopes::default()).expect("drain");
         assert_eq!(outcome.records.len(), 1);
         assert_eq!(
             outcome.records[0].resolved_target,
-            ResolvedTarget::SlotOccupant { pokemon: pokemon(9) }
+            ResolvedTarget::SlotOccupant {
+                pokemon: pokemon(9)
+            }
         );
     }
 
@@ -850,8 +881,8 @@ mod tests {
         )
         .state;
         let occupants = SlotOccupants::new(vec![(enemy_slot(1), None)]).expect("occupants");
-        let outcome = drain_due_events(&state, 2, &occupants, &UnavailableScopes::default())
-            .expect("drain");
+        let outcome =
+            drain_due_events(&state, 2, &occupants, &UnavailableScopes::default()).expect("drain");
         assert!(outcome.records.is_empty());
         assert_eq!(
             outcome.log,
@@ -942,8 +973,9 @@ mod tests {
             request(2, None, 2, ScheduledEventPayloadV1::DelayedStatusApply),
         )
         .state;
-        let unavailable =
-            UnavailableScopes::from_scopes(vec![MechanicScope::Pokemon { pokemon: pokemon(1) }]);
+        let unavailable = UnavailableScopes::from_scopes(vec![MechanicScope::Pokemon {
+            pokemon: pokemon(1),
+        }]);
         let outcome =
             drain_due_events(&state, 2, &SlotOccupants::default(), &unavailable).expect("drain");
         assert_eq!(outcome.records.len(), 1);
@@ -987,7 +1019,9 @@ mod tests {
         );
         let retired = retire_events_for_owner(
             &cancelled.state,
-            MechanicScope::Pokemon { pokemon: pokemon(1) },
+            MechanicScope::Pokemon {
+                pokemon: pokemon(1),
+            },
         )
         .expect("retire");
         assert!(retired.state.pending_events.is_empty());
@@ -1093,8 +1127,12 @@ mod tests {
             owner: MechanicScope::Battle,
             duration_turns: 2,
         };
-        let sunny = set_weather(&ScheduledEffectsState::default(), WeatherId::Sunny, request.clone())
-            .expect("sunny");
+        let sunny = set_weather(
+            &ScheduledEffectsState::default(),
+            WeatherId::Sunny,
+            request.clone(),
+        )
+        .expect("sunny");
         assert_eq!(
             sunny.log,
             vec![ScheduledEffectsLogEntry::WeatherSet {
@@ -1111,7 +1149,10 @@ mod tests {
                 ..
             }
         ));
-        assert_eq!(rainy.state.weather.as_ref().expect("live").remaining_turns, 2);
+        assert_eq!(
+            rainy.state.weather.as_ref().expect("live").remaining_turns,
+            2
+        );
         let lapsed_once = lapse_field_conditions(&rainy.state).expect("lapse");
         assert!(lapsed_once.state.weather.is_some());
         assert!(lapsed_once.log.is_empty());
@@ -1126,12 +1167,7 @@ mod tests {
         let cleared_again = clear_weather(&cleared.state).expect("clear again");
         assert!(cleared_again.log.is_empty());
         assert_eq!(
-            set_weather(
-                &ScheduledEffectsState::default(),
-                WeatherId::None,
-                request,
-            )
-            .err(),
+            set_weather(&ScheduledEffectsState::default(), WeatherId::None, request,).err(),
             Some(ScheduledEffectsError::ReservedNoneWeather)
         );
     }
@@ -1145,8 +1181,12 @@ mod tests {
             owner: MechanicScope::Battle,
             duration_turns: 1,
         };
-        let toxic = set_terrain(&ScheduledEffectsState::default(), TerrainId::Toxic, request.clone())
-            .expect("toxic");
+        let toxic = set_terrain(
+            &ScheduledEffectsState::default(),
+            TerrainId::Toxic,
+            request.clone(),
+        )
+        .expect("toxic");
         assert!(toxic.state.terrain.is_some());
         let lapsed = lapse_field_conditions(&toxic.state).expect("lapse");
         assert!(lapsed.state.terrain.is_none());
@@ -1172,18 +1212,18 @@ mod tests {
             owner: slot_scope(player_slot(0)),
             duration_turns,
         };
-        let applied =
-            apply_arena_tag(&ScheduledEffectsState::default(), ArenaTagId::Tailwind, tag_request(3))
-                .expect("apply");
+        let applied = apply_arena_tag(
+            &ScheduledEffectsState::default(),
+            ArenaTagId::Tailwind,
+            tag_request(3),
+        )
+        .expect("apply");
         assert_eq!(applied.state.arena_tags.len(), 1);
         // Same key replaces with fresh turns instead of stacking.
         let replaced =
             apply_arena_tag(&applied.state, ArenaTagId::Tailwind, tag_request(2)).expect("replace");
         assert_eq!(replaced.state.arena_tags.len(), 1);
-        assert_eq!(
-            replaced.state.arena_tags[0].remaining_turns,
-            2
-        );
+        assert_eq!(replaced.state.arena_tags[0].remaining_turns, 2);
         assert!(matches!(
             replaced.log[0],
             ScheduledEffectsLogEntry::ArenaTagApplied {
@@ -1221,7 +1261,12 @@ mod tests {
         .expect("remove");
         assert!(removed.state.arena_tags.is_empty());
         assert_eq!(
-            remove_arena_tag(&removed.state, ArenaTagId::Tailwind, slot_scope(player_slot(0))).err(),
+            remove_arena_tag(
+                &removed.state,
+                ArenaTagId::Tailwind,
+                slot_scope(player_slot(0))
+            )
+            .err(),
             Some(ScheduledEffectsError::UnknownArenaTag {
                 tag: ArenaTagId::Tailwind
             })
@@ -1233,15 +1278,20 @@ mod tests {
         let state = schedule(
             &ScheduledEffectsState::default(),
             0,
-            request(1, None, 2, ScheduledEventPayloadV1::DelayedDamage { amount: 10 }),
+            request(
+                1,
+                None,
+                2,
+                ScheduledEventPayloadV1::DelayedDamage { amount: 10 },
+            ),
         )
         .state;
         assert_eq!(state.validate(), Ok(()));
         // Unsorted pending events fail closed.
         let mut unsorted = state.clone();
         unsorted.next_event_id += 1;
-        unsorted.next_creation_ordinal = SafeU53::new(unsorted.next_creation_ordinal.get() + 1)
-            .expect("ordinal");
+        unsorted.next_creation_ordinal =
+            SafeU53::new(unsorted.next_creation_ordinal.get() + 1).expect("ordinal");
         unsorted.pending_events.push(DelayedEffectEvent {
             event_id: 2,
             source_behavior_unit: doom_desire_unit(),
@@ -1281,4 +1331,3 @@ mod tests {
         ));
     }
 }
-

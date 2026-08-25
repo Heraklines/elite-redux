@@ -13,10 +13,10 @@
 use std::collections::BTreeSet;
 
 use er_state::bespoke_v2::boss::{
-    boss_owner_unit, frozen_rng_site_id, BossCustomErStateV1, BossStateErrorV1,
-    CustomDispatchRegistryErrorV1, CustomDispatchRegistryV1, DispatchRouteEntryV1,
-    FixedDispatchHandlerKindV1, BOSS_FROZEN_RNG_CARDINALITY,
-    CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION,
+    BOSS_FROZEN_RNG_CARDINALITY, BossCustomErStateV1, BossStateErrorV1,
+    CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION, CustomDispatchRegistryErrorV1,
+    CustomDispatchRegistryV1, DispatchRouteEntryV1, FixedDispatchHandlerKindV1, boss_owner_unit,
+    frozen_rng_site_id,
 };
 use er_types::{BehaviorUnitId, ProvenanceHash, RngSiteId, SafeU53};
 use thiserror::Error;
@@ -89,9 +89,7 @@ pub enum BossMechanicErrorV1 {
     RngCardinalityMismatch { expected: u64, actual: u64 },
     #[error("RNG result {result} is outside the closed range of {cardinality}")]
     RngResultOutOfRange { cardinality: u64, result: u64 },
-    #[error(
-        "RNG admission sequence {sequence} does not advance past {previous}"
-    )]
+    #[error("RNG admission sequence {sequence} does not advance past {previous}")]
     RngSequenceNotAdvancing { sequence: u64, previous: u64 },
     #[error("RNG admission ledger cannot grow any further")]
     RngAdmissionOverflow,
@@ -131,8 +129,8 @@ fn boundary_crossed(
 
 /// Remaining boss bars: ceiling of `hp / max_hp * segments_total`.
 fn segment_count(hp: u32, max_hp: u32, segments_total: u8) -> u8 {
-    let scaled = (u64::from(hp) * u64::from(segments_total) + u64::from(max_hp) - 1)
-        / u64::from(max_hp);
+    let scaled =
+        (u64::from(hp) * u64::from(segments_total) + u64::from(max_hp) - 1) / u64::from(max_hp);
     scaled.min(u64::from(segments_total)) as u8
 }
 
@@ -158,7 +156,10 @@ pub fn apply_boss_damage(
         return Err(BossMechanicErrorV1::ZeroMaxHp);
     }
     if current_hp > max_hp {
-        return Err(BossMechanicErrorV1::CurrentHpAboveMax { current: current_hp, max: max_hp });
+        return Err(BossMechanicErrorV1::CurrentHpAboveMax {
+            current: current_hp,
+            max: max_hp,
+        });
     }
 
     let hp_after = current_hp.saturating_sub(damage);
@@ -548,15 +549,13 @@ pub fn build_custom_dispatch_registry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use er_state::bespoke_v2::boss::{BossPhaseBoundaryV1, BOSS_MAX_SHIELD_CHARGES};
+    use er_state::bespoke_v2::boss::{BOSS_MAX_SHIELD_CHARGES, BossPhaseBoundaryV1};
     use er_types::mechanics::MechanicScope;
     use er_types::{PokemonId, RngSiteOrdinal};
     use std::collections::BTreeMap;
 
-    const OWNER_HASH: &str =
-        "b0fe628993091a058fd71026b19ee1981ae457afe37823435c9cbb3c9b5e2787";
-    const SITE_HASH: &str =
-        "8b45ad4919d6e3b96286ddf9560b7ac4dc41fef80883fed673a31b84a475090b";
+    const OWNER_HASH: &str = "b0fe628993091a058fd71026b19ee1981ae457afe37823435c9cbb3c9b5e2787";
+    const SITE_HASH: &str = "8b45ad4919d6e3b96286ddf9560b7ac4dc41fef80883fed673a31b84a475090b";
 
     fn subject() -> MechanicScope {
         MechanicScope::Pokemon {
@@ -564,7 +563,13 @@ mod tests {
         }
     }
 
-    fn boundary(trigger_id: u32, numerator: u32, denominator: u32, phase: u8, slot: Option<u8>) -> BossPhaseBoundaryV1 {
+    fn boundary(
+        trigger_id: u32,
+        numerator: u32,
+        denominator: u32,
+        phase: u8,
+        slot: Option<u8>,
+    ) -> BossPhaseBoundaryV1 {
         BossPhaseBoundaryV1 {
             trigger_id,
             hp_fraction_numerator: numerator,
@@ -602,8 +607,7 @@ mod tests {
     fn multi_threshold_damage_fires_both_boundaries_in_order() {
         let state = two_boundary_state();
         // 1000 max HP, drop from full to 200: crosses 1/2 (500) and 1/4 (250).
-        let transition =
-            apply_boss_damage(&state, 800, 1000, 1000).expect("damage transition");
+        let transition = apply_boss_damage(&state, 800, 1000, 1000).expect("damage transition");
         assert_eq!(transition.hp_after, 200);
         assert_eq!(transition.state.segments_remaining, 1);
         assert_eq!(transition.state.current_phase, 2);
@@ -635,12 +639,10 @@ mod tests {
     #[test]
     fn already_fired_threshold_never_refires() {
         let state = two_boundary_state();
-        let first =
-            apply_boss_damage(&state, 600, 1000, 1000).expect("first damage");
+        let first = apply_boss_damage(&state, 600, 1000, 1000).expect("first damage");
         // Back above the half line, then cross it again: the trigger stays
         // consumed and no phase/shield replay happens.
-        let second = apply_boss_damage(&first.state, 100, 400, 1000)
-            .expect("second damage");
+        let second = apply_boss_damage(&first.state, 100, 400, 1000).expect("second damage");
         assert_eq!(second.state.fired_triggers, vec![11]);
         assert_eq!(second.state.current_phase, 1);
         assert!(matches!(
@@ -714,8 +716,7 @@ mod tests {
             decide_boss_scripted_action(&damaged.state, 7),
             Ok(BossScriptedActionDecisionV1::Locked { slot: 7 })
         );
-        let deeper =
-            apply_boss_damage(&damaged.state, 300, 400, 1000).expect("damage");
+        let deeper = apply_boss_damage(&damaged.state, 300, 400, 1000).expect("damage");
         assert_eq!(
             decide_boss_scripted_action(&deeper.state, 7),
             Ok(BossScriptedActionDecisionV1::Unlocked { slot: 7 })
@@ -793,18 +794,19 @@ mod tests {
         let state = two_boundary_state();
         let first = admit_boss_rng_draw(&state, &admission(5, 2)).expect("admit");
         assert_eq!(first.state.rng_admissions, 1);
-        let second =
-            admit_boss_rng_draw(&first.state, &admission(6, 5)).expect("admit");
+        let second = admit_boss_rng_draw(&first.state, &admission(6, 5)).expect("admit");
         assert_eq!(second.state.rng_admissions, 2);
-        assert_eq!(second.state.last_rng_result.map(|value| value.get()), Some(5));
+        assert_eq!(
+            second.state.last_rng_result.map(|value| value.get()),
+            Some(5)
+        );
     }
 
     #[test]
     fn terminal_cleanup_runs_once_and_freezes_state() {
         let state = two_boundary_state();
         let damaged = apply_boss_damage(&state, 600, 1000, 1000).expect("damage");
-        let admitted =
-            admit_boss_rng_draw(&damaged.state, &admission(5, 2)).expect("admit");
+        let admitted = admit_boss_rng_draw(&damaged.state, &admission(5, 2)).expect("admit");
         let retired = retire_boss_state(&admitted.state).expect("retire");
         assert!(retired.state.terminal);
         assert!(!retired.state.shield_active);
@@ -983,8 +985,7 @@ mod tests {
             )
             .expect("hash"),
         ]);
-        let registry =
-            build_custom_dispatch_registry(&gross, &exclusions).expect("registry");
+        let registry = build_custom_dispatch_registry(&gross, &exclusions).expect("registry");
         assert_eq!(registry.sibling_exclusions.len(), 2);
         assert_eq!(registry.routes.len(), 8);
         assert_eq!(registry.rejected_nondeterministic.len(), 1);

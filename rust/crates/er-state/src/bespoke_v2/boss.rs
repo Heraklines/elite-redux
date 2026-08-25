@@ -161,9 +161,7 @@ pub struct BossCustomErStateV1 {
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum BossStateErrorV1 {
-    #[error(
-        "boss state schema version must be {expected}, got {actual}"
-    )]
+    #[error("boss state schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
     #[error("boss subject scope must address exactly one Pokemon")]
     SubjectNotPokemon,
@@ -175,7 +173,9 @@ pub enum BossStateErrorV1 {
     RemainingSegmentsAboveTotal,
     #[error("boss boundary trigger ID must be positive")]
     ZeroTriggerId,
-    #[error("boss boundary HP fraction is degenerate: numerator and denominator must both be positive")]
+    #[error(
+        "boss boundary HP fraction is degenerate: numerator and denominator must both be positive"
+    )]
     DegenerateBoundaryFraction,
     #[error("boss boundary HP fraction must be strictly below full HP")]
     BoundaryAtOrAboveFullHp,
@@ -395,9 +395,7 @@ pub struct CustomDispatchRegistryV1 {
 /// Closed invariant failures for a built central registry.
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum CustomDispatchRegistryErrorV1 {
-    #[error(
-        "dispatch registry schema version must be {expected}, got {actual}"
-    )]
+    #[error("dispatch registry schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
     #[error("sibling exclusions must be sorted strictly ascending and unique")]
     ExclusionsOutOfOrder,
@@ -405,7 +403,9 @@ pub enum CustomDispatchRegistryErrorV1 {
     RejectionsOutOfOrder,
     #[error("routes must be sorted strictly ascending by provenance hash and unique")]
     RoutesOutOfOrder,
-    #[error("count conservation failed: exclusions + rejections + routes must equal the gross count")]
+    #[error(
+        "count conservation failed: exclusions + rejections + routes must equal the gross count"
+    )]
     ResidualUnitsRemain,
     #[error("route entries must never use a rejected handler kind")]
     RouteUsesRejectKind,
@@ -430,7 +430,8 @@ impl CustomDispatchRegistryV1 {
             if route.handler.is_reject_kind() {
                 return Err(CustomDispatchRegistryErrorV1::RouteUsesRejectKind);
             }
-            if previous_hash.is_some_and(|previous| previous.as_str() >= route.provenance_hash.as_str())
+            if previous_hash
+                .is_some_and(|previous| previous.as_str() >= route.provenance_hash.as_str())
             {
                 return Err(CustomDispatchRegistryErrorV1::RoutesOutOfOrder);
             }

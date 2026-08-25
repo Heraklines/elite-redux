@@ -19,9 +19,9 @@
 
 use std::collections::BTreeSet;
 
+use er_types::SafeU53;
 use er_types::battle_ids::PokemonId;
 use er_types::mechanics::SourceOrdinal;
-use er_types::SafeU53;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 

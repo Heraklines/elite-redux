@@ -167,9 +167,7 @@ impl Default for PivotRedirectStateV2 {
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum PivotRedirectStateError {
-    #[error(
-        "pivot/redirect state schema version must be {expected}, got {actual}"
-    )]
+    #[error("pivot/redirect state schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
     #[error("next creation ordinal must be positive")]
     ZeroNextCreationOrdinal,
@@ -272,12 +270,11 @@ impl PivotRedirectStateV2 {
             if pairing.host.pokemon == pairing.commander {
                 return Err(PivotRedirectStateError::CommanderSelfPairing);
             }
-            let commander_elsewhere =
-                redirect_sources.contains(&pairing.commander)
-                    || trap_subjects
-                        .iter()
-                        .any(|(subject, _)| *subject == pairing.commander)
-                    || intent_subjects.contains(&pairing.commander);
+            let commander_elsewhere = redirect_sources.contains(&pairing.commander)
+                || trap_subjects
+                    .iter()
+                    .any(|(subject, _)| *subject == pairing.commander)
+                || intent_subjects.contains(&pairing.commander);
             if commander_elsewhere {
                 return Err(PivotRedirectStateError::CommanderOccupiedElsewhere);
             }
@@ -585,7 +582,9 @@ mod tests {
             .expect("trap");
         let (state, dropped_redirects) = state.drop_redirects_from(trapper.pokemon).expect("drop");
         assert_eq!(dropped_redirects.len(), 1);
-        let (_, ended_traps) = state.end_traps_owned_by(trapper.pokemon).expect("end traps");
+        let (_, ended_traps) = state
+            .end_traps_owned_by(trapper.pokemon)
+            .expect("end traps");
         assert_eq!(ended_traps.len(), 1);
     }
 

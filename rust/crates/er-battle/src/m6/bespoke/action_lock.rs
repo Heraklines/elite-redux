@@ -87,7 +87,9 @@ pub struct AcquireActionLock {
 /// untouched.
 #[derive(Clone, Copy, Debug, Eq, Error, PartialEq)]
 pub enum ActionLockError {
-    #[error("an action lock is already active on {locked_move_id:?}; duplicate acquisition is forbidden")]
+    #[error(
+        "an action lock is already active on {locked_move_id:?}; duplicate acquisition is forbidden"
+    )]
     DuplicateAcquisition { locked_move_id: MoveId },
     #[error("action lock duration must be positive")]
     ZeroDuration,
@@ -162,10 +164,7 @@ pub fn advance_locked_turn(
         .validate()
         .map_err(ActionLockError::InvalidCanonicalState)?;
     match (existing.stage, command) {
-        (
-            ActionLockStage::Charging,
-            LockedTurnCommand::ContinueLockedMove { move_id },
-        ) => {
+        (ActionLockStage::Charging, LockedTurnCommand::ContinueLockedMove { move_id }) => {
             if *move_id != existing.locked_move_id {
                 return Err(ActionLockError::LockedMoveMismatch {
                     expected: existing.locked_move_id,
@@ -445,9 +444,8 @@ mod tests {
         assert_eq!(fainted.events[0].remaining_after, 0);
         assert_eq!(fainted.lock, None);
 
-        let switched =
-            clear_lock_on_interruption(&lock, LockInterruption::ActorSwitchedOut)
-                .expect("switch cleanup succeeds");
+        let switched = clear_lock_on_interruption(&lock, LockInterruption::ActorSwitchedOut)
+            .expect("switch cleanup succeeds");
         assert_eq!(
             switched.events[0].kind,
             ActionLockEventKind::ClearedOnSwitchOut
@@ -459,8 +457,7 @@ mod tests {
     #[test]
     fn zero_duration_and_non_pokemon_owners_fail_closed() {
         assert_eq!(
-            acquire_action_lock(None, &charging_request(0))
-                .expect_err("zero duration must fail"),
+            acquire_action_lock(None, &charging_request(0)).expect_err("zero duration must fail"),
             ActionLockError::ZeroDuration
         );
         let arena_request = AcquireActionLock {
@@ -468,8 +465,7 @@ mod tests {
             ..charging_request(2)
         };
         assert_eq!(
-            acquire_action_lock(None, &arena_request)
-                .expect_err("non-pokemon owner must fail"),
+            acquire_action_lock(None, &arena_request).expect_err("non-pokemon owner must fail"),
             ActionLockError::OwnerNotAPokemonScope
         );
     }

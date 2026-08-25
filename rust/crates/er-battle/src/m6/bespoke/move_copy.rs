@@ -27,8 +27,8 @@
 use std::collections::BTreeSet;
 
 use er_state::bespoke_v2::move_copy::{
-    MoveCopyStateError, MoveCopyStateV2, MoveHistoryEntryV2, MoveOutcomeV2,
-    MoveUseModeV2, STRUGGLE_MOVE_ID,
+    MoveCopyStateError, MoveCopyStateV2, MoveHistoryEntryV2, MoveOutcomeV2, MoveUseModeV2,
+    STRUGGLE_MOVE_ID,
 };
 use er_types::battle_ids::{MoveId, PokemonId};
 use er_types::ids::SafeU53;
@@ -67,7 +67,10 @@ pub enum MoveCopyTransitionError {
     #[error(
         "audited choice index {index} is outside the closed candidate set of {candidate_count}"
     )]
-    ChoiceOutOfRange { candidate_count: usize, index: usize },
+    ChoiceOutOfRange {
+        candidate_count: usize,
+        index: usize,
+    },
     #[error("candidate set contains the NONE move identity")]
     InvalidCandidateSet,
 }
@@ -125,7 +128,9 @@ pub fn record_execution(
     request: &RecordRequest,
 ) -> Result<RecordedExecution, MoveCopyTransitionError> {
     if request.move_id.get() == SafeU53::ZERO {
-        return Err(MoveCopyTransitionError::State(MoveCopyStateError::ZeroMoveId));
+        return Err(MoveCopyTransitionError::State(
+            MoveCopyStateError::ZeroMoveId,
+        ));
     }
     let (updated, entry, evicted) = state.with_recorded_entry(
         request.actor,
@@ -340,7 +345,9 @@ fn resolve_source(
 ) -> Result<ResolvedLastMove, MoveCopyTransitionError> {
     match source {
         RecordedLastSource::BattleLastMove { last_move } => match last_move {
-            Some(move_id) if move_id.get() != SafeU53::ZERO => Ok(ResolvedLastMove::Battle(*move_id)),
+            Some(move_id) if move_id.get() != SafeU53::ZERO => {
+                Ok(ResolvedLastMove::Battle(*move_id))
+            }
             _ => Err(MoveCopyFailure::NoEligibleLastMove.into()),
         },
         RecordedLastSource::ActorHistory {
@@ -414,8 +421,15 @@ pub fn resolve_recorded_last_copy(
 
     let permanent = numeric == 166; // SKETCH
     if slot_replacement {
-        let slot = request.invoking_slot.ok_or(MoveCopyFailure::NoInvokingSlot)?;
-        if permanent && request.caller_moveset.iter().any(|known| *known == copied_move) {
+        let slot = request
+            .invoking_slot
+            .ok_or(MoveCopyFailure::NoInvokingSlot)?;
+        if permanent
+            && request
+                .caller_moveset
+                .iter()
+                .any(|known| *known == copied_move)
+        {
             return Err(MoveCopyFailure::SketchAlreadyKnown { move_id: numeric }.into());
         }
         return Ok(ResolvedCopyCall {
@@ -785,804 +799,1319 @@ pub enum DispatchClassificationError {
 /// semantic-catalog-v1.json ∩ bespoke-clusters-v1.json at base `1931f32a8`;
 /// each row carries the exact base/effect/hook combinations observed there.
 static ROUTE_TABLE: &[(&str, AttributeRoute)] = &[
-    ("AbilityChangeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AbilityOp(AbilityOpKind::Change)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AbilityCopyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AbilityOp(AbilityOpKind::Copy)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AbilityGiveAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AbilityOp(AbilityOpKind::Give)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AddPledgeEffectAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::ArenaTags { removal: false }),
-        accepted_bases: &[CustomImplBase::AddArenaTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AddTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::TypeAddRemove)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AfterYouAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TurnOrderManipulation),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AlwaysHitMinimizeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::VariableAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("AngelsWrathDrainAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::RecoilDrain(RecoilKind::DelayedDrain)),
-        accepted_bases: &[CustomImplBase::HitHeal],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AngelsWrathElectrowebAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::TwoTurnAttack)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AngelsWrathGroundSuperEffectiveAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::TwoTurnAttack)),
-        accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AngelsWrathHazardAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::TwoTurnAttack)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AngelsWrathKingsShieldAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::TwoTurnAttack)),
-        accepted_bases: &[CustomImplBase::Protect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AngelsWrathSteelSuperEffectiveAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::TwoTurnAttack)),
-        accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AngelsWrathTackleAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::TwoTurnAttack)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AntiSunlightPowerDecreaseAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AttackReducePpMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PpReduction),
-        accepted_bases: &[CustomImplBase::ReducePpMove],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AuraWheelTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("AwaitCombinedPledgeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PledgeCombo),
-        accepted_bases: &[CustomImplBase::OverrideMoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("BeakBlastHeaderAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::HeaderEffect),
-        accepted_bases: &[CustomImplBase::AddBattlerTagHeader],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("BeatUpAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("BlizzardAccuracyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::VariableAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("BoostHealAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::BoostedByModifier)),
-        accepted_bases: &[CustomImplBase::Heal],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("BypassSleepAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::SleepBypass),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ChangeTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::TypeAddRemove)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ChillyReceptionAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::WeatherSet { clear_only: false }),
-        accepted_bases: &[CustomImplBase::ForceSwitchOut],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ClearTerrainAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TerrainSet { clear_only: true }),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyTerrain],
-        accepted_hooks: &[CustomHook::TerrainChanged],
-    }),
-    ("ClearWeatherAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::WeatherSet { clear_only: true }),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyWeather],
-        accepted_hooks: &[CustomHook::WeatherChanged],
-    }),
-    ("CombinedPledgePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CombinedPledgeTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CompareWeightPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ConfuseAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::Confusion)),
-        accepted_bases: &[CustomImplBase::AddBattlerTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ConsecutiveUseDoublePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::ConsecutiveUsePowerMultiplier],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ConsecutiveUseMultiBasePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::ConsecutiveUsePowerMultiplier],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CopyBiomeTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CopyMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::RecordedLast),
-        accepted_bases: &[CustomImplBase::CallMove],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CopyTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CueNextRoundAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TurnOrderManipulation),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("CurseAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::Curse)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("DefAtkAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::StatOverride(StatOverrideSurface::Offensive)),
-        accepted_bases: &[CustomImplBase::VariableAtk],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("DefDefAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::StatOverride(StatOverrideSurface::Defensive)),
-        accepted_bases: &[CustomImplBase::VariableDef],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("DestinyBondAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::DestinyBond)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("DoublePowerChanceAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ElectroBallPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ErFlingPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ErNaturalGiftPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ErNaturalGiftTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ErSkyDropReleaseAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::DelayedRelease)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ExposedMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::Exposure)),
-        accepted_bases: &[CustomImplBase::AddBattlerTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FallDownAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::ForcedLanding)),
-        accepted_bases: &[CustomImplBase::AddBattlerTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FirstMoveTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FlinchAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::Flinch)),
-        accepted_bases: &[CustomImplBase::AddBattlerTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FlyingTypeMultiplierAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::ChartOverride)),
-        accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FreezeDryAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::ChartOverride)),
-        accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FrenzyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::Frenzy)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("FriendshipPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("GyroBallPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HalfSacrificialAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(SacrificeKind::HalfHpAfterUse)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HealAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::User)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HealOnAllyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::Ally)),
-        accepted_bases: &[CustomImplBase::Heal],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HiddenPowerTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HitHealAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::DrainOnHit)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HitsSameTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::MultiHit),
-        accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HpPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("HpSplitAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::AverageWithTarget)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("IceNoEffectTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::ChartOverride)),
-        accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("IgnoreWeatherTypeDebuffAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::WeatherChanged],
-    }),
-    ("IncrementMovePriorityAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PriorityIncrement),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::PriorityQuery],
-    }),
-    ("IvyCudgelTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("JawLockAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::Trap)),
-        accepted_bases: &[CustomImplBase::AddBattlerTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("LastMoveDoublePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("LeechSeedAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::LeechSeed)),
-        accepted_bases: &[CustomImplBase::AddBattlerTag],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("LessPPMorePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("LowHpPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MagnitudePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MatchHpAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::Equalize)),
-        accepted_bases: &[CustomImplBase::FixedDamage],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MatchUserTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MessageAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(PresentationTiming::OnExecution)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MessageHeaderAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(PresentationTiming::Header)),
-        accepted_bases: &[CustomImplBase::MoveHeader],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MissEffectAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(PresentationTiming::OnFailureMiss)),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MoneyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::MoneyAward),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MovePowerMultiplierAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::MovePowerQuery],
-    }),
-    ("MovesetCopyMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::MimicSlotCopy),
-        accepted_bases: &[CustomImplBase::OverrideMoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MultiHitAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::MultiHit),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("MultiHitPowerIncrementAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("NaturePowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::TerrainCall),
-        accepted_bases: &[CustomImplBase::OverrideMoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("NoEffectAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(PresentationTiming::OnFailureImmunity)),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("OneHitKOAccuracyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::VariableAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("OneHitKOAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Ohko),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("OpponentHighHpPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PhotonGeyserCategoryAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::CategoryOverride),
-        accepted_bases: &[CustomImplBase::VariableMoveCategory],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PlantHealAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::GroundedConditional)),
-        accepted_bases: &[CustomImplBase::WeatherHeal],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PreMoveMessageAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(PresentationTiming::BeforeExecution)),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PreUseInterruptAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::HeaderEffect),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PresentPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PsychoShiftEffectAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::StatusTransfer),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PunishmentPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("PursuitPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RageFistPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RagingBullTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RandomMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::GlobalRandom),
-        accepted_bases: &[CustomImplBase::CallMove],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RandomMovesetMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::MovesetRandom),
-        accepted_bases: &[CustomImplBase::CallMove],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RecoilAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::RecoilDrain(RecoilKind::RecoilFraction)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ReducePpMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PpReduction),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RemoveScreensAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::ArenaTags { removal: true }),
-        accepted_bases: &[CustomImplBase::RemoveArenaTags],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RemoveTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::TypeAddRemove)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RepeatMoveAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::RepeatLastOwn),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("ResistLastMoveTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::ChartOverride)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RevivalBlessingAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::RevivalBlessing),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("RoundPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SacrificialAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(SacrificeKind::FaintAfterUse)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SacrificialAttrOnHit", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(SacrificeKind::FaintOnHit)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SacrificialFullRestoreAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(SacrificeKind::FullRestoreAfterUse)),
-        accepted_bases: &[CustomImplBase::Sacrificial],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SandHealAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::WeatherConditional)),
-        accepted_bases: &[CustomImplBase::WeatherHeal],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SecretPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::TerrainConditional)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SheerColdAccuracyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::OneHitKOAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("ShellSideArmCategoryAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::CategoryOverride),
-        accepted_bases: &[CustomImplBase::VariableMoveCategory],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SketchAttr", AttributeRoute {
-        route: CustomDispatchRoute::CopyCall(CopyCallVariant::SketchPermanent),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SpectralThiefAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::StatOverride(StatOverrideSurface::BoostSteal)),
-        accepted_bases: &[CustomImplBase::StatChangeBeforeDmgCalc],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("SpitUpPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("StormAccuracyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::VariableAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("SwallowHealAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::StockpileRelease)),
-        accepted_bases: &[CustomImplBase::Heal],
-        accepted_effects: &[CustomEffectKind::Heal],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("TechnoBlastTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("TerrainChangeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TerrainSet { clear_only: false }),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyTerrain],
-        accepted_hooks: &[CustomHook::TerrainChanged],
-    }),
-    ("TerrainPulseTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::TerrainChanged],
-    }),
-    ("ThunderAccuracyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::VariableAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("ToxicAccuracyAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
-        accepted_bases: &[CustomImplBase::VariableAccuracy],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::AccuracyQuery],
-    }),
-    ("TypelessAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::Typelessness)),
-        accepted_bases: &[CustomImplBase::Move],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("WaterShurikenMultiHitTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::MultiHit),
-        accepted_bases: &[CustomImplBase::ChangeMultiHitType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("WaterShurikenPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("WeatherBallTypeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(TypeOverrideLayer::DerivedType)),
-        accepted_bases: &[CustomImplBase::VariableMoveType],
-        accepted_effects: &[CustomEffectKind::ModifyType],
-        accepted_hooks: &[CustomHook::WeatherChanged],
-    }),
-    ("WeatherChangeAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::WeatherSet { clear_only: false }),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::ModifyWeather],
-        accepted_hooks: &[CustomHook::WeatherChanged],
-    }),
-    ("WeightPowerAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
-        accepted_bases: &[CustomImplBase::VariablePower],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
-    ("WishAttr", AttributeRoute {
-        route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(DelayedCommitKind::DeferredHeal)),
-        accepted_bases: &[CustomImplBase::MoveEffect],
-        accepted_effects: &[CustomEffectKind::Unresolved],
-        accepted_hooks: &[CustomHook::Unresolved],
-    }),
+    (
+        "AbilityChangeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AbilityOp(AbilityOpKind::Change)),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AbilityCopyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AbilityOp(AbilityOpKind::Copy)),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AbilityGiveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AbilityOp(AbilityOpKind::Give)),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AddPledgeEffectAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::ArenaTags { removal: false }),
+            accepted_bases: &[CustomImplBase::AddArenaTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AddTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::TypeAddRemove,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AfterYouAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TurnOrderManipulation),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AlwaysHitMinimizeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::VariableAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "AngelsWrathDrainAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::RecoilDrain(
+                RecoilKind::DelayedDrain,
+            )),
+            accepted_bases: &[CustomImplBase::HitHeal],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AngelsWrathElectrowebAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::TwoTurnAttack,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AngelsWrathGroundSuperEffectiveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::TwoTurnAttack,
+            )),
+            accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AngelsWrathHazardAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::TwoTurnAttack,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AngelsWrathKingsShieldAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::TwoTurnAttack,
+            )),
+            accepted_bases: &[CustomImplBase::Protect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AngelsWrathSteelSuperEffectiveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::TwoTurnAttack,
+            )),
+            accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AngelsWrathTackleAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::TwoTurnAttack,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AntiSunlightPowerDecreaseAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AttackReducePpMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PpReduction),
+            accepted_bases: &[CustomImplBase::ReducePpMove],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AuraWheelTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "AwaitCombinedPledgeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PledgeCombo),
+            accepted_bases: &[CustomImplBase::OverrideMoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "BeakBlastHeaderAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::HeaderEffect),
+            accepted_bases: &[CustomImplBase::AddBattlerTagHeader],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "BeatUpAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "BlizzardAccuracyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::VariableAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "BoostHealAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(
+                HealScope::BoostedByModifier,
+            )),
+            accepted_bases: &[CustomImplBase::Heal],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "BypassSleepAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::SleepBypass),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ChangeTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::TypeAddRemove,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ChillyReceptionAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::WeatherSet { clear_only: false }),
+            accepted_bases: &[CustomImplBase::ForceSwitchOut],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ClearTerrainAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TerrainSet { clear_only: true }),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyTerrain],
+            accepted_hooks: &[CustomHook::TerrainChanged],
+        },
+    ),
+    (
+        "ClearWeatherAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::WeatherSet { clear_only: true }),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyWeather],
+            accepted_hooks: &[CustomHook::WeatherChanged],
+        },
+    ),
+    (
+        "CombinedPledgePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CombinedPledgeTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CompareWeightPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ConfuseAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::Confusion,
+            )),
+            accepted_bases: &[CustomImplBase::AddBattlerTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ConsecutiveUseDoublePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::ConsecutiveUsePowerMultiplier],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ConsecutiveUseMultiBasePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::ConsecutiveUsePowerMultiplier],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CopyBiomeTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CopyMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::RecordedLast),
+            accepted_bases: &[CustomImplBase::CallMove],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CopyTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CueNextRoundAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TurnOrderManipulation),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "CurseAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::Curse,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "DefAtkAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::StatOverride(
+                StatOverrideSurface::Offensive,
+            )),
+            accepted_bases: &[CustomImplBase::VariableAtk],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "DefDefAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::StatOverride(
+                StatOverrideSurface::Defensive,
+            )),
+            accepted_bases: &[CustomImplBase::VariableDef],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "DestinyBondAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::DestinyBond,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "DoublePowerChanceAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ElectroBallPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ErFlingPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ErNaturalGiftPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ErNaturalGiftTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ErSkyDropReleaseAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::DelayedRelease,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ExposedMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::Exposure,
+            )),
+            accepted_bases: &[CustomImplBase::AddBattlerTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FallDownAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::ForcedLanding,
+            )),
+            accepted_bases: &[CustomImplBase::AddBattlerTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FirstMoveTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FlinchAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::Flinch,
+            )),
+            accepted_bases: &[CustomImplBase::AddBattlerTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FlyingTypeMultiplierAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::ChartOverride,
+            )),
+            accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FreezeDryAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::ChartOverride,
+            )),
+            accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FrenzyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::Frenzy,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "FriendshipPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "GyroBallPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HalfSacrificialAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(
+                SacrificeKind::HalfHpAfterUse,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HealAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::User)),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HealOnAllyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::Ally)),
+            accepted_bases: &[CustomImplBase::Heal],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HiddenPowerTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HitHealAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::DrainOnHit)),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HitsSameTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::MultiHit),
+            accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HpPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "HpSplitAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(
+                HealScope::AverageWithTarget,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "IceNoEffectTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::ChartOverride,
+            )),
+            accepted_bases: &[CustomImplBase::MoveTypeChartOverride],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "IgnoreWeatherTypeDebuffAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::WeatherChanged],
+        },
+    ),
+    (
+        "IncrementMovePriorityAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PriorityIncrement),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::PriorityQuery],
+        },
+    ),
+    (
+        "IvyCudgelTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "JawLockAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::Trap,
+            )),
+            accepted_bases: &[CustomImplBase::AddBattlerTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "LastMoveDoublePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "LeechSeedAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::LeechSeed,
+            )),
+            accepted_bases: &[CustomImplBase::AddBattlerTag],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "LessPPMorePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "LowHpPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MagnitudePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MatchHpAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::Equalize)),
+            accepted_bases: &[CustomImplBase::FixedDamage],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MatchUserTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MessageAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(
+                PresentationTiming::OnExecution,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MessageHeaderAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(
+                PresentationTiming::Header,
+            )),
+            accepted_bases: &[CustomImplBase::MoveHeader],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MissEffectAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(
+                PresentationTiming::OnFailureMiss,
+            )),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MoneyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::MoneyAward),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MovePowerMultiplierAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::MovePowerQuery],
+        },
+    ),
+    (
+        "MovesetCopyMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::MimicSlotCopy),
+            accepted_bases: &[CustomImplBase::OverrideMoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MultiHitAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::MultiHit),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "MultiHitPowerIncrementAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "NaturePowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::TerrainCall),
+            accepted_bases: &[CustomImplBase::OverrideMoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "NoEffectAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(
+                PresentationTiming::OnFailureImmunity,
+            )),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "OneHitKOAccuracyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::VariableAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "OneHitKOAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Ohko),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "OpponentHighHpPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PhotonGeyserCategoryAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::CategoryOverride),
+            accepted_bases: &[CustomImplBase::VariableMoveCategory],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PlantHealAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(
+                HealScope::GroundedConditional,
+            )),
+            accepted_bases: &[CustomImplBase::WeatherHeal],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PreMoveMessageAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Presentation(
+                PresentationTiming::BeforeExecution,
+            )),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PreUseInterruptAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::HeaderEffect),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PresentPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PsychoShiftEffectAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::StatusTransfer),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PunishmentPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "PursuitPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RageFistPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RagingBullTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RandomMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::GlobalRandom),
+            accepted_bases: &[CustomImplBase::CallMove],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RandomMovesetMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::MovesetRandom),
+            accepted_bases: &[CustomImplBase::CallMove],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RecoilAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::RecoilDrain(
+                RecoilKind::RecoilFraction,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ReducePpMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PpReduction),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RemoveScreensAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::ArenaTags { removal: true }),
+            accepted_bases: &[CustomImplBase::RemoveArenaTags],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RemoveTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::TypeAddRemove,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RepeatMoveAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::RepeatLastOwn),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "ResistLastMoveTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::ChartOverride,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RevivalBlessingAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::RevivalBlessing),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "RoundPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SacrificialAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(
+                SacrificeKind::FaintAfterUse,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SacrificialAttrOnHit",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(
+                SacrificeKind::FaintOnHit,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SacrificialFullRestoreAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Sacrifice(
+                SacrificeKind::FullRestoreAfterUse,
+            )),
+            accepted_bases: &[CustomImplBase::Sacrificial],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SandHealAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(
+                HealScope::WeatherConditional,
+            )),
+            accepted_bases: &[CustomImplBase::WeatherHeal],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SecretPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(
+                VolatileTagKind::TerrainConditional,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SheerColdAccuracyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::OneHitKOAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "ShellSideArmCategoryAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::CategoryOverride),
+            accepted_bases: &[CustomImplBase::VariableMoveCategory],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SketchAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::CopyCall(CopyCallVariant::SketchPermanent),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SpectralThiefAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::StatOverride(
+                StatOverrideSurface::BoostSteal,
+            )),
+            accepted_bases: &[CustomImplBase::StatChangeBeforeDmgCalc],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "SpitUpPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "StormAccuracyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::VariableAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "SwallowHealAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::Heal(HealScope::StockpileRelease)),
+            accepted_bases: &[CustomImplBase::Heal],
+            accepted_effects: &[CustomEffectKind::Heal],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "TechnoBlastTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "TerrainChangeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TerrainSet { clear_only: false }),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyTerrain],
+            accepted_hooks: &[CustomHook::TerrainChanged],
+        },
+    ),
+    (
+        "TerrainPulseTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::TerrainChanged],
+        },
+    ),
+    (
+        "ThunderAccuracyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::VariableAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "ToxicAccuracyAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::AccuracyQuery),
+            accepted_bases: &[CustomImplBase::VariableAccuracy],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::AccuracyQuery],
+        },
+    ),
+    (
+        "TypelessAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::Typelessness,
+            )),
+            accepted_bases: &[CustomImplBase::Move],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "WaterShurikenMultiHitTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::MultiHit),
+            accepted_bases: &[CustomImplBase::ChangeMultiHitType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "WaterShurikenPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "WeatherBallTypeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::TypeOverride(
+                TypeOverrideLayer::DerivedType,
+            )),
+            accepted_bases: &[CustomImplBase::VariableMoveType],
+            accepted_effects: &[CustomEffectKind::ModifyType],
+            accepted_hooks: &[CustomHook::WeatherChanged],
+        },
+    ),
+    (
+        "WeatherChangeAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::WeatherSet { clear_only: false }),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::ModifyWeather],
+            accepted_hooks: &[CustomHook::WeatherChanged],
+        },
+    ),
+    (
+        "WeightPowerAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::PowerQuery),
+            accepted_bases: &[CustomImplBase::VariablePower],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
+    (
+        "WishAttr",
+        AttributeRoute {
+            route: CustomDispatchRoute::Executable(ExecutableOp::DelayedCommit(
+                DelayedCommitKind::DeferredHeal,
+            )),
+            accepted_bases: &[CustomImplBase::MoveEffect],
+            accepted_effects: &[CustomEffectKind::Unresolved],
+            accepted_hooks: &[CustomHook::Unresolved],
+        },
+    ),
 ];
 
 /// Units per attribute, used by tests to prove exact 394-unit closure.
@@ -1747,23 +2276,25 @@ pub fn classify_custom_move<'a>(
 ) -> Result<CustomDispatchDecision<'a>, DispatchClassificationError> {
     // ROUTE_TABLE is built sorted; linear scan keeps lifetimes simple and the
     // table small (133 rows).
-    let found = ROUTE_TABLE.iter().find(|(name, _)| *name == descriptor.attribute);
+    let found = ROUTE_TABLE
+        .iter()
+        .find(|(name, _)| *name == descriptor.attribute);
     let route = match found {
         Some((name, entry)) => {
-            let axes_match = entry.accepted_bases.contains(&descriptor.implementation_base)
+            let axes_match = entry
+                .accepted_bases
+                .contains(&descriptor.implementation_base)
                 && entry.accepted_effects.contains(&descriptor.effect_kind)
                 && entry.accepted_hooks.contains(&descriptor.hook);
             if !axes_match {
-                return Err(DispatchClassificationError::CatalogAxisMismatch {
-                    attribute: name,
-                });
+                return Err(DispatchClassificationError::CatalogAxisMismatch { attribute: name });
             }
             entry.route
         }
         None => {
             return Err(DispatchClassificationError::UnknownAttribute {
                 attribute: descriptor.attribute.to_owned(),
-            })
+            });
         }
     };
     Ok(CustomDispatchDecision {
@@ -1771,7 +2302,6 @@ pub fn classify_custom_move<'a>(
         route,
     })
 }
-
 
 /// Routes a classified decision into the family transitions above.
 ///
@@ -1796,18 +2326,17 @@ pub fn route_to_family_transition(
         | CustomDispatchRoute::CopyCall(CopyCallVariant::MovesetRandom)
         | CustomDispatchRoute::CopyCall(CopyCallVariant::TerrainCall)
         | CustomDispatchRoute::CopyCall(CopyCallVariant::RepeatLastOwn) => {
-            select_random_call(candidates, choice)
-                .map(|plan| {
-                    Some(ResolvedCopyCall {
-                        state_after: state.clone(),
-                        outcome: CopyCallOutcome::Cast(plan),
-                        evidence: CopyCallEvidence {
-                            source_ordinal: None,
-                            copied_move: plan.called_move,
-                            forbidden_set_checked: false,
-                        },
-                    })
+            select_random_call(candidates, choice).map(|plan| {
+                Some(ResolvedCopyCall {
+                    state_after: state.clone(),
+                    outcome: CopyCallOutcome::Cast(plan),
+                    evidence: CopyCallEvidence {
+                        source_ordinal: None,
+                        copied_move: plan.called_move,
+                        forbidden_set_checked: false,
+                    },
                 })
+            })
         }
         CustomDispatchRoute::Executable(_) => Ok(None),
     }
@@ -1840,7 +2369,12 @@ mod tests {
         }
     }
 
-    fn record(state: &MoveCopyStateV2, actor_id: u64, move_num: u64, mode: MoveUseModeV2) -> MoveCopyStateV2 {
+    fn record(
+        state: &MoveCopyStateV2,
+        actor_id: u64,
+        move_num: u64,
+        mode: MoveUseModeV2,
+    ) -> MoveCopyStateV2 {
         record_outcome(state, actor_id, move_num, mode, MoveOutcomeV2::Succeeded)
     }
 
@@ -1887,7 +2421,10 @@ mod tests {
         assert_eq!(next.actors[0].entries[0].move_id, move_id(14));
         let newest = next.actors[0].entries.last().expect("nonempty").clone();
         assert_eq!(newest.move_id, move_id(45));
-        assert_eq!(newest.execution_ordinal, SafeU53::new(36).expect("in range"));
+        assert_eq!(
+            newest.execution_ordinal,
+            SafeU53::new(36).expect("in range")
+        );
         next.validate().expect("bounded state stays valid");
     }
 
@@ -1935,7 +2472,9 @@ mod tests {
         };
         assert!(matches!(
             record_execution(&state, &none_request),
-            Err(MoveCopyTransitionError::State(MoveCopyStateError::ZeroMoveId))
+            Err(MoveCopyTransitionError::State(
+                MoveCopyStateError::ZeroMoveId
+            ))
         ));
         let stale = RecordRequest {
             actor: CALLER,
@@ -1959,7 +2498,9 @@ mod tests {
         };
         assert!(matches!(
             record_execution(&state, &unknown),
-            Err(MoveCopyTransitionError::State(MoveCopyStateError::UnknownActor { .. }))
+            Err(MoveCopyTransitionError::State(
+                MoveCopyStateError::UnknownActor { .. }
+            ))
         ));
     }
 
@@ -2052,7 +2593,9 @@ mod tests {
         };
         assert_eq!(
             resolve_recorded_last_copy(&state, &request),
-            Err(MoveCopyTransitionError::Failed(MoveCopyFailure::NoEligibleLastMove))
+            Err(MoveCopyTransitionError::Failed(
+                MoveCopyFailure::NoEligibleLastMove
+            ))
         );
         let with_history = record(&state, 9, 55, MoveUseModeV2::FollowUp);
         let resolved =
@@ -2060,10 +2603,7 @@ mod tests {
         match resolved.outcome {
             CopyCallOutcome::Cast(plan) => {
                 assert_eq!(plan.called_move, move_id(55));
-                assert_eq!(
-                    plan.targeting,
-                    CallTargeting::Retaliate { target: TARGET }
-                );
+                assert_eq!(plan.targeting, CallTargeting::Retaliate { target: TARGET });
             }
             other => panic!("expected retaliating cast, got {other:?}"),
         }
@@ -2101,7 +2641,13 @@ mod tests {
             ))
         );
         // Completed charge copies fine and adopts the invoking slot.
-        let completed = record_outcome(&state, 9, 61, MoveUseModeV2::Normal, MoveOutcomeV2::Succeeded);
+        let completed = record_outcome(
+            &state,
+            9,
+            61,
+            MoveUseModeV2::Normal,
+            MoveOutcomeV2::Succeeded,
+        );
         let mimic_ok = RecordedLastCopyRequest {
             source: RecordedLastSource::ActorHistory {
                 target: TARGET,
@@ -2145,9 +2691,9 @@ mod tests {
         };
         assert_eq!(
             resolve_recorded_last_copy(&state, &request),
-            Err(MoveCopyTransitionError::Failed(MoveCopyFailure::SketchAlreadyKnown {
-                move_id: 70
-            }))
+            Err(MoveCopyTransitionError::Failed(
+                MoveCopyFailure::SketchAlreadyKnown { move_id: 70 }
+            ))
         );
         let fresh_moveset = RecordedLastCopyRequest {
             caller_moveset: &[move_id(71)],
@@ -2186,9 +2732,9 @@ mod tests {
         };
         assert_eq!(
             resolve_recorded_last_copy(&state, &request),
-            Err(MoveCopyTransitionError::Failed(MoveCopyFailure::ForbiddenByContent {
-                move_id: 80
-            }))
+            Err(MoveCopyTransitionError::Failed(
+                MoveCopyFailure::ForbiddenByContent { move_id: 80 }
+            ))
         );
         let recursive = RecordedLastCopyRequest {
             source: RecordedLastSource::BattleLastMove {
@@ -2234,7 +2780,9 @@ mod tests {
         // Empty candidate set is a typed failure, not a panic.
         assert_eq!(
             select_random_call(&[], &AuditedChoice { index: 0 }),
-            Err(MoveCopyTransitionError::Failed(MoveCopyFailure::EmptyCandidateSet))
+            Err(MoveCopyTransitionError::Failed(
+                MoveCopyFailure::EmptyCandidateSet
+            ))
         );
         let candidates = vec![move_id(200), move_id(201)];
         // Out-of-range audited draws are invariant errors.
@@ -2282,9 +2830,9 @@ mod tests {
 
     // -- classifier -------------------------------------------------------
 
-    use CustomImplBase as Base;
     use CustomEffectKind as Effect;
     use CustomHook as Hook;
+    use CustomImplBase as Base;
 
     fn desc<'a>(
         hash: &'a str,
@@ -2313,7 +2861,10 @@ mod tests {
         assert_eq!(ROUTE_TABLE.len(), 133);
         let names: BTreeSet<&str> = ROUTE_TABLE.iter().map(|(name, _)| *name).collect();
         assert_eq!(names.len(), ROUTE_TABLE.len(), "attributes are unique");
-        let weights: usize = ATTRIBUTE_UNIT_WEIGHTS.iter().map(|(_, weight)| weight).sum();
+        let weights: usize = ATTRIBUTE_UNIT_WEIGHTS
+            .iter()
+            .map(|(_, weight)| weight)
+            .sum();
         assert_eq!(weights, CLOSURE_TOTAL_UNITS);
         assert_eq!(ATTRIBUTE_UNIT_WEIGHTS.len(), ROUTE_TABLE.len());
     }
@@ -2356,7 +2907,15 @@ mod tests {
 
     #[test]
     fn unknown_attribute_and_axis_drift_fail_closed() {
-        let descriptor = desc("hash", 0, 1, "NotAnAttr", Base::Move, Effect::Unresolved, Hook::Unresolved);
+        let descriptor = desc(
+            "hash",
+            0,
+            1,
+            "NotAnAttr",
+            Base::Move,
+            Effect::Unresolved,
+            Hook::Unresolved,
+        );
         assert!(matches!(
             classify_custom_move(&descriptor),
             Err(DispatchClassificationError::UnknownAttribute { .. })
@@ -2364,7 +2923,15 @@ mod tests {
 
         // FlinchAttr is frozen as AddBattlerTag/flinch semantics; feeding it a
         // VariablePower base is catalog drift and must error.
-        let drifted = desc("hash", 0, 1, "FlinchAttr", Base::VariablePower, Effect::Unresolved, Hook::Unresolved);
+        let drifted = desc(
+            "hash",
+            0,
+            1,
+            "FlinchAttr",
+            Base::VariablePower,
+            Effect::Unresolved,
+            Hook::Unresolved,
+        );
         assert!(matches!(
             classify_custom_move(&drifted),
             Err(DispatchClassificationError::CatalogAxisMismatch { .. })
@@ -2373,28 +2940,60 @@ mod tests {
 
     #[test]
     fn representative_descriptors_classify_to_expected_routes() {
-        let flinch = desc("h1", 0, 1, "FlinchAttr", Base::AddBattlerTag, Effect::Unresolved, Hook::Unresolved);
+        let flinch = desc(
+            "h1",
+            0,
+            1,
+            "FlinchAttr",
+            Base::AddBattlerTag,
+            Effect::Unresolved,
+            Hook::Unresolved,
+        );
         let decision = classify_custom_move(&flinch).expect("flinch");
         assert_eq!(
             decision.route,
             CustomDispatchRoute::Executable(ExecutableOp::VolatileTag(VolatileTagKind::Flinch))
         );
 
-        let metronome = desc("h2", 0, 118, "RandomMoveAttr", Base::CallMove, Effect::Unresolved, Hook::Unresolved);
+        let metronome = desc(
+            "h2",
+            0,
+            118,
+            "RandomMoveAttr",
+            Base::CallMove,
+            Effect::Unresolved,
+            Hook::Unresolved,
+        );
         let decision = classify_custom_move(&metronome).expect("metronome");
         assert_eq!(
             decision.route,
             CustomDispatchRoute::CopyCall(CopyCallVariant::GlobalRandom)
         );
 
-        let power = desc("h3", 0, 1, "MovePowerMultiplierAttr", Base::VariablePower, Effect::Unresolved, Hook::MovePowerQuery);
+        let power = desc(
+            "h3",
+            0,
+            1,
+            "MovePowerMultiplierAttr",
+            Base::VariablePower,
+            Effect::Unresolved,
+            Hook::MovePowerQuery,
+        );
         let decision = classify_custom_move(&power).expect("power");
         assert_eq!(
             decision.route,
             CustomDispatchRoute::Executable(ExecutableOp::PowerQuery)
         );
 
-        let heal = desc("h4", 0, 1, "HitHealAttr", Base::HitHeal, Effect::Heal, Hook::Unresolved);
+        let heal = desc(
+            "h4",
+            0,
+            1,
+            "HitHealAttr",
+            Base::HitHeal,
+            Effect::Heal,
+            Hook::Unresolved,
+        );
         let decision = classify_custom_move(&heal).expect("heal");
         assert_eq!(
             decision.route,
@@ -2404,7 +3003,15 @@ mod tests {
 
     #[test]
     fn executable_decisions_do_not_enter_family_transitions() {
-        let flinch = desc("h", 0, 1, "FlinchAttr", Base::AddBattlerTag, Effect::Unresolved, Hook::Unresolved);
+        let flinch = desc(
+            "h",
+            0,
+            1,
+            "FlinchAttr",
+            Base::AddBattlerTag,
+            Effect::Unresolved,
+            Hook::Unresolved,
+        );
         let decision = classify_custom_move(&flinch).expect("classifies");
         let state = empty_state();
         let request = RecordedLastCopyRequest {
@@ -2430,7 +3037,15 @@ mod tests {
 
     #[test]
     fn recorded_last_decision_routes_into_family_transition() {
-        let copycat = desc("h", 0, 119, "CopyMoveAttr", Base::CallMove, Effect::Unresolved, Hook::Unresolved);
+        let copycat = desc(
+            "h",
+            0,
+            119,
+            "CopyMoveAttr",
+            Base::CallMove,
+            Effect::Unresolved,
+            Hook::Unresolved,
+        );
         let decision = classify_custom_move(&copycat).expect("classifies");
         let mut state = empty_state();
         state = record(&state, 9, 44, MoveUseModeV2::Normal);

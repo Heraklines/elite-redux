@@ -17,12 +17,12 @@
 //! dropped, so no unit ever becomes an unreported residual.
 
 use er_state::bespoke_v2::suppression_immunity::{
-    classify_behavior_unit, AbilitySlot, DispatchClass, SlotSuppressionEntryV2,
-    SuppressionImmunityStateV2, SuppressionOrigin, SuppressionStateError, VolatileTagInstanceV2,
-    VolatileTagSubject,
+    AbilitySlot, DispatchClass, SlotSuppressionEntryV2, SuppressionImmunityStateV2,
+    SuppressionOrigin, SuppressionStateError, VolatileTagInstanceV2, VolatileTagSubject,
+    classify_behavior_unit,
 };
 use er_types::battle_ids::{AbilityId, PokemonId};
-use er_types::battle_model::{StatusKind};
+use er_types::battle_model::StatusKind;
 use er_types::ids::SafeU53;
 use er_types::m6::BehaviorUnitId;
 use thiserror::Error;
@@ -152,11 +152,11 @@ pub enum SuppressionTransitionError {
     State(#[from] SuppressionStateError),
 }
 
-fn next_ordinal(
-    state: &SuppressionImmunityStateV2,
-) -> Result<SafeU53, SuppressionTransitionError> {
+fn next_ordinal(state: &SuppressionImmunityStateV2) -> Result<SafeU53, SuppressionTransitionError> {
     let value = state.next_creation_ordinal.get();
-    let bumped = value.checked_add(1).ok_or(SuppressionTransitionError::OrdinalExhausted)?;
+    let bumped = value
+        .checked_add(1)
+        .ok_or(SuppressionTransitionError::OrdinalExhausted)?;
     SafeU53::try_from(bumped).map_err(|_| SuppressionTransitionError::OrdinalExhausted)
 }
 
@@ -236,9 +236,8 @@ pub fn clear_suppressions(
 ) -> Result<SuppressionTransition<SuppressionCleanupEvidence>, SuppressionTransitionError> {
     let mut next = state.clone();
     let matches_event = |entry: &SlotSuppressionEntryV2| match event {
-        SuppressionCleanupEvent::OwnerLeftField(owner) | SuppressionCleanupEvent::OwnerFainted(owner) => {
-            entry.owner == owner
-        }
+        SuppressionCleanupEvent::OwnerLeftField(owner)
+        | SuppressionCleanupEvent::OwnerFainted(owner) => entry.owner == owner,
         SuppressionCleanupEvent::FieldSourceLeft(source) => {
             matches!(entry.origin, SuppressionOrigin::FieldAbility { source_pokemon } if source_pokemon == source)
         }
@@ -267,13 +266,10 @@ pub fn clear_suppressions(
         .cloned()
         .collect::<Vec<_>>();
     for removed_entry in &removed {
-        let still_covered = retained.iter().any(|entry| {
-            entry.owner == removed_entry.owner
-                && entry.slot == removed_entry.slot
-        });
-        if !still_covered
-            && !restored_slots.contains(&(removed_entry.owner, removed_entry.slot))
-        {
+        let still_covered = retained
+            .iter()
+            .any(|entry| entry.owner == removed_entry.owner && entry.slot == removed_entry.slot);
+        if !still_covered && !restored_slots.contains(&(removed_entry.owner, removed_entry.slot)) {
             restored_slots.push((removed_entry.owner, removed_entry.slot));
         }
     }
@@ -284,9 +280,9 @@ pub fn clear_suppressions(
             CleanupEventReport::OwnerLeftField { owner }
         }
         SuppressionCleanupEvent::OwnerFainted(owner) => CleanupEventReport::OwnerFainted { owner },
-        SuppressionCleanupEvent::FieldSourceLeft(source) => {
-            CleanupEventReport::FieldSourceLeft { source_pokemon: source }
-        }
+        SuppressionCleanupEvent::FieldSourceLeft(source) => CleanupEventReport::FieldSourceLeft {
+            source_pokemon: source,
+        },
         SuppressionCleanupEvent::GlobalCleared => CleanupEventReport::GlobalCleared,
     };
     Ok(SuppressionTransition::new(
@@ -327,9 +323,9 @@ pub fn advance_suppression_turns(
         }
     }
     for removed_entry in &removed {
-        let still_covered = retained.iter().any(|entry| {
-            entry.owner == removed_entry.owner && entry.slot == removed_entry.slot
-        });
+        let still_covered = retained
+            .iter()
+            .any(|entry| entry.owner == removed_entry.owner && entry.slot == removed_entry.slot);
         if !still_covered && !restored_slots.contains(&(removed_entry.owner, removed_entry.slot)) {
             restored_slots.push((removed_entry.owner, removed_entry.slot));
         }
@@ -486,18 +482,18 @@ pub fn admit_volatile_tag(
         return Err(SuppressionStateError::ZeroLayers.into());
     }
     let mut next = state.clone();
-    let existing = next.volatile_tags.iter_mut().find(|instance| {
-        instance.owner == request.owner && instance.subject == request.subject
-    });
+    let existing = next
+        .volatile_tags
+        .iter_mut()
+        .find(|instance| instance.owner == request.owner && instance.subject == request.subject);
     let (ordinal, stacked, layers_after) = match existing {
         Some(instance) => {
-            let combined = instance
-                .layers
-                .checked_add(request.layers_delta)
-                .ok_or(SuppressionStateError::LayerOverflow {
+            let combined = instance.layers.checked_add(request.layers_delta).ok_or(
+                SuppressionStateError::LayerOverflow {
                     layers: u8::MAX,
                     ceiling: er_state::bespoke_v2::suppression_immunity::VOLATILE_TAG_MAX_LAYERS,
-                })?;
+                },
+            )?;
             if combined > er_state::bespoke_v2::suppression_immunity::VOLATILE_TAG_MAX_LAYERS {
                 return Err(SuppressionStateError::LayerOverflow {
                     layers: combined,
@@ -507,9 +503,11 @@ pub fn admit_volatile_tag(
             }
             instance.layers = combined;
             if let Some(new_turns) = request.remaining_turns {
-                instance.remaining_turns = Some(instance.remaining_turns.map_or(new_turns, |current| {
-                    current.max(new_turns)
-                }));
+                instance.remaining_turns = Some(
+                    instance
+                        .remaining_turns
+                        .map_or(new_turns, |current| current.max(new_turns)),
+                );
             }
             (instance.creation_ordinal, true, instance.layers)
         }
@@ -742,7 +740,9 @@ impl DispatchPlan {
             .filter(|unit| {
                 matches!(
                     unit.gate,
-                    DispatchGate::Active | DispatchGate::PassiveOrdered | DispatchGate::RetainedUnsuppressible { .. }
+                    DispatchGate::Active
+                        | DispatchGate::PassiveOrdered
+                        | DispatchGate::RetainedUnsuppressible { .. }
                 )
             })
             .count()
@@ -848,7 +848,11 @@ mod tests {
         }
     }
 
-    fn suppressible(owner: PokemonId, slot: AbilitySlot, origin: SuppressionOrigin) -> SlotSuppressionRequest {
+    fn suppressible(
+        owner: PokemonId,
+        slot: AbilitySlot,
+        origin: SuppressionOrigin,
+    ) -> SlotSuppressionRequest {
         SlotSuppressionRequest {
             owner,
             slot,
@@ -888,7 +892,9 @@ mod tests {
             &SlotSuppressionRequest {
                 owner,
                 slot: AbilitySlot::Active,
-                origin: SuppressionOrigin::MoveApplied { source_move: mid(206) },
+                origin: SuppressionOrigin::MoveApplied {
+                    source_move: mid(206),
+                },
                 remaining_turns: None,
                 suppressibility: AbilitySuppressibility::Suppressible,
                 current_ability: loadout_before.active,
@@ -917,7 +923,9 @@ mod tests {
             &SlotSuppressionRequest {
                 owner,
                 slot: AbilitySlot::Passive0,
-                origin: SuppressionOrigin::MoveApplied { source_move: mid(206) },
+                origin: SuppressionOrigin::MoveApplied {
+                    source_move: mid(206),
+                },
                 remaining_turns: None,
                 suppressibility: AbilitySuppressibility::Unsuppressible,
                 current_ability: aid(5),
@@ -941,7 +949,13 @@ mod tests {
         let state = SuppressionImmunityStateV2::new();
         let with_move = apply_slot_suppression(
             &state,
-            &suppressible(owner, AbilitySlot::Active, SuppressionOrigin::MoveApplied { source_move: mid(206) }),
+            &suppressible(
+                owner,
+                AbilitySlot::Active,
+                SuppressionOrigin::MoveApplied {
+                    source_move: mid(206),
+                },
+            ),
         )
         .unwrap();
         let with_field = apply_slot_suppression(
@@ -949,7 +963,9 @@ mod tests {
             &suppressible(
                 owner,
                 AbilitySlot::Active,
-                SuppressionOrigin::FieldAbility { source_pokemon: pid(9) },
+                SuppressionOrigin::FieldAbility {
+                    source_pokemon: pid(9),
+                },
             ),
         )
         .unwrap();
@@ -991,7 +1007,9 @@ mod tests {
             after_source
                 .state
                 .governing_origin(owner, AbilitySlot::Active),
-            Some(&SuppressionOrigin::MoveApplied { source_move: mid(206) })
+            Some(&SuppressionOrigin::MoveApplied {
+                source_move: mid(206)
+            })
         );
         // Restoration happens only after the LAST source clears.
         let final_clear = clear_suppressions(
@@ -999,7 +1017,12 @@ mod tests {
             SuppressionCleanupEvent::OwnerLeftField(owner),
         )
         .unwrap();
-        assert!(final_clear.state.governing_origin(owner, AbilitySlot::Active).is_none());
+        assert!(
+            final_clear
+                .state
+                .governing_origin(owner, AbilitySlot::Active)
+                .is_none()
+        );
         assert_eq!(
             final_clear.evidence.restored_slots,
             vec![(owner, AbilitySlot::Active)]
@@ -1017,7 +1040,9 @@ mod tests {
                 ..suppressible(
                     owner,
                     AbilitySlot::Passive1,
-                    SuppressionOrigin::MoveApplied { source_move: mid(206) },
+                    SuppressionOrigin::MoveApplied {
+                        source_move: mid(206),
+                    },
                 )
             },
         )
@@ -1029,18 +1054,20 @@ mod tests {
                 ..suppressible(
                     owner,
                     AbilitySlot::Passive1,
-                    SuppressionOrigin::MoveApplied { source_move: mid(206) },
+                    SuppressionOrigin::MoveApplied {
+                        source_move: mid(206),
+                    },
                 )
             },
         )
         .unwrap();
         assert!(second.evidence.refreshed);
-        assert_eq!(second.evidence.creation_ordinal, first.evidence.creation_ordinal);
-        assert_eq!(second.state.slot_suppressions.len(), 1);
         assert_eq!(
-            second.state.slot_suppressions[0].remaining_turns,
-            Some(5)
+            second.evidence.creation_ordinal,
+            first.evidence.creation_ordinal
         );
+        assert_eq!(second.state.slot_suppressions.len(), 1);
+        assert_eq!(second.state.slot_suppressions[0].remaining_turns, Some(5));
     }
 
     #[test]
@@ -1054,17 +1081,16 @@ mod tests {
                 ..suppressible(
                     owner,
                     AbilitySlot::Active,
-                    SuppressionOrigin::MoveApplied { source_move: mid(206) },
+                    SuppressionOrigin::MoveApplied {
+                        source_move: mid(206),
+                    },
                 )
             },
         )
         .unwrap();
         let tick_one = advance_suppression_turns(&applied.state).unwrap();
         assert!(tick_one.evidence.removed.is_empty());
-        assert_eq!(
-            tick_one.state.slot_suppressions[0].remaining_turns,
-            Some(1)
-        );
+        assert_eq!(tick_one.state.slot_suppressions[0].remaining_turns, Some(1));
         let tick_two = advance_suppression_turns(&tick_one.state).unwrap();
         assert_eq!(tick_two.evidence.removed.len(), 1);
         assert!(tick_two.state.slot_suppressions.is_empty());
@@ -1212,10 +1238,7 @@ mod tests {
         assert!(stacked.evidence.stacked);
         assert_eq!(stacked.evidence.layers_after, 5);
         assert_eq!(stacked.state.volatile_tags.len(), 1);
-        assert_eq!(
-            stacked.state.volatile_tags[0].remaining_turns,
-            Some(6)
-        );
+        assert_eq!(stacked.state.volatile_tags[0].remaining_turns, Some(6));
         // Layer overflow past the frozen ceiling is checked arithmetic.
         let overflow = admit_volatile_tag(
             &stacked.state,
@@ -1270,22 +1293,16 @@ mod tests {
             },
         )
         .unwrap();
-        let switched = clear_volatile_tags(
-            &with_tag.state,
-            VolatileCleanupEvent::SwitchOut(owner),
-        )
-        .unwrap();
+        let switched =
+            clear_volatile_tags(&with_tag.state, VolatileCleanupEvent::SwitchOut(owner)).unwrap();
         assert_eq!(switched.evidence.removed.len(), 1);
         assert_eq!(
             switched.evidence.preserved_major_statuses,
             vec![StatusKind::Sleep]
         );
         assert_eq!(switched.state.volatile_tags.len(), 1);
-        let fainted = clear_volatile_tags(
-            &switched.state,
-            VolatileCleanupEvent::Faint(owner),
-        )
-        .unwrap();
+        let fainted =
+            clear_volatile_tags(&switched.state, VolatileCleanupEvent::Faint(owner)).unwrap();
         assert_eq!(fainted.evidence.removed.len(), 1);
         assert!(fainted.state.volatile_tags.is_empty());
         assert!(fainted.evidence.preserved_major_statuses.is_empty());
@@ -1300,12 +1317,20 @@ mod tests {
         // unsuppressible exception and give it a live overlay too.
         let suppressed_b = apply_slot_suppression(
             &state,
-            &suppressible(owner_b, AbilitySlot::Active, SuppressionOrigin::GlobalIgnore),
+            &suppressible(
+                owner_b,
+                AbilitySlot::Active,
+                SuppressionOrigin::GlobalIgnore,
+            ),
         )
         .unwrap();
         let suppressed_a_passive = apply_slot_suppression(
             &suppressed_b.state,
-            &suppressible(owner_a, AbilitySlot::Passive0, SuppressionOrigin::GlobalIgnore),
+            &suppressible(
+                owner_a,
+                AbilitySlot::Passive0,
+                SuppressionOrigin::GlobalIgnore,
+            ),
         )
         .unwrap();
         let unsuppressible = [(owner_a, AbilitySlot::Passive0)];
@@ -1372,7 +1397,9 @@ mod tests {
         assert_eq!(plan.routed[2].gate, DispatchGate::PassiveOrdered);
         assert!(matches!(
             plan.routed[3].gate,
-            DispatchGate::GatedBySuppression { origin: SuppressionOrigin::GlobalIgnore }
+            DispatchGate::GatedBySuppression {
+                origin: SuppressionOrigin::GlobalIgnore
+            }
         ));
         assert_eq!(plan.active_count(), 4);
         assert_eq!(plan.gated_count(), 1);

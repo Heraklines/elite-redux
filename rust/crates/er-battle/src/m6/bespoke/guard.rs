@@ -26,8 +26,8 @@
 //!   the first matching flag; `preventEndure` skips every path.
 
 use er_state::bespoke_v2::guard::{
-    ActiveSelfGuardEntry, ActiveSideGuardEntry, GuardFamilyState, GuardFamilyStateError,
-    GuardKind, SideGuardKind, SurvivalFlag,
+    ActiveSelfGuardEntry, ActiveSideGuardEntry, GuardFamilyState, GuardFamilyStateError, GuardKind,
+    SideGuardKind, SurvivalFlag,
 };
 use er_types::SafeU53;
 use er_types::battle_ids::BattleSide;
@@ -51,21 +51,30 @@ pub enum GuardTransitionError {
     InvalidOwnerScope,
     #[error("owner already holds an active guard of this family slot")]
     ActiveGuardConflict,
-    #[error(
-        "success threshold 3^{depth} is not representable in the audited draw domain"
-    )]
-    ThresholdRangeUnrepresentable { depth: u32 },
+    #[error("success threshold 3^{depth} is not representable in the audited draw domain")]
+    ThresholdRangeUnrepresentable {
+        depth: u32,
+    },
     #[error("chain depth counter exhausted")]
     ChainDepthOverflow,
     #[error("audited draw required at chain depth {depth}, range {expected}")]
-    MissingAuditedDraw { depth: u32, expected: u64 },
+    MissingAuditedDraw {
+        depth: u32,
+        expected: u64,
+    },
     DrawSuppliedForGuaranteedSuccess,
     #[error("side guards never consume odds; audited draws are not admitted")]
     DrawSuppliedForUngatedActivation,
     #[error("audited draw range mismatch: threshold requires {expected}, got {actual}")]
-    RangeMismatch { expected: u64, actual: u64 },
+    RangeMismatch {
+        expected: u64,
+        actual: u64,
+    },
     #[error("audited roll {roll} lies outside the declared range {range}")]
-    RollOutOfRange { roll: u64, range: u64 },
+    RollOutOfRange {
+        roll: u64,
+        range: u64,
+    },
     #[error("ordinal counter exhausted")]
     OrdinalSpaceExhausted,
     #[error("damage amount must be positive")]
@@ -141,8 +150,13 @@ pub enum GuardBypassReason {
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum GuardBlockDecision {
     NotBlocked,
-    Blocked { guard: BlockingGuard },
-    Bypassed { guard: BlockingGuard, reason: GuardBypassReason },
+    Blocked {
+        guard: BlockingGuard,
+    },
+    Bypassed {
+        guard: BlockingGuard,
+        reason: GuardBypassReason,
+    },
 }
 
 /// Evidence for one guard-block resolution.
@@ -194,7 +208,9 @@ pub fn resolve_incoming_move(
         &mut consumed_self_guard_ordinal,
     );
     if consumed_self_guard_ordinal.is_some() {
-        candidate.self_guards.retain(|entry| entry.owner != defender);
+        candidate
+            .self_guards
+            .retain(|entry| entry.owner != defender);
         candidate.validate()?;
     }
 
@@ -211,7 +227,6 @@ pub fn resolve_incoming_move(
         evidence,
     })
 }
-
 
 /// Pure read-only verdict; shared by resolution and direct queries. When a
 /// blocking self guard is found, its creation ordinal is reported through
@@ -840,7 +855,10 @@ mod tests {
         assert_eq!(clean.evidence.threshold_range, Some(1));
         assert!(clean.evidence.consumed_draw.is_none());
         assert_eq!(
-            clean.state.self_guard_for(&pokemon(OWNER_A)).map(|e| e.kind),
+            clean
+                .state
+                .self_guard_for(&pokemon(OWNER_A))
+                .map(|e| e.kind),
             Some(GuardKind::Protect)
         );
 
@@ -860,12 +878,18 @@ mod tests {
 
         assert_eq!(
             apply_guard_use(&depth_one, &second, None),
-            Err(GuardTransitionError::MissingAuditedDraw { depth: 1, expected: 3 })
+            Err(GuardTransitionError::MissingAuditedDraw {
+                depth: 1,
+                expected: 3
+            })
         );
         let wrong_range = AuditedGuardDraw::new(SafeU53::ZERO, 4);
         assert_eq!(
             apply_guard_use(&depth_one, &second, Some(wrong_range)),
-            Err(GuardTransitionError::RangeMismatch { expected: 3, actual: 4 })
+            Err(GuardTransitionError::RangeMismatch {
+                expected: 3,
+                actual: 4
+            })
         );
         let out_of_range = AuditedGuardDraw::new(SafeU53::new(7).unwrap(), 3);
         assert_eq!(
@@ -976,8 +1000,7 @@ mod tests {
                 expected: 5_559_060_566_555_523
             })
         );
-        let last_hit =
-            AuditedGuardDraw::new(SafeU53::ZERO, 5_559_060_566_555_523);
+        let last_hit = AuditedGuardDraw::new(SafeU53::ZERO, 5_559_060_566_555_523);
         let survived = apply_guard_use(&deepest, &request, Some(last_hit)).unwrap();
         assert!(survived.evidence.succeeded);
         assert_eq!(survived.state.chain_depth, 34);
@@ -995,7 +1018,6 @@ mod tests {
             apply_guard_use(&survived.state, &request, None),
             Err(GuardTransitionError::ThresholdRangeUnrepresentable { depth: 34 })
         );
-
     }
 
     #[test]
@@ -1003,13 +1025,9 @@ mod tests {
         let base = fresh_state();
 
         // Self protection: default kinds block damaging and status moves.
-        let protected = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::Protect),
-            None,
-        )
-        .unwrap()
-        .state;
+        let protected = apply_guard_use(&base, &self_request(OWNER_A, GuardKind::Protect), None)
+            .unwrap()
+            .state;
         for incoming in [attack(0), status_move()] {
             assert_eq!(
                 resolve_against(&protected, OWNER_A, BattleSide::Player, &incoming),
@@ -1020,13 +1038,9 @@ mod tests {
         }
 
         // King's Shield lets status moves through but stops attacks.
-        let kings = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::KingsShield),
-            None,
-        )
-        .unwrap()
-        .state;
+        let kings = apply_guard_use(&base, &self_request(OWNER_A, GuardKind::KingsShield), None)
+            .unwrap()
+            .state;
         assert_eq!(
             resolve_against(&kings, OWNER_A, BattleSide::Player, &status_move()),
             GuardBlockDecision::NotBlocked
@@ -1039,13 +1053,9 @@ mod tests {
         );
 
         // Endure blocks nothing.
-        let endured = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::Endure),
-            None,
-        )
-        .unwrap()
-        .state;
+        let endured = apply_guard_use(&base, &self_request(OWNER_A, GuardKind::Endure), None)
+            .unwrap()
+            .state;
         assert_eq!(
             resolve_against(&endured, OWNER_A, BattleSide::Player, &attack(0)),
             GuardBlockDecision::NotBlocked
@@ -1136,13 +1146,9 @@ mod tests {
     #[test]
     fn field_targeted_moves_are_never_blocked() {
         let base = fresh_state();
-        let protected = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::Protect),
-            None,
-        )
-        .unwrap()
-        .state;
+        let protected = apply_guard_use(&base, &self_request(OWNER_A, GuardKind::Protect), None)
+            .unwrap()
+            .state;
         let wide = apply_guard_use(
             &protected,
             &side_request(BattleSide::Player, SideGuardKind::WideGuard),
@@ -1169,13 +1175,9 @@ mod tests {
     #[test]
     fn bypass_paths_match_the_oracle_branches() {
         let base = fresh_state();
-        let protected = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::Protect),
-            None,
-        )
-        .unwrap()
-        .state;
+        let protected = apply_guard_use(&base, &self_request(OWNER_A, GuardKind::Protect), None)
+            .unwrap()
+            .state;
 
         // IGNORE_PROTECT flag bypasses the tag.
         let feint = IncomingMoveDescriptor {
@@ -1260,15 +1262,13 @@ mod tests {
     #[test]
     fn blocking_lapses_only_the_self_guard_tag() {
         let base = fresh_state();
-        let protected = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::Protect),
-            None,
-        )
-        .unwrap()
-        .state;
-        let ordinal_before =
-            protected.self_guard_for(&pokemon(OWNER_A)).unwrap().creation_ordinal;
+        let protected = apply_guard_use(&base, &self_request(OWNER_A, GuardKind::Protect), None)
+            .unwrap()
+            .state;
+        let ordinal_before = protected
+            .self_guard_for(&pokemon(OWNER_A))
+            .unwrap()
+            .creation_ordinal;
 
         let first_hit =
             resolve_incoming_move(&protected, pokemon(OWNER_A), BattleSide::Player, &attack(0))
@@ -1282,9 +1282,13 @@ mod tests {
         // Side guards and the chain survive a block resolution.
         assert_eq!(first_hit.state.chain_depth, protected.chain_depth);
 
-        let second_hit =
-            resolve_incoming_move(&first_hit.state, pokemon(OWNER_A), BattleSide::Player, &attack(0))
-                .unwrap();
+        let second_hit = resolve_incoming_move(
+            &first_hit.state,
+            pokemon(OWNER_A),
+            BattleSide::Player,
+            &attack(0),
+        )
+        .unwrap();
         assert_eq!(second_hit.decision, GuardBlockDecision::NotBlocked);
         assert_eq!(second_hit.evidence.consumed_self_guard_ordinal, None);
     }
@@ -1378,18 +1382,22 @@ mod tests {
             Err(GuardTransitionError::ActiveGuardConflict)
         );
         // Different kinds on one side coexist; different sides stay disjoint.
-        assert!(apply_guard_use(
-            &widened,
-            &side_request(BattleSide::Player, SideGuardKind::QuickGuard),
-            None
-        )
-        .is_ok());
-        assert!(apply_guard_use(
-            &widened,
-            &side_request(BattleSide::Enemy, SideGuardKind::WideGuard),
-            None
-        )
-        .is_ok());
+        assert!(
+            apply_guard_use(
+                &widened,
+                &side_request(BattleSide::Player, SideGuardKind::QuickGuard),
+                None
+            )
+            .is_ok()
+        );
+        assert!(
+            apply_guard_use(
+                &widened,
+                &side_request(BattleSide::Enemy, SideGuardKind::WideGuard),
+                None
+            )
+            .is_ok()
+        );
 
         // Owner scopes must fit the activation surface.
         let misdirected = GuardUseRequest {
@@ -1435,16 +1443,26 @@ mod tests {
         sturdy.sturdy_owners = vec![pokemon(OWNER_A)];
         let saved = apply_lethal_damage(
             &sturdy,
-            &LethalDamageInput { current_hp: 30, damage: 30, ..bare_no_owner() },
+            &LethalDamageInput {
+                current_hp: 30,
+                damage: 30,
+                ..bare_no_owner()
+            },
         )
         .unwrap();
         assert!(matches!(
             saved.decision,
-            DamageSurvivalDecision::SurvivedAtMinimumHp { source: SurvivalSource::SturdyTag }
+            DamageSurvivalDecision::SurvivedAtMinimumHp {
+                source: SurvivalSource::SturdyTag
+            }
         ));
         let last_hp = apply_lethal_damage(
             &sturdy,
-            &LethalDamageInput { current_hp: 1, damage: 5, ..bare_no_owner() },
+            &LethalDamageInput {
+                current_hp: 1,
+                damage: 5,
+                ..bare_no_owner()
+            },
         )
         .unwrap();
         assert_eq!(last_hp.decision, DamageSurvivalDecision::Fainted);
@@ -1456,7 +1474,9 @@ mod tests {
         let picked_enduring = apply_lethal_damage(&layered, &bare).unwrap();
         assert!(matches!(
             picked_enduring.decision,
-            DamageSurvivalDecision::SurvivedAtMinimumHp { source: SurvivalSource::EnduringTag }
+            DamageSurvivalDecision::SurvivedAtMinimumHp {
+                source: SurvivalSource::EnduringTag
+            }
         ));
         assert!(!picked_enduring.state.sturdy_owners.is_empty());
 
@@ -1465,14 +1485,19 @@ mod tests {
         let picked_token = apply_lethal_damage(&tokens, &bare).unwrap();
         assert!(matches!(
             picked_token.decision,
-            DamageSurvivalDecision::SurvivedAtMinimumHp { source: SurvivalSource::EndureToken }
+            DamageSurvivalDecision::SurvivedAtMinimumHp {
+                source: SurvivalSource::EndureToken
+            }
         ));
         assert!(picked_token.state.endure_token_owners.is_empty());
 
         // preventEndure skips everything.
         let prevented = apply_lethal_damage(
             &enduring,
-            &LethalDamageInput { prevent_endure: true, ..bare_no_owner() },
+            &LethalDamageInput {
+                prevent_endure: true,
+                ..bare_no_owner()
+            },
         )
         .unwrap();
         assert_eq!(prevented.decision, DamageSurvivalDecision::Fainted);
@@ -1480,7 +1505,13 @@ mod tests {
 
         // Zero damage is rejected outright.
         assert_eq!(
-            apply_lethal_damage(&base, &LethalDamageInput { damage: 0, ..bare_no_owner() }),
+            apply_lethal_damage(
+                &base,
+                &LethalDamageInput {
+                    damage: 0,
+                    ..bare_no_owner()
+                }
+            ),
             Err(GuardTransitionError::ZeroDamage)
         );
     }
@@ -1497,13 +1528,10 @@ mod tests {
     #[test]
     fn turn_end_expires_actives_but_preserves_chain() {
         let base = fresh_state();
-        let after_protect = apply_guard_use(
-            &base,
-            &self_request(OWNER_A, GuardKind::Protect),
-            None,
-        )
-        .unwrap()
-        .state;
+        let after_protect =
+            apply_guard_use(&base, &self_request(OWNER_A, GuardKind::Protect), None)
+                .unwrap()
+                .state;
         let after_quick = apply_guard_use(
             &after_protect,
             &side_request(BattleSide::Player, SideGuardKind::QuickGuard),
@@ -1542,17 +1570,17 @@ mod tests {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
         let chained = apply_guard_use(&base, &protect, None).unwrap().state;
-        let chained_again = apply_guard_use(
-            &chained,
-            &self_request(OWNER_B, GuardKind::Detect),
-            None,
-        )
-        .unwrap()
-        .state;
+        let chained_again =
+            apply_guard_use(&chained, &self_request(OWNER_B, GuardKind::Detect), None)
+                .unwrap()
+                .state;
 
         let reset = reset_guard_chain(&chained_again.state).unwrap();
         assert_eq!(reset.chain_depth, 0);
-        assert_eq!(reset.self_guards.len(), chained_again.state.self_guards.len());
+        assert_eq!(
+            reset.self_guards.len(),
+            chained_again.state.self_guards.len()
+        );
         assert_eq!(
             reset.next_creation_ordinal,
             chained_again.state.next_creation_ordinal

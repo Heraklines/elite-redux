@@ -496,12 +496,13 @@ pub fn commander_leave(
     {
         return Err(PivotRedirectError::HostStillPresent);
     }
-    let reserved = topology
-        .slots
-        .get(&pairing.commander_slot)
-        .ok_or(PivotRedirectError::UnknownSlot {
-            slot: pairing.commander_slot,
-        })?;
+    let reserved =
+        topology
+            .slots
+            .get(&pairing.commander_slot)
+            .ok_or(PivotRedirectError::UnknownSlot {
+                slot: pairing.commander_slot,
+            })?;
     if reserved.occupant.is_some() {
         return Err(PivotRedirectError::CommanderReservedSlotOccupied {
             slot: pairing.commander_slot,
@@ -545,9 +546,7 @@ pub fn cleanup_fainted_source(
     let facts_at = topology
         .slots
         .get(&fainted.slot)
-        .ok_or(PivotRedirectError::UnknownSlot {
-            slot: fainted.slot,
-        })?;
+        .ok_or(PivotRedirectError::UnknownSlot { slot: fainted.slot })?;
     if facts_at.occupant != Some(fainted.pokemon) {
         return Err(PivotRedirectError::StaleIdentity {
             expected: *fainted,
@@ -560,32 +559,30 @@ pub fn cleanup_fainted_source(
         });
     }
 
-    let (after_owned_traps, mut released_traps) =
-        state.end_traps_owned_by(fainted.pokemon).map_err(PivotRedirectError::State)?;
-    let (after_anchored_traps, anchored_traps) =
-        after_owned_traps
-            .end_traps_on(fainted.pokemon)
-            .map_err(PivotRedirectError::State)?;
+    let (after_owned_traps, mut released_traps) = state
+        .end_traps_owned_by(fainted.pokemon)
+        .map_err(PivotRedirectError::State)?;
+    let (after_anchored_traps, anchored_traps) = after_owned_traps
+        .end_traps_on(fainted.pokemon)
+        .map_err(PivotRedirectError::State)?;
     released_traps.extend(anchored_traps);
     let (after_redirects, dropped_redirects) = after_anchored_traps
         .drop_redirects_from(fainted.pokemon)
         .map_err(PivotRedirectError::State)?;
     let (after_intents, dropped_intents) = after_intents_step(&after_redirects, fainted.pokemon)?;
 
-    let mut operations =
-        vec![StagedPivotRedirectOperation::CleanupFaintedSource {
-            source: fainted.pokemon,
-        }];
+    let mut operations = vec![StagedPivotRedirectOperation::CleanupFaintedSource {
+        source: fainted.pokemon,
+    }];
     let mut commander_returned = false;
     let mut final_state = after_intents;
     if let Some(pairing) = final_state.commander.clone() {
         if pairing.host.pokemon == fainted.pokemon {
-            let reserved = topology
-                .slots
-                .get(&pairing.commander_slot)
-                .ok_or(PivotRedirectError::UnknownSlot {
+            let reserved = topology.slots.get(&pairing.commander_slot).ok_or(
+                PivotRedirectError::UnknownSlot {
                     slot: pairing.commander_slot,
-                })?;
+                },
+            )?;
             if reserved.occupant.is_some() {
                 return Err(PivotRedirectError::CommanderReservedSlotOccupied {
                     slot: pairing.commander_slot,
@@ -597,7 +594,9 @@ pub fn cleanup_fainted_source(
             });
             commander_returned = true;
         }
-        final_state = final_state.clear_commander().map_err(PivotRedirectError::State)?;
+        final_state = final_state
+            .clear_commander()
+            .map_err(PivotRedirectError::State)?;
     }
 
     Ok(CleanupTransition {
@@ -629,7 +628,9 @@ fn after_intents_step(
     state: &PivotRedirectStateV2,
     subject: PokemonId,
 ) -> Result<(PivotRedirectStateV2, Vec<PivotIntentState>), PivotRedirectError> {
-    state.drop_intents_for(subject).map_err(PivotRedirectError::State)
+    state
+        .drop_intents_for(subject)
+        .map_err(PivotRedirectError::State)
 }
 
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
@@ -695,7 +696,11 @@ mod tests {
             slots.insert(
                 slot(*side, *position),
                 OccupantFacts {
-                    occupant: if *pokemon == 0 { None } else { Some(poke(*pokemon)) },
+                    occupant: if *pokemon == 0 {
+                        None
+                    } else {
+                        Some(poke(*pokemon))
+                    },
                     fainted: *fainted,
                 },
             );
@@ -829,7 +834,10 @@ mod tests {
         )
         .expect("redirect resolves");
         assert_eq!(resolution.winner.as_ref(), Some(&follow_me));
-        assert_eq!(resolution.rejected[0].reason, RedirectRejectionReason::AttackerImmune);
+        assert_eq!(
+            resolution.rejected[0].reason,
+            RedirectRejectionReason::AttackerImmune
+        );
     }
 
     #[test]
@@ -861,7 +869,10 @@ mod tests {
         .expect("redirect resolves");
         assert_eq!(resolution.new_target, None);
         assert_eq!(resolution.winner, None);
-        assert_eq!(resolution.rejected[0].reason, RedirectRejectionReason::Bypassed);
+        assert_eq!(
+            resolution.rejected[0].reason,
+            RedirectRejectionReason::Bypassed
+        );
 
         // Immune attacker plus a fainted source: nothing legal remains.
         let fainted_topology = doubles_topology(&[
@@ -945,12 +956,8 @@ mod tests {
             (PLAYER, 1, 11, false),
             (ENEMY, 0, 99, false),
         ]);
-        let decision = evaluate_escape(
-            &swapped_topology,
-            &state,
-            &escape_facts(false, false),
-        )
-        .expect("evaluate");
+        let decision = evaluate_escape(&swapped_topology, &state, &escape_facts(false, false))
+            .expect("evaluate");
         assert_eq!(
             decision,
             EscapeDecision::Allowed {
@@ -1048,15 +1055,15 @@ mod tests {
             },
         )
         .expect_err("on-field replacement must fail");
-        assert_eq!(error, PivotRedirectError::IllegalReplacement { pokemon: poke(11) });
+        assert_eq!(
+            error,
+            PivotRedirectError::IllegalReplacement { pokemon: poke(11) }
+        );
     }
 
     #[test]
     fn forced_pivot_respects_immunity_but_ignores_trapping() {
-        let topology = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (ENEMY, 0, 20, false),
-        ]);
+        let topology = doubles_topology(&[(PLAYER, 0, 10, false), (ENEMY, 0, 20, false)]);
         let state = fresh_state();
         let (state, _) = state
             .admit_trap(TrapKind::Binding, ident(PLAYER, 0, 10), None, None)
@@ -1115,10 +1122,7 @@ mod tests {
 
     #[test]
     fn pivot_of_a_fainted_subject_degrades_to_cleanup() {
-        let topology = doubles_topology(&[
-            (PLAYER, 0, 10, true),
-            (ENEMY, 0, 20, false),
-        ]);
+        let topology = doubles_topology(&[(PLAYER, 0, 10, true), (ENEMY, 0, 20, false)]);
         let state = fresh_state();
         let subject = ident(PLAYER, 0, 10);
         let (state, _) = state
@@ -1141,11 +1145,11 @@ mod tests {
         )
         .expect("fainted pivot cleans up");
         assert!(transition.intent.is_none());
-        assert!(transition
-            .operations
-            .contains(&StagedPivotRedirectOperation::CleanupFaintedSource {
-                source: poke(10)
-            }));
+        assert!(
+            transition
+                .operations
+                .contains(&StagedPivotRedirectOperation::CleanupFaintedSource { source: poke(10) })
+        );
         assert!(transition.state.traps.is_empty());
     }
 
@@ -1250,9 +1254,15 @@ mod tests {
         assert!(transition.state.commander.is_none());
 
         // No pairing: leaving is a no-op.
-        assert!(commander_leave(&vacated_topology, &state, CommanderLeaveTrigger::HostFainted)
+        assert!(
+            commander_leave(
+                &vacated_topology,
+                &state,
+                CommanderLeaveTrigger::HostFainted
+            )
             .expect("no pairing")
-            .is_none());
+            .is_none()
+        );
 
         // A reserved slot that gained an occupant can never receive the
         // commander back.
@@ -1329,10 +1339,7 @@ mod tests {
 
         // Cleanup requires a genuinely fainted source; an alive source is
         // rejected instead of silently swept.
-        let alive_topology = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (ENEMY, 0, 20, false),
-        ]);
+        let alive_topology = doubles_topology(&[(PLAYER, 0, 10, false), (ENEMY, 0, 20, false)]);
         let error = cleanup_fainted_source(&alive_topology, &fresh_state(), &victim)
             .expect_err("cleanup of an alive source must fail");
         assert_eq!(error, PivotRedirectError::NotFainted { pokemon: poke(10) });
@@ -1350,10 +1357,7 @@ mod tests {
             PivotRedirectError::DuplicateFieldOccupant { pokemon: poke(10) }
         );
 
-        let valid = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (ENEMY, 0, 20, false),
-        ]);
+        let valid = doubles_topology(&[(PLAYER, 0, 10, false), (ENEMY, 0, 20, false)]);
         valid.validate().expect("valid topology");
 
         let stale = ident(ENEMY, 0, 99);
@@ -1365,7 +1369,9 @@ mod tests {
             }
         );
         assert_eq!(
-            valid.resolve_identity(&ident(BattleSide::Enemy, 3, 20)).expect_err("unknown slot"),
+            valid
+                .resolve_identity(&ident(BattleSide::Enemy, 3, 20))
+                .expect_err("unknown slot"),
             PivotRedirectError::UnknownSlot {
                 slot: slot(BattleSide::Enemy, 3)
             }
@@ -1374,10 +1380,7 @@ mod tests {
 
     #[test]
     fn transitions_never_mutate_their_inputs() {
-        let topology = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (ENEMY, 0, 20, false),
-        ]);
+        let topology = doubles_topology(&[(PLAYER, 0, 10, false), (ENEMY, 0, 20, false)]);
         let state = fresh_state();
         let before = state.clone();
         let _ = plan_pivot(
