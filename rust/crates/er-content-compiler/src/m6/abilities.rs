@@ -36,8 +36,8 @@ use er_content::m6_catalog::{
     ImplementationClassEvidence,
 };
 use er_mechanics::condition_v2::{
-    ConditionArenaV2, ConditionNodeV2, ConditionNodeId, ConditionPredicateV2, ValueArenaV2,
-    ValueNodeV2, ValueNodeId,
+    ConditionArenaV2, ConditionNodeId, ConditionNodeV2, ConditionPredicateV2, ValueArenaV2,
+    ValueNodeId, ValueNodeV2,
 };
 use er_mechanics::selector_operation_v2::{QueryModifierStageV2, QueryModifierV2};
 use er_mechanics::v2::MechanicHookV2;
@@ -111,8 +111,13 @@ pub fn map_abilities_unit(
 fn ability_owned_identity(unit: &CatalogBehaviorUnit) -> bool {
     matches!(
         (&unit.id.source, unit.id.unit_kind),
-        (BehaviorSourceId::ActiveAbility { .. }, BehaviorUnitKind::AbilityAttribute)
-            | (BehaviorSourceId::PassiveAbility { .. }, BehaviorUnitKind::PassiveAttribute)
+        (
+            BehaviorSourceId::ActiveAbility { .. },
+            BehaviorUnitKind::AbilityAttribute
+        ) | (
+            BehaviorSourceId::PassiveAbility { .. },
+            BehaviorUnitKind::PassiveAttribute
+        )
     )
 }
 
@@ -143,7 +148,10 @@ fn exact_unit_shape(
         || actual_base.as_deref() != Some(base)
         || family != "ABILITY_ATTRIBUTE"
         || actual_methods.len() != methods.len()
-        || actual_methods.iter().zip(methods).any(|(actual, expected)| actual != expected)
+        || actual_methods
+            .iter()
+            .zip(methods)
+            .any(|(actual, expected)| actual != expected)
     {
         return false;
     }
@@ -164,7 +172,13 @@ fn exact_unit_shape(
 fn map_block_crit(
     unit: &CatalogBehaviorUnit,
 ) -> Result<Option<RoutineProgramSpec>, RoutineCompileError> {
-    if !exact_unit_shape(unit, "BlockCritAbAttr", "AbAttr", &["apply"], "CRITICAL_QUERY") {
+    if !exact_unit_shape(
+        unit,
+        "BlockCritAbAttr",
+        "AbAttr",
+        &["apply"],
+        "CRITICAL_QUERY",
+    ) {
         return Ok(None);
     }
     suppressible_critical_query(
@@ -181,14 +195,22 @@ fn map_block_crit(
 fn map_bonus_crit(
     unit: &CatalogBehaviorUnit,
 ) -> Result<Option<RoutineProgramSpec>, RoutineCompileError> {
-    if !exact_unit_shape(unit, "BonusCritAbAttr", "AbAttr", &["apply"], "CRITICAL_QUERY") {
+    if !exact_unit_shape(
+        unit,
+        "BonusCritAbAttr",
+        "AbAttr",
+        &["apply"],
+        "CRITICAL_QUERY",
+    ) {
         return Ok(None);
     }
     suppressible_critical_query(
         BONUS_CRIT_RULE,
         unit,
         QueryModifierStageV2::EarlyAdd,
-        QueryModifierV2::Add { value: ValueNodeId(0) },
+        QueryModifierV2::Add {
+            value: ValueNodeId(0),
+        },
         ValueArenaV2(vec![ValueNodeV2::Constant { value: 1 }]),
     )
 }

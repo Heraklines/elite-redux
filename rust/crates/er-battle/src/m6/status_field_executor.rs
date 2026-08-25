@@ -51,9 +51,7 @@ pub enum StatusFieldChange {
         after: ArenaConditionSnapshot,
     },
     /// Arena tag removal (expiry or dispel).
-    ArenaTagRemoved {
-        removed: ArenaConditionSnapshot,
-    },
+    ArenaTagRemoved { removed: ArenaConditionSnapshot },
 }
 
 /// One weather/terrain cycle snapshot. The oracle code is carried exactly as
@@ -87,7 +85,7 @@ pub struct StatusFieldEvidence {
     pub change: StatusFieldChange,
 }
 
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum StatusFieldExecutorError {
     #[error("field effect duration must be positive")]
     ZeroTurnDuration,
@@ -124,7 +122,6 @@ fn terrain_snapshot(kind: &TerrainKind, remaining_turns: u16) -> FieldCycleSnaps
         remaining_turns,
     }
 }
-
 
 /// Stages a weather replacement with its full turn budget. The previous
 /// weather's remaining counter is preserved in the evidence, so expiry
@@ -249,7 +246,7 @@ pub fn stage_side_condition_set(
     {
         let before = ArenaConditionSnapshot {
             condition_id: entry.condition.as_str().to_owned(),
-            scope: scope.clone(),
+            scope,
             turn_count: entry.turn_count,
             layers: entry.layers,
         };
@@ -260,7 +257,7 @@ pub fn stage_side_condition_set(
             .ok_or(StatusFieldExecutorError::LayerOverflow)?;
         let after = ArenaConditionSnapshot {
             condition_id: entry.condition.as_str().to_owned(),
-            scope: scope.clone(),
+            scope,
             turn_count: entry.turn_count,
             layers: entry.layers,
         };
@@ -276,16 +273,18 @@ pub fn stage_side_condition_set(
     }
     let after = ArenaConditionSnapshot {
         condition_id: id.as_str().to_owned(),
-        scope: scope.clone(),
+        scope,
         turn_count: turns,
         layers: layers_delta,
     };
-    state.arena_conditions.push(er_types::battle_model::ArenaConditionState {
-        condition: id,
-        scope: scope.clone(),
-        turn_count: turns,
-        layers: layers_delta,
-    });
+    state
+        .arena_conditions
+        .push(er_types::battle_model::ArenaConditionState {
+            condition: id,
+            scope,
+            turn_count: turns,
+            layers: layers_delta,
+        });
     Ok(StatusFieldEvidence {
         schema_version: STATUS_FIELD_EXECUTOR_SCHEMA_VERSION,
         ordinal,
@@ -311,7 +310,7 @@ pub fn stage_arena_tag_remove(
         .position(|entry| entry.condition.as_str() == condition_id && entry.scope == scope)
         .ok_or_else(|| StatusFieldExecutorError::ConditionMissing {
             condition: condition_id.to_owned(),
-            scope: scope.clone(),
+            scope,
         })?;
     let removed_entry = state.arena_conditions.remove(position);
     Ok(StatusFieldEvidence {
@@ -321,7 +320,7 @@ pub fn stage_arena_tag_remove(
         change: StatusFieldChange::ArenaTagRemoved {
             removed: ArenaConditionSnapshot {
                 condition_id: removed_entry.condition.into_inner(),
-                scope: scope.clone(),
+                scope,
                 turn_count: removed_entry.turn_count,
                 layers: removed_entry.layers,
             },

@@ -33,7 +33,7 @@ pub struct PreparedMoveRoutine {
 }
 
 /// Typed rejection reasons for programs outside the move-routine surface.
-#[derive(Clone, Debug, Eq, Error, PartialEq)]
+#[derive(Debug, Error)]
 pub enum MoveRoutineAdapterError {
     #[error("program is invalid: {0}")]
     Invalid(#[source] er_mechanics::MechanicsProgramV2Error),
@@ -53,7 +53,9 @@ pub enum MoveRoutineAdapterError {
 pub fn prepare_move_routine(
     program: MechanicsProgramV2,
 ) -> Result<PreparedMoveRoutine, MoveRoutineAdapterError> {
-    program.validate().map_err(MoveRoutineAdapterError::Invalid)?;
+    program
+        .validate()
+        .map_err(MoveRoutineAdapterError::Invalid)?;
     if !matches!(program.source, BehaviorSourceId::Move { .. }) {
         return Err(MoveRoutineAdapterError::NotMoveSource);
     }
@@ -64,7 +66,9 @@ pub fn prepare_move_routine(
     }
     for (binding_index, binding) in program.bindings.iter().enumerate() {
         if !binding.hook.is_query() && binding.selector_root.is_none() {
-            return Err(MoveRoutineAdapterError::SelectorRequired { binding: binding_index });
+            return Err(MoveRoutineAdapterError::SelectorRequired {
+                binding: binding_index,
+            });
         }
     }
     Ok(PreparedMoveRoutine { program })
@@ -76,29 +80,26 @@ fn is_move_routine_operation(operation: &MechanicOperationV2) -> bool {
             query,
             stage,
             modifier,
-        } => match (query, stage, modifier) {
+        } => matches!(
+            (query, stage, modifier),
             (
                 MechanicQueryV2::CriticalRate,
                 QueryModifierStageV2::EarlyAdd,
                 QueryModifierV2::Add { .. },
-            )
-            | (
+            ) | (
                 MechanicQueryV2::CriticalRate,
                 QueryModifierStageV2::FinalOverride,
                 QueryModifierV2::Set { .. },
-            )
-            | (
+            ) | (
                 MechanicQueryV2::Damage,
                 QueryModifierStageV2::FinalOverride,
                 QueryModifierV2::Set { .. },
-            )
-            | (
+            ) | (
                 MechanicQueryV2::HitCount,
                 QueryModifierStageV2::BaseOverride,
                 QueryModifierV2::Set { .. },
-            ) => true,
-            _ => false,
-        },
+            )
+        ),
         MechanicOperationV2::StatStageChange { stat_stage } => (-6..=6).contains(stat_stage),
         MechanicOperationV2::StatusApply => true,
         _ => false,
@@ -127,16 +128,18 @@ impl PreparedMoveRoutine {
     /// Trigger steps always carry selector roots (user or target); query
     /// steps carry their value-backed modifier slices.
     pub fn steps(&self) -> impl Iterator<Item = MoveRoutineStep<'_>> + '_ {
-        self.program.bindings.iter().enumerate().map(
-            |(binding_index, binding)| MoveRoutineStep {
+        self.program
+            .bindings
+            .iter()
+            .enumerate()
+            .map(|(binding_index, binding)| MoveRoutineStep {
                 binding_index,
                 hook: binding.hook,
                 behavior_unit: &binding.behavior_unit,
                 condition_root: binding.condition_root,
                 selector_root: binding.selector_root,
                 operations: self.binding_operations(binding),
-            },
-        )
+            })
     }
 
     fn binding_operations(&self, binding: &HookBindingV2) -> &[MechanicOperationV2] {
@@ -149,8 +152,8 @@ impl PreparedMoveRoutine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
     use er_mechanics::ProgramRange;
+    use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
     use er_mechanics::selector_operation_v2::{SelectorArenaV2, SelectorNodeV2};
     use er_types::m6::{BehaviorUnitOrdinal, ProvenanceHash};
     use er_types::{M6_MECHANICS_PROGRAM_VERSION, SafeU53};
@@ -228,10 +231,7 @@ mod tests {
         let steps: Vec<_> = prepared.steps().collect();
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].hook, MechanicHookV2::AfterHit);
-        assert_eq!(
-            steps[0].operations,
-            &[MechanicOperationV2::StatusApply]
-        );
+        assert_eq!(steps[0].operations, &[MechanicOperationV2::StatusApply]);
     }
 
     #[test]
@@ -244,7 +244,9 @@ mod tests {
             MechanicOperationV2::Query {
                 query: MechanicQueryV2::CriticalRate,
                 stage: QueryModifierStageV2::EarlyAdd,
-                modifier: QueryModifierV2::Add { value: er_mechanics::condition_v2::ValueNodeId(0) },
+                modifier: QueryModifierV2::Add {
+                    value: er_mechanics::condition_v2::ValueNodeId(0),
+                },
             },
         );
         let prepared = prepare_move_routine(program).unwrap();

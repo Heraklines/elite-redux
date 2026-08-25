@@ -21,9 +21,14 @@
 //! pack `RngSiteDefinitionV1` ingredient is emitted until audited schemas
 //! freeze their ranges. Per-attribute program bodies arrive in M6B modules.
 
+pub mod abilities;
 pub mod catalog;
+pub mod items;
+pub mod moves;
 pub mod pipeline;
 pub mod routine;
+pub mod status_field;
+pub mod switch_target;
 
 pub use catalog::{
     CatalogValidationError, M6_ORACLE_SHA, SemanticCatalogInput, ValidatedSemanticCatalog,
@@ -35,6 +40,7 @@ pub use pipeline::{
     SemanticCompileOutput, SemanticCompileReport, SemanticCompileRequest, compile_semantics,
 };
 pub use routine::{
-    MappingFamily, MappingRuleId, RoutineCompileError, RoutineProgramSpec, boolean_operand,
-    implementation_name, operand, safe_integer_operand, string_operand,
+    MappingFamily, MappingRuleId, RoutineCatalogMapping, RoutineCompileError, RoutineProgramSpec,
+    boolean_operand, implementation_name, map_routine_catalog, map_routine_unit, operand,
+    safe_integer_operand, string_operand,
 };

@@ -34,8 +34,8 @@ use er_types::{BehaviorSourceId, BehaviorUnitKind};
 
 use crate::m6::pipeline::OPERAND_SCHEMA_MISSING_REASON;
 use crate::m6::routine::{
-    implementation_name, safe_integer_operand, MappingFamily, MappingRuleId, RoutineCompileError,
-    RoutineProgramSpec,
+    MappingFamily, MappingRuleId, RoutineCompileError, RoutineProgramSpec, implementation_name,
+    safe_integer_operand,
 };
 
 /// Schema version of the Items family mapping rules. Bump on any change to
@@ -120,195 +120,952 @@ pub struct ItemClassEvidence {
 /// Deterministic recognition table over all classified held items, sorted by
 /// ascending registry key so lookups binary search.
 pub static ITEM_UNIT_CLASSIFICATIONS: &[ItemClassEvidence] = &[
-ItemClassEvidence { registry_key: "ABILITY_CHARM", implementation_class: "MysteryEventRateBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ABILITY_RANDOMIZER", implementation_class: "PokemonRandomizeAbilityModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "AMULET_COIN", implementation_class: "MoneyMultiplierModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ATTACK_TYPE_BOOSTER", implementation_class: "AttackTypeBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "BASE_STAT_BOOSTER", implementation_class: "BaseStatModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "BATON", implementation_class: "SwitchEffectTransferModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "BERRY", implementation_class: "BerryModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "BERRY_POUCH", implementation_class: "PreserveBerryModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "BIG_NUGGET", implementation_class: "MoneyRewardModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "CANDY_JAR", implementation_class: "LevelIncrementBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "CATCHING_CHARM", implementation_class: "CriticalCatchChanceBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "COIN_CASE", implementation_class: "MoneyInterestModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "DAMAGE_CALCULATOR", implementation_class: "DamageCalculatorModifier", classification: ItemUnitClassification::PresentationOnly },
-    ItemClassEvidence { registry_key: "DIRE_HIT", implementation_class: "TempCritBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "DNA_SPLICERS", implementation_class: "FusePokemonModifierType", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "DYNAMAX_BAND", implementation_class: "GigantamaxAccessModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ELIXIR", implementation_class: "PokemonAllMovePpRestoreModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ENEMY_ATTACK_BURN_CHANCE", implementation_class: "EnemyAttackStatusEffectChanceModifierType", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_ATTACK_PARALYZE_CHANCE", implementation_class: "EnemyAttackStatusEffectChanceModifierType", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_ATTACK_POISON_CHANCE", implementation_class: "EnemyAttackStatusEffectChanceModifierType", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_DAMAGE_BOOSTER", implementation_class: "EnemyDamageBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_DAMAGE_REDUCTION", implementation_class: "EnemyDamageReducerModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_ENDURE_CHANCE", implementation_class: "EnemyEndureChanceModifierType", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_FUSED_CHANCE", implementation_class: "EnemyFusionChanceModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_HEAL", implementation_class: "EnemyTurnHealModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ENEMY_STATUS_EFFECT_HEAL_CHANCE", implementation_class: "EnemyStatusEffectHealChanceModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ABILITY_CAPSULE", implementation_class: "ErAbilityCapsuleModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ER_ABILITY_SHIELD", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ABSORB_BULB", implementation_class: "ErReactiveItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ADRENALINE_ORB", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_AIR_BALLOON", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ASSAULT_VEST", implementation_class: "ErAssaultVestModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_BLUNDER_POLICY", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_BOOSTER_ENERGY", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_BUG_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_CELL_BATTERY", implementation_class: "ErReactiveItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_CHILI_SAMPLE", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_CLEAR_AMULET", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_COPPER_ROD", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_COVERT_CLOAK", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_DARK_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_DEX_NAV", implementation_class: "ErDexNavModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ER_DRAGON_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_EJECT_BUTTON", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_EJECT_PACK", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ELECTRIC_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ELECTRIC_SEED", implementation_class: "ErSeedModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_EXPERT_BELT", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_FAIRY_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_FIGHTING_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_FIRE_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_FLOAT_STONE", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_FLYING_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_GHOST_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_GRASSY_SEED", implementation_class: "ErSeedModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_GRASS_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_GREATER_ABILITY_CAPSULE", implementation_class: "ErGreaterAbilityCapsuleModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ER_GREATER_ABILITY_RANDOMIZER", implementation_class: "ErGreaterAbilityRandomizerModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ER_GREATER_GOLDEN_BALL", implementation_class: "ExtraModifierModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_GREATER_MOVE_RANDOMIZER", implementation_class: "ErGreaterMoveRandomizerModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ER_GROUND_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_HEAVY_DUTY_BOOTS", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ICE_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_IRON_BALL", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_LEARNERS_SHROOM", implementation_class: "ErLearnersShroomModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "ER_LIFE_ORB", implementation_class: "ErLifeOrbModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_LOADED_DICE", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_LUCKY_HEART", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_LUMINOUS_MOSS", implementation_class: "ErReactiveItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_MENTAL_HERB", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_METRONOME_ITEM", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_MISTY_SEED", implementation_class: "ErSeedModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_MUSCLE_BAND", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_NORMAL_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_OMNI_GEM", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_POISON_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_POWER_HERB", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_PSYCHIC_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_PSYCHIC_SEED", implementation_class: "ErSeedModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_PUNCHING_GLOVE", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_RED_CARD", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ROCKY_HELMET", implementation_class: "ErRockyHelmetModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ROCK_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ROOM_SERVICE", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_RUSTY_CLAW", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_SAFETY_GOGGLES", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_SHED_SHELL", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_SMOKE_BALL", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_SNOWBALL", implementation_class: "ErReactiveItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_SPIKED_KNUCKLES", implementation_class: "ErCommunityItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_STEEL_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_STICKY_BARB", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_THROAT_SPRAY", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_UPGRADED_MAP", implementation_class: "MapModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_UTILITY_UMBRELLA", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_WATER_GEM", implementation_class: "ErGemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_WEAKNESS_POLICY", implementation_class: "ErReactiveItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_WISE_GLASSES", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ER_ZOOM_LENS", implementation_class: "ErTacticalItemModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ETHER", implementation_class: "PokemonPpRestoreModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "EVIOLITE", implementation_class: "EvolutionStatBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "EVOLUTION_ITEM", implementation_class: "EvolutionItemModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "EVOLUTION_TRACKER_GIMMIGHOUL", implementation_class: "EvoTrackerModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "EXP_BALANCE", implementation_class: "ExpBalanceModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "EXP_CHARM", implementation_class: "ExpBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "EXP_SHARE", implementation_class: "ExpShareModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "FLAME_ORB", implementation_class: "TurnStatusEffectModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "FOCUS_BAND", implementation_class: "SurviveDamageModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "FORM_CHANGE_ITEM", implementation_class: "PokemonFormChangeItemModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "FROSTBITE_ORB", implementation_class: "TurnStatusEffectModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "FULL_HEAL", implementation_class: "PokemonStatusHealModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "FULL_RESTORE", implementation_class: "PokemonHpRestoreModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "GOLDEN_EGG", implementation_class: "PokemonExpBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "GOLDEN_EXP_CHARM", implementation_class: "ExpBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "GOLDEN_POKEBALL", implementation_class: "ExtraModifierModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "GOLDEN_PUNCH", implementation_class: "DamageMoneyRewardModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "GREAT_BALL", implementation_class: "AddPokeballModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "GRIP_CLAW", implementation_class: "ContactHeldItemTransferChanceModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "HEALING_CHARM", implementation_class: "HealingBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "HYPER_POTION", implementation_class: "PokemonHpRestoreModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "IV_SCANNER", implementation_class: "IvScannerModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "KINGS_ROCK", implementation_class: "FlinchChanceModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "LEEK", implementation_class: "SpeciesCritBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "LEFTOVERS", implementation_class: "TurnHealModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "LOCK_CAPSULE", implementation_class: "LockModifierTiersModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "LUCKY_EGG", implementation_class: "PokemonExpBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "LURE", implementation_class: "DoubleBattleChanceBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MAP", implementation_class: "MapModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "MASTER_BALL", implementation_class: "AddPokeballModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MAX_ELIXIR", implementation_class: "PokemonAllMovePpRestoreModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MAX_ETHER", implementation_class: "PokemonPpRestoreModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MAX_LURE", implementation_class: "DoubleBattleChanceBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MAX_POTION", implementation_class: "PokemonHpRestoreModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MAX_REVIVE", implementation_class: "PokemonReviveModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MEGA_BRACELET", implementation_class: "MegaEvolutionAccessModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "MEMORY_MUSHROOM", implementation_class: "RememberMoveModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MINI_BLACK_HOLE", implementation_class: "TurnHeldItemTransferModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "MINT", implementation_class: "PokemonNatureChangeModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MOVE_RANDOMIZER", implementation_class: "PokemonRandomizeMoveModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MOVE_SLOT_EXPANDER", implementation_class: "PokemonAddMoveSlotModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MULTI_LENS", implementation_class: "PokemonMultiHitModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "MYSTERY_ENCOUNTER_BLACK_SLUDGE", implementation_class: "HealShopCostModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "MYSTERY_ENCOUNTER_GOLDEN_BUG_NET", implementation_class: "BoostBugSpawnModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "MYSTERY_ENCOUNTER_MACHO_BRACE", implementation_class: "PokemonIncrementingStatModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MYSTERY_ENCOUNTER_OLD_GATEAU", implementation_class: "PokemonBaseStatFlatModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MYSTERY_ENCOUNTER_SHUCKLE_JUICE", implementation_class: "PokemonBaseStatTotalModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "MYSTICAL_ROCK", implementation_class: "FieldEffectModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "NUGGET", implementation_class: "MoneyRewardModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "OVAL_CHARM", implementation_class: "MultipleParticipantExpBonusModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "POKEBALL", implementation_class: "AddPokeballModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "POTION", implementation_class: "PokemonHpRestoreModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "PP_MAX", implementation_class: "PokemonPpUpModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "PP_UP", implementation_class: "PokemonPpUpModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "QUICK_CLAW", implementation_class: "BypassSpeedChanceModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "RARER_CANDY", implementation_class: "AllPokemonLevelIncrementModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "RARE_CANDY", implementation_class: "PokemonLevelIncrementModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "RARE_EVOLUTION_ITEM", implementation_class: "EvolutionItemModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "RARE_FORM_CHANGE_ITEM", implementation_class: "PokemonFormChangeItemModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "RARE_SPECIES_STAT_BOOSTER", implementation_class: "SpeciesStatBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "RELIC_GOLD", implementation_class: "MoneyRewardModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "REVIVE", implementation_class: "PokemonReviveModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "REVIVER_SEED", implementation_class: "PokemonInstantReviveModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ROGUE_BALL", implementation_class: "AddPokeballModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "SACRED_ASH", implementation_class: "AllPokemonFullReviveModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "SCOPE_LENS", implementation_class: "CritBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "SHELL_BELL", implementation_class: "HitHealModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "SHINY_CHARM", implementation_class: "ShinyRateBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "SILVER_POKEBALL", implementation_class: "TempExtraModifierModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "SOOTHE_BELL", implementation_class: "PokemonFriendshipBoosterModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "SOUL_DEW", implementation_class: "PokemonNatureWeightModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "SPECIES_STAT_BOOSTER", implementation_class: "SpeciesStatBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "SPEED_ORDER", implementation_class: "SpeedOrderModifier", classification: ItemUnitClassification::PresentationOnly },
-    ItemClassEvidence { registry_key: "SUPER_EXP_CHARM", implementation_class: "ExpBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "SUPER_LURE", implementation_class: "DoubleBattleChanceBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "SUPER_POTION", implementation_class: "PokemonHpRestoreModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "TEMP_STAT_STAGE_BOOSTER", implementation_class: "TempStatStageBoosterModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "TERA_ORB", implementation_class: "TerastallizeAccessModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "TERA_SHARD", implementation_class: "TerastallizeModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "TM_CASE", implementation_class: "ErTmCaseModifierType", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "TM_COMMON", implementation_class: "TmModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "TM_GREAT", implementation_class: "TmModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "TM_ULTRA", implementation_class: "TmModifier", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "TOXIC_ORB", implementation_class: "TurnStatusEffectModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "ULTRA_BALL", implementation_class: "AddPokeballModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "VOUCHER", implementation_class: "AddVoucherModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "VOUCHER_PLUS", implementation_class: "AddVoucherModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "VOUCHER_PREMIUM", implementation_class: "AddVoucherModifierType", classification: ItemUnitClassification::RunOnly },
-    ItemClassEvidence { registry_key: "WHITE_HERB", implementation_class: "ResetNegativeStatStageModifier", classification: ItemUnitClassification::BattleRoutine },
-    ItemClassEvidence { registry_key: "WIDE_LENS", implementation_class: "PokemonMoveAccuracyBoosterModifier", classification: ItemUnitClassification::BattleRoutine },];
+    ItemClassEvidence {
+        registry_key: "ABILITY_CHARM",
+        implementation_class: "MysteryEventRateBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ABILITY_RANDOMIZER",
+        implementation_class: "PokemonRandomizeAbilityModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "AMULET_COIN",
+        implementation_class: "MoneyMultiplierModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ATTACK_TYPE_BOOSTER",
+        implementation_class: "AttackTypeBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "BASE_STAT_BOOSTER",
+        implementation_class: "BaseStatModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "BATON",
+        implementation_class: "SwitchEffectTransferModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "BERRY",
+        implementation_class: "BerryModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "BERRY_POUCH",
+        implementation_class: "PreserveBerryModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "BIG_NUGGET",
+        implementation_class: "MoneyRewardModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "CANDY_JAR",
+        implementation_class: "LevelIncrementBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "CATCHING_CHARM",
+        implementation_class: "CriticalCatchChanceBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "COIN_CASE",
+        implementation_class: "MoneyInterestModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "DAMAGE_CALCULATOR",
+        implementation_class: "DamageCalculatorModifier",
+        classification: ItemUnitClassification::PresentationOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "DIRE_HIT",
+        implementation_class: "TempCritBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "DNA_SPLICERS",
+        implementation_class: "FusePokemonModifierType",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "DYNAMAX_BAND",
+        implementation_class: "GigantamaxAccessModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ELIXIR",
+        implementation_class: "PokemonAllMovePpRestoreModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_ATTACK_BURN_CHANCE",
+        implementation_class: "EnemyAttackStatusEffectChanceModifierType",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_ATTACK_PARALYZE_CHANCE",
+        implementation_class: "EnemyAttackStatusEffectChanceModifierType",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_ATTACK_POISON_CHANCE",
+        implementation_class: "EnemyAttackStatusEffectChanceModifierType",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_DAMAGE_BOOSTER",
+        implementation_class: "EnemyDamageBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_DAMAGE_REDUCTION",
+        implementation_class: "EnemyDamageReducerModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_ENDURE_CHANCE",
+        implementation_class: "EnemyEndureChanceModifierType",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_FUSED_CHANCE",
+        implementation_class: "EnemyFusionChanceModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_HEAL",
+        implementation_class: "EnemyTurnHealModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ENEMY_STATUS_EFFECT_HEAL_CHANCE",
+        implementation_class: "EnemyStatusEffectHealChanceModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ABILITY_CAPSULE",
+        implementation_class: "ErAbilityCapsuleModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ABILITY_SHIELD",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ABSORB_BULB",
+        implementation_class: "ErReactiveItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ADRENALINE_ORB",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_AIR_BALLOON",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ASSAULT_VEST",
+        implementation_class: "ErAssaultVestModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_BLUNDER_POLICY",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_BOOSTER_ENERGY",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_BUG_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_CELL_BATTERY",
+        implementation_class: "ErReactiveItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_CHILI_SAMPLE",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_CLEAR_AMULET",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_COPPER_ROD",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_COVERT_CLOAK",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_DARK_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_DEX_NAV",
+        implementation_class: "ErDexNavModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_DRAGON_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_EJECT_BUTTON",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_EJECT_PACK",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ELECTRIC_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ELECTRIC_SEED",
+        implementation_class: "ErSeedModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_EXPERT_BELT",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_FAIRY_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_FIGHTING_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_FIRE_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_FLOAT_STONE",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_FLYING_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GHOST_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GRASSY_SEED",
+        implementation_class: "ErSeedModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GRASS_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GREATER_ABILITY_CAPSULE",
+        implementation_class: "ErGreaterAbilityCapsuleModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GREATER_ABILITY_RANDOMIZER",
+        implementation_class: "ErGreaterAbilityRandomizerModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GREATER_GOLDEN_BALL",
+        implementation_class: "ExtraModifierModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GREATER_MOVE_RANDOMIZER",
+        implementation_class: "ErGreaterMoveRandomizerModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_GROUND_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_HEAVY_DUTY_BOOTS",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ICE_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_IRON_BALL",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_LEARNERS_SHROOM",
+        implementation_class: "ErLearnersShroomModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_LIFE_ORB",
+        implementation_class: "ErLifeOrbModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_LOADED_DICE",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_LUCKY_HEART",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_LUMINOUS_MOSS",
+        implementation_class: "ErReactiveItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_MENTAL_HERB",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_METRONOME_ITEM",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_MISTY_SEED",
+        implementation_class: "ErSeedModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_MUSCLE_BAND",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_NORMAL_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_OMNI_GEM",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_POISON_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_POWER_HERB",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_PSYCHIC_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_PSYCHIC_SEED",
+        implementation_class: "ErSeedModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_PUNCHING_GLOVE",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_RED_CARD",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ROCKY_HELMET",
+        implementation_class: "ErRockyHelmetModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ROCK_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ROOM_SERVICE",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_RUSTY_CLAW",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_SAFETY_GOGGLES",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_SHED_SHELL",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_SMOKE_BALL",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_SNOWBALL",
+        implementation_class: "ErReactiveItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_SPIKED_KNUCKLES",
+        implementation_class: "ErCommunityItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_STEEL_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_STICKY_BARB",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_THROAT_SPRAY",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_UPGRADED_MAP",
+        implementation_class: "MapModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_UTILITY_UMBRELLA",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_WATER_GEM",
+        implementation_class: "ErGemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_WEAKNESS_POLICY",
+        implementation_class: "ErReactiveItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_WISE_GLASSES",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ER_ZOOM_LENS",
+        implementation_class: "ErTacticalItemModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ETHER",
+        implementation_class: "PokemonPpRestoreModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "EVIOLITE",
+        implementation_class: "EvolutionStatBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "EVOLUTION_ITEM",
+        implementation_class: "EvolutionItemModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "EVOLUTION_TRACKER_GIMMIGHOUL",
+        implementation_class: "EvoTrackerModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "EXP_BALANCE",
+        implementation_class: "ExpBalanceModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "EXP_CHARM",
+        implementation_class: "ExpBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "EXP_SHARE",
+        implementation_class: "ExpShareModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "FLAME_ORB",
+        implementation_class: "TurnStatusEffectModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "FOCUS_BAND",
+        implementation_class: "SurviveDamageModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "FORM_CHANGE_ITEM",
+        implementation_class: "PokemonFormChangeItemModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "FROSTBITE_ORB",
+        implementation_class: "TurnStatusEffectModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "FULL_HEAL",
+        implementation_class: "PokemonStatusHealModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "FULL_RESTORE",
+        implementation_class: "PokemonHpRestoreModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "GOLDEN_EGG",
+        implementation_class: "PokemonExpBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "GOLDEN_EXP_CHARM",
+        implementation_class: "ExpBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "GOLDEN_POKEBALL",
+        implementation_class: "ExtraModifierModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "GOLDEN_PUNCH",
+        implementation_class: "DamageMoneyRewardModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "GREAT_BALL",
+        implementation_class: "AddPokeballModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "GRIP_CLAW",
+        implementation_class: "ContactHeldItemTransferChanceModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "HEALING_CHARM",
+        implementation_class: "HealingBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "HYPER_POTION",
+        implementation_class: "PokemonHpRestoreModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "IV_SCANNER",
+        implementation_class: "IvScannerModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "KINGS_ROCK",
+        implementation_class: "FlinchChanceModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "LEEK",
+        implementation_class: "SpeciesCritBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "LEFTOVERS",
+        implementation_class: "TurnHealModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "LOCK_CAPSULE",
+        implementation_class: "LockModifierTiersModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "LUCKY_EGG",
+        implementation_class: "PokemonExpBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "LURE",
+        implementation_class: "DoubleBattleChanceBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MAP",
+        implementation_class: "MapModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "MASTER_BALL",
+        implementation_class: "AddPokeballModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MAX_ELIXIR",
+        implementation_class: "PokemonAllMovePpRestoreModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MAX_ETHER",
+        implementation_class: "PokemonPpRestoreModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MAX_LURE",
+        implementation_class: "DoubleBattleChanceBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MAX_POTION",
+        implementation_class: "PokemonHpRestoreModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MAX_REVIVE",
+        implementation_class: "PokemonReviveModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MEGA_BRACELET",
+        implementation_class: "MegaEvolutionAccessModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "MEMORY_MUSHROOM",
+        implementation_class: "RememberMoveModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MINI_BLACK_HOLE",
+        implementation_class: "TurnHeldItemTransferModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "MINT",
+        implementation_class: "PokemonNatureChangeModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MOVE_RANDOMIZER",
+        implementation_class: "PokemonRandomizeMoveModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MOVE_SLOT_EXPANDER",
+        implementation_class: "PokemonAddMoveSlotModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MULTI_LENS",
+        implementation_class: "PokemonMultiHitModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "MYSTERY_ENCOUNTER_BLACK_SLUDGE",
+        implementation_class: "HealShopCostModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "MYSTERY_ENCOUNTER_GOLDEN_BUG_NET",
+        implementation_class: "BoostBugSpawnModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "MYSTERY_ENCOUNTER_MACHO_BRACE",
+        implementation_class: "PokemonIncrementingStatModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MYSTERY_ENCOUNTER_OLD_GATEAU",
+        implementation_class: "PokemonBaseStatFlatModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MYSTERY_ENCOUNTER_SHUCKLE_JUICE",
+        implementation_class: "PokemonBaseStatTotalModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "MYSTICAL_ROCK",
+        implementation_class: "FieldEffectModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "NUGGET",
+        implementation_class: "MoneyRewardModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "OVAL_CHARM",
+        implementation_class: "MultipleParticipantExpBonusModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "POKEBALL",
+        implementation_class: "AddPokeballModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "POTION",
+        implementation_class: "PokemonHpRestoreModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "PP_MAX",
+        implementation_class: "PokemonPpUpModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "PP_UP",
+        implementation_class: "PokemonPpUpModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "QUICK_CLAW",
+        implementation_class: "BypassSpeedChanceModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "RARER_CANDY",
+        implementation_class: "AllPokemonLevelIncrementModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "RARE_CANDY",
+        implementation_class: "PokemonLevelIncrementModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "RARE_EVOLUTION_ITEM",
+        implementation_class: "EvolutionItemModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "RARE_FORM_CHANGE_ITEM",
+        implementation_class: "PokemonFormChangeItemModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "RARE_SPECIES_STAT_BOOSTER",
+        implementation_class: "SpeciesStatBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "RELIC_GOLD",
+        implementation_class: "MoneyRewardModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "REVIVE",
+        implementation_class: "PokemonReviveModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "REVIVER_SEED",
+        implementation_class: "PokemonInstantReviveModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ROGUE_BALL",
+        implementation_class: "AddPokeballModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "SACRED_ASH",
+        implementation_class: "AllPokemonFullReviveModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "SCOPE_LENS",
+        implementation_class: "CritBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "SHELL_BELL",
+        implementation_class: "HitHealModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "SHINY_CHARM",
+        implementation_class: "ShinyRateBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "SILVER_POKEBALL",
+        implementation_class: "TempExtraModifierModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "SOOTHE_BELL",
+        implementation_class: "PokemonFriendshipBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "SOUL_DEW",
+        implementation_class: "PokemonNatureWeightModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "SPECIES_STAT_BOOSTER",
+        implementation_class: "SpeciesStatBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "SPEED_ORDER",
+        implementation_class: "SpeedOrderModifier",
+        classification: ItemUnitClassification::PresentationOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "SUPER_EXP_CHARM",
+        implementation_class: "ExpBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "SUPER_LURE",
+        implementation_class: "DoubleBattleChanceBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "SUPER_POTION",
+        implementation_class: "PokemonHpRestoreModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "TEMP_STAT_STAGE_BOOSTER",
+        implementation_class: "TempStatStageBoosterModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "TERA_ORB",
+        implementation_class: "TerastallizeAccessModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "TERA_SHARD",
+        implementation_class: "TerastallizeModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "TM_CASE",
+        implementation_class: "ErTmCaseModifierType",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "TM_COMMON",
+        implementation_class: "TmModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "TM_GREAT",
+        implementation_class: "TmModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "TM_ULTRA",
+        implementation_class: "TmModifier",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "TOXIC_ORB",
+        implementation_class: "TurnStatusEffectModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "ULTRA_BALL",
+        implementation_class: "AddPokeballModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "VOUCHER",
+        implementation_class: "AddVoucherModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "VOUCHER_PLUS",
+        implementation_class: "AddVoucherModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "VOUCHER_PREMIUM",
+        implementation_class: "AddVoucherModifierType",
+        classification: ItemUnitClassification::RunOnly,
+    },
+    ItemClassEvidence {
+        registry_key: "WHITE_HERB",
+        implementation_class: "ResetNegativeStatStageModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+    ItemClassEvidence {
+        registry_key: "WIDE_LENS",
+        implementation_class: "PokemonMoveAccuracyBoosterModifier",
+        classification: ItemUnitClassification::BattleRoutine,
+    },
+];
 
 /// Relic registry keys left unclassified this wave, sorted ascending.
 pub static UNCLASSIFIED_RELIC_KEYS: &[&str] = &[
@@ -337,7 +1094,8 @@ pub static UNCLASSIFIED_RELIC_KEYS: &[&str] = &[
     "ER_RELIC_TRAILBLAZERS_MARK",
     "ER_RELIC_TWIN_LINK",
     "ER_RELIC_WARM_INCUBATOR",
-    "ER_RELIC_WEATHERVANE",];
+    "ER_RELIC_WEATHERVANE",
+];
 
 /// Classification plus its grounding implementation class, when recognized.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -552,22 +1310,26 @@ fn effect_is(unit: &CatalogBehaviorUnit, expected: CatalogEffectKind) -> bool {
 /// unrecognized (relic) keys.
 #[must_use]
 pub fn battle_schema_gap(registry_key: &str) -> Option<&'static str> {
-    let is_battle = lookup_classification(registry_key)?
-        .classification
+    let is_battle = lookup_classification(registry_key)?.classification
         == ItemUnitClassification::BattleRoutine;
     if !is_battle {
         return None;
     }
     Some(match registry_key {
         "BERRY" | "BERRY_POUCH" => BERRY_LIFECYCLE_BESPOKE_REASON,
-        "FOCUS_BAND" | "QUICK_CLAW" | "KINGS_ROCK" | "ENEMY_ENDURE_CHANCE"
-        | "ENEMY_FUSED_CHANCE" | "ENEMY_ATTACK_BURN_CHANCE" | "ENEMY_ATTACK_PARALYZE_CHANCE"
-        | "ENEMY_ATTACK_POISON_CHANCE" | "ENEMY_STATUS_EFFECT_HEAL_CHANCE" => {
-            ITEM_CHANCE_RNG_GAP_REASON
-        }
+        "FOCUS_BAND"
+        | "QUICK_CLAW"
+        | "KINGS_ROCK"
+        | "ENEMY_ENDURE_CHANCE"
+        | "ENEMY_FUSED_CHANCE"
+        | "ENEMY_ATTACK_BURN_CHANCE"
+        | "ENEMY_ATTACK_PARALYZE_CHANCE"
+        | "ENEMY_ATTACK_POISON_CHANCE"
+        | "ENEMY_STATUS_EFFECT_HEAL_CHANCE" => ITEM_CHANCE_RNG_GAP_REASON,
         "ATTACK_TYPE_BOOSTER" | "BASE_STAT_BOOSTER" => STACK_SCALED_RATIO_GAP_REASON,
-        "ER_ASSAULT_VEST" | "EVIOLITE" | "SPECIES_STAT_BOOSTER"
-        | "RARE_SPECIES_STAT_BOOSTER" => QUERIED_STAT_MATCH_GAP_REASON,
+        "ER_ASSAULT_VEST" | "EVIOLITE" | "SPECIES_STAT_BOOSTER" | "RARE_SPECIES_STAT_BOOSTER" => {
+            QUERIED_STAT_MATCH_GAP_REASON
+        }
         key if key.starts_with("ER_") && key.ends_with("_GEM") => QUERY_THEN_CONSUME_GAP_REASON,
         _ => OPERAND_SCHEMA_MISSING_REASON,
     })

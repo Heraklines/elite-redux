@@ -51,7 +51,11 @@ pub const RULE_ORDINAL_BLOCK_REDIRECT: u32 = 2;
 /// Deterministic coverage metadata: exact implementation classes this family
 /// owns audited schemas for, sorted lexicographically.
 pub fn recognized_switch_target_classes() -> &'static [&'static str] {
-    &["BlockRedirectAbAttr", "BypassRedirectAttr", "ForceSwitchOutAttr"]
+    &[
+        "BlockRedirectAbAttr",
+        "BypassRedirectAttr",
+        "ForceSwitchOutAttr",
+    ]
 }
 
 /// Deterministic coverage metadata: number of audited schemas above.
@@ -94,7 +98,10 @@ pub const EXPLICIT_SWITCH_TARGET_GAPS: &[(&str, &str)] = &[
         "RoarOfTimeForceSwitchOutAttr",
         "FORCED_CHAIN_SUBCLASS_WITH_DYNAMIC_CONDITION_REMAINS_BESPOKE",
     ),
-    ("SwitchAbilitiesAttr", "ABILITY_SWAP_HAS_NO_CLOSED_OPERATION"),
+    (
+        "SwitchAbilitiesAttr",
+        "ABILITY_SWAP_HAS_NO_CLOSED_OPERATION",
+    ),
     (
         "VariableTargetAttr",
         "CALLBACK_TARGET_REWRITE_REMAINS_BESPOKE_PER_M6_TARGETING_PLAN",
@@ -153,9 +160,13 @@ fn switch_type_symbol(op: &CatalogOperand) -> Option<SwitchTypeSymbol> {
 
 fn implementation_matches(unit: &CatalogBehaviorUnit, name: &str, base: &str) -> bool {
     implementation_name(unit) == Some(name)
-        && unit.semantic.implementation.as_ref().is_some_and(|implementation| {
-            !implementation.is_abstract && implementation.base.as_deref() == Some(base)
-        })
+        && unit
+            .semantic
+            .implementation
+            .as_ref()
+            .is_some_and(|implementation| {
+                !implementation.is_abstract && implementation.base.as_deref() == Some(base)
+            })
 }
 
 /// Closed trigger-hook evidence table for move-effect application.

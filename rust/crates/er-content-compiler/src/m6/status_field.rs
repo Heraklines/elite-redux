@@ -23,8 +23,8 @@
 use er_content::m6_catalog::{
     CatalogBehaviorUnit, CatalogEffectKind, CatalogOperand, CatalogResolution,
 };
-use er_mechanics::selector_operation_v2::MechanicOperationV2;
 use er_mechanics::MechanicHookV2;
+use er_mechanics::selector_operation_v2::MechanicOperationV2;
 use er_types::BehaviorUnitKind;
 use serde::Serialize;
 

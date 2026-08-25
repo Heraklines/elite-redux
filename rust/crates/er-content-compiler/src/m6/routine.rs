@@ -28,6 +28,18 @@ pub enum MappingFamily {
     SwitchTarget,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoutineCatalogMapping {
+    pub mapped: Vec<RoutineProgramSpec>,
+    pub unresolved: Vec<BehaviorUnitId>,
+}
+
+impl RoutineCatalogMapping {
+    pub fn total(&self) -> usize {
+        self.mapped.len() + self.unresolved.len()
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct MappingRuleId {
     pub family: MappingFamily,
@@ -208,10 +220,10 @@ pub fn boolean_operand(
     }
 }
 
-pub fn string_operand<'a>(
-    unit: &'a CatalogBehaviorUnit,
+pub fn string_operand(
+    unit: &CatalogBehaviorUnit,
     index: usize,
-) -> Result<&'a str, RoutineCompileError> {
+) -> Result<&str, RoutineCompileError> {
     match operand(unit, index)? {
         CatalogOperand::String { value } => Ok(value),
         _ => Err(RoutineCompileError::OperandKind {
@@ -219,6 +231,42 @@ pub fn string_operand<'a>(
             expected: "STRING",
         }),
     }
+}
+
+pub fn map_routine_unit(
+    unit: &CatalogBehaviorUnit,
+) -> Result<Option<RoutineProgramSpec>, RoutineCompileError> {
+    let candidates = [
+        crate::m6::moves::map_moves_unit(unit)?,
+        crate::m6::abilities::map_abilities_unit(unit)?,
+        crate::m6::items::map_items_unit(unit)?,
+        crate::m6::status_field::map_status_field_unit(unit)?,
+        crate::m6::switch_target::map_switch_target_unit(unit)?,
+    ];
+    let mut mapped = None;
+    for candidate in candidates.into_iter().flatten() {
+        if mapped.is_some() {
+            return Err(RoutineCompileError::MultipleFamilyMappings {
+                unit: unit.id.clone(),
+            });
+        }
+        mapped = Some(candidate);
+    }
+    Ok(mapped)
+}
+
+pub fn map_routine_catalog<'a>(
+    units: impl IntoIterator<Item = &'a CatalogBehaviorUnit>,
+) -> Result<RoutineCatalogMapping, RoutineCompileError> {
+    let mut mapped = Vec::new();
+    let mut unresolved = Vec::new();
+    for unit in units {
+        match map_routine_unit(unit)? {
+            Some(spec) => mapped.push(spec),
+            None => unresolved.push(unit.id.clone()),
+        }
+    }
+    Ok(RoutineCatalogMapping { mapped, unresolved })
 }
 
 fn exact_u16(resource: &'static str, value: usize) -> Result<u16, RoutineCompileError> {
@@ -241,6 +289,8 @@ pub enum RoutineCompileError {
         resource: &'static str,
         value: usize,
     },
+    #[error("behavior unit {unit:?} matches more than one routine mapping family")]
+    MultipleFamilyMappings { unit: BehaviorUnitId },
     #[error("compiled mechanics program is invalid: {0}")]
     Program(#[source] er_mechanics::MechanicsProgramV2Error),
 }

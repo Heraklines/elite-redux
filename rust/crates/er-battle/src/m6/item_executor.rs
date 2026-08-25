@@ -65,8 +65,7 @@ pub fn item_is_active(
     holder: PokemonId,
     registry_key: &str,
 ) -> Result<bool, ItemExecutorError> {
-    Ok(find_held_item(extensions, holder, registry_key)?
-        .is_some_and(|item| !item.consumed))
+    Ok(find_held_item(extensions, holder, registry_key)?.is_some_and(|item| !item.consumed))
 }
 
 /// Applies the closed held-item lifecycle subset of one mapped item routine

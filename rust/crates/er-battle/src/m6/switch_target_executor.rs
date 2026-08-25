@@ -79,7 +79,10 @@ impl SwitchTargetFacts {
     }
 }
 
-fn predicate_matches(facts: &SlotFacts, predicate: SelectorPredicateV2) -> Result<bool, SwitchTargetExecutorError> {
+fn predicate_matches(
+    facts: &SlotFacts,
+    predicate: SelectorPredicateV2,
+) -> Result<bool, SwitchTargetExecutorError> {
     Ok(match predicate {
         SelectorPredicateV2::Active => facts.active,
         SelectorPredicateV2::Fainted => facts.fainted,
@@ -131,7 +134,9 @@ fn evaluate_node(
     visiting.push(id);
     let scopes = match node {
         SelectorNodeV2::Actor | SelectorNodeV2::Source => facts.single(facts.actor),
-        SelectorNodeV2::CommandTarget | SelectorNodeV2::Target => facts.single(facts.command_target),
+        SelectorNodeV2::CommandTarget | SelectorNodeV2::Target => {
+            facts.single(facts.command_target)
+        }
         SelectorNodeV2::LastAttacker => facts.single(facts.last_attacker),
         SelectorNodeV2::ActiveBattlers => facts
             .slots
@@ -200,9 +205,10 @@ fn evaluate_node(
             sort_canonical(&mut scopes);
             scopes
         }
-        SelectorNodeV2::First { input } => {
-            evaluate_node(program, *input, facts, cache, visiting)?.into_iter().take(1).collect()
-        }
+        SelectorNodeV2::First { input } => evaluate_node(program, *input, facts, cache, visiting)?
+            .into_iter()
+            .take(1)
+            .collect(),
         SelectorNodeV2::Last { input } => evaluate_node(program, *input, facts, cache, visiting)?
             .into_iter()
             .last()
@@ -226,8 +232,8 @@ fn evaluate_node(
         | SelectorNodeV2::StoredTargets
         | SelectorNodeV2::ScheduledEventOwner
         | SelectorNodeV2::ScheduledEventTarget
-        | SelectorNodeV2::PromoteTarget
-        | SelectorNodeV2::RedirectReplacement => {
+        | SelectorNodeV2::PromoteTarget { .. }
+        | SelectorNodeV2::RedirectReplacement { .. } => {
             return Err(SwitchTargetExecutorError::UnrepresentedSelector {
                 label: "STORED_INSTANCE_OR_PROMOTION_CONTEXT",
             });
@@ -282,17 +288,27 @@ fn stable_distinct(scopes: Vec<MechanicScope>) -> Vec<MechanicScope> {
 
 /// Canonical order: player slots before enemy slots, position ascending.
 fn sort_canonical(scopes: &mut [MechanicScope]) {
-    scopes.sort_by_key(|scope| scope_slot(scope));
+    scopes.sort_by_key(scope_slot);
 }
 
 /// Staged, typed switch/target mutation ready for the atomic transition.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StagedSwitchTargetOperation {
-    PivotRequest { owner: MechanicScope },
-    SwitchRequest { subject: MechanicScope },
-    ForcedSwitchRequest { subject: MechanicScope },
-    TrapApply { subjects: Vec<MechanicScope> },
-    RedirectTarget { replacement: MechanicScope },
+    PivotRequest {
+        owner: MechanicScope,
+    },
+    SwitchRequest {
+        subject: MechanicScope,
+    },
+    ForcedSwitchRequest {
+        subject: MechanicScope,
+    },
+    TrapApply {
+        subjects: Vec<MechanicScope>,
+    },
+    RedirectTarget {
+        replacement: MechanicScope,
+    },
     LegalityQuery {
         query: MechanicQueryV2,
         stage: QueryModifierStageV2,
@@ -306,12 +322,18 @@ pub fn plan_binding(
     binding_index: usize,
     facts: &SwitchTargetFacts,
 ) -> Result<Vec<StagedSwitchTargetOperation>, SwitchTargetExecutorError> {
-    let binding = program
-        .bindings
-        .get(binding_index)
-        .ok_or(SwitchTargetExecutorError::MissingBinding { index: binding_index })?;
+    let binding =
+        program
+            .bindings
+            .get(binding_index)
+            .ok_or(SwitchTargetExecutorError::MissingBinding {
+                index: binding_index,
+            })?;
     let start = usize::from(binding.operations.start);
-    let end = binding.operations.end().ok_or(SwitchTargetExecutorError::OperationRangeOverflow)?;
+    let end = binding
+        .operations
+        .end()
+        .ok_or(SwitchTargetExecutorError::OperationRangeOverflow)?;
     let range = program
         .operations
         .get(start..end)
@@ -330,15 +352,17 @@ fn stage_operation(
     operation: &MechanicOperationV2,
     facts: &SwitchTargetFacts,
 ) -> Result<StagedSwitchTargetOperation, SwitchTargetExecutorError> {
-    let resolve_single = |facts: &SwitchTargetFacts| -> Result<MechanicScope, SwitchTargetExecutorError> {
-        let root =
-            binding.selector_root.ok_or(SwitchTargetExecutorError::MissingSelectorRoot)?;
-        let scopes = evaluate_selector(program, root, facts)?;
-        if scopes.len() != 1 {
-            return Err(SwitchTargetExecutorError::SelectionNotSingle);
-        }
-        Ok(scopes[0])
-    };
+    let resolve_single =
+        |facts: &SwitchTargetFacts| -> Result<MechanicScope, SwitchTargetExecutorError> {
+            let root = binding
+                .selector_root
+                .ok_or(SwitchTargetExecutorError::MissingSelectorRoot)?;
+            let scopes = evaluate_selector(program, root, facts)?;
+            if scopes.len() != 1 {
+                return Err(SwitchTargetExecutorError::SelectionNotSingle);
+            }
+            Ok(scopes[0])
+        };
 
     match operation {
         MechanicOperationV2::PivotRequest => Ok(StagedSwitchTargetOperation::PivotRequest {
@@ -353,20 +377,23 @@ fn stage_operation(
             })
         }
         MechanicOperationV2::TrapApply => {
-            let root =
-                binding.selector_root.ok_or(SwitchTargetExecutorError::MissingSelectorRoot)?;
+            let root = binding
+                .selector_root
+                .ok_or(SwitchTargetExecutorError::MissingSelectorRoot)?;
             let subjects = evaluate_selector(program, root, facts)?;
             if subjects.is_empty() {
                 return Err(SwitchTargetExecutorError::SelectionEmpty);
             }
             Ok(StagedSwitchTargetOperation::TrapApply { subjects })
         }
-        MechanicOperationV2::RedirectTarget => {
-            Ok(StagedSwitchTargetOperation::RedirectTarget {
-                replacement: resolve_single(facts)?,
-            })
-        }
-        MechanicOperationV2::Query { query, stage, modifier } => match query {
+        MechanicOperationV2::RedirectTarget => Ok(StagedSwitchTargetOperation::RedirectTarget {
+            replacement: resolve_single(facts)?,
+        }),
+        MechanicOperationV2::Query {
+            query,
+            stage,
+            modifier,
+        } => match query {
             MechanicQueryV2::MoveTargetShape | MechanicQueryV2::SwitchEligibility => {
                 Ok(StagedSwitchTargetOperation::LegalityQuery {
                     query: *query,
@@ -374,7 +401,7 @@ fn stage_operation(
                     modifier: modifier.clone(),
                 })
             }
-            other => Err(SwitchTargetExecutorError::UnsupportedQuery(other)),
+            other => Err(SwitchTargetExecutorError::UnsupportedQuery(*other)),
         },
         _ => Err(SwitchTargetExecutorError::UnsupportedOperation),
     }

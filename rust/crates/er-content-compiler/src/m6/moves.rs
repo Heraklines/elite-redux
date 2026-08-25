@@ -50,7 +50,7 @@ use er_mechanics::selector_operation_v2::{
     SelectorNodeV2,
 };
 use er_mechanics::{HookBindingV2, MechanicHookV2, ProgramRange};
-use er_types::{BehaviorUnitId, BehaviorUnitKind};
+use er_types::BehaviorUnitKind;
 
 use crate::m6::routine::{MappingFamily, MappingRuleId, RoutineCompileError, RoutineProgramSpec};
 
@@ -346,7 +346,10 @@ fn owned_class(unit: &CatalogBehaviorUnit) -> Option<&str> {
     let implementation = unit.semantic.implementation.as_ref()?;
     if unit.semantic.resolution != CatalogResolution::BespokeGap
         || !matches!(unit.semantic.target.kind, CatalogTargetKind::SourceDefined)
-        || !matches!(unit.semantic.condition, None | Some(CatalogOperand::Always {}))
+        || !matches!(
+            unit.semantic.condition,
+            None | Some(CatalogOperand::Always {})
+        )
     {
         return None;
     }
@@ -363,15 +366,9 @@ fn owned_class(unit: &CatalogBehaviorUnit) -> Option<&str> {
             "STAT_QUERY_OR_CHANGE",
             CatalogEffectKind::ApplyOrBlockStatus,
         ),
-        "StatStageChangeAttr" => (
-            "STAT_QUERY_OR_CHANGE",
-            CatalogEffectKind::ModifyStatOrStage,
-        ),
+        "StatStageChangeAttr" => ("STAT_QUERY_OR_CHANGE", CatalogEffectKind::ModifyStatOrStage),
         "MultiHitAttr" => ("UNRESOLVED_HOOK", CatalogEffectKind::UnresolvedEffect),
-        "FixedDamageAttr" => (
-            "DAMAGE_QUERY",
-            CatalogEffectKind::ModifyOrApplyDamage,
-        ),
+        "FixedDamageAttr" => ("DAMAGE_QUERY", CatalogEffectKind::ModifyOrApplyDamage),
         "LevelDamageAttr" => ("DAMAGE_QUERY", CatalogEffectKind::ModifyOrApplyDamage),
         "UserHpDamageAttr" => ("DAMAGE_QUERY", CatalogEffectKind::ModifyOrApplyDamage),
         "RecoilAttr" => ("UNRESOLVED_HOOK", CatalogEffectKind::UnresolvedEffect),
@@ -617,7 +614,9 @@ fn multi_hit_fixed(
 }
 
 /// FixedDamageAttr(damage): absolute damage override.
-fn fixed_damage(unit: &CatalogBehaviorUnit) -> Result<Option<RoutineProgramSpec>, RoutineCompileError> {
+fn fixed_damage(
+    unit: &CatalogBehaviorUnit,
+) -> Result<Option<RoutineProgramSpec>, RoutineCompileError> {
     if !exact_operands(unit, 1) {
         return Ok(None);
     }
@@ -716,7 +715,9 @@ fn hit_heal(unit: &CatalogBehaviorUnit) -> Result<Option<RoutineProgramSpec>, Ro
     let ratio = match unit.semantic.operands.as_slice() {
         [] => 0.5,
         [only] => match only {
-            CatalogOperand::JsNumberBits { .. } => js_number_bits(only).ok_or_else(unowned_shape)?,
+            CatalogOperand::JsNumberBits { .. } => {
+                js_number_bits(only).ok_or_else(unowned_shape)?
+            }
             CatalogOperand::SafeInteger { value } if *value > 0 => *value as f64,
             _ => return Ok(None),
         },
@@ -789,10 +790,7 @@ fn exact_ratio(value: f64) -> Option<(u32, u32)> {
         }
         let numerator = scaled as u64;
         let divisor = gcd(numerator, denominator);
-        return Some((
-            (numerator / divisor) as u32,
-            (denominator / divisor) as u32,
-        ));
+        return Some(((numerator / divisor) as u32, (denominator / divisor) as u32));
     }
     None
 }
@@ -811,8 +809,8 @@ mod tests {
         CatalogEffect, CatalogProvenance, CatalogSemantic, CatalogTarget, HookEvidence,
         ImplementationClassEvidence, SourceLocation,
     };
-    use er_types::mechanics::MechanicsProgramId;
     use er_types::m6::{BehaviorUnitOrdinal, ProvenanceHash};
+    use er_types::mechanics::MechanicsProgramId;
     use er_types::{BehaviorSourceId, SafeU53};
 
     fn attribute_unit(
@@ -890,7 +888,8 @@ mod tests {
                 },
             }]
         );
-        spec.build(MechanicsProgramId::try_from_u64(1).unwrap()).unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(1).unwrap())
+            .unwrap();
     }
 
     #[test]
@@ -931,11 +930,9 @@ mod tests {
         );
         let spec = map_moves_unit(&unit).unwrap().unwrap();
         assert_eq!(spec.operations.len(), 2);
-        assert_eq!(
-            spec.selectors,
-            SelectorArenaV2(vec![SelectorNodeV2::Actor])
-        );
-        spec.build(MechanicsProgramId::try_from_u64(2).unwrap()).unwrap();
+        assert_eq!(spec.selectors, SelectorArenaV2(vec![SelectorNodeV2::Actor]));
+        spec.build(MechanicsProgramId::try_from_u64(2).unwrap())
+            .unwrap();
     }
 
     #[test]
@@ -978,7 +975,8 @@ mod tests {
         );
         let spec = map_moves_unit(&unit).unwrap().unwrap();
         assert_eq!(spec.rule.ordinal, MULTI_HIT_FIXED_RULE_ORDINAL);
-        spec.build(MechanicsProgramId::try_from_u64(3).unwrap()).unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(3).unwrap())
+            .unwrap();
     }
 
     #[test]
@@ -997,7 +995,8 @@ mod tests {
                 denominator: 4
             }]
         );
-        spec.build(MechanicsProgramId::try_from_u64(4).unwrap()).unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(4).unwrap())
+            .unwrap();
     }
 
     #[test]
@@ -1048,7 +1047,8 @@ mod tests {
                 denominator: 2
             }]
         );
-        spec.build(MechanicsProgramId::try_from_u64(5).unwrap()).unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(5).unwrap())
+            .unwrap();
     }
 
     #[test]
@@ -1057,10 +1057,7 @@ mod tests {
             "HitHealAttr",
             "UNRESOLVED_HOOK",
             CatalogEffectKind::Heal,
-            vec![
-                CatalogOperand::Null {},
-                symbol("Stat", "ATK"),
-            ],
+            vec![CatalogOperand::Null {}, symbol("Stat", "ATK")],
         );
         assert!(map_moves_unit(&unit).unwrap().is_none());
     }
@@ -1074,7 +1071,8 @@ mod tests {
             vec![CatalogOperand::SafeInteger { value: 40 }],
         );
         let spec = map_moves_unit(&fixed).unwrap().unwrap();
-        spec.build(MechanicsProgramId::try_from_u64(6).unwrap()).unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(6).unwrap())
+            .unwrap();
 
         let status = attribute_unit(
             "StatusEffectAttr",
@@ -1084,7 +1082,8 @@ mod tests {
         );
         let spec = map_moves_unit(&status).unwrap().unwrap();
         assert_eq!(spec.operations, vec![MechanicOperationV2::StatusApply]);
-        spec.build(MechanicsProgramId::try_from_u64(7).unwrap()).unwrap();
+        spec.build(MechanicsProgramId::try_from_u64(7).unwrap())
+            .unwrap();
     }
 
     #[test]

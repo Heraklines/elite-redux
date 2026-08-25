@@ -24,11 +24,11 @@
 //! apply, in which exact order.
 
 use er_mechanics::condition_v2::{
-    ConditionArenaV2, ConditionNodeV2, ConditionNodeId, ConditionPredicateV2,
+    ConditionArenaV2, ConditionNodeId, ConditionNodeV2, ConditionPredicateV2,
 };
 use er_mechanics::v2::{
-    compare_ordered_sources, AbilitySourceRank, MechanicHookV2, OrderedMechanicSource,
-    OrderedSourceClass, OrderedSourceError,
+    AbilitySourceRank, MechanicHookV2, OrderedMechanicSource, OrderedSourceClass,
+    OrderedSourceError, compare_ordered_sources,
 };
 use er_mechanics::{HookBindingV2, MechanicsProgramV2};
 use er_types::{AbilitySourceKindV1, BehaviorSourceId, BehaviorUnitKind, SafeU53};
@@ -66,7 +66,7 @@ impl AbilityOwnerState {
         if valid {
             Ok(())
         } else {
-            Err(AbilityExecutorError::OwnerSlotMismatch { slot: self.slot })
+            Err(AbilityExecutorError::OwnerSlotMismatch(self.slot))
         }
     }
 
@@ -213,9 +213,8 @@ fn evaluate_condition(
         return Err(AbilityExecutorError::UnsupportedCondition);
     };
     let child_depth = depth + 1;
-    let evaluate_child = |child: &ConditionNodeId| {
-        evaluate_condition(arena, child.index(), owner, child_depth)
-    };
+    let evaluate_child =
+        |child: &ConditionNodeId| evaluate_condition(arena, child.index(), owner, child_depth);
     match node {
         ConditionNodeV2::Always => Ok(true),
         ConditionNodeV2::Never => Ok(false),
@@ -242,9 +241,7 @@ fn evaluate_condition(
             ConditionPredicateV2::AbilitySuppressed { suppressed } => {
                 Ok(owner.suppressed == *suppressed)
             }
-            ConditionPredicateV2::AbilitySource { source_kind } => {
-                Ok(owner.slot == *source_kind)
-            }
+            ConditionPredicateV2::AbilitySource { source_kind } => Ok(owner.slot == *source_kind),
             _ => Err(AbilityExecutorError::UnsupportedCondition),
         },
         ConditionNodeV2::Compare { .. } | ConditionNodeV2::Chance { .. } => {
@@ -282,7 +279,10 @@ mod tests {
             behavior_unit: unit(kind, ordinal),
             condition_root: None,
             selector_root: None,
-            operations: ProgramRange { start: 0, length: 1 },
+            operations: ProgramRange {
+                start: 0,
+                length: 1,
+            },
         }
     }
 
@@ -308,24 +308,30 @@ mod tests {
     fn suppressed_owner_is_skipped_unconditionally() {
         let owners = [owner(AbilitySourceKindV1::Active, true)];
         assert!(ordered_ability_bindings(&[], &owners, MechanicHookV2::CriticalQuery).is_ok());
-        assert!(conditions_admit(
-            &ConditionArenaV2(vec![ConditionNodeV2::Always]),
-            Some(ConditionNodeId(0)),
-            &owners[0],
-        )
-        .expect("supported condition"));
+        assert!(
+            conditions_admit(
+                &ConditionArenaV2(vec![ConditionNodeV2::Always]),
+                Some(ConditionNodeId(0)),
+                &owners[0],
+            )
+            .expect("supported condition")
+        );
     }
 
     #[test]
     fn active_binding_orders_before_passive_slots() {
         let active_owner = owner(AbilitySourceKindV1::Active, false);
         let passive_owner = owner(AbilitySourceKindV1::PassiveSlot0, false);
-        let active_key =
-            binding_order_key(&binding(BehaviorUnitKind::AbilityAttribute, 5), &active_owner)
-                .expect("valid key");
-        let passive_key =
-            binding_order_key(&binding(BehaviorUnitKind::PassiveAttribute, 0), &passive_owner)
-                .expect("valid key");
+        let active_key = binding_order_key(
+            &binding(BehaviorUnitKind::AbilityAttribute, 5),
+            &active_owner,
+        )
+        .expect("valid key");
+        let passive_key = binding_order_key(
+            &binding(BehaviorUnitKind::PassiveAttribute, 0),
+            &passive_owner,
+        )
+        .expect("valid key");
         assert_eq!(
             compare_ordered_sources(&active_key, &passive_key),
             std::cmp::Ordering::Less
@@ -336,12 +342,10 @@ mod tests {
     fn passive_slot_ranks_order_before_ordinals() {
         let slot0 = owner(AbilitySourceKindV1::PassiveSlot0, false);
         let slot1 = owner(AbilitySourceKindV1::PassiveSlot1, false);
-        let first =
-            binding_order_key(&binding(BehaviorUnitKind::PassiveAttribute, 7), &slot0)
-                .expect("valid key");
-        let second =
-            binding_order_key(&binding(BehaviorUnitKind::PassiveAttribute, 0), &slot1)
-                .expect("valid key");
+        let first = binding_order_key(&binding(BehaviorUnitKind::PassiveAttribute, 7), &slot0)
+            .expect("valid key");
+        let second = binding_order_key(&binding(BehaviorUnitKind::PassiveAttribute, 0), &slot1)
+            .expect("valid key");
         assert_eq!(
             compare_ordered_sources(&first, &second),
             std::cmp::Ordering::Less
