@@ -62,6 +62,7 @@ import { pickErEndlessRaidBoss } from "#data/elite-redux/er-endless-bosses";
 import {
   consumeErEndlessRift,
   getErEndlessBonusSegmentBudget,
+  getErEndlessState,
   hasErEndlessRift,
   isErEndlessContinuationActive,
   isErEndlessRaidWave,
@@ -127,6 +128,43 @@ import { achvs } from "#system/achv";
 import { randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
+
+/**
+ * The first battle after accepting the postgame Rift is a one-way handoff from
+ * a completed-run checkpoint. A transient/oversized cloud write must not send
+ * the player back to that completed boss snapshot and make them fight it again.
+ *
+ * Retry once as a local checkpoint. If even that cannot be written, keep the
+ * live run playable: later encounter checkpoints still get the normal save
+ * path, while the console/dev-log evidence retains both failures.
+ */
+export async function saveEncounterCheckpointWithEndlessEntryRecovery(
+  save: (sync: boolean) => Promise<boolean>,
+  isInitialEndlessEncounter: boolean,
+): Promise<boolean> {
+  try {
+    const saved = await save(true);
+    if (saved || !isInitialEndlessEncounter) {
+      return saved;
+    }
+    console.warn("[endless] Initial Rift checkpoint was rejected; retrying locally before presentation.");
+  } catch (error) {
+    if (!isInitialEndlessEncounter) {
+      throw error;
+    }
+    console.warn("[endless] Initial Rift cloud checkpoint threw; retrying locally before presentation.", error);
+  }
+
+  try {
+    const localSaved = await save(false);
+    if (!localSaved) {
+      console.error("[endless] Initial Rift local checkpoint was rejected; continuing the live run without resetting.");
+    }
+  } catch (error) {
+    console.error("[endless] Initial Rift local checkpoint threw; continuing the live run without resetting.", error);
+  }
+  return true;
+}
 
 /**
  * Transitional launch containment for an authoritative co-op guest. The host's launch
@@ -1700,8 +1738,14 @@ export class EncounterPhase extends BattlePhase {
                   this.enterEncounterPresentation();
                   globalScene.resetSeed();
                 } else {
-                  globalScene.gameData
-                    .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
+                  const endlessState = getErEndlessState();
+                  const isInitialEndlessEncounter =
+                    endlessState != null && battle.waveIndex === endlessState.enteredAtWave + 1;
+                  const shouldCloudSync = battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200;
+                  saveEncounterCheckpointWithEndlessEntryRecovery(
+                    sync => globalScene.gameData.saveAll(true, sync && shouldCloudSync),
+                    isInitialEndlessEncounter,
+                  )
                     .then(
                       wrapCoopEncounterContinuation(success => {
                         if (!encounterBoundaryIsLive()) {

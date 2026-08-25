@@ -135,7 +135,7 @@ describe("Endless dev scenario fixtures", () => {
     const launcher = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/index.ts"), "utf8");
     const encounter = fs.readFileSync(path.join(process.cwd(), "src/phases/encounter-phase.ts"), "utf8");
     const bypassBranch = encounter.indexOf("isDevEncounterPersistenceBypassActive()");
-    const saveBranch = encounter.indexOf("globalScene.gameData\n                    .saveAll", bypassBranch);
+    const saveBranch = encounter.indexOf("saveEncounterCheckpointWithEndlessEntryRecovery(", bypassBranch);
 
     expect(launcher).toContain("setDevEncounterPersistenceBypass()");
     expect(launcher).toContain("clearDevEncounterPersistenceBypass()");
