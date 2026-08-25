@@ -119,22 +119,44 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           submodules: false
+      - name: Restore immutable M6 semantic bundle
+        id: semantic-bundle
+        uses: actions/cache/restore@v5
+        with:
+          path: |
+            ${{ runner.temp }}/m6-semantic-bundle.tgz
+            ${{ runner.temp }}/m6-semantic-bundle.tgz.sha256
+          key: m6-semantic-bundle-v1-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m6-semantic-catalog.mjs', 'scripts/check-kernel-m6-runtime-semantics.mjs', 'test/kernel-fixtures/m6/**', 'rust/fixtures/m6/raw-source-catalog-v2.json') }}-utc-c
+      - name: Verify and unpack immutable M6 semantic bundle
+        if: steps.semantic-bundle.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          sha256sum -c m6-semantic-bundle.tgz.sha256
+          tar -xzf m6-semantic-bundle.tgz
       - uses: pnpm/action-setup@v5
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         with:
           version: 10.33.2
           run_install: false
       - uses: actions/setup-node@v6
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         with:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
       - uses: actions/download-artifact@v6
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         with:
           name: m6-source-catalog
           path: artifacts/source-catalog
       - name: Materialize exact M6 oracle
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         run: git worktree add --detach "$RUNNER_TEMP/m6-oracle" "$M6_ORACLE_SHA"
       - name: Export static semantic catalog twice
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         env:
           LC_ALL: C
           LANG: C
@@ -153,22 +175,27 @@ jobs:
             --raw-catalog "$GITHUB_WORKSPACE/artifacts/source-catalog/m6-source-catalog-v2.json" \
             --output-root "$RUNNER_TEMP/m6-semantic-b"
       - name: Verify static fresh-process determinism
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         run: diff -ru "$RUNNER_TEMP/m6-semantic-a" "$RUNNER_TEMP/m6-semantic-b"
       - name: Verify committed static semantic catalog
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         run: diff -ru rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
       - name: Publish semantic catalog mismatch
         if: failure()
         run: node scripts/diagnose-kernel-m6-semantic-diff.mjs rust/fixtures/m6 "$RUNNER_TEMP/m6-semantic-a"
       - name: Apply runtime semantic test overlay
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/m6-oracle/test/kernel-fixtures/m6"
           cp test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
             "$RUNNER_TEMP/m6-oracle/test/kernel-fixtures/m6/export-semantic-runtime.test.ts"
       - name: Install immutable oracle dependencies
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}/m6-oracle
         run: pnpm install --frozen-lockfile
       - name: Export first runtime semantic catalog
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}/m6-oracle
         env:
           LC_ALL: C
@@ -182,6 +209,7 @@ jobs:
             --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism \
             2>&1 | tee "$RUNNER_TEMP/m6-runtime-a.log"
       - name: Export repeated runtime semantic catalog
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}/m6-oracle
         env:
           LC_ALL: C
@@ -195,8 +223,10 @@ jobs:
             --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism \
             2>&1 | tee "$RUNNER_TEMP/m6-runtime-b.log"
       - name: Verify runtime semantic determinism
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         run: diff -u "$RUNNER_TEMP/m6-runtime-a.json" "$RUNNER_TEMP/m6-runtime-b.json"
       - name: Verify runtime and static semantic agreement
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           node scripts/check-kernel-m6-runtime-semantics.mjs \
@@ -204,6 +234,22 @@ jobs:
             rust/fixtures/m6/semantic-catalog-v1.json \
             rust/fixtures/m6/raw-source-catalog-v2.json \
             2>&1 | tee "$RUNNER_TEMP/m6-runtime-agreement.log"
+      - name: Create immutable M6 semantic bundle
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP"
+          tar -czf m6-semantic-bundle.tgz m6-semantic-a m6-runtime-a.json
+          sha256sum m6-semantic-bundle.tgz > m6-semantic-bundle.tgz.sha256
+      - name: Save immutable M6 semantic bundle
+        if: steps.semantic-bundle.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: |
+            ${{ runner.temp }}/m6-semantic-bundle.tgz
+            ${{ runner.temp }}/m6-semantic-bundle.tgz.sha256
+          key: m6-semantic-bundle-v1-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m6-semantic-catalog.mjs', 'scripts/check-kernel-m6-runtime-semantics.mjs', 'test/kernel-fixtures/m6/**', 'rust/fixtures/m6/raw-source-catalog-v2.json') }}-utc-c
       - name: Publish runtime semantic failure
         if: failure()
         run: |
@@ -236,14 +282,23 @@ jobs:
           fetch-depth: 0
           filter: blob:none
           submodules: false
+      - name: Restore immutable oracle bundle
+        id: oracle-bundle
+        uses: actions/cache/restore@v5
+        with:
+          path: ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle
+          key: m6-oracle-bundle-v1-${{ matrix.fixture }}-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m3-oracle.mjs', 'scripts/export-kernel-m4-oracle.mjs', 'scripts/prepare-kernel-m5-oracle-refresh.mjs', 'test/kernel-fixtures/m3/**', 'test/kernel-fixtures/m4/**') }}-utc-c
       - uses: pnpm/action-setup@v5
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         with:
           version: 10.33.2
           run_install: false
       - uses: actions/setup-node@v6
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         with:
           node-version-file: .nvmrc
       - uses: actions/cache/restore@v5
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         id: b3sum-cache
         with:
           path: |
@@ -252,6 +307,7 @@ jobs:
             ~/.cargo/git
           key: m6-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
       - name: Install pinned BLAKE3 verifier
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           if ! b3sum --version 2>/dev/null | grep -Fxq 'b3sum 1.8.6'; then
@@ -259,7 +315,7 @@ jobs:
           fi
           b3sum --version | grep -Fx 'b3sum 1.8.6'
       - uses: actions/cache/save@v5
-        if: steps.b3sum-cache.outputs.cache-hit != 'true'
+        if: steps.oracle-bundle.outputs.cache-hit != 'true' && steps.b3sum-cache.outputs.cache-hit != 'true'
         with:
           path: |
             ~/.cargo/bin/b3sum
@@ -267,6 +323,7 @@ jobs:
             ~/.cargo/git
           key: m6-b3sum-${{ runner.os }}-${{ runner.arch }}-1.8.6
       - name: Apply test-only oracle overlay
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         run: |
           set -euo pipefail
           git worktree add --detach "$RUNNER_TEMP/m6-oracle" "$M6_ORACLE_SHA"
@@ -274,9 +331,11 @@ jobs:
             --oracle-root "$RUNNER_TEMP/m6-oracle" \
             --oracle-sha "$M6_ORACLE_SHA"
       - name: Install immutable oracle dependencies
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}/m6-oracle
         run: pnpm install --frozen-lockfile
       - name: Export refreshed fixtures twice
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
         working-directory: ${{ runner.temp }}/m6-oracle
         env:
           LC_ALL: C
@@ -294,6 +353,31 @@ jobs:
             node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m6-m4-oracle" \
               2>&1 | tee "$RUNNER_TEMP/m6-m4-oracle.log"
           fi
+      - name: Write immutable oracle bundle manifest
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/m6-${{ matrix.fixture }}-oracle"
+          (
+            cd "$bundle"
+            find . -type f ! -name .immutable-sha256 -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > .immutable-sha256
+          )
+      - name: Save immutable oracle bundle
+        if: steps.oracle-bundle.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ${{ runner.temp }}/m6-${{ matrix.fixture }}-oracle
+          key: m6-oracle-bundle-v1-${{ matrix.fixture }}-${{ env.M6_ORACLE_SHA }}-${{ hashFiles('.nvmrc', 'pnpm-lock.yaml', 'scripts/export-kernel-m3-oracle.mjs', 'scripts/export-kernel-m4-oracle.mjs', 'scripts/prepare-kernel-m5-oracle-refresh.mjs', 'test/kernel-fixtures/m3/**', 'test/kernel-fixtures/m4/**') }}-utc-c
+      - name: Verify immutable oracle bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/m6-${{ matrix.fixture }}-oracle"
+          test -s "$bundle/.immutable-sha256"
+          (cd "$bundle" && sha256sum -c .immutable-sha256)
       - name: Publish failure annotation
         if: failure()
         run: |
@@ -386,7 +470,6 @@ jobs:
 
   m6-contract-types:
     name: M6 G21 compileable contracts
-    needs: m6-contract-freeze
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -432,7 +515,7 @@ jobs:
 
   m6-g22-foundation:
     name: M6 G22 foundation
-    needs: m6-g21-oracle-bootstrap
+    needs: m6-contract-types
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -509,6 +592,7 @@ jobs:
       - m6-m0-m5-regression
       - m6-source-lock
       - m6-oracle-classification
+      - m6-g21-oracle-bootstrap
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
