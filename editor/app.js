@@ -949,7 +949,7 @@ function renderFormulaCatalog() {
     group.formulas.push(formula);
   }
   const operationRows = [...(FORMULAS.operations ?? []), ...(FORMULAS.functions ?? [])];
-  return `<div class="stats-band"><h2>Formula changes</h2><p>The runtime uses TypeScript number arithmetic, native Math functions, and a small set of game helpers. It does not use a general formula library. Numeric constants linked below can be changed safely in Game because both the editor and runtime validate their ranges. A structural expression remains a reviewed code change with tests; the editor does not execute arbitrary text as game code.</p>
+  return `<div class="stats-band"><h2>Formula changes</h2><p>The runtime uses TypeScript number arithmetic, native Math functions, and a small set of game helpers. It does not use a general formula library. Numeric constants linked below can be changed safely in Game because both the editor and runtime validate their ranges.</p>
       <div class="operation-grid">${operationRows
         .map(row => `<div class="operation-row"><code>${esc(row.syntax)}</code><span>${esc(row.meaning)}</span></div>`)
         .join("")}</div></div>
