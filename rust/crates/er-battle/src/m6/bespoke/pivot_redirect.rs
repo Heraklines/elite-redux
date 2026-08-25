@@ -299,7 +299,7 @@ pub struct PivotRequestFacts {
 /// Cross-state mutation staged for the owning atomic battle transition.
 /// Family-owned state changes travel inside the returned
 /// [`PivotRedirectStateV2`] instead.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum StagedPivotRedirectOperation {
     /// The incoming action's target set changes; the actor does not.
     RedirectTarget {
@@ -1204,7 +1204,7 @@ mod tests {
         let (state, rage_powder) = state
             .admit_redirect(ident(ENEMY, 1, 21), RedirectKind::RagePowder)
             .expect("admit rage powder");
-        let (state, type_directed) = state
+        let (_, type_directed) = state
             .admit_redirect(ident(PLAYER, 0, 10), RedirectKind::TypeDirected)
             .expect("admit type-directed");
         assert!(type_directed.creation_ordinal > rage_powder.creation_ordinal);
@@ -1357,7 +1357,7 @@ mod tests {
             (ENEMY, 0, 20, true),
             (ENEMY, 1, 21, false),
         ]);
-        let (state, follow_me) = state
+        let (_, follow_me) = state
             .admit_redirect(ident(ENEMY, 0, 20), RedirectKind::FollowMe)
             .expect("admit follow me");
         let resolution = resolve_redirect(
@@ -1669,7 +1669,12 @@ mod tests {
                 departing: poke(11),
             }]
         );
-        let pairing = transition.state.commander.expect("pairing stored");
+        let pairing = transition
+            .state
+            .commander
+            .as_ref()
+            .expect("pairing stored")
+            .clone();
         assert_eq!(pairing.commander, poke(11));
         assert_eq!(pairing.host, ident(PLAYER, 0, 10));
 
