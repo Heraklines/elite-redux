@@ -5,7 +5,7 @@
 //! callers keep that behavior unit unresolved rather than manufacturing a
 //! neutral operation.
 
-use er_content::m6_catalog::{CatalogBehaviorUnit, CatalogOperand};
+use er_content::m6_catalog::{CatalogBehaviorUnit, CatalogOperand, CatalogResolution};
 use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
 use er_mechanics::m6::ProgramBudgetV2;
 use er_mechanics::selector_operation_v2::{
@@ -236,6 +236,9 @@ pub fn string_operand(
 pub fn map_routine_unit(
     unit: &CatalogBehaviorUnit,
 ) -> Result<Option<RoutineProgramSpec>, RoutineCompileError> {
+    if unit.semantic.resolution != CatalogResolution::ResolvedOperands {
+        return Ok(None);
+    }
     let candidates = [
         crate::m6::moves::map_moves_unit(unit)?,
         crate::m6::abilities::map_abilities_unit(unit)?,
