@@ -62,6 +62,7 @@ pub enum GuardTransitionError {
         depth: u32,
         expected: u64,
     },
+    #[error("first chained use is guaranteed; audited draws are not admitted")]
     DrawSuppliedForGuaranteedSuccess,
     #[error("side guards never consume odds; audited draws are not admitted")]
     DrawSuppliedForUngatedActivation,
@@ -320,7 +321,7 @@ impl AuditedGuardDraw {
         Self { roll, range }
     }
 
-    pub const fn roll(&self) -> SafeU53 {
+    pub const fn roll(self) -> SafeU53 {
         self.roll
     }
 
@@ -1570,20 +1571,19 @@ mod tests {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
         let chained = apply_guard_use(&base, &protect, None).unwrap().state;
-        let chained_again =
-            apply_guard_use(&chained, &self_request(OWNER_B, GuardKind::Detect), None)
-                .unwrap()
-                .state;
-
-        let reset = reset_guard_chain(&chained_again.state).unwrap();
+        let chained_again = apply_guard_use(
+            &chained,
+            &self_request(OWNER_B, GuardKind::Detect),
+            None,
+        )
+        .unwrap()
+        .state;
+        let reset = reset_guard_chain(&chained_again).unwrap();
+        assert_eq!(reset.self_guards.len(), chained_again.self_guards.len());
         assert_eq!(reset.chain_depth, 0);
         assert_eq!(
-            reset.self_guards.len(),
-            chained_again.state.self_guards.len()
-        );
-        assert_eq!(
             reset.next_creation_ordinal,
-            chained_again.state.next_creation_ordinal
+            chained_again.next_creation_ordinal
         );
     }
 
