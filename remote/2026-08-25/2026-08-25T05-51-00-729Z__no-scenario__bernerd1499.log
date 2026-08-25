@@ -1,0 +1,2063 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7:run-32645676937.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 OPR/134.0.0.0
+platform: Win32
+screen:   1536x864 @1.25x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@16500ms -> title-shown@20826ms
+lastSess: crashed after loading-complete
+mode:     1  wave:1218
+seed:     Z1FsGv1hCJESc2VQlTC00toy
+party:    Iron Leaves(L3182 10478hp f0), Moltres Ex(L3285 9865hp f1), Swampage(L1937 6111hp f1), Fluffbee(L2071 6492hp f0), Purugly(L2774 8970hp f0), Sableye(L2046 6045hp f1)
+enemy:    Sigilyph(L3285)
+
+----- COMMENT -----
+Used Mighty Cleave vs Sigilyph 3 times in a row and it did 0 damage each time
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7:run-32645676937.1","source":"github","sha":"3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7","workflow":{"provider":"github-actions","runId":"32645676937","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[05:48:59.199] LOG: Applied Iron 
+[05:48:59.199] LOG: Applied HP Up 
+[05:48:59.199] LOG: Applied Carbos 
+[05:48:59.199] LOG: Applied Zinc 
+[05:48:59.199] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:48:59.200] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:48:59.200] LOG: Applied Super EXP. Charm 
+[05:48:59.200] LOG: Applied EXP. Charm 
+[05:48:59.200] LOG: %cStart Phase LevelUpPhase color:green;
+[05:48:59.200] LOG: Applied HP Up 
+[05:48:59.200] LOG: Applied Iron 
+[05:48:59.201] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:48:59.201] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:48:59.201] LOG: Applied Super EXP. Charm 
+[05:48:59.201] LOG: Applied EXP. Charm 
+[05:48:59.202] LOG: %cStart Phase LevelUpPhase color:green;
+[05:48:59.202] LOG: Applied Protein 
+[05:48:59.202] LOG: Applied Iron 
+[05:48:59.203] LOG: Applied Carbos 
+[05:48:59.203] LOG: Applied Zinc 
+[05:48:59.204] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:48:59.204] LOG: %cStart Phase MoveEndPhase color:green;
+[05:48:59.204] LOG: %cStart Phase TurnInitPhase color:green;
+[05:48:59.204] LOG: %cStart Phase TurnInitPhase color:green;
+[05:48:59.204] LOG: %cStart Phase TurnInitPhase color:green;
+[05:48:59.205] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:48:59.205] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:48:59.645] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:48:59.645] LOG: %cStart Phase BerryPhase color:green;
+[05:48:59.653] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:48:59.656] LOG: %cStart Phase TurnEndPhase color:green;
+[05:48:59.671] LOG: %cStart Phase BattleEndPhase color:green;
+[05:48:59.671] LOG: Battle Score: 354 (1 Turns x1)
+[05:48:59.671] LOG: Total Score: 583452
+[05:48:59.676] LOG: Applied Amulet Coin 
+[05:48:59.680] LOG: Applied Calcium 
+[05:48:59.680] LOG: Applied Soul Dew 
+[05:48:59.681] LOG: Applied Soul Dew 
+[05:48:59.684] LOG: Applied Iron 
+[05:48:59.684] LOG: Applied Carbos 
+[05:48:59.684] LOG: Applied Zinc 
+[05:48:59.684] LOG: Applied HP Up 
+[05:48:59.684] LOG: Applied Calcium 
+[05:48:59.684] LOG: Applied Soul Dew 
+[05:48:59.685] LOG: Applied Soul Dew 
+[05:48:59.685] LOG: Applied Protein 
+[05:48:59.686] LOG: Applied Soul Dew 
+[05:48:59.686] LOG: Applied Soul Dew 
+[05:48:59.687] LOG: Applied Iron 
+[05:48:59.687] LOG: Applied HP Up 
+[05:48:59.687] LOG: Applied Carbos 
+[05:48:59.687] LOG: Applied Zinc 
+[05:48:59.687] LOG: Applied HP Up 
+[05:48:59.687] LOG: Applied Iron 
+[05:48:59.688] LOG: Applied Protein 
+[05:48:59.688] LOG: Applied Iron 
+[05:48:59.688] LOG: Applied Carbos 
+[05:48:59.688] LOG: Applied Zinc 
+[05:48:59.703] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:48:59.703] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:48:59.704] LOG: %cStart Phase MessagePhase color:green;
+[05:49:00.170] LOG: %cStart Phase EggLapsePhase color:green;
+[05:49:00.171] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:49:00.171] LOG: Wave Seed: ԚӱԆԳԇԶӱԨԃԊԅԓԣӲԖԑԬԔԃӰӰԴԯԹ 1216
+[05:49:00.209] LOG: Applied Golden Poké Ball 
+[05:49:01.526] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:49:01.546] LOG: Applied Golden Poké Ball 
+[05:49:02.592] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:49:02.612] LOG: Applied Golden Poké Ball 
+[05:49:03.674] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:49:03.692] LOG: Applied Golden Poké Ball 
+[05:49:08.733] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[05:49:08.733] LOG: Purugly's variant icon does not exist. Replacing with default.
+[05:49:10.616] LOG: %cStart Phase ErGreaterMoveRandomizerPhase color:green;
+[05:49:11.913] LOG: %cStart Phase NewBattlePhase color:green;
+[05:49:11.913] LOG: Wave Seed: ԛӲԇԴԈԷӲԩԄԋԆԔԤӳԗԒԭԕԄӱӱԵ԰Ժ 1217
+[05:49:11.914] LOG: Applied Super Lure 
+[05:49:11.914] LOG: Applied Max Lure 
+[05:49:11.915] LOG: %cStart Phase NextEncounterPhase color:green;
+[05:49:11.917] LOG: Starting species pool tier: BOSS
+[05:49:11.922] LOG: Applied Shiny Charm 
+[05:49:11.937] LOG: Pokemon: Wild Gothitelle | Species ID: 576 | Level: 3276 | Nature: Lonely (+Atk/-Def)
+[05:49:11.938] LOG: Stats (IVs): HP: 9346 (24), Atk: 4402 (16), Def: 6255 (17), Spatk: 8063 (18), Spdef: 8948 (21), Spd: 4624 (13)
+[05:49:11.938] LOG: Ability: Competitive | Passive Ability: Nocturnal | Boss Bars: 7
+[05:49:11.938] LOG: Moveset: ["Psycho Boost","Cosmic Power","Heal Bell","Mind Reader"]
+[05:49:11.938] LOG: Starting species pool tier: BOSS
+[05:49:11.945] LOG: Applied Shiny Charm 
+[05:49:11.964] LOG: Pokemon: Wild Alakazam | Species ID: 65 | Level: 3276 | Nature: Lax (+Def/-SpDef)
+[05:49:11.964] LOG: Stats (IVs): HP: 7151 (21), Atk: 3543 (23), Def: 3610 (14), Spatk: 8882 (6), Spdef: 6107 (22), Spd: 7998 (3)
+[05:49:11.964] LOG: Ability: Trace | Passive Ability: Psychic Mind | Boss Bars: 7
+[05:49:11.964] LOG: Moveset: ["Psycho Boost","Gravity","Confuse Ray","Expanding Force"]
+[05:49:13.274] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:49:13.274] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:49:13.347] LOG: Battle Seed: U942eh6mys3qLq2P
+[05:49:13.347] LOG: Applied Iron (enemy)
+[05:49:13.347] LOG: Applied Calcium (enemy)
+[05:49:13.347] LOG: Applied Protein (enemy)
+[05:49:13.347] LOG: Applied Carbos (enemy)
+[05:49:13.347] LOG: Applied HP Up (enemy)
+[05:49:13.347] LOG: Applied Zinc (enemy)
+[05:49:13.348] LOG: Applied HP Up (enemy)
+[05:49:13.348] LOG: Applied Protein (enemy)
+[05:49:13.348] LOG: Applied Calcium (enemy)
+[05:49:13.348] LOG: Applied Carbos (enemy)
+[05:49:13.348] LOG: Applied Iron (enemy)
+[05:49:13.351] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.351] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.351] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.351] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.351] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.351] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.351] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.351] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.351] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.351] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.352] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.352] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.353] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.353] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.353] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.353] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.353] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.353] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.353] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:13.353] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:13.466] DEBUG: Session data saved to slot 0!
+[05:49:13.467] LOG: Applied Iron (enemy)
+[05:49:13.467] LOG: Applied Calcium (enemy)
+[05:49:13.467] LOG: Applied Protein (enemy)
+[05:49:13.467] LOG: Applied Carbos (enemy)
+[05:49:13.467] LOG: Applied HP Up (enemy)
+[05:49:13.467] LOG: Applied Zinc (enemy)
+[05:49:13.468] LOG: Applied HP Up (enemy)
+[05:49:13.468] LOG: Applied Protein (enemy)
+[05:49:13.468] LOG: Applied Calcium (enemy)
+[05:49:13.468] LOG: Applied Carbos (enemy)
+[05:49:13.468] LOG: Applied Iron (enemy)
+[05:49:13.472] LOG: Wave Seed: ԛӲԇԴԈԷӲԩԄԋԆԔԤӳԗԒԭԕԄӱӱԵ԰Ժ 1217
+[05:49:13.929] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:49:14.029] LOG: %cStart Phase ScanIvsPhase color:green;
+[05:49:14.029] LOG: %cStart Phase ScanIvsPhase color:green;
+[05:49:14.029] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[05:49:14.032] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:49:14.413] LOG: %cStart Phase SwitchPhase color:green;
+[05:49:14.525] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[05:49:14.525] LOG: Purugly's variant icon does not exist. Replacing with default.
+[05:49:25.219] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:49:26.461] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:49:26.464] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:26.464] LOG: Ran PSP for: Alakazam
+[05:49:26.470] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:26.472] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:49:26.626] LOG: %cStart Phase MessagePhase color:green;
+[05:49:26.889] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:49:26.918] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:26.918] LOG: Ran PSP for: Gothitelle
+[05:49:26.920] LOG: %cStart Phase TurnInitPhase color:green;
+[05:49:26.924] LOG: %cStart Phase CommandPhase color:green;
+[05:49:28.467] LOG: Move: FLAME_BURST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[05:49:28.468] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:49:29.583] LOG: %cStart Phase CommandPhase color:green;
+[05:49:30.317] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[05:49:30.319] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:49:30.321] LOG: Applied Twisted Spoon (enemy)
+[05:49:30.323] LOG: Applied Damage Token (enemy)
+[05:49:30.325] LOG: Applied Twisted Spoon (enemy)
+[05:49:30.325] LOG: Applied Damage Token (enemy)
+[05:49:30.325] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:49:30.325] LOG: Applied Twisted Spoon (enemy)
+[05:49:30.325] LOG: Applied Damage Token (enemy)
+[05:49:30.326] LOG: Applied Twisted Spoon (enemy)
+[05:49:30.326] LOG: Applied Damage Token (enemy)
+[05:49:30.329] LOG: Applied Twisted Spoon (enemy)
+[05:49:30.329] LOG: Applied Damage Token (enemy)
+[05:49:30.330] LOG: Applied Twisted Spoon (enemy)
+[05:49:30.330] LOG: Applied Damage Token (enemy)
+[05:49:30.331] LOG: %cStart Phase TurnStartPhase color:green;
+[05:49:30.334] LOG: %cStart Phase MovePhase color:green;
+[05:49:30.334] LOG: %cUser: Iron Leaves
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[05:49:30.337] LOG: %cStart Phase MessagePhase color:green;
+[05:49:30.425] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:30.703] LOG: Applied Shell Bell 
+[05:49:30.703] LOG: %cStart Phase MessagePhase color:green;
+[05:49:30.920] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:30.928] LOG: %cStart Phase MovePhase color:green;
+[05:49:30.928] LOG: %cUser: Mega Moltres Ex
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[05:49:30.968] LOG: %cStart Phase MessagePhase color:green;
+[05:49:31.050] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:31.053] LOG: Applied Multi Lens 
+[05:49:31.399] LOG: Applied Scope Lens 
+[05:49:31.400] LOG: crit stage: +1
+[05:49:31.407] LOG: Applied Charcoal 
+[05:49:31.411] LOG: Move: Flame Burst | Base damage: 32138.91819280576 | Power: 72 | Source attack: 106366 | Target defense: 6255
+[05:49:31.412] LOG: Applied Multi Lens 
+[05:49:31.415] LOG: Applied Protection Token (enemy)
+[05:49:31.416] LOG: Move: Flame Burst | Attack damage: 14183
+[05:49:31.418] LOG: Applied Endure Token (enemy)
+[05:49:31.420] LOG: Applied Amulet Coin 
+[05:49:31.421] LOG: Applied Golden Punch 
+[05:49:31.424] LOG: Applied King’s Rock 
+[05:49:31.424] LOG: Applied Iron (enemy)
+[05:49:31.424] LOG: Applied Calcium (enemy)
+[05:49:31.424] LOG: Applied Protein (enemy)
+[05:49:31.425] LOG: Applied Carbos (enemy)
+[05:49:31.425] LOG: Applied HP Up (enemy)
+[05:49:31.425] LOG: Applied Zinc (enemy)
+[05:49:31.426] LOG: Applied HP Up (enemy)
+[05:49:31.426] LOG: Applied Protein (enemy)
+[05:49:31.426] LOG: Applied Calcium (enemy)
+[05:49:31.426] LOG: Applied Carbos (enemy)
+[05:49:31.426] LOG: Applied Iron (enemy)
+[05:49:31.434] LOG: Applied Iron (enemy)
+[05:49:31.434] LOG: Applied Calcium (enemy)
+[05:49:31.434] LOG: Applied Protein (enemy)
+[05:49:31.434] LOG: Applied Carbos (enemy)
+[05:49:31.434] LOG: Applied HP Up (enemy)
+[05:49:31.435] LOG: Applied Zinc (enemy)
+[05:49:31.435] LOG: Applied HP Up (enemy)
+[05:49:31.435] LOG: Applied Protein (enemy)
+[05:49:31.435] LOG: Applied Calcium (enemy)
+[05:49:31.435] LOG: Applied Carbos (enemy)
+[05:49:31.435] LOG: Applied Iron (enemy)
+[05:49:31.442] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.442] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.442] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.442] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.442] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.442] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.442] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.442] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.443] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.443] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.444] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:31.444] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:31.447] LOG: Applied Calcium 
+[05:49:31.447] LOG: Applied Soul Dew 
+[05:49:31.448] LOG: Applied Soul Dew 
+[05:49:31.449] LOG: Applied Iron 
+[05:49:31.449] LOG: Applied Carbos 
+[05:49:31.449] LOG: Applied Zinc 
+[05:49:31.449] LOG: Applied HP Up 
+[05:49:31.449] LOG: Applied Calcium 
+[05:49:31.449] LOG: Applied Soul Dew 
+[05:49:31.449] LOG: Applied Soul Dew 
+[05:49:31.450] LOG: Applied Protein 
+[05:49:31.450] LOG: Applied Soul Dew 
+[05:49:31.450] LOG: Applied Soul Dew 
+[05:49:31.450] LOG: Applied Iron 
+[05:49:31.450] LOG: Applied HP Up 
+[05:49:31.450] LOG: Applied Carbos 
+[05:49:31.450] LOG: Applied Zinc 
+[05:49:31.451] LOG: Applied HP Up 
+[05:49:31.451] LOG: Applied Iron 
+[05:49:31.451] LOG: Applied Protein 
+[05:49:31.451] LOG: Applied Iron 
+[05:49:31.452] LOG: Applied Carbos 
+[05:49:31.452] LOG: Applied Zinc 
+[05:49:31.480] LOG: Applied Grip Claw 
+[05:49:31.481] LOG: %cStart Phase MessagePhase color:green;
+[05:49:31.628] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:31.649] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:31.839] LOG: %cStart Phase MessagePhase color:green;
+[05:49:32.060] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:32.250] LOG: %cStart Phase MessagePhase color:green;
+[05:49:32.451] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:32.655] LOG: %cStart Phase MessagePhase color:green;
+[05:49:32.884] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:32.888] LOG: %cStart Phase MessagePhase color:green;
+[05:49:33.182] LOG: %cStart Phase MessagePhase color:green;
+[05:49:33.505] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:33.868] LOG: Applied Scope Lens 
+[05:49:33.869] LOG: crit stage: +1
+[05:49:33.875] LOG: Applied Charcoal 
+[05:49:33.879] LOG: Move: Flame Burst | Base damage: 32138.91819280576 | Power: 72 | Source attack: 106366 | Target defense: 6255
+[05:49:33.880] LOG: Applied Multi Lens 
+[05:49:33.884] LOG: Applied Protection Token (enemy)
+[05:49:33.885] LOG: Move: Flame Burst | Attack damage: 9935
+[05:49:33.887] LOG: Applied Amulet Coin 
+[05:49:33.887] LOG: Applied Golden Punch 
+[05:49:33.889] LOG: Applied King’s Rock 
+[05:49:33.889] LOG: Applied Iron (enemy)
+[05:49:33.890] LOG: Applied Calcium (enemy)
+[05:49:33.890] LOG: Applied Protein (enemy)
+[05:49:33.890] LOG: Applied Carbos (enemy)
+[05:49:33.890] LOG: Applied HP Up (enemy)
+[05:49:33.890] LOG: Applied Zinc (enemy)
+[05:49:33.891] LOG: Applied HP Up (enemy)
+[05:49:33.891] LOG: Applied Protein (enemy)
+[05:49:33.892] LOG: Applied Calcium (enemy)
+[05:49:33.892] LOG: Applied Carbos (enemy)
+[05:49:33.892] LOG: Applied Iron (enemy)
+[05:49:33.896] LOG: Applied Iron (enemy)
+[05:49:33.896] LOG: Applied Calcium (enemy)
+[05:49:33.896] LOG: Applied Protein (enemy)
+[05:49:33.896] LOG: Applied Carbos (enemy)
+[05:49:33.896] LOG: Applied HP Up (enemy)
+[05:49:33.896] LOG: Applied Zinc (enemy)
+[05:49:33.896] LOG: Applied HP Up (enemy)
+[05:49:33.896] LOG: Applied Protein (enemy)
+[05:49:33.896] LOG: Applied Calcium (enemy)
+[05:49:33.896] LOG: Applied Carbos (enemy)
+[05:49:33.896] LOG: Applied Iron (enemy)
+[05:49:33.903] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.903] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.903] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.903] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.904] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.904] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.904] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.904] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.904] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.905] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.905] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.905] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.905] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.905] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.905] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.905] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.906] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.906] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.906] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.906] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.906] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.906] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:33.906] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:33.908] LOG: Applied Calcium 
+[05:49:33.908] LOG: Applied Soul Dew 
+[05:49:33.909] LOG: Applied Soul Dew 
+[05:49:33.910] LOG: Applied Iron 
+[05:49:33.911] LOG: Applied Carbos 
+[05:49:33.911] LOG: Applied Zinc 
+[05:49:33.911] LOG: Applied HP Up 
+[05:49:33.911] LOG: Applied Calcium 
+[05:49:33.911] LOG: Applied Soul Dew 
+[05:49:33.911] LOG: Applied Soul Dew 
+[05:49:33.912] LOG: Applied Protein 
+[05:49:33.912] LOG: Applied Soul Dew 
+[05:49:33.913] LOG: Applied Soul Dew 
+[05:49:33.913] LOG: Applied Iron 
+[05:49:33.913] LOG: Applied HP Up 
+[05:49:33.913] LOG: Applied Carbos 
+[05:49:33.913] LOG: Applied Zinc 
+[05:49:33.914] LOG: Applied HP Up 
+[05:49:33.914] LOG: Applied Iron 
+[05:49:33.914] LOG: Applied Protein 
+[05:49:33.914] LOG: Applied Iron 
+[05:49:33.915] LOG: Applied Carbos 
+[05:49:33.915] LOG: Applied Zinc 
+[05:49:33.947] LOG: Applied Grip Claw 
+[05:49:33.949] LOG: Applied Shell Bell 
+[05:49:33.949] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:33.961] LOG: %cStart Phase MessagePhase color:green;
+[05:49:34.098] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:34.102] LOG: %cStart Phase MessagePhase color:green;
+[05:49:34.396] LOG: %cStart Phase MessagePhase color:green;
+[05:49:34.719] LOG: %cStart Phase MessagePhase color:green;
+[05:49:34.912] LOG: %cStart Phase FaintPhase color:green;
+[05:49:34.982] LOG: %cStart Phase MessagePhase color:green;
+[05:49:35.129] LOG: %cStart Phase VictoryPhase color:green;
+[05:49:35.130] LOG: Applied Soothe Bell 
+[05:49:35.131] LOG: Applied Golden Egg 
+[05:49:35.131] LOG: Applied Lucky Egg 
+[05:49:35.132] LOG: Applied Soothe Bell 
+[05:49:35.132] LOG: Applied Golden Egg 
+[05:49:35.132] LOG: Applied Lucky Egg 
+[05:49:35.132] LOG: Applied Lucky Egg 
+[05:49:35.132] LOG: Applied Lucky Egg 
+[05:49:35.132] LOG: %cStart Phase ExpPhase color:green;
+[05:49:35.133] LOG: Applied Super EXP. Charm 
+[05:49:35.133] LOG: Applied EXP. Charm 
+[05:49:35.657] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:35.657] LOG: Applied Calcium 
+[05:49:35.658] LOG: Applied Soul Dew 
+[05:49:35.658] LOG: Applied Soul Dew 
+[05:49:35.659] LOG: %cStart Phase ExpPhase color:green;
+[05:49:35.659] LOG: Applied Super EXP. Charm 
+[05:49:35.660] LOG: Applied EXP. Charm 
+[05:49:36.292] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:36.293] LOG: Applied Iron 
+[05:49:36.293] LOG: Applied Carbos 
+[05:49:36.293] LOG: Applied Zinc 
+[05:49:36.293] LOG: Applied HP Up 
+[05:49:36.293] LOG: Applied Calcium 
+[05:49:36.293] LOG: Applied Soul Dew 
+[05:49:36.293] LOG: Applied Soul Dew 
+[05:49:36.294] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:36.294] LOG: Applied Super EXP. Charm 
+[05:49:36.294] LOG: Applied EXP. Charm 
+[05:49:36.295] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:36.295] LOG: Applied Protein 
+[05:49:36.296] LOG: Applied Soul Dew 
+[05:49:36.296] LOG: Applied Soul Dew 
+[05:49:36.297] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:36.297] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:36.297] LOG: Applied Super EXP. Charm 
+[05:49:36.297] LOG: Applied EXP. Charm 
+[05:49:36.299] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:36.299] LOG: Applied Iron 
+[05:49:36.299] LOG: Applied HP Up 
+[05:49:36.299] LOG: Applied Carbos 
+[05:49:36.299] LOG: Applied Zinc 
+[05:49:36.300] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:36.300] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:36.300] LOG: Applied Super EXP. Charm 
+[05:49:36.300] LOG: Applied EXP. Charm 
+[05:49:36.301] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:36.301] LOG: Applied HP Up 
+[05:49:36.301] LOG: Applied Iron 
+[05:49:36.302] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:36.302] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:36.302] LOG: Applied Super EXP. Charm 
+[05:49:36.302] LOG: Applied EXP. Charm 
+[05:49:36.302] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:36.303] LOG: Applied Protein 
+[05:49:36.303] LOG: Applied Iron 
+[05:49:36.303] LOG: Applied Carbos 
+[05:49:36.303] LOG: Applied Zinc 
+[05:49:36.304] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:36.304] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:36.306] LOG: %cStart Phase MovePhase color:green;
+[05:49:36.306] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:36.308] LOG: %cStart Phase MovePhase color:green;
+[05:49:36.308] LOG: %cUser: Gothitelle
+Move: PSYCHO_BOOST
+Use Mode: NORMAL color:orchid
+[05:49:36.325] LOG: %cStart Phase MessagePhase color:green;
+[05:49:36.425] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:36.426] LOG: %cStart Phase MessagePhase color:green;
+[05:49:36.653] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:36.654] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:49:36.654] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:49:37.115] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:49:37.115] LOG: %cStart Phase BerryPhase color:green;
+[05:49:37.130] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:49:37.137] LOG: %cStart Phase TurnEndPhase color:green;
+[05:49:37.159] LOG: Battle Seed: U942eh6mys3qLq2P
+[05:49:37.160] LOG: Applied Iron (enemy)
+[05:49:37.160] LOG: Applied Calcium (enemy)
+[05:49:37.160] LOG: Applied Protein (enemy)
+[05:49:37.160] LOG: Applied Carbos (enemy)
+[05:49:37.160] LOG: Applied HP Up (enemy)
+[05:49:37.160] LOG: Applied Zinc (enemy)
+[05:49:37.160] LOG: Applied HP Up (enemy)
+[05:49:37.160] LOG: Applied Protein (enemy)
+[05:49:37.161] LOG: Applied Calcium (enemy)
+[05:49:37.161] LOG: Applied Carbos (enemy)
+[05:49:37.161] LOG: Applied Iron (enemy)
+[05:49:37.165] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.166] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.166] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.167] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.167] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.167] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.167] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.167] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.167] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.168] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.168] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.168] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.168] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.169] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.169] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.169] WARN: Texture "%s" has no frame "%s" pokemon_icons_5v 576_2
+[05:49:37.169] LOG: Gothitelle's variant icon does not exist. Replacing with default.
+[05:49:37.170] LOG: Applied Calcium 
+[05:49:37.170] LOG: Applied Soul Dew 
+[05:49:37.170] LOG: Applied Soul Dew 
+[05:49:37.171] LOG: Applied Iron 
+[05:49:37.171] LOG: Applied Carbos 
+[05:49:37.171] LOG: Applied Zinc 
+[05:49:37.171] LOG: Applied HP Up 
+[05:49:37.171] LOG: Applied Calcium 
+[05:49:37.171] LOG: Applied Soul Dew 
+[05:49:37.171] LOG: Applied Soul Dew 
+[05:49:37.172] LOG: Applied Protein 
+[05:49:37.172] LOG: Applied Soul Dew 
+[05:49:37.173] LOG: Applied Soul Dew 
+[05:49:37.173] LOG: Applied Iron 
+[05:49:37.173] LOG: Applied HP Up 
+[05:49:37.173] LOG: Applied Carbos 
+[05:49:37.173] LOG: Applied Zinc 
+[05:49:37.174] LOG: Applied HP Up 
+[05:49:37.174] LOG: Applied Iron 
+[05:49:37.174] LOG: Applied Protein 
+[05:49:37.174] LOG: Applied Iron 
+[05:49:37.174] LOG: Applied Carbos 
+[05:49:37.174] LOG: Applied Zinc 
+[05:49:37.202] LOG: Applied Mini Black Hole 
+[05:49:37.204] LOG: Applied Recovery Token (enemy)
+[05:49:37.204] LOG: %cStart Phase MessagePhase color:green;
+[05:49:37.440] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:49:37.565] LOG: %cStart Phase MessagePhase color:green;
+[05:49:37.790] LOG: %cStart Phase TurnInitPhase color:green;
+[05:49:37.790] LOG: %cStart Phase CommandPhase color:green;
+[05:49:39.005] LOG: %cStart Phase CommandPhase color:green;
+[05:49:39.006] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:49:39.006] LOG: Applied Twisted Spoon (enemy)
+[05:49:39.007] LOG: Applied Damage Token (enemy)
+[05:49:39.008] LOG: Applied Twisted Spoon (enemy)
+[05:49:39.009] LOG: Applied Damage Token (enemy)
+[05:49:39.009] LOG: %cStart Phase TurnStartPhase color:green;
+[05:49:39.011] LOG: %cStart Phase AttemptCapturePhase color:green;
+[05:49:39.905] LOG: [coop:account] account-write scope OPEN (own-catch) depth=1
+[05:49:40.137] LOG: %cStart Phase VictoryPhase color:green;
+[05:49:40.138] LOG: Applied Soothe Bell 
+[05:49:40.138] LOG: Applied Golden Egg 
+[05:49:40.138] LOG: Applied Lucky Egg 
+[05:49:40.138] LOG: Applied Soothe Bell 
+[05:49:40.139] LOG: Applied Golden Egg 
+[05:49:40.139] LOG: Applied Lucky Egg 
+[05:49:40.139] LOG: Applied Lucky Egg 
+[05:49:40.139] LOG: Applied Lucky Egg 
+[05:49:40.139] LOG: %cStart Phase ExpPhase color:green;
+[05:49:40.139] LOG: Applied Super EXP. Charm 
+[05:49:40.140] LOG: Applied EXP. Charm 
+[05:49:40.568] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:40.568] LOG: Applied Calcium 
+[05:49:40.569] LOG: Applied Soul Dew 
+[05:49:40.569] LOG: Applied Soul Dew 
+[05:49:40.570] LOG: %cStart Phase ExpPhase color:green;
+[05:49:40.570] LOG: Applied Super EXP. Charm 
+[05:49:40.570] LOG: Applied EXP. Charm 
+[05:49:41.006] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:41.007] LOG: Applied Iron 
+[05:49:41.007] LOG: Applied Carbos 
+[05:49:41.007] LOG: Applied Zinc 
+[05:49:41.007] LOG: Applied HP Up 
+[05:49:41.007] LOG: Applied Calcium 
+[05:49:41.007] LOG: Applied Soul Dew 
+[05:49:41.007] LOG: Applied Soul Dew 
+[05:49:41.008] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:41.008] LOG: Applied Super EXP. Charm 
+[05:49:41.008] LOG: Applied EXP. Charm 
+[05:49:41.010] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:41.010] LOG: Applied Protein 
+[05:49:41.011] LOG: Applied Soul Dew 
+[05:49:41.011] LOG: Applied Soul Dew 
+[05:49:41.012] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:41.013] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:41.013] LOG: Applied Super EXP. Charm 
+[05:49:41.013] LOG: Applied EXP. Charm 
+[05:49:41.013] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:41.014] LOG: Applied Iron 
+[05:49:41.014] LOG: Applied HP Up 
+[05:49:41.014] LOG: Applied Carbos 
+[05:49:41.014] LOG: Applied Zinc 
+[05:49:41.014] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:41.014] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:41.014] LOG: Applied Super EXP. Charm 
+[05:49:41.014] LOG: Applied EXP. Charm 
+[05:49:41.015] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:41.015] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:49:41.015] LOG: Applied Super EXP. Charm 
+[05:49:41.015] LOG: Applied EXP. Charm 
+[05:49:41.015] LOG: %cStart Phase LevelUpPhase color:green;
+[05:49:41.016] LOG: Applied Protein 
+[05:49:41.016] LOG: Applied Iron 
+[05:49:41.016] LOG: Applied Carbos 
+[05:49:41.016] LOG: Applied Zinc 
+[05:49:41.016] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:49:41.017] LOG: %cStart Phase TurnInitPhase color:green;
+[05:49:41.017] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:49:41.017] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:49:41.457] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:49:41.457] LOG: %cStart Phase BerryPhase color:green;
+[05:49:41.466] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:49:41.469] LOG: %cStart Phase TurnEndPhase color:green;
+[05:49:41.499] LOG: %cStart Phase MessagePhase color:green;
+[05:49:41.696] LOG: %cStart Phase MessagePhase color:green;
+[05:49:41.933] LOG: %cStart Phase MessagePhase color:green;
+[05:49:42.153] LOG: %cStart Phase BattleEndPhase color:green;
+[05:49:42.153] LOG: Battle Score: 1694 (2 Turns x0.91)
+[05:49:42.153] LOG: Total Score: 585146
+[05:49:42.155] LOG: Applied Amulet Coin 
+[05:49:42.158] LOG: Applied Calcium 
+[05:49:42.158] LOG: Applied Soul Dew 
+[05:49:42.159] LOG: Applied Soul Dew 
+[05:49:42.162] LOG: Applied Iron 
+[05:49:42.162] LOG: Applied Carbos 
+[05:49:42.162] LOG: Applied Zinc 
+[05:49:42.162] LOG: Applied HP Up 
+[05:49:42.162] LOG: Applied Calcium 
+[05:49:42.163] LOG: Applied Soul Dew 
+[05:49:42.163] LOG: Applied Soul Dew 
+[05:49:42.163] LOG: Applied Protein 
+[05:49:42.164] LOG: Applied Soul Dew 
+[05:49:42.164] LOG: Applied Soul Dew 
+[05:49:42.164] LOG: Applied Iron 
+[05:49:42.164] LOG: Applied HP Up 
+[05:49:42.164] LOG: Applied Carbos 
+[05:49:42.164] LOG: Applied Zinc 
+[05:49:42.165] LOG: Applied HP Up 
+[05:49:42.165] LOG: Applied Iron 
+[05:49:42.166] LOG: Applied Protein 
+[05:49:42.166] LOG: Applied Iron 
+[05:49:42.166] LOG: Applied Carbos 
+[05:49:42.166] LOG: Applied Zinc 
+[05:49:42.201] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:49:42.201] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:49:42.201] LOG: %cStart Phase MessagePhase color:green;
+[05:49:42.566] LOG: %cStart Phase EggLapsePhase color:green;
+[05:49:42.566] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:49:42.566] LOG: Wave Seed: ԛӲԇԴԈԷӲԩԄԋԆԔԤӳԗԒԭԕԄӱӱԵ԰Ժ 1217
+[05:49:42.601] LOG: Applied Golden Poké Ball 
+[05:49:44.344] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[05:49:44.344] LOG: Purugly's variant icon does not exist. Replacing with default.
+[05:49:44.994] LOG: Applied Calcium 
+[05:49:44.994] LOG: Applied Soul Dew 
+[05:49:44.995] LOG: Applied Soul Dew 
+[05:49:44.996] LOG: Applied Iron 
+[05:49:44.996] LOG: Applied Carbos 
+[05:49:44.996] LOG: Applied Zinc 
+[05:49:44.996] LOG: Applied HP Up 
+[05:49:44.996] LOG: Applied Calcium 
+[05:49:44.996] LOG: Applied Soul Dew 
+[05:49:44.997] LOG: Applied Soul Dew 
+[05:49:44.997] LOG: Applied Protein 
+[05:49:44.997] LOG: Applied Soul Dew 
+[05:49:44.997] LOG: Applied Soul Dew 
+[05:49:44.998] LOG: Applied Iron 
+[05:49:44.998] LOG: Applied HP Up 
+[05:49:44.998] LOG: Applied Carbos 
+[05:49:44.998] LOG: Applied Zinc 
+[05:49:44.998] LOG: Applied HP Up 
+[05:49:44.998] LOG: Applied Iron 
+[05:49:44.999] LOG: Applied Protein 
+[05:49:44.999] LOG: Applied Iron 
+[05:49:44.999] LOG: Applied Carbos 
+[05:49:44.999] LOG: Applied Zinc 
+[05:49:45.027] LOG: %cStart Phase NewBattlePhase color:green;
+[05:49:45.027] LOG: Wave Seed: ԜӳԈԵԉԸӳԪԅԌԇԕԥӴԘԓԮԖԅӲӲԶԱԻ 1218
+[05:49:45.027] LOG: Applied Max Lure 
+[05:49:45.028] LOG: %cStart Phase NextEncounterPhase color:green;
+[05:49:45.028] LOG: Starting species pool tier: BOSS
+[05:49:45.033] LOG: Applied Shiny Charm 
+[05:49:45.041] LOG: Pokemon: Wild Sigilyph | Species ID: 561 | Level: 3285 | Nature: Bold (+Def/-Atk)
+[05:49:45.041] LOG: Stats (IVs): HP: 8452 (20), Atk: 4202 (21), Def: 6799 (24), Spatk: 7823 (21), Spdef: 6739 (20), Spd: 7067 (10)
+[05:49:45.041] LOG: Ability: Low Visibility | Passive Ability: Flock | Boss Bars: 7
+[05:49:45.041] LOG: Moveset: ["Freezing Glare","Psycho Wave","Magic Room","Hypnosis"]
+[05:49:45.044] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:49:45.044] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:49:45.081] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:49:45.082] LOG: Applied Zinc (enemy)
+[05:49:45.082] LOG: Applied Calcium (enemy)
+[05:49:45.082] LOG: Applied Carbos (enemy)
+[05:49:45.082] LOG: Applied Iron (enemy)
+[05:49:45.082] LOG: Applied Protein (enemy)
+[05:49:45.082] LOG: Applied HP Up (enemy)
+[05:49:45.197] DEBUG: Session data saved to slot 0!
+[05:49:45.198] LOG: Applied Zinc (enemy)
+[05:49:45.198] LOG: Applied Calcium (enemy)
+[05:49:45.198] LOG: Applied Carbos (enemy)
+[05:49:45.198] LOG: Applied Iron (enemy)
+[05:49:45.198] LOG: Applied Protein (enemy)
+[05:49:45.198] LOG: Applied HP Up (enemy)
+[05:49:45.201] LOG: Wave Seed: ԜӳԈԵԉԸӳԪԅԌԇԕԥӴԘԓԮԖԅӲӲԶԱԻ 1218
+[05:49:45.617] LOG: %cStart Phase ScanIvsPhase color:green;
+[05:49:45.617] LOG: %cStart Phase ReturnPhase color:green;
+[05:49:45.726] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[05:49:45.785] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:49:46.039] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:49:46.040] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:46.040] LOG: Ran PSP for: Sigilyph
+[05:49:46.040] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:46.051] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:49:46.212] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:49:46.225] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:49:46.543] LOG: %cStart Phase MessagePhase color:green;
+[05:49:46.747] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:49:46.775] LOG: %cStart Phase TurnInitPhase color:green;
+[05:49:46.777] LOG: %cStart Phase CommandPhase color:green;
+[05:49:47.890] LOG: Move: ERUPTION Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Moltres Ex
+[05:49:47.893] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:49:47.894] LOG: Applied Twisted Spoon (enemy)
+[05:49:47.894] LOG: Applied Damage Token (enemy)
+[05:49:47.894] LOG: Applied Twisted Spoon (enemy)
+[05:49:47.895] LOG: Applied Damage Token (enemy)
+[05:49:47.895] LOG: Applied Charcoal 
+[05:49:47.895] LOG: Applied Multi Lens 
+[05:49:47.896] LOG: Applied Protection Token (enemy)
+[05:49:47.896] LOG: Applied Sharp Beak 
+[05:49:47.896] LOG: Applied Multi Lens 
+[05:49:47.896] LOG: Applied Protection Token (enemy)
+[05:49:47.898] LOG: Applied Sharp Beak 
+[05:49:47.898] LOG: Applied Multi Lens 
+[05:49:47.899] LOG: Applied Protection Token (enemy)
+[05:49:47.899] LOG: Applied Charcoal 
+[05:49:47.899] LOG: Applied Multi Lens 
+[05:49:47.900] LOG: Applied Protection Token (enemy)
+[05:49:47.900] LOG: Applied Charcoal 
+[05:49:47.900] LOG: Applied Multi Lens 
+[05:49:47.901] LOG: Applied Protection Token (enemy)
+[05:49:47.901] LOG: Applied Twisted Spoon (enemy)
+[05:49:47.902] LOG: Applied Damage Token (enemy)
+[05:49:47.903] LOG: Applied Twisted Spoon (enemy)
+[05:49:47.903] LOG: Applied Damage Token (enemy)
+[05:49:47.904] LOG: %cStart Phase TurnStartPhase color:green;
+[05:49:47.907] LOG: %cStart Phase MovePhase color:green;
+[05:49:47.907] LOG: %cUser: Mega Moltres Ex
+Move: ERUPTION
+Use Mode: NORMAL color:orchid
+[05:49:47.911] LOG: %cStart Phase MessagePhase color:green;
+[05:49:48.009] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:48.011] LOG: Applied Multi Lens 
+[05:49:48.521] LOG: Applied Scope Lens 
+[05:49:48.523] LOG: crit stage: +1
+[05:49:48.528] LOG: Applied Charcoal 
+[05:49:48.532] LOG: Move: Eruption | Base damage: 74881.07385892117 | Power: 270 | Source attack: 106654 | Target defense: 10122
+[05:49:48.533] LOG: Applied Multi Lens 
+[05:49:48.539] LOG: Applied Charcoal 
+[05:49:48.541] LOG: Applied Multi Lens 
+[05:49:48.541] LOG: Applied Protection Token (enemy)
+[05:49:48.542] LOG: Applied Protection Token (enemy)
+[05:49:48.542] LOG: Move: Eruption | Attack damage: 11749
+[05:49:48.545] LOG: Applied Amulet Coin 
+[05:49:48.546] LOG: Applied Golden Punch 
+[05:49:48.549] LOG: Applied Zinc (enemy)
+[05:49:48.549] LOG: Applied Calcium (enemy)
+[05:49:48.549] LOG: Applied Carbos (enemy)
+[05:49:48.549] LOG: Applied Iron (enemy)
+[05:49:48.549] LOG: Applied Protein (enemy)
+[05:49:48.549] LOG: Applied HP Up (enemy)
+[05:49:48.556] LOG: Applied Calcium 
+[05:49:48.556] LOG: Applied Soul Dew 
+[05:49:48.557] LOG: Applied Soul Dew 
+[05:49:48.558] LOG: Applied Iron 
+[05:49:48.558] LOG: Applied Carbos 
+[05:49:48.558] LOG: Applied Zinc 
+[05:49:48.558] LOG: Applied HP Up 
+[05:49:48.558] LOG: Applied Calcium 
+[05:49:48.558] LOG: Applied Soul Dew 
+[05:49:48.558] LOG: Applied Soul Dew 
+[05:49:48.559] LOG: Applied Protein 
+[05:49:48.559] LOG: Applied Soul Dew 
+[05:49:48.559] LOG: Applied Soul Dew 
+[05:49:48.560] LOG: Applied Iron 
+[05:49:48.560] LOG: Applied HP Up 
+[05:49:48.560] LOG: Applied Carbos 
+[05:49:48.560] LOG: Applied Zinc 
+[05:49:48.560] LOG: Applied HP Up 
+[05:49:48.560] LOG: Applied Iron 
+[05:49:48.560] LOG: Applied Protein 
+[05:49:48.561] LOG: Applied Iron 
+[05:49:48.561] LOG: Applied Carbos 
+[05:49:48.561] LOG: Applied Zinc 
+[05:49:48.571] LOG: Applied Grip Claw 
+[05:49:48.574] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:48.588] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:48.731] LOG: %cStart Phase MessagePhase color:green;
+[05:49:48.941] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:49.132] LOG: %cStart Phase MessagePhase color:green;
+[05:49:49.349] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:49.537] LOG: %cStart Phase MessagePhase color:green;
+[05:49:49.750] LOG: %cStart Phase MessagePhase color:green;
+[05:49:49.948] LOG: %cStart Phase MessagePhase color:green;
+[05:49:50.259] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:49:50.349] LOG: %cStart Phase MessagePhase color:green;
+[05:49:50.571] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:51.081] LOG: Applied Scope Lens 
+[05:49:51.082] LOG: crit stage: +1
+[05:49:51.089] LOG: Applied Charcoal 
+[05:49:51.094] LOG: Move: Eruption | Base damage: 29953.629543568462 | Power: 270 | Source attack: 106654 | Target defense: 25305
+[05:49:51.094] LOG: Applied Multi Lens 
+[05:49:51.101] LOG: Applied Charcoal 
+[05:49:51.102] LOG: Applied Multi Lens 
+[05:49:51.103] LOG: Applied Protection Token (enemy)
+[05:49:51.104] LOG: Applied Protection Token (enemy)
+[05:49:51.104] LOG: Move: Eruption | Attack damage: 1618
+[05:49:51.107] LOG: Applied Amulet Coin 
+[05:49:51.108] LOG: Applied Golden Punch 
+[05:49:51.108] LOG: Applied King’s Rock 
+[05:49:51.112] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:51.124] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:51.281] LOG: %cStart Phase MessagePhase color:green;
+[05:49:51.497] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:52.013] LOG: Applied Scope Lens 
+[05:49:52.014] LOG: crit stage: +1
+[05:49:52.019] LOG: Applied Charcoal 
+[05:49:52.024] LOG: Move: Eruption | Base damage: 29953.629543568462 | Power: 270 | Source attack: 106654 | Target defense: 25305
+[05:49:52.024] LOG: Applied Multi Lens 
+[05:49:52.031] LOG: Applied Charcoal 
+[05:49:52.033] LOG: Applied Multi Lens 
+[05:49:52.035] LOG: Applied Protection Token (enemy)
+[05:49:52.035] LOG: Applied Protection Token (enemy)
+[05:49:52.035] LOG: Move: Eruption | Attack damage: 1618
+[05:49:52.037] LOG: Applied Amulet Coin 
+[05:49:52.038] LOG: Applied Golden Punch 
+[05:49:52.043] LOG: Applied Shell Bell 
+[05:49:52.043] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:52.055] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:49:52.209] LOG: %cStart Phase MessagePhase color:green;
+[05:49:52.448] LOG: %cStart Phase MessagePhase color:green;
+[05:49:52.641] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:52.641] LOG: %cStart Phase MovePhase color:green;
+[05:49:52.641] LOG: %cUser: Sigilyph
+Move: FREEZING_GLARE
+Use Mode: NORMAL color:orchid
+[05:49:52.642] LOG: %cStart Phase MessagePhase color:green;
+[05:49:52.857] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:52.857] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:49:52.858] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:49:52.920] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:49:53.221] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:49:53.221] LOG: %cStart Phase BerryPhase color:green;
+[05:49:53.227] LOG: Applied Sitrus Berry (enemy)
+[05:49:53.228] LOG: Applied Lum Berry (enemy)
+[05:49:53.229] LOG: Applied Zinc (enemy)
+[05:49:53.229] LOG: Applied Calcium (enemy)
+[05:49:53.229] LOG: Applied Carbos (enemy)
+[05:49:53.229] LOG: Applied Iron (enemy)
+[05:49:53.229] LOG: Applied Protein (enemy)
+[05:49:53.229] LOG: Applied HP Up (enemy)
+[05:49:53.239] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:49:53.379] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:49:53.504] LOG: %cStart Phase MessagePhase color:green;
+[05:49:53.773] LOG: %cStart Phase MessagePhase color:green;
+[05:49:54.017] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:49:54.017] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:49:54.020] LOG: %cStart Phase TurnEndPhase color:green;
+[05:49:54.034] LOG: Applied Recovery Token (enemy)
+[05:49:54.037] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:49:54.170] LOG: %cStart Phase MessagePhase color:green;
+[05:49:54.396] LOG: %cStart Phase TurnInitPhase color:green;
+[05:49:54.397] LOG: %cStart Phase CommandPhase color:green;
+[05:49:56.075] LOG: Move: SEARING_SHOT Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Moltres Ex
+[05:49:56.080] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:49:56.081] LOG: Applied Twisted Spoon (enemy)
+[05:49:56.082] LOG: Applied Damage Token (enemy)
+[05:49:56.083] LOG: Applied Twisted Spoon (enemy)
+[05:49:56.084] LOG: Applied Damage Token (enemy)
+[05:49:56.085] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:49:56.088] LOG: Applied Charcoal 
+[05:49:56.088] LOG: Applied Multi Lens 
+[05:49:56.088] LOG: Applied Protection Token (enemy)
+[05:49:56.089] LOG: Applied Sharp Beak 
+[05:49:56.089] LOG: Applied Multi Lens 
+[05:49:56.090] LOG: Applied Protection Token (enemy)
+[05:49:56.091] LOG: Applied Sharp Beak 
+[05:49:56.092] LOG: Applied Multi Lens 
+[05:49:56.093] LOG: Applied Protection Token (enemy)
+[05:49:56.094] LOG: Applied Charcoal 
+[05:49:56.094] LOG: Applied Multi Lens 
+[05:49:56.094] LOG: Applied Protection Token (enemy)
+[05:49:56.095] LOG: Applied Charcoal 
+[05:49:56.095] LOG: Applied Multi Lens 
+[05:49:56.096] LOG: Applied Protection Token (enemy)
+[05:49:56.096] LOG: Applied Twisted Spoon (enemy)
+[05:49:56.096] LOG: Applied Damage Token (enemy)
+[05:49:56.097] LOG: Applied Twisted Spoon (enemy)
+[05:49:56.097] LOG: Applied Damage Token (enemy)
+[05:49:56.097] LOG: %cStart Phase TurnStartPhase color:green;
+[05:49:56.099] LOG: %cStart Phase MovePhase color:green;
+[05:49:56.099] LOG: %cUser: Sigilyph
+Move: FREEZING_GLARE
+Use Mode: NORMAL color:orchid
+[05:49:56.103] LOG: %cStart Phase MessagePhase color:green;
+[05:49:56.197] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:49:56.727] LOG: crit stage: +0
+[05:49:56.731] LOG: Applied Twisted Spoon (enemy)
+[05:49:56.735] LOG: Move: Freezing Glare | Base damage: 4306.109216885007 | Power: 133 | Source attack: 8447 | Target defense: 6870
+[05:49:56.741] LOG: Applied Damage Token (enemy)
+[05:49:56.741] LOG: Applied Zinc (enemy)
+[05:49:56.741] LOG: Applied Calcium (enemy)
+[05:49:56.741] LOG: Applied Carbos (enemy)
+[05:49:56.741] LOG: Applied Iron (enemy)
+[05:49:56.742] LOG: Applied Protein (enemy)
+[05:49:56.742] LOG: Applied HP Up (enemy)
+[05:49:56.749] LOG: Move: Freezing Glare | Attack damage: 14926
+[05:49:56.755] LOG: %cStart Phase MessagePhase color:green;
+[05:49:56.978] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:49:56.996] LOG: %cStart Phase FaintPhase color:green;
+[05:49:57.055] LOG: %cStart Phase MessagePhase color:green;
+[05:49:57.547] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:57.547] LOG: %cStart Phase MovePhase color:green;
+[05:49:57.548] LOG: %cStart Phase MoveEndPhase color:green;
+[05:49:57.548] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:49:57.548] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:49:57.600] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:49:57.600] LOG: %cStart Phase BerryPhase color:green;
+[05:49:57.602] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:49:57.602] LOG: %cStart Phase TurnEndPhase color:green;
+[05:49:57.609] LOG: Applied Recovery Token (enemy)
+[05:49:57.609] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:49:57.751] LOG: %cStart Phase MessagePhase color:green;
+[05:49:57.968] LOG: %cStart Phase SwitchPhase color:green;
+[05:49:58.048] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[05:49:58.048] LOG: Purugly's variant icon does not exist. Replacing with default.
+[05:49:59.614] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:49:59.618] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:49:59.692] LOG: Applied Protein 
+[05:49:59.693] LOG: Applied Soul Dew 
+[05:49:59.693] LOG: Applied Soul Dew 
+[05:49:59.695] LOG: Applied Iron 
+[05:49:59.696] LOG: Applied Carbos 
+[05:49:59.696] LOG: Applied Zinc 
+[05:49:59.697] LOG: Applied HP Up 
+[05:49:59.697] LOG: Applied Calcium 
+[05:49:59.697] LOG: Applied Soul Dew 
+[05:49:59.697] LOG: Applied Soul Dew 
+[05:49:59.698] LOG: Applied Calcium 
+[05:49:59.699] LOG: Applied Soul Dew 
+[05:49:59.699] LOG: Applied Soul Dew 
+[05:49:59.701] LOG: Applied Iron 
+[05:49:59.701] LOG: Applied HP Up 
+[05:49:59.701] LOG: Applied Carbos 
+[05:49:59.701] LOG: Applied Zinc 
+[05:49:59.702] LOG: Applied HP Up 
+[05:49:59.703] LOG: Applied Iron 
+[05:49:59.705] LOG: Applied Protein 
+[05:49:59.705] LOG: Applied Iron 
+[05:49:59.705] LOG: Applied Carbos 
+[05:49:59.705] LOG: Applied Zinc 
+[05:49:59.804] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:49:59.905] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:59.905] LOG: Ran PSP for: Mega Swaredux B
+[05:49:59.906] LOG: %cStart Phase PostSummonPhase color:green;
+[05:49:59.918] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:50:00.076] LOG: %cStart Phase MessagePhase color:green;
+[05:50:00.314] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:50:00.340] LOG: %cStart Phase PostSummonPhase color:green;
+[05:50:00.344] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:50:00.510] LOG: %cStart Phase MessagePhase color:green;
+[05:50:00.783] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:50:00.812] LOG: %cStart Phase PostSummonPhase color:green;
+[05:50:00.836] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:50:01.003] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:50:01.326] LOG: %cStart Phase MessagePhase color:green;
+[05:50:01.587] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:50:01.616] LOG: %cStart Phase TurnInitPhase color:green;
+[05:50:01.616] LOG: %cStart Phase CommandPhase color:green;
+[05:50:02.408] LOG: Move: SMITE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Swaredux B
+[05:50:02.412] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:50:02.414] LOG: Applied Twisted Spoon (enemy)
+[05:50:02.414] LOG: Applied Damage Token (enemy)
+[05:50:02.415] LOG: Applied Twisted Spoon (enemy)
+[05:50:02.415] LOG: Applied Damage Token (enemy)
+[05:50:02.416] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:50:02.420] LOG: Applied Magnet 
+[05:50:02.421] LOG: Applied Multi Lens 
+[05:50:02.421] LOG: Applied Magnet 
+[05:50:02.421] LOG: Applied Multi Lens 
+[05:50:02.422] LOG: Applied Protection Token (enemy)
+[05:50:02.422] LOG: Applied Protection Token (enemy)
+[05:50:02.422] LOG: Applied Mystic Water 
+[05:50:02.423] LOG: Applied Multi Lens 
+[05:50:02.423] LOG: Applied Mystic Water 
+[05:50:02.423] LOG: Applied Multi Lens 
+[05:50:02.424] LOG: Applied Protection Token (enemy)
+[05:50:02.424] LOG: Applied Protection Token (enemy)
+[05:50:02.424] LOG: Applied Magnet 
+[05:50:02.424] LOG: Applied Multi Lens 
+[05:50:02.425] LOG: Applied Magnet 
+[05:50:02.425] LOG: Applied Multi Lens 
+[05:50:02.425] LOG: Applied Protection Token (enemy)
+[05:50:02.425] LOG: Applied Protection Token (enemy)
+[05:50:02.426] LOG: Applied Mystic Water 
+[05:50:02.426] LOG: Applied Multi Lens 
+[05:50:02.427] LOG: Applied Mystic Water 
+[05:50:02.427] LOG: Applied Multi Lens 
+[05:50:02.427] LOG: Applied Protection Token (enemy)
+[05:50:02.427] LOG: Applied Protection Token (enemy)
+[05:50:02.428] LOG: Applied Multi Lens 
+[05:50:02.429] LOG: Applied Multi Lens 
+[05:50:02.430] LOG: Applied Protection Token (enemy)
+[05:50:02.430] LOG: Applied Protection Token (enemy)
+[05:50:02.431] LOG: Applied Twisted Spoon (enemy)
+[05:50:02.432] LOG: Applied Damage Token (enemy)
+[05:50:02.432] LOG: Applied Twisted Spoon (enemy)
+[05:50:02.433] LOG: Applied Damage Token (enemy)
+[05:50:02.433] LOG: %cStart Phase TurnStartPhase color:green;
+[05:50:02.434] LOG: %cStart Phase MovePhase color:green;
+[05:50:02.434] LOG: %cUser: Mega Swaredux B
+Move: SMITE
+Use Mode: NORMAL color:orchid
+[05:50:02.436] LOG: %cStart Phase MessagePhase color:green;
+[05:50:02.520] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:02.521] LOG: Applied Multi Lens 
+[05:50:02.528] LOG: %cStart Phase MessagePhase color:green;
+[05:50:02.760] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:02.761] LOG: %cStart Phase MovePhase color:green;
+[05:50:02.761] LOG: %cUser: Sigilyph
+Move: FREEZING_GLARE
+Use Mode: NORMAL color:orchid
+[05:50:02.767] LOG: %cStart Phase MessagePhase color:green;
+[05:50:02.892] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:02.898] LOG: %cStart Phase MessagePhase color:green;
+[05:50:03.128] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:03.129] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:50:03.129] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:50:03.192] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:50:03.517] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:50:03.517] LOG: %cStart Phase BerryPhase color:green;
+[05:50:03.526] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:50:03.528] LOG: %cStart Phase TurnEndPhase color:green;
+[05:50:03.547] LOG: Applied Recovery Token (enemy)
+[05:50:03.548] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:03.673] LOG: %cStart Phase MessagePhase color:green;
+[05:50:03.902] LOG: %cStart Phase TurnInitPhase color:green;
+[05:50:03.902] LOG: %cStart Phase CommandPhase color:green;
+[05:50:04.158] LOG: Move: SMITE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Swaredux B
+[05:50:04.160] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:50:04.161] LOG: Applied Twisted Spoon (enemy)
+[05:50:04.161] LOG: Applied Damage Token (enemy)
+[05:50:04.162] LOG: Applied Twisted Spoon (enemy)
+[05:50:04.163] LOG: Applied Damage Token (enemy)
+[05:50:04.163] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:50:04.164] LOG: Applied Magnet 
+[05:50:04.165] LOG: Applied Multi Lens 
+[05:50:04.165] LOG: Applied Magnet 
+[05:50:04.166] LOG: Applied Multi Lens 
+[05:50:04.166] LOG: Applied Protection Token (enemy)
+[05:50:04.166] LOG: Applied Protection Token (enemy)
+[05:50:04.167] LOG: Applied Mystic Water 
+[05:50:04.167] LOG: Applied Multi Lens 
+[05:50:04.168] LOG: Applied Mystic Water 
+[05:50:04.168] LOG: Applied Multi Lens 
+[05:50:04.169] LOG: Applied Protection Token (enemy)
+[05:50:04.169] LOG: Applied Protection Token (enemy)
+[05:50:04.169] LOG: Applied Magnet 
+[05:50:04.169] LOG: Applied Multi Lens 
+[05:50:04.170] LOG: Applied Magnet 
+[05:50:04.170] LOG: Applied Multi Lens 
+[05:50:04.170] LOG: Applied Protection Token (enemy)
+[05:50:04.170] LOG: Applied Protection Token (enemy)
+[05:50:04.170] LOG: Applied Mystic Water 
+[05:50:04.171] LOG: Applied Multi Lens 
+[05:50:04.171] LOG: Applied Mystic Water 
+[05:50:04.171] LOG: Applied Multi Lens 
+[05:50:04.171] LOG: Applied Protection Token (enemy)
+[05:50:04.172] LOG: Applied Protection Token (enemy)
+[05:50:04.172] LOG: Applied Multi Lens 
+[05:50:04.173] LOG: Applied Multi Lens 
+[05:50:04.173] LOG: Applied Protection Token (enemy)
+[05:50:04.173] LOG: Applied Protection Token (enemy)
+[05:50:04.173] LOG: Applied Twisted Spoon (enemy)
+[05:50:04.174] LOG: Applied Damage Token (enemy)
+[05:50:04.175] LOG: Applied Twisted Spoon (enemy)
+[05:50:04.177] LOG: Applied Damage Token (enemy)
+[05:50:04.177] LOG: %cStart Phase TurnStartPhase color:green;
+[05:50:04.178] LOG: %cStart Phase MovePhase color:green;
+[05:50:04.178] LOG: %cUser: Mega Swaredux B
+Move: SMITE
+Use Mode: NORMAL color:orchid
+[05:50:04.179] LOG: %cStart Phase MessagePhase color:green;
+[05:50:04.267] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:04.268] LOG: Applied Multi Lens 
+[05:50:04.276] LOG: %cStart Phase MessagePhase color:green;
+[05:50:04.503] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:04.503] LOG: %cStart Phase MovePhase color:green;
+[05:50:04.503] LOG: %cUser: Sigilyph
+Move: FREEZING_GLARE
+Use Mode: NORMAL color:orchid
+[05:50:04.512] LOG: %cStart Phase MessagePhase color:green;
+[05:50:04.638] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:05.225] LOG: crit stage: +0
+[05:50:05.227] LOG: Applied Twisted Spoon (enemy)
+[05:50:05.230] LOG: Move: Freezing Glare | Base damage: 6933.371383028599 | Power: 133 | Source attack: 8447 | Target defense: 4266
+[05:50:05.235] LOG: Applied Damage Token (enemy)
+[05:50:05.236] LOG: Move: Freezing Glare | Attack damage: 10309
+[05:50:05.237] LOG: Applied Focus Band 
+[05:50:05.242] LOG: Applied Poison Token (enemy)
+[05:50:05.243] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:05.258] LOG: %cStart Phase MessagePhase color:green;
+[05:50:05.496] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:50:05.694] LOG: %cStart Phase MessagePhase color:green;
+[05:50:05.910] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:05.911] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:50:05.911] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:50:05.976] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:50:06.296] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:50:06.296] LOG: %cStart Phase BerryPhase color:green;
+[05:50:06.302] LOG: Applied Berry Pouch 
+[05:50:06.303] LOG: Applied Starf Berry 
+[05:50:06.303] LOG: Applied Berry Pouch 
+[05:50:06.303] LOG: Applied Petaya Berry 
+[05:50:06.303] LOG: Applied Berry Pouch 
+[05:50:06.304] LOG: Applied Lansat Berry 
+[05:50:06.304] LOG: Applied Berry Pouch 
+[05:50:06.305] LOG: Applied Salac Berry 
+[05:50:06.305] LOG: Applied Berry Pouch 
+[05:50:06.305] LOG: Applied Apicot Berry 
+[05:50:06.306] LOG: Applied Berry Pouch 
+[05:50:06.306] LOG: Applied Ganlon Berry 
+[05:50:06.306] LOG: Applied Berry Pouch 
+[05:50:06.308] LOG: Applied Lum Berry 
+[05:50:06.308] LOG: Applied Berry Pouch 
+[05:50:06.309] LOG: Applied Sitrus Berry 
+[05:50:06.310] LOG: Applied Protein 
+[05:50:06.311] LOG: Applied Soul Dew 
+[05:50:06.311] LOG: Applied Soul Dew 
+[05:50:06.312] LOG: Applied Iron 
+[05:50:06.312] LOG: Applied Carbos 
+[05:50:06.312] LOG: Applied Zinc 
+[05:50:06.312] LOG: Applied HP Up 
+[05:50:06.312] LOG: Applied Calcium 
+[05:50:06.312] LOG: Applied Soul Dew 
+[05:50:06.312] LOG: Applied Soul Dew 
+[05:50:06.313] LOG: Applied Calcium 
+[05:50:06.313] LOG: Applied Soul Dew 
+[05:50:06.313] LOG: Applied Soul Dew 
+[05:50:06.314] LOG: Applied Iron 
+[05:50:06.315] LOG: Applied HP Up 
+[05:50:06.315] LOG: Applied Carbos 
+[05:50:06.315] LOG: Applied Zinc 
+[05:50:06.316] LOG: Applied HP Up 
+[05:50:06.316] LOG: Applied Iron 
+[05:50:06.317] LOG: Applied Protein 
+[05:50:06.317] LOG: Applied Iron 
+[05:50:06.317] LOG: Applied Carbos 
+[05:50:06.317] LOG: Applied Zinc 
+[05:50:06.323] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:50:06.482] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:06.673] LOG: %cStart Phase MessagePhase color:green;
+[05:50:06.906] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:07.096] LOG: %cStart Phase MessagePhase color:green;
+[05:50:07.318] LOG: %cStart Phase MessagePhase color:green;
+[05:50:07.556] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:07.755] LOG: %cStart Phase MessagePhase color:green;
+[05:50:07.962] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:08.151] LOG: %cStart Phase MessagePhase color:green;
+[05:50:08.372] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:08.571] LOG: %cStart Phase MessagePhase color:green;
+[05:50:08.795] LOG: %cStart Phase MessagePhase color:green;
+[05:50:09.050] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:50:09.051] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:09.164] LOG: Applied Healing Charm 
+[05:50:09.169] LOG: %cStart Phase MessagePhase color:green;
+[05:50:09.452] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:50:09.455] LOG: %cStart Phase TurnEndPhase color:green;
+[05:50:09.476] LOG: Applied Recovery Token (enemy)
+[05:50:09.478] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:09.636] LOG: %cStart Phase MessagePhase color:green;
+[05:50:09.862] LOG: %cStart Phase TurnInitPhase color:green;
+[05:50:09.862] LOG: %cStart Phase CommandPhase color:green;
+[05:50:11.201] LOG: Seed: otlMGw1S5sOyGrI1Gx1ManSS
+[05:50:11.202] LOG: Wave Seed: otlMGw1S5sOyGrI1Gx1ManSS 0
+[05:50:11.205] LOG: Getting Session Slot id: %d 0
+[05:50:11.711] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:50:11.711] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:50:11.772] LOG: Wave Seed: Z1FsGv1hCJESc2VQlTC00toy 0
+[05:50:11.772] LOG: Seed: Z1FsGv1hCJESc2VQlTC00toy
+[05:50:11.773] LOG: Wave Seed: ԜӳԈԵԉԸӳԪԅԌԇԕԥӴԘԓԮԖԅӲӲԶԱԻ 1218
+[05:50:11.785] LOG: Applied Calcium 
+[05:50:11.785] LOG: Applied Soul Dew 
+[05:50:11.785] LOG: Applied Soul Dew 
+[05:50:11.786] LOG: Applied Iron 
+[05:50:11.786] LOG: Applied Carbos 
+[05:50:11.786] LOG: Applied Zinc 
+[05:50:11.786] LOG: Applied HP Up 
+[05:50:11.786] LOG: Applied Calcium 
+[05:50:11.786] LOG: Applied Soul Dew 
+[05:50:11.786] LOG: Applied Soul Dew 
+[05:50:11.787] LOG: Applied Protein 
+[05:50:11.787] LOG: Applied Soul Dew 
+[05:50:11.787] LOG: Applied Soul Dew 
+[05:50:11.788] LOG: Applied Iron 
+[05:50:11.788] LOG: Applied HP Up 
+[05:50:11.788] LOG: Applied Carbos 
+[05:50:11.788] LOG: Applied Zinc 
+[05:50:11.788] LOG: Applied HP Up 
+[05:50:11.788] LOG: Applied Iron 
+[05:50:11.789] LOG: Applied Protein 
+[05:50:11.789] LOG: Applied Iron 
+[05:50:11.789] LOG: Applied Carbos 
+[05:50:11.789] LOG: Applied Zinc 
+[05:50:11.791] LOG: Applied Calcium 
+[05:50:11.791] LOG: Applied Soul Dew 
+[05:50:11.792] LOG: Applied Soul Dew 
+[05:50:11.792] LOG: Applied Iron 
+[05:50:11.792] LOG: Applied Carbos 
+[05:50:11.792] LOG: Applied Zinc 
+[05:50:11.792] LOG: Applied HP Up 
+[05:50:11.792] LOG: Applied Calcium 
+[05:50:11.792] LOG: Applied Soul Dew 
+[05:50:11.793] LOG: Applied Soul Dew 
+[05:50:11.793] LOG: Applied Protein 
+[05:50:11.794] LOG: Applied Soul Dew 
+[05:50:11.794] LOG: Applied Soul Dew 
+[05:50:11.795] LOG: Applied Iron 
+[05:50:11.795] LOG: Applied HP Up 
+[05:50:11.795] LOG: Applied Carbos 
+[05:50:11.795] LOG: Applied Zinc 
+[05:50:11.795] LOG: Applied HP Up 
+[05:50:11.795] LOG: Applied Iron 
+[05:50:11.796] LOG: Applied Protein 
+[05:50:11.796] LOG: Applied Iron 
+[05:50:11.796] LOG: Applied Carbos 
+[05:50:11.796] LOG: Applied Zinc 
+[05:50:11.797] LOG: Applied Calcium 
+[05:50:11.797] LOG: Applied Soul Dew 
+[05:50:11.797] LOG: Applied Soul Dew 
+[05:50:11.798] LOG: Applied Iron 
+[05:50:11.798] LOG: Applied Carbos 
+[05:50:11.798] LOG: Applied Zinc 
+[05:50:11.798] LOG: Applied HP Up 
+[05:50:11.798] LOG: Applied Calcium 
+[05:50:11.798] LOG: Applied Soul Dew 
+[05:50:11.798] LOG: Applied Soul Dew 
+[05:50:11.798] LOG: Applied Protein 
+[05:50:11.799] LOG: Applied Soul Dew 
+[05:50:11.799] LOG: Applied Soul Dew 
+[05:50:11.799] LOG: Applied Iron 
+[05:50:11.800] LOG: Applied HP Up 
+[05:50:11.800] LOG: Applied Carbos 
+[05:50:11.800] LOG: Applied Zinc 
+[05:50:11.800] LOG: Applied HP Up 
+[05:50:11.800] LOG: Applied Iron 
+[05:50:11.801] LOG: Applied Protein 
+[05:50:11.801] LOG: Applied Iron 
+[05:50:11.801] LOG: Applied Carbos 
+[05:50:11.801] LOG: Applied Zinc 
+[05:50:11.802] LOG: Applied Zinc (enemy)
+[05:50:11.802] LOG: Applied Calcium (enemy)
+[05:50:11.802] LOG: Applied Carbos (enemy)
+[05:50:11.802] LOG: Applied Iron (enemy)
+[05:50:11.802] LOG: Applied Protein (enemy)
+[05:50:11.802] LOG: Applied HP Up (enemy)
+[05:50:11.804] LOG: %cStart Phase EncounterPhase color:green;
+[05:50:11.805] LOG: Pokemon: Wild Sigilyph | Species ID: 561 | Level: 3285 | Nature: Bold (+Def/-Atk)
+[05:50:11.805] LOG: Stats (IVs): HP: 9142 (20), Atk: 4705 (21), Def: 8027 (24), Spatk: 8447 (21), Spdef: 10122 (20), Spd: 9005 (10)
+[05:50:11.805] LOG: Ability: Low Visibility | Passive Ability: Flock | Boss Bars: 7
+[05:50:11.805] LOG: Moveset: ["Freezing Glare","Psycho Wave","Magic Room","Hypnosis"]
+[05:50:11.806] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:50:11.806] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[05:50:11.837] LOG: Applied Zinc (enemy)
+[05:50:11.837] LOG: Applied Calcium (enemy)
+[05:50:11.837] LOG: Applied Carbos (enemy)
+[05:50:11.837] LOG: Applied Iron (enemy)
+[05:50:11.837] LOG: Applied Protein (enemy)
+[05:50:11.837] LOG: Applied HP Up (enemy)
+[05:50:11.840] LOG: Wave Seed: ԜӳԈԵԉԸӳԪԅԌԇԕԥӴԘԓԮԖԅӲӲԶԱԻ 1218
+[05:50:12.263] LOG: %cStart Phase SummonPhase color:green;
+[05:50:12.414] LOG: Applied Calcium 
+[05:50:12.414] LOG: Applied Soul Dew 
+[05:50:12.415] LOG: Applied Soul Dew 
+[05:50:12.416] LOG: Applied Iron 
+[05:50:12.416] LOG: Applied Carbos 
+[05:50:12.416] LOG: Applied Zinc 
+[05:50:12.416] LOG: Applied HP Up 
+[05:50:12.416] LOG: Applied Calcium 
+[05:50:12.416] LOG: Applied Soul Dew 
+[05:50:12.417] LOG: Applied Soul Dew 
+[05:50:12.418] LOG: Applied Protein 
+[05:50:12.419] LOG: Applied Soul Dew 
+[05:50:12.419] LOG: Applied Soul Dew 
+[05:50:12.420] LOG: Applied Iron 
+[05:50:12.420] LOG: Applied HP Up 
+[05:50:12.420] LOG: Applied Carbos 
+[05:50:12.420] LOG: Applied Zinc 
+[05:50:12.421] LOG: Applied HP Up 
+[05:50:12.421] LOG: Applied Iron 
+[05:50:12.421] LOG: Applied Protein 
+[05:50:12.421] LOG: Applied Iron 
+[05:50:12.421] LOG: Applied Carbos 
+[05:50:12.421] LOG: Applied Zinc 
+[05:50:12.524] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:50:12.729] LOG: %cStart Phase SwitchPhase color:green;
+[05:50:12.831] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[05:50:12.831] LOG: Purugly's variant icon does not exist. Replacing with default.
+[05:50:13.934] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:50:14.121] LOG: Applied Iron 
+[05:50:14.121] LOG: Applied Carbos 
+[05:50:14.121] LOG: Applied Zinc 
+[05:50:14.121] LOG: Applied HP Up 
+[05:50:14.121] LOG: Applied Calcium 
+[05:50:14.121] LOG: Applied Soul Dew 
+[05:50:14.121] LOG: Applied Soul Dew 
+[05:50:14.122] LOG: Applied Calcium 
+[05:50:14.123] LOG: Applied Soul Dew 
+[05:50:14.123] LOG: Applied Soul Dew 
+[05:50:14.124] LOG: Applied Protein 
+[05:50:14.125] LOG: Applied Soul Dew 
+[05:50:14.126] LOG: Applied Soul Dew 
+[05:50:14.127] LOG: Applied Iron 
+[05:50:14.127] LOG: Applied HP Up 
+[05:50:14.127] LOG: Applied Carbos 
+[05:50:14.127] LOG: Applied Zinc 
+[05:50:14.127] LOG: Applied HP Up 
+[05:50:14.127] LOG: Applied Iron 
+[05:50:14.128] LOG: Applied Protein 
+[05:50:14.128] LOG: Applied Iron 
+[05:50:14.128] LOG: Applied Carbos 
+[05:50:14.128] LOG: Applied Zinc 
+[05:50:14.234] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:50:14.394] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:50:14.422] LOG: %cStart Phase ShinySparklePhase color:green;
+[05:50:14.531] LOG: %cStart Phase PostSummonPhase color:green;
+[05:50:14.531] LOG: Ran PSP for: Iron Leaves
+[05:50:14.532] LOG: %cStart Phase PostSummonPhase color:green;
+[05:50:14.533] LOG: %cStart Phase ScanIvsPhase color:green;
+[05:50:14.533] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:50:14.533] LOG: %cStart Phase PostSummonPhase color:green;
+[05:50:14.533] LOG: Ran PSP for: Sigilyph
+[05:50:14.533] LOG: %cStart Phase PostSummonPhase color:green;
+[05:50:14.540] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:50:14.699] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:50:14.713] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:50:15.018] LOG: %cStart Phase MessagePhase color:green;
+[05:50:15.217] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:50:15.243] LOG: %cStart Phase TurnInitPhase color:green;
+[05:50:15.246] LOG: %cStart Phase CommandPhase color:green;
+[05:50:18.312] LOG: Move: MIGHTY_CLEAVE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Iron Leaves
+[05:50:18.316] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:50:18.317] LOG: Applied Twisted Spoon (enemy)
+[05:50:18.318] LOG: Applied Damage Token (enemy)
+[05:50:18.318] LOG: Applied Twisted Spoon (enemy)
+[05:50:18.318] LOG: Applied Damage Token (enemy)
+[05:50:18.318] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:50:18.320] LOG: Applied Miracle Seed 
+[05:50:18.320] LOG: Applied Multi Lens 
+[05:50:18.322] LOG: Applied Miracle Seed 
+[05:50:18.323] LOG: Applied Multi Lens 
+[05:50:18.323] LOG: Applied Protection Token (enemy)
+[05:50:18.323] LOG: Applied Protection Token (enemy)
+[05:50:18.323] LOG: Applied Twisted Spoon 
+[05:50:18.324] LOG: Applied Multi Lens 
+[05:50:18.324] LOG: Applied Twisted Spoon 
+[05:50:18.324] LOG: Applied Multi Lens 
+[05:50:18.324] LOG: Applied Protection Token (enemy)
+[05:50:18.325] LOG: Applied Protection Token (enemy)
+[05:50:18.325] LOG: Applied Charcoal 
+[05:50:18.326] LOG: Applied Multi Lens 
+[05:50:18.327] LOG: Applied Charcoal 
+[05:50:18.327] LOG: Applied Multi Lens 
+[05:50:18.327] LOG: Applied Protection Token (enemy)
+[05:50:18.327] LOG: Applied Protection Token (enemy)
+[05:50:18.328] LOG: Applied Hard Stone 
+[05:50:18.329] LOG: Applied Multi Lens 
+[05:50:18.329] LOG: Applied Hard Stone 
+[05:50:18.329] LOG: Applied Multi Lens 
+[05:50:18.329] LOG: Applied Protection Token (enemy)
+[05:50:18.330] LOG: Applied Protection Token (enemy)
+[05:50:18.330] LOG: Applied Twisted Spoon (enemy)
+[05:50:18.330] LOG: Applied Damage Token (enemy)
+[05:50:18.331] LOG: Applied Twisted Spoon (enemy)
+[05:50:18.331] LOG: Applied Damage Token (enemy)
+[05:50:18.331] LOG: %cStart Phase TurnStartPhase color:green;
+[05:50:18.332] LOG: %cStart Phase MovePhase color:green;
+[05:50:18.332] LOG: %cUser: Iron Leaves
+Move: MIGHTY_CLEAVE
+Use Mode: NORMAL color:orchid
+[05:50:18.334] LOG: %cStart Phase MessagePhase color:green;
+[05:50:18.435] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:18.435] LOG: Applied Multi Lens 
+[05:50:18.592] LOG: Applied Scope Lens 
+[05:50:18.592] LOG: crit stage: +1
+[05:50:18.594] LOG: Applied Hard Stone 
+[05:50:18.596] LOG: Move: Mighty Cleave | Base damage: 52824.3059713467 | Power: 222 | Source attack: 74911 | Target defense: 8027
+[05:50:18.597] LOG: Applied Multi Lens 
+[05:50:18.601] LOG: Applied Hard Stone 
+[05:50:18.602] LOG: Applied Multi Lens 
+[05:50:18.602] LOG: Applied Protection Token (enemy)
+[05:50:18.603] LOG: Applied Protection Token (enemy)
+[05:50:18.603] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:18.604] LOG: Applied Amulet Coin 
+[05:50:18.605] LOG: Applied Golden Punch 
+[05:50:18.608] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:18.623] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:50:18.784] LOG: %cStart Phase MessagePhase color:green;
+[05:50:19.053] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:19.213] LOG: Applied Scope Lens 
+[05:50:19.213] LOG: crit stage: +1
+[05:50:19.215] LOG: Applied Hard Stone 
+[05:50:19.218] LOG: Move: Mighty Cleave | Base damage: 52824.3059713467 | Power: 222 | Source attack: 74911 | Target defense: 8027
+[05:50:19.218] LOG: Applied Multi Lens 
+[05:50:19.221] LOG: Applied Hard Stone 
+[05:50:19.222] LOG: Applied Multi Lens 
+[05:50:19.223] LOG: Applied Protection Token (enemy)
+[05:50:19.224] LOG: Applied Protection Token (enemy)
+[05:50:19.225] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:19.226] LOG: Applied Amulet Coin 
+[05:50:19.227] LOG: Applied Golden Punch 
+[05:50:19.228] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:19.247] LOG: %cStart Phase MessagePhase color:green;
+[05:50:19.431] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:19.581] LOG: Applied Scope Lens 
+[05:50:19.582] LOG: crit stage: +1
+[05:50:19.583] LOG: Applied Hard Stone 
+[05:50:19.585] LOG: Move: Mighty Cleave | Base damage: 52824.3059713467 | Power: 222 | Source attack: 74911 | Target defense: 8027
+[05:50:19.586] LOG: Applied Multi Lens 
+[05:50:19.589] LOG: Applied Hard Stone 
+[05:50:19.590] LOG: Applied Multi Lens 
+[05:50:19.591] LOG: Applied Protection Token (enemy)
+[05:50:19.591] LOG: Applied Protection Token (enemy)
+[05:50:19.592] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:19.592] LOG: Applied Amulet Coin 
+[05:50:19.593] LOG: Applied Golden Punch 
+[05:50:19.595] LOG: Applied Zinc (enemy)
+[05:50:19.595] LOG: Applied Calcium (enemy)
+[05:50:19.595] LOG: Applied Carbos (enemy)
+[05:50:19.595] LOG: Applied Iron (enemy)
+[05:50:19.595] LOG: Applied Protein (enemy)
+[05:50:19.595] LOG: Applied HP Up (enemy)
+[05:50:19.601] LOG: Applied Iron 
+[05:50:19.601] LOG: Applied Carbos 
+[05:50:19.601] LOG: Applied Zinc 
+[05:50:19.601] LOG: Applied HP Up 
+[05:50:19.601] LOG: Applied Calcium 
+[05:50:19.601] LOG: Applied Soul Dew 
+[05:50:19.602] LOG: Applied Soul Dew 
+[05:50:19.603] LOG: Applied Calcium 
+[05:50:19.603] LOG: Applied Soul Dew 
+[05:50:19.604] LOG: Applied Soul Dew 
+[05:50:19.604] LOG: Applied Protein 
+[05:50:19.605] LOG: Applied Soul Dew 
+[05:50:19.605] LOG: Applied Soul Dew 
+[05:50:19.606] LOG: Applied Iron 
+[05:50:19.606] LOG: Applied HP Up 
+[05:50:19.606] LOG: Applied Carbos 
+[05:50:19.606] LOG: Applied Zinc 
+[05:50:19.607] LOG: Applied HP Up 
+[05:50:19.607] LOG: Applied Iron 
+[05:50:19.608] LOG: Applied Protein 
+[05:50:19.608] LOG: Applied Iron 
+[05:50:19.608] LOG: Applied Carbos 
+[05:50:19.608] LOG: Applied Zinc 
+[05:50:19.630] LOG: Applied Grip Claw 
+[05:50:19.630] LOG: Applied Shell Bell 
+[05:50:19.631] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:19.644] LOG: %cStart Phase MessagePhase color:green;
+[05:50:19.815] LOG: %cStart Phase MessagePhase color:green;
+[05:50:20.122] LOG: %cStart Phase MessagePhase color:green;
+[05:50:20.315] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:20.316] LOG: %cStart Phase MovePhase color:green;
+[05:50:20.316] LOG: %cUser: Sigilyph
+Move: FREEZING_GLARE
+Use Mode: NORMAL color:orchid
+[05:50:20.321] LOG: %cStart Phase MessagePhase color:green;
+[05:50:20.454] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:21.005] LOG: crit stage: +0
+[05:50:21.006] LOG: Applied Twisted Spoon (enemy)
+[05:50:21.008] LOG: Move: Freezing Glare | Base damage: 4668.12439955815 | Power: 133 | Source attack: 8447 | Target defense: 6337
+[05:50:21.010] LOG: Applied Damage Token (enemy)
+[05:50:21.010] LOG: Move: Freezing Glare | Attack damage: 9453
+[05:50:21.014] LOG: Applied Poison Token (enemy)
+[05:50:21.014] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:21.028] LOG: %cStart Phase MessagePhase color:green;
+[05:50:21.237] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:50:21.432] LOG: %cStart Phase MessagePhase color:green;
+[05:50:21.643] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:21.643] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:50:21.644] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:50:21.706] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:50:22.010] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:50:22.010] LOG: %cStart Phase BerryPhase color:green;
+[05:50:22.013] LOG: Applied Berry Pouch 
+[05:50:22.014] LOG: Applied Lum Berry 
+[05:50:22.015] LOG: Applied Berry Pouch 
+[05:50:22.015] LOG: Applied Apicot Berry 
+[05:50:22.015] LOG: Applied Berry Pouch 
+[05:50:22.015] LOG: Applied Petaya Berry 
+[05:50:22.015] LOG: Applied Berry Pouch 
+[05:50:22.016] LOG: Applied Lansat Berry 
+[05:50:22.017] LOG: Applied Berry Pouch 
+[05:50:22.017] LOG: Applied Starf Berry 
+[05:50:22.017] LOG: Applied Berry Pouch 
+[05:50:22.017] LOG: Applied Salac Berry 
+[05:50:22.017] LOG: Applied Berry Pouch 
+[05:50:22.018] LOG: Applied Sitrus Berry 
+[05:50:22.018] LOG: Applied Berry Pouch 
+[05:50:22.018] LOG: Applied Ganlon Berry 
+[05:50:22.018] LOG: Applied Berry Pouch 
+[05:50:22.018] LOG: Applied Liechi Berry 
+[05:50:22.019] LOG: Applied Iron 
+[05:50:22.019] LOG: Applied Carbos 
+[05:50:22.019] LOG: Applied Zinc 
+[05:50:22.019] LOG: Applied HP Up 
+[05:50:22.019] LOG: Applied Calcium 
+[05:50:22.019] LOG: Applied Soul Dew 
+[05:50:22.019] LOG: Applied Soul Dew 
+[05:50:22.021] LOG: Applied Calcium 
+[05:50:22.021] LOG: Applied Soul Dew 
+[05:50:22.021] LOG: Applied Soul Dew 
+[05:50:22.024] LOG: Applied Protein 
+[05:50:22.026] LOG: Applied Soul Dew 
+[05:50:22.026] LOG: Applied Soul Dew 
+[05:50:22.027] LOG: Applied Iron 
+[05:50:22.027] LOG: Applied HP Up 
+[05:50:22.027] LOG: Applied Carbos 
+[05:50:22.027] LOG: Applied Zinc 
+[05:50:22.028] LOG: Applied HP Up 
+[05:50:22.029] LOG: Applied Iron 
+[05:50:22.031] LOG: Applied Protein 
+[05:50:22.031] LOG: Applied Iron 
+[05:50:22.031] LOG: Applied Carbos 
+[05:50:22.031] LOG: Applied Zinc 
+[05:50:22.039] LOG: Applied Enigma Berry (enemy)
+[05:50:22.040] LOG: Applied Lum Berry (enemy)
+[05:50:22.040] LOG: Applied Zinc (enemy)
+[05:50:22.040] LOG: Applied Calcium (enemy)
+[05:50:22.040] LOG: Applied Carbos (enemy)
+[05:50:22.040] LOG: Applied Iron (enemy)
+[05:50:22.040] LOG: Applied Protein (enemy)
+[05:50:22.040] LOG: Applied HP Up (enemy)
+[05:50:22.045] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:50:22.198] LOG: %cStart Phase MessagePhase color:green;
+[05:50:22.439] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:50:22.440] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:22.629] LOG: %cStart Phase MessagePhase color:green;
+[05:50:22.835] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:23.035] LOG: %cStart Phase MessagePhase color:green;
+[05:50:23.239] LOG: %cStart Phase MessagePhase color:green;
+[05:50:23.461] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:23.653] LOG: %cStart Phase MessagePhase color:green;
+[05:50:23.878] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:24.068] LOG: %cStart Phase MessagePhase color:green;
+[05:50:24.269] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:24.388] LOG: Applied Healing Charm 
+[05:50:24.392] LOG: %cStart Phase MessagePhase color:green;
+[05:50:24.668] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:24.861] LOG: %cStart Phase MessagePhase color:green;
+[05:50:25.071] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:50:25.258] LOG: %cStart Phase MessagePhase color:green;
+[05:50:25.468] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:50:25.635] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:25.761] LOG: %cStart Phase MessagePhase color:green;
+[05:50:26.038] LOG: %cStart Phase MessagePhase color:green;
+[05:50:26.275] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:50:26.276] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:50:26.277] LOG: %cStart Phase TurnEndPhase color:green;
+[05:50:26.285] LOG: Applied Leftovers 
+[05:50:26.285] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:50:26.286] LOG: Applied Zinc (enemy)
+[05:50:26.286] LOG: Applied Calcium (enemy)
+[05:50:26.286] LOG: Applied Carbos (enemy)
+[05:50:26.286] LOG: Applied Iron (enemy)
+[05:50:26.287] LOG: Applied Protein (enemy)
+[05:50:26.287] LOG: Applied HP Up (enemy)
+[05:50:26.293] LOG: Applied Iron 
+[05:50:26.293] LOG: Applied Carbos 
+[05:50:26.293] LOG: Applied Zinc 
+[05:50:26.293] LOG: Applied HP Up 
+[05:50:26.293] LOG: Applied Calcium 
+[05:50:26.294] LOG: Applied Soul Dew 
+[05:50:26.295] LOG: Applied Soul Dew 
+[05:50:26.296] LOG: Applied Calcium 
+[05:50:26.296] LOG: Applied Soul Dew 
+[05:50:26.297] LOG: Applied Soul Dew 
+[05:50:26.298] LOG: Applied Protein 
+[05:50:26.299] LOG: Applied Soul Dew 
+[05:50:26.299] LOG: Applied Soul Dew 
+[05:50:26.299] LOG: Applied Iron 
+[05:50:26.299] LOG: Applied HP Up 
+[05:50:26.299] LOG: Applied Carbos 
+[05:50:26.299] LOG: Applied Zinc 
+[05:50:26.301] LOG: Applied HP Up 
+[05:50:26.302] LOG: Applied Iron 
+[05:50:26.303] LOG: Applied Protein 
+[05:50:26.304] LOG: Applied Iron 
+[05:50:26.304] LOG: Applied Carbos 
+[05:50:26.304] LOG: Applied Zinc 
+[05:50:26.332] LOG: Applied Mini Black Hole 
+[05:50:26.333] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:26.441] LOG: Applied Healing Charm 
+[05:50:26.445] LOG: %cStart Phase MessagePhase color:green;
+[05:50:26.717] LOG: %cStart Phase MessagePhase color:green;
+[05:50:27.035] LOG: %cStart Phase TurnInitPhase color:green;
+[05:50:27.035] LOG: %cStart Phase CommandPhase color:green;
+[05:50:29.028] LOG: Applied Scope Lens 
+[05:50:29.028] LOG: crit stage: +3
+[05:50:29.748] LOG: crit stage: +0
+[05:50:37.580] LOG: Move: MIGHTY_CLEAVE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Iron Leaves
+[05:50:37.586] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:50:37.587] LOG: Applied Twisted Spoon (enemy)
+[05:50:37.588] LOG: Applied Damage Token (enemy)
+[05:50:37.589] LOG: Applied Twisted Spoon (enemy)
+[05:50:37.590] LOG: Applied Damage Token (enemy)
+[05:50:37.594] LOG: Applied Miracle Seed 
+[05:50:37.595] LOG: Applied Multi Lens 
+[05:50:37.595] LOG: Applied Miracle Seed 
+[05:50:37.595] LOG: Applied Multi Lens 
+[05:50:37.596] LOG: Applied Protection Token (enemy)
+[05:50:37.596] LOG: Applied Protection Token (enemy)
+[05:50:37.597] LOG: Applied Twisted Spoon 
+[05:50:37.597] LOG: Applied Multi Lens 
+[05:50:37.598] LOG: Applied Twisted Spoon 
+[05:50:37.598] LOG: Applied Multi Lens 
+[05:50:37.599] LOG: Applied Protection Token (enemy)
+[05:50:37.600] LOG: Applied Protection Token (enemy)
+[05:50:37.602] LOG: Applied Charcoal 
+[05:50:37.603] LOG: Applied Multi Lens 
+[05:50:37.603] LOG: Applied Charcoal 
+[05:50:37.603] LOG: Applied Multi Lens 
+[05:50:37.603] LOG: Applied Protection Token (enemy)
+[05:50:37.603] LOG: Applied Protection Token (enemy)
+[05:50:37.604] LOG: Applied Hard Stone 
+[05:50:37.604] LOG: Applied Multi Lens 
+[05:50:37.604] LOG: Applied Hard Stone 
+[05:50:37.606] LOG: Applied Multi Lens 
+[05:50:37.607] LOG: Applied Protection Token (enemy)
+[05:50:37.607] LOG: Applied Protection Token (enemy)
+[05:50:37.608] LOG: Applied Twisted Spoon (enemy)
+[05:50:37.609] LOG: Applied Damage Token (enemy)
+[05:50:37.609] LOG: Applied Twisted Spoon (enemy)
+[05:50:37.610] LOG: Applied Damage Token (enemy)
+[05:50:37.610] LOG: %cStart Phase TurnStartPhase color:green;
+[05:50:37.610] LOG: %cStart Phase MovePhase color:green;
+[05:50:37.611] LOG: %cUser: Iron Leaves
+Move: MIGHTY_CLEAVE
+Use Mode: NORMAL color:orchid
+[05:50:37.612] LOG: %cStart Phase MessagePhase color:green;
+[05:50:37.705] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:37.706] LOG: Applied Multi Lens 
+[05:50:37.859] LOG: Applied Scope Lens 
+[05:50:37.859] LOG: crit stage: +3
+[05:50:37.861] LOG: Applied Hard Stone 
+[05:50:37.863] LOG: Move: Mighty Cleave | Base damage: 79235.10638993398 | Power: 222 | Source attack: 112366 | Target defense: 8027
+[05:50:37.864] LOG: Applied Multi Lens 
+[05:50:37.867] LOG: Applied Hard Stone 
+[05:50:37.867] LOG: Applied Multi Lens 
+[05:50:37.868] LOG: Applied Protection Token (enemy)
+[05:50:37.869] LOG: Applied Protection Token (enemy)
+[05:50:37.869] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:37.871] LOG: Applied Amulet Coin 
+[05:50:37.872] LOG: Applied Golden Punch 
+[05:50:37.874] LOG: Applied Zinc (enemy)
+[05:50:37.874] LOG: Applied Calcium (enemy)
+[05:50:37.875] LOG: Applied Carbos (enemy)
+[05:50:37.875] LOG: Applied Iron (enemy)
+[05:50:37.875] LOG: Applied Protein (enemy)
+[05:50:37.875] LOG: Applied HP Up (enemy)
+[05:50:37.880] LOG: Applied Iron 
+[05:50:37.881] LOG: Applied Carbos 
+[05:50:37.881] LOG: Applied Zinc 
+[05:50:37.881] LOG: Applied HP Up 
+[05:50:37.881] LOG: Applied Calcium 
+[05:50:37.881] LOG: Applied Soul Dew 
+[05:50:37.881] LOG: Applied Soul Dew 
+[05:50:37.882] LOG: Applied Calcium 
+[05:50:37.883] LOG: Applied Soul Dew 
+[05:50:37.883] LOG: Applied Soul Dew 
+[05:50:37.884] LOG: Applied Protein 
+[05:50:37.885] LOG: Applied Soul Dew 
+[05:50:37.885] LOG: Applied Soul Dew 
+[05:50:37.886] LOG: Applied Iron 
+[05:50:37.886] LOG: Applied HP Up 
+[05:50:37.886] LOG: Applied Carbos 
+[05:50:37.886] LOG: Applied Zinc 
+[05:50:37.887] LOG: Applied HP Up 
+[05:50:37.887] LOG: Applied Iron 
+[05:50:37.888] LOG: Applied Protein 
+[05:50:37.888] LOG: Applied Iron 
+[05:50:37.888] LOG: Applied Carbos 
+[05:50:37.888] LOG: Applied Zinc 
+[05:50:37.914] LOG: Applied Grip Claw 
+[05:50:37.914] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:37.924] LOG: %cStart Phase MessagePhase color:green;
+[05:50:38.079] LOG: %cStart Phase MessagePhase color:green;
+[05:50:38.392] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:38.546] LOG: Applied Scope Lens 
+[05:50:38.547] LOG: crit stage: +3
+[05:50:38.548] LOG: Applied Hard Stone 
+[05:50:38.552] LOG: Move: Mighty Cleave | Base damage: 79235.10638993398 | Power: 222 | Source attack: 112366 | Target defense: 8027
+[05:50:38.554] LOG: Applied Multi Lens 
+[05:50:38.559] LOG: Applied Hard Stone 
+[05:50:38.561] LOG: Applied Multi Lens 
+[05:50:38.562] LOG: Applied Protection Token (enemy)
+[05:50:38.563] LOG: Applied Protection Token (enemy)
+[05:50:38.564] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:38.565] LOG: Applied Amulet Coin 
+[05:50:38.566] LOG: Applied Golden Punch 
+[05:50:38.568] LOG: Applied Zinc (enemy)
+[05:50:38.569] LOG: Applied Calcium (enemy)
+[05:50:38.569] LOG: Applied Carbos (enemy)
+[05:50:38.569] LOG: Applied Iron (enemy)
+[05:50:38.569] LOG: Applied Protein (enemy)
+[05:50:38.569] LOG: Applied HP Up (enemy)
+[05:50:38.576] LOG: Applied Iron 
+[05:50:38.576] LOG: Applied Carbos 
+[05:50:38.576] LOG: Applied Zinc 
+[05:50:38.576] LOG: Applied HP Up 
+[05:50:38.576] LOG: Applied Calcium 
+[05:50:38.577] LOG: Applied Soul Dew 
+[05:50:38.577] LOG: Applied Soul Dew 
+[05:50:38.579] LOG: Applied Calcium 
+[05:50:38.580] LOG: Applied Soul Dew 
+[05:50:38.581] LOG: Applied Soul Dew 
+[05:50:38.581] LOG: Applied Protein 
+[05:50:38.582] LOG: Applied Soul Dew 
+[05:50:38.582] LOG: Applied Soul Dew 
+[05:50:38.584] LOG: Applied Iron 
+[05:50:38.584] LOG: Applied HP Up 
+[05:50:38.584] LOG: Applied Carbos 
+[05:50:38.584] LOG: Applied Zinc 
+[05:50:38.586] LOG: Applied HP Up 
+[05:50:38.586] LOG: Applied Iron 
+[05:50:38.587] LOG: Applied Protein 
+[05:50:38.587] LOG: Applied Iron 
+[05:50:38.587] LOG: Applied Carbos 
+[05:50:38.587] LOG: Applied Zinc 
+[05:50:38.612] LOG: Applied Grip Claw 
+[05:50:38.613] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:38.623] LOG: %cStart Phase MessagePhase color:green;
+[05:50:38.773] LOG: %cStart Phase MessagePhase color:green;
+[05:50:39.087] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:50:39.255] LOG: %cStart Phase MessagePhase color:green;
+[05:50:39.531] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:39.693] LOG: Applied Scope Lens 
+[05:50:39.693] LOG: crit stage: +3
+[05:50:39.696] LOG: Applied Hard Stone 
+[05:50:39.699] LOG: Move: Mighty Cleave | Base damage: 79235.10638993398 | Power: 222 | Source attack: 112366 | Target defense: 8027
+[05:50:39.699] LOG: Applied Multi Lens 
+[05:50:39.702] LOG: Applied Hard Stone 
+[05:50:39.703] LOG: Applied Multi Lens 
+[05:50:39.705] LOG: Applied Protection Token (enemy)
+[05:50:39.705] LOG: Applied Protection Token (enemy)
+[05:50:39.705] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:39.706] LOG: Applied Amulet Coin 
+[05:50:39.707] LOG: Applied Golden Punch 
+[05:50:39.707] LOG: Applied King’s Rock 
+[05:50:39.709] LOG: Applied Zinc (enemy)
+[05:50:39.709] LOG: Applied Calcium (enemy)
+[05:50:39.709] LOG: Applied Carbos (enemy)
+[05:50:39.709] LOG: Applied Iron (enemy)
+[05:50:39.709] LOG: Applied Protein (enemy)
+[05:50:39.709] LOG: Applied HP Up (enemy)
+[05:50:39.716] LOG: Applied Iron 
+[05:50:39.716] LOG: Applied Carbos 
+[05:50:39.716] LOG: Applied Zinc 
+[05:50:39.716] LOG: Applied HP Up 
+[05:50:39.716] LOG: Applied Calcium 
+[05:50:39.717] LOG: Applied Soul Dew 
+[05:50:39.718] LOG: Applied Soul Dew 
+[05:50:39.720] LOG: Applied Calcium 
+[05:50:39.720] LOG: Applied Soul Dew 
+[05:50:39.721] LOG: Applied Soul Dew 
+[05:50:39.721] LOG: Applied Protein 
+[05:50:39.722] LOG: Applied Soul Dew 
+[05:50:39.722] LOG: Applied Soul Dew 
+[05:50:39.723] LOG: Applied Iron 
+[05:50:39.723] LOG: Applied HP Up 
+[05:50:39.723] LOG: Applied Carbos 
+[05:50:39.723] LOG: Applied Zinc 
+[05:50:39.725] LOG: Applied HP Up 
+[05:50:39.725] LOG: Applied Iron 
+[05:50:39.725] LOG: Applied Protein 
+[05:50:39.725] LOG: Applied Iron 
+[05:50:39.725] LOG: Applied Carbos 
+[05:50:39.725] LOG: Applied Zinc 
+[05:50:39.746] LOG: Applied Grip Claw 
+[05:50:39.747] LOG: Applied Shell Bell 
+[05:50:39.747] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:39.756] LOG: %cStart Phase MessagePhase color:green;
+[05:50:39.913] LOG: %cStart Phase MessagePhase color:green;
+[05:50:40.129] LOG: %cStart Phase MessagePhase color:green;
+[05:50:40.434] LOG: %cStart Phase MessagePhase color:green;
+[05:50:40.636] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:40.753] LOG: Applied Healing Charm 
+[05:50:40.757] LOG: %cStart Phase MessagePhase color:green;
+[05:50:41.025] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:41.025] LOG: %cStart Phase MovePhase color:green;
+[05:50:41.025] LOG: %cUser: Sigilyph
+Move: PSYCHO_WAVE
+Use Mode: NORMAL color:orchid
+[05:50:41.026] LOG: %cStart Phase MessagePhase color:green;
+[05:50:41.248] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:41.249] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:50:41.249] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:50:41.310] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:50:41.621] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:50:41.621] LOG: %cStart Phase BerryPhase color:green;
+[05:50:41.625] LOG: Applied Enigma Berry (enemy)
+[05:50:41.627] LOG: Applied Lum Berry (enemy)
+[05:50:41.628] LOG: Applied Zinc (enemy)
+[05:50:41.629] LOG: Applied Calcium (enemy)
+[05:50:41.629] LOG: Applied Carbos (enemy)
+[05:50:41.629] LOG: Applied Iron (enemy)
+[05:50:41.629] LOG: Applied Protein (enemy)
+[05:50:41.629] LOG: Applied HP Up (enemy)
+[05:50:41.634] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:50:41.805] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:41.929] LOG: %cStart Phase MessagePhase color:green;
+[05:50:42.191] LOG: %cStart Phase MessagePhase color:green;
+[05:50:42.434] LOG: %cStart Phase ResetStatusPhase color:green;
+[05:50:42.435] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:50:42.436] LOG: %cStart Phase TurnEndPhase color:green;
+[05:50:42.447] LOG: Applied Leftovers 
+[05:50:42.448] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:50:42.449] LOG: Applied Zinc (enemy)
+[05:50:42.449] LOG: Applied Calcium (enemy)
+[05:50:42.449] LOG: Applied Carbos (enemy)
+[05:50:42.449] LOG: Applied Iron (enemy)
+[05:50:42.449] LOG: Applied Protein (enemy)
+[05:50:42.449] LOG: Applied HP Up (enemy)
+[05:50:42.457] LOG: Applied Iron 
+[05:50:42.457] LOG: Applied Carbos 
+[05:50:42.457] LOG: Applied Zinc 
+[05:50:42.458] LOG: Applied HP Up 
+[05:50:42.458] LOG: Applied Calcium 
+[05:50:42.458] LOG: Applied Soul Dew 
+[05:50:42.458] LOG: Applied Soul Dew 
+[05:50:42.459] LOG: Applied Calcium 
+[05:50:42.459] LOG: Applied Soul Dew 
+[05:50:42.461] LOG: Applied Soul Dew 
+[05:50:42.463] LOG: Applied Protein 
+[05:50:42.464] LOG: Applied Soul Dew 
+[05:50:42.465] LOG: Applied Soul Dew 
+[05:50:42.465] LOG: Applied Iron 
+[05:50:42.466] LOG: Applied HP Up 
+[05:50:42.466] LOG: Applied Carbos 
+[05:50:42.466] LOG: Applied Zinc 
+[05:50:42.466] LOG: Applied HP Up 
+[05:50:42.466] LOG: Applied Iron 
+[05:50:42.467] LOG: Applied Protein 
+[05:50:42.467] LOG: Applied Iron 
+[05:50:42.467] LOG: Applied Carbos 
+[05:50:42.467] LOG: Applied Zinc 
+[05:50:42.497] LOG: Applied Mini Black Hole 
+[05:50:42.497] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:50:42.601] LOG: Applied Healing Charm 
+[05:50:42.605] LOG: %cStart Phase MessagePhase color:green;
+[05:50:42.878] LOG: %cStart Phase MessagePhase color:green;
+[05:50:43.198] LOG: %cStart Phase TurnInitPhase color:green;
+[05:50:43.198] LOG: %cStart Phase CommandPhase color:green;
+[05:50:43.746] LOG: Move: MIGHTY_CLEAVE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Iron Leaves
+[05:50:43.748] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:50:43.749] LOG: Applied Twisted Spoon (enemy)
+[05:50:43.750] LOG: Applied Damage Token (enemy)
+[05:50:43.750] LOG: Applied Twisted Spoon (enemy)
+[05:50:43.751] LOG: Applied Damage Token (enemy)
+[05:50:43.755] LOG: Applied Miracle Seed 
+[05:50:43.755] LOG: Applied Multi Lens 
+[05:50:43.756] LOG: Applied Miracle Seed 
+[05:50:43.756] LOG: Applied Multi Lens 
+[05:50:43.756] LOG: Applied Protection Token (enemy)
+[05:50:43.756] LOG: Applied Protection Token (enemy)
+[05:50:43.756] LOG: Applied Twisted Spoon 
+[05:50:43.757] LOG: Applied Multi Lens 
+[05:50:43.757] LOG: Applied Twisted Spoon 
+[05:50:43.757] LOG: Applied Multi Lens 
+[05:50:43.757] LOG: Applied Protection Token (enemy)
+[05:50:43.757] LOG: Applied Protection Token (enemy)
+[05:50:43.758] LOG: Applied Charcoal 
+[05:50:43.759] LOG: Applied Multi Lens 
+[05:50:43.760] LOG: Applied Charcoal 
+[05:50:43.761] LOG: Applied Multi Lens 
+[05:50:43.761] LOG: Applied Protection Token (enemy)
+[05:50:43.761] LOG: Applied Protection Token (enemy)
+[05:50:43.762] LOG: Applied Hard Stone 
+[05:50:43.762] LOG: Applied Multi Lens 
+[05:50:43.763] LOG: Applied Hard Stone 
+[05:50:43.763] LOG: Applied Multi Lens 
+[05:50:43.763] LOG: Applied Protection Token (enemy)
+[05:50:43.763] LOG: Applied Protection Token (enemy)
+[05:50:43.764] LOG: Applied Twisted Spoon (enemy)
+[05:50:43.764] LOG: Applied Damage Token (enemy)
+[05:50:43.764] LOG: Applied Twisted Spoon (enemy)
+[05:50:43.765] LOG: Applied Damage Token (enemy)
+[05:50:43.765] LOG: %cStart Phase TurnStartPhase color:green;
+[05:50:43.765] LOG: %cStart Phase MovePhase color:green;
+[05:50:43.765] LOG: %cUser: Iron Leaves
+Move: MIGHTY_CLEAVE
+Use Mode: NORMAL color:orchid
+[05:50:43.767] LOG: %cStart Phase MessagePhase color:green;
+[05:50:43.864] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:43.865] LOG: Applied Multi Lens 
+[05:50:44.019] LOG: Applied Scope Lens 
+[05:50:44.020] LOG: crit stage: +3
+[05:50:44.023] LOG: Applied Hard Stone 
+[05:50:44.026] LOG: Move: Mighty Cleave | Base damage: 79235.10638993398 | Power: 222 | Source attack: 112366 | Target defense: 8027
+[05:50:44.027] LOG: Applied Multi Lens 
+[05:50:44.031] LOG: Applied Hard Stone 
+[05:50:44.032] LOG: Applied Multi Lens 
+[05:50:44.033] LOG: Applied Protection Token (enemy)
+[05:50:44.034] LOG: Applied Protection Token (enemy)
+[05:50:44.034] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:44.035] LOG: Applied Amulet Coin 
+[05:50:44.036] LOG: Applied Golden Punch 
+[05:50:44.038] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:44.055] LOG: %cStart Phase MessagePhase color:green;
+[05:50:44.239] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:50:44.431] LOG: %cStart Phase MessagePhase color:green;
+[05:50:44.646] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:44.805] LOG: Applied Scope Lens 
+[05:50:44.805] LOG: crit stage: +3
+[05:50:44.808] LOG: Applied Hard Stone 
+[05:50:44.811] LOG: Move: Mighty Cleave | Base damage: 79235.10638993398 | Power: 222 | Source attack: 112366 | Target defense: 8027
+[05:50:44.811] LOG: Applied Multi Lens 
+[05:50:44.814] LOG: Applied Hard Stone 
+[05:50:44.817] LOG: Applied Multi Lens 
+[05:50:44.818] LOG: Applied Protection Token (enemy)
+[05:50:44.818] LOG: Applied Protection Token (enemy)
+[05:50:44.819] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:44.820] LOG: Applied Amulet Coin 
+[05:50:44.821] LOG: Applied Golden Punch 
+[05:50:44.823] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:44.840] LOG: %cStart Phase MessagePhase color:green;
+[05:50:45.023] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:45.183] LOG: Applied Scope Lens 
+[05:50:45.183] LOG: crit stage: +3
+[05:50:45.185] LOG: Applied Hard Stone 
+[05:50:45.188] LOG: Move: Mighty Cleave | Base damage: 79235.10638993398 | Power: 222 | Source attack: 112366 | Target defense: 8027
+[05:50:45.189] LOG: Applied Multi Lens 
+[05:50:45.192] LOG: Applied Hard Stone 
+[05:50:45.193] LOG: Applied Multi Lens 
+[05:50:45.194] LOG: Applied Protection Token (enemy)
+[05:50:45.195] LOG: Applied Protection Token (enemy)
+[05:50:45.195] LOG: Move: Mighty Cleave | Attack damage: 1
+[05:50:45.197] LOG: Applied Amulet Coin 
+[05:50:45.198] LOG: Applied Golden Punch 
+[05:50:45.200] LOG: Applied Shell Bell 
+[05:50:45.200] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:50:45.214] LOG: %cStart Phase MessagePhase color:green;
+[05:50:45.392] LOG: %cStart Phase MessagePhase color:green;
+[05:50:45.600] LOG: %cStart Phase MessagePhase color:green;
+[05:50:45.788] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:45.788] LOG: %cStart Phase MovePhase color:green;
+[05:50:45.788] LOG: %cUser: Sigilyph
+Move: PSYCHO_WAVE
+Use Mode: NORMAL color:orchid
+[05:50:45.795] LOG: %cStart Phase MessagePhase color:green;
+[05:50:45.923] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:50:45.926] LOG: %cStart Phase MessagePhase color:green;
+[05:50:46.148] LOG: %cStart Phase MoveEndPhase color:green;
+[05:50:46.148] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:50:46.148] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:50:46.216] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[05:50:46.533] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:50:46.534] LOG: %cStart Phase BerryPhase color:green;
+[05:50:46.540] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:50:46.542] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[05:50:46.728] LOG: %cStart Phase MessagePhase color:green;
+[05:50:46.962] LOG: %cStart Phase TurnEndPhase color:green;
+[05:50:46.970] LOG: Battle Seed: O5CbuxfTR6RHk4As
+[05:50:46.971] LOG: Applied Zinc (enemy)
+[05:50:46.971] LOG: Applied Calcium (enemy)
+[05:50:46.971] LOG: Applied Carbos (enemy)
+[05:50:46.971] LOG: Applied Iron (enemy)
+[05:50:46.971] LOG: Applied Protein (enemy)
+[05:50:46.971] LOG: Applied HP Up (enemy)
+[05:50:46.980] LOG: Applied Iron 
+[05:50:46.980] LOG: Applied Carbos 
+[05:50:46.981] LOG: Applied Zinc 
+[05:50:46.981] LOG: Applied HP Up 
+[05:50:46.981] LOG: Applied Calcium 
+[05:50:46.982] LOG: Applied Soul Dew 
+[05:50:46.984] LOG: Applied Soul Dew 
+[05:50:46.985] LOG: Applied Calcium 
+[05:50:46.985] LOG: Applied Soul Dew 
+[05:50:46.986] LOG: Applied Soul Dew 
+[05:50:46.989] LOG: Applied Protein 
+[05:50:46.990] LOG: Applied Soul Dew 
+[05:50:46.990] LOG: Applied Soul Dew 
+[05:50:46.992] LOG: Applied Iron 
+[05:50:46.992] LOG: Applied HP Up 
+[05:50:46.992] LOG: Applied Carbos 
+[05:50:46.992] LOG: Applied Zinc 
+[05:50:46.993] LOG: Applied HP Up 
+[05:50:46.993] LOG: Applied Iron 
+[05:50:46.994] LOG: Applied Protein 
+[05:50:46.994] LOG: Applied Iron 
+[05:50:46.995] LOG: Applied Carbos 
+[05:50:46.995] LOG: Applied Zinc 
+[05:50:47.023] LOG: Applied Mini Black Hole 
+[05:50:47.023] LOG: Applied Recovery Token (enemy)
+[05:50:47.023] LOG: %cStart Phase MessagePhase color:green;
+
+----- REPLAY TRACE (JSON) -----
+(none)
