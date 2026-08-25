@@ -27,7 +27,7 @@
 
 use er_state::bespoke_v2::guard::{
     ActiveSelfGuardEntry, ActiveSideGuardEntry, GuardFamilyState, GuardFamilyStateError,
-    GuardKind, SideGuardKind, SurvivalFlag, GUARD_CHAIN_MAX_DEPTH,
+    GuardKind, SideGuardKind, SurvivalFlag,
 };
 use er_types::SafeU53;
 use er_types::battle_ids::BattleSide;
@@ -51,11 +51,14 @@ pub enum GuardTransitionError {
     InvalidOwnerScope,
     #[error("owner already holds an active guard of this family slot")]
     ActiveGuardConflict,
-    #[error("chained activation would exceed the frozen ceiling of {max}")]
-    ChainCeilingExceeded { max: u8 },
+    #[error(
+        "success threshold 3^{depth} is not representable in the audited draw domain"
+    )]
+    ThresholdRangeUnrepresentable { depth: u32 },
+    #[error("chain depth counter exhausted")]
+    ChainDepthOverflow,
     #[error("audited draw required at chain depth {depth}, range {expected}")]
-    MissingAuditedDraw { depth: u8, expected: u64 },
-    #[error("first chained use is guaranteed; audited draws are not admitted")]
+    MissingAuditedDraw { depth: u32, expected: u64 },
     DrawSuppliedForGuaranteedSuccess,
     #[error("side guards never consume odds; audited draws are not admitted")]
     DrawSuppliedForUngatedActivation,
@@ -337,8 +340,8 @@ pub struct GuardUseEvidence {
     pub schema_version: u32,
     pub activation: GuardActivation,
     pub owner: MechanicScope,
-    pub chain_depth_before: u8,
-    pub chain_depth_after: u8,
+    pub chain_depth_before: u32,
+    pub chain_depth_after: u32,
     /// Exact threshold range `3^depth`; `None` for ungated side guards.
     pub threshold_range: Option<u64>,
     /// The audited outcome admitted and inspected by this transition, if any.
@@ -466,29 +469,30 @@ pub fn apply_guard_use(
 
 fn advance_chain_checked(
     candidate: &mut GuardFamilyState,
-    depth_before: u8,
+    depth_before: u32,
 ) -> Result<(), GuardTransitionError> {
     let next_depth = depth_before
         .checked_add(1)
-        .ok_or(GuardTransitionError::ChainCeilingExceeded {
-            max: GUARD_CHAIN_MAX_DEPTH,
-        })?;
-    if next_depth > GUARD_CHAIN_MAX_DEPTH {
-        return Err(GuardTransitionError::ChainCeilingExceeded {
-            max: GUARD_CHAIN_MAX_DEPTH,
-        });
-    }
+        .ok_or(GuardTransitionError::ChainDepthOverflow)?;
     candidate.chain_depth = next_depth;
     Ok(())
 }
 
-/// Exact oracle threshold: the draw range equals `3^chain_depth`.
-fn threshold_range(depth: u8) -> Result<u64, GuardTransitionError> {
+/// Exact oracle threshold: the draw range equals `3^chain_depth`. The range
+/// must stay inside the audited draw domain — a `SafeU53` roll, exactly as
+/// the oracle's `randBattleSeedInt` — so the first depth whose power of three
+/// leaves that domain is the frozen numeric boundary; deeper chains fail
+/// deterministically instead of approximating.
+fn threshold_range(depth: u32) -> Result<u64, GuardTransitionError> {
+    const DRAW_DOMAIN_MAX: u64 = SafeU53::MAX.get();
     let mut range: u64 = 1;
     for _ in 0..depth {
-        range = range
-            .checked_mul(3)
-            .ok_or(GuardTransitionError::OrdinalSpaceExhausted)?;
+        match range.checked_mul(3) {
+            Some(next) if next <= DRAW_DOMAIN_MAX => range = next,
+            Some(_) | None => {
+                return Err(GuardTransitionError::ThresholdRangeUnrepresentable { depth });
+            }
+        }
     }
     Ok(range)
 }
@@ -577,7 +581,7 @@ pub struct GuardTurnEndEvidence {
     pub endure_token_flags_expired: u64,
     pub sturdy_flags_expired: u64,
     /// Chain depth survives expiry; only move history breaks it.
-    pub chain_depth_preserved: u8,
+    pub chain_depth_preserved: u32,
 }
 
 /// Atomic result of [`expire_turn_end`].
@@ -757,7 +761,6 @@ fn consume_survival_flag(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use er_state::bespoke_v2::guard::GUARD_CHAIN_MAX_DEPTH;
 
     const OWNER_A: u64 = 101;
     const OWNER_B: u64 = 202;
@@ -930,18 +933,69 @@ mod tests {
     }
 
     #[test]
-    fn chain_ceiling_is_enforced_deterministically() {
+    fn chains_run_deep_past_six_with_exact_powers_of_three() {
         let mut deep = fresh_state();
-        deep.chain_depth = GUARD_CHAIN_MAX_DEPTH;
+        deep.chain_depth = 7;
         deep.validate().unwrap();
         let request = self_request(OWNER_A, GuardKind::Protect);
-        let hit = AuditedGuardDraw::new(SafeU53::ZERO, 729);
+
         assert_eq!(
-            apply_guard_use(&deep, &request, Some(hit)),
-            Err(GuardTransitionError::ChainCeilingExceeded {
-                max: GUARD_CHAIN_MAX_DEPTH
+            apply_guard_use(&deep, &request, None),
+            Err(GuardTransitionError::MissingAuditedDraw {
+                depth: 7,
+                expected: 2187
             })
         );
+        let miss = AuditedGuardDraw::new(SafeU53::new(1).unwrap(), 2187);
+        let failed = apply_guard_use(&deep, &request, Some(miss)).unwrap();
+        assert!(!failed.evidence.succeeded);
+        assert_eq!(failed.state.chain_depth, 0);
+
+        deep.chain_depth = 6;
+        let hit = AuditedGuardDraw::new(SafeU53::ZERO, 729);
+        let passed = apply_guard_use(&deep, &request, Some(hit)).unwrap();
+        assert!(passed.evidence.succeeded);
+        assert_eq!(passed.state.chain_depth, 7);
+    }
+
+    #[test]
+    fn boundary_is_the_safe_draw_domain_not_a_depth_cap() {
+        const DOMAIN_MAX: u64 = SafeU53::MAX.get();
+        // 3^33 fits the safe-integer draw domain; 3^34 does not.
+        assert_eq!(3_u64.pow(33) <= DOMAIN_MAX, true);
+        assert_eq!(3_u64.pow(34) > DOMAIN_MAX, true);
+
+        let mut deepest = fresh_state();
+        deepest.chain_depth = 33;
+        deepest.validate().unwrap();
+        let request = self_request(OWNER_A, GuardKind::Protect);
+        assert_eq!(
+            apply_guard_use(&deepest, &request, None),
+            Err(GuardTransitionError::MissingAuditedDraw {
+                depth: 33,
+                expected: 5_559_060_566_555_523
+            })
+        );
+        let last_hit =
+            AuditedGuardDraw::new(SafeU53::ZERO, 5_559_060_566_555_523);
+        let survived = apply_guard_use(&deepest, &request, Some(last_hit)).unwrap();
+        assert!(survived.evidence.succeeded);
+        assert_eq!(survived.state.chain_depth, 34);
+
+        // The very next depth crosses the frozen numeric boundary.
+        let beyond = AuditedGuardDraw::new(SafeU53::ZERO, u64::MAX);
+        assert_eq!(
+            apply_guard_use(&survived.state, &request, Some(beyond)),
+            Err(GuardTransitionError::ThresholdRangeUnrepresentable { depth: 34 })
+        );
+
+        // The threshold computation itself refuses before any draw is
+        // consulted, whether or not an outcome was supplied.
+        assert_eq!(
+            apply_guard_use(&survived.state, &request, None),
+            Err(GuardTransitionError::ThresholdRangeUnrepresentable { depth: 34 })
+        );
+
     }
 
     #[test]

@@ -21,12 +21,6 @@ use thiserror::Error;
 /// Schema version of the guard family's canonical state.
 pub const GUARD_FAMILY_STATE_SCHEMA_VERSION: u32 = 1;
 
-/// Frozen ceiling on the consecutive-use chain, shared with
-/// `er_state::mechanic_state_v2` (`GUARD_CHAIN_MAX_DEPTH`). The oracle has no
-/// explicit cap, but the success range grows as `3^depth`, so depth 6 already
-/// bounds the success range at 729 within `u64`.
-pub const GUARD_CHAIN_MAX_DEPTH: u8 = 6;
-
 /// Closed self-protection kinds carried by the catalog `ProtectAttr` moves.
 ///
 /// Provenance (`src/data/moves/move.ts`, oracle worktree): every variant maps
@@ -126,7 +120,7 @@ pub struct ActiveSideGuardEntry {
 pub struct GuardFamilyState {
     pub schema_version: u32,
     /// Consecutive successful protect-family/side-chain-guard uses.
-    pub chain_depth: u8,
+    pub chain_depth: u32,
     /// Active self-protection tags, creation order preserved.
     pub self_guards: Vec<ActiveSelfGuardEntry>,
     /// Active side guards, creation order preserved.
@@ -162,8 +156,6 @@ impl Default for GuardFamilyState {
 pub enum GuardFamilyStateError {
     #[error("guard family schema version must be {expected}, got {actual}")]
     SchemaVersion { expected: u32, actual: u32 },
-    #[error("guard chain depth {actual} exceeds the frozen ceiling of {max}")]
-    ChainTooDeep { actual: u8, max: u8 },
     #[error("next guard creation ordinal must be positive")]
     ZeroNextCreationOrdinal,
     #[error("active self guard owner must be a Pokemon scope")]
@@ -187,19 +179,13 @@ pub enum GuardFamilyStateError {
 }
 
 impl GuardFamilyState {
-    /// Total validation: schema, chain ceiling, active-guard coherence, and
-    /// ordinal monotonicity.
+    /// Total validation: schema, active-guard coherence, and ordinal
+    /// monotonicity.
     pub fn validate(&self) -> Result<(), GuardFamilyStateError> {
         if self.schema_version != GUARD_FAMILY_STATE_SCHEMA_VERSION {
             return Err(GuardFamilyStateError::SchemaVersion {
                 expected: GUARD_FAMILY_STATE_SCHEMA_VERSION,
                 actual: self.schema_version,
-            });
-        }
-        if self.chain_depth > GUARD_CHAIN_MAX_DEPTH {
-            return Err(GuardFamilyStateError::ChainTooDeep {
-                actual: self.chain_depth,
-                max: GUARD_CHAIN_MAX_DEPTH,
             });
         }
         if self.next_creation_ordinal == SafeU53::ZERO {
@@ -344,16 +330,10 @@ mod tests {
     }
 
     #[test]
-    fn rejects_chain_depth_above_ceiling() {
+    fn arbitrarily_deep_chains_validate() {
         let mut state = GuardFamilyState::default();
-        state.chain_depth = GUARD_CHAIN_MAX_DEPTH + 1;
-        assert_eq!(
-            state.validate(),
-            Err(GuardFamilyStateError::ChainTooDeep {
-                actual: GUARD_CHAIN_MAX_DEPTH + 1,
-                max: GUARD_CHAIN_MAX_DEPTH,
-            })
-        );
+        state.chain_depth = 100_000;
+        state.validate().unwrap();
     }
 
     #[test]
@@ -483,10 +463,9 @@ mod tests {
     #[test]
     fn coherent_state_with_mixed_activity_validates_and_queries() {
         let mut state = GuardFamilyState::default();
-        state.chain_depth = GUARD_CHAIN_MAX_DEPTH;
+        state.chain_depth = 6;
         state.self_guards.push(ActiveSelfGuardEntry {
             kind: GuardKind::KingsShield,
-            owner: pokemon_scope(11),
             creation_ordinal: ordinal(1),
         });
         state.side_guards.push(ActiveSideGuardEntry {
