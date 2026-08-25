@@ -886,14 +886,22 @@ mod tests {
             apply_guard_use(&depth_one, &second, Some(out_of_range)),
             Err(GuardTransitionError::RollOutOfRange { roll: 7, range: 3 })
         );
-
         let miss = AuditedGuardDraw::new(SafeU53::new(1).unwrap(), 3);
         let failed = apply_guard_use(&depth_one, &second, Some(miss)).unwrap();
         assert!(!failed.evidence.succeeded);
         assert_eq!(failed.state.chain_depth, 0);
-        assert!(failed.state.self_guards.is_empty());
+        // A failed chained attempt breaks only the chain: every guard from
+        // earlier successful uses stays active until turn-end expiry.
+        assert_eq!(
+            failed.state.self_guard_for(&pokemon(OWNER_A)).map(|e| e.kind),
+            Some(GuardKind::Protect)
+        );
+        assert!(failed.state.self_guard_for(&pokemon(OWNER_B)).is_none());
 
-        let rebuilt = apply_guard_use(&failed.state, &first, None).unwrap().state;
+        // Turn-end expiry clears those tags; the next chain starts fresh.
+        let renewed = expire_turn_end(&failed.state).unwrap().state;
+        assert!(renewed.self_guards.is_empty());
+        let rebuilt = apply_guard_use(&renewed, &first, None).unwrap().state;
         let hit = AuditedGuardDraw::new(SafeU53::ZERO, 3);
         let passed = apply_guard_use(&rebuilt, &second, Some(hit)).unwrap();
         assert!(passed.evidence.succeeded);
@@ -1305,13 +1313,9 @@ mod tests {
             ..spread_attack()
         };
         // Both conditions match; the earlier-created Quick Guard answers.
-        assert_eq!(
-            resolve_against(&both, OWNER_A, BattleSide::Player, &priority_spread),
-            GuardBlockDecision::Blocked {
-                guard: BlockingGuard::SideGuard(SideGuardKind::QuickGuard)
-            }
-        );
-        // Non-matching earlier guards fall through to later ones.
+        // The oracle resolves arena tags in creation order, so when both
+        // conditions match a physical spread move the earlier Mat Block
+        // answers even though Wide Guard would also cover it.
         let mat_then_wide = apply_guard_use(
             &base,
             &side_request(BattleSide::Player, SideGuardKind::MatBlock),
@@ -1329,7 +1333,28 @@ mod tests {
         assert_eq!(
             resolve_against(&layered, OWNER_A, BattleSide::Player, &spread_attack()),
             GuardBlockDecision::Blocked {
-                guard: BlockingGuard::SideGuard(SideGuardKind::WideGuard)
+                guard: BlockingGuard::SideGuard(SideGuardKind::MatBlock)
+            }
+        );
+        // A non-matching earlier guard falls through to a matching later one.
+        let crafty_then_quick = apply_guard_use(
+            &base,
+            &side_request(BattleSide::Player, SideGuardKind::CraftyShield),
+            None,
+        )
+        .unwrap()
+        .state;
+        let fall_through = apply_guard_use(
+            &crafty_then_quick,
+            &side_request(BattleSide::Player, SideGuardKind::QuickGuard),
+            None,
+        )
+        .unwrap()
+        .state;
+        assert_eq!(
+            resolve_against(&fall_through, OWNER_A, BattleSide::Player, &attack(1)),
+            GuardBlockDecision::Blocked {
+                guard: BlockingGuard::SideGuard(SideGuardKind::QuickGuard)
             }
         );
     }
@@ -1353,8 +1378,19 @@ mod tests {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
         let once = apply_guard_use(&base, &protect, None).unwrap().state;
+        // The odds gate runs before any coherence check: a chained
+        // re-request without its audited draw reports the missing draw
+        // first, exactly as the oracle evaluates the move condition before
+        // effects.
         assert_eq!(
             apply_guard_use(&once, &protect, None),
+            Err(GuardTransitionError::MissingAuditedDraw { depth: 1, expected: 3 })
+        );
+        // With the audited outcome admitted, the duplicate self guard
+        // conflicts.
+        let hit = AuditedGuardDraw::new(SafeU53::ZERO, 3);
+        assert_eq!(
+            apply_guard_use(&once, &protect, Some(hit)),
             Err(GuardTransitionError::ActiveGuardConflict)
         );
 
@@ -1362,6 +1398,11 @@ mod tests {
         let enduring = apply_guard_use(&base, &endure, None).unwrap().state;
         assert_eq!(
             apply_guard_use(&enduring, &endure, None),
+            Err(GuardTransitionError::MissingAuditedDraw { depth: 1, expected: 3 })
+        );
+        let endure_hit = AuditedGuardDraw::new(SafeU53::ZERO, 3);
+        assert_eq!(
+            apply_guard_use(&enduring, &endure, Some(endure_hit)),
             Err(GuardTransitionError::ActiveGuardConflict)
         );
 
@@ -1560,10 +1601,13 @@ mod tests {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
         let chained = apply_guard_use(&base, &protect, None).unwrap().state;
-        let chained_again =
-            apply_guard_use(&chained, &self_request(OWNER_B, GuardKind::Detect), None)
-                .unwrap()
-                .state;
+        let chained_again = apply_guard_use(
+            &chained,
+            &self_request(OWNER_B, GuardKind::Detect),
+            Some(AuditedGuardDraw::new(SafeU53::ZERO, 3)),
+        )
+        .unwrap()
+        .state;
         let reset = reset_guard_chain(&chained_again).unwrap();
         assert_eq!(reset.self_guards.len(), chained_again.self_guards.len());
         assert_eq!(reset.chain_depth, 0);
