@@ -184,12 +184,9 @@ pub fn stage_stance_request(
     if let Some(active) = one_time_active(battler) {
         return Err(FormsTransitionError::OverlayActive { active });
     }
-    if target.species != battler.base.species {
-        return Err(FormsTransitionError::StanceCrossSpecies);
-    }
-    if target == battler.current {
-        return Err(FormsTransitionError::StanceTargetEqualsCurrent);
-    }
+    // Oracle precedence: the identity of an already-staged request is
+    // resolved first — idempotent restage or typed conflict — before any
+    // false-condition validation of a fresh target.
     if let Some(pending) = &battler.pending_stance_request {
         if pending.request_id == request_id {
             if pending.target == target {
@@ -202,6 +199,12 @@ pub fn stage_stance_request(
         return Err(FormsTransitionError::StanceRequestPending {
             pending_request_id: pending.request_id,
         });
+    }
+    if target.species != battler.base.species {
+        return Err(FormsTransitionError::StanceCrossSpecies);
+    }
+    if target == battler.current {
+        return Err(FormsTransitionError::StanceTargetEqualsCurrent);
     }
     battler.pending_stance_request = Some(StanceRequestV2 {
         request_id,
@@ -1033,17 +1036,35 @@ mod tests {
         require_species_metadata(&registry, &identity(42, "shield")).expect("covered species");
     }
 
-    /// Proves exact closure over the frozen CUSTOM_DISPATCH `SPECIES` group:
-    /// all 2,018 otherwise-unowned `SPECIES_FORM_BEHAVIOR` units load into the
-    /// canonical registry without loss or duplication.
+    /// Walks up from the crate manifest so the frozen cluster fixture
+    /// resolves under any integration layout (crate dir, workspace root,
+    /// or a relocated checkout that keeps `fixtures/m6` or
+    /// `rust/fixtures/m6` on the ancestor chain).
+    fn resolve_cluster_fixture() -> std::path::PathBuf {
+        let mut dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        loop {
+            for candidate in [
+                dir.join("fixtures/m6/bespoke-clusters-v1.json"),
+                dir.join("rust/fixtures/m6/bespoke-clusters-v1.json"),
+            ] {
+                if candidate.is_file() {
+                    return candidate;
+                }
+            }
+            if !dir.pop() {
+                break;
+            }
+        }
+        panic!(
+            "frozen bespoke clusters fixture not found above {}",
+            env!("CARGO_MANIFEST_DIR")
+        );
+    }
+
     #[test]
     fn custom_dispatch_species_subset_is_exactly_covered() {
-        let fixture_path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../../fixtures/m6/bespoke-clusters-v1.json"
-        );
-        let raw =
-            std::fs::read_to_string(fixture_path).expect("frozen bespoke clusters fixture exists");
+        let raw = std::fs::read_to_string(resolve_cluster_fixture())
+            .expect("frozen bespoke clusters fixture exists");
         let fixture: serde_json::Value = serde_json::from_str(&raw).expect("fixture parses");
 
         let clusters = fixture["clusters"].as_array().expect("clusters array");

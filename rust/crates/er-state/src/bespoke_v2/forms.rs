@@ -384,9 +384,16 @@ impl SpeciesFormRegistryV2 {
     where
         I: IntoIterator<Item = u64>,
     {
+        // SafeU53(0) is a representable value, so zero ids are rejected here
+        // explicitly — the constructor must be total without a later validate().
         let mut entries: Vec<SafeU53> = ids
             .into_iter()
-            .map(|id| SafeU53::new(id).map_err(|_| FormsStateError::ZeroSpecies))
+            .map(|id| {
+                if id == 0 {
+                    return Err(FormsStateError::ZeroSpecies);
+                }
+                SafeU53::new(id).map_err(|_| FormsStateError::ZeroSpecies)
+            })
             .collect::<Result<_, _>>()?;
         entries.sort();
         if entries.windows(2).any(|window| window[0] == window[1]) {
