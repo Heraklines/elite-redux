@@ -1,0 +1,2074 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    github:3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7:run-32645676937.1
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 OPR/134.0.0.0
+platform: Win32
+screen:   1536x864 @1.25x  devmem:16 GB
+boot:     boot-start@0ms -> loading-complete@16500ms -> title-shown@20826ms
+lastSess: crashed after loading-complete
+mode:     1  wave:1145
+seed:     Z1FsGv1hCJESc2VQlTC00toy
+party:    Moltres Ex(L2717 8161hp f1), Iron Leaves(L2639 8692hp f0), Swampage(L1772 5591hp f1), Fluffbee(L1886 5913hp f0), Purugly(L2705 8412hp f0), Sableye(L1868 5520hp f1)
+enemy:    Purugly(L2705), Florges(L2705)
+
+----- COMMENT -----
+t3 Purugly has a Turtwig icon
+
+----- BUILD IDENTITY (JSON) -----
+{"version":1,"id":"github:3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7:run-32645676937.1","source":"github","sha":"3bb6d49c924293ef79e3ab2f11e10cf4f5b9c6c7","workflow":{"provider":"github-actions","runId":"32645676937","runAttempt":1,"workflow":"Deploy Staging","job":"deploy","repository":"Heraklines/elite-redux","ref":"feat/elite-redux-port"},"deployment":null}
+
+----- CONSOLE -----
+[04:50:58.420] LOG: %cStart Phase SelectBiomePhase color:green;
+[04:50:58.420] LOG: Wave Seed: ӎҥҺӧһӪҥӜҷҾҹӇӗҦӊӅӠӈҷҤҤӨӣӭ 1140
+[04:50:58.420] LOG: %cStart Phase PartyHealPhase color:green;
+[04:51:00.880] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:51:00.880] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:51:00.882] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:51:00.883] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:51:00.884] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:51:00.884] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:51:00.884] LOG: %cStart Phase SwitchBiomePhase color:green;
+[04:51:01.304] LOG: %cStart Phase NewBattlePhase color:green;
+[04:51:01.304] LOG: Wave Seed: ӏҦһӨҼӫҦӝҸҿҺӈӘҧӋӆӡӉҸҥҥөӤӮ 1141
+[04:51:01.305] LOG: Applied Super Lure 
+[04:51:01.305] LOG: Applied Lure 
+[04:51:01.306] LOG: %cStart Phase ReturnPhase color:green;
+[04:51:01.412] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:51:01.571] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:51:01.598] LOG: %cStart Phase ShowTrainerPhase color:green;
+[04:51:01.708] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[04:51:01.710] LOG: Starting species pool tier: COMMON
+[04:51:01.712] LOG: Replaced GOSSIFLEUR with ELDEGOSS
+[04:51:01.713] LOG: Applied Shiny Charm 
+[04:51:01.725] LOG: Pokemon: Wild Eldegoss | Species ID: 830 | Level: 2663 | Nature: Timid (+Spd/-Atk)
+[04:51:01.725] LOG: Stats (IVs): HP: 6481 (23), Atk: 2472 (3), Def: 5091 (11), Spatk: 5064 (30), Spdef: 8420 (26), Spd: 3521 (0)
+[04:51:01.725] LOG: Ability: Overcoat | Passive Ability: Fluffy 
+[04:51:01.725] LOG: Moveset: ["Magical Leaf","Synthesis","Pollen Puff","Cotton Guard"]
+[04:51:01.725] LOG: Starting species pool tier: UNCOMMON
+[04:51:01.727] LOG: Replaced RALTS with GARDEVOIR
+[04:51:01.730] LOG: Applied Shiny Charm 
+[04:51:01.738] LOG: Pokemon: Wild Gardevoir | Species ID: 282 | Level: 2663 | Nature: Hardy (-)
+[04:51:01.739] LOG: Stats (IVs): HP: 6374 (3), Atk: 3813 (23), Def: 3520 (2), Spatk: 6715 (2), Spdef: 6342 (8), Spd: 5703 (14)
+[04:51:01.739] LOG: Ability: Queenly Majesty | Passive Ability: Serene Grace 
+[04:51:01.739] LOG: Moveset: ["Esper Waltz","Destiny Bond","Entrainment","Revelation Dance"]
+[04:51:03.608] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:51:03.608] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:51:03.651] LOG: Battle Seed: 9EGoCnZ5lkA3D8fp
+[04:51:03.651] LOG: Applied Zinc (enemy)
+[04:51:03.651] LOG: Applied Protein (enemy)
+[04:51:03.651] LOG: Applied HP Up (enemy)
+[04:51:03.652] LOG: Applied Zinc (enemy)
+[04:51:03.772] DEBUG: Session data saved to slot 0!
+[04:51:03.773] LOG: Applied Zinc (enemy)
+[04:51:03.773] LOG: Applied Protein (enemy)
+[04:51:03.773] LOG: Applied HP Up (enemy)
+[04:51:03.774] LOG: Applied Zinc (enemy)
+[04:51:03.776] LOG: Wave Seed: ӏҦһӨҼӫҦӝҸҿҺӈӘҧӋӆӡӉҸҥҥөӤӮ 1141
+[04:51:03.981] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:51:04.085] LOG: %cStart Phase LevelCapPhase color:green;
+[04:51:04.684] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:51:04.684] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:51:04.684] LOG: %cStart Phase SummonPhase color:green;
+[04:51:04.828] LOG: Applied Calcium 
+[04:51:04.828] LOG: Applied Soul Dew 
+[04:51:04.828] LOG: Applied Soul Dew 
+[04:51:04.829] LOG: Applied Iron 
+[04:51:04.829] LOG: Applied Carbos 
+[04:51:04.829] LOG: Applied Zinc 
+[04:51:04.829] LOG: Applied HP Up 
+[04:51:04.829] LOG: Applied Calcium 
+[04:51:04.830] LOG: Applied Soul Dew 
+[04:51:04.830] LOG: Applied Soul Dew 
+[04:51:04.831] LOG: Applied Protein 
+[04:51:04.831] LOG: Applied Soul Dew 
+[04:51:04.831] LOG: Applied Soul Dew 
+[04:51:04.834] LOG: Applied Iron 
+[04:51:04.835] LOG: Applied HP Up 
+[04:51:04.835] LOG: Applied Carbos 
+[04:51:04.835] LOG: Applied Zinc 
+[04:51:04.836] LOG: Applied HP Up 
+[04:51:04.836] LOG: Applied Calcium 
+[04:51:04.836] LOG: Applied Protein 
+[04:51:04.836] LOG: Applied Iron 
+[04:51:04.836] LOG: Applied Carbos 
+[04:51:04.836] LOG: Applied Zinc 
+[04:51:04.938] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:51:04.940] LOG: %cStart Phase SummonPhase color:green;
+[04:51:05.098] LOG: Applied Calcium 
+[04:51:05.098] LOG: Applied Soul Dew 
+[04:51:05.099] LOG: Applied Soul Dew 
+[04:51:05.100] LOG: Applied Iron 
+[04:51:05.100] LOG: Applied Carbos 
+[04:51:05.100] LOG: Applied Zinc 
+[04:51:05.100] LOG: Applied HP Up 
+[04:51:05.100] LOG: Applied Calcium 
+[04:51:05.101] LOG: Applied Soul Dew 
+[04:51:05.101] LOG: Applied Soul Dew 
+[04:51:05.102] LOG: Applied Protein 
+[04:51:05.105] LOG: Applied Soul Dew 
+[04:51:05.106] LOG: Applied Soul Dew 
+[04:51:05.107] LOG: Applied Iron 
+[04:51:05.107] LOG: Applied HP Up 
+[04:51:05.107] LOG: Applied Carbos 
+[04:51:05.107] LOG: Applied Zinc 
+[04:51:05.109] LOG: Applied HP Up 
+[04:51:05.109] LOG: Applied Calcium 
+[04:51:05.110] LOG: Applied Protein 
+[04:51:05.111] LOG: Applied Iron 
+[04:51:05.111] LOG: Applied Carbos 
+[04:51:05.111] LOG: Applied Zinc 
+[04:51:05.201] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:51:05.317] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:51:05.593] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:51:05.799] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:51:05.815] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:05.815] LOG: Ran PSP for: Iron Leaves
+[04:51:05.834] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:05.834] LOG: Ran PSP for: Mega Moltres Ex
+[04:51:05.847] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:05.865] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:51:06.018] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:51:06.410] LOG: %cStart Phase MessagePhase color:green;
+[04:51:06.647] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:51:06.676] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:51:06.849] LOG: %cStart Phase MessagePhase color:green;
+[04:51:07.099] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:51:07.143] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:07.143] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:51:07.309] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:51:07.359] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:07.362] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:51:07.525] LOG: %cStart Phase MessagePhase color:green;
+[04:51:07.837] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:51:07.870] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:07.871] LOG: Ran PSP for: Gardevoir
+[04:51:07.877] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:07.877] LOG: Ran PSP for: Eldegoss
+[04:51:07.881] LOG: %cStart Phase PostSummonPhase color:green;
+[04:51:07.881] LOG: %cStart Phase TurnInitPhase color:green;
+[04:51:07.882] LOG: %cStart Phase CommandPhase color:green;
+[04:52:17.940] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:52:17.940] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:52:19.507] LOG: Move: FLAME_BURST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[04:52:19.510] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:52:19.947] LOG: %cStart Phase CommandPhase color:green;
+[04:52:20.625] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:52:20.627] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:20.630] LOG: Applied Miracle Seed (enemy)
+[04:52:20.631] LOG: Applied Damage Token (enemy)
+[04:52:20.631] LOG: Applied Miracle Seed (enemy)
+[04:52:20.632] LOG: Applied Damage Token (enemy)
+[04:52:20.633] LOG: Applied Damage Token (enemy)
+[04:52:20.633] LOG: Applied Damage Token (enemy)
+[04:52:20.634] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:20.636] LOG: Applied Damage Token (enemy)
+[04:52:20.637] LOG: Applied Damage Token (enemy)
+[04:52:20.641] LOG: Applied Damage Token (enemy)
+[04:52:20.641] LOG: Applied Damage Token (enemy)
+[04:52:20.643] LOG: %cStart Phase TurnStartPhase color:green;
+[04:52:20.647] LOG: %cStart Phase MovePhase color:green;
+[04:52:20.647] LOG: %cUser: Iron Leaves
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[04:52:20.650] LOG: %cStart Phase MessagePhase color:green;
+[04:52:20.733] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:20.988] LOG: Applied Shell Bell 
+[04:52:20.988] LOG: %cStart Phase MessagePhase color:green;
+[04:52:21.205] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:21.213] LOG: %cStart Phase MovePhase color:green;
+[04:52:21.213] LOG: %cUser: Mega Moltres Ex
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[04:52:21.233] LOG: %cStart Phase MessagePhase color:green;
+[04:52:21.333] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:52:21.498] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:52:21.531] LOG: %cStart Phase MessagePhase color:green;
+[04:52:21.727] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:21.729] LOG: %cStart Phase MovePhase color:green;
+[04:52:21.729] LOG: %cUser: Gardevoir
+Move: ESPER_WALTZ
+Use Mode: NORMAL color:orchid
+[04:52:21.769] LOG: %cStart Phase MessagePhase color:green;
+[04:52:21.855] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:22.104] LOG: crit stage: +0
+[04:52:22.110] LOG: Move: Esper Waltz | Base damage: 2060.5272531418314 | Power: 80 | Source attack: 6715 | Target defense: 5570
+[04:52:22.112] LOG: Applied Damage Token (enemy)
+[04:52:22.113] LOG: Move: Esper Waltz | Attack damage: 3403
+[04:52:22.118] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:52:22.129] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:52:22.311] LOG: %cStart Phase MessagePhase color:green;
+[04:52:22.528] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:22.528] LOG: %cStart Phase MovePhase color:green;
+[04:52:22.528] LOG: %cUser: Eldegoss
+Move: POLLEN_PUFF
+Use Mode: NORMAL color:orchid
+[04:52:22.568] LOG: %cStart Phase MessagePhase color:green;
+[04:52:22.653] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:22.656] LOG: %cStart Phase MessagePhase color:green;
+[04:52:22.888] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:22.888] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:52:22.889] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:52:23.343] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:52:23.343] LOG: %cStart Phase BerryPhase color:green;
+[04:52:23.367] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:52:23.386] LOG: %cStart Phase TurnEndPhase color:green;
+[04:52:23.393] LOG: Battle Seed: 9EGoCnZ5lkA3D8fp
+[04:52:23.397] LOG: Applied Leftovers 
+[04:52:23.399] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:52:23.501] LOG: Applied Healing Charm 
+[04:52:23.506] LOG: %cStart Phase MessagePhase color:green;
+[04:52:23.790] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:23.790] LOG: %cStart Phase CommandPhase color:green;
+[04:52:25.893] LOG: Move: AEROBLAST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[04:52:25.895] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:52:26.170] LOG: %cStart Phase CommandPhase color:green;
+[04:52:26.718] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:52:26.720] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:26.721] LOG: Applied Miracle Seed (enemy)
+[04:52:26.722] LOG: Applied Damage Token (enemy)
+[04:52:26.722] LOG: Applied Miracle Seed (enemy)
+[04:52:26.722] LOG: Applied Damage Token (enemy)
+[04:52:26.724] LOG: Applied Damage Token (enemy)
+[04:52:26.725] LOG: Applied Damage Token (enemy)
+[04:52:26.726] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:26.728] LOG: Applied Damage Token (enemy)
+[04:52:26.729] LOG: Applied Damage Token (enemy)
+[04:52:26.730] LOG: Applied Damage Token (enemy)
+[04:52:26.730] LOG: %cStart Phase TurnStartPhase color:green;
+[04:52:26.733] LOG: %cStart Phase MovePhase color:green;
+[04:52:26.733] LOG: %cUser: Iron Leaves
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[04:52:26.737] LOG: %cStart Phase MessagePhase color:green;
+[04:52:26.821] LOG: %cStart Phase MessagePhase color:green;
+[04:52:27.018] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:27.025] LOG: %cStart Phase MovePhase color:green;
+[04:52:27.025] LOG: %cUser: Mega Moltres Ex
+Move: AEROBLAST
+Use Mode: NORMAL color:orchid
+[04:52:27.056] LOG: %cStart Phase MessagePhase color:green;
+[04:52:27.139] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:27.141] LOG: Applied Multi Lens 
+[04:52:28.183] LOG: Applied Scope Lens 
+[04:52:28.184] LOG: crit stage: +2
+[04:52:28.191] LOG: Applied Sharp Beak 
+[04:52:28.195] LOG: Move: Aeroblast | Base damage: 40274.04085106383 | Power: 200 | Source attack: 86463 | Target defense: 9165
+[04:52:28.196] LOG: Applied Multi Lens 
+[04:52:28.199] LOG: Applied Protection Token (enemy)
+[04:52:28.201] LOG: Move: Aeroblast | Attack damage: 23408
+[04:52:28.203] LOG: Applied Amulet Coin 
+[04:52:28.204] LOG: Applied Golden Punch 
+[04:52:28.209] LOG: Applied Shell Bell 
+[04:52:28.210] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:52:28.222] LOG: %cStart Phase MessagePhase color:green;
+[04:52:28.420] LOG: %cStart Phase MessagePhase color:green;
+[04:52:28.616] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:52:28.737] LOG: Applied Healing Charm 
+[04:52:28.741] LOG: %cStart Phase MessagePhase color:green;
+[04:52:29.021] LOG: %cStart Phase FaintPhase color:green;
+[04:52:31.093] LOG: %cStart Phase MessagePhase color:green;
+[04:52:31.303] LOG: %cStart Phase VictoryPhase color:green;
+[04:52:31.304] LOG: Applied Soothe Bell 
+[04:52:31.306] LOG: Applied Golden Egg 
+[04:52:31.306] LOG: Applied Lucky Egg 
+[04:52:31.307] LOG: Applied Soothe Bell 
+[04:52:31.307] LOG: Applied Lucky Egg 
+[04:52:31.307] LOG: Applied Golden Egg 
+[04:52:31.307] LOG: Applied Lucky Egg 
+[04:52:31.307] LOG: Applied Lucky Egg 
+[04:52:31.307] LOG: Applied Lucky Egg 
+[04:52:31.307] LOG: %cStart Phase ExpPhase color:green;
+[04:52:31.307] LOG: Applied Super EXP. Charm 
+[04:52:31.308] LOG: Applied EXP. Charm 
+[04:52:31.752] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:31.753] LOG: Applied Calcium 
+[04:52:31.753] LOG: Applied Soul Dew 
+[04:52:31.754] LOG: Applied Soul Dew 
+[04:52:31.755] LOG: %cStart Phase ExpPhase color:green;
+[04:52:31.755] LOG: Applied Super EXP. Charm 
+[04:52:31.756] LOG: Applied EXP. Charm 
+[04:52:32.273] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:32.274] LOG: Applied Iron 
+[04:52:32.274] LOG: Applied Carbos 
+[04:52:32.274] LOG: Applied Zinc 
+[04:52:32.274] LOG: Applied HP Up 
+[04:52:32.274] LOG: Applied Calcium 
+[04:52:32.274] LOG: Applied Soul Dew 
+[04:52:32.275] LOG: Applied Soul Dew 
+[04:52:32.275] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:32.275] LOG: Applied Super EXP. Charm 
+[04:52:32.275] LOG: Applied EXP. Charm 
+[04:52:32.276] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:32.276] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:32.276] LOG: Applied Super EXP. Charm 
+[04:52:32.276] LOG: Applied EXP. Charm 
+[04:52:32.278] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:32.279] LOG: Applied Iron 
+[04:52:32.279] LOG: Applied HP Up 
+[04:52:32.279] LOG: Applied Carbos 
+[04:52:32.279] LOG: Applied Zinc 
+[04:52:32.280] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:32.280] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:32.280] LOG: Applied Super EXP. Charm 
+[04:52:32.280] LOG: Applied EXP. Charm 
+[04:52:32.280] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:32.280] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:32.280] LOG: Applied Super EXP. Charm 
+[04:52:32.280] LOG: Applied EXP. Charm 
+[04:52:32.281] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:32.281] LOG: Applied Protein 
+[04:52:32.281] LOG: Applied Iron 
+[04:52:32.281] LOG: Applied Carbos 
+[04:52:32.281] LOG: Applied Zinc 
+[04:52:32.281] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:32.281] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:32.283] LOG: %cStart Phase MovePhase color:green;
+[04:52:32.283] LOG: %cUser: Gardevoir
+Move: REVELATION_DANCE
+Use Mode: NORMAL color:orchid
+[04:52:32.304] LOG: %cStart Phase MessagePhase color:green;
+[04:52:32.403] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:32.779] LOG: crit stage: +0
+[04:52:32.783] LOG: Move: Revelation Dance | Base damage: 4115.600612323 | Power: 100 | Source attack: 10072 | Target defense: 5226
+[04:52:32.785] LOG: Applied Damage Token (enemy)
+[04:52:32.786] LOG: Move: Revelation Dance | Attack damage: 3288
+[04:52:32.790] LOG: Applied Paralyze Token (enemy)
+[04:52:32.792] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:52:32.802] LOG: %cStart Phase MessagePhase color:green;
+[04:52:33.016] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[04:52:33.187] LOG: %cStart Phase MessagePhase color:green;
+[04:52:33.461] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:33.461] LOG: %cStart Phase MovePhase color:green;
+[04:52:33.461] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:33.461] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:52:33.461] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:52:33.904] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:52:33.904] LOG: %cStart Phase BerryPhase color:green;
+[04:52:33.914] LOG: Applied Berry Pouch 
+[04:52:33.915] LOG: Applied Lum Berry 
+[04:52:33.917] LOG: Applied Calcium 
+[04:52:33.918] LOG: Applied Soul Dew 
+[04:52:33.919] LOG: Applied Soul Dew 
+[04:52:33.920] LOG: Applied Iron 
+[04:52:33.920] LOG: Applied Carbos 
+[04:52:33.920] LOG: Applied Zinc 
+[04:52:33.920] LOG: Applied HP Up 
+[04:52:33.920] LOG: Applied Calcium 
+[04:52:33.920] LOG: Applied Soul Dew 
+[04:52:33.920] LOG: Applied Soul Dew 
+[04:52:33.921] LOG: Applied Protein 
+[04:52:33.921] LOG: Applied Soul Dew 
+[04:52:33.922] LOG: Applied Soul Dew 
+[04:52:33.923] LOG: Applied Iron 
+[04:52:33.923] LOG: Applied HP Up 
+[04:52:33.924] LOG: Applied Carbos 
+[04:52:33.924] LOG: Applied Zinc 
+[04:52:33.925] LOG: Applied HP Up 
+[04:52:33.925] LOG: Applied Calcium 
+[04:52:33.926] LOG: Applied Protein 
+[04:52:33.926] LOG: Applied Iron 
+[04:52:33.926] LOG: Applied Carbos 
+[04:52:33.926] LOG: Applied Zinc 
+[04:52:33.964] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:52:34.111] LOG: %cStart Phase MessagePhase color:green;
+[04:52:34.358] LOG: %cStart Phase ResetStatusPhase color:green;
+[04:52:34.358] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:52:34.367] LOG: %cStart Phase TurnEndPhase color:green;
+[04:52:34.377] LOG: Applied Leftovers 
+[04:52:34.378] LOG: Battle Seed: 9EGoCnZ5lkA3D8fp
+[04:52:34.384] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:52:34.489] LOG: Applied Healing Charm 
+[04:52:34.494] LOG: %cStart Phase MessagePhase color:green;
+[04:52:34.768] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:34.768] LOG: %cStart Phase CommandPhase color:green;
+[04:52:36.977] LOG: %cStart Phase CommandPhase color:green;
+[04:52:36.978] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:36.979] LOG: Applied Damage Token (enemy)
+[04:52:36.979] LOG: Applied Damage Token (enemy)
+[04:52:36.981] LOG: Applied Damage Token (enemy)
+[04:52:36.982] LOG: Applied Damage Token (enemy)
+[04:52:36.983] LOG: %cStart Phase TurnStartPhase color:green;
+[04:52:36.985] LOG: %cStart Phase AttemptCapturePhase color:green;
+[04:52:38.426] LOG: [coop:account] account-write scope OPEN (own-catch) depth=1
+[04:52:38.844] LOG: %cStart Phase VictoryPhase color:green;
+[04:52:38.844] LOG: Applied Soothe Bell 
+[04:52:38.844] LOG: Applied Golden Egg 
+[04:52:38.844] LOG: Applied Lucky Egg 
+[04:52:38.844] LOG: Applied Soothe Bell 
+[04:52:38.845] LOG: Applied Lucky Egg 
+[04:52:38.845] LOG: Applied Golden Egg 
+[04:52:38.845] LOG: Applied Lucky Egg 
+[04:52:38.845] LOG: Applied Lucky Egg 
+[04:52:38.845] LOG: Applied Lucky Egg 
+[04:52:38.845] LOG: %cStart Phase ExpPhase color:green;
+[04:52:38.845] LOG: Applied Super EXP. Charm 
+[04:52:38.845] LOG: Applied EXP. Charm 
+[04:52:39.677] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:39.677] LOG: Applied Calcium 
+[04:52:39.678] LOG: Applied Soul Dew 
+[04:52:39.678] LOG: Applied Soul Dew 
+[04:52:39.679] LOG: %cStart Phase ExpPhase color:green;
+[04:52:39.679] LOG: Applied Super EXP. Charm 
+[04:52:39.679] LOG: Applied EXP. Charm 
+[04:52:40.153] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:40.153] LOG: Applied Iron 
+[04:52:40.153] LOG: Applied Carbos 
+[04:52:40.154] LOG: Applied Zinc 
+[04:52:40.154] LOG: Applied HP Up 
+[04:52:40.154] LOG: Applied Calcium 
+[04:52:40.154] LOG: Applied Soul Dew 
+[04:52:40.154] LOG: Applied Soul Dew 
+[04:52:40.155] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:40.155] LOG: Applied Super EXP. Charm 
+[04:52:40.155] LOG: Applied EXP. Charm 
+[04:52:40.155] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:40.156] LOG: Applied Protein 
+[04:52:40.156] LOG: Applied Soul Dew 
+[04:52:40.157] LOG: Applied Soul Dew 
+[04:52:40.157] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:40.158] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:40.158] LOG: Applied Super EXP. Charm 
+[04:52:40.158] LOG: Applied EXP. Charm 
+[04:52:40.159] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:40.160] LOG: Applied Iron 
+[04:52:40.160] LOG: Applied HP Up 
+[04:52:40.160] LOG: Applied Carbos 
+[04:52:40.160] LOG: Applied Zinc 
+[04:52:40.161] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:40.161] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:40.161] LOG: Applied Super EXP. Charm 
+[04:52:40.161] LOG: Applied EXP. Charm 
+[04:52:40.161] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:40.161] LOG: Applied HP Up 
+[04:52:40.161] LOG: Applied Calcium 
+[04:52:40.162] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:40.162] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:40.162] LOG: Applied Super EXP. Charm 
+[04:52:40.162] LOG: Applied EXP. Charm 
+[04:52:40.162] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:40.162] LOG: Applied Protein 
+[04:52:40.162] LOG: Applied Iron 
+[04:52:40.162] LOG: Applied Carbos 
+[04:52:40.162] LOG: Applied Zinc 
+[04:52:40.163] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:40.163] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:40.163] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:52:40.164] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:52:40.592] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:52:40.592] LOG: %cStart Phase BerryPhase color:green;
+[04:52:40.602] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:52:40.605] LOG: %cStart Phase TurnEndPhase color:green;
+[04:52:40.608] LOG: Applied Leftovers 
+[04:52:40.614] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:52:40.720] LOG: Applied Healing Charm 
+[04:52:40.723] LOG: %cStart Phase MessagePhase color:green;
+[04:52:40.995] LOG: %cStart Phase MessagePhase color:green;
+[04:52:41.230] LOG: %cStart Phase MessagePhase color:green;
+[04:52:41.458] LOG: %cStart Phase MessagePhase color:green;
+[04:52:41.674] LOG: %cStart Phase BattleEndPhase color:green;
+[04:52:41.675] LOG: Battle Score: 295 (3 Turns x0.69)
+[04:52:41.675] LOG: Total Score: 516326
+[04:52:41.677] LOG: Applied Amulet Coin 
+[04:52:41.679] LOG: Applied Calcium 
+[04:52:41.680] LOG: Applied Soul Dew 
+[04:52:41.681] LOG: Applied Soul Dew 
+[04:52:41.682] LOG: Applied Iron 
+[04:52:41.682] LOG: Applied Carbos 
+[04:52:41.682] LOG: Applied Zinc 
+[04:52:41.683] LOG: Applied HP Up 
+[04:52:41.683] LOG: Applied Calcium 
+[04:52:41.683] LOG: Applied Soul Dew 
+[04:52:41.683] LOG: Applied Soul Dew 
+[04:52:41.683] LOG: Applied Protein 
+[04:52:41.684] LOG: Applied Soul Dew 
+[04:52:41.684] LOG: Applied Soul Dew 
+[04:52:41.684] LOG: Applied Iron 
+[04:52:41.684] LOG: Applied HP Up 
+[04:52:41.684] LOG: Applied Carbos 
+[04:52:41.684] LOG: Applied Zinc 
+[04:52:41.685] LOG: Applied HP Up 
+[04:52:41.685] LOG: Applied Calcium 
+[04:52:41.685] LOG: Applied Protein 
+[04:52:41.685] LOG: Applied Iron 
+[04:52:41.685] LOG: Applied Carbos 
+[04:52:41.685] LOG: Applied Zinc 
+[04:52:41.702] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:52:41.702] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:52:41.703] LOG: %cStart Phase MessagePhase color:green;
+[04:52:41.809] LOG: %cStart Phase EggLapsePhase color:green;
+[04:52:41.809] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:52:41.809] LOG: Wave Seed: ӏҦһӨҼӫҦӝҸҿҺӈӘҧӋӆӡӉҸҥҥөӤӮ 1141
+[04:52:41.841] LOG: Applied Golden Poké Ball 
+[04:52:43.561] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:52:43.581] LOG: Applied Golden Poké Ball 
+[04:52:44.799] LOG: Applied Amulet Coin 
+[04:52:46.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:52:46.204] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:52:48.101] LOG: Applied Amulet Coin 
+[04:52:48.718] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:52:48.718] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:52:49.096] LOG: Applied Calcium 
+[04:52:49.096] LOG: Applied Soul Dew 
+[04:52:49.097] LOG: Applied Soul Dew 
+[04:52:49.099] LOG: Applied Iron 
+[04:52:49.099] LOG: Applied Carbos 
+[04:52:49.099] LOG: Applied Zinc 
+[04:52:49.099] LOG: Applied HP Up 
+[04:52:49.099] LOG: Applied Calcium 
+[04:52:49.100] LOG: Applied Soul Dew 
+[04:52:49.100] LOG: Applied Soul Dew 
+[04:52:49.100] LOG: Applied Protein 
+[04:52:49.101] LOG: Applied Soul Dew 
+[04:52:49.101] LOG: Applied Soul Dew 
+[04:52:49.102] LOG: Applied Iron 
+[04:52:49.102] LOG: Applied HP Up 
+[04:52:49.102] LOG: Applied Carbos 
+[04:52:49.102] LOG: Applied Zinc 
+[04:52:49.102] LOG: Applied HP Up 
+[04:52:49.102] LOG: Applied Calcium 
+[04:52:49.103] LOG: Applied Protein 
+[04:52:49.103] LOG: Applied Iron 
+[04:52:49.103] LOG: Applied Carbos 
+[04:52:49.103] LOG: Applied Zinc 
+[04:52:49.172] LOG: %cStart Phase NewBattlePhase color:green;
+[04:52:49.172] LOG: Wave Seed: ӐҧҼөҽӬҧӞҹӀһӉәҨӌӇӢӊҹҦҦӪӥӯ 1142
+[04:52:49.172] LOG: Applied Super Lure 
+[04:52:49.172] LOG: Applied Lure 
+[04:52:49.173] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:52:49.174] LOG: Starting species pool tier: COMMON
+[04:52:49.175] LOG: Replaced WOOLOO with DUBWOOL
+[04:52:49.177] LOG: Applied Shiny Charm 
+[04:52:49.184] LOG: Pokemon: Wild Dubwool | Species ID: 832 | Level: 2675 | Nature: Timid (+Spd/-Atk)
+[04:52:49.184] LOG: Stats (IVs): HP: 7259 (27), Atk: 4410 (23), Def: 5729 (14), Spatk: 4017 (30), Spdef: 5381 (21), Spd: 5656 (16)
+[04:52:49.184] LOG: Ability: Sap Sipper | Passive Ability: Let's Roll 
+[04:52:49.184] LOG: Moveset: ["Head Charge","Volt Tackle","Submission","Cotton Guard"]
+[04:52:49.184] LOG: Starting species pool tier: COMMON
+[04:52:49.186] LOG: Replaced BLITZLE with ZEBSTRIKA
+[04:52:49.187] LOG: Applied Shiny Charm 
+[04:52:49.194] LOG: Pokemon: Wild Zebstrika | Species ID: 523 | Level: 2675 | Nature: Timid (+Spd/-Atk)
+[04:52:49.194] LOG: Stats (IVs): HP: 7901 (25), Atk: 5637 (14), Def: 4124 (28), Spatk: 4338 (2), Spdef: 3429 (2), Spd: 6891 (2)
+[04:52:49.194] LOG: Ability: Adrenaline Rush | Passive Ability: Reckless 
+[04:52:49.194] LOG: Moveset: ["Double Shock","Quick Attack","Overheat","Me First"]
+[04:52:50.788] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:52:50.788] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:52:50.855] LOG: Battle Seed: Ya5w79TIxrl61iPG
+[04:52:50.856] LOG: Applied Carbos (enemy)
+[04:52:50.967] DEBUG: Session data saved to slot 0!
+[04:52:50.968] LOG: Applied Carbos (enemy)
+[04:52:50.969] LOG: Wave Seed: ӐҧҼөҽӬҧӞҹӀһӉәҨӌӇӢӊҹҦҦӪӥӯ 1142
+[04:52:51.410] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:52:51.411] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:52:51.411] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:52:51.411] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:52:51.648] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:52:51.901] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:52:51.905] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:51.906] LOG: Ran PSP for: Zebstrika
+[04:52:51.909] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:51.909] LOG: Ran PSP for: Dubwool
+[04:52:51.913] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:51.914] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:52:52.073] LOG: %cStart Phase MovePhase color:green;
+[04:52:52.073] LOG: %cUser: Dubwool
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[04:52:52.114] LOG: %cStart Phase MessagePhase color:green;
+[04:52:52.195] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:52.204] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:52:52.402] LOG: %cStart Phase MessagePhase color:green;
+[04:52:52.613] LOG: %cStart Phase MoveEndPhase color:green;
+[04:52:52.614] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:52:52.637] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:52.637] LOG: %cStart Phase CommandPhase color:green;
+[04:52:53.995] LOG: Move: ERUPTION Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Mega Moltres Ex
+[04:52:53.997] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:52:54.303] LOG: %cStart Phase CommandPhase color:green;
+[04:52:55.491] LOG: Move: BITTER_BLADE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Iron Leaves
+[04:52:55.493] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:52:55.785] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:55.787] LOG: Applied Damage Token (enemy)
+[04:52:55.788] LOG: Applied Damage Token (enemy)
+[04:52:55.788] LOG: Applied Damage Token (enemy)
+[04:52:55.788] LOG: Applied Damage Token (enemy)
+[04:52:55.789] LOG: Applied Damage Token (enemy)
+[04:52:55.789] LOG: Applied Damage Token (enemy)
+[04:52:55.794] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:55.795] LOG: Applied Damage Token (enemy)
+[04:52:55.795] LOG: Applied Damage Token (enemy)
+[04:52:55.795] LOG: Applied Damage Token (enemy)
+[04:52:55.795] LOG: Applied Damage Token (enemy)
+[04:52:55.796] LOG: Applied Damage Token (enemy)
+[04:52:55.796] LOG: Applied Damage Token (enemy)
+[04:52:55.796] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[04:52:55.797] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[04:52:55.797] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[04:52:55.797] WARN: BattlerTag DOUBLE_SHOCKED is missing a score!
+[04:52:55.798] LOG: %cStart Phase TurnStartPhase color:green;
+[04:52:55.803] LOG: %cStart Phase MovePhase color:green;
+[04:52:55.803] LOG: %cUser: Iron Leaves
+Move: BITTER_BLADE
+Use Mode: NORMAL color:orchid
+[04:52:55.806] LOG: %cStart Phase MessagePhase color:green;
+[04:52:55.897] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:52:55.898] LOG: Applied Multi Lens 
+[04:52:56.259] LOG: Applied Scope Lens 
+[04:52:56.260] LOG: crit stage: +1
+[04:52:56.262] LOG: Applied Charcoal 
+[04:52:56.268] LOG: Move: Bitter Blade | Base damage: 46524.201139532175 | Power: 187 | Source attack: 101567 | Target defense: 8593
+[04:52:56.268] LOG: Applied Multi Lens 
+[04:52:56.269] LOG: Applied Protection Token (enemy)
+[04:52:56.271] LOG: Move: Bitter Blade | Attack damage: 8278
+[04:52:56.273] LOG: Applied Amulet Coin 
+[04:52:56.274] LOG: Applied Golden Punch 
+[04:52:56.275] LOG: Applied Scope Lens 
+[04:52:56.276] LOG: crit stage: +1
+[04:52:56.278] LOG: Applied Charcoal 
+[04:52:56.282] LOG: Move: Bitter Blade | Base damage: 96938.29349951504 | Power: 187 | Source attack: 101567 | Target defense: 4124
+[04:52:56.282] LOG: Applied Multi Lens 
+[04:52:56.283] LOG: Applied Protection Token (enemy)
+[04:52:56.283] LOG: Move: Bitter Blade | Attack damage: 23002
+[04:52:56.285] LOG: Applied Amulet Coin 
+[04:52:56.285] LOG: Applied Golden Punch 
+[04:52:56.287] LOG: Applied Shell Bell 
+[04:52:56.287] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:52:56.299] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:52:56.299] LOG: %cStart Phase MessagePhase color:green;
+[04:52:56.504] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:52:56.522] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:52:56.522] LOG: %cStart Phase MessagePhase color:green;
+[04:52:56.749] LOG: %cStart Phase MessagePhase color:green;
+[04:52:56.938] LOG: %cStart Phase FaintPhase color:green;
+[04:52:58.255] LOG: %cStart Phase MessagePhase color:green;
+[04:52:58.498] LOG: %cStart Phase VictoryPhase color:green;
+[04:52:58.499] LOG: Applied Soothe Bell 
+[04:52:58.501] LOG: Applied Golden Egg 
+[04:52:58.501] LOG: Applied Lucky Egg 
+[04:52:58.502] LOG: Applied Soothe Bell 
+[04:52:58.502] LOG: Applied Lucky Egg 
+[04:52:58.502] LOG: Applied Golden Egg 
+[04:52:58.502] LOG: Applied Lucky Egg 
+[04:52:58.502] LOG: Applied Lucky Egg 
+[04:52:58.502] LOG: Applied Lucky Egg 
+[04:52:58.503] LOG: %cStart Phase ExpPhase color:green;
+[04:52:58.503] LOG: Applied Super EXP. Charm 
+[04:52:58.503] LOG: Applied EXP. Charm 
+[04:52:58.927] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:58.928] LOG: Applied Calcium 
+[04:52:58.928] LOG: Applied Soul Dew 
+[04:52:58.928] LOG: Applied Soul Dew 
+[04:52:58.929] LOG: %cStart Phase ExpPhase color:green;
+[04:52:58.930] LOG: Applied Super EXP. Charm 
+[04:52:58.930] LOG: Applied EXP. Charm 
+[04:52:59.298] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:59.298] LOG: Applied Iron 
+[04:52:59.299] LOG: Applied Carbos 
+[04:52:59.299] LOG: Applied Zinc 
+[04:52:59.299] LOG: Applied HP Up 
+[04:52:59.299] LOG: Applied Calcium 
+[04:52:59.299] LOG: Applied Soul Dew 
+[04:52:59.299] LOG: Applied Soul Dew 
+[04:52:59.300] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:59.300] LOG: Applied Super EXP. Charm 
+[04:52:59.300] LOG: Applied EXP. Charm 
+[04:52:59.301] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:59.302] LOG: Applied Protein 
+[04:52:59.302] LOG: Applied Soul Dew 
+[04:52:59.303] LOG: Applied Soul Dew 
+[04:52:59.304] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:59.304] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:59.304] LOG: Applied Super EXP. Charm 
+[04:52:59.304] LOG: Applied EXP. Charm 
+[04:52:59.304] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:59.305] LOG: Applied Iron 
+[04:52:59.305] LOG: Applied HP Up 
+[04:52:59.305] LOG: Applied Carbos 
+[04:52:59.305] LOG: Applied Zinc 
+[04:52:59.306] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:59.306] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:59.306] LOG: Applied Super EXP. Charm 
+[04:52:59.306] LOG: Applied EXP. Charm 
+[04:52:59.306] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:59.306] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:52:59.306] LOG: Applied Super EXP. Charm 
+[04:52:59.306] LOG: Applied EXP. Charm 
+[04:52:59.307] LOG: %cStart Phase LevelUpPhase color:green;
+[04:52:59.307] LOG: Applied Protein 
+[04:52:59.307] LOG: Applied Iron 
+[04:52:59.307] LOG: Applied Carbos 
+[04:52:59.307] LOG: Applied Zinc 
+[04:52:59.308] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:52:59.308] LOG: %cStart Phase FaintPhase color:green;
+[04:53:01.062] LOG: %cStart Phase MessagePhase color:green;
+[04:53:01.427] LOG: %cStart Phase VictoryPhase color:green;
+[04:53:01.428] LOG: Applied Soothe Bell 
+[04:53:01.428] LOG: Applied Golden Egg 
+[04:53:01.428] LOG: Applied Lucky Egg 
+[04:53:01.429] LOG: Applied Soothe Bell 
+[04:53:01.429] LOG: Applied Lucky Egg 
+[04:53:01.429] LOG: Applied Golden Egg 
+[04:53:01.429] LOG: Applied Lucky Egg 
+[04:53:01.429] LOG: Applied Lucky Egg 
+[04:53:01.429] LOG: Applied Lucky Egg 
+[04:53:01.437] LOG: %cStart Phase ExpPhase color:green;
+[04:53:01.437] LOG: Applied Super EXP. Charm 
+[04:53:01.437] LOG: Applied EXP. Charm 
+[04:53:01.932] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:01.932] LOG: Applied Calcium 
+[04:53:01.933] LOG: Applied Soul Dew 
+[04:53:01.933] LOG: Applied Soul Dew 
+[04:53:01.934] LOG: %cStart Phase ExpPhase color:green;
+[04:53:01.935] LOG: Applied Super EXP. Charm 
+[04:53:01.935] LOG: Applied EXP. Charm 
+[04:53:02.468] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:02.468] LOG: Applied Iron 
+[04:53:02.468] LOG: Applied Carbos 
+[04:53:02.468] LOG: Applied Zinc 
+[04:53:02.468] LOG: Applied HP Up 
+[04:53:02.468] LOG: Applied Calcium 
+[04:53:02.468] LOG: Applied Soul Dew 
+[04:53:02.468] LOG: Applied Soul Dew 
+[04:53:02.469] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:02.469] LOG: Applied Super EXP. Charm 
+[04:53:02.469] LOG: Applied EXP. Charm 
+[04:53:02.470] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:02.470] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:02.470] LOG: Applied Super EXP. Charm 
+[04:53:02.470] LOG: Applied EXP. Charm 
+[04:53:02.471] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:02.471] LOG: Applied Iron 
+[04:53:02.471] LOG: Applied HP Up 
+[04:53:02.471] LOG: Applied Carbos 
+[04:53:02.471] LOG: Applied Zinc 
+[04:53:02.473] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:02.474] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:02.474] LOG: Applied Super EXP. Charm 
+[04:53:02.474] LOG: Applied EXP. Charm 
+[04:53:02.474] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:02.474] LOG: Applied HP Up 
+[04:53:02.475] LOG: Applied Calcium 
+[04:53:02.475] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:02.475] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:02.475] LOG: Applied Super EXP. Charm 
+[04:53:02.475] LOG: Applied EXP. Charm 
+[04:53:02.475] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:02.476] LOG: Applied Protein 
+[04:53:02.476] LOG: Applied Iron 
+[04:53:02.476] LOG: Applied Carbos 
+[04:53:02.476] LOG: Applied Zinc 
+[04:53:02.477] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:02.477] LOG: %cStart Phase MoveEndPhase color:green;
+[04:53:02.477] LOG: %cStart Phase TurnInitPhase color:green;
+[04:53:02.477] LOG: %cStart Phase TurnInitPhase color:green;
+[04:53:02.477] LOG: %cStart Phase TurnInitPhase color:green;
+[04:53:02.477] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:53:02.477] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:53:02.477] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:53:02.478] LOG: %cStart Phase BerryPhase color:green;
+[04:53:02.489] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:53:02.491] LOG: %cStart Phase TurnEndPhase color:green;
+[04:53:02.496] LOG: %cStart Phase BattleEndPhase color:green;
+[04:53:02.496] LOG: Battle Score: 306 (1 Turns x1)
+[04:53:02.496] LOG: Total Score: 516632
+[04:53:02.498] LOG: Applied Amulet Coin 
+[04:53:02.503] LOG: Applied Calcium 
+[04:53:02.504] LOG: Applied Soul Dew 
+[04:53:02.505] LOG: Applied Soul Dew 
+[04:53:02.507] LOG: Applied Iron 
+[04:53:02.507] LOG: Applied Carbos 
+[04:53:02.507] LOG: Applied Zinc 
+[04:53:02.507] LOG: Applied HP Up 
+[04:53:02.507] LOG: Applied Calcium 
+[04:53:02.507] LOG: Applied Soul Dew 
+[04:53:02.507] LOG: Applied Soul Dew 
+[04:53:02.508] LOG: Applied Protein 
+[04:53:02.508] LOG: Applied Soul Dew 
+[04:53:02.509] LOG: Applied Soul Dew 
+[04:53:02.509] LOG: Applied Iron 
+[04:53:02.509] LOG: Applied HP Up 
+[04:53:02.509] LOG: Applied Carbos 
+[04:53:02.509] LOG: Applied Zinc 
+[04:53:02.510] LOG: Applied HP Up 
+[04:53:02.510] LOG: Applied Calcium 
+[04:53:02.510] LOG: Applied Protein 
+[04:53:02.510] LOG: Applied Iron 
+[04:53:02.510] LOG: Applied Carbos 
+[04:53:02.510] LOG: Applied Zinc 
+[04:53:02.520] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:53:02.520] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:53:02.520] LOG: %cStart Phase MessagePhase color:green;
+[04:53:02.670] LOG: %cStart Phase EggLapsePhase color:green;
+[04:53:02.670] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:02.670] LOG: Wave Seed: ӐҧҼөҽӬҧӞҹӀһӉәҨӌӇӢӊҹҦҦӪӥӯ 1142
+[04:53:02.697] LOG: Applied Golden Poké Ball 
+[04:53:03.785] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:03.804] LOG: Applied Golden Poké Ball 
+[04:53:06.813] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:06.831] LOG: Applied Golden Poké Ball 
+[04:53:09.070] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:53:09.070] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:53:12.365] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:12.384] LOG: Applied Golden Poké Ball 
+[04:53:14.853] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:14.873] LOG: Applied Golden Poké Ball 
+[04:53:16.511] LOG: Applied Calcium 
+[04:53:16.512] LOG: Applied Soul Dew 
+[04:53:16.513] LOG: Applied Soul Dew 
+[04:53:16.514] LOG: Applied Iron 
+[04:53:16.514] LOG: Applied Carbos 
+[04:53:16.514] LOG: Applied Zinc 
+[04:53:16.514] LOG: Applied HP Up 
+[04:53:16.514] LOG: Applied Calcium 
+[04:53:16.514] LOG: Applied Soul Dew 
+[04:53:16.515] LOG: Applied Soul Dew 
+[04:53:16.515] LOG: Applied Protein 
+[04:53:16.516] LOG: Applied Soul Dew 
+[04:53:16.516] LOG: Applied Soul Dew 
+[04:53:16.517] LOG: Applied Iron 
+[04:53:16.517] LOG: Applied HP Up 
+[04:53:16.517] LOG: Applied Carbos 
+[04:53:16.517] LOG: Applied Zinc 
+[04:53:16.518] LOG: Applied HP Up 
+[04:53:16.518] LOG: Applied Calcium 
+[04:53:16.519] LOG: Applied Protein 
+[04:53:16.520] LOG: Applied Iron 
+[04:53:16.520] LOG: Applied Carbos 
+[04:53:16.520] LOG: Applied Zinc 
+[04:53:16.572] LOG: %cStart Phase NewBattlePhase color:green;
+[04:53:16.572] LOG: Wave Seed: ӑҨҽӪҾӭҨӟҺӁҼӊӚҩӍӈӣӋҺҧҧӫӦӰ 1143
+[04:53:16.572] LOG: Applied Super Lure 
+[04:53:16.572] LOG: Applied Lure 
+[04:53:16.572] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:53:16.573] LOG: Starting species pool tier: COMMON
+[04:53:16.575] LOG: Replaced GOSSIFLEUR with ELDEGOSS
+[04:53:16.576] LOG: Applied Shiny Charm 
+[04:53:16.582] LOG: Pokemon: Wild Eldegoss | Species ID: 830 | Level: 2685 | Nature: Naive (+Spd/-SpDef)
+[04:53:16.582] LOG: Stats (IVs): HP: 6454 (20), Atk: 2716 (1), Def: 5428 (22), Spatk: 4864 (21), Spdef: 7132 (5), Spd: 4052 (17)
+[04:53:16.583] LOG: Ability: Cotton Down | Passive Ability: Fluffy 
+[04:53:16.583] LOG: Moveset: ["Magical Leaf","Cotton Guard","Sleep Powder","Pollen Puff"]
+[04:53:16.583] LOG: Starting species pool tier: SUPER_RARE
+[04:53:16.585] LOG: Applied Shiny Charm 
+[04:53:16.593] LOG: Pokemon: Wild Sylveon | Species ID: 700 | Level: 2685 | Nature: Timid (+Spd/-Atk)
+[04:53:16.593] LOG: Stats (IVs): HP: 7850 (2), Atk: 3749 (25), Def: 3737 (9), Spatk: 5965 (2), Spdef: 7335 (13), Spd: 4111 (19)
+[04:53:16.593] LOG: Ability: Serene Grace | Passive Ability: Pixilate 
+[04:53:16.593] LOG: Moveset: ["Pixie Slash","Trump Card","Star Crash","Last Resort"]
+[04:53:18.547] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:53:18.547] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:53:18.613] LOG: Battle Seed: JFIE5rKSxlcC0iz8
+[04:53:18.613] LOG: Applied Carbos (enemy)
+[04:53:18.613] LOG: Applied Zinc (enemy)
+[04:53:18.613] LOG: Applied Protein (enemy)
+[04:53:18.613] LOG: Applied Carbos (enemy)
+[04:53:18.613] LOG: Applied Iron (enemy)
+[04:53:18.722] DEBUG: Session data saved to slot 0!
+[04:53:18.723] LOG: Applied Carbos (enemy)
+[04:53:18.723] LOG: Applied Zinc (enemy)
+[04:53:18.723] LOG: Applied Protein (enemy)
+[04:53:18.723] LOG: Applied Carbos (enemy)
+[04:53:18.723] LOG: Applied Iron (enemy)
+[04:53:18.726] LOG: Wave Seed: ӑҨҽӪҾӭҨӟҺӁҼӊӚҩӍӈӣӋҺҧҧӫӦӰ 1143
+[04:53:19.171] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:53:19.267] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:53:19.268] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:53:19.268] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:53:19.272] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:53:19.382] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:53:19.740] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:53:19.745] LOG: %cStart Phase PostSummonPhase color:green;
+[04:53:19.746] LOG: Ran PSP for: Sylveon
+[04:53:19.749] LOG: %cStart Phase PostSummonPhase color:green;
+[04:53:19.750] LOG: Ran PSP for: Eldegoss
+[04:53:19.755] LOG: %cStart Phase TurnInitPhase color:green;
+[04:53:19.755] LOG: %cStart Phase CommandPhase color:green;
+[04:53:32.923] LOG: Move: FLAME_BURST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[04:53:32.926] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:53:33.724] LOG: %cStart Phase CommandPhase color:green;
+[04:53:34.602] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:53:34.603] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:53:34.607] LOG: Applied Miracle Seed (enemy)
+[04:53:34.607] LOG: Applied Damage Token (enemy)
+[04:53:34.607] LOG: Applied Miracle Seed (enemy)
+[04:53:34.608] LOG: Applied Damage Token (enemy)
+[04:53:34.608] LOG: Applied Silver Powder (enemy)
+[04:53:34.608] LOG: Applied Damage Token (enemy)
+[04:53:34.609] LOG: Applied Silver Powder (enemy)
+[04:53:34.609] LOG: Applied Damage Token (enemy)
+[04:53:34.610] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:53:34.611] LOG: Applied Fairy Feather (enemy)
+[04:53:34.612] LOG: Applied Damage Token (enemy)
+[04:53:34.613] LOG: Applied Fairy Feather (enemy)
+[04:53:34.613] LOG: Applied Damage Token (enemy)
+[04:53:34.614] LOG: Applied Fairy Feather (enemy)
+[04:53:34.615] LOG: Applied Damage Token (enemy)
+[04:53:34.615] LOG: Applied Fairy Feather (enemy)
+[04:53:34.615] LOG: Applied Damage Token (enemy)
+[04:53:34.616] LOG: Applied Fairy Feather (enemy)
+[04:53:34.616] LOG: Applied Damage Token (enemy)
+[04:53:34.616] LOG: Applied Fairy Feather (enemy)
+[04:53:34.616] LOG: Applied Damage Token (enemy)
+[04:53:34.619] LOG: %cStart Phase TurnStartPhase color:green;
+[04:53:34.624] LOG: %cStart Phase MovePhase color:green;
+[04:53:34.624] LOG: %cUser: Iron Leaves
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[04:53:34.628] LOG: %cStart Phase MessagePhase color:green;
+[04:53:34.710] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:53:34.942] LOG: Applied Shell Bell 
+[04:53:34.942] LOG: %cStart Phase MessagePhase color:green;
+[04:53:35.160] LOG: %cStart Phase MoveEndPhase color:green;
+[04:53:35.164] LOG: %cStart Phase MovePhase color:green;
+[04:53:35.164] LOG: %cUser: Mega Moltres Ex
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[04:53:35.197] LOG: %cStart Phase MessagePhase color:green;
+[04:53:35.292] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:53:35.294] LOG: Applied Multi Lens 
+[04:53:35.587] LOG: Applied Scope Lens 
+[04:53:35.588] LOG: crit stage: +1
+[04:53:35.593] LOG: Applied Charcoal 
+[04:53:35.597] LOG: Move: Flame Burst | Base damage: 16836.795468311833 | Power: 64 | Source attack: 87176 | Target defense: 7132
+[04:53:35.598] LOG: Applied Multi Lens 
+[04:53:35.601] LOG: Applied Protection Token (enemy)
+[04:53:35.603] LOG: Move: Flame Burst | Attack damage: 24710
+[04:53:35.605] LOG: Applied Endure Token (enemy)
+[04:53:35.608] LOG: Applied Amulet Coin 
+[04:53:35.609] LOG: Applied Golden Punch 
+[04:53:35.614] LOG: %cStart Phase MessagePhase color:green;
+[04:53:35.807] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:53:35.824] LOG: %cStart Phase MessagePhase color:green;
+[04:53:36.052] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:53:36.056] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:53:36.224] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:53:36.408] LOG: %cStart Phase MessagePhase color:green;
+[04:53:36.613] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:53:36.802] LOG: %cStart Phase MessagePhase color:green;
+[04:53:37.022] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:53:37.045] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:53:37.357] LOG: Applied Scope Lens 
+[04:53:37.358] LOG: crit stage: +1
+[04:53:37.363] LOG: Applied Charcoal 
+[04:53:37.366] LOG: Move: Flame Burst | Base damage: 16836.795468311833 | Power: 64 | Source attack: 87176 | Target defense: 7132
+[04:53:37.367] LOG: Applied Multi Lens 
+[04:53:37.370] LOG: Applied Protection Token (enemy)
+[04:53:37.371] LOG: Move: Flame Burst | Attack damage: 10748
+[04:53:37.373] LOG: Applied Amulet Coin 
+[04:53:37.374] LOG: Applied Golden Punch 
+[04:53:37.379] LOG: Applied Shell Bell 
+[04:53:37.379] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:53:37.390] LOG: %cStart Phase MessagePhase color:green;
+[04:53:37.588] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:53:37.592] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:53:37.756] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:53:37.944] LOG: %cStart Phase MessagePhase color:green;
+[04:53:38.154] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:53:38.346] LOG: %cStart Phase MessagePhase color:green;
+[04:53:38.565] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:53:38.588] LOG: %cStart Phase MessagePhase color:green;
+[04:53:38.777] LOG: %cStart Phase FaintPhase color:green;
+[04:53:40.843] LOG: %cStart Phase MessagePhase color:green;
+[04:53:41.011] LOG: %cStart Phase VictoryPhase color:green;
+[04:53:41.011] LOG: Applied Soothe Bell 
+[04:53:41.013] LOG: Applied Golden Egg 
+[04:53:41.014] LOG: Applied Lucky Egg 
+[04:53:41.014] LOG: Applied Soothe Bell 
+[04:53:41.015] LOG: Applied Lucky Egg 
+[04:53:41.015] LOG: Applied Golden Egg 
+[04:53:41.015] LOG: Applied Lucky Egg 
+[04:53:41.015] LOG: Applied Lucky Egg 
+[04:53:41.015] LOG: Applied Lucky Egg 
+[04:53:41.015] LOG: %cStart Phase ExpPhase color:green;
+[04:53:41.015] LOG: Applied Super EXP. Charm 
+[04:53:41.015] LOG: Applied EXP. Charm 
+[04:53:41.463] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:41.464] LOG: Applied Calcium 
+[04:53:41.464] LOG: Applied Soul Dew 
+[04:53:41.465] LOG: Applied Soul Dew 
+[04:53:41.467] LOG: %cStart Phase ExpPhase color:green;
+[04:53:41.467] LOG: Applied Super EXP. Charm 
+[04:53:41.467] LOG: Applied EXP. Charm 
+[04:53:41.711] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:41.712] LOG: Applied Iron 
+[04:53:41.712] LOG: Applied Carbos 
+[04:53:41.712] LOG: Applied Zinc 
+[04:53:41.712] LOG: Applied HP Up 
+[04:53:41.712] LOG: Applied Calcium 
+[04:53:41.712] LOG: Applied Soul Dew 
+[04:53:41.713] LOG: Applied Soul Dew 
+[04:53:41.713] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:41.714] LOG: Applied Super EXP. Charm 
+[04:53:41.714] LOG: Applied EXP. Charm 
+[04:53:41.714] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:41.715] LOG: Applied Protein 
+[04:53:41.716] LOG: Applied Soul Dew 
+[04:53:41.717] LOG: Applied Soul Dew 
+[04:53:41.718] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:41.718] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:41.718] LOG: Applied Super EXP. Charm 
+[04:53:41.718] LOG: Applied EXP. Charm 
+[04:53:41.718] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:41.719] LOG: Applied Iron 
+[04:53:41.719] LOG: Applied HP Up 
+[04:53:41.719] LOG: Applied Carbos 
+[04:53:41.719] LOG: Applied Zinc 
+[04:53:41.719] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:41.719] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:41.719] LOG: Applied Super EXP. Charm 
+[04:53:41.719] LOG: Applied EXP. Charm 
+[04:53:41.719] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:41.719] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:41.720] LOG: Applied Super EXP. Charm 
+[04:53:41.720] LOG: Applied EXP. Charm 
+[04:53:41.720] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:41.720] LOG: %cStart Phase MoveEndPhase color:green;
+[04:53:41.722] LOG: %cStart Phase MovePhase color:green;
+[04:53:41.722] LOG: %cUser: Sylveon
+Move: TRUMP_CARD
+Use Mode: NORMAL color:orchid
+[04:53:41.741] LOG: %cStart Phase MessagePhase color:green;
+[04:53:41.835] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:53:41.837] LOG: %cStart Phase MessagePhase color:green;
+[04:53:42.063] LOG: %cStart Phase MoveEndPhase color:green;
+[04:53:42.063] LOG: %cStart Phase MovePhase color:green;
+[04:53:42.064] LOG: %cStart Phase MoveEndPhase color:green;
+[04:53:42.064] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:53:42.064] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:53:42.064] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:53:42.064] LOG: %cStart Phase BerryPhase color:green;
+[04:53:42.083] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:53:42.092] LOG: %cStart Phase TurnEndPhase color:green;
+[04:53:42.095] LOG: Battle Seed: JFIE5rKSxlcC0iz8
+[04:53:42.096] LOG: Applied Carbos (enemy)
+[04:53:42.097] LOG: Applied Zinc (enemy)
+[04:53:42.097] LOG: Applied Protein (enemy)
+[04:53:42.097] LOG: Applied Carbos (enemy)
+[04:53:42.097] LOG: Applied Iron (enemy)
+[04:53:42.100] LOG: Applied Calcium 
+[04:53:42.101] LOG: Applied Soul Dew 
+[04:53:42.101] LOG: Applied Soul Dew 
+[04:53:42.102] LOG: Applied Iron 
+[04:53:42.102] LOG: Applied Carbos 
+[04:53:42.102] LOG: Applied Zinc 
+[04:53:42.102] LOG: Applied HP Up 
+[04:53:42.102] LOG: Applied Calcium 
+[04:53:42.102] LOG: Applied Soul Dew 
+[04:53:42.102] LOG: Applied Soul Dew 
+[04:53:42.102] LOG: Applied Protein 
+[04:53:42.103] LOG: Applied Soul Dew 
+[04:53:42.103] LOG: Applied Soul Dew 
+[04:53:42.103] LOG: Applied Iron 
+[04:53:42.104] LOG: Applied HP Up 
+[04:53:42.104] LOG: Applied Carbos 
+[04:53:42.104] LOG: Applied Zinc 
+[04:53:42.104] LOG: Applied HP Up 
+[04:53:42.104] LOG: Applied Calcium 
+[04:53:42.105] LOG: Applied Protein 
+[04:53:42.105] LOG: Applied Iron 
+[04:53:42.105] LOG: Applied Carbos 
+[04:53:42.105] LOG: Applied Zinc 
+[04:53:42.130] LOG: Applied Mini Black Hole 
+[04:53:42.131] LOG: Applied Recovery Token (enemy)
+[04:53:42.132] LOG: %cStart Phase MessagePhase color:green;
+[04:53:42.368] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:53:42.491] LOG: %cStart Phase MessagePhase color:green;
+[04:53:42.718] LOG: %cStart Phase TurnInitPhase color:green;
+[04:53:42.718] LOG: %cStart Phase CommandPhase color:green;
+[04:53:44.335] LOG: %cStart Phase CommandPhase color:green;
+[04:53:44.336] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:53:44.337] LOG: Applied Damage Token (enemy)
+[04:53:44.338] LOG: Applied Damage Token (enemy)
+[04:53:44.340] LOG: Applied Damage Token (enemy)
+[04:53:44.341] LOG: Applied Damage Token (enemy)
+[04:53:44.341] LOG: Applied Damage Token (enemy)
+[04:53:44.341] LOG: Applied Damage Token (enemy)
+[04:53:44.343] LOG: %cStart Phase TurnStartPhase color:green;
+[04:53:44.344] LOG: %cStart Phase AttemptCapturePhase color:green;
+[04:53:45.713] LOG: [coop:account] account-write scope OPEN (own-catch) depth=1
+[04:53:45.976] LOG: %cStart Phase VictoryPhase color:green;
+[04:53:45.977] LOG: Applied Soothe Bell 
+[04:53:45.977] LOG: Applied Golden Egg 
+[04:53:45.977] LOG: Applied Lucky Egg 
+[04:53:45.978] LOG: Applied Soothe Bell 
+[04:53:45.978] LOG: Applied Lucky Egg 
+[04:53:45.978] LOG: Applied Golden Egg 
+[04:53:45.978] LOG: Applied Lucky Egg 
+[04:53:45.978] LOG: Applied Lucky Egg 
+[04:53:45.978] LOG: Applied Lucky Egg 
+[04:53:45.979] LOG: %cStart Phase ExpPhase color:green;
+[04:53:45.979] LOG: Applied Super EXP. Charm 
+[04:53:45.979] LOG: Applied EXP. Charm 
+[04:53:46.371] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:46.371] LOG: Applied Calcium 
+[04:53:46.372] LOG: Applied Soul Dew 
+[04:53:46.372] LOG: Applied Soul Dew 
+[04:53:46.373] LOG: %cStart Phase ExpPhase color:green;
+[04:53:46.373] LOG: Applied Super EXP. Charm 
+[04:53:46.373] LOG: Applied EXP. Charm 
+[04:53:46.795] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:46.795] LOG: Applied Iron 
+[04:53:46.795] LOG: Applied Carbos 
+[04:53:46.795] LOG: Applied Zinc 
+[04:53:46.795] LOG: Applied HP Up 
+[04:53:46.795] LOG: Applied Calcium 
+[04:53:46.796] LOG: Applied Soul Dew 
+[04:53:46.796] LOG: Applied Soul Dew 
+[04:53:46.796] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:46.797] LOG: Applied Super EXP. Charm 
+[04:53:46.797] LOG: Applied EXP. Charm 
+[04:53:46.797] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:46.798] LOG: Applied Protein 
+[04:53:46.800] LOG: Applied Soul Dew 
+[04:53:46.800] LOG: Applied Soul Dew 
+[04:53:46.801] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:46.801] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:46.801] LOG: Applied Super EXP. Charm 
+[04:53:46.801] LOG: Applied EXP. Charm 
+[04:53:46.802] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:46.802] LOG: Applied Iron 
+[04:53:46.802] LOG: Applied HP Up 
+[04:53:46.802] LOG: Applied Carbos 
+[04:53:46.802] LOG: Applied Zinc 
+[04:53:46.803] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:46.803] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:46.804] LOG: Applied Super EXP. Charm 
+[04:53:46.804] LOG: Applied EXP. Charm 
+[04:53:46.804] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:46.804] LOG: Applied HP Up 
+[04:53:46.805] LOG: Applied Calcium 
+[04:53:46.807] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:46.807] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:53:46.808] LOG: Applied Super EXP. Charm 
+[04:53:46.808] LOG: Applied EXP. Charm 
+[04:53:46.809] LOG: %cStart Phase LevelUpPhase color:green;
+[04:53:46.809] LOG: Applied Protein 
+[04:53:46.809] LOG: Applied Iron 
+[04:53:46.809] LOG: Applied Carbos 
+[04:53:46.810] LOG: Applied Zinc 
+[04:53:46.810] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:53:46.810] LOG: %cStart Phase TurnInitPhase color:green;
+[04:53:46.810] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:53:46.810] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:53:46.810] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:53:46.810] LOG: %cStart Phase BerryPhase color:green;
+[04:53:46.818] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:53:46.821] LOG: %cStart Phase TurnEndPhase color:green;
+[04:53:46.824] LOG: %cStart Phase BattleEndPhase color:green;
+[04:53:46.824] LOG: Battle Score: 356 (2 Turns x0.84)
+[04:53:46.824] LOG: Total Score: 516988
+[04:53:46.826] LOG: Applied Amulet Coin 
+[04:53:46.829] LOG: Applied Calcium 
+[04:53:46.829] LOG: Applied Soul Dew 
+[04:53:46.830] LOG: Applied Soul Dew 
+[04:53:46.831] LOG: Applied Iron 
+[04:53:46.831] LOG: Applied Carbos 
+[04:53:46.831] LOG: Applied Zinc 
+[04:53:46.831] LOG: Applied HP Up 
+[04:53:46.831] LOG: Applied Calcium 
+[04:53:46.831] LOG: Applied Soul Dew 
+[04:53:46.831] LOG: Applied Soul Dew 
+[04:53:46.831] LOG: Applied Protein 
+[04:53:46.832] LOG: Applied Soul Dew 
+[04:53:46.832] LOG: Applied Soul Dew 
+[04:53:46.832] LOG: Applied Iron 
+[04:53:46.832] LOG: Applied HP Up 
+[04:53:46.832] LOG: Applied Carbos 
+[04:53:46.832] LOG: Applied Zinc 
+[04:53:46.834] LOG: Applied HP Up 
+[04:53:46.834] LOG: Applied Calcium 
+[04:53:46.835] LOG: Applied Protein 
+[04:53:46.835] LOG: Applied Iron 
+[04:53:46.835] LOG: Applied Carbos 
+[04:53:46.835] LOG: Applied Zinc 
+[04:53:46.845] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:53:46.845] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:53:46.845] LOG: %cStart Phase MessagePhase color:green;
+[04:53:47.115] LOG: %cStart Phase EggLapsePhase color:green;
+[04:53:47.115] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:47.116] LOG: Wave Seed: ӑҨҽӪҾӭҨӟҺӁҼӊӚҩӍӈӣӋҺҧҧӫӦӰ 1143
+[04:53:47.144] LOG: Applied Golden Poké Ball 
+[04:53:50.311] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:50.330] LOG: Applied Golden Poké Ball 
+[04:53:54.826] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:53:54.846] LOG: Applied Golden Poké Ball 
+[04:53:56.489] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:53:56.489] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:54:00.065] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:54:00.065] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:54:01.194] LOG: Applied Calcium 
+[04:54:01.194] LOG: Applied Soul Dew 
+[04:54:01.195] LOG: Applied Soul Dew 
+[04:54:01.196] LOG: Applied Iron 
+[04:54:01.196] LOG: Applied Carbos 
+[04:54:01.196] LOG: Applied Zinc 
+[04:54:01.196] LOG: Applied HP Up 
+[04:54:01.196] LOG: Applied Calcium 
+[04:54:01.197] LOG: Applied Soul Dew 
+[04:54:01.197] LOG: Applied Soul Dew 
+[04:54:01.198] LOG: Applied Protein 
+[04:54:01.198] LOG: Applied Soul Dew 
+[04:54:01.199] LOG: Applied Soul Dew 
+[04:54:01.200] LOG: Applied Iron 
+[04:54:01.200] LOG: Applied HP Up 
+[04:54:01.200] LOG: Applied Carbos 
+[04:54:01.200] LOG: Applied Zinc 
+[04:54:01.201] LOG: Applied HP Up 
+[04:54:01.201] LOG: Applied Calcium 
+[04:54:01.201] LOG: Applied Protein 
+[04:54:01.201] LOG: Applied Iron 
+[04:54:01.202] LOG: Applied Carbos 
+[04:54:01.202] LOG: Applied Zinc 
+[04:54:01.258] LOG: %cStart Phase NewBattlePhase color:green;
+[04:54:01.258] LOG: Wave Seed: ӒҩҾӫҿӮҩӠһӂҽӋӛҪӎӉӤӌһҨҨӬӧӱ 1144
+[04:54:01.259] LOG: Applied Super Lure 
+[04:54:01.259] LOG: Applied Lure 
+[04:54:01.259] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:54:01.260] LOG: Starting species pool tier: COMMON
+[04:54:01.261] LOG: Replaced WOOLOO with DUBWOOL
+[04:54:01.262] LOG: Applied Shiny Charm 
+[04:54:01.269] LOG: Pokemon: Wild Dubwool | Species ID: 832 | Level: 2695 | Nature: Jolly (+Spd/-SpAtk)
+[04:54:01.269] LOG: Stats (IVs): HP: 7017 (16), Atk: 4317 (0), Def: 5826 (16), Spatk: 3278 (15), Spdef: 4936 (3), Spd: 5727 (17)
+[04:54:01.269] LOG: Ability: Scrappy | Passive Ability: Let's Roll 
+[04:54:01.269] LOG: Moveset: ["Head Charge","Court Change","Submission","Swagger"]
+[04:54:01.269] LOG: Starting species pool tier: COMMON
+[04:54:01.271] LOG: Replaced WOOLOO with DUBWOOL
+[04:54:01.272] LOG: Applied Shiny Charm 
+[04:54:01.279] LOG: Pokemon: Wild Dubwool | Species ID: 832 | Level: 2695 | Nature: Rash (+SpAtk/-SpDef)
+[04:54:01.279] LOG: Stats (IVs): HP: 6963 (14), Atk: 4936 (23), Def: 5664 (10), Spatk: 3859 (10), Spdef: 5024 (27), Spd: 5017 (10)
+[04:54:01.279] LOG: Ability: Sap Sipper | Passive Ability: Let's Roll 
+[04:54:01.279] LOG: Moveset: ["Flail","Cotton Guard","Swagger","Double-Edge"]
+[04:54:01.991] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:54:01.991] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:54:02.060] LOG: Battle Seed: Furja5ss8zxBVIp0
+[04:54:02.060] LOG: Applied Iron (enemy)
+[04:54:02.061] LOG: Applied Carbos (enemy)
+[04:54:02.061] LOG: Applied Protein (enemy)
+[04:54:02.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.062] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.062] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.062] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.063] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.063] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.064] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:02.064] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:02.169] DEBUG: Session data saved to slot 0!
+[04:54:02.170] LOG: Applied Iron (enemy)
+[04:54:02.171] LOG: Applied Carbos (enemy)
+[04:54:02.171] LOG: Applied Protein (enemy)
+[04:54:02.173] LOG: Wave Seed: ӒҩҾӫҿӮҩӠһӂҽӋӛҪӎӉӤӌһҨҨӬӧӱ 1144
+[04:54:02.622] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:54:02.726] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:54:02.726] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:54:02.726] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:54:02.728] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:54:03.053] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:54:03.261] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:54:03.263] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:03.263] LOG: Ran PSP for: Dubwool
+[04:54:03.269] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:03.269] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:54:03.429] LOG: %cStart Phase MovePhase color:green;
+[04:54:03.429] LOG: %cUser: Dubwool
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[04:54:03.469] LOG: %cStart Phase MessagePhase color:green;
+[04:54:03.550] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:03.558] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:54:03.758] LOG: %cStart Phase MessagePhase color:green;
+[04:54:03.968] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:03.968] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:54:03.993] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:03.994] LOG: Ran PSP for: Dubwool
+[04:54:03.997] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:03.997] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:54:04.159] LOG: %cStart Phase MovePhase color:green;
+[04:54:04.159] LOG: %cUser: Dubwool
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[04:54:04.198] LOG: %cStart Phase MessagePhase color:green;
+[04:54:04.278] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:04.287] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:54:04.489] LOG: %cStart Phase MessagePhase color:green;
+[04:54:04.696] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:04.697] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:54:04.728] LOG: %cStart Phase TurnInitPhase color:green;
+[04:54:04.728] LOG: %cStart Phase CommandPhase color:green;
+[04:54:05.617] LOG: Move: FLAME_BURST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[04:54:05.620] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:54:06.116] LOG: %cStart Phase CommandPhase color:green;
+[04:54:06.822] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:54:06.823] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:54:06.825] LOG: Applied Damage Token (enemy)
+[04:54:06.826] LOG: Applied Damage Token (enemy)
+[04:54:06.827] LOG: Applied Damage Token (enemy)
+[04:54:06.828] LOG: Applied Damage Token (enemy)
+[04:54:06.829] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.829] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.829] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.829] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.829] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:54:06.830] LOG: Applied Damage Token (enemy)
+[04:54:06.830] LOG: Applied Damage Token (enemy)
+[04:54:06.831] LOG: Applied Damage Token (enemy)
+[04:54:06.831] LOG: Applied Damage Token (enemy)
+[04:54:06.832] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.832] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.832] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.833] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:06.833] LOG: %cStart Phase TurnStartPhase color:green;
+[04:54:06.837] LOG: %cStart Phase MovePhase color:green;
+[04:54:06.837] LOG: %cUser: Iron Leaves
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[04:54:06.838] LOG: %cStart Phase MessagePhase color:green;
+[04:54:06.943] LOG: %cStart Phase MessagePhase color:green;
+[04:54:07.140] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:07.145] LOG: %cStart Phase MovePhase color:green;
+[04:54:07.145] LOG: %cUser: Mega Moltres Ex
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[04:54:07.183] LOG: %cStart Phase MessagePhase color:green;
+[04:54:07.264] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:07.267] LOG: Applied Multi Lens 
+[04:54:07.568] LOG: Applied Scope Lens 
+[04:54:07.569] LOG: crit stage: +1
+[04:54:07.574] LOG: Applied Charcoal 
+[04:54:07.579] LOG: Move: Flame Burst | Base damage: 24078.983439490446 | Power: 64 | Source attack: 87502 | Target defense: 5024
+[04:54:07.579] LOG: Applied Multi Lens 
+[04:54:07.582] LOG: Applied Protection Token (enemy)
+[04:54:07.584] LOG: Move: Flame Burst | Attack damage: 16610
+[04:54:07.586] LOG: Applied Amulet Coin 
+[04:54:07.586] LOG: Applied Golden Punch 
+[04:54:07.588] LOG: Applied King’s Rock 
+[04:54:07.592] LOG: Applied Shell Bell 
+[04:54:07.593] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:07.605] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:07.608] LOG: %cStart Phase MessagePhase color:green;
+[04:54:07.772] LOG: %cStart Phase FaintPhase color:green;
+[04:54:09.098] LOG: %cStart Phase MessagePhase color:green;
+[04:54:09.343] LOG: %cStart Phase VictoryPhase color:green;
+[04:54:09.343] LOG: Applied Soothe Bell 
+[04:54:09.344] LOG: Applied Golden Egg 
+[04:54:09.344] LOG: Applied Lucky Egg 
+[04:54:09.344] LOG: Applied Soothe Bell 
+[04:54:09.344] LOG: Applied Lucky Egg 
+[04:54:09.344] LOG: Applied Golden Egg 
+[04:54:09.345] LOG: Applied Lucky Egg 
+[04:54:09.345] LOG: Applied Lucky Egg 
+[04:54:09.345] LOG: Applied Lucky Egg 
+[04:54:09.345] LOG: %cStart Phase ExpPhase color:green;
+[04:54:09.345] LOG: Applied Super EXP. Charm 
+[04:54:09.345] LOG: Applied EXP. Charm 
+[04:54:09.804] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:09.804] LOG: Applied Calcium 
+[04:54:09.804] LOG: Applied Soul Dew 
+[04:54:09.805] LOG: Applied Soul Dew 
+[04:54:09.806] LOG: %cStart Phase ExpPhase color:green;
+[04:54:09.807] LOG: Applied Super EXP. Charm 
+[04:54:09.807] LOG: Applied EXP. Charm 
+[04:54:10.682] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:10.682] LOG: Applied Iron 
+[04:54:10.682] LOG: Applied Carbos 
+[04:54:10.682] LOG: Applied Zinc 
+[04:54:10.682] LOG: Applied HP Up 
+[04:54:10.682] LOG: Applied Calcium 
+[04:54:10.682] LOG: Applied Soul Dew 
+[04:54:10.683] LOG: Applied Soul Dew 
+[04:54:10.683] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:10.684] LOG: Applied Super EXP. Charm 
+[04:54:10.684] LOG: Applied EXP. Charm 
+[04:54:10.684] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:10.685] LOG: Applied Protein 
+[04:54:10.686] LOG: Applied Soul Dew 
+[04:54:10.686] LOG: Applied Soul Dew 
+[04:54:10.687] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:10.687] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:10.687] LOG: Applied Super EXP. Charm 
+[04:54:10.687] LOG: Applied EXP. Charm 
+[04:54:10.688] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:10.688] LOG: Applied Iron 
+[04:54:10.688] LOG: Applied HP Up 
+[04:54:10.688] LOG: Applied Carbos 
+[04:54:10.688] LOG: Applied Zinc 
+[04:54:10.689] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:10.689] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:10.689] LOG: Applied Super EXP. Charm 
+[04:54:10.689] LOG: Applied EXP. Charm 
+[04:54:10.689] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:10.689] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:10.689] LOG: Applied Super EXP. Charm 
+[04:54:10.689] LOG: Applied EXP. Charm 
+[04:54:10.689] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:10.690] LOG: Applied Protein 
+[04:54:10.690] LOG: Applied Iron 
+[04:54:10.690] LOG: Applied Carbos 
+[04:54:10.690] LOG: Applied Zinc 
+[04:54:10.690] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:10.690] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:10.692] LOG: %cStart Phase MovePhase color:green;
+[04:54:10.693] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:10.693] LOG: %cStart Phase MovePhase color:green;
+[04:54:10.693] LOG: %cUser: Dubwool
+Move: HEAD_CHARGE
+Use Mode: NORMAL color:orchid
+[04:54:10.711] LOG: %cStart Phase MessagePhase color:green;
+[04:54:10.792] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:11.001] LOG: crit stage: +0
+[04:54:11.006] LOG: Move: Head Charge | Base damage: 1875.687876758205 | Power: 120 | Source attack: 4317 | Target defense: 5972
+[04:54:11.008] LOG: Applied Damage Token (enemy)
+[04:54:11.009] LOG: Move: Head Charge | Attack damage: 4951
+[04:54:11.012] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:11.024] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:11.024] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:54:11.024] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:54:11.024] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:54:11.024] LOG: %cStart Phase BerryPhase color:green;
+[04:54:11.039] LOG: Applied Berry Pouch 
+[04:54:11.040] LOG: Applied Sitrus Berry 
+[04:54:11.040] LOG: Applied Calcium 
+[04:54:11.041] LOG: Applied Soul Dew 
+[04:54:11.041] LOG: Applied Soul Dew 
+[04:54:11.044] LOG: Applied Iron 
+[04:54:11.044] LOG: Applied Carbos 
+[04:54:11.044] LOG: Applied Zinc 
+[04:54:11.044] LOG: Applied HP Up 
+[04:54:11.044] LOG: Applied Calcium 
+[04:54:11.045] LOG: Applied Soul Dew 
+[04:54:11.045] LOG: Applied Soul Dew 
+[04:54:11.045] LOG: Applied Protein 
+[04:54:11.046] LOG: Applied Soul Dew 
+[04:54:11.046] LOG: Applied Soul Dew 
+[04:54:11.046] LOG: Applied Iron 
+[04:54:11.046] LOG: Applied HP Up 
+[04:54:11.046] LOG: Applied Carbos 
+[04:54:11.046] LOG: Applied Zinc 
+[04:54:11.047] LOG: Applied HP Up 
+[04:54:11.047] LOG: Applied Calcium 
+[04:54:11.048] LOG: Applied Protein 
+[04:54:11.048] LOG: Applied Iron 
+[04:54:11.048] LOG: Applied Carbos 
+[04:54:11.048] LOG: Applied Zinc 
+[04:54:11.056] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:54:11.210] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:54:11.315] LOG: Applied Healing Charm 
+[04:54:11.319] LOG: %cStart Phase MessagePhase color:green;
+[04:54:11.600] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:54:11.606] LOG: %cStart Phase TurnEndPhase color:green;
+[04:54:11.611] LOG: Battle Seed: Furja5ss8zxBVIp0
+[04:54:11.614] LOG: Applied Recovery Token (enemy)
+[04:54:11.614] LOG: Applied Leftovers 
+[04:54:11.615] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:54:11.741] LOG: %cStart Phase MessagePhase color:green;
+[04:54:11.963] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:54:12.091] LOG: Applied Healing Charm 
+[04:54:12.095] LOG: %cStart Phase MessagePhase color:green;
+[04:54:12.365] LOG: %cStart Phase TurnInitPhase color:green;
+[04:54:12.365] LOG: %cStart Phase CommandPhase color:green;
+[04:54:13.890] LOG: %cStart Phase CommandPhase color:green;
+[04:54:13.891] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:54:13.892] LOG: Applied Damage Token (enemy)
+[04:54:13.892] LOG: Applied Damage Token (enemy)
+[04:54:13.893] LOG: Applied Damage Token (enemy)
+[04:54:13.893] LOG: Applied Damage Token (enemy)
+[04:54:13.894] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:13.895] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:13.895] WARN: BattlerTag ER_ENRAGE is missing a score!
+[04:54:13.896] LOG: %cStart Phase TurnStartPhase color:green;
+[04:54:13.897] LOG: %cStart Phase AttemptCapturePhase color:green;
+[04:54:15.392] LOG: [coop:account] account-write scope OPEN (own-catch) depth=1
+[04:54:16.157] WARN: Texture "%s" has no frame "%s" pokemon_icons_3v 344_2
+[04:54:16.157] LOG: Claydol's variant icon does not exist. Replacing with default.
+[04:54:18.327] LOG: Applied Calcium 
+[04:54:18.327] LOG: Applied Soul Dew 
+[04:54:18.328] LOG: Applied Soul Dew 
+[04:54:18.330] LOG: Applied Iron 
+[04:54:18.330] LOG: Applied Carbos 
+[04:54:18.330] LOG: Applied Zinc 
+[04:54:18.330] LOG: Applied HP Up 
+[04:54:18.330] LOG: Applied Calcium 
+[04:54:18.330] LOG: Applied Soul Dew 
+[04:54:18.330] LOG: Applied Soul Dew 
+[04:54:18.331] LOG: Applied Protein 
+[04:54:18.332] LOG: Applied Soul Dew 
+[04:54:18.332] LOG: Applied Soul Dew 
+[04:54:18.333] LOG: Applied Iron 
+[04:54:18.333] LOG: Applied HP Up 
+[04:54:18.333] LOG: Applied Carbos 
+[04:54:18.334] LOG: Applied Zinc 
+[04:54:18.335] LOG: Applied Protein 
+[04:54:18.335] LOG: Applied Iron 
+[04:54:18.335] LOG: Applied Carbos 
+[04:54:18.335] LOG: Applied Zinc 
+[04:54:18.436] LOG: Applied Calcium 
+[04:54:18.436] LOG: Applied Soul Dew 
+[04:54:18.437] LOG: Applied Soul Dew 
+[04:54:18.439] LOG: Applied Iron 
+[04:54:18.439] LOG: Applied Carbos 
+[04:54:18.439] LOG: Applied Zinc 
+[04:54:18.439] LOG: Applied HP Up 
+[04:54:18.439] LOG: Applied Calcium 
+[04:54:18.440] LOG: Applied Soul Dew 
+[04:54:18.441] LOG: Applied Soul Dew 
+[04:54:18.442] LOG: Applied Protein 
+[04:54:18.442] LOG: Applied Soul Dew 
+[04:54:18.443] LOG: Applied Soul Dew 
+[04:54:18.444] LOG: Applied Iron 
+[04:54:18.444] LOG: Applied HP Up 
+[04:54:18.444] LOG: Applied Carbos 
+[04:54:18.444] LOG: Applied Zinc 
+[04:54:18.445] LOG: Applied Iron 
+[04:54:18.446] LOG: Applied Protein 
+[04:54:18.446] LOG: Applied Iron 
+[04:54:18.446] LOG: Applied Carbos 
+[04:54:18.446] LOG: Applied Zinc 
+[04:54:19.910] LOG: %cStart Phase VictoryPhase color:green;
+[04:54:19.911] LOG: Applied Soothe Bell 
+[04:54:19.911] LOG: Applied Golden Egg 
+[04:54:19.911] LOG: Applied Lucky Egg 
+[04:54:19.912] LOG: Applied Soothe Bell 
+[04:54:19.912] LOG: Applied Lucky Egg 
+[04:54:19.912] LOG: Applied Golden Egg 
+[04:54:19.912] LOG: Applied Lucky Egg 
+[04:54:19.912] LOG: Applied Lucky Egg 
+[04:54:19.912] LOG: %cStart Phase ExpPhase color:green;
+[04:54:19.913] LOG: Applied Super EXP. Charm 
+[04:54:19.913] LOG: Applied EXP. Charm 
+[04:54:20.242] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:20.242] LOG: Applied Calcium 
+[04:54:20.243] LOG: Applied Soul Dew 
+[04:54:20.244] LOG: Applied Soul Dew 
+[04:54:20.245] LOG: %cStart Phase ExpPhase color:green;
+[04:54:20.245] LOG: Applied Super EXP. Charm 
+[04:54:20.245] LOG: Applied EXP. Charm 
+[04:54:20.454] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:20.455] LOG: Applied Iron 
+[04:54:20.455] LOG: Applied Carbos 
+[04:54:20.455] LOG: Applied Zinc 
+[04:54:20.455] LOG: Applied HP Up 
+[04:54:20.455] LOG: Applied Calcium 
+[04:54:20.455] LOG: Applied Soul Dew 
+[04:54:20.456] LOG: Applied Soul Dew 
+[04:54:20.456] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:20.457] LOG: Applied Super EXP. Charm 
+[04:54:20.457] LOG: Applied EXP. Charm 
+[04:54:20.458] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:20.458] LOG: Applied Protein 
+[04:54:20.460] LOG: Applied Soul Dew 
+[04:54:20.461] LOG: Applied Soul Dew 
+[04:54:20.461] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:20.461] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:20.461] LOG: Applied Super EXP. Charm 
+[04:54:20.461] LOG: Applied EXP. Charm 
+[04:54:20.462] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:20.462] LOG: Applied Iron 
+[04:54:20.462] LOG: Applied HP Up 
+[04:54:20.462] LOG: Applied Carbos 
+[04:54:20.462] LOG: Applied Zinc 
+[04:54:20.462] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:20.463] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:20.463] LOG: Applied Super EXP. Charm 
+[04:54:20.463] LOG: Applied EXP. Charm 
+[04:54:20.463] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:20.464] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:20.464] LOG: Applied Super EXP. Charm 
+[04:54:20.464] LOG: Applied EXP. Charm 
+[04:54:20.465] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:20.466] LOG: Applied Protein 
+[04:54:20.466] LOG: Applied Iron 
+[04:54:20.466] LOG: Applied Carbos 
+[04:54:20.466] LOG: Applied Zinc 
+[04:54:20.467] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:20.467] LOG: %cStart Phase TurnInitPhase color:green;
+[04:54:20.467] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:54:20.467] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:54:20.467] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:54:20.467] LOG: %cStart Phase BerryPhase color:green;
+[04:54:20.476] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:54:20.477] LOG: %cStart Phase TurnEndPhase color:green;
+[04:54:20.480] LOG: Applied Leftovers 
+[04:54:20.481] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:54:20.585] LOG: Applied Healing Charm 
+[04:54:20.590] LOG: %cStart Phase MessagePhase color:green;
+[04:54:20.869] LOG: %cStart Phase BattleEndPhase color:green;
+[04:54:20.869] LOG: Battle Score: 273 (2 Turns x0.84)
+[04:54:20.869] LOG: Total Score: 517261
+[04:54:20.871] LOG: Applied Amulet Coin 
+[04:54:20.874] LOG: Applied Calcium 
+[04:54:20.874] LOG: Applied Soul Dew 
+[04:54:20.874] LOG: Applied Soul Dew 
+[04:54:20.875] LOG: Applied Iron 
+[04:54:20.875] LOG: Applied Carbos 
+[04:54:20.875] LOG: Applied Zinc 
+[04:54:20.875] LOG: Applied HP Up 
+[04:54:20.875] LOG: Applied Calcium 
+[04:54:20.875] LOG: Applied Soul Dew 
+[04:54:20.876] LOG: Applied Soul Dew 
+[04:54:20.876] LOG: Applied Protein 
+[04:54:20.877] LOG: Applied Soul Dew 
+[04:54:20.878] LOG: Applied Soul Dew 
+[04:54:20.879] LOG: Applied Iron 
+[04:54:20.879] LOG: Applied HP Up 
+[04:54:20.879] LOG: Applied Carbos 
+[04:54:20.879] LOG: Applied Zinc 
+[04:54:20.880] LOG: Applied Iron 
+[04:54:20.880] LOG: Applied Protein 
+[04:54:20.880] LOG: Applied Iron 
+[04:54:20.880] LOG: Applied Carbos 
+[04:54:20.880] LOG: Applied Zinc 
+[04:54:20.891] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:54:20.892] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:54:20.892] LOG: %cStart Phase MessagePhase color:green;
+[04:54:20.991] LOG: %cStart Phase EggLapsePhase color:green;
+[04:54:20.991] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:54:20.991] LOG: Wave Seed: ӒҩҾӫҿӮҩӠһӂҽӋӛҪӎӉӤӌһҨҨӬӧӱ 1144
+[04:54:21.024] LOG: Applied Golden Poké Ball 
+[04:54:26.918] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:54:26.936] LOG: Applied Golden Poké Ball 
+[04:54:28.302] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:54:28.320] LOG: Applied Golden Poké Ball 
+[04:54:31.204] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:31.204] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:32.074] LOG: Applied Calcium 
+[04:54:32.074] LOG: Applied Soul Dew 
+[04:54:32.075] LOG: Applied Soul Dew 
+[04:54:32.075] LOG: Applied Iron 
+[04:54:32.075] LOG: Applied Carbos 
+[04:54:32.075] LOG: Applied Zinc 
+[04:54:32.075] LOG: Applied HP Up 
+[04:54:32.076] LOG: Applied Calcium 
+[04:54:32.076] LOG: Applied Soul Dew 
+[04:54:32.076] LOG: Applied Soul Dew 
+[04:54:32.077] LOG: Applied Protein 
+[04:54:32.078] LOG: Applied Soul Dew 
+[04:54:32.079] LOG: Applied Soul Dew 
+[04:54:32.080] LOG: Applied Iron 
+[04:54:32.080] LOG: Applied HP Up 
+[04:54:32.080] LOG: Applied Carbos 
+[04:54:32.080] LOG: Applied Zinc 
+[04:54:32.081] LOG: Applied Iron 
+[04:54:32.081] LOG: Applied Protein 
+[04:54:32.081] LOG: Applied Iron 
+[04:54:32.081] LOG: Applied Carbos 
+[04:54:32.081] LOG: Applied Zinc 
+[04:54:32.138] LOG: %cStart Phase NewBattlePhase color:green;
+[04:54:32.138] LOG: Wave Seed: ӓҪҿӬӀӯҪӡҼӃҾӌӜҫӏӊӥӍҼҩҩӭӨӲ 1145
+[04:54:32.138] LOG: Applied Super Lure 
+[04:54:32.138] LOG: Applied Lure 
+[04:54:32.138] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:54:32.139] LOG: Starting species pool tier: UNCOMMON
+[04:54:32.141] LOG: Replaced GLAMEOW with PURUGLY
+[04:54:32.142] LOG: Applied Shiny Charm 
+[04:54:32.150] LOG: Pokemon: Wild Purugly | Species ID: 432 | Level: 2705 | Nature: Brave (+Atk/-Spd)
+[04:54:32.150] LOG: Stats (IVs): HP: 8314 (31), Atk: 6612 (18), Def: 3792 (12), Spatk: 4062 (22), Spdef: 4251 (19), Spd: 5481 (1)
+[04:54:32.150] LOG: Ability: Intimidate | Passive Ability: Hyper Aggressive 
+[04:54:32.150] LOG: Moveset: ["Thrash","Body Slam","Sucker Punch","Bind"]
+[04:54:32.150] LOG: Starting species pool tier: COMMON
+[04:54:32.152] LOG: Replaced FLABEBE with FLORGES
+[04:54:32.153] LOG: Applied Shiny Charm 
+[04:54:32.160] LOG: Pokemon: Wild Florges | Species ID: 671 | Level: 2705 | Nature: Relaxed (+Def/-Spd)
+[04:54:32.160] LOG: Stats (IVs): HP: 7773 (31), Atk: 3602 (3), Def: 4409 (12), Spatk: 6388 (12), Spdef: 8471 (5), Spd: 4045 (16)
+[04:54:32.160] LOG: Ability: Harvest | Passive Ability: Natural Cure 
+[04:54:32.160] LOG: Moveset: ["Alluring Voice","Light of Ruin","Synthesis","Sweet Scent"]
+[04:54:33.874] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:54:33.874] WARN: updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build
+[04:54:33.954] LOG: Battle Seed: BzBpIegu7SDI33nz
+[04:54:33.954] LOG: Applied HP Up (enemy)
+[04:54:33.954] LOG: Applied Iron (enemy)
+[04:54:33.955] LOG: Applied Zinc (enemy)
+[04:54:33.955] LOG: Applied Carbos (enemy)
+[04:54:33.955] LOG: Applied Calcium (enemy)
+[04:54:33.956] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.956] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.961] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.961] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.962] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.962] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.962] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.962] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.962] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.962] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.963] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.963] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.963] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.963] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:33.964] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:54:33.964] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:54:34.081] DEBUG: Session data saved to slot 0!
+[04:54:34.081] LOG: Applied HP Up (enemy)
+[04:54:34.081] LOG: Applied Iron (enemy)
+[04:54:34.082] LOG: Applied Zinc (enemy)
+[04:54:34.082] LOG: Applied Carbos (enemy)
+[04:54:34.082] LOG: Applied Calcium (enemy)
+[04:54:34.084] LOG: Wave Seed: ӓҪҿӬӀӯҪӡҼӃҾӌӜҫӏӊӥӍҼҩҩӭӨӲ 1145
+[04:54:34.511] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:54:34.615] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:54:34.616] LOG: %cStart Phase ScanIvsPhase color:green;
+[04:54:34.616] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:54:34.619] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:54:35.166] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:54:35.400] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:54:35.403] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:35.403] LOG: Ran PSP for: Purugly
+[04:54:35.409] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:35.412] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:54:35.576] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:54:35.579] LOG: %cStart Phase MessagePhase color:green;
+[04:54:35.869] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:54:36.075] LOG: %cStart Phase MessagePhase color:green;
+[04:54:36.279] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:54:36.309] LOG: %cStart Phase PostSummonPhase color:green;
+[04:54:36.309] LOG: Ran PSP for: Florges
+[04:54:36.312] LOG: %cStart Phase TurnInitPhase color:green;
+[04:54:36.313] LOG: %cStart Phase CommandPhase color:green;
+[04:54:37.248] LOG: Move: FLAME_BURST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[04:54:37.249] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:54:37.802] LOG: %cStart Phase CommandPhase color:green;
+[04:54:38.652] LOG: Move: PROTECT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:54:38.655] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:54:38.657] LOG: Applied Damage Token (enemy)
+[04:54:38.658] LOG: Applied Damage Token (enemy)
+[04:54:38.659] LOG: Applied Damage Token (enemy)
+[04:54:38.661] LOG: Applied Damage Token (enemy)
+[04:54:38.661] LOG: Applied Damage Token (enemy)
+[04:54:38.662] LOG: Applied Damage Token (enemy)
+[04:54:38.662] LOG: Applied Damage Token (enemy)
+[04:54:38.667] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:54:38.667] LOG: Applied Fairy Feather (enemy)
+[04:54:38.668] LOG: Applied Damage Token (enemy)
+[04:54:38.668] LOG: Applied Fairy Feather (enemy)
+[04:54:38.668] LOG: Applied Damage Token (enemy)
+[04:54:38.668] LOG: Applied Fairy Feather (enemy)
+[04:54:38.668] LOG: Applied Damage Token (enemy)
+[04:54:38.668] LOG: Applied Fairy Feather (enemy)
+[04:54:38.669] LOG: Applied Damage Token (enemy)
+[04:54:38.669] LOG: %cStart Phase TurnStartPhase color:green;
+[04:54:38.671] LOG: %cStart Phase MovePhase color:green;
+[04:54:38.671] LOG: %cUser: Iron Leaves
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[04:54:38.673] LOG: %cStart Phase MessagePhase color:green;
+[04:54:38.751] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:39.047] LOG: Applied Shell Bell 
+[04:54:39.047] LOG: %cStart Phase MessagePhase color:green;
+[04:54:39.252] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:39.260] LOG: %cStart Phase MovePhase color:green;
+[04:54:39.260] LOG: %cUser: Mega Moltres Ex
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[04:54:39.291] LOG: %cStart Phase MessagePhase color:green;
+[04:54:39.396] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:39.397] LOG: Applied Multi Lens 
+[04:54:39.753] LOG: Applied Scope Lens 
+[04:54:39.754] LOG: crit stage: +1
+[04:54:39.759] LOG: Applied Charcoal 
+[04:54:39.763] LOG: Move: Flame Burst | Base damage: 13129.55645373263 | Power: 64 | Source attack: 87828 | Target defense: 9283
+[04:54:39.763] LOG: Applied Multi Lens 
+[04:54:39.766] LOG: Applied Protection Token (enemy)
+[04:54:39.767] LOG: Move: Flame Burst | Attack damage: 4576
+[04:54:39.768] LOG: Applied Amulet Coin 
+[04:54:39.769] LOG: Applied Golden Punch 
+[04:54:39.770] LOG: Applied King’s Rock 
+[04:54:39.775] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:39.789] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:39.790] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:40.162] LOG: Applied Scope Lens 
+[04:54:40.163] LOG: crit stage: +1
+[04:54:40.167] LOG: Applied Charcoal 
+[04:54:40.171] LOG: Move: Flame Burst | Base damage: 13129.55645373263 | Power: 64 | Source attack: 87828 | Target defense: 9283
+[04:54:40.171] LOG: Applied Multi Lens 
+[04:54:40.174] LOG: Applied Protection Token (enemy)
+[04:54:40.175] LOG: Move: Flame Burst | Attack damage: 3359
+[04:54:40.177] LOG: Applied Endure Token (enemy)
+[04:54:40.179] LOG: Applied Amulet Coin 
+[04:54:40.179] LOG: Applied Golden Punch 
+[04:54:40.180] LOG: Applied King’s Rock 
+[04:54:40.183] LOG: %cStart Phase MessagePhase color:green;
+[04:54:40.369] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:40.397] LOG: %cStart Phase MessagePhase color:green;
+[04:54:40.606] LOG: %cStart Phase MessagePhase color:green;
+[04:54:40.800] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:40.804] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:41.169] LOG: Applied Scope Lens 
+[04:54:41.170] LOG: crit stage: +1
+[04:54:41.175] LOG: Applied Charcoal 
+[04:54:41.178] LOG: Move: Flame Burst | Base damage: 13129.55645373263 | Power: 64 | Source attack: 87828 | Target defense: 9283
+[04:54:41.179] LOG: Applied Multi Lens 
+[04:54:41.181] LOG: Applied Protection Token (enemy)
+[04:54:41.181] LOG: Move: Flame Burst | Attack damage: 2383
+[04:54:41.183] LOG: Applied Amulet Coin 
+[04:54:41.184] LOG: Applied Golden Punch 
+[04:54:41.187] LOG: Applied Shell Bell 
+[04:54:41.187] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:41.196] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:54:41.200] LOG: %cStart Phase MessagePhase color:green;
+[04:54:41.376] LOG: %cStart Phase FaintPhase color:green;
+[04:54:43.455] LOG: %cStart Phase MessagePhase color:green;
+[04:54:43.615] LOG: %cStart Phase VictoryPhase color:green;
+[04:54:43.615] LOG: Applied Soothe Bell 
+[04:54:43.616] LOG: Applied Golden Egg 
+[04:54:43.616] LOG: Applied Lucky Egg 
+[04:54:43.616] LOG: Applied Soothe Bell 
+[04:54:43.616] LOG: Applied Lucky Egg 
+[04:54:43.616] LOG: Applied Golden Egg 
+[04:54:43.616] LOG: Applied Lucky Egg 
+[04:54:43.617] LOG: Applied Lucky Egg 
+[04:54:43.617] LOG: %cStart Phase ExpPhase color:green;
+[04:54:43.617] LOG: Applied Super EXP. Charm 
+[04:54:43.617] LOG: Applied EXP. Charm 
+[04:54:44.172] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:44.172] LOG: Applied Calcium 
+[04:54:44.172] LOG: Applied Soul Dew 
+[04:54:44.173] LOG: Applied Soul Dew 
+[04:54:44.174] LOG: %cStart Phase ExpPhase color:green;
+[04:54:44.174] LOG: Applied Super EXP. Charm 
+[04:54:44.174] LOG: Applied EXP. Charm 
+[04:54:49.803] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:49.803] LOG: Applied Iron 
+[04:54:49.803] LOG: Applied Carbos 
+[04:54:49.803] LOG: Applied Zinc 
+[04:54:49.803] LOG: Applied HP Up 
+[04:54:49.803] LOG: Applied Calcium 
+[04:54:49.804] LOG: Applied Soul Dew 
+[04:54:49.804] LOG: Applied Soul Dew 
+[04:54:49.805] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:49.805] LOG: Applied Super EXP. Charm 
+[04:54:49.805] LOG: Applied EXP. Charm 
+[04:54:49.805] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:49.805] LOG: Applied Protein 
+[04:54:49.806] LOG: Applied Soul Dew 
+[04:54:49.806] LOG: Applied Soul Dew 
+[04:54:49.807] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:49.807] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:49.807] LOG: Applied Super EXP. Charm 
+[04:54:49.807] LOG: Applied EXP. Charm 
+[04:54:49.807] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:49.808] LOG: Applied Iron 
+[04:54:49.808] LOG: Applied HP Up 
+[04:54:49.808] LOG: Applied Carbos 
+[04:54:49.808] LOG: Applied Zinc 
+[04:54:49.808] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:49.808] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:49.809] LOG: Applied Super EXP. Charm 
+[04:54:49.809] LOG: Applied EXP. Charm 
+[04:54:49.809] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:49.809] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:54:49.809] LOG: Applied Super EXP. Charm 
+[04:54:49.809] LOG: Applied EXP. Charm 
+[04:54:49.810] LOG: %cStart Phase LevelUpPhase color:green;
+[04:54:49.810] LOG: Applied Protein 
+[04:54:49.810] LOG: Applied Iron 
+[04:54:49.810] LOG: Applied Carbos 
+[04:54:49.810] LOG: Applied Zinc 
+[04:54:49.811] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:54:49.811] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:49.813] LOG: %cStart Phase MovePhase color:green;
+[04:54:49.813] LOG: %cUser: Purugly
+Move: BODY_SLAM
+Use Mode: NORMAL color:orchid
+[04:54:49.829] LOG: %cStart Phase MessagePhase color:green;
+[04:54:49.939] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:54:49.942] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:54:50.101] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:54:50.142] LOG: %cStart Phase MessagePhase color:green;
+[04:54:50.352] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:50.352] LOG: %cStart Phase MovePhase color:green;
+[04:54:50.352] LOG: %cStart Phase MoveEndPhase color:green;
+[04:54:50.352] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:54:50.352] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:54:50.352] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:54:50.352] LOG: %cStart Phase BerryPhase color:green;
+[04:54:50.366] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:54:50.371] LOG: %cStart Phase TurnEndPhase color:green;
+[04:54:50.374] LOG: Battle Seed: BzBpIegu7SDI33nz
+[04:54:50.376] LOG: Applied Recovery Token (enemy)
+[04:54:50.377] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:54:50.514] LOG: %cStart Phase MessagePhase color:green;
+[04:54:50.747] LOG: %cStart Phase TurnInitPhase color:green;
+[04:54:50.747] LOG: %cStart Phase CommandPhase color:green;
+[04:54:53.415] LOG: %cStart Phase CommandPhase color:green;
+[04:54:53.415] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:54:53.416] LOG: Applied Damage Token (enemy)
+[04:54:53.417] LOG: Applied Damage Token (enemy)
+[04:54:53.419] LOG: Applied Damage Token (enemy)
+[04:54:53.419] LOG: Applied Damage Token (enemy)
+[04:54:53.419] LOG: Applied Damage Token (enemy)
+[04:54:53.420] LOG: Applied Damage Token (enemy)
+[04:54:53.420] LOG: Applied Damage Token (enemy)
+[04:54:53.422] LOG: %cStart Phase TurnStartPhase color:green;
+[04:54:53.424] LOG: %cStart Phase AttemptCapturePhase color:green;
+[04:54:55.185] LOG: [coop:account] account-write scope OPEN (own-catch) depth=1
+[04:54:56.210] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:56.210] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:57.810] WARN: Texture "%s" has no frame "%s" pokemon_icons_8v 832_2
+[04:54:57.810] LOG: Dubwool's variant icon does not exist. Replacing with default.
+[04:54:59.061] LOG: Applied Calcium 
+[04:54:59.062] LOG: Applied Soul Dew 
+[04:54:59.062] LOG: Applied Soul Dew 
+[04:54:59.064] LOG: Applied Iron 
+[04:54:59.064] LOG: Applied Carbos 
+[04:54:59.064] LOG: Applied Zinc 
+[04:54:59.064] LOG: Applied HP Up 
+[04:54:59.064] LOG: Applied Calcium 
+[04:54:59.064] LOG: Applied Soul Dew 
+[04:54:59.065] LOG: Applied Soul Dew 
+[04:54:59.066] LOG: Applied Protein 
+[04:54:59.067] LOG: Applied Soul Dew 
+[04:54:59.067] LOG: Applied Soul Dew 
+[04:54:59.067] LOG: Applied Iron 
+[04:54:59.068] LOG: Applied HP Up 
+[04:54:59.068] LOG: Applied Carbos 
+[04:54:59.068] LOG: Applied Zinc 
+[04:54:59.068] LOG: Applied Protein 
+[04:54:59.068] LOG: Applied Iron 
+[04:54:59.068] LOG: Applied Carbos 
+[04:54:59.068] LOG: Applied Zinc 
+[04:54:59.173] LOG: Applied Calcium 
+[04:54:59.173] LOG: Applied Soul Dew 
+[04:54:59.174] LOG: Applied Soul Dew 
+[04:54:59.176] LOG: Applied Iron 
+[04:54:59.176] LOG: Applied Carbos 
+[04:54:59.176] LOG: Applied Zinc 
+[04:54:59.176] LOG: Applied HP Up 
+[04:54:59.176] LOG: Applied Calcium 
+[04:54:59.177] LOG: Applied Soul Dew 
+[04:54:59.177] LOG: Applied Soul Dew 
+[04:54:59.177] LOG: Applied Protein 
+[04:54:59.178] LOG: Applied Soul Dew 
+[04:54:59.178] LOG: Applied Soul Dew 
+[04:54:59.178] LOG: Applied Iron 
+[04:54:59.178] LOG: Applied HP Up 
+[04:54:59.178] LOG: Applied Carbos 
+[04:54:59.179] LOG: Applied Zinc 
+[04:54:59.179] LOG: Applied HP Up 
+[04:54:59.179] LOG: Applied Iron 
+[04:54:59.179] LOG: Applied Protein 
+[04:54:59.180] LOG: Applied Iron 
+[04:54:59.180] LOG: Applied Carbos 
+[04:54:59.180] LOG: Applied Zinc 
+[04:55:01.931] LOG: %cStart Phase VictoryPhase color:green;
+[04:55:01.932] LOG: Applied Soothe Bell 
+[04:55:01.933] LOG: Applied Golden Egg 
+[04:55:01.933] LOG: Applied Lucky Egg 
+[04:55:01.933] LOG: Applied Soothe Bell 
+[04:55:01.933] LOG: Applied Lucky Egg 
+[04:55:01.933] LOG: Applied Golden Egg 
+[04:55:01.933] LOG: Applied Lucky Egg 
+[04:55:01.934] LOG: Applied Lucky Egg 
+[04:55:01.934] LOG: %cStart Phase ExpPhase color:green;
+[04:55:01.934] LOG: Applied Super EXP. Charm 
+[04:55:01.934] LOG: Applied EXP. Charm 
+[04:55:02.580] LOG: %cStart Phase LevelUpPhase color:green;
+[04:55:02.580] LOG: Applied Calcium 
+[04:55:02.581] LOG: Applied Soul Dew 
+[04:55:02.581] LOG: Applied Soul Dew 
+[04:55:02.582] LOG: %cStart Phase ExpPhase color:green;
+[04:55:02.582] LOG: Applied Super EXP. Charm 
+[04:55:02.582] LOG: Applied EXP. Charm 
+[04:55:02.803] LOG: %cStart Phase LevelUpPhase color:green;
+[04:55:02.804] LOG: Applied Iron 
+[04:55:02.804] LOG: Applied Carbos 
+[04:55:02.804] LOG: Applied Zinc 
+[04:55:02.804] LOG: Applied HP Up 
+[04:55:02.804] LOG: Applied Calcium 
+[04:55:02.805] LOG: Applied Soul Dew 
+[04:55:02.805] LOG: Applied Soul Dew 
+[04:55:02.805] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:55:02.806] LOG: Applied Super EXP. Charm 
+[04:55:02.806] LOG: Applied EXP. Charm 
+[04:55:02.808] LOG: %cStart Phase LevelUpPhase color:green;
+[04:55:02.808] LOG: Applied Protein 
+[04:55:02.809] LOG: Applied Soul Dew 
+[04:55:02.809] LOG: Applied Soul Dew 
+[04:55:02.810] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:55:02.810] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:55:02.810] LOG: Applied Super EXP. Charm 
+[04:55:02.810] LOG: Applied EXP. Charm 
+[04:55:02.810] LOG: %cStart Phase LevelUpPhase color:green;
+[04:55:02.811] LOG: Applied Iron 
+[04:55:02.811] LOG: Applied HP Up 
+[04:55:02.811] LOG: Applied Carbos 
+[04:55:02.811] LOG: Applied Zinc 
+[04:55:02.811] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:55:02.812] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:55:02.812] LOG: Applied Super EXP. Charm 
+[04:55:02.812] LOG: Applied EXP. Charm 
+[04:55:02.812] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:55:02.812] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:55:02.813] LOG: Applied Super EXP. Charm 
+[04:55:02.813] LOG: Applied EXP. Charm 
+[04:55:02.815] LOG: %cStart Phase LevelUpPhase color:green;
+[04:55:02.816] LOG: Applied Protein 
+[04:55:02.816] LOG: Applied Iron 
+[04:55:02.816] LOG: Applied Carbos 
+[04:55:02.816] LOG: Applied Zinc 
+[04:55:02.816] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:55:02.816] LOG: %cStart Phase TurnInitPhase color:green;
+[04:55:02.816] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:55:02.816] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:55:02.816] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:55:02.816] LOG: %cStart Phase BerryPhase color:green;
+[04:55:02.829] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:55:02.831] LOG: %cStart Phase TurnEndPhase color:green;
+[04:55:02.836] LOG: %cStart Phase BattleEndPhase color:green;
+[04:55:02.837] LOG: Battle Score: 441 (2 Turns x0.84)
+[04:55:02.837] LOG: Total Score: 517702
+[04:55:02.838] LOG: Applied Amulet Coin 
+[04:55:02.840] LOG: Applied Calcium 
+[04:55:02.840] LOG: Applied Soul Dew 
+[04:55:02.841] LOG: Applied Soul Dew 
+[04:55:02.842] LOG: Applied Iron 
+[04:55:02.842] LOG: Applied Carbos 
+[04:55:02.842] LOG: Applied Zinc 
+[04:55:02.842] LOG: Applied HP Up 
+[04:55:02.842] LOG: Applied Calcium 
+[04:55:02.842] LOG: Applied Soul Dew 
+[04:55:02.843] LOG: Applied Soul Dew 
+[04:55:02.843] LOG: Applied Protein 
+[04:55:02.844] LOG: Applied Soul Dew 
+[04:55:02.844] LOG: Applied Soul Dew 
+[04:55:02.844] LOG: Applied Iron 
+[04:55:02.845] LOG: Applied HP Up 
+[04:55:02.845] LOG: Applied Carbos 
+[04:55:02.845] LOG: Applied Zinc 
+[04:55:02.845] LOG: Applied HP Up 
+[04:55:02.845] LOG: Applied Iron 
+[04:55:02.845] LOG: Applied Protein 
+[04:55:02.845] LOG: Applied Iron 
+[04:55:02.845] LOG: Applied Carbos 
+[04:55:02.845] LOG: Applied Zinc 
+[04:55:02.853] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:55:02.853] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:55:02.853] LOG: %cStart Phase MessagePhase color:green;
+[04:55:03.248] LOG: %cStart Phase EggLapsePhase color:green;
+[04:55:03.248] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:55:03.248] LOG: Wave Seed: ӓҪҿӬӀӯҪӡҼӃҾӌӜҫӏӊӥӍҼҩҩӭӨӲ 1145
+[04:55:03.279] LOG: Applied Golden Poké Ball 
+[04:55:06.414] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:55:06.414] LOG: Purugly's variant icon does not exist. Replacing with default.
+[04:55:11.592] WARN: Texture "%s" has no frame "%s" pokemon_icons_4v 432_3
+[04:55:11.592] LOG: Purugly's variant icon does not exist. Replacing with default.
+
+----- REPLAY TRACE (JSON) -----
+(none)
