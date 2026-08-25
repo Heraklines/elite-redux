@@ -151,7 +151,7 @@ impl ActorMoveHistoryV2 {
 
 /// Canonical move-copy family state root: one bounded history per actor plus
 /// the battle-wide ordinal allocator.
-#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MoveCopyStateV2 {
     /// Strictly ascending unique `actor` identities.
