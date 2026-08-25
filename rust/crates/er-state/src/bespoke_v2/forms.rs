@@ -278,13 +278,6 @@ impl FormsStateV2 {
             .map(|position| &self.battlers[position])
     }
 
-    fn battler_mut(&mut self, scope: &MechanicScope) -> Option<&mut FormsBattlerStateV2> {
-        match self.battlers.binary_search_by(|b| b.scope.cmp(scope)) {
-            Ok(position) => self.battlers.get_mut(position),
-            Err(_) => None,
-        }
-    }
-
     /// Teras already consumed by `side` this battle.
     pub fn teras_used(&self, side: BattleSide) -> u32 {
         match side {
@@ -353,7 +346,7 @@ impl FormsStateV2 {
         &self,
         scope: &MechanicScope,
     ) -> Result<(Self, usize), FormsTransitionScopeError> {
-        let mut next = self.clone();
+        let next = self.clone();
         let position = next
             .battlers
             .binary_search_by(|b| b.scope.cmp(scope))
