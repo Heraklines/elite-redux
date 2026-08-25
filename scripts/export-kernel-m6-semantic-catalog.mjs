@@ -216,6 +216,8 @@ function callbackOperand(node, sourceFile) {
 }
 
 function inferHook(attribute) {
+  const audited = AUDITED_ATTRIBUTE_SCHEMAS.get(attribute);
+  if (audited != null) return audited.hook;
   const value = attribute.toUpperCase();
   if (value.includes("POSTSUMMON") || value.includes("SWITCHIN")) return "AFTER_SUMMON";
   if (value.includes("PRESWITCH") || value.includes("LEAVEFIELD")) return "BEFORE_SWITCH_OUT";
@@ -235,6 +237,8 @@ function inferHook(attribute) {
 }
 
 function inferEffect(attribute) {
+  const audited = AUDITED_ATTRIBUTE_SCHEMAS.get(attribute);
+  if (audited != null) return audited.effect;
   const value = attribute.toUpperCase();
   if (value.includes("DAMAGE")) return "MODIFY_OR_APPLY_DAMAGE";
   if (value.includes("STATUS")) return "APPLY_OR_BLOCK_STATUS";
@@ -254,7 +258,23 @@ function attributeClassName(node, sourceFile) {
   if (ts.isNewExpression(node)) return node.expression.getText(sourceFile);
   return node.getText(sourceFile);
 }
-const AUDITED_ATTRIBUTE_SCHEMAS = new Set();
+const AUDITED_ATTRIBUTE_SCHEMAS = new Map([
+  ["HighCritAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
+  ["CritOnlyAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
+  ["StatusEffectAttr", { hook: "STAT_QUERY_OR_CHANGE", effect: "APPLY_OR_BLOCK_STATUS" }],
+  ["StatStageChangeAttr", { hook: "STAT_QUERY_OR_CHANGE", effect: "MODIFY_STAT_OR_STAGE" }],
+  ["MultiHitAttr", { hook: "HIT_COUNT_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
+  ["FixedDamageAttr", { hook: "DAMAGE_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
+  ["LevelDamageAttr", { hook: "DAMAGE_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
+  ["UserHpDamageAttr", { hook: "DAMAGE_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
+  ["RecoilAttr", { hook: "AFTER_DAMAGE", effect: "MODIFY_OR_APPLY_DAMAGE" }],
+  ["HitHealAttr", { hook: "AFTER_DAMAGE", effect: "HEAL" }],
+  ["BlockCritAbAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
+  ["BonusCritAbAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
+  ["ForceSwitchOutAttr", { hook: "AFTER_HIT", effect: "SWITCH_OR_TRAP" }],
+  ["BypassRedirectAttr", { hook: "MOVE_TARGET_QUERY", effect: "MODIFY_TARGET" }],
+  ["BlockRedirectAbAttr", { hook: "MOVE_TARGET_QUERY", effect: "MODIFY_TARGET" }],
+]);
 
 function builderChainRoot(node) {
   let current = node;

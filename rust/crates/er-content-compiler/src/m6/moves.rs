@@ -352,8 +352,10 @@ pub fn map_moves_unit(
 /// frozen extraction shape for MOVE_ATTRIBUTE attachments.
 fn owned_class(unit: &CatalogBehaviorUnit) -> Option<&str> {
     let implementation = unit.semantic.implementation.as_ref()?;
-    if unit.semantic.resolution != CatalogResolution::BespokeGap
-        || !matches!(unit.semantic.target.kind, CatalogTargetKind::SourceDefined)
+    if !matches!(
+        unit.semantic.resolution,
+        CatalogResolution::BespokeGap | CatalogResolution::ResolvedOperands
+    ) || !matches!(unit.semantic.target.kind, CatalogTargetKind::SourceDefined)
         || !matches!(
             unit.semantic.condition,
             None | Some(CatalogOperand::Always {})
@@ -367,23 +369,56 @@ fn owned_class(unit: &CatalogBehaviorUnit) -> Option<&str> {
     {
         return None;
     }
-    let (hook_evidence, effect_kind) = match name {
-        "HighCritAttr" => ("CRITICAL_QUERY", CatalogEffectKind::UnresolvedEffect),
-        "CritOnlyAttr" => ("CRITICAL_QUERY", CatalogEffectKind::UnresolvedEffect),
+    let (hook_evidence, alternate_hook, effect_kind, alternate_effect) = match name {
+        "HighCritAttr" | "CritOnlyAttr" => (
+            "CRITICAL_QUERY",
+            None,
+            CatalogEffectKind::ModifyStatOrStage,
+            Some(CatalogEffectKind::UnresolvedEffect),
+        ),
         "StatusEffectAttr" => (
             "STAT_QUERY_OR_CHANGE",
+            None,
             CatalogEffectKind::ApplyOrBlockStatus,
+            None,
         ),
-        "StatStageChangeAttr" => ("STAT_QUERY_OR_CHANGE", CatalogEffectKind::ModifyStatOrStage),
-        "MultiHitAttr" => ("UNRESOLVED_HOOK", CatalogEffectKind::UnresolvedEffect),
-        "FixedDamageAttr" => ("DAMAGE_QUERY", CatalogEffectKind::ModifyOrApplyDamage),
-        "LevelDamageAttr" => ("DAMAGE_QUERY", CatalogEffectKind::ModifyOrApplyDamage),
-        "UserHpDamageAttr" => ("DAMAGE_QUERY", CatalogEffectKind::ModifyOrApplyDamage),
-        "RecoilAttr" => ("UNRESOLVED_HOOK", CatalogEffectKind::UnresolvedEffect),
-        "HitHealAttr" => ("UNRESOLVED_HOOK", CatalogEffectKind::Heal),
+        "StatStageChangeAttr" => (
+            "STAT_QUERY_OR_CHANGE",
+            None,
+            CatalogEffectKind::ModifyStatOrStage,
+            None,
+        ),
+        "MultiHitAttr" => (
+            "HIT_COUNT_QUERY",
+            Some("UNRESOLVED_HOOK"),
+            CatalogEffectKind::ModifyOrApplyDamage,
+            Some(CatalogEffectKind::UnresolvedEffect),
+        ),
+        "FixedDamageAttr" | "LevelDamageAttr" | "UserHpDamageAttr" => (
+            "DAMAGE_QUERY",
+            None,
+            CatalogEffectKind::ModifyOrApplyDamage,
+            None,
+        ),
+        "RecoilAttr" => (
+            "AFTER_DAMAGE",
+            Some("UNRESOLVED_HOOK"),
+            CatalogEffectKind::ModifyOrApplyDamage,
+            Some(CatalogEffectKind::UnresolvedEffect),
+        ),
+        "HitHealAttr" => (
+            "AFTER_DAMAGE",
+            Some("UNRESOLVED_HOOK"),
+            CatalogEffectKind::Heal,
+            None,
+        ),
         _ => return None,
     };
-    if unit.semantic.hook.0 != hook_evidence || unit.semantic.effect.kind != effect_kind {
+    if (unit.semantic.hook.0 != hook_evidence
+        && alternate_hook != Some(unit.semantic.hook.0.as_str()))
+        || (unit.semantic.effect.kind != effect_kind
+            && alternate_effect != Some(unit.semantic.effect.kind))
+    {
         return None;
     }
     Some(name)

@@ -21,9 +21,19 @@ fn frozen_semantic_catalog_loads_and_validates() {
         u64::try_from(catalog.behavior_units.len()).unwrap(),
         catalog.declared_behavior_unit_total()
     );
+    assert_eq!(
+        catalog
+            .behavior_units
+            .iter()
+            .filter(|unit| unit.semantic.resolution == CatalogResolution::ResolvedOperands)
+            .count(),
+        95
+    );
     assert!(catalog.behavior_units.iter().all(|unit| matches!(
         unit.semantic.resolution,
-        CatalogResolution::ResolvedIntrinsic | CatalogResolution::BespokeGap
+        CatalogResolution::ResolvedIntrinsic
+            | CatalogResolution::ResolvedOperands
+            | CatalogResolution::BespokeGap
     )));
 }
 

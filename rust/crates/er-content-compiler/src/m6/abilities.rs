@@ -156,7 +156,10 @@ fn exact_unit_shape(
         return false;
     }
     if semantic.hook.0 != hook_evidence
-        || semantic.effect.kind != CatalogEffectKind::UnresolvedEffect
+        || !matches!(
+            semantic.effect.kind,
+            CatalogEffectKind::UnresolvedEffect | CatalogEffectKind::ModifyStatOrStage
+        )
         || semantic.effect.attribute.as_deref() != Some(class)
         || !matches!(semantic.condition, Some(CatalogOperand::Always {}))
         || semantic.target.kind != CatalogTargetKind::SourceDefined
