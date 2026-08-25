@@ -1,8 +1,9 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 
 use er_content::m6_catalog::SemanticCatalogV1;
 use er_content_compiler::m6::abilities::mapped_unit_count;
+use er_content_compiler::m6::moves::map_moves_unit;
 use er_content_compiler::m6::moves::move_compiled_site_total;
 use er_content_compiler::m6::{
     SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog,
@@ -32,6 +33,22 @@ fn routine_mapping_is_deterministic_complete_and_buildable() -> Result<(), Box<d
     let expected_abilities = mapped_unit_count(catalog.behavior_units());
     assert_eq!(expected_moves, 321);
     assert_eq!(expected_abilities, 6);
+    let mut mapped_move_classes = BTreeMap::<String, usize>::new();
+    for unit in catalog.behavior_units() {
+        if map_moves_unit(unit)?.is_some() {
+            let class = unit
+                .semantic
+                .implementation
+                .as_ref()
+                .map_or("<none>", |implementation| implementation.name.as_str());
+            *mapped_move_classes.entry(class.to_owned()).or_default() += 1;
+        }
+    }
+    let actual_moves = mapped_move_classes.values().sum::<usize>();
+    assert_eq!(
+        actual_moves, expected_moves,
+        "move coverage drift: {mapped_move_classes:?}"
+    );
     assert_eq!(first.mapped.len(), expected_moves + expected_abilities);
     assert_eq!(first.unresolved.len(), 9_388 - first.mapped.len());
 

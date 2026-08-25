@@ -53,12 +53,12 @@ pub enum MoveRoutineAdapterError {
 pub fn prepare_move_routine(
     program: MechanicsProgramV2,
 ) -> Result<PreparedMoveRoutine, MoveRoutineAdapterError> {
-    program
-        .validate()
-        .map_err(MoveRoutineAdapterError::Invalid)?;
     if !matches!(program.source, BehaviorSourceId::Move { .. }) {
         return Err(MoveRoutineAdapterError::NotMoveSource);
     }
+    program
+        .validate()
+        .map_err(MoveRoutineAdapterError::Invalid)?;
     for (index, operation) in program.operations.iter().enumerate() {
         if !is_move_routine_operation(operation) {
             return Err(MoveRoutineAdapterError::UnsupportedOperation { index });
