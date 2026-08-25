@@ -325,7 +325,7 @@ pub fn map_moves_unit(
     if unit.id.unit_kind != BehaviorUnitKind::MoveAttribute {
         return Ok(None);
     }
-    match owned_class(unit) {
+    let mapped = match owned_class(unit) {
         Some("HighCritAttr") => high_crit(unit).map(Some),
         Some("CritOnlyAttr") => crit_only(unit).map(Some),
         Some("StatusEffectAttr") => status_effect(unit).map(Some),
@@ -337,6 +337,12 @@ pub fn map_moves_unit(
         Some("RecoilAttr") => recoil(unit),
         Some("HitHealAttr") => hit_heal(unit),
         _ => Ok(None),
+    };
+    match mapped {
+        Err(
+            RoutineCompileError::MissingOperand { .. } | RoutineCompileError::OperandKind { .. },
+        ) => Ok(None),
+        result => result,
     }
 }
 

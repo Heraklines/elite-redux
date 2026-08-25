@@ -1315,6 +1315,9 @@ pub fn battle_schema_gap(registry_key: &str) -> Option<&'static str> {
     if !is_battle {
         return None;
     }
+    if ITEMS_ADMITTED_REGISTRY_KEYS.contains(&registry_key) {
+        return None;
+    }
     Some(match registry_key {
         "BERRY" | "BERRY_POUCH" => BERRY_LIFECYCLE_BESPOKE_REASON,
         "FOCUS_BAND"
