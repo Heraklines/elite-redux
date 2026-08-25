@@ -120,6 +120,8 @@ if (deployArg) {
     "data/dex-detail.json",
     "data/species-extra.json",
     "data/leaderboards.json",
+    "data/balance-observations.json",
+    "data/_decisions.json",
     "data/_runs.json",
     "data/_showdown.json",
   ]) {
@@ -127,8 +129,10 @@ if (deployArg) {
   }
   const publicDataFiles = readdirSync(new URL("data/", deployUrl)).sort();
   const expectedDataFiles = [
+    "_decisions.json",
     "_runs.json",
     "_showdown.json",
+    "balance-observations.json",
     "dex-detail.json",
     "dex.json",
     "leaderboards.json",
