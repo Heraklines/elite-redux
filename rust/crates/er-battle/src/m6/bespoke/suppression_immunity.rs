@@ -189,7 +189,7 @@ pub fn apply_slot_suppression(
             (entry.creation_ordinal, true)
         }
         None => {
-            let ordinal = next_ordinal(&next)?;
+            let ordinal = next.next_creation_ordinal;
             next.slot_suppressions.push(SlotSuppressionEntryV2 {
                 owner: request.owner,
                 slot: request.slot,
@@ -512,7 +512,7 @@ pub fn admit_volatile_tag(
             (instance.creation_ordinal, true, instance.layers)
         }
         None => {
-            let ordinal = next_ordinal(&next)?;
+            let ordinal = next.next_creation_ordinal;
             let layers_after = request.layers_delta;
             next.volatile_tags.push(VolatileTagInstanceV2 {
                 owner: request.owner,
