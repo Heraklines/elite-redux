@@ -392,45 +392,41 @@ pub fn resolve_recorded_last_copy(
         .into());
     }
 
-    let (copied_move, source_ordinal) = match resolve_source(state, &request.source)? {
-        ResolvedLastMove::Battle(move_id) => (move_id, None),
-        ResolvedLastMove::FromHistory(entry) => (entry.move_id, Some(entry.execution_ordinal)),
+    let resolved = resolve_source(state, &request.source)?;
+    let (copied_move, source_ordinal, source_outcome) = match &resolved {
+        ResolvedLastMove::Battle(move_id) => (*move_id, None, None),
+        ResolvedLastMove::FromHistory(entry) => (
+            entry.move_id,
+            Some(entry.execution_ordinal),
+            Some(entry.outcome),
+        ),
     };
 
     guard_copied_move(copied_move, &request.content)?;
-    let numeric = copied_move.get().get();
 
-    // Mimic/Sketch share the charging-guard condition: a charging move whose
-    // recorded turn ended in `Other` never completed and cannot be adopted.
-    let slot_replacement = matches!(numeric, 102 /* MIMIC */ | 166 /* SKETCH */);
-    if slot_replacement && request.content.charging_moves.contains(&copied_move) {
-        let charging_incomplete = match &request.source {
-            RecordedLastSource::ActorHistory { .. } => {
-                matches!(
-                    resolve_source(state, &request.source)?,
-                    ResolvedLastMove::FromHistory(entry)
-                        if entry.outcome == MoveOutcomeV2::Other
-                )
-            }
-            RecordedLastSource::BattleLastMove { .. } => true,
-        };
-        if charging_incomplete {
-            return Err(MoveCopyFailure::ChargingMoveIncomplete { move_id: numeric }.into());
-        }
-    }
+    // Variant discrimination keys off the INVOKING move (the move whose
+    // effect is running), never the copied move.
+    let invoking_numeric = request.invoking_move.get().get();
+    let slot_replacement = matches!(invoking_numeric, 102 /* MIMIC */ | 166 /* SKETCH */);
+    let permanent = invoking_numeric == 166; // SKETCH
 
-    let permanent = numeric == 166; // SKETCH
     if slot_replacement {
-        let slot = request
-            .invoking_slot
-            .ok_or(MoveCopyFailure::NoInvokingSlot)?;
-        if permanent
-            && request
-                .caller_moveset
-                .iter()
-                .any(|known| *known == copied_move)
+        let slot = request.invoking_slot.ok_or(MoveCopyFailure::NoInvokingSlot)?;
+        // Mimic/Sketch copiability: a charging move whose recorded turn ended
+        // in `Other` never completed its charge and cannot be adopted.
+        if request.content.charging_moves.contains(&copied_move)
+            && source_outcome == Some(MoveOutcomeV2::Other)
         {
-            return Err(MoveCopyFailure::SketchAlreadyKnown { move_id: numeric }.into());
+            return Err(MoveCopyFailure::ChargingMoveIncomplete {
+                move_id: copied_move.get().get(),
+            }
+            .into());
+        }
+        if permanent && request.caller_moveset.iter().any(|known| *known == copied_move) {
+            return Err(MoveCopyFailure::SketchAlreadyKnown {
+                move_id: copied_move.get().get(),
+            }
+            .into());
         }
         return Ok(ResolvedCopyCall {
             state_after: state.clone(),
@@ -2120,8 +2116,6 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("AbilityChangeAttr", 2),
     ("AbilityCopyAttr", 2),
     ("AbilityGiveAttr", 1),
-    ("AddArenaTagAttr", 0),
-    ("AddBattlerTagHeaderAttr", 0),
     ("AddPledgeEffectAttr", 6),
     ("AddTypeAttr", 2),
     ("AfterYouAttr", 1),
@@ -2142,7 +2136,6 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("BlizzardAccuracyAttr", 1),
     ("BoostHealAttr", 1),
     ("BypassSleepAttr", 2),
-    ("ChangeMultiHitTypeAttr", 0),
     ("ChangeTypeAttr", 2),
     ("ChillyReceptionAttr", 1),
     ("ClearTerrainAttr", 4),
@@ -2153,7 +2146,6 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("ConfuseAttr", 18),
     ("ConsecutiveUseDoublePowerAttr", 3),
     ("ConsecutiveUseMultiBasePowerAttr", 1),
-    ("ConsecutiveUsePowerMultiplierAttr", 0),
     ("CopyBiomeTypeAttr", 1),
     ("CopyMoveAttr", 2),
     ("CopyTypeAttr", 1),
@@ -2171,10 +2163,8 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("ExposedMoveAttr", 3),
     ("FallDownAttr", 2),
     ("FirstMoveTypeAttr", 1),
-    ("FixedDamageAttr", 0),
     ("FlinchAttr", 33),
     ("FlyingTypeMultiplierAttr", 1),
-    ("ForceSwitchOutAttr", 0),
     ("FreezeDryAttr", 1),
     ("FrenzyAttr", 4),
     ("FriendshipPowerAttr", 4),
@@ -2203,9 +2193,7 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("MessageHeaderAttr", 1),
     ("MissEffectAttr", 8),
     ("MoneyAttr", 3),
-    ("MoveHeaderAttr", 0),
     ("MovePowerMultiplierAttr", 34),
-    ("MoveTypeChartOverrideAttr", 0),
     ("MovesetCopyMoveAttr", 1),
     ("MultiHitAttr", 33),
     ("MultiHitPowerIncrementAttr", 2),
@@ -2219,7 +2207,6 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("PreMoveMessageAttr", 5),
     ("PreUseInterruptAttr", 1),
     ("PresentPowerAttr", 1),
-    ("ProtectAttr", 0),
     ("PsychoShiftEffectAttr", 1),
     ("PunishmentPowerAttr", 1),
     ("PursuitPowerAttr", 1),
@@ -2229,7 +2216,6 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("RandomMovesetMoveAttr", 2),
     ("RecoilAttr", 14),
     ("ReducePpMoveAttr", 1),
-    ("RemoveArenaTagsAttr", 0),
     ("RemoveScreensAttr", 4),
     ("RemoveTypeAttr", 2),
     ("RepeatMoveAttr", 1),
@@ -2246,7 +2232,6 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("SketchAttr", 1),
     ("SpectralThiefAttr", 1),
     ("SpitUpPowerAttr", 1),
-    ("StatChangeBeforeDmgCalcAttr", 0),
     ("StormAccuracyAttr", 3),
     ("SwallowHealAttr", 1),
     ("TechnoBlastTypeAttr", 1),
@@ -2255,20 +2240,13 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("ThunderAccuracyAttr", 2),
     ("ToxicAccuracyAttr", 1),
     ("TypelessAttr", 1),
-    ("VariableAccuracyAttr", 0),
-    ("VariableAtkAttr", 0),
-    ("VariableDefAttr", 0),
-    ("VariableMoveCategoryAttr", 0),
-    ("VariableMoveTypeAttr", 0),
     ("WaterShurikenMultiHitTypeAttr", 1),
     ("WaterShurikenPowerAttr", 1),
     ("WeatherBallTypeAttr", 1),
     ("WeatherChangeAttr", 5),
-    ("WeatherHealAttr", 0),
     ("WeightPowerAttr", 2),
     ("WishAttr", 1),
-];
-
+]
 /// Classifies one descriptor. Total over the frozen closure: every unit whose
 /// attribute exists in the table and whose axes match the frozen catalog gets
 /// a typed route; anything else is a fail-closed error, never a fallback.
@@ -2538,12 +2516,22 @@ mod tests {
         state = record(&state, 9, 30, MoveUseModeV2::Reflected);
         state = record(&state, 9, 40, MoveUseModeV2::FollowUp);
 
-        // Default filter skips all virtual entries → last normal (non-struggle
-        // filtering off) is move 20.
+        // Default filter: IgnorePp is non-virtual, so the newest eligible
+        // entry IS Struggle — exactly TS getLastNonVirtualMove() defaults.
         let seen = last_non_virtual(&state, target(), 1, &LastMoveFilter::DEFAULT)
             .expect("query ok")
             .expect("has default-visible entry");
-        assert_eq!(seen.move_id, move_id(20));
+        assert_eq!(seen.move_id.get().get(), STRUGGLE_MOVE_ID);
+
+        // Opting out of struggle surfaces the newest ordinary execution.
+        let no_struggle = LastMoveFilter {
+            ignore_struggle: true,
+            ignore_follow_up: true,
+        };
+        let ordinary = last_non_virtual(&state, target(), 1, &no_struggle)
+            .expect("query ok")
+            .expect("has ordinary entry");
+        assert_eq!(ordinary.move_id, move_id(20));
 
         // Mirror Move filter admits follow-ups but still skips Reflected.
         let mirrored = last_non_virtual(&state, target(), 1, &LastMoveFilter::MIRROR_MOVE)
@@ -2866,16 +2854,22 @@ mod tests {
     }
 
     #[test]
-    fn route_table_has_one_hundred_thirty_three_attributes() {
-        assert_eq!(ROUTE_TABLE.len(), 133);
-        let names: BTreeSet<&str> = ROUTE_TABLE.iter().map(|(name, _)| *name).collect();
-        assert_eq!(names.len(), ROUTE_TABLE.len(), "attributes are unique");
-        let weights: usize = ATTRIBUTE_UNIT_WEIGHTS
-            .iter()
-            .map(|(_, weight)| weight)
-            .sum();
+    fn route_table_closes_exactly_over_the_frozen_closure() {
+        // The table and the unit weights must be a bijection over attributes,
+        // and the weights must sum to exactly 394 units — closure is defined
+        // by that identity, not by a magic row count.
+        let route_names: BTreeSet<&str> = ROUTE_TABLE.iter().map(|(name, _)| *name).collect();
+        let weight_names: BTreeSet<&str> =
+            ATTRIBUTE_UNIT_WEIGHTS.iter().map(|(name, _)| *name).collect();
+        assert_eq!(route_names.len(), ROUTE_TABLE.len(), "attributes are unique");
+        assert_eq!(route_names, weight_names, "routes and weights are a bijection");
+        let weights: usize = ATTRIBUTE_UNIT_WEIGHTS.iter().map(|(_, weight)| weight).sum();
         assert_eq!(weights, CLOSURE_TOTAL_UNITS);
-        assert_eq!(ATTRIBUTE_UNIT_WEIGHTS.len(), ROUTE_TABLE.len());
+        assert_eq!(
+            ATTRIBUTE_UNIT_WEIGHTS.iter().filter(|(_, w)| *w > 0).count(),
+            ROUTE_TABLE.len(),
+            "every routed attribute carries at least one unit"
+        );
     }
 
     #[test]
@@ -2994,15 +2988,7 @@ mod tests {
             CustomDispatchRoute::Executable(ExecutableOp::PowerQuery)
         );
 
-        let heal = desc(
-            "h4",
-            0,
-            1,
-            "HitHealAttr",
-            Base::HitHeal,
-            Effect::Heal,
-            Hook::Unresolved,
-        );
+        let heal = desc("h4", 0, 1, "HitHealAttr", Base::MoveEffect, Effect::Heal, Hook::Unresolved);
         let decision = classify_custom_move(&heal).expect("heal");
         assert_eq!(
             decision.route,

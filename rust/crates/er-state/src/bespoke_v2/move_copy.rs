@@ -213,21 +213,29 @@ impl MoveCopyStateV2 {
             return Err(MoveCopyStateError::ZeroNextExecutionOrdinal);
         }
         let mut previous_actor: Option<PokemonId> = None;
-        let mut seen_ordinals = BTreeSet::new();
         for history in &self.actors {
             history.validate()?;
             if previous_actor.is_some_and(|previous| history.actor <= previous) {
                 return Err(MoveCopyStateError::ActorsOutOfOrder);
             }
+            previous_actor = Some(history.actor);
+        }
+        // Duplicate ordinals are reported before allocator-range violations
+        // so a corrupted store surfaces its most specific defect first.
+        let mut seen_ordinals = BTreeSet::new();
+        for history in &self.actors {
             for entry in &history.entries {
                 if !seen_ordinals.insert(entry.execution_ordinal) {
                     return Err(MoveCopyStateError::DuplicateExecutionOrdinal);
                 }
+            }
+        }
+        for history in &self.actors {
+            for entry in &history.entries {
                 if entry.execution_ordinal >= self.next_execution_ordinal {
                     return Err(MoveCopyStateError::NextOrdinalNotAhead);
                 }
             }
-            previous_actor = Some(history.actor);
         }
         Ok(())
     }
