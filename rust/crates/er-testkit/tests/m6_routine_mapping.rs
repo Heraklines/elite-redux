@@ -31,7 +31,7 @@ fn routine_mapping_is_deterministic_complete_and_buildable() -> Result<(), Box<d
         .iter()
         .filter(|unit| unit.semantic.resolution == CatalogResolution::ResolvedOperands)
         .count();
-    assert_eq!(resolved_operand_count, 95);
+    assert_eq!(resolved_operand_count, 46);
     assert_eq!(first.mapped.len(), resolved_operand_count);
     assert_eq!(first.unresolved.len(), 9_388 - resolved_operand_count);
 

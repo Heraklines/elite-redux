@@ -261,18 +261,11 @@ function attributeClassName(node, sourceFile) {
 const AUDITED_ATTRIBUTE_SCHEMAS = new Map([
   ["HighCritAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
   ["CritOnlyAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
-  ["StatusEffectAttr", { hook: "STAT_QUERY_OR_CHANGE", effect: "APPLY_OR_BLOCK_STATUS" }],
-  ["StatStageChangeAttr", { hook: "STAT_QUERY_OR_CHANGE", effect: "MODIFY_STAT_OR_STAGE" }],
-  ["MultiHitAttr", { hook: "HIT_COUNT_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
   ["FixedDamageAttr", { hook: "DAMAGE_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
   ["LevelDamageAttr", { hook: "DAMAGE_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
   ["UserHpDamageAttr", { hook: "DAMAGE_QUERY", effect: "MODIFY_OR_APPLY_DAMAGE" }],
-  ["RecoilAttr", { hook: "AFTER_DAMAGE", effect: "MODIFY_OR_APPLY_DAMAGE" }],
-  ["HitHealAttr", { hook: "AFTER_DAMAGE", effect: "HEAL" }],
   ["BlockCritAbAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
   ["BonusCritAbAttr", { hook: "CRITICAL_QUERY", effect: "MODIFY_STAT_OR_STAGE" }],
-  ["ForceSwitchOutAttr", { hook: "AFTER_HIT", effect: "SWITCH_OR_TRAP" }],
-  ["BypassRedirectAttr", { hook: "MOVE_TARGET_QUERY", effect: "MODIFY_TARGET" }],
   ["BlockRedirectAbAttr", { hook: "MOVE_TARGET_QUERY", effect: "MODIFY_TARGET" }],
 ]);
 

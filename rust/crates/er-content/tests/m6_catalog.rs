@@ -27,7 +27,7 @@ fn frozen_semantic_catalog_loads_and_validates() {
             .iter()
             .filter(|unit| unit.semantic.resolution == CatalogResolution::ResolvedOperands)
             .count(),
-        95
+        46
     );
     assert!(catalog.behavior_units.iter().all(|unit| matches!(
         unit.semantic.resolution,

@@ -31,18 +31,18 @@ pair_determinism_digest_version = 4
 battle_content_hash_version = 3
 
 raw_source_catalog_sha256 = "7d374e2604b1ab4c907c7bb465c505e17538098505407d742faa4cd7b52f2ca2"
-semantic_catalog_sha256 = "4039183478286a251bc61f94887d4abcafe76eafd04eaaf5c7c824a6b5b43049"
+semantic_catalog_sha256 = "ec7f3b0e7497f6bbab5cdf8cf605c923c4cac84c5dde1d23027dc01540ee5b99"
 behavior_unit_manifest_sha256 = "8bda9c028e08e8fa260389941d42f15cf294a61ff7db011da3103d61a6b7c4bd"
-primitive_gap_manifest_sha256 = "b69d21d5e255a3d733f442b3bf52ab522b8fdfc5626669b54a5c96311367c656"
-bespoke_cluster_manifest_sha256 = "4cfdffef778fb5322010650144655825663345f926f27e9dcd38656d7b671a31"
-oracle_witness_plan_sha256 = "49375d707e0741e9e05179395b45eee6639c0148736822de266fa826bdf45fc1"
+primitive_gap_manifest_sha256 = "9c70788d3fee409865831c5b4807d368ab40f087d1a3fe5fc4393114ef0e2244"
+bespoke_cluster_manifest_sha256 = "fa92337c6b7681d9a20197ebcb55e86a218589221d83619dc375809115fcf0f9"
+oracle_witness_plan_sha256 = "68f2298267420ea0d69a853cdb2fe2f0cb4d16dfce5b3d60d03e64e9a9c9ac3d"
 rng_site_manifest_sha256 = "01a7dbaa370db405052d0c81bf500079726d2e57806c631c91cc3609a61bc34b"
 
 source_identity_count = 7374
 behavior_unit_count = 9388
 resolved_intrinsic_count = 3634
-resolved_operand_count = 95
-primitive_gap_count = 5659
+resolved_operand_count = 46
+primitive_gap_count = 5708
 bespoke_cluster_count = 13
 rng_site_count = 273
 species_count = 2018

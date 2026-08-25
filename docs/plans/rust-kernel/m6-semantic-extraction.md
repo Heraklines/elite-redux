@@ -35,11 +35,11 @@ Move extraction contains 1,112 declarations and 1,110 unique numeric identities;
 Resolution totals:
 
 - `RESOLVED_INTRINSIC`: 3,634.
-- `RESOLVED_OPERANDS`: 95.
-- `BESPOKE_GAP`: 5,659.
+- `RESOLVED_OPERANDS`: 46.
+- `BESPOKE_GAP`: 5,708.
 - Unclassified identities or units: zero.
 
-The M6B schema-upgrade checkpoint admits only the 95 behavior units whose implementation class, closed hook/effect, condition shape, and constructor operands match the audited exporter table exactly. Callback-bearing or shape-mismatched instances of the same class remain gaps.
+The M6B schema-upgrade checkpoint admits only the 46 behavior units whose implementation class, closed hook/effect, condition shape, and constructor operands match the audited exporter table exactly. Callback-bearing or shape-mismatched instances of the same class remain gaps.
 
 ## Evidence products
 
@@ -104,21 +104,21 @@ Runtime reflection does not make a callback portable. A callback remains a bespo
 
 ## Bespoke closure boundary
 
-The 5,659 current gaps are grouped mechanically as:
+The 5,708 current gaps are grouped mechanically as:
 
 | Cluster | Gap count |
 |---|---:|
 | Boss/custom ER | 1 |
 | Charge/recharge lock | 12 |
-| Custom dispatch | 3,219 |
+| Custom dispatch | 3,287 |
 | Delayed/scheduled effect | 4 |
 | Item/berry lifecycle | 323 |
 | Protect/endure/guard | 42 |
-| Special damage/counter | 180 |
+| Special damage/counter | 153 |
 | Status/volatile/tag | 910 |
 | Substitute proxy HP | 8 |
 | Suppression/unusual immunity | 134 |
-| Switch/trap/redirect | 111 |
+| Switch/trap/redirect | 119 |
 | Transform/form copy | 658 |
 | Weather/terrain/field | 57 |
 

@@ -58,7 +58,7 @@ Static resolutions mean:
 - `RESOLVED_OPERANDS`: hook, effect, condition, implementation class, and operands fit the closed descriptor vocabulary;
 - `BESPOKE_GAP`: callback, unresolved hook/effect, unattached callsite, fixed dispatch, or opaque lifecycle remains.
 
-At the M6B schema-upgrade checkpoint, `RESOLVED_OPERANDS` contains exactly 95 behavior units from the explicitly audited routine classes in the semantic exporter. Every other attribute remains `BESPOKE_GAP`; class-name recognition alone still grants no compiler support.
+At the M6B schema-upgrade checkpoint, `RESOLVED_OPERANDS` contains exactly 46 behavior units from the explicitly audited routine classes in the semantic exporter. Every other attribute remains `BESPOKE_GAP`; class-name recognition alone still grants no compiler support.
 
 None of these values means production support. Support is granted only by the compiled/bespoke classification plus witnesses.
 
