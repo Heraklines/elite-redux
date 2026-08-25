@@ -2137,6 +2137,22 @@ function handleDailySeed(cors: Record<string, string>): Response {
 // #endregion
 // #region run history (ghost-team pool + analytics)
 
+type GhostRunPacing = "normal" | "sprint";
+
+/** Successful production rollout that first exposed Sprint without a ghost cadence tag. */
+export const SPRINT_GHOST_CADENCE_CUTOFF_MS = Date.parse("2026-08-20T01:44:14Z");
+
+function parseGhostRunPacing(value: unknown): GhostRunPacing | null {
+  return value === "normal" || value === "sprint" ? value : null;
+}
+
+function normalizedGhostProgressionWave(wave: number, pacing: GhostRunPacing | null): number | null {
+  if (!Number.isFinite(wave) || pacing == null) {
+    return null;
+  }
+  return Math.max(0, Math.min(200, wave * (pacing === "sprint" ? 2 : 1)));
+}
+
 /** Record a finished run (win or loss). Idempotent by client-generated `id`. */
 async function handleRunCreate(
   request: Request,
@@ -2154,8 +2170,10 @@ async function handleRunCreate(
     isVictory?: unknown;
     difficulty?: unknown;
     mode?: unknown;
+    pacing?: unknown;
     wave?: unknown;
     waveReached?: unknown;
+    progressionWaveReached?: unknown;
     timestamp?: unknown;
     party?: unknown;
     opponentName?: unknown;
@@ -2199,6 +2217,10 @@ async function handleRunCreate(
   const outcome =
     run.outcome === "victory" || run.outcome === "defeat" ? run.outcome : run.isVictory ? "victory" : "defeat";
   const wave = Number.parseInt(String(run.wave ?? run.waveReached ?? ""), 10);
+  const pacing = parseGhostRunPacing(run.pacing);
+  // Compute this server-side from the authenticated upload's raw wave + cadence;
+  // never trust an independently supplied progression value.
+  const progressionWave = normalizedGhostProgressionWave(wave, pacing);
   const createdAt = Number.parseInt(String(run.timestamp ?? ""), 10);
   // ER (#384): usage-tier inputs ride the SAME single insert - no extra
   // requests or writes. Lazy one-time column migration below.
@@ -2218,8 +2240,8 @@ async function handleRunCreate(
   const relicsBlob = relicsStr && relicsStr.length <= 2048 ? relicsStr : null;
   await ensureRunStatColumns(env);
   await env.DB.prepare(
-    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation, relics)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation, relics)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
        ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -2229,7 +2251,9 @@ async function handleRunCreate(
       outcome,
       typeof run.difficulty === "string" ? run.difficulty : null,
       typeof run.mode === "string" ? run.mode : null,
+      pacing,
       Number.isFinite(wave) ? wave : null,
+      progressionWave,
       Number.isFinite(createdAt) ? createdAt : Date.now(),
       JSON.stringify(party),
       typeof run.opponentName === "string" ? run.opponentName : null,
@@ -2393,13 +2417,18 @@ async function ensureRunsGhostIndex(env: Env): Promise<void> {
 }
 
 /**
- * Lazily index runs by `wave` so the ghost-sample keyset walk (handleRunSample)
- * scans only the eligible wave band, not the whole table. The (wave) index carries
- * rowid implicitly, so `ORDER BY wave, rowid` is served straight from it.
+ * Lazily index both raw and normalized ghost depth. New Sprint rows use
+ * `progression_wave`; trusted pre-Sprint rows fall back to raw `wave`.
  */
 async function ensureRunSampleIndex(env: Env): Promise<void> {
+  await ensureRunStatColumns(env);
   try {
-    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave)").run();
+    await env.DB.batch([
+      env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave)"),
+      env.DB.prepare(
+        "CREATE INDEX IF NOT EXISTS idx_runs_ghost_progression ON runs (COALESCE(progression_wave, wave), created_at)",
+      ),
+    ]);
   } catch {
     // Index is an optimization only; the query is correct without it.
   }
@@ -2678,7 +2707,9 @@ type RunSampleRow = {
   outcome: string | null;
   difficulty: string | null;
   mode: string | null;
+  pacing: string | null;
   wave: number | null;
+  progression_wave: number | null;
   created_at: number;
   player_team: string;
   opponent_name: string | null;
@@ -2690,13 +2721,22 @@ type RunSampleRow = {
 
 function runSampleRowToGhost(row: RunSampleRow, fallbackDifficulty = ""): Record<string, unknown> | null {
   try {
+    const pacing =
+      parseGhostRunPacing(row.pacing) ?? (row.created_at < SPRINT_GHOST_CADENCE_CUTOFF_MS ? "normal" : null);
+    if (pacing == null) {
+      return null;
+    }
+    const rawWave = row.wave ?? 0;
+    const progressionWaveReached = row.progression_wave ?? normalizedGhostProgressionWave(rawWave, pacing) ?? rawWave;
     return {
       id: row.id,
       sourceUserId: String(row.user_id),
       trainerName: row.username ?? "Trainer",
       difficulty: row.difficulty ?? fallbackDifficulty,
       mode: row.mode ?? undefined,
-      waveReached: row.wave ?? 0,
+      pacing,
+      waveReached: rawWave,
+      progressionWaveReached,
       isVictory: row.outcome === "victory",
       timestamp: row.created_at,
       party: JSON.parse(row.player_team),
@@ -2721,8 +2761,16 @@ export const GHOST_SAMPLE_MAX_WAVE = 200;
 const GHOST_SAMPLE_MAX_COUNT = 240;
 /** Modes that must never seed the ghost pool (endless/daily contamination). */
 const NON_GHOST_MODES_SQL = "'endless', 'spliced_endless', 'daily'";
+/** Shared source-depth expression: tagged rows use normalized progression; trusted legacy rows use raw wave. */
+const GHOST_PROGRESSION_SQL = "COALESCE(progression_wave, wave)";
+const GHOST_PROGRESSION_R_SQL = "COALESCE(r.progression_wave, r.wave)";
+/**
+ * Keep all run history, but field only explicitly tagged rows or snapshots from
+ * before Sprint existed in production (which are known-normal by construction).
+ */
+const GHOST_CADENCE_ELIGIBLE_SQL = `(pacing IN ('normal', 'sprint') OR (pacing IS NULL AND created_at < ${SPRINT_GHOST_CADENCE_CUTOFF_MS}))`;
 
-type RunSampleCandidate = { rid: number; wave: number; userId: number };
+type RunSampleCandidate = { rid: number; progressionWave: number; userId: number };
 
 async function enumerateEligibleRunCandidates(
   env: Env,
@@ -2734,24 +2782,25 @@ async function enumerateEligibleRunCandidates(
   victoriesOnly = false,
 ): Promise<RunSampleCandidate[]> {
   const candidates: RunSampleCandidate[] = [];
-  let cursorWave = minWave - 1;
+  let cursorProgression = minWave - 1;
   let cursorRowid = 0;
   for (;;) {
     const page = await env.DB.prepare(
-      `SELECT rowid AS rid, wave, user_id AS userId FROM runs
-         WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
+      `SELECT rowid AS rid, ${GHOST_PROGRESSION_SQL} AS progressionWave, user_id AS userId FROM runs
+         WHERE ${GHOST_PROGRESSION_SQL} >= ?1 AND ${GHOST_PROGRESSION_SQL} <= ?2 AND user_id != ?3
            AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+           AND ${GHOST_CADENCE_ELIGIBLE_SQL}
            ${requireSavedItems ? "AND player_team LIKE '%\"heldItems\":%'" : ""}
            ${victoriesOnly ? "AND outcome = 'victory'" : ""}
-           AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
-         ORDER BY wave, rowid LIMIT ?6`,
+           AND (${GHOST_PROGRESSION_SQL} > ?4 OR (${GHOST_PROGRESSION_SQL} = ?4 AND rowid > ?5))
+         ORDER BY ${GHOST_PROGRESSION_SQL}, rowid LIMIT ?6`,
     )
-      .bind(minWave, maxWave, uid, cursorWave, cursorRowid, pageSize)
+      .bind(minWave, maxWave, uid, cursorProgression, cursorRowid, pageSize)
       .all<RunSampleCandidate>();
     const rows = page.results ?? [];
     for (const row of rows) {
       candidates.push(row);
-      cursorWave = row.wave;
+      cursorProgression = row.progressionWave;
       cursorRowid = row.rid;
     }
     if (rows.length < pageSize) {
@@ -2781,25 +2830,27 @@ export async function enumerateEligibleRunRowids(
   pageSize = 2000,
   maxWave = GHOST_SAMPLE_MAX_WAVE,
 ): Promise<number[]> {
+  await ensureRunStatColumns(env);
   const rowids: number[] = [];
-  let cursorWave = minWave - 1;
+  let cursorProgression = minWave - 1;
   let cursorRowid = 0;
   for (;;) {
     const page = await env.DB.prepare(
-      `SELECT rowid AS rid, wave FROM runs
-         WHERE wave >= ?1 AND wave <= ?2 AND user_id != ?3
+      `SELECT rowid AS rid, ${GHOST_PROGRESSION_SQL} AS progressionWave FROM runs
+         WHERE ${GHOST_PROGRESSION_SQL} >= ?1 AND ${GHOST_PROGRESSION_SQL} <= ?2 AND user_id != ?3
            AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
-           AND (wave > ?4 OR (wave = ?4 AND rowid > ?5))
-         ORDER BY wave, rowid LIMIT ?6`,
+           AND ${GHOST_CADENCE_ELIGIBLE_SQL}
+           AND (${GHOST_PROGRESSION_SQL} > ?4 OR (${GHOST_PROGRESSION_SQL} = ?4 AND rowid > ?5))
+         ORDER BY ${GHOST_PROGRESSION_SQL}, rowid LIMIT ?6`,
     )
-      .bind(minWave, maxWave, uid, cursorWave, cursorRowid, pageSize)
-      .all<{ rid: number; wave: number }>();
+      .bind(minWave, maxWave, uid, cursorProgression, cursorRowid, pageSize)
+      .all<{ rid: number; progressionWave: number }>();
     const rows = page.results ?? [];
     for (const row of rows) {
       rowids.push(row.rid);
-      // Rows are ordered (wave, rowid), so the last iteration leaves the cursor on
+      // Rows are ordered (normalized progression, rowid), so the last iteration leaves the cursor on
       // the last row of the page — the keyset start for the next page.
-      cursorWave = row.wave;
+      cursorProgression = row.progressionWave;
       cursorRowid = row.rid;
     }
     if (rows.length < pageSize) {
@@ -2856,8 +2907,8 @@ async function handleRunSample(
   // pagination, maximise distinct uploaders, then fetch only the selected rows.
   // This avoids both shallow-row bias and prolific-uploader domination.
   const cols =
-    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
-  // Index the (wave, rowid) keyset walk. Cheap no-op once created; lazy so an
+    "id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
+  // Index the (normalized progression, rowid) keyset walk. Cheap no-op once created; lazy so an
   // already-deployed prod DB gains it without a manual migration (mirrors
   // ensureRunsGhostIndex). schema.sql declares it for a fresh DB.
   await ensureRunSampleIndex(env);
@@ -2933,10 +2984,13 @@ async function handleRunLineage(
   if (!sourceRunId || sourceRunId.length > 160) {
     return json({ teams: [] }, 200, cors);
   }
+  await ensureRunStatColumns(env);
   const source = await env.DB.prepare(
     `SELECT user_id FROM runs
        WHERE id = ?1 AND user_id != ?2 AND outcome = 'victory'
-         AND wave <= ?3 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+         AND ${GHOST_PROGRESSION_SQL} <= ?3
+         AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+         AND ${GHOST_CADENCE_ELIGIBLE_SQL}
        LIMIT 1`,
   )
     .bind(sourceRunId, auth.uid, GHOST_SAMPLE_MAX_WAVE)
@@ -2945,11 +2999,12 @@ async function handleRunLineage(
     return json({ teams: [] }, 200, cors);
   }
   const cols =
-    "id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
+    "id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
   const { results } = await env.DB.prepare(
     `SELECT ${cols} FROM runs
-       WHERE user_id = ?1 AND id != ?2 AND outcome = 'victory' AND wave <= ?3
+       WHERE user_id = ?1 AND id != ?2 AND outcome = 'victory' AND ${GHOST_PROGRESSION_SQL} <= ?3
          AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES_SQL}))
+         AND ${GHOST_CADENCE_ELIGIBLE_SQL}
          AND player_team LIKE '%"heldItems":%'
        ORDER BY created_at DESC LIMIT ?4`,
   )
@@ -2982,58 +3037,34 @@ async function handleRunDeadliest(
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 10) : 1;
   const minWaveParsed = Number.parseInt(url.searchParams.get("minWave") ?? "", 10);
   const minWave = Number.isFinite(minWaveParsed) ? Math.max(minWaveParsed, 0) : 0;
+  await ensureRunStatColumns(env);
 
   // Rank source runs by how many losing runs name them as the killer ghost.
   // Join the kill rows (k) to the source run (r) to fetch its team; exclude the
   // caller's own runs and honour the wave floor + optional difficulty filter.
   const filterDifficulty = difficulty && difficulty !== "any";
   const { results } = await env.DB.prepare(
-    `SELECT r.id, r.username, r.outcome, r.difficulty, r.wave, r.created_at, r.player_team,
-            r.opponent_name, r.opponent_team, r.presentation, r.relics, COUNT(*) AS kills
+    `SELECT r.id, r.user_id, r.username, r.outcome, r.difficulty, r.mode, r.pacing,
+            r.wave, r.progression_wave, r.created_at, r.player_team,
+            r.opponent_name, r.opponent_team, r.challenges, r.presentation, r.relics,
+            COUNT(*) AS kills
        FROM runs k
        JOIN runs r ON r.id = k.ghost_source_run_id
        WHERE k.killed_by_ghost = 1 AND k.ghost_source_run_id IS NOT NULL
-         AND r.user_id != ?1 AND r.wave >= ?2
+         AND r.user_id != ?1 AND ${GHOST_PROGRESSION_R_SQL} >= ?2
+         AND (r.mode IS NULL OR r.mode NOT IN (${NON_GHOST_MODES_SQL}))
+         AND (r.pacing IN ('normal', 'sprint') OR (r.pacing IS NULL AND r.created_at < ${SPRINT_GHOST_CADENCE_CUTOFF_MS}))
          ${filterDifficulty ? "AND r.difficulty = ?4" : ""}
        GROUP BY k.ghost_source_run_id
        ORDER BY kills DESC
        LIMIT ?3`,
   )
     .bind(...(filterDifficulty ? [auth.uid, minWave, count, difficulty] : [auth.uid, minWave, count]))
-    .all<{
-      id: string;
-      username: string | null;
-      outcome: string | null;
-      difficulty: string | null;
-      wave: number | null;
-      created_at: number;
-      player_team: string;
-      opponent_name: string | null;
-      opponent_team: string | null;
-      presentation: string | null;
-      relics: string | null;
-      kills: number;
-    }>();
+    .all<RunSampleRow & { kills: number }>();
   const teams = (results ?? [])
     .map(row => {
-      try {
-        return {
-          id: row.id,
-          trainerName: row.username ?? "Trainer",
-          difficulty: row.difficulty ?? difficulty,
-          waveReached: row.wave ?? 0,
-          isVictory: row.outcome === "victory",
-          timestamp: row.created_at,
-          kills: row.kills ?? 0,
-          party: JSON.parse(row.player_team),
-          opponentName: row.opponent_name ?? undefined,
-          opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
-          presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
-          relics: row.relics ? JSON.parse(row.relics) : undefined,
-        };
-      } catch {
-        return null;
-      }
+      const ghost = runSampleRowToGhost(row, difficulty);
+      return ghost == null ? null : { ...ghost, kills: row.kills ?? 0 };
     })
     .filter(t => t !== null);
   return json({ teams }, 200, cors);
@@ -3118,6 +3149,11 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
   for (const col of [
     "starters TEXT",
     "challenges TEXT",
+    // Ghost source cadence. Rows remain immutable run history; untagged rows
+    // created after Sprint's first production rollout are quarantined by the
+    // sampling queries instead of being deleted or rewritten.
+    "pacing TEXT",
+    "progression_wave INTEGER",
     // ER (Colosseum): the killer ghost on a run-ending defeat. Additive +
     // nullable - old clients simply send null. No new request/write (rides the
     // existing run-create INSERT).

@@ -49,7 +49,12 @@ import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies"
 import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
-import { getErProgressionWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
+import {
+  getErProgressionWave,
+  getErRunPacing,
+  type ErRunPacing,
+  isErSprintRun,
+} from "#data/elite-redux/er-run-pacing";
 import {
   type GhostDialogueContext,
   type GhostTrainerProfile,
@@ -223,7 +228,11 @@ export interface GhostTeamSnapshot {
    * fielded as a ghost in a classic run. Optional for back-compat with old snapshots.
    */
   mode?: string | undefined;
+  /** Source run cadence. Added with Sprint; absent only on trusted pre-Sprint snapshots. */
+  pacing?: ErRunPacing | undefined;
   waveReached: number;
+  /** Source depth on the shared 1..200 progression scale (Sprint raw wave × 2). */
+  progressionWaveReached?: number | undefined;
   isVictory: boolean;
   timestamp: number;
   /** Up to 6 serialised members. */
@@ -269,6 +278,33 @@ export interface GhostTeamSnapshot {
   } | undefined;
   /** Hidden per-save relationship level; intentionally never rendered. */
   endlessNemesisRank?: number | undefined;
+}
+
+/**
+ * Production rollout that first exposed Sprint without tagging ghost snapshots.
+ * Untagged snapshots at/after this instant remain stored as run history, but are
+ * quarantined from every ghost-sampling path because their source cadence cannot
+ * be reconstructed reliably.
+ */
+export const ER_SPRINT_GHOST_CADENCE_CUTOFF_MS = Date.parse("2026-08-20T01:44:14Z");
+
+/** Whether a snapshot has a trustworthy source cadence for ghost matchmaking. */
+export function isErGhostSnapshotCadenceTrusted(snapshot: GhostTeamSnapshot): boolean {
+  if (snapshot.pacing === "normal" || snapshot.pacing === "sprint") {
+    return true;
+  }
+  const timestamp = Number(snapshot.timestamp);
+  return Number.isFinite(timestamp) && timestamp < ER_SPRINT_GHOST_CADENCE_CUTOFF_MS;
+}
+
+/** Resolve a source snapshot onto the common normal-run 1..200 progression scale. */
+export function getErGhostProgressionWave(snapshot: GhostTeamSnapshot): number {
+  const stored = Math.floor(Number(snapshot.progressionWaveReached));
+  if (Number.isFinite(stored) && stored > 0) {
+    return stored;
+  }
+  const raw = Math.max(1, Math.floor(Number(snapshot.waveReached)) || 1);
+  return snapshot.pacing === "sprint" ? raw * 2 : raw;
 }
 
 const MAX_PARTY = 6;
@@ -521,7 +557,7 @@ async function sampleRunsFromServer(
       return [];
     }
     const data = await res.json();
-    return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot) as GhostTeamSnapshot[];
+    return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isGhostPoolSnapshot) as GhostTeamSnapshot[];
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
     console.warn("[er-ghost] server sample fetch failed:", err);
@@ -548,7 +584,7 @@ async function fetchEndlessLineage(sourceRunId: string, count = 4): Promise<Ghos
     }
     const data = await response.json();
     return (Array.isArray(data) ? data : (data?.teams ?? []))
-      .filter(isValidSnapshot)
+      .filter(isGhostPoolSnapshot)
       .filter(snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot));
   } catch {
     return [];
@@ -598,7 +634,7 @@ export async function fetchDeadliestGhosts(
       return [];
     }
     const data = await res.json();
-    return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isValidSnapshot) as GhostTeamSnapshot[];
+    return (Array.isArray(data) ? data : (data?.teams ?? [])).filter(isGhostPoolSnapshot) as GhostTeamSnapshot[];
   } catch {
     return [];
   }
@@ -617,7 +653,9 @@ export async function sampleGhostSnapshots(
 ): Promise<GhostTeamSnapshot[]> {
   let pool = await sampleRunsFromServer(difficulty, count, minWave);
   if (pool.length < count) {
-    const local = loadLocalGhostTeams().filter(s => !minWave || s.waveReached >= minWave);
+    const local = loadLocalGhostTeams().filter(
+      s => isErGhostSnapshotCadenceTrusted(s) && (!minWave || getErGhostProgressionWave(s) >= minWave),
+    );
     pool = [...pool, ...local];
   }
   const seen = new Set<string>();
@@ -665,7 +703,7 @@ function sharedCacheKey(): string {
 function loadSharedGhostCache(): GhostTeamSnapshot[] {
   try {
     const parsed = JSON.parse(localStorage.getItem(sharedCacheKey()) ?? "[]");
-    return Array.isArray(parsed) ? parsed.filter(isValidSnapshot) : [];
+    return Array.isArray(parsed) ? parsed.filter(isGhostPoolSnapshot) : [];
   } catch {
     return [];
   }
@@ -678,7 +716,7 @@ function saveSharedGhostCache(snapshots: GhostTeamSnapshot[]): void {
     const seenTeams = new Set<string>();
     const unique: GhostTeamSnapshot[] = [];
     for (const snapshot of merged) {
-      if (!isErGhostTeamLegal(snapshot)) {
+      if (!isErGhostSnapshotCadenceTrusted(snapshot) || !isErGhostTeamLegal(snapshot)) {
         continue;
       }
       const fingerprint = ghostTeamFingerprint(snapshot);
@@ -903,6 +941,7 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   }
   const partyData = party.slice(0, MAX_PARTY).map(m => serializeMember(m));
   const waveReached = globalScene?.currentBattle?.waveIndex ?? 0;
+  const pacing = getErRunPacing();
   const { name: opponentName, party: opponentParty } = captureOpponent();
   // ER (Colosseum): if THIS defeat was dealt by a fielded ghost, record who it
   // was (and which winning run it came from) so the deadliest-ghost board is
@@ -915,7 +954,9 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     difficulty: getErDifficulty(),
     // Only classic / classic-challenge reach here (endless + daily bailed above).
     mode: globalScene?.gameMode?.isChallenge ? "challenge" : "classic",
+    pacing,
     waveReached,
+    progressionWaveReached: getErProgressionWave(waveReached),
     isVictory,
     timestamp: Date.now(),
     party: partyData,
@@ -1134,7 +1175,9 @@ function mergeGhostPool(teams: GhostTeamSnapshot[], persist = false): void {
   if (persist && teams.length > 0) {
     saveSharedGhostCache(teams);
   }
-  const merged = [...(prefetched ?? []), ...teams].filter(isErGhostTeamLegal);
+  const merged = [...(prefetched ?? []), ...teams].filter(
+    team => isErGhostSnapshotCadenceTrusted(team) && isErGhostTeamLegal(team),
+  );
   const ids = new Set<string>();
   const fingerprints = new Set<string>();
   prefetched = merged.filter(team => {
@@ -1284,6 +1327,10 @@ function isValidSnapshot(s: unknown): s is GhostTeamSnapshot {
   );
 }
 
+function isGhostPoolSnapshot(s: unknown): s is GhostTeamSnapshot {
+  return isValidSnapshot(s) && isErGhostSnapshotCadenceTrusted(s);
+}
+
 async function fetchGhostTeams(
   difficulty: ErDifficulty,
   count: number,
@@ -1319,7 +1366,7 @@ async function fetchGhostTeams(
       if (res.ok) {
         const data = await res.json();
         const list = (Array.isArray(data) ? data : (data?.teams ?? []))
-          .filter(isValidSnapshot)
+          .filter(isGhostPoolSnapshot)
           .filter(snapshot =>
             (!requireSavedItems || hasErGhostSavedItems(snapshot)) && (!victoriesOnly || snapshot.isVictory),
           );
@@ -1337,8 +1384,8 @@ async function fetchGhostTeams(
   // out-of-range team or the current player's own uploaded run.
   const cached = loadSharedGhostCache().filter(
     snapshot =>
-      snapshot.waveReached >= minWave
-      && snapshot.waveReached <= maxWave
+      getErGhostProgressionWave(snapshot) >= minWave
+      && getErGhostProgressionWave(snapshot) <= maxWave
       && (victoriesOnly || ghostDifficultyRank(snapshot.difficulty) <= ghostDifficultyRank(difficulty))
       && (!requireSavedItems || hasErGhostSavedItems(snapshot))
       && (!victoriesOnly || snapshot.isVictory),
@@ -1350,7 +1397,11 @@ async function fetchGhostTeams(
 export async function prepareErEndlessGhostPool(): Promise<void> {
   seedGhostPoolFromSharedCache();
   const local = loadLocalGhostTeams().filter(
-    snapshot => snapshot.isVictory && hasErGhostSavedItems(snapshot) && isErGhostTeamLegal(snapshot),
+    snapshot =>
+      isErGhostSnapshotCadenceTrusted(snapshot)
+      && snapshot.isVictory
+      && hasErGhostSavedItems(snapshot)
+      && isErGhostTeamLegal(snapshot),
   );
   mergeGhostPool(local);
   await requestErEndlessGhostPool();
@@ -1807,7 +1858,10 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   const challengeMode = isErGhostChallengeActive();
   const requireSavedItems = shouldRequireLateHellGhostItems(waveIndex);
   const legal = pool.filter(
-    snapshot => isErGhostTeamLegal(snapshot) && (!requireSavedItems || hasErGhostSavedItems(snapshot)),
+    snapshot =>
+      isErGhostSnapshotCadenceTrusted(snapshot)
+      && isErGhostTeamLegal(snapshot)
+      && (!requireSavedItems || hasErGhostSavedItems(snapshot)),
   );
   const unseen = legal.filter(snapshot => {
     return (
@@ -1817,28 +1871,32 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     );
   });
   const primary = unseen.filter(
-    snapshot =>
-      snapshot.waveReached >= eligibilityWave
-      && snapshot.waveReached <= eligibilityWave + GHOST_PRIMARY_WAVE_WINDOW,
+    snapshot => {
+      const sourceProgression = getErGhostProgressionWave(snapshot);
+      return sourceProgression >= eligibilityWave && sourceProgression <= eligibilityWave + GHOST_PRIMARY_WAVE_WINDOW;
+    },
   );
   const fallback = unseen.filter(
-    snapshot =>
-      snapshot.waveReached >= eligibilityWave
-      && snapshot.waveReached <= eligibilityWave + ER_GHOST_WAVE_WINDOW,
+    snapshot => {
+      const sourceProgression = getErGhostProgressionWave(snapshot);
+      return sourceProgression >= eligibilityWave && sourceProgression <= eligibilityWave + ER_GHOST_WAVE_WINDOW;
+    },
   );
   const next = pickGhost(primary.length > 0 ? primary : fallback, waveIndex);
   if (!next) {
     if (challengeMode) {
       // biome-ignore lint/suspicious/noConsole: live diagnostic (#422) - the smoking gun for "normal trainer in ghost mode"
       console.warn(
-        `[er-ghost] wave ${waveIndex}: NO ghost - pool=${pool.length} legal=${legal.length} deeper=${legal.filter(s => s.waveReached >= waveIndex).length} prefetch=${prefetched === null ? "PENDING" : "done"}`,
+        `[er-ghost] wave ${waveIndex}: NO ghost - pool=${pool.length} legal=${legal.length} deeper=${legal.filter(s => getErGhostProgressionWave(s) >= eligibilityWave).length} prefetch=${prefetched === null ? "PENDING" : "done"}`,
       );
     }
     return null;
   }
   if (challengeMode) {
     // biome-ignore lint/suspicious/noConsole: live diagnostic (#422)
-    console.log(`[er-ghost] wave ${waveIndex}: ghost '${next.trainerName}' (run ended at ${next.waveReached})`);
+    console.log(
+      `[er-ghost] wave ${waveIndex}: ghost '${next.trainerName}' (source ${next.pacing ?? "legacy-normal"} wave ${next.waveReached}, progression ${getErGhostProgressionWave(next)})`,
+    );
   }
   usedGhostIds.add(next.id);
   usedGhostUploaders.add(ghostUploaderKey(next));
@@ -2331,7 +2389,7 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     // the player is already strong (level ~50, evolved roster), so a deep ghost is just
     // re-levelled down (level cap below), never devolved - that devolve was the cause of
     // "baby / not-fully-evolved ghost mons" at the scheduled ghost waves (hell 63+).
-    const overshoot = Math.max(0, snapshot.waveReached - (currentWave + ER_GHOST_WAVE_WINDOW));
+    const overshoot = Math.max(0, getErGhostProgressionWave(snapshot) - (currentWave + ER_GHOST_WAVE_WINDOW));
     if (overshoot > 0 && currentWave < ER_GHOST_NO_DEVOLVE_WAVE) {
       const stages = overshoot > 60 ? 3 : overshoot > 20 ? 2 : 1;
       for (let i = 0; i < stages; i++) {

@@ -24,7 +24,11 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import saveWorker, { enumerateEligibleRunRowids, GHOST_SAMPLE_MAX_WAVE } from "../../workers/er-save-api/src/index";
+import saveWorker, {
+  enumerateEligibleRunRowids,
+  GHOST_SAMPLE_MAX_WAVE,
+  SPRINT_GHOST_CADENCE_CUTOFF_MS,
+} from "../../workers/er-save-api/src/index";
 
 interface D1ResultLike {
   success: boolean;
@@ -301,6 +305,69 @@ describe("er-save-api — ghost sample considers ALL eligible runs (de-restricti
       expect(wave).toBeLessThanOrEqual(GHOST_SAMPLE_MAX_WAVE);
       expect(ineligibleIds.has(id)).toBe(false);
     }
+  });
+
+  it("quarantines post-Sprint untagged history without deleting it", async () => {
+    const insert = sqlite.prepare(
+      `INSERT INTO runs
+         (id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, player_team)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    insert.run(
+      "post-sprint-untagged",
+      2,
+      "Bob",
+      "defeat",
+      "hell",
+      "classic",
+      null,
+      120,
+      null,
+      SPRINT_GHOST_CADENCE_CUTOFF_MS + 1,
+      PLAYER_TEAM,
+    );
+    insert.run(
+      "tagged-sprint",
+      3,
+      "Carol",
+      "defeat",
+      "hell",
+      "classic",
+      "sprint",
+      60,
+      120,
+      SPRINT_GHOST_CADENCE_CUTOFF_MS + 1,
+      PLAYER_TEAM,
+    );
+
+    const rowids = await enumerateEligibleRunRowids({ DB: database } as never, CALLER_UID, 120, 2000, 120);
+    const ids = new Set(rowidsToIds(rowids));
+    expect(ids.has("post-sprint-untagged")).toBe(false);
+    expect(ids.has("tagged-sprint")).toBe(true);
+    expect(sqlite.prepare("SELECT COUNT(*) AS n FROM runs WHERE id = ?").get("post-sprint-untagged")).toEqual({ n: 1 });
+  });
+
+  it("records Sprint cadence and computes normalized progression server-side", async () => {
+    const request = new Request("https://save.test/savedata/run", {
+      method: "POST",
+      headers: { Authorization: authorization, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: "uploaded-sprint",
+        isVictory: false,
+        difficulty: "hell",
+        mode: "classic",
+        pacing: "sprint",
+        waveReached: 60,
+        progressionWaveReached: 999,
+        timestamp: SPRINT_GHOST_CADENCE_CUTOFF_MS + 2,
+        party: JSON.parse(PLAYER_TEAM),
+      }),
+    });
+    const response = await saveWorker.fetch(request, { DB: database, SESSION_SECRET: secret } as never);
+    expect(response.status).toBe(200);
+    expect(
+      sqlite.prepare("SELECT pacing, wave, progression_wave FROM runs WHERE id = ?").get("uploaded-sprint"),
+    ).toEqual({ pacing: "sprint", wave: 60, progression_wave: 120 });
   });
 
   it("honors an explicit maxWave ceiling and maximises distinct uploaders", async () => {

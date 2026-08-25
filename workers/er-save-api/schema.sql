@@ -66,7 +66,9 @@ CREATE TABLE IF NOT EXISTS runs (
   outcome       TEXT,                  -- 'victory' | 'defeat'
   difficulty    TEXT,                  -- 'ace' | 'elite' | 'hell'
   mode          TEXT,
+  pacing        TEXT,                  -- 'normal' | 'sprint'; NULL legacy rows may be quarantined
   wave          INTEGER,
+  progression_wave INTEGER,            -- normalized 1..200 depth (Sprint raw wave * 2)
   created_at    INTEGER NOT NULL,
   player_team   TEXT    NOT NULL,
   opponent_name TEXT,
@@ -94,6 +96,7 @@ CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created
 -- eligible run; a (wave) index carries rowid implicitly so `ORDER BY wave, rowid`
 -- is served straight from it and only the eligible wave band is scanned.
 CREATE INDEX IF NOT EXISTS idx_runs_wave ON runs (wave);
+CREATE INDEX IF NOT EXISTS idx_runs_ghost_progression ON runs (COALESCE(progression_wave, wave), created_at);
 
 -- Idempotent, anonymized Endless ghost performance. The worker also creates
 -- these lazily so existing deployments require no manual migration.

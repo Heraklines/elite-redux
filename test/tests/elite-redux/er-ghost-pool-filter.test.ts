@@ -21,13 +21,17 @@
 
 import {
   ER_GHOST_WAVE_WINDOW,
+  ER_SPRINT_GHOST_CADENCE_CUTOFF_MS,
   type GhostTeamSnapshot,
+  getErGhostProgressionWave,
+  isErGhostSnapshotCadenceTrusted,
   isErGhostTeamLegal,
   resetErGhostRunState,
   setPrefetchedGhostTeamsForTests,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -49,6 +53,7 @@ const member = (speciesId: number, formIndex = 0) => ({
   variant: 0,
   passive: false,
   moves: [],
+  heldItems: [] as [string, number][],
 });
 
 const snapshot = (id: string, waveReached: number, party: ReturnType<typeof member>[]): GhostTeamSnapshot => ({
@@ -65,6 +70,22 @@ const snapshot = (id: string, waveReached: number, party: ReturnType<typeof memb
 const formIndexOf = (speciesId: number, pattern: RegExp): number =>
   getPokemonSpecies(speciesId)?.forms?.findIndex(f => pattern.test(f.formKey.toLowerCase())) ?? -1;
 
+describe("ER ghost source cadence", () => {
+  it("trusts known-normal legacy snapshots and quarantines untagged post-Sprint snapshots", () => {
+    const legacy = snapshot("legacy", 60, [member(SpeciesId.PIKACHU)]);
+    legacy.timestamp = ER_SPRINT_GHOST_CADENCE_CUTOFF_MS - 1;
+    expect(isErGhostSnapshotCadenceTrusted(legacy)).toBe(true);
+    expect(getErGhostProgressionWave(legacy)).toBe(60);
+
+    const ambiguous = { ...legacy, id: "ambiguous", timestamp: ER_SPRINT_GHOST_CADENCE_CUTOFF_MS };
+    expect(isErGhostSnapshotCadenceTrusted(ambiguous)).toBe(false);
+
+    const sprint = { ...ambiguous, id: "sprint", pacing: "sprint" as const };
+    expect(isErGhostSnapshotCadenceTrusted(sprint)).toBe(true);
+    expect(getErGhostProgressionWave(sprint)).toBe(120);
+  });
+});
+
 describe.skipIf(!RUN)("ER ghost pool integrity (ban list + wave window)", () => {
   let phaserGame: Phaser.Game;
   // biome-ignore lint/correctness/noUnusedVariables: side-effectful full init
@@ -77,10 +98,25 @@ describe.skipIf(!RUN)("ER ghost pool integrity (ban list + wave window)", () => 
     game = new GameManager(phaserGame);
     resetErGhostRunState();
     setErDifficulty("hell");
+    setErRunPacing("normal");
+  });
+
+  it("selects a Sprint ghost by normalized depth and never fields an ambiguous snapshot", () => {
+    const ambiguous = snapshot("ambiguous", 90, [member(SpeciesId.PIKACHU)]);
+    ambiguous.timestamp = ER_SPRINT_GHOST_CADENCE_CUTOFF_MS;
+    const sprint = snapshot("sprint", 50, [member(SpeciesId.PIKACHU)]);
+    sprint.timestamp = ER_SPRINT_GHOST_CADENCE_CUTOFF_MS;
+    sprint.pacing = "sprint";
+    sprint.progressionWaveReached = 100;
+
+    setPrefetchedGhostTeamsForTests([ambiguous, sprint]);
+
+    expect(takeGhostForWave(87)?.id).toBe("sprint");
   });
   afterEach(() => {
     resetErGhostRunState();
     setErDifficulty("ace");
+    setErRunPacing("normal");
   });
 
   it("bans every listed standalone ER species id", () => {
@@ -142,15 +178,17 @@ describe.skipIf(!RUN)("ER ghost pool integrity (ban list + wave window)", () => 
   it(`wave window: only runs ending within +${ER_GHOST_WAVE_WINDOW} waves are eligible (losses included)`, () => {
     const early = 87; // hell ghost wave
     const late = 192; // hell ghost wave
+    const stockedEndgameMember = member(SpeciesId.GARCHOMP);
+    stockedEndgameMember.heldItems.push(["test_item", 1]);
     setPrefetchedGhostTeamsForTests([
-      snapshot("endgame", 200, [member(SpeciesId.GARCHOMP)]), // 200 > 87+20 → not at 87
+      snapshot("endgame", 200, [stockedEndgameMember]), // 200 > 87+20 → not at 87
       snapshot("too-far", early + ER_GHOST_WAVE_WINDOW + 1, [member(SpeciesId.MILOTIC)]),
       snapshot("near-loss", early + 10, [member(SpeciesId.METAGROSS)]), // lost at 97 → fine at 87
     ]);
     expect(takeGhostForWave(early)?.id).toBe("near-loss");
 
     resetErGhostRunState();
-    setPrefetchedGhostTeamsForTests([snapshot("endgame", 200, [member(SpeciesId.GARCHOMP)])]);
+    setPrefetchedGhostTeamsForTests([snapshot("endgame", 200, [stockedEndgameMember])]);
     expect(takeGhostForWave(early)).toBeNull(); // never an endgame team at wave 87
     expect(takeGhostForWave(late)?.id).toBe("endgame"); // 192 ≤ 200 ≤ 212 → fine late
   });
