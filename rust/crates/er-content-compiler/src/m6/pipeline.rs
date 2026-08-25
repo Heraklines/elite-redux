@@ -17,11 +17,10 @@
 //! - exact closure counts in [`SemanticCompileReport`].
 //!
 //! Unresolved outcomes are data, never conversions: an unmatched
-//! `RESOLVED_INTRINSIC` unit becomes `INTRINSIC_RULE_MISSING`, a
-//! `RESOLVED_OPERANDS` unit becomes `OPERAND_SCHEMA_MISSING` (no audited
-//! per-attribute schema exists at G21), and a `BESPOKE_GAP` unit must carry
-//! exactly one bespoke assignment or compilation fails with first-error
-//! context in frozen order.
+//! `RESOLVED_INTRINSIC` unit becomes `INTRINSIC_RULE_MISSING`, every
+//! `RESOLVED_OPERANDS` unit must pass one audited routine mapper, and a
+//! `BESPOKE_GAP` unit must carry exactly one bespoke assignment or compilation
+//! fails with first-error context in frozen order.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -32,6 +31,7 @@ use er_content::pack::m6_pack::{
     BESPOKE_MANIFEST_SCHEMA_VERSION_V2, BehaviorClassificationEntryV2,
     BehaviorClassificationManifestV2, BespokeManifestEntryV2, BespokeManifestV2,
 };
+use er_mechanics::MechanicsProgramV2;
 use er_types::mechanics::MechanicsProgramId;
 use er_types::{
     BehaviorClassificationKindV2, BehaviorSourceId, BehaviorUnitId, BespokeMechanicId, SafeU53,
@@ -39,6 +39,7 @@ use er_types::{
 use thiserror::Error;
 
 use crate::m6::catalog::ValidatedSemanticCatalog;
+use crate::m6::routine::{RoutineCompileError, RoutineProgramSpec, map_routine_catalog};
 
 /// Schema version of [`SemanticCompileReport`].
 pub const SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION: u32 = 1;
@@ -47,9 +48,8 @@ pub const SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION: u32 = 1;
 /// explicit intrinsic rule admits.
 pub const INTRINSIC_RULE_MISSING_REASON: &str = "INTRINSIC_RULE_MISSING";
 
-/// Deterministic unsupported reason for a `RESOLVED_OPERANDS` unit: its
-/// descriptors fit the closed vocabulary, but no audited per-attribute
-/// schema freezes hook, condition, operand types, selector, or operations.
+/// Deterministic unsupported reason for a `RESOLVED_OPERANDS` unit that does
+/// not match any audited routine schema.
 pub const OPERAND_SCHEMA_MISSING_REASON: &str = "OPERAND_SCHEMA_MISSING";
 
 /// Compile options. The only tunable is where positive program-ID
@@ -138,6 +138,8 @@ pub enum SemanticCompileError {
     InvalidFirstProgramId { value: u64 },
     #[error("program id space exhausted after {allocated} allocations")]
     ProgramIdExhausted { allocated: u64 },
+    #[error("routine mapping or program construction failed: {0}")]
+    Routine(#[from] RoutineCompileError),
 }
 
 /// First failing behavior unit in frozen order, with provenance coordinates.
@@ -158,7 +160,7 @@ pub enum BehaviorCompileOutcome {
     Compiled { program: MechanicsProgramId },
     /// `RESOLVED_INTRINSIC` without an explicit intrinsic rule.
     IntrinsicRuleMissing,
-    /// `RESOLVED_OPERANDS` without an audited per-attribute schema.
+    /// `RESOLVED_OPERANDS` without an audited routine schema.
     OperandSchemaMissing,
     /// `BESPOKE_GAP` routed to its closed bespoke mechanic.
     BespokeCluster(BespokeMechanicId),
@@ -211,6 +213,8 @@ pub struct SemanticCompileOutput {
     pub bespoke: BespokeManifestV2,
     /// Ascending stable positive program IDs.
     pub programs: Vec<ProgramAllocation>,
+    /// Fully built Mechanics IR V2 programs for audited routine units.
+    pub routine_programs: Vec<MechanicsProgramV2>,
     /// Per-unit records in frozen catalog order.
     pub units: Vec<BehaviorCompilation>,
     pub report: SemanticCompileReport,
@@ -346,9 +350,16 @@ pub fn compile_semantics(
 
     let admitted = validate_intrinsic_rules(&request, &unit_index)?;
     let routed = validate_bespoke_assignments(&request, &unit_index)?;
+    let mut routine_specs: BTreeMap<BehaviorUnitId, RoutineProgramSpec> =
+        map_routine_catalog(units)?
+            .mapped
+            .into_iter()
+            .map(|spec| (spec.behavior_unit.clone(), spec))
+            .collect();
 
     let mut next_program_id = next_base;
     let mut programs: Vec<ProgramAllocation> = Vec::new();
+    let mut routine_programs = Vec::with_capacity(routine_specs.len());
     let mut compilations: Vec<BehaviorCompilation> = Vec::with_capacity(units.len());
     let mut classifications = Vec::with_capacity(units.len());
     let mut compiled_unit_count = 0_usize;
@@ -358,50 +369,70 @@ pub fn compile_semantics(
     // declared counts slice `units` into consecutive per-source ranges.
     for entry in request.catalog.sources() {
         let source = entry.source.clone();
-        let mut source_program: Option<MechanicsProgramId> = None;
+        let mut source_program: Option<(MechanicsProgramId, usize)> = None;
         for _ in 0..entry.behavior_unit_count {
             let unit = &units[cursor];
             cursor += 1;
 
-            let outcome = match unit.semantic.resolution {
-                CatalogResolution::ResolvedIntrinsic => {
-                    if admitted.contains(&unit.id) {
-                        let program = match source_program {
-                            Some(program) => program,
-                            None => {
-                                let id = MechanicsProgramId::try_from_u64(next_program_id)
-                                    .map_err(|_| SemanticCompileError::ProgramIdExhausted {
-                                        allocated: next_program_id - next_base,
-                                    })?;
-                                next_program_id += 1;
-                                source_program = Some(id);
-                                programs.push(ProgramAllocation {
-                                    id,
-                                    source: source.clone(),
-                                    behavior_units: Vec::new(),
-                                });
-                                id
-                            }
-                        };
-                        if let Some(allocation) = programs.last_mut() {
-                            allocation.behavior_units.push(unit.id.clone());
+            let outcome =
+                match unit.semantic.resolution {
+                    CatalogResolution::ResolvedIntrinsic => {
+                        if admitted.contains(&unit.id) {
+                            let (program, allocation_index) = match source_program {
+                                Some(allocation) => allocation,
+                                None => {
+                                    let id = MechanicsProgramId::try_from_u64(next_program_id)
+                                        .map_err(|_| SemanticCompileError::ProgramIdExhausted {
+                                            allocated: next_program_id - next_base,
+                                        })?;
+                                    next_program_id += 1;
+                                    let allocation_index = programs.len();
+                                    source_program = Some((id, allocation_index));
+                                    programs.push(ProgramAllocation {
+                                        id,
+                                        source: source.clone(),
+                                        behavior_units: Vec::new(),
+                                    });
+                                    (id, allocation_index)
+                                }
+                            };
+                            programs[allocation_index]
+                                .behavior_units
+                                .push(unit.id.clone());
+                            compiled_unit_count += 1;
+                            BehaviorCompileOutcome::Compiled { program }
+                        } else {
+                            BehaviorCompileOutcome::IntrinsicRuleMissing
                         }
-                        compiled_unit_count += 1;
-                        BehaviorCompileOutcome::Compiled { program }
-                    } else {
-                        BehaviorCompileOutcome::IntrinsicRuleMissing
                     }
-                }
-                CatalogResolution::ResolvedOperands => BehaviorCompileOutcome::OperandSchemaMissing,
-                CatalogResolution::BespokeGap => match routed.get(&unit.id) {
-                    Some(mechanic) => BehaviorCompileOutcome::BespokeCluster(*mechanic),
-                    None => {
-                        return Err(SemanticCompileError::UnassignedBespokeGap {
-                            context: failure_context(unit),
-                        });
+                    CatalogResolution::ResolvedOperands => {
+                        if let Some(spec) = routine_specs.remove(&unit.id) {
+                            let program = MechanicsProgramId::try_from_u64(next_program_id)
+                                .map_err(|_| SemanticCompileError::ProgramIdExhausted {
+                                    allocated: next_program_id - next_base,
+                                })?;
+                            next_program_id += 1;
+                            programs.push(ProgramAllocation {
+                                id: program,
+                                source: source.clone(),
+                                behavior_units: vec![unit.id.clone()],
+                            });
+                            routine_programs.push(spec.build(program)?);
+                            compiled_unit_count += 1;
+                            BehaviorCompileOutcome::Compiled { program }
+                        } else {
+                            BehaviorCompileOutcome::OperandSchemaMissing
+                        }
                     }
-                },
-            };
+                    CatalogResolution::BespokeGap => match routed.get(&unit.id) {
+                        Some(mechanic) => BehaviorCompileOutcome::BespokeCluster(*mechanic),
+                        None => {
+                            return Err(SemanticCompileError::UnassignedBespokeGap {
+                                context: failure_context(unit),
+                            });
+                        }
+                    },
+                };
 
             let kind = outcome.classification_kind();
             classifications.push(BehaviorClassificationEntryV2 {
@@ -427,6 +458,7 @@ pub fn compile_semantics(
     }
 
     debug_assert_eq!(cursor, units.len());
+    debug_assert!(routine_specs.is_empty());
 
     let mut bespoke_units: BTreeMap<BespokeMechanicId, Vec<BehaviorUnitId>> = BTreeMap::new();
     for compilation in &compilations {
@@ -480,6 +512,7 @@ pub fn compile_semantics(
             entries: bespoke_entries,
         },
         programs,
+        routine_programs,
         units: compilations,
         report: SemanticCompileReport {
             schema_version: SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION,

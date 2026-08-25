@@ -79,9 +79,16 @@ fn full_frozen_semantic_catalog_compiles_deterministically() -> Result<(), Box<d
     assert_eq!(first.report.resolved_intrinsic_count, 3_634);
     assert_eq!(first.report.resolved_operand_count, 46);
     assert_eq!(first.report.bespoke_gap_count, 5_708);
-    assert_eq!(first.report.compiled_unit_count, 3_634);
+    assert_eq!(first.report.compiled_unit_count, 3_680);
     assert_eq!(first.report.bespoke_unit_count, 5_708);
-    assert_eq!(first.report.unsupported_unit_count, 46);
+    assert_eq!(first.report.unsupported_unit_count, 0);
+    assert_eq!(first.routine_programs.len(), 46);
+    assert!(
+        first
+            .routine_programs
+            .iter()
+            .all(|program| program.validate().is_ok())
+    );
     assert_eq!(first.report.rng_site_count, 273);
     assert_eq!(first.report.rng_site_unresolved_count, 273);
     assert_eq!(first.classifications.0.len(), 9_388);
