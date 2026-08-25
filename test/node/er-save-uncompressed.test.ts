@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { DatabaseSync, type SQLInputValue, type StatementSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import communitySuggestionAchievements from "../../src/data/elite-redux/er-community-suggestion-achievements.json";
 import saveWorker from "../../workers/er-save-api/src/index";
 
 interface D1ResultLike {
@@ -215,6 +216,32 @@ describe("er-save-api — uncompressed saves + legacy GZ1 back-compat", () => {
       leaderboard_stats: string;
     };
     expect(JSON.parse(row.leaderboard_stats)).toEqual(LEADERBOARD_STATS);
+  });
+
+  it("derives community-editor eligibility from the current save without an achievement report", async () => {
+    const required = communitySuggestionAchievements.requiredAchievements;
+    const reduxIds = communitySuggestionAchievements.achievements.slice(0, required).map(achievement => achievement.id);
+    const save = JSON.stringify({
+      ...JSON.parse(SAMPLE_SAVE),
+      achvUnlocks: Object.fromEntries(reduxIds.map((id, index) => [id, index + 1])),
+    });
+    expect((await call("/savedata/system/update", { method: "POST", body: save })).status).toBe(200);
+
+    const response = await call("/community/editor-suggestions/eligibility");
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      eligible: true,
+      achievementCount: required,
+      requiredAchievements: required,
+      totalAchievements: communitySuggestionAchievements.totalAchievements,
+    });
+    expect(
+      (
+        sqlite.prepare("SELECT COUNT(*) AS count FROM achievement_holders WHERE user_id = 1").get() as {
+          count: number;
+        }
+      ).count,
+    ).toBe(0);
   });
 
   it("does not replace valid leaderboard stats with malformed values", async () => {
