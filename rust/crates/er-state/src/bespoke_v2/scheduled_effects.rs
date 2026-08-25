@@ -338,6 +338,9 @@ pub struct ScheduledEffectsState {
     pub next_event_id: u64,
     /// Next allocatable family-wide creation ordinal.
     pub next_creation_ordinal: SafeU53,
+    /// Every stable event ID ever scheduled, sorted strictly ascending.
+    /// Consumed IDs are never reusable, independent of allocation order.
+    pub scheduled_event_ids: Vec<u64>,
     /// Pending delayed effects in frozen delivery order.
     pub pending_events: Vec<DelayedEffectEvent>,
     /// Active weather, if any.
@@ -354,6 +357,7 @@ impl Default for ScheduledEffectsState {
             schema_version: SCHEDULED_EFFECTS_SCHEMA_VERSION,
             next_event_id: 1,
             next_creation_ordinal: SafeU53::new(1).expect("one fits in SafeU53"),
+            scheduled_event_ids: Vec::new(),
             pending_events: Vec::new(),
             weather: None,
             terrain: None,
@@ -390,8 +394,10 @@ pub enum ScheduledEffectsStateError {
     ReservedNoneWeather,
     #[error("terrain identity NONE is a reserved sentinel and cannot be live")]
     ReservedNoneTerrain,
-    #[error("arena tags must be sorted by tag identity then owner scope")]
-    UnsortedArenaTags,
+    #[error("consumed event IDs must be sorted strictly ascending and unique")]
+    ConsumedEventIdsOutOfOrder,
+    #[error("pending event {0} is missing from the consumed-ID ledger")]
+    PendingEventIdUntracked(u64),
     #[error("arena tags must be unique per tag identity and owner scope")]
     DuplicateArenaTag,
 }
@@ -414,6 +420,19 @@ impl ScheduledEffectsState {
         if self.next_creation_ordinal == SafeU53::ZERO {
             return Err(ScheduledEffectsStateError::ZeroNextCreationOrdinal);
         }
+        let mut previous_consumed: Option<u64> = None;
+        for consumed in &self.scheduled_event_ids {
+            if *consumed == 0 {
+                return Err(ScheduledEffectsStateError::ZeroEventId);
+            }
+            if previous_consumed.is_some_and(|previous| *consumed <= previous) {
+                return Err(ScheduledEffectsStateError::ConsumedEventIdsOutOfOrder);
+            }
+            if *consumed >= self.next_event_id {
+                return Err(ScheduledEffectsStateError::NextEventIdNotAhead);
+            }
+            previous_consumed = Some(*consumed);
+        }
         let mut ordinals = BTreeSet::new();
         let mut previous_key: Option<(u32, u8, SafeU53, u64)> = None;
         for event in &self.pending_events {
@@ -424,6 +443,15 @@ impl ScheduledEffectsState {
             }
             if !ordinals.insert(event.creation_ordinal) {
                 return Err(ScheduledEffectsStateError::DuplicateCreationOrdinal);
+            }
+            if !self
+                .scheduled_event_ids
+                .binary_search(&event.event_id)
+                .is_ok()
+            {
+                return Err(ScheduledEffectsStateError::PendingEventIdUntracked(
+                    event.event_id,
+                ));
             }
             if event.event_id >= self.next_event_id {
                 return Err(ScheduledEffectsStateError::NextEventIdNotAhead);

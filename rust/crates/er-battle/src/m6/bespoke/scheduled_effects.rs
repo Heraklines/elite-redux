@@ -315,15 +315,20 @@ pub fn schedule_delayed_effect(
             event_id: request.event_id,
         });
     }
-    if request.event_id < state.next_event_id {
+    if state
+        .scheduled_event_ids
+        .binary_search(&request.event_id)
+        .is_ok()
+    {
         return Err(ScheduledEffectsError::ConsumedEventId {
             event_id: request.event_id,
         });
     }
-    let next_event_id = request
-        .event_id
-        .checked_add(1)
-        .ok_or(ScheduledEffectsError::EventIdOverflow)?;
+    // Stable IDs may be allocated in any caller-chosen order; the high-water
+    // mark only moves forward.
+    let next_event_id = state
+        .next_event_id
+        .max(request.event_id.checked_add(1).ok_or(ScheduledEffectsError::EventIdOverflow)?);
     if matches!(request.payload, ScheduledEventPayloadV1::FutureMove { .. }) {
         match request.stored_target {
             Some(MechanicScope::Field { .. }) => {}
@@ -337,8 +342,15 @@ pub fn schedule_delayed_effect(
             return Err(ScheduledEffectsError::FutureMoveAdmissionConflict);
         }
     }
-    let (creation_ordinal, next_creation_ordinal) = allocate_ordinal(state)?;
     let mut prepared = state.clone();
+    let insert_position = state
+        .scheduled_event_ids
+        .binary_search(&request.event_id)
+        .expect_err("consumed check above guarantees the ID is free");
+    prepared
+        .scheduled_event_ids
+        .insert(insert_position, request.event_id);
+    let (creation_ordinal, next_creation_ordinal) = allocate_ordinal(state)?;
     prepared.pending_events.push(DelayedEffectEvent {
         event_id: request.event_id,
         source_behavior_unit: request.source_behavior_unit,
@@ -420,11 +432,11 @@ pub fn drain_due_events(
             log.push(ScheduledEffectsLogEntry::EffectFizzled {
                 event_id: event.event_id,
             });
-        } else {
-            log.push(ScheduledEffectsLogEntry::EffectDelivered {
-                event_id: event.event_id,
-            });
+            continue;
         }
+        log.push(ScheduledEffectsLogEntry::EffectDelivered {
+            event_id: event.event_id,
+        });
         records.push(DeliveryRecord {
             event_id: event.event_id,
             payload: event.payload.clone(),
@@ -957,6 +969,35 @@ mod tests {
     }
 
     #[test]
+    fn stable_ids_may_allocate_out_of_order_and_ledger_stays_sorted() {
+        let mut state = ScheduledEffectsState::default();
+        state = schedule(
+            &state,
+            0,
+            request(7, None, 2, ScheduledEventPayloadV1::DelayedDamage { amount: 10 }),
+        )
+        .state;
+        assert_eq!(state.scheduled_event_ids, vec![7]);
+        assert_eq!(state.next_event_id, 8);
+        // A lower never-used ID stays schedulable despite the high-water mark.
+        state = schedule(
+            &state,
+            0,
+            request(2, None, 3, ScheduledEventPayloadV1::DelayedDamage { amount: 10 }),
+        )
+        .state;
+        assert_eq!(state.scheduled_event_ids, vec![2, 7]);
+        assert_eq!(state.next_event_id, 8);
+        // An unsorted consumed-ID ledger fails validation closed.
+        let mut corrupt = state.clone();
+        corrupt.scheduled_event_ids.reverse();
+        assert_eq!(
+            corrupt.validate(),
+            Err(ScheduledEffectsStateError::ConsumedEventIdsOutOfOrder)
+        );
+    }
+
+    #[test]
     fn cancellation_policies_fire_against_unavailable_scopes() {
         let mut state = ScheduledEffectsState::default();
         state = schedule(
@@ -1291,8 +1332,9 @@ mod tests {
         // Unsorted pending events fail closed.
         let mut unsorted = state.clone();
         unsorted.next_event_id += 1;
-        unsorted.next_creation_ordinal =
-            SafeU53::new(unsorted.next_creation_ordinal.get() + 1).expect("ordinal");
+        unsorted.scheduled_event_ids.push(2);
+        unsorted.next_creation_ordinal = SafeU53::new(unsorted.next_creation_ordinal.get() + 1)
+            .expect("ordinal");
         unsorted.pending_events.push(DelayedEffectEvent {
             event_id: 2,
             source_behavior_unit: doom_desire_unit(),
