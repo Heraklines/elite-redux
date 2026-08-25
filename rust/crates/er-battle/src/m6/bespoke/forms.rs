@@ -16,10 +16,12 @@
 //!   (`canSpeciesTera`, `src/utils/pokemon-utils.ts:204-208`);
 //! - Terastallization consumes the frozen per-side budget of
 //!   [`TERAS_PER_SIDE_MAX`] (`MAX_TERAS_PER_ARENA`, `src/constants.ts:129`)
-//!   and lapses on switch cleanup while the budget stays consumed
-//!   (`SpeciesFormChangeLapseTeraTrigger`);
-//! - Mega admission is one-time per battler per battle and survives switch
-//!   cleanup until battle end;
+//!   and PERSISTS through switch-out: `resetTera()`
+//!   (`src/field/pokemon.ts:7523`) runs only on faint
+//!   (`src/phases/faint-phase.ts:202`) and trainer-battle end
+//!   (`src/battle-scene.ts:2440`); `SpeciesFormChangeLapseTeraTrigger`
+//!   reverts Ogerpon/Terapagos form keys inside that reset, never on
+//!   switch.
 //! - stance swaps are same-species and cannot be staged under a one-time
 //!   overlay.
 //!
@@ -389,10 +391,13 @@ pub fn admit_tera(
     finish(next, FormsOutcomeV2::Applied, cue_start)
 }
 
-/// Switch-out cleanup: lapses every overlay on the scope back to its stable
-/// base form and discards a pending stance request. Consumed one-time
-/// admissions (`mega_used`, per-side Tera budget) persist until battle end.
-/// With nothing to lapse this is a no-op.
+/// Switch-out cleanup: lapses the reversible overlays (Conditional/Stance)
+/// on the scope back to its stable base form and discards a pending stance
+/// request. The Tera overlay PERSISTS through switch-out (frozen rule:
+/// `resetTera()` runs only on faint, `src/phases/faint-phase.ts:202`, and
+/// trainer-battle end, `src/battle-scene.ts:2440`), as do consumed one-time
+/// admissions (`mega_used`, per-side Tera budget). With nothing to lapse
+/// this is a no-op.
 pub fn cleanup_on_switch(
     state: &FormsStateV2,
     scope: &MechanicScope,
@@ -400,27 +405,31 @@ pub fn cleanup_on_switch(
     let (mut next, position) = prepared(state, scope)?;
     let cue_start = next.cues.len();
     let battler = next.battler_mut_at(position);
-    let lapsed = active_overlay(battler);
+    let lapsed = match &battler.overlay {
+        Some(overlay) if overlay.kind != FormOverlayKindV2::Tera => Some(overlay.kind),
+        _ => None,
+    };
     let had_request = battler.pending_stance_request.is_some();
     if lapsed.is_none() && !had_request {
         return finish(next, FormsOutcomeV2::IdempotentNoOp, cue_start);
     }
-    let base = battler.base.clone();
-    let previous = battler.current.clone();
     if let Some(kind) = lapsed {
+        let base = battler.base.clone();
+        let previous = battler.current.clone();
         next.push_cue(
             FormCueKindV2::OverlayReverted(kind),
             *scope,
             Some(previous),
-            Some(base.clone()),
+            Some(base),
         );
+        battler.overlay = None;
+        battler.current = battler.base.clone();
     }
     battler.pending_stance_request = None;
-    battler.overlay = None;
-    battler.current = base;
     next.push_cue(FormCueKindV2::SwitchCleanup, *scope, None, None);
     finish(next, FormsOutcomeV2::Applied, cue_start)
 }
+
 
 /// Battle-end cleanup: resets every battler to its stable base form and
 /// restores all one-time admissions. Already-pristine state is a no-op.
@@ -682,7 +691,7 @@ mod tests {
     }
 
     #[test]
-    fn tera_admission_consumes_side_budget_and_lapses_on_switch_only() {
+    fn tera_admission_consumes_side_budget_and_persists_through_switch() {
         let state = seeded();
         let scope = field_scope(BattleSide::Player, 0);
 
@@ -708,10 +717,20 @@ mod tests {
         let enemy_tera = admit_tera(&tera.state, BattleSide::Enemy, &enemy_scope, 11).expect("enemy tera");
         assert_eq!(enemy_tera.state.teras_used(BattleSide::Enemy), 1);
 
-        // Tera lapses on switch like any overlay...
+        // Tera PERSISTS through switch-out: resetTera() runs only on faint
+        // (src/phases/faint-phase.ts:202) and trainer-battle end
+        // (src/battle-scene.ts:2440), never on switch.
         let cleaned = cleanup_on_switch(&enemy_tera.state, &scope).expect("cleanup");
-        assert_eq!(cleaned.state.battler(&scope).expect("b").overlay, None);
-        // ...but the side budget stays consumed until battle end.
+        assert_eq!(cleaned.outcome, FormsOutcomeV2::IdempotentNoOp);
+        assert_eq!(
+            cleaned.state.battler(&scope).expect("b").overlay,
+            Some(FormOverlayV2 {
+                kind: FormOverlayKindV2::Tera,
+                current: identity(SPECIES_AEGISLASH, "shield"),
+                tera_type_ordinal: Some(10),
+            })
+        );
+        // The side budget stays consumed until battle end.
         assert_eq!(cleaned.state.teras_used(BattleSide::Player), TERAS_PER_SIDE_MAX);
         assert_eq!(
             admit_tera(&cleaned.state, BattleSide::Player, &scope, 10).unwrap_err(),

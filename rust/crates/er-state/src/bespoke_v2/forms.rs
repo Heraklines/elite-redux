@@ -14,8 +14,12 @@
 //! - `Tera`: a one-time per-side Terastallization carrying the assigned
 //!   Tera type (`MAX_TERAS_PER_ARENA = 1`, `src/constants.ts:129`;
 //!   blocked while a Mega/Primal overlay is active,
-//!   `src/utils/pokemon-utils.ts:204-208`; lapses on switch while the
-//!   per-side budget stays consumed, `SpeciesFormChangeLapseTeraTrigger`).
+//!   `src/utils/pokemon-utils.ts:204-208`). Tera persists through
+//!   switch-out: `resetTera()` (`src/field/pokemon.ts:7523`) runs only on
+//!   faint (`src/phases/faint-phase.ts:202`) and trainer-battle end
+//!   (`src/battle-scene.ts:2440`), and `SpeciesFormChangeLapseTeraTrigger`
+//!   is the Ogerpon/Terapagos form-key revert inside that reset, never a
+//!   switch hook.
 //!
 //! State is canonical and total: every invariant listed under
 //! [`FormsStateV2::validate`] holds for any accepted value. Transitions live
