@@ -23,8 +23,8 @@
 
 use std::collections::BTreeSet;
 
-use er_types::battle_ids::{MoveId, PokemonId};
-use er_types::battle_model::{BattleSide, StatusKind};
+use er_types::battle_ids::{BattleSide, MoveId, PokemonId};
+use er_types::battle_model::StatusKind;
 use er_types::ids::SafeU53;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -110,7 +110,7 @@ impl SuppressionOrigin {
     /// Source-scoped precedence used when several suppressors cover one
     /// slot. Lower wins: the global switch outranks field abilities, which
     /// outrank move-applied overlays; ties break by creation ordinal.
-    pub fn precedence(self) -> u8 {
+    pub fn precedence(&self) -> u8 {
         match self {
             SuppressionOrigin::GlobalIgnore => 0,
             SuppressionOrigin::FieldAbility { .. } => 1,
@@ -260,7 +260,7 @@ impl SuppressionImmunityStateV2 {
             return Err(SuppressionStateError::ZeroCreationOrdinal);
         }
         let mut ordinals = BTreeSet::new();
-        let mut previous: Option<(u32, u8, u8, SafeU53)> = None;
+        let mut previous: Option<(u64, u8, u8, SafeU53)> = None;
         for entry in &self.slot_suppressions {
             entry.validate()?;
             if !ordinals.insert(entry.creation_ordinal) {
@@ -280,7 +280,7 @@ impl SuppressionImmunityStateV2 {
             }
             previous = Some(key);
         }
-        let mut previous_tag: Option<(u32, u8, String, SafeU53)> = None;
+        let mut previous_tag: Option<(u64, u8, String, SafeU53)> = None;
         for instance in &self.volatile_tags {
             instance.validate()?;
             if !ordinals.insert(instance.creation_ordinal) {
