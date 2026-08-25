@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import type { ConsequenceEffect, TargetSpec } from "#data/llm-director/beat-schema";
 import type { BiomeId } from "#enums/biome-id";
 import { EggSourceType } from "#enums/egg-source-types";
@@ -484,6 +485,9 @@ const VOUCHER_KEY_MAP: Record<string, VoucherType> = {
 };
 
 function applyGiveVoucher(effect: { voucherType: string }): string | null {
+  if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+    return null;
+  }
   const vt = VOUCHER_KEY_MAP[effect.voucherType];
   if (vt === undefined) {
     console.warn(`[llm-director] give_voucher unknown voucherType="${effect.voucherType}"`);

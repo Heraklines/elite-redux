@@ -67,7 +67,12 @@ import {
 } from "#data/elite-redux/er-custom-trainer-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { getErEndlessSaveData, restoreErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
-import { getFunModeConfig, resetFunModeConfig, setFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import {
+  getFunModeConfig,
+  isFunDebugModeActive,
+  resetFunModeConfig,
+  setFunModeConfig,
+} from "#data/elite-redux/er-fun-mode";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import {
   getLastGenericTrainerType,
@@ -496,6 +501,9 @@ export class GameData {
    */
   private systemDataLoaded = false;
 
+  /** Immutable account snapshot used while a progression-free Fun Debug run is active. */
+  private funDebugSystemBaseline: string | null = null;
+
   /**
    * A confirmed overwrite has already retired the previous cloud row. Its replacement must bypass
    * the ordinary cloud cadence exactly once, otherwise the preceding save's 20-minute success
@@ -679,6 +687,41 @@ export class GameData {
       trainerFx: this.trainerFx,
       erTitles: this.erTitles.slice(0),
     };
+  }
+
+  public beginFunDebugSystemIsolation(): void {
+    if (this.funDebugSystemBaseline != null) {
+      return;
+    }
+    const maxIntAttrValue = 0x80000000;
+    this.funDebugSystemBaseline = JSON.stringify(this.getSystemSaveData(), (_key, value) =>
+      typeof value === "bigint" ? (value <= maxIntAttrValue ? Number(value) : value.toString()) : value,
+    );
+  }
+
+  public restoreFunDebugSystemIsolation(): void {
+    if (this.funDebugSystemBaseline == null) {
+      return;
+    }
+    const baseline = this.funDebugSystemBaseline;
+    // Keep isolation armed while initParsedSystem restores settings so any
+    // incidental save triggered during restoration remains suppressed.
+    // These save maps are sparse and initParsedSystem normally merges them, so
+    // clear them first to make this an exact rollback even if a future debug
+    // feature writes one directly instead of using the guarded APIs.
+    this.achvUnlocks = {};
+    this.voucherUnlocks = {};
+    this.initParsedSystem(GameData.parseSystemData(baseline));
+    this.funDebugSystemBaseline = null;
+  }
+
+  private getFunDebugBaselineSaveData(): SystemSaveData | null {
+    if (this.funDebugSystemBaseline == null) {
+      return null;
+    }
+    const baseline = GameData.parseSystemData(this.funDebugSystemBaseline);
+    baseline.timestamp = Date.now();
+    return baseline;
   }
 
   public nextSameSpeciesEggSeed(speciesId: SpeciesId): string {
@@ -892,6 +935,10 @@ export class GameData {
   }
 
   public async saveSystem(forceSync = false): Promise<boolean> {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      this.beginFunDebugSystemIsolation();
+      return true;
+    }
     globalScene.ui.savingIcon.show();
     // Catch-all for the one-time Legendary-egg gift: a brand-new account never
     // runs initParsedSystem on its first session (no save to parse yet), so the
@@ -5209,6 +5256,9 @@ export class GameData {
       } else {
         resetMoodyModeState();
       }
+      if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+        this.beginFunDebugSystemIsolation();
+      }
     } else {
       resetMoodyModeState();
     }
@@ -5946,9 +5996,15 @@ export class GameData {
     const maxIntAttrValue = 0x80000000;
 
     const systemStorageKey = `data_${saveAccountIdentity ?? "undefined"}`;
-    const systemData = useCachedSystem
-      ? GameData.parseSystemData(decrypt(localStorage.getItem(systemStorageKey)!, bypassLogin))
-      : this.getSystemSaveData(); // TODO: is this bang correct?
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      this.beginFunDebugSystemIsolation();
+    }
+    const debugBaseline = isFunDebugModeActive(globalScene.gameMode?.isFun) ? this.getFunDebugBaselineSaveData() : null;
+    const systemData =
+      debugBaseline
+      ?? (useCachedSystem
+        ? GameData.parseSystemData(decrypt(localStorage.getItem(systemStorageKey)!, bypassLogin))
+        : this.getSystemSaveData());
 
     const request = {
       system: systemData,
@@ -6941,6 +6997,9 @@ export class GameData {
   }
 
   setPokemonSeen(pokemon: Pokemon, incrementCount = true, trainer = false): void {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return;
+    }
     // Some Mystery Encounters block updates to these stats
     if (
       globalScene.currentBattle?.isBattleMysteryEncounter()
@@ -6987,6 +7046,9 @@ export class GameData {
     showMessage = true,
     grantPermanentProgress = true,
   ): Promise<boolean> {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return false;
+    }
     // #807 B (default-deny account writes): during a CO-OP session, caught-registration only
     // proceeds from explicitly allowlisted scopes (own catch, scoped share apply, own adopt
     // credit). Anything else is a leak path by definition - blocked + loudly logged.
@@ -7227,6 +7289,9 @@ export class GameData {
    * @returns The number of classic wins after incrementing.
    */
   incrementRibbonCount(species: PokemonSpecies, forStarter = false): number {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return this.getStarterDataEntry(species.getRootSpeciesId(forStarter)).classicWinCount ?? 0;
+    }
     const speciesIdToIncrement: SpeciesId = species.getRootSpeciesId(forStarter);
     const starterEntry = this.getStarterDataEntry(speciesIdToIncrement);
 
@@ -7268,6 +7333,9 @@ export class GameData {
    * @returns Whether the candy count was incremented
    */
   public addStarterCandy(speciesId: SpeciesId, count: number, fromEgg = false, showCandyBar = true): boolean {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return false;
+    }
     // ER: route a custom MEGA form id to its base so the candy lands on the base
     // bucket AND the candy bar (which does a raw starterData[id] read) is handed
     // an id whose bucket getStarterDataEntry just guaranteed.
@@ -7309,6 +7377,9 @@ export class GameData {
     showMessage = true,
     prependSpeciesToMessage = false,
   ): Promise<boolean> {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return false;
+    }
     const { speciesId } = species;
     if (!Object.hasOwn(speciesEggMoves, speciesId) || !speciesEggMoves[speciesId][eggMoveIndex]) {
       return false;
@@ -7350,6 +7421,9 @@ export class GameData {
    * Will fail silently if root species has not been unlocked
    */
   unlockSpeciesNature(species: PokemonSpecies, nature: Nature): void {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return;
+    }
     if (!this.isRootSpeciesUnlocked(species)) {
       return;
     }
@@ -7363,6 +7437,9 @@ export class GameData {
   }
 
   updateSpeciesDexIvs(speciesId: SpeciesId, ivs: number[]): void {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return;
+    }
     let dexEntry: DexEntry;
     do {
       dexEntry = globalScene.gameData.dexData[speciesId];

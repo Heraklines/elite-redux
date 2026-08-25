@@ -189,6 +189,7 @@ import {
   getFunRandomAbilityId,
   getFunRandomLevelMoves,
   getFunRandomTypes,
+  isFunDebugModeActive,
   rollFunRandomSpecies,
 } from "#data/elite-redux/er-fun-mode";
 import {
@@ -9044,6 +9045,9 @@ export class PlayerPokemon extends Pokemon {
         : newFriendship;
 
     this.friendship = Math.min(finalFriendship, 255);
+    if (isFunDebugModeActive(gameMode.isFun)) {
+      return;
+    }
     if (this.friendship >= 255) {
       globalScene.validateAchv(achvs.MAX_FRIENDSHIP);
       awardRibbonsToSpeciesLine(this.species.speciesId, RibbonData.FRIENDSHIP);

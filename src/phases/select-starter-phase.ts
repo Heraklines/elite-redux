@@ -47,7 +47,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
-import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { notifyMoodyRuntimeBoonDraft } from "#data/elite-redux/moody/moody-runtime-field-engine";
@@ -126,6 +126,10 @@ export class SelectStarterPhase extends Phase {
 
   start() {
     super.start();
+
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      globalScene.gameData.beginFunDebugSystemIsolation();
+    }
 
     // Local-only dev tools: a test scenario may have staged a party so we can
     // drop straight into the battle, skipping starter-select. consumePending…

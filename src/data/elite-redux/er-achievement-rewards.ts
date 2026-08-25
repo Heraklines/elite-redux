@@ -35,6 +35,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { speciesStarterCosts } from "#balance/starters";
 import type { PlayerPokemon } from "#field/pokemon";
 import { Egg } from "#data/egg";
@@ -848,6 +849,9 @@ function getAchievementRewardTeam(): PlayerPokemon[] {
  * first-unlock path (see battle-scene.validateAchv).
  */
 export function grantErAchievementReward(achvId: string): void {
+  if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+    return;
+  }
   try {
     const entry = ER_ACHIEVEMENT_REWARDS[achvId];
     const specs: RewardSpec[] = entry ? (Array.isArray(entry) ? [...entry] : [entry]) : [];

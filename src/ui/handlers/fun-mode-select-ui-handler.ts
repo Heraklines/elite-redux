@@ -26,6 +26,12 @@ const OPTIONS: readonly { key: FunModeOptionKey; label: string; description: str
     description: "Choose Youngster rules or the full Hell difficulty rules for this Fun Mode run.",
   },
   {
+    key: "debugMode",
+    label: "Debug",
+    description:
+      "Temporarily unlock every starter, form, ability, innate, nature, egg move, and shiny tier for this run. Team budget becomes 999. Debug runs grant no catches, candy, vouchers, achievements, ribbons, unlocks, or account progress.",
+  },
+  {
     key: "randomizePokemon",
     label: "Pokemon",
     description:
@@ -94,6 +100,8 @@ const OPTIONS: readonly { key: FunModeOptionKey; label: string; description: str
     description: "Every 10 waves, choose a boon or upgrade and receive a curse. Enemy trainers also receive boons.",
   },
 ];
+
+export const FUN_MODE_OPTION_COUNT = OPTIONS.length;
 
 const VISIBLE_OPTION_ROWS = 9;
 
@@ -393,7 +401,9 @@ export class FunModeSelectUiHandler extends UiHandler {
 
   private refresh(): void {
     this.rulesText.setText(
-      `${this.config.difficulty === "hell" ? "Hell" : "Youngster"} rules  |  No Favor or Vouchers`,
+      this.config.debugMode
+        ? `${this.config.difficulty === "hell" ? "Hell" : "Youngster"} rules  |  Debug: no account progress`
+        : `${this.config.difficulty === "hell" ? "Hell" : "Youngster"} rules  |  No Favor or Vouchers`,
     );
     if (!this.cursorObject || !this.descriptionText) {
       return;
@@ -489,7 +499,7 @@ export class FunModeSelectUiHandler extends UiHandler {
       } else {
         this.startText.setText("START").setAlpha(anyEnabled ? 1 : 0.45);
         this.setDescription(
-          anyEnabled ? "Begin a 200-wave Fun Mode run." : "Enable at least one randomizer before starting.",
+          anyEnabled ? "Begin a 200-wave Fun Mode run." : "Enable at least one modifier before starting.",
         );
       }
     }

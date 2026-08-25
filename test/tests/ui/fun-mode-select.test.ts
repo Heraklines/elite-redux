@@ -7,7 +7,7 @@ import {
 import { Button } from "#enums/buttons";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
-import type { FunModeSelectUiHandler } from "#ui/handlers/fun-mode-select-ui-handler";
+import { FUN_MODE_OPTION_COUNT, type FunModeSelectUiHandler } from "#ui/handlers/fun-mode-select-ui-handler";
 import { saveLastFunModeConfig } from "#utils/data";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -50,7 +50,7 @@ describe("UI - Fun Mode select", () => {
 
     expect(handler.getCursor()).toBe(0);
     expect(handler.processInput(Button.SUBMIT)).toBe(true);
-    expect(handler.getCursor()).toBe(13);
+    expect(handler.getCursor()).toBe(FUN_MODE_OPTION_COUNT);
     expect(state.config.difficulty).toBe(difficulty);
     expect(state.startRegionOption).toBe(0);
   });
@@ -61,7 +61,7 @@ describe("UI - Fun Mode select", () => {
     const state = handler as unknown as { startRegionOption: number; startText: Phaser.GameObjects.Text };
 
     expect(handler.processInput(Button.SUBMIT)).toBe(true);
-    expect(handler.getCursor()).toBe(13);
+    expect(handler.getCursor()).toBe(FUN_MODE_OPTION_COUNT);
     expect(state.startRegionOption).toBe(0);
     expect(state.startText.text).toBe("START");
   });
@@ -85,6 +85,6 @@ describe("UI - Fun Mode select", () => {
     expect(handler.getCursor()).toBe(0);
     expect(state.config.difficulty).toBe("hell");
     expect(handler.processInput(Button.SUBMIT)).toBe(true);
-    expect(handler.getCursor()).toBe(13);
+    expect(handler.getCursor()).toBe(FUN_MODE_OPTION_COUNT);
   });
 });

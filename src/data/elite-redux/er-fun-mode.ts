@@ -21,6 +21,7 @@ import { randSeedInt, randSeedItem } from "#utils/common";
 
 export interface FunModeConfig {
   difficulty: "youngster" | "hell";
+  debugMode: boolean;
   randomizePokemon: boolean;
   randomizeTypes: boolean;
   randomizeAbilities: boolean;
@@ -39,6 +40,7 @@ export interface FunModeConfig {
 
 export const DEFAULT_FUN_MODE_CONFIG: Readonly<FunModeConfig> = Object.freeze({
   difficulty: "youngster",
+  debugMode: false,
   randomizePokemon: false,
   randomizeTypes: false,
   randomizeAbilities: false,
@@ -76,12 +78,18 @@ export function getFunModeConfig(): Readonly<FunModeConfig> {
  * to shiny catches so it cannot be used as a permanent shiny-farming modifier.
  */
 export function shouldGrantFunCaptureProgress(isShiny: boolean): boolean {
-  return !currentConfig.randomizePokemon && !(currentConfig.itemChaos && isShiny);
+  return !currentConfig.debugMode && !currentConfig.randomizePokemon && !(currentConfig.itemChaos && isShiny);
+}
+
+/** Whether the current Fun run is an isolated, progression-free debug run. */
+export function isFunDebugModeActive(isFunMode: boolean | undefined): boolean {
+  return isFunMode === true && currentConfig.debugMode;
 }
 
 export function setFunModeConfig(config: FunModeConfig): void {
   currentConfig = {
     difficulty: config.difficulty === "hell" ? "hell" : "youngster",
+    debugMode: config.debugMode === true,
     randomizePokemon: config.randomizePokemon === true,
     randomizeTypes: config.randomizeTypes === true,
     randomizeAbilities: config.randomizeAbilities === true,

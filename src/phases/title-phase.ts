@@ -184,6 +184,9 @@ export class TitlePhase extends Phase {
   async start(): Promise<void> {
     super.start();
 
+    globalScene.gameData.restoreFunDebugSystemIsolation();
+    resetFunModeConfig();
+
     // #ios-stability: we reached the title — boot completed cleanly. This is the milestone whose
     // ABSENCE (in a persisted trail read back after a reload) means the previous session crashed on boot.
     markBootMilestone("title-shown");

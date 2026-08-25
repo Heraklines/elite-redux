@@ -44,6 +44,7 @@ import {
 } from "#data/elite-redux/er-endless-continuation";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
+import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { bypassLogin } from "#constants/app-constants";
 import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies";
 import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
@@ -1101,6 +1102,9 @@ export async function uploadLocalRunHistory(): Promise<number> {
  * configured. Only records victories or sufficiently deep runs. Never throws.
  */
 export function recordGhostTeamOnGameOver(isVictory: boolean): void {
+  if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+    return;
+  }
   try {
     // Record EVERY finished run — wins AND losses, at any wave — for the shared
     // run-history pool (#217 ghost teams + balancing data). captureGhostTeam bails

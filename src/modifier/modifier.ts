@@ -15,7 +15,7 @@ import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-
 import { getErEndlessHeldItemCandidateIndex, hasErEndlessRift } from "#data/elite-redux/er-endless-continuation";
 import { applyErEndlessHealing } from "#data/elite-redux/er-endless-rift-runtime";
 import { canUseFunMegaStone, getFunRealMegaChange } from "#data/elite-redux/er-fun-mega-mode";
-import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import type { GreaterAbilityRandomizerChoiceCache } from "#data/elite-redux/er-greater-ability-randomizer";
 import { randomizePokemonMove } from "#data/elite-redux/er-move-randomizer";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
@@ -383,6 +383,9 @@ export class AddVoucherModifier extends ConsumableModifier {
    * @returns always `true`
    */
   override apply(): boolean {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return true;
+    }
     const voucherCounts = globalScene.gameData.voucherCounts;
     voucherCounts[this.voucherType] += this.count;
 

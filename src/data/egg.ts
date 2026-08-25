@@ -25,6 +25,7 @@ import { speciesStarterCosts } from "#balance/starters";
 import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { erBalanceArr, erBalanceMap, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { maybeUpgradeToErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { getErEggWeightDivisor } from "#data/elite-redux/init-elite-redux-egg-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { EggSourceType } from "#enums/egg-source-types";
@@ -390,6 +391,9 @@ export class Egg {
 
   // Doesn't need to be called if the egg got pulled by a gacha machiene
   public addEggToGameData(): void {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      return;
+    }
     if (!coopGateAccountWrite(globalScene.gameMode?.isCoop === true, `addEgg id=${this.id}`)) {
       return;
     }

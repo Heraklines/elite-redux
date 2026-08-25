@@ -47,7 +47,8 @@ import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#d
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
 import { resetErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
-import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { applyFunDebugStarterUnlocks, FUN_DEBUG_STARTER_VALUE_LIMIT } from "#data/elite-redux/er-fun-debug";
+import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { resetGenericTrainerTracking } from "#data/elite-redux/er-generic-trainer-run-state";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
@@ -2044,6 +2045,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * @returns true if the user has enough candies and a passive has not been unlocked already
    */
   isPassiveAvailable(speciesId: SpeciesId): boolean {
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return false;
+    }
     const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
     if (starterCost == null) {
@@ -2076,6 +2080,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * @returns true if the user has enough candies and all value reductions have not been unlocked already
    */
   isValueReductionAvailable(speciesId: SpeciesId): boolean {
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return false;
+    }
     // Get this species ID's starter data
     const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
@@ -2093,6 +2100,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * @returns true if the user has enough candies
    */
   isSameSpeciesEggAvailable(speciesId: SpeciesId): boolean {
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return false;
+    }
     const starterData = globalScene.gameData.getStarterDataEntry(speciesId);
     const starterCost = speciesStarterCosts[speciesId];
     const dexData = globalScene.gameData.dexData[speciesId];
@@ -3947,7 +3957,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr);
     const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
     const isBlackShiny = this.isBlackShinyPick(species.speciesId, starterDataEntry, props.shiny, props.variant);
-    if (isBlackShiny && countErBlackShinyStarters(this.starters) >= 1) {
+    if (
+      !isFunDebugModeActive(globalScene.gameMode.isFun)
+      && isBlackShiny
+      && countErBlackShinyStarters(this.starters) >= 1
+    ) {
       if (!randomSelection) {
         this.rejectBlackShinyPick();
       }
@@ -4970,6 +4984,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // the affordability grey-out leaves cells gated ONLY by challenge legality.
     if (this.rosterPickMode) {
       return Number.POSITIVE_INFINITY;
+    }
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return FUN_DEBUG_STARTER_VALUE_LIMIT;
     }
     // Showdown: teams are built at level 100 from the player's own unlocked
     // collection, and the point budget is deferred by design - so no cost ceiling
@@ -6526,6 +6543,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (applyChallenge) {
       applyChallenges(ChallengeType.STARTER_SELECT_MODIFY, speciesId, copiedDexEntry, copiedStarterDataEntry);
     }
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      applyFunDebugStarterUnlocks(getPokemonSpecies(speciesId), copiedDexEntry, copiedStarterDataEntry);
+    }
     return { dexEntry: { ...copiedDexEntry }, starterDataEntry: { ...copiedStarterDataEntry } };
   }
 
@@ -7134,7 +7154,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     this.updateInstructions();
 
-    if (save) {
+    if (save && !isFunDebugModeActive(globalScene.gameMode.isFun)) {
       saveStarterPreferences(this.originalStarterPreferences);
     }
   }
@@ -7532,15 +7552,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // object identity). Reconcile the explicit t4 preference at the launch
     // boundary so a visibly selected Black Shiny cannot enter as its underlying
     // epic/red variant. Variant 2 alone is deliberately insufficient here.
-    this.starters = enforceErBlackShinyStarterLimit(
-      this.starters.map(starter =>
-        reconcileErBlackShinyStarterSelection(
-          starter,
-          !!this.getSpeciesData(starter.speciesId).starterDataEntry.erBlackShiny,
-          this.starterPreferences[starter.speciesId],
-        ),
+    const reconciledStarters = this.starters.map(starter =>
+      reconcileErBlackShinyStarterSelection(
+        starter,
+        !!this.getSpeciesData(starter.speciesId).starterDataEntry.erBlackShiny,
+        this.starterPreferences[starter.speciesId],
       ),
     );
+    this.starters = isFunDebugModeActive(globalScene.gameMode.isFun)
+      ? reconciledStarters
+      : enforceErBlackShinyStarterLimit(reconciledStarters);
 
     const ui = this.getUi();
 
@@ -7628,7 +7649,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               globalScene.money = globalScene.gameMode.getStartingMoney();
               const starters = this.starters.slice(0);
               // ER: remember this team so it can be re-selected next run.
-              saveLastTeam(starters);
+              if (!isFunDebugModeActive(globalScene.gameMode.isFun)) {
+                saveLastTeam(starters);
+              }
               ui.setMode(UiMode.STARTER_SELECT);
               const originalStarterSelectCallback = this.starterSelectCallback;
               this.starterSelectCallback = null;
@@ -7815,7 +7838,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * It checks each pokemon against the challenge - noting that due to monotype challenges it needs to check the pokemon while ignoring their evolutions/form change items
    */
   isPartyValid(): boolean {
-    if (countErBlackShinyStarters(this.starters) > 1) {
+    if (!isFunDebugModeActive(globalScene.gameMode.isFun) && countErBlackShinyStarters(this.starters) > 1) {
       return false;
     }
     let canStart = false;
@@ -7970,7 +7993,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.showdownSeedInFlight = null;
     this.setErLinksVisible(false); // hide the Discord/GitHub corner links off the starter screen
 
-    saveStarterPreferences(this.originalStarterPreferences);
+    if (!isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      saveStarterPreferences(this.originalStarterPreferences);
+    }
 
     this.clearStarterPreferences();
     this.cursor = -1;

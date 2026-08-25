@@ -25,7 +25,7 @@ import {
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
 import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
-import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import {
   hasErGhostOverride,
   recordGhostTeamOnGameOver,
@@ -309,7 +309,8 @@ export class GameOverPhase extends BattlePhase {
           }
 
           const clear = (endCardPhase?: EndCardPhase) => {
-            if (this.isVictory && newClear) {
+            const debugRun = isFunDebugModeActive(globalScene.gameMode.isFun);
+            if (this.isVictory && newClear && !debugRun) {
               this.handleUnlocks();
 
               for (const species of this.firstRibbons) {
@@ -319,16 +320,17 @@ export class GameOverPhase extends BattlePhase {
                 globalScene.phaseManager.unshiftNew("GameOverModifierRewardPhase", modifierTypes.VOUCHER_PREMIUM);
               }
             }
-            this.getRunHistoryEntry().then(runHistoryEntry => {
-              globalScene.gameData.saveRunHistory(runHistoryEntry, this.isVictory);
-              // ER (#217): snapshot the finished team as a cross-player "ghost"
-              // (stored locally + uploaded when an endpoint is configured).
-              recordGhostTeamOnGameOver(this.isVictory);
-              // ER Community Challenge: record the FOUNDER's qualifying-run outcome. A win
-              // auto-publishes the draft (flips draft->active); a LOSS still records the
-              // attempt locally so the draft is NOT lost and stays in MY CHALLENGES to finalize.
-              this.recordFounderRunOutcome();
-              this.recordCommunityRunOutcome();
+            const finishRun = () => {
+              if (!debugRun) {
+                // ER (#217): snapshot the finished team as a cross-player "ghost"
+                // (stored locally + uploaded when an endpoint is configured).
+                recordGhostTeamOnGameOver(this.isVictory);
+                // ER Community Challenge: record the FOUNDER's qualifying-run outcome. A win
+                // auto-publishes the draft (flips draft->active); a LOSS still records the
+                // attempt locally so the draft is NOT lost and stays in MY CHALLENGES to finalize.
+                this.recordFounderRunOutcome();
+                this.recordCommunityRunOutcome();
+              }
               // Co-op (#829/#834): the run is over - tear the co-op runtime down on THIS client so the
               // run-over tail cleans up on BOTH clients (drop the detached ME listeners + stall watchdog,
               // close the transport, and zero the ME pins so nothing leaks into the next co-op run). Placed
@@ -345,6 +347,14 @@ export class GameOverPhase extends BattlePhase {
                 globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
               }
               this.end();
+            };
+            if (debugRun) {
+              finishRun();
+              return;
+            }
+            this.getRunHistoryEntry().then(runHistoryEntry => {
+              globalScene.gameData.saveRunHistory(runHistoryEntry, this.isVictory);
+              finishRun();
             });
           };
 
@@ -495,6 +505,9 @@ export class GameOverPhase extends BattlePhase {
   }
 
   handleUnlocks(): void {
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return;
+    }
     if (this.isVictory && globalScene.gameMode.isClassic) {
       if (!globalScene.gameData.unlocks[Unlockables.ENDLESS_MODE]) {
         globalScene.phaseManager.unshiftNew("UnlockPhase", Unlockables.ENDLESS_MODE);
@@ -518,6 +531,9 @@ export class GameOverPhase extends BattlePhase {
   }
 
   awardFirstClassicCompletion(pokemon: Pokemon, forStarter = false): void {
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return;
+    }
     const speciesId = getPokemonSpecies(pokemon.species.speciesId);
     const speciesRibbonCount = globalScene.gameData.incrementRibbonCount(speciesId, forStarter);
     // first time classic win, award voucher
