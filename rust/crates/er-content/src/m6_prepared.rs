@@ -509,7 +509,9 @@ mod tests {
     use er_mechanics::ProgramRange;
     use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
     use er_mechanics::m6::ProgramBudgetV2;
-    use er_mechanics::selector_operation_v2::{MechanicOperationV2, SelectorArenaV2};
+    use er_mechanics::selector_operation_v2::{
+        MechanicOperationV2, QueryModifierStageV2, QueryModifierV2, SelectorArenaV2,
+    };
     use er_types::battle_model::{
         EffectChance, MoveAccuracy, MoveCategory, MovePower, MoveTarget, PokemonType, PokemonTyping,
     };
@@ -546,7 +548,24 @@ mod tests {
     }
 
     fn program(id: u64, unit: BehaviorUnitId, bindings: Vec<HookBindingV2>) -> MechanicsProgramV2 {
-        let operations = bindings.len();
+        let operation_nodes: Vec<MechanicOperationV2> = bindings
+            .iter()
+            .map(|binding| {
+                if binding.hook.is_query() {
+                    MechanicOperationV2::Query {
+                        query: binding
+                            .hook
+                            .query()
+                            .expect("query hook must map to a query"),
+                        stage: QueryModifierStageV2::Cancel,
+                        modifier: QueryModifierV2::Cancel,
+                    }
+                } else {
+                    MechanicOperationV2::StatusApply
+                }
+            })
+            .collect();
+        let operations = operation_nodes.len();
         MechanicsProgramV2 {
             schema_version: M6_MECHANICS_PROGRAM_VERSION,
             id: MechanicsProgramId::try_from_u64(id).expect("fixture must be valid"),
@@ -555,7 +574,7 @@ mod tests {
             conditions: ConditionArenaV2::default(),
             selectors: SelectorArenaV2::default(),
             values: ValueArenaV2::default(),
-            operations: vec![MechanicOperationV2::StatusApply; operations],
+            operations: operation_nodes,
             scheduled_events: Vec::new(),
             rng_sites: Vec::new(),
             budget: ProgramBudgetV2 {
