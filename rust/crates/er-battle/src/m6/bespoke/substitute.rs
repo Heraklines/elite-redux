@@ -20,6 +20,8 @@
 //!   secondary effects) are blocked; user-side effects still apply.
 //! - Infiltrator, sound-based moves, and `IGNORE_SUBSTITUTE` bypass the doll;
 //!   self/side-targeting moves never hit it.
+//! - Degenerate owners (`maxHp < 4`) pay the cost and create a zero-HP doll
+//!   that still intercepts one hit before removal (exact oracle lifecycle).
 //! - Switch-out, faint, and `RemoveAllSubstitutesAttr` clear dolls outright.
 
 use er_state::bespoke_v2::substitute::{
@@ -106,12 +108,6 @@ pub enum SubstituteCreationFailure {
         hp_current: SafeU53,
         cost: SafeU53,
     },
-    /// `floor(maxHp / 4) == 0`: no positive proxy can exist. Canonical state
-    /// admits strictly positive proxy HP, so creation fails cleanly.
-    ///
-    /// Contract gap versus production TypeScript: the tag would be added with
-    /// zero HP there and removed on first damage. The kernel rejects instead.
-    ProxyDegenerate,
 }
 
 /// One atomic creation attempt.
@@ -234,7 +230,8 @@ pub struct SubstituteCreationRequest<'a> {
 ///
 /// Pure: validates inputs, clones the store, applies the result, revalidates,
 /// and returns the transition. Failed creations leave the store byte-equal to
-/// the input and pay no HP.
+/// the input and pay no HP. Degenerate owners (`maxHp < 4`) succeed with a
+/// zero-HP doll exactly like the production tag.
 ///
 /// # Errors
 /// Only arithmetic/state failures; eligibility failures are typed outcomes.
@@ -261,10 +258,10 @@ pub fn create_substitute(
             cost,
         });
     }
+
+    // Zero proxy HP is admissible: degenerate owners (`maxHp < 4`) create a
+    // doll that intercepts exactly one hit before removal, per the oracle.
     let proxy_hp = compute_proxy_hp(request.hp_max)?;
-    if proxy_hp == SafeU53::ZERO {
-        return failure(SubstituteCreationFailure::ProxyDegenerate);
-    }
 
     // Eligibility guarantees `hp_current > cost`, so no underflow is possible.
     let hp_after = request
@@ -295,8 +292,8 @@ pub fn create_substitute(
 ///
 /// This is the single blocking predicate reused for damage interception and
 /// every target-side effect query (status moves, stat stages, secondary
-/// effects): blocked iff the doll is active, the attack targets the owner
-/// directly, and no bypass applies.
+/// effects): blocked iff the doll is active (entry exists, including zero
+/// HP), the attack targets the owner directly, and no bypass applies.
 #[must_use]
 pub fn intercepts_hit(
     store: &SubstituteProxyStoreV2,
@@ -451,6 +448,7 @@ mod tests {
             provenance_hash: ProvenanceHash::parse(SUBSTITUTE_PROVENANCE).expect("provenance"),
         }
     }
+
     fn direct_hit() -> InterceptionFacts {
         InterceptionFacts {
             targets_owner: true,
@@ -532,7 +530,6 @@ mod tests {
     #[test]
     fn failed_creations_leave_input_unmutated() {
         let store = SubstituteProxyStoreV2::new();
-        let baseline = store.clone();
 
         // Overlap failure.
         let seeded = create(&store, 3, 80, 100).unwrap().store;
@@ -543,15 +540,50 @@ mod tests {
             SubstituteCreationOutcome::Failed(SubstituteCreationFailure::ProxyAlreadyActive)
         );
         assert_eq!(overlapped.store, seeded_baseline);
+        // The failed overlap attempt left the seeded store byte-equal.
+        assert_eq!(seeded, seeded_baseline);
+    }
 
-        // Degenerate proxy (maxHp < 4 leaves no positive doll HP).
-        let degenerate = create(&store, 9, 3, 3).unwrap();
+    #[test]
+    fn degenerate_max_hp_creates_a_zero_hp_proxy_with_exact_lifecycle() {
+        let store = SubstituteProxyStoreV2::new();
+
+        // maxHp 3: cost = max(floor(3/4), 1) = 1; hp 3 > 1 passes eligibility;
+        // the owner pays 1 HP and the doll is created with floor(3/4) = 0 HP,
+        // exactly like `SubstituteTag.onAdd`.
+        let created = create(&store, 9, 3, 3).unwrap();
         assert_eq!(
-            degenerate.outcome,
-            SubstituteCreationOutcome::Failed(SubstituteCreationFailure::ProxyDegenerate)
+            created.outcome,
+            SubstituteCreationOutcome::Created {
+                cost: hp(1),
+                proxy_hp: SafeU53::ZERO,
+            }
         );
-        assert_eq!(degenerate.store, baseline);
-        assert_eq!(store, baseline);
+        assert_eq!(created.owner_hp_after, hp(2));
+        created.store.validate().unwrap();
+        let proxy = created.store.active_proxy(owner(9)).unwrap();
+        assert_eq!(proxy.proxy_hp, SafeU53::ZERO);
+        assert_eq!(proxy.owner_max_hp, hp(3));
+
+        // The zero-HP doll still blocks target-side effects and intercepts
+        // exactly one hit: credited damage min(damage, 0) = 0, overkill =
+        // full damage, broken, then removed by the break sweep.
+        assert!(intercepts_hit(&created.store, owner(9), &direct_hit()));
+        let hit =
+            intercept_damage(&created.store, owner(9), &direct_hit(), hp(5), hp(2)).unwrap();
+        assert_eq!(
+            hit.outcome,
+            SubstituteDamageOutcome::Absorbed {
+                proxy_hp_before: SafeU53::ZERO,
+                damage_credited: SafeU53::ZERO,
+                overkill: hp(5),
+                broken: true,
+            }
+        );
+        assert!(hit.target_effects_blocked);
+        assert_eq!(hit.owner_hp_after, hp(2));
+        assert!(!hit.store.is_active(owner(9)));
+        hit.store.validate().unwrap();
     }
 
     #[test]
@@ -737,15 +769,6 @@ mod tests {
     fn canonical_state_enforces_positive_bounded_proxies() {
         use er_state::bespoke_v2::substitute::SubstituteProxyStateError;
 
-        // Zero proxy HP never persists: rejected by upsert validation.
-        let result = SubstituteProxyStoreV2::new().upsert(SubstituteProxyStateV2 {
-            owner: owner(1),
-            proxy_hp: SafeU53::ZERO,
-            owner_max_hp: hp(100),
-            source_behavior_unit: substitute_unit(),
-        });
-        assert_eq!(result.unwrap_err(), SubstituteProxyStateError::ZeroProxyHp);
-
         // Proxy HP above the creation bound is rejected.
         let result = SubstituteProxyStoreV2::new().upsert(SubstituteProxyStateV2 {
             owner: owner(1),
@@ -797,5 +820,12 @@ mod tests {
                 .unwrap_err(),
             SubstituteMechanicError::ZeroIncomingDamage
         );
+
+        // A zero-HP doll (degenerate owner) is admissible canonical state.
+        let degenerate = create(&SubstituteProxyStoreV2::new(), 2, 3, 3)
+            .unwrap()
+            .store;
+        degenerate.validate().unwrap();
+        assert!(degenerate.is_active(owner(2)));
     }
 }

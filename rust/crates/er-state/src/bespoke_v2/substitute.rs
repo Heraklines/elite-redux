@@ -4,10 +4,11 @@
 //! `AddSubstituteAttr` move attributes (moves 164/880) and removed on break,
 //! switch-out, faint, or `RemoveAllSubstitutesAttr` (move 882).
 //!
-//! Canonical invariant: a doll is active if and only if its proxy HP is
-//! strictly positive and does not exceed the creation bound
-//! `floor(owner_max_hp / 4)`. Broken dolls leave canonical state entirely;
-//! zero-HP entries never persist.
+//! Canonical invariant: a doll is active exactly while its entry exists
+//! (matching live tag presence), with proxy HP bounded by
+//! `floor(owner_max_hp / 4)`. Proxy HP may be zero for degenerate owners
+//! (`maxHp < 4`); such a doll still intercepts one hit and is then removed,
+//! exactly like the production `hp <= 0` removal sweep.
 
 use er_types::battle_ids::PokemonId;
 use er_types::m6::{BehaviorUnitId, M6_MECHANIC_STATE_SCHEMA_VERSION};
@@ -21,7 +22,8 @@ use thiserror::Error;
 pub struct SubstituteProxyStateV2 {
     /// Battler the doll protects.
     pub owner: PokemonId,
-    /// Remaining proxy HP; strictly positive while the doll is active.
+    /// Remaining proxy HP; may be zero for degenerate owners until the next
+    /// intercepted hit removes the doll.
     pub proxy_hp: SafeU53,
     /// Owner max HP captured at creation; fixes the proxy-size bound.
     pub owner_max_hp: SafeU53,
@@ -54,15 +56,15 @@ impl SubstituteProxyStateV2 {
 
     /// Validates one doll against the canonical invariants.
     ///
+    /// Zero proxy HP is admissible (degenerate owners, `maxHp < 4`); the doll
+    /// stays active until its next intercepted hit removes it.
+    ///
     /// # Errors
-    /// Returns [`SubstituteProxyStateError`] when the owner max HP is zero,
-    /// the proxy HP is zero, or the proxy HP exceeds its creation bound.
+    /// Returns [`SubstituteProxyStateError`] when the owner max HP is zero
+    /// or the proxy HP exceeds its creation bound.
     pub fn validate(&self) -> Result<(), SubstituteProxyStateError> {
         if self.owner_max_hp == SafeU53::ZERO {
             return Err(SubstituteProxyStateError::ZeroOwnerMaxHp);
-        }
-        if self.proxy_hp == SafeU53::ZERO {
-            return Err(SubstituteProxyStateError::ZeroProxyHp);
         }
         if self.proxy_hp > Self::proxy_bound(self.owner_max_hp) {
             return Err(SubstituteProxyStateError::ProxyHpAboveBound);
@@ -87,8 +89,8 @@ impl SubstituteProxyStoreV2 {
         self.proxies.iter().find(|proxy| proxy.owner == owner)
     }
 
-    /// True exactly when `owner` has an active doll. Canonical state admits
-    /// only positive, bounded proxy HP, so this equals `active_proxy(..).is_some()`.
+    /// True exactly when `owner` has an active doll, including a zero-HP doll
+    /// awaiting removal on its next intercepted hit.
     #[must_use]
     pub fn is_active(&self, owner: PokemonId) -> bool {
         self.active_proxy(owner).is_some()
@@ -167,8 +169,6 @@ pub enum SubstituteProxyStateError {
     ProxiesOutOfOrder,
     #[error("substitute owner max HP must be positive")]
     ZeroOwnerMaxHp,
-    #[error("substitute proxy HP must be positive; broken dolls leave state")]
-    ZeroProxyHp,
     #[error("substitute proxy HP exceeds its creation bound")]
     ProxyHpAboveBound,
 }
