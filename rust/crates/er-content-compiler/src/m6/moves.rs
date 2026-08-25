@@ -339,9 +339,11 @@ pub fn map_moves_unit(
         _ => Ok(None),
     };
     match mapped {
-        Err(
-            RoutineCompileError::MissingOperand { .. } | RoutineCompileError::OperandKind { .. },
-        ) => Ok(None),
+        Err(RoutineCompileError::MissingOperand { .. }) => Ok(None),
+        Err(RoutineCompileError::OperandKind {
+            index: 0,
+            expected: "operand value representable in the closed mechanics IR",
+        }) => Ok(None),
         result => result,
     }
 }
