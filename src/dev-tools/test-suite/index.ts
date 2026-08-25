@@ -91,6 +91,7 @@ import {
   DEV_MENU_SCENARIOS,
   DEV_SCENARIOS,
   type DevScenario,
+  getVisibleDevMenuScenarios,
   resetDevOverrides,
 } from "./scenarios";
 
@@ -691,8 +692,7 @@ function clampLabel(label: string): string {
  */
 function openScenarioList(ctx: DevMenuCtx): void {
   // Hide scenarios passed by ANYONE on the team (local + shared remote set).
-  const passedSet = new Set(combinedPassed());
-  const remaining = DEV_MENU_SCENARIOS.filter(s => !passedSet.has(s.label));
+  const remaining = getVisibleDevMenuScenarios(combinedPassed());
   const localPassed = getPassed();
 
   const options = [
@@ -760,8 +760,7 @@ function openScenarioList(ctx: DevMenuCtx): void {
       // keeps eating input -> "can't move / locked when going back". Reset the
       // chain first; the fresh TitlePhase then transitions cleanly from the
       // (cleared) OPTION_SELECT mode to TITLE.
-      globalScene.ui.resetModeChain();
-      globalScene.phaseManager.toTitleScreen();
+      ctx.returnToTitle();
       return true;
     },
   });

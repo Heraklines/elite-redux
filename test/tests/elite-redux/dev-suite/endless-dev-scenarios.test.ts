@@ -16,6 +16,7 @@ import {
   setPendingDevPartySetup,
 } from "#app/dev-tools/registry";
 import { DEV_HELL_VICTORY_GHOST } from "#app/dev-tools/test-suite/fixtures/hell-victory-ghost";
+import { DEV_MENU_SCENARIOS, getVisibleDevMenuScenarios } from "#app/dev-tools/test-suite/scenarios";
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
@@ -114,6 +115,18 @@ describe("Endless dev scenario fixtures", () => {
     expect(source).toContain("DEV_MENU_SCENARIO_LABELS.has(scenario.label)");
   });
 
+  it("keeps the final-boss fixture visible after it is marked passed", () => {
+    const label = "Endless: final boss auto-KO";
+    const scenario = DEV_MENU_SCENARIOS.find(candidate => candidate.label === label);
+
+    expect(scenario?.repeatable).toBe(true);
+    expect(
+      getVisibleDevMenuScenarios(DEV_MENU_SCENARIOS.map(candidate => candidate.label)).map(
+        candidate => candidate.label,
+      ),
+    ).toContain(label);
+  });
+
   it("exposes a deep Endless fixture with Avalanche and active Rifts", () => {
     const source = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/scenarios.ts"), "utf8");
     const scenarioStart = source.indexOf('label: "Endless: deep Hell ghost (wave 401)"');
@@ -142,6 +155,23 @@ describe("Endless dev scenario fixtures", () => {
     expect(bypassBranch).toBeGreaterThan(-1);
     expect(saveBranch).toBeGreaterThan(bypassBranch);
     expect(encounter.slice(bypassBranch, saveBranch)).toContain("this.enterEncounterPresentation()");
+  });
+
+  it("returns control from the picker through the owning title phase", () => {
+    const registry = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/registry.ts"), "utf8");
+    const title = fs.readFileSync(path.join(process.cwd(), "src/phases/title-phase.ts"), "utf8");
+    const menu = fs.readFileSync(path.join(process.cwd(), "src/dev-tools/test-suite/index.ts"), "utf8");
+    const cancelStart = menu.indexOf('label: "Cancel"');
+    const cancelEnd = menu.indexOf("const header =", cancelStart);
+    const returnStart = title.indexOf("const returnToTitle = () =>");
+    const returnEnd = title.indexOf("options.push(...getDevMenuItems", returnStart);
+
+    expect(registry).toContain("returnToTitle: () => void");
+    expect(cancelStart).toBeGreaterThan(-1);
+    expect(menu.slice(cancelStart, cancelEnd)).toContain("ctx.returnToTitle()");
+    expect(returnStart).toBeGreaterThan(-1);
+    expect(title.slice(returnStart, returnEnd)).toContain("globalScene.phaseManager.toTitleScreen()");
+    expect(title.slice(returnStart, returnEnd)).toContain("super.end()");
   });
 
   it("waits for the first committed move before triggering the scenario KO", () => {

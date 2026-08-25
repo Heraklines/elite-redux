@@ -190,6 +190,8 @@ export interface DevScenario {
   onFirstTurnCommitted?: () => void;
   /** Optional: skip encounter cloud-save gates for the lifetime of a throwaway dev fixture. */
   bypassEncounterPersistence?: boolean;
+  /** Keep this reusable fixture in the staff picker after it is marked PASS. */
+  repeatable?: boolean;
   /**
    * Optional: guarantee these reward options in the FIRST shop after the opening
    * battle ("start in the store, test a specific item"). Each is a
@@ -8377,6 +8379,7 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "SAFETY: the auto-KO exists only in this dev scenario; normal bosses are untouched.",
     startingLevels: DEV_HELL_VICTORY_GHOST.party.map(member => member.level),
     bypassEncounterPersistence: true,
+    repeatable: true,
     setup: () => {
       resetDevOverrides();
       setErRunPacing("normal");
@@ -21893,3 +21896,9 @@ const DEV_MENU_SCENARIO_LABELS = new Set([
 export const DEV_MENU_SCENARIOS: DevScenario[] = DEV_SCENARIOS.filter(scenario =>
   DEV_MENU_SCENARIO_LABELS.has(scenario.label),
 );
+
+/** Hide completed QA checks while retaining fixtures authored for repeated use. */
+export function getVisibleDevMenuScenarios(passedLabels: Iterable<string>): DevScenario[] {
+  const passed = new Set(passedLabels);
+  return DEV_MENU_SCENARIOS.filter(scenario => scenario.repeatable || !passed.has(scenario.label));
+}

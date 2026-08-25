@@ -45,6 +45,12 @@ export interface DevMenuCtx {
    * so SelectStarterPhase auto-submits the staged party.
    */
   startRunWithMode: (gameMode: GameModes) => void;
+  /**
+   * Leave a dev-menu overlay and complete the owning TitlePhase handoff to a
+   * freshly rebuilt title screen. Merely queueing TitlePhase is insufficient:
+   * the current TitlePhase must end before the queued one can start.
+   */
+  returnToTitle: () => void;
 }
 
 /** A factory that, given launch context, returns one or more menu items. */

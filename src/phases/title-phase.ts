@@ -559,7 +559,12 @@ export class TitlePhase extends Phase {
       globalScene.ui.clearText();
       this.end();
     };
-    options.push(...getDevMenuItems({ startRunWithMode }));
+    const returnToTitle = () => {
+      globalScene.ui.resetModeChain();
+      globalScene.phaseManager.toTitleScreen();
+      super.end();
+    };
+    options.push(...getDevMenuItems({ startRunWithMode, returnToTitle }));
     const config: OptionSelectConfig = {
       options,
       noCancel: true,
@@ -2083,18 +2088,19 @@ export class TitlePhase extends Phase {
         this.loaded = true;
         globalScene.ui.showText(i18next.t("menu:sessionSuccess"), null, () => this.end());
       } else {
-        this.returnToTitleAfterSaveLoadFailure();
+        this.returnToTitleAfterSaveLoadFailure(globalScene.gameData.consumeSessionLoadRefusalMessage());
       }
     } catch (err) {
       console.error(err);
-      this.returnToTitleAfterSaveLoadFailure();
+      this.returnToTitleAfterSaveLoadFailure(globalScene.gameData.consumeSessionLoadRefusalMessage());
     }
   }
 
-  private returnToTitleAfterSaveLoadFailure(): void {
+  private returnToTitleAfterSaveLoadFailure(refusalMessage?: string | null): void {
     this.loaded = false;
     globalScene.ui.showText(
-      `${i18next.t("menu:failedToLoadSession")} If this is a co-op save, choose New Game > Co-op and connect to the exact saved partner before continuing.`,
+      refusalMessage
+        ?? `${i18next.t("menu:failedToLoadSession")} If this is a co-op save, choose New Game > Co-op and connect to the exact saved partner before continuing.`,
       null,
       () => {
         void this.showOptions(NO_SAVE_SLOT);

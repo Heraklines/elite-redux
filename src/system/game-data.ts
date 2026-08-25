@@ -80,6 +80,10 @@ import {
 } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { getErGhostRepeatLedger, restoreErGhostRepeatLedger } from "#data/elite-redux/er-ghost-teams";
+import {
+  isRetiredStandaloneEndlessSave,
+  RETIRED_STANDALONE_ENDLESS_MESSAGE,
+} from "#data/elite-redux/er-legacy-endless-save";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
@@ -487,6 +491,9 @@ export class GameData {
    * save is local-only right now.
    */
   public lastCloudSyncFailed = false;
+
+  /** Player-facing reason for the most recent deliberately refused session load. */
+  private lastSessionLoadRefusalMessage: string | null = null;
 
   /**
    * ER save-integrity guard: `true` once THIS GameData instance has been populated
@@ -2594,8 +2601,14 @@ export class GameData {
    * (i.e. whether a save in the given slot exists)
    */
   public async loadSession(slotIndex: number): Promise<boolean> {
+    this.lastSessionLoadRefusalMessage = null;
     const sessionData = await this.getSession(slotIndex);
     if (!sessionData) {
+      return false;
+    }
+    if (isRetiredStandaloneEndlessSave(sessionData)) {
+      this.lastSessionLoadRefusalMessage = RETIRED_STANDALONE_ENDLESS_MESSAGE;
+      console.warn(`[save] Refused retired standalone Endless save in slot ${slotIndex}; stored data was preserved.`);
       return false;
     }
     // #807 RESUME-REQUIRES-BOTH (finally enforced at the chokepoint): a co-op session save
@@ -2646,6 +2659,13 @@ export class GameData {
     }
     await this.initSessionFromData(sessionData);
     return true;
+  }
+
+  /** Read and clear the reason a session load was intentionally refused. */
+  public consumeSessionLoadRefusalMessage(): string | null {
+    const message = this.lastSessionLoadRefusalMessage;
+    this.lastSessionLoadRefusalMessage = null;
+    return message;
   }
 
   /**
