@@ -24,9 +24,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use er_content::m6_catalog::{
-    CatalogBehaviorUnit, CatalogProvenance, CatalogResolution, CatalogRngBindingStatus,
-};
+use er_content::m6_catalog::{CatalogBehaviorUnit, CatalogProvenance, CatalogResolution};
 use er_content::pack::m6_pack::{
     BESPOKE_MANIFEST_SCHEMA_VERSION_V2, BehaviorClassificationEntryV2,
     BehaviorClassificationManifestV2, BespokeManifestEntryV2, BespokeManifestV2,
@@ -239,8 +237,8 @@ pub struct SemanticCompileReport {
     pub unsupported_unit_count: usize,
     pub program_count: usize,
     pub intrinsic_rule_count: usize,
-    /// RNG sites in the catalog; all remain non-executable bespoke gaps at
-    /// G21 because their range/stream/singleton semantics are unresolved.
+    /// RNG sites whose owning behavior unit remains unsupported after the
+    /// complete compile. Compiled and bespoke owners both close their sites.
     pub rng_site_count: usize,
     pub rng_site_unresolved_count: usize,
 }
@@ -497,11 +495,21 @@ pub fn compile_semantics(
         units.len()
     );
 
+    let supported_units: BTreeSet<&BehaviorUnitId> = compilations
+        .iter()
+        .filter(|record| {
+            matches!(
+                record.outcome,
+                BehaviorCompileOutcome::Compiled { .. } | BehaviorCompileOutcome::BespokeCluster(_)
+            )
+        })
+        .map(|record| &record.unit)
+        .collect();
     let rng_site_unresolved_count = request
         .catalog
         .rng_sites()
         .iter()
-        .filter(|site| site.binding_status == CatalogRngBindingStatus::BespokeGap)
+        .filter(|site| !supported_units.contains(&site.owner))
         .count();
     let program_count = programs.len();
 

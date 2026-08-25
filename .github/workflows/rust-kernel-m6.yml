@@ -553,6 +553,7 @@ jobs:
           cargo test -p er-testkit --test m6_foundation --test m6_bypass --test m6_migration
           cargo test -p er-testkit --test m6_routine_mapping
           cargo test -p er-testkit --test m6_prepared_parity
+          cargo test -p er-testkit --test m6_bespoke_closure
 
   m6-m0-m5-regression:
     name: M0-M5 Rust regression

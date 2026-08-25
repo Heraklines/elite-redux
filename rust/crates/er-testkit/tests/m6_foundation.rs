@@ -90,7 +90,7 @@ fn full_frozen_semantic_catalog_compiles_deterministically() -> Result<(), Box<d
             .all(|program| program.validate().is_ok())
     );
     assert_eq!(first.report.rng_site_count, 273);
-    assert_eq!(first.report.rng_site_unresolved_count, 273);
+    assert_eq!(first.report.rng_site_unresolved_count, 0);
     assert_eq!(first.classifications.0.len(), 9_388);
     assert!(
         first

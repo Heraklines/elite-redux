@@ -415,11 +415,15 @@ pub enum CustomDispatchRegistryErrorV1 {
     SchemaVersion { expected: u32, actual: u32 },
     #[error("sibling exclusions must be sorted strictly ascending and unique")]
     ExclusionsOutOfOrder,
-    #[error("non-mechanical exclusions must be sorted strictly ascending by provenance hash and unique")]
+    #[error(
+        "non-mechanical exclusions must be sorted strictly ascending by provenance hash and unique"
+    )]
     NonMechanicalOutOfOrder,
     #[error("routes must be sorted strictly ascending by provenance hash and unique")]
     RoutesOutOfOrder,
-    #[error("count conservation failed: exclusions + non-mechanical + routes must equal the gross count")]
+    #[error(
+        "count conservation failed: exclusions + non-mechanical + routes must equal the gross count"
+    )]
     ResidualUnitsRemain,
 }
 
@@ -445,7 +449,8 @@ impl CustomDispatchRegistryV1 {
         }
         let mut previous_hash: Option<&ProvenanceHash> = None;
         for route in &self.routes {
-            if previous_hash.is_some_and(|previous| previous.as_str() >= route.provenance_hash.as_str())
+            if previous_hash
+                .is_some_and(|previous| previous.as_str() >= route.provenance_hash.as_str())
             {
                 return Err(CustomDispatchRegistryErrorV1::RoutesOutOfOrder);
             }

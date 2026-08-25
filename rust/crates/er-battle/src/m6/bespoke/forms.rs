@@ -426,7 +426,7 @@ pub fn cleanup_on_switch(
         let previous = battler.current.clone();
         // Mutate through the owned borrow first; cue staging below re-borrows
         // `next`, so the mutable battler borrow must end before the calls.
-        if let Some(kind) = lapsed {
+        if lapsed.is_some() {
             battler.overlay = None;
             battler.current = base.clone();
         }

@@ -13,10 +13,10 @@
 use std::collections::BTreeSet;
 
 use er_state::bespoke_v2::boss::{
-    boss_owner_unit, frozen_rng_site_id, BossCustomErStateV1, BossStateErrorV1,
-    CustomDispatchRegistryErrorV1, CustomDispatchRegistryV1, DispatchRouteEntryV1,
-    FixedDispatchHandlerKindV1, NonMechanicalDomainV1, NonMechanicalExclusionV1,
-    BOSS_FROZEN_RNG_CARDINALITY, CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION,
+    BOSS_FROZEN_RNG_CARDINALITY, BossCustomErStateV1, BossStateErrorV1,
+    CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION, CustomDispatchRegistryErrorV1,
+    CustomDispatchRegistryV1, DispatchRouteEntryV1, FixedDispatchHandlerKindV1,
+    NonMechanicalDomainV1, NonMechanicalExclusionV1, boss_owner_unit, frozen_rng_site_id,
 };
 use er_types::{BehaviorUnitId, ProvenanceHash, RngSiteId, SafeU53};
 use thiserror::Error;
@@ -483,9 +483,7 @@ const NON_MECHANICAL_SITES: [(&str, NonMechanicalDomainV1); 5] = [
 ];
 
 /// Resolves the pinned non-mechanical domain for a registry key, if any.
-pub fn non_mechanical_domain_for_registry_key(
-    registry_key: &str,
-) -> Option<NonMechanicalDomainV1> {
+pub fn non_mechanical_domain_for_registry_key(registry_key: &str) -> Option<NonMechanicalDomainV1> {
     NON_MECHANICAL_SITES
         .iter()
         .find(|(key, _)| *key == registry_key)
@@ -659,18 +657,26 @@ pub fn stage_dispatch_operations(
     let mut staged = Vec::with_capacity(registry.routes.len());
     for (index, route) in registry.routes.iter().enumerate() {
         let payload = match route.handler {
-            FixedDispatchHandlerKindV1::BattleSeedDraw => DispatchStagePayloadV1::AuditedRngDrawStaged {
-                callee_class: RngCalleeClassV1::BattleSeed,
-            },
-            FixedDispatchHandlerKindV1::RunSeedDraw => DispatchStagePayloadV1::AuditedRngDrawStaged {
-                callee_class: RngCalleeClassV1::RunSeed,
-            },
-            FixedDispatchHandlerKindV1::SeedShuffle => DispatchStagePayloadV1::AuditedRngDrawStaged {
-                callee_class: RngCalleeClassV1::SeedShuffle,
-            },
-            FixedDispatchHandlerKindV1::LocalRangeDraw => DispatchStagePayloadV1::AuditedRngDrawStaged {
-                callee_class: RngCalleeClassV1::LocalRange,
-            },
+            FixedDispatchHandlerKindV1::BattleSeedDraw => {
+                DispatchStagePayloadV1::AuditedRngDrawStaged {
+                    callee_class: RngCalleeClassV1::BattleSeed,
+                }
+            }
+            FixedDispatchHandlerKindV1::RunSeedDraw => {
+                DispatchStagePayloadV1::AuditedRngDrawStaged {
+                    callee_class: RngCalleeClassV1::RunSeed,
+                }
+            }
+            FixedDispatchHandlerKindV1::SeedShuffle => {
+                DispatchStagePayloadV1::AuditedRngDrawStaged {
+                    callee_class: RngCalleeClassV1::SeedShuffle,
+                }
+            }
+            FixedDispatchHandlerKindV1::LocalRangeDraw => {
+                DispatchStagePayloadV1::AuditedRngDrawStaged {
+                    callee_class: RngCalleeClassV1::LocalRange,
+                }
+            }
             FixedDispatchHandlerKindV1::AbilityAttributeRegistration => {
                 DispatchStagePayloadV1::AbilityAttributeBound {
                     attr_name: attr_name_from_registry_key(&route.registry_key),
@@ -1311,9 +1317,7 @@ mod tests {
         );
         // Any other Math.random site stays an unclassified residual.
         assert_eq!(
-            non_mechanical_domain_for_registry_key(
-                "RNG:src/somewhere/else.ts:1:1:Math.random",
-            ),
+            non_mechanical_domain_for_registry_key("RNG:src/somewhere/else.ts:1:1:Math.random",),
             None
         );
     }
@@ -1326,7 +1330,9 @@ mod tests {
         assert_eq!(staged.len(), registry.routes.len());
         let mut seen_payloads = BTreeMap::new();
         for entry in &staged {
-            *seen_payloads.entry(format!("{:?}", entry.payload)).or_insert(0) += 1;
+            *seen_payloads
+                .entry(format!("{:?}", entry.payload))
+                .or_insert(0) += 1;
             assert!(entry.ordinal.get() >= 1);
         }
         assert_eq!(
@@ -1345,7 +1351,9 @@ mod tests {
         assert!(staged.iter().any(|entry| {
             matches!(
                 &entry.payload,
-                DispatchStagePayloadV1::AuditedRngDrawStaged { callee_class: RngCalleeClassV1::BattleSeed }
+                DispatchStagePayloadV1::AuditedRngDrawStaged {
+                    callee_class: RngCalleeClassV1::BattleSeed
+                }
             )
         }));
         // Filtered dispatch flag is derived from the key shape.

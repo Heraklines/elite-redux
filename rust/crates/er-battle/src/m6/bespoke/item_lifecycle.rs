@@ -710,17 +710,26 @@ pub fn knock_off_item(
             registry_key: request.registry_key.clone(),
         },
     )?;
-    let instance = &staged.instances[index];
+    let (instance_id, source_ordinal, creation_ordinal, charges, transferable) = {
+        let instance = &staged.instances[index];
+        (
+            instance.instance_id,
+            instance.source_ordinal,
+            instance.creation_ordinal,
+            instance.charges,
+            instance.transferable,
+        )
+    };
     let ordinal = staged.next_ledger_ordinal;
     staged.consume_ledger.push(ConsumeLedgerEntryV2 {
         ledger_ordinal: ordinal,
-        instance_id: instance.instance_id,
+        instance_id,
         consumer: request.target,
         registry_key: request.registry_key.clone(),
-        source_ordinal: instance.source_ordinal,
-        creation_ordinal: instance.creation_ordinal,
-        charges: instance.charges,
-        transferable: instance.transferable,
+        source_ordinal,
+        creation_ordinal,
+        charges,
+        transferable,
         restorable: false,
         restored: false,
     });
@@ -734,7 +743,7 @@ pub fn knock_off_item(
                 effect: ItemEffectRequest {
                     owner: request.target,
                     registry_key: request.registry_key.clone(),
-                    source_ordinal: instance.source_ordinal,
+                    source_ordinal,
                 },
                 ledger_ordinal: None,
             },

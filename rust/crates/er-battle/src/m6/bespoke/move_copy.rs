@@ -2115,6 +2115,7 @@ static ROUTE_TABLE: &[(&str, AttributeRoute)] = &[
 ];
 
 /// Units per attribute, used by tests to prove exact 394-unit closure.
+#[cfg(test)]
 static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("AbilityChangeAttr", 2),
     ("AbilityCopyAttr", 2),

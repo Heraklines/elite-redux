@@ -148,6 +148,7 @@ jobs:
           set -euo pipefail
           cargo test -p er-testkit --test m6_routine_mapping
           cargo test -p er-testkit --test m6_prepared_parity
+          cargo test -p er-testkit --test m6_bespoke_closure
 
   family-tests:
     name: Focused M6 family tests

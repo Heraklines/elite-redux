@@ -179,7 +179,10 @@ pub enum CounterTargetSelection {
     Direct(u8),
     /// The recorded attacker left the field and the first active battler on
     /// the attacker's side was delivered instead (multi-battle fallback).
-    SideFallback { recorded_index: u8, delivered_index: u8 },
+    SideFallback {
+        recorded_index: u8,
+        delivered_index: u8,
+    },
     /// The recorded attacker and every same-side battler are gone: the
     /// oracle's redirect falls back to the `BattlerIndex.ATTACKER` sentinel,
     /// which skips the redirect and fails the move downstream. Carried as
@@ -190,7 +193,11 @@ pub enum CounterTargetSelection {
 impl CounterTargetSelection {
     pub fn delivered_index(&self) -> Option<u8> {
         match *self {
-            Self::Direct(index) | Self::SideFallback { delivered_index: index, .. } => Some(index),
+            Self::Direct(index)
+            | Self::SideFallback {
+                delivered_index: index,
+                ..
+            } => Some(index),
             Self::AttackerSentinel { .. } => None,
         }
     }
@@ -198,8 +205,13 @@ impl CounterTargetSelection {
     pub fn recorded_index(&self) -> u8 {
         match *self {
             Self::Direct(index)
-            | Self::SideFallback { recorded_index: index, .. }
-            | Self::AttackerSentinel { recorded_index: index } => index,
+            | Self::SideFallback {
+                recorded_index: index,
+                ..
+            }
+            | Self::AttackerSentinel {
+                recorded_index: index,
+            } => index,
         }
     }
 }
@@ -265,9 +277,12 @@ pub fn select_counter_target(
                 delivered_index,
             },
         )),
-        None => Ok((record, CounterTargetSelection::AttackerSentinel {
-            recorded_index: record.attacker_index,
-        })),
+        None => Ok((
+            record,
+            CounterTargetSelection::AttackerSentinel {
+                recorded_index: record.attacker_index,
+            },
+        )),
     }
 }
 
@@ -352,10 +367,11 @@ pub fn execute_retaliation(
     )?;
     let retaliation_damage = compute_retaliation_amount(record.damage, profile.multiplier)?;
     let outcome = match selection {
-        CounterTargetSelection::Direct(_)
-        | CounterTargetSelection::SideFallback { .. } => RetaliationOutcome::Delivered {
-            damage: retaliation_damage,
-        },
+        CounterTargetSelection::Direct(_) | CounterTargetSelection::SideFallback { .. } => {
+            RetaliationOutcome::Delivered {
+                damage: retaliation_damage,
+            }
+        }
         CounterTargetSelection::AttackerSentinel { recorded_index } => {
             RetaliationOutcome::FailedWithoutRedirect { recorded_index }
         }
@@ -398,7 +414,9 @@ pub fn execute_accumulated_release(
             turn_index: 0,
         },
         selection: CounterTargetSelection::Direct(0),
-        outcome: RetaliationOutcome::Delivered { damage: retaliation_damage },
+        outcome: RetaliationOutcome::Delivered {
+            damage: retaliation_damage,
+        },
         retaliation_damage,
     };
     Ok((successor, transition))
@@ -603,7 +621,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 16,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -612,7 +632,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 23,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -621,7 +643,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 34,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -630,7 +654,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 57,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -648,7 +674,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 89,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -657,7 +685,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 149,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::RandomLevelDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::RandomLevelDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -675,7 +705,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 222,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -684,7 +716,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 239,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -702,7 +736,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 250,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -711,7 +747,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 263,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BypassBurnDamageReductionAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::BypassBurnDamageReductionAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -720,7 +758,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 279,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::TurnDamagedDoublePowerAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::TurnDamagedDoublePowerAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -738,7 +778,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 407,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -747,7 +789,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 419,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::TurnDamagedDoublePowerAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::TurnDamagedDoublePowerAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -756,7 +800,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 484,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -765,7 +811,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 535,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -774,7 +822,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 537,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -783,7 +833,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 560,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -801,7 +853,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 614,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::NeutralDamageAgainstFlyingTypeAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::NeutralDamageAgainstFlyingTypeAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -810,7 +864,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 696,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -828,7 +884,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 916,
         registry_key: "",
         unit_kind: BehaviorUnitKind::MoveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::HitsTagForDoubleDamageAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -846,7 +904,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 24,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostDefendContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -864,7 +924,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 47,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -873,7 +935,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 47,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -882,7 +946,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 62,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BypassBurnDamageReductionAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::BypassBurnDamageReductionAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -909,7 +975,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 85,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReduceBurnDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReduceBurnDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -918,7 +986,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 85,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -927,7 +997,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 87,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 4,
@@ -936,7 +1008,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 87,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostWeatherLapseDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -954,7 +1028,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 94,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostWeatherLapseDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -972,7 +1048,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 106,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostFaintContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -981,7 +1059,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 110,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::MoveDamageBoostAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -990,7 +1070,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 111,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1008,7 +1090,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 116,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1017,7 +1101,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 132,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::AlliedFieldDamageReductionAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::AlliedFieldDamageReductionAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1026,7 +1112,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 136,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1062,7 +1150,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 160,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostDefendContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1071,7 +1161,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 169,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1080,7 +1172,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 185,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::MoveDamageBoostAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 4,
@@ -1089,7 +1183,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 199,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1098,7 +1194,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 215,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintHPDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostFaintHPDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1107,7 +1205,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 218,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1116,7 +1216,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 218,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1125,7 +1227,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 231,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1134,7 +1238,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 232,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1143,7 +1249,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 244,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1152,7 +1260,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 246,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1161,7 +1271,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 272,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1179,7 +1291,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 24,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostDefendContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1197,7 +1311,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 47,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1206,7 +1322,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 47,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1215,7 +1333,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 62,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BypassBurnDamageReductionAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::BypassBurnDamageReductionAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1242,7 +1362,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 85,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReduceBurnDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReduceBurnDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1251,7 +1373,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 85,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1260,7 +1384,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 87,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 4,
@@ -1269,7 +1395,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 87,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostWeatherLapseDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1287,7 +1415,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 94,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostWeatherLapseDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1305,7 +1435,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 106,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostFaintContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1314,7 +1446,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 110,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::MoveDamageBoostAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1323,7 +1457,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 111,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1341,7 +1477,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 116,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1350,7 +1488,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 132,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::AlliedFieldDamageReductionAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::AlliedFieldDamageReductionAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1359,7 +1499,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 136,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1395,7 +1537,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 160,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostDefendContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1404,7 +1548,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 169,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1413,7 +1559,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 185,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::MoveDamageBoostAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 4,
@@ -1422,7 +1570,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 199,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1431,7 +1581,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 215,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintHPDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostFaintHPDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1440,7 +1592,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 218,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 2,
@@ -1449,7 +1603,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 218,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1458,7 +1614,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 231,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1467,7 +1625,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 232,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1476,7 +1636,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 244,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1485,7 +1647,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 246,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 1,
@@ -1494,7 +1658,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 272,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1701,7 +1867,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1022:7:attr:ReceivedMoveDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1710,7 +1878,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1080:7:attr:ReceivedMoveDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1719,7 +1889,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1086:7:attr:ReceivedMoveDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1728,7 +1900,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1098:7:attr:ReceivedMoveDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1737,7 +1911,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1117:7:attr:ReceivedMoveDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1746,7 +1922,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1127:7:attr:BitterDrillDamageAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BitterDrillDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::BitterDrillDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1755,7 +1933,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1133:7:attr:CritDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::CritDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::CritDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1818,7 +1998,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/init-elite-redux-custom-abilities.ts:1175:5:attr:PostDefendContactDamageAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::PostDefendContactDamageAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1827,7 +2009,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/init-elite-redux-custom-abilities.ts:1176:5:attr:DamageReductionAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::DamageReductionAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::DamageReductionAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1836,7 +2020,9 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 0,
         registry_key: "src/data/elite-redux/init-elite-redux-custom-abilities.ts:933:5:attr:ReceivedMoveDamageMultiplierAbAttr",
         unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
-        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+        class: SpecialDamageUnitClass::DamageFormulaQuery(
+            DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr,
+        ),
     },
     RegistryEntry {
         ordinal: 0,
@@ -1975,13 +2161,17 @@ static REGISTRY: &[RegistryEntry] = &[
     },
 ];
 
-fn source_kind_matches(tag: SourceKindTag, source: &BehaviorSourceId) -> bool {
-    match (tag, source) {
-        (SourceKindTag::Move, BehaviorSourceId::Move { .. })
-        | (SourceKindTag::ActiveAbility, BehaviorSourceId::ActiveAbility { .. })
-        | (SourceKindTag::PassiveAbility, BehaviorSourceId::PassiveAbility { .. })
-        | (SourceKindTag::BattlerTag, BehaviorSourceId::BattlerTag { .. })
-        | (SourceKindTag::Bespoke, BehaviorSourceId::Bespoke { .. }) => true,
+fn source_matches(entry: &RegistryEntry, source: &BehaviorSourceId) -> bool {
+    match (entry.source_kind, source) {
+        (SourceKindTag::Move, BehaviorSourceId::Move { numeric_id })
+        | (SourceKindTag::ActiveAbility, BehaviorSourceId::ActiveAbility { numeric_id })
+        | (SourceKindTag::PassiveAbility, BehaviorSourceId::PassiveAbility { numeric_id }) => {
+            numeric_id.get() == entry.numeric_id
+        }
+        (SourceKindTag::BattlerTag, BehaviorSourceId::BattlerTag { registry_key })
+        | (SourceKindTag::Bespoke, BehaviorSourceId::Bespoke { registry_key }) => {
+            registry_key == entry.registry_key
+        }
         _ => false,
     }
 }
@@ -1997,7 +2187,7 @@ pub fn classify_special_damage_unit(
         .find(|entry| {
             entry.ordinal == unit.ordinal.get()
                 && entry.provenance_hash == unit.provenance_hash.as_str()
-                && source_kind_matches(entry.source_kind, &unit.source)
+                && source_matches(entry, &unit.source)
                 && entry.unit_kind == unit.unit_kind
         })
         .ok_or(SpecialDamageError::UnregisteredBehaviorUnit)?;
@@ -2008,7 +2198,10 @@ pub fn classify_special_damage_unit(
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SpecialDamageDispatchRequestV2 {
     /// Gate decision for one received-damage fact.
-    RecordAdmission { origin: DamageOrigin, gates: RecordGateSet },
+    RecordAdmission {
+        origin: DamageOrigin,
+        gates: RecordGateSet,
+    },
     /// Whether the on-hit archetype defender was hit by a direct damaging move.
     OnHitCounterDirectHit(bool),
     /// Whether the consulted party member holds SYNCHRONIZE during encounter
@@ -2024,7 +2217,9 @@ pub enum SpecialDamageDispatchOutcomeV2 {
         multiplier: ExactRatioV2,
         filter: SpecialDamageFilter,
     },
-    RetaliationRedirectPath { move_id: u16 },
+    RetaliationRedirectPath {
+        move_id: u16,
+    },
     RecordAdmission(RecordAdmission),
     OnHitCounterArmed,
     OnHitCounterDormant,
@@ -2037,7 +2232,9 @@ pub enum SpecialDamageDispatchOutcomeV2 {
         hook: MechanicHookV2,
         query: MechanicQueryV2,
     },
-    DispatchLoop { surface: DispatchSurface },
+    DispatchLoop {
+        surface: DispatchSurface,
+    },
     ContentLoadIntrinsic,
 }
 
@@ -2060,7 +2257,9 @@ pub fn dispatch_special_damage_unit(
             }
         }
         SpecialDamageUnitClass::RetaliationRedirect => {
-            SpecialDamageDispatchOutcomeV2::RetaliationRedirectPath { move_id: move_id_of(unit)? }
+            SpecialDamageDispatchOutcomeV2::RetaliationRedirectPath {
+                move_id: move_id_of(unit)?,
+            }
         }
         SpecialDamageUnitClass::RecordGate(_) => match request {
             SpecialDamageDispatchRequestV2::RecordAdmission { origin, gates } => {
@@ -2097,7 +2296,9 @@ pub fn dispatch_special_damage_unit(
             SpecialDamageDispatchOutcomeV2::ContentLoadIntrinsic
         }
         SpecialDamageUnitClass::EncounterNatureSync => match request {
-            SpecialDamageDispatchRequestV2::EncounterNatureSync { holder_has_synchronize } => {
+            SpecialDamageDispatchRequestV2::EncounterNatureSync {
+                holder_has_synchronize,
+            } => {
                 if *holder_has_synchronize {
                     // Oracle: target.setNature(pokemon.getNature()) — the
                     // encounter transition installs the holder's nature.
@@ -2108,8 +2309,7 @@ pub fn dispatch_special_damage_unit(
                 }
             }
             _ => return Err(SpecialDamageError::DispatchRequestMismatch),
-        }
-
+        },
     })
 }
 
@@ -2354,12 +2554,16 @@ mod tests {
         .unwrap();
         assert_eq!(
             transition.selection,
-            CounterTargetSelection::AttackerSentinel { recorded_index: ENEMY_A },
+            CounterTargetSelection::AttackerSentinel {
+                recorded_index: ENEMY_A
+            },
         );
         assert_eq!(transition.selection.delivered_index(), None);
         assert_eq!(
             transition.outcome,
-            RetaliationOutcome::FailedWithoutRedirect { recorded_index: ENEMY_A },
+            RetaliationOutcome::FailedWithoutRedirect {
+                recorded_index: ENEMY_A
+            },
         );
         // Computation evidence is retained but never delivered.
         assert_eq!(transition.retaliation_damage, 200);
@@ -2460,7 +2664,9 @@ mod tests {
 
     fn unit(move_id: u64, ordinal: u32, hash: &str) -> BehaviorUnitId {
         BehaviorUnitId {
-            source: BehaviorSourceId::Move { numeric_id: SafeU53::new(move_id).unwrap() },
+            source: BehaviorSourceId::Move {
+                numeric_id: SafeU53::new(move_id).unwrap(),
+            },
             unit_kind: BehaviorUnitKind::MoveAttribute,
             ordinal: BehaviorUnitOrdinal::new(ordinal),
             provenance_hash: ProvenanceHash::parse(hash).unwrap(),
@@ -2470,8 +2676,10 @@ mod tests {
     #[test]
     fn registry_covers_exactly_153_unique_units() {
         assert_eq!(REGISTRY.len(), SPECIAL_DAMAGE_REGISTRY_LEN);
-        let keys: Vec<(u32, &str)> =
-            REGISTRY.iter().map(|e| (e.ordinal, e.provenance_hash)).collect();
+        let keys: Vec<(u32, &str)> = REGISTRY
+            .iter()
+            .map(|e| (e.ordinal, e.provenance_hash))
+            .collect();
         let unique = keys
             .iter()
             .zip(keys.iter().skip(1))
@@ -2503,12 +2711,16 @@ mod tests {
         );
         assert_eq!(
             classify_special_damage_unit(&hits_tag).unwrap(),
-            SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+            SpecialDamageUnitClass::DamageFormulaQuery(
+                DamageQueryAttribute::HitsTagForDoubleDamageAttr
+            ),
         );
         // SYNCHRONIZE encounter-nature sync (ability 28; the active and
         // passive slots share one provenance hash, active is ordinal 2).
         let synchronize_active = BehaviorUnitId {
-            source: BehaviorSourceId::ActiveAbility { numeric_id: SafeU53::new(28).unwrap() },
+            source: BehaviorSourceId::ActiveAbility {
+                numeric_id: SafeU53::new(28).unwrap(),
+            },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
             provenance_hash: ProvenanceHash::parse(
@@ -2521,7 +2733,9 @@ mod tests {
             SpecialDamageUnitClass::EncounterNatureSync,
         );
         let synchronize_passive = BehaviorUnitId {
-            source: BehaviorSourceId::PassiveAbility { numeric_id: SafeU53::new(28).unwrap() },
+            source: BehaviorSourceId::PassiveAbility {
+                numeric_id: SafeU53::new(28).unwrap(),
+            },
             unit_kind: BehaviorUnitKind::PassiveAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
             provenance_hash: ProvenanceHash::parse(
@@ -2534,7 +2748,11 @@ mod tests {
             SpecialDamageUnitClass::EncounterNatureSync,
         );
         // Unknown identity fails closed.
-        let stranger = unit(68, 9, "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4");
+        let stranger = unit(
+            68,
+            9,
+            "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
+        );
         assert_eq!(
             classify_special_damage_unit(&stranger),
             Err(SpecialDamageError::UnregisteredBehaviorUnit),
@@ -2550,7 +2768,11 @@ mod tests {
         );
         let any_request = &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false);
         match dispatch_special_damage_unit(&counter_amount, any_request).unwrap() {
-            SpecialDamageDispatchOutcomeV2::RetaliationAmountPath { move_id, multiplier, filter } => {
+            SpecialDamageDispatchOutcomeV2::RetaliationAmountPath {
+                move_id,
+                multiplier,
+                filter,
+            } => {
                 assert_eq!(move_id, MOVE_COUNTER);
                 assert_eq!(multiplier.numerator, 2);
                 assert_eq!(filter, SpecialDamageFilter::Physical);
@@ -2564,7 +2786,11 @@ mod tests {
             "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
         );
         match dispatch_special_damage_unit(&hits_tag, any_request).unwrap() {
-            SpecialDamageDispatchOutcomeV2::DamageQueryFold { attribute, hook, query } => {
+            SpecialDamageDispatchOutcomeV2::DamageQueryFold {
+                attribute,
+                hook,
+                query,
+            } => {
                 assert_eq!(attribute, DamageQueryAttribute::HitsTagForDoubleDamageAttr);
                 assert_eq!(hook, MechanicHookV2::DamageQuery);
                 assert_eq!(query, MechanicQueryV2::Damage);
@@ -2601,7 +2827,9 @@ mod tests {
         );
 
         let synchronize_active = BehaviorUnitId {
-            source: BehaviorSourceId::ActiveAbility { numeric_id: SafeU53::new(28).unwrap() },
+            source: BehaviorSourceId::ActiveAbility {
+                numeric_id: SafeU53::new(28).unwrap(),
+            },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
             provenance_hash: ProvenanceHash::parse(
@@ -2638,7 +2866,6 @@ mod tests {
             Err(SpecialDamageError::DispatchRequestMismatch),
         );
     }
-
 
     fn registry_entry_to_id(entry: &RegistryEntry) -> BehaviorUnitId {
         BehaviorUnitId {
@@ -2694,15 +2921,27 @@ mod tests {
             RecordAdmission::DeniedBy(RecordGateKind::NonDirectDamage),
         );
         assert_eq!(
-            RecordGateSet { non_direct_damage: false, ..all }.admit(DamageOrigin::Weather),
+            RecordGateSet {
+                non_direct_damage: false,
+                ..all
+            }
+            .admit(DamageOrigin::Weather),
             RecordAdmission::DeniedBy(RecordGateKind::WeatherDamage),
         );
         assert_eq!(
-            RecordGateSet { non_direct_damage: false, ..all }.admit(DamageOrigin::Status),
+            RecordGateSet {
+                non_direct_damage: false,
+                ..all
+            }
+            .admit(DamageOrigin::Status),
             RecordAdmission::DeniedBy(RecordGateKind::StatusDamage),
         );
         assert_eq!(
-            RecordGateSet { non_direct_damage: false, ..all }.admit(DamageOrigin::Recoil),
+            RecordGateSet {
+                non_direct_damage: false,
+                ..all
+            }
+            .admit(DamageOrigin::Recoil),
             RecordAdmission::DeniedBy(RecordGateKind::RecoilDamage),
         );
         assert_eq!(open.admit(DamageOrigin::Weather), RecordAdmission::Admitted);
@@ -2791,8 +3030,12 @@ mod tests {
                 }
                 SpecialDamageUnitClass::CentralDispatchSite(_) => {
                     sites[match entry.class {
-                        SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs) => 0,
-                        SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyFilteredAbAttrs) => 1,
+                        SpecialDamageUnitClass::CentralDispatchSite(
+                            DispatchSurface::ApplyAbAttrs,
+                        ) => 0,
+                        SpecialDamageUnitClass::CentralDispatchSite(
+                            DispatchSurface::ApplyFilteredAbAttrs,
+                        ) => 1,
                         _ => 2,
                     }] += 1;
                     dispatch_special_damage_unit(&id, any_request)
@@ -2829,20 +3072,28 @@ mod tests {
             "gates must be [NonDirect, Weather, Status, Recoil]",
         );
         assert_eq!(query, 87);
-        assert_eq!(sites, [35, 1, 2], "sites must be [AbAttrs, FilteredAbAttrs, MoveAttrs]");
+        assert_eq!(
+            sites,
+            [35, 1, 2],
+            "sites must be [AbAttrs, FilteredAbAttrs, MoveAttrs]"
+        );
         assert_eq!(on_hit, 1);
         assert_eq!(intrinsics, 2);
         assert_eq!(nature_sync, 2);
         // The lanes sum to the exact frozen total: zero rejected, zero residual.
         let total = retaliation
             + redirect
-            + gates[0] + gates[1] + gates[2] + gates[3]
+            + gates[0]
+            + gates[1]
+            + gates[2]
+            + gates[3]
             + query
-            + sites[0] + sites[1] + sites[2]
+            + sites[0]
+            + sites[1]
+            + sites[2]
             + on_hit
             + intrinsics
             + nature_sync;
         assert_eq!(total, SPECIAL_DAMAGE_REGISTRY_LEN);
     }
 }
-
