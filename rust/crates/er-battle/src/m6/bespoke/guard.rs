@@ -1529,7 +1529,7 @@ mod tests {
         )
         .unwrap()
         .state;
-        let mut armed = after_quick.state.clone();
+        let mut armed = after_quick.clone();
         armed.enduring_owners = vec![pokemon(OWNER_B)];
         armed.endure_token_owners = vec![pokemon(OWNER_A)];
         armed.sturdy_owners = vec![pokemon(OWNER_A), pokemon(OWNER_B)];
