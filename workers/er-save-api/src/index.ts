@@ -4678,8 +4678,7 @@ async function handleCommunitySuggestionMine(
   const { results } = await env.DB.prepare(
     `SELECT * FROM community_editor_suggestions
       WHERE user_id = ?
-      ORDER BY created_at DESC
-      LIMIT 100`,
+      ORDER BY created_at DESC`,
   )
     .bind(auth.uid)
     .all<CommunitySuggestionRow>();

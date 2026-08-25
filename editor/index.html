@@ -10,7 +10,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
-    <title>Elite Redux — Balancing Editor</title>
+    <title>PKR ER Editor</title>
     <style>
       :root {
         --bg: #16161e; --panel: #1e1e2a; --panel2: #262633; --line: #353548;
@@ -57,6 +57,9 @@
         padding: 10px; display: flex; gap: 10px; align-items: flex-start; overflow: hidden;
       }
       .card.dirty { border-color: var(--accent); }
+      .card.sug-open { flex-wrap: wrap; align-content: flex-start; overflow: visible; border-color: var(--accent); }
+      .card.sug-open > .sug-ctx { width: 100%; flex-basis: 100%; }
+      #grid:has(.card.sug-open) { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
       .card img { width: 56px; height: 56px; image-rendering: pixelated; object-fit: contain; flex: none; background: #0d0d14; border-radius: 6px; }
       .card .body { flex: 1; min-width: 0; }
       .card .name { font-weight: 600; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -331,7 +334,7 @@
       .ctr-modal-cell .ctr-sprite-frame { min-width: 32px; min-height: 40px; background: #0d0d14; }
       .ctr-cell-name { font-size: 11px; color: var(--muted); word-break: break-word; }
       /* ---- Pokedex Editor (Learnsets / TMs / Abilities) ---- */
-      .pd { display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 132px); }
+      .pd { position: relative; display: grid; grid-template-columns: 280px 1fr; gap: 0; height: calc(100vh - 132px); }
       .pd-list { overflow-y: auto; border-right: 1px solid var(--line); padding: 8px; display: flex; flex-direction: column; gap: 3px; }
       .pd-sp {
         display: flex; gap: 8px; align-items: center; text-align: left; padding: 5px 8px;
@@ -435,7 +438,7 @@
       .tour-back { margin-bottom: 10px; }
       .tour-err { color: #e0556a; font-size: 13px; margin: 8px 0; }
       /* ---- Community suggestion review ---- */
-      .sug-shell { display: grid; grid-template-columns: 300px minmax(420px, 1fr) 272px; height: calc(100vh - 122px); min-height: 480px; }
+      .sug-shell { display: grid; grid-template-columns: minmax(0, 1fr) 300px; height: calc(100vh - 122px); min-height: 480px; }
       .sug-list, .sug-detail, .sug-inspector { overflow-y: auto; min-height: 0; min-width: 0; }
       .sug-list, .sug-inspector { background: var(--panel); }
       .sug-list { display: flex; flex-direction: column; border-right: 1px solid var(--line); }
@@ -499,15 +502,132 @@
         .sug-rows { max-height: 320px; }
         .sug-detail { overflow-y: visible; }
       }
+      /* ---- Contextual community suggestion review (staff) ---- */
+      /* Circular magenta counters, fixed size so labels never shift. */
+      [data-sug-badge], .sug-ent, .suggestion-count {
+        display: inline-flex; align-items: center; justify-content: center; flex: none;
+        min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+        background: var(--accent); color: #fff; border: 1px solid #e0437f;
+        font-size: 11px; font-weight: 700; line-height: 1; cursor: pointer;
+        font-family: inherit; vertical-align: 1px;
+      }
+      [data-sug-badge]:hover, .sug-ent:hover { filter: brightness(1.18); }
+      [data-sug-badge]:focus-visible, .sug-ent:focus-visible { outline: 2px solid #ff8ab8; outline-offset: 1px; }
+      [data-sug-badge] { margin-left: 6px; }
+      .sug-ent { font-size: 10px; min-width: 17px; height: 17px; margin-left: 6px; }
+      .pd-sp .sug-ent { margin-left: auto; }
+      /* Inline/contextual review panel: bounded, never a giant card. */
+      .sug-ctx {
+        margin-top: 8px; padding: 10px 12px; max-height: 380px; overflow-y: auto;
+        background: var(--panel2); border: 1px solid #7a2c4d; border-left: 3px solid var(--accent);
+        border-radius: 8px; font-size: 13px; line-height: 1.5; outline: none;
+      }
+      .sug-ctx:focus-visible { box-shadow: 0 0 0 2px #ff8ab8; }
+      .sug-ctx-head {
+        display: flex; gap: 8px; align-items: center; margin: 2px 0 8px;
+        color: #ff8ab8; font-size: 11px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .07em;
+      }
+      .sug-ctx-head .sug-next { margin-left: auto; text-transform: none; letter-spacing: 0; }
+      .sug-newtag {
+        background: var(--accent); color: #fff; border-radius: 4px;
+        font-size: 10px; font-weight: 800; padding: 1px 6px; letter-spacing: .05em;
+      }
+      .sug-item + .sug-item { border-top: 1px solid var(--line); margin-top: 10px; padding-top: 10px; }
+      .sug-item-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+      .sug-item-head .sug-avatar { width: 22px; height: 22px; font-size: 11px; }
+      .sug-item-head strong { color: var(--text); }
+      .sug-item-head time { color: var(--muted); }
+      .sug-review-reason-label { margin-top: 8px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+      .sug-reason-line { margin: 2px 0 7px; font-size: 12.5px; color: var(--text); white-space: pre-wrap; }
+      .sug-rows { display: flex; flex-direction: column; gap: 8px; margin: 4px 0; }
+      .sug-row { min-width: 0; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; background: color-mix(in srgb, var(--panel) 70%, transparent); font-size: 12.5px; }
+      .sug-row .lb { display: block; margin-bottom: 5px; color: var(--text); }
+      .sug-col-labels, .sug-values { display: grid; grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) 104px; gap: 6px; align-items: center; }
+      .sug-col-labels { color: var(--muted); font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+      .sug-row .sug-old { color: #e9919e; overflow-wrap: anywhere; }
+      .sug-row .sug-new { color: #82dfb5; overflow-wrap: anywhere; }
+      .sug-row .sug-arr { color: var(--muted); text-align: center; }
+      .sug-values .sug-by { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .sug-values .sug-avatar { width: 19px; height: 19px; font-size: 9px; }
+      .sug-item-actions { display: flex; gap: 8px; margin-top: 8px; align-items: center; flex-wrap: wrap; }
+      .sug-item-actions button, .sug-next { padding: 5px 12px; font-size: 12.5px; }
+      .sug-item-actions .approve, .sug-actions .approve { background: #176745; border-color: var(--ok); color: #d4f5e3; }
+      .sug-item-actions .approve:hover, .sug-actions .approve:hover { filter: brightness(1.15); }
+      .sug-item-actions .dismiss, .sug-actions .dismiss { color: #ef8293; border-color: #e0556a; }
+      /* New-trainer complete preview grid. */
+      .sug-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 18px; margin: 6px 0; }
+      .sug-preview .full { grid-column: 1 / -1; }
+      .sug-preview h4 { margin: 4px 0 2px; font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+      .sug-preview div { min-width: 0; }
+      .sug-preview ul { margin: 2px 0; padding-left: 18px; }
+      .sug-preview li { font-size: 12.5px; }
+      .sug-preview .kv { font-size: 12.5px; }
+      .sug-preview .kv b { color: var(--muted); font-weight: 400; }
+      /* Custom Trainers contextual strips. */
+      .sug-strip { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+      .sug-strip .sug-ctx { margin-top: 0; }
+      .sug-review-drawer {
+        position: absolute; z-index: 8; top: 6px; right: 14px; width: 400px;
+        max-height: calc(100vh - 158px); margin: 0; border-left-width: 1px;
+        box-shadow: 0 12px 32px #000b;
+      }
+      /* Aggregate index groups. */
+      .sug-index { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; padding: 12px 14px 28px; }
+      .sug-toolbarline { position: sticky; top: 0; z-index: 2; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 4px 0 10px; background: var(--bg); }
+      .sug-toolbarline label.check { display: inline-flex; gap: 5px; align-items: center; color: var(--muted); font-size: 12px; }
+      .sug-toolbarline .grow { flex: 1; min-width: 140px; }
+      .sug-toolbarline .push-right { margin-left: auto; }
+      .sug-group { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); margin: 6px 0; overflow: hidden; }
+      .sug-group-head {
+        display: flex; gap: 9px; align-items: center; width: 100%; text-align: left;
+        padding: 8px 12px; border: 0; background: transparent; color: var(--text); font-weight: 600;
+      }
+      .sug-group-head:hover { background: var(--panel2); }
+      .sug-group-head .caret { color: var(--muted); font-size: 11px; width: 12px; }
+      .sug-groupheadbadge {
+        min-width: 17px; height: 17px; padding: 0 5px; border-radius: 9px; font-size: 10px; font-weight: 700;
+        display: inline-flex; align-items: center; justify-content: center;
+        background: var(--accent); color: #fff; border: 1px solid #e0437f;
+      }
+      .sug-rowitem {
+        display: grid; grid-template-columns: 18px minmax(0, 1.5fr) auto minmax(0, 1fr) auto auto;
+        gap: 12px; align-items: center; padding: 8px 12px; border-top: 1px solid var(--line);
+        cursor: pointer; background: transparent; font-size: 13px;
+      }
+      .sug-rowitem:hover { background: var(--panel2); }
+      .sug-rowitem.active { background: var(--panel2); box-shadow: inset 3px 0 var(--accent); }
+      .sug-radio {
+        width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid var(--muted); justify-self: center;
+      }
+      .sug-rowitem.active .sug-radio { background: var(--accent); border-color: #ff8ab8; box-shadow: 0 0 0 2px #7a2c4d; }
+      .sug-rowitem .sug-main { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .sug-rowitem .sug-excerpt { min-width: 0; color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .sug-by { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 12px; white-space: nowrap; }
+      .sug-by .sug-avatar { width: 20px; height: 20px; font-size: 10px; }
+      .sug-goto { white-space: nowrap; padding: 5px 10px; font-size: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel2); color: var(--text); }
+      .sug-goto:hover { border-color: var(--accent); color: #ff8ab8; }
+      .sug-inspector .sug-quote { padding: 8px 10px; background: var(--panel2); border-left: 3px solid var(--accent); font-size: 12px; white-space: pre-wrap; margin: 4px 0 10px; }
+      .sug-inspector .sug-excerptbox { padding: 6px 9px; background: var(--panel2); border: 1px solid var(--line); font-size: 12px; margin: 4px 0 10px; }
+      .sug-inspector h4 { margin: 12px 0 3px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+      .sug-note { color: var(--muted); font-size: 11.5px; margin: 8px 0 0; }
+      @media (max-width: 980px) {
+        .sug-shell { grid-template-columns: minmax(0, 1fr); height: auto; }
+        .sug-inspector { grid-column: auto; border-left: 0; border-top: 1px solid var(--line); max-height: none; }
+        .sug-rows { grid-template-columns: 1fr; }
+        .sug-preview { grid-template-columns: 1fr; }
+        .sug-rowitem { grid-template-columns: 18px minmax(0, 1fr) auto; }
+        .sug-rowitem .sug-excerpt, .sug-rowitem .sug-goto { display: none; }
+      }
       .community-only { display: none; }
       body.community-mode .community-only { display: inline-flex; }
       body.community-mode #author,
       body.community-mode #password,
       body.community-mode #deploy,
+      body.community-mode nav.tabs [data-tab="trainers"],
       body.community-mode nav.tabs [data-tab="assets"],
       body.community-mode nav.tabs [data-tab="addmon"],
-      body.community-mode nav.tabs [data-tab="tournaments"],
-      body.community-mode nav.tabs [data-tab="suggestions"] { display: none; }
+      body.community-mode nav.tabs [data-tab="tournaments"] { display: none; }
       #community-access { color: var(--muted); font-size: 12px; white-space: nowrap; }
       #community-access[data-state="eligible"] { color: var(--ok); }
       #community-access[data-state="locked"], #community-access[data-state="error"] { color: var(--warn); }
@@ -527,16 +647,59 @@
       }
       .community-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
       #community-login-status { min-height: 18px; color: var(--warn); font-size: 12px; }
+      .mine-suggestions { max-width: 1180px; margin: 0 auto; padding: 18px; }
+      .mine-suggestions-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+      .mine-suggestions-head h2, .mine-suggestions-empty h2 { margin: 0 0 4px; font-size: 20px; }
+      .mine-suggestions-head p, .mine-suggestions-empty p { margin: 0; color: var(--muted); font-size: 12px; }
+      .mine-suggestions-head > button { margin-left: auto; }
+      .mine-filters { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 10px; }
+      .mine-filters button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+      .mine-filters button.active { border-color: var(--accent); color: #ff8ab8; background: #2c1b29; }
+      .mine-filters button span { min-width: 18px; padding: 1px 5px; border-radius: 9px; background: var(--panel2); text-align: center; font-size: 10px; }
+      .mine-suggestion-list { display: grid; gap: 10px; }
+      .mine-suggestion-card { border: 1px solid var(--line); border-radius: 7px; background: var(--panel); padding: 13px; }
+      .mine-suggestion-card > header { display: flex; align-items: flex-start; gap: 12px; }
+      .mine-suggestion-card h3 { margin: 0 0 2px; font-size: 15px; }
+      .mine-suggestion-date { color: var(--muted); font-size: 10.5px; }
+      .mine-status { margin-left: auto; border: 1px solid currentColor; border-radius: 10px; padding: 2px 8px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+      .mine-status.pending { color: #f0bd46; }
+      .mine-status.approved { color: #52d890; }
+      .mine-status.applied { color: #76c7ff; }
+      .mine-status.rejected { color: #ff718d; }
+      .mine-status.withdrawn, .mine-status.unknown { color: var(--muted); }
+      .mine-reason { margin: 10px 0; padding: 8px 10px; border-left: 3px solid var(--accent); background: var(--panel2); font-size: 12px; line-height: 1.45; }
+      .mine-reason.muted { color: var(--muted); }
+      .mine-suggestion-diff { border: 1px solid var(--line); border-radius: 6px; background: #171722; }
+      .mine-suggestion-diff summary { cursor: pointer; padding: 8px 10px; font-size: 12px; font-weight: 600; }
+      .mine-suggestion-diff section { border-top: 1px solid var(--line); padding: 8px 10px; }
+      .mine-suggestion-diff h4 { margin: 0 0 6px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .05em; }
+      .mine-diff-row { display: grid; grid-template-columns: minmax(100px, .8fr) minmax(100px, 1fr) 18px minmax(100px, 1fr); gap: 8px; align-items: baseline; padding: 4px 0; font-size: 11.5px; }
+      .mine-diff-row + .mine-diff-row { border-top: 1px solid rgba(255,255,255,.05); }
+      .mine-diff-row > span:first-child { color: var(--muted); }
+      .mine-diff-row del { color: #ff869b; text-decoration: none; }
+      .mine-diff-row ins { color: #68e7a1; text-decoration: none; }
+      .mine-suggestion-card footer { display: flex; align-items: center; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 10.5px; }
+      .mine-withdraw { border-color: #9a3850; color: #ff8aa0; }
+      .mine-suggestions-empty, .mine-loading, .mine-error { max-width: 620px; margin: 80px auto; padding: 24px; text-align: center; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); }
+      .mine-suggestions-empty button { margin-top: 14px; }
+      .mine-error { color: var(--warn); }
+      .mine-suggestion-empty-diff { color: var(--muted); font-size: 11px; }
       @media (max-width: 760px) {
         body.community-mode header { align-items: stretch; }
         body.community-mode #search { order: 5; flex-basis: 100%; }
         #community-access { order: 4; flex: 1; }
+        .mine-suggestions { padding: 12px; }
+        .mine-suggestions-head { align-items: flex-start; }
+        .mine-diff-row { grid-template-columns: 1fr 1fr; }
+        .mine-diff-row > span:first-child { grid-column: 1 / -1; }
+        .mine-diff-row > span[aria-hidden] { display: none; }
+        .mine-suggestion-card footer { align-items: flex-start; flex-wrap: wrap; }
       }
     </style>
   </head>
   <body>
     <header>
-      <h1>⚖️ ER Balancing Editor</h1>
+      <h1>⚖️ PKR ER Editor</h1>
       <input id="search" type="search" placeholder="Search…" autocomplete="off" />
       <select id="sort" title="Sort the species list">
         <option value="name">Sort: Name</option>
@@ -594,8 +757,8 @@
         </div>
       </form>
     </dialog>
-    <script src="./community-mode.js"></script>
-    <script src="./app.js"></script>
-    <script src="./suggestions.js"></script>
+    <script src="./community-mode.js?v=20260825-3"></script>
+    <script src="./app.js?v=20260825-3"></script>
+    <script src="./suggestions.js?v=20260825-3"></script>
   </body>
 </html>

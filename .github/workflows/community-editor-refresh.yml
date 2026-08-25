@@ -1,4 +1,4 @@
-name: Refresh Community ER Editor
+name: Refresh PKRM Community Editor
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: er-community-editor-refresh
+  group: pkrm-community-editor-refresh
   cancel-in-progress: true
 
 jobs:
@@ -71,10 +71,10 @@ jobs:
           node --check community-editor/_deploy/suggestions.js
           node scripts/validate-editor-data.mjs community-editor/_deploy/data
 
-      - name: Deploy Community ER Editor to Cloudflare Pages
+      - name: Deploy PKRM Community Editor to Cloudflare Pages
         run: >-
           npx wrangler pages deploy community-editor/_deploy
-          --project-name=er-community-editor
+          --project-name=pkrm-community-editor
           --branch=main
           --commit-hash="$EDITOR_SOURCE_SHA"
           --commit-dirty=true

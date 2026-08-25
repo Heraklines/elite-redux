@@ -10,6 +10,9 @@ const WORKER_URL = "https://er-editor-api.heraklines.workers.dev"; // er-editor-
 const REPO = "Heraklines/elite-redux";
 const BRANCH = "feat/elite-redux-port";
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/data/elite-redux`;
+const LOCAL_DEMO =
+  new URLSearchParams(location.search).has("demo") || new URLSearchParams(location.search).has("suggestion-demo");
+const LIVE_BASE = LOCAL_DEMO ? "../src/data/elite-redux" : RAW_BASE;
 const SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/pokemon/elite-redux";
 const TRAINER_SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/trainer";
 const USAGE_TIERS_URL = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/usage-tiers.json";
@@ -360,9 +363,19 @@ function refreshChrome() {
     if (b.dataset.tab === "suggestions") {
       return;
     }
+    // Cache the pristine label before any badges/dots were appended, so later
+    // rewrites never fold a suggestion count or dirty dot into the label text.
+    if (!b.dataset.tabLabel) {
+      b.dataset.tabLabel = b.textContent.replace(/\s*●$/, "").trim();
+    }
     const n = dots[b.dataset.tab];
-    const label = b.textContent.replace(/\s*●$/, "");
-    b.innerHTML = n > 0 ? `${esc(label)}<span class="dot">●</span>` : esc(label);
+    // The circular suggestion-count badge is owned by suggestions.js; preserve
+    // the node across chrome refreshes so its count + click binding survive.
+    const sugBadge = b.querySelector("[data-sug-badge]");
+    b.innerHTML = n > 0 ? `${esc(b.dataset.tabLabel)}<span class="dot">●</span>` : esc(b.dataset.tabLabel);
+    if (sugBadge) {
+      b.appendChild(sugBadge);
+    }
   });
   undoBtn.textContent = undoStack.length > 0 ? `↶ Undo (${undoStack.length})` : "↶ Undo";
   undoBtn.disabled = undoStack.length === 0 || activeTab !== "eggmoves";
@@ -4756,11 +4769,21 @@ function render() {
   } else if (activeTab === "tournaments") {
     renderTournaments(root);
   } else if (activeTab === "suggestions") {
-    window.communitySuggestions?.render?.(root);
+    if (communityMode?.enabled) {
+      communityMode.renderSuggestions?.(root);
+    } else {
+      window.communitySuggestions?.render?.(root);
+    }
   } else {
     renderGame(root);
   }
   refreshChrome();
+  // Suggestion review overlay: decorate the freshly rendered tab with inline
+  // review badges/panels (suggestions.js owns that module; no-op when absent
+  // or when the community player skin is active).
+  if (activeTab !== "suggestions") {
+    window.communitySuggestions?.decorate?.(activeTab, root);
+  }
 }
 
 // Live-input targets for the Pokedex tabs. These deliberately do NOT re-render
@@ -5663,6 +5686,180 @@ function buildDeltas() {
   return { deltas, bad };
 }
 
+// ---- Bridge for the community suggestion review UI (editor/suggestions.js) ---
+// A tiny, read-mostly surface: catalog name resolution + catalog access +
+// navigation into the editor's own tabs. suggestions.js owns the review state
+// and rendering; it only talks to app.js through this object.
+window.erAppBridge = {
+  activeTab: () => activeTab,
+  render: () => render(),
+  prettify,
+  catalogs: () => ({
+    EGG_TIER_NAMES,
+    ITEM_TIERS,
+    KNOBS,
+    ITEMS,
+    MOVES_RICH,
+    ABILS_RICH,
+    SPECIES,
+  }),
+  speciesLabel(key) {
+    return spByConst.get(key)?.name || prettify(String(key).replace(/^SPECIES_/, ""));
+  },
+  species(key) {
+    return spByConst.get(key) || null;
+  },
+  speciesById(id) {
+    return spById.get(Number(id));
+  },
+  moveLabel(id) {
+    return moveById.get(Number(id))?.name || null;
+  },
+  abilityLabel(id) {
+    return abilById.get(Number(id))?.name || null;
+  },
+  knob(key) {
+    return KNOBS.find(k => k.key === key) || null;
+  },
+  bgmLabel(key) {
+    if (!key) {
+      return "";
+    }
+    return BGM_LIST.find(b => b.key === key)?.label || prettify(key);
+  },
+  fxLabel(id) {
+    return trainerFxById.get(id)?.label || id || "";
+  },
+  classLabel(name) {
+    return name ? prettify(String(name)) : "";
+  },
+  spriteLabel(key) {
+    if (!key) {
+      return "";
+    }
+    return trainerSpriteByKey.get(key)?.label || prettify(key);
+  },
+  heldItemLabel(key) {
+    return HELD_ITEMS.find(h => h.key === key)?.label || prettify(key);
+  },
+  itemLabel(key) {
+    return ITEMS.find(entry => entry.key === key)?.label || prettify(key);
+  },
+  challengeValueLabel(kind, value) {
+    return CHALLENGE_VALUES[kind]?.find(o => o.value === Number(value))?.label || null;
+  },
+  trainerInEditor(key) {
+    return Object.hasOwn(ctr.current, key);
+  },
+  trainerLabel(key) {
+    return ctr.current[key]?.name || CTR_LIVE[key]?.name || prettify(key);
+  },
+  trainers() {
+    return Object.entries(ctr.current)
+      .filter(([, value]) => value)
+      .map(([key, value]) => ({ key, name: value.name || prettify(key) }));
+  },
+  trainer(key) {
+    const value = ctr.current[key] || null;
+    return value ? JSON.parse(JSON.stringify(value)) : null;
+  },
+  currentValue(file, key) {
+    const sources = {
+      "egg-moves": egg.current,
+      "species-tuning": sp.current,
+      learnsets: learn.current,
+      "tm-learnsets": tms.current,
+      "species-abilities": abil.current,
+      "item-tuning": item.current,
+      "balance-tuning": bal.current,
+      "custom-trainers": CTR_LIVE,
+      "custom-trainers-config": ctrConfig.current,
+    };
+    const source = sources[file];
+    if (!source) {
+      return null;
+    }
+    const value = key === undefined ? source : source[key];
+    return value === undefined ? null : JSON.parse(JSON.stringify(value));
+  },
+  applyChanges(changes) {
+    const mergeEntries = (target, delta) => {
+      for (const [key, value] of Object.entries(delta || {})) {
+        if (value === null) {
+          delete target[key];
+        } else if (
+          value
+          && typeof value === "object"
+          && !Array.isArray(value)
+          && target[key]
+          && typeof target[key] === "object"
+          && !Array.isArray(target[key])
+        ) {
+          target[key] = { ...target[key], ...JSON.parse(JSON.stringify(value)) };
+        } else {
+          target[key] = JSON.parse(JSON.stringify(value));
+        }
+      }
+    };
+    for (const [file, delta] of Object.entries(changes || {})) {
+      if (file === "egg-moves") {
+        mergeEntries(egg.current, delta);
+      } else if (file === "species-tuning") {
+        mergeEntries(sp.current, delta);
+      } else if (file === "learnsets") {
+        mergeEntries(learn.current, delta);
+      } else if (file === "tm-learnsets") {
+        mergeEntries(tms.current, delta);
+      } else if (file === "species-abilities") {
+        mergeEntries(abil.current, delta);
+      } else if (file === "item-tuning") {
+        mergeEntries(item.current, delta);
+      } else if (file === "balance-tuning") {
+        mergeEntries(bal.current, delta);
+      } else if (file === "custom-trainers-config") {
+        mergeEntries(ctrConfig.current, delta);
+      } else if (file === "custom-trainers") {
+        for (const [key, value] of Object.entries(delta || {})) {
+          if (value === null) {
+            delete ctr.current[key];
+          } else {
+            ctr.current[key] = ctrLiveToEdit(JSON.parse(JSON.stringify(value)));
+          }
+        }
+      }
+    }
+    refreshChrome();
+  },
+  /**
+   * Jump the editor to the place a suggestion applies to: activates the tab,
+   * selects the species/trainer, clears the header search when it would hide
+   * the target, re-renders and updates the tab chrome. suggestions.js sets its
+   * own reveal state before calling this; the decorate hook then drops the
+   * expanded review card at that target and scrolls it into view.
+   */
+  navigate(target) {
+    if (!target || !target.tab) {
+      return;
+    }
+    const search = $("#search");
+    if (search?.value) {
+      search.value = "";
+    }
+    activeTab = target.tab;
+    document
+      .querySelectorAll("nav.tabs button")
+      .forEach(x => x.classList.toggle("active", x.dataset.tab === target.tab));
+    if (POKEDEX_TABS.has(target.tab) && target.key) {
+      pdSelected = target.key;
+      closeAbilDrops();
+    } else if (target.tab === "customtrainers" && target.kind === "trainer" && ctr.current[target.key]) {
+      ctrSelected = target.key;
+      ctrResetMemberUiState();
+    }
+    render();
+  },
+};
+
 function communityBaselineSource(file) {
   if (file === "egg-moves") {
     return egg.baseline;
@@ -6092,12 +6289,12 @@ async function init() {
       fetchJson("./data/trainers.json", { frequencyDefaults: { elite: {}, hell: {} }, factorySpecies: [] }),
       fetchJson("./data/balance-knobs.json", []),
       // Live override files (resilient: missing on the branch → start empty).
-      fetchJson(`${RAW_BASE}/er-egg-moves.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-species-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-item-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-trainer-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-balance-tuning.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-custom-mons.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-egg-moves.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-species-tuning.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-item-tuning.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-trainer-tuning.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-balance-tuning.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-custom-mons.json${bust}`, {}),
       // Pokedex editor: rich catalogs + per-species baseline data (keyed by speciesId).
       fetchJson("./data/moves-rich.json", []),
       fetchJson("./data/abilities-rich.json", []),
@@ -6105,18 +6302,18 @@ async function init() {
       fetchJson("./data/tm-learnsets.json", {}),
       fetchJson("./data/species-abilities.json", {}),
       // Live Pokedex override files (resilient: missing → start from baseline).
-      fetchJson(`${RAW_BASE}/er-learnsets.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-tm-learnsets.json${bust}`, {}),
-      fetchJson(`${RAW_BASE}/er-species-abilities.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-learnsets.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-tm-learnsets.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-species-abilities.json${bust}`, {}),
       // Pokedex editor: the FULL species universe (evolutions/forms) + evo graph.
       fetchJson("./data/all-species.json", []),
       // Exact form choices used only by Custom Trainer team/fusion selectors.
       fetchJson("./data/species-forms.json", []),
       fetchJson("./data/evolutions.json", {}),
       // Live custom-trainers override file (resilient: missing on the branch → empty).
-      fetchJson(`${RAW_BASE}/er-custom-trainers.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-custom-trainers.json${bust}`, {}),
       // Live custom-trainer spawn-density config (resilient: missing → defaults).
-      fetchJson(`${RAW_BASE}/er-custom-trainers-config.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-custom-trainers-config.json${bust}`, {}),
       // Trainer-class sprite catalog (generated). Fallback → static list below.
       fetchJson("./data/trainer-classes.json", []),
       // Battle-music catalog (generated). Fallback → empty (picker offers "(default)").
@@ -6131,7 +6328,7 @@ async function init() {
       fetchJson("./data/challenge-values.json", {}),
       // Named challenge presets (generated). Fallback → [] (preset picker hides).
       fetchJson("./data/challenge-presets.json", []),
-      fetchJson(`${RAW_BASE}/er-custom-trainer-sprites.json${bust}`, {}),
+      fetchJson(`${LIVE_BASE}/er-custom-trainer-sprites.json${bust}`, {}),
     ]);
     SPECIES = species;
     MOVES = moves;

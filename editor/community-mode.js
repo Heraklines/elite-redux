@@ -6,14 +6,193 @@
   const TOKEN_KEY = "er-community-editor-token";
   const USER_KEY = "er-community-editor-user";
   const DEMO_QUEUE_KEY = "er-community-editor-demo-suggestions";
+  const STATUS_META = {
+    open: { label: "Pending", className: "pending" },
+    approved: { label: "Approved", className: "approved" },
+    applied: { label: "Applied", className: "applied" },
+    dismissed: { label: "Rejected", className: "rejected" },
+    withdrawn: { label: "Withdrawn", className: "withdrawn" },
+  };
 
   let token = demo ? "demo" : localStorage.getItem(TOKEN_KEY) || "";
   let username = demo ? "UmbraKai" : localStorage.getItem(USER_KEY) || "";
   let eligibility = demo
     ? { eligible: true, achievementCount: 96, requiredAchievements: 82, totalAchievements: 164 }
     : null;
+  let mineRoot = null;
+  let mineItems = [];
+  let mineLoaded = false;
+  let mineLoading = false;
+  let mineError = "";
+  let mineFilter = "all";
 
   const $ = selector => document.querySelector(selector);
+  const esc = value =>
+    String(value ?? "").replace(
+      /[&<>"']/g,
+      char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
+    );
+
+  function demoMineItems() {
+    try {
+      const queue = JSON.parse(localStorage.getItem(DEMO_QUEUE_KEY) || "[]");
+      return Array.isArray(queue) ? queue.filter(item => item.author === username) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function mineCount(status) {
+    return mineItems.filter(item => status === "all" || item.status === status).length;
+  }
+
+  function updateMineBadge() {
+    const badge = $("#suggestion-nav-count");
+    if (!badge || !enabled) {
+      return;
+    }
+    const count = mineItems.length;
+    badge.className = count ? "suggestion-count" : "";
+    badge.textContent = count ? String(count) : "";
+  }
+
+  async function refreshMine(force = false) {
+    if (mineLoading || (mineLoaded && !force)) {
+      return;
+    }
+    if (!token) {
+      mineItems = [];
+      mineLoaded = true;
+      mineError = "";
+      updateMineBadge();
+      drawMine();
+      return;
+    }
+    mineLoading = true;
+    mineError = "";
+    drawMine();
+    try {
+      if (demo) {
+        mineItems = demoMineItems();
+      } else {
+        const response = await fetch(`${API}/community/editor-suggestions/mine`, {
+          headers: { Authorization: token },
+        });
+        if (response.status === 401) {
+          logout();
+          return;
+        }
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || `Could not load suggestions (${response.status})`);
+        }
+        mineItems = Array.isArray(data.items) ? data.items : [];
+      }
+      mineItems.sort((a, b) => Number(b.createdAt || 0) - Number(a.createdAt || 0));
+      mineLoaded = true;
+      updateMineBadge();
+    } catch (error) {
+      mineError = error.message;
+    } finally {
+      mineLoading = false;
+      drawMine();
+    }
+  }
+
+  function formatDate(value) {
+    const date = new Date(Number(value || 0));
+    return Number.isNaN(date.getTime()) ? "" : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function describe(item) {
+    return window.communitySuggestions?.describe?.(item) || [];
+  }
+
+  function diffHtml(item) {
+    const groups = describe(item);
+    const count = groups.reduce((sum, group) => sum + group.rows.length, 0);
+    if (!count) {
+      return `<div class="mine-suggestion-empty-diff">The proposed data is attached to this suggestion.</div>`;
+    }
+    return `<details class="mine-suggestion-diff"><summary>View ${count} proposed change${count === 1 ? "" : "s"}</summary>${groups.map(group => `<section><h4>${esc(group.tabLabel)}</h4>${group.rows.map(row => `<div class="mine-diff-row"><span>${esc(row.label)}</span><del>${esc(row.before)}</del><span aria-hidden="true">-&gt;</span><ins>${esc(row.after)}</ins></div>`).join("")}</section>`).join("")}</details>`;
+  }
+
+  function suggestionCard(item) {
+    const meta = STATUS_META[item.status] || { label: item.status || "Unknown", className: "unknown" };
+    const reviewed = item.reviewedAt ? `<span>Reviewed ${esc(formatDate(item.reviewedAt))}</span>` : "";
+    const applied = item.appliedAt ? `<span>Applied ${esc(formatDate(item.appliedAt))}</span>` : "";
+    const withdraw =
+      item.status === "open"
+        ? `<button type="button" class="mine-withdraw" data-mine-withdraw="${esc(item.id)}">Withdraw</button>`
+        : "";
+    return `<article class="mine-suggestion-card"><header><div><h3>${esc(item.entityLabel || item.entityKey || "Suggestion")}</h3><span class="mine-suggestion-date">Submitted ${esc(formatDate(item.createdAt))}</span></div><span class="mine-status ${esc(meta.className)}">${esc(meta.label)}</span></header>${item.reason ? `<p class="mine-reason">${esc(item.reason)}</p>` : `<p class="mine-reason muted">No reasoning supplied.</p>`}${diffHtml(item)}<footer>${reviewed}${applied}<span class="grow"></span>${withdraw}</footer></article>`;
+  }
+
+  function drawMine() {
+    if (!mineRoot?.isConnected) {
+      return;
+    }
+    if (!token) {
+      mineRoot.innerHTML = `<section class="mine-suggestions-empty"><h2>My Suggestions</h2><p>Log in with your game account to see every suggestion you have submitted and its review status.</p><button type="button" class="primary" id="mine-login">Log in</button></section>`;
+      mineRoot.querySelector("#mine-login")?.addEventListener("click", () => $("#community-login-dialog").showModal());
+      return;
+    }
+    const filters = ["all", "open", "approved", "applied", "dismissed", "withdrawn"];
+    const visible = mineItems.filter(item => mineFilter === "all" || item.status === mineFilter);
+    const accountCopy = demo
+      ? `Demo suggestions saved for ${esc(username)} in this browser.`
+      : `Only suggestions submitted by the logged-in account ${esc(username)} are shown here.`;
+    mineRoot.innerHTML = `<div class="mine-suggestions"><div class="mine-suggestions-head"><div><h2>My Suggestions</h2><p>${accountCopy}</p></div><button type="button" id="mine-refresh">Refresh</button></div><div class="mine-filters">${filters
+      .map(filter => {
+        const meta = filter === "all" ? { label: "All" } : STATUS_META[filter];
+        return `<button type="button" data-mine-filter="${filter}" class="${mineFilter === filter ? "active" : ""}">${esc(meta.label)} <span>${mineCount(filter)}</span></button>`;
+      })
+      .join(
+        "",
+      )}</div>${mineLoading ? `<div class="mine-loading">Loading suggestions...</div>` : mineError ? `<div class="mine-error">${esc(mineError)}</div>` : visible.length > 0 ? `<div class="mine-suggestion-list">${visible.map(suggestionCard).join("")}</div>` : `<div class="mine-suggestions-empty"><h3>No ${mineFilter === "all" ? "" : (STATUS_META[mineFilter]?.label || mineFilter).toLowerCase() + " "}suggestions</h3><p>Your submitted suggestions will appear here.</p></div>`}</div>`;
+    mineRoot.querySelector("#mine-refresh")?.addEventListener("click", () => void refreshMine(true));
+    mineRoot.querySelectorAll("[data-mine-filter]").forEach(button =>
+      button.addEventListener("click", () => {
+        mineFilter = button.dataset.mineFilter;
+        drawMine();
+      }),
+    );
+    mineRoot
+      .querySelectorAll("[data-mine-withdraw]")
+      .forEach(button => button.addEventListener("click", () => void withdrawMine(button.dataset.mineWithdraw)));
+  }
+
+  async function withdrawMine(id) {
+    const item = mineItems.find(entry => entry.id === id);
+    if (!item || item.status !== "open") {
+      return;
+    }
+    try {
+      if (demo) {
+        const queue = JSON.parse(localStorage.getItem(DEMO_QUEUE_KEY) || "[]");
+        const queued = queue.find(entry => entry.id === id);
+        if (queued) {
+          queued.status = "withdrawn";
+        }
+        localStorage.setItem(DEMO_QUEUE_KEY, JSON.stringify(queue));
+      } else {
+        const response = await fetch(`${API}/community/editor-suggestions/withdraw`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: token },
+          body: JSON.stringify({ id }),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(data.error || `Could not withdraw suggestion (${response.status})`);
+        }
+      }
+      item.status = "withdrawn";
+      drawMine();
+    } catch (error) {
+      mineError = error.message;
+      drawMine();
+    }
+  }
 
   function setAccess(message, state = "") {
     const element = $("#community-access");
@@ -41,6 +220,10 @@
     localStorage.removeItem(USER_KEY);
     updateAccount();
     setAccess("Log in to make suggestions");
+    mineItems = [];
+    mineLoaded = true;
+    updateMineBadge();
+    drawMine();
   }
 
   async function refreshEligibility() {
@@ -94,6 +277,8 @@
     localStorage.setItem(USER_KEY, username);
     updateAccount();
     await refreshEligibility();
+    mineLoaded = false;
+    await refreshMine(true);
   }
 
   function promptReason(summary) {
@@ -153,7 +338,10 @@
     }
     const payload = { ...draft, reason };
     if (demo) {
-      return saveDemoDraft(payload);
+      const saved = saveDemoDraft(payload);
+      mineLoaded = false;
+      void refreshMine(true);
+      return saved;
     }
     const response = await fetch(`${API}/community/editor-suggestions`, {
       method: "POST",
@@ -164,6 +352,8 @@
     if (!response.ok) {
       throw new Error(data.error || data.errors?.join("; ") || `Submission failed (${response.status})`);
     }
+    mineLoaded = false;
+    void refreshMine(true);
     return data;
   }
 
@@ -196,14 +386,19 @@
       return;
     }
     document.body.classList.add("community-mode");
-    document.title = "Pokerogue Redux Community Editor";
+    document.title = "PKRM Community Editor";
     const heading = document.querySelector("header h1");
     if (heading) {
-      heading.textContent = "ER Community Editor";
+      heading.textContent = "PKRM Community Editor";
+    }
+    const suggestionTab = document.querySelector('nav.tabs [data-tab="suggestions"]');
+    if (suggestionTab) {
+      suggestionTab.innerHTML = `My Suggestions <span id="suggestion-nav-count"></span>`;
     }
     updateAccount();
     bindDialogs();
     void refreshEligibility();
+    void refreshMine();
   }
 
   window.communityEditorMode = {
@@ -211,6 +406,11 @@
     demo,
     init,
     submitDraft,
+    renderSuggestions(root) {
+      mineRoot = root;
+      drawMine();
+      void refreshMine();
+    },
     username: () => username,
     demoQueueKey: DEMO_QUEUE_KEY,
   };
