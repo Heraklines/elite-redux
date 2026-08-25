@@ -70,6 +70,9 @@ CREATE TABLE IF NOT EXISTS runs (
   wave          INTEGER,
   progression_wave INTEGER,            -- normalized 1..200 depth (Sprint raw wave * 2)
   created_at    INTEGER NOT NULL,
+  build_sha     TEXT,
+  game_version  TEXT,
+  er_version    TEXT,
   player_team   TEXT    NOT NULL,
   opponent_name TEXT,
   opponent_team TEXT,

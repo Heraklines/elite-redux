@@ -64,10 +64,13 @@ const now = Date.now();
 const since = now - WINDOW_DAYS * 24 * 60 * 60 * 1000;
 const savesDb = databaseId("workers/er-save-api/wrangler.toml", "er-saves");
 const telemetryDb = databaseId("workers/er-telemetry/wrangler.toml", "er-telemetry");
+const runColumns = new Set((await query(savesDb, "PRAGMA table_info(runs)")).map(row => String(row.name)));
+const runColumn = name => (runColumns.has(name) ? name : `NULL AS ${name}`);
 
 const runRows = await pagedQuery(
   savesDb,
-  `SELECT user_id, starters, challenges, difficulty, mode, wave, outcome,
+  `SELECT user_id, starters, challenges, difficulty, mode, pacing, wave, progression_wave, outcome,
+          ${runColumn("build_sha")}, ${runColumn("game_version")}, ${runColumn("er_version")},
           player_team, opponent_team, killed_by_ghost, relics, created_at
      FROM runs
     WHERE created_at >= ?1 AND starters IS NOT NULL

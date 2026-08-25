@@ -234,6 +234,39 @@ describe("telemetry queue", () => {
     expect(await store.totalBytes()).toBe(0);
   });
 
+  it("batches biome and mystery-event decisions without changing the upload cadence", async () => {
+    const q = new TelemetryQueue(store, envelope("balance-decisions"), upload);
+    q.enqueue({
+      kind: "biome_decision",
+      t: 2,
+      wave: 15,
+      action: "travel",
+      currentBiome: 1,
+      offeredBiomes: [2, 3],
+      chosenBiome: 3,
+      enteredWave: 6,
+      wavesSpent: 10,
+    });
+    q.enqueue({
+      kind: "mystery_encounter",
+      t: 3,
+      wave: 16,
+      stage: "choice",
+      encounterType: 24,
+      encounterTier: 2,
+      optionCount: 3,
+      availableOptions: [0, 2],
+      optionIndex: 2,
+      subSelection: false,
+    });
+
+    expect(uploads).toHaveLength(0);
+    await q.finalize();
+
+    expect(uploads).toHaveLength(1);
+    expect(uploads[0].events.map(event => event.kind)).toEqual(["biome_decision", "mystery_encounter"]);
+  });
+
   it("drains decisions captured behind an in-flight upload when the session ends", async () => {
     let releaseFirstUpload: ((ok: boolean) => void) | undefined;
     upload = vi.fn((batch: TelemetryBatch) => {

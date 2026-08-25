@@ -385,7 +385,15 @@ describe("tools — dump editor SPA data", () => {
     writeFileSync("editor/data/items.json", `${JSON.stringify(items, null, 2)}\n`, "utf8");
     writeFileSync("editor/data/trainers.json", `${JSON.stringify(trainers, null, 2)}\n`, "utf8");
     // The Game tab renders straight from the knob registry (single source of truth).
-    writeFileSync("editor/data/balance-knobs.json", `${JSON.stringify(ER_BALANCE_KNOBS, null, 2)}\n`, "utf8");
+    writeFileSync(
+      "editor/data/balance-knobs.json",
+      `${JSON.stringify(
+        ER_BALANCE_KNOBS.filter(knob => knob.editorVisible !== false),
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
 
     // Ability display names (vanilla + ER customs) for the Add-a-Mon autocomplete.
     const abilityNames = [

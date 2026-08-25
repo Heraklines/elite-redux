@@ -228,6 +228,27 @@ export interface TelemetryInputEvent extends TelemetryEventBase {
   uiMode: number;
 }
 
+export interface TelemetryBiomeDecisionEvent extends TelemetryEventBase {
+  kind: "biome_decision";
+  action: "stay" | "leave" | "travel";
+  currentBiome: number;
+  offeredBiomes: number[];
+  chosenBiome?: number;
+  enteredWave: number;
+  wavesSpent: number;
+}
+
+export interface TelemetryMysteryEncounterEvent extends TelemetryEventBase {
+  kind: "mystery_encounter";
+  stage: "opened" | "choice" | "resolved";
+  encounterType: number;
+  encounterTier: number;
+  optionCount: number;
+  availableOptions: number[];
+  optionIndex?: number;
+  subSelection: boolean;
+}
+
 /** One captured telemetry event (the ordered stream). */
 export type TelemetryEvent =
   | TelemetryBattleDecisionEvent
@@ -239,7 +260,9 @@ export type TelemetryEvent =
   | TelemetryRunOutcomeEvent
   | TelemetrySurfaceOpenEvent
   | TelemetrySurfaceChoiceEvent
-  | TelemetryInputEvent;
+  | TelemetryInputEvent
+  | TelemetryBiomeDecisionEvent
+  | TelemetryMysteryEncounterEvent;
 
 /**
  * The per-session ENVELOPE, captured once at session start. Carries the PSEUDONYMOUS player id (a hash of

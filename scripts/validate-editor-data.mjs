@@ -76,6 +76,7 @@ const learnsets = requireObject("learnsets.json", 1_500);
 const tmLearnsets = requireObject("tm-learnsets.json", 1_500);
 const speciesAbilities = requireObject("species-abilities.json", 1_500);
 const evolutions = requireObject("evolutions.json", 500);
+const formulaCatalog = requireObject("formulas.json", 3);
 
 const speciesById = uniqueIndex(allSpecies, "id", "all-species.json");
 const speciesByConst = uniqueIndex(allSpecies, "const", "all-species.json");
@@ -83,6 +84,20 @@ const moveById = uniqueIndex(moves, "id", "moves-rich.json");
 const abilityById = uniqueIndex(abilities, "id", "abilities-rich.json");
 uniqueIndex(starters, "id", "species.json");
 uniqueIndex(forms, "const", "species-forms.json");
+
+if (!Array.isArray(formulaCatalog.operations) || !Array.isArray(formulaCatalog.functions)) {
+  failures.push("formulas.json: operations and functions must be arrays");
+}
+if (!Array.isArray(formulaCatalog.formulas) || formulaCatalog.formulas.length < 15) {
+  failures.push("formulas.json: expected at least 15 formulas");
+} else {
+  uniqueIndex(formulaCatalog.formulas, "id", "formulas.json");
+  for (const formula of formulaCatalog.formulas) {
+    if (!formula.label || !formula.group || !formula.expression || !formula.source) {
+      failures.push(`formulas.json: incomplete formula ${JSON.stringify(formula.id)}`);
+    }
+  }
+}
 
 for (const starter of starters) {
   if (!speciesById.has(starter.id)) {

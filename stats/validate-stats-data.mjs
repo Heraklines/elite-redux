@@ -5,6 +5,7 @@ const dex = JSON.parse(readFileSync(new URL("dex.json", DIR), "utf8"));
 const detail = JSON.parse(readFileSync(new URL("dex-detail.json", DIR), "utf8"));
 const extra = JSON.parse(readFileSync(new URL("species-extra.json", DIR), "utf8"));
 const stats = JSON.parse(readFileSync(new URL("species-stats.json", DIR), "utf8"));
+const observations = JSON.parse(readFileSync(new URL("balance-observations.json", DIR), "utf8"));
 const maxAgeHours = Number(process.env.STATS_MAX_AGE_HOURS || 12);
 
 function assert(condition, message) {
@@ -63,6 +64,10 @@ assert(Object.keys(stats.species || {}).length >= 500, "too few species have run
 assert(Number.isFinite(Date.parse(stats.generatedAt)), "stats generatedAt is invalid");
 assert(ageHours(stats.generatedAt) >= -1 && ageHours(stats.generatedAt) <= maxAgeHours, `stats are stale (${ageHours(stats.generatedAt).toFixed(1)}h)`);
 assert(detail.sourceSha === stats.sourceSha, "catalog and telemetry source SHAs disagree");
+assert(observations.schemaVersion === 1, "balance observations schema is unsupported");
+assert(observations.windows && typeof observations.windows === "object", "balance observations windows are missing");
+assert(observations.patches && typeof observations.patches === "object", "balance observations patch history is missing");
+assert(ageHours(observations.generatedAt) >= -1 && ageHours(observations.generatedAt) <= maxAgeHours, `balance observations are stale (${ageHours(observations.generatedAt).toFixed(1)}h)`);
 if (process.env.STATS_SOURCE_SHA) {
   assert(stats.sourceSha === process.env.STATS_SOURCE_SHA, "generated data does not match STATS_SOURCE_SHA");
 }
@@ -81,6 +86,7 @@ const forbiddenKeys = new Set([
   "summary_json",
 ]);
 walk(stats, key => assert(!forbiddenKeys.has(key), `public stats contain forbidden field: ${key}`));
+walk(observations, key => assert(!forbiddenKeys.has(key), `public balance observations contain forbidden field: ${key}`));
 
 for (const [slug, row] of Object.entries(stats.species || {})) {
   assert(dex.some(mon => mon.slug === slug), `stats contain an unknown starter slug: ${slug}`);
@@ -94,7 +100,7 @@ for (const [slug, row] of Object.entries(stats.species || {})) {
 const deployArg = process.argv.find(argument => argument.startsWith("--deploy="));
 if (deployArg) {
   const deployDir = new URL(`${deployArg.slice("--deploy=".length).replace(/\\/g, "/").replace(/\/$/, "")}/`, `file:///${process.cwd().replace(/\\/g, "/")}/`);
-  for (const name of ["_runs.json", "_showdown.json"]) {
+  for (const name of ["_runs.json", "_showdown.json", "_decisions.json"]) {
     const path = new URL(`data/${name}`, deployDir);
     assert(existsSync(path), `deploy placeholder is missing: ${name}`);
     const publicValue = JSON.parse(readFileSync(path, "utf8"));

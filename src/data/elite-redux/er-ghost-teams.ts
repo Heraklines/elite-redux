@@ -44,7 +44,7 @@ import {
 } from "#data/elite-redux/er-endless-continuation";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
-import { bypassLogin } from "#constants/app-constants";
+import { bypassLogin, ER_VERSION } from "#constants/app-constants";
 import { ER_BLACK_SHINY_ABILITY_POOL } from "#data/elite-redux/er-black-shinies";
 import { ER_GHOST_WAVE_WINDOW } from "#data/elite-redux/er-ghost-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -92,6 +92,7 @@ import { PERMANENT_STATS, Stat, type PermanentStat } from "#enums/stat";
 import { PokemonMove } from "#moves/pokemon-move";
 import type { Variant } from "#sprites/variant";
 import { sessionIdKey } from "#utils/common";
+import { version } from "#package.json";
 import { getCookie } from "#utils/cookies";
 import { loadLastTeam } from "#utils/data";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -235,6 +236,9 @@ export interface GhostTeamSnapshot {
   progressionWaveReached?: number | undefined;
   isVictory: boolean;
   timestamp: number;
+  buildSha?: string | undefined;
+  gameVersion?: string | undefined;
+  erVersion?: string | undefined;
   /** Up to 6 serialised members. */
   party: GhostMember[];
   /** The opponent that ended the run (trainer/rival/ghost name, or wild species). */
@@ -959,6 +963,9 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     progressionWaveReached: getErProgressionWave(waveReached),
     isVictory,
     timestamp: Date.now(),
+    buildSha: (import.meta.env as { VITE_BUILD_SHA?: string }).VITE_BUILD_SHA,
+    gameVersion: version,
+    erVersion: ER_VERSION,
     party: partyData,
     opponentName,
     opponentParty,

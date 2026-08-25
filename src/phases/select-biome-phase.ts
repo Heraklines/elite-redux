@@ -61,6 +61,7 @@ import {
   rollErNextBiomeNodes,
   setErPendingNodes,
 } from "#data/elite-redux/er-biome-routing";
+import { getErBiomeStartWave, wavesSinceEnteredBiome } from "#data/elite-redux/er-biome-structure";
 import {
   clearMapTravelTarget,
   consumeMapTravelTarget,
@@ -69,6 +70,7 @@ import {
 } from "#data/elite-redux/er-map-nodes";
 import { isErChapterStartWave, isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
+import { recordTelemetryBiomeDecision } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { UiMode } from "#enums/ui-mode";
@@ -1764,6 +1766,20 @@ export class SelectBiomePhase extends BattlePhase {
       // single-node / travel-target / random resolution, or an anti-hang fallback). The watcher applies this
       // biome VERBATIM, so the owner can never travel one-sided-silently and the two clients can never land in
       // different biomes. Idempotent (coopBiomeRelaySent) so the picker pick + this funnel never double-send.
+      recordTelemetryBiomeDecision({
+        action: "travel",
+        currentBiome: globalScene.arena.biomeId,
+        offeredBiomes: [
+          ...new Set(
+            getErPendingNodes()
+              .filter(node => node.revealed)
+              .map(node => node.biome),
+          ),
+        ],
+        chosenBiome: nextBiome,
+        enteredWave: getErBiomeStartWave(),
+        wavesSpent: Math.max(0, wavesSinceEnteredBiome(currentWaveIndex)),
+      });
       globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome, currentWaveIndex);
       // Co-op (#848): terminate the biome interaction with the single from-pinned advance (idempotent,
       // #837). Fires when this phase participated in an interaction: a chained crossroads-Leave (always)

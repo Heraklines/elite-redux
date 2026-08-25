@@ -360,14 +360,26 @@ describe("er-save-api — ghost sample considers ALL eligible runs (de-restricti
         waveReached: 60,
         progressionWaveReached: 999,
         timestamp: SPRINT_GHOST_CADENCE_CUTOFF_MS + 2,
+        buildSha: "abcdef1234567890",
+        gameVersion: "1.2.3",
+        erVersion: "0.0.6.1",
         party: JSON.parse(PLAYER_TEAM),
       }),
     });
     const response = await saveWorker.fetch(request, { DB: database, SESSION_SECRET: secret } as never);
     expect(response.status).toBe(200);
     expect(
-      sqlite.prepare("SELECT pacing, wave, progression_wave FROM runs WHERE id = ?").get("uploaded-sprint"),
-    ).toEqual({ pacing: "sprint", wave: 60, progression_wave: 120 });
+      sqlite
+        .prepare("SELECT pacing, wave, progression_wave, build_sha, game_version, er_version FROM runs WHERE id = ?")
+        .get("uploaded-sprint"),
+    ).toEqual({
+      pacing: "sprint",
+      wave: 60,
+      progression_wave: 120,
+      build_sha: "abcdef1234567890",
+      game_version: "1.2.3",
+      er_version: "0.0.6.1",
+    });
   });
 
   it("honors an explicit maxWave ceiling and maximises distinct uploaders", async () => {

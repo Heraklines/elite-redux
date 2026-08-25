@@ -84,10 +84,16 @@ import {
 import { coopInteractionOwnerSeat } from "#data/elite-redux/coop/coop-session";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
-import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
+import {
+  erMarkBiomeStay,
+  getErBiomeStartWave,
+  setErLeaveBiomeNow,
+  wavesSinceEnteredBiome,
+} from "#data/elite-redux/er-biome-structure";
 import { isErSprintRun } from "#data/elite-redux/er-run-pacing";
 import { isMoodyAutomaticBiomeHealingEnabled } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
+import { recordTelemetryBiomeDecision } from "#data/elite-redux/telemetry/telemetry-hooks";
 import type { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { UiMode } from "#enums/ui-mode";
@@ -1245,6 +1251,13 @@ export class ErCrossroadsPhase extends Phase {
       return;
     }
     this.resolving = true;
+    recordTelemetryBiomeDecision({
+      action: moveOn ? "leave" : "stay",
+      currentBiome: globalScene.arena.biomeId,
+      offeredBiomes: [],
+      enteredWave: getErBiomeStartWave(),
+      wavesSpent: Math.max(0, wavesSinceEnteredBiome(this.coopSourceWave)),
+    });
     // #record-replay (single-player): capture the crossroads Stay(0)/Leave(1) choice. No-op unless
     // recording (co-op captures via the relay taps instead).
     recordSinglePlayerInteraction("crossroads", moveOn ? 1 : 0);

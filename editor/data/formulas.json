@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "operations": [
+    { "syntax": "+  -  *  /", "meaning": "Arithmetic" },
+    { "syntax": "%", "meaning": "Remainder" },
+    {
+      "syntax": "** or Math.pow(a, b)",
+      "meaning": "Exponentiation; ^ is bitwise XOR in TypeScript and must not be used for powers"
+    },
+    { "syntax": "( )", "meaning": "Grouping" },
+    { "syntax": "<  <=  >  >=  ===", "meaning": "Comparison" },
+    { "syntax": "condition ? a : b", "meaning": "Conditional value" }
+  ],
+  "functions": [
+    { "syntax": "Math.min(a, b, ...)", "meaning": "Smallest input" },
+    { "syntax": "Math.max(a, b, ...)", "meaning": "Largest input" },
+    { "syntax": "Math.floor(x)", "meaning": "Round down" },
+    { "syntax": "Math.ceil(x)", "meaning": "Round up" },
+    { "syntax": "Math.round(x)", "meaning": "Round to nearest integer" },
+    { "syntax": "Math.abs(x)", "meaning": "Absolute value" },
+    { "syntax": "Math.sqrt(x)", "meaning": "Square root" },
+    { "syntax": "Math.log(x)", "meaning": "Natural logarithm" },
+    { "syntax": "Math.exp(x)", "meaning": "e raised to x" },
+    { "syntax": "clamp(x, low, high)", "meaning": "Game helper equivalent to Math.min(high, Math.max(low, x))" }
+  ],
+  "formulas": [
+    {
+      "id": "progression-wave",
+      "group": "Run pacing",
+      "label": "Comparable progression wave",
+      "expression": "runWave * (pacing === 'sprint' ? 2 : 1)",
+      "variables": ["runWave", "pacing"],
+      "source": "src/data/elite-redux/er-run-pacing.ts",
+      "change": "code"
+    },
+    {
+      "id": "early-move-power",
+      "group": "Run pacing",
+      "label": "Early-wave move power",
+      "expression": "0.4 + 0.6 * clamp((runWave - 1) / (capWave - 1), 0, 1)",
+      "variables": ["runWave", "capWave: 30 normal, 15 sprint"],
+      "source": "src/data/elite-redux/er-run-pacing.ts",
+      "change": "code"
+    },
+    {
+      "id": "enemy-level",
+      "group": "Difficulty progression",
+      "label": "Base enemy level",
+      "expression": "1 + progressionWave / waveSlope + (progressionWave / quadDivisor) ** 2",
+      "variables": ["progressionWave", "waveSlope", "quadDivisor"],
+      "source": "src/battle.ts",
+      "knobs": ["vanilla.level.waveSlope", "vanilla.level.quadDivisor", "vanilla.level.bossMult"],
+      "change": "knobs"
+    },
+    {
+      "id": "pokemon-stat",
+      "group": "Combat",
+      "label": "Base non-HP stat",
+      "expression": "Math.floor((2 * baseStat + iv) * level / 100) + 5, then nature and runtime modifiers",
+      "variables": ["baseStat", "iv", "level", "nature", "vitamins", "fusion", "abilities", "items"],
+      "source": "src/field/pokemon.ts",
+      "change": "code"
+    },
+    {
+      "id": "pokemon-hp",
+      "group": "Combat",
+      "label": "Base HP",
+      "expression": "Math.floor((2 * baseHp + iv) * level / 100) + level + 10, then runtime modifiers",
+      "variables": ["baseHp", "iv", "level", "vitamins", "fusion", "abilities", "items"],
+      "source": "src/field/pokemon.ts",
+      "change": "code"
+    },
+    {
+      "id": "damage-baseline",
+      "group": "Combat",
+      "label": "Damage baseline",
+      "expression": "(((2 * level / 5 + 2) * power * attack / defense) / 50) + 2",
+      "variables": ["level", "power", "attack", "defense"],
+      "source": "src/field/pokemon.ts",
+      "note": "The runtime then applies target count, multistrike, weather, terrain, critical, random 0.85-1.00, STAB, type, status, screens, tags, relics, abilities, items, enemy tokens, and Endless modifiers in order.",
+      "change": "code"
+    },
+    {
+      "id": "trainer-set-target",
+      "group": "Trainer generation",
+      "label": "Trainer set progression target",
+      "expression": "targetIndex = Math.round(clamp((progressionWave - 1) / span, 0, 1) * (poolSize - 1))",
+      "variables": ["progressionWave", "span", "poolSize"],
+      "source": "src/data/elite-redux/er-trainer-runtime-hook.ts",
+      "knobs": ["er.trainer.waveProgressionSpan"],
+      "change": "knobs"
+    },
+    {
+      "id": "trainer-set-window",
+      "group": "Trainer generation",
+      "label": "Trainer set selection window",
+      "expression": "radius = Math.max(2, Math.min(Math.floor(poolSize * 0.4), 12))",
+      "variables": ["poolSize", "targetIndex", "seed"],
+      "source": "src/data/elite-redux/er-trainer-runtime-hook.ts",
+      "change": "code"
+    },
+    {
+      "id": "wave-money",
+      "group": "Economy",
+      "label": "Wave money",
+      "expression": "((waveSet + 1 + (0.75 + slot / 10)) * 100) ** (1 + 0.005 * waveSet) * moneyMultiplier",
+      "variables": ["waveSet = Math.ceil(wave / 10) - 1", "slot = ((wave - 1) % 10) + 1", "moneyMultiplier"],
+      "source": "src/battle-scene.ts",
+      "change": "code"
+    },
+    {
+      "id": "money-streak",
+      "group": "Economy",
+      "label": "Faint-free money streak",
+      "expression": "perMonPct = Math.min(capPct, Math.floor(faintFreeWaves / wavesPerPct)); teamPct = sum(perMonPct)",
+      "variables": ["faintFreeWaves", "capPct", "wavesPerPct"],
+      "source": "src/data/elite-redux/er-money-streak.ts",
+      "knobs": ["er.money.streakCapPct", "er.money.streakWavesPerPct"],
+      "change": "knobs"
+    },
+    {
+      "id": "biome-shop-price",
+      "group": "Economy",
+      "label": "Biome shop price",
+      "expression": "Math.max(10, Math.floor(waveIncome * tierFactor * categoryModifier / 10) * 10)",
+      "variables": ["waveIncome", "tierFactor", "categoryModifier"],
+      "source": "src/data/elite-redux/er-biome-economy.ts",
+      "knobs": ["er.shop.tierFactor", "er.shop.cheapMult", "er.shop.dearMult", "er.shop.biomePriceMod"],
+      "change": "knobs"
+    },
+    {
+      "id": "shop-reroll",
+      "group": "Economy",
+      "label": "Shop reroll cost",
+      "expression": "Math.ceil(wave / 10) * rerollBase * 2 ** rerollCount * tierValue",
+      "variables": ["wave", "rerollBase", "rerollCount", "tierValue"],
+      "source": "src/phases/select-modifier-phase.ts",
+      "knobs": ["vanilla.shop.rerollBase", "vanilla.shop.rerollTierValues"],
+      "change": "knobs"
+    },
+    {
+      "id": "reward-tier",
+      "group": "Rewards",
+      "label": "Depth reward tier",
+      "expression": "1 + Math.min(9, Math.floor((equivalentWave - 1) / tierEquivalentWaves))",
+      "variables": ["equivalentWave", "tierEquivalentWaves"],
+      "source": "src/data/elite-redux/er-reward-rates.ts",
+      "knobs": ["er.rewards.tierEquivalentWaves"],
+      "change": "knobs"
+    },
+    {
+      "id": "favour-multiplier",
+      "group": "Rewards",
+      "label": "Challenge Favour multiplier",
+      "expression": "Math.min(cap, 1 + Math.floor((Math.max(0, Math.floor(favour)) + 5) / 10))",
+      "variables": ["favour", "cap"],
+      "source": "src/data/elite-redux/er-shiny-favour.ts",
+      "knobs": [
+        "er.favour.maxMult",
+        "er.favour.lowTierMaxMult",
+        "er.favour.byChallenge",
+        "er.favour.limitedSupport",
+        "er.favour.usageTier"
+      ],
+      "change": "knobs"
+    },
+    {
+      "id": "reward-rate",
+      "group": "Rewards",
+      "label": "Shiny and candy reward rate",
+      "expression": "Math.min(totalRateCap, baseRate * favourMultiplier + Math.floor(endlessDepth / endlessStep) * endlessAmount)",
+      "variables": ["baseRate", "favourMultiplier", "endlessDepth", "endlessStep", "endlessAmount", "totalRateCap"],
+      "source": "src/data/elite-redux/er-reward-rates.ts",
+      "knobs": ["er.rewards.totalRateCap", "er.rewards.endlessStepEquivalentWaves", "er.rewards.endlessStepAmount"],
+      "change": "knobs"
+    },
+    {
+      "id": "shiny-roll",
+      "group": "Rewards",
+      "label": "Wild shiny probability",
+      "expression": "Math.min(1, shinyRate * 64 / 65536)",
+      "variables": ["shinyRate"],
+      "source": "src/field/pokemon.ts",
+      "change": "code"
+    },
+    {
+      "id": "black-shiny-roll",
+      "group": "Rewards",
+      "label": "Black shiny probability after an epic shiny",
+      "expression": "1 / blackShinyDenominator",
+      "variables": ["blackShinyDenominator"],
+      "source": "src/field/pokemon.ts",
+      "knobs": ["er.shiny.blackShinyDenominator"],
+      "change": "knobs"
+    },
+    {
+      "id": "luck-upgrade",
+      "group": "Rewards",
+      "label": "Reward rarity upgrade odds",
+      "expression": "odds = Math.max(1, Math.floor(512 / (Math.min(luck, 14) + 5 + 2 * Math.max(0, luck - 14)))); chance = 4 / odds",
+      "variables": ["luck"],
+      "source": "src/modifier/modifier-type.ts",
+      "change": "code"
+    },
+    {
+      "id": "mystery-event-roll",
+      "group": "Mystery events",
+      "label": "Mystery event roll",
+      "expression": "baseChance + eligibleMisses * missBonus, adjusted toward the pacing target and capped by the anti-variance limit",
+      "variables": ["wave", "legalWaveSpan", "pacingTarget", "eligibleMisses", "biomeMultiplier", "mysteryCharm"],
+      "source": "src/battle-scene.ts",
+      "note": "The runtime also enforces legal waves and a three-wave cooldown, so this is a stateful probability rather than one independent roll.",
+      "change": "code"
+    },
+    {
+      "id": "biome-notoriety",
+      "group": "Biomes",
+      "label": "Biome overstay pressure",
+      "expression": "ramp = Math.min(1, overstayWaves / 10); bstBonus = Math.round(ramp * 100); levelBonus = Math.round(ramp * 10)",
+      "variables": ["overstayWaves"],
+      "source": "src/data/elite-redux/er-biome-structure.ts",
+      "change": "code"
+    },
+    {
+      "id": "ai-damage-score",
+      "group": "Battle AI",
+      "label": "Experimental AI direct-damage score",
+      "expression": "damage / targetMaxHp * 75 * accuracy + (isKo ? 1000 * accuracy : 0)",
+      "variables": ["damage", "targetMaxHp", "accuracy", "isKo"],
+      "source": "src/data/elite-redux/ai",
+      "knobs": [
+        "er.ai.enabled",
+        "er.ai.experimentalPct",
+        "er.ai.experimentalHell",
+        "er.ai.sharpnessElite",
+        "er.ai.sharpnessHell"
+      ],
+      "change": "knobs"
+    },
+    {
+      "id": "usage-performance",
+      "group": "Observed balance",
+      "label": "Usage-tier performance score",
+      "expression": "0.5 * winRateLiftRank + 0.5 * averageWaveLiftRank",
+      "variables": ["winRateLiftRank", "averageWaveLiftRank", "sampleSize"],
+      "source": "stats/gen-usage-tiers.mjs",
+      "note": "The nightly job uses player-relative lift and empirical-Bayes shrinkage before ranking, then applies tier quantiles and usage gates.",
+      "change": "code"
+    }
+  ]
+}

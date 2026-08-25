@@ -2175,6 +2175,9 @@ async function handleRunCreate(
     waveReached?: unknown;
     progressionWaveReached?: unknown;
     timestamp?: unknown;
+    buildSha?: unknown;
+    gameVersion?: unknown;
+    erVersion?: unknown;
     party?: unknown;
     opponentName?: unknown;
     opponentParty?: unknown;
@@ -2222,6 +2225,10 @@ async function handleRunCreate(
   // never trust an independently supplied progression value.
   const progressionWave = normalizedGhostProgressionWave(wave, pacing);
   const createdAt = Number.parseInt(String(run.timestamp ?? ""), 10);
+  const buildSha =
+    typeof run.buildSha === "string" && /^[0-9a-f]{7,40}$/i.test(run.buildSha) ? run.buildSha.toLowerCase() : null;
+  const gameVersion = typeof run.gameVersion === "string" ? run.gameVersion.slice(0, 32) : null;
+  const erVersion = typeof run.erVersion === "string" ? run.erVersion.slice(0, 32) : null;
   // ER (#384): usage-tier inputs ride the SAME single insert - no extra
   // requests or writes. Lazy one-time column migration below.
   const starters = Array.isArray(run.starters) ? run.starters.filter(v => typeof v === "number") : null;
@@ -2240,8 +2247,8 @@ async function handleRunCreate(
   const relicsBlob = relicsStr && relicsStr.length <= 2048 ? relicsStr : null;
   await ensureRunStatColumns(env);
   await env.DB.prepare(
-    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation, relics)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, build_sha, game_version, er_version, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation, relics)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
        ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -2255,6 +2262,9 @@ async function handleRunCreate(
       Number.isFinite(wave) ? wave : null,
       progressionWave,
       Number.isFinite(createdAt) ? createdAt : Date.now(),
+      buildSha,
+      gameVersion,
+      erVersion,
       JSON.stringify(party),
       typeof run.opponentName === "string" ? run.opponentName : null,
       Array.isArray(run.opponentParty) ? JSON.stringify(run.opponentParty) : null,
@@ -3154,6 +3164,9 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
     // sampling queries instead of being deleted or rewritten.
     "pacing TEXT",
     "progression_wave INTEGER",
+    "build_sha TEXT",
+    "game_version TEXT",
+    "er_version TEXT",
     // ER (Colosseum): the killer ghost on a run-ending defeat. Additive +
     // nullable - old clients simply send null. No new request/write (rides the
     // existing run-create INSERT).

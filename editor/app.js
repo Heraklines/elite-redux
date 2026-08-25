@@ -16,6 +16,9 @@ const LIVE_BASE = LOCAL_DEMO ? "../src/data/elite-redux" : RAW_BASE;
 const SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/pokemon/elite-redux";
 const TRAINER_SPRITE_BASE = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/images/trainer";
 const USAGE_TIERS_URL = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/usage-tiers.json";
+const BALANCE_OBSERVATIONS_URL = LOCAL_DEMO
+  ? "../stats/data/balance-observations.json"
+  : "https://er-stats.pages.dev/data/balance-observations.json";
 
 const EGG_TIER_NAMES = ["Common", "Rare", "Epic", "Legendary"];
 const ITEM_TIERS = ["COMMON", "GREAT", "ULTRA", "ROGUE", "MASTER"];
@@ -39,6 +42,9 @@ let ITEMS = []; // [{key, tier, weight, maxWeight}]
 let TRAINER_DEFAULTS = { elite: {}, hell: {} };
 let FACTORY_SPECIES = []; // [{const, name, sets}]
 let KNOBS = []; // balance-knob registry rows (editor/data/balance-knobs.json)
+let FORMULAS = { operations: [], functions: [], formulas: [] };
+let OBSERVED = { windows: {} };
+let statsWindow = "currentPatch";
 
 // Per-domain current/baseline (baseline = last saved; dirty = current != baseline).
 const egg = { current: {}, baseline: {} }; // const → [moves]
@@ -804,6 +810,179 @@ function renderGame(root) {
     )
     .join("")}${groups.length === 0 ? '<div class="empty">No knobs match your search.</div>' : ""}
     <p class="hint" style="margin:0 16px 16px;color:var(--muted);font-size:12px">Every value here is validated twice: the editor refuses obviously bad input, and the game itself ignores any out-of-range override and keeps its default - a bad save cannot break a build.</p>`;
+}
+
+function statsCount(value) {
+  return Number.isFinite(Number(value)) ? Number(value).toLocaleString() : "-";
+}
+
+function statsPercent(value) {
+  return Number.isFinite(Number(value)) ? `${(Number(value) * 100).toFixed(1)}%` : "-";
+}
+
+function statsDate(value) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toLocaleDateString() : "-";
+}
+
+function statsTable(headers, rows) {
+  if (rows.length === 0) {
+    return '<div class="stats-empty">No comparable data has been collected for this window yet.</div>';
+  }
+  return `<div style="overflow-x:auto"><table class="stats-table"><thead><tr>${headers
+    .map(header => `<th>${esc(header)}</th>`)
+    .join("")}</tr></thead><tbody>${rows
+    .map(row => `<tr>${row.map(value => `<td>${value}</td>`).join("")}</tr>`)
+    .join("")}</tbody></table></div>`;
+}
+
+function renderObservedStats() {
+  const selectedPatch = statsWindow.startsWith("patch:") ? statsWindow.slice(6) : "";
+  const windowData = selectedPatch ? OBSERVED?.patches?.[selectedPatch] : OBSERVED?.windows?.[statsWindow];
+  const patchOptions = Object.keys(OBSERVED?.patches ?? {});
+  const buttons = [
+    ["currentPatch", "Current patch"],
+    ["last7Days", "Last 7 days"],
+    ["last30Days", "Last 30 days"],
+    ["previousPatch", "Previous patch"],
+  ];
+  const toolbar = `<div class="stats-toolbar">${buttons
+    .map(
+      ([key, label]) =>
+        `<button type="button" class="stats-window${statsWindow === key ? " on" : ""}" data-stats-window="${key}">${label}</button>`,
+    )
+    .join(
+      "",
+    )}<select id="stats-patch-window" aria-label="Patch history"><option value="">Patch history</option>${patchOptions
+    .map(
+      patch => `<option value="${esc(patch)}"${selectedPatch === patch ? " selected" : ""}>ER ${esc(patch)}</option>`,
+    )
+    .join("")}</select><span class="stats-meta">${
+    OBSERVED?.generatedAt
+      ? `Updated ${esc(new Date(OBSERVED.generatedAt).toLocaleString())}`
+      : "Awaiting nightly aggregate"
+  }</span></div>`;
+  if (!windowData) {
+    return `${toolbar}<div class="stats-empty">This view starts collecting after the tagged build is deployed. Older untagged runs are excluded from the current-patch default.</div>`;
+  }
+  const summary = windowData.summary ?? {};
+  const difficulties = Array.isArray(windowData.difficulties) ? windowData.difficulties : [];
+  const wipes = Array.isArray(windowData.wipeHotspots) ? windowData.wipeHotspots : [];
+  const transitions = Array.isArray(windowData.biomeTransitions) ? windowData.biomeTransitions : [];
+  const biomeDecisions = Array.isArray(windowData.biomeDecisions) ? windowData.biomeDecisions : [];
+  const mysteries = Array.isArray(windowData.mysteryEvents) ? windowData.mysteryEvents : [];
+  return `${toolbar}
+    <div class="stats-metrics">
+      <div class="stats-metric"><strong>${statsCount(summary.runs)}</strong><span>Completed runs</span></div>
+      <div class="stats-metric"><strong>${statsCount(summary.players)}</strong><span>Distinct players</span></div>
+      <div class="stats-metric"><strong>${statsPercent(summary.winRate)}</strong><span>Win rate</span></div>
+      <div class="stats-metric"><strong>${statsCount(summary.medianWave)}</strong><span>Median progression wave</span></div>
+    </div>
+    <div class="stats-band"><h2>Difficulty progression</h2><p>${esc(windowData.label ?? "Comparable run sample")} from ${statsDate(windowData.from)} to ${statsDate(windowData.to)}.</p>${statsTable(
+      ["Difficulty", "Runs", "Players", "Wins", "Win rate", "Median wave", "Average wave"],
+      difficulties.map(row => [
+        esc(row.difficulty ?? "unknown"),
+        statsCount(row.runs),
+        statsCount(row.players),
+        statsCount(row.victories),
+        statsPercent(row.winRate),
+        statsCount(row.medianWave),
+        Number.isFinite(Number(row.averageWave)) ? Number(row.averageWave).toFixed(1) : "-",
+      ]),
+    )}</div>
+    <div class="stats-band"><h2>Wipe hotspots</h2><p>Defeats grouped into ten-wave progression bands; use the difficulty column before judging a spike.</p>${statsTable(
+      ["Difficulty", "Wave band", "Defeats", "Share of that difficulty's defeats"],
+      wipes.map(row => [
+        esc(row.difficulty ?? "unknown"),
+        `${statsCount(row.waveStart)}-${statsCount(row.waveEnd)}`,
+        statsCount(row.defeats),
+        statsPercent(row.share),
+      ]),
+    )}</div>
+    <div class="stats-band"><h2>Biome paths</h2><p>Committed travel decisions only. Waves spent is measured from biome entry to the transition wave.</p>${statsTable(
+      ["From", "To", "Transitions", "Average waves spent", "Share from source"],
+      transitions.map(row => [
+        esc(row.from ?? "unknown"),
+        esc(row.to ?? "unknown"),
+        statsCount(row.count),
+        Number.isFinite(Number(row.averageWavesSpent)) ? Number(row.averageWavesSpent).toFixed(1) : "-",
+        statsPercent(row.shareFromSource),
+      ]),
+    )}</div>
+    <div class="stats-band"><h2>Biome stay/leave decisions</h2><p>Crossroads choices are separate from the route transition that follows a leave decision.</p>${statsTable(
+      ["Biome", "Decision", "Count", "Share", "Difficulty"],
+      biomeDecisions.map(row => [
+        esc(row.biome ?? "unknown"),
+        esc(row.action ?? "unknown"),
+        statsCount(row.count),
+        statsPercent(row.share),
+        esc(row.difficulty ?? "all"),
+      ]),
+    )}</div>
+    <div class="stats-band"><h2>Mystery-event decisions</h2><p>Encounter and option ids are stable game ids, not translated labels.</p>${statsTable(
+      ["Event id", "Option", "Choices", "Choice rate", "Difficulty"],
+      mysteries.map(row => [
+        statsCount(row.encounterType),
+        statsCount(row.optionIndex),
+        statsCount(row.count),
+        statsPercent(row.share),
+        esc(row.difficulty ?? "all"),
+      ]),
+    )}</div>`;
+}
+
+function renderFormulaCatalog() {
+  const query = ($("#search").value || "").trim().toLowerCase();
+  const rows = (FORMULAS.formulas ?? []).filter(formula => {
+    const haystack = [formula.label, formula.group, formula.expression, formula.source, ...(formula.knobs ?? [])]
+      .join(" ")
+      .toLowerCase();
+    return !query || haystack.includes(query);
+  });
+  const groups = [];
+  for (const formula of rows) {
+    let group = groups.find(entry => entry.name === formula.group);
+    if (!group) {
+      group = { name: formula.group, formulas: [] };
+      groups.push(group);
+    }
+    group.formulas.push(formula);
+  }
+  const operationRows = [...(FORMULAS.operations ?? []), ...(FORMULAS.functions ?? [])];
+  return `<div class="stats-band"><h2>Formula changes</h2><p>The runtime uses TypeScript number arithmetic, native Math functions, and a small set of game helpers. It does not use a general formula library. Numeric constants linked below can be changed safely in Game because both the editor and runtime validate their ranges. A structural expression remains a reviewed code change with tests; the editor does not execute arbitrary text as game code.</p>
+      <div class="operation-grid">${operationRows
+        .map(row => `<div class="operation-row"><code>${esc(row.syntax)}</code><span>${esc(row.meaning)}</span></div>`)
+        .join("")}</div></div>
+    ${groups
+      .map(
+        group =>
+          `<div class="stats-band"><h2>${esc(group.name)}</h2><div class="formula-grid">${group.formulas
+            .map(
+              formula =>
+                `<article class="formula-row"><h3>${esc(formula.label)}</h3><code>${esc(formula.expression)}</code><small>Inputs: ${esc((formula.variables ?? []).join("; "))}</small><small>Source: ${esc(formula.source)}</small>${
+                  formula.note ? `<small>${esc(formula.note)}</small>` : ""
+                }${
+                  formula.knobs?.length > 0
+                    ? `<div class="formula-knobs">${formula.knobs
+                        .map(
+                          knob =>
+                            `<button type="button" data-formula-knob="${esc(knob)}" title="Open this validated value in Game">${esc(knob)}</button>`,
+                        )
+                        .join("")}</div>`
+                    : ""
+                }</article>`,
+            )
+            .join("")}</div></div>`,
+      )
+      .join("")}${rows.length === 0 ? '<div class="stats-empty">No formulas match your search.</div>' : ""}`;
+}
+
+function renderStats(root) {
+  root.innerHTML = `<div class="stats-shell"><div><h2>Observed balance</h2><p>Current patch is the default comparison unit. Rolling windows and previous patches remain separate so older balance states do not contaminate current decisions.</p>${renderObservedStats()}</div>${renderFormulaCatalog()}</div>`;
+  root.querySelector("#stats-patch-window")?.addEventListener("change", event => {
+    statsWindow = event.target.value ? `patch:${event.target.value}` : "currentPatch";
+    render();
+  });
 }
 
 // ---- Add a Mon tab -------------------------------------------------------------
@@ -4768,6 +4947,8 @@ function render() {
     renderAssets(root);
   } else if (activeTab === "tournaments") {
     renderTournaments(root);
+  } else if (activeTab === "stats") {
+    renderStats(root);
   } else if (activeTab === "suggestions") {
     if (communityMode?.enabled) {
       communityMode.renderSuggestions?.(root);
@@ -5041,6 +5222,22 @@ function onPokedexClick(e) {
 
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
+  const statsWindowButton = e.target.closest("[data-stats-window]");
+  if (statsWindowButton) {
+    statsWindow = statsWindowButton.dataset.statsWindow;
+    render();
+    return;
+  }
+  const formulaKnob = e.target.closest("[data-formula-knob]");
+  if (formulaKnob) {
+    activeTab = "game";
+    $("#search").value = formulaKnob.dataset.formulaKnob;
+    document
+      .querySelectorAll("nav.tabs button")
+      .forEach(button => button.classList.toggle("active", button.dataset.tab === activeTab));
+    render();
+    return;
+  }
   if (activeTab === "assets" && onAssetsClick(e)) {
     return;
   }
@@ -6282,6 +6479,8 @@ async function init() {
       challengeValuesData,
       challengePresetsData,
       trainerSpritesData,
+      formulasData,
+      observedData,
     ] = await Promise.all([
       fetch("./data/species.json").then(r => r.json()),
       fetch("./data/moves.json").then(r => r.json()),
@@ -6329,6 +6528,8 @@ async function init() {
       // Named challenge presets (generated). Fallback → [] (preset picker hides).
       fetchJson("./data/challenge-presets.json", []),
       fetchJson(`${LIVE_BASE}/er-custom-trainer-sprites.json${bust}`, {}),
+      fetchJson("./data/formulas.json", { operations: [], functions: [], formulas: [] }),
+      fetchJson(BALANCE_OBSERVATIONS_URL, { windows: {} }),
     ]);
     SPECIES = species;
     MOVES = moves;
@@ -6337,6 +6538,8 @@ async function init() {
     FACTORY_SPECIES = trainers.factorySpecies;
     KNOBS = knobs;
     MONS_LIVE = monsLive;
+    FORMULAS = formulasData;
+    OBSERVED = observedData;
 
     // Seed balance-knob overrides from the live tuning file (only keys that
     // are still in the registry; map overrides keep just their own entries).

@@ -63,10 +63,12 @@ import {
 import type {
   TelemetryActor,
   TelemetryBattleTerminalEvent,
+  TelemetryBiomeDecisionEvent,
   TelemetryCombatAuxiliaryDecisionEvent,
   TelemetryCombatContractEvent,
   TelemetryCombatTransitionEvent,
   TelemetryMode,
+  TelemetryMysteryEncounterEvent,
   TelemetryRunOutcomeEvent,
   TelemetrySessionEnvelope,
 } from "#data/elite-redux/telemetry/telemetry-schema";
@@ -243,6 +245,40 @@ function ensureSession(): boolean {
   store.saveEnvelope(env).catch(() => {});
   beginTelemetrySession(env, q);
   return true;
+}
+
+export function recordTelemetryBiomeDecision(input: Omit<TelemetryBiomeDecisionEvent, "kind" | "t" | "wave">): void {
+  try {
+    if (!ensureSession() || currentMode() !== "solo") {
+      return;
+    }
+    recordTelemetryEvent({
+      ...input,
+      kind: "biome_decision",
+      t: Date.now(),
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+    });
+  } catch {
+    return;
+  }
+}
+
+export function recordTelemetryMysteryEncounter(
+  input: Omit<TelemetryMysteryEncounterEvent, "kind" | "t" | "wave">,
+): void {
+  try {
+    if (!ensureSession() || currentMode() !== "solo") {
+      return;
+    }
+    recordTelemetryEvent({
+      ...input,
+      kind: "mystery_encounter",
+      t: Date.now(),
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+    });
+  } catch {
+    return;
+  }
 }
 
 function currentJointActionId(sessionId: string): string {

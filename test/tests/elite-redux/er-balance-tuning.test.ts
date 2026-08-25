@@ -136,4 +136,17 @@ describe("ER balance tuning (er-balance-tuning.json loader)", () => {
       }
     }
   });
+
+  it("keeps dead compatibility knobs out of the staff editor", () => {
+    const hidden = ER_BALANCE_KNOBS.filter(knob => knob.editorVisible === false).map(knob => knob.key);
+    expect(hidden).toEqual([
+      "er.shiny.multElite",
+      "er.shiny.multHell",
+      "er.candy.multYoungster",
+      "er.candy.multAce",
+      "er.candy.globalMult",
+      "er.favour.perStep",
+      "er.favour.stepBonus",
+    ]);
+  });
 });

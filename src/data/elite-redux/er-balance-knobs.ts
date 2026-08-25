@@ -45,6 +45,7 @@ export interface ErBalanceKnob {
   ordering?: "asc" | "desc";
   /** Editor hint: show in the "advanced - edit with care" section. */
   advanced?: boolean;
+  editorVisible?: boolean;
 }
 
 export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
@@ -58,6 +59,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     default: 1.5,
     min: 0.5,
     max: 10,
+    editorVisible: false,
   },
   {
     key: "er.shiny.multHell",
@@ -68,6 +70,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     default: 2,
     min: 0.5,
     max: 10,
+    editorVisible: false,
   },
   {
     key: "er.candy.multYoungster",
@@ -78,6 +81,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     default: 2,
     min: 0.5,
     max: 10,
+    editorVisible: false,
   },
   {
     key: "er.candy.multAce",
@@ -88,6 +92,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     default: 1.5,
     min: 0.5,
     max: 10,
+    editorVisible: false,
   },
   {
     key: "er.candy.globalMult",
@@ -98,6 +103,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     default: 1.35,
     min: 0.1,
     max: 10,
+    editorVisible: false,
   },
   {
     key: "er.rewards.shinyYoungster",
@@ -409,6 +415,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     min: 1,
     max: 100,
     integer: true,
+    editorVisible: false,
   },
   {
     key: "er.favour.stepBonus",
@@ -419,6 +426,7 @@ export const ER_BALANCE_KNOBS: readonly ErBalanceKnob[] = [
     default: 0.5,
     min: 0.05,
     max: 5,
+    editorVisible: false,
   },
   {
     key: "er.favour.maxMult",

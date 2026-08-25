@@ -128,6 +128,32 @@
       .knob-row2 input[type="text"] { width: 320px; font-family: ui-monospace, monospace; font-size: 13px; }
       .knob-row2.dirty { background: rgba(179, 36, 92, 0.07); }
       .knob-row2 .warn-badge { color: var(--warn); font-size: 11px; font-weight: 700; }
+      .stats-shell { padding: 16px; max-width: 1240px; }
+      .stats-toolbar { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+      .stats-toolbar button.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 700; }
+      .stats-meta { color: var(--muted); font-size: 12px; margin-left: auto; }
+      .stats-band { border-top: 1px solid var(--line); padding: 16px 0; }
+      .stats-band:first-of-type { border-top: 0; padding-top: 0; }
+      .stats-band h2 { margin: 0 0 4px; font-size: 16px; }
+      .stats-band > p { color: var(--muted); margin: 0 0 12px; }
+      .stats-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+      .stats-metric { border-left: 3px solid var(--accent); background: var(--panel); padding: 9px 11px; min-height: 66px; }
+      .stats-metric strong { display: block; font-size: 20px; }
+      .stats-metric span { color: var(--muted); font-size: 12px; }
+      .stats-table { width: 100%; border-collapse: collapse; }
+      .stats-table th, .stats-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+      .stats-table th { color: var(--muted); font-size: 12px; }
+      .formula-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 8px; }
+      .formula-row { border: 1px solid var(--line); background: var(--panel); padding: 10px; min-width: 0; }
+      .formula-row h3 { margin: 0 0 6px; font-size: 14px; }
+      .formula-row code { display: block; white-space: pre-wrap; overflow-wrap: anywhere; color: #f3c969; background: #101018; padding: 8px; }
+      .formula-row small { display: block; color: var(--muted); margin-top: 6px; }
+      .formula-knobs { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 7px; }
+      .formula-knobs button { padding: 3px 7px; font: 11px ui-monospace, monospace; }
+      .operation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 6px 16px; }
+      .operation-row { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 10px; align-items: baseline; }
+      .operation-row code { color: #f3c969; }
+      .stats-empty { color: var(--muted); padding: 18px 0; }
       .map-rows { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 280px; }
       .map-rows .map-row { display: flex; gap: 8px; align-items: center; }
       .map-rows .map-row .mkey { width: 140px; color: var(--muted); font-size: 12px; }
@@ -627,7 +653,8 @@
       body.community-mode nav.tabs [data-tab="trainers"],
       body.community-mode nav.tabs [data-tab="assets"],
       body.community-mode nav.tabs [data-tab="addmon"],
-      body.community-mode nav.tabs [data-tab="tournaments"] { display: none; }
+      body.community-mode nav.tabs [data-tab="tournaments"],
+      body.community-mode nav.tabs [data-tab="stats"] { display: none; }
       #community-access { color: var(--muted); font-size: 12px; white-space: nowrap; }
       #community-access[data-state="eligible"] { color: var(--ok); }
       #community-access[data-state="locked"], #community-access[data-state="error"] { color: var(--warn); }
@@ -731,6 +758,7 @@
       <button type="button" data-tab="addmon">➕ Add a Mon</button>
       <button type="button" data-tab="tournaments">🏆 Tournaments</button>
       <button type="button" data-tab="suggestions">💬 Suggestions <span id="suggestion-nav-count"></span></button>
+      <button type="button" data-tab="stats">Stats</button>
     </nav>
     <main id="content"></main>
     <dialog id="community-login-dialog" class="community-dialog">

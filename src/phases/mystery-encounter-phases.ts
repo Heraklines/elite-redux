@@ -69,6 +69,7 @@ import { COOP_ME_PICK_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-re
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { erRecordMysteryEncounterResolved } from "#data/elite-redux/er-achievement-detection";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
+import { recordTelemetryMysteryEncounter } from "#data/elite-redux/telemetry/telemetry-hooks";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -460,6 +461,20 @@ export class MysteryEncounterPhase extends Phase {
     encounter.updateSeedOffset();
 
     if (!this.optionSelectSettings) {
+      let availableOptions: number[] = [];
+      try {
+        availableOptions = encounter.options.flatMap((option, index) => (option.meetsRequirements() ? [index] : []));
+      } catch {
+        availableOptions = [];
+      }
+      recordTelemetryMysteryEncounter({
+        stage: "opened",
+        encounterType: encounter.encounterType,
+        encounterTier: encounter.encounterTier,
+        optionCount: encounter.options.length,
+        availableOptions,
+        subSelection: false,
+      });
       // Sets flag that ME was encountered, only if this is not a followup option select phase
       // Can be used in later MEs to check for requirements to spawn, run history, etc.
       globalScene.mysteryEncounterSaveData.encounteredEvents.push(
@@ -821,6 +836,17 @@ export class MysteryEncounterPhase extends Phase {
 
     // Set option selected only after the exact operation is committed (or on the negotiated legacy path).
     globalScene.currentBattle.mysteryEncounter!.selectedOption = option;
+    const selectedEncounter = globalScene.currentBattle.mysteryEncounter!;
+    const selectedOptions = this.optionSelectSettings?.overrideOptions ?? selectedEncounter.options;
+    recordTelemetryMysteryEncounter({
+      stage: "choice",
+      encounterType: selectedEncounter.encounterType,
+      encounterTier: selectedEncounter.encounterTier,
+      optionCount: selectedOptions.length,
+      availableOptions: [],
+      optionIndex: index,
+      subSelection: this.optionSelectSettings != null,
+    });
 
     // #record-replay (single-player): capture the ME option pick (top-level "me" vs a followup "meSub").
     // No-op unless recording / in co-op (co-op drives the ME via its pump, which owns that path).
@@ -1791,6 +1817,19 @@ export class PostMysteryEncounterPhase extends Phase {
    * Queues {@linkcode NewBattlePhase}, plays outro dialogue and ends phase
    */
   continueEncounter() {
+    const encounter = globalScene.currentBattle?.mysteryEncounter;
+    if (encounter) {
+      const selectedOptionIndex = encounter.selectedOption ? encounter.options.indexOf(encounter.selectedOption) : -1;
+      recordTelemetryMysteryEncounter({
+        stage: "resolved",
+        encounterType: encounter.encounterType,
+        encounterTier: encounter.encounterTier,
+        optionCount: encounter.options.length,
+        availableOptions: [],
+        ...(selectedOptionIndex >= 0 ? { optionIndex: selectedOptionIndex } : {}),
+        subSelection: false,
+      });
+    }
     const endPhase = () => {
       // Co-op AUTHORITATIVE host (#633, CHANGE-4 / P4): UNCONDITIONALLY stream the comprehensive
       // ME-terminal resync (full party / ME-save weighting / RNG cursor / dex) AFTER all side
