@@ -1284,7 +1284,7 @@ mod tests {
             &VolatileTagAdmission {
                 owner,
                 subject: VolatileTagSubject::PositionalTag {
-                    side: er_types::battle_model::BattleSide::Player,
+                    side: er_types::battle_ids::BattleSide::Player,
                     registry_key: "STEALTH_ROCK".to_owned(),
                 },
                 layers_delta: 1,
