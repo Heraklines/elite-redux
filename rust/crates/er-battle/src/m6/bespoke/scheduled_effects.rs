@@ -713,8 +713,13 @@ pub fn lapse_field_conditions(
 mod tests {
     use super::*;
     use er_state::bespoke_v2::scheduled_effects::SCHEDULED_EFFECTS_SCHEMA_VERSION;
+    use er_types::BehaviorSourceId;
+    use er_types::BehaviorUnitKind;
+    use er_types::BehaviorUnitOrdinal;
     use er_types::ProvenanceHash;
     use er_types::battle_ids::BattleSide;
+
+    const FIXTURE_HASH: &str = "c3454e08d7445e131e46dec1fb9cbf2c5da15d843d1a404c028ecedda6668a4e";
 
     fn unit(source: BehaviorSourceId) -> BehaviorUnitId {
         BehaviorUnitId {
