@@ -154,8 +154,10 @@ mod tests {
     use super::*;
     use er_mechanics::ProgramRange;
     use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
+    use er_mechanics::m6::ProgramBudgetV2;
     use er_mechanics::selector_operation_v2::{SelectorArenaV2, SelectorNodeV2};
     use er_types::m6::{BehaviorUnitOrdinal, ProvenanceHash};
+    use er_types::mechanics::MechanicsProgramId;
     use er_types::{M6_MECHANICS_PROGRAM_VERSION, SafeU53};
 
     const TEST_PROVENANCE_HASH: &str =
@@ -179,6 +181,7 @@ mod tests {
         selector_root: Option<SelectorNodeIdV2>,
         operation: MechanicOperationV2,
     ) -> MechanicsProgramV2 {
+        let selector_nodes = u16::try_from(selectors.len()).unwrap_or(u16::MAX);
         let unit = move_unit();
         MechanicsProgramV2 {
             schema_version: M6_MECHANICS_PROGRAM_VERSION,
@@ -206,7 +209,7 @@ mod tests {
             budget: ProgramBudgetV2 {
                 hook_bindings: 1,
                 condition_nodes: 0,
-                selector_nodes: selectors.len() as u16,
+                selector_nodes,
                 value_nodes: 0,
                 operations: 1,
                 scheduled_events: 0,
@@ -236,7 +239,7 @@ mod tests {
 
     #[test]
     fn crit_query_step_exposes_staged_modifier() {
-        let program = program_with(
+        let mut program = program_with(
             10,
             MechanicHookV2::CriticalQuery,
             SelectorArenaV2::default(),
@@ -249,6 +252,10 @@ mod tests {
                 },
             },
         );
+        program.values = ValueArenaV2(vec![er_mechanics::condition_v2::ValueNodeV2::Constant {
+            value: 1,
+        }]);
+        program.budget.value_nodes = 1;
         let prepared = prepare_move_routine(program).unwrap();
         let steps: Vec<_> = prepared.steps().collect();
         assert_eq!(steps[0].hook, MechanicHookV2::CriticalQuery);
@@ -270,10 +277,10 @@ mod tests {
         program.source = BehaviorSourceId::Weather {
             numeric_id: SafeU53::new(3).unwrap(),
         };
-        assert_eq!(
+        assert!(matches!(
             prepare_move_routine(program),
             Err(MoveRoutineAdapterError::NotMoveSource)
-        );
+        ));
     }
 
     #[test]
@@ -285,10 +292,10 @@ mod tests {
             Some(SelectorNodeIdV2::ZERO),
             MechanicOperationV2::HpDamage { amount: 10 },
         );
-        assert_eq!(
+        assert!(matches!(
             prepare_move_routine(program),
             Err(MoveRoutineAdapterError::UnsupportedOperation { index: 0 })
-        );
+        ));
     }
 
     #[test]
@@ -300,9 +307,9 @@ mod tests {
             None,
             MechanicOperationV2::StatusApply,
         );
-        assert_eq!(
+        assert!(matches!(
             prepare_move_routine(program),
             Err(MoveRoutineAdapterError::SelectorRequired { binding: 0 })
-        );
+        ));
     }
 }

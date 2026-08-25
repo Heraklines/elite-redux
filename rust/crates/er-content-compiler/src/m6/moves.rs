@@ -811,7 +811,7 @@ mod tests {
     };
     use er_types::m6::{BehaviorUnitOrdinal, ProvenanceHash};
     use er_types::mechanics::MechanicsProgramId;
-    use er_types::{BehaviorSourceId, SafeU53};
+    use er_types::{BehaviorSourceId, BehaviorUnitId, SafeU53};
 
     fn attribute_unit(
         class: &str,
