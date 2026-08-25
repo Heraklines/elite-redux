@@ -141,9 +141,13 @@ jobs:
           restore-keys: |
             m6-focused-routine-${{ runner.os }}-${{ runner.arch }}-
             m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
-      - name: Run exact changed routine contract first
+      - name: Run exact changed routine contracts first
         working-directory: rust
-        run: cargo test -p er-testkit --test m6_routine_mapping
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m6_routine_mapping
+          cargo test -p er-testkit --test m6_prepared_parity
 
   family-tests:
     name: Focused M6 family tests
