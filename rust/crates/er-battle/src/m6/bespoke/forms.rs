@@ -68,6 +68,8 @@ pub enum FormsOutcomeV2 {
 
 #[derive(Debug, Eq, Error, PartialEq)]
 pub enum FormsTransitionError {
+    #[error("no battler is registered under the requested mechanic scope")]
+    UnknownBattlerScope,
     #[error("scope already carries an active {active:?} overlay")]
     OverlayActive { active: FormOverlayKindV2 },
     #[error("mega evolution was already admitted for this battler this battle")]
@@ -411,28 +413,34 @@ pub fn cleanup_on_switch(
 ) -> Result<FormsTransitionV2, FormsTransitionError> {
     let (mut next, position) = prepared(state, scope)?;
     let cue_start = next.cues.len();
-    let battler = next.battler_mut_at(position);
-    let lapsed = match &battler.overlay {
-        Some(overlay) if overlay.kind != FormOverlayKindV2::Tera => Some(overlay.kind),
-        _ => None,
-    };
-    let had_request = battler.pending_stance_request.is_some();
-    if lapsed.is_none() && !had_request {
-        return finish(next, FormsOutcomeV2::IdempotentNoOp, cue_start);
-    }
-    if let Some(kind) = lapsed {
+    let (lapsed, base, previous) = {
+        let battler = next.battler_mut_at(position);
+        let lapsed = match &battler.overlay {
+            Some(overlay) if overlay.kind != FormOverlayKindV2::Tera => Some(overlay.kind),
+            _ => None,
+        };
+        if lapsed.is_none() && battler.pending_stance_request.is_none() {
+            return finish(next, FormsOutcomeV2::IdempotentNoOp, cue_start);
+        }
         let base = battler.base.clone();
         let previous = battler.current.clone();
+        // Mutate through the owned borrow first; cue staging below re-borrows
+        // `next`, so the mutable battler borrow must end before the calls.
+        if let Some(kind) = lapsed {
+            battler.overlay = None;
+            battler.current = base.clone();
+        }
+        battler.pending_stance_request = None;
+        (lapsed, base, previous)
+    };
+    if let Some(kind) = lapsed {
         next.push_cue(
             FormCueKindV2::OverlayReverted(kind),
             *scope,
             Some(previous),
             Some(base),
         );
-        battler.overlay = None;
-        battler.current = battler.base.clone();
     }
-    battler.pending_stance_request = None;
     next.push_cue(FormCueKindV2::SwitchCleanup, *scope, None, None);
     finish(next, FormsOutcomeV2::Applied, cue_start)
 }
