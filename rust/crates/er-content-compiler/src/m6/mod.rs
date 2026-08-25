@@ -23,6 +23,7 @@
 
 pub mod catalog;
 pub mod pipeline;
+pub mod routine;
 
 pub use catalog::{
     CatalogValidationError, M6_ORACLE_SHA, SemanticCatalogInput, ValidatedSemanticCatalog,
@@ -32,4 +33,8 @@ pub use pipeline::{
     CompilerOptions, INTRINSIC_RULE_MISSING_REASON, IntrinsicRule, OPERAND_SCHEMA_MISSING_REASON,
     ProgramAllocation, SEMANTIC_COMPILE_REPORT_SCHEMA_VERSION, SemanticCompileError,
     SemanticCompileOutput, SemanticCompileReport, SemanticCompileRequest, compile_semantics,
+};
+pub use routine::{
+    MappingFamily, MappingRuleId, RoutineCompileError, RoutineProgramSpec, boolean_operand,
+    implementation_name, operand, safe_integer_operand, string_operand,
 };
