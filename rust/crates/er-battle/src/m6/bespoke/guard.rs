@@ -52,30 +52,19 @@ pub enum GuardTransitionError {
     #[error("owner already holds an active guard of this family slot")]
     ActiveGuardConflict,
     #[error("success threshold 3^{depth} is not representable in the audited draw domain")]
-    ThresholdRangeUnrepresentable {
-        depth: u32,
-    },
+    ThresholdRangeUnrepresentable { depth: u32 },
     #[error("chain depth counter exhausted")]
     ChainDepthOverflow,
     #[error("audited draw required at chain depth {depth}, range {expected}")]
-    MissingAuditedDraw {
-        depth: u32,
-        expected: u64,
-    },
+    MissingAuditedDraw { depth: u32, expected: u64 },
     #[error("first chained use is guaranteed; audited draws are not admitted")]
     DrawSuppliedForGuaranteedSuccess,
     #[error("side guards never consume odds; audited draws are not admitted")]
     DrawSuppliedForUngatedActivation,
     #[error("audited draw range mismatch: threshold requires {expected}, got {actual}")]
-    RangeMismatch {
-        expected: u64,
-        actual: u64,
-    },
+    RangeMismatch { expected: u64, actual: u64 },
     #[error("audited roll {roll} lies outside the declared range {range}")]
-    RollOutOfRange {
-        roll: u64,
-        range: u64,
-    },
+    RollOutOfRange { roll: u64, range: u64 },
     #[error("ordinal counter exhausted")]
     OrdinalSpaceExhausted,
     #[error("damage amount must be positive")]
@@ -1571,13 +1560,10 @@ mod tests {
         let base = fresh_state();
         let protect = self_request(OWNER_A, GuardKind::Protect);
         let chained = apply_guard_use(&base, &protect, None).unwrap().state;
-        let chained_again = apply_guard_use(
-            &chained,
-            &self_request(OWNER_B, GuardKind::Detect),
-            None,
-        )
-        .unwrap()
-        .state;
+        let chained_again =
+            apply_guard_use(&chained, &self_request(OWNER_B, GuardKind::Detect), None)
+                .unwrap()
+                .state;
         let reset = reset_guard_chain(&chained_again).unwrap();
         assert_eq!(reset.self_guards.len(), chained_again.self_guards.len());
         assert_eq!(reset.chain_depth, 0);

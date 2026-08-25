@@ -474,9 +474,7 @@ pub fn commander_enter(
     topology.validate()?;
     topology.resolve_identity(&facts.commander)?;
     topology.resolve_identity(&facts.host)?;
-    if !eligibility.commander_is_commander_species
-        || !eligibility.host_is_commanded_species
-    {
+    if !eligibility.commander_is_commander_species || !eligibility.host_is_commanded_species {
         return Err(PivotRedirectError::CommanderSpeciesIneligible);
     }
     if facts.commander.slot == facts.host.slot {
@@ -920,9 +918,7 @@ pub fn plan_moving_first_trap_flinch(
     let admitted = match (gate_open, draw) {
         (false, None) => None,
         (false, Some(offered)) => {
-            return Err(PivotRedirectError::UnexpectedAuditedDraw {
-                site: offered.site,
-            });
+            return Err(PivotRedirectError::UnexpectedAuditedDraw { site: offered.site });
         }
         (true, None) => {
             return Err(PivotRedirectError::MissingAuditedDraw {
@@ -1020,9 +1016,7 @@ pub fn plan_pitfall_always_hit(
     let (admitted, succeeded) = match (facts.chance_gate, draw) {
         (ChanceGate::Always, None) => (None, true),
         (ChanceGate::Always, Some(offered)) => {
-            return Err(PivotRedirectError::UnexpectedAuditedDraw {
-                site: offered.site,
-            });
+            return Err(PivotRedirectError::UnexpectedAuditedDraw { site: offered.site });
         }
         (ChanceGate::Percent(_), None) => {
             return Err(PivotRedirectError::MissingAuditedDraw {
@@ -1922,12 +1916,8 @@ mod tests {
             }
         );
 
-        let admitted = admit_audited_draw(&draw(
-            FamilyRngSite::MovingFirstTrapFlinchRoll,
-            100,
-            41,
-        ))
-        .expect("admits");
+        let admitted = admit_audited_draw(&draw(FamilyRngSite::MovingFirstTrapFlinchRoll, 100, 41))
+            .expect("admits");
         assert_eq!(admitted.site_ordinal, 90);
         assert_eq!(
             admitted.registry_key,
@@ -1939,18 +1929,14 @@ mod tests {
 
         // The dynamic-denominator site accepts any result inside the range
         // the audited runtime actually used.
-        let admitted =
-            admit_audited_draw(&draw(FamilyRngSite::MoodyFormationDenominator, 3, 2))
-                .expect("dynamic range admits");
+        let admitted = admit_audited_draw(&draw(FamilyRngSite::MoodyFormationDenominator, 3, 2))
+            .expect("dynamic range admits");
         assert_eq!(admitted.site.frozen_range(), None);
     }
 
     #[test]
     fn moving_first_trap_applies_on_every_hit_and_flinch_only_on_the_first() {
-        let topology = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (ENEMY, 0, 20, false),
-        ]);
+        let topology = doubles_topology(&[(PLAYER, 0, 10, false), (ENEMY, 0, 20, false)]);
         let state = fresh_state();
         let facts = MovingFirstTrapFlinchFacts {
             trapper: ident(PLAYER, 0, 10),
@@ -1981,9 +1967,8 @@ mod tests {
                 site: FamilyRngSite::MovingFirstTrapFlinchRoll
             }
         );
-        let untouched =
-            plan_moving_first_trap_flinch(&topology, &state, &closed_gate, None)
-                .expect("closed gate without a draw");
+        let untouched = plan_moving_first_trap_flinch(&topology, &state, &closed_gate, None)
+            .expect("closed gate without a draw");
         assert!(!untouched.trap_applied);
         assert!(untouched.state.traps.is_empty());
 
@@ -2073,10 +2058,7 @@ mod tests {
 
     #[test]
     fn pitfall_chance_roll_gates_both_effects_together() {
-        let topology = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (ENEMY, 0, 20, false),
-        ]);
+        let topology = doubles_topology(&[(PLAYER, 0, 10, false), (ENEMY, 0, 20, false)]);
         let state = fresh_state();
         let facts = PitfallAlwaysHitFacts {
             user: ident(PLAYER, 0, 10),
@@ -2147,10 +2129,7 @@ mod tests {
 
     #[test]
     fn commander_species_eligibility_facts_reject_false_verdicts() {
-        let topology = doubles_topology(&[
-            (PLAYER, 0, 10, false),
-            (PLAYER, 1, 11, false),
-        ]);
+        let topology = doubles_topology(&[(PLAYER, 0, 10, false), (PLAYER, 1, 11, false)]);
         let state = fresh_state();
         let pair = CommanderPairFacts {
             commander: ident(PLAYER, 1, 11),

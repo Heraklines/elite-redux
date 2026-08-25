@@ -364,9 +364,9 @@ pub enum TransformImposterError {
 
 #[cfg(test)]
 mod tests {
-    use er_types::battle_ids::{AbilityId, BattleSide};
     use super::TransformTransitionKindV2 as Kind;
     use super::*;
+    use er_types::battle_ids::{AbilityId, BattleSide};
 
     const SUBJECT_ID: u64 = 10;
     const SOURCE_ID: u64 = 20;

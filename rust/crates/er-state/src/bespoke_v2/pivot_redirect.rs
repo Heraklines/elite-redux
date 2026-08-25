@@ -362,8 +362,7 @@ impl PivotRedirectStateV2 {
         };
         let mut next = self.advance_ordinal()?;
         next.traps.retain(|existing| {
-            !(existing.kind == TrapKind::Binding
-                && existing.subject.pokemon == subject.pokemon)
+            !(existing.kind == TrapKind::Binding && existing.subject.pokemon == subject.pokemon)
         });
         next.traps.push(trap.clone());
         let next = next.validated()?;
@@ -588,7 +587,10 @@ mod tests {
         assert_eq!(error, PivotRedirectStateError::CommanderSelfPairing);
 
         let (state, _) = state
-            .admit_redirect(occupant(player(0), u64::from(commander)), RedirectKind::FollowMe)
+            .admit_redirect(
+                occupant(player(0), u64::from(commander)),
+                RedirectKind::FollowMe,
+            )
             .expect("redirect");
         let error = state
             .assign_commander(commander, player(0), host)
