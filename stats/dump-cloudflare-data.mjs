@@ -69,7 +69,7 @@ const runColumn = name => (runColumns.has(name) ? name : `NULL AS ${name}`);
 
 const runRows = await pagedQuery(
   savesDb,
-  `SELECT user_id, starters, challenges, difficulty, mode, pacing, wave, progression_wave, outcome,
+  `SELECT user_id, starters, challenges, difficulty, mode, ${runColumn("pacing")}, wave, ${runColumn("progression_wave")}, outcome,
           ${runColumn("build_sha")}, ${runColumn("game_version")}, ${runColumn("er_version")},
           player_team, opponent_team, killed_by_ghost, relics, created_at
      FROM runs
