@@ -24,7 +24,7 @@ use er_state::bespoke_v2::transform_imposter::{
     TransformCopyTriggerV2, TransformFormCopyStateError, TransformFormCopyStateV2,
 };
 use er_types::SafeU53;
-use er_types::battle_ids::{AbilityId, FieldSlot, MoveId, PokemonId};
+use er_types::battle_ids::{FieldSlot, MoveId, PokemonId};
 use er_types::battle_model::{BattleStats, PokemonTyping, StatStages};
 use er_types::m6::FormId;
 
@@ -364,9 +364,9 @@ pub enum TransformImposterError {
 
 #[cfg(test)]
 mod tests {
+    use er_types::battle_ids::{AbilityId, BattleSide};
     use super::TransformTransitionKindV2 as Kind;
     use super::*;
-    use er_types::battle_ids::BattleSide;
 
     const SUBJECT_ID: u64 = 10;
     const SOURCE_ID: u64 = 20;
