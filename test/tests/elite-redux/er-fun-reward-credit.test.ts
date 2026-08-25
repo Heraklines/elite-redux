@@ -50,4 +50,22 @@ describe.skipIf(!RUN)("Fun Mode reward credit", () => {
     expect(globalScene.gameData.addStarterCandy(SpeciesId.MAGIKARP, 1, false, false)).toBe(true);
     expect(candyEntry.candyCount).toBe(candyBefore + getCurrentErRewardRates().totalCandy);
   });
+
+  it("suppresses voucher rewards in Fun Debug", async () => {
+    const game = new GameManager(phaserGame);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    game.scene.gameMode = getGameMode(GameModes.FUN);
+    setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, debugMode: true });
+
+    const voucher = new Voucher(VoucherType.PLUS, "Fun Debug isolation");
+    voucher.id = "__ER_FUN_DEBUG_NO_REWARD__";
+    const plusBefore = globalScene.gameData.voucherCounts[VoucherType.PLUS];
+    expect(globalScene.validateVoucher(voucher)).toBe(false);
+    expect(globalScene.gameData.voucherCounts[VoucherType.PLUS]).toBe(plusBefore);
+
+    const regularBefore = globalScene.gameData.voucherCounts[VoucherType.REGULAR];
+    const type = new AddVoucherModifierType(VoucherType.REGULAR, 3);
+    expect(new AddVoucherModifier(type, VoucherType.REGULAR, 3).apply()).toBe(true);
+    expect(globalScene.gameData.voucherCounts[VoucherType.REGULAR]).toBe(regularBefore);
+  });
 });

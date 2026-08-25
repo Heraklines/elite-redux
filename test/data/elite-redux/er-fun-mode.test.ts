@@ -67,6 +67,7 @@ describe("Fun Mode configuration", () => {
   it("starts fresh runs with every modifier disabled", () => {
     expect(DEFAULT_FUN_MODE_CONFIG).toMatchObject({
       difficulty: "youngster",
+      debugMode: false,
       randomizePokemon: false,
       randomizeTypes: false,
       randomizeAbilities: false,
@@ -95,6 +96,7 @@ describe("Fun Mode configuration", () => {
   it("stores independent randomizer toggles", () => {
     setFunModeConfig({
       difficulty: "hell",
+      debugMode: true,
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: false,
@@ -112,6 +114,7 @@ describe("Fun Mode configuration", () => {
     });
     expect(getFunModeConfig()).toEqual({
       difficulty: "hell",
+      debugMode: true,
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: false,
@@ -132,6 +135,7 @@ describe("Fun Mode configuration", () => {
   it("persists the last modifier setup without carrying over its reroll seed", () => {
     const config = {
       difficulty: "hell" as const,
+      debugMode: true,
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: true,
@@ -150,6 +154,7 @@ describe("Fun Mode configuration", () => {
     saveLastFunModeConfig(config);
     expect(loadLastFunModeConfig()).toEqual({
       difficulty: "hell",
+      debugMode: true,
       randomizePokemon: false,
       randomizeTypes: true,
       randomizeAbilities: true,
@@ -183,6 +188,7 @@ describe("Fun Mode configuration", () => {
     );
     expect(loadLastFunModeConfig()).toMatchObject({
       difficulty: "youngster",
+      debugMode: false,
       randomizePokemon: true,
       randomizeTypes: false,
       randomizeAbilities: true,
@@ -211,6 +217,10 @@ describe("Fun Mode configuration", () => {
     setFunModeConfig(DEFAULT_FUN_MODE_CONFIG);
     expect(shouldGrantFunCaptureProgress(false)).toBe(true);
     expect(shouldGrantFunCaptureProgress(true)).toBe(true);
+
+    setFunModeConfig({ ...DEFAULT_FUN_MODE_CONFIG, debugMode: true });
+    expect(shouldGrantFunCaptureProgress(false)).toBe(false);
+    expect(shouldGrantFunCaptureProgress(true)).toBe(false);
   });
 });
 

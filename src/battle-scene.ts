@@ -86,7 +86,7 @@ import {
 } from "#data/elite-redux/er-endless-continuation";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
-import { getFunModeConfig } from "#data/elite-redux/er-fun-mode";
+import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { getLastGenericTrainerType, markGenericTrainerType } from "#data/elite-redux/er-generic-trainer-run-state";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -5058,6 +5058,9 @@ export class BattleScene extends SceneBase {
   }
 
   validateAchv<T extends Achv>(achv: T, args?: Parameters<T["validate"]>[0]): boolean {
+    if (isFunDebugModeActive(this.gameMode?.isFun)) {
+      return false;
+    }
     if (
       (!Object.hasOwn(this.gameData.achvUnlocks, achv.id) || Overrides.ACHIEVEMENTS_REUNLOCK_OVERRIDE)
       && achv.validate(args)
@@ -5077,6 +5080,9 @@ export class BattleScene extends SceneBase {
   }
 
   validateVoucher(voucher: Voucher, args?: unknown[]): boolean {
+    if (isFunDebugModeActive(this.gameMode?.isFun)) {
+      return false;
+    }
     if (!Object.hasOwn(this.gameData.voucherUnlocks, voucher.id) && voucher.validate(args)) {
       this.gameData.voucherUnlocks[voucher.id] = Date.now();
       this.ui.achvBar.showAchv(voucher);

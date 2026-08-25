@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
+import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import type { SpeciesId } from "#enums/species-id";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
 
@@ -10,6 +11,9 @@ import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
  * @param ribbons - The ribbon(s) to award (use bitwise OR to combine multiple)
  */
 export function awardRibbonsToSpeciesLine(id: SpeciesId, ribbons: RibbonFlag): void {
+  if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+    return;
+  }
   const dexData = globalScene.gameData.dexData;
   dexData[id].ribbons.award(ribbons);
   // Mark all pre-evolutions of the Pokémon with the same ribbon flags.

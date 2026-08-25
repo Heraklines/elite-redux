@@ -243,6 +243,7 @@ export type SavedFunModeConfig = Omit<FunModeConfig, "abilityRerollSeed">;
 
 const FUN_MODE_CONFIG_KEYS: readonly (keyof SavedFunModeConfig)[] = [
   "difficulty",
+  "debugMode",
   "randomizePokemon",
   "randomizeTypes",
   "randomizeAbilities",

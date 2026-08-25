@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { UiMode } from "#enums/ui-mode";
 import type { Unlockables } from "#enums/unlockables";
 import { getUnlockableName } from "#system/unlockables";
@@ -16,6 +17,10 @@ export class UnlockPhase extends Phase {
   }
 
   start(): void {
+    if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
+      this.end();
+      return;
+    }
     globalScene.time.delayedCall(2000, () => {
       globalScene.gameData.unlocks[this.unlockable] = true;
       // Sound loaded into game as is

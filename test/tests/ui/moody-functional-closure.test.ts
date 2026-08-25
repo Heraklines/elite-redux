@@ -9,7 +9,10 @@ vi.mock("#app/global-scene", () => ({ globalScene: {} }));
 vi.mock("#app/phase", () => ({ Phase: class {} }));
 vi.mock("#constants/app-constants", () => ({ isDev: false }));
 vi.mock("#data/data-lists", () => ({ allMoves: [] }));
-vi.mock("#data/elite-redux/er-fun-mode", () => ({ getFunModeConfig: () => ({ moodyMode: false }) }));
+vi.mock("#data/elite-redux/er-fun-mode", () => ({
+  getFunModeConfig: () => ({ moodyMode: false }),
+  isFunDebugModeActive: () => false,
+}));
 vi.mock("#data/elite-redux/moody/moody-enemy", () => ({ getMoodyEnemyBoonLoadout: () => null }));
 vi.mock("#data/elite-redux/moody/moody-formation-game-adapter", () => ({
   getMoodyFormationHudSnapshot: () => ({ activePlayer: [] }),
