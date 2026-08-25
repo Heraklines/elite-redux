@@ -1,59 +1,574 @@
 {
+  "SPECIES_ABRA_REDUX": {
+    "cost": 4
+  },
+  "SPECIES_AERODACTYL": {
+    "cost": 4
+  },
+  "SPECIES_AIPOM": {
+    "cost": 3
+  },
+  "SPECIES_ALOLA_GEODUDE": {
+    "cost": 2
+  },
+  "SPECIES_ALOLA_GRIMER": {
+    "cost": 1
+  },
+  "SPECIES_ALOLA_MEOWTH": {
+    "cost": 2
+  },
+  "SPECIES_ALOMOMOLA": {
+    "cost": 1
+  },
+  "SPECIES_AMAURA": {
+    "cost": 3
+  },
+  "SPECIES_ANORITH": {
+    "cost": 2
+  },
+  "SPECIES_ARCEUS": {
+    "cost": 8
+  },
+  "SPECIES_ARROKUDA": {
+    "cost": 2
+  },
+  "SPECIES_ARTICUNO_EX": {
+    "cost": 8
+  },
+  "SPECIES_AZELF": {
+    "cost": 5
+  },
+  "SPECIES_AZELF_REDUX": {
+    "cost": 5
+  },
+  "SPECIES_AZURILL": {
+    "cost": 3
+  },
+  "SPECIES_BASCULIN": {
+    "cost": 3
+  },
+  "SPECIES_BELLSPROUT_REDUX": {
+    "cost": 2
+  },
+  "SPECIES_BERGMITE": {
+    "cost": 2
+  },
+  "SPECIES_BLACEPHALON": {
+    "cost": 6
+  },
+  "SPECIES_BLIZZARD_MAW": {
+    "cost": 5
+  },
+  "SPECIES_BOMBIRDIER": {
+    "cost": 3
+  },
+  "SPECIES_BOUFFALANT": {
+    "cost": 3
+  },
+  "SPECIES_BRAMBLIN": {
+    "cost": 1
+  },
+  "SPECIES_BRONZOR": {
+    "cost": 2
+  },
+  "SPECIES_BRUXISH": {
+    "cost": 3
+  },
+  "SPECIES_BUNNELBY": {
+    "cost": 1
+  },
+  "SPECIES_BURMY_ETERNA": {
+    "cost": 10
+  },
+  "SPECIES_CARVANHA": {
+    "cost": 2
+  },
   "SPECIES_CASTFORM": {
-    "cost": 2,
+    "cost": 1,
     "eggTier": 1
+  },
+  "SPECIES_CELESTEELA": {
+    "cost": 5
+  },
+  "SPECIES_CETODDLE": {
+    "cost": 2
   },
   "SPECIES_CHI_YU": {
     "eggTier": 3
   },
+  "SPECIES_COBALION": {
+    "cost": 5
+  },
+  "SPECIES_COSMOG": {
+    "cost": 6
+  },
+  "SPECIES_CRAMORANT": {
+    "cost": 2
+  },
+  "SPECIES_CRESSELIA": {
+    "cost": 5
+  },
+  "SPECIES_CRYOGONAL": {
+    "cost": 3
+  },
+  "SPECIES_DARKRAI_NIGHTMARE": {
+    "cost": 9
+  },
+  "SPECIES_DEERLING": {
+    "cost": 1
+  },
+  "SPECIES_DIPPOWDOWN": {
+    "cost": 4
+  },
+  "SPECIES_DRAGONITE_DELIVERY": {
+    "cost": 8
+  },
+  "SPECIES_DUNSPARCE": {
+    "cost": 2
+  },
+  "SPECIES_DUSKULL": {
+    "cost": 2
+  },
+  "SPECIES_ENAMORUS": {
+    "cost": 4
+  },
+  "SPECIES_ENTEI": {
+    "cost": 5
+  },
+  "SPECIES_EXEGGCUTE": {
+    "cost": 2
+  },
+  "SPECIES_EXEGGCUTE_REDUX": {
+    "cost": 2
+  },
+  "SPECIES_FALINKS": {
+    "cost": 3
+  },
   "SPECIES_FEEBAS": {
     "cost": 3
+  },
+  "SPECIES_FLABEBE": {
+    "cost": 2
+  },
+  "SPECIES_FLAMIGO": {
+    "cost": 3
+  },
+  "SPECIES_FLUTTER_MANE": {
+    "cost": 5
+  },
+  "SPECIES_FLYGON_REDUX_B": {
+    "cost": 5
+  },
+  "SPECIES_FOONGUS": {
+    "cost": 2
+  },
+  "SPECIES_FRIGIBAX": {
+    "cost": 3
+  },
+  "SPECIES_FRILLISH": {
+    "cost": 2
+  },
+  "SPECIES_FURFROU": {
+    "cost": 2
+  },
+  "SPECIES_GALAR_MEOWTH": {
+    "cost": 2
   },
   "SPECIES_GALAR_STUNFISK": {
     "eggTier": 0
   },
+  "SPECIES_GALAR_ZIGZAGOON": {
+    "cost": 2
+  },
+  "SPECIES_GASTLY": {
+    "cost": 3
+  },
+  "SPECIES_GEODUDE": {
+    "cost": 2
+  },
+  "SPECIES_GIBLE_REDUX": {
+    "cost": 4
+  },
+  "SPECIES_GLIGAR_REDUX": {
+    "cost": 4
+  },
+  "SPECIES_GOTHITA": {
+    "cost": 2
+  },
+  "SPECIES_GOUGING_FIRE": {
+    "cost": 6
+  },
+  "SPECIES_GREAT_TUSK": {
+    "cost": 5
+  },
+  "SPECIES_GRIMER": {
+    "cost": 1
+  },
+  "SPECIES_GROTOM": {
+    "cost": 4
+  },
+  "SPECIES_GROTOM_DRUM": {
+    "cost": 4
+  },
+  "SPECIES_GROTOM_FILL": {
+    "cost": 4
+  },
+  "SPECIES_GROTOM_GLASS": {
+    "cost": 4
+  },
+  "SPECIES_GROTOM_KICK": {
+    "cost": 4
+  },
+  "SPECIES_GROTOM_ROLL": {
+    "cost": 4
+  },
+  "SPECIES_GROUDON": {
+    "cost": 8
+  },
+  "SPECIES_GROWLITHE": {
+    "cost": 3
+  },
+  "SPECIES_GULPIN": {
+    "cost": 2
+  },
+  "SPECIES_HARVESTING_TYRANT": {
+    "cost": 5
+  },
   "SPECIES_HEATRAN": {
     "eggTier": 3
+  },
+  "SPECIES_HISUI_QWILFISH": {
+    "cost": 3
+  },
+  "SPECIES_HISUI_ZORUA": {
+    "cost": 2
+  },
+  "SPECIES_HO_OH": {
+    "cost": 7
+  },
+  "SPECIES_IRON_BUNDLE": {
+    "cost": 5
+  },
+  "SPECIES_IRON_CARAPACE": {
+    "cost": 5
+  },
+  "SPECIES_IRON_CROWN": {
+    "cost": 5
+  },
+  "SPECIES_IRON_SCYTHE": {
+    "cost": 5
+  },
+  "SPECIES_IRON_VOCA": {
+    "cost": 7
+  },
+  "SPECIES_JOLTIK": {
+    "cost": 2
   },
   "SPECIES_KARTANA": {
     "cost": 7
   },
   "SPECIES_KARTANA_FALLEN": {
-    "cost": 12
+    "cost": 10
   },
   "SPECIES_KECLEON": {
+    "cost": 3,
     "eggTier": 1
+  },
+  "SPECIES_KECLEONG": {
+    "cost": 10
+  },
+  "SPECIES_KYOGRE": {
+    "cost": 8
+  },
+  "SPECIES_LARVITAR": {
+    "cost": 3
+  },
+  "SPECIES_LATIAS": {
+    "cost": 6
+  },
+  "SPECIES_LATIOS": {
+    "cost": 6
+  },
+  "SPECIES_LUGIA": {
+    "cost": 7
+  },
+  "SPECIES_LUNATONE": {
+    "cost": 1
+  },
+  "SPECIES_MAGBY": {
+    "cost": 2
+  },
+  "SPECIES_MANKEY": {
+    "cost": 3
+  },
+  "SPECIES_MARBEEP": {
+    "cost": 3
+  },
+  "SPECIES_MELTAN": {
+    "cost": 5
+  },
+  "SPECIES_MERRYKARP": {
+    "cost": 3
+  },
+  "SPECIES_MESPRIT": {
+    "cost": 4
+  },
+  "SPECIES_MESPRIT_REDUX": {
+    "cost": 5
+  },
+  "SPECIES_MILCERY": {
+    "cost": 1
+  },
+  "SPECIES_MILTANK": {
+    "cost": 2
+  },
+  "SPECIES_MIME_JR": {
+    "cost": 1
+  },
+  "SPECIES_MIMIKYU": {
+    "cost": 3
   },
   "SPECIES_MINCCINO_REDUX": {
     "eggTier": 2
   },
+  "SPECIES_MOLTRES": {
+    "cost": 5
+  },
+  "SPECIES_MOLTRES_EX": {
+    "cost": 10
+  },
+  "SPECIES_MUNCHLAX": {
+    "cost": 3
+  },
+  "SPECIES_MURKROW": {
+    "cost": 2
+  },
+  "SPECIES_NACLI": {
+    "cost": 3
+  },
+  "SPECIES_NIHILEGO": {
+    "cost": 5
+  },
   "SPECIES_OGERPON": {
     "eggTier": 3
   },
+  "SPECIES_OKIDOGI": {
+    "cost": 5
+  },
+  "SPECIES_OMANYTE": {
+    "cost": 2
+  },
+  "SPECIES_ONIX": {
+    "cost": 2
+  },
+  "SPECIES_ORANGURU": {
+    "cost": 3
+  },
+  "SPECIES_ORTHWORM": {
+    "cost": 3
+  },
+  "SPECIES_PANCHAM": {
+    "cost": 2
+  },
+  "SPECIES_PANPOUR_REDUX": {
+    "cost": 2
+  },
+  "SPECIES_PANSAGE_REDUX": {
+    "cost": 2
+  },
+  "SPECIES_PANSEAR": {
+    "cost": 1
+  },
+  "SPECIES_PANSEAR_REDUX": {
+    "cost": 2
+  },
+  "SPECIES_PECHARUNT": {
+    "cost": 3
+  },
+  "SPECIES_PETILIL": {
+    "cost": 2
+  },
+  "SPECIES_PHANPY": {
+    "cost": 1
+  },
+  "SPECIES_PHIONE": {
+    "cost": 3
+  },
+  "SPECIES_POLARTIC_BLUEMOON": {
+    "cost": 5
+  },
+  "SPECIES_POLIWAG": {
+    "cost": 1
+  },
+  "SPECIES_POLTCHAGEIST": {
+    "cost": 3
+  },
+  "SPECIES_RAGING_BOLT": {
+    "cost": 6
+  },
+  "SPECIES_REGICE": {
+    "cost": 4
+  },
+  "SPECIES_REGIDRAGO": {
+    "cost": 5
+  },
+  "SPECIES_REGIELEKI": {
+    "cost": 5
+  },
+  "SPECIES_REGIGIGAS": {
+    "cost": 6
+  },
+  "SPECIES_REGIROCK": {
+    "cost": 4
+  },
+  "SPECIES_REGISTEEL": {
+    "cost": 4
+  },
+  "SPECIES_RIBOMBEE_REDUX": {
+    "cost": 4
+  },
+  "SPECIES_ROARING_MOON": {
+    "cost": 6
+  },
+  "SPECIES_ROLYCOLY": {
+    "cost": 2
+  },
   "SPECIES_SABLEYE_REDUX": {
     "eggTier": 1
+  },
+  "SPECIES_SANDY_SHOCKS": {
+    "cost": 5
+  },
+  "SPECIES_SAWK": {
+    "cost": 2
   },
   "SPECIES_SCYTHER": {
     "cost": 4,
     "eggTier": 0
   },
   "SPECIES_SCYTHER_REDUX": {
-    "cost": 4,
+    "cost": 5,
     "eggTier": 2
+  },
+  "SPECIES_SEEL": {
+    "cost": 2
   },
   "SPECIES_SEEL_REDUX": {
     "eggTier": 1
   },
+  "SPECIES_SEVIPER": {
+    "cost": 2
+  },
+  "SPECIES_SEWADDLE": {
+    "cost": 1
+  },
+  "SPECIES_SHAYMIN": {
+    "cost": 4
+  },
+  "SPECIES_SHUCKLE": {
+    "cost": 2
+  },
+  "SPECIES_SILICOBRA": {
+    "cost": 2
+  },
+  "SPECIES_SKARMORY": {
+    "cost": 3
+  },
   "SPECIES_SKARMORY_REDUX": {
+    "cost": 4,
     "eggTier": 2
+  },
+  "SPECIES_SLITHER_WING": {
+    "cost": 5
+  },
+  "SPECIES_SMEARGLE": {
+    "cost": 2
+  },
+  "SPECIES_SNOM": {
+    "cost": 1
+  },
+  "SPECIES_SOLOSIS": {
+    "cost": 2
+  },
+  "SPECIES_SPIRITOMB": {
+    "cost": 3
+  },
+  "SPECIES_SPOINK": {
+    "cost": 1
+  },
+  "SPECIES_STAKATAKA": {
+    "cost": 5
+  },
+  "SPECIES_STONJOURNER": {
+    "cost": 2
+  },
+  "SPECIES_STUFFUL": {
+    "cost": 2
+  },
+  "SPECIES_STUNKY": {
+    "cost": 1
+  },
+  "SPECIES_SURSKIT": {
+    "cost": 1
+  },
+  "SPECIES_SWINUB": {
+    "cost": 2
+  },
+  "SPECIES_SWIRLIX": {
+    "cost": 2
+  },
+  "SPECIES_TANGELA": {
+    "cost": 1
+  },
+  "SPECIES_TAPU_LELE": {
+    "cost": 6
+  },
+  "SPECIES_TEMPORAL_SKULL": {
+    "cost": 5
+  },
+  "SPECIES_TERAPAGOS": {
+    "cost": 8
+  },
+  "SPECIES_TERRAKION": {
+    "cost": 6
   },
   "SPECIES_TRAPINCH_REDUX": {
     "eggTier": 1
   },
+  "SPECIES_TROPIUS": {
+    "cost": 2
+  },
+  "SPECIES_TYRUNT": {
+    "cost": 2
+  },
+  "SPECIES_UXIE": {
+    "cost": 4
+  },
+  "SPECIES_UXIE_REDUX": {
+    "cost": 5
+  },
   "SPECIES_VOLCANION": {
     "cost": 6
   },
+  "SPECIES_XURKITREE": {
+    "cost": 5
+  },
+  "SPECIES_YANMA": {
+    "cost": 2
+  },
+  "SPECIES_YUNGOOS": {
+    "cost": 1
+  },
   "SPECIES_ZANGOOSE": {
     "cost": 3
+  },
+  "SPECIES_ZAPDOS_EX": {
+    "cost": 8
+  },
+  "SPECIES_ZIGZAGOON": {
+    "cost": 3
+  },
+  "SPECIES_ZORUA": {
+    "cost": 2
   }
 }
