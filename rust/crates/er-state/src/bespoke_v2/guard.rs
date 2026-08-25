@@ -465,6 +465,7 @@ mod tests {
         state.chain_depth = 6;
         state.self_guards.push(ActiveSelfGuardEntry {
             kind: GuardKind::KingsShield,
+            owner: pokemon_scope(11),
             creation_ordinal: ordinal(1),
         });
         state.side_guards.push(ActiveSideGuardEntry {
