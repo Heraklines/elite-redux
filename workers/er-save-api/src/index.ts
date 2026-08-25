@@ -5888,9 +5888,9 @@ export default {
       if (pathname === "/community/history" && method === "GET") {
         return await handleCommunityHistory(auth, env, cors);
       }
-      // Player reports allowlisted achievement unlocks (system saves are encrypted,
-      // so the worker can't read achvUnlocks itself). Used by featured tallies and
-      // Redux-only community-editor eligibility.
+      // Player reports allowlisted achievement unlocks for featured tallies and as
+      // a denormalized compatibility cache. Eligibility also reads achvUnlocks from
+      // the authenticated account's current system save.
       if (pathname === "/community/achv" && method === "POST") {
         return await handleCommunityAchvReport(request, auth, env, cors);
       }
