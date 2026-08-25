@@ -33,10 +33,11 @@
 //! this family: it consumes already-recorded damage values only.
 
 use er_mechanics::condition_v2::ExactRatioV2;
+use er_mechanics::v2::{MechanicHookV2, MechanicQueryV2};
 use er_state::bespoke_v2::special_damage::{
     SpecialDamageCategory, SpecialDamageStateError, SpecialDamageStateV2, StoredDamageRecordV2,
 };
-use er_types::SafeU53;
+use er_types::{BehaviorSourceId, BehaviorUnitId, BehaviorUnitKind, SafeU53};
 use thiserror::Error;
 
 /// Counter — 2x physical retaliation.
@@ -171,38 +172,46 @@ fn is_ally(left: u8, right: u8) -> bool {
     (left < BATTLER_INDEX_ENEMY_BOUNDARY) == (right < BATTLER_INDEX_ENEMY_BOUNDARY)
 }
 
-/// Target-selection evidence for one retaliation.
+/// Target-selection evidence for one retaliation, in oracle order.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum CounterTargetSelection {
     /// The recorded attacker is delivered directly.
     Direct(u8),
     /// The recorded attacker left the field and the first active battler on
     /// the attacker's side was delivered instead (multi-battle fallback).
-    SideFallback {
-        recorded_index: u8,
-        delivered_index: u8,
-    },
+    SideFallback { recorded_index: u8, delivered_index: u8 },
+    /// The recorded attacker and every same-side battler are gone: the
+    /// oracle's redirect falls back to the `BattlerIndex.ATTACKER` sentinel,
+    /// which skips the redirect and fails the move downstream. Carried as
+    /// ordered evidence instead of an early typed failure.
+    AttackerSentinel { recorded_index: u8 },
 }
 
 impl CounterTargetSelection {
-    pub fn delivered_index(&self) -> u8 {
+    pub fn delivered_index(&self) -> Option<u8> {
         match *self {
-            Self::Direct(index)
-            | Self::SideFallback {
-                delivered_index: index,
-                ..
-            } => index,
+            Self::Direct(index) | Self::SideFallback { delivered_index: index, .. } => Some(index),
+            Self::AttackerSentinel { .. } => None,
         }
     }
+
     pub fn recorded_index(&self) -> u8 {
         match *self {
             Self::Direct(index)
-            | Self::SideFallback {
-                recorded_index: index,
-                ..
-            } => index,
+            | Self::SideFallback { recorded_index: index, .. }
+            | Self::AttackerSentinel { recorded_index: index } => index,
         }
     }
+}
+
+/// Final delivery outcome of one retaliation transition.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RetaliationOutcome {
+    /// The redirect delivered; `damage` is the exact dealt amount.
+    Delivered { damage: i64 },
+    /// The oracle skipped the redirect onto its ATTACKER sentinel and the
+    /// move failed: no damage is dealt and no RNG is consumed.
+    FailedWithoutRedirect { recorded_index: u8 },
 }
 
 /// Selects the retaliation target from the stored record window.
@@ -256,7 +265,9 @@ pub fn select_counter_target(
                 delivered_index,
             },
         )),
-        None => Err(SpecialDamageError::SourceDisappeared),
+        None => Ok((record, CounterTargetSelection::AttackerSentinel {
+            recorded_index: record.attacker_index,
+        })),
     }
 }
 
@@ -310,7 +321,11 @@ pub struct RetaliationTransitionV2 {
     /// The record the retaliation consumed as its evidence.
     pub record: StoredDamageRecordV2,
     pub selection: CounterTargetSelection,
-    /// Exact retaliation damage after the frozen rounding rule.
+    /// Ordered delivery evidence.
+    pub outcome: RetaliationOutcome,
+    /// Exact retaliation amount after the frozen rounding rule. On
+    /// [`RetaliationOutcome::FailedWithoutRedirect`] this amount is never
+    /// dealt; it is retained as computation evidence only.
     pub retaliation_damage: i64,
 }
 
@@ -336,12 +351,22 @@ pub fn execute_retaliation(
         &request.field,
     )?;
     let retaliation_damage = compute_retaliation_amount(record.damage, profile.multiplier)?;
+    let outcome = match selection {
+        CounterTargetSelection::Direct(_)
+        | CounterTargetSelection::SideFallback { .. } => RetaliationOutcome::Delivered {
+            damage: retaliation_damage,
+        },
+        CounterTargetSelection::AttackerSentinel { recorded_index } => {
+            RetaliationOutcome::FailedWithoutRedirect { recorded_index }
+        }
+    };
     let transition = RetaliationTransitionV2 {
         move_id: profile.move_id,
         multiplier: profile.multiplier,
         filter: profile.filter,
         record,
         selection,
+        outcome,
         retaliation_damage,
     };
     let successor = state.clone();
@@ -373,6 +398,7 @@ pub fn execute_accumulated_release(
             turn_index: 0,
         },
         selection: CounterTargetSelection::Direct(0),
+        outcome: RetaliationOutcome::Delivered { damage: retaliation_damage },
         retaliation_damage,
     };
     Ok((successor, transition))
@@ -386,8 +412,12 @@ pub enum SpecialDamageError {
     NoEligibleSource,
     #[error("matching received attacks exist only outside the requested turn window")]
     StaleRecordsOnly,
-    #[error("recorded retaliation source disappeared with no alive replacement on its side")]
-    SourceDisappeared,
+    #[error("behavior unit is not part of the frozen special-damage cluster registry")]
+    UnregisteredBehaviorUnit,
+    #[error("catalog-marked unresolved effect from an unrelated ability cannot dispatch through this family")]
+    ForeignUnresolvedEffect,
+    #[error("dispatch request does not match the classified behavior unit")]
+    DispatchRequestMismatch,
     #[error("counter field view is invalid: {0}")]
     InvalidField(&'static str),
     #[error("retaliation multiplier must be positive")]
@@ -396,6 +426,1678 @@ pub enum SpecialDamageError {
     ArithmeticOverflow,
     #[error("special-damage state rejected the transition: {0}")]
     State(#[from] SpecialDamageStateError),
+}
+
+// ===== Frozen behavior-unit classification/dispatch registry =====
+//
+// The SPECIAL_DAMAGE_COUNTER cluster in `rust/fixtures/m6/bespoke-clusters-v1.json`
+// contains exactly 153 behavior units. Every unit is classified below by its
+// exact identity (ordinal + provenance hash + source + unit kind) and every
+// class resolves through the closed dispatcher at the bottom of this section.
+// Nothing is unclassified and no classification is a silent no-op: query
+// modifiers name their production DAMAGE_QUERY fold, dispatch sites name the
+// central loop surface that executes them, and foreign unresolved effects fail
+// closed.
+
+/// Behavior units covered by [`REGISTRY`].
+pub const SPECIAL_DAMAGE_REGISTRY_LEN: usize = 153;
+
+/// Received-damage admission gates of the `Block*` attribute family.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecordGateKind {
+    NonDirectDamage,
+    WeatherDamage,
+    StatusDamage,
+    RecoilDamage,
+}
+
+/// Origin of received damage considered for the record window.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DamageOrigin {
+    DirectMove(SpecialDamageCategory),
+    Weather,
+    Status,
+    Recoil,
+}
+
+/// Audited facts: which blocking effects are active on the defender.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct RecordGateSet {
+    pub non_direct_damage: bool,
+    pub weather_damage: bool,
+    pub status_damage: bool,
+    pub recoil_damage: bool,
+}
+
+/// Admission decision for one received-damage fact.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum RecordAdmission {
+    Admitted,
+    DeniedBy(RecordGateKind),
+}
+
+impl RecordGateSet {
+    /// Evaluates the frozen gate order against one damage origin.
+    ///
+    /// Mirrors `BlockNonDirectDamageAbAttr` (blocks everything that is not a
+    /// direct move hit) and the specific weather/status/recoil blockers.
+    pub fn admit(self, origin: DamageOrigin) -> RecordAdmission {
+        match origin {
+            DamageOrigin::DirectMove(_) => RecordAdmission::Admitted,
+            DamageOrigin::Weather => {
+                if self.non_direct_damage {
+                    RecordAdmission::DeniedBy(RecordGateKind::NonDirectDamage)
+                } else if self.weather_damage {
+                    RecordAdmission::DeniedBy(RecordGateKind::WeatherDamage)
+                } else {
+                    RecordAdmission::Admitted
+                }
+            }
+            DamageOrigin::Status => {
+                if self.non_direct_damage {
+                    RecordAdmission::DeniedBy(RecordGateKind::NonDirectDamage)
+                } else if self.status_damage {
+                    RecordAdmission::DeniedBy(RecordGateKind::StatusDamage)
+                } else {
+                    RecordAdmission::Admitted
+                }
+            }
+            DamageOrigin::Recoil => {
+                if self.non_direct_damage {
+                    RecordAdmission::DeniedBy(RecordGateKind::NonDirectDamage)
+                } else if self.recoil_damage {
+                    RecordAdmission::DeniedBy(RecordGateKind::RecoilDamage)
+                } else {
+                    RecordAdmission::Admitted
+                }
+            }
+        }
+    }
+}
+
+/// Pure damage-formula query attributes routed to the production
+/// `DAMAGE_QUERY` fold. Their arithmetic belongs to the ordinary damage
+/// formula family and is deliberately not duplicated here; this family only
+/// certifies the routing target.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DamageQueryAttribute {
+    AlliedFieldDamageReductionAbAttr,
+    BitterDrillDamageAbAttr,
+    BypassBurnDamageReductionAbAttr,
+    BypassBurnDamageReductionAttr,
+    CritDamageMultiplierAbAttr,
+    DamageReductionAbAttr,
+    HitsTagForDoubleDamageAttr,
+    MoveDamageBoostAbAttr,
+    NeutralDamageAgainstFlyingTypeAttr,
+    PostDefendContactDamageAbAttr,
+    PostFaintContactDamageAbAttr,
+    PostFaintHPDamageAbAttr,
+    PostWeatherLapseDamageAbAttr,
+    RandomLevelDamageAttr,
+    ReceivedMoveDamageMultiplierAbAttr,
+    ReceivedTypeDamageMultiplierAbAttr,
+    ReduceBurnDamageAbAttr,
+    SplashDamageAbAttr,
+    SurviveDamageAttr,
+    TurnDamagedDoublePowerAttr,
+}
+
+/// Central TypeScript dispatch-loop surfaces referenced by fixed-dispatch units.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DispatchSurface {
+    ApplyAbAttrs,
+    ApplyFilteredAbAttrs,
+    ApplyMoveAttrs,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SourceKindTag {
+    Move,
+    ActiveAbility,
+    PassiveAbility,
+    BattlerTag,
+    Bespoke,
+}
+
+/// Closed classification of one behavior unit of the frozen cluster.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpecialDamageUnitClass {
+    /// `CounterDamageAttr` DAMAGE_QUERY amount path (the four catalog moves).
+    RetaliationAmount,
+    /// `CounterRedirectAttr` target-selection path.
+    RetaliationRedirect,
+    /// Received-damage admission gate.
+    RecordGate(RecordGateKind),
+    /// ER counter-attack-on-hit post-defend archetype, including its audited
+    /// draw site (`RNG:` provenance inside `counter-attack-on-hit.ts`).
+    CounterOnHitArchetype,
+    /// Pure damage-formula modifier executed by the DAMAGE_QUERY fold.
+    DamageFormulaQuery(DamageQueryAttribute),
+    /// Central dispatch-loop site; executes already-staged bindings by kind.
+    CentralDispatchSite(DispatchSurface),
+    /// Content-load intrinsic definition.
+    ContentLoadIntrinsic,
+    /// Catalog-marked unresolved effect from an unrelated ability; fails closed.
+    ForeignUnresolvedEffect,
+}
+
+struct RegistryEntry {
+    ordinal: u32,
+    provenance_hash: &'static str,
+    source_kind: SourceKindTag,
+    numeric_id: u64,
+    registry_key: &'static str,
+    unit_kind: BehaviorUnitKind,
+    class: SpecialDamageUnitClass,
+}
+
+static REGISTRY: &[RegistryEntry] = &[
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 16,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "5150d59d268ff4575fb83e14c56371c21ec165bdd2fb626e09ca2ae88e76ed70",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 23,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "3a38062ecea22b8f9c97cde6bda1f9164fb8cd9a0f9bb07872497fab930de7d0",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 34,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "085f2eb79bca408ce23e723cafb1ec49ae6e92f70d1340d8632b0dae3079fe5f",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 57,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 68,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::RetaliationAmount,
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "2ee266f702653fc8c00b683cb188bf7280f63ede10944f22246d44f3322be906",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 89,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "1d212f732ab5ed538bb09771138393c7fa282074e58a27eda364513eb745d7df",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 149,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::RandomLevelDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "f520aa9d923e7f97a0abd7f576a585f6b9800e7fbb2129a625742cb95364f826",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 206,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::SurviveDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "214c6f93290fabfe7e3170b6d927db189e0c3fbfc6d0dba0b067ce13871ff096",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 222,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "dffe0aef43d32577cad1ff48ac9c5252fbf2f07009f5e8fbed3584915a2227b6",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 239,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "2e316bc19623171b4916ff313336e9f2946e9d98c3c2699b2ef438a3f34d938c",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 243,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::RetaliationAmount,
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "46e15cbd980d4e1d7fdc94ec51586cd738e2558831d5e486bf07b330a3b132cc",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 250,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "79c7c5444197630ba5aa839b26ae32ec73ee793dace3e19acd9a2ac4017be053",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 263,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BypassBurnDamageReductionAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "86acb6734c4d7f1c7f0489f21a229d737f6a32bb11059293a3749dd4ebd400a0",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 279,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::TurnDamagedDoublePowerAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "36ede1abea9bb51e988b26a4e5db09587c0fe9015d2473c3c4cd268de119e068",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 368,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::RetaliationAmount,
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "b67a1ea557fb37fd4628b8e8af5c6ed646d1597ee9167ef23085c8410904620c",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 407,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "7e0fdeb4e14d89e564fd7c12ede86871989f29b5af5b0147a59e42f50a8d06a6",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 419,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::TurnDamagedDoublePowerAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "d724b3a12254b91ea63cbf9bfafbce27055a388c44442d4261aa71672d3ba31f",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 484,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "3fd7cbb518e2d396bbf00e4bd3e4d1ebac8aab1e07df8837a179717d5bae123b",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 535,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "3e4244b8e1ecc07a60bb65b428875ce48b22ed825c451642a5221c36cd3325d6",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 537,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "a3fe2b9c878c49cca06b76a1abca4a694796f93728042cffc55bdd79684d3284",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 560,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "f8aa2cad3c0bcd52f53ee9a2315dcbc600589ec5b8f78ade37c7ef2aadb5e9bf",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 610,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::SurviveDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 5,
+        provenance_hash: "b971227b771ed48be4a8c7cd0196d9d94e431f9769295ef6f1c89cb505d79b06",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 614,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::NeutralDamageAgainstFlyingTypeAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "06c9da530ebf54c6316c136a5c508fb629be9a853c4ebfd7b287e3291205b22c",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 696,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "fd55bfdcc8ad56a00c1414e351173615587c6f302cc1e8a059a00ab22cc07a41",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 894,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::RetaliationAmount,
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "3c1f65941194d7d720d9b03e55d65fbb9bb91e5336dbbf99b82b464921e7d971",
+        source_kind: SourceKindTag::Move,
+        numeric_id: 916,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::MoveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "70aca669cd2619dafc0c07bbe72dd05bce9012659f844d57bc3f7d427ce76361",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 8,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "35e9cd63f11d9f62053f58ce0425ac671d9cd22308276fa63ab267718c89b153",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 24,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 28,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::ForeignUnresolvedEffect,
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "4cd355b72b12326ef1a5b4b1a903da99448b242e57287f70437401f3263ec543",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 47,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "4cd355b72b12326ef1a5b4b1a903da99448b242e57287f70437401f3263ec543",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 47,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "e85cc70018a0052cb2054a9f9ec5a34cadc06a6a670deb948cc4d8e0bcb8a688",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 62,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BypassBurnDamageReductionAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "8bd4379d40220008d27a8f254c2abefe7b38213d5315728bb87c991ae7ec8098",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 69,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::RecoilDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "5a8c47e56017cc514e205168e32e20aa54f0498bfe545b5039b0e742ceb6c86b",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 81,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "17dcd1290cd3b5a179dacf970a7af35fa602b4d45ed7f55b2ead613b74ba86c3",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 85,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReduceBurnDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "4db5b834d1b9691e44ffe5a5bc22318fbbce46ae1426ea5de2ce43d9da789247",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 85,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "836c3d658c32af9f30f18e572c7f9178ed2e2e561334ebc9525287adc29997bc",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 87,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 4,
+        provenance_hash: "ae1abde2a4e243ab445bb3bae543e5610784be0afacb72b7bbdabb960cbd23a6",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 87,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "ef5038a3a931bee0db2c79e114f3fc9beffe5fab24271d15e8d8691a87613284",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 90,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::StatusDamage),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "b2dc371b0b891076c73f06512d3eee7596082ec53a55979f2f35a84356b45297",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 94,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "a6c73641abadc70a0dfc375afee5181512aa385fd50fa64b9b044f989c6802b4",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 98,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::NonDirectDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "38d9b57bef15fcbb73b894e2f684728681f048c4c9e073307829bfc44bcc9a2e",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 106,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "aca0779b8334fca6b4e05607524ed3726ee415629dd30860cb9b9ea44014ccbb",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 110,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "38e011df8faf41d051c28971850e7b1d660535329206a229f3e3ba72cf810ba8",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 111,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "649eb7da11c431cb2b13ed8bdaf2b18a6b432f2cf893512066bea43f502bba8e",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 115,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "46995010473632ba573cb1b9c0656c9ec04f5fe7fefd80cde82024ca8b36c33b",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 116,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "1d7eeba58edff9f8b1adc8df1ce9940c9fefef5ebd1574c0c57c03a10a001d9b",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 132,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::AlliedFieldDamageReductionAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "25aa13c991f2903ea629b0d4c91f0e6e61810d30e2c4411cf362fe9dfa51f861",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 136,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "0664864f80eabdc069f16c81d50a93cbe59b916b928f44a33e2e4be77dbf63dc",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 142,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "dfbfe56bddc8000a008e5d2bcdfd47cb98840df1df45f1bb75c56e62fd92dd03",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 146,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "f8d8eadea4da4db8b7454f4e85ee2f9232d15c027ce6b8caea0ecce2eed931c6",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 159,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "29ce442edf19dc998cc8f47603d3fefc4159d4eff128884a8352f4b1905acc03",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 160,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "212fa7b5ec24aa2693227b84e50923f609c3e7d28f91c4a5d91cc29ae06c93ef",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 169,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "663cc288af54877131f61531541dc3c38ef2a468383ad71fe0d8aae79d7cdd76",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 185,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 4,
+        provenance_hash: "09f0152bf67d153792d4fe991c7720416539934e4a7bb5a097e1d235b755701b",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 199,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "bf153272a8edf1e9796d25d59eb53a18928c0d7157a85e7319ee56fbd3119302",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 215,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintHPDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "a2a929379a9374a8d74b77914fe45fa22b476c8b97cf55b2ba94d1279a661410",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 218,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "a2a929379a9374a8d74b77914fe45fa22b476c8b97cf55b2ba94d1279a661410",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 218,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "56093cbb1ad8bf683c7553a2059e92ca02403d86609e91b2604a8a139b548819",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 231,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "09567a6f4726f143acc9e68f08301d19cc5732e03e9d23704e418627356a01ac",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 232,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "2cd992eddcf7d6d9730fb952233bc731a71c41f5c9167aa88716f956469d4567",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 244,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "d8a516bb6efa6ceaeb72a0c03da2352dda1139bfdd007f94b079b00c592711d1",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 246,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "c7da671fe733eb27465733c1c5bdaa181ea09bb31063e718b023a01b5451f3d7",
+        source_kind: SourceKindTag::ActiveAbility,
+        numeric_id: 272,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::AbilityAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "70aca669cd2619dafc0c07bbe72dd05bce9012659f844d57bc3f7d427ce76361",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 8,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "35e9cd63f11d9f62053f58ce0425ac671d9cd22308276fa63ab267718c89b153",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 24,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 28,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::ForeignUnresolvedEffect,
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "4cd355b72b12326ef1a5b4b1a903da99448b242e57287f70437401f3263ec543",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 47,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "4cd355b72b12326ef1a5b4b1a903da99448b242e57287f70437401f3263ec543",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 47,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "e85cc70018a0052cb2054a9f9ec5a34cadc06a6a670deb948cc4d8e0bcb8a688",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 62,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BypassBurnDamageReductionAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "8bd4379d40220008d27a8f254c2abefe7b38213d5315728bb87c991ae7ec8098",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 69,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::RecoilDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "5a8c47e56017cc514e205168e32e20aa54f0498bfe545b5039b0e742ceb6c86b",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 81,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "17dcd1290cd3b5a179dacf970a7af35fa602b4d45ed7f55b2ead613b74ba86c3",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 85,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReduceBurnDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "4db5b834d1b9691e44ffe5a5bc22318fbbce46ae1426ea5de2ce43d9da789247",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 85,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "836c3d658c32af9f30f18e572c7f9178ed2e2e561334ebc9525287adc29997bc",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 87,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 4,
+        provenance_hash: "ae1abde2a4e243ab445bb3bae543e5610784be0afacb72b7bbdabb960cbd23a6",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 87,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "ef5038a3a931bee0db2c79e114f3fc9beffe5fab24271d15e8d8691a87613284",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 90,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::StatusDamage),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "b2dc371b0b891076c73f06512d3eee7596082ec53a55979f2f35a84356b45297",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 94,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostWeatherLapseDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "a6c73641abadc70a0dfc375afee5181512aa385fd50fa64b9b044f989c6802b4",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 98,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::NonDirectDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "38d9b57bef15fcbb73b894e2f684728681f048c4c9e073307829bfc44bcc9a2e",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 106,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "aca0779b8334fca6b4e05607524ed3726ee415629dd30860cb9b9ea44014ccbb",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 110,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "38e011df8faf41d051c28971850e7b1d660535329206a229f3e3ba72cf810ba8",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 111,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "649eb7da11c431cb2b13ed8bdaf2b18a6b432f2cf893512066bea43f502bba8e",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 115,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "46995010473632ba573cb1b9c0656c9ec04f5fe7fefd80cde82024ca8b36c33b",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 116,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "1d7eeba58edff9f8b1adc8df1ce9940c9fefef5ebd1574c0c57c03a10a001d9b",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 132,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::AlliedFieldDamageReductionAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "25aa13c991f2903ea629b0d4c91f0e6e61810d30e2c4411cf362fe9dfa51f861",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 136,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "0664864f80eabdc069f16c81d50a93cbe59b916b928f44a33e2e4be77dbf63dc",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 142,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "dfbfe56bddc8000a008e5d2bcdfd47cb98840df1df45f1bb75c56e62fd92dd03",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 146,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "f8d8eadea4da4db8b7454f4e85ee2f9232d15c027ce6b8caea0ecce2eed931c6",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 159,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "29ce442edf19dc998cc8f47603d3fefc4159d4eff128884a8352f4b1905acc03",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 160,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "212fa7b5ec24aa2693227b84e50923f609c3e7d28f91c4a5d91cc29ae06c93ef",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 169,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "663cc288af54877131f61531541dc3c38ef2a468383ad71fe0d8aae79d7cdd76",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 185,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::MoveDamageBoostAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 4,
+        provenance_hash: "09f0152bf67d153792d4fe991c7720416539934e4a7bb5a097e1d235b755701b",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 199,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "bf153272a8edf1e9796d25d59eb53a18928c0d7157a85e7319ee56fbd3119302",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 215,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostFaintHPDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "a2a929379a9374a8d74b77914fe45fa22b476c8b97cf55b2ba94d1279a661410",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 218,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 2,
+        provenance_hash: "a2a929379a9374a8d74b77914fe45fa22b476c8b97cf55b2ba94d1279a661410",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 218,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "56093cbb1ad8bf683c7553a2059e92ca02403d86609e91b2604a8a139b548819",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 231,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "09567a6f4726f143acc9e68f08301d19cc5732e03e9d23704e418627356a01ac",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 232,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "2cd992eddcf7d6d9730fb952233bc731a71c41f5c9167aa88716f956469d4567",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 244,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "d8a516bb6efa6ceaeb72a0c03da2352dda1139bfdd007f94b079b00c592711d1",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 246,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 1,
+        provenance_hash: "c7da671fe733eb27465733c1c5bdaa181ea09bb31063e718b023a01b5451f3d7",
+        source_kind: SourceKindTag::PassiveAbility,
+        numeric_id: 272,
+        registry_key: "",
+        unit_kind: BehaviorUnitKind::PassiveAttribute,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedTypeDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "8719c6b34b170466467af31520c1bce41ce50767b4d4fb1a9221cf8121c6f38f",
+        source_kind: SourceKindTag::BattlerTag,
+        numeric_id: 0,
+        registry_key: "MYSTERY_ENCOUNTER_POST_SUMMON",
+        unit_kind: BehaviorUnitKind::BattlerTagBehavior,
+        class: SpecialDamageUnitClass::ContentLoadIntrinsic,
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "c15cc3b06664c2cf1eb361d4d6ef6a140b428ae0ebb7b1104052864079538fb3",
+        source_kind: SourceKindTag::BattlerTag,
+        numeric_id: 0,
+        registry_key: "RECEIVE_DOUBLE_DAMAGE",
+        unit_kind: BehaviorUnitKind::BattlerTagBehavior,
+        class: SpecialDamageUnitClass::ContentLoadIntrinsic,
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "639fe3d81cbbdeb848f523ae78ee9b52c1c0d0f032d1059d1907029dc089e862",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "RNG:src/data/elite-redux/archetypes/counter-attack-on-hit.ts:152:20:pokemon.randBattleSeedInt",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CounterOnHitArchetype,
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "08fde441f7fdd4b8d119e4b64ae4f3bd95d962f47cdf2f9b85bd53e0b0e3fa74",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/abilities/ab-attrs.ts:5633:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "244b1fd317dbb963514040238ccacd9a2e30435840bf1be63c38616c631c1314",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/abilities/ab-attrs.ts:6205:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "7779e194712ee809080db4f071cd2f22bbbc5119a71ba1b8bc886bcf459666c8",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/abilities/ab-attrs.ts:6244:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "d582d27059bfcd5614208b48dfcdf63630dea08df95d43a15f8350baa1a169d8",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/abilities/ab-attrs.ts:758:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "1318a4f506ad1aa98053a44cb366b22ec0f18533e39d433b4d90d115abd6a7cc",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/arena-tag.ts:959:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "430cdbc61a390abc359daac7a4a00568a1a18e545082e2f04bc05b112b013ef9",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:1372:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "3120c1a63f4f90b15e50b479a64ab771faa71dacb90c1d0574cd0ed540412e24",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:1489:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "18c2b04319b24df59f32f82e5164355b0444a53c40fefa00a2cfc9de6a7ddca5",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:1540:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "9d44ce9505c4fc2d2607c48ae4bde49879d8736f0e3835329f5d18d0453b4ae3",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:1929:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "8d53fb1a1023a83e416c0d66f90586a1b4ecba5c95256b34e9767f7cef5c66be",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:2290:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "e5ade11e736c99f53e29c20415be6d8b36d57bdfd5c92bcc423a6c35c293814a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:2981:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "14e7bb0940a2558a5db9a2eed78bfb103106cbe042232883ad0763df9c5c5cc9",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:3030:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "e98c30f137e65f9c9071df7821bfcdcbff46af8f21ae49d60c2445ad283af54f",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:3324:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "50e9a9d9eec9fbfc800c33149f0f91ec60ab546d2cb535920e52c0bf41c4db6a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:4274:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "840a9ca3d9520f731ccf7a2644800e4dc9e9ffefbef9409515bf9cd4467cc92a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:4320:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "86df5f6f5dca6f69ec94f51d0f1196c3d1fe56ab48b55c26eba9323f7480c8ff",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:4485:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "3baab5187be9b6061ba5fbd9f8860a170931aa8261522be4990498685aa5f837",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:4597:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "bfdc0f110d520defaa76e241ae9cfedf15a64868298e18879eb2bb09e95cf364",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/battler-tags.ts:4598:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "f03ecc49f184ada290c1c977b9ad4ff7df8b66d598f483cf5890b34729e6f285",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1018:7:attr:SplashDamageAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::SplashDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "8d3dd495384296408b78d521c0d0bfa925828d2a7b2d3e0ea546091439e8ad1a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1022:7:attr:ReceivedMoveDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "e5163ec523786eb8b992ab1dee3ea453a23d72c6ec8d5f973f62a8a21ee2b641",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1080:7:attr:ReceivedMoveDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "70dc885d43907bc803555c3ae85a4c3c50107194b536603d27d01d244010e21a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1086:7:attr:ReceivedMoveDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "e8108a45e7bdb932b10c753ff3ed16abfec8d1cd1e80e3f5468ac942d5a526a9",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1098:7:attr:ReceivedMoveDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "8f1542315c8a3c06b8c45e84ea92ffc235a3c517e2ed9d752eb412a86c378014",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1117:7:attr:ReceivedMoveDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "d5e742ec35ca7bbad5797c1ad736f9226daca040904265db08ca8e0a385bb970",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1127:7:attr:BitterDrillDamageAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::BitterDrillDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "a01bf39d2ac5074315b903b444b92770a6a022c34cbfcc93c34a0991e02dd467",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1133:7:attr:CritDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::CritDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "885559ef272107a706f032a51fc45ccbb499c6ff255c56c506adedb63ccb76ae",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/fakemon-pitch-mechanics.ts:1143:7:attr:BlockStatusDamageAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::RecordGate(RecordGateKind::StatusDamage),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "ebf253454cb9f94cb0db5b2faf7fca028029242d3f6aef8a789a901b1a1ec9c7",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/abilities/post-turn-hurt-non-typed.ts:207:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "f268ff919ceec0722297c77cf63d8d55c742be91a70f27e2b08cc853abd95a7b",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/archetypes/lifesteal.ts:107:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "ea7a375185b8f1920a4f04f9ac240c0afa424a3bf245f9fead4b79ad0c334579",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/archetypes/on-faint-effect.ts:387:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "3acd62a9e51792400a2e1fd68887c4cbfb5b538344a1b331e39b7c50d073e3a4",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/archetypes/type-damage-boost.ts:257:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "4c6c051151586392b9a8f0b6642bad75ea89a44bf566a7670d526d9887387036",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/archetypes/type-damage-boost.ts:258:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "559dff6df9ee3e67e0b1dc72ab60d38240a3b0f0f2c833550117ae2bf3f78551",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/init-elite-redux-custom-abilities.ts:1175:5:attr:PostDefendContactDamageAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::PostDefendContactDamageAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "c26b9a764ad50fb3d4412af7a04d513033fbb35914860f00566b88ef00851a6a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/init-elite-redux-custom-abilities.ts:1176:5:attr:DamageReductionAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::DamageReductionAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "7c3d476f4136edb7a2b81b34f2c3994b144f08dc0a404f5575b6aec3b51eead4",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/elite-redux/init-elite-redux-custom-abilities.ts:933:5:attr:ReceivedMoveDamageMultiplierAbAttr",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::ReceivedMoveDamageMultiplierAbAttr),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "4c179a09bb19b6836092a167f7cf3456b8a9ad338d15cd9cfa6dfa3985275323",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/moves/move.ts:2542:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "c7b24dcc2fb7d01ca44372029f5c9905e630ad56e7649dcd5847f907b9d7b8d3",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/moves/move.ts:2543:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "d6199ee1896c934835169b495ebb00f8ddbaddd6764ec626ec3470bbb8619ada",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/moves/move.ts:2690:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "4001626a9f2eed1ddd5379402bbf46cb4c8737cf8fc8da1b7b5aca5d53cade56",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/moves/move.ts:3004:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "f99367cb80e90dfd915c70dbc215fec2debda52777a3dd178ff9c0a4f5531658",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/data/moves/move.ts:7674:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "d7d85af8a62fe1fb53270f4c05bcf913b5f61adae46c96400aafe16b566902df",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:5860:applyMoveAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyMoveAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "97ca6f92dd567d715b8d51ea9bb2ece35d738b00649998bbb20b9ec1679e099f",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:5885:applyFilteredAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyFilteredAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "42e38373518a8a826cbcbc5cf4310330c72edfdf6b47136aec334a27e5d0cd49",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6001:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "abe2de88db4379843502320249ce6d02d5524a9337a108c566dd14b56599e847",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6022:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "9a02137a86b892f02dd9d64f55ec18af26fe2b36c5e3639ff975d030c9f70bb4",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6051:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "18d5c06adccb7550a787244f10683fe6abd15b844d66351b61b6d9f72dac6080",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6189:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "252dcb297a35d72874cda9fbbb38658267d35d4d1c951218045a3aa3435e4314",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6274:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "649726ccc7fa8ec99064a9dea9339789f6dfdedac8da7eb0ce01027dc6d7cea6",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6282:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "8bd037a96884d49f966180689407bcd3e55d5e96c0a7f9d3738a89e5eeb3f38f",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6289:applyMoveAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyMoveAttrs),
+    },
+    RegistryEntry {
+        ordinal: 0,
+        provenance_hash: "78245bf28d153043672bcdce2047d6dd62e0597b61a3535c466c904da05d9a4a",
+        source_kind: SourceKindTag::Bespoke,
+        numeric_id: 0,
+        registry_key: "src/field/pokemon.ts:6594:applyAbAttrs",
+        unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+        class: SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs),
+    },
+];
+
+fn source_kind_matches(tag: SourceKindTag, source: &BehaviorSourceId) -> bool {
+    match (tag, source) {
+        (SourceKindTag::Move, BehaviorSourceId::Move { .. })
+        | (SourceKindTag::ActiveAbility, BehaviorSourceId::ActiveAbility { .. })
+        | (SourceKindTag::PassiveAbility, BehaviorSourceId::PassiveAbility { .. })
+        | (SourceKindTag::BattlerTag, BehaviorSourceId::BattlerTag { .. })
+        | (SourceKindTag::Bespoke, BehaviorSourceId::Bespoke { .. }) => true,
+        _ => false,
+    }
+}
+
+/// Classifies one behavior unit against the frozen 153-entry cluster
+/// registry. Identity must match exactly (ordinal, hash, source kind, unit
+/// kind); anything else is an [`SpecialDamageError::UnregisteredBehaviorUnit`].
+pub fn classify_special_damage_unit(
+    unit: &BehaviorUnitId,
+) -> Result<SpecialDamageUnitClass, SpecialDamageError> {
+    let entry = REGISTRY
+        .iter()
+        .find(|entry| {
+            entry.ordinal == unit.ordinal.get()
+                && entry.provenance_hash == unit.provenance_hash.as_str()
+                && source_kind_matches(entry.source_kind, &unit.source)
+                && entry.unit_kind == unit.unit_kind
+        })
+        .ok_or(SpecialDamageError::UnregisteredBehaviorUnit)?;
+    Ok(entry.class)
+}
+
+/// Audited facts supplied to the dispatcher alongside a classified unit.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpecialDamageDispatchRequestV2 {
+    /// Gate decision for one received-damage fact.
+    RecordAdmission { origin: DamageOrigin, gates: RecordGateSet },
+    /// Whether the on-hit archetype defender was hit by a direct damaging move.
+    OnHitCounterDirectHit(bool),
+}
+
+/// Closed dispatch outcome with exact downstream executor identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SpecialDamageDispatchOutcomeV2 {
+    RetaliationAmountPath {
+        move_id: u16,
+        multiplier: ExactRatioV2,
+        filter: SpecialDamageFilter,
+    },
+    RetaliationRedirectPath { move_id: u16 },
+    RecordAdmission(RecordAdmission),
+    OnHitCounterArmed,
+    OnHitCounterDormant,
+    DamageQueryFold {
+        attribute: DamageQueryAttribute,
+        hook: MechanicHookV2,
+        query: MechanicQueryV2,
+    },
+    DispatchLoop { surface: DispatchSurface },
+    ContentLoadIntrinsic,
+}
+
+/// Exhaustive dispatcher over the frozen cluster registry. Every classified
+/// unit resolves to exactly one outcome; foreign unresolved effects are typed
+/// failures, never silent skips.
+pub fn dispatch_special_damage_unit(
+    unit: &BehaviorUnitId,
+    request: &SpecialDamageDispatchRequestV2,
+) -> Result<SpecialDamageDispatchOutcomeV2, SpecialDamageError> {
+    let class = classify_special_damage_unit(unit)?;
+    Ok(match class {
+        SpecialDamageUnitClass::RetaliationAmount => {
+            let move_id = move_id_of(unit)?;
+            let profile = retaliation_profile(move_id)?;
+            SpecialDamageDispatchOutcomeV2::RetaliationAmountPath {
+                move_id: profile.move_id,
+                multiplier: profile.multiplier,
+                filter: profile.filter,
+            }
+        }
+        SpecialDamageUnitClass::RetaliationRedirect => {
+            SpecialDamageDispatchOutcomeV2::RetaliationRedirectPath { move_id: move_id_of(unit)? }
+        }
+        SpecialDamageUnitClass::RecordGate(_) => match request {
+            SpecialDamageDispatchRequestV2::RecordAdmission { origin, gates } => {
+                SpecialDamageDispatchOutcomeV2::RecordAdmission(gates.admit(*origin))
+            }
+            _ => return Err(SpecialDamageError::DispatchRequestMismatch),
+        },
+        SpecialDamageUnitClass::CounterOnHitArchetype => match request {
+            SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(true) => {
+                // The archetype counters after consuming its bound audited
+                // RNG site; kernel execution must go through that binding.
+                SpecialDamageDispatchOutcomeV2::OnHitCounterArmed
+            }
+            SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false) => {
+                SpecialDamageDispatchOutcomeV2::OnHitCounterDormant
+            }
+            _ => return Err(SpecialDamageError::DispatchRequestMismatch),
+        },
+        SpecialDamageUnitClass::DamageFormulaQuery { .. } => {
+            let attribute = match class {
+                SpecialDamageUnitClass::DamageFormulaQuery(attribute) => attribute,
+                _ => unreachable!("classified as damage-formula query above"),
+            };
+            SpecialDamageDispatchOutcomeV2::DamageQueryFold {
+                attribute,
+                hook: MechanicHookV2::DamageQuery,
+                query: MechanicQueryV2::Damage,
+            }
+        }
+        SpecialDamageUnitClass::CentralDispatchSite(surface) => {
+            SpecialDamageDispatchOutcomeV2::DispatchLoop { surface }
+        }
+        SpecialDamageUnitClass::ContentLoadIntrinsic => {
+            SpecialDamageDispatchOutcomeV2::ContentLoadIntrinsic
+        }
+        SpecialDamageUnitClass::ForeignUnresolvedEffect => {
+            return Err(SpecialDamageError::ForeignUnresolvedEffect);
+        }
+    })
+}
+
+fn move_id_of(unit: &BehaviorUnitId) -> Result<u16, SpecialDamageError> {
+    match unit.source {
+        BehaviorSourceId::Move { numeric_id } => u16::try_from(numeric_id.get())
+            .map_err(|_| SpecialDamageError::UnregisteredBehaviorUnit),
+        _ => Err(SpecialDamageError::UnregisteredBehaviorUnit),
+    }
 }
 
 #[cfg(test)]
@@ -615,11 +2317,11 @@ mod tests {
     }
 
     #[test]
-    fn fully_disappeared_side_fails_the_transition() {
+    fn fully_disappeared_side_yields_attacker_sentinel_and_failed_move() {
         let state = SpecialDamageStateV2::default()
             .record_attack(hit(ENEMY_A, 0, 100, TURN))
             .unwrap();
-        let outcome = execute_retaliation(
+        let (successor, transition) = execute_retaliation(
             &state,
             RetaliationRequestV2 {
                 move_id: MOVE_COUNTER,
@@ -627,8 +2329,20 @@ mod tests {
                 turn_index: TURN,
                 field: doubles_field(&[OWNER]),
             },
+        )
+        .unwrap();
+        assert_eq!(
+            transition.selection,
+            CounterTargetSelection::AttackerSentinel { recorded_index: ENEMY_A },
         );
-        assert_eq!(outcome.unwrap_err(), SpecialDamageError::SourceDisappeared);
+        assert_eq!(transition.selection.delivered_index(), None);
+        assert_eq!(
+            transition.outcome,
+            RetaliationOutcome::FailedWithoutRedirect { recorded_index: ENEMY_A },
+        );
+        // Computation evidence is retained but never delivered.
+        assert_eq!(transition.retaliation_damage, 200);
+        assert_eq!(successor, state);
     }
 
     #[test]
@@ -718,5 +2432,264 @@ mod tests {
         let cleared = hit_one.clear_record_window();
         assert!(cleared.records.is_empty());
         assert_eq!(cleared.reset(), SpecialDamageStateV2::default());
+    }
+    // ===== Frozen registry, gate, and dispatch tests =====
+
+    use er_types::m6::{BehaviorUnitOrdinal, ProvenanceHash};
+
+    fn unit(move_id: u64, ordinal: u32, hash: &str) -> BehaviorUnitId {
+        BehaviorUnitId {
+            source: BehaviorSourceId::Move { numeric_id: SafeU53::new(move_id).unwrap() },
+            unit_kind: BehaviorUnitKind::MoveAttribute,
+            ordinal: BehaviorUnitOrdinal::new(ordinal),
+            provenance_hash: ProvenanceHash::parse(hash).unwrap(),
+        }
+    }
+
+    #[test]
+    fn registry_covers_exactly_153_unique_units() {
+        assert_eq!(REGISTRY.len(), SPECIAL_DAMAGE_REGISTRY_LEN);
+        let mut keys: Vec<(u32, &str)> =
+            REGISTRY.iter().map(|e| (e.ordinal, e.provenance_hash)).collect();
+        let unique = keys
+            .iter()
+            .zip(keys.iter().skip(1))
+            .all(|(a, b)| a.0 != b.0 || a.1 != b.1);
+        assert!(unique);
+        for entry in REGISTRY {
+            assert_eq!(entry.provenance_hash.len(), 64);
+            assert!(ProvenanceHash::parse(entry.provenance_hash).is_ok());
+        }
+    }
+
+    #[test]
+    fn classifies_known_units_from_every_closed_class() {
+        // CounterDamageAttr amount path for MOVE 68 (Counter), ordinal 1.
+        let counter_amount = unit(
+            68,
+            1,
+            "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
+        );
+        assert_eq!(
+            classify_special_damage_unit(&counter_amount).unwrap(),
+            SpecialDamageUnitClass::RetaliationAmount,
+        );
+        // HitsTagForDoubleDamageAttr for MOVE 16, ordinal 0.
+        let hits_tag = unit(
+            16,
+            0,
+            "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
+        );
+        assert_eq!(
+            classify_special_damage_unit(&hits_tag).unwrap(),
+            SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
+        );
+        // Foreign unresolved SyncEncounterNatureAbAttr (ability 28).
+        let foreign = BehaviorUnitId {
+            source: BehaviorSourceId::ActiveAbility { numeric_id: SafeU53::new(28).unwrap() },
+            unit_kind: BehaviorUnitKind::AbilityAttribute,
+            ordinal: BehaviorUnitOrdinal::new(2),
+            provenance_hash: ProvenanceHash::parse(
+                "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
+            )
+            .unwrap(),
+        };
+        assert_eq!(
+            classify_special_damage_unit(&foreign).unwrap(),
+            SpecialDamageUnitClass::ForeignUnresolvedEffect,
+        );
+        // Unknown identity fails closed.
+        let stranger = unit(68, 9, "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4");
+        assert_eq!(
+            classify_special_damage_unit(&stranger),
+            Err(SpecialDamageError::UnregisteredBehaviorUnit),
+        );
+    }
+
+    #[test]
+    fn dispatch_resolves_each_class_to_a_closed_outcome() {
+        let counter_amount = unit(
+            68,
+            1,
+            "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4",
+        );
+        let any_request = &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false);
+        match dispatch_special_damage_unit(&counter_amount, any_request).unwrap() {
+            SpecialDamageDispatchOutcomeV2::RetaliationAmountPath { move_id, multiplier, filter } => {
+                assert_eq!(move_id, MOVE_COUNTER);
+                assert_eq!(multiplier.numerator, 2);
+                assert_eq!(filter, SpecialDamageFilter::Physical);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+
+        let hits_tag = unit(
+            16,
+            0,
+            "0603d573a1ff5e28e9150dbaa22d027ad6d44c61a3124566462ca6fd3b6bbed2",
+        );
+        match dispatch_special_damage_unit(&hits_tag, any_request).unwrap() {
+            SpecialDamageDispatchOutcomeV2::DamageQueryFold { attribute, hook, query } => {
+                assert_eq!(attribute, DamageQueryAttribute::HitsTagForDoubleDamageAttr);
+                assert_eq!(hook, MechanicHookV2::DamageQuery);
+                assert_eq!(query, MechanicQueryV2::Damage);
+            }
+            other => panic!("unexpected outcome: {other:?}"),
+        }
+
+        let on_hit_site = BehaviorUnitId {
+            source: BehaviorSourceId::Bespoke {
+                registry_key: "RNG:src/data/elite-redux/archetypes/counter-attack-on-hit.ts:152:20:pokemon.randBattleSeedInt".to_string(),
+            },
+            unit_kind: BehaviorUnitKind::FixedDispatchBehavior,
+            ordinal: BehaviorUnitOrdinal::new(0),
+            provenance_hash: ProvenanceHash::parse(
+                "639fe3d81cbbdeb848f523ae78ee9b52c1c0d0f032d1059d1907029dc089e862",
+            )
+            .unwrap(),
+        };
+        assert_eq!(
+            dispatch_special_damage_unit(
+                &on_hit_site,
+                &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(true),
+            )
+            .unwrap(),
+            SpecialDamageDispatchOutcomeV2::OnHitCounterArmed,
+        );
+        assert_eq!(
+            dispatch_special_damage_unit(
+                &on_hit_site,
+                &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false),
+            )
+            .unwrap(),
+            SpecialDamageDispatchOutcomeV2::OnHitCounterDormant,
+        );
+
+        let foreign = BehaviorUnitId {
+            source: BehaviorSourceId::ActiveAbility { numeric_id: SafeU53::new(28).unwrap() },
+            unit_kind: BehaviorUnitKind::AbilityAttribute,
+            ordinal: BehaviorUnitOrdinal::new(2),
+            provenance_hash: ProvenanceHash::parse(
+                "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
+            )
+            .unwrap(),
+        };
+        assert_eq!(
+            dispatch_special_damage_unit(&foreign, any_request),
+            Err(SpecialDamageError::ForeignUnresolvedEffect),
+        );
+
+        // Gate units reject mismatched requests instead of guessing.
+        let weather_gate_unit = REGISTRY
+            .iter()
+            .find(|e| e.class == SpecialDamageUnitClass::RecordGate(RecordGateKind::WeatherDamage))
+            .unwrap();
+        let weather_gate_id = registry_entry_to_id(weather_gate_unit);
+        assert_eq!(
+            dispatch_special_damage_unit(&weather_gate_id, any_request),
+            Err(SpecialDamageError::DispatchRequestMismatch),
+        );
+    }
+
+
+    fn registry_entry_to_id(entry: &RegistryEntry) -> BehaviorUnitId {
+        BehaviorUnitId {
+            source: match entry.source_kind {
+                SourceKindTag::Move => BehaviorSourceId::Move {
+                    numeric_id: SafeU53::new(entry.numeric_id).unwrap(),
+                },
+                SourceKindTag::ActiveAbility => BehaviorSourceId::ActiveAbility {
+                    numeric_id: SafeU53::new(entry.numeric_id).unwrap(),
+                },
+                SourceKindTag::PassiveAbility => BehaviorSourceId::PassiveAbility {
+                    numeric_id: SafeU53::new(entry.numeric_id).unwrap(),
+                },
+                SourceKindTag::BattlerTag => BehaviorSourceId::BattlerTag {
+                    registry_key: entry.registry_key.to_string(),
+                },
+                SourceKindTag::Bespoke => BehaviorSourceId::Bespoke {
+                    registry_key: entry.registry_key.to_string(),
+                },
+            },
+            unit_kind: entry.unit_kind,
+            ordinal: BehaviorUnitOrdinal::new(entry.ordinal),
+            provenance_hash: ProvenanceHash::parse(entry.provenance_hash).unwrap(),
+        }
+    }
+
+    #[test]
+    fn record_gates_admit_direct_moves_and_block_audited_origins() {
+        let open = RecordGateSet {
+            non_direct_damage: false,
+            weather_damage: false,
+            status_damage: false,
+            recoil_damage: false,
+        };
+        let all = RecordGateSet {
+            non_direct_damage: true,
+            weather_damage: true,
+            status_damage: true,
+            recoil_damage: true,
+        };
+        // Direct move damage is never gated.
+        assert_eq!(
+            open.admit(DamageOrigin::DirectMove(SpecialDamageCategory::Physical)),
+            RecordAdmission::Admitted,
+        );
+        assert_eq!(
+            all.admit(DamageOrigin::DirectMove(SpecialDamageCategory::Special)),
+            RecordAdmission::Admitted,
+        );
+        // Non-direct blocker dominates the specific gates deterministically.
+        assert_eq!(
+            all.admit(DamageOrigin::Weather),
+            RecordAdmission::DeniedBy(RecordGateKind::NonDirectDamage),
+        );
+        assert_eq!(
+            RecordGateSet { non_direct_damage: false, ..all }.admit(DamageOrigin::Weather),
+            RecordAdmission::DeniedBy(RecordGateKind::WeatherDamage),
+        );
+        assert_eq!(
+            RecordGateSet { non_direct_damage: false, ..all }.admit(DamageOrigin::Status),
+            RecordAdmission::DeniedBy(RecordGateKind::StatusDamage),
+        );
+        assert_eq!(
+            RecordGateSet { non_direct_damage: false, ..all }.admit(DamageOrigin::Recoil),
+            RecordAdmission::DeniedBy(RecordGateKind::RecoilDamage),
+        );
+        assert_eq!(open.admit(DamageOrigin::Weather), RecordAdmission::Admitted);
+    }
+
+    #[test]
+    fn gated_admission_feeds_the_retaliation_pipeline_end_to_end() {
+        let gates = RecordGateSet {
+            non_direct_damage: false,
+            weather_damage: false,
+            status_damage: false,
+            recoil_damage: false,
+        };
+        // A weather tick is admitted when no blocker is active and then
+        // records like any other received damage.
+        assert_eq!(
+            gates.admit(DamageOrigin::Weather),
+            RecordAdmission::Admitted,
+        );
+        let state = SpecialDamageStateV2::default()
+            .record_attack(hit(ENEMY_A, 0, 40, TURN))
+            .unwrap();
+        let (_, transition) = execute_retaliation(
+            &state,
+            RetaliationRequestV2 {
+                move_id: MOVE_COUNTER,
+                owner_index: OWNER,
+                turn_index: TURN,
+                field: doubles_field(&[OWNER, ENEMY_A]),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            transition.outcome,
+            RetaliationOutcome::Delivered { damage: 80 },
+        );
     }
 }
