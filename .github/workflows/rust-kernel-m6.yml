@@ -477,7 +477,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           sparse-checkout-cone-mode: false
           sparse-checkout: |
             /rust/
