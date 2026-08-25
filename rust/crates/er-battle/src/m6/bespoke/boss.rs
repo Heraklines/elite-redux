@@ -13,10 +13,10 @@
 use std::collections::BTreeSet;
 
 use er_state::bespoke_v2::boss::{
-    BOSS_FROZEN_RNG_CARDINALITY, BossCustomErStateV1, BossStateErrorV1,
-    CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION, CustomDispatchRegistryErrorV1,
-    CustomDispatchRegistryV1, DispatchRouteEntryV1, FixedDispatchHandlerKindV1, boss_owner_unit,
-    frozen_rng_site_id,
+    boss_owner_unit, frozen_rng_site_id, BossCustomErStateV1, BossStateErrorV1,
+    CustomDispatchRegistryErrorV1, CustomDispatchRegistryV1, DispatchRouteEntryV1,
+    FixedDispatchHandlerKindV1, NonMechanicalDomainV1, NonMechanicalExclusionV1,
+    BOSS_FROZEN_RNG_CARDINALITY, CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION,
 };
 use er_types::{BehaviorUnitId, ProvenanceHash, RngSiteId, SafeU53};
 use thiserror::Error;
@@ -239,11 +239,10 @@ pub fn consume_boss_shield_charge(
     updated.shield_charges -= 1;
     updated.shield_active = updated.shield_charges > 0;
     updated.validate()?;
+    let remaining = updated.shield_charges;
     Ok(BossShieldTransitionV1 {
         state: updated,
-        evidence: ordain(vec![BossEvidenceKindV1::ShieldConsumed {
-            remaining: updated.shield_charges,
-        }]),
+        evidence: ordain(vec![BossEvidenceKindV1::ShieldConsumed { remaining }]),
     })
 }
 
@@ -438,6 +437,61 @@ pub enum DispatchRegistryBuildErrorV1 {
     UnclassifiedUnit { provenance_hash: ProvenanceHash },
 }
 
+/// The five pinned direct-`Math.random` sites, each excluded from mechanical
+/// catalogs with source/data-flow evidence.
+///
+/// Evidence summary:
+/// - `coop-session-controller.ts:508` (`this.tiebreak = opts.tiebreak ??
+///   Math.random()`): role-election tiebreak nonce. Consumers are HELLO
+///   handshake frames, resume decision-id strings, log text, and the
+///   host-conflict comparison at line 3287; the nonce is injectable via
+///   session options for tests and never reaches battle state or any seeded
+///   stream.
+/// - `coop-session-controller.ts:848` (`mintEpoch`): operation-epoch id
+///   jitter on top of `Date.now() * 1024`. Consumed only by epoch
+///   negotiation announcements; transport bookkeeping, no battle reader.
+/// - `er-achievement-rewards.ts:1033`: unseeded Fisher-Yates shuffle picking
+///   one cosmetic shiny-lab aura effect; source comment pins it "Unseeded
+///   (cosmetic, needs no reproducibility)".
+/// - `er-achievement-rewards.ts:1158`: cosmetic shiny variant tier roll
+///   (1-3, never black); source comment: "Unseeded ... cosmetic, needs no
+///   reproducibility across players".
+/// - `er-achievement-rewards.ts:1191`: reward species pick, deliberately
+///   UNSEEDED so co-op players do not all receive the same species; source
+///   comment: "A reward roll is cosmetic and needs no reproducibility".
+const NON_MECHANICAL_SITES: [(&str, NonMechanicalDomainV1); 5] = [
+    (
+        "RNG:src/data/elite-redux/coop/coop-session-controller.ts:508:38:Math.random",
+        NonMechanicalDomainV1::CoopSessionControl,
+    ),
+    (
+        "RNG:src/data/elite-redux/coop/coop-session-controller.ts:848:54:Math.random",
+        NonMechanicalDomainV1::CoopSessionControl,
+    ),
+    (
+        "RNG:src/data/elite-redux/er-achievement-rewards.ts:1033:26:Math.random",
+        NonMechanicalDomainV1::AchievementRewardCosmetic,
+    ),
+    (
+        "RNG:src/data/elite-redux/er-achievement-rewards.ts:1158:43:Math.random",
+        NonMechanicalDomainV1::AchievementRewardCosmetic,
+    ),
+    (
+        "RNG:src/data/elite-redux/er-achievement-rewards.ts:1191:26:Math.random",
+        NonMechanicalDomainV1::AchievementRewardCosmetic,
+    ),
+];
+
+/// Resolves the pinned non-mechanical domain for a registry key, if any.
+pub fn non_mechanical_domain_for_registry_key(
+    registry_key: &str,
+) -> Option<NonMechanicalDomainV1> {
+    NON_MECHANICAL_SITES
+        .iter()
+        .find(|(key, _)| *key == registry_key)
+        .map(|(_, domain)| *domain)
+}
+
 /// Classifies one frozen registry key into its closed handler kind.
 ///
 /// Classification is a pure function of key shape: `RNG:` sites split by
@@ -457,8 +511,6 @@ pub fn classify_dispatch_registry_key(
             Ok(FixedDispatchHandlerKindV1::RunSeedDraw)
         } else if callee == "localRng?.integerInRange" {
             Ok(FixedDispatchHandlerKindV1::LocalRangeDraw)
-        } else if callee == "Math.random" {
-            Ok(FixedDispatchHandlerKindV1::NondeterministicSourceRejected)
         } else {
             Err(())
         };
@@ -516,12 +568,17 @@ pub fn build_custom_dispatch_registry(
     classified.sort_by(|left, right| left.provenance_hash.cmp(&right.provenance_hash));
 
     let mut routes = Vec::new();
-    let mut rejected_nondeterministic = Vec::new();
+    let mut non_mechanical_exclusions = Vec::new();
     for unit in classified {
+        if let Some(domain) = non_mechanical_domain_for_registry_key(&unit.registry_key) {
+            non_mechanical_exclusions.push(NonMechanicalExclusionV1 {
+                provenance_hash: unit.provenance_hash.clone(),
+                registry_key: unit.registry_key.clone(),
+                domain,
+            });
+            continue;
+        }
         match classify_dispatch_registry_key(&unit.registry_key) {
-            Ok(handler) if handler.is_reject_kind() => {
-                rejected_nondeterministic.push(unit.provenance_hash.clone());
-            }
             Ok(handler) => routes.push(DispatchRouteEntryV1 {
                 provenance_hash: unit.provenance_hash.clone(),
                 registry_key: unit.registry_key.clone(),
@@ -534,24 +591,134 @@ pub fn build_custom_dispatch_registry(
             }
         }
     }
-    rejected_nondeterministic.sort();
     let registry = CustomDispatchRegistryV1 {
         schema_version: CUSTOM_DISPATCH_REGISTRY_SCHEMA_VERSION,
         gross_unit_count: u32::try_from(seen.len()).unwrap_or(u32::MAX),
         sibling_exclusions: sibling_exclusions.iter().cloned().collect(),
-        rejected_nondeterministic,
+        non_mechanical_exclusions,
         routes,
     };
     registry.validate()?;
     Ok(registry)
 }
 
+/// Closed RNG callee classes carried by staged draw requests.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum RngCalleeClassV1 {
+    /// `randBattleSeedInt` receiver draws on the battle substream.
+    BattleSeed,
+    /// Global seeded `randSeedInt` draws outside the battle substream.
+    RunSeed,
+    /// Global seeded Fisher-Yates shuffles.
+    SeedShuffle,
+    /// Local deterministic range draws.
+    LocalRange,
+}
+
+/// Typed payload produced by executing one route's handler kind.
+///
+/// Every variant is a concrete operation consumed downstream: RNG stages feed
+/// the integration audited-draw planner (each later admits results exactly
+/// like [`admit_boss_rng_draw`] does for the boss site), attribute bindings
+/// feed the prepared-content ability/move indexes, and dispatch stagings feed
+/// mechanics mutation accumulation. There are no no-op payloads.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DispatchStagePayloadV1 {
+    /// An RNG site armed for externally supplied audited results.
+    AuditedRngDrawStaged { callee_class: RngCalleeClassV1 },
+    /// One ability attribute bound into the prepared ability index.
+    AbilityAttributeBound { attr_name: String },
+    /// One move attribute bound into the prepared move index.
+    MoveAttributeBound { attr_name: String },
+    /// One ability-attribute application dispatch staged for mutation.
+    AbilityDispatchStaged { filtered: bool },
+    /// One move-attribute application dispatch staged for mutation.
+    MoveAttrsDispatchStaged,
+    /// One modifier application dispatch staged for mutation.
+    ModifierApplicationStaged,
+}
+
+/// One executed route in deterministic hash order with a creation ordinal.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DispatchStageEntryV1 {
+    pub ordinal: SafeU53,
+    pub provenance_hash: ProvenanceHash,
+    pub handler: FixedDispatchHandlerKindV1,
+    pub payload: DispatchStagePayloadV1,
+}
+
+/// Executes every executable route of a registry into typed staging entries.
+///
+/// Routes are already sorted by provenance hash, so execution order is fully
+/// deterministic; ordinals start at 1. Non-mechanical exclusions and sibling
+/// exclusions never stage anything.
+pub fn stage_dispatch_operations(
+    registry: &CustomDispatchRegistryV1,
+) -> Result<Vec<DispatchStageEntryV1>, CustomDispatchRegistryErrorV1> {
+    registry.validate()?;
+    let mut staged = Vec::with_capacity(registry.routes.len());
+    for (index, route) in registry.routes.iter().enumerate() {
+        let payload = match route.handler {
+            FixedDispatchHandlerKindV1::BattleSeedDraw => DispatchStagePayloadV1::AuditedRngDrawStaged {
+                callee_class: RngCalleeClassV1::BattleSeed,
+            },
+            FixedDispatchHandlerKindV1::RunSeedDraw => DispatchStagePayloadV1::AuditedRngDrawStaged {
+                callee_class: RngCalleeClassV1::RunSeed,
+            },
+            FixedDispatchHandlerKindV1::SeedShuffle => DispatchStagePayloadV1::AuditedRngDrawStaged {
+                callee_class: RngCalleeClassV1::SeedShuffle,
+            },
+            FixedDispatchHandlerKindV1::LocalRangeDraw => DispatchStagePayloadV1::AuditedRngDrawStaged {
+                callee_class: RngCalleeClassV1::LocalRange,
+            },
+            FixedDispatchHandlerKindV1::AbilityAttributeRegistration => {
+                DispatchStagePayloadV1::AbilityAttributeBound {
+                    attr_name: attr_name_from_registry_key(&route.registry_key),
+                }
+            }
+            FixedDispatchHandlerKindV1::MoveAttributeRegistration => {
+                DispatchStagePayloadV1::MoveAttributeBound {
+                    attr_name: attr_name_from_registry_key(&route.registry_key),
+                }
+            }
+            FixedDispatchHandlerKindV1::AbilityAttributeDispatch => {
+                DispatchStagePayloadV1::AbilityDispatchStaged {
+                    filtered: route.registry_key.ends_with("applyFilteredAbAttrs"),
+                }
+            }
+            FixedDispatchHandlerKindV1::MoveAttributeDispatch => {
+                DispatchStagePayloadV1::MoveAttrsDispatchStaged
+            }
+            FixedDispatchHandlerKindV1::ModifierDispatch => {
+                DispatchStagePayloadV1::ModifierApplicationStaged
+            }
+        };
+        staged.push(DispatchStageEntryV1 {
+            ordinal: SafeU53::new(index as u64 + 1).unwrap_or(SafeU53::ZERO),
+            provenance_hash: route.provenance_hash.clone(),
+            handler: route.handler,
+            payload,
+        });
+    }
+    Ok(staged)
+}
+
+/// Extracts the attribute name following the final `:attr:` segment.
+fn attr_name_from_registry_key(registry_key: &str) -> String {
+    registry_key
+        .rsplit(":attr:")
+        .next()
+        .unwrap_or_default()
+        .to_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use er_state::bespoke_v2::boss::{BOSS_MAX_SHIELD_CHARGES, BossPhaseBoundaryV1};
+    use er_types::RngSiteOrdinal;
+    use er_types::battle_ids::PokemonId;
     use er_types::mechanics::MechanicScope;
-    use er_types::{PokemonId, RngSiteOrdinal};
     use std::collections::BTreeMap;
 
     const OWNER_HASH: &str = "b0fe628993091a058fd71026b19ee1981ae457afe37823435c9cbb3c9b5e2787";
@@ -913,8 +1080,8 @@ mod tests {
             *counts.entry(format!("{:?}", route.handler)).or_insert(0) += 1;
         }
         counts.insert(
-            String::from("REJECTED_NONDETERMINISTIC"),
-            registry.rejected_nondeterministic.len(),
+            String::from("NON_MECHANICAL_EXCLUDED"),
+            registry.non_mechanical_exclusions.len(),
         );
         counts
     }
@@ -934,7 +1101,11 @@ mod tests {
         assert_eq!(counts.get("AbilityAttributeDispatch"), Some(&2));
         assert_eq!(counts.get("MoveAttributeDispatch"), Some(&1));
         assert_eq!(counts.get("ModifierDispatch"), Some(&1));
-        assert_eq!(counts.get("REJECTED_NONDETERMINISTIC"), Some(&1));
+        assert_eq!(counts.get("NON_MECHANICAL_EXCLUDED"), Some(&1));
+        assert_eq!(
+            registry.non_mechanical_exclusions[0].domain,
+            NonMechanicalDomainV1::CoopSessionControl
+        );
         let total: usize = counts.values().sum();
         assert_eq!(total, sample_gross_set().len());
         assert_eq!(registry.validate(), Ok(()));
@@ -988,7 +1159,7 @@ mod tests {
         let registry = build_custom_dispatch_registry(&gross, &exclusions).expect("registry");
         assert_eq!(registry.sibling_exclusions.len(), 2);
         assert_eq!(registry.routes.len(), 8);
-        assert_eq!(registry.rejected_nondeterministic.len(), 1);
+        assert_eq!(registry.non_mechanical_exclusions.len(), 1);
         assert_eq!(registry.validate(), Ok(()));
     }
 
@@ -1041,10 +1212,148 @@ mod tests {
         assert_eq!(counts.get("AbilityAttributeDispatch"), Some(&46));
         assert_eq!(counts.get("MoveAttributeDispatch"), Some(&19));
         assert_eq!(counts.get("ModifierDispatch"), Some(&32));
-        assert_eq!(counts.get("REJECTED_NONDETERMINISTIC"), Some(&5));
+        assert_eq!(counts.get("NON_MECHANICAL_EXCLUDED"), Some(&5));
         assert_eq!(registry.routes.len(), 510);
-        assert_eq!(registry.rejected_nondeterministic.len(), 5);
+        assert_eq!(registry.non_mechanical_exclusions.len(), 5);
         assert_eq!(registry.sibling_exclusions.len(), 0);
+        // Every one of the five pinned Math.random sites is excluded with its
+        // evidence-backed domain; zero rejected routes remain anywhere.
+        let coop_exclusions = registry
+            .non_mechanical_exclusions
+            .iter()
+            .filter(|entry| entry.domain == NonMechanicalDomainV1::CoopSessionControl)
+            .count();
+        let cosmetic_exclusions = registry
+            .non_mechanical_exclusions
+            .iter()
+            .filter(|entry| entry.domain == NonMechanicalDomainV1::AchievementRewardCosmetic)
+            .count();
+        assert_eq!(coop_exclusions, 2);
+        assert_eq!(cosmetic_exclusions, 3);
+        for exclusion in &registry.non_mechanical_exclusions {
+            assert!(exclusion.registry_key.ends_with("Math.random"));
+        }
         assert_eq!(registry.validate(), Ok(()));
+        // All 510 executable routes stage into typed operations.
+        let staged = stage_dispatch_operations(&registry).expect("staging");
+        assert_eq!(staged.len(), registry.routes.len());
+        let rng_staged = staged
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    entry.payload,
+                    DispatchStagePayloadV1::AuditedRngDrawStaged { .. }
+                )
+            })
+            .count();
+        assert_eq!(rng_staged, 186);
+        let bound = staged
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    entry.payload,
+                    DispatchStagePayloadV1::AbilityAttributeBound { .. }
+                        | DispatchStagePayloadV1::MoveAttributeBound { .. }
+                )
+            })
+            .count();
+        assert_eq!(bound, 227);
+        let dispatches = staged
+            .iter()
+            .filter(|entry| {
+                matches!(
+                    entry.payload,
+                    DispatchStagePayloadV1::AbilityDispatchStaged { .. }
+                        | DispatchStagePayloadV1::MoveAttrsDispatchStaged
+                        | DispatchStagePayloadV1::ModifierApplicationStaged
+                )
+            })
+            .count();
+        assert_eq!(dispatches, 97);
+        assert_eq!(staged[0].ordinal.get(), 1);
+        assert_eq!(
+            staged.last().expect("non-empty").ordinal.get(),
+            staged.len() as u64
+        );
+    }
+
+    #[test]
+    fn pinned_non_mechanical_sites_resolve_to_exact_domains() {
+        assert_eq!(
+            non_mechanical_domain_for_registry_key(
+                "RNG:src/data/elite-redux/coop/coop-session-controller.ts:508:38:Math.random",
+            ),
+            Some(NonMechanicalDomainV1::CoopSessionControl)
+        );
+        assert_eq!(
+            non_mechanical_domain_for_registry_key(
+                "RNG:src/data/elite-redux/coop/coop-session-controller.ts:848:54:Math.random",
+            ),
+            Some(NonMechanicalDomainV1::CoopSessionControl)
+        );
+        assert_eq!(
+            non_mechanical_domain_for_registry_key(
+                "RNG:src/data/elite-redux/er-achievement-rewards.ts:1033:26:Math.random",
+            ),
+            Some(NonMechanicalDomainV1::AchievementRewardCosmetic)
+        );
+        assert_eq!(
+            non_mechanical_domain_for_registry_key(
+                "RNG:src/data/elite-redux/er-achievement-rewards.ts:1158:43:Math.random",
+            ),
+            Some(NonMechanicalDomainV1::AchievementRewardCosmetic)
+        );
+        assert_eq!(
+            non_mechanical_domain_for_registry_key(
+                "RNG:src/data/elite-redux/er-achievement-rewards.ts:1191:26:Math.random",
+            ),
+            Some(NonMechanicalDomainV1::AchievementRewardCosmetic)
+        );
+        // Any other Math.random site stays an unclassified residual.
+        assert_eq!(
+            non_mechanical_domain_for_registry_key(
+                "RNG:src/somewhere/else.ts:1:1:Math.random",
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn staging_resolves_every_route_to_a_typed_operation() {
+        let registry = build_custom_dispatch_registry(&sample_gross_set(), &BTreeSet::new())
+            .expect("sample registry");
+        let staged = stage_dispatch_operations(&registry).expect("staging");
+        assert_eq!(staged.len(), registry.routes.len());
+        let mut seen_payloads = BTreeMap::new();
+        for entry in &staged {
+            *seen_payloads.entry(format!("{:?}", entry.payload)).or_insert(0) += 1;
+            assert!(entry.ordinal.get() >= 1);
+        }
+        assert_eq!(
+            seen_payloads.keys().count(),
+            10,
+            "every route kind stages a distinct typed payload"
+        );
+        // Attribute bindings carry the parsed attribute name.
+        assert!(staged.iter().any(|entry| {
+            matches!(&entry.payload, DispatchStagePayloadV1::AbilityAttributeBound { attr_name } if attr_name == "LowerOffenseMoveCategoryAbAttr")
+        }));
+        assert!(staged.iter().any(|entry| {
+            matches!(&entry.payload, DispatchStagePayloadV1::MoveAttributeBound { attr_name } if attr_name == "MultiHitAttr")
+        }));
+        // RNG draws stage as audited-draw requests, never raw draws.
+        assert!(staged.iter().any(|entry| {
+            matches!(
+                &entry.payload,
+                DispatchStagePayloadV1::AuditedRngDrawStaged { callee_class: RngCalleeClassV1::BattleSeed }
+            )
+        }));
+        // Filtered dispatch flag is derived from the key shape.
+        assert!(staged.iter().any(|entry| {
+            matches!(
+                &entry.payload,
+                DispatchStagePayloadV1::AbilityDispatchStaged { filtered: false }
+            )
+        }));
     }
 }

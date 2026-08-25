@@ -339,10 +339,6 @@ pub enum FixedDispatchHandlerKindV1 {
     SeedShuffle,
     /// Local deterministic range draws (`localRng.integerInRange`).
     LocalRangeDraw,
-    /// Direct `Math.random` sites: closed rejection surface. They are
-    /// classified but never executed; integration rejects any attempt to run
-    /// them until oracle witnesses replace each site with closed semantics.
-    NondeterministicSourceRejected,
     /// One ability attribute registration (`attr:<name>AbAttr`).
     AbilityAttributeRegistration,
     /// One move attribute registration (`attr:<name>Attr`, non-ability).
@@ -354,12 +350,34 @@ pub enum FixedDispatchHandlerKindV1 {
     /// A `globalScene.applyModifier` / `applyModifiers` dispatch callsite.
     ModifierDispatch,
 }
+/// Closed non-mechanical domains for excluded fixed-dispatch sites.
+///
+/// Each domain carries source/data-flow evidence that the site can never
+/// influence battle-mechanical state, protocol material, control, or the RNG
+/// frontier of a battle transition, which excludes it from mechanical
+/// catalogs entirely.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum NonMechanicalDomainV1 {
+    /// Coop transport session control: role-election tiebreak nonce and
+    /// operation-epoch minting. Consumers read handshake frames and log
+    /// strings only; the nonce is injectable per session and never reaches
+    /// battle state or any seeded stream.
+    CoopSessionControl,
+    /// Achievement reward cosmetics: deliberately unseeded rolls for shiny-
+    /// lab aura availability, shiny tier, and reward species picks. Source
+    /// comments pin them as cosmetic with no reproducibility requirement;
+    /// writes go to save-scope cosmetics and UI toasts only.
+    AchievementRewardCosmetic,
+}
 
-impl FixedDispatchHandlerKindV1 {
-    /// Rejected kinds classify units but never receive executable routes.
-    pub fn is_reject_kind(self) -> bool {
-        self == Self::NondeterministicSourceRejected
-    }
+/// One excluded non-mechanical site with its classification evidence.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NonMechanicalExclusionV1 {
+    pub provenance_hash: ProvenanceHash,
+    pub registry_key: String,
+    pub domain: NonMechanicalDomainV1,
 }
 
 /// One executable route: a classified unit and its closed handler kind.
@@ -370,11 +388,8 @@ pub struct DispatchRouteEntryV1 {
     pub registry_key: String,
     pub handler: FixedDispatchHandlerKindV1,
 }
-
-/// Canonical central registry over the `CUSTOM_DISPATCH` BESPOKE surface.
-///
 /// Count conservation is the zero-residual contract: `gross_unit_count ==
-/// sibling_exclusions.len() + rejected_nondeterministic.len() +
+/// sibling_exclusions.len() + non_mechanical_exclusions.len() +
 /// routes.len()` for every valid registry. The pinned fixture corpus pins
 /// the expected gross total of 515 at integration time.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -385,9 +400,10 @@ pub struct CustomDispatchRegistryV1 {
     /// Exact provenance hashes claimed by sibling bespoke families; sorted
     /// strictly ascending and unique. Excluded units carry no route here.
     pub sibling_exclusions: Vec<ProvenanceHash>,
-    /// Classified `Math.random` sites awaiting witness replacement; sorted
-    /// strictly ascending and unique. They are never executable.
-    pub rejected_nondeterministic: Vec<ProvenanceHash>,
+    /// Sites proven non-mechanical with source/data-flow evidence; sorted
+    /// strictly ascending by provenance hash. They carry no executable
+    /// route and are excluded from mechanical catalogs entirely.
+    pub non_mechanical_exclusions: Vec<NonMechanicalExclusionV1>,
     /// Executable routes; sorted strictly ascending by provenance hash.
     pub routes: Vec<DispatchRouteEntryV1>,
 }
@@ -399,16 +415,12 @@ pub enum CustomDispatchRegistryErrorV1 {
     SchemaVersion { expected: u32, actual: u32 },
     #[error("sibling exclusions must be sorted strictly ascending and unique")]
     ExclusionsOutOfOrder,
-    #[error("rejected nondeterministic units must be sorted strictly ascending and unique")]
-    RejectionsOutOfOrder,
+    #[error("non-mechanical exclusions must be sorted strictly ascending by provenance hash and unique")]
+    NonMechanicalOutOfOrder,
     #[error("routes must be sorted strictly ascending by provenance hash and unique")]
     RoutesOutOfOrder,
-    #[error(
-        "count conservation failed: exclusions + rejections + routes must equal the gross count"
-    )]
+    #[error("count conservation failed: exclusions + non-mechanical + routes must equal the gross count")]
     ResidualUnitsRemain,
-    #[error("route entries must never use a rejected handler kind")]
-    RouteUsesRejectKind,
 }
 
 impl CustomDispatchRegistryV1 {
@@ -422,16 +434,18 @@ impl CustomDispatchRegistryV1 {
         if !strictly_ascending(&self.sibling_exclusions) {
             return Err(CustomDispatchRegistryErrorV1::ExclusionsOutOfOrder);
         }
-        if !strictly_ascending(&self.rejected_nondeterministic) {
-            return Err(CustomDispatchRegistryErrorV1::RejectionsOutOfOrder);
+        let mut previous_exclusion: Option<&ProvenanceHash> = None;
+        for exclusion in &self.non_mechanical_exclusions {
+            if previous_exclusion
+                .is_some_and(|previous| previous.as_str() >= exclusion.provenance_hash.as_str())
+            {
+                return Err(CustomDispatchRegistryErrorV1::NonMechanicalOutOfOrder);
+            }
+            previous_exclusion = Some(&exclusion.provenance_hash);
         }
         let mut previous_hash: Option<&ProvenanceHash> = None;
         for route in &self.routes {
-            if route.handler.is_reject_kind() {
-                return Err(CustomDispatchRegistryErrorV1::RouteUsesRejectKind);
-            }
-            if previous_hash
-                .is_some_and(|previous| previous.as_str() >= route.provenance_hash.as_str())
+            if previous_hash.is_some_and(|previous| previous.as_str() >= route.provenance_hash.as_str())
             {
                 return Err(CustomDispatchRegistryErrorV1::RoutesOutOfOrder);
             }
@@ -439,7 +453,7 @@ impl CustomDispatchRegistryV1 {
         }
         let accounted = u32::try_from(
             self.sibling_exclusions.len()
-                + self.rejected_nondeterministic.len()
+                + self.non_mechanical_exclusions.len()
                 + self.routes.len(),
         )
         .unwrap_or(u32::MAX);
