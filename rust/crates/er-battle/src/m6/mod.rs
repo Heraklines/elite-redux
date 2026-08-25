@@ -5,6 +5,7 @@
 //! closed move-routine surface are rejected at preparation time.
 
 pub mod ability_executor;
+pub mod bespoke;
 pub mod item_executor;
 pub mod move_executor;
 pub mod routine_executor;

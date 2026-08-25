@@ -2,6 +2,7 @@
 
 pub mod battle;
 pub mod battle_v2;
+pub mod bespoke_v2;
 pub mod conditions;
 pub mod digest;
 pub mod digest_v2;
