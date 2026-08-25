@@ -136,9 +136,9 @@ pub const MOVE_CLASS_COVERAGE: &[MoveRoutineClassCoverage] = &[
         implementation_class: "StatStageChangeAttr",
         task: MoveRoutineTask::StatusStatStage,
         compiled_rule_ordinal: Some(STAT_STAGE_CHANGE_RULE_ORDINAL),
-        compiled_sites: 165,
-        deferred_sites: 16,
-        deferred_reason: Some("ATTRIBUTE_OPTIONS_UNSUPPORTED"),
+        compiled_sites: 160,
+        deferred_sites: 21,
+        deferred_reason: Some("ATTRIBUTE_OPTIONS_OR_STAGE_SHAPE_UNSUPPORTED"),
     },
     MoveRoutineClassCoverage {
         implementation_class: "ConfuseAttr",
@@ -208,9 +208,9 @@ pub const MOVE_CLASS_COVERAGE: &[MoveRoutineClassCoverage] = &[
         implementation_class: "HitHealAttr",
         task: MoveRoutineTask::MultiHitRecoilDrainFixedDamage,
         compiled_rule_ordinal: Some(DRAIN_ON_HIT_RULE_ORDINAL),
-        compiled_sites: 13,
-        deferred_sites: 1,
-        deferred_reason: Some("HEAL_STAT_VARIANT"),
+        compiled_sites: 12,
+        deferred_sites: 2,
+        deferred_reason: Some("HEAL_STAT_OR_RATIO_VARIANT"),
     },
     MoveRoutineClassCoverage {
         implementation_class: "AlwaysHitMinimizeAttr",
@@ -1097,8 +1097,8 @@ mod tests {
     #[test]
     fn coverage_totals_close_against_frozen_fixture() {
         assert_eq!(move_recognized_class_count(), MOVE_CLASS_COVERAGE.len());
-        assert_eq!(move_compiled_site_total(), 321);
-        assert_eq!(move_deferred_site_total(), 161);
+        assert_eq!(move_compiled_site_total(), 315);
+        assert_eq!(move_deferred_site_total(), 167);
     }
 
     fn symbol(owner: &str, member: &str) -> CatalogOperand {

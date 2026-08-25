@@ -31,7 +31,7 @@ fn routine_mapping_is_deterministic_complete_and_buildable() -> Result<(), Box<d
 
     let expected_moves = usize::try_from(move_compiled_site_total())?;
     let expected_abilities = mapped_unit_count(catalog.behavior_units());
-    assert_eq!(expected_moves, 321);
+    assert_eq!(expected_moves, 315);
     assert_eq!(expected_abilities, 6);
     let mut mapped_move_classes = BTreeMap::<String, usize>::new();
     for unit in catalog.behavior_units() {
