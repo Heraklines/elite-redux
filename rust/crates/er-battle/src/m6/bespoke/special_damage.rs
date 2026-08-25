@@ -40,13 +40,13 @@ use er_state::bespoke_v2::special_damage::{
 use er_types::{BehaviorSourceId, BehaviorUnitId, BehaviorUnitKind, SafeU53};
 use thiserror::Error;
 
-/// Counter — 2x physical retaliation.
+/// Counter â€” 2x physical retaliation.
 pub const MOVE_COUNTER: u16 = 68;
-/// Mirror Coat — 2x special retaliation.
+/// Mirror Coat â€” 2x special retaliation.
 pub const MOVE_MIRROR_COAT: u16 = 243;
-/// Metal Burst — 1.5x retaliation against any category.
+/// Metal Burst â€” 1.5x retaliation against any category.
 pub const MOVE_METAL_BURST: u16 = 368;
-/// Comeuppance — 1.5x retaliation against any category.
+/// Comeuppance â€” 1.5x retaliation against any category.
 pub const MOVE_COMEUPPANCE: u16 = 894;
 
 /// Flat ally boundary of the frozen `BattlerIndex` layout
@@ -336,7 +336,7 @@ pub struct RetaliationTransitionV2 {
 /// equals the input because the oracle keeps `turnData.attacksReceived` until
 /// the next turn boundary; clearing happens through
 /// [`SpecialDamageStateV2::clear_record_window`] at that boundary. On any
-/// failure the input state is returned untouched inside the error-free path —
+/// failure the input state is returned untouched inside the error-free path â€”
 /// no mutation is ever constructed.
 pub fn execute_retaliation(
     state: &SpecialDamageStateV2,
@@ -414,8 +414,6 @@ pub enum SpecialDamageError {
     StaleRecordsOnly,
     #[error("behavior unit is not part of the frozen special-damage cluster registry")]
     UnregisteredBehaviorUnit,
-    #[error("catalog-marked unresolved effect from an unrelated ability cannot dispatch through this family")]
-    ForeignUnresolvedEffect,
     #[error("dispatch request does not match the classified behavior unit")]
     DispatchRequestMismatch,
     #[error("counter field view is invalid: {0}")]
@@ -436,8 +434,8 @@ pub enum SpecialDamageError {
 // class resolves through the closed dispatcher at the bottom of this section.
 // Nothing is unclassified and no classification is a silent no-op: query
 // modifiers name their production DAMAGE_QUERY fold, dispatch sites name the
-// central loop surface that executes them, and foreign unresolved effects fail
-// closed.
+// central loop surface that executes them, and the two SYNCHRONIZE
+// encounter-nature units resolve through a closed audited-facts decision.
 
 /// Behavior units covered by [`REGISTRY`].
 pub const SPECIAL_DAMAGE_REGISTRY_LEN: usize = 153;
@@ -578,8 +576,13 @@ pub enum SpecialDamageUnitClass {
     CentralDispatchSite(DispatchSurface),
     /// Content-load intrinsic definition.
     ContentLoadIntrinsic,
-    /// Catalog-marked unresolved effect from an unrelated ability; fails closed.
-    ForeignUnresolvedEffect,
+    /// SYNCHRONIZE's wild-encounter nature sync (`SyncEncounterNatureAbAttr`,
+    /// `src/data/abilities/ab-attrs.ts:6409-6416`: the generated enemy adopts
+    /// the holder's nature via `target.setNature(pokemon.getNature())`,
+    /// consulted per player-party member at encounter materialization in
+    /// `src/phases/encounter-phase.ts:1129`, wired to SYNCHRONIZE in
+    /// `init-abilities.ts:412-415`).
+    EncounterNatureSync,
 }
 
 struct RegistryEntry {
@@ -852,7 +855,7 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 28,
         registry_key: "",
         unit_kind: BehaviorUnitKind::AbilityAttribute,
-        class: SpecialDamageUnitClass::ForeignUnresolvedEffect,
+        class: SpecialDamageUnitClass::EncounterNatureSync,
     },
     RegistryEntry {
         ordinal: 1,
@@ -1185,7 +1188,7 @@ static REGISTRY: &[RegistryEntry] = &[
         numeric_id: 28,
         registry_key: "",
         unit_kind: BehaviorUnitKind::PassiveAttribute,
-        class: SpecialDamageUnitClass::ForeignUnresolvedEffect,
+        class: SpecialDamageUnitClass::EncounterNatureSync,
     },
     RegistryEntry {
         ordinal: 1,
@@ -2008,6 +2011,9 @@ pub enum SpecialDamageDispatchRequestV2 {
     RecordAdmission { origin: DamageOrigin, gates: RecordGateSet },
     /// Whether the on-hit archetype defender was hit by a direct damaging move.
     OnHitCounterDirectHit(bool),
+    /// Whether the consulted party member holds SYNCHRONIZE during encounter
+    /// materialization.
+    EncounterNatureSync { holder_has_synchronize: bool },
 }
 
 /// Closed dispatch outcome with exact downstream executor identity.
@@ -2022,6 +2028,10 @@ pub enum SpecialDamageDispatchOutcomeV2 {
     RecordAdmission(RecordAdmission),
     OnHitCounterArmed,
     OnHitCounterDormant,
+    /// SYNCHRONIZE applied: the generated enemy adopts the holder's nature.
+    EncounterNatureSyncApplied,
+    /// The consulted member lacks SYNCHRONIZE: the generated nature stands.
+    EncounterNatureSyncUnchanged,
     DamageQueryFold {
         attribute: DamageQueryAttribute,
         hook: MechanicHookV2,
@@ -2032,8 +2042,8 @@ pub enum SpecialDamageDispatchOutcomeV2 {
 }
 
 /// Exhaustive dispatcher over the frozen cluster registry. Every classified
-/// unit resolves to exactly one outcome; foreign unresolved effects are typed
-/// failures, never silent skips.
+/// unit resolves to exactly one executable outcome; nothing is rejected as
+/// unsupported.
 pub fn dispatch_special_damage_unit(
     unit: &BehaviorUnitId,
     request: &SpecialDamageDispatchRequestV2,
@@ -2086,9 +2096,20 @@ pub fn dispatch_special_damage_unit(
         SpecialDamageUnitClass::ContentLoadIntrinsic => {
             SpecialDamageDispatchOutcomeV2::ContentLoadIntrinsic
         }
-        SpecialDamageUnitClass::ForeignUnresolvedEffect => {
-            return Err(SpecialDamageError::ForeignUnresolvedEffect);
+        SpecialDamageUnitClass::EncounterNatureSync => match request {
+            SpecialDamageDispatchRequestV2::EncounterNatureSync { holder_has_synchronize } => {
+                if *holder_has_synchronize {
+                    // Oracle: target.setNature(pokemon.getNature()) — the
+                    // encounter transition installs the holder's nature.
+                    SpecialDamageDispatchOutcomeV2::EncounterNatureSyncApplied
+                } else {
+                    // No SYNCHRONIZE holder consulted: generated nature stands.
+                    SpecialDamageDispatchOutcomeV2::EncounterNatureSyncUnchanged
+                }
+            }
+            _ => return Err(SpecialDamageError::DispatchRequestMismatch),
         }
+
     })
 }
 
@@ -2449,7 +2470,7 @@ mod tests {
     #[test]
     fn registry_covers_exactly_153_unique_units() {
         assert_eq!(REGISTRY.len(), SPECIAL_DAMAGE_REGISTRY_LEN);
-        let mut keys: Vec<(u32, &str)> =
+        let keys: Vec<(u32, &str)> =
             REGISTRY.iter().map(|e| (e.ordinal, e.provenance_hash)).collect();
         let unique = keys
             .iter()
@@ -2484,8 +2505,9 @@ mod tests {
             classify_special_damage_unit(&hits_tag).unwrap(),
             SpecialDamageUnitClass::DamageFormulaQuery(DamageQueryAttribute::HitsTagForDoubleDamageAttr),
         );
-        // Foreign unresolved SyncEncounterNatureAbAttr (ability 28).
-        let foreign = BehaviorUnitId {
+        // SYNCHRONIZE encounter-nature sync (ability 28; the active and
+        // passive slots share one provenance hash, active is ordinal 2).
+        let synchronize_active = BehaviorUnitId {
             source: BehaviorSourceId::ActiveAbility { numeric_id: SafeU53::new(28).unwrap() },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
@@ -2495,8 +2517,21 @@ mod tests {
             .unwrap(),
         };
         assert_eq!(
-            classify_special_damage_unit(&foreign).unwrap(),
-            SpecialDamageUnitClass::ForeignUnresolvedEffect,
+            classify_special_damage_unit(&synchronize_active).unwrap(),
+            SpecialDamageUnitClass::EncounterNatureSync,
+        );
+        let synchronize_passive = BehaviorUnitId {
+            source: BehaviorSourceId::PassiveAbility { numeric_id: SafeU53::new(28).unwrap() },
+            unit_kind: BehaviorUnitKind::PassiveAttribute,
+            ordinal: BehaviorUnitOrdinal::new(2),
+            provenance_hash: ProvenanceHash::parse(
+                "746a9d953897d35f447e63f481f60ab3ad3c7e5af0ff9f4ee1feab438f9250e8",
+            )
+            .unwrap(),
+        };
+        assert_eq!(
+            classify_special_damage_unit(&synchronize_passive).unwrap(),
+            SpecialDamageUnitClass::EncounterNatureSync,
         );
         // Unknown identity fails closed.
         let stranger = unit(68, 9, "5c05dc43f69412ce8344ab9f03d6e29d7aacace1bd4e7571758e0c6f5cc40cf4");
@@ -2565,7 +2600,7 @@ mod tests {
             SpecialDamageDispatchOutcomeV2::OnHitCounterDormant,
         );
 
-        let foreign = BehaviorUnitId {
+        let synchronize_active = BehaviorUnitId {
             source: BehaviorSourceId::ActiveAbility { numeric_id: SafeU53::new(28).unwrap() },
             unit_kind: BehaviorUnitKind::AbilityAttribute,
             ordinal: BehaviorUnitOrdinal::new(2),
@@ -2574,9 +2609,22 @@ mod tests {
             )
             .unwrap(),
         };
+        let synchronize_holder = &SpecialDamageDispatchRequestV2::EncounterNatureSync {
+            holder_has_synchronize: true,
+        };
         assert_eq!(
-            dispatch_special_damage_unit(&foreign, any_request),
-            Err(SpecialDamageError::ForeignUnresolvedEffect),
+            dispatch_special_damage_unit(&synchronize_active, synchronize_holder).unwrap(),
+            SpecialDamageDispatchOutcomeV2::EncounterNatureSyncApplied,
+        );
+        assert_eq!(
+            dispatch_special_damage_unit(
+                &synchronize_active,
+                &SpecialDamageDispatchRequestV2::EncounterNatureSync {
+                    holder_has_synchronize: false,
+                },
+            )
+            .unwrap(),
+            SpecialDamageDispatchOutcomeV2::EncounterNatureSyncUnchanged,
         );
 
         // Gate units reject mismatched requests instead of guessing.
@@ -2692,4 +2740,109 @@ mod tests {
             RetaliationOutcome::Delivered { damage: 80 },
         );
     }
+    #[test]
+    fn every_registered_unit_dispatches_with_zero_residual() {
+        let any_request = &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(false);
+        let open_gates = RecordGateSet {
+            non_direct_damage: false,
+            weather_damage: false,
+            status_damage: false,
+            recoil_damage: false,
+        };
+        let mut retaliation = 0usize;
+        let mut redirect = 0usize;
+        let mut gates = [0usize; 4];
+        let mut query = 0usize;
+        let mut sites = [0usize; 3];
+        let mut on_hit = 0usize;
+        let mut intrinsics = 0usize;
+        let mut nature_sync = 0usize;
+        for entry in REGISTRY {
+            let id = registry_entry_to_id(entry);
+            let outcome = match entry.class {
+                SpecialDamageUnitClass::RetaliationAmount => {
+                    retaliation += 1;
+                    dispatch_special_damage_unit(&id, any_request)
+                }
+                SpecialDamageUnitClass::RetaliationRedirect => {
+                    redirect += 1;
+                    dispatch_special_damage_unit(&id, any_request)
+                }
+                SpecialDamageUnitClass::RecordGate(kind) => {
+                    gates[kind as usize] += 1;
+                    dispatch_special_damage_unit(
+                        &id,
+                        &SpecialDamageDispatchRequestV2::RecordAdmission {
+                            origin: DamageOrigin::Weather,
+                            gates: open_gates,
+                        },
+                    )
+                }
+                SpecialDamageUnitClass::CounterOnHitArchetype => {
+                    on_hit += 1;
+                    dispatch_special_damage_unit(
+                        &id,
+                        &SpecialDamageDispatchRequestV2::OnHitCounterDirectHit(true),
+                    )
+                }
+                SpecialDamageUnitClass::DamageFormulaQuery(_) => {
+                    query += 1;
+                    dispatch_special_damage_unit(&id, any_request)
+                }
+                SpecialDamageUnitClass::CentralDispatchSite(_) => {
+                    sites[match entry.class {
+                        SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyAbAttrs) => 0,
+                        SpecialDamageUnitClass::CentralDispatchSite(DispatchSurface::ApplyFilteredAbAttrs) => 1,
+                        _ => 2,
+                    }] += 1;
+                    dispatch_special_damage_unit(&id, any_request)
+                }
+                SpecialDamageUnitClass::ContentLoadIntrinsic => {
+                    intrinsics += 1;
+                    dispatch_special_damage_unit(&id, any_request)
+                }
+                SpecialDamageUnitClass::EncounterNatureSync => {
+                    nature_sync += 1;
+                    dispatch_special_damage_unit(
+                        &id,
+                        &SpecialDamageDispatchRequestV2::EncounterNatureSync {
+                            holder_has_synchronize: true,
+                        },
+                    )
+                }
+            };
+            assert!(
+                outcome.is_ok(),
+                "unit {} failed to dispatch: {:?}",
+                entry.provenance_hash,
+                outcome.err(),
+            );
+        }
+        // Exact frozen lane counts derived from bespoke-clusters-v1.json.
+        assert_eq!(REGISTRY.len(), SPECIAL_DAMAGE_REGISTRY_LEN);
+        assert_eq!(SPECIAL_DAMAGE_REGISTRY_LEN, 153);
+        assert_eq!(retaliation, 4);
+        assert_eq!(redirect, 0);
+        assert_eq!(
+            gates,
+            [2, 12, 3, 2],
+            "gates must be [NonDirect, Weather, Status, Recoil]",
+        );
+        assert_eq!(query, 87);
+        assert_eq!(sites, [35, 1, 2], "sites must be [AbAttrs, FilteredAbAttrs, MoveAttrs]");
+        assert_eq!(on_hit, 1);
+        assert_eq!(intrinsics, 2);
+        assert_eq!(nature_sync, 2);
+        // The lanes sum to the exact frozen total: zero rejected, zero residual.
+        let total = retaliation
+            + redirect
+            + gates[0] + gates[1] + gates[2] + gates[3]
+            + query
+            + sites[0] + sites[1] + sites[2]
+            + on_hit
+            + intrinsics
+            + nature_sync;
+        assert_eq!(total, SPECIAL_DAMAGE_REGISTRY_LEN);
+    }
 }
+
