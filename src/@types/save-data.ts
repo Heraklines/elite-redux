@@ -352,6 +352,10 @@ export interface Starter {
   ivs: number[];
   /** ER Black Shinies (#349): start this mon as a t4 black shiny. */
   erBlackShiny?: boolean | undefined;
+  /** Fun Debug only: concrete evolution/form to field for this temporary run. */
+  funDebugSpeciesId?: SpeciesId | undefined;
+  /** Fun Debug only: form index on {@linkcode funDebugSpeciesId}. */
+  funDebugFormIndex?: number | undefined;
   /**
    * Co-op (#633 Fix #3): the owning player's per-account innate-unlock snapshot (one
    * `passiveAttr` bitmask per ER innate slot 0/1/2), threaded into `customPokemonData` at

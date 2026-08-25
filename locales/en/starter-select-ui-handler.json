@@ -32,6 +32,7 @@
   "eggMoves": "Egg Moves",
   "addToParty": "Add to Party",
   "removeFromParty": "Remove from Party",
+  "startingForm": "Starting Form: {{form}}",
   "toggleIVs": "Toggle IVs",
   "manageMoves": "Manage Moves",
   "manageNature": "Manage Nature",

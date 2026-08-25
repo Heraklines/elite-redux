@@ -47,6 +47,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
+import { resolveFunDebugStarterStage } from "#data/elite-redux/er-fun-debug";
 import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -789,14 +790,16 @@ export class SelectStarterPhase extends Phase {
     // harness runs both clients in one process, where a global read here poisons the host's
     // party with the guest's stash (caught by showdown-duo.test.ts).
     const ownManifests = globalScene.gameMode.isShowdown ? (showdownManifests ?? null) : null;
+    const funDebugActive = isFunDebugModeActive(globalScene.gameMode.isFun);
     let primedEvolutionFixtureSubject = false;
     starters.forEach((starter: Starter, i: number) => {
       if (!i && Overrides.STARTER_SPECIES_OVERRIDE) {
         starter.speciesId = Overrides.STARTER_SPECIES_OVERRIDE;
       }
       const showdownMon = ownManifests?.[i] ?? null;
-      const species = getPokemonSpecies(showdownMon?.speciesId ?? starter.speciesId);
-      let starterFormIndex = showdownMon?.formIndex ?? starter.formIndex;
+      const debugStage = resolveFunDebugStarterStage(starter, funDebugActive);
+      const species = getPokemonSpecies(showdownMon?.speciesId ?? debugStage.speciesId);
+      let starterFormIndex = showdownMon?.formIndex ?? debugStage.formIndex;
       if (
         starter.speciesId in Overrides.STARTER_FORM_OVERRIDES
         && Overrides.STARTER_FORM_OVERRIDES[starter.speciesId] != null

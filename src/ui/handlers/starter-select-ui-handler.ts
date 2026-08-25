@@ -47,7 +47,11 @@ import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#d
 import { resetErCustomTrainerTracking } from "#data/elite-redux/er-custom-trainers";
 import { resetErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
-import { applyFunDebugStarterUnlocks, FUN_DEBUG_STARTER_VALUE_LIMIT } from "#data/elite-redux/er-fun-debug";
+import {
+  applyFunDebugStarterUnlocks,
+  FUN_DEBUG_STARTER_VALUE_LIMIT,
+  listFunDebugStarterStages,
+} from "#data/elite-redux/er-fun-debug";
 import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import { resetGenericTrainerTracking } from "#data/elite-redux/er-generic-trainer-run-state";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
@@ -655,6 +659,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     number,
     { speciesId: number; formIndex: number; item?: string | undefined; prevItem?: string | undefined }
   > = new Map();
+  /** Temporary starting evolution/form choices for progression-free Fun Debug runs. */
+  private funDebugSelections = new Map<number, { speciesId: SpeciesId; formIndex: number }>();
   /**
    * Showdown: the wall-clock end of the 10-minute team-build pick window (`getShowdownPickWaitMs`),
    * anchored on first opening the Set Editor. The editor's top-strip countdown reads the remaining
@@ -2766,6 +2772,27 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             ];
           }
 
+          if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+            const stages = listFunDebugStarterStages(this.lastSpecies.speciesId);
+            if (stages.length > 1) {
+              const selected = this.funDebugSelections.get(this.lastSpecies.speciesId) ?? stages[0];
+              const selectedLabel =
+                stages.find(stage => stage.speciesId === selected.speciesId && stage.formIndex === selected.formIndex)
+                  ?.label ?? this.lastSpecies.name;
+              options.push({
+                semanticId: "select-starting-form",
+                label: i18next.t("starterSelectUiHandler:startingForm", {
+                  form: selectedLabel,
+                  defaultValue: "Starting Form: {{form}}",
+                }),
+                handler: () => {
+                  this.showFunDebugStageOptions();
+                  return true;
+                },
+              });
+            }
+          }
+
           options.push(
             // this shows the IVs for the pokemon
             {
@@ -2817,9 +2844,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           // plus the line's unlocked egg moves - the exact set `isMoveLegal` accepts, so a
           // picked move can never be rejected at start. Every other mode keeps the vanilla
           // early-level `speciesStarterMoves` pool byte-for-byte.
-          const movePool: MoveId[] = globalScene.gameMode.isShowdown
-            ? this.showdownLegalMovePool()
-            : this.speciesStarterMoves;
+          const movePool: MoveId[] =
+            globalScene.gameMode.isShowdown || isFunDebugModeActive(globalScene.gameMode.isFun)
+              ? this.selectedStageLegalMovePool()
+              : this.speciesStarterMoves;
           if (movePool.length > 1) {
             // this lets you change the pokemon moves
             const showSwapOptions = (moveset: StarterMoveset) => {
@@ -3703,7 +3731,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             break;
           case Button.CYCLE_ABILITY:
             if (this.canCycleAbility) {
-              const abilityCount = this.lastSpecies.getAbilityCount();
+              const renderStage = isFunDebugModeActive(globalScene.gameMode.isFun)
+                ? this.starterRenderStage(this.lastSpecies.speciesId)
+                : null;
+              const abilitySpecies = renderStage
+                ? getPokemonSpeciesForm(renderStage.species.speciesId, renderStage.formIndex)
+                : this.lastSpecies;
+              const abilityCount = abilitySpecies.getAbilityCount();
               const abilityAttr = starterData.abilityAttr;
               const hasAbility1 = abilityAttr & AbilityAttr.ABILITY_1;
               let newAbilityIndex = this.abilityCursor;
@@ -3715,7 +3749,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                   }
                 } else if (newAbilityIndex === 1) {
                   // If ability 1 and 2 are the same and ability 1 is unlocked, skip over ability 2
-                  if (this.lastSpecies.ability1 === this.lastSpecies.ability2 && hasAbility1) {
+                  if (abilitySpecies.ability1 === abilitySpecies.ability2 && hasAbility1) {
                     newAbilityIndex = (newAbilityIndex + 1) % abilityCount;
                   }
                   break;
@@ -3729,7 +3763,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               const { visible: tooltipVisible } = globalScene.ui.getTooltip();
 
               if (tooltipVisible && this.activeTooltip === "ABILITY") {
-                const newAbility = allAbilities[this.lastSpecies.getAbility(newAbilityIndex)];
+                const newAbility = allAbilities[abilitySpecies.getAbility(newAbilityIndex)];
                 globalScene.ui.editTooltip(`${newAbility.name}`, `${newAbility.description}`);
               }
 
@@ -3755,7 +3789,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             break;
           case Button.CYCLE_TERA:
             if (this.canCycleTera) {
-              const speciesForm = getPokemonSpeciesForm(this.lastSpecies.speciesId, starterAttributes.form ?? 0);
+              const renderStage = isFunDebugModeActive(globalScene.gameMode.isFun)
+                ? this.starterRenderStage(this.lastSpecies.speciesId)
+                : null;
+              const speciesForm = getPokemonSpeciesForm(
+                renderStage?.species.speciesId ?? this.lastSpecies.speciesId,
+                renderStage?.formIndex ?? starterAttributes.form ?? 0,
+              );
               const teraTypes = speciesFormTypes(speciesForm);
               const currentIndex = teraTypes.indexOf(this.teraCursor);
               const nextType = teraTypes[(currentIndex + 1) % teraTypes.length] ?? speciesForm.type1;
@@ -3984,7 +4024,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     // TODO(er-phase-b): `passive: boolean` on the run-start `Starter` is slot-1 only.
     // Phase B will widen `Starter` to carry per-slot enabled state across all 3 slots.
-    const starter = {
+    const starter: Starter = {
       speciesId: species.speciesId,
       shiny: props.shiny,
       variant: props.variant,
@@ -4012,6 +4052,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // mon's custom shiny effects (mirrors the co-op #785 carry + the ghost capture). Shiny-gated
       // by the helper (returns undefined for a non-shiny / lookless pick), so a plain shiny is unaffected.
       (starter as Starter).erShinyLab = getErShinyLabSavedLookForSpecies(species.speciesId, props.shiny);
+    }
+    if (isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      const debugSelection = this.funDebugSelections.get(species.speciesId);
+      if (debugSelection) {
+        starter.funDebugSpeciesId = debugSelection.speciesId;
+        starter.funDebugFormIndex = debugSelection.formIndex;
+      }
     }
 
     this.starters.push(starter);
@@ -4528,11 +4575,66 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * move-swap picker can never offer a move the start-time validator would reject. Only
    * meaningful in showdown mode (the fielded stage falls back to the grid species otherwise).
    */
-  private showdownLegalMovePool(rootId: number = this.lastSpecies.speciesId): MoveId[] {
-    const selection = this.showdownSelections.get(rootId);
-    const fieldedSpeciesId = selection?.speciesId ?? rootId;
+  private selectedStageLegalMovePool(rootId: number = this.lastSpecies.speciesId): MoveId[] {
+    const fieldedSpeciesId = this.starterRenderStage(rootId)?.species.speciesId ?? rootId;
     const eggBits = this.getSpeciesData(rootId).starterDataEntry.eggMoves;
     return [...collectShowdownLegalMoves(rootId, fieldedSpeciesId, collectUnlockedEggMoves(rootId, eggBits))];
+  }
+
+  /** Concrete evolution/form currently previewed and fielded for this starter line. */
+  private starterRenderStage(rootSpeciesId: number): { species: PokemonSpecies; formIndex: number } | null {
+    const showdownStage = this.showdownRenderStage(rootSpeciesId);
+    if (showdownStage) {
+      return showdownStage;
+    }
+    if (!isFunDebugModeActive(globalScene.gameMode.isFun)) {
+      return null;
+    }
+    const selection = this.funDebugSelections.get(rootSpeciesId);
+    if (!selection) {
+      return null;
+    }
+    return { species: getPokemonSpecies(selection.speciesId), formIndex: selection.formIndex };
+  }
+
+  /** Record a temporary Debug starting stage and immediately refresh its preview/party slot. */
+  private setFunDebugStage(rootSpeciesId: number, speciesId: SpeciesId, formIndex: number): void {
+    this.funDebugSelections.set(rootSpeciesId, { speciesId, formIndex });
+    const partyIndex = this.starterSpecies.findIndex(species => species.speciesId === rootSpeciesId);
+    if (partyIndex >= 0) {
+      this.starters[partyIndex].funDebugSpeciesId = speciesId;
+      this.starters[partyIndex].funDebugFormIndex = formIndex;
+      this.updatePartyIcon(this.starterSpecies[partyIndex], partyIndex);
+    }
+    if (this.lastSpecies?.speciesId === rootSpeciesId) {
+      const selectedForm = getPokemonSpeciesForm(speciesId, formIndex);
+      this.setSpeciesDetails(this.lastSpecies, { abilityIndex: 0, teraType: selectedForm.type1 });
+      this.updateSelectedStarterMoveset(rootSpeciesId as SpeciesId);
+    }
+  }
+
+  /** Compact Debug-only chooser for every evolution and obtainable form in the starter line. */
+  private showFunDebugStageOptions(): void {
+    const ui = this.getUi();
+    const rootId = this.lastSpecies.speciesId;
+    const options: OptionSelectItem[] = listFunDebugStarterStages(rootId).map(stage => ({
+      label: stage.label,
+      handler: () => {
+        this.setFunDebugStage(rootId, stage.speciesId, stage.formIndex);
+        ui.setMode(UiMode.STARTER_SELECT);
+        return true;
+      },
+    }));
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        ui.setMode(UiMode.STARTER_SELECT);
+        return true;
+      },
+    });
+    ui.setMode(UiMode.STARTER_SELECT).then(() =>
+      ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
+    );
   }
 
   /**
@@ -4736,7 +4838,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // the prior slot occupant's generated-FX source before rendering the new
     // species so an FX cache/source miss cannot restore a stale icon.
     resetErShinyLabSpriteFxTexture(icon);
-    const renderStage = this.showdownRenderStage(species.speciesId);
+    const renderStage = this.starterRenderStage(species.speciesId);
     const iconSpecies = renderStage?.species ?? species;
     const iconFormIndex = renderStage?.formIndex ?? props.formIndex;
     const wantId = iconSpecies.getIconId(props.female, iconFormIndex, props.shiny, props.variant);
@@ -5986,7 +6088,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           this.updateSelectedStarterMoveset(species.speciesId);
         }
 
-        const speciesForm = getPokemonSpeciesForm(species.speciesId, props.formIndex);
+        const renderStage = this.starterRenderStage(species.speciesId);
+        const speciesForm = getPokemonSpeciesForm(
+          renderStage?.species.speciesId ?? species.speciesId,
+          renderStage?.formIndex ?? props.formIndex,
+        );
         this.setTypeIcons(speciesFormTypes(speciesForm));
 
         this.pokemonSprite.clearTint();
@@ -6369,7 +6475,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // cosmetics still come from the root pick, and the Shiny Lab look stays keyed on the ROOT
     // (its custom-shiny palette is per-line), so the picked stage still renders shiny-tinted.
     // No-op in every non-showdown mode (renderSpecies === species, renderFormIndex === props).
-    const renderStage = this.showdownRenderStage(species.speciesId);
+    const renderStage = this.starterRenderStage(species.speciesId);
     const renderSpecies = renderStage?.species ?? species;
     const renderFormIndex = renderStage?.formIndex ?? props.formIndex;
     const isBlackShiny = this.isBlackShinyPick(
@@ -6572,7 +6678,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     // Showdown (staging fix 2026-07-07): the passive SLOTS follow the picked field stage too
     // (item 15) - the fielded species' passive set is what battles. Identity off-showdown.
-    const stage = globalScene.gameMode.isShowdown ? this.showdownRenderStage(this.lastSpecies.speciesId) : null;
+    const stage = this.starterRenderStage(this.lastSpecies.speciesId);
     const passiveSpecies = stage?.species ?? this.lastSpecies;
     const passiveFormIndex = stage ? stage.formIndex : formIndex;
     const passiveAbilityIds = passiveSpecies.getPassiveAbilities(passiveFormIndex);
@@ -6794,6 +6900,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
       const caughtAttr = dexEntry.caughtAttr || BigInt(0);
       const abilityAttr = starterDataEntry.abilityAttr;
+      const displayStage = this.starterRenderStage(species.speciesId);
+      const displaySpecies = displayStage?.species ?? species;
+      const displayFormIndex = displayStage?.formIndex ?? formIndex ?? 0;
+      const displaySpeciesForm = getPokemonSpeciesForm(displaySpecies.speciesId, displayFormIndex);
+      const cycleSpeciesForm = isFunDebugModeActive(globalScene.gameMode.isFun)
+        ? displaySpeciesForm
+        : getPokemonSpeciesForm(species.speciesId, formIndex ?? 0);
 
       if (!caughtAttr) {
         const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
@@ -6906,14 +7019,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
          * This prevents cycling between ability 1 and 2 if they are both unlocked and the same
          * but we still need to account for the possibility ability 1 was never unlocked and fallback on ability 2 in this case
          */
-        if (hasAbility1 && hasAbility2 && species.ability1 === species.ability2) {
+        if (hasAbility1 && hasAbility2 && cycleSpeciesForm.ability1 === cycleSpeciesForm.ability2) {
           hasAbility2 = 0;
         }
 
-        this.canCycleAbility = [hasAbility1, hasAbility2, hasHiddenAbility].filter(a => a).length > 1;
+        this.canCycleAbility =
+          [hasAbility1, hasAbility2, hasHiddenAbility].slice(0, cycleSpeciesForm.getAbilityCount()).filter(a => a)
+            .length > 1;
 
         this.canCycleForm =
-          species.forms
+          !isFunDebugModeActive(globalScene.gameMode.isFun)
+          && species.forms
             .filter(f => f.isStarterSelectable || !pokemonFormChanges[species.speciesId]?.find(fc => fc.formKey))
             .map((_, f) => dexEntry.caughtAttr & globalScene.gameData.getFormAttr(f))
             .filter(f => f).length > 1;
@@ -6921,7 +7037,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         this.canCycleTera =
           !this.statsMode
           && this.allowTera
-          && speciesFormTypes(getPokemonSpeciesForm(species.speciesId, formIndex ?? 0)).length > 1
+          && speciesFormTypes(cycleSpeciesForm).length > 1
           && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
       }
 
@@ -6952,16 +7068,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // Unlock/cycle semantics stay ROOT-based (the abilityIndex is validated against the root's
         // unlocks upstream; this only reconciles the DISPLAY layout of a differently-shaped
         // evolved/mega ability list). No-op in every other mode / when no stage is picked.
-        const displayStage = globalScene.gameMode.isShowdown ? this.showdownRenderStage(species.speciesId) : null;
-        const displaySpecies = displayStage?.species ?? this.lastSpecies;
-        const displayFormIndex = displayStage ? displayStage.formIndex : (formIndex ?? 0);
         const formForAbility =
           displaySpecies.forms?.length > 1
             ? (displaySpecies.forms[displayFormIndex] ?? displaySpecies)
             : displaySpecies;
         const ability: Ability = allAbilities[formForAbility.getAbility(abilityIndex!)] ?? allAbilities[AbilityId.NONE];
 
-        const isHidden = abilityIndex === (this.lastSpecies.ability2 ? 2 : 1);
+        const abilityLayoutSpecies = isFunDebugModeActive(globalScene.gameMode.isFun)
+          ? displaySpeciesForm
+          : this.lastSpecies;
+        const isHidden = abilityIndex === (abilityLayoutSpecies.ability2 ? 2 : 1);
         this.pokemonAbilityText
           .setText(ability.name)
           .setColor(getTextColor(isHidden ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_ALT))
@@ -7055,9 +7171,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         // filtered right back out here on the very next setSpeciesDetails and the swap silently
         // reverts. Only the FILTER widens; the fill-to-4 below still seeds from the vanilla pool so
         // a fresh mon defaults to its early moves. No-op in every other mode (uses availableStarterMoves).
-        const moveFilterPool = globalScene.gameMode.isShowdown
-          ? this.showdownLegalMovePool(species.speciesId)
-          : availableStarterMoves;
+        const moveFilterPool =
+          globalScene.gameMode.isShowdown || isFunDebugModeActive(globalScene.gameMode.isFun)
+            ? this.selectedStageLegalMovePool(species.speciesId)
+            : availableStarterMoves;
         this.starterMoveset = (moveData || (this.speciesStarterMoves.slice(0, 4) as StarterMoveset)).filter(m =>
           moveFilterPool.find(sm => sm === m),
         ) as StarterMoveset;
@@ -7180,6 +7297,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // silently re-stamp a stale (e.g. mega) selection past the picker guards. Keyed by the
     // root (grid) species id. No-op in non-showdown modes (the map is always empty there).
     this.showdownSelections.delete(this.starterSpecies[index]?.speciesId);
+    this.funDebugSelections.delete(this.starterSpecies[index]?.speciesId);
     this.starterSpecies.splice(index, 1);
     this.starters.splice(index, 1);
 
@@ -8029,6 +8147,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // Showdown: drop all stored stage/item choices on screen exit so a later re-entry
     // (same or a fresh run) starts clean instead of restoring stale selections.
     this.showdownSelections.clear();
+    this.funDebugSelections.clear();
 
     if (this.statsMode) {
       this.toggleStatsMode(false);

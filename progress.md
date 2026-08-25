@@ -8027,3 +8027,8 @@ Original prompt: Build a true two-real-browser public-UI game-over journey that 
 - Restored the complete form-aware editor catalog/search work and extended the runtime dump to include every registered fakemon-pitch species with stable sprite slugs.
 - Added a fail-closed catalog validator covering starter/all-species inclusion, forms, learnsets, TM pools, evolutions, and move/ability references.
 - Added an automatic `feat/elite-redux-port` workflow that regenerates all editor catalogs on GitHub runners and deploys only the standalone `er-editor` Cloudflare Pages project with cache revalidation. Game staging and production deployments are not part of this workflow.
+
+2026-08-25 - Fun Debug starting forms
+
+- Added a Debug-only starter action that lists every obtainable form across the selected Pokemon's forward evolution graph, including alternate and Mega forms, and fields the selected stage without changing the account's dex, unlocks, costs, or saved starter preferences.
+- Preview sprite, party icon, types, abilities, passives, Tera options, and legal move pool now follow the temporary stage. The focused GitHub runner passed (`32907133550`); game production remains untouched.
