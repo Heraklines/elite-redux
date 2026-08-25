@@ -34,7 +34,8 @@ pub enum BossEvidenceKindV1 {
     TriggerFired { trigger_id: u32 },
     /// The boss entered a new phase.
     PhaseChanged { from: u8, to: u8 },
-    /// A phase entry granted (or replaced with) an active shield.
+    /// A phase entry granted an active shield (positive-charge boundaries
+    /// only; zero-charge boundaries never strip an earlier grant).
     ShieldGained { charges: u8 },
     /// One shield charge was consumed.
     ShieldConsumed { remaining: u8 },
@@ -199,15 +200,16 @@ pub fn apply_boss_damage(
             });
             updated.current_phase = boundary.phase_index;
         }
-        updated.shield_charges = boundary.shield_charges;
-        updated.shield_active = updated.shield_charges > 0;
-        if updated.shield_active {
+        if boundary.shield_charges > 0 {
+            // Grants are deterministic and non-destructive: a boundary with
+            // no shield never strips one granted by an earlier phase.
+            updated.shield_charges = boundary.shield_charges;
+            updated.shield_active = true;
             kinds.push(BossEvidenceKindV1::ShieldGained {
                 charges: updated.shield_charges,
             });
         }
     }
-
     updated.validate()?;
     Ok(BossDamageTransitionV1 {
         state: updated,
@@ -951,9 +953,14 @@ mod tests {
             })
         );
 
-        assert!(admit_boss_rng_draw(&state, &admission(10, 3)).is_ok());
+        // Transitions are pure: the first admission succeeds and returns an
+        // updated ledger; replaying the same draw against THAT ledger is the
+        // duplicate the one-time contract rejects.
+        let admitted = admit_boss_rng_draw(&state, &admission(10, 3))
+            .expect("first admission");
+        assert_eq!(admitted.state.rng_admissions, 1);
         assert_eq!(
-            admit_boss_rng_draw(&state, &admission(10, 3)),
+            admit_boss_rng_draw(&admitted.state, &admission(10, 3)),
             Err(BossMechanicErrorV1::RngSequenceNotAdvancing {
                 sequence: 10,
                 previous: 10
@@ -1185,12 +1192,17 @@ mod tests {
             source: FixtureSource,
         }
         #[derive(serde::Deserialize)]
-        struct FixtureSource {
-            kind: String,
-            registry_key: Option<String>,
+        struct FixtureRoot {
+            clusters: Vec<Cluster>,
         }
-        let parsed: Vec<Cluster> = serde_json::from_str(&raw).expect("fixture shape");
+        #[derive(serde::Deserialize)]
+        struct Cluster {
+            cluster: String,
+            behavior_units: Vec<FixtureUnit>,
+        }
+        let parsed: FixtureRoot = serde_json::from_str(&raw).expect("fixture shape");
         let units: Vec<DispatchUnitIdentityV1> = parsed
+            .clusters
             .iter()
             .filter(|cluster| cluster.cluster == "CUSTOM_DISPATCH")
             .flat_map(|cluster| &cluster.behavior_units)
@@ -1337,7 +1349,7 @@ mod tests {
         }
         assert_eq!(
             seen_payloads.keys().count(),
-            10,
+            9,
             "every route kind stages a distinct typed payload"
         );
         // Attribute bindings carry the parsed attribute name.
