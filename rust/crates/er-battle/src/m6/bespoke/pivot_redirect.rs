@@ -23,6 +23,7 @@ use er_state::bespoke_v2::pivot_redirect::{
     RedirectDirectiveState, RedirectKind, TrapInstanceState,
 };
 use er_types::battle_ids::{FieldSlot, PokemonId};
+use er_types::{RngDomainV1, RngReasonV2};
 
 /// Occupancy facts for one field slot in the validated topology snapshot.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -334,6 +335,19 @@ pub enum StagedPivotRedirectOperation {
     CleanupFaintedSource {
         source: PokemonId,
     },
+    /// Timed TRAPPED tag from the moving-first archetype or pitfall.
+    ApplyTrappedTag {
+        subject: OccupantIdentity,
+        turns: u16,
+    },
+    /// Flinch volatile granted on the first moving-first strike.
+    ApplyFlinch {
+        subject: OccupantIdentity,
+    },
+    /// Pitfall's ALWAYS_GET_HIT flag, applied together with its trap.
+    ApplyAlwaysGetHit {
+        subject: OccupantIdentity,
+    },
 }
 
 /// Complete output of one pivot decision.
@@ -431,6 +445,16 @@ pub struct CommanderPairFacts {
     pub host: OccupantIdentity,
 }
 
+/// Closed Commander species-eligibility verdicts supplied by the caller
+/// from catalog identity (commanding species = Tatsugiri family, commanded
+/// species = Dondozo family). A false fact rejects the pairing outright;
+/// eligibility is never inferred from slots or occupancy here.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct CommanderEligibilityFacts {
+    pub commander_is_commander_species: bool,
+    pub host_is_commanded_species: bool,
+}
+
 /// Complete output of one Commander entry or exit decision.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommanderTransition {
@@ -445,10 +469,16 @@ pub fn commander_enter(
     topology: &TopologyFacts,
     state: &PivotRedirectStateV2,
     facts: &CommanderPairFacts,
+    eligibility: &CommanderEligibilityFacts,
 ) -> Result<CommanderTransition, PivotRedirectError> {
     topology.validate()?;
     topology.resolve_identity(&facts.commander)?;
     topology.resolve_identity(&facts.host)?;
+    if !eligibility.commander_is_commander_species
+        || !eligibility.host_is_commanded_species
+    {
+        return Err(PivotRedirectError::CommanderSpeciesIneligible);
+    }
     if facts.commander.slot == facts.host.slot {
         return Err(PivotRedirectError::CommanderSameSlot);
     }
@@ -458,7 +488,6 @@ pub fn commander_enter(
     if state.commander.is_some() {
         return Err(PivotRedirectError::CommanderAlreadyActive);
     }
-
     let (next_state, _) = state
         .assign_commander(facts.commander.pokemon, facts.commander.slot, facts.host)
         .map_err(PivotRedirectError::State)?;
@@ -633,6 +662,414 @@ fn after_intents_step(
         .map_err(PivotRedirectError::State)
 }
 
+// ---------------------------------------------------------------------------
+// Closed audited-draw admission for the family's fixed-dispatch RNG sites.
+//
+// Every site below is pinned to its exact rng-site-manifest-v1 identity:
+// registry key, manifest ordinal, site and owner provenance hashes, domain,
+// reason, and the frozen exclusive range where the oracle extracted a literal
+// bound. This module never draws and never falls back: decisions consume
+// results produced by the audited RNG runtime through `admit_audited_draw`.
+// ---------------------------------------------------------------------------
+
+/// Closed set of RNG site identities this family's decisions may consume.
+/// Six entries are the SWITCH_TRAP_REDIRECT cluster's own fixed-dispatch
+/// sites; [`FamilyRngSite::PitfallChanceRoll`] is the externally owned
+/// dispatcher site consumed by this family's pitfall decision.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum FamilyRngSite {
+    /// Archetype dispatcher entry roll (dispatcher case 329, 10% gate).
+    DispatcherEntry329,
+    /// Archetype dispatcher entry roll (dispatcher case 632, 10% gate).
+    DispatcherEntry632,
+    /// Moving-first trap/flinch flinch roll against the dex threshold.
+    MovingFirstTrapFlinchRoll,
+    /// Ability-upgrade chance roll (voodoo-power upgrade).
+    AbilityUpgradesChance,
+    /// Moody formation roll over a dynamic denominator.
+    MoodyFormationDenominator,
+    /// Modifier-layer percentage roll.
+    ModifierTargetRoll,
+    /// Pitfall trap shared chance roll (move-archetype-dispatcher:621).
+    PitfallChanceRoll,
+}
+
+impl FamilyRngSite {
+    /// Every closed site identity, in manifest-ordinal order.
+    pub const ALL: [Self; 7] = [
+        Self::MovingFirstTrapFlinchRoll,
+        Self::DispatcherEntry329,
+        Self::DispatcherEntry632,
+        Self::AbilityUpgradesChance,
+        Self::MoodyFormationDenominator,
+        Self::ModifierTargetRoll,
+        Self::PitfallChanceRoll,
+    ];
+
+    const fn spec(
+        self,
+    ) -> (
+        &'static str,
+        u16,
+        &'static str,
+        &'static str,
+        RngReasonV2,
+        Option<u64>,
+    ) {
+        match self {
+            Self::DispatcherEntry329 => (
+                "RNG:src/data/elite-redux/archetype-dispatcher.ts:4266:17:target.randBattleSeedInt",
+                239,
+                "f376a40954fe08b5462e38a32732c993fb6dc3e4dfbca36047a8e83f7916d97b",
+                "7b8ccd808a29e3a36699ed122413ac1f31576038d71b3640f8a57758bb8f7b6e",
+                RngReasonV2::TargetSelection,
+                Some(100),
+            ),
+            Self::DispatcherEntry632 => (
+                "RNG:src/data/elite-redux/archetype-dispatcher.ts:4282:17:target.randBattleSeedInt",
+                240,
+                "7cf967284ba725c5e982c71503fd7b06645aaec63556bc0c3056ba92c9269e65",
+                "409f4277713a42bf049a40d18c70c7762a47ba95ed24694e16764157a11b5cd9",
+                RngReasonV2::TargetSelection,
+                Some(100),
+            ),
+            Self::MovingFirstTrapFlinchRoll => (
+                "RNG:src/data/elite-redux/archetypes/moving-first-trap-flinch.ts:57:21:pokemon.randBattleSeedInt",
+                90,
+                "9b93510b027aa74338c0d0d066363e6c6844cd4cd6e42420c23aa67bbe619f18",
+                "bf53eb0b3652724f64ca76bf2b1f03f9f8ebd9054a606f4839f53a1f97a19880",
+                RngReasonV2::SourceIdentifiedBespoke,
+                Some(100),
+            ),
+            Self::AbilityUpgradesChance => (
+                "RNG:src/data/elite-redux/init-elite-redux-ability-upgrades.ts:671:17:target.randBattleSeedInt",
+                241,
+                "75d4fa36f6b8a9f4178d7bb5325d8358cc02581c6f70888b9abe85b2afbf3877",
+                "74714978c272b16f7a60c97571a159b5709493e3c0ccd166abadf058e2060a3f",
+                RngReasonV2::TargetSelection,
+                Some(100),
+            ),
+            Self::MoodyFormationDenominator => (
+                "RNG:src/data/elite-redux/moody/moody-formation-game-adapter.ts:1515:12:target.randBattleSeedInt",
+                242,
+                "d5052a1bb85d131b66bba8df0310d2734a53fee700dbbfbfdb9bfa9ed3a7c1f4",
+                "e8a3e97850c5a7521dbeb2ebcf3797441b1e6d6ded3ff6a71e684e93e327c7c8",
+                RngReasonV2::TargetSelection,
+                None,
+            ),
+            Self::ModifierTargetRoll => (
+                "RNG:src/modifier/modifier.ts:4508:36:target.randBattleSeedInt",
+                243,
+                "6025144548c1bd09973b98e831cba711802cb7e0b8a7cb79133e5039ec12324f",
+                "9474c016c54087970faf32ab5ca58ba41531bb057bd38d12e7c01421c3cfbf74",
+                RngReasonV2::TargetSelection,
+                Some(100),
+            ),
+            Self::PitfallChanceRoll => (
+                "RNG:src/data/elite-redux/move-archetype-dispatcher.ts:621:50:user.randBattleSeedInt",
+                248,
+                "da168da1d6ea4165e64d4389c7dfbf2195b46b190ec1732842ed9ae7177564ae",
+                "b0b28db063e0e6f282a24f067499aee894a0a7b20cebf718a01d179926451f21",
+                RngReasonV2::MoveSelection,
+                Some(100),
+            ),
+        }
+    }
+
+    pub const fn registry_key(self) -> &'static str {
+        self.spec().0
+    }
+
+    pub const fn site_ordinal(self) -> u16 {
+        self.spec().1
+    }
+
+    pub const fn site_provenance_hash(self) -> &'static str {
+        self.spec().2
+    }
+
+    pub const fn owner_provenance_hash(self) -> &'static str {
+        self.spec().3
+    }
+
+    pub const fn reason(self) -> RngReasonV2 {
+        self.spec().4
+    }
+
+    /// All six cluster-owned plus one externally consumed site draw from the
+    /// battle mechanical domain.
+    pub const fn domain(self) -> RngDomainV1 {
+        RngDomainV1::BattleMechanical
+    }
+
+    /// Frozen exclusive range, or `None` where the oracle recorded a dynamic
+    /// source expression (`denominator`) instead of a literal bound.
+    pub const fn frozen_range(self) -> Option<u64> {
+        self.spec().5
+    }
+}
+
+impl std::fmt::Display for FamilyRngSite {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.registry_key())
+    }
+}
+
+/// One externally drawn audited result offered for admission.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AuditedDrawFacts {
+    pub site: FamilyRngSite,
+    /// Exclusive range as executed by the audited runtime.
+    pub range: u64,
+    pub result: u64,
+}
+
+/// A fully admitted draw carrying the complete closed site evidence.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct AdmittedAuditedDraw {
+    pub site: FamilyRngSite,
+    pub registry_key: &'static str,
+    pub site_provenance_hash: &'static str,
+    pub owner_provenance_hash: &'static str,
+    pub site_ordinal: u16,
+    pub domain: RngDomainV1,
+    pub reason: RngReasonV2,
+    pub range: u64,
+    pub result: u64,
+}
+
+/// Admits one audited draw against the frozen site table. The range must
+/// equal the frozen literal where one exists, and the result must fall
+/// inside the exclusive range. Pure; no internal RNG anywhere.
+pub fn admit_audited_draw(
+    draw: &AuditedDrawFacts,
+) -> Result<AdmittedAuditedDraw, PivotRedirectError> {
+    if let Some(frozen) = draw.site.frozen_range() {
+        if draw.range != frozen {
+            return Err(PivotRedirectError::DrawRangeMismatch {
+                site: draw.site,
+                expected: frozen,
+                actual: draw.range,
+            });
+        }
+    }
+    if draw.range == 0 || draw.result >= draw.range {
+        return Err(PivotRedirectError::DrawResultOutOfRange {
+            site: draw.site,
+            range: draw.range,
+            result: draw.result,
+        });
+    }
+    Ok(AdmittedAuditedDraw {
+        site: draw.site,
+        registry_key: draw.site.registry_key(),
+        site_provenance_hash: draw.site.site_provenance_hash(),
+        owner_provenance_hash: draw.site.owner_provenance_hash(),
+        site_ordinal: draw.site.site_ordinal(),
+        domain: draw.site.domain(),
+        reason: draw.site.reason(),
+        range: draw.range,
+        result: draw.result,
+    })
+}
+
+/// Typed facts for one moving-first trap/flinch application attempt
+/// (archetype `moving-first-trap-flinch`): the trap applies on every
+/// moving-first hit that landed with an effect; the flinch roll is gated to
+/// the first strike of a multi-hit move.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct MovingFirstTrapFlinchFacts {
+    pub trapper: OccupantIdentity,
+    pub target: OccupantIdentity,
+    /// The hit resolved above NO_EFFECT.
+    pub landed_with_effect: bool,
+    /// The target had not yet acted this turn (the moving-first condition).
+    pub target_not_yet_acted: bool,
+    /// First strike of a multi-hit move (hitCount == hitsLeft).
+    pub first_hit: bool,
+    /// Frozen dex flinch threshold in percent.
+    pub flinch_chance_percent: u64,
+    pub trap_turns: u16,
+}
+
+/// Complete output of one moving-first trap/flinch decision.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MovingFirstTrapFlinchTransition {
+    pub admitted_draw: Option<AdmittedAuditedDraw>,
+    pub trap_applied: bool,
+    pub flinch_applied: bool,
+    pub operations: Vec<StagedPivotRedirectOperation>,
+    pub state: PivotRedirectStateV2,
+}
+
+/// Plans one moving-first trap/flinch decision. The source gates its roll
+/// behind `canApply`, so a closed gate consumes no draw: supplying one is a
+/// typed error, and an open gate without a draw fails closed. The trap
+/// applies on every open-gate hit regardless of the flinch outcome. Pure.
+pub fn plan_moving_first_trap_flinch(
+    topology: &TopologyFacts,
+    state: &PivotRedirectStateV2,
+    facts: &MovingFirstTrapFlinchFacts,
+    draw: Option<&AuditedDrawFacts>,
+) -> Result<MovingFirstTrapFlinchTransition, PivotRedirectError> {
+    topology.validate()?;
+    topology.resolve_identity(&facts.trapper)?;
+    topology.resolve_identity(&facts.target)?;
+
+    let gate_open = facts.landed_with_effect && facts.target_not_yet_acted;
+    let admitted = match (gate_open, draw) {
+        (false, None) => None,
+        (false, Some(offered)) => {
+            return Err(PivotRedirectError::UnexpectedAuditedDraw {
+                site: offered.site,
+            });
+        }
+        (true, None) => {
+            return Err(PivotRedirectError::MissingAuditedDraw {
+                site: FamilyRngSite::MovingFirstTrapFlinchRoll,
+            });
+        }
+        (true, Some(draw)) => {
+            if draw.site != FamilyRngSite::MovingFirstTrapFlinchRoll {
+                return Err(PivotRedirectError::DrawSiteMismatch {
+                    expected: FamilyRngSite::MovingFirstTrapFlinchRoll,
+                    actual: draw.site,
+                });
+            }
+            Some(admit_audited_draw(draw)?)
+        }
+    };
+
+    let Some(admitted) = admitted else {
+        return Ok(MovingFirstTrapFlinchTransition {
+            admitted_draw: None,
+            trap_applied: false,
+            flinch_applied: false,
+            operations: Vec::new(),
+            state: state.clone(),
+        });
+    };
+
+    let (next_state, _) = state
+        .refresh_binding_trap(facts.target, Some(facts.trapper), facts.trap_turns)
+        .map_err(PivotRedirectError::State)?;
+    let mut operations = vec![StagedPivotRedirectOperation::ApplyTrappedTag {
+        subject: facts.target,
+        turns: facts.trap_turns,
+    }];
+    let flinch_applied = facts.first_hit && admitted.result < facts.flinch_chance_percent;
+    if flinch_applied {
+        operations.push(StagedPivotRedirectOperation::ApplyFlinch {
+            subject: facts.target,
+        });
+    }
+    Ok(MovingFirstTrapFlinchTransition {
+        admitted_draw: Some(admitted),
+        trap_applied: true,
+        flinch_applied,
+        operations,
+        state: next_state,
+    })
+}
+
+/// Frozen move-chance gate mirroring the pitfall attr's check:
+/// `moveChance >= 0 && moveChance !== 100` rolls once; any always-hit
+/// encoding short-circuits the roll entirely.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ChanceGate {
+    Always,
+    Percent(u64),
+}
+
+/// Typed facts for one pitfall application (ER Pitfall 937): one shared
+/// chance roll decides both the timed TRAPPED tag and ALWAYS_GET_HIT —
+/// either both land or neither.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct PitfallAlwaysHitFacts {
+    pub user: OccupantIdentity,
+    pub target: OccupantIdentity,
+    pub chance_gate: ChanceGate,
+    /// Trap duration supplied from the audited runtime's ranged draw.
+    pub trap_turns: u16,
+}
+
+/// Complete output of one pitfall decision.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PitfallAlwaysHitTransition {
+    pub admitted_draw: Option<AdmittedAuditedDraw>,
+    pub applied: bool,
+    pub operations: Vec<StagedPivotRedirectOperation>,
+    pub state: PivotRedirectStateV2,
+}
+
+/// Plans one pitfall trap + always-hit decision. `Percent(n)` requires an
+/// admitted draw pinned to [`FamilyRngSite::PitfallChanceRoll`] and applies
+/// only when `result < n`; `Always` short-circuits the roll so no draw may
+/// be supplied. On success both effects stage together or neither does.
+/// Pure.
+pub fn plan_pitfall_always_hit(
+    topology: &TopologyFacts,
+    state: &PivotRedirectStateV2,
+    facts: &PitfallAlwaysHitFacts,
+    draw: Option<&AuditedDrawFacts>,
+) -> Result<PitfallAlwaysHitTransition, PivotRedirectError> {
+    topology.validate()?;
+    topology.resolve_identity(&facts.user)?;
+    topology.resolve_identity(&facts.target)?;
+
+    let (admitted, succeeded) = match (facts.chance_gate, draw) {
+        (ChanceGate::Always, None) => (None, true),
+        (ChanceGate::Always, Some(offered)) => {
+            return Err(PivotRedirectError::UnexpectedAuditedDraw {
+                site: offered.site,
+            });
+        }
+        (ChanceGate::Percent(_), None) => {
+            return Err(PivotRedirectError::MissingAuditedDraw {
+                site: FamilyRngSite::PitfallChanceRoll,
+            });
+        }
+        (ChanceGate::Percent(threshold), Some(draw)) => {
+            if draw.site != FamilyRngSite::PitfallChanceRoll {
+                return Err(PivotRedirectError::DrawSiteMismatch {
+                    expected: FamilyRngSite::PitfallChanceRoll,
+                    actual: draw.site,
+                });
+            }
+            let admitted = admit_audited_draw(draw)?;
+            let succeeded = admitted.result < threshold;
+            (Some(admitted), succeeded)
+        }
+    };
+
+    if !succeeded {
+        return Ok(PitfallAlwaysHitTransition {
+            admitted_draw: admitted,
+            applied: false,
+            operations: Vec::new(),
+            state: state.clone(),
+        });
+    }
+
+    let (next_state, _) = state
+        .refresh_binding_trap(facts.target, Some(facts.user), facts.trap_turns)
+        .map_err(PivotRedirectError::State)?;
+    Ok(PitfallAlwaysHitTransition {
+        admitted_draw: admitted,
+        applied: true,
+        operations: vec![
+            StagedPivotRedirectOperation::ApplyTrappedTag {
+                subject: facts.target,
+                turns: facts.trap_turns,
+            },
+            StagedPivotRedirectOperation::ApplyAlwaysGetHit {
+                subject: facts.target,
+            },
+        ],
+        state: next_state,
+    })
+}
+
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum PivotRedirectError {
     #[error("Pokémon {pokemon} would occupy more than one field slot")]
@@ -658,6 +1095,29 @@ pub enum PivotRedirectError {
     CommanderReservedSlotOccupied { slot: FieldSlot },
     #[error("host still occupies its slot; the pairing cannot end through this trigger")]
     HostStillPresent,
+    #[error("commander species eligibility facts reject the pairing")]
+    CommanderSpeciesIneligible,
+    #[error("audited draw was drawn at {actual}; the decision requires {expected}")]
+    DrawSiteMismatch {
+        expected: FamilyRngSite,
+        actual: FamilyRngSite,
+    },
+    #[error("site {site} freezes an exclusive range of {expected}; got {actual}")]
+    DrawRangeMismatch {
+        site: FamilyRngSite,
+        expected: u64,
+        actual: u64,
+    },
+    #[error("site {site} draw result {result} is outside its exclusive range {range}")]
+    DrawResultOutOfRange {
+        site: FamilyRngSite,
+        range: u64,
+        result: u64,
+    },
+    #[error("taken branch requires an audited draw at {site}")]
+    MissingAuditedDraw { site: FamilyRngSite },
+    #[error("untaken branch must not consume an audited draw; got {site}")]
+    UnexpectedAuditedDraw { site: FamilyRngSite },
     #[error("Pokémon {pokemon} is not a legal pivot replacement")]
     IllegalReplacement { pokemon: PokemonId },
     #[error("family state rejected the transition: {0}")]
@@ -710,6 +1170,23 @@ mod tests {
 
     fn fresh_state() -> PivotRedirectStateV2 {
         PivotRedirectStateV2::default()
+    }
+
+    fn eligible() -> CommanderEligibilityFacts {
+        CommanderEligibilityFacts {
+            commander_is_commander_species: true,
+            host_is_commanded_species: true,
+        }
+    }
+
+    /// Builds an audited draw for `site`; dynamic-range sites fall back to a
+    /// caller-supplied exclusive range.
+    fn draw(site: FamilyRngSite, range: u64, result: u64) -> AuditedDrawFacts {
+        AuditedDrawFacts {
+            site,
+            range: site.frozen_range().unwrap_or(range),
+            result,
+        }
     }
 
     #[test]
@@ -1170,6 +1647,7 @@ mod tests {
                 commander: ident(PLAYER, 0, 10),
                 host: ident(ENEMY, 0, 20),
             },
+            &eligible(),
         )
         .expect_err("cross-side pairing must fail");
         assert_eq!(error, PivotRedirectError::CommanderCrossSide);
@@ -1181,6 +1659,7 @@ mod tests {
                 commander: ident(PLAYER, 1, 11),
                 host: ident(PLAYER, 0, 10),
             },
+            &eligible(),
         )
         .expect("pairing establishes");
         assert_eq!(
@@ -1201,6 +1680,7 @@ mod tests {
                 commander: ident(ENEMY, 1, 21),
                 host: ident(ENEMY, 0, 20),
             },
+            &eligible(),
         )
         .expect_err("second pairing must fail");
         assert_eq!(error, PivotRedirectError::CommanderAlreadyActive);
@@ -1221,6 +1701,7 @@ mod tests {
                 commander: ident(PLAYER, 1, 11),
                 host: ident(PLAYER, 0, 10),
             },
+            &eligible(),
         )
         .expect("pairing establishes")
         .state;
@@ -1400,5 +1881,301 @@ mod tests {
         .expect("pivot plans");
         assert_eq!(state, before);
         assert!(state.pivot_intents.is_empty());
+    }
+
+    #[test]
+    fn audited_draw_admission_enforces_the_frozen_site_table() {
+        // A frozen-range site rejects a mismatched range and an
+        // out-of-range result, then admits with full closed evidence.
+        let error = admit_audited_draw(&AuditedDrawFacts {
+            site: FamilyRngSite::MovingFirstTrapFlinchRoll,
+            range: 7,
+            result: 5,
+        })
+        .expect_err("frozen range mismatch must fail");
+        assert_eq!(
+            error,
+            PivotRedirectError::DrawRangeMismatch {
+                site: FamilyRngSite::MovingFirstTrapFlinchRoll,
+                expected: 100,
+                actual: 7,
+            }
+        );
+
+        let error = admit_audited_draw(&AuditedDrawFacts {
+            site: FamilyRngSite::MovingFirstTrapFlinchRoll,
+            range: 100,
+            result: 100,
+        })
+        .expect_err("result at the exclusive bound must fail");
+        assert_eq!(
+            error,
+            PivotRedirectError::DrawResultOutOfRange {
+                site: FamilyRngSite::MovingFirstTrapFlinchRoll,
+                range: 100,
+                result: 100,
+            }
+        );
+
+        let admitted = admit_audited_draw(&draw(
+            FamilyRngSite::MovingFirstTrapFlinchRoll,
+            100,
+            41,
+        ))
+        .expect("admits");
+        assert_eq!(admitted.site_ordinal, 90);
+        assert_eq!(
+            admitted.registry_key,
+            "RNG:src/data/elite-redux/archetypes/moving-first-trap-flinch.ts:57:21:pokemon.randBattleSeedInt"
+        );
+        assert_eq!(admitted.reason, RngReasonV2::SourceIdentifiedBespoke);
+        assert_eq!(admitted.domain, RngDomainV1::BattleMechanical);
+        assert_eq!(FamilyRngSite::ALL.len(), 7);
+
+        // The dynamic-denominator site accepts any result inside the range
+        // the audited runtime actually used.
+        let admitted =
+            admit_audited_draw(&draw(FamilyRngSite::MoodyFormationDenominator, 3, 2))
+                .expect("dynamic range admits");
+        assert_eq!(admitted.site.frozen_range(), None);
+    }
+
+    #[test]
+    fn moving_first_trap_applies_on_every_hit_and_flinch_only_on_the_first() {
+        let topology = doubles_topology(&[
+            (PLAYER, 0, 10, false),
+            (ENEMY, 0, 20, false),
+        ]);
+        let state = fresh_state();
+        let facts = MovingFirstTrapFlinchFacts {
+            trapper: ident(PLAYER, 0, 10),
+            target: ident(ENEMY, 0, 20),
+            landed_with_effect: true,
+            target_not_yet_acted: true,
+            first_hit: true,
+            flinch_chance_percent: 30,
+            trap_turns: 3,
+        };
+
+        // The gate consumed no draw upstream in the source: an offered draw
+        // on a closed gate is a typed failure.
+        let closed_gate = MovingFirstTrapFlinchFacts {
+            target_not_yet_acted: false,
+            ..facts
+        };
+        let error = plan_moving_first_trap_flinch(
+            &topology,
+            &state,
+            &closed_gate,
+            Some(&draw(FamilyRngSite::MovingFirstTrapFlinchRoll, 100, 5)),
+        )
+        .expect_err("closed gate must not consume a draw");
+        assert_eq!(
+            error,
+            PivotRedirectError::UnexpectedAuditedDraw {
+                site: FamilyRngSite::MovingFirstTrapFlinchRoll
+            }
+        );
+        let untouched =
+            plan_moving_first_trap_flinch(&topology, &state, &closed_gate, None)
+                .expect("closed gate without a draw");
+        assert!(!untouched.trap_applied);
+        assert!(untouched.state.traps.is_empty());
+
+        // An open gate without a draw fails closed.
+        let error = plan_moving_first_trap_flinch(&topology, &state, &facts, None)
+            .expect_err("open gate requires its audited draw");
+        assert_eq!(
+            error,
+            PivotRedirectError::MissingAuditedDraw {
+                site: FamilyRngSite::MovingFirstTrapFlinchRoll
+            }
+        );
+
+        // A draw pinned to another closed site is rejected.
+        let error = plan_moving_first_trap_flinch(
+            &topology,
+            &state,
+            &facts,
+            Some(&draw(FamilyRngSite::ModifierTargetRoll, 100, 5)),
+        )
+        .expect_err("site identity is pinned");
+        assert_eq!(
+            error,
+            PivotRedirectError::DrawSiteMismatch {
+                expected: FamilyRngSite::MovingFirstTrapFlinchRoll,
+                actual: FamilyRngSite::ModifierTargetRoll,
+            }
+        );
+
+        // First strike under threshold: trap AND flinch apply.
+        let applied = plan_moving_first_trap_flinch(
+            &topology,
+            &state,
+            &facts,
+            Some(&draw(FamilyRngSite::MovingFirstTrapFlinchRoll, 100, 29)),
+        )
+        .expect("applies");
+        assert!(applied.trap_applied && applied.flinch_applied);
+        assert_eq!(
+            applied.operations,
+            vec![
+                StagedPivotRedirectOperation::ApplyTrappedTag {
+                    subject: ident(ENEMY, 0, 20),
+                    turns: 3,
+                },
+                StagedPivotRedirectOperation::ApplyFlinch {
+                    subject: ident(ENEMY, 0, 20),
+                },
+            ]
+        );
+        assert_eq!(applied.state.traps.len(), 1);
+        assert_eq!(applied.state.traps[0].remaining_turns, Some(3));
+
+        // Later multi-hit strikes keep the trap but never re-roll flinch.
+        let later_hit = MovingFirstTrapFlinchFacts {
+            first_hit: false,
+            ..facts
+        };
+        let applied = plan_moving_first_trap_flinch(
+            &topology,
+            &applied.state,
+            &later_hit,
+            Some(&draw(FamilyRngSite::MovingFirstTrapFlinchRoll, 100, 5)),
+        )
+        .expect("trap reapplies");
+        assert!(applied.trap_applied);
+        assert!(!applied.flinch_applied);
+        assert_eq!(
+            applied.operations,
+            vec![StagedPivotRedirectOperation::ApplyTrappedTag {
+                subject: ident(ENEMY, 0, 20),
+                turns: 3,
+            }]
+        );
+
+        // At or above the threshold only the trap lands.
+        let resisted = plan_moving_first_trap_flinch(
+            &topology,
+            &fresh_state(),
+            &facts,
+            Some(&draw(FamilyRngSite::MovingFirstTrapFlinchRoll, 100, 30)),
+        )
+        .expect("threshold roll resists flinch");
+        assert!(resisted.trap_applied);
+        assert!(!resisted.flinch_applied);
+    }
+
+    #[test]
+    fn pitfall_chance_roll_gates_both_effects_together() {
+        let topology = doubles_topology(&[
+            (PLAYER, 0, 10, false),
+            (ENEMY, 0, 20, false),
+        ]);
+        let state = fresh_state();
+        let facts = PitfallAlwaysHitFacts {
+            user: ident(PLAYER, 0, 10),
+            target: ident(ENEMY, 0, 20),
+            chance_gate: ChanceGate::Percent(30),
+            trap_turns: 5,
+        };
+
+        // Missed roll: neither effect applies.
+        let missed = plan_pitfall_always_hit(
+            &topology,
+            &state,
+            &facts,
+            Some(&draw(FamilyRngSite::PitfallChanceRoll, 100, 30)),
+        )
+        .expect("roll resolves");
+        assert!(!missed.applied);
+        assert!(missed.state.traps.is_empty());
+
+        // Hit roll: TRAPPED and ALWAYS_GET_HIT stage together.
+        let hit = plan_pitfall_always_hit(
+            &topology,
+            &state,
+            &facts,
+            Some(&draw(FamilyRngSite::PitfallChanceRoll, 100, 29)),
+        )
+        .expect("both effects apply");
+        assert!(hit.applied);
+        assert_eq!(
+            hit.operations,
+            vec![
+                StagedPivotRedirectOperation::ApplyTrappedTag {
+                    subject: ident(ENEMY, 0, 20),
+                    turns: 5,
+                },
+                StagedPivotRedirectOperation::ApplyAlwaysGetHit {
+                    subject: ident(ENEMY, 0, 20),
+                },
+            ]
+        );
+        assert_eq!(hit.state.traps.len(), 1);
+        assert_eq!(hit.admitted_draw.expect("draw carried").site_ordinal, 248);
+
+        // Always-hit encoding short-circuits the roll: no draw allowed.
+        let always = PitfallAlwaysHitFacts {
+            chance_gate: ChanceGate::Always,
+            ..facts
+        };
+        let error = plan_pitfall_always_hit(
+            &topology,
+            &state,
+            &always,
+            Some(&draw(FamilyRngSite::PitfallChanceRoll, 100, 0)),
+        )
+        .expect_err("always gate consumes no roll");
+        assert_eq!(
+            error,
+            PivotRedirectError::UnexpectedAuditedDraw {
+                site: FamilyRngSite::PitfallChanceRoll
+            }
+        );
+        let applied = plan_pitfall_always_hit(&topology, &state, &always, None)
+            .expect("always applies both effects");
+        assert!(applied.applied);
+        assert!(applied.admitted_draw.is_none());
+        assert_eq!(applied.state.traps.len(), 1);
+    }
+
+    #[test]
+    fn commander_species_eligibility_facts_reject_false_verdicts() {
+        let topology = doubles_topology(&[
+            (PLAYER, 0, 10, false),
+            (PLAYER, 1, 11, false),
+        ]);
+        let state = fresh_state();
+        let pair = CommanderPairFacts {
+            commander: ident(PLAYER, 1, 11),
+            host: ident(PLAYER, 0, 10),
+        };
+
+        let error = commander_enter(
+            &topology,
+            &state,
+            &pair,
+            &CommanderEligibilityFacts {
+                commander_is_commander_species: false,
+                host_is_commanded_species: true,
+            },
+        )
+        .expect_err("non-commanding species must fail");
+        assert_eq!(error, PivotRedirectError::CommanderSpeciesIneligible);
+
+        let error = commander_enter(
+            &topology,
+            &state,
+            &pair,
+            &CommanderEligibilityFacts {
+                commander_is_commander_species: true,
+                host_is_commanded_species: false,
+            },
+        )
+        .expect_err("non-commanded host species must fail");
+        assert_eq!(error, PivotRedirectError::CommanderSpeciesIneligible);
+
+        commander_enter(&topology, &state, &pair, &eligible()).expect("eligible pairing");
     }
 }

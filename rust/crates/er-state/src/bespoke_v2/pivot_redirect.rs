@@ -297,7 +297,7 @@ impl PivotRedirectStateV2 {
         Ok(advanced)
     }
 
-    fn validated(mut self) -> Result<Self, PivotRedirectStateError> {
+    fn validated(self) -> Result<Self, PivotRedirectStateError> {
         self.validate()?;
         Ok(self)
     }
@@ -338,6 +338,33 @@ impl PivotRedirectStateV2 {
             creation_ordinal,
         };
         let mut next = self.advance_ordinal()?;
+        next.traps.push(trap.clone());
+        let next = next.validated()?;
+        Ok((next, trap))
+    }
+
+    /// Refreshes the timed binding trap anchoring to `subject`, mirroring
+    /// tag-refresh semantics: any existing binding trap on the subject is
+    /// replaced, then one fresh timed instance is admitted. Pure.
+    pub fn refresh_binding_trap(
+        &self,
+        subject: OccupantIdentity,
+        trapper: Option<OccupantIdentity>,
+        remaining_turns: u16,
+    ) -> Result<(Self, TrapInstanceState), PivotRedirectStateError> {
+        let creation_ordinal = self.next_creation_ordinal;
+        let trap = TrapInstanceState {
+            kind: TrapKind::Binding,
+            subject,
+            trapper,
+            remaining_turns: Some(remaining_turns),
+            creation_ordinal,
+        };
+        let mut next = self.advance_ordinal()?;
+        next.traps.retain(|existing| {
+            !(existing.kind == TrapKind::Binding
+                && existing.subject.pokemon == subject.pokemon)
+        });
         next.traps.push(trap.clone());
         let next = next.validated()?;
         Ok((next, trap))
@@ -561,7 +588,7 @@ mod tests {
         assert_eq!(error, PivotRedirectStateError::CommanderSelfPairing);
 
         let (state, _) = state
-            .admit_redirect(occupant(player(0), commander.get()), RedirectKind::FollowMe)
+            .admit_redirect(occupant(player(0), u64::from(commander)), RedirectKind::FollowMe)
             .expect("redirect");
         let error = state
             .assign_commander(commander, player(0), host)
