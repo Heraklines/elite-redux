@@ -20,6 +20,7 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { Nature } from "#enums/nature";
 import { StatusEffect } from "#enums/status-effect";
 import { PokemonData } from "#system/pokemon-data";
 import { UiMode } from "#enums/ui-mode";
@@ -618,6 +619,29 @@ function applyScenarioInitialState(game: GameManager, id: string): void {
   move.ppUsed = move.getMovePp();
 }
 
+/**
+ * The M4 migration catalog observes permanent Pokémon fields that the live
+ * scenario constructor may source from process-global generation seams before
+ * the battle seed is installed. Normalize those fields at the test-only
+ * capture boundary so two fresh exporter processes replay the same mechanics.
+ */
+function stabilizeMigrationRosters(game: GameManager): void {
+  const rosters = [game.scene.getPlayerParty(), game.scene.getEnemyParty()];
+  for (const roster of rosters) {
+    for (const mon of roster) {
+      const previousMaxHp = mon.getMaxHp();
+      const previousHp = mon.hp;
+      const hpRatio = previousMaxHp > 0 ? previousHp / previousMaxHp : 0;
+      mon.ivs = [31, 31, 31, 31, 31, 31];
+      mon.customPokemonData.nature = -1;
+      mon.setNature(Nature.HARDY);
+      mon.hp = previousHp === 0
+        ? 0
+        : Math.max(1, Math.min(mon.getMaxHp(), Math.round(mon.getMaxHp() * hpRatio)));
+    }
+  }
+}
+
 function ownerSeat(game: GameManager, mon: Pokemon, partyIndex: number, side: "PLAYER" | "ENEMY"): number | null {
   if (side === "ENEMY") return null;
   const capacity = game.scene.currentBattle.arrangement.playerCapacity;
@@ -962,6 +986,7 @@ async function captureCase(
   const spec = scenarioFor(id);
   const game = await launchScenario(spec, phaserGame);
   try {
+    stabilizeMigrationRosters(game);
     applyScenarioInitialState(game, id);
     const playerInitial = game.scene.getPlayerParty().slice();
     const enemyInitial = game.scene.getEnemyParty().slice();
