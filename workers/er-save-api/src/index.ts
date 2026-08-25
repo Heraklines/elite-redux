@@ -45,7 +45,11 @@ import { MysteryEncounterType } from "../../../src/enums/mystery-encounter-type"
 import { SpeciesId } from "../../../src/enums/species-id";
 import { TrainerType } from "../../../src/enums/trainer-type";
 import { TrainerVariant } from "../../../src/enums/trainer-variant";
-import { calculateCommunitySuggestionEligibility, validateCommunitySuggestion } from "./community-suggestions";
+import {
+  calculateCommunitySuggestionEligibility,
+  extractCommunitySuggestionAchievementIds,
+  validateCommunitySuggestion,
+} from "./community-suggestions";
 import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
   applyResultReport,
@@ -4476,9 +4480,11 @@ async function handleCommunityHistory(auth: TokenPayload, env: Env, cors: Record
 }
 
 /**
- * POST /community/achv - the player REPORTS their tracked achievement unlocks (the
- * client sends these because system saves are encrypted and the worker can't read
- * achvUnlocks itself). Body: `{ unlocked: Array<{ id: string; at?: number }> }`.
+ * POST /community/achv - the player REPORTS their tracked achievement unlocks.
+ * This remains a denormalized compatibility/cache path; suggestion eligibility
+ * also reads achvUnlocks from the authenticated account's current system save so
+ * a failed fire-and-forget report cannot incorrectly lock a qualified player out.
+ * Body: `{ unlocked: Array<{ id: string; at?: number }> }`.
  * Only featured tally ids or the generated Redux-only suggestion-eligibility ids
  * are stored (anything else is ignored - anti-abuse).
  * The UPSERT keeps the EARLIEST unlock time per (user, achv). Always `{ ok: true }`.
@@ -4614,11 +4620,25 @@ async function readCommunitySuggestionBody(request: Request): Promise<Record<str
 
 async function communitySuggestionEligibility(auth: TokenPayload, env: Env) {
   await ensureCommunityTables(env);
-  const { results } = await env.DB.prepare("SELECT achv_id FROM achievement_holders WHERE user_id = ?")
-    .bind(auth.uid)
-    .all<{ achv_id: string }>();
+  const [reported, save] = await Promise.all([
+    env.DB.prepare("SELECT achv_id FROM achievement_holders WHERE user_id = ?")
+      .bind(auth.uid)
+      .all<{ achv_id: string }>(),
+    env.DB.prepare("SELECT data FROM system_saves WHERE user_id = ?").bind(auth.uid).first<{ data: string }>(),
+  ]);
+  let savedAchievementIds: string[] = [];
+  if (save?.data) {
+    try {
+      savedAchievementIds = extractCommunitySuggestionAchievementIds(
+        await decompressSave(save.data),
+        COMMUNITY_SUGGESTION_ACHIEVEMENTS,
+      );
+    } catch (error) {
+      console.warn("Could not inspect system save for community-editor eligibility", auth.uid, error);
+    }
+  }
   return calculateCommunitySuggestionEligibility(
-    (results ?? []).map(row => row.achv_id),
+    [...(reported.results ?? []).map(row => row.achv_id), ...savedAchievementIds],
     COMMUNITY_SUGGESTION_ACHIEVEMENTS,
     COMMUNITY_SUGGESTION_REQUIRED_ACHIEVEMENTS,
   );

@@ -56,6 +56,26 @@ export function calculateCommunitySuggestionEligibility(
   };
 }
 
+/**
+ * Read the account's authoritative achievement map from its current system save.
+ * The save Worker stores system saves as JSON (legacy GZ1 rows are decompressed by
+ * the caller), so eligibility does not have to depend on the best-effort report.
+ */
+export function extractCommunitySuggestionAchievementIds(
+  systemSave: string,
+  eligibleIds: ReadonlySet<string>,
+): string[] {
+  try {
+    const root: unknown = JSON.parse(systemSave);
+    if (!isPlainObject(root) || !isPlainObject(root.achvUnlocks)) {
+      return [];
+    }
+    return Object.keys(root.achvUnlocks).filter(id => eligibleIds.has(id));
+  } catch {
+    return [];
+  }
+}
+
 const FILES = new Set<string>(COMMUNITY_SUGGESTION_FILES);
 const ENTITY_TYPES = new Set(["pokemon", "item", "trainer", "game", "other"]);
 const MAX_REASON = 1200;

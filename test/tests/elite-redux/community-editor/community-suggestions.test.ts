@@ -3,6 +3,7 @@ import vanillaAchievementIds from "../../../../scripts/elite-redux/vanilla-achie
 import communitySuggestionAchievements from "../../../../src/data/elite-redux/er-community-suggestion-achievements.json";
 import {
   calculateCommunitySuggestionEligibility,
+  extractCommunitySuggestionAchievementIds,
   mergeSuggestionDeltas,
   validateCommunitySuggestion,
 } from "../../../../workers/er-save-api/src/community-suggestions";
@@ -58,6 +59,23 @@ describe("community editor suggestion validation", () => {
       eligible: true,
       achievementCount: communitySuggestionAchievements.requiredAchievements,
     });
+  });
+
+  it("extracts only Redux achievements from a current system save", () => {
+    const reduxIds = communitySuggestionAchievements.achievements.map(achievement => achievement.id);
+    const eligibleIds = new Set(reduxIds);
+    const save = JSON.stringify({
+      achvUnlocks: {
+        [reduxIds[0]]: 1,
+        [reduxIds[1]]: 2,
+        CLASSIC_VICTORY: 3,
+        UNKNOWN_ACHIEVEMENT: 4,
+      },
+    });
+
+    expect(extractCommunitySuggestionAchievementIds(save, eligibleIds)).toEqual([reduxIds[0], reduxIds[1]]);
+    expect(extractCommunitySuggestionAchievementIds("not-json", eligibleIds)).toEqual([]);
+    expect(extractCommunitySuggestionAchievementIds(JSON.stringify({ achvUnlocks: [] }), eligibleIds)).toEqual([]);
   });
 
   it("accepts a bounded editor-native delta", () => {
