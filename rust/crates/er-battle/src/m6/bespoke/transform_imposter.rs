@@ -3,8 +3,9 @@
 //! Pure planning and apply/clear transitions for the battle-state copy
 //! performed by MOVE 144 `TransformAttr` (`PokemonTransformPhase`) and the
 //! Imposter post-summon copy. The executor consumes a typed facts snapshot of
-//! the subject and target battlers, validates the closed guard set (missing,
-//! self, terminal, already-transformed), projects the target onto the
+//! canonical battle state by the caller, validates the closed guard set
+//! (missing, self, terminal, already-transformed, illusion, substitute,
+//! fusion), projects the target onto the
 //! canonical copy payload owned by [`er_state::bespoke_v2::transform_imposter`],
 //! and returns a fresh state plus deterministic evidence. Inputs are never
 //! mutated: every transition clones, applies, revalidates, then returns.
@@ -39,6 +40,14 @@ pub struct TransformBattlerFactsV2 {
     pub fainted: bool,
     /// Whether an active transform overlay already covers this battler.
     pub transformed: bool,
+    /// Oracle `summonData.illusion` blocker: an illusioned battler can
+    /// neither transform nor be transformed.
+    pub behind_illusion: bool,
+    /// Oracle `BattlerTagType.SUBSTITUTE` blocker on this battler.
+    pub has_substitute: bool,
+    /// Oracle `isFusion()` blocker: fusion battlers are excluded on both
+    /// sides of a copy.
+    pub fusion: bool,
     pub species: SafeU53,
     pub form_key: FormId,
     pub typing: PokemonTyping,
@@ -158,6 +167,24 @@ pub fn plan_transform_copy(
     // Frozen TypeScript guard: neither side may already be transformed.
     if facts.subject.transformed || target.transformed {
         return Err(TransformImposterError::AlreadyTransformed);
+    }
+    // Frozen TypeScript `canTransformInto` blockers, checked in oracle
+    // order after the transformed guard: illusions on either side, then a
+    // substitute on the target, then fusion on either side.
+    if target.behind_illusion {
+        return Err(TransformImposterError::TargetIllusion);
+    }
+    if facts.subject.behind_illusion {
+        return Err(TransformImposterError::SubjectIllusion);
+    }
+    if target.has_substitute {
+        return Err(TransformImposterError::TargetSubstitute);
+    }
+    if facts.subject.fusion {
+        return Err(TransformImposterError::SubjectFusion);
+    }
+    if target.fusion {
+        return Err(TransformImposterError::TargetFusion);
     }
 
     let mut moveset = Vec::with_capacity(target.moveset.len());
@@ -324,6 +351,16 @@ pub enum TransformImposterError {
     TerminalTarget,
     #[error("neither side of a transform may already be transformed")]
     AlreadyTransformed,
+    #[error("transform target is behind an illusion and cannot be copied")]
+    TargetIllusion,
+    #[error("an illusioned battler cannot perform a transform copy")]
+    SubjectIllusion,
+    #[error("a battler behind a substitute cannot be copied by transform")]
+    TargetSubstitute,
+    #[error("fusion battlers cannot perform a transform copy")]
+    SubjectFusion,
+    #[error("fusion battlers cannot be copied by transform")]
+    TargetFusion,
     #[error("staged copy payload is invalid: {0}")]
     InvalidCopiedState(#[source] TransformFormCopyStateError),
     #[error("battler {subject:?} already carries a different live transform copy")]
@@ -346,7 +383,6 @@ mod tests {
         PokemonId::try_from_u64(value).expect("in-range pokemon id")
     }
 
-    fn slot(position: u8) -> FieldSlot {
         FieldSlot::new(BattleSide::Player, position).expect("valid slot")
     }
 
@@ -368,6 +404,9 @@ mod tests {
             slot: slot(if id == SUBJECT_ID { 0 } else { 1 }),
             fainted: false,
             transformed: false,
+            behind_illusion: false,
+            has_substitute: false,
+            fusion: false,
             species: species(if id == SOURCE_ID { 6 } else { 25 }),
             form_key: FormId::parse("1").expect("non-empty"),
             typing: PokemonTyping {
@@ -614,6 +653,51 @@ mod tests {
                     copied_fields: Vec::new(),
                 },
             }
+        );
+    }
+
+    #[test]
+    fn oracle_blockers_fail_closed_distinctly() {
+        let base_subject = battler(SUBJECT_ID, 100, 55);
+        let valid_target = battler(SOURCE_ID, 42, 81);
+
+        // Illusion on either side, target checked first (oracle order).
+        let mut illusioned_target = valid_target.clone();
+        illusioned_target.behind_illusion = true;
+        assert_eq!(
+            plan_transform_copy(&facts(base_subject.clone(), Some(illusioned_target))),
+            Err(TransformImposterError::TargetIllusion)
+        );
+        let mut illusioned_subject = base_subject.clone();
+        illusioned_subject.behind_illusion = true;
+        assert_eq!(
+            plan_transform_copy(&facts(
+                illusioned_subject,
+                Some(valid_target.clone())
+            )),
+            Err(TransformImposterError::SubjectIllusion)
+        );
+
+        // Substitute only blocks the copied side.
+        let mut substituted_target = valid_target.clone();
+        substituted_target.has_substitute = true;
+        assert_eq!(
+            plan_transform_copy(&facts(base_subject.clone(), Some(substituted_target))),
+            Err(TransformImposterError::TargetSubstitute)
+        );
+
+        // Fusion is excluded on both sides, subject checked first.
+        let mut fusion_subject = base_subject;
+        fusion_subject.fusion = true;
+        assert_eq!(
+            plan_transform_copy(&facts(fusion_subject, Some(valid_target.clone()))),
+            Err(TransformImposterError::SubjectFusion)
+        );
+        let mut fusion_target = valid_target;
+        fusion_target.fusion = true;
+        assert_eq!(
+            plan_transform_copy(&facts(battler(SUBJECT_ID, 100, 55), Some(fusion_target))),
+            Err(TransformImposterError::TargetFusion)
         );
     }
 
