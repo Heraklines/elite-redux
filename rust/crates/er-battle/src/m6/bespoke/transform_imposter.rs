@@ -381,7 +381,7 @@ mod tests {
     }
 
     fn species(value: u64) -> SafeU53 {
-        SafeU53::try_from_u64(value).expect("in-range species id")
+        SafeU53::new(value).expect("in-range species id")
     }
 
     fn ability(value: u64) -> AbilityId {

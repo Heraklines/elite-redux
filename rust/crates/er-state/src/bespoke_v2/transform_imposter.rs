@@ -314,7 +314,7 @@ mod tests {
 
     fn valid_copied() -> TransformCopiedBattleStateV2 {
         TransformCopiedBattleStateV2 {
-            species: SafeU53::try_from_u64(132).expect("in-range species"),
+            species: SafeU53::new(132).expect("in-range species"),
             form_key: FormId::parse("0").expect("non-empty form key"),
             typing: PokemonTyping {
                 primary: er_types::battle_model::PokemonType::Normal,
