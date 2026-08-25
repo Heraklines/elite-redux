@@ -2347,8 +2347,13 @@ mod tests {
     use super::*;
     use er_state::bespoke_v2::move_copy::ActorMoveHistoryV2;
 
-    const CALLER: PokemonId = PokemonId::new(SafeU53::new(7).unwrap_or(SafeU53::ZERO));
-    const TARGET: PokemonId = PokemonId::new(SafeU53::new(9).unwrap_or(SafeU53::ZERO));
+    fn caller() -> PokemonId {
+        PokemonId::new(SafeU53::new(7).expect("in range"))
+    }
+
+    fn target() -> PokemonId {
+        PokemonId::new(SafeU53::new(9).expect("in range"))
+    }
 
     fn move_id(value: u64) -> MoveId {
         MoveId::new(SafeU53::new(value).unwrap_or(SafeU53::ZERO))
@@ -2464,7 +2469,7 @@ mod tests {
     fn recording_rejects_none_moves_unknown_and_stale_actors() {
         let state = empty_state();
         let none_request = RecordRequest {
-            actor: CALLER,
+            actor: caller(),
             summon_generation: 1,
             move_id: SafeU53::ZERO.into(),
             use_mode: MoveUseModeV2::Normal,
@@ -2477,7 +2482,7 @@ mod tests {
             ))
         ));
         let stale = RecordRequest {
-            actor: CALLER,
+            actor: caller(),
             summon_generation: 5,
             move_id: move_id(10),
             use_mode: MoveUseModeV2::Normal,
@@ -2511,7 +2516,7 @@ mod tests {
         let first = record_execution(
             &state,
             &RecordRequest {
-                actor: CALLER,
+                actor: caller(),
                 summon_generation: 1,
                 move_id: move_id(50),
                 use_mode: MoveUseModeV2::Indirect,
@@ -2534,13 +2539,13 @@ mod tests {
 
         // Default filter skips all virtual entries → last normal (non-struggle
         // filtering off) is move 20.
-        let seen = last_non_virtual(&state, TARGET, 1, &LastMoveFilter::DEFAULT)
+        let seen = last_non_virtual(&state, target(), 1, &LastMoveFilter::DEFAULT)
             .expect("query ok")
             .expect("has default-visible entry");
         assert_eq!(seen.move_id, move_id(20));
 
         // Mirror Move filter admits follow-ups but still skips Reflected.
-        let mirrored = last_non_virtual(&state, TARGET, 1, &LastMoveFilter::MIRROR_MOVE)
+        let mirrored = last_non_virtual(&state, target(), 1, &LastMoveFilter::MIRROR_MOVE)
             .expect("query ok")
             .expect("mirror sees follow-up");
         assert_eq!(mirrored.move_id, move_id(40));
@@ -2550,7 +2555,7 @@ mod tests {
     fn copycat_casts_battle_last_move_as_free_follow_up() {
         let state = empty_state();
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(119), // COPYCAT
             source: RecordedLastSource::BattleLastMove {
@@ -2578,16 +2583,16 @@ mod tests {
     fn mirror_move_fails_without_history_and_retaliates_with_it() {
         let state = empty_state();
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(383), // MIRROR_MOVE
             source: RecordedLastSource::ActorHistory {
-                target: TARGET,
+                target: target(),
                 summon_generation: 1,
                 filter: LastMoveFilter::MIRROR_MOVE,
             },
             content: no_sets(),
-            retaliate_target: Some(TARGET),
+            retaliate_target: Some(target()),
             invoking_slot: None,
             caller_moveset: &[],
         };
@@ -2603,7 +2608,10 @@ mod tests {
         match resolved.outcome {
             CopyCallOutcome::Cast(plan) => {
                 assert_eq!(plan.called_move, move_id(55));
-                assert_eq!(plan.targeting, CallTargeting::Retaliate { target: TARGET });
+                assert_eq!(
+                    plan.targeting,
+                    CallTargeting::Retaliate { target: target() }
+                );
             }
             other => panic!("expected retaliating cast, got {other:?}"),
         }
@@ -2621,11 +2629,11 @@ mod tests {
         // Incomplete charge: recorded outcome Other.
         state = record_outcome(&state, 9, 60, MoveUseModeV2::Normal, MoveOutcomeV2::Other);
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(102), // MIMIC
             source: RecordedLastSource::ActorHistory {
-                target: TARGET,
+                target: target(),
                 summon_generation: 1,
                 filter: LastMoveFilter::DEFAULT,
             },
@@ -2650,7 +2658,7 @@ mod tests {
         );
         let mimic_ok = RecordedLastCopyRequest {
             source: RecordedLastSource::ActorHistory {
-                target: TARGET,
+                target: target(),
                 summon_generation: 1,
                 filter: LastMoveFilter::DEFAULT,
             },
@@ -2676,11 +2684,11 @@ mod tests {
         let mut state = empty_state();
         state = record(&state, 9, 70, MoveUseModeV2::Normal);
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(166), // SKETCH
             source: RecordedLastSource::ActorHistory {
-                target: TARGET,
+                target: target(),
                 summon_generation: 1,
                 filter: LastMoveFilter::DEFAULT,
             },
@@ -2719,7 +2727,7 @@ mod tests {
         };
         let state = empty_state();
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(119),
             source: RecordedLastSource::BattleLastMove {
@@ -2756,7 +2764,7 @@ mod tests {
         state = record(&state, 7, 90, MoveUseModeV2::Normal);
         // Caller generation bumped as after a switch-in: history is gone.
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 2,
             invoking_move: move_id(119),
             source: RecordedLastSource::BattleLastMove {
@@ -3015,7 +3023,7 @@ mod tests {
         let decision = classify_custom_move(&flinch).expect("classifies");
         let state = empty_state();
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(119),
             source: RecordedLastSource::BattleLastMove { last_move: None },
@@ -3050,11 +3058,11 @@ mod tests {
         let mut state = empty_state();
         state = record(&state, 9, 44, MoveUseModeV2::Normal);
         let request = RecordedLastCopyRequest {
-            caller: CALLER,
+            caller: caller(),
             caller_generation: 1,
             invoking_move: move_id(119),
             source: RecordedLastSource::ActorHistory {
-                target: TARGET,
+                target: target(),
                 summon_generation: 1,
                 filter: LastMoveFilter::DEFAULT,
             },
