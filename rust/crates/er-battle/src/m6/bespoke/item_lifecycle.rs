@@ -732,6 +732,7 @@ pub fn knock_off_item(
         evidence: ConsumeEvidence {
             outcome: ConsumeOutcome::Consumed {
                 effect: ItemEffectRequest {
+                    owner: request.target,
                     registry_key: request.registry_key.clone(),
                     source_ordinal: instance.source_ordinal,
                 },
