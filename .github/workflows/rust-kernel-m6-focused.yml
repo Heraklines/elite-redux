@@ -1,4 +1,5 @@
 name: Rust Kernel M6 Focused
+# Branch-focused evidence never substitutes for the full M6 checkpoint gate.
 
 on:
   push:
