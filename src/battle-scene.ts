@@ -100,6 +100,7 @@ import {
   isErGhostEnemyPokemon,
   markTrainerAsGhost,
   maybePrefetchGhostTeams,
+  shouldRestoreErGhostSavedInventory,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
@@ -4468,7 +4469,7 @@ export class BattleScene extends SceneBase {
   private addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void {
     const trainer = this.currentBattle.trainer;
     const snapshot = trainer ? getErGhostSnapshot(trainer) : null;
-    if (!snapshot) {
+    if (!snapshot || !shouldRestoreErGhostSavedInventory(this.currentBattle.waveIndex)) {
       return;
     }
     resetErEnemyRelicBattleState();

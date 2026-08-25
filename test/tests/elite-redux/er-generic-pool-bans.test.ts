@@ -16,7 +16,11 @@
 // =============================================================================
 
 import { allSpecies } from "#data/data-lists";
-import { isErBattleFormCustomSpecies, isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
+import {
+  isErBattleFormCustomSpecies,
+  isErGenericPoolBanned,
+  isErGenericTrainerSpeciesBanned,
+} from "#data/elite-redux/er-generic-pool-bans";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -74,11 +78,18 @@ describe.skipIf(!RUN)("ER generic-pool bans (Weird Dream / GTS, #414)", () => {
     expect(isErGenericPoolBanned(SpeciesId.URSHIFU, "Urshifu")).toBe(false);
   });
 
-  it("never admits standalone Primal Cascoon to generic trainer pools", () => {
+  it("excludes only Primal Cascoon from generic trainers while retaining random Megas and Primals", () => {
     setErDifficulty("hell");
     const primalCascoon = allSpecies.find(sp => Number(sp.speciesId) === ErSpeciesId.CASCOON_PRIMAL);
+    const urshifuMega = byName("Urshifu Mega")!;
+    const victiniPrimal = byName("Victini Primal")!;
     expect(primalCascoon).toBeDefined();
-    expect(isErBattleFormCustomSpecies(primalCascoon!.speciesId, primalCascoon!.name)).toBe(true);
+    expect(urshifuMega).toBeDefined();
+    expect(victiniPrimal).toBeDefined();
+    expect(isErGenericTrainerSpeciesBanned(primalCascoon!.speciesId)).toBe(true);
+    expect(isErGenericTrainerSpeciesBanned(urshifuMega.speciesId)).toBe(false);
+    expect(isErGenericTrainerSpeciesBanned(victiniPrimal.speciesId)).toBe(false);
+    expect(isErGenericTrainerSpeciesBanned(SpeciesId.SNORLAX)).toBe(false);
   });
 
   it("normal customs are allowed on Elite/Hell but banned on the pure-vanilla difficulties (#345)", () => {

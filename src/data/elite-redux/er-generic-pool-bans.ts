@@ -28,6 +28,7 @@
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { ErSpeciesId } from "#enums/er-species-id";
 
 /** First pokerogue id reserved for ER custom species. */
 const ER_CUSTOM_ID_CUTOFF = 10000;
@@ -94,6 +95,18 @@ export function isErBattleFormCustomSpecies(speciesId: number, name: string): bo
     return false;
   }
   return megaTargetIds().has(speciesId) || ER_BATTLE_FORM_NAME_TOKENS.test(name) || /^Darmanitan Aura$/i.test(name);
+}
+
+/**
+ * Boss-only species that generic NPC trainer generation must not roll.
+ *
+ * Random trainers are intentionally allowed to field ordinary Mega, Primal,
+ * Origin, and other battle-form records. Primal Cascoon is the exception: it
+ * is an authored boss encounter and must never leak into a generic trainer
+ * party (the reported Sprint wave-55 Bug Trainer).
+ */
+export function isErGenericTrainerSpeciesBanned(speciesId: number): boolean {
+  return speciesId === ErSpeciesId.CASCOON_PRIMAL;
 }
 
 /**

@@ -176,7 +176,7 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     // ghosted (rival/evil-team/E4/champion checks live in handleFixedBattle).
   });
 
-  it("restores ghost inventory additively and destroys it on theft", async () => {
+  it("keeps normal trainer items before halfway and restores saved ghost inventory only afterward", async () => {
     const inventorySnapshot: GhostTeamSnapshot = {
       ...SNAPSHOT,
       id: "ghost-inventory-test",
@@ -184,27 +184,43 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
       relics: [["bloodPact", 1, null]],
     };
     game.override.startingWave(5);
-    setPrefetchedGhostTeamsForTests([inventorySnapshot]);
-    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
-    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const trainer = game.scene.currentBattle.trainer!;
     const enemy = game.scene.getEnemyParty()[0] as EnemyPokemon;
+    markTrainerAsGhost(trainer, inventorySnapshot);
     expect(hasErGhostOverride(trainer)).toBe(true);
 
     const baselineType = getModifierDataTypeFactory("LEFTOVERS")!();
     baselineType.id = "LEFTOVERS";
     const baseline = baselineType.newModifier(enemy) as PokemonHeldItemModifier;
     await game.scene.addEnemyModifier(baseline, true, true);
-    // Re-run the inventory layer directly to prove it never clears the normal
-    // generated inventory that precedes it in generateEnemyModifiers.
-    (
-      game.scene as unknown as {
-        addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void;
-      }
-    ).addErGhostSnapshotInventory([enemy]);
+    const addGhostInventory = () =>
+      (
+        game.scene as unknown as {
+          addErGhostSnapshotInventory(party: readonly EnemyPokemon[]): void;
+        }
+      ).addErGhostSnapshotInventory([enemy]);
+    // Before halfway, the source player's inventory/relics are suppressed and
+    // the ordinary generated trainer item remains untouched.
+    addGhostInventory();
 
-    const enemyItems = game.scene.findModifiers(
+    let enemyItems = game.scene.findModifiers(
+      m => m instanceof PokemonHeldItemModifier && m.pokemonId === enemy.id,
+      false,
+    ) as PokemonHeldItemModifier[];
+    expect(enemyItems.some(m => m.type.id === "LEFTOVERS")).toBe(true);
+    expect(enemyItems.some(m => m.type.id === "WIDE_LENS")).toBe(false);
+    expect(game.scene.findModifiers(m => m instanceof ErRelicModifier && m.kind === "bloodPact", false)).toHaveLength(
+      0,
+    );
+
+    // The same ghost snapshot gains its saved inventory just after the normal
+    // midpoint; this layer remains additive and does not clear baseline items.
+    game.scene.currentBattle.waveIndex = 101;
+    addGhostInventory();
+
+    enemyItems = game.scene.findModifiers(
       m => m instanceof PokemonHeldItemModifier && m.pokemonId === enemy.id,
       false,
     ) as PokemonHeldItemModifier[];

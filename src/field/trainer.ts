@@ -3,7 +3,7 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
 import { isErSmartSwitching } from "#data/elite-redux/er-enemy-ai";
-import { isErBattleFormCustomSpecies } from "#data/elite-redux/er-generic-pool-bans";
+import { isErGenericTrainerSpeciesBanned } from "#data/elite-redux/er-generic-pool-bans";
 import type { GhostApproachEffect } from "#data/elite-redux/er-ghost-profile";
 import { applyErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import {
@@ -631,7 +631,7 @@ export class Trainer extends Phaser.GameObjects.Container {
         battle.waveIndex,
         level,
         false,
-        species => this.config.speciesFilter(species) && !isErBattleFormCustomSpecies(species.speciesId, species.name),
+        species => this.config.speciesFilter(species) && !isErGenericTrainerSpeciesBanned(species.speciesId),
       );
     }
 
@@ -642,13 +642,9 @@ export class Trainer extends Phaser.GameObjects.Container {
 
     console.log(ret.getName());
 
-    if (
-      isErBattleFormCustomSpecies(baseSpecies.speciesId, baseSpecies.name)
-      || isErBattleFormCustomSpecies(ret.speciesId, ret.name)
-    ) {
-      // Generic trainers may never roll standalone Mega/Primal/etc records.
-      // Static/editor-authored trainers bypass this generator and remain free
-      // to explicitly field those forms.
+    if (isErGenericTrainerSpeciesBanned(baseSpecies.speciesId) || isErGenericTrainerSpeciesBanned(ret.speciesId)) {
+      // Primal Cascoon is boss-only. Other standalone Mega/Primal/etc records
+      // remain legal for randomly generated trainers.
       retry = true;
     } else if (Object.hasOwn(pokemonPrevolutions, baseSpecies.speciesId) && ret.speciesId !== baseSpecies.speciesId) {
       retry = true;
@@ -689,14 +685,13 @@ export class Trainer extends Phaser.GameObjects.Container {
       console.log("Rerolling party member...");
       ret = this.genNewPartyMemberSpecies(level, strength, (attempt ?? 0) + 1);
     } else if (retry) {
-      // A pathological configured pool can contain nothing but battle forms.
-      // Never leak one after the retry budget: use the normal legal trainer
-      // species pool as the final deterministic fallback.
+      // Never leak boss-only Primal Cascoon after the retry budget: use the
+      // normal trainer species pool as the final deterministic fallback.
       const fallbackBase = globalScene.randomSpecies(
         battle.waveIndex,
         level,
         false,
-        species => this.config.speciesFilter(species) && !isErBattleFormCustomSpecies(species.speciesId, species.name),
+        species => this.config.speciesFilter(species) && !isErGenericTrainerSpeciesBanned(species.speciesId),
       );
       ret = getPokemonSpecies(
         fallbackBase.getTrainerSpeciesForLevel(level, true, strength, template.evoLevelThresholdKind),

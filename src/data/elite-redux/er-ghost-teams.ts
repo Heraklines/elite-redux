@@ -1492,6 +1492,15 @@ export function shouldRequireLateHellGhostItems(waveIndex: number): boolean {
   return waveIndex > LATE_HELL_GHOST_START_WAVE[pacing];
 }
 
+/**
+ * Saved player inventories are a second-half ghost power layer. Before the
+ * midpoint, ghosts keep only the ordinary trainer items generated for their
+ * encounter; their source player's held items and relics are not restored.
+ */
+export function shouldRestoreErGhostSavedInventory(waveIndex: number): boolean {
+  return getErProgressionWave(waveIndex) > LATE_HELL_GHOST_START_WAVE.normal;
+}
+
 /** The uploader of the most recently fielded ghost - the picker avoids
  * fielding the same player twice in a row when alternatives exist (#422). */
 let lastGhostUploader: string | null = null;

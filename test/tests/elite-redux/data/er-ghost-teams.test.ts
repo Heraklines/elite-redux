@@ -10,6 +10,7 @@ import {
   hasErGhostSavedItems,
   markTrainerAsGhost,
   shouldRequireLateHellGhostItems,
+  shouldRestoreErGhostSavedInventory,
   shouldUseLateHellGhostTrainer,
 } from "#data/elite-redux/er-ghost-teams";
 import { ghostWavesForCurrentRun, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
@@ -27,13 +28,13 @@ describe("ER ghost teams", () => {
     resetErRunPacing();
   });
 
-  it("spawns the right number of ghosts per difficulty (Ace 1 / Elite 3 / Hell 8)", () => {
+  it("spawns the configured ghost schedule only on Elite and Hell", () => {
     setErDifficulty("ace");
-    expect(ghostWavesForCurrentRun()).toHaveLength(1);
+    expect(ghostWavesForCurrentRun()).toHaveLength(0);
     setErDifficulty("elite");
-    expect(ghostWavesForCurrentRun()).toHaveLength(3);
+    expect(ghostWavesForCurrentRun()).toHaveLength(6);
     setErDifficulty("hell");
-    expect(ghostWavesForCurrentRun()).toHaveLength(8);
+    expect(ghostWavesForCurrentRun()).toHaveLength(13);
   });
 
   it("never places a ghost on a fixed / boss / x1 / gym wave", () => {
@@ -67,7 +68,7 @@ describe("ER ghost teams", () => {
     expect(isErGhostWave(150)).toBe(false);
     expect(isErGhostWave(200)).toBe(false);
     setErDifficulty("ace");
-    expect(isErGhostWave(196)).toBe(true);
+    expect(isErGhostWave(196)).toBe(false);
     expect(isErGhostWave(192)).toBe(false);
   });
 
@@ -139,5 +140,14 @@ describe("ER ghost teams", () => {
     setErRunPacing("sprint");
     expect(shouldRequireLateHellGhostItems(50)).toBe(false);
     expect(shouldRequireLateHellGhostItems(51)).toBe(true);
+  });
+
+  it("restores source-player ghost inventory only after the pacing-normalized midpoint", () => {
+    expect(shouldRestoreErGhostSavedInventory(100)).toBe(false);
+    expect(shouldRestoreErGhostSavedInventory(101)).toBe(true);
+
+    setErRunPacing("sprint");
+    expect(shouldRestoreErGhostSavedInventory(50)).toBe(false);
+    expect(shouldRestoreErGhostSavedInventory(51)).toBe(true);
   });
 });
