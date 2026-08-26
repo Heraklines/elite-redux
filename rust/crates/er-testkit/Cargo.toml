@@ -25,5 +25,6 @@ thiserror.workspace = true
 workspace = true
 
 [dev-dependencies]
+er-content-compiler = { path = "../er-content-compiler" }
 er-wasm = { path = "../er-wasm" }
 er-game = { path = "../er-game" }

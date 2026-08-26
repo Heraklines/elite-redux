@@ -1,24 +1,27 @@
+//! Eventwise native/wasm32 evidence for the production M6 system proof.
 //!
-//! This adapter owns no battle mechanics.  It constructs the same
-//! `GameKernel::new_battle` boundary used by the native and wasm32 targets,
-//! feeds one canonical serialized raw-input trace, and records the complete
-//! observation set published after every drained external event: ordered
-//! effects (actions and mutations), the kernel state digest, the full V2
-//! endpoint snapshot digest, mechanical/kernel-determinism/presentation-plan
-//! digests, the next control plan, the ordered RNG audit, internal event
-//! kinds, and live resources.  The report crosses a real destroy/restore
-//! boundary on the production V2 snapshot wire format and proves canonical
-//! round-trips for `GameStateV4`, `RestorableKernelSnapshotV5`, and typed
-//! TURN material bytes.  Native and wasm32 runs emit this same canonical
-//! report shape; CI compares the two independent target artifacts and names
-//! the first divergent event when they differ.
+//! This adapter owns no battle mechanics and no fixture compilation.  It
+//! constructs the same `GameKernel::new_battle` boundary used by the native
+//! and wasm32 targets, feeds one canonical serialized raw-input trace, and
+//! records the complete observation set published after every drained external
+//! event: ordered effects (actions and mutations), the kernel state digest,
+//! the full V2 endpoint snapshot digest, mechanical/kernel-determinism/
+//! presentation-plan digests, the next control plan, the ordered RNG audit,
+//! internal event kinds, and live resources.  The report crosses a real
+//! destroy/restore boundary on the production V2 snapshot wire format and
+//! proves canonical round-trips for caller-supplied typed production state
+//! (`GameStateV3`/`GameStateV4`), the derived validated
+//! `RestorableKernelSnapshotV5`, and typed TURN material bytes.  Native and
+//! wasm32 runs emit this same canonical report shape; CI compares the two
+//! independent target artifacts and names the first divergent event when they
+//! differ.
 //!
 //! Ownership notes: the live battle frontier is captured as a production
-//! `RestorableKernelSnapshotV2`.  The kernel has no V3+ capture entry point
-//! at this revision, so the V5 wrapper's runtime fields are lifted here from
-//! that real capture while its game frontier comes from the real production
-//! migration chain (`GameStateV2` → `GameStateV3` → `GameStateV4`) anchored on
-//! compiled frozen-catalog content identity.  Authority-issued TURN material
+//! `RestorableKernelSnapshotV2`.  The kernel has no V3+ capture entry point at
+//! this revision, so the V5 wrapper's runtime fields are lifted here from that
+//! real capture while its game frontier is the caller-supplied typed
+//! `GameStateV3`/`GameStateV4` pair (produced by the production migration
+//! chain wherever the host anchors it).  Authority-issued TURN material
 //! payloads remain crate-private inside the kernel, so the material round-trip
 //! exercises the production codec over evidence assembled exclusively from
 //! real replay captures (states, mechanical digests, RNG audit, control plan).
@@ -27,14 +30,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use er_canonical::{canonicalize_value, content_digest, fixture_digest};
-use er_content::m6_catalog::SemanticCatalogV1;
-use er_content::pack::m6_pack::{
-    BattleContentPackV3, BehaviorClassificationEntryV2, BehaviorClassificationManifestV2,
-    BespokeManifestV2, FieldContentV1,
-};
-use er_content::pack::m6_prepared::{PreparedBattleContentV3, prepare_content};
 use er_content::pack::{ContentPack, selected_content_pack};
-use er_content_compiler::m6::{SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog};
 use er_game::internal_event::InternalEventKind;
 use er_game::material::{
     BATTLE_MATERIAL_SCHEMA_VERSION, BattleTurnMaterialV1, decode_turn_material,
@@ -50,7 +46,7 @@ use er_kernel::snapshot_v3::{
 use er_kernel::snapshot_v4::{
     RestorableKernelSnapshotV4, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4,
 };
-use er_kernel::snapshot_v5::RestorableKernelSnapshotV5;
+use er_kernel::snapshot_v5::{PreparedContentIdentityV3, RestorableKernelSnapshotV5};
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput, LiveResourceSnapshot,
@@ -59,18 +55,13 @@ use er_protocol::{AuthorityLogConfig, BackoffPolicy};
 use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_rng::audit::RngDraw;
 use er_state::format::BattleFormat;
-use er_state::game_v2::GameStateV2;
-use er_state::migration_v3::migrate_game_v2_to_v3;
-use er_state::migration_v4::{GameStateV4, M5ToM6MigrationContext, migrate_m5_to_m6};
+use er_state::migration_v3::GameStateV3;
+use er_state::migration_v4::GameStateV4;
 use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
 };
 use er_state::snapshot::GameState;
-use er_testkit::m4_fixture::assemble_game_state;
-use er_types::mechanics::{
-    MECHANIC_STATE_SCHEMA_VERSION, MECHANICS_PROGRAM_VERSION, MechanicsProgramId,
-};
-use er_types::run_ids::RunContentPackHash;
+use er_types::mechanics::{MECHANIC_STATE_SCHEMA_VERSION, MECHANICS_PROGRAM_VERSION};
 use serde_json::{Value, json};
 
 use er_types::battle_command::{
@@ -78,17 +69,15 @@ use er_types::battle_command::{
     scripted_enemy_command_operation_id, turn_result_operation_id, CommandSet,
 };
 use er_types::battle_ids::{
-    AbilityId, BattleId, BattleSide, ContentPackHash, FieldSlot, GameModeId, MoveSlotIndex,
+    AbilityId, BattleId, BattleSide, FieldSlot, GameModeId, MoveSlotIndex,
     PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::{BattleOutcome, StatusKind};
 use er_battle::BattleNextDecision;
 use er_state::battle::BattleRngState;
 use er_types::{
-    BehaviorClassificationKindV2, BehaviorUnitId, CatalogHash, BattleContentPackHashV3,
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision,
-    M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, OracleSha, PhysicalKey, RawInputEvent, RunId, SafeU53,
-    SeatId, SessionId, TimeClass,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
+    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -98,14 +87,6 @@ pub const M6_PARITY_FIXTURE_SCHEMA_VERSION: u32 = 1;
 pub const M6_PARITY_TRACE_ID: &str = "m6-local-battle-native-wasm-v1";
 pub const M6_PARITY_SEED: &str = "1469598103934665603";
 
-/// Frozen M6 semantic catalog embedded at compile time so native and wasm32
-/// targets consume byte-identical content identity.
-pub const FROZEN_SEMANTIC_CATALOG_BYTES: &[u8] =
-    include_bytes!("../../../fixtures/m6/semantic-catalog-v1.json");
-/// Frozen M4 oracle run segment anchoring the `GameStateV4` migration chain.
-const FROZEN_M4_RUN_SEGMENT_BYTES: &[u8] = include_bytes!(
-    "../../../fixtures/m4/oracle/run-segments/classic-composed-wave-9-through-11-v1.json"
-);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct M6ParityEvent {
@@ -122,15 +103,41 @@ pub struct M6ParityFixture {
     pub events: Vec<M6ParityEvent>,
 }
 
-/// Compiled frozen-content identity carried in every report.
+/// Prepared-content identity derived from the validated V5 snapshot root.
 #[derive(Clone, Debug, PartialEq)]
 pub struct M6PreparedContentIdentity {
-    pub oracle_sha: String,
-    pub raw_catalog_hash: String,
     pub semantic_catalog_hash: String,
     pub battle_content_hash: String,
-    pub mechanics_program_count: u64,
-    pub behavior_unit_count: u64,
+    pub mechanics_program_version: u32,
+}
+
+/// Caller-supplied typed production state anchoring the V5 snapshot frontier.
+///
+/// Hosts produce this pair through the production migration chain
+/// (`migrate_game_v2_to_v3` then `migrate_m5_to_m6`) from whatever run
+/// frontier they anchor; the adapter only validates internal consistency and
+/// never fabricates state.
+#[derive(Clone, Debug, PartialEq)]
+pub struct M6ParityEvidence {
+    pub game_v3: GameStateV3,
+    pub game_v4: GameStateV4,
+}
+
+impl M6ParityEvidence {
+    pub fn validate(&self) -> Result<(), M6ParityError> {
+        self.game_v3
+            .validate()
+            .map_err(|error| M6ParityError::Migration(error.to_string()))?;
+        self.game_v4
+            .validate()
+            .map_err(|error| M6ParityError::Migration(error.to_string()))?;
+        if self.game_v4.base != self.game_v3.base {
+            return Err(M6ParityError::Migration(
+                "GameStateV4 base does not match GameStateV3 base".to_owned(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -170,7 +177,6 @@ pub struct M6ParitySnapshotBoundary {
     pub pending_presentation_count: SafeU53,
     pub prepared_content: M6PreparedContentIdentity,
     pub game_state_schema_version: u32,
-    pub migration_migrated_instances: usize,
     pub game_v4_digest: String,
     pub snapshot_v5_schema_version: u32,
     pub snapshot_v5_digest: String,
@@ -286,9 +292,6 @@ fn pokemon_id(value: u64) -> PokemonId {
     PokemonId::new(safe(value))
 }
 
-fn hash_v1(fill: char) -> String {
-    format!("blake3-v1:{}", fill.to_string().repeat(64))
-}
 
 fn canonical_error(field: &'static str, error: impl fmt::Display) -> M6ParityError {
     M6ParityError::Canonical {
@@ -305,160 +308,15 @@ fn snapshot_error(stage: &'static str, error: impl fmt::Display) -> M6ParityErro
 }
 
 // ---------------------------------------------------------------------------
-// Prepared M6 content identity (production compiler + prepared indexes)
+// Prepared content identity from the validated V5 root
 // ---------------------------------------------------------------------------
 
-struct CompiledM6Content {
-    prepared: PreparedBattleContentV3,
-    behavior_units: Vec<BehaviorUnitId>,
-}
-
-fn validated_catalog() -> Result<ValidatedSemanticCatalog, M6ParityError> {
-    let catalog = SemanticCatalogV1::from_bytes(FROZEN_SEMANTIC_CATALOG_BYTES)
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-    let raw_hash = CatalogHash::parse(catalog.raw_catalog_hash.clone())
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-    ValidatedSemanticCatalog::new(SemanticCatalogInput::new(catalog, raw_hash))
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))
-}
-
-fn compile_frozen_content() -> Result<CompiledM6Content, M6ParityError> {
-    let catalog = validated_catalog()?;
-    let mapped = map_routine_catalog(catalog.behavior_units())
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-    let behavior_units = mapped
-        .mapped
-        .iter()
-        .map(|spec| spec.behavior_unit.clone())
-        .collect::<Vec<_>>();
-    let mut programs = vec![None];
-    let mut classifications = Vec::with_capacity(mapped.mapped.len());
-    for (index, spec) in mapped.mapped.into_iter().enumerate() {
-        let id = MechanicsProgramId::try_from_u64(
-            u64::try_from(index)
-                .map_err(|error| M6ParityError::Configuration(format!("program index overflows u64: {error}")))?
-                + 1,
-        )
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-        classifications.push(BehaviorClassificationEntryV2 {
-            behavior_unit: spec.behavior_unit.clone(),
-            kind: BehaviorClassificationKindV2::Compiled,
-            programs: vec![id],
-            bespoke: None,
-            unsupported_reason: None,
-        });
-        let program = spec
-            .build(id)
-            .map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-        programs.push(Some(program));
-    }
-    let mut pack = BattleContentPackV3 {
-        schema_version: M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION,
-        oracle_sha: OracleSha::parse(catalog.oracle_sha().to_owned())
-            .map_err(|error| M6ParityError::Configuration(error.to_string()))?,
-        raw_catalog_hash: CatalogHash::parse(catalog.raw_catalog_hash().to_owned())
-            .map_err(|error| M6ParityError::Configuration(error.to_string()))?,
-        semantic_catalog_hash: catalog.semantic_catalog_hash().clone(),
-        content_hash: BattleContentPackHashV3::parse(format!(
-            "{}{}",
-            BattleContentPackHashV3::PREFIX,
-            "0".repeat(64)
-        ))
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))?,
-        species: Vec::new(),
-        forms: Vec::new(),
-        moves: Vec::new(),
-        abilities: Vec::new(),
-        held_items: Vec::new(),
-        field_content: FieldContentV1::default(),
-        programs,
-        classifications: BehaviorClassificationManifestV2(classifications),
-        bespoke: BespokeManifestV2::default(),
-        rng_sites: Vec::new(),
-        type_chart: er_content::pack::selected_type_chart(),
-    };
-    pack.content_hash = pack
-        .compute_content_hash()
-        .map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-    let prepared =
-        prepare_content(pack).map_err(|error| M6ParityError::Configuration(error.to_string()))?;
-    Ok(CompiledM6Content {
-        prepared,
-        behavior_units,
-    })
-}
-
-fn prepared_identity(compiled: &CompiledM6Content) -> M6PreparedContentIdentity {
+fn prepared_identity(prepared: &PreparedContentIdentityV3) -> M6PreparedContentIdentity {
     M6PreparedContentIdentity {
-        oracle_sha: compiled.prepared.oracle_sha().as_str().to_owned(),
-        raw_catalog_hash: compiled.prepared.raw_catalog_hash().as_str().to_owned(),
-        semantic_catalog_hash: compiled
-            .prepared
-            .semantic_catalog_hash()
-            .as_str()
-            .to_owned(),
-        battle_content_hash: compiled.prepared.content_hash().as_str().to_owned(),
-        mechanics_program_count: compiled
-            .prepared
-            .pack()
-            .programs
-            .iter()
-            .filter(|program| program.is_some())
-            .count() as u64,
-        behavior_unit_count: compiled.behavior_units.len() as u64,
+        semantic_catalog_hash: prepared.semantic_catalog_hash.as_str().to_owned(),
+        battle_content_hash: prepared.battle_content_hash.as_str().to_owned(),
+        mechanics_program_version: prepared.mechanics_program_version,
     }
-}
-
-fn migration_context(compiled: &CompiledM6Content) -> Result<M5ToM6MigrationContext, M6ParityError> {
-    let mut target_programs = Vec::new();
-    for index in 1..=compiled.prepared.pack().programs.len() as u64 {
-        target_programs.push(
-            MechanicsProgramId::try_from_u64(index)
-                .map_err(|error| M6ParityError::Migration(error.to_string()))?,
-        );
-    }
-    let mut target_behavior_units = compiled.behavior_units.clone();
-    target_behavior_units.sort();
-    target_behavior_units.dedup();
-    Ok(M5ToM6MigrationContext {
-        source_content_hash_v2: hash_v1('c'),
-        target_content_hash_v3: compiled.prepared.content_hash().clone(),
-        semantic_catalog_hash: compiled.prepared.semantic_catalog_hash().clone(),
-        bindings: Vec::new(),
-        target_programs,
-        target_behavior_units,
-        held_item_registry_keys: Vec::new(),
-    })
-}
-
-fn migrated_game_states(
-    compiled: &CompiledM6Content,
-) -> Result<(GameStateV2, GameStateV4, usize), M6ParityError> {
-    let fixture: Value = serde_json::from_slice(FROZEN_M4_RUN_SEGMENT_BYTES).map_err(|error| {
-        M6ParityError::Migration(format!("frozen M4 segment is invalid: {error}"))
-    })?;
-    let v2 = assemble_game_state(
-        &fixture,
-        ContentPackHash::new(hash_v1('a'))
-            .map_err(|error| M6ParityError::Migration(error.to_string()))?,
-        RunContentPackHash::new(hash_v1('b'))
-            .map_err(|error| M6ParityError::Migration(error.to_string()))?,
-        er_state::migration::M4_ORACLE_SHA,
-    )
-    .map_err(|error| M6ParityError::Migration(error.to_string()))?;
-    let (v3, _) = migrate_game_v2_to_v3(&v2, hash_v1('c'))
-        .map_err(|error| M6ParityError::Migration(error.to_string()))?;
-    let context = migration_context(compiled)?;
-    let (v4, evidence) =
-        migrate_m5_to_m6(&v3, &context).map_err(|error| M6ParityError::Migration(error.to_string()))?;
-    v4.validate_against(&context)
-        .map_err(|error| M6ParityError::Migration(error.to_string()))?;
-    if evidence.active_battle {
-        return Err(M6ParityError::Migration(
-            "migration chain must anchor on a quiescent frontier".to_owned(),
-        ));
-    }
-    Ok((v2, v4, evidence.migrated_instances))
 }
 
 // ---------------------------------------------------------------------------
@@ -1143,7 +1001,7 @@ type BoundaryOutputs = (
 fn cross_snapshot_boundary(
     kernel: GameKernel,
     content: &Arc<ContentPack>,
-    compiled: &CompiledM6Content,
+    evidence: &M6ParityEvidence,
     after_raw_event: SafeU53,
     virtual_time_ms: SafeU53,
     seed: &str,
@@ -1185,13 +1043,10 @@ fn cross_snapshot_boundary(
     let restored_snapshot_digest = content_digest(&restored)
         .map_err(|error| snapshot_error("restored digest", error))?;
 
-    // Canonical GameStateV4 migration chain anchored on frozen catalog identity.
-    let (game_v2_state, game_v4, migrated_instances) = migrated_game_states(compiled)?;
-    let (game_v3, _) = migrate_game_v2_to_v3(&game_v2_state, hash_v1('c'))
-        .map_err(|error| M6ParityError::Migration(error.to_string()))?;
-    let base_v4 = lift_snapshot_chain(&capture, &game_v3)?;
-    let snapshot_v5 =
-        RestorableKernelSnapshotV5::new(base_v4, game_v4.clone()).map_err(|error| snapshot_error("v5 build", error))?;
+    evidence.validate()?;
+    let base_v4 = lift_snapshot_chain(&capture, &evidence.game_v3)?;
+    let snapshot_v5 = RestorableKernelSnapshotV5::new(base_v4, evidence.game_v4.clone())
+        .map_err(|error| snapshot_error("v5 build", error))?;
     let v5_value = serde_json::to_value(&snapshot_v5)
         .map_err(|error| snapshot_error("v5 serialize", error))?;
     let v5_wire = canonicalize_value(&v5_value).map_err(|error| snapshot_error("v5 canonicalize", error))?;
@@ -1204,12 +1059,12 @@ fn cross_snapshot_boundary(
         });
     }
     v5_decoded.validate().map_err(|error| snapshot_error("v5 validate", error))?;
-    let v4_value = serde_json::to_value(&game_v4)
+    let v4_value = serde_json::to_value(&evidence.game_v4)
         .map_err(|error| snapshot_error("v4 serialize", error))?;
     let v4_wire = canonicalize_value(&v4_value).map_err(|error| snapshot_error("v4 canonicalize", error))?;
     let v4_decoded: GameStateV4 = serde_json::from_str(&v4_wire)
         .map_err(|error| snapshot_error("v4 deserialize", error))?;
-    if v4_decoded != game_v4 {
+    if v4_decoded != evidence.game_v4 {
         return Err(M6ParityError::Snapshot {
             stage: "v4 round-trip",
             reason: "restored GameStateV4 differs from its canonical encoding".to_owned(),
@@ -1227,10 +1082,10 @@ fn cross_snapshot_boundary(
         snapshot_bytes_digest,
         restored_snapshot_digest,
         pending_presentation_count: safe(pending_presentation_count as u64),
-        prepared_content: prepared_identity(compiled),
-        game_state_schema_version: game_v4.schema_version,
-        migration_migrated_instances: migrated_instances,
-        game_v4_digest: content_digest(&game_v4).map_err(|error| snapshot_error("v4 digest", error))?,
+        prepared_content: prepared_identity(&snapshot_v5.prepared_content),
+        game_state_schema_version: evidence.game_v4.schema_version,
+        game_v4_digest: content_digest(&evidence.game_v4)
+            .map_err(|error| snapshot_error("v4 digest", error))?,
         snapshot_v5_schema_version: snapshot_v5.schema_version,
         snapshot_v5_digest: content_digest(&snapshot_v5)
             .map_err(|error| snapshot_error("v5 digest", error))?,
@@ -1297,10 +1152,13 @@ fn settle_pending_presentations(
 /// Replay one serialized raw-input trace through one production Battle kernel
 /// and collect every boundary artifact (report, V4/V5 canonical wires, TURN
 /// material bytes).
-pub fn replay_with_artifacts(fixture: &M6ParityFixture) -> Result<M6BoundaryArtifacts, M6ParityError> {
+pub fn replay_with_artifacts(
+    fixture: &M6ParityFixture,
+    evidence: &M6ParityEvidence,
+) -> Result<M6BoundaryArtifacts, M6ParityError> {
     validate_fixture(fixture)?;
     let content = selected_content()?;
-    let compiled = compile_frozen_content()?;
+    evidence.validate()?;
     let mut kernel = new_battle_kernel_with_content(&fixture.seed, Arc::clone(&content))?;
     let mut observations = Vec::with_capacity(fixture.events.len() + 4);
     let mut next_sequence = 1_u64;
@@ -1324,7 +1182,7 @@ pub fn replay_with_artifacts(fixture: &M6ParityFixture) -> Result<M6BoundaryArti
             ) = cross_snapshot_boundary(
                 kernel,
                 &content,
-                &compiled,
+                &evidence,
                 safe((index + 1) as u64),
                 event.virtual_time_ms,
                 &fixture.seed,
@@ -1380,8 +1238,11 @@ pub fn replay_with_artifacts(fixture: &M6ParityFixture) -> Result<M6BoundaryArti
 }
 
 /// Replay one serialized raw-input trace through one production Battle kernel.
-pub fn replay_eventwise(fixture: &M6ParityFixture) -> Result<M6ParityReport, M6ParityError> {
-    Ok(replay_with_artifacts(fixture)?.report)
+pub fn replay_eventwise(
+    fixture: &M6ParityFixture,
+    evidence: &M6ParityEvidence,
+) -> Result<M6ParityReport, M6ParityError> {
+    Ok(replay_with_artifacts(fixture, evidence)?.report)
 }
 
 fn observation_value(observation: &M6ParityObservation) -> Value {
@@ -1424,20 +1285,12 @@ fn report_value(report: &M6ParityReport) -> Value {
             "after_raw_event": report.snapshot_boundary.after_raw_event,
             "virtual_time_ms": report.snapshot_boundary.virtual_time_ms,
             "kernel_snapshot_schema_version": report.snapshot_boundary.kernel_snapshot_schema_version,
-            "snapshot_digest": report.snapshot_boundary.snapshot_digest,
-            "snapshot_bytes_digest": report.snapshot_boundary.snapshot_bytes_digest,
-            "restored_snapshot_digest": report.snapshot_boundary.restored_snapshot_digest,
-            "pending_presentation_count": report.snapshot_boundary.pending_presentation_count,
             "prepared_content": {
-                "oracle_sha": report.snapshot_boundary.prepared_content.oracle_sha,
-                "raw_catalog_hash": report.snapshot_boundary.prepared_content.raw_catalog_hash,
                 "semantic_catalog_hash": report.snapshot_boundary.prepared_content.semantic_catalog_hash,
                 "battle_content_hash": report.snapshot_boundary.prepared_content.battle_content_hash,
-                "mechanics_program_count": report.snapshot_boundary.prepared_content.mechanics_program_count,
-                "behavior_unit_count": report.snapshot_boundary.prepared_content.behavior_unit_count,
+                "mechanics_program_version": report.snapshot_boundary.prepared_content.mechanics_program_version,
             },
             "game_state_schema_version": report.snapshot_boundary.game_state_schema_version,
-            "migration_migrated_instances": report.snapshot_boundary.migration_migrated_instances,
             "game_v4_digest": report.snapshot_boundary.game_v4_digest,
             "snapshot_v5_schema_version": report.snapshot_boundary.snapshot_v5_schema_version,
             "snapshot_v5_digest": report.snapshot_boundary.snapshot_v5_digest,
@@ -1453,40 +1306,76 @@ fn report_value(report: &M6ParityReport) -> Value {
 }
 
 /// Replay a canonical serialized trace and return the canonical hosted report.
-pub fn replay_serialized_trace_json(input: &str) -> Result<String, M6ParityError> {
+pub fn replay_serialized_trace_json(
+    input: &str,
+    evidence: &M6ParityEvidence,
+) -> Result<String, M6ParityError> {
     let fixture = parse_serialized_trace(input)?;
-    let report = replay_eventwise(&fixture)?;
+    let report = replay_eventwise(&fixture, evidence)?;
     let value = report_value(&report);
     canonicalize_value(&value).map_err(|error| canonical_error("report", error))
 }
 
-/// Generate the hosted/native report from the same serialized trace that the
-/// wasm32/Node export receives, including every boundary artifact.
-pub fn final_evidence_artifacts() -> Result<M6BoundaryArtifacts, M6ParityError> {
-    replay_with_artifacts(&final_evidence_fixture())
+/// One serialized replay request: the canonical trace plus the typed
+/// production state pair over the wire.  Deserialization is deny-unknown
+/// and validated before any kernel runs, so tampered requests fail closed.
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6ReplayRequest {
+    trace: String,
+    game_v3: GameStateV3,
+    game_v4: GameStateV4,
 }
 
-pub fn final_evidence_report_json() -> Result<String, M6ParityError> {
-    replay_serialized_trace_json(&final_evidence_trace_json()?)
+/// Replay a full serialized request (trace + typed state) into the canonical
+/// hosted report.  Shared by native hosts and the wasm32 export.
+pub fn replay_serialized_request_json(request: &str) -> Result<String, M6ParityError> {
+    let parsed: M6ReplayRequest = serde_json::from_str(request)
+        .map_err(|error| M6ParityError::InvalidFixture(format!("replay request is invalid: {error}")))?;
+    let evidence = M6ParityEvidence {
+        game_v3: parsed.game_v3,
+        game_v4: parsed.game_v4,
+    };
+    replay_serialized_trace_json(&parsed.trace, &evidence)
 }
 
-/// Canonical `GameStateV4` wire form produced by the production migration
-/// chain at the evidence boundary; tampering with this JSON must fail the
-/// typed round-trip.
-pub fn final_evidence_game_state_v4_json() -> Result<String, M6ParityError> {
-    Ok(final_evidence_artifacts()?.game_state_v4_wire)
+/// Generate the hosted/native report from the same serialized request that
+/// the wasm32/Node export receives, including every boundary artifact.
+pub fn final_evidence_artifacts(
+    evidence: &M6ParityEvidence,
+) -> Result<M6BoundaryArtifacts, M6ParityError> {
+    replay_with_artifacts(&final_evidence_fixture(), evidence)
+}
+
+pub fn final_evidence_report_json(evidence: &M6ParityEvidence) -> Result<String, M6ParityError> {
+    replay_serialized_trace_json(&final_evidence_trace_json()?, evidence)
+}
+
+/// Canonical `GameStateV4` wire form supplied by the host and round-tripped
+/// at the evidence boundary; tampering with this JSON must fail the typed
+/// round-trip.
+pub fn final_evidence_game_state_v4_json(
+    evidence: &M6ParityEvidence,
+) -> Result<String, M6ParityError> {
+    let value = serde_json::to_value(&evidence.game_v4)
+        .map_err(|error| canonical_error("game_state_v4", error))?;
+    canonicalize_value(&value).map_err(|error| canonical_error("game_state_v4", error))
 }
 
 /// Canonical `RestorableKernelSnapshotV5` wire form (validated, round-tripped)
 /// produced at the evidence boundary.
-pub fn final_evidence_snapshot_v5_json() -> Result<String, M6ParityError> {
-    Ok(final_evidence_artifacts()?.snapshot_v5_wire)
+pub fn final_evidence_snapshot_v5_json(
+    evidence: &M6ParityEvidence,
+) -> Result<String, M6ParityError> {
+    Ok(final_evidence_artifacts(evidence)?.snapshot_v5_wire)
 }
 
 /// Canonical typed TURN material bytes produced at the evidence boundary;
 /// any byte mutation must fail exact canonical decoding.
-pub fn final_evidence_turn_material_bytes() -> Result<Vec<u8>, M6ParityError> {
-    Ok(final_evidence_artifacts()?.turn_material_bytes)
+pub fn final_evidence_turn_material_bytes(
+    evidence: &M6ParityEvidence,
+) -> Result<Vec<u8>, M6ParityError> {
+    Ok(final_evidence_artifacts(evidence)?.turn_material_bytes)
 }
 
 // ---------------------------------------------------------------------------
@@ -1588,11 +1477,10 @@ pub fn first_divergence(left: &Value, right: &Value) -> Option<M6ParityDivergenc
 pub fn final_evidence_trace_json_wasm() -> Result<String, JsValue> {
     final_evidence_trace_json().map_err(|error| JsValue::from_str(&error.to_string()))
 }
-
 #[cfg(target_arch = "wasm32")]
-#[wasm_bindgen(js_name = replayM6FinalEvidence)]
-pub fn final_evidence_report_json_wasm(serialized_trace: &str) -> Result<String, JsValue> {
-    replay_serialized_trace_json(serialized_trace)
+#[wasm_bindgen(js_name = replayM6Request)]
+pub fn replay_request_json_wasm(serialized_request: &str) -> Result<String, JsValue> {
+    replay_serialized_request_json(serialized_request)
         .map_err(|error| JsValue::from_str(&error.to_string()))
 }
 
