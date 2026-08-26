@@ -1,0 +1,282 @@
+name: Rust Kernel M7 Bootstrap
+
+on:
+  push:
+    branches:
+      - arch/rust-kernel-m7
+    paths:
+      - ".github/workflows/rust-kernel-m7-bootstrap.yml"
+      - "rust/contracts/**"
+      - "rust/fixtures/m6/m6-final-qualification.json"
+      - "rust/fixtures/m7/**"
+      - "scripts/*kernel-m7*"
+      - "scripts/*kernel-m6*"
+      - "scripts/*kernel-m5*"
+      - "scripts/export-kernel-m3-oracle.mjs"
+      - "scripts/export-kernel-m4-oracle.mjs"
+      - "test/kernel-fixtures/m3/**"
+      - "test/kernel-fixtures/m4/**"
+      - "test/kernel-fixtures/m6/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-kernel-m7-bootstrap-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  M7_BASE_SHA: 93d0d047b4fefaea2033920047010214a8fcd5c0
+  M7_ORACLE_SHA: 399d5d368f0b5642ebf8f45bd8a5e73350fa4de7
+
+jobs:
+  m7-source-lock:
+    name: M7 source lock and M6 attestation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - name: Preserve exact M6 production source
+        run: |
+          set -euo pipefail
+          git cat-file -e "${M7_BASE_SHA}^{commit}"
+          git merge-base --is-ancestor "$M7_BASE_SHA" "$GITHUB_SHA"
+          git diff --exit-code "$M7_BASE_SHA" "$GITHUB_SHA" -- src rust/source-lock.toml
+          git diff --check "$M7_BASE_SHA" "$GITHUB_SHA"
+      - name: Validate final M6 evidence
+        run: |
+          set -euo pipefail
+          manifest=rust/fixtures/m6/m6-final-qualification.json
+          test "$(jq -r '.sha' "$manifest")" = "$M7_BASE_SHA"
+          test "$(jq -r '.gate_run_id' "$manifest")" = 33003637831
+          test "$(jq -r '[to_entries[] | select(.key != "milestone" and .key != "sha" and .key != "gate_run_id") | .value] | all(. == "success")' "$manifest")" = true
+          test "$(jq -r '.oracle_sha' rust/fixtures/m7/oracle-selection.json)" = "$M7_ORACLE_SHA"
+
+  m7-static-refresh:
+    name: M7 static M6 catalog refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize immutable M7 oracle
+        run: git worktree add --detach "$RUNNER_TEMP/m7-oracle" "$M7_ORACLE_SHA"
+      - name: Export source and semantic catalogs twice
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_TYPESCRIPT_ROOT: ${{ github.workspace }}/node_modules/typescript
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m5-source-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m7-oracle" \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --output "$RUNNER_TEMP/m7-raw-source-catalog-v2.json"
+          node scripts/export-kernel-m6-semantic-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m7-oracle" \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --raw-catalog "$RUNNER_TEMP/m7-raw-source-catalog-v2.json" \
+            --output-root "$RUNNER_TEMP/m7-semantic-a"
+          node scripts/export-kernel-m6-semantic-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m7-oracle" \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --raw-catalog "$RUNNER_TEMP/m7-raw-source-catalog-v2.json" \
+            --output-root "$RUNNER_TEMP/m7-semantic-b"
+          diff -ru "$RUNNER_TEMP/m7-semantic-a" "$RUNNER_TEMP/m7-semantic-b"
+          diff -ru rust/fixtures/m7/m6-refresh "$RUNNER_TEMP/m7-semantic-a"
+      - name: Reproduce drift classifications
+        run: |
+          set -euo pipefail
+          node scripts/classify-kernel-m6-catalog-drift.mjs \
+            --legacy rust/fixtures/m6/raw-source-catalog-v2.json \
+            --fresh rust/fixtures/m7/m6-refresh/raw-source-catalog-v2.json \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --output "$RUNNER_TEMP/m7-catalog-drift-v1.json"
+          diff -u rust/fixtures/m7/m6-catalog-drift-v1.json "$RUNNER_TEMP/m7-catalog-drift-v1.json"
+          node scripts/classify-kernel-m7-semantic-drift.mjs \
+            --legacy rust/fixtures/m6/semantic-catalog-v1.json \
+            --fresh rust/fixtures/m7/m6-refresh/semantic-catalog-v1.json \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --output "$RUNNER_TEMP/m7-semantic-drift-v1.json"
+          diff -u rust/fixtures/m7/m6-semantic-drift-v1.json "$RUNNER_TEMP/m7-semantic-drift-v1.json"
+
+  m7-runtime-semantics:
+    name: M7 hosted runtime semantic agreement
+    needs: m7-static-refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize and overlay immutable oracle
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m7-oracle" "$M7_ORACLE_SHA"
+          mkdir -p "$RUNNER_TEMP/m7-oracle/test/kernel-fixtures/m6"
+          cp test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            "$RUNNER_TEMP/m7-oracle/test/kernel-fixtures/m6/export-semantic-runtime.test.ts"
+      - name: Install immutable oracle dependencies
+        working-directory: ${{ runner.temp }}/m7-oracle
+        run: pnpm install --frozen-lockfile
+      - name: Export runtime semantics twice
+        working-directory: ${{ runner.temp }}/m7-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M6_ORACLE_SHA: ${{ env.M7_ORACLE_SHA }}
+        run: |
+          set -euo pipefail
+          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m7-runtime-a.json" \
+            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
+          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m7-runtime-b.json" \
+            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+            --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
+          diff -u "$RUNNER_TEMP/m7-runtime-a.json" "$RUNNER_TEMP/m7-runtime-b.json"
+      - name: Verify runtime and static agreement
+        run: |
+          node scripts/check-kernel-m6-runtime-semantics.mjs \
+            "$RUNNER_TEMP/m7-runtime-a.json" \
+            rust/fixtures/m7/m6-refresh/semantic-catalog-v1.json \
+            rust/fixtures/m7/m6-refresh/raw-source-catalog-v2.json
+
+  m7-historical-refresh:
+    name: M7 ${{ matrix.fixture }} oracle refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [m3, m4]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Install pinned BLAKE3 verifier
+        run: cargo install b3sum --version 1.8.6 --locked
+      - name: Materialize and overlay immutable oracle
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$RUNNER_TEMP/m7-oracle" "$M7_ORACLE_SHA"
+          node scripts/prepare-kernel-m5-oracle-refresh.mjs \
+            --oracle-root "$RUNNER_TEMP/m7-oracle" \
+            --oracle-sha "$M7_ORACLE_SHA"
+      - name: Install immutable oracle dependencies
+        working-directory: ${{ runner.temp }}/m7-oracle
+        run: pnpm install --frozen-lockfile
+      - name: Export fixture twice
+        working-directory: ${{ runner.temp }}/m7-oracle
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M5_ORACLE_REFRESH_SHA: ${{ env.M7_ORACLE_SHA }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/m7-${{ matrix.fixture }}-oracle-a" "$RUNNER_TEMP/m7-${{ matrix.fixture }}-oracle-b"
+          if [[ "${{ matrix.fixture }}" == "m3" ]]; then
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m7-m3-oracle-a"
+            node scripts/export-kernel-m3-oracle.mjs --output-root "$RUNNER_TEMP/m7-m3-oracle-b"
+          else
+            M4_ORACLE_GAP_REPORT="$RUNNER_TEMP/m7-m4-oracle-a/gaps.json" \
+              node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m7-m4-oracle-a"
+            M4_ORACLE_GAP_REPORT="$RUNNER_TEMP/m7-m4-oracle-b/gaps.json" \
+              node scripts/export-kernel-m4-oracle.mjs --output-root "$RUNNER_TEMP/m7-m4-oracle-b"
+          fi
+          diff -ru "$RUNNER_TEMP/m7-${{ matrix.fixture }}-oracle-a" "$RUNNER_TEMP/m7-${{ matrix.fixture }}-oracle-b"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m7-${{ matrix.fixture }}-oracle-refresh
+          path: ${{ runner.temp }}/m7-${{ matrix.fixture }}-oracle-a
+          if-no-files-found: error
+          retention-days: 14
+
+  m7-oracle-classification:
+    name: M7 historical oracle drift classification
+    needs: m7-historical-refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - uses: actions/download-artifact@v6
+        with:
+          name: m7-m3-oracle-refresh
+          path: artifacts/fresh-m3
+      - uses: actions/download-artifact@v6
+        with:
+          name: m7-m4-oracle-refresh
+          path: artifacts/fresh-m4
+      - name: Classify M3 and M4 drift
+        run: |
+          set -euo pipefail
+          node scripts/classify-kernel-m5-oracle-refresh.mjs \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --legacy-m3 rust/fixtures/m3/oracle \
+            --fresh-m3 artifacts/fresh-m3/m7-m3-oracle-a \
+            --legacy-m4 rust/fixtures/m4/oracle \
+            --fresh-m4 artifacts/fresh-m4/m7-m4-oracle-a \
+            --output "$GITHUB_WORKSPACE/artifacts/m7-oracle-fixture-drift-v1.json"
+      - uses: actions/upload-artifact@v6
+        with:
+          name: m7-oracle-drift
+          path: artifacts/m7-oracle-fixture-drift-v1.json
+          if-no-files-found: error
+          retention-days: 14
+
+  m7-bootstrap-aggregate:
+    name: M7 oracle bootstrap aggregate
+    needs:
+      - m7-source-lock
+      - m7-static-refresh
+      - m7-runtime-semantics
+      - m7-historical-refresh
+      - m7-oracle-classification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed oracle bootstrap"

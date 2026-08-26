@@ -10,11 +10,15 @@ function fail(message) {
 function args(argv) {
   const values = new Map();
   for (let index = 0; index < argv.length; index += 2) {
-    if (!argv[index]?.startsWith("--") || argv[index + 1] == null) fail("invalid arguments");
+    if (!argv[index]?.startsWith("--") || argv[index + 1] == null) {
+      fail("invalid arguments");
+    }
     values.set(argv[index], argv[index + 1]);
   }
   for (const key of ["--legacy", "--fresh", "--oracle-sha", "--output"]) {
-    if (!values.has(key)) fail(`missing ${key}`);
+    if (!values.has(key)) {
+      fail(`missing ${key}`);
+    }
   }
   if (!/^[0-9a-f]{40}$/u.test(values.get("--oracle-sha")) || !isAbsolute(values.get("--output"))) {
     fail("oracle SHA or output path is invalid");
@@ -32,7 +36,9 @@ function readJson(path) {
 }
 
 function identity(kind, entry) {
-  if (kind === "modifier_types") return entry.key;
+  if (kind === "modifier_types") {
+    return entry.key;
+  }
   return `${entry.enum_name}/${entry.member}`;
 }
 
@@ -55,7 +61,11 @@ function changedFiles(left, right) {
 const input = args(process.argv.slice(2));
 const legacy = readJson(input.legacy);
 const fresh = readJson(input.fresh);
-if (legacy.schema_version !== 1 || fresh.schema_version !== 1 || fresh.oracle_sha !== input.oracleSha) {
+if (
+  ![1, 2].includes(legacy.schema_version)
+  || ![1, 2].includes(fresh.schema_version)
+  || fresh.oracle_sha !== input.oracleSha
+) {
   fail("catalog identity mismatch");
 }
 const kinds = [
