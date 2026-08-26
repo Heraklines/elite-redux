@@ -2,7 +2,6 @@ import { Container, getContainer } from "@cloudflare/containers";
 
 interface Env {
   ABILITY_AI: DurableObjectNamespace<AbilityAiContainer>;
-  EDITOR_API: Fetcher;
   AUTH_ENCRYPTION_KEY: string;
   NVIDIA_NIM_API_KEY?: string;
   ALLOWED_ORIGINS: string;
@@ -217,7 +216,7 @@ export default {
       return withCors(json({ error: "Ability builder secrets are not configured" }, 503), origin, env);
     }
     const suppliedPassword = request.headers.get("X-Editor-Password") ?? "";
-    const authResponse = await env.EDITOR_API.fetch("https://er-editor-api/auth-check", {
+    const authResponse = await fetch("https://er-editor-api.heraklines.workers.dev/auth-check", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: suppliedPassword }),

@@ -10,12 +10,6 @@
     "CODEX_EFFORT": "high",
     "NVIDIA_NIM_MODEL": "qwen/qwen3-coder-480b-a35b-instruct"
   },
-  "services": [
-    {
-      "binding": "EDITOR_API",
-      "service": "er-editor-api"
-    }
-  ],
   "containers": [
     {
       "class_name": "AbilityAiContainer",
