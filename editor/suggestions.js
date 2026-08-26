@@ -469,6 +469,7 @@
     } catch (cause) {
       error = cause.message;
       items = [];
+      loaded = true;
     } finally {
       loading = false;
       syncNavBadges();

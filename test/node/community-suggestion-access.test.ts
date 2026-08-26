@@ -27,6 +27,7 @@ describe("community suggestion access", () => {
     expect(listRequest).not.toContain("password:");
     expect(load).toContain("await suggestionListRequest()");
     expect(load).not.toContain("!password()");
+    expect(load).toMatch(/catch \(cause\) \{[\s\S]*?loaded = true;[\s\S]*?\} finally/);
     expect(staffList).not.toContain("verifyEditorPassword");
   });
 

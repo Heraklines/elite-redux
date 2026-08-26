@@ -238,6 +238,8 @@
   min-width: 0;
   border-radius: 4px;
   background: #171d27;
+  color: #e7edf7;
+  caret-color: #e7edf7;
 }
 .as-details-grid input[readonly] {
   color: #8290a3;
