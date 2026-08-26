@@ -20,6 +20,16 @@
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities, allSpecies } from "#data/data-lists";
+import { describeAbilityStudioComponent } from "#data/elite-redux/ability-studio/component-semantics";
+import {
+  ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS,
+  abilityStudioRuntimeCapabilityHookLabel,
+  abilityStudioRuntimeClassChain,
+  abilityStudioRuntimeConfiguration,
+  abilityStudioRuntimeHookId,
+  abilityStudioRuntimeMethodOwner,
+  compileAbilityStudioRuntimeComponentRule,
+} from "#data/elite-redux/ability-studio/runtime-components";
 import { ER_BALANCE_KNOBS } from "#data/elite-redux/er-balance-knobs";
 import { ER_TRAINER_CADENCE } from "#data/elite-redux/er-battle-frequency";
 import { ER_FACTORY_SETS } from "#data/elite-redux/er-factory-sets";
@@ -47,6 +57,123 @@ import { writeFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const VANILLA_ID_CUTOFF = 10000;
+
+const MECHANIC_HOOKS = new Map<string, string>([
+  ["PostBattleInitAbAttr", "After battle initialization"],
+  ["PreDefendAbAttr", "Before taking a hit"],
+  ["PostDefendAbAttr", "After being hit"],
+  ["PostStatStageChangeAbAttr", "After holder stats change"],
+  ["PostAllyStatStageChangeAbAttr", "After ally stats change"],
+  ["PreAttackAbAttr", "Before attacking"],
+  ["PostAttackAbAttr", "After landing a move"],
+  ["PostSetStatusAbAttr", "After gaining a status"],
+  ["PostVictoryAbAttr", "After victory"],
+  ["PostKnockOutAbAttr", "After knocking out a foe"],
+  ["PostSummonAbAttr", "On entry"],
+  ["PreSwitchOutAbAttr", "Before switching out"],
+  ["PreLeaveFieldAbAttr", "Before leaving the field"],
+  ["PreStatStageChangeAbAttr", "Before stats change"],
+  ["PreSetStatusAbAttr", "Before gaining a status"],
+  ["PreApplyBattlerTagAbAttr", "Before a battle effect is applied"],
+  ["PostWakeUpAbAttr", "After waking up"],
+  ["PreWeatherDamageAbAttr", "Before weather damage"],
+  ["PreWeatherEffectAbAttr", "Before weather effects"],
+  ["PostWeatherChangeAbAttr", "After weather changes"],
+  ["PostWeatherLapseAbAttr", "After weather advances"],
+  ["PostTerrainChangeAbAttr", "After terrain changes"],
+  ["PostTurnAbAttr", "At the end of each turn"],
+  ["PostBiomeChangeAbAttr", "After changing biome"],
+  ["PostMoveUsedAbAttr", "After using a move"],
+  ["PostItemLostAbAttr", "After losing an item"],
+  ["PostBattleAbAttr", "After battle"],
+  ["PostFaintAbAttr", "After fainting"],
+  ["PreSummonAbAttr", "Before entry"],
+  ["RedirectMoveAbAttr", "When redirecting a move"],
+  ["FlinchEffectAbAttr", "When applying flinch"],
+  ["CancelInteractionAbAttr", "When blocking an interaction"],
+]);
+
+function mechanicLabel(type: string): string {
+  return type
+    .replace(/AbAttr$/, "")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/\bHp\b/g, "HP")
+    .replace(/\bKo\b/g, "KO")
+    .replace(/\bPp\b/g, "PP")
+    .replace(/\bAi\b/g, "AI")
+    .replace(/\bBst\b/g, "BST")
+    .replace(/\bEr\b/g, "ER");
+}
+
+function mechanicHook(
+  attr: Parameters<typeof abilityStudioRuntimeHookId>[0],
+  chain: readonly string[],
+): { id: string; label: string; mode: "event" | "calculation" } {
+  const id = abilityStudioRuntimeHookId(attr);
+  const capabilityHookLabel = abilityStudioRuntimeCapabilityHookLabel(attr);
+  if (capabilityHookLabel !== undefined) {
+    return { id, label: capabilityHookLabel, mode: "event" };
+  }
+  for (const type of chain) {
+    const hook = MECHANIC_HOOKS.get(type);
+    if (hook !== undefined) {
+      return { id, label: hook, mode: "event" };
+    }
+  }
+  return {
+    id,
+    label: `During ${mechanicLabel(chain[0])}`,
+    mode: "calculation",
+  };
+}
+
+const COMPONENT_HOOK_CONTEXTS: Readonly<Record<string, readonly string[]>> = {
+  PostBattleInitAbAttr: ["holder", "battle initialization"],
+  PreDefendAbAttr: ["holder", "attacker", "move", "incoming damage", "simulation state"],
+  PostDefendAbAttr: ["holder", "attacker", "move", "damage dealt", "hit result", "simulation state"],
+  PostStatStageChangeAbAttr: ["holder", "changed stats", "stage delta", "source", "simulation state"],
+  PostAllyStatStageChangeAbAttr: ["holder", "ally", "changed stats", "stage delta", "simulation state"],
+  PreAttackAbAttr: ["holder", "target", "move", "move calculation", "simulation state"],
+  PostAttackAbAttr: ["holder", "target", "move", "damage dealt", "hit result", "simulation state"],
+  PostSetStatusAbAttr: ["holder", "status", "source", "simulation state"],
+  PostVictoryAbAttr: ["holder", "defeated Pokemon", "simulation state"],
+  PostKnockOutAbAttr: ["holder", "defeated Pokemon", "simulation state"],
+  PostSummonAbAttr: ["holder", "entry state", "simulation state"],
+  PreSwitchOutAbAttr: ["holder", "switch state", "simulation state"],
+  PreLeaveFieldAbAttr: ["holder", "field-leave state", "simulation state"],
+  PreStatStageChangeAbAttr: ["holder", "changed stats", "stage delta", "source", "cancellation state"],
+  PreSetStatusAbAttr: ["holder", "status", "source", "cancellation state"],
+  PreApplyBattlerTagAbAttr: ["holder", "volatile effect", "source", "cancellation state"],
+  PostWakeUpAbAttr: ["holder", "wake-up state"],
+  PreWeatherDamageAbAttr: ["holder", "weather", "cancellation state"],
+  PreWeatherEffectAbAttr: ["holder", "weather", "cancellation state"],
+  PostWeatherChangeAbAttr: ["holder", "weather", "simulation state"],
+  PostWeatherLapseAbAttr: ["holder", "weather", "simulation state"],
+  PostTerrainChangeAbAttr: ["holder", "terrain", "simulation state"],
+  PostTurnAbAttr: ["holder", "turn-end state", "simulation state"],
+  PostBiomeChangeAbAttr: ["holder", "biome", "simulation state"],
+  PostMoveUsedAbAttr: ["holder", "move user", "move", "targets", "simulation state"],
+  PostItemLostAbAttr: ["holder", "opponent", "lost-item state"],
+  PostBattleAbAttr: ["holder", "victory state"],
+  PostFaintAbAttr: ["holder", "attacker", "move", "simulation state"],
+  PreSummonAbAttr: ["holder", "pre-entry state"],
+  RedirectMoveAbAttr: ["holder", "move user", "move", "targets", "redirection state"],
+  FlinchEffectAbAttr: ["holder", "flinch state", "simulation state"],
+  CancelInteractionAbAttr: ["holder", "cancellation state"],
+  "source-ability-runtime-check": ["holder", "direct engine check"],
+};
+
+function componentHookContext(hookId: string): readonly string[] {
+  return COMPONENT_HOOK_CONTEXTS[hookId] ?? ["holder", "runtime calculation value"];
+}
+
+function componentConditionKind(value: string): "ability" | "holder" | "event" {
+  if (value === "ability" || value === "holder" || value === "event") {
+    return value;
+  }
+  throw new Error(`Unsupported component condition kind ${value}`);
+}
 
 describe("tools — dump editor SPA data", () => {
   it("writes editor/data/{species,items,trainers}.json from the live tables", () => {
@@ -400,6 +527,173 @@ describe("tools — dump editor SPA data", () => {
       ...new Set(allAbilities.filter(a => a && a.id > 0 && a.name && !a.name.startsWith("???")).map(a => a.name)),
     ].sort();
     writeFileSync("editor/data/abilities.json", `${JSON.stringify(abilityNames, null, 2)}\n`, "utf8");
+    const abilityMechanics = allAbilities
+      .filter(ability => ability && ability.id > 0 && ability.name && !ability.name.startsWith("???"))
+      .map(ability => ({
+        id: ability.id,
+        name: ability.name,
+        description: ability.description,
+        mechanics: ability.attrs.map((attr, index) => {
+          const chain = abilityStudioRuntimeClassChain(attr);
+          const hook = mechanicHook(attr, chain);
+          const semantics = describeAbilityStudioComponent(ability, attr);
+          return {
+            index,
+            type: chain[0],
+            label: semantics.label,
+            summary: semantics.summary,
+            scope: semantics.scope,
+            parameters: semantics.parameters,
+            trigger: hook.label,
+            conditioned: attr.getCondition() !== null || ability.conditions.length > 0,
+          };
+        }),
+      }))
+      .filter(ability => ability.mechanics.length > 0)
+      .sort((a, b) => a.name.localeCompare(b.name));
+    writeFileSync("editor/data/ability-mechanics.json", `${JSON.stringify(abilityMechanics, null, 2)}\n`, "utf8");
+    const abilityComponents = allAbilities
+      .filter(ability => ability && ability.id > 0 && ability.name && !ability.name.startsWith("???"))
+      .map(ability => ({
+        id: ability.id,
+        name: ability.name,
+        description: ability.description,
+        flags: {
+          bypassFaint: ability.bypassFaint,
+          ignorable: ability.ignorable,
+          suppressable: ability.suppressable,
+          copiable: ability.copiable,
+          replaceable: ability.replaceable,
+        },
+        rules: ability.attrs.map((attr, index) => {
+          const chain = abilityStudioRuntimeClassChain(attr);
+          const hook = mechanicHook(attr, chain);
+          const semantics = describeAbilityStudioComponent(ability, attr);
+          const label = semantics.label;
+          const applyOwner = abilityStudioRuntimeMethodOwner(attr, "apply");
+          const canApplyOwner = abilityStudioRuntimeMethodOwner(attr, "canApply");
+          const source = { abilityId: ability.id, attrIndex: index, attrType: chain[0] };
+          const conditions = [
+            ...ability.conditions.map((_condition, conditionIndex) => ({
+              id: `ability-${ability.id}-condition-${conditionIndex + 1}`,
+              label: `${ability.name} ability-wide gate${ability.conditions.length > 1 ? ` ${conditionIndex + 1}` : ""}`,
+              summary: `This source ability must satisfy its ability-wide activation gate. ${ability.description}`,
+              kind: "ability",
+              sourceOwner: "Ability",
+              required: true,
+              source: { ...source, conditionIndex },
+            })),
+            ...(attr.getCondition() === null
+              ? []
+              : [
+                  {
+                    id: `ability-${ability.id}-${chain[0]}-${index + 1}-holder-condition`,
+                    label: `Holder gate for ${label}`,
+                    summary: `The holder must satisfy the configured ${label.toLowerCase()} gate from ${ability.name}. ${ability.description}`,
+                    kind: "holder",
+                    sourceOwner: abilityStudioRuntimeMethodOwner(attr, "getCondition"),
+                    required: true,
+                    source,
+                  },
+                ]),
+            ...(canApplyOwner === "AbAttr"
+              ? []
+              : [
+                  {
+                    id: `ability-${ability.id}-${chain[0]}-${index + 1}-event-condition`,
+                    label: `Trigger gate for ${label}`,
+                    summary: `The source effect's ${hook.label.toLowerCase()} eligibility check must pass. ${ability.description}`,
+                    kind: "event",
+                    sourceOwner: canApplyOwner,
+                    required: true,
+                    source,
+                  },
+                ]),
+          ];
+          return {
+            id: `ability-${ability.id}-${chain[0]}-${index + 1}`,
+            label,
+            summary: semantics.summary,
+            scope: semantics.scope,
+            parameters: semantics.parameters,
+            source,
+            hook: {
+              ...hook,
+              contract: hook.id,
+              context: componentHookContext(hook.id),
+              source,
+            },
+            conditions,
+            effects: [
+              {
+                id: `ability-${ability.id}-${chain[0]}-${index + 1}-effect`,
+                label,
+                summary: semantics.summary,
+                scope: semantics.scope,
+                parameters: semantics.parameters,
+                kind: applyOwner === "AbAttr" ? "capability" : "effect",
+                sourceOwner: applyOwner,
+                source,
+              },
+            ],
+          };
+        }),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    for (const componentAbility of abilityComponents) {
+      const sourceAbility = allAbilities[componentAbility.id];
+      for (const rule of componentAbility.rules) {
+        const sourceAttr = sourceAbility.attrs[rule.source.attrIndex];
+        const compiledAttr = compileAbilityStudioRuntimeComponentRule(
+          {
+            key: rule.id,
+            hook: rule.source,
+            chance: 100,
+            conditions: rule.conditions.map(condition => ({
+              ...condition.source,
+              kind: componentConditionKind(condition.kind),
+            })),
+            effects: [rule.source],
+          },
+          id => allAbilities[id],
+        );
+        expect(compiledAttr.constructor.name, `${componentAbility.name}: ${rule.label}`).toBe(
+          sourceAttr.constructor.name,
+        );
+        expect(abilityStudioRuntimeConfiguration(compiledAttr), `${componentAbility.name}: ${rule.label}`).toEqual(
+          abilityStudioRuntimeConfiguration(sourceAttr),
+        );
+      }
+    }
+    const generatedRules = abilityComponents.flatMap(ability => ability.rules);
+    expect(generatedRules.filter(rule => rule.scope === "package")).toHaveLength(
+      ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS.size,
+    );
+    expect(
+      generatedRules.filter(
+        rule =>
+          !rule.summary
+          || !rule.scope
+          || !Array.isArray(rule.parameters)
+          || rule.hook.contract !== rule.hook.id
+          || !Array.isArray(rule.hook.context)
+          || rule.conditions.some(condition => !condition.summary)
+          || rule.effects.some(effect => !effect.summary),
+      ),
+    ).toEqual([]);
+    expect(
+      generatedRules.filter(
+        rule =>
+          rule.label.includes("linked runtime behavior")
+          || rule.conditions.some(condition => /requirements|battle-event requirements/.test(condition.label)),
+      ),
+    ).toEqual([]);
+    expect(abilityComponents.filter(ability => ability.rules.length === 0).map(ability => ability.name)).toEqual([
+      "Bad Company",
+      "Cheek Pouch",
+    ]);
+    writeFileSync("editor/data/ability-components.json", `${JSON.stringify(abilityComponents, null, 2)}\n`, "utf8");
 
     // Sanity: the roster covers every starter-cost entry that is a real species,
     // includes vanilla + ER customs, and lost nobody to a missing const key.
@@ -412,6 +706,12 @@ describe("tools — dump editor SPA data", () => {
     expect(species.filter(s => s.id >= VANILLA_ID_CUTOFF).length).toBeGreaterThan(100);
     expect(items.length).toBeGreaterThan(50);
     expect(factorySpecies.length).toBeGreaterThan(100);
+    expect(abilityMechanics.length).toBeGreaterThan(800);
+    expect(abilityMechanics.reduce((total, ability) => total + ability.mechanics.length, 0)).toBeGreaterThan(1_000);
+    expect(abilityComponents.length).toBeGreaterThanOrEqual(abilityMechanics.length);
+    expect(abilityComponents.reduce((total, ability) => total + ability.rules.length, 0)).toBe(
+      abilityMechanics.reduce((total, ability) => total + ability.mechanics.length, 0),
+    );
     // eslint-disable-next-line no-console
     console.log(
       `WROTE editor data: ${species.length} species (${species.filter(s => s.slug).length} with sprites), ${items.length} pool items, ${factorySpecies.length} factory species`,

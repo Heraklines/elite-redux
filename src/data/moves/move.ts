@@ -34,10 +34,6 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
-import {
-  ER_REAP_AND_SOW_ABILITY_ID,
-  ER_SLEEPING_IN_ABILITY_ID,
-} from "#data/elite-redux/abilities/fakemon-pitch-abilities";
 import { recordMagneticFluxRecipient } from "#data/elite-redux/abilities/fakemon-pitch-raichu";
 import {
   applyFoulHarvestDrainBonus,
@@ -46,6 +42,7 @@ import {
   // biome-ignore lint/suspicious/noImportCycles: Signature hooks run at the universal accuracy/heal/hazard chokepoints.
 } from "#data/elite-redux/abilities/newcomer-signature-mechanics";
 import { erRendezvousPowerMultiplier } from "#data/elite-redux/abilities/rendezvous";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { hasCommandAbilityProvenance } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
 import { getMoveHpCostFraction } from "#data/elite-redux/ability-upgrades/attrs/move-hp-cost";
 import { HitMultiplierAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
@@ -1637,7 +1634,10 @@ export abstract class Move implements Localizable {
  * (ability 474) and a usable Power Herb - but WITHOUT consuming the herb charge.
  */
 function userSkipsChargeTurn(user: Pokemon): boolean {
-  return user.hasAbility(ErAbilityId.ACCELERATE as unknown as AbilityId) || erHasUsablePowerHerb(user);
+  return (
+    user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.ACCELERATE_CHARGE_SKIP)
+    || erHasUsablePowerHerb(user)
+  );
 }
 
 export class AttackMove extends Move {
@@ -3105,7 +3105,10 @@ export abstract class WeatherHealAttr extends HealAttr {
     // HP instead of the normal amount." Move-specific override, gated on the user
     // holding Moon Spirit and the move being Moonlight (mirrors the Chloroplast
     // userActsInSun special-case in PlantHealAttr).
-    if (move.id === MoveId.MOONLIGHT && user.hasAbility(ErAbilityId.MOON_SPIRIT as unknown as AbilityId)) {
+    if (
+      move.id === MoveId.MOONLIGHT
+      && user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.MOON_SPIRIT_MOONLIGHT_HEAL)
+    ) {
       healRatio = Math.max(healRatio, 0.75);
     }
     this.addHealPhase(user, healRatio);
@@ -3582,7 +3585,10 @@ export class StatusEffectAttr extends MoveEffectAttr {
       return false;
     }
     const quiet = move.category !== MoveCategory.STATUS;
-    if (this.effect === StatusEffect.SLEEP && user.hasAbility(ER_SLEEPING_IN_ABILITY_ID as unknown as AbilityId)) {
+    if (
+      this.effect === StatusEffect.SLEEP
+      && user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.SLEEPING_IN_YAWN_STYLE)
+    ) {
       const sleeper = this.selfTarget ? user : target;
       const added = sleeper.addTag(BattlerTagType.DROWSY, 2, MoveId.YAWN, user.id);
       if (added) {
@@ -4755,13 +4761,10 @@ export function userActsInSun(user: Pokemon | null | undefined): boolean {
     globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
     && globalScene
       .getField(true)
-      .some(fieldPokemon => fieldPokemon.hasAbility(ER_REAP_AND_SOW_ABILITY_ID as unknown as AbilityId));
-  if (
-    user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)
-    || user?.hasAbility(ErAbilityId.SOLAR_FLARE as unknown as AbilityId)
-    || user?.hasAbility(ErAbilityId.BIG_LEAVES as unknown as AbilityId)
-    || grassyReapAndSow
-  ) {
+      .some(fieldPokemon =>
+        fieldPokemon.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.REAP_AND_SOW_SUN),
+      );
+  if (user?.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.CHLOROPLAST_SUN_MOVES) || grassyReapAndSow) {
     return true;
   }
   const weather = globalScene.arena.weather;
@@ -4780,7 +4783,7 @@ export function userActsInSun(user: Pokemon | null | undefined): boolean {
  * correct for non-Aurora-Borealis mons).
  */
 export function userActsInIce(user: Pokemon | null | undefined): boolean {
-  if (user?.hasAbility(ErAbilityId.AURORA_BOREALIS as unknown as AbilityId)) {
+  if (user?.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.AURORA_BOREALIS_ICE_WEATHER)) {
     return true;
   }
   const weather = globalScene.arena.weather;
@@ -7815,7 +7818,7 @@ export class AddBattlerTagAttr extends MoveEffectAttr {
       if (
         added
         && this.tagType === BattlerTagType.DROWSY
-        && user.hasAbility(ER_SLEEPING_IN_ABILITY_ID as unknown as AbilityId)
+        && user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.SLEEPING_IN_YAWN_STYLE)
       ) {
         sleeper.getTag(DrowsyTag)?.setSleepTurnsRemaining(2);
       }
@@ -8390,7 +8393,7 @@ export class RemoveArenaTrapAttr extends RemoveArenaTagsAttr {
 
 /** True iff the move's user currently has the Angel's Wrath ability/innate. */
 function userHasAngelsWrath(user: Pokemon | null | undefined): boolean {
-  return !!user?.hasAbility(ErAbilityId.ANGEL_S_WRATH as unknown as AbilityId);
+  return !!user?.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.ANGELS_WRATH_MOVE_REWRITES);
 }
 
 function addAngelsWrathMoveLock(user: Pokemon, target: Pokemon, move: Move, tagType: BattlerTagType): boolean {
@@ -9174,7 +9177,8 @@ export class RoarOfTimeForceSwitchOutAttr extends ForceSwitchOutAttr {
   override getSwitchOutCondition(): MoveConditionFunc {
     const base = super.getSwitchOutCondition();
     return (user, target, move) =>
-      !user.hasAbility(ErAbilityId.TEMPORAL_RUPTURE as unknown as AbilityId) && base(user, target, move);
+      !user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.TEMPORAL_RUPTURE_ROAR_OF_TIME)
+      && base(user, target, move);
   }
 }
 
@@ -12772,9 +12776,13 @@ export function initMoves() {
       // in, slow-started by the ability's rider). Base Roar of Time keeps the -6
       // force-switch and 90 BP.
       .attr(MovePowerMultiplierAttr, user =>
-        user.hasAbility(ErAbilityId.TEMPORAL_RUPTURE as unknown as AbilityId) ? 10 / 9 : 1,
+        user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.TEMPORAL_RUPTURE_ROAR_OF_TIME) ? 10 / 9 : 1,
       )
-      .attr(IncrementMovePriorityAttr, user => user.hasAbility(ErAbilityId.TEMPORAL_RUPTURE as unknown as AbilityId), 6)
+      .attr(
+        IncrementMovePriorityAttr,
+        user => user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.TEMPORAL_RUPTURE_ROAR_OF_TIME),
+        6,
+      )
       .attr(RoarOfTimeForceSwitchOutAttr, false, SwitchType.FORCE_SWITCH)
       .hidesTarget(),
     new AttackMove(MoveId.SPACIAL_REND, PokemonType.DRAGON, MoveCategory.SPECIAL, 100, 95, 5, -1, 0, 4) //

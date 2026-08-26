@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   MeloettaFormChangePostMoveTrigger,
   SpeciesDefaultFormMatchTrigger,
@@ -18,7 +19,6 @@ import {
   SpeciesFormChangeWeatherTrigger,
 } from "#data/form-change-triggers";
 import { AbilityId } from "#enums/ability-id";
-import { ErAbilityId } from "#enums/er-ability-id";
 import { FormChangeItem } from "#enums/form-change-item";
 import { MoveCategory } from "#enums/move-category";
 import { MoveId } from "#enums/move-id";
@@ -322,7 +322,9 @@ export const pokemonFormChanges: PokemonFormChanges = {
     // on Aegislash's Stance Change (PreMove trigger gated on the ability), so
     // the form is set before the move resolves and uses the new form's stats.
     ...((): SpeciesFormChange[] => {
-      const dna = new SpeciesFormChangeCondition(p => p.hasAbility(ErAbilityId.DNA_SCRAMBLE as unknown as AbilityId));
+      const dna = new SpeciesFormChangeCondition(p =>
+        p.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.DNA_SCRAMBLE_FORM_CHANGE),
+      );
       const damaging = (m: MoveId): boolean => allMoves[m].category !== MoveCategory.STATUS;
       const otherStatus = (m: MoveId): boolean => allMoves[m].category === MoveCategory.STATUS && m !== MoveId.RECOVER;
       const forms = ["normal", "attack", "defense", "speed"] as const;

@@ -104,6 +104,12 @@ import {
 import { erApplySoulmateHealCopy, erApplySoulmateRedirect } from "#data/elite-redux/abilities/soulmate";
 import { getGraftedTypes } from "#data/elite-redux/abilities/type-graft";
 import {
+  ABILITY_STUDIO_RUNTIME_CAPABILITIES,
+  type AbilityStudioRuntimeCapability,
+  abilityStudioAbilityHasCapability,
+  abilityStudioAbilityReferencesSource,
+} from "#data/elite-redux/ability-studio/runtime-capabilities";
+import {
   isAbilityIdSuppressed,
   isInnateSlotSuppressed,
 } from "#data/elite-redux/ability-upgrades/attrs/innate-slot-suppression";
@@ -227,7 +233,6 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
-import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
 import {
   absorbMoodyFormationBarrier,
   applyMoodyFormationLethalClamp,
@@ -297,7 +302,6 @@ import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { Challenges } from "#enums/challenges";
 import { DexAttr } from "#enums/dex-attr";
-import { ErAbilityId } from "#enums/er-ability-id";
 import { FieldPosition } from "#enums/field-position";
 import type { FormChangeItem } from "#enums/form-change-item";
 import { HitResult } from "#enums/hit-result";
@@ -3755,9 +3759,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           holder =>
             holder !== this
             && !holder.isFainted()
-            && holder
-              .getAbilitySources()
-              .some(source => source.ability.id === (FAKEMON_PITCH_RUNTIME_ABILITY_IDS.DEADLY_SENTENCING as AbilityId)),
+            && holder.hasAbilityStudioCapability(
+              ABILITY_STUDIO_RUNTIME_CAPABILITIES.DEADLY_SENTENCING_SUPPRESSION,
+              false,
+            ),
         )
     ) {
       return false;
@@ -3821,7 +3826,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public hasAbility(ability: AbilityId, canApply = true, ignoreOverride = false): boolean {
     const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
-    return sources.some(source => source.ability.id === ability);
+    return sources.some(
+      source => source.ability.id === ability || abilityStudioAbilityReferencesSource(source.ability, ability),
+    );
+  }
+
+  public hasAbilityStudioCapability(
+    capability: AbilityStudioRuntimeCapability,
+    canApply = true,
+    ignoreOverride = false,
+  ): boolean {
+    const sources = canApply ? this.getActiveAbilitySources(ignoreOverride) : this.getAbilitySources(ignoreOverride);
+    return sources.some(source => abilityStudioAbilityHasCapability(source.ability, capability));
   }
 
   /**
@@ -5707,7 +5723,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       .getField()
       .some(
         p =>
-          p != null && p !== source && !p.isFainted() && p.hasAbility(ErAbilityId.RELIC_STONE as unknown as AbilityId),
+          p != null
+          && p !== source
+          && !p.isFainted()
+          && p.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.RELIC_STONE_STAB_SUPPRESSION),
       );
     if (relicStoneSuppressed) {
       return 1;
@@ -6001,7 +6020,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // up to 6x at FULL power (big community report). Per the v2.65.3b ROM long
     // description: "The first hit deals full damage while each additional hit
     // deals 10% damage." (full 6 hits = 150% total).
-    if (source.hasAbility(ErAbilityId.MINION_CONTROL as unknown as AbilityId)) {
+    if (source.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.MINION_CONTROL_HIT_POWER)) {
       const strikeIndex = source.turnData.hitCount - source.turnData.hitsLeft; // 0-based
       if (strikeIndex > 0) {
         multiStrikeEnhancementMultiplier.value *= 0.1;
@@ -6204,7 +6223,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         .getField(true)
         .some(
           holder =>
-            !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId),
+            !holder.isFainted()
+            && holder.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.BURN_FATIGUE_DAMAGE),
         )
     ) {
       damage.value = toDmgValue(damage.value * (4 / 3));
@@ -8786,7 +8806,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (!donor.isActive(true) || donor.isFainted()) {
         continue;
       }
-      const source = donor.getActiveAbilitySources().find(entry => entry.ability.id === AbilityId.SYMBIOSIS);
+      const source = donor
+        .getActiveAbilitySources()
+        .find(entry =>
+          abilityStudioAbilityHasCapability(entry.ability, ABILITY_STUDIO_RUNTIME_CAPABILITIES.SYMBIOSIS_ITEM_TRANSFER),
+        );
       if (!source) {
         continue;
       }

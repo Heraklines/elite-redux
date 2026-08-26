@@ -77,6 +77,7 @@ import {
   ER_SUGAR_RUSH_ABILITY_ID,
   ER_UPCYCLE_ABILITY_ID,
   holderHasUpcycle,
+  holderHasUpcyclePoisonBoost,
   isErFoodPokemon,
 } from "#data/elite-redux/abilities/food-based";
 import { ER_GENESIS_SUPERNOVA_ABILITY_ID, GenesisSupernovaAbAttr } from "#data/elite-redux/abilities/genesis-supernova";
@@ -137,6 +138,8 @@ import {
   WorldInPiecesSpeedAbAttr,
   WorldInPiecesSummonAbAttr,
 } from "#data/elite-redux/abilities/world-in-pieces";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { AttackStatSubstituteAbAttr } from "#data/elite-redux/archetypes/attack-stat-substitute";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
@@ -922,18 +925,35 @@ function buildCustomAbility(
       (user, target) =>
         !!target
         && (holderHasUpcycle(user) || isErFoodPokemon(target))
-        && !(holderHasUpcycle(user) && target.isOfType(PokemonType.POISON)),
+        && !(holderHasUpcyclePoisonBoost(user) && target.isOfType(PokemonType.POISON)),
       1.5,
     );
     builder.attr(
       MovePowerBoostAbAttr,
-      (user, target) => !!target && holderHasUpcycle(user) && target.isOfType(PokemonType.POISON),
+      (user, target) => !!target && holderHasUpcyclePoisonBoost(user) && target.isOfType(PokemonType.POISON),
       2,
     );
     builder.attr(
       ReceivedMoveDamageMultiplierAbAttr,
       (holder, attacker) => !!attacker && (holderHasUpcycle(holder) || isErFoodPokemon(attacker)),
       0.5,
+    );
+  }
+
+  if (pokerogueId === ER_UPCYCLE_ABILITY_ID) {
+    builder.attr(
+      AbilityStudioRuntimeCapabilityAbAttr,
+      ABILITY_STUDIO_RUNTIME_CAPABILITIES.UPCYCLE_FOOD_FIELD,
+      "Make every Pokemon count as Food for Sugar Rush",
+      "sugar-rush-food-calculation",
+      "When Sugar Rush checks whether a Pokemon is Food",
+    );
+    builder.attr(
+      AbilityStudioRuntimeCapabilityAbAttr,
+      ABILITY_STUDIO_RUNTIME_CAPABILITIES.UPCYCLE_POISON_BOOST,
+      "Make Sugar Rush deal 2x damage to Poison-type targets",
+      "sugar-rush-poison-calculation",
+      "When Sugar Rush targets a Poison-type Pokemon",
     );
   }
 

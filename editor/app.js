@@ -130,6 +130,24 @@ let EVOS = {}; // speciesId → { to: number[], from: number[] }
 const moveById = new Map(); // moveId → rich move
 const abilById = new Map(); // abilityId → rich ability
 const abilIdByNormalizedName = new Map(); // lowercase display name → abilityId
+const studioAbilityIds = new Set();
+function syncStudioAbilityCatalog(entries) {
+  for (const id of studioAbilityIds) {
+    abilById.delete(id);
+  }
+  studioAbilityIds.clear();
+  for (const ability of entries || []) {
+    abilById.set(ability.id, ability);
+    studioAbilityIds.add(ability.id);
+  }
+  abilIdByNormalizedName.clear();
+  for (const ability of abilById.values()) {
+    abilIdByNormalizedName.set(ability.name.trim().toLowerCase(), ability.id);
+  }
+}
+function fullAbilityCatalog() {
+  return window.erAbilityStudio?.getAbilityCatalog?.() || ABILS_RICH;
+}
 // Custom Trainers: sprite-bearing trainer classes (from trainer-classes.json),
 // with a NAME→entry lookup for the sprite preview. Falls back to the static
 // TRAINER_CLASS_OPTIONS list if the generated file is missing.
@@ -332,6 +350,7 @@ function dirtyCounts() {
   if (!jsonEq(ctrConfig.current, ctrConfig.baseline)) {
     ctrN++;
   }
+  const studioN = window.erAbilityStudio?.available?.() ? window.erAbilityStudio.dirtyCount() : 0;
   return {
     eggN,
     spN,
@@ -341,13 +360,14 @@ function dirtyCounts() {
     lsN,
     tmN,
     abN,
+    studioN,
     ctrN,
-    total: eggN + spN + itemN + trN + balN + lsN + tmN + abN + ctrN,
+    total: eggN + spN + itemN + trN + balN + lsN + tmN + abN + studioN + ctrN,
   };
 }
 
 function refreshChrome() {
-  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, ctrN, total: localTotal } = dirtyCounts();
+  const { eggN, spN, itemN, trN, balN, lsN, tmN, abN, studioN, ctrN, total: localTotal } = dirtyCounts();
   const stagedTotal = communityMode?.enabled ? 0 : window.communitySuggestions?.stagedCount?.() || 0;
   const total = localTotal + stagedTotal;
   saveBtn.textContent = communityMode?.enabled
@@ -363,7 +383,7 @@ function refreshChrome() {
     game: balN,
     learnsets: lsN,
     tms: tmN,
-    abilities: abN,
+    abilities: abN + studioN,
   };
   document.querySelectorAll("nav.tabs button").forEach(b => {
     if (b.dataset.tab === "suggestions") {
@@ -1749,7 +1769,33 @@ function abilSlotHtml(cur, slot, readOnly = false) {
 }
 
 function renderAbilities(root) {
-  root.innerHTML = `<div class="pd"><aside class="pd-list">${pdListHtml()}</aside><section class="pd-main" id="pd-main"></section></div>`;
+  const studio = window.erAbilityStudio;
+  const studioAvailable = studio?.available?.();
+  const editorMode = studioAvailable ? studio.mode() : "assignments";
+  const modeBar = studioAvailable
+    ? `<div class="ability-mode-bar"><div class="ability-mode-switch"><button type="button" data-ability-mode="assignments" class="${editorMode === "assignments" ? "active" : ""}">Assignments</button><button type="button" data-ability-mode="studio" class="${editorMode === "studio" ? "active" : ""}">Ability Studio</button></div><span class="ability-mode-note">Create mechanics, then assign the ability to a species slot.</span></div>`
+    : "";
+  root.innerHTML = `${modeBar}<div id="ability-mode-content"></div>`;
+  root.querySelectorAll("[data-ability-mode]").forEach(button => {
+    button.addEventListener("click", event => {
+      event.stopPropagation();
+      studio?.setMode?.(button.dataset.abilityMode);
+    });
+  });
+  const modeRoot = $("#ability-mode-content");
+  if (editorMode === "studio") {
+    studio.renderContent(modeRoot);
+    modeRoot.addEventListener("click", event => {
+      event.stopPropagation();
+      studio.handleClick(event);
+    });
+    modeRoot.addEventListener("input", event => {
+      event.stopPropagation();
+      studio.handleInput(event.target);
+    });
+    return;
+  }
+  modeRoot.innerHTML = `<div class="pd"><aside class="pd-list">${pdListHtml()}</aside><section class="pd-main" id="pd-main"></section></div>`;
   const main = $("#pd-main");
   if (!pdSelected) {
     main.innerHTML = '<div class="empty">Select a species from the list to edit its ability + innate slots.</div>';
@@ -1774,7 +1820,8 @@ function openAbilDrop(slot, query) {
     return;
   }
   const q = query.trim().toLowerCase();
-  const matches = (q === "" ? ABILS_RICH : ABILS_RICH.filter(a => a.hay.includes(q))).slice(0, 60);
+  const catalog = fullAbilityCatalog();
+  const matches = (q === "" ? catalog : catalog.filter(a => a.hay.includes(q))).slice(0, 60);
   drop.innerHTML = matches
     .map(
       a => `<button type="button" class="abil-opt" data-slot="${slot}" data-abilid="${a.id}">
@@ -4970,6 +5017,9 @@ function render() {
 // Live-input targets for the Pokedex tabs. These deliberately do NOT re-render
 // (which would steal focus): they mutate state + tweak the DOM in place.
 function onPokedexInput(el) {
+  if (activeTab === "abilities" && window.erAbilityStudio?.mode?.() === "studio") {
+    return window.erAbilityStudio.handleInput(el);
+  }
   if (el.id === "pal-search") {
     palQuery = el.value;
     filterPalette();
@@ -5173,6 +5223,9 @@ function pdAddMove(moveId) {
 
 // Click targets for the Pokedex tabs (species pick, palette add, row delete, revert, ability pick).
 function onPokedexClick(e) {
+  if (activeTab === "abilities" && window.erAbilityStudio?.mode?.() === "studio") {
+    return window.erAbilityStudio.handleClick(e);
+  }
   const pick = e.target.closest("[data-pdpick]");
   if (pick) {
     pdSelected = pick.dataset.pdpick;
@@ -5222,6 +5275,15 @@ function onPokedexClick(e) {
 
 // Click targets on the Trainers tab (toggle cards, knob resets, filter chips).
 function onClick(e) {
+  const abilityMode = e.target.closest("[data-ability-mode]");
+  if (abilityMode && activeTab === "abilities") {
+    window.erAbilityStudio?.setMode?.(abilityMode.dataset.abilityMode);
+    return;
+  }
+  if (activeTab === "abilities" && window.erAbilityStudio?.mode?.() === "studio") {
+    window.erAbilityStudio.handleClick(e);
+    return;
+  }
   const statsWindowButton = e.target.closest("[data-stats-window]");
   if (statsWindowButton) {
     statsWindow = statsWindowButton.dataset.statsWindow;
@@ -5880,6 +5942,14 @@ function buildDeltas() {
     deltas["custom-trainers-config"] = cfgOut;
   }
 
+  if (window.erAbilityStudio?.available?.()) {
+    const studioResult = window.erAbilityStudio.buildDelta();
+    if (Object.keys(studioResult.delta).length > 0) {
+      deltas["custom-abilities"] = studioResult.delta;
+    }
+    bad.push(...studioResult.errors);
+  }
+
   return { deltas, bad };
 }
 
@@ -6361,6 +6431,8 @@ function markSaved(file) {
     tms.baseline = JSON.parse(JSON.stringify(tms.current));
   } else if (file === "species-abilities") {
     abil.baseline = JSON.parse(JSON.stringify(abil.current));
+  } else if (file === "custom-abilities") {
+    window.erAbilityStudio?.markSaved?.();
   } else if (file === "custom-trainers-config") {
     ctrConfig.baseline = JSON.parse(JSON.stringify(ctrConfig.current));
   }
@@ -6479,6 +6551,10 @@ async function init() {
       challengeValuesData,
       challengePresetsData,
       trainerSpritesData,
+      abilityPrimitivesData,
+      abilityMechanicsData,
+      abilityComponentsData,
+      customAbilitiesLive,
       formulasData,
       observedData,
     ] = await Promise.all([
@@ -6528,6 +6604,10 @@ async function init() {
       // Named challenge presets (generated). Fallback → [] (preset picker hides).
       fetchJson("./data/challenge-presets.json", []),
       fetchJson(`${LIVE_BASE}/er-custom-trainer-sprites.json${bust}`, {}),
+      fetchJson("./data/ability-primitives.json", null),
+      fetchJson("./data/ability-mechanics.json", []),
+      fetchJson("./data/ability-components.json", []),
+      fetchJson(`${LIVE_BASE}/er-custom-abilities.json${bust}`, {}),
       fetchJson("./data/formulas.json", { operations: [], functions: [], formulas: [] }),
       fetchJson(BALANCE_OBSERVATIONS_URL, { windows: {} }),
     ]);
@@ -6575,6 +6655,21 @@ async function init() {
     for (const a of ABILS_RICH) {
       abilById.set(a.id, a);
       abilIdByNormalizedName.set(a.name.trim().toLowerCase(), a.id);
+    }
+    if (abilityPrimitivesData && window.erAbilityStudio) {
+      window.erAbilityStudio.init({
+        catalog: abilityPrimitivesData,
+        abilities: ABILS_RICH,
+        mechanics: abilityMechanicsData,
+        components: abilityComponentsData,
+        blueprints: customAbilitiesLive,
+        community: communityMode?.enabled,
+        callbacks: {
+          onChange: refreshChrome,
+          onCatalogChange: syncStudioAbilityCatalog,
+          render,
+        },
+      });
     }
     spByConst.clear();
     spById.clear();
@@ -6799,7 +6894,9 @@ async function init() {
     // Ability names for the Add-a-Mon autocomplete.
     const adl = document.createElement("datalist");
     adl.id = "abilities-list";
-    adl.innerHTML = ABILS_RICH.map(a => `<option value="${esc(a.name)}"></option>`).join("");
+    adl.innerHTML = fullAbilityCatalog()
+      .map(a => `<option value="${esc(a.name)}"></option>`)
+      .join("");
     document.body.appendChild(adl);
     // Custom Trainers: species picker (full universe). Trainer classes use a
     // closed select in the form so a display-only sprite label can never be
@@ -6906,6 +7003,13 @@ async function init() {
     });
     let dragMoveId = null;
     content.addEventListener("dragstart", e => {
+      if (
+        activeTab === "abilities"
+        && window.erAbilityStudio?.mode?.() === "studio"
+        && window.erAbilityStudio.handleDragStart?.(e)
+      ) {
+        return;
+      }
       const pal = e.target.closest?.(".pal-move");
       if (pal) {
         dragMoveId = Number(pal.dataset.moveid);
@@ -6913,6 +7017,13 @@ async function init() {
       }
     });
     content.addEventListener("dragover", e => {
+      if (
+        activeTab === "abilities"
+        && window.erAbilityStudio?.mode?.() === "studio"
+        && window.erAbilityStudio.handleDragOver?.(e)
+      ) {
+        return;
+      }
       const zone = e.target.closest?.("[data-drop]");
       if (zone && dragMoveId !== null) {
         e.preventDefault();
@@ -6927,12 +7038,24 @@ async function init() {
       }
     });
     content.addEventListener("drop", e => {
+      if (
+        activeTab === "abilities"
+        && window.erAbilityStudio?.mode?.() === "studio"
+        && window.erAbilityStudio.handleDrop?.(e)
+      ) {
+        return;
+      }
       const zone = e.target.closest?.("[data-drop]");
       if (zone && dragMoveId !== null) {
         e.preventDefault();
         zone.classList.remove("drag");
         pdAddMove(dragMoveId);
         dragMoveId = null;
+      }
+    });
+    content.addEventListener("dragend", e => {
+      if (activeTab === "abilities" && window.erAbilityStudio?.mode?.() === "studio") {
+        window.erAbilityStudio.handleDragEnd?.(e);
       }
     });
     $("#search").addEventListener("input", render);

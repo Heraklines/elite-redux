@@ -19,6 +19,7 @@ import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-
 import type { AbilityId } from "#enums/ability-id";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import type { Pokemon } from "#field/pokemon";
+import { AbilityStudioRuleEffectPhase } from "#phases/ability-studio-rule-effect-phase";
 import { AddEnemyBuffModifierPhase } from "#phases/add-enemy-buff-modifier-phase";
 import { AttemptCapturePhase } from "#phases/attempt-capture-phase";
 import { AttemptRunPhase } from "#phases/attempt-run-phase";
@@ -205,6 +206,7 @@ import type { NonEmptyTuple } from "type-fest";
  */
 const PHASES = Object.freeze({
   AddEnemyBuffModifierPhase,
+  AbilityStudioRuleEffectPhase,
   AttemptCapturePhase,
   AttemptRunPhase,
   BattleEndPhase,

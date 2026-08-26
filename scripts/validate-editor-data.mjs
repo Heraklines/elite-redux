@@ -72,6 +72,8 @@ const allSpecies = requireArray("all-species.json", 1_500);
 const forms = requireArray("species-forms.json", 1);
 const moves = requireArray("moves-rich.json", 1_000);
 const abilities = requireArray("abilities-rich.json", 1_000);
+const abilityMechanics = requireArray("ability-mechanics.json", 800);
+const abilityComponents = requireArray("ability-components.json", 800);
 const learnsets = requireObject("learnsets.json", 1_500);
 const tmLearnsets = requireObject("tm-learnsets.json", 1_500);
 const speciesAbilities = requireObject("species-abilities.json", 1_500);
@@ -82,6 +84,8 @@ const speciesById = uniqueIndex(allSpecies, "id", "all-species.json");
 const speciesByConst = uniqueIndex(allSpecies, "const", "all-species.json");
 const moveById = uniqueIndex(moves, "id", "moves-rich.json");
 const abilityById = uniqueIndex(abilities, "id", "abilities-rich.json");
+uniqueIndex(abilityMechanics, "id", "ability-mechanics.json");
+uniqueIndex(abilityComponents, "id", "ability-components.json");
 uniqueIndex(starters, "id", "species.json");
 uniqueIndex(forms, "const", "species-forms.json");
 
@@ -161,6 +165,96 @@ for (const ability of abilities) {
   if (typeof ability.description !== "string") {
     failures.push(`abilities-rich.json: ability ${ability.id} has no description string`);
   }
+}
+
+let mechanicCount = 0;
+for (const ability of abilityMechanics) {
+  if (!ability.name || typeof ability.description !== "string") {
+    failures.push(`ability-mechanics.json: incomplete ability ${ability.id}`);
+  }
+  if (!Array.isArray(ability.mechanics) || ability.mechanics.length === 0) {
+    failures.push(`ability-mechanics.json: ${ability.name} has no mechanics`);
+    continue;
+  }
+  mechanicCount += ability.mechanics.length;
+  ability.mechanics.forEach((mechanic, index) => {
+    if (
+      mechanic.index !== index
+      || typeof mechanic.type !== "string"
+      || typeof mechanic.label !== "string"
+      || typeof mechanic.summary !== "string"
+      || !["primitive", "package"].includes(mechanic.scope)
+      || !Array.isArray(mechanic.parameters)
+      || typeof mechanic.trigger !== "string"
+      || typeof mechanic.conditioned !== "boolean"
+    ) {
+      failures.push(`ability-mechanics.json: invalid mechanic for ${ability.name} at ${index}`);
+    }
+  });
+}
+if (mechanicCount < 1_000) {
+  failures.push(`ability-mechanics.json: expected at least 1000 mechanics, found ${mechanicCount}`);
+}
+
+let componentRuleCount = 0;
+let componentPackageCount = 0;
+const componentsByAbility = new Map(abilityComponents.map(ability => [ability.id, ability]));
+for (const ability of abilityComponents) {
+  if (!ability.name || typeof ability.description !== "string" || !Array.isArray(ability.rules)) {
+    failures.push(`ability-components.json: incomplete ability ${ability.id}`);
+    continue;
+  }
+  componentRuleCount += ability.rules.length;
+  const mechanicAbility = abilityMechanics.find(candidate => candidate.id === ability.id);
+  if (
+    (mechanicAbility && ability.rules.length !== mechanicAbility.mechanics.length)
+    || (!mechanicAbility && ability.rules.length > 0)
+  ) {
+    failures.push(`ability-components.json: rule coverage mismatch for ${ability.name}`);
+  }
+  for (const rule of ability.rules) {
+    if (
+      !rule.id
+      || !rule.label
+      || !rule.summary
+      || !["primitive", "package"].includes(rule.scope)
+      || !Array.isArray(rule.parameters)
+      || !rule.source
+      || !rule.hook?.id
+      || !rule.hook?.label
+      || rule.hook?.contract !== rule.hook?.id
+      || !Array.isArray(rule.hook?.context)
+      || !["event", "calculation"].includes(rule.hook?.mode)
+      || !Array.isArray(rule.conditions)
+      || !Array.isArray(rule.effects)
+      || rule.effects.length !== 1
+      || rule.conditions.some(condition => !condition.label || !condition.summary || !condition.source)
+      || rule.effects.some(
+        effect =>
+          !effect.label
+          || !effect.summary
+          || !["primitive", "package"].includes(effect.scope)
+          || !Array.isArray(effect.parameters)
+          || !effect.source,
+      )
+    ) {
+      failures.push(`ability-components.json: invalid component rule for ${ability.name}`);
+    }
+    if (rule.scope === "package") {
+      componentPackageCount++;
+    }
+  }
+}
+for (const ability of abilityMechanics) {
+  if (!componentsByAbility.has(ability.id)) {
+    failures.push(`ability-components.json: missing ${ability.name} (${ability.id})`);
+  }
+}
+if (componentRuleCount !== mechanicCount) {
+  failures.push(`ability-components.json: expected ${mechanicCount} rules, found ${componentRuleCount}`);
+}
+if (componentPackageCount < 1 || componentPackageCount > 100) {
+  failures.push(`ability-components.json: unexpected direct-engine package count ${componentPackageCount}`);
 }
 
 if (failures.length > 0) {

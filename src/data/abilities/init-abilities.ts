@@ -193,6 +193,8 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { GroundedTag } from "#data/battler-tags";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { PostWeatherMoveFollowUpAbAttr } from "#data/elite-redux/archetypes/post-weather-move-follow-up";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
@@ -1272,6 +1274,13 @@ export function initAbilities() {
       .ignorable()
       .build(),
     new AbBuilder(AbilityId.SYMBIOSIS, 6) //
+      .attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.SYMBIOSIS_ITEM_TRANSFER,
+        "Transfer a held item to an adjacent ally after that ally loses its item",
+        "ally-item-lost",
+        "After an adjacent ally loses its held item",
+      )
       .build(),
     new AbBuilder(AbilityId.TOUGH_CLAWS, 6) //
       .attr(MovePowerBoostAbAttr, (_user, _target, move) => move.hasFlag(MoveFlags.MAKES_CONTACT), 1.3)

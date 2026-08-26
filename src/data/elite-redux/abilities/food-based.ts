@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
-import type { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
@@ -105,5 +105,9 @@ export function isErFoodPokemon(pokemon: Pokemon): boolean {
 
 /** Upcycle is a marker ability; Sugar Rush owns the actual damage modifiers. */
 export function holderHasUpcycle(pokemon: Pokemon): boolean {
-  return pokemon.hasAbility(ER_UPCYCLE_ABILITY_ID as AbilityId);
+  return pokemon.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.UPCYCLE_FOOD_FIELD);
+}
+
+export function holderHasUpcyclePoisonBoost(pokemon: Pokemon): boolean {
+  return pokemon.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.UPCYCLE_POISON_BOOST);
 }

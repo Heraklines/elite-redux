@@ -148,6 +148,8 @@ import { SetArenaTagOnHitAbAttr, SetTerrainOnHitAbAttr } from "#data/elite-redux
 import { StatBoostOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-boost-on-flag-attack";
 import { StatChangeOnCategoryAttackAbAttr } from "#data/elite-redux/abilities/stat-change-on-category-attack";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import { HolderAndAlliesRecoveryAbAttr } from "#data/elite-redux/ability-upgrades/attrs/party-recovery";
 import { onSuccessfulStatDrop } from "#data/elite-redux/ability-upgrades/attrs/stat-control";
 import { AbsorbantAbAttr } from "#data/elite-redux/archetypes/absorbant";
@@ -3428,6 +3430,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new StabAddAbAttr({ targetType: PokemonType.ICE }),
         new ConditionalAlwaysHitAbAttr({ moveIds: [MoveId.BLIZZARD] }),
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.AURORA_BOREALIS_ICE_WEATHER,
+          "Make Ice weather mechanics act as if hail or snow were active",
+          "ice-weather-calculation",
+          "When resolving an Ice weather mechanic",
+        ),
       ]);
     case 297:
       // Amphibious — "Water moves gain STAB. Can't become drenched."
@@ -3454,6 +3462,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new StabAddAbAttr({ targetType: PokemonType.FAIRY }),
         new StabAddAbAttr({ targetType: PokemonType.DARK }),
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.MOON_SPIRIT_MOONLIGHT_HEAL,
+          "Make Moonlight restore at least 75% of maximum HP",
+          "moonlight-healing-calculation",
+          "When using Moonlight",
+        ),
       ]);
     case 494:
       // Arcane Force — "All moves gain STAB. Ups super-effective by 10%."
@@ -4155,6 +4169,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 439: {
       const enhancedAttacks = [MoveId.TACKLE, MoveId.POISON_STING, MoveId.ELECTROWEB, MoveId.BUG_BITE];
       return ok([
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.ANGELS_WRATH_MOVE_REWRITES,
+          "Apply Angel's Wrath rewrites to Tackle, Poison Sting, Electroweb, and Bug Bite",
+          "angels-wrath-move-resolution",
+          "When using an Angel's Wrath move",
+        ),
         new ConditionalAlwaysHitAbAttr({ moveIds: enhancedAttacks }),
         new MovePowerBoostAbAttr((_user, _target, move) => move.id === MoveId.TACKLE, 2.5),
         new MovePowerBoostAbAttr((_user, _target, move) => move.id === MoveId.POISON_STING, 3),
@@ -4228,7 +4248,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // table in pokemon-forms.ts carries PreMove triggers gated on this
       // ability (Damaging → Attack, Recover → Defense, other status → Speed).
       // The ability itself is a pure marker — no AbAttr behavior to attach.
-      return ok([]);
+      return ok([
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.DNA_SCRAMBLE_FORM_CHANGE,
+          "Change Deoxys form based on the selected move",
+          "before-move-form-change",
+          "Before using a move",
+        ),
+      ]);
     case 813:
       // Mixed Martial Arts — "Normal moves are flagged as Punch + Kick moves."
       // The holder's Normal moves gain the PUNCHING + KICKING flags (so Iron
@@ -4246,7 +4273,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // recharge." Signature rider: on hitting with Roar of Time, set the
       // target's ability to Slow Start. (The BP/priority/no-recharge stat
       // tweaks are Roar-of-Time move-data overrides handled in the move layer.)
-      return ok([new SetTargetAbilityOnMoveAbAttr(MoveId.ROAR_OF_TIME, AbilityId.SLOW_START)]);
+      return ok([
+        new SetTargetAbilityOnMoveAbAttr(MoveId.ROAR_OF_TIME, AbilityId.SLOW_START),
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.TEMPORAL_RUPTURE_ROAR_OF_TIME,
+          "Make Roar of Time 100 power at normal priority without forcing a switch",
+          "roar-of-time-move-calculation",
+          "When using Roar of Time",
+        ),
+      ]);
     case 834:
       // Toxic Surge — "Sets Toxic Terrain on entry." Sets the ER-custom Toxic
       // Terrain (boosts Poison moves + chips grounded non-Poison mons) for 8
@@ -5061,7 +5096,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // weather: Solar moves charge instantly, Growth gives +2, Weather Ball
       // becomes Fire-type, Moonlight/Synthesis/Morning Sun recover 2/3. The
       // ability itself is a pure marker.
-      return ok([]);
+      return ok([
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.CHLOROPLAST_SUN_MOVES,
+          "Make Weather Ball, solar moves, Growth, and recovery moves act as if used in sun",
+          "sun-sensitive-move-calculation",
+          "When using a sun-sensitive move",
+        ),
+      ]);
     // -------------------------------------------------------------------------
     // Round 14 — defensive / utility / type-cluster wires
     // -------------------------------------------------------------------------
@@ -5486,7 +5528,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 592:
       // Minion Control — "Moves hit an extra time for each healthy party
       // member (max 6 hits)." +1 hit per non-fainted, unstatused party member.
-      return ok([new PartyCountMultiHitAbAttr(6)]);
+      return ok([
+        new PartyCountMultiHitAbAttr(6),
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.MINION_CONTROL_HIT_POWER,
+          "Make each additional Minion Control hit deal 10% damage",
+          "multi-hit-damage-calculation",
+          "When calculating an additional Minion Control hit",
+        ),
+      ]);
     case 602:
       // Lawnmower — "Removes terrain on switch-in. Stat up if terrain
       // removed." Terrain-clear on entry needs Lawnmower primitive. Defer.
@@ -7398,7 +7448,15 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // ability id (#449). SkipChargeTurnAbAttr is kept as a harmless registration
       // marker + belt-and-braces tag clear; the PreAttack approach alone never
       // skipped the charge turn.
-      return ok([new SkipChargeTurnAbAttr()]);
+      return ok([
+        new SkipChargeTurnAbAttr(),
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.ACCELERATE_CHARGE_SKIP,
+          "Skip the charge turn of charging moves",
+          "charging-move-resolution",
+          "When using a charging move",
+        ),
+      ]);
     case 515:
       // Retriever — "Retrieves its original held item on switch-out if it is
       // not currently holding one." The snapshot attr records the entry item on
@@ -7621,7 +7679,15 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       ]);
     case 866:
       // Relic Stone — "Other battlers don't benefit from STAB."
-      return ok([new StabSuppressAuraAbAttr()]);
+      return ok([
+        new StabSuppressAuraAbAttr(),
+        new AbilityStudioRuntimeCapabilityAbAttr(
+          ABILITY_STUDIO_RUNTIME_CAPABILITIES.RELIC_STONE_STAB_SUPPRESSION,
+          "Suppress STAB for every other battler",
+          "field-stab-calculation",
+          "When another battler's STAB is calculated",
+        ),
+      ]);
     case 880:
       // Paint Shot — "Mega launcher moves change the target's type to the move
       // used." This is OFFENSIVE (the holder's pulse moves repaint the FOE), so

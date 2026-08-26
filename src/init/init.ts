@@ -4,8 +4,10 @@ import { initAbilities } from "#abilities/init-abilities";
 import { initPokemonPrevolutions, initPokemonStarters } from "#balance/pokemon-evolutions";
 import { initSpecies } from "#balance/pokemon-species";
 import { initChallenges } from "#data/challenge";
+import { allAbilities } from "#data/data-lists";
 import { initTrainerTypeDialogue } from "#data/dialogue";
 import { wireEliteReduxManualComposites } from "#data/elite-redux/abilities/composite-newcomers";
+import { installAbilityStudioSourceAbilityComponents } from "#data/elite-redux/ability-studio/runtime-components";
 import {
   applyErFakemonPitchEggMoves,
   applyErFakemonPitchLearnsets,
@@ -21,6 +23,7 @@ import {
   injectErNewcomerSpecies,
 } from "#data/elite-redux/er-newcomer-species";
 import { applyErTypeNativization } from "#data/elite-redux/er-type-nativization";
+import { initEditorAuthoredAbilities } from "#data/elite-redux/init-editor-authored-abilities";
 import { initEliteReduxAbilityUpgrades } from "#data/elite-redux/init-elite-redux-ability-upgrades";
 import {
   initEliteReduxCSourceCorrections,
@@ -278,6 +281,13 @@ function initPhaseErSpritesRebalance(): void {
   console.info(
     `[er-ability-upgrades] applied ${abilityUpgradeResult.applied} upgrades${abilityUpgradeResult.missingDraftIds.length > 0 ? ` (${abilityUpgradeResult.missingDraftIds.length} missing draft ids)` : ""}`,
   );
+  installAbilityStudioSourceAbilityComponents(allAbilities);
+  const editorAbilityResult = initEditorAuthoredAbilities();
+  installAbilityStudioSourceAbilityComponents(allAbilities);
+  if (editorAbilityResult.errors.length > 0) {
+    console.warn("[er-editor-abilities] issues:", editorAbilityResult.errors);
+  }
+  console.info(`[er-editor-abilities] registered ${editorAbilityResult.registered} staff-authored abilities`);
 }
 
 function initPhaseErTrainersForms(): void {

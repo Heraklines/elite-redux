@@ -1,13 +1,12 @@
 import { globalScene } from "#app/global-scene";
 import { MoveChargeAnim } from "#data/battle-anims";
 import { erTryQuickeningGrace } from "#data/elite-redux/abilities/quickening-grace";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erRecordAchievementChargeMove } from "#data/elite-redux/er-achievement-tracker";
 import { erTryConsumePowerHerb } from "#data/elite-redux/er-community-items";
-import type { AbilityId } from "#enums/ability-id";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
-import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
 import { MoveResult } from "#enums/move-result";
 import type { MoveUseMode } from "#enums/move-use-mode";
@@ -97,7 +96,10 @@ export class MoveChargePhase extends PokemonPhase {
     // used instantly"): the holder skips EVERY charge turn, free. Handled here at
     // the real charge-resolution point (the same hook Power Herb uses) - the prior
     // PreAttack tag-removal approach never actually skipped the charge.
-    if (!instantCharge.value && user?.hasAbility(ErAbilityId.ACCELERATE as unknown as AbilityId)) {
+    if (
+      !instantCharge.value
+      && user?.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.ACCELERATE_CHARGE_SKIP)
+    ) {
       instantCharge.value = true;
     }
 

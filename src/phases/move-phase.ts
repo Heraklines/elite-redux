@@ -8,13 +8,13 @@ import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
 import { sleepingInBlocksMove } from "#data/elite-redux/abilities/fakemon-pitch-mechanics";
 import { erLibraryRecordFoeMove } from "#data/elite-redux/abilities/library";
 import { erOmniformOnMoveStart } from "#data/elite-redux/abilities/omniform";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import {
   isCoopRecording,
   recordCoopEvent,
   withCoopMessageRecordingSuppressed,
 } from "#data/elite-redux/coop/coop-turn-recorder";
 import { consumeErEndlessMoveCost } from "#data/elite-redux/er-endless-rift-runtime";
-import { FAKEMON_PITCH_RUNTIME_ABILITY_IDS } from "#data/elite-redux/fakemon-pitch-runtime-ids";
 import {
   notifyMoodyFormationMoveAttempt,
   notifyMoodyFormationMoveResolved,
@@ -414,7 +414,9 @@ export class MovePhase extends PokemonPhase {
     const hasBurnFatigueAura = globalScene
       .getField(true)
       .some(
-        holder => !holder.isFainted() && holder.hasAbility(FAKEMON_PITCH_RUNTIME_ABILITY_IDS.BURN_FATIGUE as AbilityId),
+        holder =>
+          !holder.isFainted()
+          && holder.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.BURN_FATIGUE_ACTION_FAILURE),
       );
     if (
       this.useMode === MoveUseMode.INDIRECT

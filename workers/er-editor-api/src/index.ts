@@ -462,6 +462,563 @@ function validateSpeciesAbilitiesDelta(delta: unknown): ValidationResult {
   return { ok: true };
 }
 
+const ABILITY_STUDIO_TRIGGERS = new Set([
+  "on-entry",
+  "after-attack",
+  "after-hit",
+  "after-ko",
+  "end-turn",
+  "after-faint",
+]);
+const ABILITY_STUDIO_TARGETS = new Set(["holder", "other", "holder-side", "opposing-side"]);
+const ABILITY_STUDIO_STATS = new Set(["ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"]);
+const ABILITY_STUDIO_STAT_MULTIPLIER_STATS = new Set(["ATK", "DEF", "SPATK", "SPDEF", "SPD"]);
+const ABILITY_STUDIO_STATUSES = new Set(["POISON", "TOXIC", "PARALYSIS", "SLEEP", "FREEZE", "BURN"]);
+const ABILITY_STUDIO_TYPES = new Set([
+  "NORMAL",
+  "FIGHTING",
+  "FLYING",
+  "POISON",
+  "GROUND",
+  "ROCK",
+  "BUG",
+  "GHOST",
+  "STEEL",
+  "FIRE",
+  "WATER",
+  "GRASS",
+  "ELECTRIC",
+  "PSYCHIC",
+  "ICE",
+  "DRAGON",
+  "DARK",
+  "FAIRY",
+  "STELLAR",
+]);
+const ABILITY_STUDIO_CATEGORIES = new Set(["PHYSICAL", "SPECIAL", "STATUS"]);
+const ABILITY_STUDIO_MOVE_FLAGS = new Set([
+  "MAKES_CONTACT",
+  "SOUND_BASED",
+  "BITING_MOVE",
+  "PULSE_MOVE",
+  "PUNCHING_MOVE",
+  "SLICING_MOVE",
+  "RECKLESS_MOVE",
+  "BALLBOMB_MOVE",
+  "POWDER_MOVE",
+  "DANCE_MOVE",
+  "WIND_MOVE",
+  "TRIAGE_MOVE",
+  "AIR_BASED",
+  "ARROW_BASED",
+  "BONE_BASED",
+  "DRILL_BASED",
+  "FIELD_BASED",
+  "HAMMER_BASED",
+  "HORN_BASED",
+  "KICKING_MOVE",
+  "LUNAR_MOVE",
+  "THROW_BASED",
+  "WEATHER_BASED",
+]);
+const ABILITY_STUDIO_WEATHERS = new Set([
+  "NONE",
+  "SUNNY",
+  "RAIN",
+  "SANDSTORM",
+  "HAIL",
+  "SNOW",
+  "FOG",
+  "HEAVY_RAIN",
+  "HARSH_SUN",
+  "STRONG_WINDS",
+  "TEMPEST_STORM",
+  "SNOWY_WRATH",
+  "EERIE_FOG",
+]);
+const ABILITY_STUDIO_TERRAINS = new Set(["NONE", "MISTY", "ELECTRIC", "GRASSY", "PSYCHIC", "TOXIC"]);
+
+function isStudioEnum(value: unknown, values: ReadonlySet<string>): value is string {
+  return typeof value === "string" && values.has(value);
+}
+
+function validateStudioMoveFilter(value: unknown, path: string): string | null {
+  if (!isPlainObject(value) || Object.keys(value).length === 0) {
+    return `${path}: move filter must be a non-empty object`;
+  }
+  for (const [key, member] of Object.entries(value)) {
+    if (key === "type" && !isStudioEnum(member, ABILITY_STUDIO_TYPES)) {
+      return `${path}.type: invalid type`;
+    }
+    if (key === "category" && !isStudioEnum(member, ABILITY_STUDIO_CATEGORIES)) {
+      return `${path}.category: invalid category`;
+    }
+    if (key === "flag" && !isStudioEnum(member, ABILITY_STUDIO_MOVE_FLAGS)) {
+      return `${path}.flag: invalid move family`;
+    }
+    if (key === "damaging" && typeof member !== "boolean") {
+      return `${path}.damaging: must be boolean`;
+    }
+    if (!["type", "category", "flag", "damaging"].includes(key)) {
+      return `${path}.${key}: unsupported filter`;
+    }
+  }
+  return null;
+}
+
+function validateStudioCondition(value: unknown, path: string): string | null {
+  if (!isPlainObject(value) || typeof value.kind !== "string") {
+    return `${path}: invalid condition`;
+  }
+  if (value.kind === "holder-hp") {
+    const min = value.minPercent;
+    const max = value.maxPercent;
+    if (min === undefined && max === undefined) {
+      return `${path}: HP condition needs a bound`;
+    }
+    if (min !== undefined && (typeof min !== "number" || min < 0 || min > 100)) {
+      return `${path}.minPercent: must be 0-100`;
+    }
+    if (max !== undefined && (typeof max !== "number" || max < 0 || max > 100)) {
+      return `${path}.maxPercent: must be 0-100`;
+    }
+    if (typeof min === "number" && typeof max === "number" && min > max) {
+      return `${path}: minimum exceeds maximum`;
+    }
+    return null;
+  }
+  if (value.kind === "holder-status" || value.kind === "other-status") {
+    return value.status === "NONE" || isStudioEnum(value.status, ABILITY_STUDIO_STATUSES)
+      ? null
+      : `${path}.status: invalid status`;
+  }
+  if (value.kind === "weather") {
+    return isStudioEnum(value.weather, ABILITY_STUDIO_WEATHERS) ? null : `${path}.weather: invalid weather`;
+  }
+  if (value.kind === "terrain") {
+    return isStudioEnum(value.terrain, ABILITY_STUDIO_TERRAINS) ? null : `${path}.terrain: invalid terrain`;
+  }
+  if (value.kind === "move") {
+    return validateStudioMoveFilter(value.filter, `${path}.filter`);
+  }
+  return `${path}.kind: unsupported condition`;
+}
+
+function validateStudioEffect(value: unknown, trigger: string, path: string): string | null {
+  if (!isPlainObject(value) || typeof value.kind !== "string") {
+    return `${path}: invalid effect`;
+  }
+  if (["stat-stage", "status", "heal-percent", "cure-status"].includes(value.kind)) {
+    if (!isStudioEnum(value.target, ABILITY_STUDIO_TARGETS)) {
+      return `${path}.target: invalid target`;
+    }
+    if (value.target === "other" && (trigger === "on-entry" || trigger === "end-turn")) {
+      return `${path}.target: trigger has no other Pokemon`;
+    }
+  }
+  if (value.kind === "stat-stage") {
+    if (!isStudioEnum(value.stat, ABILITY_STUDIO_STATS)) {
+      return `${path}.stat: invalid stat`;
+    }
+    if (!Number.isInteger(value.stages) || (value.stages as number) === 0 || Math.abs(value.stages as number) > 6) {
+      return `${path}.stages: must be a non-zero integer from -6 to 6`;
+    }
+    return null;
+  }
+  if (value.kind === "status") {
+    return isStudioEnum(value.status, ABILITY_STUDIO_STATUSES) ? null : `${path}.status: invalid status`;
+  }
+  if (value.kind === "heal-percent") {
+    return typeof value.percent === "number" && value.percent >= 1 && value.percent <= 100
+      ? null
+      : `${path}.percent: must be 1-100`;
+  }
+  if (value.kind === "cure-status") {
+    return value.status === "ANY" || isStudioEnum(value.status, ABILITY_STUDIO_STATUSES)
+      ? null
+      : `${path}.status: invalid status`;
+  }
+  if (value.kind === "set-weather") {
+    return isStudioEnum(value.weather, ABILITY_STUDIO_WEATHERS) ? null : `${path}.weather: invalid weather`;
+  }
+  if (value.kind === "set-terrain") {
+    return isStudioEnum(value.terrain, ABILITY_STUDIO_TERRAINS) ? null : `${path}.terrain: invalid terrain`;
+  }
+  return `${path}.kind: unsupported effect`;
+}
+
+function validateStudioRule(value: unknown, path: string): string | null {
+  if (!isPlainObject(value)) {
+    return `${path}: rule must be an object`;
+  }
+  if (typeof value.key !== "string" || !/^[a-z0-9-]{1,40}$/.test(value.key)) {
+    return `${path}.key: invalid rule key`;
+  }
+  if (!isStudioEnum(value.trigger, ABILITY_STUDIO_TRIGGERS)) {
+    return `${path}.trigger: invalid trigger`;
+  }
+  if (typeof value.chance !== "number" || value.chance < 1 || value.chance > 100) {
+    return `${path}.chance: must be 1-100`;
+  }
+  if (value.conditionLogic !== undefined && !["all", "any"].includes(value.conditionLogic as string)) {
+    return `${path}.conditionLogic: must be all or any`;
+  }
+  if (!Array.isArray(value.conditions) || value.conditions.length > 8) {
+    return `${path}.conditions: must contain at most 8 entries`;
+  }
+  if (!Array.isArray(value.effects) || value.effects.length === 0 || value.effects.length > 8) {
+    return `${path}.effects: must contain 1-8 entries`;
+  }
+  if (
+    (value.trigger === "on-entry" || value.trigger === "after-ko" || value.trigger === "end-turn")
+    && value.conditions.some(
+      condition =>
+        isPlainObject(condition)
+        && (condition.kind === "move"
+          || ((value.trigger === "on-entry" || value.trigger === "end-turn") && condition.kind === "other-status")),
+    )
+  ) {
+    return `${path}: trigger does not provide the selected condition context`;
+  }
+  for (let index = 0; index < value.conditions.length; index++) {
+    const error = validateStudioCondition(value.conditions[index], `${path}.conditions[${index}]`);
+    if (error) {
+      return error;
+    }
+  }
+  for (let index = 0; index < value.effects.length; index++) {
+    const error = validateStudioEffect(value.effects[index], value.trigger, `${path}.effects[${index}]`);
+    if (error) {
+      return error;
+    }
+  }
+  return null;
+}
+
+function validateStudioModifier(value: unknown, path: string): string | null {
+  if (!isPlainObject(value) || typeof value.kind !== "string") {
+    return `${path}: invalid modifier`;
+  }
+  if (value.kind === "stat-multiplier") {
+    if (!isStudioEnum(value.stat, ABILITY_STUDIO_STAT_MULTIPLIER_STATS)) {
+      return `${path}.stat: invalid stat`;
+    }
+    return typeof value.multiplier === "number" && value.multiplier >= 0.1 && value.multiplier <= 4
+      ? null
+      : `${path}.multiplier: must be 0.1-4`;
+  }
+  if (value.kind === "priority") {
+    if (!Number.isInteger(value.amount) || (value.amount as number) === 0 || Math.abs(value.amount as number) > 7) {
+      return `${path}.amount: must be a non-zero integer from -7 to 7`;
+    }
+    return validateStudioMoveFilter(value.filter, `${path}.filter`);
+  }
+  if (value.kind === "move-power" || value.kind === "received-damage") {
+    if (typeof value.multiplier !== "number" || value.multiplier < 0.1 || value.multiplier > 4) {
+      return `${path}.multiplier: must be 0.1-4`;
+    }
+    return validateStudioMoveFilter(value.filter, `${path}.filter`);
+  }
+  return `${path}.kind: unsupported modifier`;
+}
+
+function validateRuntimeComponentSource(value: unknown, path: string, ownId: number): string | null {
+  if (
+    !isPlainObject(value)
+    || !Number.isInteger(value.abilityId)
+    || (value.abilityId as number) <= 0
+    || value.abilityId === ownId
+    || !Number.isInteger(value.attrIndex)
+    || (value.attrIndex as number) < 0
+    || (value.attrIndex as number) > 1023
+    || typeof value.attrType !== "string"
+    || !/^[A-Za-z0-9_]{2,120}$/.test(value.attrType)
+  ) {
+    return `${path}: invalid component source`;
+  }
+  return null;
+}
+
+function validateRuntimeComponentRule(value: unknown, path: string, ownId: number): string | null {
+  if (!isPlainObject(value)) {
+    return `${path}: must be an object`;
+  }
+  if (typeof value.key !== "string" || !/^[a-z0-9-]{1,48}$/.test(value.key)) {
+    return `${path}.key: invalid`;
+  }
+  if (value.prerequisiteHooks !== undefined && !Array.isArray(value.prerequisiteHooks)) {
+    return `${path}.prerequisiteHooks: must be an array`;
+  }
+  if (Array.isArray(value.prerequisiteHooks)) {
+    if (value.prerequisiteHooks.length > 7) {
+      return `${path}.prerequisiteHooks: must contain at most 7 entries`;
+    }
+    for (let index = 0; index < value.prerequisiteHooks.length; index++) {
+      const sourceError = validateRuntimeComponentSource(
+        value.prerequisiteHooks[index],
+        `${path}.prerequisiteHooks[${index}]`,
+        ownId,
+      );
+      if (sourceError) {
+        return sourceError;
+      }
+    }
+  }
+  const hookError = validateRuntimeComponentSource(value.hook, `${path}.hook`, ownId);
+  if (hookError) {
+    return hookError;
+  }
+  if (typeof value.chance !== "number" || value.chance < 1 || value.chance > 100) {
+    return `${path}.chance: must be 1-100`;
+  }
+  if (value.conditionLogic !== undefined && !["all", "any"].includes(value.conditionLogic as string)) {
+    return `${path}.conditionLogic: must be all or any`;
+  }
+  if (!Array.isArray(value.conditions) || value.conditions.length > 16) {
+    return `${path}.conditions: must contain at most 16 entries`;
+  }
+  for (let index = 0; index < value.conditions.length; index++) {
+    const condition = value.conditions[index];
+    const sourceError = validateRuntimeComponentSource(condition, `${path}.conditions[${index}]`, ownId);
+    if (sourceError) {
+      return sourceError;
+    }
+    if (!isPlainObject(condition) || !["ability", "holder", "event"].includes(condition.kind as string)) {
+      return `${path}.conditions[${index}].kind: invalid`;
+    }
+    if (
+      condition.kind === "ability"
+      && (!Number.isInteger(condition.conditionIndex)
+        || (condition.conditionIndex as number) < 0
+        || (condition.conditionIndex as number) > 63)
+    ) {
+      return `${path}.conditions[${index}].conditionIndex: invalid`;
+    }
+  }
+  if (!Array.isArray(value.effects) || value.effects.length === 0 || value.effects.length > 8) {
+    return `${path}.effects: must contain 1-8 entries`;
+  }
+  for (let index = 0; index < value.effects.length; index++) {
+    const sourceError = validateRuntimeComponentSource(value.effects[index], `${path}.effects[${index}]`, ownId);
+    if (sourceError) {
+      return sourceError;
+    }
+  }
+  return null;
+}
+
+function validateCustomAbilitiesDelta(delta: unknown): ValidationResult {
+  if (!isPlainObject(delta)) {
+    return { ok: false, error: "delta must be an object" };
+  }
+  const ids = new Set<number>();
+  const names = new Set<string>();
+  const abilities = new Map<number, Record<string, unknown>>();
+  for (const [key, value] of Object.entries(delta)) {
+    if (!/^[a-z0-9-]{2,48}$/.test(key)) {
+      return { ok: false, error: `${key}: invalid ability key` };
+    }
+    if (value === null) {
+      continue;
+    }
+    if (!isPlainObject(value)) {
+      return { ok: false, error: `${key}: ability must be an object or null` };
+    }
+    if (value.version !== 1) {
+      return { ok: false, error: `${key}.version: must be 1` };
+    }
+    if (!Number.isInteger(value.id) || (value.id as number) < 20000 || (value.id as number) > 29999) {
+      return { ok: false, error: `${key}.id: must be 20000-29999` };
+    }
+    if (ids.has(value.id as number)) {
+      return { ok: false, error: `${key}.id: duplicate id in save` };
+    }
+    ids.add(value.id as number);
+    if (typeof value.name !== "string" || value.name.trim().length < 2 || value.name.length > 40) {
+      return { ok: false, error: `${key}.name: must be 2-40 characters` };
+    }
+    const normalizedName = value.name.trim().toLowerCase();
+    if (names.has(normalizedName)) {
+      return { ok: false, error: `${key}.name: duplicate name in save` };
+    }
+    names.add(normalizedName);
+    if (
+      typeof value.description !== "string"
+      || value.description.trim().length < 2
+      || value.description.length > 500
+    ) {
+      return { ok: false, error: `${key}.description: must be 2-500 characters` };
+    }
+    if (!Number.isInteger(value.generation) || (value.generation as number) < 1 || (value.generation as number) > 9) {
+      return { ok: false, error: `${key}.generation: must be 1-9` };
+    }
+    if (
+      !Array.isArray(value.includes)
+      || value.includes.length > 12
+      || value.includes.some(id => !Number.isInteger(id) || (id as number) <= 0 || id === value.id)
+    ) {
+      return { ok: false, error: `${key}.includes: invalid ability ids` };
+    }
+    if (
+      value.mechanics !== undefined
+      && (!Array.isArray(value.mechanics)
+        || value.mechanics.length > 64
+        || value.mechanics.some(
+          mechanic =>
+            !isPlainObject(mechanic)
+            || !Number.isInteger(mechanic.abilityId)
+            || (mechanic.abilityId as number) <= 0
+            || mechanic.abilityId === value.id
+            || !Number.isInteger(mechanic.attrIndex)
+            || (mechanic.attrIndex as number) < 0
+            || (mechanic.attrIndex as number) > 1023
+            || typeof mechanic.attrType !== "string"
+            || !/^[A-Za-z0-9_]{2,120}$/.test(mechanic.attrType),
+        ))
+    ) {
+      return { ok: false, error: `${key}.mechanics: invalid runtime mechanic references` };
+    }
+    if (Array.isArray(value.mechanics)) {
+      const mechanicKeys = value.mechanics.map(mechanic => {
+        const reference = mechanic as Record<string, unknown>;
+        return `${reference.abilityId}:${reference.attrIndex}:${reference.attrType}`;
+      });
+      if (new Set(mechanicKeys).size !== mechanicKeys.length) {
+        return { ok: false, error: `${key}.mechanics: duplicate runtime mechanic reference` };
+      }
+    }
+    if (value.componentRules !== undefined && !Array.isArray(value.componentRules)) {
+      return { ok: false, error: `${key}.componentRules: must be an array` };
+    }
+    if (Array.isArray(value.componentRules)) {
+      if (value.componentRules.length > 32) {
+        return { ok: false, error: `${key}.componentRules: must contain at most 32 entries` };
+      }
+      const componentRuleKeys = new Set<string>();
+      for (let index = 0; index < value.componentRules.length; index++) {
+        const error = validateRuntimeComponentRule(
+          value.componentRules[index],
+          `${key}.componentRules[${index}]`,
+          value.id as number,
+        );
+        if (error) {
+          return { ok: false, error };
+        }
+        const ruleKey = (value.componentRules[index] as Record<string, unknown>).key as string;
+        if (componentRuleKeys.has(ruleKey)) {
+          return { ok: false, error: `${key}.componentRules[${index}].key: duplicate rule key` };
+        }
+        componentRuleKeys.add(ruleKey);
+      }
+    }
+    if (!Array.isArray(value.rules) || value.rules.length > 24) {
+      return { ok: false, error: `${key}.rules: must contain at most 24 entries` };
+    }
+    if (!Array.isArray(value.modifiers) || value.modifiers.length > 24) {
+      return { ok: false, error: `${key}.modifiers: must contain at most 24 entries` };
+    }
+    if (
+      value.includes.length
+        + (Array.isArray(value.mechanics) ? value.mechanics.length : 0)
+        + (Array.isArray(value.componentRules) ? value.componentRules.length : 0)
+        + value.rules.length
+        + value.modifiers.length
+      === 0
+    ) {
+      return { ok: false, error: `${key}: add an include, component rule, mechanic, rule, or modifier` };
+    }
+    const ruleKeys = new Set<string>();
+    for (let index = 0; index < value.rules.length; index++) {
+      const error = validateStudioRule(value.rules[index], `${key}.rules[${index}]`);
+      if (error) {
+        return { ok: false, error };
+      }
+      const ruleKey = (value.rules[index] as Record<string, unknown>).key as string;
+      if (ruleKeys.has(ruleKey)) {
+        return { ok: false, error: `${key}.rules[${index}].key: duplicate rule key` };
+      }
+      ruleKeys.add(ruleKey);
+    }
+    for (let index = 0; index < value.modifiers.length; index++) {
+      const error = validateStudioModifier(value.modifiers[index], `${key}.modifiers[${index}]`);
+      if (error) {
+        return { ok: false, error };
+      }
+    }
+    if (
+      value.flags !== undefined
+      && (!isPlainObject(value.flags)
+        || Object.entries(value.flags).some(
+          ([flag, enabled]) =>
+            !["bypassFaint", "ignorable", "unsuppressable", "uncopiable", "unreplaceable"].includes(flag)
+            || typeof enabled !== "boolean",
+        ))
+    ) {
+      return { ok: false, error: `${key}.flags: invalid ability flags` };
+    }
+    abilities.set(value.id as number, value);
+  }
+  const finished = new Set<number>();
+  const visit = (id: number, stack: Set<number>): boolean => {
+    if (stack.has(id)) {
+      return false;
+    }
+    if (finished.has(id)) {
+      return true;
+    }
+    const ability = abilities.get(id);
+    if (!ability) {
+      return true;
+    }
+    const next = new Set(stack);
+    next.add(id);
+    const referencedIds = [
+      ...(ability.includes as number[]),
+      ...((ability.mechanics as Record<string, unknown>[] | undefined)?.map(mechanic => mechanic.abilityId as number)
+        ?? []),
+      ...((ability.componentRules as Record<string, unknown>[] | undefined)?.flatMap(rule => [
+        ...((rule.prerequisiteHooks as Record<string, unknown>[] | undefined)?.map(hook => hook.abilityId as number)
+          ?? []),
+        (rule.hook as Record<string, unknown>).abilityId as number,
+        ...(rule.conditions as Record<string, unknown>[]).map(condition => condition.abilityId as number),
+        ...(rule.effects as Record<string, unknown>[]).map(effect => effect.abilityId as number),
+      ]) ?? []),
+    ];
+    for (const referencedId of referencedIds) {
+      if (!visit(referencedId, next)) {
+        return false;
+      }
+    }
+    finished.add(id);
+    return true;
+  };
+  for (const id of abilities.keys()) {
+    if (!visit(id, new Set())) {
+      return { ok: false, error: `ability ${id}: reference cycle` };
+    }
+  }
+  for (const [id, ability] of abilities) {
+    const referencedIds = [
+      ...(ability.includes as number[]),
+      ...((ability.mechanics as Record<string, unknown>[] | undefined)?.map(mechanic => mechanic.abilityId as number)
+        ?? []),
+      ...((ability.componentRules as Record<string, unknown>[] | undefined)?.flatMap(rule => [
+        ...((rule.prerequisiteHooks as Record<string, unknown>[] | undefined)?.map(hook => hook.abilityId as number)
+          ?? []),
+        (rule.hook as Record<string, unknown>).abilityId as number,
+        ...(rule.conditions as Record<string, unknown>[]).map(condition => condition.abilityId as number),
+        ...(rule.effects as Record<string, unknown>[]).map(effect => effect.abilityId as number),
+      ]) ?? []),
+    ];
+    for (const referencedId of referencedIds) {
+      if (referencedId >= 20000 && referencedId <= 29999 && !abilities.has(referencedId)) {
+        return { ok: false, error: `ability ${id}: referenced custom ability ${referencedId} does not exist` };
+      }
+    }
+  }
+  return { ok: true };
+}
+
 /** The ONLY repo paths this Worker will ever write. */
 const EDITABLE_FILES: Record<string, EditableFile> = {
   "egg-moves": {
@@ -518,6 +1075,11 @@ const EDITABLE_FILES: Record<string, EditableFile> = {
     path: "src/data/elite-redux/er-species-abilities.json",
     label: "species abilities",
     validate: validateSpeciesAbilitiesDelta,
+  },
+  "custom-abilities": {
+    path: "src/data/elite-redux/er-custom-abilities.json",
+    label: "custom abilities",
+    validate: validateCustomAbilitiesDelta,
   },
 };
 
@@ -1206,6 +1768,12 @@ async function handleSave(body: SaveBody, env: Env): Promise<Response> {
   }
 
   const merged = sortKeysDeep(deepMerge(existing, body.delta)) as Record<string, unknown>;
+  if (body.file === "custom-abilities") {
+    const mergedValidation = validateCustomAbilitiesDelta(merged);
+    if (!mergedValidation.ok) {
+      return json({ ok: false, error: mergedValidation.error }, 400, env);
+    }
+  }
   const content = `${JSON.stringify(merged, null, 2)}\n`;
 
   const author = typeof body.author === "string" ? body.author.slice(0, 40).replace(/[^\w .-]/g, "") : "";

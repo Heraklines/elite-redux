@@ -43,6 +43,8 @@ import type { AbBuilder } from "#abilities/ability";
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { StatDebuffOnFlagAttackAbAttr } from "#data/elite-redux/abilities/stat-debuff-on-flag-attack";
+import { ABILITY_STUDIO_RUNTIME_CAPABILITIES } from "#data/elite-redux/ability-studio/runtime-capabilities";
+import { AbilityStudioRuntimeCapabilityAbAttr } from "#data/elite-redux/ability-studio/runtime-components";
 import {
   claimSummonAbilityProvenance,
   hasSummonAbilityProvenance,
@@ -100,10 +102,12 @@ import {
   ER_BLIND_JUSTICE_ABILITY_ID,
   ER_BOOBY_TRAP_ABILITY_ID,
   ER_BRIBERY_ABILITY_ID,
+  ER_BURN_FATIGUE_ABILITY_ID,
   ER_CELESTIAL_JELLY_ABILITY_ID,
   ER_CONFECTIOUS_ABILITY_ID,
   ER_CONTAMINATED_ABILITY_ID,
   ER_CYBERKINETIC_ABILITY_ID,
+  ER_DEADLY_SENTENCING_ABILITY_ID,
   ER_DECAY_ABILITY_ID,
   ER_DOGGED_JAW_ABILITY_ID,
   ER_ELECTRIFIED_ABILITY_ID,
@@ -729,14 +733,14 @@ export class PerpetualMotionPowerAbAttr extends VariableMovePowerAbAttr {
   }
 }
 
-function hasPitchAbility(pokemon: Pokemon, abilityId: number): boolean {
-  return pokemon.getActiveAbilitySources().some(source => source.ability.id === abilityId);
-}
-
 function isReapAndSowSunActive(pokemon: Pokemon): boolean {
   return (
     globalScene.arena.terrain?.terrainType === TerrainType.GRASSY
-    && globalScene.getField(true).some(fieldPokemon => hasPitchAbility(fieldPokemon, ER_REAP_AND_SOW_ABILITY_ID))
+    && globalScene
+      .getField(true)
+      .some(fieldPokemon =>
+        fieldPokemon.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.REAP_AND_SOW_SUN),
+      )
     && !pokemon.isFainted()
   );
 }
@@ -754,7 +758,10 @@ function isSleepInducingMove(move: Move): boolean {
 }
 
 export function sleepingInBlocksMove(user: Pokemon, move: Move): boolean {
-  if (!hasPitchAbility(user, ER_SLEEPING_IN_ABILITY_ID) || !isSleepInducingMove(move)) {
+  if (
+    !user.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.SLEEPING_IN_REPEAT_BLOCK)
+    || !isSleepInducingMove(move)
+  ) {
     return false;
   }
   const previous = user.getLastNonVirtualMove();
@@ -767,7 +774,7 @@ export function sleepingInMove(move: Move): boolean {
 
 export function spatialMagicWouldSwitch(holder: Pokemon, attacker: Pokemon, move: Move): boolean {
   if (
-    !hasPitchAbility(holder, ER_SPATIAL_MAGIC_ABILITY_ID)
+    !holder.hasAbilityStudioCapability(ABILITY_STUDIO_RUNTIME_CAPABILITIES.SPATIAL_MAGIC_SWITCH)
     || holder.isFainted()
     || attacker.isFainted()
     || (move.category !== MoveCategory.PHYSICAL && move.category !== MoveCategory.SPECIAL)
@@ -950,6 +957,40 @@ class SomniloquyPostTurnAbAttr extends PostTurnAbAttr {
 
 export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
   switch (id) {
+    case ER_DEADLY_SENTENCING_ABILITY_ID:
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.DEADLY_SENTENCING_SUPPRESSION,
+        "Suppress other Pokemon that know a Dark-type move",
+        "active-field-ability-suppression",
+        "While active on the field",
+      );
+      break;
+    case ER_BURN_FATIGUE_ABILITY_ID:
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.BURN_FATIGUE_ACTION_FAILURE,
+        "Give burned Pokemon a one-in-three chance to fail their action",
+        "before-burned-pokemon-acts",
+        "Before a burned Pokemon acts",
+      );
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.BURN_FATIGUE_DAMAGE,
+        "Make burned Pokemon take 33% more damage",
+        "burned-pokemon-damage-calculation",
+        "When a burned Pokemon takes damage",
+      );
+      break;
+    case ER_SPATIAL_MAGIC_ABILITY_ID:
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.SPATIAL_MAGIC_SWITCH,
+        "Switch both Pokemon before a direct hit would knock out the holder",
+        "before-lethal-direct-hit",
+        "Before an opposing direct hit would knock out the holder",
+      );
+      break;
     case ER_STELLARIZE_ABILITY_ID:
       builder.attr(StellarizeTypeAbAttr);
       builder.attr(StabAddAbAttr, { targetType: PokemonType.STELLAR });
@@ -958,12 +999,33 @@ export function wireFakemonPitchAbility(builder: AbBuilder, id: number): void {
     case ER_REAP_AND_SOW_ABILITY_ID:
       builder.attr(PostSummonTerrainChangeAbAttr, TerrainType.GRASSY);
       builder.attr(PostBiomeChangeTerrainChangeAbAttr, TerrainType.GRASSY);
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.REAP_AND_SOW_SUN,
+        "Make abilities and moves benefit as though sun were active during Grassy Terrain",
+        "grassy-terrain-sun-calculation",
+        "While Grassy Terrain is active",
+      );
       break;
     case ER_SERFDOM_ABILITY_ID:
       builder.attr(PostTurnRestoreBerryAbAttr, (pokemon: Pokemon) => (isReapAndSowSunActive(pokemon) ? 1 : 0.5));
       break;
     case ER_SLEEPING_IN_ABILITY_ID:
       builder.attr(SleepingInAccuracyAbAttr);
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.SLEEPING_IN_REPEAT_BLOCK,
+        "Prevent using the same sleep-inducing move twice in a row",
+        "before-sleep-move-selection",
+        "Before selecting a sleep-inducing move",
+      );
+      builder.attr(
+        AbilityStudioRuntimeCapabilityAbAttr,
+        ABILITY_STUDIO_RUNTIME_CAPABILITIES.SLEEPING_IN_YAWN_STYLE,
+        "Give sleep-inducing moves Yawn's delay and a one-turn sleep duration",
+        "sleep-move-resolution",
+        "When a sleep-inducing move resolves",
+      );
       break;
     case ER_HONK_SHOO_ABILITY_ID:
       builder.attr(StatusEffectImmunityAbAttr, ...getNonVolatileStatusEffects());
