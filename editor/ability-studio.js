@@ -135,24 +135,13 @@
     scheduleAiRefresh();
   }
 
-  function aiPassword() {
-    return String(callbacks.getPassword?.() || "").trim();
-  }
-
   async function aiRequest(path, body = {}, signal) {
     if (!aiEndpoint) {
       throw new Error("The Ability Builder service is not configured");
     }
-    const password = aiPassword();
-    if (!password) {
-      throw new Error("Enter the staff editor password first");
-    }
     const response = await fetch(`${aiEndpoint}${path}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Editor-Password": password,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
       signal,
     });

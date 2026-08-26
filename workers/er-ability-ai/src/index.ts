@@ -204,7 +204,7 @@ function withCors(response: Response, origin: string | null, env: Env): Response
     headers.set("Access-Control-Allow-Origin", origin);
     headers.set("Vary", "Origin");
   }
-  headers.set("Access-Control-Allow-Headers", "Content-Type, X-Editor-Password");
+  headers.set("Access-Control-Allow-Headers", "Content-Type");
   headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "no-referrer");
@@ -230,23 +230,11 @@ export default {
     if (!env.AUTH_ENCRYPTION_KEY) {
       return withCors(json({ error: "Ability builder secrets are not configured" }, 503), origin, env);
     }
-    const suppliedPassword = request.headers.get("X-Editor-Password") ?? "";
-    const authResponse = await fetch("https://er-editor-api.heraklines.workers.dev/auth-check", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: suppliedPassword }),
-    });
-    if (!authResponse.ok) {
-      const status = authResponse.status === 401 ? 401 : 503;
-      const error = status === 401 ? "Invalid editor password" : "Editor authentication is unavailable";
-      return withCors(json({ error }, status), origin, env);
-    }
     const contentLength = Number(request.headers.get("Content-Length") ?? 0);
     if (contentLength > 524_288) {
       return withCors(json({ error: "Ability builder request is too large" }, 413), origin, env);
     }
     const headers = new Headers(request.headers);
-    headers.delete("X-Editor-Password");
     headers.delete("Cookie");
     const internalRequest = new Request(request, { headers });
     const response = await getContainer(env.ABILITY_AI, "editor-primary").fetch(internalRequest);

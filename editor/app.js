@@ -6669,7 +6669,6 @@ async function init() {
         aiEndpoint: ABILITY_AI_URL,
         community: communityMode?.enabled,
         callbacks: {
-          getPassword: () => document.getElementById("password")?.value || "",
           onChange: refreshChrome,
           onCatalogChange: syncStudioAbilityCatalog,
           render,

@@ -3,7 +3,7 @@
   "name": "er-ability-ai",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-26",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "ALLOWED_ORIGINS": "https://er-editor.pages.dev,http://localhost:4176,http://127.0.0.1:4176,http://localhost:4174,http://127.0.0.1:4174",
     "CODEX_MODEL": "gpt-5.6-luna",
