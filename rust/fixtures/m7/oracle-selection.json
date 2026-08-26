@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "m7_base_sha": "93d0d047b4fefaea2033920047010214a8fcd5c0",
+  "m6_final_tag": "rust-kernel-m6-final",
+  "m6_gate_run_id": 33003637831,
+  "oracle_branch": "feat/elite-redux-port",
+  "oracle_sha": "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7",
+  "oracle_tree_sha": "51777137fd4bf6561f505fe0974960308b84869b",
+  "production_typescript_read_only": true
+}
