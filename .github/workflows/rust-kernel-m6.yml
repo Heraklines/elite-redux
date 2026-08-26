@@ -588,15 +588,166 @@ jobs:
           set -euo pipefail
           cargo test --workspace --all-targets
 
-  m6-g22-aggregate:
-    name: M6 G22 foundation aggregate
+  m6d-parity:
+    name: M6D parity ${{ matrix.surface }}
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - surface: moves
+            test: m6_move_parity
+          - surface: abilities
+            test: m6_ability_parity
+          - surface: items
+            test: m6_item_parity
+          - surface: field
+            test: m6_field_parity
+          - surface: species-forms
+            test: m6_species_form_parity
+          - surface: properties
+            test: m6_properties
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6d-${{ matrix.surface }}-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-${{ matrix.surface }}-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run exact M6D parity surface
+        working-directory: rust
+        run: cargo test -p er-testkit --test ${{ matrix.test }} -- --test-threads=1
+
+  m6d-campaigns:
+    name: M6D raw-key campaigns snapshots teardown
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6d-campaigns-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-campaigns-${{ runner.os }}-${{ runner.arch }}-
+            m6-g22-foundation-${{ runner.os }}-${{ runner.arch }}-
+      - name: Run deterministic M6 campaigns
+        working-directory: rust
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test -p er-testkit --test m6_solo_campaigns -- --test-threads=1
+          cargo test -p er-testkit --test m6_coop_campaigns -- --test-threads=1
+          cargo test -p er-testkit --test m6_snapshot_v5 -- --test-threads=1
+          cargo test -p er-testkit --test m6_native_wasm -- --test-threads=1
+          cargo test -p er-testkit --test m6_bespoke_closure -- --test-threads=1
+
+  m6d-wasm:
+    name: M6D wasm32 build and native boundary
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+            ~/.rustup/toolchains
+          key: m6d-wasm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-wasm-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install wasm32 target
+        run: rustup target add wasm32-unknown-unknown
+      - name: Build production Wasm boundary
+        working-directory: rust
+        env:
+          CARGO_BUILD_TARGET: wasm32-unknown-unknown
+        run: cargo check -p er-wasm
+      - name: Verify native side of identical boundary
+        working-directory: rust
+        run: cargo test -p er-testkit --test m6_native_wasm -- --test-threads=1
+
+  m6d-performance:
+    name: M6D release performance qualification
+    needs: m6-g22-foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /schemas/kernel/
+            /test/kernel-fixtures/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m6d-performance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+          restore-keys: |
+            m6d-performance-${{ runner.os }}-${{ runner.arch }}-
+      - name: Enforce release ceilings
+        working-directory: rust
+        env:
+          ER_M6_PERFORMANCE_ENFORCE: "1"
+        run: cargo test --release -p er-testkit --test m6_performance -- --test-threads=1
+
+  m6-g25-aggregate:
+    name: M6 G25 final aggregate
     needs:
       - m6-g22-foundation
       - m6-m0-m5-regression
       - m6-source-lock
       - m6-oracle-classification
       - m6-g21-oracle-bootstrap
+      - m6d-parity
+      - m6d-campaigns
+      - m6d-wasm
+      - m6d-performance
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - run: printf '%s\n' "M6 exact SHA $GITHUB_SHA passed G22 foundation and M0-M5 regression"
+      - run: printf '%s\n' "M6 exact SHA $GITHUB_SHA passed G25 final qualification"

@@ -8,7 +8,7 @@ use thiserror::Error;
 use crate::mechanics_condition::{
     ConditionEvaluationError, ConditionFacts, evaluate_condition_with_rng, evaluate_value,
 };
-use crate::mechanics_executor::{PlannedMechanicOperation, QueryExecutionPlan};
+use crate::mechanics_executor::QueryExecutionPlan;
 use crate::mechanics_selector::{
     SelectorEvaluationError, SelectorFacts, evaluate_selector_with_rng,
 };

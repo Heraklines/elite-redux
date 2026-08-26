@@ -41,14 +41,6 @@ use er_game::material::{
 };
 use er_game::runtime::BATTLE_START_SCHEMA_VERSION;
 use er_kernel::snapshot::RestorableKernelSnapshotV2;
-use er_kernel::snapshot_v3::{
-    GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3, GameRuntimeSnapshotV3, KernelDeterminismDigestV2,
-    MechanicalStateDigestV2, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3,
-    RestorableKernelSnapshotV3,
-};
-use er_kernel::snapshot_v4::{
-    RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4, RestorableKernelSnapshotV4,
-};
 use er_kernel::snapshot_v5::{PreparedContentIdentityV3, RestorableKernelSnapshotV5};
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
@@ -64,7 +56,6 @@ use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
 };
 use er_state::snapshot::GameState;
-use er_types::mechanics::{MECHANIC_STATE_SCHEMA_VERSION, MECHANICS_PROGRAM_VERSION};
 use serde_json::{Value, json};
 
 use er_battle::BattleNextDecision;
@@ -851,75 +842,6 @@ pub fn parse_serialized_trace(input: &str) -> Result<M6ParityFixture, M6ParityEr
 // ---------------------------------------------------------------------------
 // Snapshot boundary: destroy/restore + V5 lift + material round-trip
 // ---------------------------------------------------------------------------
-
-/// Lifts a real kernel V2 capture into the validated V3/V4 snapshot DTO chain.
-///
-/// Every runtime field is copied verbatim from the production capture; only
-/// the digest wrappers are re-typed (identical checked digest strings) and the
-/// game frontier comes from the production migration chain so the V5 root can
-/// carry `GameStateV4` with exact prepared-content identity.
-fn lift_snapshot_chain(
-    capture: &RestorableKernelSnapshotV2,
-    game_v3: &er_state::migration_v3::GameStateV3,
-) -> Result<RestorableKernelSnapshotV4, M6ParityError> {
-    let surface_digest = game_v3
-        .base
-        .run
-        .active_surface
-        .as_ref()
-        .map(|surface| surface.header().surface_digest.clone());
-    let game = GameRuntimeSnapshotV3 {
-        schema_version: GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3,
-        state: game_v3.base.clone(),
-        current_control: capture.game.current_control.clone(),
-        control_history: capture.game.control_history.clone(),
-        command_admission: capture.game.command_admission.clone(),
-        scripted_enemy_policy: capture.game.scripted_enemy_policy.clone(),
-        menu_allocators: capture.game.menu_allocators.clone(),
-        completed: capture.game.completed,
-        progression: game_v3.base.run.progression.clone(),
-        active_surface: game_v3.base.run.active_surface.clone(),
-        counters: game_v3.base.run.counters.clone(),
-        surface_digest: surface_digest.clone(),
-    };
-    let base = RestorableKernelSnapshotV3 {
-        schema_version: RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3,
-        content_hash: game_v3.base.battle_content_hash.clone(),
-        run_content_hash: game_v3.base.run_content_hash.clone(),
-        runtime_identity: capture.runtime_identity.clone(),
-        input_router: capture.input_router.clone(),
-        ui: capture.ui.clone(),
-        scheduler: capture.scheduler.clone(),
-        protocol: capture.protocol.clone(),
-        game,
-        pending_presentations: capture.pending_presentations.clone(),
-        terminal: capture.terminal.clone(),
-        disposed: capture.disposed,
-        prepared_transaction: None,
-        mechanical_digest: MechanicalStateDigestV2::new(capture.mechanical_digest.as_str())
-            .map_err(|error| snapshot_error("lift mechanical digest", error))?,
-        kernel_determinism_digest: KernelDeterminismDigestV2::new(
-            capture.kernel_determinism_digest.as_str(),
-        )
-        .map_err(|error| snapshot_error("lift determinism digest", error))?,
-        presentation_plan_digest: capture.presentation_plan_digest.clone(),
-        surface_digest,
-    };
-    base.validate()
-        .map_err(|error| snapshot_error("lift v3", error))?;
-    let snapshot = RestorableKernelSnapshotV4 {
-        schema_version: RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4,
-        mechanics_program_version: MECHANICS_PROGRAM_VERSION,
-        mechanic_state_schema_version: MECHANIC_STATE_SCHEMA_VERSION,
-        battle_content_hash_v2: game_v3.battle_content_hash_v2.clone(),
-        base,
-        game_v3: game_v3.clone(),
-    };
-    snapshot
-        .validate()
-        .map_err(|error| snapshot_error("lift v4", error))?;
-    Ok(snapshot)
-}
 
 /// Assembles typed TURN material from real boundary evidence only: captured
 /// frontier states, real mechanical digests, the real ordered RNG audit, and

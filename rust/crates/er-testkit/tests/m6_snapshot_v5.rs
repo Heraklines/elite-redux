@@ -23,7 +23,6 @@ use std::collections::{BTreeSet, VecDeque};
 use std::error::Error;
 use std::sync::Arc;
 
-use er_canonical::content_digest;
 use er_content::m6_catalog::SemanticCatalogV1;
 use er_content::pack::m6_pack::{
     BattleContentPackV3, BehaviorClassificationEntryV2, BehaviorClassificationManifestV2,
@@ -38,13 +37,6 @@ use er_game::m6::runtime_v4::{
     GameRuntimeSnapshotV4, M6_RUNTIME_SNAPSHOT_SCHEMA_VERSION, PendingPresentationV4,
 };
 use er_kernel::snapshot::RestorableKernelSnapshotV2;
-use er_kernel::snapshot_v3::{
-    GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3, GameRuntimeSnapshotV3, KernelDeterminismDigestV2,
-    RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3, RestorableKernelSnapshotV3,
-};
-use er_kernel::snapshot_v4::{
-    RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4, RestorableKernelSnapshotV4,
-};
 use er_kernel::snapshot_v5::RestorableKernelSnapshotV5;
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
@@ -57,7 +49,6 @@ use er_protocol::{
 };
 use er_rng::audit::RngDraw;
 use er_state::battle_v2::{BattleParticipationState, BattleSettlementState};
-use er_state::digest_v2::MechanicalStateDigestV2 as FrontierMechanicalDigestV2;
 use er_state::migration::{
     M3_PARITY_ORACLE_SHA, M3BattleCompanion, M3PokemonCompanion, M3PokemonCompanionKey,
     M3ToM4MigrationContext, M4_ORACLE_SHA, MigrationStateSide,
@@ -79,9 +70,7 @@ use er_types::battle_ids::{
     BattlePresentationEventId, BattleSide, FieldSlot, MoveId, MoveSlotIndex, PartyIndex, TurnIndex,
 };
 use er_types::battle_ui::PresentationSettlementOutcome;
-use er_types::mechanics::{
-    MECHANIC_STATE_SCHEMA_VERSION, MECHANICS_PROGRAM_VERSION, MechanicsProgramId,
-};
+use er_types::mechanics::MechanicsProgramId;
 use er_types::run_ids::{Experience, GrowthRateId, NatureId, RunContentPackHash};
 use er_types::{
     BattleContentPackHashV3, BehaviorUnitId, CatalogHash, ConnectionGeneration, FrameContext,
@@ -95,8 +84,8 @@ use serde_json::{Value, json};
 use recovery_campaign::{
     CampaignEndpoint, CampaignStep, CapturedFrontierV5, ContinuationStep, RECOVERY_BOUNDARY_KINDS,
     RecoveryBoundaryKind, RecoveryFrontierContexts, SNAPSHOT_V5_TAMPER_VECTORS,
-    SnapshotV5TamperVector, apply_snapshot_v5_tamper, assert_continuation_identical, campaign,
-    capture_frontier_v5, verify_restored_frontier_v5,
+    apply_snapshot_v5_tamper, assert_continuation_identical, campaign, capture_frontier_v5,
+    verify_restored_frontier_v5,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -1257,14 +1246,6 @@ impl BattlePair {
             .battle_ui_projection()
             .ok_or_else(|| invalid("battle kernel has no UI projection"))?;
         Ok(projection.seat_control.control.clone())
-    }
-
-    fn fence_state(&self, endpoint: Endpoint) -> TestResult<String> {
-        let state = self.kernel(endpoint).snapshot().state;
-        Ok(state["protocol"]["recoveryFence"]["state"]
-            .as_str()
-            .unwrap_or("absent")
-            .to_owned())
     }
 
     fn mechanical_state(&self, endpoint: Endpoint) -> TestResult<GameState> {
