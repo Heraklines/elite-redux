@@ -432,8 +432,6 @@ async function runCodex(payload, emit) {
     sandbox: "read-only",
     serviceName: "er_ability_studio",
     ephemeral: true,
-    runtimeWorkspaceRoots: [],
-    environments: [],
   });
   const threadId = threadResult.thread.id;
   let turnId = "";
