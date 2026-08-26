@@ -857,7 +857,11 @@ export class SelectStarterPhase extends Phase {
         starterPokemon.pauseEvolutions = true;
       }
       if (starter.moveset) {
-        starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);
+        // Fun Debug's starter overlay deliberately exposes the complete legal
+        // move pool without writing those unlocks into the player's account.
+        // Revalidating here against the real starterData silently discarded a
+        // selected egg/TM/late-level move as soon as the Pokemon was fielded.
+        starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation || funDebugActive);
       }
       // ER (community report 2026-06-11): some lines' EARLY learnset is all
       // status moves (Krabby Redux opens Kinesis/Showtime/Meditate/...), so a
@@ -882,7 +886,10 @@ export class SelectStarterPhase extends Phase {
       // Showdown teams are competitive manifests, not progression-gated starters. The mirrored trainer
       // representation always runs every ER innate, so unlock all three slots on the local player copy as
       // well; otherwise dual-simulation clients resolve different abilities from the same team.
-      if (globalScene.gameMode.isShowdown) {
+      if (globalScene.gameMode.isShowdown || funDebugActive) {
+        // Fun Debug mirrors Showdown's run-only innate access: every slot shown
+        // as unlocked in starter select must actually function in battle, but
+        // the account's permanent candy/passive data remains untouched.
         starterPokemon.customPokemonData.erRunUnlockedAbilitySlots = [1, 2, 3];
       }
       starterPokemon.luck = globalScene.gameData.getDexAttrLuck(
