@@ -48,8 +48,8 @@ use er_state::bespoke_v2::suppression_immunity::{
     classify_behavior_unit,
 };
 use er_types::battle_ids::{AbilityId, PokemonId};
-use er_types::mechanics::MechanicsProgramId;
 use er_types::m6::{BespokeMechanicId, RngDomainV1, RngReasonV2};
+use er_types::mechanics::MechanicsProgramId;
 use er_types::{AbilitySourceKindV1, BehaviorSourceId, BehaviorUnitId, SafeU53};
 use thiserror::Error;
 
@@ -466,9 +466,8 @@ pub fn suppression_gate_evidence(
     let mut excluded_owner_indices = Vec::new();
     let mut governing_origins = Vec::with_capacity(owners.len());
     for (index, owner) in owners.iter().enumerate() {
-        let slot = canonical_slot(owner.slot).ok_or(AbilityParityError::RuntimeExtraUnsupported(
-            owner.slot,
-        ))?;
+        let slot = canonical_slot(owner.slot)
+            .ok_or(AbilityParityError::RuntimeExtraUnsupported(owner.slot))?;
         let pokemon = owner_pokemon[index];
         let live = suppression.slot_is_suppressed(pokemon, slot);
         let unsuppressible = unsuppressible_slots.contains(&(pokemon, slot));
@@ -483,11 +482,7 @@ pub fn suppression_gate_evidence(
         if owner.suppressed {
             excluded_owner_indices.push(index);
         }
-        governing_origins.push(
-            suppression
-                .governing_origin(pokemon, slot)
-                .cloned(),
-        );
+        governing_origins.push(suppression.governing_origin(pokemon, slot).cloned());
     }
     let executed = slot_order_evidence(programs, owners, hook)?;
     Ok(SuppressionGateEvidence {
@@ -530,7 +525,11 @@ pub fn overlap_suppression_evidence(
                     stacked_entries_after: state.slot_suppressions.len(),
                 });
             }
-            Err(SuppressionTransitionError::UnsuppressibleAbility { owner, slot, ability }) => {
+            Err(SuppressionTransitionError::UnsuppressibleAbility {
+                owner,
+                slot,
+                ability,
+            }) => {
                 outcomes.push(OverlapSuppressionOutcome::RejectedUnsuppressible {
                     owner,
                     slot,
@@ -564,9 +563,8 @@ pub fn immunity_bypass_matrix(
     subject: ImmunitySubject,
     claim_ability: AbilityId,
 ) -> Result<[ImmunityMatrixRow; 4], AbilityParityError> {
-    let class = classify_behavior_unit(claim.provenance_hash).map_err(|_| {
-        AbilityParityError::NotAnImmunityClaim(claim.provenance_hash.to_owned())
-    })?;
+    let class = classify_behavior_unit(claim.provenance_hash)
+        .map_err(|_| AbilityParityError::NotAnImmunityClaim(claim.provenance_hash.to_owned()))?;
     if class != DispatchClass::ImmunityGate {
         return Err(AbilityParityError::NotAnImmunityClaim(
             claim.provenance_hash.to_owned(),
@@ -585,11 +583,7 @@ pub fn immunity_bypass_matrix(
         .map_err(|error| AbilityParityError::SuppressionTransition(error.to_string()))?
         .state;
     let combinations = [
-        (
-            false,
-            AbilityBypassInput::None,
-            ImmunityDecision::Denied,
-        ),
+        (false, AbilityBypassInput::None, ImmunityDecision::Denied),
         (
             false,
             AbilityBypassInput::IgnoreAbilities,
@@ -723,8 +717,10 @@ pub fn rng_admission_evidence(
         numerator: 1,
         denominator: 2,
     }]);
-    let chance_rejected =
-        matches!(conditions_admit(&chance_arena, Some(ConditionNodeId(0)), &owner), Err(AbilityExecutorError::UnsupportedCondition));
+    let chance_rejected = matches!(
+        conditions_admit(&chance_arena, Some(ConditionNodeId(0)), &owner),
+        Err(AbilityExecutorError::UnsupportedCondition)
+    );
     if !chance_rejected {
         return Err(AbilityParityError::ChanceConditionAdmitted);
     }

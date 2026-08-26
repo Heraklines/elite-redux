@@ -49,14 +49,10 @@ use er_mechanics::selector_operation_v2::{
 };
 use er_rng::battle::BattleRngState;
 use er_rng::phaser::{PhaserRdg, RunRngState};
-use er_state::battle::{
-    BattleOutcome, BattleState, CommandCollectionState, ReplacementProgress,
-};
+use er_state::battle::{BattleOutcome, BattleState, CommandCollectionState, ReplacementProgress};
 use er_state::bespoke_v2::guard::{GuardFamilyState, GuardKind};
 use er_state::bespoke_v2::item_lifecycle::ItemLifecycleStateV2;
-use er_state::bespoke_v2::scheduled_effects::{
-    ScheduledEffectsState, TerrainId, WeatherId,
-};
+use er_state::bespoke_v2::scheduled_effects::{ScheduledEffectsState, TerrainId, WeatherId};
 use er_state::bespoke_v2::suppression_immunity::{
     AbilitySlot, SuppressionImmunityStateV2, SuppressionOrigin,
 };
@@ -70,9 +66,7 @@ use er_state::pokemon::{
     AbilityLoadout, BattleStats, MoveSlotState, PokemonState, StatStages, StatusState,
     validate_move_slot,
 };
-use er_state::snapshot::{
-    GameState, canonical_game_state_bytes, decode_canonical_game_state,
-};
+use er_state::snapshot::{GameState, canonical_game_state_bytes, decode_canonical_game_state};
 use er_types::battle_command::{
     AcceptedBattleCommand, BattleCommand, BattleCommandProposalV1, BattleTargetSelection,
     CommandAdmissionSource, CommandFrontierEntry, CommandFrontierStatus, CommandSet,
@@ -80,7 +74,7 @@ use er_types::battle_command::{
     replacement_operation_id, scripted_enemy_command_operation_id, turn_result_operation_id,
 };
 use er_types::battle_ids::{
-    AbilityId, AuthorityEpoch, BattleId, BattleSide, FieldSlot, FaintOccurrenceId, GameModeId,
+    AbilityId, AuthorityEpoch, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId,
     MenuInstanceId, MoveId, MoveSlotIndex, PartyIndex, PokemonId, SpeciesId, TurnIndex, WaveIndex,
 };
 use er_types::battle_model::StatusKind;
@@ -439,7 +433,11 @@ fn admit_singles_fight(state: &mut GameState, epoch_seed: u64) -> TestResult<Com
 
 fn turn_operation(state: &GameState) -> TestResult<OperationId> {
     let current = state.battle.as_ref().expect("battle present");
-    Ok(turn_result_operation_id(current.battle_id, current.wave, current.turn)?)
+    Ok(turn_result_operation_id(
+        current.battle_id,
+        current.wave,
+        current.turn,
+    )?)
 }
 
 // ---------------------------------------------------------------------------
@@ -491,7 +489,12 @@ fn fail(seed: u64, case: &str, trace: &[TraceStep], reason: &str) -> String {
 }
 
 /// Complete-content validity plus HP/PP/faint/topology bounds for one state.
-fn check_state_invariants(seed: u64, case: &str, trace: &[TraceStep], state: &GameState) -> TestResult {
+fn check_state_invariants(
+    seed: u64,
+    case: &str,
+    trace: &[TraceStep],
+    state: &GameState,
+) -> TestResult {
     let pack = content();
     validate_state_content(state, pack).map_err(|error| -> Box<dyn Error> {
         fail(
@@ -500,7 +503,7 @@ fn check_state_invariants(seed: u64, case: &str, trace: &[TraceStep], state: &Ga
             trace,
             &format!("complete-content validation rejected the state: {error}"),
         )
-            .into()
+        .into()
     })?;
     let battle = state
         .battle
@@ -525,7 +528,10 @@ fn check_state_invariants(seed: u64, case: &str, trace: &[TraceStep], state: &Ga
         }
     }
 
-    for (party_name, party) in [("player", &battle.player_party), ("enemy", &battle.enemy_party)] {
+    for (party_name, party) in [
+        ("player", &battle.player_party),
+        ("enemy", &battle.enemy_party),
+    ] {
         for member in party.iter() {
             if member.hp > member.max_hp || (!member.fainted && member.hp == 0) {
                 panic!(
@@ -550,18 +556,19 @@ fn check_state_invariants(seed: u64, case: &str, trace: &[TraceStep], state: &Ga
                             trace,
                             &format!("move slot references absent content move: {error}"),
                         )
-                            .into()
+                        .into()
                     })?;
-                let max_pp = validate_move_slot(slot, definition.base_pp)
-                    .map_err(|error| -> Box<dyn Error> {
+                let max_pp = validate_move_slot(slot, definition.base_pp).map_err(
+                    |error| -> Box<dyn Error> {
                         fail(
                             seed,
                             case,
                             trace,
                             &format!("PP bounds violated on a party member: {error}"),
                         )
-                            .into()
-                    })?;
+                        .into()
+                    },
+                )?;
                 if slot.pp_used > max_pp {
                     panic!(
                         "{}",
@@ -583,7 +590,10 @@ fn check_state_invariants(seed: u64, case: &str, trace: &[TraceStep], state: &Ga
     for occurrence in battle.faint_queue.iter() {
         assert!(occurrence.id > previous_id.unwrap_or(occurrence.id));
         if !seen_ids.insert(occurrence.id) {
-            panic!("{}", fail(seed, case, trace, "faint occurrence id appears twice"));
+            panic!(
+                "{}",
+                fail(seed, case, trace, "faint occurrence id appears twice")
+            );
         }
         previous_id = Some(occurrence.id);
         assert!(occurrence.id < battle.next_faint_occurrence);
@@ -622,7 +632,10 @@ fn m6d_generated_states_pass_complete_content_validation_and_snapshot_round_trip
         // Digest computation is pure: recomputing never changes anything.
         let first = MechanicalStateDigest::compute(&state)?;
         let second = MechanicalStateDigest::compute(&state)?;
-        assert_eq!(first, second, "digest recomputation diverged for seed {seed}");
+        assert_eq!(
+            first, second,
+            "digest recomputation diverged for seed {seed}"
+        );
 
         // Canonical snapshot round trip restores an identical state.
         let bytes = canonical_game_state_bytes(&state)?;
@@ -678,7 +691,10 @@ fn m6d_turn_resolution_is_pure_and_deterministic_across_the_corpus() -> TestResu
                         "resolve_turn",
                         &before,
                         &first.after_state,
-                        format!("outcome={:?} decision={:?}", first.outcome, first.next_decision),
+                        format!(
+                            "outcome={:?} decision={:?}",
+                            first.outcome, first.next_decision
+                        ),
                     )],
                     "two identical resolutions produced different transitions",
                 )
@@ -801,7 +817,8 @@ fn m6d_pairwise_factor_matrix_keeps_all_invariants_after_resolution() -> TestRes
 }
 
 #[test]
-fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consistency() -> TestResult {
+fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consistency() -> TestResult
+{
     for &seed in &SEEDS {
         let player_party_size = 1 + CaseRng::new(seed).below(3);
         let generated = generated_single_battle(seed, player_party_size)?;
@@ -838,7 +855,12 @@ fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consiste
                 derive_battle_outcome(after_battle),
                 transition.outcome,
                 "{}",
-                replay_report(seed, &case, &trace, "recorded outcome diverged from derived outcome")
+                replay_report(
+                    seed,
+                    &case,
+                    &trace,
+                    "recorded outcome diverged from derived outcome"
+                )
             );
 
             state = match &transition.next_decision {
@@ -885,13 +907,23 @@ fn resolve_campaign_replacement(
         .iter()
         .find(|entry| entry.id == occurrence_id)
         .ok_or_else(|| {
-            fail(seed, case, trace, "next decision referenced an unknown occurrence")
+            fail(
+                seed,
+                case,
+                trace,
+                "next decision referenced an unknown occurrence",
+            )
         })?;
     assert_eq!(
         occurrence.slot.side,
         BattleSide::Player,
         "{}",
-        fail(seed, case, trace, "the public resolver only owns player-side replacements")
+        fail(
+            seed,
+            case,
+            trace,
+            "the public resolver only owns player-side replacements"
+        )
     );
     let owner_seat = occurrence
         .owner_seat
@@ -923,7 +955,12 @@ fn resolve_campaign_replacement(
         if validate_replacement_selection(&pending, occurrence_id, &illegal, pack).is_ok() {
             panic!(
                 "{}",
-                fail(seed, case, trace, "an illegal replacement selection was accepted")
+                fail(
+                    seed,
+                    case,
+                    trace,
+                    "an illegal replacement selection was accepted"
+                )
             );
         }
     }
@@ -935,7 +972,7 @@ fn resolve_campaign_replacement(
                 trace,
                 &format!("a legal replacement selection was rejected: {error}"),
             )
-                .into()
+            .into()
         },
     )?;
 
@@ -971,7 +1008,12 @@ fn resolve_campaign_replacement(
         resolved.replacement,
         ReplacementProgress::Pending,
         "{}",
-        fail(seed, case, trace, "the replacement window stayed pending after resolution")
+        fail(
+            seed,
+            case,
+            trace,
+            "the replacement window stayed pending after resolution"
+        )
     );
     check_state_invariants(seed, case, trace, &transition.after_state)?;
     Ok(transition.after_state)
@@ -1058,7 +1100,9 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
             stored.source.resolved_turn,
             stored.source.turn_occurrence + 77,
             stored.slot,
-            stored.owner_seat.expect("player occurrence carries its owner"),
+            stored
+                .owner_seat
+                .expect("player occurrence carries its owner"),
         )?;
         let reserve = battle_ref
             .player_party
@@ -1155,7 +1199,10 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
         battle.player_party[1].fainted = true;
         queue_faints(
             battle,
-            &[FaintCandidate::new(battle.player_party[1].id, player_slot(0))],
+            &[FaintCandidate::new(
+                battle.player_party[1].id,
+                player_slot(0),
+            )],
             epoch,
             2,
         )?
@@ -1182,8 +1229,7 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
 
     // Selecting an already-fainted candidate for any queued window fails closed.
     for occurrence in battle.faint_queue.iter().copied() {
-        let fainted_self =
-            ReplacementSelection::selected(PartyIndex::ZERO, occurrence.pokemon);
+        let fainted_self = ReplacementSelection::selected(PartyIndex::ZERO, occurrence.pokemon);
         let verdict =
             validate_replacement_selection(&state, occurrence.id, &fainted_self, content());
         assert!(
@@ -1223,7 +1269,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
                 };
                 let outcome =
                     schedule_delayed_effect(&state, turn as u32, request).map_err(|error| {
-                            fail(
+                        fail(
                             seed,
                             "scheduled-effects",
                             &[],
@@ -1414,16 +1460,14 @@ fn m6d_guard_chain_follows_audited_draw_thresholds_and_validates_throughout() ->
             assert_eq!(expired.state.chain_depth, state.chain_depth);
             assert!(expired.state.self_guards.is_empty());
             state = expired.state;
-            state
-                .validate()
-                .map_err(|error| {
-                    fail(
-                        seed,
-                        "guard-chain",
-                        &[],
-                        &format!("guard family state invalidated: {error}"),
-                    )
-                })?;
+            state.validate().map_err(|error| {
+                fail(
+                    seed,
+                    "guard-chain",
+                    &[],
+                    &format!("guard family state invalidated: {error}"),
+                )
+            })?;
         }
     }
     Ok(())
@@ -1502,7 +1546,10 @@ fn m6d_item_lifecycle_keeps_stack_charge_and_ledger_bounds_under_seeded_activity
             // Instances stay unique per (owner, registry key) with sane stacks.
             let mut pairs: BTreeSet<(PokemonId, &str)> = BTreeSet::new();
             for instance in state.instances.iter() {
-                assert!(instance.stacks >= 1, "a live instance dropped below one stack");
+                assert!(
+                    instance.stacks >= 1,
+                    "a live instance dropped below one stack"
+                );
                 assert!(
                     instance.charges.map_or(true, |charges| charges >= 1),
                     "a live charged instance dropped below one charge"

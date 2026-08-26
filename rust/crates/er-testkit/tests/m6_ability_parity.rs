@@ -14,18 +14,17 @@ use std::error::Error;
 use er_battle::m6::ability_executor::AbilityOwnerState;
 use er_battle::m6::bespoke::suppression_immunity::{
     AbilityBypassInput, AbilitySuppressibility, DispatchContext, DispatchGate, DispatchUnitInput,
-    ImmunityAllowReason, ImmunityClaim, ImmunityDecision, ImmunitySubject,
-    SlotSuppressionRequest, SuppressionCleanupEvent, apply_slot_suppression, clear_suppressions,
-    route_ability_dispatch,
+    ImmunityAllowReason, ImmunityClaim, ImmunityDecision, ImmunitySubject, SlotSuppressionRequest,
+    SuppressionCleanupEvent, apply_slot_suppression, clear_suppressions, route_ability_dispatch,
 };
 use er_battle::m6::routine_executor::MechanicsContextV2;
 use er_battle::m6::system::ability_parity::{
     AbilityClosureEvidence, AbilityExecutionLane, AbilityParityError, BespokeClusterInput,
     OracleWitnessInput, OverlapSuppressionOutcome, SlotExecutionStep, WitnessDivergence,
-    ability_polarity,
-    false_condition_exclusion_evidence, first_witness_divergence, immunity_bypass_matrix,
-    overlap_suppression_evidence, prepared_dispatch_parity, resolve_ability_closure,
-    rng_admission_evidence, slot_order_evidence, suppression_gate_evidence,
+    ability_polarity, false_condition_exclusion_evidence, first_witness_divergence,
+    immunity_bypass_matrix, overlap_suppression_evidence, prepared_dispatch_parity,
+    resolve_ability_closure, rng_admission_evidence, slot_order_evidence,
+    suppression_gate_evidence,
 };
 use er_content::m6_catalog::SemanticCatalogV1;
 use er_content::pack::m6_pack::{
@@ -46,16 +45,15 @@ use er_types::battle_ids::{AbilityId, MoveId, PokemonId};
 use er_types::battle_model::StatusKind;
 use er_types::mechanics::MechanicsProgramId;
 use er_types::{
-    AbilitySourceKindV1, BehaviorClassificationKindV2, BehaviorSourceId, BehaviorUnitId,
-    BehaviorUnitKind, BehaviorUnitOrdinal, BespokeMechanicId, BattleContentPackHashV3, CatalogHash,
+    AbilitySourceKindV1, BattleContentPackHashV3, BehaviorClassificationKindV2, BehaviorSourceId,
+    BehaviorUnitId, BehaviorUnitKind, BehaviorUnitOrdinal, BespokeMechanicId, CatalogHash,
     M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, OracleSha, ProvenanceHash, SafeU53,
 };
 use serde::Deserialize;
 
 /// Frozen provenance of a `CUSTOM_DISPATCH` `ImmunityGate`-lane unit in the
 /// pinned semantic catalog (`BlockOneHitKOAbAttr`, active slot).
-const IMMUNITY_GATE_HASH: &str =
-    "8cc546d6fc0a778c7c9c868629bc99da5702d697d934cfc7fc7bada9cdd53db9";
+const IMMUNITY_GATE_HASH: &str = "8cc546d6fc0a778c7c9c868629bc99da5702d697d934cfc7fc7bada9cdd53db9";
 /// Frozen provenance of a `PowerQuery`-lane unit used as a negative control.
 const POWER_QUERY_HASH: &str = "56a22dc113e3c68b8cbed651256c161dc73639ffda7e262d4acd396edf2758c5";
 
@@ -99,8 +97,7 @@ fn validated_catalog() -> Result<ValidatedSemanticCatalog, Box<dyn Error>> {
     ))?;
     let raw_hash = CatalogHash::parse(catalog.raw_catalog_hash.clone())?;
     Ok(ValidatedSemanticCatalog::new(SemanticCatalogInput::new(
-        catalog,
-        raw_hash,
+        catalog, raw_hash,
     ))?)
 }
 
@@ -187,12 +184,7 @@ fn build_programs_and_content() -> Result<
         type_chart: er_content::pack::selected_type_chart(),
     };
     pack.content_hash = pack.compute_content_hash()?;
-    Ok((
-        catalog,
-        cluster_manifest()?,
-        direct,
-        prepare_content(pack)?,
-    ))
+    Ok((catalog, cluster_manifest()?, direct, prepare_content(pack)?))
 }
 
 fn closure(
@@ -313,12 +305,10 @@ fn closure_is_exact_complete_and_residual_free() -> Result<(), Box<dyn Error>> {
     }
     let routine_unit = lanes
         .iter()
-        .find_map(
-            |(unit, lane)| match lane {
-                AbilityExecutionLane::RoutineProgram { .. } => Some(unit),
-                _ => None,
-            },
-        )
+        .find_map(|(unit, lane)| match lane {
+            AbilityExecutionLane::RoutineProgram { .. } => Some(unit),
+            _ => None,
+        })
         .expect("ten routine lanes exist");
     assert!(evidence.lane_of(routine_unit).is_some());
     Ok(())
@@ -373,8 +363,8 @@ fn four_slot_ordering_is_active_before_passive_and_permutation_invariant()
 }
 
 #[test]
-fn overlapping_suppression_stacks_with_total_precedence_and_restores()
--> Result<(), Box<dyn Error>> {
+fn overlapping_suppression_stacks_with_total_precedence_and_restores() -> Result<(), Box<dyn Error>>
+{
     let subject = pid(1);
     let slot = AbilitySlot::Passive0;
     let ability = AbilityId::try_from_u64(77)?;
@@ -477,24 +467,24 @@ fn suppression_gates_execution_but_reports_instead_of_dropping() -> Result<(), B
     owners[1].suppressed = true;
 
     let pokemon: Vec<PokemonId> = (1..=5).map(pid).collect();
-    let gate_request =
-        |owner_id: PokemonId, slot: AbilitySlot| -> Result<SlotSuppressionRequest, Box<dyn Error>> {
-            Ok(SlotSuppressionRequest {
-                owner: owner_id,
-                slot,
-                origin: SuppressionOrigin::MoveApplied {
-                    source_move: MoveId::try_from_u64(33)?,
-                },
-                remaining_turns: None,
-                suppressibility: AbilitySuppressibility::Suppressible,
-                current_ability: AbilityId::try_from_u64(5)?,
-            })
-        };
+    let gate_request = |owner_id: PokemonId,
+                        slot: AbilitySlot|
+     -> Result<SlotSuppressionRequest, Box<dyn Error>> {
+        Ok(SlotSuppressionRequest {
+            owner: owner_id,
+            slot,
+            origin: SuppressionOrigin::MoveApplied {
+                source_move: MoveId::try_from_u64(33)?,
+            },
+            remaining_turns: None,
+            suppressibility: AbilitySuppressibility::Suppressible,
+            current_ability: AbilityId::try_from_u64(5)?,
+        })
+    };
     let mut state = SuppressionImmunityStateV2::new();
-    state = apply_slot_suppression(&state, &gate_request(pokemon[1], AbilitySlot::Passive0)?)?
-        .state;
     state =
-        apply_slot_suppression(&state, &gate_request(pokemon[4], AbilitySlot::Active)?)?.state;
+        apply_slot_suppression(&state, &gate_request(pokemon[1], AbilitySlot::Passive0)?)?.state;
+    state = apply_slot_suppression(&state, &gate_request(pokemon[4], AbilitySlot::Active)?)?.state;
 
     let unsuppressible = [(pokemon[4], AbilitySlot::Active)];
     let evidence = suppression_gate_evidence(
@@ -736,13 +726,12 @@ fn oracle_witnesses_agree_and_first_divergence_is_exact() -> Result<(), Box<dyn 
         })
         .collect();
     assert!(inputs.iter().all(|input| input.asserts_source_reached));
-    assert!(
-        ability_witnesses
+    assert!(ability_witnesses.iter().all(|witness| {
+        witness
+            .negative_assertions
             .iter()
-            .all(|witness| witness.negative_assertions
-                .iter()
-                .any(|assertion| assertion.kind == "FALSE_CONDITION_DOES_NOT_MUTATE"))
-    );
+            .any(|assertion| assertion.kind == "FALSE_CONDITION_DOES_NOT_MUTATE")
+    }));
     assert_eq!(
         first_witness_divergence(&inputs, &evidence),
         None,
@@ -778,7 +767,10 @@ fn oracle_witnesses_agree_and_first_divergence_is_exact() -> Result<(), Box<dyn 
             expected: BehaviorSourceId::ActiveAbility {
                 numeric_id: s53(999_999)
             },
-            actual: ability_witnesses[corrupt_index].behavior_unit.source.clone(),
+            actual: ability_witnesses[corrupt_index]
+                .behavior_unit
+                .source
+                .clone(),
         }
     );
     Ok(())
@@ -845,6 +837,9 @@ fn prepared_query_and_trigger_dispatch_matches_direct_reference() -> Result<(), 
     assert_eq!(report.contexts, 3);
     assert_eq!(report.compared_queries, 17 * 3);
     assert_eq!(report.compared_hooks, 24 * 3);
-    assert!(report.staged_operations > 0, "ordered evidence was compared");
+    assert!(
+        report.staged_operations > 0,
+        "ordered evidence was compared"
+    );
     Ok(())
 }

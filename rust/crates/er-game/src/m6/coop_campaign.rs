@@ -25,10 +25,10 @@ use er_types::{AuthorityEntryBody, AuthorityReceiptBody};
 use er_types::{OperationId, PhysicalKey, Revision, SeatId};
 
 use crate::material::{
+    BattleMaterialApplyContext, BattleMaterialApplyError, BattleMaterialCodecError,
+    BattleReplacementMaterialV1, BattleTurnMaterialV1, MaterialApplyResult,
     apply_replacement_material, apply_turn_material, replacement_material_digest,
-    turn_material_digest, BattleMaterialApplyContext, BattleMaterialApplyError,
-    BattleMaterialCodecError, BattleReplacementMaterialV1, BattleTurnMaterialV1,
-    MaterialApplyResult,
+    turn_material_digest,
 };
 
 /// Frozen schema version of the campaign plan and evidence types below.
@@ -102,9 +102,15 @@ impl CoopPacketSelector {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum CoopAnchor {
     /// Apply before delivering the ordinal-matching packet.
-    BeforeDelivery { selector: CoopPacketSelector, ordinal: u32 },
+    BeforeDelivery {
+        selector: CoopPacketSelector,
+        ordinal: u32,
+    },
     /// Apply immediately after delivering the ordinal-matching packet.
-    AfterDelivery { selector: CoopPacketSelector, ordinal: u32 },
+    AfterDelivery {
+        selector: CoopPacketSelector,
+        ordinal: u32,
+    },
     /// Apply once neither endpoint can make transport progress: no deliverable
     /// packet is due and no packet is queued.
     WhenIdle,
@@ -117,7 +123,10 @@ pub enum CoopScheduledActionKind {
     /// Deliver an exact copy of the matched packet after the original.
     DuplicatePacket { selector: CoopPacketSelector },
     /// Postpone the matched packet by an exact virtual delay in milliseconds.
-    DelayPacket { selector: CoopPacketSelector, additional_ms: u64 },
+    DelayPacket {
+        selector: CoopPacketSelector,
+        additional_ms: u64,
+    },
     /// Tear down one endpoint's transport; its in-flight traffic goes stale.
     Disconnect { endpoint: CoopEndpoint },
     /// Rebind one endpoint onto a fresh connection generation.
@@ -266,7 +275,9 @@ pub fn verify_authority_receipt_order(
             | AuthorityEntryKind::ReplacementCommit
             | AuthorityEntryKind::TerminalCommit => {}
             other => {
-                return Err(CoopCampaignError::UnsupportedCommitKind(format!("{other:?}")));
+                return Err(CoopCampaignError::UnsupportedCommitKind(format!(
+                    "{other:?}"
+                )));
             }
         }
         if seen_operations.contains(&entry.operation_id) {
@@ -421,8 +432,9 @@ impl CoopCandidateReplayV1 {
         let result = match entry.kind {
             AuthorityEntryKind::TurnCommit => {
                 let material: BattleTurnMaterialV1 =
-                    serde_json::from_value(entry.material.payload.clone())
-                        .map_err(|error| CoopCampaignError::SerializedMaterial(error.to_string()))?;
+                    serde_json::from_value(entry.material.payload.clone()).map_err(|error| {
+                        CoopCampaignError::SerializedMaterial(error.to_string())
+                    })?;
                 let digest = turn_material_digest(&material)?;
                 if digest != entry.material.digest {
                     return Err(CoopCampaignError::MaterialDigestMismatch);
@@ -431,8 +443,9 @@ impl CoopCandidateReplayV1 {
             }
             AuthorityEntryKind::ReplacementCommit => {
                 let material: BattleReplacementMaterialV1 =
-                    serde_json::from_value(entry.material.payload.clone())
-                        .map_err(|error| CoopCampaignError::SerializedMaterial(error.to_string()))?;
+                    serde_json::from_value(entry.material.payload.clone()).map_err(|error| {
+                        CoopCampaignError::SerializedMaterial(error.to_string())
+                    })?;
                 let digest = replacement_material_digest(&material)?;
                 if digest != entry.material.digest {
                     return Err(CoopCampaignError::MaterialDigestMismatch);
@@ -440,7 +453,9 @@ impl CoopCandidateReplayV1 {
                 apply_replacement_material(&context, &material, content)?
             }
             other => {
-                return Err(CoopCampaignError::UnsupportedCommitKind(format!("{other:?}")));
+                return Err(CoopCampaignError::UnsupportedCommitKind(format!(
+                    "{other:?}"
+                )));
             }
         };
 
@@ -565,8 +580,7 @@ impl CoopTraceDigestV1 {
     }
 
     fn current_bits(&self) -> u64 {
-        self.value
-            [TRACE_DIGEST_PREFIX.len()..]
+        self.value[TRACE_DIGEST_PREFIX.len()..]
             .get(..16)
             .and_then(|hex| u64::from_str_radix(hex, 16).ok())
             .unwrap_or(FNV_OFFSET_BASIS)

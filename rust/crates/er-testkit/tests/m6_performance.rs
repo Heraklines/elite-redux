@@ -18,10 +18,10 @@ use std::error::Error;
 use m6_benchmark::{
     BenchmarkProfile, HOSTED_ENFORCEMENT_ENV, M6_BENCHMARK_MANIFEST_VERSION,
     RELEASE_QUALIFICATION_CEILINGS_V1, SOLO_CAMPAIGN_SCENARIOS, WorkloadMeasurement,
-    assert_measurements_deterministic, hosted_enforcement_requested,
-    qualification_report, render_measurements_json, render_qualification_json,
-    run_all_workloads, run_bespoke_dispatch, run_content_preparation, run_coop_campaign,
-    run_routine_dispatch, run_snapshot_restoration, run_solo_campaign, run_turn_execution,
+    assert_measurements_deterministic, hosted_enforcement_requested, qualification_report,
+    render_measurements_json, render_qualification_json, run_all_workloads, run_bespoke_dispatch,
+    run_content_preparation, run_coop_campaign, run_routine_dispatch, run_snapshot_restoration,
+    run_solo_campaign, run_turn_execution,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -62,15 +62,19 @@ fn require_manifest_shape(measurement: &WorkloadMeasurement) {
 
 #[test]
 fn content_preparation_reproduces_checksums_and_counts() -> TestResult {
-    let measurement =
-        deterministic_pair("m6.content_preparation", run_content_preparation)?;
+    let measurement = deterministic_pair("m6.content_preparation", run_content_preparation)?;
     require_manifest_shape(&measurement);
     assert_eq!(
         measurement.counters.get("content_units"),
         Some(&u64::from(measurement.iterations))
     );
     assert!(
-        measurement.counters.get("routine_programs").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("routine_programs")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "content preparation produced no routine programs"
     );
     Ok(())
@@ -80,7 +84,11 @@ fn content_preparation_reproduces_checksums_and_counts() -> TestResult {
 fn routine_dispatch_keeps_prepared_and_direct_identical() -> TestResult {
     let measurement = deterministic_pair("m6.routine_dispatch", run_routine_dispatch)?;
     require_manifest_shape(&measurement);
-    let calls = measurement.counters.get("executor_calls").copied().unwrap_or(0);
+    let calls = measurement
+        .counters
+        .get("executor_calls")
+        .copied()
+        .unwrap_or(0);
     let sweeps = u64::from(measurement.iterations);
     assert_eq!(calls, sweeps * 41, "executor call accounting did not close");
     Ok(())
@@ -91,12 +99,25 @@ fn bespoke_dispatch_routes_every_cluster_deterministically() -> TestResult {
     let measurement = deterministic_pair("m6.bespoke_dispatch", run_bespoke_dispatch)?;
     require_manifest_shape(&measurement);
     assert!(
-        measurement.counters.get("bespoke_clusters").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("bespoke_clusters")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "no bespoke clusters were routed"
     );
     assert!(
-        measurement.counters.get("behavior_units").copied().unwrap_or(0)
-            >= measurement.counters.get("bespoke_clusters").copied().unwrap_or(0),
+        measurement
+            .counters
+            .get("behavior_units")
+            .copied()
+            .unwrap_or(0)
+            >= measurement
+                .counters
+                .get("bespoke_clusters")
+                .copied()
+                .unwrap_or(0),
         "behavior-unit counter did not close against cluster count"
     );
     Ok(())
@@ -107,11 +128,21 @@ fn turn_execution_drives_real_presentations_and_rng() -> TestResult {
     let measurement = deterministic_pair("m6.turn_execution", run_turn_execution)?;
     require_manifest_shape(&measurement);
     assert!(
-        measurement.counters.get("move_actions").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("move_actions")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "turn workload resolved no move actions"
     );
     assert!(
-        measurement.counters.get("presentations").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("presentations")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "turn workload observed no presentation events"
     );
     assert_eq!(
@@ -128,11 +159,7 @@ fn solo_campaign_covers_the_scenario_set() -> TestResult {
     require_manifest_shape(&measurement);
     assert_eq!(
         usize::try_from(measurement.iterations).map_err(|e| e.to_string())?,
-        measurement
-            .counters
-            .get("battles")
-            .copied()
-            .unwrap_or(0) as usize,
+        measurement.counters.get("battles").copied().unwrap_or(0) as usize,
         "battle counter did not close against iteration count"
     );
     assert!(
@@ -147,11 +174,21 @@ fn coop_campaign_agrees_both_endpoints_deterministically() -> TestResult {
     let measurement = deterministic_pair("m6.coop_campaign", run_coop_campaign)?;
     require_manifest_shape(&measurement);
     assert!(
-        measurement.counters.get("authority_entries").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("authority_entries")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "co-op campaign recorded no authority commit entries"
     );
     assert!(
-        measurement.counters.get("peak_queued_packets").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("peak_queued_packets")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "co-op pump never queued transport packets"
     );
     Ok(())
@@ -167,7 +204,12 @@ fn snapshot_restoration_round_trips_bytes_and_continues() -> TestResult {
         "every restore must continue identically to its source kernel"
     );
     assert!(
-        measurement.counters.get("peak_snapshot_bytes").copied().unwrap_or(0) > 0,
+        measurement
+            .counters
+            .get("peak_snapshot_bytes")
+            .copied()
+            .unwrap_or(0)
+            > 0,
         "snapshot restoration recorded no serialized footprint"
     );
     Ok(())

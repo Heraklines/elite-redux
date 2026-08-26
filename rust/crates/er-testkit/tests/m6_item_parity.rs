@@ -29,14 +29,14 @@ use er_content::pack::m6_pack::{
 };
 use er_content::pack::m6_prepared::prepare_content;
 use er_content_compiler::m6::{
-    BespokeAssignment, CompilerOptions, IntrinsicRule, SemanticCatalogInput,
-    SemanticCompileRequest, SemanticCompileOutput, ValidatedSemanticCatalog, compile_semantics,
+    BespokeAssignment, CompilerOptions, IntrinsicRule, SemanticCatalogInput, SemanticCompileOutput,
+    SemanticCompileRequest, ValidatedSemanticCatalog, compile_semantics,
 };
 use er_mechanics::v2::{MechanicHookV2, MechanicQueryV2};
 use er_types::battle_ids::{PokemonId, WaveIndex};
 use er_types::{
     BattleContentPackHashV3, BehaviorClassificationKindV2, BehaviorSourceId,
-    BehaviorUnitId as UnitKeyAlias, BespokeMechanicId, BehaviorUnitKind, CatalogHash,
+    BehaviorUnitId as UnitKeyAlias, BehaviorUnitKind, BespokeMechanicId, CatalogHash,
     M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, OracleSha, SafeU53,
 };
 use serde::Deserialize;
@@ -105,9 +105,7 @@ fn compile_production() -> Result<(ValidatedSemanticCatalog, SemanticCompileOutp
 /// intrinsic-rule allocations carry no executable IR and cannot slot into a
 /// validated pack, so those entries stay out; every bespoke and resolved
 /// routine entry ships verbatim.
-fn pack_classifications(
-    output: &SemanticCompileOutput,
-) -> BehaviorClassificationManifestV2 {
+fn pack_classifications(output: &SemanticCompileOutput) -> BehaviorClassificationManifestV2 {
     let built: BTreeSet<er_types::mechanics::MechanicsProgramId> = output
         .routine_programs
         .iter()
@@ -175,7 +173,10 @@ fn held_item_inventory_is_exactly_once_and_fully_closed() -> Result<(), Box<dyn 
         assert_eq!(entry.bespoke, Some(BespokeMechanicId::ItemBerryLifecycle));
         assert!(entry.programs.is_empty());
         assert!(entry.unsupported_reason.is_none());
-        assert!(matches!(entry.unit_source, BehaviorSourceId::HeldItem { .. }));
+        assert!(matches!(
+            entry.unit_source,
+            BehaviorSourceId::HeldItem { .. }
+        ));
     }
     // Representative identities really are present exactly once each.
     for key in ["BERRY", "BERRY_POUCH", "SCOPE_LENS", "ER_LIFE_ORB"] {
@@ -198,16 +199,18 @@ fn held_item_inventory_is_exactly_once_and_fully_closed() -> Result<(), Box<dyn 
         .iter()
         .enumerate()
         .filter_map(|(index, entry)| {
-            matches!(entry.behavior_unit.source, BehaviorSourceId::HeldItem { .. })
-                .then_some(index)
+            matches!(
+                entry.behavior_unit.source,
+                BehaviorSourceId::HeldItem { .. }
+            )
+            .then_some(index)
         })
         .collect();
     assert_eq!(held_entries.len(), 215);
 
     let mut missing = output.classifications.clone();
     missing.0.remove(held_entries[0]);
-    let error =
-        item_parity::inventory_held_items(catalog.behavior_units(), &missing).unwrap_err();
+    let error = item_parity::inventory_held_items(catalog.behavior_units(), &missing).unwrap_err();
     assert!(matches!(
         error,
         ItemParityError::UnclassifiedHeldItemUnit { .. }
@@ -231,8 +234,7 @@ fn held_item_inventory_is_exactly_once_and_fully_closed() -> Result<(), Box<dyn 
         registry_key: "PHANTOM_NOT_IN_CATALOG".to_owned(),
     };
     phantom.0.push(cloned);
-    let error =
-        item_parity::inventory_held_items(catalog.behavior_units(), &phantom).unwrap_err();
+    let error = item_parity::inventory_held_items(catalog.behavior_units(), &phantom).unwrap_err();
     assert!(matches!(
         error,
         ItemParityError::UnknownHeldItemClassification { .. }
@@ -427,7 +429,10 @@ fn lifecycle_campaign_witnesses_are_deterministic_and_complete() -> Result<(), B
             assert_eq!(evidence.stacks_after, Some(2));
             assert!(matches!(
                 evidence.outcome,
-                ConsumeOutcome::Consumed { ledger_ordinal: None, .. }
+                ConsumeOutcome::Consumed {
+                    ledger_ordinal: None,
+                    ..
+                }
             ));
         }
         other => panic!("step 5 should be a surviving consume, got {other:?}"),
@@ -507,10 +512,11 @@ fn lifecycle_campaign_witnesses_are_deterministic_and_complete() -> Result<(), B
             "placeholder comparison guard"
         );
     }
-    assert!(!steps.iter().any(|step| matches!(
-        step.mirror,
-        ExecutorMirror::UnmirroredShape { .. }
-    )));
+    assert!(
+        !steps
+            .iter()
+            .any(|step| matches!(step.mirror, ExecutorMirror::UnmirroredShape { .. }))
+    );
 
     Ok(())
 }
@@ -614,7 +620,10 @@ fn prepared_and_direct_paths_agree_under_item_source_stacks() -> Result<(), Box<
         (MechanicQueryV2::Damage, QueryValueV2::Signed(240)),
         (MechanicQueryV2::CriticalRate, QueryValueV2::Signed(0)),
         (MechanicQueryV2::Accuracy, QueryValueV2::Signed(100)),
-        (MechanicQueryV2::ItemEligibility, QueryValueV2::Boolean(true)),
+        (
+            MechanicQueryV2::ItemEligibility,
+            QueryValueV2::Boolean(true),
+        ),
     ];
     let mut queries: Vec<_> = candidate_queries
         .iter()
@@ -622,7 +631,10 @@ fn prepared_and_direct_paths_agree_under_item_source_stacks() -> Result<(), Box<
         .cloned()
         .collect();
     for query in &bound_queries {
-        if !candidate_queries.iter().any(|(candidate, _)| candidate == query) {
+        if !candidate_queries
+            .iter()
+            .any(|(candidate, _)| candidate == query)
+        {
             queries.push((*query, QueryValueV2::Signed(7)));
         }
     }

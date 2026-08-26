@@ -8,15 +8,11 @@
 //! role-neutral material applier and must reproduce both live endpoints'
 //! mechanical observations byte-for-byte.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::error::Error;
-use std::sync::Arc;
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::m6::coop_campaign::{
-    self, CoopAnchor, CoopCandidateReplayV1, CoopCampaignV1, CoopEndpoint,
-    CoopPacketKind, CoopPacketSelector, CoopScheduledAction, CoopScheduledActionKind,
-    CoopTraceDigestV1, verify_authority_receipt_order, verify_commit_parity,
-    verify_replica_receipt_order,
+    self, CoopAnchor, CoopCampaignV1, CoopCandidateReplayV1, CoopEndpoint, CoopPacketKind,
+    CoopPacketSelector, CoopScheduledAction, CoopScheduledActionKind, CoopTraceDigestV1,
+    verify_authority_receipt_order, verify_commit_parity, verify_replica_receipt_order,
 };
 use er_kernel::snapshot::RestorableKernelSnapshotV2;
 use er_kernel::{
@@ -32,16 +28,21 @@ use er_types::battle_command::{
     BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
     scripted_enemy_command_operation_id,
 };
-use er_types::battle_ids::{BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, TurnIndex};
-use er_types::battle_ui::PresentationSettlementOutcome;
 use er_types::battle_control::BattleControl;
+use er_types::battle_ids::{
+    BattlePresentationEventId, BattleSide, FieldSlot, MoveSlotIndex, PartyIndex, TurnIndex,
+};
+use er_types::battle_ui::PresentationSettlementOutcome;
 use er_types::protocol::{AuthorityEntryKind, KernelEffect, KernelInput};
 use er_types::{
     AuthorityEntryBody, AuthorityReceiptBody, ConnectionGeneration, FrameContext, FrameType,
     InputFocus, LiveResourceSnapshot, MembershipRevision, PhysicalKey, ProposalMessage, RawFrame,
-    RawInputEvent, RunId, SafeU53, SessionId, SeatId, TimeClass, TimerId, TransportState,
+    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass, TimerId, TransportState,
 };
 use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::error::Error;
+use std::sync::Arc;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -678,9 +679,12 @@ fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicy
     let mut scripted_commands = Vec::new();
     let mut script_cursor = 0_u64;
     for turn_offset in 0..SCRIPTED_TURN_HORIZON {
-        let turn_value = battle.turn.get().get().checked_add(turn_offset).ok_or_else(|| {
-            invalid("scripted enemy horizon overflowed the turn index")
-        })?;
+        let turn_value = battle
+            .turn
+            .get()
+            .get()
+            .checked_add(turn_offset)
+            .ok_or_else(|| invalid("scripted enemy horizon overflowed the turn index"))?;
         let turn = TurnIndex::new(safe(turn_value))?;
         for position in 0..battle.format.enemy_capacity {
             let field_slot = FieldSlot::new(BattleSide::Enemy, position)?;
@@ -717,7 +721,10 @@ fn scripted_enemy_policy(battle: &BattleState) -> TestResult<ScriptedEnemyPolicy
             script_cursor += 1;
         }
     }
-    Ok(ScriptedEnemyPolicyV1::new(SafeU53::ZERO, scripted_commands)?)
+    Ok(ScriptedEnemyPolicyV1::new(
+        SafeU53::ZERO,
+        scripted_commands,
+    )?)
 }
 
 /// The proven M3 forced-victory seeding: player leads open with their
@@ -876,7 +883,10 @@ impl CampaignPump {
         );
         let mut pump = Self {
             campaign,
-            endpoint_of_seat: BTreeMap::from([(host_seat, Endpoint::Host), (guest_seat, Endpoint::Guest)]),
+            endpoint_of_seat: BTreeMap::from([
+                (host_seat, Endpoint::Host),
+                (guest_seat, Endpoint::Guest),
+            ]),
             content,
             kernels,
             queue: Vec::new(),
@@ -884,10 +894,7 @@ impl CampaignPump {
             clock_ms: 0,
             timers: BTreeMap::new(),
             connection_generation: generation_one,
-            connected: BTreeMap::from([
-                (Endpoint::Host, false),
-                (Endpoint::Guest, false),
-            ]),
+            connected: BTreeMap::from([(Endpoint::Host, false), (Endpoint::Guest, false)]),
             delivered_ordinals: HashMap::new(),
             applied_actions: BTreeSet::new(),
             commit_observations: Vec::new(),
@@ -987,7 +994,12 @@ impl CampaignPump {
                 } else {
                     return Err(invalid("SendProposal targeted an unknown seat"));
                 };
-                self.enqueue(source, to, PacketBody::Proposal(proposal), Some(CoopPacketKind::Proposal));
+                self.enqueue(
+                    source,
+                    to,
+                    PacketBody::Proposal(proposal),
+                    Some(CoopPacketKind::Proposal),
+                );
             }
             KernelEffect::ScheduleTimer {
                 endpoint,
@@ -995,9 +1007,10 @@ impl CampaignPump {
                 delay_ms,
                 ..
             } => {
-                let due = self.clock_ms.checked_add(delay_ms.get()).ok_or_else(|| {
-                    invalid("scheduled timer overflowed the virtual clock")
-                })?;
+                let due = self
+                    .clock_ms
+                    .checked_add(delay_ms.get())
+                    .ok_or_else(|| invalid("scheduled timer overflowed the virtual clock"))?;
                 self.timers.insert(TimerKey { endpoint, timer_id }, due);
             }
             KernelEffect::CancelTimer { endpoint, timer_id } => {
@@ -1047,7 +1060,9 @@ impl CampaignPump {
     fn set_transport(&mut self, endpoint: Endpoint, state: TransportState) -> TestResult<()> {
         let peer_state = match state {
             TransportState::Connected => TransportState::Connected,
-            TransportState::Disconnected | TransportState::Connecting => TransportState::Disconnected,
+            TransportState::Disconnected | TransportState::Connecting => {
+                TransportState::Disconnected
+            }
         };
         self.step(
             endpoint,
@@ -1065,10 +1080,8 @@ impl CampaignPump {
                 generation: self.connection_generation,
             },
         )?;
-        self.connected.insert(
-            endpoint,
-            matches!(state, TransportState::Connected),
-        );
+        self.connected
+            .insert(endpoint, matches!(state, TransportState::Connected));
         Ok(())
     }
 
@@ -1102,9 +1115,10 @@ impl CampaignPump {
             .find(|(index, entry)| {
                 !self.applied_actions.contains(index)
                     && match entry.anchor {
-                        CoopAnchor::BeforeDelivery { selector, ordinal: at } => {
-                            at == ordinal && Self::selector_matches(packet, &selector)
-                        }
+                        CoopAnchor::BeforeDelivery {
+                            selector,
+                            ordinal: at,
+                        } => at == ordinal && Self::selector_matches(packet, &selector),
                         _ => false,
                     }
             })
@@ -1159,9 +1173,7 @@ impl CampaignPump {
             if transport_op {
                 // The matched packet never reaches its receiver: it is torn
                 // down together with the endpoint's whole in-flight lane.
-                if let PacketBody::Frame(RawFrame::JsonValue(value)) =
-                    &self.queue[index].body
-                {
+                if let PacketBody::Frame(RawFrame::JsonValue(value)) = &self.queue[index].body {
                     if let Some(operation) = value
                         .get("body")
                         .and_then(|body| body.get("operationId"))
@@ -1223,9 +1235,10 @@ impl CampaignPump {
             .filter(|(action_index, entry)| {
                 !self.applied_actions.contains(action_index)
                     && match entry.anchor {
-                        CoopAnchor::AfterDelivery { selector, ordinal: at } => {
-                            at == ordinal && Self::selector_matches(&packet, &selector)
-                        }
+                        CoopAnchor::AfterDelivery {
+                            selector,
+                            ordinal: at,
+                        } => at == ordinal && Self::selector_matches(&packet, &selector),
                         _ => false,
                     }
             })
@@ -1277,9 +1290,9 @@ impl CampaignPump {
 
     /// True while any authority commit awaits delivery.
     fn commit_lane_busy(&self) -> bool {
-        self.queue.iter().any(|packet| {
-            matches!(packet.kind, Some(CoopPacketKind::AuthorityCommit))
-        })
+        self.queue
+            .iter()
+            .any(|packet| matches!(packet.kind, Some(CoopPacketKind::AuthorityCommit)))
     }
 
     /// Earliest deliverable packet. The authority-commit lane is ordered:
@@ -1301,12 +1314,10 @@ impl CampaignPump {
             .iter()
             .enumerate()
             .filter(|(_, packet)| {
-                let lane_blocked = packet
-                    .kind
-                    .is_some_and(|kind| {
-                        matches!(kind, CoopPacketKind::AuthorityCommit)
-                            && lane_heads[&(kind, packet.from, packet.to)] != packet.seq
-                    });
+                let lane_blocked = packet.kind.is_some_and(|kind| {
+                    matches!(kind, CoopPacketKind::AuthorityCommit)
+                        && lane_heads[&(kind, packet.from, packet.to)] != packet.seq
+                });
                 !lane_blocked && packet.deliver_at_ms <= self.clock_ms
             })
             .min_by_key(|(_, packet)| (packet.deliver_at_ms, packet.seq))
@@ -1322,11 +1333,16 @@ impl CampaignPump {
         let host = self.kernel(Endpoint::Host).snapshot().state;
         let guest = self.kernel(Endpoint::Guest).snapshot().state;
         let Some((sender, entry)) = self.authority_entries.last() else {
-            return Err(invalid("commit capture without an observed authority entry"));
+            return Err(invalid(
+                "commit capture without an observed authority entry",
+            ));
         };
         let entry = entry.clone();
         let sender = *sender;
-        if self.captured_commit_ids.insert(entry.operation_id.to_string()) {
+        if self
+            .captured_commit_ids
+            .insert(entry.operation_id.to_string())
+        {
             self.commit_observations.push(CommitObservation {
                 sender,
                 entry,
@@ -1413,12 +1429,9 @@ impl CampaignPump {
         }
         // Idle means something to rebind: transport traffic has already
         // flowed and at least one endpoint sits torn down.
-        let committed = self
-            .delivered_ordinals
-            .iter()
-            .any(|((kind, _, _), count)| {
-                matches!(kind, CoopPacketKind::AuthorityCommit) && *count > 0
-            });
+        let committed = self.delivered_ordinals.iter().any(|((kind, _, _), count)| {
+            matches!(kind, CoopPacketKind::AuthorityCommit) && *count > 0
+        });
         let torn_down = self.connected.values().any(|connected| !connected);
         if !committed || !torn_down {
             return Ok(false);
@@ -1439,7 +1452,11 @@ impl CampaignPump {
 
     fn fire_due_timer(&mut self) -> TestResult<bool> {
         let now = self.clock_ms;
-        let Some((key, _)) = self.timers.iter().find(|(_, due)| **due <= now).map(|(key, due)| (*key, *due))
+        let Some((key, _)) = self
+            .timers
+            .iter()
+            .find(|(_, due)| **due <= now)
+            .map(|(key, due)| (*key, *due))
         else {
             return Ok(false);
         };
@@ -1599,7 +1616,6 @@ impl CampaignPump {
     }
 }
 
-
 fn operation_id_str(operation_id: &er_types::OperationId) -> &str {
     operation_id.as_str()
 }
@@ -1662,8 +1678,7 @@ fn finish_and_verify(mut pump: CampaignPump) -> TestResult<CampaignEvidence> {
     let strict_parity = !pump.campaign.actions.iter().any(|action| {
         matches!(
             action.action,
-            CoopScheduledActionKind::Disconnect { .. }
-                | CoopScheduledActionKind::Reconnect { .. }
+            CoopScheduledActionKind::Disconnect { .. } | CoopScheduledActionKind::Reconnect { .. }
         )
     });
 
@@ -1748,11 +1763,7 @@ fn finish_and_verify(mut pump: CampaignPump) -> TestResult<CampaignEvidence> {
         .iter()
         .map(|commit| commit.revision)
         .collect::<Vec<_>>();
-    verify_replica_receipt_order(
-        pump.campaign.guest_seat,
-        &ledger,
-        &observed_receipts,
-    )?;
+    verify_replica_receipt_order(pump.campaign.guest_seat, &ledger, &observed_receipts)?;
     let mut receipt_revisions: Vec<u64> = committed_revisions
         .iter()
         .map(|revision| revision.get().get())
@@ -1821,7 +1832,9 @@ fn finish_and_verify(mut pump: CampaignPump) -> TestResult<CampaignEvidence> {
     // Zero-resource teardown: explicit disposal is the final lifecycle action.
     let _residual_packets = pump.queue.len();
     for endpoint in [Endpoint::Host, Endpoint::Guest] {
-        let effects = pump.kernel_mut(endpoint).dispose("m6 co-op campaign complete");
+        let effects = pump
+            .kernel_mut(endpoint)
+            .dispose("m6 co-op campaign complete");
         drop(effects);
         assert_eq!(
             pump.kernel(endpoint).live_resources(),
@@ -1990,7 +2003,6 @@ fn combined_fault_campaign(seed: u64) -> TestResult<CoopCampaignV1> {
         ],
     )?)
 }
-
 
 // ---------------------------------------------------------------------------
 // Tests.

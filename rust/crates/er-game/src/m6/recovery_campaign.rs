@@ -28,7 +28,7 @@ use er_canonical::content_digest;
 use er_state::migration::{M3ToM4MigrationContext, migrate_m3_game_state};
 use er_state::migration_v3::{GameStateV3, migrate_game_v2_to_v3};
 use er_state::migration_v4::{
-    GameStateV4, MigrationEvidenceV4, M5ToM6MigrationContext, migrate_m5_to_m6,
+    GameStateV4, M5ToM6MigrationContext, MigrationEvidenceV4, migrate_m5_to_m6,
 };
 use er_state::snapshot::GameState as GameStateV1;
 use er_types::PhysicalKey;
@@ -298,8 +298,6 @@ pub fn campaign(boundary: RecoveryBoundaryKind) -> RecoveryCampaign {
                     endpoint: CampaignEndpoint::Replica,
                     connected: false,
                 },
-            ],
-            vec![
                 CampaignStep::FireScheduledTimers {
                     endpoint: CampaignEndpoint::Replica,
                 },
@@ -307,8 +305,8 @@ pub fn campaign(boundary: RecoveryBoundaryKind) -> RecoveryCampaign {
                     endpoint: CampaignEndpoint::Replica,
                     connected: true,
                 },
-                deliver_all(),
             ],
+            vec![deliver_all()],
         ),
         RecoveryBoundaryKind::PendingPresentation => (
             "m6d-recovery/pending-presentation",
@@ -334,6 +332,7 @@ pub fn campaign(boundary: RecoveryBoundaryKind) -> RecoveryCampaign {
                 press_enter(CampaignEndpoint::Authority),
                 press_enter(CampaignEndpoint::Replica),
                 press_enter(CampaignEndpoint::Replica),
+                press_right(CampaignEndpoint::Replica),
                 press_enter(CampaignEndpoint::Replica),
                 deliver_non_authority_packets(),
                 deliver_all(),
@@ -376,6 +375,14 @@ fn press_enter(endpoint: CampaignEndpoint) -> CampaignStep {
     }
 }
 
+fn press_right(endpoint: CampaignEndpoint) -> CampaignStep {
+    CampaignStep::Press {
+        endpoint,
+        code: PhysicalKey::ArrowRight,
+        printable: false,
+    }
+}
+
 fn key_up_enter(endpoint: CampaignEndpoint) -> CampaignStep {
     CampaignStep::KeyUp {
         endpoint,
@@ -406,7 +413,6 @@ pub struct RecoveryFrontierContexts {
     /// M5 → M6 program-binding context pinning the prepared-content identity.
     pub m5_to_m6: M5ToM6MigrationContext,
 }
-
 
 /// Capture the canonical Snapshot V5 frontier of a live mechanical state.
 ///
@@ -543,9 +549,7 @@ pub enum ContinuationAxis {
 
 /// A fail-closed continuation mismatch.
 #[derive(Clone, Debug, Eq, PartialEq, Error)]
-#[error(
-    "continuation diverged at step {step_index} ({step_label}) on axis {axis:?}: {detail}"
-)]
+#[error("continuation diverged at step {step_index} ({step_label}) on axis {axis:?}: {detail}")]
 pub struct ContinuationMismatch {
     /// Index of the diverging continuation step.
     pub step_index: usize,
@@ -583,13 +587,12 @@ pub fn assert_continuation_identical(
         });
     }
     for (index, (expected, actual)) in native.iter().zip(restored.iter()).enumerate() {
-        let mismatch =
-            |axis: ContinuationAxis, detail: String| ContinuationMismatch {
-                step_index: index,
-                step_label: expected.label.clone(),
-                axis,
-                detail,
-            };
+        let mismatch = |axis: ContinuationAxis, detail: String| ContinuationMismatch {
+            step_index: index,
+            step_label: expected.label.clone(),
+            axis,
+            detail,
+        };
         if expected.label != actual.label {
             return Err(mismatch(
                 ContinuationAxis::Effects,
@@ -645,8 +648,8 @@ pub fn assert_continuation_identical(
 /// Wire tampering vectors proving Snapshot V5 envelopes fail closed.
 ///
 /// Every vector performs a deterministic, structure-preserving mutation of a
-/// serialized recovery envelope (`{"kernel": …, "frontier": …}`) so that a
-/// downstream validator must reject the envelope instead of repairing it.
+/// serialized direct V5 recovery envelope (`{"frontier": …}`) so that the
+/// V5 owner constructor must reject it instead of repairing it.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SnapshotV5TamperVector {
     /// Bump the frontier schema version.
@@ -659,12 +662,11 @@ pub enum SnapshotV5TamperVector {
     PreparedBattleContentHash,
     /// Swap the prepared semantic-catalog identity hash.
     SemanticCatalogHash,
-    /// Mutate the canonical `game_v4` frontier so it stops matching the
-    /// embedded base snapshot frontier.
+    /// Mutate the canonical `GameStateV4` schema inside the live runtime.
     CanonicalGameFrontier,
-    /// Mutate the base V3 canonical frontier so it stops matching `game_v4`.
+    /// Mutate the canonical `GameStateV2` base inside the live V4 state.
     BaseCanonicalFrontier,
-    /// Bump the embedded kernel endpoint snapshot schema version.
+    /// Bump the direct V4 runtime snapshot schema version.
     KernelEndpointSchema,
 }
 
@@ -709,8 +711,8 @@ pub fn apply_snapshot_v5_tamper(
     };
     match vector {
         SnapshotV5TamperVector::FrontierSchemaVersion => {
-            let version = path_u64(&tampered, &["frontier", "schema_version"])
-                .ok_or_else(missing)?;
+            let version =
+                path_u64(&tampered, &["frontier", "schema_version"]).ok_or_else(missing)?;
             *path_mut(&mut tampered, &["frontier", "schema_version"]).ok_or_else(missing)? =
                 Value::from(version + 1);
         }
@@ -721,11 +723,13 @@ pub fn apply_snapshot_v5_tamper(
                 .ok_or_else(missing)? = Value::from(version + 1);
         }
         SnapshotV5TamperVector::MechanicStateSchemaVersion => {
-            let version =
-                path_u64(&tampered, &["frontier", "mechanic_state_schema_version"])
-                    .ok_or_else(missing)?;
-            *path_mut(&mut tampered, &["frontier", "mechanic_state_schema_version"])
-                .ok_or_else(missing)? = Value::from(version + 1);
+            let version = path_u64(&tampered, &["frontier", "mechanic_state_schema_version"])
+                .ok_or_else(missing)?;
+            *path_mut(
+                &mut tampered,
+                &["frontier", "mechanic_state_schema_version"],
+            )
+            .ok_or_else(missing)? = Value::from(version + 1);
         }
         SnapshotV5TamperVector::PreparedBattleContentHash => {
             *path_mut(
@@ -744,22 +748,23 @@ pub fn apply_snapshot_v5_tamper(
         SnapshotV5TamperVector::CanonicalGameFrontier => {
             bump_mode(
                 &mut tampered,
-                &["frontier", "game_v4", "base", "schema_version"],
+                &["frontier", "runtime", "state", "schema_version"],
                 missing,
             )?;
         }
         SnapshotV5TamperVector::BaseCanonicalFrontier => {
             bump_mode(
                 &mut tampered,
-                &["frontier", "base", "game_v3", "base", "schema_version"],
+                &["frontier", "runtime", "state", "base", "schema_version"],
                 missing,
             )?;
         }
         SnapshotV5TamperVector::KernelEndpointSchema => {
-            let version = path_u64(&tampered, &["kernel", "schema_version"])
-                .ok_or_else(missing)?;
-            *path_mut(&mut tampered, &["kernel", "schema_version"]).ok_or_else(missing)? =
-                Value::from(version + 1);
+            bump_mode(
+                &mut tampered,
+                &["frontier", "runtime", "schema_version"],
+                missing,
+            )?;
         }
     }
     Ok(tampered)

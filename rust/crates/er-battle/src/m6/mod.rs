@@ -9,9 +9,9 @@ pub mod bespoke;
 pub mod item_executor;
 pub mod move_executor;
 pub mod routine_executor;
-pub mod system;
 pub mod status_field_executor;
 pub mod switch_target_executor;
+pub mod system;
 
 pub use move_executor::{
     MoveRoutineAdapterError, MoveRoutineStep, PreparedMoveRoutine, prepare_move_routine,

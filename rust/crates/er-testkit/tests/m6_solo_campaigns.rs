@@ -17,17 +17,17 @@ use er_content::pack::m6_pack::{
 };
 use er_content::pack::m6_prepared::prepare_content;
 use er_content::pack::selected_content_pack;
+use er_content_compiler::m6::{
+    SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog,
+};
 use er_game::m6::solo_campaign::{
-    self, SoloBattlePlan, SoloCampaignConfig, SoloCampaignHost, SoloCampaignRun,
-    SoloCombatantPlan, SoloContentTable, SoloControlKind, SoloFirstDivergence, SoloObservation,
+    self, SoloBattlePlan, SoloCampaignConfig, SoloCampaignHost, SoloCampaignRun, SoloCombatantPlan,
+    SoloContentTable, SoloControlKind, SoloFirstDivergence, SoloObservation,
     first_trace_divergence, plan_solo_campaign, run_solo_campaign,
 };
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
     KernelEffect, KernelInput,
-};
-use er_content_compiler::m6::{
-    SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog,
 };
 use er_protocol::{AuthorityLogConfig, BackoffPolicy};
 use er_rng::phaser::{PhaserRdg, RunRngState};
@@ -73,7 +73,8 @@ static PREPARED_FULL_CONTENT_IDENTITY: LazyLock<Result<String, String>> = LazyLo
         "../../../fixtures/m6/semantic-catalog-v1.json"
     ))
     .map_err(|error| error.to_string())?;
-    let raw_hash = CatalogHash::parse(catalog.raw_catalog_hash.clone()).map_err(|e| e.to_string())?;
+    let raw_hash =
+        CatalogHash::parse(catalog.raw_catalog_hash.clone()).map_err(|e| e.to_string())?;
     let validated = ValidatedSemanticCatalog::new(SemanticCatalogInput::new(catalog, raw_hash))
         .map_err(|error| error.to_string())?;
     let mapped = map_routine_catalog(validated.behavior_units()).map_err(|e| e.to_string())?;
@@ -229,9 +230,7 @@ impl KernelHost {
             BattleControl::Waiting(_) => (SoloControlKind::Waiting, None, None),
             BattleControl::Complete(outcome) => (SoloControlKind::Complete, None, Some(*outcome)),
         };
-        let options = menu
-            .map(visible_option_ids)
-            .unwrap_or_default();
+        let options = menu.map(visible_option_ids).unwrap_or_default();
         let selected = menu
             .map(|menu| menu.selected_option_id.as_str().to_owned())
             .unwrap_or_default();
@@ -255,7 +254,9 @@ impl KernelHost {
                     | KernelEffect::ApplyAuthorityMaterial { .. }
                     | KernelEffect::ProjectAuthorityControl { .. }
             ) {
-                return Err(format!("battle mode emitted a compatibility effect: {effect:?}").into());
+                return Err(
+                    format!("battle mode emitted a compatibility effect: {effect:?}").into(),
+                );
             }
         }
         Ok(())
@@ -339,10 +340,7 @@ impl KernelHost {
         .map_err(|error| error.into())
     }
 
-    fn open_battle_plan(
-        &mut self,
-        plan: &SoloBattlePlan,
-    ) -> TestResult<()> {
+    fn open_battle_plan(&mut self, plan: &SoloBattlePlan) -> TestResult<()> {
         let content = Arc::clone(&self.content);
         let battle_index = u64::from(plan.battle_index) + 1;
         let battle_id = BattleId::new(safe(battle_index));
@@ -461,7 +459,8 @@ impl SoloCampaignHost for KernelHost {
         &mut self,
         plan: &SoloBattlePlan,
     ) -> Result<(SoloObservation, Vec<BattlePresentationEvent>), Self::Error> {
-        self.open_battle_plan(plan).map_err(|error| error.to_string())?;
+        self.open_battle_plan(plan)
+            .map_err(|error| error.to_string())?;
         let observation = self.observe_screen().map_err(|error| error.to_string())?;
         Ok((observation, Vec::new()))
     }
@@ -511,7 +510,10 @@ impl SoloCampaignHost for KernelHost {
     }
 
     fn live_resources(&self) -> Result<LiveResourceSnapshot, Self::Error> {
-        Ok(self.kernel().map_err(|error| error.to_string())?.live_resources())
+        Ok(self
+            .kernel()
+            .map_err(|error| error.to_string())?
+            .live_resources())
     }
 
     fn close_battle(&mut self) -> Result<(), Self::Error> {
@@ -533,16 +535,20 @@ fn planning_is_deterministic_and_fails_closed() -> TestResult {
 
     let first = plan_solo_campaign(&config, &table)?;
     let second = plan_solo_campaign(&config, &table)?;
-    assert_eq!(first, second, "identical seeds must produce identical plans");
+    assert_eq!(
+        first, second,
+        "identical seeds must produce identical plans"
+    );
     assert_eq!(first.battles.len(), 3);
     assert_eq!(first.digest()?, second.digest()?);
-    assert!(first.digest()?.starts_with(er_canonical::CONTENT_DIGEST_KIND));
+    assert!(
+        first
+            .digest()?
+            .starts_with(er_canonical::CONTENT_DIGEST_KIND)
+    );
 
     // Plans differ across seeds but stay structurally valid.
-    let other = plan_solo_campaign(
-        &SoloCampaignConfig::new("plan-determinism-2", 3)?,
-        &table,
-    )?;
+    let other = plan_solo_campaign(&SoloCampaignConfig::new("plan-determinism-2", 3)?, &table)?;
     assert_ne!(first, other);
 
     let rejected = [
@@ -593,13 +599,24 @@ fn seeded_solo_campaigns_reach_terminal_outcomes_over_prepared_full_content() ->
         );
         for record in &run.report.battles {
             assert!(
-                matches!(record.outcome, BattleOutcome::Victory | BattleOutcome::Defeat),
+                matches!(
+                    record.outcome,
+                    BattleOutcome::Victory | BattleOutcome::Defeat
+                ),
                 "battle {} ended non-terminal: {:?}",
                 record.index,
                 record.outcome
             );
-            assert!(record.inputs > 0, "battle {} took no physical input", record.index);
-            assert!(record.settlements > 0, "battle {} settled nothing", record.index);
+            assert!(
+                record.inputs > 0,
+                "battle {} took no physical input",
+                record.index
+            );
+            assert!(
+                record.settlements > 0,
+                "battle {} settled nothing",
+                record.index
+            );
             assert!(
                 record
                     .final_frontier_digest
@@ -649,7 +666,9 @@ fn identical_seed_and_trace_replays_byte_identically() -> TestResult {
     // First-divergence evidence: a single mutated entry is located exactly.
     let mut tampered_trace = first.trace.clone();
     match &mut tampered_trace[1] {
-        solo_campaign::SoloTraceEntry::BattleOpened { frontier_digest, .. } => {
+        solo_campaign::SoloTraceEntry::BattleOpened {
+            frontier_digest, ..
+        } => {
             frontier_digest.insert_str(0, "f");
         }
         other => panic!("expected BattleOpened trace header, found {other:?}"),

@@ -27,8 +27,7 @@ use er_canonical::{CanonicalError, canonical_bytes, content_digest};
 use er_rng::phaser::PhaserRdg;
 use er_types::{
     InputFocus, LiveResourceSnapshot, PhysicalKey, RawInputEvent, SafeU53,
-    battle_ids::BattlePresentationEventId,
-    battle_model::BattleOutcome,
+    battle_ids::BattlePresentationEventId, battle_model::BattleOutcome,
     battle_ui::BattlePresentationEvent,
 };
 use serde::{Deserialize, Serialize};
@@ -136,7 +135,9 @@ impl SoloCampaignConfig {
             )));
         }
         if self.seed.is_empty() {
-            return Err(SoloCampaignError::Config("campaign seed is empty".to_owned()));
+            return Err(SoloCampaignError::Config(
+                "campaign seed is empty".to_owned(),
+            ));
         }
         if self.battles == 0 || self.battles > SOLO_CAMPAIGN_MAX_BATTLES {
             return Err(SoloCampaignError::Config(format!(
@@ -228,8 +229,7 @@ pub fn plan_solo_campaign(
     let mut rng = PhaserRdg::from_seeds(&[config.seed.as_str(), "m6-solo-campaign-plan"]);
     let mut battles = Vec::with_capacity(usize::try_from(config.battles).unwrap_or(0));
     for battle_index in 0..config.battles {
-        let party_size =
-            usize::try_from(rng.pick_index(PARTY_SIZE_CARDINALITY)?).unwrap_or(0) + 1;
+        let party_size = usize::try_from(rng.pick_index(PARTY_SIZE_CARDINALITY)?).unwrap_or(0) + 1;
         let player_favored = rng.pick_index(2)? == 0;
         let mut player_party = Vec::with_capacity(party_size);
         for ordinal in 0..party_size {
@@ -515,10 +515,7 @@ pub enum SoloCampaignError {
     #[error("planning failed: {0}")]
     Planning(String),
     #[error("host rejected {step}: {message}")]
-    Host {
-        step: &'static str,
-        message: String,
-    },
+    Host { step: &'static str, message: String },
     #[error("battle {battle_index} exhausted its {budget}-input budget without terminating")]
     InputBudgetExhausted { battle_index: u32, budget: u32 },
     #[error("battle {battle_index} exhausted its {budget}-settlement budget")]
@@ -532,10 +529,7 @@ pub enum SoloCampaignError {
     #[error("battle {battle_index} stalled without an actionable control")]
     IdleStall { battle_index: u32 },
     #[error("navigation to option {option:?} failed in battle {battle_index}")]
-    NavigationFailed {
-        battle_index: u32,
-        option: String,
-    },
+    NavigationFailed { battle_index: u32, option: String },
     #[error("battle {battle_index} reached Complete without a terminal outcome")]
     NotTerminal { battle_index: u32 },
     #[error("battle {battle_index} closed with live resources: {resources:?}")]
@@ -630,7 +624,14 @@ fn run_single_battle<H: SoloCampaignHost>(
     let mut drive_rng = PhaserRdg::from_seeds(&[config.seed.as_str(), drive_seed.as_str()]);
 
     let mut pending: VecDeque<BattlePresentationEvent> = opening_events.into_iter().collect();
-    drain_presentations(host, trace, battle_index, config, &mut counters, &mut pending)?;
+    drain_presentations(
+        host,
+        trace,
+        battle_index,
+        config,
+        &mut counters,
+        &mut pending,
+    )?;
 
     let outcome = loop {
         let observation = host
@@ -638,9 +639,9 @@ fn run_single_battle<H: SoloCampaignHost>(
             .map_err(|error| host_error("observe", error))?;
         match observation.control {
             SoloControlKind::Complete => {
-                break observation.outcome.ok_or(SoloCampaignError::NotTerminal {
-                    battle_index,
-                })?;
+                break observation
+                    .outcome
+                    .ok_or(SoloCampaignError::NotTerminal { battle_index })?;
             }
             SoloControlKind::Waiting => {
                 counters.idle_observations += 1;
@@ -698,7 +699,14 @@ fn run_single_battle<H: SoloCampaignHost>(
 
         // Presentations emitted by the last action settle before any further
         // decision, mirroring virtual renderer callback ordering.
-        drain_presentations(host, trace, battle_index, config, &mut counters, &mut pending)?;
+        drain_presentations(
+            host,
+            trace,
+            battle_index,
+            config,
+            &mut counters,
+            &mut pending,
+        )?;
 
         let settled_observation = host
             .observe()
@@ -725,7 +733,14 @@ fn run_single_battle<H: SoloCampaignHost>(
     if !matches!(outcome, BattleOutcome::Victory | BattleOutcome::Defeat) {
         return Err(SoloCampaignError::NotTerminal { battle_index });
     }
-    drain_presentations(host, trace, battle_index, config, &mut counters, &mut pending)?;
+    drain_presentations(
+        host,
+        trace,
+        battle_index,
+        config,
+        &mut counters,
+        &mut pending,
+    )?;
     let final_frontier_digest = host
         .frontier_digest()
         .map_err(|error| host_error("frontier_digest", error))?;
@@ -787,7 +802,15 @@ fn press_command_root<H: SoloCampaignHost>(
         && drive_rng.pick_index(SWITCH_PERIOD)? == 0;
     if wants_switch {
         let target = switch_option.unwrap_or_default();
-        return select_and_confirm(host, trace, battle_index, config, counters, &target, pending);
+        return select_and_confirm(
+            host,
+            trace,
+            battle_index,
+            config,
+            counters,
+            &target,
+            pending,
+        );
     }
     let fight_target = observation
         .options
@@ -825,12 +848,14 @@ fn first_option(
     observation: &SoloObservation,
     battle_index: u32,
 ) -> Result<String, SoloCampaignError> {
-    observation.options.first().cloned().ok_or_else(|| {
-        SoloCampaignError::NavigationFailed {
+    observation
+        .options
+        .first()
+        .cloned()
+        .ok_or_else(|| SoloCampaignError::NavigationFailed {
             battle_index,
             option: "<empty-menu>".to_owned(),
-        }
-    })
+        })
 }
 
 fn select_and_confirm<H: SoloCampaignHost>(

@@ -2,8 +2,8 @@
 
 pub mod clock;
 pub mod m4_pair;
-pub mod network;
 pub mod m6_benchmark;
+pub mod network;
 pub mod pair;
 pub mod presenter;
 pub mod snapshot;

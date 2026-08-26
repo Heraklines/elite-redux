@@ -547,18 +547,20 @@ pub fn apply_major_status(
     input: StatusApplicationInput,
 ) -> Result<StatusApplicationOutcome, StatusError> {
     if input.bypass != StatusBypass::None {
-        return Err(StatusError::UnsupportedBypass { bypass: input.bypass });
+        return Err(StatusError::UnsupportedBypass {
+            bypass: input.bypass,
+        });
     }
     match input.requested {
         StatusKind::None => {
             return Ok(StatusApplicationOutcome::Rejected {
                 reason: StatusRejection::IntrinsicSentinel,
-            })
+            });
         }
         StatusKind::Sleep => {
             return Ok(StatusApplicationOutcome::Rejected {
                 reason: StatusRejection::SleepWindowRequired,
-            })
+            });
         }
         StatusKind::Burn | StatusKind::Paralysis | StatusKind::Poison | StatusKind::Toxic => {}
     }
@@ -608,8 +610,7 @@ pub fn roll_sleep_window(runtime: &mut RngRuntime) -> Result<u16, StatusError> {
         RngCallsiteId::mechanics(RngReason::StatusDuration),
     )?;
     // The inclusive [2, 4] window always fits u16 by construction.
-    let window = u16::try_from(draw.get())
-        .expect("status-duration range draw stays within [2, 4]");
+    let window = u16::try_from(draw.get()).expect("status-duration range draw stays within [2, 4]");
     Ok(window)
 }
 

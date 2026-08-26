@@ -27,12 +27,12 @@ use er_content_compiler::m6::{
     SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog,
 };
 use er_mechanics::program_v2::MechanicsProgramV2;
-use er_types::mechanics::MechanicsProgramId;
 use er_mechanics::selector_operation_v2::{
     MechanicOperationV2, QueryModifierStageV2, QueryModifierV2,
 };
+use er_types::mechanics::MechanicsProgramId;
 use er_types::{
-    BehaviorSourceId, BehaviorUnitId, BespokeMechanicId, CatalogHash, BehaviorUnitKind,
+    BehaviorSourceId, BehaviorUnitId, BehaviorUnitKind, BespokeMechanicId, CatalogHash,
 };
 use serde::Deserialize;
 
@@ -60,7 +60,10 @@ struct WitnessPlanFile {
 fn fixtures_dir() -> Result<PathBuf, Box<dyn Error>> {
     fn walk(dir: &Path) -> Option<PathBuf> {
         let candidate = dir.join("fixtures").join("m6");
-        candidate.join("semantic-catalog-v1.json").is_file().then_some(candidate)
+        candidate
+            .join("semantic-catalog-v1.json")
+            .is_file()
+            .then_some(candidate)
     }
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     for ancestor in manifest.ancestors() {
@@ -340,8 +343,10 @@ fn full_witness_matrix_executes_through_prepared_dispatch() -> Result<(), Box<dy
     // Determinism: rerunning the identical plan reproduces every digest.
     let replayed = run_all_shards(&domain, 16, &witnesses)?;
     fn digests_of(runs: &[ShardRun]) -> Vec<(u32, &String)> {
-        let mut digests: Vec<(u32, &String)> =
-            runs.iter().map(|(index, digest, _)| (*index, digest)).collect();
+        let mut digests: Vec<(u32, &String)> = runs
+            .iter()
+            .map(|(index, digest, _)| (*index, digest))
+            .collect();
         digests.sort();
         digests
     }
@@ -350,9 +355,7 @@ fn full_witness_matrix_executes_through_prepared_dispatch() -> Result<(), Box<dy
     // Shard independence: a different shard count yields identical per-unit
     // evidence once grouped by unit identity.
     let seven = run_all_shards(&domain, 7, &witnesses)?;
-    fn flatten(
-        runs: &[ShardRun],
-    ) -> BTreeMap<&BehaviorUnitId, &MoveUnitParityRecord> {
+    fn flatten(runs: &[ShardRun]) -> BTreeMap<&BehaviorUnitId, &MoveUnitParityRecord> {
         runs.iter()
             .flat_map(|(_, _, records)| records.iter())
             .collect()
@@ -402,7 +405,10 @@ fn full_witness_matrix_executes_through_prepared_dispatch() -> Result<(), Box<dy
 fn staged_modifier_label(program: &MechanicsProgramV2) -> &'static str {
     let binding = &program.bindings[0];
     let operation = &program.operations[usize::from(binding.operations.start)];
-    let MechanicOperationV2::Query { stage, modifier, .. } = operation else {
+    let MechanicOperationV2::Query {
+        stage, modifier, ..
+    } = operation
+    else {
         panic!("compiled move routines are query-only");
     };
     match (modifier, stage) {
@@ -501,13 +507,16 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
     let domain = prepared_domain()?;
 
     // A bespoke unit routed through the compiled surface fails closed.
-    let bespoke_unit = first_bespoke_gap_unit(catalog.behavior_units())
-        .expect("bespoke move units exist");
+    let bespoke_unit =
+        first_bespoke_gap_unit(catalog.behavior_units()).expect("bespoke move units exist");
     let error = domain
         .require_compiled_unit(&bespoke_unit)
         .err()
         .expect("bespoke unit must not compile");
-    assert!(matches!(error, MoveParityError::NotACompiledMoveUnit { .. }));
+    assert!(matches!(
+        error,
+        MoveParityError::NotACompiledMoveUnit { .. }
+    ));
 
     // An unassigned bespoke gap fails closed during inventory construction.
     let reduced_routes: Vec<BespokeClusterRoute> = routes
@@ -526,7 +535,10 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
     let error = build_move_domain_inventory(catalog.behavior_units(), &routines, &reduced_routes)
         .err()
         .expect("unassigned bespoke gap must fail closed");
-    assert!(matches!(error, MoveParityError::UnassignedBespokeGap { .. }));
+    assert!(matches!(
+        error,
+        MoveParityError::UnassignedBespokeGap { .. }
+    ));
 
     // Dropping every routine program leaves operand units residual.
     let error = build_move_domain_inventory(catalog.behavior_units(), &[], &routes)
@@ -551,7 +563,10 @@ fn unsupported_and_residual_identities_fail_closed() -> Result<(), Box<dyn Error
         build_move_domain_inventory(catalog.behavior_units(), &routines, &duplicated_routes)
             .err()
             .expect("duplicate bespoke route must fail closed");
-    assert!(matches!(error, MoveParityError::DuplicateBespokeRoute { .. }));
+    assert!(matches!(
+        error,
+        MoveParityError::DuplicateBespokeRoute { .. }
+    ));
 
     // A shard whose units lack witnesses cannot run.
     let empty_witnesses: BTreeMap<BehaviorUnitId, OracleWitness> = BTreeMap::new();

@@ -25,35 +25,35 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use er_content::pack::m6_pack::species_gap::{
-    self, ErGapDerivationError, ErGapSpeciesClass, ErGapSpeciesSource,
-};
-use er_content::species::SpeciesBaseStats;
-use er_state::bespoke_v2::forms::{
-    FormCueKindV2, FormIdentityV2, FormOverlayKindV2, FormsStateV2, SpeciesFormRegistryV2,
-    MAX_POKEMON_TYPE_ORDINAL,
-};
-use er_state::bespoke_v2::transform_imposter::{
-    TRANSFORM_COPIED_PP_CAP, TransformCopiedAbilitiesV2, TransformCopiedBattleStateV2,
-    TransformCopiedGenderV2, TransformCopiedMoveV2, TransformCopiedStatsV2,
-    TransformCopyTriggerV2, TransformFormCopyStateV2,
-};
-use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, PokemonId};
-use er_types::battle_model::{BattleStats, BattleTyping, PokemonType, PokemonTyping, StatStages};
-use er_types::m6::FormId;
-use er_types::mechanics::MechanicScope;
-use er_types::SafeU53;
-use serde_json::Value;
-use thiserror::Error;
 use crate::m6::bespoke::forms::{
     FormsOutcomeV2, FormsTransitionError, admit_mega, admit_tera, cleanup_battle_end,
     cleanup_on_switch, require_species_metadata, resolve_pending_stance, stage_stance_request,
 };
 use crate::m6::bespoke::transform_imposter::{
-    TransformBattlerFactsV2, TransformCopiedFieldV2, TransformImposterFactsV2,
-    TransformImposterError, TransformSourceMoveFactsV2, TransformTransitionKindV2,
+    TransformBattlerFactsV2, TransformCopiedFieldV2, TransformImposterError,
+    TransformImposterFactsV2, TransformSourceMoveFactsV2, TransformTransitionKindV2,
     apply_transform_copy, clear_transform_copy, copied_field_evidence, plan_transform_copy,
 };
+use er_content::pack::m6_pack::species_gap::{
+    self, ErGapDerivationError, ErGapSpeciesClass, ErGapSpeciesSource,
+};
+use er_content::species::SpeciesBaseStats;
+use er_state::bespoke_v2::forms::{
+    FormCueKindV2, FormIdentityV2, FormOverlayKindV2, FormsStateV2, MAX_POKEMON_TYPE_ORDINAL,
+    SpeciesFormRegistryV2,
+};
+use er_state::bespoke_v2::transform_imposter::{
+    TRANSFORM_COPIED_PP_CAP, TransformCopiedAbilitiesV2, TransformCopiedBattleStateV2,
+    TransformCopiedGenderV2, TransformCopiedMoveV2, TransformCopiedStatsV2, TransformCopyTriggerV2,
+    TransformFormCopyStateV2,
+};
+use er_types::SafeU53;
+use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, PokemonId};
+use er_types::battle_model::{BattleStats, BattleTyping, PokemonType, PokemonTyping, StatStages};
+use er_types::m6::FormId;
+use er_types::mechanics::MechanicScope;
+use serde_json::Value;
+use thiserror::Error;
 
 /// Exact frozen species identity closure of the raw source oracle.
 pub const ORACLE_SPECIES_CLOSURE_COUNT: usize = 2018;
@@ -90,11 +90,10 @@ pub enum SpeciesFormParityError {
     },
     #[error("ability table declares duplicate member `{0}`")]
     DuplicateAbilityMember(String),
-    #[error("species {id}: content evidence is incomplete (non-null `{field}` inside an extraction gap)")]
-    MixedIdentityEvidence {
-        id: u64,
-        field: &'static str,
-    },
+    #[error(
+        "species {id}: content evidence is incomplete (non-null `{field}` inside an extraction gap)"
+    )]
+    MixedIdentityEvidence { id: u64, field: &'static str },
     #[error(
         "species {id}: base stat total {declared} differs from the resolved stat sum {resolved}"
     )]
@@ -124,7 +123,11 @@ pub enum SpeciesFormParityError {
     #[error(
         "species {id}: pinned derivation key `{record}` does not bind the frozen oracle key `{oracle}`"
     )]
-    GapKeyBindingMismatch { id: u64, record: String, oracle: String },
+    GapKeyBindingMismatch {
+        id: u64,
+        record: String,
+        oracle: String,
+    },
     #[error(
         "species {id}: copy-source species {source_id} is not compiled ahead of the gap identity"
     )]
@@ -160,14 +163,12 @@ impl AbilityTable {
                     field: "member",
                 })?
                 .to_owned();
-            let numeric_id =
-                value
-                    .get("numeric_id")
-                    .and_then(Value::as_u64)
-                    .ok_or(SpeciesFormParityError::MalformedField {
-                        identity: format!("ability {member}"),
-                        field: "numeric_id",
-                    })?;
+            let numeric_id = value.get("numeric_id").and_then(Value::as_u64).ok_or(
+                SpeciesFormParityError::MalformedField {
+                    identity: format!("ability {member}"),
+                    field: "numeric_id",
+                },
+            )?;
             if by_member.insert(member.clone(), numeric_id).is_some() {
                 return Err(SpeciesFormParityError::DuplicateAbilityMember(member));
             }
@@ -212,10 +213,12 @@ fn field<'a>(
     identity: &str,
     name: &'static str,
 ) -> Result<&'a Value, SpeciesFormParityError> {
-    value.get(name).ok_or(SpeciesFormParityError::MalformedField {
-        identity: identity.to_owned(),
-        field: name,
-    })
+    value
+        .get(name)
+        .ok_or(SpeciesFormParityError::MalformedField {
+            identity: identity.to_owned(),
+            field: name,
+        })
 }
 
 fn safe_integer(
@@ -248,28 +251,24 @@ fn js_number_bits(
 ) -> Result<u64, SpeciesFormParityError> {
     let bits = match value.get("kind").and_then(Value::as_str) {
         Some("SAFE_INTEGER") => {
-            let integer = value
-                .get("value")
-                .and_then(Value::as_f64)
-                .ok_or(SpeciesFormParityError::MalformedField {
-                    identity: identity.to_owned(),
-                    field: name,
-                })?;
-            integer.to_bits()
-        }
-        Some("JS_NUMBER_BITS") => {
-            let hex = value
-                .get("bits")
-                .and_then(Value::as_str)
-                .ok_or(SpeciesFormParityError::MalformedField {
-                    identity: identity.to_owned(),
-                    field: name,
-                })?;
-            u64::from_str_radix(hex, 16).map_err(|_| {
+            let integer = value.get("value").and_then(Value::as_f64).ok_or(
                 SpeciesFormParityError::MalformedField {
                     identity: identity.to_owned(),
                     field: name,
-                }
+                },
+            )?;
+            integer.to_bits()
+        }
+        Some("JS_NUMBER_BITS") => {
+            let hex = value.get("bits").and_then(Value::as_str).ok_or(
+                SpeciesFormParityError::MalformedField {
+                    identity: identity.to_owned(),
+                    field: name,
+                },
+            )?;
+            u64::from_str_radix(hex, 16).map_err(|_| SpeciesFormParityError::MalformedField {
+                identity: identity.to_owned(),
+                field: name,
             })?
         }
         _ => {
@@ -301,13 +300,12 @@ fn symbol_member<'a>(
             field: "symbol",
         });
     }
-    let owner = value
-        .get("owner")
-        .and_then(Value::as_str)
-        .ok_or(SpeciesFormParityError::MalformedField {
+    let owner = value.get("owner").and_then(Value::as_str).ok_or(
+        SpeciesFormParityError::MalformedField {
             identity: identity.to_owned(),
             field: "owner",
-        })?;
+        },
+    )?;
     if owner != expected_owner {
         return Err(SpeciesFormParityError::SymbolOwnerMismatch {
             identity: identity.to_owned(),
@@ -440,12 +438,12 @@ fn compile_ability_slots(
     identity: &str,
     table: &AbilityTable,
 ) -> Result<ResolvedAbilitySlots, SpeciesFormParityError> {
-    let slots = field(entry, identity, "ability_slots")?
-        .as_array()
-        .ok_or(SpeciesFormParityError::MalformedField {
+    let slots = field(entry, identity, "ability_slots")?.as_array().ok_or(
+        SpeciesFormParityError::MalformedField {
             identity: identity.to_owned(),
             field: "ability_slots",
-        })?;
+        },
+    )?;
     if slots.len() != 3 {
         return Err(SpeciesFormParityError::MalformedField {
             identity: identity.to_owned(),
@@ -495,12 +493,11 @@ fn compile_content(
         identity,
         "base_stat_total",
     )?;
-    let base_stat_total = u32::try_from(declared_total).map_err(|_| {
-        SpeciesFormParityError::MalformedField {
+    let base_stat_total =
+        u32::try_from(declared_total).map_err(|_| SpeciesFormParityError::MalformedField {
             identity: identity.to_owned(),
             field: "base_stat_total",
-        }
-    })?;
+        })?;
     let resolved_total = u64::from(base_stats.hp)
         + u64::from(base_stats.attack)
         + u64::from(base_stats.defense)
@@ -642,10 +639,9 @@ pub fn compile_species_entry_with_context<'a>(
                 }
             }
             ErGapSpeciesSource::DumpCustom { .. } | ErGapSpeciesSource::Authored { .. } => {
-                let derived =
-                    record
-                        .derive_content()
-                        .map_err(|source| SpeciesFormParityError::GapDerivation { id, source })?;
+                let derived = record
+                    .derive_content()
+                    .map_err(|source| SpeciesFormParityError::GapDerivation { id, source })?;
                 ResolvedContent {
                     base_stats: derived.stats,
                     base_stat_total: derived.base_stat_total,
@@ -685,12 +681,13 @@ pub fn compile_form_entry(
     entry: &Value,
     table: &AbilityTable,
 ) -> Result<ResolvedFormMetadata, SpeciesFormParityError> {
-    let id_string = field(entry, "form", "id")?
-        .as_str()
-        .ok_or(SpeciesFormParityError::MalformedField {
-            identity: "form".to_owned(),
-            field: "id",
-        })?;
+    let id_string =
+        field(entry, "form", "id")?
+            .as_str()
+            .ok_or(SpeciesFormParityError::MalformedField {
+                identity: "form".to_owned(),
+                field: "id",
+            })?;
     let identity = format!("form {id_string}");
     let id = FormId::parse(id_string).map_err(|_| SpeciesFormParityError::MalformedField {
         identity: identity.clone(),
@@ -719,12 +716,11 @@ pub fn compile_form_entry(
         })?
         .to_owned();
     let content = compile_content(&identity, entry, table)?;
-    let form_index = u32::try_from(form_index).map_err(|_| {
-        SpeciesFormParityError::MalformedField {
+    let form_index =
+        u32::try_from(form_index).map_err(|_| SpeciesFormParityError::MalformedField {
             identity: identity.clone(),
             field: "form_index",
-        }
-    })?;
+        })?;
     Ok(ResolvedFormMetadata {
         id,
         species,
@@ -782,10 +778,7 @@ impl SpeciesFormClosure {
         }
     }
 
-    fn metadata(
-        &self,
-        species: u64,
-    ) -> Result<&ResolvedSpeciesMetadata, SpeciesFormParityError> {
+    fn metadata(&self, species: u64) -> Result<&ResolvedSpeciesMetadata, SpeciesFormParityError> {
         self.species
             .binary_search_by(|entry| entry.id.cmp(&species))
             .ok()
@@ -883,7 +876,10 @@ pub fn verify_identity_closure(
 
     let mut forms_by_species: BTreeMap<u64, Vec<usize>> = BTreeMap::new();
     for (index, form) in forms.iter().enumerate() {
-        forms_by_species.entry(form.species).or_default().push(index);
+        forms_by_species
+            .entry(form.species)
+            .or_default()
+            .push(index);
     }
     for (&species_id, indices) in forms_by_species.iter_mut() {
         indices.sort_by_key(|&index| forms[index].form_index);
@@ -1072,8 +1068,11 @@ pub fn prove_overlay_admission(
         keys.sort_unstable();
         keys.dedup();
 
-        let alternates: Vec<&str> =
-            keys.iter().copied().filter(|key| *key != base_key).collect();
+        let alternates: Vec<&str> = keys
+            .iter()
+            .copied()
+            .filter(|key| *key != base_key)
+            .collect();
         if alternates.is_empty() {
             // No alternate key exists: same-identity and cross-species
             // staging must fail closed with their exact typed errors.
@@ -1203,8 +1202,7 @@ fn prove_tera_persistence(
             && overlay.tera_type_ordinal == Some(tera_ordinal)
             && battler.current == *base
             && applied.state.teras_used(side) == 1,
-        "tera overlay must carry the assigned type without changing the presented form"
-            .to_owned(),
+        "tera overlay must carry the assigned type without changing the presented form".to_owned(),
     )?;
     evidence.tera_admissions += 1;
 
@@ -1313,11 +1311,15 @@ fn prove_stance_swap(
     let conflicting = base.clone();
     expect_error(
         stage_stance_request(&staged.state, scope, 7, conflicting),
-        &FormsTransitionError::StanceRequestConflict { staged_request_id: 7 },
+        &FormsTransitionError::StanceRequestConflict {
+            staged_request_id: 7,
+        },
     )?;
     expect_error(
         stage_stance_request(&staged.state, scope, 8, target.clone()),
-        &FormsTransitionError::StanceRequestPending { pending_request_id: 7 },
+        &FormsTransitionError::StanceRequestPending {
+            pending_request_id: 7,
+        },
     )?;
 
     // Resolution swaps the presented form onto the reversible stance overlay.
@@ -1359,7 +1361,6 @@ fn prove_stance_swap(
         "switch-out must restore the stable base form".to_owned(),
     )
 }
-
 
 /// One-time Mega chain: admission, exhaustion, composition blocks,
 /// persistence through switch-out, battle-end restoration.
@@ -1420,16 +1421,14 @@ fn prove_mega_admission(
             && cleaned.cues.len() == 2
             && cleaned.cues[0].kind == FormCueKindV2::OverlayReverted(FormOverlayKindV2::Mega)
             && cleaned.cues[1].kind == FormCueKindV2::SwitchCleanup,
-        "switch-out must revert the Mega presentation and stage cleanup evidence"
-            .to_owned(),
+        "switch-out must revert the Mega presentation and stage cleanup evidence".to_owned(),
     )?;
     let battler = cleaned.state.battler(scope).ok_or_else(|| {
         SpeciesFormParityError::ClosureViolated("registered battler vanished".to_owned())
     })?;
     require(
         battler.mega_used && battler.overlay.is_none() && battler.current == battler.base,
-        "the mega admission must persist through switch-out with the base form restored"
-            .to_owned(),
+        "the mega admission must persist through switch-out with the base form restored".to_owned(),
     )?;
     // Battle end restores the base form and the one-time admission.
     let ended = cleanup_battle_end(&cleaned.state)?;
@@ -1642,14 +1641,19 @@ pub fn prove_transform_copy_surface(
         };
         require(
             plan.copied == expected_payload,
-            format!("copy payload must equal the compiled metadata of {}", form.id.as_str()),
+            format!(
+                "copy payload must equal the compiled metadata of {}",
+                form.id.as_str()
+            ),
         )?;
         require(
             plan.evidence == expected_copied_fields,
             "every successful plan must carry the full ordered evidence".to_owned(),
         )?;
-        require(plan.subject == subject.pokemon && plan.source == target_pokemon_id(&facts),
-            "plan identity must name the subject and source".to_owned())?;
+        require(
+            plan.subject == subject.pokemon && plan.source == target_pokemon_id(&facts),
+            "plan identity must name the subject and source".to_owned(),
+        )?;
         evidence.copy_plans_projected += 1;
 
         // Apply onto fresh canonical state, then clear to a tombstone twice.
@@ -1672,14 +1676,9 @@ pub fn prove_transform_copy_surface(
             "clearing a live copy must report Cleared".to_owned(),
         )?;
         let cleared_state = &cleared.state;
-        let tombstone_position =
-            cleared_state
-                .position_of(plan.subject)
-                .ok_or_else(|| {
-                    SpeciesFormParityError::ClosureViolated(
-                        "tombstone entry missing".to_owned(),
-                    )
-                })?;
+        let tombstone_position = cleared_state.position_of(plan.subject).ok_or_else(|| {
+            SpeciesFormParityError::ClosureViolated("tombstone entry missing".to_owned())
+        })?;
         require(
             !cleared_state.entries[tombstone_position].active,
             "cleared entry must be an inactive tombstone".to_owned(),
@@ -1714,32 +1713,33 @@ fn prove_transform_exclusion_guards(
     healthy_target.pokemon = pokemon_id(2)?;
     healthy_target.slot = FieldSlot::new(BattleSide::Enemy, 0)
         .expect("frozen parity harness uses in-range field slots");
-    let facts_with =
-        |subject: &TransformBattlerFactsV2,
-         target: Option<TransformBattlerFactsV2>|
-         -> TransformImposterFactsV2 {
-            TransformImposterFactsV2 {
-                trigger: TransformCopyTriggerV2::Imposter,
-                subject: subject.clone(),
-                target,
-            }
-        };
-    let expect_guard =
-        |facts: &TransformImposterFactsV2,
-         expected: &TransformImposterError|
-         -> Result<(), SpeciesFormParityError> {
-            match plan_transform_copy(facts) {
-                Err(actual) => require(
-                    &actual == expected,
-                    format!("expected exclusion {expected:?}, got {actual:?}"),
-                ),
-                Ok(_) => Err(SpeciesFormParityError::ClosureViolated(format!(
-                    "expected exclusion {expected:?}, but the plan succeeded"
-                ))),
-            }
-        };
+    let facts_with = |subject: &TransformBattlerFactsV2,
+                      target: Option<TransformBattlerFactsV2>|
+     -> TransformImposterFactsV2 {
+        TransformImposterFactsV2 {
+            trigger: TransformCopyTriggerV2::Imposter,
+            subject: subject.clone(),
+            target,
+        }
+    };
+    let expect_guard = |facts: &TransformImposterFactsV2,
+                        expected: &TransformImposterError|
+     -> Result<(), SpeciesFormParityError> {
+        match plan_transform_copy(facts) {
+            Err(actual) => require(
+                &actual == expected,
+                format!("expected exclusion {expected:?}, got {actual:?}"),
+            ),
+            Ok(_) => Err(SpeciesFormParityError::ClosureViolated(format!(
+                "expected exclusion {expected:?}, but the plan succeeded"
+            ))),
+        }
+    };
 
-    expect_guard(&facts_with(subject, None), &TransformImposterError::MissingTarget)?;
+    expect_guard(
+        &facts_with(subject, None),
+        &TransformImposterError::MissingTarget,
+    )?;
 
     let self_target = facts_with(subject, Some(subject.clone()));
     expect_guard(&self_target, &TransformImposterError::SelfTarget)?;

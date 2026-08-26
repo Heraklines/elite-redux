@@ -36,7 +36,7 @@ use er_content::m6_catalog::CatalogBehaviorUnit;
 use er_rng::battle::RngRuntime;
 use er_state::battle_v2::BattleStateV2;
 use er_state::bespoke_v2::suppression_immunity::{
-    SuppressionImmunityStateV2, VolatileTagSubject, VOLATILE_TAG_MAX_LAYERS,
+    SuppressionImmunityStateV2, VOLATILE_TAG_MAX_LAYERS, VolatileTagSubject,
 };
 use er_types::battle_ids::{BattleSide, PokemonId};
 use er_types::battle_model::{
@@ -47,21 +47,20 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::m6::bespoke::suppression_immunity::{
-    admit_volatile_tag, clear_volatile_tags, lapse_volatile_tags, ExpiredTag,
-    SuppressionTransitionError, TagAdmitted, TagAdmission, VolatileCleanupEvent,
-    VolatileTagAdmission,
+    ExpiredTag, SuppressionTransitionError, TagAdmission, TagAdmitted, VolatileCleanupEvent,
+    VolatileTagAdmission, admit_volatile_tag, clear_volatile_tags, lapse_volatile_tags,
 };
 use crate::m6::status_field_executor::{
-    stage_arena_tag_remove, stage_side_condition_set, stage_terrain_expire, stage_terrain_set,
-    stage_weather_expire, stage_weather_set, StatusFieldExecutorError,
-    STATUS_FIELD_EXECUTOR_SCHEMA_VERSION,
+    STATUS_FIELD_EXECUTOR_SCHEMA_VERSION, StatusFieldExecutorError, stage_arena_tag_remove,
+    stage_side_condition_set, stage_terrain_expire, stage_terrain_set, stage_weather_expire,
+    stage_weather_set,
 };
 use crate::status::{
-    advance_sleep, apply_major_status, apply_sleep_window, cure_major_status, check_paralysis,
-    resolve_frostbite_chip, resolve_residual,
-    resolve_toxic_residual, roll_status_chance, FrostbiteChipOutcome, ParalysisActivationOutcome,
-    SleepGateOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError,
-    StatusRejection, StatusResidualInput, StatusResidualOutcome,
+    FrostbiteChipOutcome, ParalysisActivationOutcome, SleepGateOutcome, StatusApplicationInput,
+    StatusApplicationOutcome, StatusBypass, StatusError, StatusRejection, StatusResidualInput,
+    StatusResidualOutcome, advance_sleep, apply_major_status, apply_sleep_window, check_paralysis,
+    cure_major_status, resolve_frostbite_chip, resolve_residual, resolve_toxic_residual,
+    roll_status_chance,
 };
 
 /// Schema version of every transcript and inventory record emitted here.
@@ -133,7 +132,9 @@ pub enum MajorStatusSubject {
     Faint,
     /// An unknown oracle code; fails closed (unreachable in the frozen
     /// catalog, kept so catalog drift can never silently dispatch).
-    Unrepresented { oracle_code: u16 },
+    Unrepresented {
+        oracle_code: u16,
+    },
 }
 
 /// The production carrier selected for one major-status identity.
@@ -229,14 +230,16 @@ impl FieldSubject {
 /// Resolves one frozen behavior source onto its canonical field subject.
 /// Source kinds that cannot carry a field subject fail closed even after a
 /// successful domain gate, so catalog drift can never silently dispatch.
-pub fn resolve_field_subject(source: &BehaviorSourceId) -> Result<FieldSubject, FieldIdentityError> {
+pub fn resolve_field_subject(
+    source: &BehaviorSourceId,
+) -> Result<FieldSubject, FieldIdentityError> {
     match source {
         BehaviorSourceId::MajorStatus { numeric_id } => Ok(FieldSubject::MajorStatus(
-            MajorStatusSubject::from_oracle_code(u16::try_from(numeric_id.get()).map_err(|_| {
-                FieldIdentityError::OracleCodeOverflow {
+            MajorStatusSubject::from_oracle_code(u16::try_from(numeric_id.get()).map_err(
+                |_| FieldIdentityError::OracleCodeOverflow {
                     code: numeric_id.get(),
-                }
-            })?),
+                },
+            )?),
         )),
         BehaviorSourceId::BattlerTag { registry_key } => Ok(FieldSubject::VolatileTag {
             registry_key: registry_key.clone(),
@@ -250,12 +253,13 @@ pub fn resolve_field_subject(source: &BehaviorSourceId) -> Result<FieldSubject, 
         BehaviorSourceId::Terrain { numeric_id } => Ok(FieldSubject::Terrain {
             oracle_code: oracle_code(numeric_id.get())?,
         }),
-        BehaviorSourceId::SideCondition { registry_key } | BehaviorSourceId::ArenaTag { registry_key } => {
-            Ok(FieldSubject::ArenaCondition {
-                registry_key: registry_key.clone(),
-            })
-        }
-        other => Err(FieldIdentityError::UnsupportedSourceKind(source_kind_name(other))),
+        BehaviorSourceId::SideCondition { registry_key }
+        | BehaviorSourceId::ArenaTag { registry_key } => Ok(FieldSubject::ArenaCondition {
+            registry_key: registry_key.clone(),
+        }),
+        other => Err(FieldIdentityError::UnsupportedSourceKind(source_kind_name(
+            other,
+        ))),
     }
 }
 
@@ -459,8 +463,12 @@ impl FieldLifecycleStep {
             | Self::AdmissionDeniedByImmunity { subject }
             | Self::LayerOverflowRejected { subject }
             | Self::StatusApplied { status: subject }
-            | Self::StatusChanceGateFailed { status: subject, .. }
-            | Self::StatusAdmissionRejected { status: subject, .. }
+            | Self::StatusChanceGateFailed {
+                status: subject, ..
+            }
+            | Self::StatusAdmissionRejected {
+                status: subject, ..
+            }
             | Self::StatusAdmissionFailClosed { status: subject }
             | Self::CureApplied { subject, .. }
             | Self::FaintSubstateResolved { subject, .. }
@@ -478,14 +486,14 @@ impl FieldLifecycleStep {
     pub fn mutates(&self) -> bool {
         match self {
             Self::Admitted { .. }
-                | Self::StatusApplied { .. }
-                | Self::CycleSet { .. }
-                | Self::CycleTick { .. }
-                | Self::CycleExpired { .. }
-                | Self::ArenaStacked { .. }
-                | Self::ArenaRemoved { .. }
-                | Self::CureApplied { .. }
-                | Self::FaintSubstateResolved { .. } => true,
+            | Self::StatusApplied { .. }
+            | Self::CycleSet { .. }
+            | Self::CycleTick { .. }
+            | Self::CycleExpired { .. }
+            | Self::ArenaStacked { .. }
+            | Self::ArenaRemoved { .. }
+            | Self::CureApplied { .. }
+            | Self::FaintSubstateResolved { .. } => true,
             Self::ResidualResolved { outcome, .. } => *outcome != "NOT_APPLICABLE",
             _ => false,
         }
@@ -499,8 +507,12 @@ impl FieldLifecycleStep {
             | Self::StatusAdmissionFailClosed { .. }
             | Self::StatusChanceGateFailed { .. }
             | Self::UnsupportedIdentityRejected { .. } => true,
-            Self::CycleSetRejectedZeroTurns { state_unchanged, .. }
-            | Self::ArenaRemoveRejectedMissing { state_unchanged, .. } => *state_unchanged,
+            Self::CycleSetRejectedZeroTurns {
+                state_unchanged, ..
+            }
+            | Self::ArenaRemoveRejectedMissing {
+                state_unchanged, ..
+            } => *state_unchanged,
             _ => false,
         }
     }
@@ -677,30 +689,41 @@ pub fn run_tag_lifecycle(
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "immunity-denied admission failed with an unexpected error: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "immunity-denied admission unexpectedly succeeded".to_owned(),
-            ))
+            ));
         }
     }
 
     // 2. Fresh admission creates an instance with a creation ordinal.
     let admitted = admit_volatile_tag(
         initial,
-        &request(scenario, &subject, scenario.layers_initial, Some(scenario.window_turns)),
+        &request(
+            scenario,
+            &subject,
+            scenario.layers_initial,
+            Some(scenario.window_turns),
+        ),
     )?;
     record_admission(&mut steps, &subject_key, &admitted.evidence)?;
     let mut state = admitted.state;
 
     // 3. Stacking admission accumulates layers and refreshes the window.
-    let stack_window = scenario.window_turns.checked_add(1).ok_or_else(|| {
-        FieldParityError::Invariant("stacked window overflowed u16".to_owned())
-    })?;
+    let stack_window = scenario
+        .window_turns
+        .checked_add(1)
+        .ok_or_else(|| FieldParityError::Invariant("stacked window overflowed u16".to_owned()))?;
     let stacked = admit_volatile_tag(
         &state,
-        &request(scenario, &subject, scenario.layers_stack, Some(stack_window)),
+        &request(
+            scenario,
+            &subject,
+            scenario.layers_stack,
+            Some(stack_window),
+        ),
     )?;
     record_admission(&mut steps, &subject_key, &stacked.evidence)?;
     state = stacked.state;
@@ -711,7 +734,9 @@ pub fn run_tag_lifecycle(
         &request(scenario, &subject, u8::MAX, Some(stack_window)),
     ) {
         Err(SuppressionTransitionError::State(
-            er_state::bespoke_v2::suppression_immunity::SuppressionStateError::LayerOverflow { .. },
+            er_state::bespoke_v2::suppression_immunity::SuppressionStateError::LayerOverflow {
+                ..
+            },
         )) => {
             steps.push(FieldLifecycleStep::LayerOverflowRejected {
                 subject: subject_key.clone(),
@@ -720,12 +745,12 @@ pub fn run_tag_lifecycle(
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "overflow admission failed with an unexpected error: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "ceiling-overflow admission unexpectedly succeeded".to_owned(),
-            ))
+            ));
         }
     }
 
@@ -806,7 +831,9 @@ pub fn run_tag_lifecycle(
     }
     steps.push(FieldLifecycleStep::CleanupCleared {
         event: FieldCleanupEvent::SwitchOut,
-            preserved_major_statuses: preserved_status_names(&cleanup.evidence.preserved_major_statuses),
+        preserved_major_statuses: preserved_status_names(
+            &cleanup.evidence.preserved_major_statuses,
+        ),
         removed,
     });
 
@@ -818,7 +845,6 @@ pub fn run_tag_lifecycle(
         audited_draws: 0,
     })
 }
-
 
 fn request(
     scenario: &TagScenario,
@@ -857,7 +883,9 @@ fn record_admission(
     Ok(())
 }
 
-fn timed_ref(instance: &er_state::bespoke_v2::suppression_immunity::VolatileTagInstanceV2) -> InstanceRef {
+fn timed_ref(
+    instance: &er_state::bespoke_v2::suppression_immunity::VolatileTagInstanceV2,
+) -> InstanceRef {
     InstanceRef {
         owner: instance.owner.get().get(),
         subject: volatile_subject_key(&instance.subject),
@@ -881,7 +909,11 @@ fn volatile_subject_key(subject: &VolatileTagSubject) -> String {
         VolatileTagSubject::BattlerTag { registry_key } => format!("BATTLER_TAG:{registry_key}"),
         VolatileTagSubject::PositionalTag { side, registry_key } => format!(
             "POSITIONAL_TAG:{}:{registry_key}",
-            if *side == BattleSide::Player { "PLAYER" } else { "ENEMY" }
+            if *side == BattleSide::Player {
+                "PLAYER"
+            } else {
+                "ENEMY"
+            }
         ),
     }
 }
@@ -997,12 +1029,7 @@ pub fn run_major_status_lifecycle(
             push_rejection(
                 &mut steps,
                 &status_key,
-                apply_sleep_window(
-                    clean,
-                    grass_typing(),
-                    true,
-                    scenario.sleep_window,
-                )?,
+                apply_sleep_window(clean, grass_typing(), true, scenario.sleep_window)?,
                 "powder sleep onto Grass did not reject".to_owned(),
             )?;
         } else {
@@ -1056,7 +1083,7 @@ pub fn run_major_status_lifecycle(
                         _ => {
                             return Err(FieldParityError::Invariant(
                                 "toxic residual did not apply in a healthy scenario".to_owned(),
-                            ))
+                            ));
                         }
                     }
                 }
@@ -1092,7 +1119,7 @@ pub fn run_major_status_lifecycle(
                     StatusResidualOutcome::TargetFainted { .. } => {
                         return Err(FieldParityError::Invariant(
                             "residual target fainted in a healthy scenario".to_owned(),
-                        ))
+                        ));
                     }
                 }
             }
@@ -1102,7 +1129,7 @@ pub fn run_major_status_lifecycle(
             StatusKind::None => {
                 return Err(FieldParityError::Invariant(
                     "sentinel identities never reach the admitted lane".to_owned(),
-                ))
+                ));
             }
         }
 
@@ -1115,7 +1142,7 @@ pub fn run_major_status_lifecycle(
                     SleepGateOutcome::NotAsleep => {
                         return Err(FieldParityError::Invariant(
                             "sleep gate lost its sleeping target".to_owned(),
-                        ))
+                        ));
                     }
                     SleepGateOutcome::Woke => {
                         steps.push(FieldLifecycleStep::SleepActionLock {
@@ -1201,7 +1228,8 @@ pub fn run_major_status_lifecycle(
         });
         state = switch_out.state;
         if !state.volatile_tags.iter().any(|instance| {
-            instance.owner == scenario.target && instance.subject == VolatileTagSubject::MajorStatus(requested)
+            instance.owner == scenario.target
+                && instance.subject == VolatileTagSubject::MajorStatus(requested)
         }) {
             return Err(FieldParityError::Invariant(
                 "switch-out dropped a major-status instance".to_owned(),
@@ -1243,15 +1271,13 @@ fn admit_expanded(
         StatusKind::Sleep => {
             apply_sleep_window(current, scenario.typing, false, scenario.sleep_window)?
         }
-        other => {
-            apply_major_status(StatusApplicationInput {
-                requested: other,
-                current,
-                target_types: scenario.typing,
-                powder: false,
-                bypass: StatusBypass::None,
-            })?
-        }
+        other => apply_major_status(StatusApplicationInput {
+            requested: other,
+            current,
+            target_types: scenario.typing,
+            powder: false,
+            bypass: StatusBypass::None,
+        })?,
     })
 }
 
@@ -1366,7 +1392,7 @@ pub fn run_sentinel_lifecycle() -> Result<FieldLifecycleReport, FieldParityError
         _ => {
             return Err(FieldParityError::Invariant(
                 "sentinel admission unexpectedly succeeded".to_owned(),
-            ))
+            ));
         }
     }
 
@@ -1390,7 +1416,7 @@ pub fn run_sentinel_lifecycle() -> Result<FieldLifecycleReport, FieldParityError
         _ => {
             return Err(FieldParityError::Invariant(
                 "cleared sentinel produced a post-turn residual".to_owned(),
-            ))
+            ));
         }
     }
 
@@ -1415,7 +1441,7 @@ pub fn run_sentinel_lifecycle() -> Result<FieldLifecycleReport, FieldParityError
         _ => {
             return Err(FieldParityError::Invariant(
                 "curing a statusful target did not apply".to_owned(),
-            ))
+            ));
         }
     }
 
@@ -1466,12 +1492,12 @@ pub fn run_frostbite_lifecycle(
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "immunity-denied freeze admission failed unexpectedly: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "immunity-denied freeze admission unexpectedly succeeded".to_owned(),
-            ))
+            ));
         }
     }
 
@@ -1499,7 +1525,7 @@ pub fn run_frostbite_lifecycle(
         FrostbiteChipOutcome::TargetFainted => {
             return Err(FieldParityError::Invariant(
                 "frostbite chip hit a fainted carrier in a healthy scenario".to_owned(),
-            ))
+            ));
         }
     }
 
@@ -1631,7 +1657,7 @@ pub fn run_cycle_lifecycle(
         _ => {
             return Err(FieldParityError::Invariant(
                 "run_cycle_lifecycle only covers weather and terrain".to_owned(),
-            ))
+            ));
         }
     };
     let domain_name = domain.name();
@@ -1647,12 +1673,12 @@ pub fn run_cycle_lifecycle(
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "zero-turn budget failed with an unexpected error: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "zero-turn budget unexpectedly staged".to_owned(),
-            ))
+            ));
         }
     }
     steps.push(FieldLifecycleStep::CycleSetRejectedZeroTurns {
@@ -1661,7 +1687,13 @@ pub fn run_cycle_lifecycle(
     });
 
     // 2. Fresh admission carries the full turn budget.
-    stage_cycle_set(&mut state, domain, scenario.oracle_code, scenario.turns, ordinal)?;
+    stage_cycle_set(
+        &mut state,
+        domain,
+        scenario.oracle_code,
+        scenario.turns,
+        ordinal,
+    )?;
     steps.push(FieldLifecycleStep::CycleSet {
         domain: domain_name.to_owned(),
         before_code: None,
@@ -1675,7 +1707,13 @@ pub fn run_cycle_lifecycle(
     //    reconstructible.
     let replacement_code = scenario.oracle_code.wrapping_add(1);
     ordinal += 1;
-    stage_cycle_set(&mut state, domain, replacement_code, scenario.turns, ordinal)?;
+    stage_cycle_set(
+        &mut state,
+        domain,
+        replacement_code,
+        scenario.turns,
+        ordinal,
+    )?;
     steps.push(FieldLifecycleStep::CycleSet {
         domain: domain_name.to_owned(),
         before_code: Some(scenario.oracle_code),
@@ -1688,14 +1726,18 @@ pub fn run_cycle_lifecycle(
     for tick in 0..scenario.turns {
         let step = lapse_field_cycle(&mut state, domain, &mut ordinal)?;
         match &step {
-            FieldLifecycleStep::CycleTick { remaining_before, .. } => {
+            FieldLifecycleStep::CycleTick {
+                remaining_before, ..
+            } => {
                 if *remaining_before != scenario.turns - tick {
                     return Err(FieldParityError::Invariant(format!(
                         "cycle tick {tick} observed remaining counter {remaining_before}"
                     )));
                 }
             }
-            FieldLifecycleStep::CycleExpired { remaining_before, .. } => {
+            FieldLifecycleStep::CycleExpired {
+                remaining_before, ..
+            } => {
                 if tick + 1 != scenario.turns || *remaining_before != 1 {
                     return Err(FieldParityError::Invariant(
                         "cycle expired off its exact turn boundary".to_owned(),
@@ -1705,7 +1747,7 @@ pub fn run_cycle_lifecycle(
             other => {
                 return Err(FieldParityError::Invariant(format!(
                     "lapse produced an unexpected step: {other:?}"
-                )))
+                )));
             }
         }
         steps.push(step);
@@ -1764,7 +1806,7 @@ pub fn lapse_field_cycle(
         _ => {
             return Err(FieldParityError::Invariant(
                 "lapse_field_cycle only covers weather and terrain".to_owned(),
-            ))
+            ));
         }
     };
     if remaining_before == 0 {
@@ -1856,19 +1898,25 @@ pub fn run_arena_condition_lifecycle(
 
     // 1. Zero-turn budgets are rejected without staging.
     let before = state.clone();
-    let zero_turn =
-        stage_side_condition_set(&mut state, &scenario.condition_id, scenario.scope, scenario.layers_initial, 0, ordinal);
+    let zero_turn = stage_side_condition_set(
+        &mut state,
+        &scenario.condition_id,
+        scenario.scope,
+        scenario.layers_initial,
+        0,
+        ordinal,
+    );
     match zero_turn {
         Err(StatusFieldExecutorError::ZeroTurnDuration) => {}
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "zero-turn budget failed with an unexpected error: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "zero-turn budget unexpectedly staged".to_owned(),
-            ))
+            ));
         }
     }
     steps.push(FieldLifecycleStep::CycleSetRejectedZeroTurns {
@@ -1934,12 +1982,12 @@ pub fn run_arena_condition_lifecycle(
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "layer overflow failed with an unexpected error: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "layer overflow unexpectedly staged".to_owned(),
-            ))
+            ));
         }
     }
     ordinal += 1;
@@ -1954,18 +2002,19 @@ pub fn run_arena_condition_lifecycle(
 
     // 6. Removing an absent condition fails closed without mutating.
     let before = state.clone();
-    let absent = stage_arena_tag_remove(&mut state, &scenario.condition_id, scenario.scope, ordinal);
+    let absent =
+        stage_arena_tag_remove(&mut state, &scenario.condition_id, scenario.scope, ordinal);
     match absent {
         Err(StatusFieldExecutorError::ConditionMissing { .. }) => {}
         Err(other) => {
             return Err(FieldParityError::Invariant(format!(
                 "absent removal failed with an unexpected error: {other}"
-            )))
+            )));
         }
         Ok(_) => {
             return Err(FieldParityError::Invariant(
                 "absent removal unexpectedly succeeded".to_owned(),
-            ))
+            ));
         }
     }
     steps.push(FieldLifecycleStep::ArenaRemoveRejectedMissing {
@@ -2099,9 +2148,9 @@ pub fn evaluate_witness(
                         let addressed = match step {
                             // Cycle steps carry no subject key; they address
                             // their unit through the domain/code pair staged.
-                            FieldLifecycleStep::CycleSet { domain, after_code, .. } => {
-                                report.subject_key == format!("{domain}:{after_code}")
-                            }
+                            FieldLifecycleStep::CycleSet {
+                                domain, after_code, ..
+                            } => report.subject_key == format!("{domain}:{after_code}"),
                             _ => step.subject() == Some(report.subject_key.as_str()),
                         };
                         addressed && step.mutates()

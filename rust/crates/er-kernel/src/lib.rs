@@ -7,6 +7,7 @@ mod battle_replica;
 mod battle_ui;
 pub mod input_router;
 pub mod kernel;
+pub mod m6_kernel_v5;
 pub mod snapshot;
 pub mod snapshot_v3;
 pub mod snapshot_v4;
@@ -22,4 +23,5 @@ pub use kernel::{
     LiveResourceSnapshot, MenuProposalPlan, ProtocolKernelConfig, ProtocolRoleConfig,
     RunKernelRole,
 };
+pub use m6_kernel_v5::{GameKernelV5, M6KernelResourceSnapshot, M6KernelV5Error};
 pub use ui_reducer::UiReducer;

@@ -14,36 +14,33 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 
 use er_battle::m6::system::field_parity::{
-    evaluate_witness, field_inventory, first_divergence, resolve_field_subject,
-    run_arena_condition_lifecycle, run_cycle_lifecycle, run_faint_substate_lifecycle,
-    run_frostbite_lifecycle, run_major_status_lifecycle, run_sentinel_lifecycle,
-    run_tag_lifecycle, ArenaConditionScenario, CycleScenario, FieldCoverage, FieldDomain,
-    FieldLifecycleReport, FieldLifecycleStep, FieldSubject,
-    MajorStatusLane, MajorStatusScenario, TagScenario, WitnessAssertion,
-    FIELD_PARITY_SCHEMA_VERSION,
+    ArenaConditionScenario, CycleScenario, FIELD_PARITY_SCHEMA_VERSION, FieldCoverage, FieldDomain,
+    FieldLifecycleReport, FieldLifecycleStep, FieldSubject, MajorStatusLane, MajorStatusScenario,
+    TagScenario, WitnessAssertion, evaluate_witness, field_inventory, first_divergence,
+    resolve_field_subject, run_arena_condition_lifecycle, run_cycle_lifecycle,
+    run_faint_substate_lifecycle, run_frostbite_lifecycle, run_major_status_lifecycle,
+    run_sentinel_lifecycle, run_tag_lifecycle,
 };
 use er_content::m6_catalog::SemanticCatalogV1;
 use er_rng::audit::RngCallsiteId;
 use er_rng::battle::RngRuntime;
 use er_state::battle_v2::{
-    BattleParticipationState, BattleSettlementState, BattleStateV2, BATTLE_STATE_SCHEMA_VERSION_V2,
+    BATTLE_STATE_SCHEMA_VERSION_V2, BattleParticipationState, BattleSettlementState, BattleStateV2,
 };
-use er_state::bespoke_v2::suppression_immunity::{
-    SuppressionImmunityStateV2, VolatileTagSubject,
-};
+use er_state::bespoke_v2::suppression_immunity::{SuppressionImmunityStateV2, VolatileTagSubject};
 use er_state::field::FieldState;
+use er_types::SafeU53;
+use er_types::SeatId;
 use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{
     BattleFormat, BattleId, BattleSide, FaintOccurrenceId, PokemonId, TurnIndex, WaveIndex,
 };
-use er_types::SeatId;
 use er_types::battle_model::{
     BattleOutcome, GlobalAbilitySuppressionState, TerrainKind, TerrainState, WeatherKind,
     WeatherState,
 };
 use er_types::m6::{BehaviorUnitId, BehaviorUnitKind};
 use er_types::run_ids::Money;
-use er_types::SafeU53;
 use serde::Deserialize;
 
 const OWNER: u64 = 501;
@@ -112,11 +109,23 @@ fn witness_plan() -> Result<BTreeMap<BehaviorUnitId, Witness>, Box<dyn Error>> {
 // ---------------------------------------------------------------------------
 
 const FIELD_DOMAINS: [(BehaviorUnitKind, FieldDomain, usize); 6] = [
-    (BehaviorUnitKind::StatusBehavior, FieldDomain::MajorStatus, 8),
-    (BehaviorUnitKind::BattlerTagBehavior, FieldDomain::VolatileTag, 123),
+    (
+        BehaviorUnitKind::StatusBehavior,
+        FieldDomain::MajorStatus,
+        8,
+    ),
+    (
+        BehaviorUnitKind::BattlerTagBehavior,
+        FieldDomain::VolatileTag,
+        123,
+    ),
     (BehaviorUnitKind::WeatherBehavior, FieldDomain::Weather, 13),
     (BehaviorUnitKind::TerrainBehavior, FieldDomain::Terrain, 6),
-    (BehaviorUnitKind::ArenaTagBehavior, FieldDomain::ArenaCondition, 42),
+    (
+        BehaviorUnitKind::ArenaTagBehavior,
+        FieldDomain::ArenaCondition,
+        42,
+    ),
     (
         BehaviorUnitKind::PositionalTagBehavior,
         FieldDomain::PositionalTag,
@@ -198,7 +207,10 @@ fn cycle_scenario(index: usize, oracle_code: u16) -> CycleScenario {
     }
 }
 
-fn arena_scenario(index: usize, condition_id: String) -> Result<ArenaConditionScenario, Box<dyn Error>> {
+fn arena_scenario(
+    index: usize,
+    condition_id: String,
+) -> Result<ArenaConditionScenario, Box<dyn Error>> {
     let scope = match index % 3 {
         0 => er_types::battle_model::ArenaConditionScope::Both,
         1 => er_types::battle_model::ArenaConditionScope::Side(BattleSide::Player),
@@ -215,10 +227,7 @@ fn arena_scenario(index: usize, condition_id: String) -> Result<ArenaConditionSc
 
 fn seeded_runtime(seed: &str) -> Result<RngRuntime, Box<dyn Error>> {
     let mut runtime = RngRuntime::from_run_seed(seed);
-    runtime.initialize_battle(
-        "m6d-field-parity-wave",
-        WaveIndex::new(SafeU53::new(7)?)?,
-    )?;
+    runtime.initialize_battle("m6d-field-parity-wave", WaveIndex::new(SafeU53::new(7)?)?)?;
     Ok(runtime)
 }
 
@@ -240,7 +249,10 @@ fn major_status_scenario() -> Result<MajorStatusScenario, Box<dyn Error>> {
 
 /// Runs the full lifecycle campaign for one proven inventory entry through
 /// its domain's production driver.
-fn run_campaign(index: usize, subject: &FieldSubject) -> Result<FieldLifecycleReport, Box<dyn Error>> {
+fn run_campaign(
+    index: usize,
+    subject: &FieldSubject,
+) -> Result<FieldLifecycleReport, Box<dyn Error>> {
     let report = match subject {
         FieldSubject::MajorStatus(inner) => match inner.parity_lane() {
             MajorStatusLane::Admitted(kind) => {
@@ -260,7 +272,7 @@ fn run_campaign(index: usize, subject: &FieldSubject) -> Result<FieldLifecycleRe
                 run_faint_substate_lifecycle(&fresh_suppression(), owner()?)?
             }
             MajorStatusLane::Unsupported => {
-                return Err("unsupported identity reached the campaign driver".into())
+                return Err("unsupported identity reached the campaign driver".into());
             }
         },
         FieldSubject::VolatileTag { registry_key } => run_tag_lifecycle(
@@ -328,7 +340,10 @@ fn field_inventory_is_exactly_once_with_zero_residual() -> Result<(), Box<dyn Er
                 std::mem::discriminant(&unit.id.unit_kind) == std::mem::discriminant(&kind)
             })
             .count();
-        assert_eq!(manifest_count, expected, "manifest count drift for {kind:?}");
+        assert_eq!(
+            manifest_count, expected,
+            "manifest count drift for {kind:?}"
+        );
         assert_eq!(catalog_count, expected, "catalog count drift for {kind:?}");
     }
 
@@ -345,7 +360,11 @@ fn field_inventory_is_exactly_once_with_zero_residual() -> Result<(), Box<dyn Er
             witness.behavior_unit, entry.unit,
             "witness identity mismatch"
         );
-        assert_eq!(witness.rng_contract.len(), 0, "unexpected field RNG contract");
+        assert_eq!(
+            witness.rng_contract.len(),
+            0,
+            "unexpected field RNG contract"
+        );
     }
     assert_eq!(seen.len(), total);
 
@@ -367,7 +386,11 @@ fn field_inventory_is_exactly_once_with_zero_residual() -> Result<(), Box<dyn Er
             FieldCoverage::FailClosed { .. } => Some(entry.subject_key.as_str()),
         })
         .collect();
-    assert_eq!(fail_closed, Vec::<&str>::new(), "unexpected fail-closed units");
+    assert_eq!(
+        fail_closed,
+        Vec::<&str>::new(),
+        "unexpected fail-closed units"
+    );
     let proven = inventory
         .iter()
         .filter(|entry| matches!(entry.coverage, FieldCoverage::Proven))
@@ -460,13 +483,16 @@ fn field_campaigns_are_deterministic_and_rng_is_audited() -> Result<(), Box<dyn 
             second_pass.push(run_campaign(index, &resolved)?);
         }
     }
-    assert_eq!(first_pass, second_pass, "lifecycle ordering diverged on replay");
+    assert_eq!(
+        first_pass, second_pass,
+        "lifecycle ordering diverged on replay"
+    );
     assert!(!first_pass.is_empty());
 
     // Audited RNG: chance-gated and paralysis-gated campaigns produce
     // strictly increasing audited draws with the frozen callsite identities,
     // and identical seeds reproduce identical fingerprints.
-    use er_battle::status::{apply_status_with_chance, StatusApplicationInput, StatusBypass};
+    use er_battle::status::{StatusApplicationInput, StatusBypass, apply_status_with_chance};
     use er_types::battle_model::{PokemonType, PokemonTyping, StatusKind, StatusState};
 
     let typing = PokemonTyping {
@@ -505,10 +531,12 @@ fn field_campaigns_are_deterministic_and_rng_is_audited() -> Result<(), Box<dyn 
         }
         other => panic!("chance campaign produced {other:?}"),
     }
-    assert!(paralysis_report
-        .steps
-        .iter()
-        .any(|step| matches!(step, FieldLifecycleStep::ParalysisActivationGate { .. })));
+    assert!(
+        paralysis_report
+            .steps
+            .iter()
+            .any(|step| matches!(step, FieldLifecycleStep::ParalysisActivationGate { .. }))
+    );
 
     let audit_first: Vec<_> = rng_first
         .audit_entries()
@@ -567,7 +595,10 @@ fn field_campaigns_are_deterministic_and_rng_is_audited() -> Result<(), Box<dyn 
             )
         })
         .collect();
-    assert_eq!(audit_first, audit_second, "RNG audit trail diverged on replay");
+    assert_eq!(
+        audit_first, audit_second,
+        "RNG audit trail diverged on replay"
+    );
 
     // A zero chance always fails the strict gate, commits the consumed draw,
     // and leaves the target clean.
@@ -613,7 +644,11 @@ fn first_divergence_localizes_exact_step_including_false_conditions() -> Result<
     )?;
 
     // Identical inputs: no divergence anywhere.
-    let replay = run_tag_lifecycle(&fresh_suppression(), baseline_subject.clone(), &tag_scenario(1)?)?;
+    let replay = run_tag_lifecycle(
+        &fresh_suppression(),
+        baseline_subject.clone(),
+        &tag_scenario(1)?,
+    )?;
     assert_eq!(first_divergence(&baseline.steps, &replay.steps), None);
 
     // A different initial layer count first shows up in the fresh-admission
@@ -622,7 +657,8 @@ fn first_divergence_localizes_exact_step_including_false_conditions() -> Result<
         layers_initial: tag_scenario(1)?.layers_initial + 1,
         ..tag_scenario(1)?
     };
-    let thicker_report = run_tag_lifecycle(&fresh_suppression(), baseline_subject.clone(), &thicker)?;
+    let thicker_report =
+        run_tag_lifecycle(&fresh_suppression(), baseline_subject.clone(), &thicker)?;
     let divergence = first_divergence(&baseline.steps, &thicker_report.steps)
         .ok_or("layer divergence not detected")?;
     assert_eq!(divergence.index, 1);
@@ -692,10 +728,10 @@ fn first_divergence_localizes_exact_step_including_false_conditions() -> Result<
 #[test]
 fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
     use er_battle::status::{
-        advance_sleep, apply_major_status, apply_sleep_window, cure_major_status,
-        resolve_frostbite_chip, resolve_toxic_residual, roll_sleep_window, FrostbiteChipOutcome,
-        SleepGateOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
-        StatusRejection, StatusResidualInput, StatusResidualOutcome,
+        FrostbiteChipOutcome, SleepGateOutcome, StatusApplicationInput, StatusApplicationOutcome,
+        StatusBypass, StatusRejection, StatusResidualInput, StatusResidualOutcome, advance_sleep,
+        apply_major_status, apply_sleep_window, cure_major_status, resolve_frostbite_chip,
+        resolve_toxic_residual, roll_sleep_window,
     };
     use er_rng::audit::{RngCallsiteId, RngReason};
     use er_types::battle_model::{PokemonType, PokemonTyping, StatusKind, StatusState};

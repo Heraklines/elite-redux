@@ -62,7 +62,10 @@ use er_state::mechanic_state::{HeldItemStateV1, MechanicStateStoreV1};
 use er_state::migration_v3::PokemonMechanicExtensionV3;
 use er_types::battle_ids::{PokemonId, WaveIndex};
 use er_types::mechanics::{MechanicsProgramId, SourceOrdinal};
-use er_types::{BespokeMechanicId, BehaviorClassificationKindV2, BehaviorSourceId, BehaviorUnitId, BehaviorUnitKind, SafeU53};
+use er_types::{
+    BehaviorClassificationKindV2, BehaviorSourceId, BehaviorUnitId, BehaviorUnitKind,
+    BespokeMechanicId, SafeU53,
+};
 use thiserror::Error;
 
 use crate::m6::bespoke::item_lifecycle::{
@@ -226,7 +229,10 @@ pub fn inventory_held_items(
         .map(|unit| &unit.id)
         .collect();
     for entry in &classifications.0 {
-        if !matches!(entry.behavior_unit.source, BehaviorSourceId::HeldItem { .. }) {
+        if !matches!(
+            entry.behavior_unit.source,
+            BehaviorSourceId::HeldItem { .. }
+        ) {
             continue;
         }
         if !catalog_held.contains(&entry.behavior_unit) {
@@ -506,17 +512,17 @@ impl CampaignSession {
         {
             Some(item) => item.charges = charges_value,
             None => {
-                let slot =
-                    u64::try_from(held_items.len()).map_err(|_| ItemParityError::MirrorDivergence {
-                        ordinal,
-                        detail: "too many distinct held items for one holder".to_owned(),
-                    })?;
-                let item_id = SafeU53::new(slot + 1).map_err(|_| {
+                let slot = u64::try_from(held_items.len()).map_err(|_| {
                     ItemParityError::MirrorDivergence {
                         ordinal,
-                        detail: "item id overflow".to_owned(),
+                        detail: "too many distinct held items for one holder".to_owned(),
                     }
                 })?;
+                let item_id =
+                    SafeU53::new(slot + 1).map_err(|_| ItemParityError::MirrorDivergence {
+                        ordinal,
+                        detail: "item id overflow".to_owned(),
+                    })?;
                 held_items.push(HeldItemStateV1 {
                     item_id,
                     registry_key: registry_key.to_owned(),
@@ -543,13 +549,8 @@ impl CampaignSession {
                 detail: format!("holder {owner:?} has no extension slice"),
             });
         };
-        let evidence = apply_item_routine(
-            &mut self.extensions,
-            owner,
-            registry_key,
-            operations,
-        )
-        .map_err(ItemParityError::Executor)?;
+        let evidence = apply_item_routine(&mut self.extensions, owner, registry_key, operations)
+            .map_err(ItemParityError::Executor)?;
         let charges_after = self.extensions[index]
             .held_items
             .iter()
@@ -607,9 +608,8 @@ pub fn run_item_campaign(
     let mut steps = Vec::with_capacity(actions.len());
 
     for (index, action) in actions.iter().enumerate() {
-        let ordinal = u32::try_from(index).map_err(|_| ItemParityError::Digest(
-            "campaign exceeds u32 step count".to_owned(),
-        ))?;
+        let ordinal = u32::try_from(index)
+            .map_err(|_| ItemParityError::Digest("campaign exceeds u32 step count".to_owned()))?;
         if !action_references_registered_holders(config.holders, action) {
             return Err(ItemParityError::UnregisteredHolder { ordinal });
         }
@@ -662,15 +662,10 @@ fn action_references_registered_holders(
         | ItemCampaignAction::Eligibility { owner, .. }
         | ItemCampaignAction::Consume { owner, .. }
         | ItemCampaignAction::Restore { owner }
-        | ItemCampaignAction::KnockOff {
-            target: owner,
-            ..
-        }
+        | ItemCampaignAction::KnockOff { target: owner, .. }
         | ItemCampaignAction::Suppress { holder: owner, .. } => registered(owner),
         ItemCampaignAction::Transfer { from, to, .. } => registered(from) && registered(to),
-        ItemCampaignAction::Swap {
-            left, right, ..
-        } => registered(left) && registered(right),
+        ItemCampaignAction::Swap { left, right, .. } => registered(left) && registered(right),
         ItemCampaignAction::Expire { .. } => true,
     }
 }
@@ -698,14 +693,10 @@ fn resolve_action_turns(
                 if minimum > maximum {
                     return Err(ItemParityError::EmptyTurnRange { minimum, maximum });
                 }
-                let minimum_id =
-                    SafeU53::new(u64::from(minimum)).map_err(|_| {
-                        ItemParityError::EmptyTurnRange { minimum, maximum }
-                    })?;
-                let maximum_id =
-                    SafeU53::new(u64::from(maximum)).map_err(|_| {
-                        ItemParityError::EmptyTurnRange { minimum, maximum }
-                    })?;
+                let minimum_id = SafeU53::new(u64::from(minimum))
+                    .map_err(|_| ItemParityError::EmptyTurnRange { minimum, maximum })?;
+                let maximum_id = SafeU53::new(u64::from(maximum))
+                    .map_err(|_| ItemParityError::EmptyTurnRange { minimum, maximum })?;
                 let sequence = runtime.next_audit_sequence().ok_or_else(|| {
                     ItemParityError::Rng("audit sequence exhausted before draw".to_owned())
                 })?;
@@ -718,10 +709,12 @@ fn resolve_action_turns(
                     )
                     .map_err(|error| ItemParityError::Rng(error.to_string()))?;
                 sequences.push(sequence);
-                u32::try_from(drawn.get()).map_err(|_| ItemParityError::Rng(format!(
-                    "drawn value {} exceeds the u32 turn range",
-                    drawn.get()
-                )))?
+                u32::try_from(drawn.get()).map_err(|_| {
+                    ItemParityError::Rng(format!(
+                        "drawn value {} exceeds the u32 turn range",
+                        drawn.get()
+                    ))
+                })?
             }
         };
     }
@@ -773,8 +766,13 @@ fn execute_action(
             session.state = transition.state;
             // Initial grants seed both roots identically: the extension slice
             // is constructed from the same final (stacks, charges) facts.
-            let mirrored =
-                session.mirror_grant(ordinal, *owner, registry_key, evidence.stacks_after, *charges)?;
+            let mirrored = session.mirror_grant(
+                ordinal,
+                *owner,
+                registry_key,
+                evidence.stacks_after,
+                *charges,
+            )?;
             Ok(StepExecutions {
                 evidence: Ok(ItemStepEvidence::Grant(evidence)),
                 mirror: if mirrored.is_some() {
@@ -900,7 +898,10 @@ fn execute_action(
                 Err(error) => Ok(rejected_step(error)),
             }
         }
-        ItemCampaignAction::KnockOff { target, registry_key } => {
+        ItemCampaignAction::KnockOff {
+            target,
+            registry_key,
+        } => {
             let request = KnockOffRequest {
                 target: *target,
                 registry_key: registry_key.clone(),
@@ -992,7 +993,6 @@ fn execute_action(
         }
     }
 }
-
 
 // ---------------------------------------------------------------------------
 // Witness comparison (first-divergence reports)
@@ -1102,7 +1102,10 @@ fn divergence_at(step: u32, field: &str) -> ItemDivergence {
 
 /// Reports the first field-level difference between two query folds, or
 /// `None` when identical.
-pub fn first_query_divergence(left: &QueryTransitionV2, right: &QueryTransitionV2) -> Option<String> {
+pub fn first_query_divergence(
+    left: &QueryTransitionV2,
+    right: &QueryTransitionV2,
+) -> Option<String> {
     if left.before != right.before {
         return Some(format!("query initial values differ: {:?}", left.before));
     }
@@ -1203,12 +1206,9 @@ pub fn compare_prepared_and_direct(
         }
     }
     for hook in hooks {
-        let direct = crate::m6::routine_executor::execute_hook_v2_direct_reference(
-            programs,
-            context,
-            *hook,
-        )
-        .map_err(|error| ItemParityError::Routine(error.to_string()))?;
+        let direct =
+            crate::m6::routine_executor::execute_hook_v2_direct_reference(programs, context, *hook)
+                .map_err(|error| ItemParityError::Routine(error.to_string()))?;
         let indexed = crate::m6::routine_executor::execute_hook_v2(prepared, context, *hook)
             .map_err(|error| ItemParityError::Routine(error.to_string()))?;
         if let Some(detail) = first_hook_divergence(&direct, &indexed) {

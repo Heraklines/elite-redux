@@ -30,8 +30,11 @@ use std::fmt;
 use std::sync::Arc;
 
 use er_canonical::{canonicalize_value, content_digest, fixture_digest};
+use er_content::pack::m6_pack::BattleContentPackV3;
+use er_content::pack::m6_prepared::{PreparedBattleContentV3, prepare_content};
 use er_content::pack::{ContentPack, selected_content_pack};
 use er_game::internal_event::InternalEventKind;
+use er_game::m6::runtime_v4::{GameRuntimeSnapshotV4, PendingPresentationV4};
 use er_game::material::{
     BATTLE_MATERIAL_SCHEMA_VERSION, BattleTurnMaterialV1, decode_turn_material,
     encode_turn_material, turn_material_digest,
@@ -39,21 +42,21 @@ use er_game::material::{
 use er_game::runtime::BATTLE_START_SCHEMA_VERSION;
 use er_kernel::snapshot::RestorableKernelSnapshotV2;
 use er_kernel::snapshot_v3::{
-    GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3, GameRuntimeSnapshotV3,
-    KernelDeterminismDigestV2, MechanicalStateDigestV2, RestorableKernelSnapshotV3,
-    RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3,
+    GAME_RUNTIME_SNAPSHOT_SCHEMA_VERSION_V3, GameRuntimeSnapshotV3, KernelDeterminismDigestV2,
+    MechanicalStateDigestV2, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V3,
+    RestorableKernelSnapshotV3,
 };
 use er_kernel::snapshot_v4::{
-    RestorableKernelSnapshotV4, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4,
+    RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4, RestorableKernelSnapshotV4,
 };
 use er_kernel::snapshot_v5::{PreparedContentIdentityV3, RestorableKernelSnapshotV5};
 use er_kernel::{
     BattleGameConfig, BattleProtocolConfig, BattleProtocolRoleConfig, BattleStartV1, GameKernel,
-    KernelEffect, KernelInput, LiveResourceSnapshot,
+    GameKernelV5, KernelEffect, KernelInput, LiveResourceSnapshot,
 };
 use er_protocol::{AuthorityLogConfig, BackoffPolicy};
-use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_rng::audit::RngDraw;
+use er_rng::phaser::{PhaserRdg, RunRngState};
 use er_state::format::BattleFormat;
 use er_state::migration_v3::GameStateV3;
 use er_state::migration_v4::GameStateV4;
@@ -64,20 +67,20 @@ use er_state::snapshot::GameState;
 use er_types::mechanics::{MECHANIC_STATE_SCHEMA_VERSION, MECHANICS_PROGRAM_VERSION};
 use serde_json::{Value, json};
 
-use er_types::battle_command::{
-    BattleCommand, BattleTargetSelection, ScriptedEnemyBattleCommandV1, ScriptedEnemyPolicyV1,
-    scripted_enemy_command_operation_id, turn_result_operation_id, CommandSet,
-};
-use er_types::battle_ids::{
-    AbilityId, BattleId, BattleSide, FieldSlot, GameModeId, MoveSlotIndex,
-    PartyIndex, PokemonId, TurnIndex, WaveIndex,
-};
-use er_types::battle_model::{BattleOutcome, StatusKind};
 use er_battle::BattleNextDecision;
 use er_state::battle::BattleRngState;
+use er_types::battle_command::{
+    BattleCommand, BattleTargetSelection, CommandSet, ScriptedEnemyBattleCommandV1,
+    ScriptedEnemyPolicyV1, scripted_enemy_command_operation_id, turn_result_operation_id,
+};
+use er_types::battle_ids::{
+    AbilityId, BattleId, BattleSide, FieldSlot, GameModeId, MoveSlotIndex, PartyIndex, PokemonId,
+    TurnIndex, WaveIndex,
+};
+use er_types::battle_model::{BattleOutcome, StatusKind};
 use er_types::{
-    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey,
-    RawInputEvent, RunId, SafeU53, SeatId, SessionId, TimeClass,
+    ConnectionGeneration, FrameContext, InputFocus, MembershipRevision, PhysicalKey, RawInputEvent,
+    RunId, SafeU53, SeatId, SessionId, TimeClass,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -86,7 +89,6 @@ use wasm_bindgen::prelude::*;
 pub const M6_PARITY_FIXTURE_SCHEMA_VERSION: u32 = 1;
 pub const M6_PARITY_TRACE_ID: &str = "m6-local-battle-native-wasm-v1";
 pub const M6_PARITY_SEED: &str = "1469598103934665603";
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct M6ParityEvent {
@@ -117,10 +119,11 @@ pub struct M6PreparedContentIdentity {
 /// (`migrate_game_v2_to_v3` then `migrate_m5_to_m6`) from whatever run
 /// frontier they anchor; the adapter only validates internal consistency and
 /// never fabricates state.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct M6ParityEvidence {
     pub game_v3: GameStateV3,
     pub game_v4: GameStateV4,
+    pub prepared: Arc<PreparedBattleContentV3>,
 }
 
 impl M6ParityEvidence {
@@ -134,6 +137,13 @@ impl M6ParityEvidence {
         if self.game_v4.base != self.game_v3.base {
             return Err(M6ParityError::Migration(
                 "GameStateV4 base does not match GameStateV3 base".to_owned(),
+            ));
+        }
+        if self.prepared.content_hash() != &self.game_v4.battle_content_hash_v3
+            || self.prepared.semantic_catalog_hash() != &self.game_v4.semantic_catalog_hash
+        {
+            return Err(M6ParityError::Migration(
+                "prepared BattleContentPackV3 identity does not match GameStateV4".to_owned(),
             ));
         }
         Ok(())
@@ -292,11 +302,26 @@ fn pokemon_id(value: u64) -> PokemonId {
     PokemonId::new(safe(value))
 }
 
-
 fn canonical_error(field: &'static str, error: impl fmt::Display) -> M6ParityError {
     M6ParityError::Canonical {
         field,
         reason: error.to_string(),
+    }
+}
+
+fn checked_digest<T: serde::Serialize>(
+    field: &'static str,
+    value: &T,
+) -> Result<String, M6ParityError> {
+    let raw = content_digest(value).map_err(|error| canonical_error(field, error))?;
+    Ok(format!("blake3-v1:{raw}"))
+}
+
+fn normalize_checked_digest(value: String) -> String {
+    if value.starts_with("blake3-v1:") {
+        value
+    } else {
+        format!("blake3-v1:{value}")
     }
 }
 
@@ -580,35 +605,32 @@ fn observe(
     input_kind: &str,
     effects: &[KernelEffect],
 ) -> Result<M6ParityObservation, M6ParityError> {
-    let projection = kernel.battle_ui_projection().ok_or_else(|| {
-        M6ParityError::InvalidFixture("kernel is not in Battle mode".to_owned())
-    })?;
-    let capture = kernel.snapshot_v2().map_err(|error| snapshot_error("observation", error))?;
+    let projection = kernel
+        .battle_ui_projection()
+        .ok_or_else(|| M6ParityError::InvalidFixture("kernel is not in Battle mode".to_owned()))?;
+    let capture = kernel
+        .snapshot_v2()
+        .map_err(|error| snapshot_error("observation", error))?;
     let (rng_audit, internal_events) = kernel.m3_trace_audit();
     let effect_values = effects
         .iter()
-        .map(|effect| serde_json::to_value(effect).map_err(|error| canonical_error("effects", error)))
+        .map(|effect| {
+            serde_json::to_value(effect).map_err(|error| canonical_error("effects", error))
+        })
         .collect::<Result<Vec<_>, M6ParityError>>()?;
-    let effect_digest =
-        content_digest(&effect_values).map_err(|error| canonical_error("effects", error))?;
-    let snapshot_digest =
-        content_digest(&capture).map_err(|error| canonical_error("snapshot", error))?;
-    let ui_projection_digest = content_digest(projection)
-        .map_err(|error| canonical_error("battle_ui_projection", error))?;
-    let control_digest = content_digest(&capture.game.current_control)
-        .map_err(|error| canonical_error("control", error))?;
-    let rng_audit_digest =
-        content_digest(&rng_audit).map_err(|error| canonical_error("rng_audit", error))?;
+    let effect_digest = checked_digest("effects", &effect_values)?;
+    let snapshot_digest = checked_digest("snapshot", &capture)?;
+    let ui_projection_digest = checked_digest("battle_ui_projection", projection)?;
+    let control_digest = checked_digest("control", &capture.game.current_control)?;
+    let rng_audit_digest = checked_digest("rng_audit", &rng_audit)?;
     let internal_events = internal_events
         .into_iter()
         .map(internal_event_kind_name)
         .map(str::to_owned)
         .collect::<Vec<_>>();
-    let internal_events_digest = content_digest(&internal_events)
-        .map_err(|error| canonical_error("internal_events", error))?;
+    let internal_events_digest = checked_digest("internal_events", &internal_events)?;
     let live_resources = kernel.live_resources();
-    let live_resources_digest = content_digest(&live_resources)
-        .map_err(|error| canonical_error("live_resources", error))?;
+    let live_resources_digest = checked_digest("live_resources", &live_resources)?;
     Ok(M6ParityObservation {
         sequence,
         virtual_time_ms,
@@ -616,7 +638,7 @@ fn observe(
         battle_turn: projection.turn,
         effects: effect_values,
         effect_digest,
-        state_digest: kernel.state_digest(),
+        state_digest: normalize_checked_digest(kernel.state_digest()),
         snapshot_digest,
         ui_projection_digest,
         mechanical_digest: capture.mechanical_digest.as_str().to_owned(),
@@ -624,7 +646,7 @@ fn observe(
         presentation_plan_digest: capture.presentation_plan_digest.as_str().to_owned(),
         control_digest,
         pending_presentation_count: safe(
-            capture.pending_presentations.pending_barrier_ids.len() as u64,
+            capture.pending_presentations.pending_barrier_ids.len() as u64
         ),
         rng_audit,
         rng_audit_digest,
@@ -640,12 +662,20 @@ fn step_observation(
     event: &M6ParityEvent,
     sequence: SafeU53,
 ) -> Result<M6ParityObservation, M6ParityError> {
-    let effects = kernel.step(event.input.clone()).map_err(|error| M6ParityError::Kernel {
+    let effects = kernel
+        .step(event.input.clone())
+        .map_err(|error| M6ParityError::Kernel {
+            sequence,
+            side: "trace",
+            reason: error.to_string(),
+        })?;
+    observe(
+        kernel,
         sequence,
-        side: "trace",
-        reason: error.to_string(),
-    })?;
-    observe(kernel, sequence, event.virtual_time_ms, "RAW_INPUT", &effects)
+        event.virtual_time_ms,
+        "RAW_INPUT",
+        &effects,
+    )
 }
 
 fn validate_fixture(fixture: &M6ParityFixture) -> Result<(), M6ParityError> {
@@ -732,8 +762,9 @@ pub fn final_evidence_trace_json() -> Result<String, M6ParityError> {
 
 /// Parse the exact serialized trace artifact before any kernel is constructed.
 pub fn parse_serialized_trace(input: &str) -> Result<M6ParityFixture, M6ParityError> {
-    let value: Value = serde_json::from_str(input)
-        .map_err(|error| M6ParityError::InvalidFixture(format!("trace JSON is invalid: {error}")))?;
+    let value: Value = serde_json::from_str(input).map_err(|error| {
+        M6ParityError::InvalidFixture(format!("trace JSON is invalid: {error}"))
+    })?;
     let object = value.as_object().ok_or_else(|| {
         M6ParityError::InvalidFixture("serialized trace root must be an object".to_owned())
     })?;
@@ -754,19 +785,15 @@ pub fn parse_serialized_trace(input: &str) -> Result<M6ParityFixture, M6ParityEr
         .and_then(Value::as_str)
         .ok_or_else(|| M6ParityError::InvalidFixture("trace seed must be a string".to_owned()))?
         .to_owned();
-    let snapshot_boundary_after: SafeU53 = serde_json::from_value(
-        object
-            .get("snapshot_boundary_after")
-            .cloned()
-            .ok_or_else(|| {
-                M6ParityError::InvalidFixture("trace snapshot_boundary_after is missing".to_owned())
-            })?,
-    )
-    .map_err(|error| {
-        M6ParityError::InvalidFixture(format!(
-            "trace snapshot_boundary_after is invalid: {error}"
-        ))
-    })?;
+    let snapshot_boundary_after: SafeU53 =
+        serde_json::from_value(object.get("snapshot_boundary_after").cloned().ok_or_else(
+            || M6ParityError::InvalidFixture("trace snapshot_boundary_after is missing".to_owned()),
+        )?)
+        .map_err(|error| {
+            M6ParityError::InvalidFixture(format!(
+                "trace snapshot_boundary_after is invalid: {error}"
+            ))
+        })?;
     let events = object
         .get("events")
         .and_then(Value::as_array)
@@ -777,28 +804,26 @@ pub fn parse_serialized_trace(input: &str) -> Result<M6ParityFixture, M6ParityEr
             let event = value.as_object().ok_or_else(|| {
                 M6ParityError::InvalidFixture(format!("trace event {index} must be an object"))
             })?;
-            let virtual_time_ms: SafeU53 = serde_json::from_value(
-                event.get("virtual_time_ms").cloned().ok_or_else(|| {
+            let virtual_time_ms: SafeU53 =
+                serde_json::from_value(event.get("virtual_time_ms").cloned().ok_or_else(|| {
                     M6ParityError::InvalidFixture(format!(
                         "trace event {index} is missing virtual_time_ms"
                     ))
-                })?,
-            )
-            .map_err(|error| {
-                M6ParityError::InvalidFixture(format!(
-                    "trace event {index} virtual_time_ms is invalid: {error}"
-                ))
-            })?;
-            let input: KernelInput = serde_json::from_value(
-                event.get("input").cloned().ok_or_else(|| {
+                })?)
+                .map_err(|error| {
+                    M6ParityError::InvalidFixture(format!(
+                        "trace event {index} virtual_time_ms is invalid: {error}"
+                    ))
+                })?;
+            let input: KernelInput =
+                serde_json::from_value(event.get("input").cloned().ok_or_else(|| {
                     M6ParityError::InvalidFixture(format!("trace event {index} is missing input"))
-                })?,
-            )
-            .map_err(|error| {
-                M6ParityError::InvalidFixture(format!(
-                    "trace event {index} input is invalid: {error}"
-                ))
-            })?;
+                })?)
+                .map_err(|error| {
+                    M6ParityError::InvalidFixture(format!(
+                        "trace event {index} input is invalid: {error}"
+                    ))
+                })?;
             Ok(M6ParityEvent {
                 virtual_time_ms,
                 input,
@@ -880,7 +905,8 @@ fn lift_snapshot_chain(
         presentation_plan_digest: capture.presentation_plan_digest.clone(),
         surface_digest,
     };
-    base.validate().map_err(|error| snapshot_error("lift v3", error))?;
+    base.validate()
+        .map_err(|error| snapshot_error("lift v3", error))?;
     let snapshot = RestorableKernelSnapshotV4 {
         schema_version: RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V4,
         mechanics_program_version: MECHANICS_PROGRAM_VERSION,
@@ -889,7 +915,9 @@ fn lift_snapshot_chain(
         base,
         game_v3: game_v3.clone(),
     };
-    snapshot.validate().map_err(|error| snapshot_error("lift v4", error))?;
+    snapshot
+        .validate()
+        .map_err(|error| snapshot_error("lift v4", error))?;
     Ok(snapshot)
 }
 
@@ -905,19 +933,20 @@ fn turn_material_from_captures(
     seed: &str,
 ) -> Result<BattleTurnMaterialV1, M6ParityError> {
     let battle_id = BattleId::new(safe(1));
-    let wave =
-        WaveIndex::new(safe(1)).map_err(|error| M6ParityError::Material {
-            stage: "assemble",
-            reason: error.to_string(),
-        })?;
+    let wave = WaveIndex::new(safe(1)).map_err(|error| M6ParityError::Material {
+        stage: "assemble",
+        reason: error.to_string(),
+    })?;
     let resolved_turn = TurnIndex::new(safe(1)).map_err(|error| M6ParityError::Material {
         stage: "assemble",
         reason: error.to_string(),
     })?;
-    let operation_id = turn_result_operation_id(battle_id, wave, resolved_turn)
-        .map_err(|error| M6ParityError::Material {
-            stage: "assemble",
-            reason: error.to_string(),
+    let operation_id =
+        turn_result_operation_id(battle_id, wave, resolved_turn).map_err(|error| {
+            M6ParityError::Material {
+                stage: "assemble",
+                reason: error.to_string(),
+            }
         })?;
     let material = BattleTurnMaterialV1 {
         schema_version: BATTLE_MATERIAL_SCHEMA_VERSION,
@@ -998,6 +1027,43 @@ type BoundaryOutputs = (
     Vec<u8>,
 );
 
+fn v4_runtime_snapshot_from_capture(
+    capture: &RestorableKernelSnapshotV2,
+    state: GameStateV4,
+) -> Result<GameRuntimeSnapshotV4, M6ParityError> {
+    let mut pending_presentations = Vec::new();
+    let mut ordinal = 1_u64;
+    for event in &capture.pending_presentations.event_catalog {
+        if capture
+            .pending_presentations
+            .pending_barrier_ids
+            .contains(&event.event_id)
+        {
+            pending_presentations.push(PendingPresentationV4 {
+                ordinal: safe(ordinal),
+                event: event.clone(),
+                blocks_human_input: capture
+                    .pending_presentations
+                    .blocking_barrier_ids
+                    .contains(&event.event_id),
+            });
+            ordinal += 1;
+        }
+    }
+    let snapshot = GameRuntimeSnapshotV4 {
+        schema_version: er_game::m6::runtime_v4::M6_RUNTIME_SNAPSHOT_SCHEMA_VERSION,
+        state,
+        control: capture.game.current_control.clone(),
+        revision: SafeU53::ZERO,
+        next_presentation_ordinal: safe(ordinal),
+        pending_presentations,
+    };
+    snapshot
+        .validate()
+        .map_err(|error| snapshot_error("v4 runtime snapshot", error))?;
+    Ok(snapshot)
+}
+
 fn cross_snapshot_boundary(
     kernel: GameKernel,
     content: &Arc<ContentPack>,
@@ -1008,7 +1074,9 @@ fn cross_snapshot_boundary(
 ) -> Result<BoundaryOutputs, M6ParityError> {
     // Ordered audit evidence must leave the kernel before it is destroyed.
     let (rng_audit, _) = kernel.m3_trace_audit();
-    let capture = kernel.snapshot_v2().map_err(|error| snapshot_error("capture", error))?;
+    let capture = kernel
+        .snapshot_v2()
+        .map_err(|error| snapshot_error("capture", error))?;
     let pending_presentation_count = capture.pending_presentations.pending_barrier_ids.len();
     if pending_presentation_count == 0 {
         return Err(M6ParityError::InvalidFixture(
@@ -1019,8 +1087,8 @@ fn cross_snapshot_boundary(
         content_digest(&capture).map_err(|error| snapshot_error("digest", error))?;
     let snapshot_bytes_digest =
         fixture_digest(&capture).map_err(|error| snapshot_error("bytes digest", error))?;
-    let snapshot_value = serde_json::to_value(&capture)
-        .map_err(|error| snapshot_error("serialize", error))?;
+    let snapshot_value =
+        serde_json::to_value(&capture).map_err(|error| snapshot_error("serialize", error))?;
     let snapshot_wire = canonicalize_value(&snapshot_value)
         .map_err(|error| snapshot_error("canonicalize", error))?;
     let decoded: RestorableKernelSnapshotV2 = serde_json::from_str(&snapshot_wire)
@@ -1029,8 +1097,8 @@ fn cross_snapshot_boundary(
     // This explicit drop is the production ownership boundary: continuation
     // must come from the V2 wire snapshot, never from a cloned live kernel.
     drop(kernel);
-    let restored_kernel =
-        GameKernel::from_snapshot(decoded, Arc::clone(content)).map_err(|error| snapshot_error("restore", error))?;
+    let restored_kernel = GameKernel::from_snapshot(decoded, Arc::clone(content))
+        .map_err(|error| snapshot_error("restore", error))?;
     let restored = restored_kernel
         .snapshot_v2()
         .map_err(|error| snapshot_error("restored capture", error))?;
@@ -1040,30 +1108,53 @@ fn cross_snapshot_boundary(
             reason: "restored V2 snapshot differs before continuation".to_owned(),
         });
     }
-    let restored_snapshot_digest = content_digest(&restored)
-        .map_err(|error| snapshot_error("restored digest", error))?;
+    let restored_snapshot_digest =
+        content_digest(&restored).map_err(|error| snapshot_error("restored digest", error))?;
 
     evidence.validate()?;
-    let base_v4 = lift_snapshot_chain(&capture, &evidence.game_v3)?;
-    let snapshot_v5 = RestorableKernelSnapshotV5::new(base_v4, evidence.game_v4.clone())
-        .map_err(|error| snapshot_error("v5 build", error))?;
+    let runtime_snapshot = v4_runtime_snapshot_from_capture(&capture, evidence.game_v4.clone())?;
+    let snapshot_v5 = RestorableKernelSnapshotV5::new(
+        runtime_snapshot,
+        capture.input_router.clone(),
+        capture.ui.clone(),
+        capture.scheduler.clone(),
+        capture.protocol.clone(),
+        capture.terminal.clone(),
+    )
+    .map_err(|error| snapshot_error("v5 build", error))?;
     let v5_value = serde_json::to_value(&snapshot_v5)
         .map_err(|error| snapshot_error("v5 serialize", error))?;
-    let v5_wire = canonicalize_value(&v5_value).map_err(|error| snapshot_error("v5 canonicalize", error))?;
-    let v5_decoded: RestorableKernelSnapshotV5 = serde_json::from_str(&v5_wire)
-        .map_err(|error| snapshot_error("v5 deserialize", error))?;
+    let v5_wire =
+        canonicalize_value(&v5_value).map_err(|error| snapshot_error("v5 canonicalize", error))?;
+    let v5_decoded: RestorableKernelSnapshotV5 =
+        serde_json::from_str(&v5_wire).map_err(|error| snapshot_error("v5 deserialize", error))?;
     if v5_decoded != snapshot_v5 {
         return Err(M6ParityError::Snapshot {
             stage: "v5 round-trip",
             reason: "restored V5 snapshot differs from its canonical encoding".to_owned(),
         });
     }
-    v5_decoded.validate().map_err(|error| snapshot_error("v5 validate", error))?;
+    v5_decoded
+        .validate()
+        .map_err(|error| snapshot_error("v5 validate", error))?;
+    let restored_v5_kernel =
+        GameKernelV5::from_snapshot(v5_decoded.clone(), Arc::clone(&evidence.prepared))
+            .map_err(|error| snapshot_error("v5 direct restore", error))?;
+    let recaptured_v5 = restored_v5_kernel
+        .snapshot()
+        .map_err(|error| snapshot_error("v5 recapture", error))?;
+    if recaptured_v5 != v5_decoded {
+        return Err(M6ParityError::Snapshot {
+            stage: "v5 direct restore",
+            reason: "directly restored V5 owner graph changed before continuation".to_owned(),
+        });
+    }
     let v4_value = serde_json::to_value(&evidence.game_v4)
         .map_err(|error| snapshot_error("v4 serialize", error))?;
-    let v4_wire = canonicalize_value(&v4_value).map_err(|error| snapshot_error("v4 canonicalize", error))?;
-    let v4_decoded: GameStateV4 = serde_json::from_str(&v4_wire)
-        .map_err(|error| snapshot_error("v4 deserialize", error))?;
+    let v4_wire =
+        canonicalize_value(&v4_value).map_err(|error| snapshot_error("v4 canonicalize", error))?;
+    let v4_decoded: GameStateV4 =
+        serde_json::from_str(&v4_wire).map_err(|error| snapshot_error("v4 deserialize", error))?;
     if v4_decoded != evidence.game_v4 {
         return Err(M6ParityError::Snapshot {
             stage: "v4 round-trip",
@@ -1173,20 +1264,15 @@ pub fn replay_with_artifacts(
         next_sequence = next_sequence.saturating_add(1);
         let observation = step_observation(&mut kernel, event, sequence)?;
         if index + 1 == fixture.snapshot_boundary_after.into_inner() as usize {
-            let (
-                restored_kernel,
-                snapshot_boundary,
-                v4_wire,
-                v5_wire,
-                material_bytes,
-            ) = cross_snapshot_boundary(
-                kernel,
-                &content,
-                &evidence,
-                safe((index + 1) as u64),
-                event.virtual_time_ms,
-                &fixture.seed,
-            )?;
+            let (restored_kernel, snapshot_boundary, v4_wire, v5_wire, material_bytes) =
+                cross_snapshot_boundary(
+                    kernel,
+                    &content,
+                    &evidence,
+                    safe((index + 1) as u64),
+                    event.virtual_time_ms,
+                    &fixture.seed,
+                )?;
             kernel = restored_kernel;
             boundary = Some(snapshot_boundary);
             game_state_v4_wire = v4_wire;
@@ -1285,6 +1371,10 @@ fn report_value(report: &M6ParityReport) -> Value {
             "after_raw_event": report.snapshot_boundary.after_raw_event,
             "virtual_time_ms": report.snapshot_boundary.virtual_time_ms,
             "kernel_snapshot_schema_version": report.snapshot_boundary.kernel_snapshot_schema_version,
+            "snapshot_digest": report.snapshot_boundary.snapshot_digest,
+            "snapshot_bytes_digest": report.snapshot_boundary.snapshot_bytes_digest,
+            "restored_snapshot_digest": report.snapshot_boundary.restored_snapshot_digest,
+            "pending_presentation_count": report.snapshot_boundary.pending_presentation_count,
             "prepared_content": {
                 "semantic_catalog_hash": report.snapshot_boundary.prepared_content.semantic_catalog_hash,
                 "battle_content_hash": report.snapshot_boundary.prepared_content.battle_content_hash,
@@ -1325,16 +1415,22 @@ struct M6ReplayRequest {
     trace: String,
     game_v3: GameStateV3,
     game_v4: GameStateV4,
+    pack_v3: BattleContentPackV3,
 }
 
 /// Replay a full serialized request (trace + typed state) into the canonical
 /// hosted report.  Shared by native hosts and the wasm32 export.
 pub fn replay_serialized_request_json(request: &str) -> Result<String, M6ParityError> {
-    let parsed: M6ReplayRequest = serde_json::from_str(request)
-        .map_err(|error| M6ParityError::InvalidFixture(format!("replay request is invalid: {error}")))?;
+    let parsed: M6ReplayRequest = serde_json::from_str(request).map_err(|error| {
+        M6ParityError::InvalidFixture(format!("replay request is invalid: {error}"))
+    })?;
+    let prepared = prepare_content(parsed.pack_v3).map_err(|error| {
+        M6ParityError::InvalidFixture(format!("replay prepared content is invalid: {error}"))
+    })?;
     let evidence = M6ParityEvidence {
         game_v3: parsed.game_v3,
         game_v4: parsed.game_v4,
+        prepared: Arc::new(prepared),
     };
     replay_serialized_trace_json(&parsed.trace, &evidence)
 }
@@ -1407,11 +1503,7 @@ fn first_value_divergence(
             }
             for (key, right_value) in right_object {
                 if !left_object.contains_key(key) {
-                    return Some((
-                        format!("{path}/{key}"),
-                        Value::Null,
-                        right_value.clone(),
-                    ));
+                    return Some((format!("{path}/{key}"), Value::Null, right_value.clone()));
                 }
             }
             None
@@ -1457,8 +1549,7 @@ fn sequence_for_path(report: &Value, path: &str) -> Option<u64> {
 /// reported so CI can name the first divergent event directly.
 pub fn first_divergence(left: &Value, right: &Value) -> Option<M6ParityDivergence> {
     let mut path = String::new();
-    let (path, left_value, right_value) =
-        first_value_divergence(&mut path, left, right)?;
+    let (path, left_value, right_value) = first_value_divergence(&mut path, left, right)?;
     let sequence = sequence_for_path(left, &path).or_else(|| sequence_for_path(right, &path));
     Some(M6ParityDivergence {
         path,

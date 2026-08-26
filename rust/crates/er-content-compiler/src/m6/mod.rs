@@ -25,6 +25,7 @@ pub mod abilities;
 pub mod catalog;
 pub mod items;
 pub mod moves;
+pub mod pack_v3;
 pub mod pipeline;
 pub mod routine;
 pub mod status_field;
@@ -32,6 +33,9 @@ pub mod switch_target;
 
 pub use catalog::{
     CatalogValidationError, M6_ORACLE_SHA, SemanticCatalogInput, ValidatedSemanticCatalog,
+};
+pub use pack_v3::{
+    BattleContentDefinitionsV3, PackAssemblyErrorV3, assemble_battle_content_pack_v3,
 };
 pub use pipeline::{
     BehaviorCompilation, BehaviorCompileOutcome, BespokeAssignment, CompileFailureContext,

@@ -18,7 +18,7 @@
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 
 use er_content::m6_catalog::SemanticCatalogV1;
 use er_content::pack::m6_pack::{
@@ -26,24 +26,26 @@ use er_content::pack::m6_pack::{
     BespokeManifestV2, FieldContentV1,
 };
 use er_content::pack::m6_prepared::prepare_content;
-use er_content_compiler::m6::{SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog};
+use er_content_compiler::m6::{
+    SemanticCatalogInput, ValidatedSemanticCatalog, map_routine_catalog,
+};
 use er_game::material::{decode_turn_material, turn_material_digest};
 use er_kernel::snapshot_v5::RestorableKernelSnapshotV5;
 use er_state::migration_v3::migrate_game_v2_to_v3;
 use er_state::migration_v4::{GameStateV4, M5ToM6MigrationContext, migrate_m5_to_m6};
 use er_testkit::m4_fixture::assemble_game_state;
-use er_types::mechanics::{MechanicsProgramId, MECHANICS_PROGRAM_VERSION};
 use er_types::battle_ids::ContentPackHash;
+use er_types::mechanics::MechanicsProgramId;
 use er_types::{
-    BehaviorClassificationKindV2, BehaviorUnitId, BattleContentPackHashV3, CatalogHash,
-    M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, OracleSha, RunContentPackHash, SafeU53,
+    BattleContentPackHashV3, BehaviorClassificationKindV2, BehaviorUnitId, CatalogHash,
+    M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, M6_MECHANICS_PROGRAM_VERSION, OracleSha,
+    RunContentPackHash, SafeU53,
 };
 use er_wasm::m6_parity::{
     M6_PARITY_FIXTURE_SCHEMA_VERSION, M6_PARITY_SEED, M6_PARITY_TRACE_ID, M6ParityEvidence,
     final_evidence_artifacts, final_evidence_fixture, final_evidence_game_state_v4_json,
-    final_evidence_snapshot_v5_json, final_evidence_trace_json,
-    final_evidence_turn_material_bytes, first_divergence, parse_serialized_trace,
-    replay_serialized_trace_json,
+    final_evidence_snapshot_v5_json, final_evidence_trace_json, final_evidence_turn_material_bytes,
+    first_divergence, parse_serialized_trace, replay_serialized_trace_json,
 };
 use serde_json::{Value, json};
 
@@ -100,15 +102,21 @@ fn validated_catalog() -> Result<ValidatedSemanticCatalog, Box<dyn Error>> {
     let catalog = SemanticCatalogV1::from_bytes(&bytes)?;
     let raw_hash = CatalogHash::parse(catalog.raw_catalog_hash.clone())?;
     Ok(ValidatedSemanticCatalog::new(SemanticCatalogInput::new(
-        catalog,
-        raw_hash,
+        catalog, raw_hash,
     ))?)
 }
 
 /// Compiles the frozen catalog through the production pipeline into prepared
 /// content plus its checked identity fingerprints.
-fn compile_frozen_identity(
-) -> Result<(CompiledIdentity, Vec<BehaviorUnitId>, usize), Box<dyn Error>> {
+fn compile_frozen_identity() -> Result<
+    (
+        CompiledIdentity,
+        Vec<BehaviorUnitId>,
+        usize,
+        BattleContentPackV3,
+    ),
+    Box<dyn Error>,
+> {
     let catalog = validated_catalog()?;
     let mapped = map_routine_catalog(catalog.behavior_units())?;
     let behavior_units = mapped
@@ -155,7 +163,7 @@ fn compile_frozen_identity(
     pack.content_hash = pack.compute_content_hash()?;
     let semantic_catalog_hash = pack.semantic_catalog_hash.clone();
     let content_hash = pack.compute_content_hash()?;
-    prepare_content(pack)?;
+    prepare_content(pack.clone())?;
     Ok((
         CompiledIdentity {
             semantic_catalog_hash,
@@ -163,6 +171,7 @@ fn compile_frozen_identity(
         },
         behavior_units,
         program_count,
+        pack,
     ))
 }
 
@@ -170,7 +179,7 @@ fn compile_frozen_identity(
 /// the frozen M4 oracle segment becomes `GameStateV2`, then migrates V3 and V4
 /// against the compiled frozen-catalog identity.
 fn build_evidence() -> Result<BuiltEvidence, Box<dyn Error>> {
-    let (identity, behavior_units, program_count) = compile_frozen_identity()?;
+    let (identity, behavior_units, program_count, pack) = compile_frozen_identity()?;
     let source_hash = hash_str('c');
     let segment: Value = serde_json::from_slice(
         read_fixture(&[
@@ -207,10 +216,17 @@ fn build_evidence() -> Result<BuiltEvidence, Box<dyn Error>> {
     };
     let (game_v4, migration) = migrate_m5_to_m6(&game_v3, &context)?;
     game_v4.validate_against(&context)?;
-    assert!(!migration.active_battle, "evidence frontier must be quiescent");
+    assert!(
+        !migration.active_battle,
+        "evidence frontier must be quiescent"
+    );
     Ok(BuiltEvidence {
         identity,
-        parity: M6ParityEvidence { game_v3, game_v4 },
+        parity: M6ParityEvidence {
+            game_v3,
+            game_v4,
+            prepared: Arc::new(prepare_content(pack)?),
+        },
     })
 }
 
@@ -231,12 +247,12 @@ fn parity_evidence() -> &'static M6ParityEvidence {
 fn assert_no_floating_numbers(value: &Value) -> Result<(), Box<dyn Error>> {
     match value {
         Value::Number(number) => {
-            let integer = number.as_u64().ok_or_else(|| {
-                format!("fixture number {number} is negative, fractional, or beyond u64 canonical range")
+            let integer = number.as_i64().ok_or_else(|| {
+                format!("fixture number {number} is fractional or beyond signed canonical range")
             })?;
-            if integer > M53_CEILING {
+            if integer.unsigned_abs() > M53_CEILING {
                 return Err(format!(
-                    "fixture number {number} exceeds the safe-integer canonical range"
+                    "fixture number {number} exceeds the signed safe-integer canonical range"
                 )
                 .into());
             }
@@ -265,7 +281,8 @@ fn canonical_report_value(report_json: &str) -> Result<Value, Box<dyn Error>> {
 }
 
 fn report_value_for_evidence() -> Result<Value, Box<dyn Error>> {
-    let report_json = replay_serialized_trace_json(&final_evidence_trace_json()?, parity_evidence())?;
+    let report_json =
+        replay_serialized_trace_json(&final_evidence_trace_json()?, parity_evidence())?;
     canonical_report_value(&report_json)
 }
 
@@ -281,18 +298,23 @@ fn full_m6_fixture_catalog_is_float_free_and_compiles_deterministically()
         .map(|entry| entry.map(|entry| entry.path()))
         .collect::<Result<Vec<_>, _>>()?;
     entries.sort();
-    assert!(entries.len() >= 7, "expected the full frozen M6 fixture set");
+    assert!(
+        entries.len() >= 7,
+        "expected the full frozen M6 fixture set"
+    );
     for path in entries {
         let name = path.file_name().unwrap().to_string_lossy().to_string();
         let bytes = std::fs::read(&path)?;
         let value: Value = serde_json::from_slice(&bytes)
             .map_err(|error| format!("fixture {name} is invalid JSON: {error}"))?;
-        assert_no_floating_numbers(&value)
-            .map_err(|error| format!("fixture {name}: {error}"))?;
+        assert_no_floating_numbers(&value).map_err(|error| format!("fixture {name}: {error}"))?;
     }
     // Compiling the frozen catalog twice must produce identical identity.
     let second = compile_frozen_identity()?;
-    assert_eq!(second.0.battle_content_hash, EVIDENCE.identity.battle_content_hash);
+    assert_eq!(
+        second.0.battle_content_hash,
+        EVIDENCE.identity.battle_content_hash
+    );
     assert_eq!(
         second.0.semantic_catalog_hash,
         EVIDENCE.identity.semantic_catalog_hash
@@ -355,12 +377,24 @@ fn trace_round_trip_and_replay_are_canonical_and_deterministic() -> Result<(), B
             );
         }
         // Ordered evidence, never only final digests.
-        assert!(observation.get("effects").map(Value::is_array).unwrap_or(false));
-        assert!(observation.get("rng_audit").map(Value::is_array).unwrap_or(false));
-        assert!(observation
-            .get("internal_events")
-            .map(Value::is_array)
-            .unwrap_or(false));
+        assert!(
+            observation
+                .get("effects")
+                .map(Value::is_array)
+                .unwrap_or(false)
+        );
+        assert!(
+            observation
+                .get("rng_audit")
+                .map(Value::is_array)
+                .unwrap_or(false)
+        );
+        assert!(
+            observation
+                .get("internal_events")
+                .map(Value::is_array)
+                .unwrap_or(false)
+        );
     }
 
     // Boundary evidence: destroy/restore equality plus prepared identity.
@@ -412,7 +446,7 @@ fn trace_round_trip_and_replay_are_canonical_and_deterministic() -> Result<(), B
         prepared
             .get("mechanics_program_version")
             .and_then(Value::as_u64),
-        Some(MECHANICS_PROGRAM_VERSION as u64)
+        Some(M6_MECHANICS_PROGRAM_VERSION as u64)
     );
     Ok(())
 }
@@ -448,15 +482,9 @@ fn tampered_traces_fail_closed() -> Result<(), Box<dyn Error>> {
     let trace = final_evidence_trace_json()?;
     let value: Value = serde_json::from_str(&trace)?;
 
-    // Non-canonical key order.
-    let reordered = json!({
-        "events": value["events"].clone(),
-        "seed": value["seed"].clone(),
-        "snapshot_boundary_after": value["snapshot_boundary_after"].clone(),
-        "trace_id": value["trace_id"].clone(),
-        "schema_version": value["schema_version"].clone(),
-    });
-    assert!(parse_serialized_trace(&serde_json::to_string(&reordered)?).is_err());
+    // Leading whitespace is valid JSON but not the exact canonical artifact.
+    let noncanonical = format!(" {trace}");
+    assert!(parse_serialized_trace(&noncanonical).is_err());
 
     // Wrong schema version.
     let mut wrong_schema = value.clone();
@@ -493,10 +521,13 @@ fn tampered_snapshot_v5_and_game_state_v4_fail_closed() -> Result<(), Box<dyn Er
 
     // Content-identity tamper with a well-formed foreign hash must reject.
     let mut wrong_hash = v5;
-    wrong_hash["game_v4"]["battle_content_hash_v3"] =
+    wrong_hash["runtime"]["state"]["battle_content_hash_v3"] =
         json!(format!("blake3-v3:{}", "f".repeat(64)));
     let decoded: RestorableKernelSnapshotV5 = serde_json::from_str(&wrong_hash.to_string())?;
-    assert!(decoded.validate().is_err(), "foreign content identity must reject");
+    assert!(
+        decoded.validate().is_err(),
+        "foreign content identity must reject"
+    );
 
     // GameStateV4 rejects unknown fields outright (deny_unknown_fields).
     let v4_wire = final_evidence_game_state_v4_json(parity_evidence())?;
@@ -509,7 +540,10 @@ fn tampered_snapshot_v5_and_game_state_v4_fail_closed() -> Result<(), Box<dyn Er
     let mut wrong_state_schema: Value = serde_json::from_str(&v4_wire)?;
     wrong_state_schema["schema_version"] = json!(99);
     let decoded: GameStateV4 = serde_json::from_str(&wrong_state_schema.to_string())?;
-    assert!(decoded.validate().is_err(), "tampered state schema must reject");
+    assert!(
+        decoded.validate().is_err(),
+        "tampered state schema must reject"
+    );
     Ok(())
 }
 

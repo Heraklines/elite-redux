@@ -76,11 +76,11 @@ use er_types::battle_ui::{
 };
 use er_types::mechanics::MechanicsProgramId;
 use er_types::{
-    AuthorityEntryBody, AuthorityEntryKind, BehaviorClassificationKindV2, BehaviorSourceId,
-    BespokeMechanicId, CatalogHash, ConnectionGeneration, FrameContext, FrameType,
-    InputFocus, M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, MembershipRevision,
-    OracleSha, PhysicalKey, ProposalMessage, RawFrame, RawInputEvent, RunId, SafeU53, SeatId,
-    SessionId, TimeClass, TransportState, BattleContentPackHashV3,
+    AuthorityEntryBody, AuthorityEntryKind, BattleContentPackHashV3, BehaviorClassificationKindV2,
+    BehaviorSourceId, BespokeMechanicId, CatalogHash, ConnectionGeneration, FrameContext,
+    FrameType, InputFocus, M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION, MembershipRevision, OracleSha,
+    PhysicalKey, ProposalMessage, RawFrame, RawInputEvent, RunId, SafeU53, SeatId, SessionId,
+    TimeClass, TransportState,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -157,9 +157,7 @@ pub enum BenchmarkError {
     Pipeline(String),
     #[error("workload {workload_id} has no release ceiling")]
     UnknownCeiling { workload_id: &'static str },
-    #[error(
-        "workload measurements disagree between independent runs for {workload_id}: {detail}"
-    )]
+    #[error("workload measurements disagree between independent runs for {workload_id}: {detail}")]
     Nondeterministic {
         workload_id: &'static str,
         detail: String,
@@ -190,7 +188,6 @@ impl From<er_content_compiler::m6::CatalogValidationError> for BenchmarkError {
         Self::Pipeline(error.to_string())
     }
 }
-
 
 impl From<er_content_compiler::m6::SemanticCompileError> for BenchmarkError {
     fn from(error: er_content_compiler::m6::SemanticCompileError) -> Self {
@@ -348,9 +345,7 @@ impl Checksum {
     }
 }
 
-fn counter_map(
-    entries: impl IntoIterator<Item = (&'static str, u64)>,
-) -> BTreeMap<String, u64> {
+fn counter_map(entries: impl IntoIterator<Item = (&'static str, u64)>) -> BTreeMap<String, u64> {
     entries
         .into_iter()
         .map(|(key, value)| (key.to_owned(), value))
@@ -382,11 +377,7 @@ pub fn assert_measurements_deterministic(
     }
     if left.counters != right.counters {
         let mut detail = String::new();
-        let keys: Vec<&String> = left
-            .counters
-            .keys()
-            .chain(right.counters.keys())
-            .collect();
+        let keys: Vec<&String> = left.counters.keys().chain(right.counters.keys()).collect();
         for key in keys {
             let l = left.counters.get(key);
             let r = right.counters.get(key);
@@ -394,7 +385,10 @@ pub fn assert_measurements_deterministic(
                 detail.push_str(&format!("{key}: {l:?} != {r:?}; "));
             }
         }
-        return Err(BenchmarkError::Nondeterministic { workload_id, detail });
+        return Err(BenchmarkError::Nondeterministic {
+            workload_id,
+            detail,
+        });
     }
     Ok(())
 }
@@ -793,7 +787,9 @@ fn press_physical_key(
     Ok(effects)
 }
 
-pub fn run_routine_dispatch(profile: BenchmarkProfile) -> Result<WorkloadMeasurement, BenchmarkError> {
+pub fn run_routine_dispatch(
+    profile: BenchmarkProfile,
+) -> Result<WorkloadMeasurement, BenchmarkError> {
     let inputs = load_content_inputs()?;
     let setup = build_routine_dispatch_setup(&inputs)?;
     let sweeps = profile.dispatch_sweeps();
@@ -804,13 +800,9 @@ pub fn run_routine_dispatch(profile: BenchmarkProfile) -> Result<WorkloadMeasure
         let context = sweep_context(sweep as u64, &setup.active_sources);
         for query in DISPATCH_QUERIES {
             let initial = query_initial(query);
-            let direct = execute_query_v2_direct_reference(
-                &setup.direct,
-                &context,
-                query,
-                initial.clone(),
-            )
-            .map_err(|error| BenchmarkError::Kernel(error.to_string()))?;
+            let direct =
+                execute_query_v2_direct_reference(&setup.direct, &context, query, initial.clone())
+                    .map_err(|error| BenchmarkError::Kernel(error.to_string()))?;
             let indexed = execute_query_v2(&setup.prepared, &context, query, initial)
                 .map_err(|error| BenchmarkError::Kernel(error.to_string()))?;
             if indexed != direct {
@@ -860,7 +852,9 @@ pub fn run_routine_dispatch(profile: BenchmarkProfile) -> Result<WorkloadMeasure
 // Workload 3: m6.bespoke_dispatch
 // ---------------------------------------------------------------------------
 
-pub fn run_bespoke_dispatch(profile: BenchmarkProfile) -> Result<WorkloadMeasurement, BenchmarkError> {
+pub fn run_bespoke_dispatch(
+    profile: BenchmarkProfile,
+) -> Result<WorkloadMeasurement, BenchmarkError> {
     let inputs = load_content_inputs()?;
     // Setup: pin the cluster manifest to the frozen catalog oracle identity.
     let validated = validated_catalog(&inputs.catalog_bytes)?;
@@ -923,11 +917,10 @@ fn field<'a>(object: &'a Value, key: &str) -> Result<&'a Value, BenchmarkError> 
         .ok_or_else(|| invalid(format!("fixture is missing field {key:?}")))
 }
 
-fn field_mut<'a>(
-    object: &'a mut Value,
-    key: &str,
-) -> Result<&'a mut Value, BenchmarkError> {
-    object.get_mut(key).ok_or_else(|| invalid(format!("fixture is missing mutable field {key:?}")))
+fn field_mut<'a>(object: &'a mut Value, key: &str) -> Result<&'a mut Value, BenchmarkError> {
+    object
+        .get_mut(key)
+        .ok_or_else(|| invalid(format!("fixture is missing mutable field {key:?}")))
 }
 
 fn safe(value: u64) -> SafeU53 {
@@ -962,7 +955,9 @@ fn normalize_legacy_status_kind(path: &str, status: &mut Value) -> Result<(), Be
     let normalized = match kind {
         Value::String(tag) if is_status_kind_tag(&tag) => Value::String(tag),
         Value::String(tag) => {
-            return Err(invalid(format!("{path}.kind has unsupported value {tag:?}")));
+            return Err(invalid(format!(
+                "{path}.kind has unsupported value {tag:?}"
+            )));
         }
         Value::Object(wrapper) => {
             if wrapper.len() != 1 || !wrapper.contains_key("kind") {
@@ -982,7 +977,9 @@ fn normalize_legacy_status_kind(path: &str, status: &mut Value) -> Result<(), Be
             Value::String(tag.to_owned())
         }
         other => {
-            return Err(invalid(format!("{path}.kind has unsupported value {other}")));
+            return Err(invalid(format!(
+                "{path}.kind has unsupported value {other}"
+            )));
         }
     };
     status_object.insert("kind".to_owned(), normalized);
@@ -992,7 +989,9 @@ fn normalize_legacy_status_kind(path: &str, status: &mut Value) -> Result<(), Be
 fn normalize_legacy_adjacent_kind(path: &str, kind: Value) -> Result<Value, BenchmarkError> {
     match kind {
         Value::String(tag) if tag == "NONE" => Ok(json!({ "kind": tag })),
-        Value::String(tag) => Err(invalid(format!("{path} has unsupported legacy value {tag:?}"))),
+        Value::String(tag) => Err(invalid(format!(
+            "{path} has unsupported legacy value {tag:?}"
+        ))),
         Value::Object(wrapper) => {
             let tag = wrapper
                 .get("kind")
@@ -1010,7 +1009,9 @@ fn normalize_legacy_adjacent_kind(path: &str, kind: Value) -> Result<Value, Benc
                 _ => false,
             };
             if !valid_shape {
-                return Err(invalid(format!("{path} has an invalid adjacent kind object")));
+                return Err(invalid(format!(
+                    "{path} has an invalid adjacent kind object"
+                )));
             }
             Ok(Value::Object(wrapper))
         }
@@ -1056,7 +1057,9 @@ fn normalize_legacy_canonical_state(canonical: &mut Value) -> Result<(), Benchma
         .and_then(|slot_field| slot_field.get("slots"))
         .cloned()
         .ok_or_else(|| invalid("canonical battle field slots are missing"))?;
-    if format_slots.is_array() != true || field_slots.is_array() != true || format_slots != field_slots
+    if format_slots.is_array() != true
+        || field_slots.is_array() != true
+        || format_slots != field_slots
     {
         return Err(invalid(
             "canonical format.slots does not mirror field.slots as arrays",
@@ -1074,9 +1077,11 @@ fn normalize_legacy_canonical_state(canonical: &mut Value) -> Result<(), Benchma
             .and_then(Value::as_array_mut)
             .ok_or_else(|| invalid(format!("canonical battle {party_name} is invalid")))?;
         for (index, pokemon) in party.iter_mut().enumerate() {
-            let status = pokemon
-                .get_mut("status")
-                .ok_or_else(|| invalid(format!("canonical battle {party_name}[{index}] status is missing")))?;
+            let status = pokemon.get_mut("status").ok_or_else(|| {
+                invalid(format!(
+                    "canonical battle {party_name}[{index}] status is missing"
+                ))
+            })?;
             normalize_legacy_status_kind(
                 &format!("canonical battle {party_name}[{index}] status"),
                 status,
@@ -1153,17 +1158,13 @@ fn normalize_legacy_state_content_identity(
         }
         return Ok(());
     }
-    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH
-        || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
+    if fixture_hash != LEGACY_ORACLE_CONTENT_HASH || provenance_hash != LEGACY_ORACLE_CONTENT_DIGEST
     {
         return Err(invalid(
             "fixture content identity is neither the current selected pair nor the exact published legacy pair",
         ));
     }
-    canonical.insert(
-        "content_hash".to_owned(),
-        Value::String(selected_hash),
-    );
+    canonical.insert("content_hash".to_owned(), Value::String(selected_hash));
     Ok(())
 }
 
@@ -1185,10 +1186,13 @@ fn singles_battle_config(
         .map_err(|error| invalid(format!("selected content pack failed to load: {error}")))?;
 
     let mut initial_state = field(document, "initial_state")?.clone();
-    normalize_legacy_canonical_state(initial_state.as_object_mut()
-        .ok_or_else(|| invalid("initial_state is not an object"))?
-        .get_mut("canonical")
-        .ok_or_else(|| invalid("initial_state.canonical is missing"))?)?;
+    normalize_legacy_canonical_state(
+        initial_state
+            .as_object_mut()
+            .ok_or_else(|| invalid("initial_state is not an object"))?
+            .get_mut("canonical")
+            .ok_or_else(|| invalid("initial_state.canonical is missing"))?,
+    )?;
     normalize_legacy_state_content_identity(document, &mut initial_state, &selected)?;
 
     let canonical = field(&initial_state, "canonical")?.clone();
@@ -1244,10 +1248,15 @@ fn singles_battle_config(
         let cursor = safe(cursor_number);
         let turn = TurnIndex::new(safe(turn_number + cursor_number))
             .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))?;
-        let operation_id = scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, cursor)
-            .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))?;
-        let command = BattleCommand::fight(actor, MoveSlotIndex::ZERO, BattleTargetSelection::implicit())
-            .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))?;
+        let operation_id =
+            scripted_enemy_command_operation_id(battle_id, wave, turn, enemy_slot, cursor)
+                .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))?;
+        let command = BattleCommand::fight(
+            actor,
+            MoveSlotIndex::ZERO,
+            BattleTargetSelection::implicit(),
+        )
+        .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))?;
         commands.push(
             ScriptedEnemyBattleCommandV1::new(
                 operation_id,
@@ -1337,8 +1346,12 @@ fn new_solo_kernel(
     content: &Arc<ContentPack>,
 ) -> Result<GameKernel, BenchmarkError> {
     let config = singles_battle_config(document, scenario, enemy_turns)?;
-    GameKernel::new_battle(config, local_authority_protocol(seat(1))?, Arc::clone(content))
-        .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))
+    GameKernel::new_battle(
+        config,
+        local_authority_protocol(seat(1))?,
+        Arc::clone(content),
+    )
+    .map_err(|error| BenchmarkError::scenario(scenario, error.to_string()))
 }
 
 // --- generic raw-key driver ------------------------------------------------
@@ -1535,7 +1548,9 @@ fn drive_solo_battle(
 // Workload 4: m6.turn_execution
 // ---------------------------------------------------------------------------
 
-pub fn run_turn_execution(profile: BenchmarkProfile) -> Result<WorkloadMeasurement, BenchmarkError> {
+pub fn run_turn_execution(
+    profile: BenchmarkProfile,
+) -> Result<WorkloadMeasurement, BenchmarkError> {
     let content = selected_content()?;
     let rounds = profile.turn_rounds();
     let cap = profile.resolutions_per_battle();
@@ -1725,7 +1740,11 @@ impl CoopPair {
         }
     }
 
-    fn step(&mut self, endpoint: Endpoint, input: KernelInput) -> Result<Vec<KernelEffect>, BenchmarkError> {
+    fn step(
+        &mut self,
+        endpoint: Endpoint,
+        input: KernelInput,
+    ) -> Result<Vec<KernelEffect>, BenchmarkError> {
         let effects = self
             .kernel_mut(endpoint)
             .step(input)
@@ -1737,7 +1756,11 @@ impl CoopPair {
         Ok(effects)
     }
 
-    fn observe_effect(&mut self, source: Endpoint, effect: &KernelEffect) -> Result<(), BenchmarkError> {
+    fn observe_effect(
+        &mut self,
+        source: Endpoint,
+        effect: &KernelEffect,
+    ) -> Result<(), BenchmarkError> {
         match effect {
             KernelEffect::SendFrame { frame, .. } => {
                 if frame.frame_type == FrameType::AuthorityEntry {
@@ -1833,16 +1856,22 @@ impl CoopPair {
             .ok_or_else(|| BenchmarkError::PumpBound("no packet to deliver".to_owned()))?;
         match packet {
             Packet::Frame { to, raw, .. } => {
-                self.step(to, KernelInput::RawNetworkFrame {
-                    endpoint: to.seat(),
-                    frame: raw,
-                })?;
+                self.step(
+                    to,
+                    KernelInput::RawNetworkFrame {
+                        endpoint: to.seat(),
+                        frame: raw,
+                    },
+                )?;
             }
             Packet::Proposal { to, proposal } => {
-                self.step(to, KernelInput::ProposalReceived {
-                    endpoint: to.seat(),
-                    proposal,
-                })?;
+                self.step(
+                    to,
+                    KernelInput::ProposalReceived {
+                        endpoint: to.seat(),
+                        proposal,
+                    },
+                )?;
             }
         }
         self.delivered_packets += 1;
@@ -1905,7 +1934,8 @@ impl CoopPair {
                     endpoint
                 )));
             }
-            self.settled_presentations.push((*endpoint, event_id.clone()));
+            self.settled_presentations
+                .push((*endpoint, event_id.clone()));
             self.stats.presentations += 1;
         }
         self.deliver_all()?;
@@ -2014,9 +2044,7 @@ fn coop_doubles_config(document: &Value) -> Result<BattleGameConfig, BenchmarkEr
     }
     normalize_legacy_state_content_identity(document, &mut initial_state, &selected)?;
 
-    let canonical: GameState = serde_json::from_value(
-        field(&initial_state, "canonical")?.clone(),
-    )?;
+    let canonical: GameState = serde_json::from_value(field(&initial_state, "canonical")?.clone())?;
     let battle = canonical
         .battle
         .clone()
@@ -2066,9 +2094,12 @@ fn coop_doubles_config(document: &Value) -> Result<BattleGameConfig, BenchmarkEr
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    let next_turn_value = battle.turn.get().get().checked_add(1).ok_or_else(|| {
-        invalid("forced-replacement next turn overflowed")
-    })?;
+    let next_turn_value = battle
+        .turn
+        .get()
+        .get()
+        .checked_add(1)
+        .ok_or_else(|| invalid("forced-replacement next turn overflowed"))?;
     let next_turn =
         TurnIndex::new(safe(next_turn_value)).map_err(|error| invalid(error.to_string()))?;
     let mut scripted_commands = Vec::new();
@@ -2092,8 +2123,7 @@ fn coop_doubles_config(document: &Value) -> Result<BattleGameConfig, BenchmarkEr
             )
             .map_err(|error| invalid(error.to_string()))?;
             let script_cursor = safe(
-                turn_offset as u64 * u64::from(battle.format.enemy_capacity)
-                    + u64::from(position),
+                turn_offset as u64 * u64::from(battle.format.enemy_capacity) + u64::from(position),
             );
             let operation_id = scripted_enemy_command_operation_id(
                 battle.battle_id,
@@ -2240,8 +2270,7 @@ fn adapt_legacy_content_artifact(
         .as_object_mut()
         .ok_or_else(|| invalid("published content pack is not an object"))?;
     pack_object.insert("hash".to_owned(), Value::String(selected.hash.to_string()));
-    let content: ContentPack =
-        serde_json::from_value(field(artifact, "content_pack")?.clone())?;
+    let content: ContentPack = serde_json::from_value(field(artifact, "content_pack")?.clone())?;
     if content != *selected {
         return Err(invalid(
             "published legacy content pack did not normalize to the current selected content",
@@ -2333,7 +2362,10 @@ pub fn run_coop_campaign(profile: BenchmarkProfile) -> Result<WorkloadMeasuremen
     // Setup: shared content, adapted legacy artifact, doubles config.
     let selected = selected_content()?;
     let mut artifact = fixture_value(CONTENT_PACK_FIXTURE)?;
-    let content = Arc::new(adapt_legacy_content_artifact(&mut artifact, selected.as_ref())?);
+    let content = Arc::new(adapt_legacy_content_artifact(
+        &mut artifact,
+        selected.as_ref(),
+    )?);
     let document = fixture_value(COOP_SCENARIO_FIXTURE)?;
     let config = coop_doubles_config(&document)?;
     let battles = profile.coop_battles();
@@ -2569,9 +2601,8 @@ pub fn qualification_report(
     for ceiling in RELEASE_QUALIFICATION_CEILINGS_V1 {
         let comparison = match by_id.get(ceiling.workload_id) {
             Some(measurement) => {
-                let ratio_micro =
-                    (measurement.elapsed_micros.saturating_mul(1_000_000))
-                        / ceiling.ceiling_micros.max(1);
+                let ratio_micro = (measurement.elapsed_micros.saturating_mul(1_000_000))
+                    / ceiling.ceiling_micros.max(1);
                 let within_ceiling = measurement.elapsed_micros <= ceiling.ceiling_micros;
                 if !within_ceiling {
                     passed = false;
@@ -2619,9 +2650,7 @@ pub fn render_measurements_json(
 }
 
 /// Serializes a qualification report into machine-readable JSON.
-pub fn render_qualification_json(
-    report: &QualificationReport,
-) -> Result<String, BenchmarkError> {
+pub fn render_qualification_json(report: &QualificationReport) -> Result<String, BenchmarkError> {
     Ok(serde_json::to_string_pretty(report)?)
 }
 

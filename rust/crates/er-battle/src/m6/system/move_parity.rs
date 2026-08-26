@@ -48,16 +48,12 @@ use er_content::pack::m6_pack::{
     BehaviorClassificationManifestV2, BespokeManifestEntryV2, BespokeManifestV2, FieldContentV1,
     MoveDefinitionV3,
 };
-use er_content::pack::m6_prepared::{
-    ContentError, PreparedBattleContentV3, prepare_content,
-};
+use er_content::pack::m6_prepared::{ContentError, PreparedBattleContentV3, prepare_content};
 use er_content::pack::selected_type_chart;
 use er_mechanics::condition_v2::{ConditionArenaV2, ValueArenaV2};
 use er_mechanics::m6::ProgramBudgetV2;
 use er_mechanics::program_v2::MechanicsProgramV2;
-use er_mechanics::selector_operation_v2::{
-    QueryModifierStageV2, SelectorArenaV2,
-};
+use er_mechanics::selector_operation_v2::{QueryModifierStageV2, SelectorArenaV2};
 use er_mechanics::v2::{MechanicHookV2, MechanicQueryV2};
 use er_types::battle_ids::MoveId;
 use er_types::battle_model::{
@@ -219,7 +215,10 @@ impl MoveDomainInventory {
             shards[index as usize].sources.push(source.source.clone());
         }
         debug_assert_eq!(
-            shards.iter().map(|shard| shard.sources.len()).sum::<usize>(),
+            shards
+                .iter()
+                .map(|shard| shard.sources.len())
+                .sum::<usize>(),
             self.sources.len()
         );
         Ok(shards)
@@ -320,9 +319,11 @@ pub fn build_move_domain_inventory(
             (BehaviorUnitKind::IntrinsicMoveRule, CatalogResolution::ResolvedIntrinsic) => {
                 MoveUnitClass::IntrinsicIdentity
             }
-            (kind @ (BehaviorUnitKind::IntrinsicMoveRule | BehaviorUnitKind::MoveAttribute), resolution)
-                if kind == &BehaviorUnitKind::MoveAttribute
-                    && resolution == CatalogResolution::ResolvedOperands =>
+            (
+                kind @ (BehaviorUnitKind::IntrinsicMoveRule | BehaviorUnitKind::MoveAttribute),
+                resolution,
+            ) if kind == &BehaviorUnitKind::MoveAttribute
+                && resolution == CatalogResolution::ResolvedOperands =>
             {
                 MoveUnitClass::CompiledRoutine
             }
@@ -383,9 +384,7 @@ pub fn build_move_domain_inventory(
     }
 
     if let Some(unit) = routine_of_unit.iter().next() {
-        return Err(MoveParityError::UnownedRoutineProgram {
-            unit: unit.clone(),
-        });
+        return Err(MoveParityError::UnownedRoutineProgram { unit: unit.clone() });
     }
 
     Ok(MoveDomainInventory { sources, counts })
@@ -453,11 +452,9 @@ pub fn prepare_move_domain(
                     }
                 }
                 MoveUnitClass::CompiledRoutine => {
-                    let spec = program_of_routine
-                        .get(unit)
-                        .ok_or_else(|| MoveParityError::ResidualOperandUnit {
-                            unit: unit.clone(),
-                        })?;
+                    let spec = program_of_routine.get(unit).ok_or_else(|| {
+                        MoveParityError::ResidualOperandUnit { unit: unit.clone() }
+                    })?;
                     let id = allocate_id(&mut next_program_id)?;
                     let mut program = (*spec).clone();
                     program.id = id;
@@ -475,7 +472,11 @@ pub fn prepare_move_domain(
             let (kind, programs, bespoke) = match class {
                 MoveUnitClass::IntrinsicIdentity => (
                     BehaviorClassificationKindV2::Compiled,
-                    vec![allocation.identity_program.expect("admission program allocated")],
+                    vec![
+                        allocation
+                            .identity_program
+                            .expect("admission program allocated"),
+                    ],
                     None,
                 ),
                 MoveUnitClass::CompiledRoutine => (
@@ -487,7 +488,7 @@ pub fn prepare_move_domain(
                     BehaviorClassificationKindV2::Bespoke,
                     Vec::new(),
                     Some(*mechanic),
-                )
+                ),
             };
             classifications.push(BehaviorClassificationEntryV2 {
                 behavior_unit: unit.clone(),
@@ -502,8 +503,7 @@ pub fn prepare_move_domain(
         // intrinsic-unit ownership now that the walk has seen all of them.
         if !intrinsic_units.is_empty() {
             let id = allocation.identity_program.expect("allocated above");
-            let admission =
-                identity_admission_program(id, &source_entry.source, &intrinsic_units);
+            let admission = identity_admission_program(id, &source_entry.source, &intrinsic_units);
             let slot = usize::try_from(u64::from(id.get())).map_err(|_| {
                 MoveParityError::IndexOverflow {
                     value: u64::from(id.get()),
@@ -542,7 +542,10 @@ pub fn prepare_move_domain(
     let mut bespoke_units: BTreeMap<BespokeMechanicId, Vec<BehaviorUnitId>> = BTreeMap::new();
     for (unit, class) in inventory.all_units() {
         if let MoveUnitClass::Bespoke(mechanic) = class {
-            bespoke_units.entry(mechanic).or_default().push(unit.clone());
+            bespoke_units
+                .entry(mechanic)
+                .or_default()
+                .push(unit.clone());
         }
     }
     let bespoke_entries = bespoke_units
@@ -668,9 +671,8 @@ fn scaffold_move_definition(
     mechanic_programs: Vec<MechanicsProgramId>,
 ) -> Result<MoveDefinitionV3, MoveParityError> {
     Ok(MoveDefinitionV3 {
-        id: MoveId::try_from_u64(numeric_id).map_err(|_| MoveParityError::InvalidMoveId {
-            numeric_id,
-        })?,
+        id: MoveId::try_from_u64(numeric_id)
+            .map_err(|_| MoveParityError::InvalidMoveId { numeric_id })?,
         category: MoveCategory::Status,
         move_type: PokemonType::Normal,
         power: MovePower::None,
@@ -686,8 +688,7 @@ fn scaffold_move_definition(
 
 /// Zero digest placeholder required before the real content hash computes.
 fn battle_content_pack_v3_hash_placeholder()
-    -> Result<er_types::BattleContentPackHashV3, MoveParityError>
-{
+-> Result<er_types::BattleContentPackHashV3, MoveParityError> {
     use er_types::BattleContentPackHashV3;
     BattleContentPackHashV3::parse(format!(
         "{}{}",
@@ -732,9 +733,7 @@ impl PreparedMoveDomain {
         self.program_of_unit
             .get(unit)
             .copied()
-            .ok_or_else(|| MoveParityError::NotACompiledMoveUnit {
-                unit: unit.clone(),
-            })
+            .ok_or_else(|| MoveParityError::NotACompiledMoveUnit { unit: unit.clone() })
     }
 
     /// The frozen catalog admits zero MOVE-owned RNG sites and the compiled
@@ -779,8 +778,7 @@ impl PreparedMoveDomain {
                 continue;
             }
             let prepared = execute_hook_v2(self.prepared(), &context, hook)?;
-            let direct =
-                execute_hook_v2_direct_reference(direct_reference, &context, hook)?;
+            let direct = execute_hook_v2_direct_reference(direct_reference, &context, hook)?;
             require_equal_transition(&prepared, &direct, hook.surface_name(), None)?;
             sweep.staged_mutations += prepared.operations.len();
             for operation in &prepared.operations {
@@ -795,12 +793,8 @@ impl PreparedMoveDomain {
         for query in ALL_QUERIES {
             let initial = witness_initial(query);
             let prepared = execute_query_v2(self.prepared(), &context, query, initial.clone())?;
-            let direct = execute_query_v2_direct_reference(
-                direct_reference,
-                &context,
-                query,
-                initial,
-            )?;
+            let direct =
+                execute_query_v2_direct_reference(direct_reference, &context, query, initial)?;
             require_equal_query(&prepared, &direct, query.surface_name(), None)?;
             sweep.query_evidence += prepared.evidence.len();
             for evidence in &prepared.evidence {
@@ -864,9 +858,7 @@ impl PreparedMoveDomain {
             for (unit, class) in &source_entry.units {
                 let witness = witnesses
                     .get(unit)
-                    .ok_or_else(|| MoveParityError::WitnessMissing {
-                        unit: unit.clone(),
-                    })?;
+                    .ok_or_else(|| MoveParityError::WitnessMissing { unit: unit.clone() })?;
                 self.check_witness_identity(unit, witness)?;
                 let record = match class {
                     MoveUnitClass::IntrinsicIdentity => {
@@ -923,21 +915,17 @@ impl PreparedMoveDomain {
         unit: &BehaviorUnitId,
         witness: &OracleWitness,
     ) -> Result<MoveUnitParityRecord, MoveParityError> {
-        let allocation =
-            self.allocation(&source_entry.source)
-                .ok_or_else(|| MoveParityError::MissingAllocation {
-                    source_id: source_entry.source.clone(),
-                })?;
+        let allocation = self.allocation(&source_entry.source).ok_or_else(|| {
+            MoveParityError::MissingAllocation {
+                source_id: source_entry.source.clone(),
+            }
+        })?;
         let identity_program = allocation
             .identity_program
-            .ok_or_else(|| MoveParityError::MissingAdmissionProgram {
-                unit: unit.clone(),
-            })?;
+            .ok_or_else(|| MoveParityError::MissingAdmissionProgram { unit: unit.clone() })?;
         let program = self.prepared.program(identity_program)?;
         if !program.bindings.is_empty() || !program.behavior_units.contains(unit) {
-            return Err(MoveParityError::AdmissionNotReachable {
-                unit: unit.clone(),
-            });
+            return Err(MoveParityError::AdmissionNotReachable { unit: unit.clone() });
         }
 
         // Negative sweep: even with the source active, no dispatch surface
@@ -956,11 +944,12 @@ impl PreparedMoveDomain {
                 .count();
         }
         for query in ALL_QUERIES {
-            attributed += execute_query_v2(self.prepared(), &context, query, witness_initial(query))?
-                .evidence
-                .iter()
-                .filter(|evidence| &evidence.behavior_unit == unit)
-                .count();
+            attributed +=
+                execute_query_v2(self.prepared(), &context, query, witness_initial(query))?
+                    .evidence
+                    .iter()
+                    .filter(|evidence| &evidence.behavior_unit == unit)
+                    .count();
         }
         if attributed != 0 {
             return Err(MoveParityError::AdmissionStagedEvidence {
@@ -994,9 +983,7 @@ impl PreparedMoveDomain {
         let program_id = self.require_compiled_unit(unit)?;
         let program = self.prepared.program(program_id)?;
         if program.source != unit.source || program.bindings.is_empty() {
-            return Err(MoveParityError::RoutineProgramDegenerate {
-                unit: unit.clone(),
-            });
+            return Err(MoveParityError::RoutineProgramDegenerate { unit: unit.clone() });
         }
         check_expected_hooks(unit, program, witness)?;
         let mut summary = None;
@@ -1021,16 +1008,19 @@ impl PreparedMoveDomain {
                 query,
                 initial.clone(),
             )?;
-            require_equal_query(&prepared_positive, &direct_positive, query.surface_name(), Some(unit))?;
+            require_equal_query(
+                &prepared_positive,
+                &direct_positive,
+                query.surface_name(),
+                Some(unit),
+            )?;
             enforce_positive_witness(witness, !prepared_positive.evidence.is_empty())?;
             if !prepared_positive
                 .evidence
                 .iter()
                 .any(|entry| &entry.behavior_unit == unit)
             {
-                return Err(MoveParityError::PositiveWitnessMissedSource {
-                    unit: unit.clone(),
-                });
+                return Err(MoveParityError::PositiveWitnessMissedSource { unit: unit.clone() });
             }
 
             // False-condition witness: inactive source stages nothing and
@@ -1043,7 +1033,12 @@ impl PreparedMoveDomain {
                 query,
                 initial.clone(),
             )?;
-            require_equal_query(&prepared_negative, &direct_negative, query.surface_name(), Some(unit))?;
+            require_equal_query(
+                &prepared_negative,
+                &direct_negative,
+                query.surface_name(),
+                Some(unit),
+            )?;
             let false_condition_clean = prepared_negative.evidence.is_empty()
                 && prepared_negative.after == prepared_negative.before
                 && prepared_negative.allowed.is_none()
@@ -1114,13 +1109,9 @@ impl PreparedMoveDomain {
             .binary_search_by(|entry| entry.behavior_unit.cmp(unit))
             .ok()
             .and_then(|index| pack.classifications.0.get(index))
-            .ok_or_else(|| MoveParityError::BespokeUnitUnclassified {
-                unit: unit.clone(),
-            })?;
+            .ok_or_else(|| MoveParityError::BespokeUnitUnclassified { unit: unit.clone() })?;
         let Some(mechanic) = classification.bespoke else {
-            return Err(MoveParityError::BespokeUnitUnclassified {
-                unit: unit.clone(),
-            });
+            return Err(MoveParityError::BespokeUnitUnclassified { unit: unit.clone() });
         };
         let handlers = crate::m6::bespoke::handlers_for(mechanic);
         if handlers.is_empty() {
@@ -1140,9 +1131,7 @@ impl PreparedMoveDomain {
             });
         }
         if self.program_of_unit.contains_key(unit) {
-            return Err(MoveParityError::BespokeUnitCompiled {
-                unit: unit.clone(),
-            });
+            return Err(MoveParityError::BespokeUnitCompiled { unit: unit.clone() });
         }
 
         enforce_positive_witness(witness, true)?;
@@ -1215,28 +1204,13 @@ pub struct EvidenceStage {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum QueryValueSummary {
-    Boolean {
-        value: bool,
-    },
-    Signed {
-        value: i64,
-    },
-    Unsigned {
-        value: u64,
-    },
-    Ratio {
-        numerator: i32,
-        denominator: u32,
-    },
-    TypeId {
-        value: u8,
-    },
-    CategoryId {
-        value: u8,
-    },
-    TargetId {
-        value: u8,
-    },
+    Boolean { value: bool },
+    Signed { value: i64 },
+    Unsigned { value: u64 },
+    Ratio { numerator: i32, denominator: u32 },
+    TypeId { value: u8 },
+    CategoryId { value: u8 },
+    TargetId { value: u8 },
 }
 
 fn summarize_value(value: &QueryValueV2) -> QueryValueSummary {
@@ -1267,69 +1241,42 @@ pub struct MoveParityDivergence {
 /// fails closed; nothing degrades to empty acceptance.
 #[derive(Debug, Error)]
 pub enum MoveParityError {
-    #[error("move unit {unit:?} carries unsupported kind/resolution pair ({kind:?}, {resolution:?})")]
+    #[error(
+        "move unit {unit:?} carries unsupported kind/resolution pair ({kind:?}, {resolution:?})"
+    )]
     UnsupportedResolution {
         unit: BehaviorUnitId,
         kind: BehaviorUnitKind,
         resolution: CatalogResolution,
     },
     #[error("RESOLVED_OPERANDS move unit {unit:?} has no compiled routine program")]
-    ResidualOperandUnit {
-        unit: BehaviorUnitId,
-    },
+    ResidualOperandUnit { unit: BehaviorUnitId },
     #[error("BESPOKE_GAP move unit {unit:?} has no bespoke mechanic route")]
-    UnassignedBespokeGap {
-        unit: BehaviorUnitId,
-    },
+    UnassignedBespokeGap { unit: BehaviorUnitId },
     #[error("duplicate routine program for unit {unit:?}")]
-    DuplicateRoutineProgram {
-        unit: BehaviorUnitId,
-    },
+    DuplicateRoutineProgram { unit: BehaviorUnitId },
     #[error("routine program {program:?} does not own exactly one behavior unit")]
-    RoutineProgramOwnershipShape {
-        program: MechanicsProgramId,
-    },
+    RoutineProgramOwnershipShape { program: MechanicsProgramId },
     #[error("routine program {program:?} does not belong to a MOVE source")]
-    RoutineProgramForeignSource {
-        program: MechanicsProgramId,
-    },
+    RoutineProgramForeignSource { program: MechanicsProgramId },
     #[error("compiled routine program for unit {unit:?} was never claimed by the inventory")]
-    UnownedRoutineProgram {
-        unit: BehaviorUnitId,
-    },
+    UnownedRoutineProgram { unit: BehaviorUnitId },
     #[error("duplicate bespoke route for unit {unit:?}")]
-    DuplicateBespokeRoute {
-        unit: BehaviorUnitId,
-    },
+    DuplicateBespokeRoute { unit: BehaviorUnitId },
     #[error("duplicate behavior-unit identity {unit:?} in the frozen catalog walk")]
-    DuplicateUnit {
-        unit: BehaviorUnitId,
-    },
+    DuplicateUnit { unit: BehaviorUnitId },
     #[error("units of source {source_id:?} are not contiguous in frozen catalog order")]
-    NonContiguousSourceUnits {
-        source_id: BehaviorSourceId,
-    },
+    NonContiguousSourceUnits { source_id: BehaviorSourceId },
     #[error("classifications are not ascending at unit {unit:?}")]
-    ClassificationsNotSorted {
-        unit: BehaviorUnitId,
-    },
+    ClassificationsNotSorted { unit: BehaviorUnitId },
     #[error("program ID space exhausted after {allocated} allocations")]
-    ProgramIdExhausted {
-        allocated: u64,
-    },
+    ProgramIdExhausted { allocated: u64 },
     #[error("program slot mismatch: expected {expected}, actual {actual}")]
-    ProgramSlotMismatch {
-        expected: usize,
-        actual: usize,
-    },
+    ProgramSlotMismatch { expected: usize, actual: usize },
     #[error("platform index overflow: {value}")]
-    IndexOverflow {
-        value: u64,
-    },
+    IndexOverflow { value: u64 },
     #[error("invalid numeric move id {numeric_id}")]
-    InvalidMoveId {
-        numeric_id: u64,
-    },
+    InvalidMoveId { numeric_id: u64 },
     #[error("invalid catalog identity string: {0}")]
     StringIdentity(#[source] M6StringIdentityError),
     #[error("invalid mechanics program: {0}")]
@@ -1343,89 +1290,64 @@ pub enum MoveParityError {
     #[error("executor failure: {0}")]
     Executor(#[from] MechanicsErrorV2),
     #[error("source {source_id:?} is not part of this domain")]
-    SourceNotInDomain {
-        source_id: BehaviorSourceId,
-    },
+    SourceNotInDomain { source_id: BehaviorSourceId },
     #[error("missing allocation for source {source_id:?}")]
-    MissingAllocation {
-        source_id: BehaviorSourceId,
-    },
+    MissingAllocation { source_id: BehaviorSourceId },
     #[error("identity admission program missing for unit {unit:?}")]
-    MissingAdmissionProgram {
-        unit: BehaviorUnitId,
-    },
+    MissingAdmissionProgram { unit: BehaviorUnitId },
     #[error("identity admission for unit {unit:?} is not reachable through prepared indexes")]
-    AdmissionNotReachable {
-        unit: BehaviorUnitId,
-    },
+    AdmissionNotReachable { unit: BehaviorUnitId },
     #[error("identity admission unit {unit:?} was attributed {evidence} evidence elements")]
     AdmissionStagedEvidence {
         unit: BehaviorUnitId,
         evidence: usize,
     },
     #[error("compiled routine program for unit {unit:?} is degenerate")]
-    RoutineProgramDegenerate {
-        unit: BehaviorUnitId,
-    },
+    RoutineProgramDegenerate { unit: BehaviorUnitId },
     #[error("unit {unit:?} carries a trigger binding; the compiled move surface is query-only")]
-    RoutineTriggerBindingUnsupported {
-        unit: BehaviorUnitId,
-    },
+    RoutineTriggerBindingUnsupported { unit: BehaviorUnitId },
     #[error("witness missing for unit {unit:?}")]
-    WitnessMissing {
-        unit: BehaviorUnitId,
-    },
-    #[error("witness for unit {unit:?} targets source {expected_source:?}, unit lives on {actual_source:?}")]
+    WitnessMissing { unit: BehaviorUnitId },
+    #[error(
+        "witness for unit {unit:?} targets source {expected_source:?}, unit lives on {actual_source:?}"
+    )]
     WitnessIdentityMismatch {
         unit: BehaviorUnitId,
         expected_source: Box<BehaviorSourceId>,
         actual_source: Box<BehaviorSourceId>,
     },
     #[error("witness for unit {unit:?} declares {sites} RNG sites; the move surface admits none")]
-    WitnessRngContractNotEmpty {
-        unit: BehaviorUnitId,
-        sites: usize,
-    },
+    WitnessRngContractNotEmpty { unit: BehaviorUnitId, sites: usize },
     #[error("positive witness assertion failed for unit {unit:?}")]
-    PositiveWitnessAssertionFailed {
-        unit: Box<BehaviorUnitId>,
-    },
+    PositiveWitnessAssertionFailed { unit: Box<BehaviorUnitId> },
     #[error("false-condition witness assertion failed for unit {unit:?}")]
-    FalseConditionAssertionFailed {
-        unit: Box<BehaviorUnitId>,
-    },
+    FalseConditionAssertionFailed { unit: Box<BehaviorUnitId> },
     #[error("positive witness ran but never reached the unit's source: {unit:?}")]
-    PositiveWitnessMissedSource {
-        unit: BehaviorUnitId,
-    },
-    #[error("hook evidence mismatch for unit {unit:?}: witness says {expected}, program binds {actual}")]
+    PositiveWitnessMissedSource { unit: BehaviorUnitId },
+    #[error(
+        "hook evidence mismatch for unit {unit:?}: witness says {expected}, program binds {actual}"
+    )]
     HookEvidenceMismatch {
         unit: BehaviorUnitId,
         expected: String,
         actual: String,
     },
     #[error("unit {unit:?} is not a compiled move unit")]
-    NotACompiledMoveUnit {
-        unit: BehaviorUnitId,
-    },
+    NotACompiledMoveUnit { unit: BehaviorUnitId },
     #[error("bespoke unit {unit:?} has no Bespoke classification")]
-    BespokeUnitUnclassified {
-        unit: BehaviorUnitId,
-    },
+    BespokeUnitUnclassified { unit: BehaviorUnitId },
     #[error("bespoke mechanic {mechanic:?} has no production handler set")]
-    BespokeMechanicWithoutHandler {
-        mechanic: BespokeMechanicId,
-    },
+    BespokeMechanicWithoutHandler { mechanic: BespokeMechanicId },
     #[error("bespoke manifest does not own unit {unit:?} under {mechanic:?}")]
     BespokeManifestMismatch {
         unit: BehaviorUnitId,
         mechanic: BespokeMechanicId,
     },
     #[error("bespoke unit {unit:?} unexpectedly carries a compiled program")]
-    BespokeUnitCompiled {
-        unit: BehaviorUnitId,
-    },
-    #[error("catalog binds {sites} RNG sites into compiled move program {program:?}; this adapter admits none")]
+    BespokeUnitCompiled { unit: BehaviorUnitId },
+    #[error(
+        "catalog binds {sites} RNG sites into compiled move program {program:?}; this adapter admits none"
+    )]
     MoveRngSitePresent {
         program: MechanicsProgramId,
         sites: usize,
@@ -1544,10 +1466,7 @@ fn enforce_positive_witness(
     Ok(())
 }
 
-fn enforce_negative_witness(
-    witness: &OracleWitness,
-    clean: bool,
-) -> Result<(), MoveParityError> {
+fn enforce_negative_witness(witness: &OracleWitness, clean: bool) -> Result<(), MoveParityError> {
     if witness
         .negative_assertions
         .contains(&WitnessAssertion::FalseConditionDoesNotMutate)
@@ -1676,16 +1595,22 @@ fn require_equal_query(
             ),
             None => format!(
                 "accumulator result diverged: prepared after {:?} allowed {:?} cancelled {} vs direct after {:?} allowed {:?} cancelled {}",
-                prepared.after, prepared.allowed, prepared.cancelled,
-                direct.after, direct.allowed, direct.cancelled,
+                prepared.after,
+                prepared.allowed,
+                prepared.cancelled,
+                direct.after,
+                direct.allowed,
+                direct.cancelled,
             ),
         }
     };
-    Err(MoveParityError::Divergence(Box::new(MoveParityDivergence {
-        stage: surface,
-        unit: unit.cloned(),
-        detail,
-    })))
+    Err(MoveParityError::Divergence(Box::new(
+        MoveParityDivergence {
+            stage: surface,
+            unit: unit.cloned(),
+            detail,
+        },
+    )))
 }
 
 fn require_equal_transition(
@@ -1717,11 +1642,13 @@ fn require_equal_transition(
             None => "staged operation payloads diverged".to_owned(),
         }
     };
-    Err(MoveParityError::Divergence(Box::new(MoveParityDivergence {
-        stage: surface,
-        unit: unit.cloned(),
-        detail,
-    })))
+    Err(MoveParityError::Divergence(Box::new(
+        MoveParityDivergence {
+            stage: surface,
+            unit: unit.cloned(),
+            detail,
+        },
+    )))
 }
 
 /// Invalid witnesses must resolve identically on both paths: either both
@@ -1736,23 +1663,25 @@ fn require_compatible_invalid_outcome(
         (Ok(left), Ok(right)) => require_equal_query(left, right, "INVALID_WITNESS", Some(unit)),
         (Err(left), Err(right)) => {
             if format!("{left:?}") != format!("{right:?}") {
-                return Err(MoveParityError::Divergence(Box::new(MoveParityDivergence {
-                    stage: "INVALID_WITNESS",
-                    unit: Some(unit.clone()),
-                    detail: format!(
-                        "typed rejection diverged: prepared {left:?} vs direct {right:?}"
-                    ),
-                })));
+                return Err(MoveParityError::Divergence(Box::new(
+                    MoveParityDivergence {
+                        stage: "INVALID_WITNESS",
+                        unit: Some(unit.clone()),
+                        detail: format!(
+                            "typed rejection diverged: prepared {left:?} vs direct {right:?}"
+                        ),
+                    },
+                )));
             }
             Ok(())
         }
-        (Ok(_), Err(error)) | (Err(error), Ok(_)) => {
-            Err(MoveParityError::Divergence(Box::new(MoveParityDivergence {
+        (Ok(_), Err(error)) | (Err(error), Ok(_)) => Err(MoveParityError::Divergence(Box::new(
+            MoveParityDivergence {
                 stage: "INVALID_WITNESS",
                 unit: Some(unit.clone()),
                 detail: format!("one path rejected while the other applied: {error:?}"),
-            })))
-        }
+            },
+        ))),
     }
 }
 

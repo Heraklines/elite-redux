@@ -34,9 +34,8 @@ use er_battle::m6::bespoke::transform_imposter::{
 };
 use er_battle::m6::system::species_form_parity::{
     AbilityTable, ORACLE_FORM_CLOSURE_COUNT, ORACLE_SPECIES_CLOSURE_COUNT, ResolvedFormMetadata,
-    SpeciesContentEvidence, compile_form_entry,
-    compile_species_entry_with_context, prove_overlay_admission, prove_transform_copy_surface,
-    verify_identity_closure,
+    SpeciesContentEvidence, compile_form_entry, compile_species_entry_with_context,
+    prove_overlay_admission, prove_transform_copy_surface, verify_identity_closure,
 };
 use er_content::m6_catalog::{CatalogEffectKind, SemanticCatalogV1};
 use er_content::pack::m6_pack::species_gap::{
@@ -47,10 +46,10 @@ use er_state::bespoke_v2::transform_imposter::{
     TRANSFORM_COPIED_PP_CAP, TransformCopiedAbilitiesV2, TransformCopiedGenderV2,
     TransformCopyTriggerV2, TransformFormCopyStateV2,
 };
-use er_types::{BehaviorSourceId, SafeU53};
 use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, PokemonId};
 use er_types::battle_model::{BattleStats, BattleTyping, StatStages};
 use er_types::mechanics::MechanicScope;
+use er_types::{BehaviorSourceId, SafeU53};
 
 /// Walks up from the crate manifest so the frozen fixture resolves under any
 /// integration layout (crate dir, workspace root, or a relocated checkout
@@ -155,13 +154,25 @@ fn species_and_form_closure_is_exact_with_zero_residual() {
             .iter()
             .find(|candidate| candidate.id == metadata.id)
             .expect("recompiled identity");
-        assert_eq!(*expected, *metadata, "species {} recompiles exactly", metadata.id);
+        assert_eq!(
+            *expected, *metadata,
+            "species {} recompiles exactly",
+            metadata.id
+        );
 
         let content = closure.species_content(metadata.id).expect("content");
         let weight = f64::from_bits(content.weight_bits);
         let height = f64::from_bits(content.height_bits);
-        assert!(weight > 0.0 && weight.is_finite(), "{} weight positive", metadata.id);
-        assert!(height > 0.0 && height.is_finite(), "{} height positive", metadata.id);
+        assert!(
+            weight > 0.0 && weight.is_finite(),
+            "{} weight positive",
+            metadata.id
+        );
+        assert!(
+            height > 0.0 && height.is_finite(),
+            "{} height positive",
+            metadata.id
+        );
 
         if let SpeciesContentEvidence::Derived(derived) = &metadata.content {
             // Provenance travels with every derived identity.
@@ -177,14 +188,13 @@ fn species_and_form_closure_is_exact_with_zero_residual() {
                     let ErGapSpeciesSource::ContentOf(source_species) = record.source else {
                         panic!("class/source coherence broke for {}", metadata.id);
                     };
-                    let source_content =
-                        closure.species_content(source_species).expect("compiled source");
+                    let source_content = closure
+                        .species_content(source_species)
+                        .expect("compiled source");
                     assert_eq!(
-                        &derived.content,
-                        source_content,
+                        &derived.content, source_content,
                         "clone {} equals its source {}",
-                        metadata.id,
-                        source_species
+                        metadata.id, source_species
                     );
                 }
                 ErGapSpeciesClass::AuthoredNewcomer | ErGapSpeciesClass::PitchRoster => {
@@ -221,7 +231,12 @@ fn species_and_form_closure_is_exact_with_zero_residual() {
 
     for (entry, resolved) in form_entries.iter().zip(&closure.forms) {
         let recomputed = compile_form_entry(entry, &table).expect("recompiled form");
-        assert_eq!(recomputed, *resolved, "form {} recompiles exactly", resolved.id.as_str());
+        assert_eq!(
+            recomputed,
+            *resolved,
+            "form {} recompiles exactly",
+            resolved.id.as_str()
+        );
         let weight = f64::from_bits(resolved.content.weight_bits);
         let height = f64::from_bits(resolved.content.height_bits);
         assert!(weight > 0.0 && weight.is_finite(), "form weight positive");
@@ -260,7 +275,10 @@ fn semantic_catalog_species_units_match_the_raw_closure() {
 
     // Both catalogs carry the same oracle identity.
     let raw_oracle = raw["oracle_sha"].as_str().expect("raw oracle sha");
-    assert_eq!(raw_oracle, semantic.oracle_sha, "catalogs share the oracle sha");
+    assert_eq!(
+        raw_oracle, semantic.oracle_sha,
+        "catalogs share the oracle sha"
+    );
 
     let mut semantic_species_ids: Vec<u64> = semantic
         .behavior_units
@@ -303,7 +321,10 @@ fn empty_string_is_a_first_class_base_form_key() {
     let applied = admit_tera(&state, BattleSide::Player, &scope, 0).expect("tera applies");
     assert_eq!(applied.outcome, FormsOutcomeV2::Applied);
     let cleaned = cleanup_on_switch(&applied.state, &scope).expect("switch-out cleanup");
-    let battler = cleaned.state.battler(&scope).expect("battler stays registered");
+    let battler = cleaned
+        .state
+        .battler(&scope)
+        .expect("battler stays registered");
     assert_eq!(battler.current.form_key, "");
 }
 
@@ -318,8 +339,14 @@ fn overlay_admission_holds_for_every_species_identity() {
     // base form (the empty key included), completed a Tera chain, and the
     // 157 multi-key species completed stance and Mega chains; single-key
     // identities proved their negative witnesses instead.
-    assert_eq!(evidence.species_admission_checked, ORACLE_SPECIES_CLOSURE_COUNT);
-    assert_eq!(evidence.base_form_registrations, ORACLE_SPECIES_CLOSURE_COUNT);
+    assert_eq!(
+        evidence.species_admission_checked,
+        ORACLE_SPECIES_CLOSURE_COUNT
+    );
+    assert_eq!(
+        evidence.base_form_registrations,
+        ORACLE_SPECIES_CLOSURE_COUNT
+    );
     assert_eq!(evidence.tera_admissions, ORACLE_SPECIES_CLOSURE_COUNT);
     assert_eq!(evidence.stance_pairs_exercised, 157);
     assert_eq!(evidence.mega_pairs_exercised, 157);
@@ -331,8 +358,7 @@ fn transform_copy_surface_is_exhaustive_and_fail_closed() {
     let raw = load_fixture("raw-source-catalog-v2.json");
     let closure = frozen_closure(&raw);
 
-    let evidence =
-        prove_transform_copy_surface(&closure).expect("transform copy surface proof");
+    let evidence = prove_transform_copy_surface(&closure).expect("transform copy surface proof");
 
     assert_eq!(evidence.copied_fields, copied_field_evidence());
     assert_eq!(evidence.copied_fields.len(), 8);
@@ -347,7 +373,11 @@ fn transform_copy_surface_is_exhaustive_and_fail_closed() {
 
 /// Builds battler facts for one frozen form identity, as the parity harness
 /// observes them.
-fn form_facts(pokemon: u64, side: BattleSide, form: &ResolvedFormMetadata) -> TransformBattlerFactsV2 {
+fn form_facts(
+    pokemon: u64,
+    side: BattleSide,
+    form: &ResolvedFormMetadata,
+) -> TransformBattlerFactsV2 {
     TransformBattlerFactsV2 {
         pokemon: PokemonId::try_from_u64(pokemon).expect("in-range pokemon id"),
         slot: FieldSlot::new(side, 0).expect("in-range field slot"),
@@ -419,7 +449,10 @@ fn typeless_identity_copies_explicitly_and_stays_out_of_the_chart() {
         "copied typing must be the explicit typeless presentation"
     );
     assert_eq!(plan.copied.form_key.as_str(), "493:18:unknown");
-    assert_eq!(plan.copied.stats.attack, target_form.content.base_stats.attack);
+    assert_eq!(
+        plan.copied.stats.attack,
+        target_form.content.base_stats.attack
+    );
     assert_eq!(plan.evidence, copied_field_evidence());
 
     let applied =
@@ -452,7 +485,10 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
     unknown_type["typing"]["primary"]["member"] = json!("NOT_A_TYPE");
     assert!(matches!(
         compile_species_entry_with_context(&unknown_type, &table, &[]),
-        Err(E::UnknownEnumMember { owner: "PokemonType", .. })
+        Err(E::UnknownEnumMember {
+            owner: "PokemonType",
+            ..
+        })
     ));
 
     // Wrong symbol owner fails closed.
@@ -468,12 +504,17 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
     unknown_ability["ability_slots"][0]["member"] = json!("NOT_AN_ABILITY");
     assert!(matches!(
         compile_species_entry_with_context(&unknown_ability, &table, &[]),
-        Err(E::UnknownEnumMember { owner: "AbilityId", .. })
+        Err(E::UnknownEnumMember {
+            owner: "AbilityId",
+            ..
+        })
     ));
 
     // A duplicated ability table row fails closed.
-    let mut duplicated_abilities =
-        raw["abilities"].as_array().expect("abilities array").clone();
+    let mut duplicated_abilities = raw["abilities"]
+        .as_array()
+        .expect("abilities array")
+        .clone();
     duplicated_abilities.push(duplicated_abilities[0].clone());
     assert!(matches!(
         AbilityTable::from_catalog_values(&duplicated_abilities),
@@ -490,7 +531,9 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
 
     // A base stat total that disagrees with the resolved sum fails closed.
     let mut tampered_total = species_entries[0].clone();
-    let declared = tampered_total["base_stat_total"]["value"].as_u64().expect("total");
+    let declared = tampered_total["base_stat_total"]["value"]
+        .as_u64()
+        .expect("total");
     tampered_total["base_stat_total"]["value"] = json!(declared + 1);
     assert!(matches!(
         compile_species_entry_with_context(&tampered_total, &table, &[]),
@@ -506,7 +549,10 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
     partial_gap["weight"] = json!({ "kind": "SAFE_INTEGER", "value": 10 });
     assert!(matches!(
         compile_species_entry_with_context(&partial_gap, &table, &[]),
-        Err(E::MixedIdentityEvidence { field: "weight", .. })
+        Err(E::MixedIdentityEvidence {
+            field: "weight",
+            ..
+        })
     ));
 
     // An unrecognized gap marker fails closed instead of guessing a seam.
@@ -524,7 +570,10 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
         .expect("the frozen catalog carries the RATTATA_ALOLAN alias");
     assert!(matches!(
         compile_species_entry_with_context(&species_entries[alias_position], &table, &[]),
-        Err(E::UnknownGapCopySource { id: 10143, source_id: 2019 })
+        Err(E::UnknownGapCopySource {
+            id: 10143,
+            source_id: 2019
+        })
     ));
 
     // A divergence between the pinned derivation key and the oracle key
@@ -562,7 +611,10 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
     residual_forms.push(phantom);
     assert!(matches!(
         verify_identity_closure(&species_entries, &residual_forms, &table),
-        Err(E::UnknownFormSpecies { species: 888888, .. })
+        Err(E::UnknownFormSpecies {
+            species: 888888,
+            ..
+        })
     ));
     let mut duplicate_keys = species_entries.clone();
     duplicate_keys[1]["key"] = duplicate_keys[0]["key"].clone();
