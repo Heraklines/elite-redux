@@ -479,10 +479,20 @@ async function runCodex(payload, emit) {
     });
     turnId = started.turn.id;
     activeTurn = { requestId: payload.requestId, threadId, turnId };
-    await Promise.race([
-      done,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Ability generation timed out")), 180_000)),
-    ]);
+    try {
+      await Promise.race([
+        done,
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(Object.assign(new Error("Ability generation timed out"), { fallback: true })),
+            120_000,
+          ),
+        ),
+      ]);
+    } catch (error) {
+      await rpc.request("turn/interrupt", { threadId, turnId }).catch(() => {});
+      throw error;
+    }
     if (turnError) {
       const info = errorInfo(turnError);
       throw Object.assign(new Error(info.message), {
