@@ -2436,10 +2436,11 @@ export class ErGreaterMoveRandomizerModifier extends ConsumablePokemonMoveModifi
 
 /**
  * ER Rogue-tier consumable: randomizes one of a Pokémon's ability slots (the
- * active ability or any of its ER innate slots — chosen by the player when the
- * item is used) to any ability in the game (except Truant and Slow Start, which
- * are pure downsides). The new ability is stored as a per-Pokémon override on
- * {@linkcode CustomPokemonData}, so it persists across the run.
+ * active ability, any ER innate, or any current Avalanche-added slot — chosen by
+ * the player when the item is used) to any ability in the game (except Truant
+ * and Slow Start, which are pure downsides). The new ability is stored as a
+ * per-Pokémon override on {@linkcode CustomPokemonData}, so it persists across
+ * the run.
  */
 export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
   /** Abilities that the randomizer must never roll (pure-downside abilities). */
@@ -2449,7 +2450,7 @@ export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
     AbilityId.SLOW_START,
   ]);
 
-  /** Which ability slot to reroll: 0 = active ability, 1-3 = ER innate slots. */
+  /** Which ability slot to reroll: 0 = active, 1-3 = innates, 4+ = Avalanche. */
   public abilitySlot: number;
 
   constructor(type: ModifierType, pokemonId: number, abilitySlot = 0) {
@@ -2458,9 +2459,9 @@ export class PokemonRandomizeAbilityModifier extends ConsumablePokemonModifier {
   }
 
   override apply(playerPokemon: PlayerPokemon): boolean {
-    // Resolve the targeted slot (falling back to the active ability if the
-    // requested innate slot is absent for this Pokémon).
-    const slots = playerPokemon.getAbilitySlots();
+    // Resolve the targeted slot, falling back to the active ability if it is no
+    // longer present when the modifier applies.
+    const slots = playerPokemon.getRandomizableAbilitySlots();
     const target = slots.find(s => s.slot === this.abilitySlot) ?? slots[0];
     const current = target.ability.id;
     // Build the candidate pool from every registered ability, minus the excluded

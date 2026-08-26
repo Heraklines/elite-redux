@@ -456,6 +456,11 @@ let activeAbilitySourceCache: ActiveAbilitySourceCache | null = null;
 const funAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
 const endlessAvalancheAbilityIds = new WeakMap<Pokemon, Set<AbilityId>>();
 const endlessAvalancheAbilityIndexes = new WeakMap<Pokemon, Map<AbilityId, number>>();
+interface RandomizableAvalancheAbilitySlot {
+  readonly key: string;
+  readonly ability: Ability;
+}
+const randomizableAvalancheAbilitySlots = new WeakMap<Pokemon, readonly RandomizableAvalancheAbilitySlot[]>();
 
 export abstract class Pokemon extends Phaser.GameObjects.Container {
   /**
@@ -3060,17 +3065,24 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     for (const abilityId of getMoodyCoordinatorExtraAbilityIds(this.id)) {
       appendUniqueAbility(allAbilities[abilityId]);
     }
+    const avalancheSlots: RandomizableAvalancheAbilitySlot[] = [];
+    const resolveAvalancheAbility = (key: string, fallbackId: AbilityId): Ability => {
+      const overrideId = this.customPokemonData.erAvalancheAbilityOverrides[key];
+      return (overrideId == null ? undefined : allAbilities[overrideId]) ?? allAbilities[fallbackId];
+    };
     if (globalScene.gameMode.isFun && getFunModeConfig().abilityAvalanche) {
       const excludedIds = [this.getAbility().id, ...presentIds];
       const avalancheIds = new Set<AbilityId>();
-      for (const avalancheId of getFunAbilityAvalancheIds(
+      for (const [index, generatedId] of getFunAbilityAvalancheIds(
         this.id,
         globalScene.currentBattle?.waveIndex ?? 1,
         excludedIds,
-      )) {
-        const avalancheAbility = allAbilities[avalancheId];
+      ).entries()) {
+        const key = `fun:${index}`;
+        const avalancheAbility = resolveAvalancheAbility(key, generatedId);
         if (appendUniqueAbility(avalancheAbility)) {
-          avalancheIds.add(avalancheId);
+          avalancheIds.add(avalancheAbility.id);
+          avalancheSlots.push({ key, ability: avalancheAbility });
         }
       }
       funAvalancheAbilityIds.set(this, avalancheIds);
@@ -3100,11 +3112,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const activeIds = hasErEndlessRift("avalanche-reroll")
         ? getEndlessAbilityAvalancheIds(this.id, count, excludedIds, Math.imul(wave, 0x45d9f3b))
         : canonicalIds.slice(0, count);
-      for (const avalancheId of activeIds) {
-        const avalancheAbility = allAbilities[avalancheId];
+      for (const [index, generatedId] of activeIds.entries()) {
+        const key = `endless:${index}`;
+        const avalancheAbility = resolveAvalancheAbility(key, generatedId);
         if (appendUniqueAbility(avalancheAbility)) {
-          avalancheIndexes.set(avalancheId, avalancheIndexes.size);
-          avalancheIds.add(avalancheId);
+          avalancheIndexes.set(avalancheAbility.id, avalancheIndexes.size);
+          avalancheIds.add(avalancheAbility.id);
+          avalancheSlots.push({ key, ability: avalancheAbility });
         }
       }
       endlessAvalancheAbilityIds.set(this, avalancheIds);
@@ -3113,6 +3127,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       endlessAvalancheAbilityIds.delete(this);
       endlessAvalancheAbilityIndexes.delete(this);
     }
+    randomizableAvalancheAbilitySlots.set(this, avalancheSlots);
     // ER Black Shinies (#349): append the active GIFT abilities — this mon's
     // own gift plus any on-field black-shiny ally's gift. Flowing them through
     // the passive list makes combat + every abilities screen pick them up.
@@ -3211,10 +3226,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   /**
-   * The selectable ability "slots" for this Pokémon, used by the ER Ability
-   * Randomizer: slot 0 is the active ability, slots 1-3 are the ER innate
-   * (passive) slots that resolve to a real ability. Returns one entry per
-   * present slot, each with the {@linkcode Ability} currently occupying it.
+   * The standard selectable ability slots for this Pokémon: slot 0 is the
+   * active ability, slots 1-3 are the ER innate slots that resolve to a real
+   * ability. Avalanche-aware randomizers extend this through
+   * {@linkcode getRandomizableAbilitySlots}.
    */
   public getAbilitySlots(): { slot: number; ability: Ability }[] {
     const slots: { slot: number; ability: Ability }[] = [{ slot: 0, ability: this.getAbility() }];
@@ -3231,12 +3246,29 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return slots;
   }
 
+  /** Ability Randomizer targets: the normal four slots plus current Avalanche additions. */
+  public getRandomizableAbilitySlots(): { slot: number; ability: Ability }[] {
+    const slots = this.getAbilitySlots();
+    const avalancheSlots = randomizableAvalancheAbilitySlots.get(this) ?? [];
+    return [...slots, ...avalancheSlots.map(({ ability }, index) => ({ slot: index + 4, ability }))];
+  }
+
   /**
    * Persistently override the ability occupying a given slot (0 = active
-   * ability, 1-3 = ER innate slots). Stored on {@linkcode CustomPokemonData} so
-   * it survives the run. Used by the ER Ability Randomizer consumable.
+   * ability, 1-3 = ER innate slots, 4+ = visible Avalanche additions). Stored on
+   * {@linkcode CustomPokemonData} so it survives the run. Used by the ER Ability
+   * Randomizer consumable.
    */
   public setAbilityOverrideForSlot(slot: number, abilityId: AbilityId): void {
+    if (slot >= 4) {
+      const avalancheSlot = this.getRandomizableAbilitySlots().find(entry => entry.slot === slot);
+      const source = randomizableAvalancheAbilitySlots.get(this)?.[slot - 4];
+      if (avalancheSlot == null || source == null) {
+        return;
+      }
+      this.customPokemonData.erAvalancheAbilityOverrides[source.key] = abilityId;
+      return;
+    }
     const owner = this.getAbilitySlotOwner(slot, true);
     if (!owner) {
       return;

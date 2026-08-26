@@ -49,7 +49,7 @@ export function rollGreaterRandomizerAbilities(
   pokemon: PlayerPokemon,
   exclude: Iterable<AbilityId> = [],
 ): BargainAbilityChoice[] {
-  const present = pokemon.getAbilitySlots().map(s => s.ability.id);
+  const present = pokemon.getRandomizableAbilitySlots().map(s => s.ability.id);
   return rollCuriosityAbilities([...present, ...exclude], GREATER_RANDOMIZER_ABILITY_CHOICES);
 }
 
@@ -76,7 +76,7 @@ export function resolveGreaterRandomizerAbilityIds(
   pokemon: PlayerPokemon,
   abilityIds: readonly number[],
 ): BargainAbilityChoice[] | null {
-  const present = new Set(pokemon.getAbilitySlots().map(slot => slot.ability.id));
+  const present = new Set(pokemon.getRandomizableAbilitySlots().map(slot => slot.ability.id));
   if (
     abilityIds.length !== GREATER_RANDOMIZER_ABILITY_CHOICES
     || new Set(abilityIds).size !== abilityIds.length
@@ -101,7 +101,7 @@ export function resolveGreaterRandomizerAbilityIds(
 
 /**
  * Write the player-chosen rolled ability into the chosen slot (ER index: 0 = active
- * ability, 1-3 = innate slots), reusing the same per-mon override path as the
+ * ability, 1-3 = innate slots, 4+ = Avalanche slots), reusing the same per-mon override path as the
  * existing Ability Randomizer + Curiosity ({@linkcode PlayerPokemon.setAbilityOverrideForSlot}
  * via {@linkcode bargainReplaceAbilitySlot}). Run-state only (customPokemonData),
  * never a permanent dex unlock.

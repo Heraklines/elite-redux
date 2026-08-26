@@ -1889,6 +1889,7 @@ export class SelectModifierPhase extends BattlePhase {
         : undefined,
       tmMoveId,
       isPpRestoreModifier,
+      isAbilityModifier,
     );
   }
 

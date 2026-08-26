@@ -233,6 +233,10 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           this.openAbilityPicker(mon, slot);
         },
         (p: PlayerPokemon) => (p === mon ? null : i18next.t(`${ns}:erGreaterAbilityRandomizer.chooseSameMon`)),
+        undefined,
+        undefined,
+        false,
+        true,
       ),
     ).then(() => notifyCoopV2InteractionSurfaceReady(this.coopOwningRuntime));
   }

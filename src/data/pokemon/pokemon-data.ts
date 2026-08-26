@@ -26,6 +26,18 @@ import type { TurnMove } from "#types/turn-move";
 import type { CoerceNullPropertiesToUndefined } from "#types/type-helpers";
 import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 
+function normalizeAvalancheAbilityOverrides(value: unknown): Record<string, AbilityId> {
+  if (value == null || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter(
+      ([key, abilityId]) =>
+        /^(fun|endless):\d+$/.test(key) && typeof abilityId === "number" && Number.isSafeInteger(abilityId),
+    ),
+  ) as Record<string, AbilityId>;
+}
+
 /**
  * Permanent data that can customize a Pokemon in non-standard ways from its Species.
  * Includes abilities, nature, changed types, etc.
@@ -172,6 +184,12 @@ export class CustomPokemonData {
    * cannot reroll abilities that the Pokemon already earned.
    */
   public erEndlessAvalancheAbilities: AbilityId[] = [];
+  /**
+   * Run-scoped Ability Randomizer replacements for Fun/Endless Avalanche slots.
+   * Keys identify the stable source slot (`fun:N` or `endless:N`) so replacements
+   * survive battles and save reloads without making Black Shiny gifts targetable.
+   */
+  public erAvalancheAbilityOverrides: Record<string, AbilityId> = {};
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -202,6 +220,7 @@ export class CustomPokemonData {
     this.erEndlessAvalancheAbilities = Array.isArray(data?.erEndlessAvalancheAbilities)
       ? [...data.erEndlessAvalancheAbilities]
       : [];
+    this.erAvalancheAbilityOverrides = normalizeAvalancheAbilityOverrides(data?.erAvalancheAbilityOverrides);
   }
 }
 
