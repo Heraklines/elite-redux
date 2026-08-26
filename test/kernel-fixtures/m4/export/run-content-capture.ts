@@ -509,10 +509,15 @@ function abilityEffect(ability: AnyRecord, id: number): JsonObject {
     return { kind: "POST_SUMMON_ADJACENT_OPPONENT_ATTACK_MINUS_ONE" };
   }
   if (id === 25) {
-    if (attrs.length !== 1) {
-      gap("ABILITY_MECHANICS_UNOBSERVABLE", "src/data/abilities/ab-attrs.ts:NonSuperEffectiveImmunityAbAttr", "WONDER GUARD attr closure is not exact");
+    const mechanicalAttrs = attrs.filter((raw, index) => {
+      const attr = requireRecord(raw, `abilities.${id}.attrs[${index}]`);
+      const name = requireString(attr.constructor?.name, `abilities.${id}.attrs[${index}].constructor.name`);
+      return name !== "AbilityStudioRuntimeCapabilityAbAttr" && name !== "AbilityStudioSourceAbilityAbAttr";
+    });
+    if (mechanicalAttrs.length !== 1) {
+      gap("ABILITY_MECHANICS_UNOBSERVABLE", "src/data/abilities/ab-attrs.ts:NonSuperEffectiveImmunityAbAttr", "WONDER GUARD mechanical attr closure is not exact");
     }
-    exact(requireString(requireRecord(attrs[0], `abilities.${id}.attrs[0]`).constructor?.name, `abilities.${id}.attrs[0].constructor.name`), "NonSuperEffectiveImmunityAbAttr", `abilities.${id}.attr`);
+    exact(requireString(requireRecord(mechanicalAttrs[0], `abilities.${id}.mechanicalAttrs[0]`).constructor?.name, `abilities.${id}.mechanicalAttrs[0].constructor.name`), "NonSuperEffectiveImmunityAbAttr", `abilities.${id}.attr`);
     return { kind: "NON_SUPER_EFFECTIVE_ATTACK_IMMUNITY" };
   }
   gap("CONTENT_CANONICAL_VALUE", "src/data/abilities/ability.ts:Ability", `unmapped ability ${id}`);

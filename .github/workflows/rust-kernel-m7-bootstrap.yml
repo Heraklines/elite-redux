@@ -268,6 +268,76 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  m7-system-catalog:
+    name: M7 complete game-system inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+          submodules: false
+      - uses: pnpm/action-setup@v5
+        with:
+          version: 10.33.2
+          run_install: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Materialize immutable M7 oracle
+        run: git worktree add --detach "$RUNNER_TEMP/m7-oracle" "$M7_ORACLE_SHA"
+      - name: Export complete inventory twice
+        env:
+          LC_ALL: C
+          LANG: C
+          TZ: UTC
+          M7_TYPESCRIPT_ROOT: ${{ github.workspace }}/node_modules/typescript
+        run: |
+          set -euo pipefail
+          node scripts/export-kernel-m7-system-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m7-oracle" \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --output-root "$RUNNER_TEMP/m7-system-a"
+          node scripts/export-kernel-m7-system-catalog.mjs \
+            --oracle-root "$RUNNER_TEMP/m7-oracle" \
+            --oracle-sha "$M7_ORACLE_SHA" \
+            --output-root "$RUNNER_TEMP/m7-system-b"
+          diff -ru "$RUNNER_TEMP/m7-system-a" "$RUNNER_TEMP/m7-system-b"
+          for file in \
+            game-system-catalog-v1.json \
+            run-behavior-unit-manifest-v1.json \
+            scenario-catalog-v1.json \
+            ai-policy-catalog-v1.json \
+            save-field-catalog-v1.json \
+            platform-boundary-manifest-v1.json \
+            m7-gap-clusters-v1.json \
+            m7-oracle-witness-plan-v1.json
+          do
+            diff -u "rust/fixtures/m7/$file" "$RUNNER_TEMP/m7-system-a/$file"
+          done
+
+  m7-contract-freeze:
+    name: M7 G26 contract freeze
+    needs:
+      - m7-source-lock
+      - m7-static-refresh
+      - m7-runtime-semantics
+      - m7-historical-refresh
+      - m7-oracle-classification
+      - m7-system-catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          submodules: false
+      - name: Validate exact M7 contracts and inventories
+        run: node scripts/check-kernel-m7-contract.mjs
+
   m7-bootstrap-aggregate:
     name: M7 oracle bootstrap aggregate
     needs:
@@ -276,6 +346,8 @@ jobs:
       - m7-runtime-semantics
       - m7-historical-refresh
       - m7-oracle-classification
+      - m7-system-catalog
+      - m7-contract-freeze
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

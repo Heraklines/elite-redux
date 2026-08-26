@@ -1,0 +1,87 @@
+integration_branch = "arch/rust-kernel-m7"
+integration_base_sha = "93d0d047b4fefaea2033920047010214a8fcd5c0"
+oracle_sha = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7"
+contract = "rust/contracts/m7-contract.toml"
+production_typescript_read_only = true
+integration_owner = "Main"
+central_kernel_owner = "Main"
+public_contract_changes = "integration-owner-only"
+wire_schema_changes = "integration-owner-only"
+writer_policy = "single integration owner per explicit user direction"
+historical_adapters = "er-testkit-only"
+
+[[surface]]
+name = "state-v5"
+owner = "Main"
+paths = ["rust/crates/er-state/**", "rust/crates/er-types/**"]
+
+[[surface]]
+name = "content-bundle"
+owner = "Main"
+paths = ["rust/crates/er-content/**", "rust/crates/er-content-compiler/**"]
+
+[[surface]]
+name = "battle-cutover"
+owner = "Main"
+paths = ["rust/crates/er-battle/**"]
+
+[[surface]]
+name = "progression"
+owner = "Main"
+paths = ["rust/crates/er-progression/**"]
+
+[[surface]]
+name = "world"
+owner = "Main"
+paths = ["rust/crates/er-world/**"]
+
+[[surface]]
+name = "scenario"
+owner = "Main"
+paths = ["rust/crates/er-scenario/**"]
+
+[[surface]]
+name = "ai"
+owner = "Main"
+paths = ["rust/crates/er-ai/**"]
+
+[[surface]]
+name = "run-runtime"
+owner = "Main"
+paths = ["rust/crates/er-run/**", "rust/crates/er-game/**"]
+
+[[surface]]
+name = "kernel-integration"
+owner = "Main"
+paths = ["rust/crates/er-kernel/**", "rust/crates/er-protocol/**"]
+exclusive = true
+
+[[surface]]
+name = "save-replay"
+owner = "Main"
+paths = ["rust/crates/er-save/**"]
+
+[[surface]]
+name = "environment"
+owner = "Main"
+paths = ["rust/crates/er-env/**"]
+
+[[surface]]
+name = "cli"
+owner = "Main"
+paths = ["rust/crates/er-cli/**"]
+
+[[surface]]
+name = "wasm"
+owner = "Main"
+paths = ["rust/crates/er-wasm/**"]
+
+[[surface]]
+name = "fixtures-tooling"
+owner = "Main"
+paths = ["scripts/*kernel-m7*", "rust/fixtures/m7/**", "test/kernel-fixtures/m7/**"]
+
+[[surface]]
+name = "qualification"
+owner = "Main"
+paths = [".github/workflows/rust-kernel-m7*.yml", "rust/crates/er-testkit/**", "rust/crates/er-sim/**"]
