@@ -15,8 +15,8 @@
 
 use er_types::SafeU53;
 use er_types::battle_ids::{AbilityId, MoveId, PokemonId};
-use er_types::battle_model::{PokemonTyping, StatStages};
-use er_types::m6::{FormId, M6_MECHANIC_STATE_SCHEMA_VERSION};
+use er_types::battle_model::{BattleTyping, StatStages};
+use er_types::m6::{FormId, M6_TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -27,8 +27,12 @@ pub const TRANSFORM_COPIED_PP_CAP: u16 = 5;
 /// Largest number of copied moveslots the transform copy accepts.
 pub const TRANSFORM_MOVESET_MAX_LEN: usize = 4;
 
-/// Schema version of the transform/imposter canonical state root.
-pub const TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION: u32 = M6_MECHANIC_STATE_SCHEMA_VERSION;
+/// Schema version of the transform/imposter canonical state root. Split from
+/// the shared mechanic-state envelope when the copied typing gained its
+/// explicit typeless variant ([`BattleTyping`]) - a deliberate wire-format
+/// change recorded by its own version.
+pub const TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION: u32 =
+    M6_TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION;
 
 /// Which audited behavior produced the copy.
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -102,7 +106,10 @@ pub struct TransformCopiedAbilitiesV2 {
 pub struct TransformCopiedBattleStateV2 {
     pub species: SafeU53,
     pub form_key: FormId,
-    pub typing: PokemonTyping,
+    /// Explicit copied typing: the concrete pairing or the production
+    /// typeless presentation (`493:18:unknown`). Typeless copies stay outside
+    /// type-chart lookup by construction.
+    pub typing: BattleTyping,
     pub gender: TransformCopiedGenderV2,
     pub stats: TransformCopiedStatsV2,
     pub stages: StatStages,
@@ -315,11 +322,11 @@ mod tests {
     fn valid_copied() -> TransformCopiedBattleStateV2 {
         TransformCopiedBattleStateV2 {
             species: SafeU53::new(132).expect("in-range species"),
-            form_key: FormId::parse("0").expect("non-empty form key"),
-            typing: PokemonTyping {
+            form_key: FormId::parse("0").expect("compound form id"),
+            typing: BattleTyping::from(er_types::battle_model::PokemonTyping {
                 primary: er_types::battle_model::PokemonType::Normal,
                 secondary: None,
-            },
+            }),
             gender: TransformCopiedGenderV2::Unknown,
             stats: TransformCopiedStatsV2 {
                 attack: 48,
@@ -367,6 +374,22 @@ mod tests {
         let deserialized: TransformFormCopyStateV2 =
             serde_json::from_str(&serialized).expect("deserialization");
         assert_eq!(deserialized, state);
+    }
+
+    #[test]
+    fn typeless_copy_is_representable_and_never_carries_a_chart_entry() {
+        // The frozen oracle's typeless identity (`493:18:unknown`) copies as
+        // the explicit TYPELESS presentation, not as an UNKNOWN chart row.
+        let mut copied = valid_copied();
+        copied.typing = BattleTyping::Typeless;
+        copied.validate().expect("typeless copy validates");
+        let serialized = serde_json::to_string(&copied).expect("serialize");
+        assert!(serialized.contains("TYPELESS"), "wire form: {serialized}");
+        let round_tripped: TransformCopiedBattleStateV2 =
+            serde_json::from_str(&serialized).expect("deserialize");
+        assert_eq!(round_tripped, copied);
+        assert!(round_tripped.typing.is_typeless());
+        assert!(round_tripped.typing.typed().is_none());
     }
 
     #[test]

@@ -45,6 +45,12 @@ pub const MAX_POKEMON_TYPE_ORDINAL: u8 = 19;
 pub const TERAS_PER_SIDE_MAX: u32 = 1;
 
 /// A stable species + form-key identity.
+///
+/// The canonical base-form key is the empty string: every species whose
+/// catalog identity carries no named form (or whose canonical index-zero form
+/// exports the empty key) registers and presents under `""`. Named keys are
+/// alternate presentations (stance targets, Mega evolutions); overlays never
+/// change the stable base identity underneath.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FormIdentityV2 {
@@ -66,9 +72,8 @@ impl FormIdentityV2 {
         if self.species == SafeU53::ZERO {
             return Err(FormsStateError::ZeroSpecies);
         }
-        if self.form_key.is_empty() {
-            return Err(FormsStateError::EmptyFormKey);
-        }
+        // The empty key is the valid canonical base-form presentation; only a
+        // zero species identity fails.
         Ok(())
     }
 }
@@ -445,8 +450,6 @@ pub enum FormsStateError {
     SchemaVersion { expected: u32, actual: u32 },
     #[error("form species must be positive")]
     ZeroSpecies,
-    #[error("form key must be non-empty")]
-    EmptyFormKey,
     #[error("tera type ordinal must be within 0..={MAX_POKEMON_TYPE_ORDINAL} inclusive")]
     InvalidTeraTypeOrdinal,
     #[error("only a Tera overlay may carry a Tera type")]

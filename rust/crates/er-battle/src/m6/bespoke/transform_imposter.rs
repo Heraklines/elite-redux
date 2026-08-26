@@ -25,7 +25,7 @@ use er_state::bespoke_v2::transform_imposter::{
 };
 use er_types::SafeU53;
 use er_types::battle_ids::{FieldSlot, MoveId, PokemonId};
-use er_types::battle_model::{BattleStats, PokemonTyping, StatStages};
+use er_types::battle_model::{BattleStats, BattleTyping, StatStages};
 use er_types::m6::FormId;
 
 /// Battle-visible facts snapshot for one battler, taken from validated
@@ -49,7 +49,9 @@ pub struct TransformBattlerFactsV2 {
     pub fusion: bool,
     pub species: SafeU53,
     pub form_key: FormId,
-    pub typing: PokemonTyping,
+    /// Explicit battle typing of the source battler; typeless sources copy as
+    /// [`BattleTyping::Typeless`], never as an UNKNOWN chart entry.
+    pub typing: BattleTyping,
     pub gender: TransformCopiedGenderV2,
     /// Full stat block including HP; only the non-HP fields are copyable.
     pub stats: BattleStats,
@@ -402,11 +404,11 @@ mod tests {
             has_substitute: false,
             fusion: false,
             species: species(if id == SOURCE_ID { 6 } else { 25 }),
-            form_key: FormId::parse("1").expect("non-empty"),
-            typing: PokemonTyping {
+            form_key: FormId::parse("1").expect("compound form id"),
+            typing: BattleTyping::from(er_types::battle_model::PokemonTyping {
                 primary: er_types::battle_model::PokemonType::Fire,
                 secondary: Some(er_types::battle_model::PokemonType::Flying),
-            },
+            }),
             gender: TransformCopiedGenderV2::Male,
             stats: BattleStats {
                 hp,
@@ -481,7 +483,7 @@ mod tests {
         assert_eq!(copied.species, species(6));
         assert_eq!(copied.form_key.as_str(), "1");
         assert_eq!(
-            copied.typing.primary,
+            copied.typing.typed().expect("typed source").primary,
             er_types::battle_model::PokemonType::Fire
         );
         assert_eq!(copied.gender, TransformCopiedGenderV2::Male);

@@ -9,6 +9,14 @@ use crate::SafeU53;
 pub const M6_MECHANICS_IR_VERSION: u32 = 2;
 pub const M6_MECHANICS_PROGRAM_VERSION: u32 = 2;
 pub const M6_MECHANIC_STATE_SCHEMA_VERSION: u32 = 2;
+
+/// Schema version of the transform/imposter canonical state root. Deliberately
+/// split from the shared [`M6_MECHANIC_STATE_SCHEMA_VERSION`] envelope when
+/// the copied-typing surface gained its explicit typeless variant: the copied
+/// `typing` field moved from a bare `PokemonTyping` to the tagged
+/// `BattleTyping` sum (typed pairing or the production typeless presentation),
+/// which is an intentional wire-format change, not a silent reshape.
+pub const M6_TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION: u32 = 3;
 pub const M6_GAME_STATE_SCHEMA_VERSION: u32 = 4;
 pub const M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION: u32 = 3;
 pub const M6_BATTLE_MATERIAL_VERSION: u32 = 4;

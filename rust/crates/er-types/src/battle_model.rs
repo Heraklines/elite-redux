@@ -210,6 +210,49 @@ pub struct PokemonTyping {
     pub secondary: Option<PokemonType>,
 }
 
+/// Explicit battle typing: either a concrete one/two-type pairing, or the
+/// production typeless presentation.
+///
+/// Production (`src/field/pokemon.ts::getTypes`) exports a missing secondary
+/// type as `PokemonType.UNKNOWN`, and fully typeless identities (the frozen
+/// oracle's form `493:18:unknown`) carry `UNKNOWN` as their primary. The
+/// closed [`PokemonType`] enum deliberately has no such variant, so the
+/// typeless presentation is its own variant here: it can never enter
+/// ordinary type-chart lookup disguised as an entry (production itself
+/// short-circuits `UNKNOWN` to a neutral multiplier before consulting the
+/// chart, `src/data/type.ts::getTypeChartMultiplier`). Effectiveness against
+/// a typeless battler is neutral by construction, never an `UNKNOWN`
+/// effectiveness row.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum BattleTyping {
+    Typed(PokemonTyping),
+    Typeless,
+}
+
+impl BattleTyping {
+    /// The concrete pairing, or `None` for the typeless presentation.
+    /// Type-effectiveness consumers must go through here so typeless
+    /// identities stay outside the chart.
+    pub fn typed(self) -> Option<PokemonTyping> {
+        match self {
+            BattleTyping::Typed(typing) => Some(typing),
+            BattleTyping::Typeless => None,
+        }
+    }
+
+    /// Whether this identity presents as typeless.
+    pub fn is_typeless(self) -> bool {
+        matches!(self, BattleTyping::Typeless)
+    }
+}
+
+impl From<PokemonTyping> for BattleTyping {
+    fn from(typing: PokemonTyping) -> Self {
+        BattleTyping::Typed(typing)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BattleStats {

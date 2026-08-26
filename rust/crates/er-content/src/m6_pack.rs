@@ -26,6 +26,14 @@ use thiserror::Error;
 use crate::pack::{TypeChart, TypeChartError};
 use crate::species::SpeciesBaseStats;
 
+/// Pinned exact derivation table for the 936 frozen extraction-gap species
+/// identities (`NO_STATIC_POKEMON_SPECIES_CONSTRUCTOR`). The parity adapter
+/// resolves every such oracle identity through this table instead of
+/// inventing or failing closed on content production itself derives from the
+/// pinned construction seams.
+#[path = "m6_species_gap.rs"]
+pub mod species_gap;
+
 pub const BESPOKE_MANIFEST_SCHEMA_VERSION_V2: u32 = 2;
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

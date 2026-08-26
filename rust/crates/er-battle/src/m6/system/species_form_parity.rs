@@ -5,26 +5,33 @@
 //! every battle-relevant species/form identity extracted from production:
 //! 2,018 species and their 534-form closure, each entry keyed by provenance
 //! hash with resolved base stats, typing, ability slots, weight, and height.
-//! Species extracted through the static constructor path carry full content;
-//! the frozen oracle explicitly marks identities without a static constructor
-//! (`NO_STATIC_POKEMON_SPECIES_CONSTRUCTOR`) as identity-only evidence. This
-//! adapter fails closed on any attempt to read content such entries do not
-//! declare instead of inventing it.
+//! Species extracted through the static constructor path compile directly
+//! from oracle bytes; the 936 identities without a static constructor
+//! (`NO_STATIC_POKEMON_SPECIES_CONSTRUCTOR`) resolve through the pinned
+//! derivation table in `er-content::m6_pack::species_gap`, which carries the
+//! verbatim primitives of production's own construction seams (dump drafts,
+//! authored rosters, exact kit clones) with per-record provenance. Partial or
+//! divergent evidence still fails closed — nothing is invented.
 //!
 //! Every function here is pure and deterministic: catalog JSON in, typed
 //! battle metadata or a typed failure out. The companion testkit harness
 //! (`m6_species_form_parity.rs`) drives these adapters against the frozen
 //! fixture bytes and proves identity closure with zero residual, exact
-//! content identity, overlay-admission behavior of the real `forms`
-//! transitions, the transform copy surface, and negative invalid-combination
-//! witnesses.
+//! content identity for both extracted and derived species (clone records
+//! must equal their compiled source), overlay admission over every canonical
+//! base identity (empty form keys included), the full transform copy surface
+//! over all 534 forms including the typeless presentation, and negative
+//! invalid-combination witnesses.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use er_content::m6_pack::species_gap::{
+    self, ErGapDerivationError, ErGapSpeciesClass, ErGapSpeciesSource,
+};
 use er_content::species::SpeciesBaseStats;
 use er_state::bespoke_v2::forms::{
-    FormCueKindV2, FormIdentityV2, FormOverlayKindV2, FormsStateError, FormsStateV2,
-    SpeciesFormRegistryV2, MAX_POKEMON_TYPE_ORDINAL,
+    FormCueKindV2, FormIdentityV2, FormOverlayKindV2, FormsStateV2, SpeciesFormRegistryV2,
+    MAX_POKEMON_TYPE_ORDINAL,
 };
 use er_state::bespoke_v2::transform_imposter::{
     TRANSFORM_COPIED_PP_CAP, TransformCopiedAbilitiesV2, TransformCopiedBattleStateV2,
@@ -32,7 +39,7 @@ use er_state::bespoke_v2::transform_imposter::{
     TransformCopyTriggerV2, TransformFormCopyStateV2,
 };
 use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, PokemonId};
-use er_types::battle_model::{BattleStats, PokemonType, PokemonTyping, StatStages};
+use er_types::battle_model::{BattleStats, BattleTyping, PokemonType, PokemonTyping, StatStages};
 use er_types::m6::FormId;
 use er_types::mechanics::MechanicScope;
 use er_types::SafeU53;
@@ -112,6 +119,21 @@ pub enum SpeciesFormParityError {
     Transition(#[from] FormsTransitionError),
     #[error("transform copy surface failed: {0}")]
     Transform(#[from] TransformImposterError),
+    #[error("species {id}: extraction gap has no pinned derivation record")]
+    UnresolvedGapSpecies { id: u64 },
+    #[error(
+        "species {id}: pinned derivation key `{record}` does not bind the frozen oracle key `{oracle}`"
+    )]
+    GapKeyBindingMismatch { id: u64, record: String, oracle: String },
+    #[error(
+        "species {id}: copy-source species {source} is not compiled ahead of the gap identity"
+    )]
+    UnknownGapCopySource { id: u64, source: u64 },
+    #[error("species {id}: pinned derivation failed: {source}")]
+    GapDerivation {
+        id: u64,
+        source: ErGapDerivationError,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -317,16 +339,18 @@ fn resolve_type_member(
 
 /// Resolves one frozen typing object. An explicit `{"kind":"NULL"}` secondary
 /// means the oracle declares the identity single-typed.
-fn compile_typing(entry: &Value, identity: &str) -> Result<ResolvedTyping, SpeciesFormParityError> {
+///
+/// The frozen oracle exports the production `PokemonType.UNKNOWN` presentation
+/// for typeless identities (form `493:18:unknown`); those resolve to the
+/// explicit [`BattleTyping::Typeless`] variant so they stay representable in
+/// every copied payload while remaining structurally outside type-chart
+/// lookup.
+fn compile_typing(entry: &Value, identity: &str) -> Result<BattleTyping, SpeciesFormParityError> {
     let typing = field(entry, identity, "typing")?;
     let primary_value = field(typing, identity, "primary")?;
     let primary_member = symbol_member(primary_value, identity, "PokemonType")?;
     if primary_member == "UNKNOWN" {
-        // The frozen oracle exports the typeless presentation through the
-        // production `PokemonType.UNKNOWN` member; the closed Rust enum has
-        // no such variant, so the adapter carries it as an owned typeless
-        // marker instead of mis-typing the identity.
-        return Ok(ResolvedTyping::Typeless);
+        return Ok(BattleTyping::Typeless);
     }
     let primary = resolve_type_member(identity, primary_member)?;
     let secondary = match typing.get("secondary") {
@@ -340,28 +364,7 @@ fn compile_typing(entry: &Value, identity: &str) -> Result<ResolvedTyping, Speci
             }
         }
     };
-    Ok(ResolvedTyping::Typed(PokemonTyping { primary, secondary }))
-}
-
-/// Exact resolved typing of one identity. [`ResolvedTyping::Typeless`]
-/// carries the frozen oracle's `PokemonType.UNKNOWN` presentation that the
-/// closed [`PokemonType`] enum cannot represent.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum ResolvedTyping {
-    Typed(PokemonTyping),
-    Typeless,
-}
-
-impl ResolvedTyping {
-    /// The typed view; fails closed on typeless identities.
-    pub fn typed(&self) -> Result<PokemonTyping, SpeciesFormParityError> {
-        match self {
-            ResolvedTyping::Typed(typing) => Ok(*typing),
-            ResolvedTyping::Typeless => Err(SpeciesFormParityError::ClosureViolated(
-                "typeless identity has no typed presentation".to_owned(),
-            )),
-        }
-    }
+    Ok(BattleTyping::Typed(PokemonTyping { primary, secondary }))
 }
 
 /// Resolved ability slots: the active ability plus the ER three-passive
@@ -378,7 +381,7 @@ pub struct ResolvedAbilitySlots {
 pub struct ResolvedContent {
     pub base_stats: SpeciesBaseStats,
     pub base_stat_total: u32,
-    pub typing: ResolvedTyping,
+    pub typing: BattleTyping,
     /// Exact oracle weight as IEEE-754 bits.
     pub weight_bits: u64,
     /// Exact oracle height as IEEE-754 bits.
@@ -386,13 +389,30 @@ pub struct ResolvedContent {
     pub ability_slots: ResolvedAbilitySlots,
 }
 
-/// Content evidence carried by one species identity. The frozen oracle
-/// either extracted full static-constructor content or explicitly marked the
-/// identity as lacking one; nothing in between is accepted.
+/// Content provenance carried by one species identity: either the frozen
+/// oracle's own extracted static-constructor content, or content derived
+/// through a pinned production construction seam recorded by the generated
+/// `er-content::m6_pack::species_gap` table. Every one of the 2,018 species
+/// identities resolves to exact battle metadata; nothing is identity-only.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SpeciesContentEvidence {
+    /// Content compiled directly from the frozen oracle entry.
     Extracted(Box<ResolvedContent>),
-    IdentityOnly,
+    /// Content derived from pinned primitives (dump draft, authored roster,
+    /// or an exact kit clone of an earlier-resolved identity), with its seam
+    /// class and human-auditable provenance.
+    Derived(Box<DerivedSpeciesEvidence>),
+}
+
+/// Derived-content evidence for one extraction-gap identity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DerivedSpeciesEvidence {
+    /// Pinned production seam this identity resolves through.
+    pub class: ErGapSpeciesClass,
+    /// Human-auditable provenance (pinned source path / revision).
+    pub provenance: &'static str,
+    /// The exactly resolved battle content of the identity.
+    pub content: ResolvedContent,
 }
 
 /// One fully resolved species identity from the frozen oracle.
@@ -526,11 +546,17 @@ fn plain_u64(
 
 /// Resolves one frozen species entry into typed battle metadata. Identities
 /// carrying the frozen `NO_STATIC_POKEMON_SPECIES_CONSTRUCTOR` gap must have
-/// every content field exactly null and resolve to identity-only evidence;
-/// partial content fails closed.
-pub fn compile_species_entry(
+/// every content field exactly null (partial content fails closed) and then
+/// resolve through the pinned derivation table:
+///
+/// - dump-draft and authored records derive deterministically from their
+///   pinned primitives with provenance attached;
+/// - kit-clone records copy the already-compiled content of their source
+///   identity, which `compiled` (ascending catalog order) must contain.
+pub fn compile_species_entry_with_context<'a>(
     entry: &Value,
     table: &AbilityTable,
+    compiled: &'a [ResolvedSpeciesMetadata],
 ) -> Result<ResolvedSpeciesMetadata, SpeciesFormParityError> {
     let id = plain_u64(entry, "species", "id")?;
     let identity = format!("species {id}");
@@ -590,7 +616,57 @@ pub fn compile_species_entry(
                 }
             }
         }
-        SpeciesContentEvidence::IdentityOnly
+        // The frozen identity binds its pinned derivation record by key; a
+        // divergence means the two provenance chains disagree and fails closed.
+        let record =
+            species_gap::resolve(id).ok_or(SpeciesFormParityError::UnresolvedGapSpecies { id })?;
+        if record.key != key {
+            return Err(SpeciesFormParityError::GapKeyBindingMismatch {
+                id,
+                record: record.key.to_owned(),
+                oracle: key.clone(),
+            });
+        }
+        let derived_content = match &record.source {
+            ErGapSpeciesSource::ContentOf(source_species) => {
+                let source_metadata = compiled
+                    .iter()
+                    .find(|entry| entry.id == *source_species)
+                    .ok_or(SpeciesFormParityError::UnknownGapCopySource {
+                        id,
+                        source: *source_species,
+                    })?;
+                match &source_metadata.content {
+                    SpeciesContentEvidence::Extracted(content) => (**content).clone(),
+                    SpeciesContentEvidence::Derived(derived) => derived.content.clone(),
+                }
+            }
+            ErGapSpeciesSource::DumpCustom { .. } | ErGapSpeciesSource::Authored { .. } => {
+                let derived =
+                    record
+                        .derive_content()
+                        .map_err(|source| SpeciesFormParityError::GapDerivation { id, source })?;
+                ResolvedContent {
+                    base_stats: derived.stats,
+                    base_stat_total: derived.base_stat_total,
+                    typing: BattleTyping::Typed(PokemonTyping {
+                        primary: derived.primary,
+                        secondary: derived.secondary,
+                    }),
+                    weight_bits: derived.weight_bits,
+                    height_bits: derived.height_bits,
+                    ability_slots: ResolvedAbilitySlots {
+                        active: derived.active_ability,
+                        passives: [derived.passives[0], derived.passives[1], None],
+                    },
+                }
+            }
+        };
+        SpeciesContentEvidence::Derived(Box::new(DerivedSpeciesEvidence {
+            class: record.class,
+            provenance: record.provenance,
+            content: derived_content,
+        }))
     } else {
         let content = compile_content(&identity, entry, table)?;
         SpeciesContentEvidence::Extracted(Box::new(content))
@@ -678,7 +754,8 @@ pub struct SpeciesFormClosure {
 }
 
 impl SpeciesFormClosure {
-    /// Content of one species; fails closed on identity-only evidence.
+    /// Exact battle content of one species, whether extracted from the frozen
+    /// oracle or derived through its pinned seam.
     pub fn species_content(
         &self,
         species: u64,
@@ -686,12 +763,22 @@ impl SpeciesFormClosure {
         let metadata = self.metadata(species)?;
         match &metadata.content {
             SpeciesContentEvidence::Extracted(content) => Ok(content),
-            SpeciesContentEvidence::IdentityOnly => {
-                Err(SpeciesFormParityError::MixedIdentityEvidence {
-                    id: species,
-                    field: "content",
-                })
-            }
+            SpeciesContentEvidence::Derived(derived) => Ok(&derived.content),
+        }
+    }
+
+    /// Derived-content evidence of one extraction-gap identity; fails closed
+    /// on identities the oracle extracted itself.
+    pub fn derived_evidence(
+        &self,
+        species: u64,
+    ) -> Result<&DerivedSpeciesEvidence, SpeciesFormParityError> {
+        let metadata = self.metadata(species)?;
+        match &metadata.content {
+            SpeciesContentEvidence::Derived(derived) => Ok(derived),
+            SpeciesContentEvidence::Extracted(_) => Err(SpeciesFormParityError::ClosureViolated(
+                format!("species {species} carries extracted, not derived, content"),
+            )),
         }
     }
 
@@ -737,7 +824,7 @@ pub fn verify_identity_closure(
     let mut keys = BTreeSet::new();
     let mut species = Vec::with_capacity(species_entries.len());
     for entry in species_entries {
-        let resolved = compile_species_entry(entry, table)?;
+        let resolved = compile_species_entry_with_context(entry, table, &species)?;
         if previous_id.is_some_and(|previous| previous >= resolved.id) {
             return Err(SpeciesFormParityError::ClosureViolated(format!(
                 "species ids are not strictly ascending at {}",
@@ -818,25 +905,15 @@ pub fn verify_identity_closure(
                 });
             }
         }
-        let species_metadata = species
-            .iter()
-            .find(|entry| entry.id == species_id)
-            .ok_or_else(|| SpeciesFormParityError::UnknownFormSpecies {
+        // Every form-bearing species must exist in the compiled closure; the
+        // frozen oracle permits a canonical (index-zero) form to carry its own
+        // extracted content where the production form constructor overrides
+        // species defaults, so content parity is proven per identity.
+        if !species.iter().any(|entry| entry.id == species_id) {
+            return Err(SpeciesFormParityError::UnknownFormSpecies {
                 id: forms[indices[0]].id.as_str().to_owned(),
                 species: species_id,
-            })?;
-        // The frozen oracle permits a canonical (index-zero) form to carry
-        // its own extracted content where the production form constructor
-        // overrides species defaults; each identity's content parity is
-        // proven directly against its own oracle entry. Form-bearing
-        // identities must still belong to content-extracted species.
-        if matches!(
-            species_metadata.content,
-            SpeciesContentEvidence::IdentityOnly
-        ) {
-            return Err(SpeciesFormParityError::ClosureViolated(format!(
-                "identity-only species {species_id} unexpectedly owns forms"
-            )));
+            });
         }
     }
 
@@ -857,17 +934,19 @@ pub fn verify_identity_closure(
 pub struct OverlayAdmissionEvidence {
     /// Species identities whose registry admission was proven.
     pub species_admission_checked: usize,
-    /// Registrable base identities exercised through full transition chains.
-    pub registrable_bases: usize,
-    /// Canonical identities whose empty catalog form key is rejected by the
-    /// frozen identity contract (`EmptyFormKey`) — fail-closed witnesses.
-    pub unregistrable_canonical_identities: usize,
+    /// Canonical base identities (empty catalog key included) that
+    /// registered and completed a full Tera chain.
+    pub base_form_registrations: usize,
     /// Stance swap chains staged, resolved, and lapsed on switch-out.
     pub stance_pairs_exercised: usize,
     /// One-time Mega admissions exercised with persistence checks.
     pub mega_pairs_exercised: usize,
     /// Terastallizations admitted with persistence-through-switch checks.
     pub tera_admissions: usize,
+    /// Single-presentation identities that proved the negative witnesses:
+    /// same-identity stance staging and self Mega admission fail closed,
+    /// and cross-species targets stay rejected.
+    pub single_key_negative_witnesses: usize,
 }
 
 fn require(condition: bool, detail: String) -> Result<(), SpeciesFormParityError> {
@@ -923,34 +1002,23 @@ fn expect_monotone_cues(
     )
 }
 
-/// The frozen [`FormIdentityV2`] contract rejects empty battle form keys, so
-/// identities whose canonical catalog key is `""` are unregistrable and the
-/// rejection itself is the fail-closed witness.
-fn expect_empty_key_rejection(species: u64) -> Result<(), SpeciesFormParityError> {
-    match FormIdentityV2::new(species, "") {
-        Err(FormsStateError::EmptyFormKey) => Ok(()),
-        Err(other) => Err(SpeciesFormParityError::StateInvariant(format!(
-            "species {species}: expected EmptyFormKey, got {other:?}"
-        ))),
-        Ok(_) => Err(SpeciesFormParityError::ClosureViolated(format!(
-            "species {species}: empty canonical form key must not register"
-        ))),
-    }
-}
-
 /// Exhaustive overlay-admission proof over every species identity of the
 /// closure:
 ///
-/// - every registered base admits exactly one Tera per side, which persists
-///   through switch-out and resets only at battle end;
+/// - every species registers its canonical base identity — the index-zero
+///   catalog form key where one exists, otherwise the valid empty base-form
+///   key `""` — and admits exactly one Tera per side, which persists through
+///   switch-out and resets only at battle end;
 /// - every same-species alternate key stages a reversible stance swap that
 ///   switch-out lapses back to the stable base;
 /// - every same-species alternate key admits Mega exactly once per battle;
 ///   it persists through switch-out, blocks Tera and stance staging while
 ///   active, and battle end restores the admission;
-/// - identities whose canonical catalog form key is empty are rejected by
-///   the frozen [`FormIdentityV2`] contract (fail closed);
-/// - invalid combinations (cross-species targets, equal-key targets,
+/// - single-presentation identities prove the negative witnesses:
+///   same-identity stance staging fails with `StanceTargetEqualsCurrent`,
+///   self Mega admission with `MegaTargetEqualsBase`, cross-species targets
+///   with `StanceCrossSpecies`;
+/// - other invalid combinations (cross-species targets, equal-key targets,
 ///   ordinal overflow, exhausted budgets, side mismatches) are rejected with
 ///   their exact typed errors.
 pub fn prove_overlay_admission(
@@ -973,33 +1041,36 @@ pub fn prove_overlay_admission(
             closure.registry.covers(metadata.id),
             format!("registry must cover species {}", metadata.id),
         )?;
-        let Some(indices) = closure.forms_by_species.get(&metadata.id) else {
-            expect_empty_key_rejection(metadata.id)?;
-            evidence.unregistrable_canonical_identities += 1;
-            continue;
+        // The canonical base-form key is the index-zero catalog form key when
+        // the species owns forms, else the valid empty base-form key.
+        let base_key = match closure.forms_by_species.get(&metadata.id) {
+            Some(indices) => canonical_base_key(indices, &closure.forms),
+            None => "",
         };
-        let mut keys: Vec<&str> = indices
-            .iter()
-            .map(|&index| closure.forms[index].form_key.as_str())
-            .filter(|key| !key.is_empty())
-            .collect();
-        keys.sort_unstable();
-        keys.dedup();
-        if keys.is_empty() {
-            expect_empty_key_rejection(metadata.id)?;
-            evidence.unregistrable_canonical_identities += 1;
-            continue;
-        }
-
-        let content = closure.species_content(metadata.id)?;
-        let base_key = canonical_registrable_key(indices, &closure.forms).unwrap_or(keys[0]);
         let base = FormIdentityV2::new(metadata.id, base_key)
             .map_err(|error| SpeciesFormParityError::StateInvariant(error.to_string()))?;
         require_species_metadata(&closure.registry, &base)
             .map_err(|_| SpeciesFormParityError::ClosureViolated("gate".to_owned()))?;
-        let tera_ordinal = type_ordinal(content.typing.typed()?.primary)?;
+        let content = closure.species_content(metadata.id)?;
+        let typed_typing = content.typing.typed().ok_or_else(|| {
+            SpeciesFormParityError::ClosureViolated(format!(
+                "species {} presents typeless at its base; no typed Tera ordinal exists",
+                metadata.id
+            ))
+        })?;
+        let tera_ordinal = type_ordinal(typed_typing.primary)?;
         prove_tera_persistence(&player_slot, &base, tera_ordinal, &mut evidence)?;
-        evidence.registrable_bases += 1;
+        evidence.base_form_registrations += 1;
+
+        let mut keys: Vec<&str> = match closure.forms_by_species.get(&metadata.id) {
+            Some(indices) => indices
+                .iter()
+                .map(|&index| closure.forms[index].form_key.as_str())
+                .collect(),
+            None => vec![base_key],
+        };
+        keys.sort_unstable();
+        keys.dedup();
 
         let alternates: Vec<&str> =
             keys.iter().copied().filter(|key| *key != base_key).collect();
@@ -1020,6 +1091,7 @@ pub fn prove_overlay_admission(
                 stage_stance_request(&state, &player_slot, 7, foreign_identity),
                 &FormsTransitionError::StanceCrossSpecies,
             )?;
+            evidence.single_key_negative_witnesses += 1;
             continue;
         }
 
@@ -1035,16 +1107,15 @@ pub fn prove_overlay_admission(
     Ok(evidence)
 }
 
-fn canonical_registrable_key<'a>(
-    indices: &[usize],
-    forms: &'a [ResolvedFormMetadata],
-) -> Option<&'a str> {
+/// The canonical base-form presentation of a form-bearing species: its
+/// index-zero catalog form key, empty or named.
+fn canonical_base_key<'a>(indices: &[usize], forms: &'a [ResolvedFormMetadata]) -> &'a str {
     indices
         .iter()
         .map(|&index| &forms[index])
         .find(|form| form.form_index == 0)
         .map(|form| form.form_key.as_str())
-        .filter(|key| !key.is_empty())
+        .unwrap_or("")
 }
 
 fn foreign_probe_identity(
@@ -1394,14 +1465,15 @@ fn prove_mega_admission(
 pub struct TransformCopySurfaceEvidence {
     /// The closed copied-field evidence list, compared byte-for-byte.
     pub copied_fields: Vec<TransformCopiedFieldV2>,
-    /// Copy plans projected over every registrable form identity.
+    /// Copy plans projected over every form identity (all 534, empty
+    /// catalog keys included).
     pub copy_plans_projected: usize,
     /// Applied-then-cleared overlay cycles on canonical state.
     pub apply_clear_cycles: usize,
-    /// Typeless identities (`PokemonType.UNKNOWN` in the frozen oracle)
-    /// that the closed typed copy surface cannot represent: a counted,
-    /// fail-closed contract gap, never a mis-typed projection.
-    pub unrepresentable_typeless_targets: usize,
+    /// Plans whose copied typing is the explicit typeless presentation
+    /// (`493:18:unknown`); they carry `BattleTyping::Typeless` and stay
+    /// structurally outside type-chart lookup.
+    pub typeless_copies: usize,
 }
 
 fn zero_stages() -> StatStages {
@@ -1426,7 +1498,7 @@ fn battler_facts(
     slot_position: u8,
     species: SafeU53,
     form_key: FormId,
-    typing: PokemonTyping,
+    typing: BattleTyping,
     content: &ResolvedContent,
 ) -> TransformBattlerFactsV2 {
     let slot = FieldSlot::new(slot_side, slot_position)
@@ -1466,10 +1538,11 @@ fn battler_facts(
 
 /// Exhaustive transform-copy proof over the frozen closure:
 /// - the copied-field evidence list is exactly the frozen eight-field order;
-/// - every registrable form identity projects onto a valid plan whose
-///   payload carries that identity's exact compiled metadata (species, form
-///   key, typing, gender presentation, stats excluding HP, zero stages, PP
-///   clamped to the frozen cap, ability presentation identity);
+/// - every one of the 534 form identities — empty catalog keys included —
+///   projects onto a valid plan whose payload carries that identity's exact
+///   compiled metadata (species, form key, explicit typing including the
+///   typeless presentation, gender presentation, stats excluding HP, zero
+///   stages, PP clamped to the frozen cap, ability presentation identity);
 /// - each plan applies onto canonical state and clears back to a stable
 ///   tombstone with typed transition kinds;
 /// - every structural exclusion guard rejects with its exact typed error.
@@ -1491,20 +1564,11 @@ pub fn prove_transform_copy_surface(
         "the copied-field evidence list must equal the frozen eight-field order".to_owned(),
     )?;
 
-    // The fixed subject is the first registrable base with extracted content.
-    let subject_form_index = closure
-        .forms
-        .iter()
-        .position(|form| {
-            !form.form_key.is_empty()
-                && matches!(form.content.typing, ResolvedTyping::Typed(_))
-        })
-        .ok_or_else(|| {
-            SpeciesFormParityError::ClosureViolated(
-                "closure holds no registrable typed form identity".to_owned(),
-            )
-        })?;
-    let subject_form = &closure.forms[subject_form_index];
+    // The fixed subject is the first form identity of the closure; every
+    // form identity is now representable, typeless ones included.
+    let subject_form = closure.forms.first().ok_or_else(|| {
+        SpeciesFormParityError::ClosureViolated("closure holds no form identity".to_owned())
+    })?;
     let subject = battler_facts(
         pokemon_id(1)?,
         BattleSide::Player,
@@ -1516,7 +1580,7 @@ pub fn prove_transform_copy_surface(
             ))
         })?,
         subject_form.id.clone(),
-        subject_form.content.typing.typed()?,
+        subject_form.content.typing,
         &subject_form.content,
     );
 
@@ -1524,26 +1588,14 @@ pub fn prove_transform_copy_surface(
         copied_fields: expected_copied_fields.clone(),
         copy_plans_projected: 0,
         apply_clear_cycles: 0,
-        unrepresentable_typeless_targets: 0,
+        typeless_copies: 0,
     };
 
     for (index, form) in closure.forms.iter().enumerate() {
-        if form.form_key.is_empty() {
-            // The empty canonical presentation key is unregistrable; the
-            // identity contract already proved its fail-closed rejection.
-            continue;
+        let typing = form.content.typing;
+        if typing.is_typeless() {
+            evidence.typeless_copies += 1;
         }
-        let typing = match form.content.typing {
-            ResolvedTyping::Typed(typing) => typing,
-            // The typeless presentation has no counterpart in the closed
-            // `PokemonType` enum the transform copy surface is typed over;
-            // the identity stays covered by closure and content parity and
-            // the boundary is reported as a counted contract gap.
-            ResolvedTyping::Typeless => {
-                evidence.unrepresentable_typeless_targets += 1;
-                continue;
-            }
-        };
         let target_species = SafeU53::new(form.species).map_err(|_| {
             SpeciesFormParityError::RegistryRejected(format!(
                 "species {} exceeds SafeU53",
