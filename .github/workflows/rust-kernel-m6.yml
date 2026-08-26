@@ -550,6 +550,7 @@ jobs:
           cargo test -p er-content --test m6_catalog --test m6_pack
           cargo test -p er-content-compiler --lib
           cargo test -p er-state mechanic_state_v2
+          cargo test -p er-battle --lib m6:: -- --test-threads=1
           cargo test -p er-testkit --test m6_foundation --test m6_bypass --test m6_migration
           cargo test -p er-testkit --test m6_routine_mapping
           cargo test -p er-testkit --test m6_prepared_parity

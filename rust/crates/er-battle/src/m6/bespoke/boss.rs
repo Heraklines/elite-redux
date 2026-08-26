@@ -956,8 +956,7 @@ mod tests {
         // Transitions are pure: the first admission succeeds and returns an
         // updated ledger; replaying the same draw against THAT ledger is the
         // duplicate the one-time contract rejects.
-        let admitted = admit_boss_rng_draw(&state, &admission(10, 3))
-            .expect("first admission");
+        let admitted = admit_boss_rng_draw(&state, &admission(10, 3)).expect("first admission");
         assert_eq!(admitted.state.rng_admissions, 1);
         assert_eq!(
             admit_boss_rng_draw(&admitted.state, &admission(10, 3)),
@@ -1192,13 +1191,13 @@ mod tests {
             source: FixtureSource,
         }
         #[derive(serde::Deserialize)]
-        struct FixtureRoot {
-            clusters: Vec<Cluster>,
+        struct FixtureSource {
+            kind: String,
+            registry_key: Option<String>,
         }
         #[derive(serde::Deserialize)]
-        struct Cluster {
-            cluster: String,
-            behavior_units: Vec<FixtureUnit>,
+        struct FixtureRoot {
+            clusters: Vec<Cluster>,
         }
         let parsed: FixtureRoot = serde_json::from_str(&raw).expect("fixture shape");
         let units: Vec<DispatchUnitIdentityV1> = parsed

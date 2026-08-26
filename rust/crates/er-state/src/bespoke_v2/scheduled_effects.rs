@@ -398,6 +398,8 @@ pub enum ScheduledEffectsStateError {
     ConsumedEventIdsOutOfOrder,
     #[error("pending event {0} is missing from the consumed-ID ledger")]
     PendingEventIdUntracked(u64),
+    #[error("arena tags must be sorted canonically by identity, owner, and creation ordinal")]
+    UnsortedArenaTags,
     #[error("arena tags must be unique per tag identity and owner scope")]
     DuplicateArenaTag,
 }

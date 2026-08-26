@@ -179,12 +179,9 @@ pub fn advance_locked_turn(
                 }
             })
         }
-        (
-            ActionLockStage::Recharging,
-            LockedTurnCommand::ForcedRechargeSkip,
-        ) => consume_one_turn(existing, |_| {
-            ActionLockEventKind::ReleasedAfterRechargeSkip
-        }),
+        (ActionLockStage::Recharging, LockedTurnCommand::ForcedRechargeSkip) => {
+            consume_one_turn(existing, |_| ActionLockEventKind::ReleasedAfterRechargeSkip)
+        }
         (stage, _) => Err(ActionLockError::CompetingCommandWhileLocked {
             stage,
             locked_move_id: existing.locked_move_id,

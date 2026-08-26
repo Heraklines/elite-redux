@@ -181,7 +181,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo test -p er-content-compiler --lib
-          cargo test -p er-battle --lib m6::
+          cargo test -p er-battle --lib m6:: -- --test-threads=1
           cargo test -p er-testkit --test m6_foundation --test m6_bypass --test m6_migration
 
   workspace-regression:

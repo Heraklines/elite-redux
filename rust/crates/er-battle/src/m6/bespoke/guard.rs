@@ -893,7 +893,10 @@ mod tests {
         // A failed chained attempt breaks only the chain: every guard from
         // earlier successful uses stays active until turn-end expiry.
         assert_eq!(
-            failed.state.self_guard_for(&pokemon(OWNER_A)).map(|e| e.kind),
+            failed
+                .state
+                .self_guard_for(&pokemon(OWNER_A))
+                .map(|e| e.kind),
             Some(GuardKind::Protect)
         );
         assert!(failed.state.self_guard_for(&pokemon(OWNER_B)).is_none());
@@ -1294,25 +1297,6 @@ mod tests {
     #[test]
     fn side_guard_evaluation_follows_creation_order() {
         let base = fresh_state();
-        let with_quick = apply_guard_use(
-            &base,
-            &side_request(BattleSide::Player, SideGuardKind::QuickGuard),
-            None,
-        )
-        .unwrap()
-        .state;
-        let both = apply_guard_use(
-            &with_quick,
-            &side_request(BattleSide::Player, SideGuardKind::WideGuard),
-            None,
-        )
-        .unwrap()
-        .state;
-        let priority_spread = IncomingMoveDescriptor {
-            effective_priority: 1,
-            ..spread_attack()
-        };
-        // Both conditions match; the earlier-created Quick Guard answers.
         // The oracle resolves arena tags in creation order, so when both
         // conditions match a physical spread move the earlier Mat Block
         // answers even though Wide Guard would also cover it.
@@ -1384,7 +1368,10 @@ mod tests {
         // effects.
         assert_eq!(
             apply_guard_use(&once, &protect, None),
-            Err(GuardTransitionError::MissingAuditedDraw { depth: 1, expected: 3 })
+            Err(GuardTransitionError::MissingAuditedDraw {
+                depth: 1,
+                expected: 3
+            })
         );
         // With the audited outcome admitted, the duplicate self guard
         // conflicts.
@@ -1398,7 +1385,10 @@ mod tests {
         let enduring = apply_guard_use(&base, &endure, None).unwrap().state;
         assert_eq!(
             apply_guard_use(&enduring, &endure, None),
-            Err(GuardTransitionError::MissingAuditedDraw { depth: 1, expected: 3 })
+            Err(GuardTransitionError::MissingAuditedDraw {
+                depth: 1,
+                expected: 3
+            })
         );
         let endure_hit = AuditedGuardDraw::new(SafeU53::ZERO, 3);
         assert_eq!(

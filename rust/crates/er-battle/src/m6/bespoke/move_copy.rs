@@ -411,7 +411,9 @@ pub fn resolve_recorded_last_copy(
     let permanent = invoking_numeric == 166; // SKETCH
 
     if slot_replacement {
-        let slot = request.invoking_slot.ok_or(MoveCopyFailure::NoInvokingSlot)?;
+        let slot = request
+            .invoking_slot
+            .ok_or(MoveCopyFailure::NoInvokingSlot)?;
         // Mimic/Sketch copiability: a charging move whose recorded turn ended
         // in `Other` never completed its charge and cannot be adopted.
         if request.content.charging_moves.contains(&copied_move)
@@ -422,7 +424,12 @@ pub fn resolve_recorded_last_copy(
             }
             .into());
         }
-        if permanent && request.caller_moveset.iter().any(|known| *known == copied_move) {
+        if permanent
+            && request
+                .caller_moveset
+                .iter()
+                .any(|known| *known == copied_move)
+        {
             return Err(MoveCopyFailure::SketchAlreadyKnown {
                 move_id: copied_move.get().get(),
             }
@@ -2246,7 +2253,7 @@ static ATTRIBUTE_UNIT_WEIGHTS: &[(&str, usize)] = &[
     ("WeatherChangeAttr", 5),
     ("WeightPowerAttr", 2),
     ("WishAttr", 1),
-]
+];
 /// Classifies one descriptor. Total over the frozen closure: every unit whose
 /// attribute exists in the table and whose axes match the frozen catalog gets
 /// a typed route; anything else is a fail-closed error, never a fallback.
@@ -2859,14 +2866,29 @@ mod tests {
         // and the weights must sum to exactly 394 units — closure is defined
         // by that identity, not by a magic row count.
         let route_names: BTreeSet<&str> = ROUTE_TABLE.iter().map(|(name, _)| *name).collect();
-        let weight_names: BTreeSet<&str> =
-            ATTRIBUTE_UNIT_WEIGHTS.iter().map(|(name, _)| *name).collect();
-        assert_eq!(route_names.len(), ROUTE_TABLE.len(), "attributes are unique");
-        assert_eq!(route_names, weight_names, "routes and weights are a bijection");
-        let weights: usize = ATTRIBUTE_UNIT_WEIGHTS.iter().map(|(_, weight)| weight).sum();
+        let weight_names: BTreeSet<&str> = ATTRIBUTE_UNIT_WEIGHTS
+            .iter()
+            .map(|(name, _)| *name)
+            .collect();
+        assert_eq!(
+            route_names.len(),
+            ROUTE_TABLE.len(),
+            "attributes are unique"
+        );
+        assert_eq!(
+            route_names, weight_names,
+            "routes and weights are a bijection"
+        );
+        let weights: usize = ATTRIBUTE_UNIT_WEIGHTS
+            .iter()
+            .map(|(_, weight)| weight)
+            .sum();
         assert_eq!(weights, CLOSURE_TOTAL_UNITS);
         assert_eq!(
-            ATTRIBUTE_UNIT_WEIGHTS.iter().filter(|(_, w)| *w > 0).count(),
+            ATTRIBUTE_UNIT_WEIGHTS
+                .iter()
+                .filter(|(_, w)| *w > 0)
+                .count(),
             ROUTE_TABLE.len(),
             "every routed attribute carries at least one unit"
         );
@@ -2988,7 +3010,15 @@ mod tests {
             CustomDispatchRoute::Executable(ExecutableOp::PowerQuery)
         );
 
-        let heal = desc("h4", 0, 1, "HitHealAttr", Base::MoveEffect, Effect::Heal, Hook::Unresolved);
+        let heal = desc(
+            "h4",
+            0,
+            1,
+            "HitHealAttr",
+            Base::MoveEffect,
+            Effect::Heal,
+            Hook::Unresolved,
+        );
         let decision = classify_custom_move(&heal).expect("heal");
         assert_eq!(
             decision.route,

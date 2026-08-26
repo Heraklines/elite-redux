@@ -326,9 +326,12 @@ pub fn schedule_delayed_effect(
     }
     // Stable IDs may be allocated in any caller-chosen order; the high-water
     // mark only moves forward.
-    let next_event_id = state
-        .next_event_id
-        .max(request.event_id.checked_add(1).ok_or(ScheduledEffectsError::EventIdOverflow)?);
+    let next_event_id = state.next_event_id.max(
+        request
+            .event_id
+            .checked_add(1)
+            .ok_or(ScheduledEffectsError::EventIdOverflow)?,
+    );
     if matches!(request.payload, ScheduledEventPayloadV1::FutureMove { .. }) {
         match request.stored_target {
             Some(MechanicScope::Field { .. }) => {}
@@ -974,7 +977,12 @@ mod tests {
         state = schedule(
             &state,
             0,
-            request(7, None, 2, ScheduledEventPayloadV1::DelayedDamage { amount: 10 }),
+            request(
+                7,
+                None,
+                2,
+                ScheduledEventPayloadV1::DelayedDamage { amount: 10 },
+            ),
         )
         .state;
         assert_eq!(state.scheduled_event_ids, vec![7]);
@@ -983,7 +991,12 @@ mod tests {
         state = schedule(
             &state,
             0,
-            request(2, None, 3, ScheduledEventPayloadV1::DelayedDamage { amount: 10 }),
+            request(
+                2,
+                None,
+                3,
+                ScheduledEventPayloadV1::DelayedDamage { amount: 10 },
+            ),
         )
         .state;
         assert_eq!(state.scheduled_event_ids, vec![2, 7]);
@@ -1333,8 +1346,8 @@ mod tests {
         let mut unsorted = state.clone();
         unsorted.next_event_id += 1;
         unsorted.scheduled_event_ids.push(2);
-        unsorted.next_creation_ordinal = SafeU53::new(unsorted.next_creation_ordinal.get() + 1)
-            .expect("ordinal");
+        unsorted.next_creation_ordinal =
+            SafeU53::new(unsorted.next_creation_ordinal.get() + 1).expect("ordinal");
         unsorted.pending_events.push(DelayedEffectEvent {
             event_id: 2,
             source_behavior_unit: doom_desire_unit(),
