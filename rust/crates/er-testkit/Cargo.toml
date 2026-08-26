@@ -23,3 +23,7 @@ thiserror.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+er-wasm = { path = "../er-wasm" }
+er-game = { path = "../er-game" }

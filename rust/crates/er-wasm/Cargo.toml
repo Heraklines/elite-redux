@@ -16,11 +16,13 @@ thiserror.workspace = true
 er-battle = { path = "../er-battle" }
 er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
+er-content-compiler = { path = "../er-content-compiler" }
 er-game = { path = "../er-game" }
 er-kernel = { path = "../er-kernel" }
 er-protocol = { path = "../er-protocol" }
 er-rng = { path = "../er-rng" }
 er-state = { path = "../er-state" }
+er-testkit = { path = "../er-testkit" }
 er-types = { path = "../er-types" }
 wasm-bindgen.workspace = true
 
