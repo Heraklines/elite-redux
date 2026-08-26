@@ -108,7 +108,7 @@ pub enum CampaignEndpoint {
 /// callbacks of the virtual scheduler/network harness (packet delivery,
 /// transport state, recovery-class timer firings, presentation settlement,
 /// endpoint disposal); none of them carries a semantic battle choice.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum CampaignStep {
     /// Physical keydown on an endpoint.
     KeyDown {
@@ -794,8 +794,8 @@ fn bump_mode(
     path: &[&str],
     missing: impl Fn() -> RecoveryCampaignError,
 ) -> Result<(), RecoveryCampaignError> {
-    let mode = path_u64(envelope, path).ok_or_else(missing)?;
-    *path_mut(envelope, path).ok_or_else(missing)? = Value::from(mode + 1);
+    let mode = path_u64(envelope, path).ok_or_else(&missing)?;
+    *path_mut(envelope, path).ok_or_else(&missing)? = Value::from(mode + 1);
     Ok(())
 }
 

@@ -48,7 +48,6 @@ use er_state::bespoke_v2::suppression_immunity::{
     classify_behavior_unit,
 };
 use er_types::battle_ids::{AbilityId, PokemonId};
-use er_types::battle_model::StatusKind;
 use er_types::mechanics::MechanicsProgramId;
 use er_types::m6::{BespokeMechanicId, RngDomainV1, RngReasonV2};
 use er_types::{AbilitySourceKindV1, BehaviorSourceId, BehaviorUnitId, SafeU53};
@@ -58,7 +57,7 @@ use crate::m6::ability_executor::{
     AbilityExecutorError, AbilityOwnerState, conditions_admit, ordered_ability_bindings,
 };
 use crate::m6::bespoke::suppression_immunity::{
-    AbilityAllowReason, AbilityBypassInput, AbilitySuppressibility, ImmunityClaim,
+    AbilityBypassInput, AbilitySuppressibility, ImmunityAllowReason, ImmunityClaim,
     ImmunityDecision, ImmunitySubject, SlotSuppressionRequest, SuppressionTransitionError,
     apply_slot_suppression, evaluate_immunity,
 };
@@ -595,21 +594,21 @@ pub fn immunity_bypass_matrix(
             false,
             AbilityBypassInput::IgnoreAbilities,
             ImmunityDecision::Allowed {
-                reason: AbilityAllowReason::BypassPrecedence,
+                reason: ImmunityAllowReason::BypassPrecedence,
             },
         ),
         (
             true,
             AbilityBypassInput::None,
             ImmunityDecision::Allowed {
-                reason: AbilityAllowReason::ClaimingSlotSuppressed,
+                reason: ImmunityAllowReason::ClaimingSlotSuppressed,
             },
         ),
         (
             true,
             AbilityBypassInput::IgnoreAbilities,
             ImmunityDecision::Allowed {
-                reason: AbilityAllowReason::ClaimingSlotSuppressed,
+                reason: ImmunityAllowReason::ClaimingSlotSuppressed,
             },
         ),
     ];

@@ -115,6 +115,10 @@ fn status_rejection_label(reason: &StatusRejection) -> &'static str {
         StatusRejection::ExistingMajorStatus { .. } => "EXISTING_MAJOR_STATUS",
         StatusRejection::TypeImmunity { .. } => "TYPE_IMMUNITY",
         StatusRejection::PowderImmunity { .. } => "POWDER_IMMUNITY",
+        StatusRejection::IntrinsicSentinel => "INTRINSIC_SENTINEL",
+        StatusRejection::SleepWindowRequired => "SLEEP_WINDOW_REQUIRED",
+        StatusRejection::ReroutedToFrostbiteTag => "REROUTED_TO_FROSTBITE_TAG",
+        StatusRejection::RoutedToFaintSubstate => "ROUTED_TO_FAINT_SUBSTATE",
     }
 }
 

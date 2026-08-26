@@ -13,14 +13,16 @@ use std::error::Error;
 
 use er_battle::m6::ability_executor::AbilityOwnerState;
 use er_battle::m6::bespoke::suppression_immunity::{
-    AbilityAllowReason, AbilityBypassInput, AbilitySuppressibility, DispatchContext,
-    DispatchGate, DispatchUnitInput, ImmunityClaim, ImmunityDecision, ImmunitySubject,
-    SlotSuppressionRequest, apply_slot_suppression, route_ability_dispatch,
+    AbilityBypassInput, AbilitySuppressibility, DispatchContext, DispatchGate, DispatchUnitInput,
+    ImmunityAllowReason, ImmunityClaim, ImmunityDecision, ImmunitySubject,
+    SlotSuppressionRequest, SuppressionCleanupEvent, apply_slot_suppression, clear_suppressions,
+    route_ability_dispatch,
 };
 use er_battle::m6::routine_executor::MechanicsContextV2;
 use er_battle::m6::system::ability_parity::{
-    AbilityExecutionLane, AbilityParityError, BespokeClusterInput, OracleWitnessInput,
-    OverlapSuppressionOutcome, SlotExecutionStep, WitnessDivergence, ability_polarity,
+    AbilityClosureEvidence, AbilityExecutionLane, AbilityParityError, BespokeClusterInput,
+    OracleWitnessInput, OverlapSuppressionOutcome, SlotExecutionStep, WitnessDivergence,
+    ability_polarity,
     false_condition_exclusion_evidence, first_witness_divergence, immunity_bypass_matrix,
     overlap_suppression_evidence, prepared_dispatch_parity, resolve_ability_closure,
     rng_admission_evidence, slot_order_evidence, suppression_gate_evidence,
@@ -38,8 +40,7 @@ use er_mechanics::condition_v2::{ConditionNodeId, ConditionNodeV2};
 use er_mechanics::program_v2::MechanicsProgramV2;
 use er_mechanics::v2::MechanicHookV2;
 use er_state::bespoke_v2::suppression_immunity::{
-    AbilitySlot, SuppressionCleanupEvent, SuppressionImmunityStateV2, SuppressionOrigin,
-    clear_suppressions,
+    AbilitySlot, SuppressionImmunityStateV2, SuppressionOrigin,
 };
 use er_types::battle_ids::{AbilityId, MoveId, PokemonId};
 use er_types::battle_model::StatusKind;
@@ -639,20 +640,20 @@ fn immunity_gate_yields_to_suppression_then_bypass_precedence() -> Result<(), Bo
     assert_eq!(
         rows[1].decision,
         ImmunityDecision::Allowed {
-            reason: AbilityAllowReason::BypassPrecedence
+            reason: ImmunityAllowReason::BypassPrecedence
         }
     );
     assert_eq!(
         rows[2].decision,
         ImmunityDecision::Allowed {
-            reason: AbilityAllowReason::ClaimingSlotSuppressed
+            reason: ImmunityAllowReason::ClaimingSlotSuppressed
         }
     );
     assert_eq!(rows[2].bypass, AbilityBypassInput::None);
     assert_eq!(
         rows[3].decision,
         ImmunityDecision::Allowed {
-            reason: AbilityAllowReason::ClaimingSlotSuppressed
+            reason: ImmunityAllowReason::ClaimingSlotSuppressed
         }
     );
 

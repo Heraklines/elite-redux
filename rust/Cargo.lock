@@ -246,10 +246,13 @@ dependencies = [
 name = "er-sim"
 version = "0.1.0"
 dependencies = [
+ "er-battle",
  "er-canonical",
  "er-content",
+ "er-content-compiler",
  "er-game",
  "er-kernel",
+ "er-mechanics",
  "er-protocol",
  "er-rng",
  "er-run",
