@@ -46,10 +46,8 @@ impl TopologyFacts {
     pub fn validate(&self) -> Result<(), PivotRedirectError> {
         let mut seen = BTreeSet::new();
         for facts in self.slots.values() {
-            if let Some(pokemon) = facts.occupant {
-                if !seen.insert(pokemon) {
-                    return Err(PivotRedirectError::DuplicateFieldOccupant { pokemon });
-                }
+            if let Some(pokemon) = facts.occupant && !seen.insert(pokemon) {
+                return Err(PivotRedirectError::DuplicateFieldOccupant { pokemon });
             }
         }
         Ok(())
@@ -842,14 +840,14 @@ pub struct AdmittedAuditedDraw {
 pub fn admit_audited_draw(
     draw: &AuditedDrawFacts,
 ) -> Result<AdmittedAuditedDraw, PivotRedirectError> {
-    if let Some(frozen) = draw.site.frozen_range() {
-        if draw.range != frozen {
-            return Err(PivotRedirectError::DrawRangeMismatch {
-                site: draw.site,
-                expected: frozen,
-                actual: draw.range,
-            });
-        }
+    if let Some(frozen) = draw.site.frozen_range()
+        && draw.range != frozen
+    {
+        return Err(PivotRedirectError::DrawRangeMismatch {
+            site: draw.site,
+            expected: frozen,
+            actual: draw.range,
+        });
     }
     if draw.range == 0 || draw.result >= draw.range {
         return Err(PivotRedirectError::DrawResultOutOfRange {

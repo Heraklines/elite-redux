@@ -18,6 +18,7 @@
 //!    implementation base / effect kind / hook axes. There is no unsupported
 //!    or no-op residual: an unknown attribute or a descriptor whose catalog
 //!    axes disagree with the frozen table is a hard classification error.
+//!
 //! Every transition is pure: inputs are validated, outputs are cloned into
 //! fresh typed state, results are re-validated, and nothing mutates its
 //! arguments. Failures that are legitimate battle outcomes are typed values
@@ -424,12 +425,7 @@ pub fn resolve_recorded_last_copy(
             }
             .into());
         }
-        if permanent
-            && request
-                .caller_moveset
-                .iter()
-                .any(|known| *known == copied_move)
-        {
+        if permanent && request.caller_moveset.contains(&copied_move) {
             return Err(MoveCopyFailure::SketchAlreadyKnown {
                 move_id: copied_move.get().get(),
             }
