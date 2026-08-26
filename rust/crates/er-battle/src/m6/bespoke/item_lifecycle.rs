@@ -410,12 +410,12 @@ pub fn trigger_eligibility(
     require_non_empty_key(registry_key)?;
     state.validate()?;
     if state.find_instance(owner, registry_key).is_some() {
-        if let Some(window) = state.find_suppression(owner, registry_key) {
-            if window.is_active(current_turn) {
-                return Ok(ItemTriggerEligibility::Suppressed {
-                    expiry_turn: window.expiry_turn,
-                });
-            }
+        if let Some(window) = state.find_suppression(owner, registry_key)
+            && window.is_active(current_turn)
+        {
+            return Ok(ItemTriggerEligibility::Suppressed {
+                expiry_turn: window.expiry_turn,
+            });
         }
         return Ok(ItemTriggerEligibility::Eligible);
     }
@@ -468,19 +468,19 @@ pub fn consume_item(
             })
         };
     };
-    if let Some(window) = state.find_suppression(request.owner, &request.registry_key) {
-        if window.is_active(request.current_turn) {
-            return Ok(ItemTransition {
-                state: state.clone(),
-                evidence: ConsumeEvidence {
-                    outcome: ConsumeOutcome::Suppressed {
-                        expiry_turn: window.expiry_turn,
-                    },
-                    stacks_before: instance.stacks,
-                    stacks_after: Some(instance.stacks),
+    if let Some(window) = state.find_suppression(request.owner, &request.registry_key)
+        && window.is_active(request.current_turn)
+    {
+        return Ok(ItemTransition {
+            state: state.clone(),
+            evidence: ConsumeEvidence {
+                outcome: ConsumeOutcome::Suppressed {
+                    expiry_turn: window.expiry_turn,
                 },
-            });
-        }
+                stacks_before: instance.stacks,
+                stacks_after: Some(instance.stacks),
+            },
+        });
     }
     if request.preserve {
         return Ok(ItemTransition {

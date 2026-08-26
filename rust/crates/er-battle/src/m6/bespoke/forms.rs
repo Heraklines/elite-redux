@@ -264,10 +264,11 @@ pub fn apply_conditional_overlay(
     if let Some(active) = one_time_active(battler) {
         return Err(FormsTransitionError::OverlayActive { active });
     }
-    if let Some(overlay) = &battler.overlay {
-        if overlay.kind == FormOverlayKindV2::Conditional && overlay.current == target {
-            return finish(next, FormsOutcomeV2::IdempotentNoOp, cue_start);
-        }
+    if let Some(overlay) = &battler.overlay
+        && overlay.kind == FormOverlayKindV2::Conditional
+        && overlay.current == target
+    {
+        return finish(next, FormsOutcomeV2::IdempotentNoOp, cue_start);
     }
     let from = Some(battler.current.clone());
     battler.overlay = Some(FormOverlayV2 {
