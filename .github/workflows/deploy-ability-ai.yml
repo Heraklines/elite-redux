@@ -44,4 +44,6 @@ jobs:
 
       - run: npx wrangler deploy
 
-      - run: node -e 'process.stdout.write(JSON.stringify({ AUTH_ENCRYPTION_KEY: process.env.AUTH_ENCRYPTION_KEY, NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY }))' | npx wrangler secret bulk
+      - run: >-
+          node -e 'process.stdout.write(JSON.stringify({ AUTH_ENCRYPTION_KEY: process.env.AUTH_ENCRYPTION_KEY, NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY }))'
+          | npx wrangler secret bulk
