@@ -27,6 +27,7 @@ import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { erMegaStoneAppearsAtGate, erMegaStoneTier, pickErMegaStoneWeighted } from "#data/elite-redux/er-mega-tiers";
 import { getMoveRandomizerCandidates } from "#data/elite-redux/er-move-randomizer";
+import { isNewPokemonContentEnabled } from "#data/elite-redux/er-new-pokemon-gate";
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
@@ -1894,7 +1895,12 @@ class SpeciesStatBoosterModifierTypeGenerator extends ModifierTypeGenerator {
     THICK_CLUB: {
       stats: [Stat.ATK],
       multiplier: 2,
-      species: [SpeciesId.CUBONE, SpeciesId.MAROWAK, SpeciesId.ALOLA_MAROWAK, 70060 as SpeciesId],
+      species: [
+        SpeciesId.CUBONE,
+        SpeciesId.MAROWAK,
+        SpeciesId.ALOLA_MAROWAK,
+        ...(isNewPokemonContentEnabled() ? [70060 as SpeciesId] : []),
+      ],
       rare: true,
     },
     METAL_POWDER: {

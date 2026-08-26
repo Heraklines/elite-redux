@@ -17,7 +17,7 @@ on:
       collect_player_training_data:
         description: Collect player battle-decision training data during this build
         required: false
-        default: true
+        default: false
         type: boolean
 
 concurrency:
@@ -48,7 +48,7 @@ jobs:
 
       - name: Write standalone login env (PROD - no dev tools)
         run: |
-          node scripts/export-data-dictionary.mjs --out "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          VITE_ENABLE_NEW_POKEMON=off node scripts/export-data-dictionary.mjs --out "$RUNNER_TEMP/er-combat-data-dictionary.json"
           AI_DICTIONARY_HASH="$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)"
           echo "AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}" >> "$GITHUB_ENV"
           {
@@ -62,6 +62,7 @@ jobs:
             fi
             echo "VITE_BUILD_SHA=${PROMOTED_SHA}"
             echo "VITE_AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}"
+            echo "VITE_ENABLE_NEW_POKEMON=off"
           } > .env.standalone.local
 
       # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's _redirects

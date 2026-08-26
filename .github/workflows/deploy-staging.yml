@@ -224,7 +224,7 @@ jobs:
 
       - name: Write standalone login env
         run: |
-          node scripts/export-data-dictionary.mjs --out "$RUNNER_TEMP/er-combat-data-dictionary.json"
+          VITE_ENABLE_NEW_POKEMON=on node scripts/export-data-dictionary.mjs --out "$RUNNER_TEMP/er-combat-data-dictionary.json"
           AI_DICTIONARY_HASH="$(sha256sum "$RUNNER_TEMP/er-combat-data-dictionary.json" | cut -d' ' -f1)"
           echo "AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}" >> "$GITHUB_ENV"
           {
@@ -254,6 +254,7 @@ jobs:
             echo "VITE_BUILD_SHA=${PROMOTED_SHA}"
             echo "VITE_AI_DICTIONARY_HASH=${AI_DICTIONARY_HASH}"
             echo "VITE_ENABLE_SHOWDOWN_TOURNAMENTS=1"
+            echo "VITE_ENABLE_NEW_POKEMON=on"
             # Enable the in-game dev TEST SUITE on STAGING only (Dev Scenarios menu,
             # Pass/Fail, Send Logs). Production's Cloudflare Pages build does NOT set
             # this, so the suite never activates there. See CLAUDE.md.

@@ -47,6 +47,7 @@ import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
+import { isNewPokemonContentEnabled } from "#data/elite-redux/er-new-pokemon-gate";
 import { dispatchMoveArchetype, PitfallTrapAndAlwaysHitAttr } from "#data/elite-redux/move-archetype-dispatcher";
 import {
   AddArenaTagAttr,
@@ -534,26 +535,28 @@ export function initEliteReduxCustomMoves(): InitEliteReduxCustomMovesResult {
     }
   }
 
-  if (existingIds.has(MoveId.SWIRLY_ROOM)) {
-    result.customsAlreadyPresent++;
-  } else {
-    try {
-      (allMoves as Move[])[MoveId.SWIRLY_ROOM] = buildSwirlyRoomMove();
-      result.customsAdded++;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      result.errors.push(`Failed to construct manual move "Swirly Room": ${msg}`);
+  if (isNewPokemonContentEnabled()) {
+    if (existingIds.has(MoveId.SWIRLY_ROOM)) {
+      result.customsAlreadyPresent++;
+    } else {
+      try {
+        (allMoves as Move[])[MoveId.SWIRLY_ROOM] = buildSwirlyRoomMove();
+        result.customsAdded++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        result.errors.push(`Failed to construct manual move "Swirly Room": ${msg}`);
+      }
     }
-  }
-  if (existingIds.has(MoveId.IVORY_IMPACT)) {
-    result.customsAlreadyPresent++;
-  } else {
-    try {
-      (allMoves as Move[])[MoveId.IVORY_IMPACT] = buildIvoryImpactMove();
-      result.customsAdded++;
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      result.errors.push(`Failed to construct manual move "Ivory Impact": ${msg}`);
+    if (existingIds.has(MoveId.IVORY_IMPACT)) {
+      result.customsAlreadyPresent++;
+    } else {
+      try {
+        (allMoves as Move[])[MoveId.IVORY_IMPACT] = buildIvoryImpactMove();
+        result.customsAdded++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        result.errors.push(`Failed to construct manual move "Ivory Impact": ${msg}`);
+      }
     }
   }
   return result;

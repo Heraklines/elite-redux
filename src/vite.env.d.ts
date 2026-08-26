@@ -42,6 +42,8 @@ interface ImportMetaEnv {
   readonly VITE_TELEMETRY_SALT?: string;
   readonly VITE_BUILD_SHA?: string;
   readonly VITE_AI_DICTIONARY_HASH?: string;
+  // August 2026 Pokemon roster. Staging opts in; production explicitly opts out.
+  readonly VITE_ENABLE_NEW_POKEMON?: "off" | "on";
 }
 
 // tell vite to disallow missing env vars

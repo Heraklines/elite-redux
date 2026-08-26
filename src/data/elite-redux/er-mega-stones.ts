@@ -20,6 +20,10 @@
 // =============================================================================
 
 import { FormChangeItem } from "#enums/form-change-item";
+import {
+  isGatedNewPokemonStoneName,
+  isNewPokemonContentEnabled,
+} from "#data/elite-redux/er-new-pokemon-gate";
 
 /** [ER stone enum name, existing items-atlas icon frame to reuse]. */
 const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
@@ -293,16 +297,20 @@ const ER_STONE_DEFS: ReadonlyArray<readonly [string, string]> = [
 
 type FcRecord = Record<string, number>;
 
+const ACTIVE_ER_STONE_DEFS = ER_STONE_DEFS.filter(
+  ([name]) => isNewPokemonContentEnabled() || !isGatedNewPokemonStoneName(name),
+);
+
 /** ER-only FormChangeItem ids (the custom mega/primal stones). */
 export const ER_MEGA_STONE_ITEMS: ReadonlySet<FormChangeItem> = new Set<FormChangeItem>(
-  ER_STONE_DEFS.map(([name]) => (FormChangeItem as unknown as FcRecord)[name]).filter(
+  ACTIVE_ER_STONE_DEFS.map(([name]) => (FormChangeItem as unknown as FcRecord)[name]).filter(
     (v): v is FormChangeItem => v !== undefined,
   ),
 );
 
 /** ER stone id -> the existing items-atlas icon frame it reuses. */
 const ER_STONE_ICON_BY_ITEM: ReadonlyMap<FormChangeItem, string> = new Map(
-  ER_STONE_DEFS.map(
+  ACTIVE_ER_STONE_DEFS.map(
     ([name, icon]) => [(FormChangeItem as unknown as FcRecord)[name] as FormChangeItem, icon] as const,
   ).filter(([item]) => item !== undefined),
 );
