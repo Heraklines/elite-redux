@@ -142,9 +142,9 @@ jobs:
         run: |
           set -euo pipefail
           git worktree add --detach "$RUNNER_TEMP/m7-oracle" "$M7_ORACLE_SHA"
-          mkdir -p "$RUNNER_TEMP/m7-oracle/test/kernel-fixtures/m6"
-          cp test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
-            "$RUNNER_TEMP/m7-oracle/test/kernel-fixtures/m6/export-semantic-runtime.test.ts"
+          mkdir -p "$RUNNER_TEMP/m7-oracle/test/kernel-fixtures/m7"
+          cp test/kernel-fixtures/m7/export-semantic-runtime.test.ts \
+            "$RUNNER_TEMP/m7-oracle/test/kernel-fixtures/m7/export-semantic-runtime.test.ts"
       - name: Install immutable oracle dependencies
         working-directory: ${{ runner.temp }}/m7-oracle
         run: pnpm install --frozen-lockfile
@@ -154,14 +154,14 @@ jobs:
           LC_ALL: C
           LANG: C
           TZ: UTC
-          M6_ORACLE_SHA: ${{ env.M7_ORACLE_SHA }}
+          M7_ORACLE_SHA: ${{ env.M7_ORACLE_SHA }}
         run: |
           set -euo pipefail
-          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m7-runtime-a.json" \
-            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+          M7_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m7-runtime-a.json" \
+            pnpm exec vitest run test/kernel-fixtures/m7/export-semantic-runtime.test.ts \
             --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
-          M6_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m7-runtime-b.json" \
-            pnpm exec vitest run test/kernel-fixtures/m6/export-semantic-runtime.test.ts \
+          M7_SEMANTIC_RUNTIME_OUTPUT="$RUNNER_TEMP/m7-runtime-b.json" \
+            pnpm exec vitest run test/kernel-fixtures/m7/export-semantic-runtime.test.ts \
             --reporter=default --pool=forks --maxWorkers=1 --no-file-parallelism
           diff -u "$RUNNER_TEMP/m7-runtime-a.json" "$RUNNER_TEMP/m7-runtime-b.json"
       - name: Verify runtime and static agreement
