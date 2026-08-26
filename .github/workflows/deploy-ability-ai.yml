@@ -1,0 +1,47 @@
+name: Deploy ER Ability AI
+
+on:
+  push:
+    branches:
+      - feat/elite-redux-port
+    paths:
+      - "workers/er-ability-ai/**"
+      - .github/workflows/deploy-ability-ai.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: er-ability-ai
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.repository == 'Heraklines/elite-redux'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      AUTH_ENCRYPTION_KEY: ${{ secrets.ER_ABILITY_AI_AUTH_ENCRYPTION_KEY }}
+      NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
+    defaults:
+      run:
+        working-directory: workers/er-ability-ai
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: workers/er-ability-ai/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run check
+
+      - run: npx wrangler deploy
+
+      - run: node -e 'process.stdout.write(JSON.stringify({ AUTH_ENCRYPTION_KEY: process.env.AUTH_ENCRYPTION_KEY, NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY }))' | npx wrangler secret bulk

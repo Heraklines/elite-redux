@@ -7,6 +7,9 @@
 
 // ---- Config (edit if URLs change) ------------------------------------------
 const WORKER_URL = "https://er-editor-api.heraklines.workers.dev"; // er-editor-api Worker
+const ABILITY_AI_URL = ["localhost", "127.0.0.1"].includes(location.hostname)
+  ? "http://localhost:8787"
+  : "https://er-ability-ai.heraklines.workers.dev";
 const REPO = "Heraklines/elite-redux";
 const BRANCH = "feat/elite-redux-port";
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/src/data/elite-redux`;
@@ -6663,8 +6666,10 @@ async function init() {
         mechanics: abilityMechanicsData,
         components: abilityComponentsData,
         blueprints: customAbilitiesLive,
+        aiEndpoint: ABILITY_AI_URL,
         community: communityMode?.enabled,
         callbacks: {
+          getPassword: () => document.getElementById("password")?.value || "",
           onChange: refreshChrome,
           onCatalogChange: syncStudioAbilityCatalog,
           render,

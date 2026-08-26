@@ -1,0 +1,18 @@
+{
+  "name": "er-ability-ai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc --noEmit && wrangler deploy --dry-run --outdir .wrangler-dry-run",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "0.3.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260826.1",
+    "typescript": "6.0.3",
+    "wrangler": "4.126.0"
+  }
+}

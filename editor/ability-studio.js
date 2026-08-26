@@ -47,6 +47,24 @@
   let studioDrag = null;
   let community = false;
   let callbacks = {};
+  let aiEndpoint = "";
+  let aiAbortController = null;
+  let aiStatusPromise = null;
+  let aiLoginTimer = null;
+  let aiRefreshTimer = null;
+  let aiState = {
+    prompt: "",
+    provider: "auto",
+    running: false,
+    checked: false,
+    connected: false,
+    planType: null,
+    login: null,
+    activity: [],
+    usage: null,
+    error: "",
+    requestId: null,
+  };
 
   const clone = value => JSON.parse(JSON.stringify(value));
   const esc = value =>
@@ -87,11 +105,383 @@
   function refreshInspector() {
     const root = document.querySelector(".as-inspector");
     const entry = currentEntry();
-    if (!root || !entry) {
+    if (!root) {
       return;
     }
     const allIds = new Set(getAbilityCatalog().map(ability => ability.id));
-    root.innerHTML = renderInspector(entry, validateEntry(selected, entry, allIds));
+    root.innerHTML = entry
+      ? renderInspector(entry, validateEntry(selected, entry, allIds))
+      : `${renderAiAssistant(null)}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`;
+  }
+
+  function scheduleAiRefresh() {
+    if (aiRefreshTimer) {
+      return;
+    }
+    aiRefreshTimer = window.setTimeout(() => {
+      aiRefreshTimer = null;
+      if (!aiState.running && document.activeElement?.matches?.("[data-as-ai-prompt], [data-as-ai-provider]")) {
+        scheduleAiRefresh();
+        return;
+      }
+      refreshInspector();
+    }, 80);
+  }
+
+  function aiActivity(type, text, append = false) {
+    if (!text) {
+      return;
+    }
+    const last = aiState.activity.at(-1);
+    if (append && last?.type === type) {
+      last.text += text;
+    } else if (!append || last?.text !== text) {
+      aiState.activity.push({ type, text });
+      aiState.activity = aiState.activity.slice(-12);
+    }
+    scheduleAiRefresh();
+  }
+
+  function aiPassword() {
+    return String(callbacks.getPassword?.() || "").trim();
+  }
+
+  async function aiRequest(path, body = {}, signal) {
+    if (!aiEndpoint) {
+      throw new Error("The Ability Builder service is not configured");
+    }
+    const password = aiPassword();
+    if (!password) {
+      throw new Error("Enter the staff editor password first");
+    }
+    const response = await fetch(`${aiEndpoint}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Editor-Password": password,
+      },
+      body: JSON.stringify(body),
+      signal,
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || `Ability Builder request failed (${response.status})`);
+    }
+    return response;
+  }
+
+  async function refreshAiStatus(force = false) {
+    if (!aiEndpoint || aiStatusPromise !== null || (aiState.checked && !force)) {
+      return aiStatusPromise;
+    }
+    aiStatusPromise = (async () => {
+      try {
+        const response = await aiRequest("/auth/status");
+        const result = await response.json();
+        aiState.checked = true;
+        aiState.connected = !!result.connected;
+        aiState.planType = result.planType || null;
+        aiState.error = "";
+        if (aiState.connected) {
+          aiState.login = null;
+          if (aiLoginTimer) {
+            window.clearTimeout(aiLoginTimer);
+            aiLoginTimer = null;
+          }
+        }
+      } catch (error) {
+        aiState.checked = true;
+        aiState.connected = false;
+        aiState.error = error.message || String(error);
+      } finally {
+        aiStatusPromise = null;
+        scheduleAiRefresh();
+      }
+    })();
+    return aiStatusPromise;
+  }
+
+  function pollAiLogin(startedAt = Date.now()) {
+    if (Date.now() - startedAt > 10 * 60_000 || aiState.connected) {
+      return;
+    }
+    aiLoginTimer = window.setTimeout(async () => {
+      await refreshAiStatus(true);
+      pollAiLogin(startedAt);
+    }, 3000);
+  }
+
+  async function startAiLogin() {
+    const loginWindow = window.open("about:blank", "er-codex-login", "noopener,noreferrer");
+    aiState.error = "";
+    aiActivity("status", "Starting the one-time ChatGPT connection");
+    try {
+      const response = await aiRequest("/auth/start");
+      const result = await response.json();
+      if (result.connected) {
+        aiState.connected = true;
+        aiState.planType = result.planType || null;
+        loginWindow?.close();
+      } else {
+        aiState.login = {
+          verificationUrl: result.verificationUrl,
+          userCode: result.userCode,
+          loginId: result.loginId,
+        };
+        if (loginWindow && result.verificationUrl) {
+          loginWindow.location.href = result.verificationUrl;
+        }
+        pollAiLogin();
+      }
+    } catch (error) {
+      loginWindow?.close();
+      aiState.error = error.message || String(error);
+    }
+    refreshInspector();
+  }
+
+  function aiSearchTerms(prompt) {
+    return [...new Set(prompt.toLowerCase().match(/[a-z0-9]+/g) || [])].filter(term => term.length > 2).slice(0, 40);
+  }
+
+  function aiComponentContext(prompt) {
+    const normalizedPrompt = prompt.toLowerCase();
+    const terms = aiSearchTerms(prompt);
+    const matches = [];
+    for (const ability of componentCatalog) {
+      for (const rule of ability.rules || []) {
+        const haystack = componentHaystack(ability, rule);
+        let score = terms.reduce((total, term) => total + (haystack.includes(term) ? 3 : 0), 0);
+        if (normalizedPrompt.includes(ability.name.toLowerCase())) {
+          score += 60;
+        }
+        if (normalizedPrompt.includes(rule.label.toLowerCase())) {
+          score += 40;
+        }
+        if (rule.hook?.label && normalizedPrompt.includes(rule.hook.label.toLowerCase())) {
+          score += 15;
+        }
+        matches.push({ ability, rule, score });
+      }
+    }
+    matches.sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name));
+    const grouped = new Map();
+    for (const { ability, rule } of matches.slice(0, 100)) {
+      if (!grouped.has(ability.id)) {
+        grouped.set(ability.id, {
+          id: ability.id,
+          name: ability.name,
+          description: ability.description,
+          rules: [],
+        });
+      }
+      grouped.get(ability.id).rules.push({
+        id: rule.id,
+        label: rule.label,
+        summary: rule.summary,
+        source: rule.source,
+        hook: rule.hook,
+        conditions: rule.conditions,
+        effects: rule.effects,
+      });
+    }
+    return [...grouped.values()];
+  }
+
+  function cleanAiFilter(filter) {
+    return Object.fromEntries(
+      Object.entries(filter || {}).filter(([, value]) => value !== null && value !== undefined && value !== ""),
+    );
+  }
+
+  function normalizeAiBlueprint(raw) {
+    const blueprint = clone(raw || {});
+    blueprint.version = primitiveCatalog.schemaVersion;
+    blueprint.id = nextId();
+    blueprint.name = String(blueprint.name || "Generated Ability")
+      .trim()
+      .slice(0, 40);
+    blueprint.description = String(blueprint.description || "Generated ability draft.")
+      .trim()
+      .slice(0, 500);
+    blueprint.generation = Number.isInteger(blueprint.generation) ? blueprint.generation : 9;
+    blueprint.includes = Array.isArray(blueprint.includes) ? blueprint.includes.map(Number) : [];
+    blueprint.mechanics = Array.isArray(blueprint.mechanics) ? blueprint.mechanics : [];
+    blueprint.componentRules = Array.isArray(blueprint.componentRules) ? blueprint.componentRules : [];
+    blueprint.rules = Array.isArray(blueprint.rules) ? blueprint.rules : [];
+    blueprint.modifiers = Array.isArray(blueprint.modifiers) ? blueprint.modifiers : [];
+    blueprint.flags = blueprint.flags && typeof blueprint.flags === "object" ? blueprint.flags : {};
+    blueprint.componentRules.forEach((rule, index) => {
+      rule.key ||= `component-${index + 1}`;
+      rule.prerequisiteHooks ||= [];
+      rule.conditionLogic ||= "all";
+      rule.conditions ||= [];
+      rule.effects ||= [];
+      rule.conditions.forEach(condition => {
+        if (condition.conditionIndex === null || condition.conditionIndex === undefined) {
+          condition.conditionIndex = undefined;
+        }
+      });
+    });
+    blueprint.rules.forEach((rule, index) => {
+      rule.key ||= `rule-${index + 1}`;
+      rule.conditionLogic ||= "all";
+      rule.conditions ||= [];
+      rule.effects ||= [];
+      rule.conditions.forEach(condition => {
+        if (condition.filter) {
+          condition.filter = cleanAiFilter(condition.filter);
+        }
+        Object.keys(condition).forEach(key => condition[key] == null && delete condition[key]);
+      });
+      rule.effects.forEach(effect => {
+        Object.keys(effect).forEach(key => effect[key] == null && delete effect[key]);
+      });
+    });
+    blueprint.modifiers.forEach(modifier => {
+      if (modifier.filter) {
+        modifier.filter = cleanAiFilter(modifier.filter);
+      }
+      Object.keys(modifier).forEach(key => modifier[key] == null && delete modifier[key]);
+    });
+    return blueprint;
+  }
+
+  function installAiBlueprint(result) {
+    const blueprint = normalizeAiBlueprint(result.blueprint);
+    const key = uniqueKey(blueprint.name);
+    const allIds = new Set([...getAbilityCatalog().map(ability => ability.id), blueprint.id]);
+    const errors = validateEntry(key, blueprint, allIds);
+    if (errors.length > 0) {
+      throw new Error(`Generated draft did not pass Ability Studio validation: ${errors.join("; ")}`);
+    }
+    state[key] = blueprint;
+    selected = key;
+    aiActivity("result", result.explanation || `Created ${blueprint.name}`);
+    notify(true);
+  }
+
+  function handleAiEvent(event) {
+    if (event.type === "status") {
+      aiActivity("status", event.message);
+    } else if (event.type === "reasoning") {
+      aiActivity("reasoning", event.delta, true);
+    } else if (event.type === "usage") {
+      aiState.usage = event.usage;
+      scheduleAiRefresh();
+    } else if (event.type === "error") {
+      aiState.error = event.message || "Ability generation failed";
+      if (event.reauthRequired) {
+        aiState.connected = false;
+      }
+      scheduleAiRefresh();
+    } else if (event.type === "result") {
+      installAiBlueprint(event);
+    }
+  }
+
+  async function generateAiAbility() {
+    const prompt = aiState.prompt.trim();
+    if (prompt.length < 3 || aiState.running) {
+      if (prompt.length < 3) {
+        aiState.error = "Describe the ability first";
+        refreshInspector();
+      }
+      return;
+    }
+    aiState.running = true;
+    aiState.error = "";
+    aiState.activity = [];
+    aiState.usage = null;
+    aiState.requestId = crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`;
+    aiAbortController = new AbortController();
+    refreshInspector();
+    try {
+      const response = await aiRequest(
+        "/generate",
+        {
+          requestId: aiState.requestId,
+          provider: aiState.provider,
+          prompt,
+          currentBlueprint: currentEntry() ? clone(currentEntry()) : null,
+          primitiveCatalog,
+          abilityIndex: getAbilityCatalog().map(ability => ({
+            id: ability.id,
+            name: ability.name,
+            description: ability.description || ability.desc || "",
+          })),
+          componentCandidates: aiComponentContext(prompt),
+        },
+        aiAbortController.signal,
+      );
+      if (!response.body) {
+        throw new Error("The Ability Builder returned an empty response");
+      }
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          break;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (line.trim()) {
+            handleAiEvent(JSON.parse(line));
+          }
+        }
+      }
+      if (buffer.trim()) {
+        handleAiEvent(JSON.parse(buffer));
+      }
+    } catch (error) {
+      if (error.name !== "AbortError") {
+        aiState.error = error.message || String(error);
+      }
+    } finally {
+      aiState.running = false;
+      aiAbortController = null;
+      refreshInspector();
+    }
+  }
+
+  async function cancelAiAbility() {
+    if (!aiState.running) {
+      return;
+    }
+    const requestId = aiState.requestId;
+    aiAbortController?.abort();
+    aiState.running = false;
+    aiActivity("status", "Generation cancelled");
+    await aiRequest("/cancel", { requestId }).catch(() => {});
+    refreshInspector();
+  }
+
+  function aiUsageLabel() {
+    const usage = aiState.usage;
+    if (!usage || typeof usage !== "object") {
+      return "";
+    }
+    const total = usage.totalTokens ?? usage.total_tokens ?? usage.total;
+    return Number.isFinite(total) ? `${Number(total).toLocaleString()} tokens` : "Usage updated";
+  }
+
+  function renderAiAssistant(entry) {
+    const account = aiState.connected
+      ? `Luna connected${aiState.planType ? ` · ${pretty(aiState.planType)}` : ""}`
+      : aiState.checked
+        ? "Luna not connected"
+        : "Checking Luna connection…";
+    const activity =
+      aiState.activity.length > 0
+        ? aiState.activity
+            .map(item => `<li class="${esc(item.type)}"><span aria-hidden="true"></span><p>${esc(item.text)}</p></li>`)
+            .join("")
+        : '<li class="empty"><p>Describe an ability to assemble a draft from existing mechanics.</p></li>';
+    return `<section class="as-ai as-panel" aria-label="AI Ability Builder"><div class="as-ai-heading"><div><span class="as-eyebrow">AI ABILITY BUILDER</span><h3>Assemble from mechanics</h3></div><span class="as-ai-account ${aiState.connected ? "connected" : ""}">${esc(account)}</span></div><textarea rows="5" maxlength="4000" aria-label="Describe the ability to build" placeholder="Example: After landing a contact Fire move, burn the target; if it burns, raise the holder's Speed by 1." data-as-ai-prompt${aiState.running ? " disabled" : ""}>${esc(aiState.prompt)}</textarea><div class="as-ai-controls"><select aria-label="Ability builder model" data-as-ai-provider${aiState.running ? " disabled" : ""}>${option("auto", aiState.provider, "Luna, then NIM fallback")}${option("codex", aiState.provider, "Luna only")}${option("nim", aiState.provider, "NVIDIA NIM only")}</select>${aiState.running ? '<button type="button" class="danger" data-as-action="ai-cancel">Stop</button>' : '<button type="button" class="primary" data-as-action="ai-generate">Build draft</button>'}</div>${aiState.connected ? "" : '<button type="button" class="as-ai-connect" data-as-action="ai-connect">Connect ChatGPT subscription</button>'}${aiState.login ? `<div class="as-ai-login"><span>Enter this code once</span><b>${esc(aiState.login.userCode)}</b><a href="${esc(aiState.login.verificationUrl)}" target="_blank" rel="noreferrer">Open sign-in</a></div>` : ""}<div class="as-ai-activity"><div><b>${aiState.running ? "BUILDING" : "ACTIVITY"}</b><span>${esc(aiUsageLabel())}</span></div><ol>${activity}</ol></div>${aiState.error ? `<p class="as-ai-error">${esc(aiState.error)}</p>` : ""}${entry ? `<p class="as-ai-context">Uses <b>${esc(entry.name)}</b> as optional context and creates a separate unsaved draft.</p>` : ""}</section>`;
   }
 
   function nextId() {
@@ -1278,6 +1668,7 @@
   }
 
   function renderContent(root) {
+    refreshAiStatus();
     const entries = visibleEntries();
     if (!selected || !state[selected]) {
       selected = entries[0]?.[0] || null;
@@ -1299,7 +1690,7 @@
           : '<div class="as-list-empty">No authored abilities yet.</div>'
       }</div></aside>
       <main class="as-workspace" aria-label="Ability editor">${entry ? renderEntry(entry, errors) : '<div class="as-welcome"><h2>Create an ability</h2><p>Build it from existing ability packages, passive modifiers, and triggered effect chains.</p><button type="button" class="primary" data-as-action="new-ability">Create first ability</button></div>'}</main>
-      <aside class="as-inspector" aria-label="Summary and validation">${entry ? renderInspector(entry, errors) : '<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>'}</aside>
+      <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant(null)}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
     </div>`;
   }
 
@@ -1365,7 +1756,7 @@
       ],
       [!errors.some(error => error.includes("cycle")), "No circular ability references"],
     ];
-    return `<div class="as-panel"><span class="as-eyebrow">MECHANICS SUMMARY</span><h3>${esc(entry.name)}</h3><div class="as-summary">${lines.length > 0 ? lines.map(line => `<p>${esc(line)}</p>`).join("") : '<p class="muted">No mechanics yet.</p>'}</div></div>
+    return `${renderAiAssistant(entry)}<div class="as-panel"><span class="as-eyebrow">MECHANICS SUMMARY</span><h3>${esc(entry.name)}</h3><div class="as-summary">${lines.length > 0 ? lines.map(line => `<p>${esc(line)}</p>`).join("") : '<p class="muted">No mechanics yet.</p>'}</div></div>
       <div class="as-panel"><span class="as-eyebrow">VALIDATION</span><div class="as-checklist">${checks.map(([pass, text]) => `<div class="${pass ? "pass" : "fail"}"><span aria-hidden="true">${pass ? "✓" : "!"}</span><p>${esc(text)}</p></div>`).join("")}</div>${errors.length > 0 ? `<ul class="as-errors">${errors.map(error => `<li>${esc(error)}</li>`).join("")}</ul>` : ""}</div>
       <div class="as-panel"><span class="as-eyebrow">ABILITY FLAGS</span><div class="as-flags">${flags.map(([key, text]) => `<label><input type="checkbox" data-as-flag="${key}"${entry.flags?.[key] ? " checked" : ""}><span>${esc(text)}</span></label>`).join("")}</div></div>`;
   }
@@ -1409,6 +1800,15 @@
   }
 
   function handleInput(element) {
+    if (element.hasAttribute("data-as-ai-prompt")) {
+      aiState.prompt = element.value;
+      aiState.error = "";
+      return true;
+    }
+    if (element.hasAttribute("data-as-ai-provider")) {
+      aiState.provider = element.value;
+      return true;
+    }
     if (element.hasAttribute("data-as-list-search")) {
       listQuery = element.value.trim().toLowerCase();
       document.querySelectorAll(".as-ability-row").forEach(row => {
@@ -1693,6 +2093,18 @@
     }
     const action = button.dataset.asAction;
     const entry = currentEntry();
+    if (action === "ai-connect") {
+      startAiLogin();
+      return true;
+    }
+    if (action === "ai-generate") {
+      generateAiAbility();
+      return true;
+    }
+    if (action === "ai-cancel") {
+      cancelAiAbility();
+      return true;
+    }
     if (action === "open-include-search") {
       renderIncludeSearch(button);
       return true;
@@ -2010,6 +2422,27 @@
     );
     community = !!options.community;
     callbacks = options.callbacks || {};
+    aiEndpoint = String(options.aiEndpoint || "").replace(/\/$/, "");
+    aiAbortController?.abort();
+    aiAbortController = null;
+    if (aiLoginTimer) {
+      window.clearTimeout(aiLoginTimer);
+      aiLoginTimer = null;
+    }
+    aiStatusPromise = null;
+    aiState = {
+      prompt: "",
+      provider: "auto",
+      running: false,
+      checked: false,
+      connected: false,
+      planType: null,
+      login: null,
+      activity: [],
+      usage: null,
+      error: "",
+      requestId: null,
+    };
     const source = options.blueprints && typeof options.blueprints === "object" ? options.blueprints : {};
     state = clone(source);
     for (const entry of Object.values(state)) {
