@@ -4824,10 +4824,6 @@ async function handleCommunitySuggestionStaffList(
   cors: Record<string, string>,
 ): Promise<Response> {
   const body = await readCommunitySuggestionBody(request);
-  const password = typeof body?.password === "string" ? body.password.trim() : "";
-  if (!(await verifyEditorPassword(password, env))) {
-    return json({ error: "Invalid editor password." }, 401, cors);
-  }
   await ensureCommunityTables(env);
   const allowedStatuses = new Set(["open", "approved", "dismissed", "applied", "withdrawn", "all"]);
   const status = typeof body?.status === "string" && allowedStatuses.has(body.status) ? body.status : "open";
@@ -5755,7 +5751,6 @@ export default {
       if (pathname === "/community/editor-suggestions/counts" && method === "GET") {
         return await handleCommunitySuggestionCounts(env, cors);
       }
-      // Staff routes use the existing editor password, verified by er-editor-api.
       if (pathname === "/community/editor-suggestions/staff/list" && method === "POST") {
         return await handleCommunitySuggestionStaffList(request, env, cors);
       }
