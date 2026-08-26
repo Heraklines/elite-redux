@@ -418,13 +418,13 @@ async function runCodex(payload, emit) {
   await rpc.start();
   const account = await rpc.request("account/read", { refreshToken: true });
   if (!account?.account || account.account.type !== "chatgpt") {
-    throw Object.assign(new Error("Codex is not connected to ChatGPT"), { reauthRequired: true, fallback: true });
+    throw Object.assign(new Error("The ability builder is temporarily unavailable"), { fallback: true });
   }
   const limits = await rpc.request("account/rateLimits/read").catch(() => null);
   if (limits?.rateLimits?.rateLimitReachedType || limits?.rateLimits?.primary?.usedPercent >= 100) {
-    throw Object.assign(new Error("The Codex subscription limit is currently reached"), { fallback: true });
+    throw Object.assign(new Error("The ability builder is temporarily at its usage limit"), { fallback: true });
   }
-  emit({ type: "status", message: `Starting ${codexModel} with ${codexEffort} reasoning` });
+  emit({ type: "status", message: "Preparing the requested ability" });
   const threadResult = await rpc.request("thread/start", {
     model: codexModel,
     cwd: "/srv/empty",
@@ -483,7 +483,7 @@ async function runCodex(payload, emit) {
     activeTurn = { requestId: payload.requestId, threadId, turnId };
     await Promise.race([
       done,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Codex generation timed out")), 180_000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Ability generation timed out")), 180_000)),
     ]);
     if (turnError) {
       const info = errorInfo(turnError);
@@ -499,7 +499,7 @@ async function runCodex(payload, emit) {
     }
     const result = stripNulls(extractJson(finalText));
     validateSources(result, payload);
-    return { ...result, provider: "codex", model: codexModel };
+    return result;
   } finally {
     activeTurn = null;
     unsubscribe();
@@ -509,9 +509,9 @@ async function runCodex(payload, emit) {
 
 async function runNim(payload, emit) {
   if (!nimKey) {
-    throw new Error("NVIDIA NIM fallback is not configured");
+    throw new Error("The ability builder is temporarily unavailable");
   }
-  emit({ type: "status", message: `Falling back to ${nimModel}` });
+  emit({ type: "status", message: "Retrying the request" });
   const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -535,8 +535,7 @@ async function runNim(payload, emit) {
     }),
   });
   if (!response.ok || !response.body) {
-    const body = await response.text().catch(() => "");
-    throw new Error(`NVIDIA NIM failed (${response.status})${body ? `: ${body.slice(0, 200)}` : ""}`);
+    throw new Error(`The ability builder could not complete the request (${response.status})`);
   }
   const reader = response.body.getReader();
   const textDecoder = new TextDecoder();
@@ -563,7 +562,7 @@ async function runNim(payload, emit) {
   }
   const result = stripNulls(extractJson(content.replace(/<think>[\s\S]*?<\/think>/gi, "")));
   validateSources(result, payload);
-  return { ...result, provider: "nim", model: nimModel };
+  return result;
 }
 
 function validateGeneratePayload(payload) {
@@ -572,9 +571,6 @@ function validateGeneratePayload(payload) {
   }
   if (typeof payload.prompt !== "string" || payload.prompt.trim().length < 3 || payload.prompt.length > 4000) {
     throw Object.assign(new Error("Describe the ability in 3-4000 characters"), { status: 400 });
-  }
-  if (!["auto", "codex", "nim"].includes(payload.provider)) {
-    throw Object.assign(new Error("Invalid model provider"), { status: 400 });
   }
   if (!Array.isArray(payload.abilityIndex) || !Array.isArray(payload.componentCandidates)) {
     throw Object.assign(new Error("Ability catalog context is missing"), { status: 400 });
@@ -602,17 +598,13 @@ async function generate(request, response) {
   try {
     emit({ type: "status", message: "Matching the request to available ability components" });
     let result;
-    if (payload.provider === "nim") {
-      result = await runNim(payload, emit);
-    } else {
-      try {
-        result = await runCodex(payload, emit);
-      } catch (error) {
-        if (payload.provider === "auto" && error.fallback && nimKey) {
-          result = await runNim(payload, emit);
-        } else {
-          throw error;
-        }
+    try {
+      result = await runCodex(payload, emit);
+    } catch (error) {
+      if (error.fallback && nimKey) {
+        result = await runNim(payload, emit);
+      } else {
+        throw error;
       }
     }
     emit({ type: "result", ...result });
@@ -620,8 +612,6 @@ async function generate(request, response) {
     emit({
       type: "error",
       message: error.message || String(error),
-      reauthRequired: Boolean(error.reauthRequired),
-      fallbackAvailable: Boolean(nimKey),
     });
   } finally {
     generationBusy = false;
@@ -659,26 +649,6 @@ const server = createServer(async (request, response) => {
         }
         throw error;
       }
-    }
-    if (request.method === "POST" && url.pathname === "/auth/start") {
-      await rpc.start();
-      const status = await rpc.request("account/read", { refreshToken: false });
-      if (status?.account?.type === "chatgpt") {
-        return writeJson(response, { connected: true, planType: status.account.planType || null });
-      }
-      const login = await rpc.request("account/login/start", { type: "chatgptDeviceCode" });
-      return writeJson(response, { connected: false, ...login });
-    }
-    if (request.method === "POST" && url.pathname === "/auth/status") {
-      await rpc.start();
-      const status = await rpc.request("account/read", { refreshToken: false });
-      const limits =
-        status?.account?.type === "chatgpt" ? await rpc.request("account/rateLimits/read").catch(() => null) : null;
-      return writeJson(response, {
-        connected: status?.account?.type === "chatgpt",
-        planType: status?.account?.planType || null,
-        rateLimits: limits?.rateLimits || null,
-      });
     }
     if (request.method === "POST" && url.pathname === "/generate") {
       return await generate(request, response);

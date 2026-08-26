@@ -49,17 +49,10 @@
   let callbacks = {};
   let aiEndpoint = "";
   let aiAbortController = null;
-  let aiStatusPromise = null;
-  let aiLoginTimer = null;
   let aiRefreshTimer = null;
   let aiState = {
     prompt: "",
-    provider: "auto",
     running: false,
-    checked: false,
-    connected: false,
-    planType: null,
-    login: null,
     activity: [],
     usage: null,
     error: "",
@@ -111,7 +104,7 @@
     const allIds = new Set(getAbilityCatalog().map(ability => ability.id));
     root.innerHTML = entry
       ? renderInspector(entry, validateEntry(selected, entry, allIds))
-      : `${renderAiAssistant(null)}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`;
+      : `${renderAiAssistant()}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`;
   }
 
   function scheduleAiRefresh() {
@@ -120,7 +113,7 @@
     }
     aiRefreshTimer = window.setTimeout(() => {
       aiRefreshTimer = null;
-      if (!aiState.running && document.activeElement?.matches?.("[data-as-ai-prompt], [data-as-ai-provider]")) {
+      if (!aiState.running && document.activeElement?.matches?.("[data-as-ai-prompt]")) {
         scheduleAiRefresh();
         return;
       }
@@ -168,76 +161,6 @@
       throw new Error(result.error || `Ability Builder request failed (${response.status})`);
     }
     return response;
-  }
-
-  async function refreshAiStatus(force = false) {
-    if (!aiEndpoint || aiStatusPromise !== null || (aiState.checked && !force)) {
-      return aiStatusPromise;
-    }
-    aiStatusPromise = (async () => {
-      try {
-        const response = await aiRequest("/auth/status");
-        const result = await response.json();
-        aiState.checked = true;
-        aiState.connected = !!result.connected;
-        aiState.planType = result.planType || null;
-        aiState.error = "";
-        if (aiState.connected) {
-          aiState.login = null;
-          if (aiLoginTimer) {
-            window.clearTimeout(aiLoginTimer);
-            aiLoginTimer = null;
-          }
-        }
-      } catch (error) {
-        aiState.checked = true;
-        aiState.connected = false;
-        aiState.error = error.message || String(error);
-      } finally {
-        aiStatusPromise = null;
-        scheduleAiRefresh();
-      }
-    })();
-    return aiStatusPromise;
-  }
-
-  function pollAiLogin(startedAt = Date.now()) {
-    if (Date.now() - startedAt > 10 * 60_000 || aiState.connected) {
-      return;
-    }
-    aiLoginTimer = window.setTimeout(async () => {
-      await refreshAiStatus(true);
-      pollAiLogin(startedAt);
-    }, 3000);
-  }
-
-  async function startAiLogin() {
-    const loginWindow = window.open("about:blank", "er-codex-login", "noopener,noreferrer");
-    aiState.error = "";
-    aiActivity("status", "Starting the one-time ChatGPT connection");
-    try {
-      const response = await aiRequest("/auth/start");
-      const result = await response.json();
-      if (result.connected) {
-        aiState.connected = true;
-        aiState.planType = result.planType || null;
-        loginWindow?.close();
-      } else {
-        aiState.login = {
-          verificationUrl: result.verificationUrl,
-          userCode: result.userCode,
-          loginId: result.loginId,
-        };
-        if (loginWindow && result.verificationUrl) {
-          loginWindow.location.href = result.verificationUrl;
-        }
-        pollAiLogin();
-      }
-    } catch (error) {
-      loginWindow?.close();
-      aiState.error = error.message || String(error);
-    }
-    refreshInspector();
   }
 
   function aiSearchTerms(prompt) {
@@ -371,9 +294,6 @@
       scheduleAiRefresh();
     } else if (event.type === "error") {
       aiState.error = event.message || "Ability generation failed";
-      if (event.reauthRequired) {
-        aiState.connected = false;
-      }
       scheduleAiRefresh();
     } else if (event.type === "result") {
       installAiBlueprint(event);
@@ -401,7 +321,6 @@
         "/generate",
         {
           requestId: aiState.requestId,
-          provider: aiState.provider,
           prompt,
           currentBlueprint: currentEntry() ? clone(currentEntry()) : null,
           primitiveCatalog,
@@ -469,19 +388,14 @@
     return Number.isFinite(total) ? `${Number(total).toLocaleString()} tokens` : "Usage updated";
   }
 
-  function renderAiAssistant(entry) {
-    const account = aiState.connected
-      ? `Luna connected${aiState.planType ? ` · ${pretty(aiState.planType)}` : ""}`
-      : aiState.checked
-        ? "Luna not connected"
-        : "Checking Luna connection…";
+  function renderAiAssistant() {
     const activity =
       aiState.activity.length > 0
         ? aiState.activity
             .map(item => `<li class="${esc(item.type)}"><span aria-hidden="true"></span><p>${esc(item.text)}</p></li>`)
             .join("")
         : '<li class="empty"><p>Describe an ability to assemble a draft from existing mechanics.</p></li>';
-    return `<section class="as-ai as-panel" aria-label="AI Ability Builder"><div class="as-ai-heading"><div><span class="as-eyebrow">AI ABILITY BUILDER</span><h3>Assemble from mechanics</h3></div><span class="as-ai-account ${aiState.connected ? "connected" : ""}">${esc(account)}</span></div><textarea rows="5" maxlength="4000" aria-label="Describe the ability to build" placeholder="Example: After landing a contact Fire move, burn the target; if it burns, raise the holder's Speed by 1." data-as-ai-prompt${aiState.running ? " disabled" : ""}>${esc(aiState.prompt)}</textarea><div class="as-ai-controls"><select aria-label="Ability builder model" data-as-ai-provider${aiState.running ? " disabled" : ""}>${option("auto", aiState.provider, "Luna, then NIM fallback")}${option("codex", aiState.provider, "Luna only")}${option("nim", aiState.provider, "NVIDIA NIM only")}</select>${aiState.running ? '<button type="button" class="danger" data-as-action="ai-cancel">Stop</button>' : '<button type="button" class="primary" data-as-action="ai-generate">Build draft</button>'}</div>${aiState.connected ? "" : '<button type="button" class="as-ai-connect" data-as-action="ai-connect">Connect ChatGPT subscription</button>'}${aiState.login ? `<div class="as-ai-login"><span>Enter this code once</span><b>${esc(aiState.login.userCode)}</b><a href="${esc(aiState.login.verificationUrl)}" target="_blank" rel="noreferrer">Open sign-in</a></div>` : ""}<div class="as-ai-activity"><div><b>${aiState.running ? "BUILDING" : "ACTIVITY"}</b><span>${esc(aiUsageLabel())}</span></div><ol>${activity}</ol></div>${aiState.error ? `<p class="as-ai-error">${esc(aiState.error)}</p>` : ""}${entry ? `<p class="as-ai-context">Uses <b>${esc(entry.name)}</b> as optional context and creates a separate unsaved draft.</p>` : ""}</section>`;
+    return `<section class="as-ai as-panel" aria-label="Agent Ability Builder"><div class="as-ai-heading"><h3>Agent Ability Builder</h3></div><textarea rows="5" maxlength="4000" aria-label="Describe the ability to build" placeholder="Example: After landing a contact Fire move, burn the target; if it burns, raise the holder's Speed by 1." data-as-ai-prompt${aiState.running ? " disabled" : ""}>${esc(aiState.prompt)}</textarea><div class="as-ai-controls">${aiState.running ? '<button type="button" class="danger" data-as-action="ai-cancel">Stop</button>' : '<button type="button" class="primary" data-as-action="ai-generate">Build draft</button>'}</div><div class="as-ai-activity"><div><b>${aiState.running ? "BUILDING" : "ACTIVITY"}</b><span>${esc(aiUsageLabel())}</span></div><ol>${activity}</ol></div>${aiState.error ? `<p class="as-ai-error">${esc(aiState.error)}</p>` : ""}</section>`;
   }
 
   function nextId() {
@@ -1668,7 +1582,6 @@
   }
 
   function renderContent(root) {
-    refreshAiStatus();
     const entries = visibleEntries();
     if (!selected || !state[selected]) {
       selected = entries[0]?.[0] || null;
@@ -1690,7 +1603,7 @@
           : '<div class="as-list-empty">No authored abilities yet.</div>'
       }</div></aside>
       <main class="as-workspace" aria-label="Ability editor">${entry ? renderEntry(entry, errors) : '<div class="as-welcome"><h2>Create an ability</h2><p>Build it from existing ability packages, passive modifiers, and triggered effect chains.</p><button type="button" class="primary" data-as-action="new-ability">Create first ability</button></div>'}</main>
-      <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant(null)}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
+      <aside class="as-inspector" aria-label="Builder, summary, and validation">${entry ? renderInspector(entry, errors) : `${renderAiAssistant()}<div class="as-panel"><h3>Ability Studio</h3><p class="muted">No ability selected.</p></div>`}</aside>
     </div>`;
   }
 
@@ -1756,7 +1669,7 @@
       ],
       [!errors.some(error => error.includes("cycle")), "No circular ability references"],
     ];
-    return `${renderAiAssistant(entry)}<div class="as-panel"><span class="as-eyebrow">MECHANICS SUMMARY</span><h3>${esc(entry.name)}</h3><div class="as-summary">${lines.length > 0 ? lines.map(line => `<p>${esc(line)}</p>`).join("") : '<p class="muted">No mechanics yet.</p>'}</div></div>
+    return `${renderAiAssistant()}<div class="as-panel"><span class="as-eyebrow">MECHANICS SUMMARY</span><h3>${esc(entry.name)}</h3><div class="as-summary">${lines.length > 0 ? lines.map(line => `<p>${esc(line)}</p>`).join("") : '<p class="muted">No mechanics yet.</p>'}</div></div>
       <div class="as-panel"><span class="as-eyebrow">VALIDATION</span><div class="as-checklist">${checks.map(([pass, text]) => `<div class="${pass ? "pass" : "fail"}"><span aria-hidden="true">${pass ? "✓" : "!"}</span><p>${esc(text)}</p></div>`).join("")}</div>${errors.length > 0 ? `<ul class="as-errors">${errors.map(error => `<li>${esc(error)}</li>`).join("")}</ul>` : ""}</div>
       <div class="as-panel"><span class="as-eyebrow">ABILITY FLAGS</span><div class="as-flags">${flags.map(([key, text]) => `<label><input type="checkbox" data-as-flag="${key}"${entry.flags?.[key] ? " checked" : ""}><span>${esc(text)}</span></label>`).join("")}</div></div>`;
   }
@@ -1803,10 +1716,6 @@
     if (element.hasAttribute("data-as-ai-prompt")) {
       aiState.prompt = element.value;
       aiState.error = "";
-      return true;
-    }
-    if (element.hasAttribute("data-as-ai-provider")) {
-      aiState.provider = element.value;
       return true;
     }
     if (element.hasAttribute("data-as-list-search")) {
@@ -2093,10 +2002,6 @@
     }
     const action = button.dataset.asAction;
     const entry = currentEntry();
-    if (action === "ai-connect") {
-      startAiLogin();
-      return true;
-    }
     if (action === "ai-generate") {
       generateAiAbility();
       return true;
@@ -2425,19 +2330,9 @@
     aiEndpoint = String(options.aiEndpoint || "").replace(/\/$/, "");
     aiAbortController?.abort();
     aiAbortController = null;
-    if (aiLoginTimer) {
-      window.clearTimeout(aiLoginTimer);
-      aiLoginTimer = null;
-    }
-    aiStatusPromise = null;
     aiState = {
       prompt: "",
-      provider: "auto",
       running: false,
-      checked: false,
-      connected: false,
-      planType: null,
-      login: null,
       activity: [],
       usage: null,
       error: "",

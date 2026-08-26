@@ -25,6 +25,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       AUTH_ENCRYPTION_KEY: ${{ secrets.ER_ABILITY_AI_AUTH_ENCRYPTION_KEY }}
+      CODEX_AUTH_BOOTSTRAP: ${{ secrets.ER_ABILITY_AI_CODEX_AUTH }}
       NVIDIA_NIM_API_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
     defaults:
       run:
@@ -45,5 +46,5 @@ jobs:
       - run: npx wrangler deploy
 
       - run: >-
-          node -e 'process.stdout.write(JSON.stringify({ AUTH_ENCRYPTION_KEY: process.env.AUTH_ENCRYPTION_KEY, NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY }))'
+          node -e 'process.stdout.write(JSON.stringify({ AUTH_ENCRYPTION_KEY: process.env.AUTH_ENCRYPTION_KEY, CODEX_AUTH_BOOTSTRAP: process.env.CODEX_AUTH_BOOTSTRAP, NVIDIA_NIM_API_KEY: process.env.NVIDIA_NIM_API_KEY }))'
           | npx wrangler secret bulk

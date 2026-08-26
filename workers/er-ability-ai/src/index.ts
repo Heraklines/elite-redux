@@ -3,6 +3,8 @@ import { Container, getContainer } from "@cloudflare/containers";
 interface Env {
   ABILITY_AI: DurableObjectNamespace<AbilityAiContainer>;
   AUTH_ENCRYPTION_KEY: string;
+  CODEX_AUTH_BOOTSTRAP?: string;
+  CODEX_AUTH_BOOTSTRAP_VERSION: string;
   NVIDIA_NIM_API_KEY?: string;
   ALLOWED_ORIGINS: string;
   CODEX_MODEL: string;
@@ -14,6 +16,7 @@ interface StoredAuth {
   version: 1;
   iv: string;
   data: string;
+  bootstrapVersion?: string;
 }
 
 interface RateWindow {
@@ -23,7 +26,7 @@ interface RateWindow {
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const publicPaths = new Set(["/auth/start", "/auth/status", "/generate", "/cancel"]);
+const publicPaths = new Set(["/generate", "/cancel"]);
 
 function base64(bytes: Uint8Array): string {
   let value = "";
@@ -47,10 +50,10 @@ async function encryptionKey(secret: string): Promise<CryptoKey> {
   return crypto.subtle.importKey("raw", digest, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
 
-async function encrypt(value: string, secret: string): Promise<StoredAuth> {
+async function encrypt(value: string, secret: string, bootstrapVersion: string): Promise<StoredAuth> {
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await encryptionKey(secret), encoder.encode(value));
-  return { version: 1, iv: base64(iv), data: base64(new Uint8Array(data)) };
+  return { version: 1, iv: base64(iv), data: base64(new Uint8Array(data)), bootstrapVersion };
 }
 
 async function decrypt(value: StoredAuth, secret: string): Promise<string> {
@@ -100,13 +103,22 @@ export class AbilityAiContainer extends Container<Env> {
       return;
     }
     const stored = await this.ctx.storage.get<StoredAuth>("codex-auth");
-    let auth = "";
-    if (stored) {
+    let auth = this.runtimeEnv.CODEX_AUTH_BOOTSTRAP ?? "";
+    if (stored?.bootstrapVersion === this.runtimeEnv.CODEX_AUTH_BOOTSTRAP_VERSION) {
       try {
         auth = await decrypt(stored, this.runtimeEnv.AUTH_ENCRYPTION_KEY);
       } catch {
         return json({ error: "The saved Codex login could not be decrypted" }, 500);
       }
+    }
+    if (!auth) {
+      return json({ error: "The ability builder credentials are not configured" }, 503);
+    }
+    if (stored?.bootstrapVersion !== this.runtimeEnv.CODEX_AUTH_BOOTSTRAP_VERSION) {
+      await this.ctx.storage.put(
+        "codex-auth",
+        await encrypt(auth, this.runtimeEnv.AUTH_ENCRYPTION_KEY, this.runtimeEnv.CODEX_AUTH_BOOTSTRAP_VERSION),
+      );
     }
     const response = await this.containerFetch("http://localhost/internal/auth/restore", {
       method: "POST",
@@ -131,7 +143,10 @@ export class AbilityAiContainer extends Container<Env> {
     }
     const auth = await response.text();
     if (auth.length > 0) {
-      await this.ctx.storage.put("codex-auth", await encrypt(auth, this.runtimeEnv.AUTH_ENCRYPTION_KEY));
+      await this.ctx.storage.put(
+        "codex-auth",
+        await encrypt(auth, this.runtimeEnv.AUTH_ENCRYPTION_KEY, this.runtimeEnv.CODEX_AUTH_BOOTSTRAP_VERSION),
+      );
     }
   }
 
