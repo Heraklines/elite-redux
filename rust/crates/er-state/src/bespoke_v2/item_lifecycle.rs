@@ -325,8 +325,7 @@ mod tests {
     fn seeded() -> ItemLifecycleStateV2 {
         let mut state = ItemLifecycleStateV2::default();
         state.next_instance_id = 3;
-        state.next_creation_ordinal =
-            SafeU53::new(3).expect("test creation cursor fits SafeU53");
+        state.next_creation_ordinal = SafeU53::new(3).expect("test creation cursor fits SafeU53");
         state.next_ledger_ordinal = SafeU53::new(3).expect("test ledger cursor fits SafeU53");
         state
     }

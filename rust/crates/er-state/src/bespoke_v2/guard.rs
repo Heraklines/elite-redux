@@ -232,8 +232,8 @@ impl GuardFamilyState {
         for ordinal in self
             .self_guards
             .iter()
-            .chain(self.side_guards.iter())
             .map(|entry| entry.creation_ordinal)
+            .chain(self.side_guards.iter().map(|entry| entry.creation_ordinal))
         {
             if ordinal == SafeU53::ZERO || ordinal >= self.next_creation_ordinal {
                 return Err(GuardFamilyStateError::CreationOrdinalNotAhead);
