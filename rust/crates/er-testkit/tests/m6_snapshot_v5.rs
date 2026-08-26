@@ -88,9 +88,10 @@ use serde_json::{Value, json};
 
 use recovery_campaign::{
     CampaignEndpoint, CampaignStep, CapturedFrontierV5, ContinuationStep,
-    RecoveryBoundaryKind, RecoveryFrontierContexts, SnapshotV5TamperVector,
-    SNAPSHOT_V5_TAMPER_VECTORS, apply_snapshot_v5_tamper, assert_continuation_identical,
-    campaign, capture_frontier_v5, verify_restored_frontier_v5,
+    RECOVERY_BOUNDARY_KINDS, RecoveryBoundaryKind, RecoveryFrontierContexts,
+    SnapshotV5TamperVector, SNAPSHOT_V5_TAMPER_VECTORS, apply_snapshot_v5_tamper,
+    assert_continuation_identical, campaign, capture_frontier_v5,
+    verify_restored_frontier_v5,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -174,8 +175,9 @@ fn compiled_identity() -> TestResult<CompiledIdentity> {
         type_chart: er_content::pack::selected_type_chart(),
     };
     pack.content_hash = pack.compute_content_hash()?;
+    let classification_count = classifications.len();
     let mut target_programs = Vec::new();
-    for ordinal in 1..=classifications.len() {
+    for ordinal in 1..=classification_count {
         target_programs.push(MechanicsProgramId::try_from_u64(u64::try_from(ordinal)?)?);
     }
     Ok(CompiledIdentity {
@@ -683,7 +685,7 @@ fn replica_protocol(host: SeatId, guest: SeatId, connection_generation: Connecti
 // Virtual network pair of production kernels.
 // ---------------------------------------------------------------------------
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 enum Endpoint {
     Host,
     Guest,
@@ -810,7 +812,7 @@ impl BattlePair {
     fn kernel_mut(&mut self, endpoint: Endpoint) -> &mut GameKernel {
         match endpoint {
             Endpoint::Host => &mut self.host,
-            Endpoint::Guest => &self.guest,
+            Endpoint::Guest => &mut self.guest,
         }
     }
 
@@ -1403,7 +1405,7 @@ fn recovery_contexts(
     }
 
     let mut participants = Vec::new();
-    for position in 0..u64::from(battle.format.player_capacity) {
+    for position in 0..battle.format.player_capacity {
         let slot = FieldSlot::new(BattleSide::Player, position)?;
         if let Some(id) = battle.field.occupant(&battle.format, slot)? {
             participants.push(id);
@@ -1663,9 +1665,8 @@ fn run_recovery_campaign(boundary: RecoveryBoundaryKind) -> TestResult {
         doubles_config()?
     };
     let script = campaign(boundary);
-    let mut native = BattlePair::new(config, Arc::clone(&content))?;
     for step in &script.setup {
-        native.apply(*step)?;
+        native.apply(step.clone())?;
     }
     assert_boundary_state(&native, boundary)?;
 
@@ -1710,14 +1711,14 @@ fn run_recovery_campaign(boundary: RecoveryBoundaryKind) -> TestResult {
     let mut restored_steps = Vec::new();
     for (index, step) in script.continuation.iter().enumerate() {
         let label = format!("{}/continuation/{index}", script.id);
-        let native_delta = native.apply(*step)?;
+        let native_delta = native.apply(step.clone())?;
         native_steps.push(native.observe(
             checkpoint.rng_log_len,
             checkpoint.events_log_len,
             &label,
             &native_delta,
         )?);
-        let restored_delta = restored.apply(*step)?;
+        let restored_delta = restored.apply(step.clone())?;
         restored_steps.push(restored.observe(0, 0, &label, &restored_delta)?);
         assert_pair_step_snapshots_equal(&native, &restored, &label)?;
     }
@@ -1731,9 +1732,8 @@ fn run_recovery_campaign(boundary: RecoveryBoundaryKind) -> TestResult {
 fn held_key_envelope_wire() -> TestResult<String> {
     let content = Arc::new(selected_content_pack()?);
     let script = campaign(RecoveryBoundaryKind::HeldKey);
-    let mut pair = BattlePair::new(doubles_config()?, content)?;
     for step in &script.setup {
-        pair.apply(*step)?;
+        pair.apply(step.clone())?;
     }
     let identity = compiled_identity()?;
     let contexts = recovery_contexts(
