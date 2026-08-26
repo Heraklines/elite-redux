@@ -426,23 +426,28 @@
     return data;
   }
 
+  async function suggestionListRequest() {
+    const response = await fetch(`${API}/community/editor-suggestions/staff/list`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "all" }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.error || `Request failed (${response.status})`);
+    }
+    return data;
+  }
+
   async function load(force = false) {
     if (loading || (loaded && !force)) {
-      return;
-    }
-    if (!demo && !password()) {
-      error = "Enter the editor password to load community suggestions.";
-      syncNavBadges();
-      drawAggregate();
       return;
     }
     loading = true;
     error = "";
     drawAggregate();
     try {
-      items = demo
-        ? [...localDemoItems(), ...builtInDemoItems()]
-        : (await staffRequest("/community/editor-suggestions/staff/list", { status: "all" })).items || [];
+      items = demo ? [...localDemoItems(), ...builtInDemoItems()] : (await suggestionListRequest()).items || [];
       if (demo) {
         const reviews = demoReviews();
         items.forEach(item => {
