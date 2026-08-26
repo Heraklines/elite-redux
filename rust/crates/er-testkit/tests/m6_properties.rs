@@ -197,7 +197,6 @@ fn pokemon_scope(id: PokemonId) -> MechanicScope {
 }
 
 fn generated_pokemon(
-    rng: &mut CaseRng,
     id: u64,
     owner_seat: Option<SeatId>,
     status_kind: StatusKind,
@@ -274,21 +273,23 @@ fn generated_single_battle(seed: u64, player_party_size: u64) -> TestResult<Gene
     let format = BattleFormat::single();
     let mut player_party = Vec::new();
     for index in 0..player_party_size {
+        let status = *rng.pick(&[StatusKind::None, StatusKind::None, StatusKind::Burn]);
+        let speed = rng.range(50, 200) as u32;
         player_party.push(generated_pokemon(
-            &mut rng,
             100 + index,
             Some(seat(1)),
-            *rng.pick(&[StatusKind::None, StatusKind::None, StatusKind::Burn]),
-            rng.range(50, 200) as u32,
+            status,
+            speed,
             true,
         )?);
     }
+    let enemy_status = *rng.pick(&[StatusKind::None, StatusKind::Poison]);
+    let enemy_speed = rng.range(50, 200) as u32;
     let enemy_party = vec![generated_pokemon(
-        &mut rng,
         200,
         None,
-        *rng.pick(&[StatusKind::None, StatusKind::Poison]),
-        rng.range(50, 200) as u32,
+        enemy_status,
+        enemy_speed,
         true,
     )?];
     let wave = WaveIndex::new(safe(1))?;
@@ -724,28 +725,13 @@ fn m6d_pairwise_factor_matrix_keeps_all_invariants_after_resolution() -> TestRes
     for status in statuses {
         for speed in speeds {
             for hp_full in hp_levels {
-                let mut rng = CaseRng::new(u64::from(speed) ^ u64::from(hp_full));
-                let player = generated_pokemon(
-                    &mut rng,
-                    300,
-                    Some(seat(1)),
-                    status,
-                    speed,
-                    hp_full,
-                )?;
+                let player = generated_pokemon(300, Some(seat(1)), status, speed, hp_full)?;
                 let enemy_status = if status == StatusKind::None {
                     StatusKind::Poison
                 } else {
                     StatusKind::None
                 };
-                let enemy = generated_pokemon(
-                    &mut rng,
-                    301,
-                    None,
-                    enemy_status,
-                    300 - speed,
-                    true,
-                )?;
+                let enemy = generated_pokemon(301, None, enemy_status, 300 - speed, true)?;
                 let pack = content();
                 let wave = WaveIndex::new(safe(1))?;
                 let turn = TurnIndex::new(safe(1))?;
@@ -885,7 +871,7 @@ fn m6d_campaigns_chain_turns_with_bounds_faint_replacement_and_terminal_consiste
 fn resolve_campaign_replacement(
     seed: u64,
     case: &str,
-    trace: &mut [TraceStep],
+    trace: &mut Vec<TraceStep>,
     pending: GameState,
     occurrence_id: FaintOccurrenceId,
 ) -> TestResult<GameState> {
@@ -920,13 +906,16 @@ fn resolve_campaign_replacement(
         .find(|(_, member)| !member.fainted && member.id != occurrence.pokemon)
         .map(|(index, member)| {
             (
-                PartyIndex::try_from(index).expect("reserve index fits six party slots"),
+                PartyIndex::try_from(index as u64).expect("reserve index fits six party slots"),
                 member.id,
             )
         });
     let selection = reserve
         .as_ref()
-        .map(|(party_index, pokemon_id)| ReplacementSelection::Selected(*party_index, *pokemon_id))
+        .map(|(party_index, pokemon_id)| ReplacementSelection::Selected {
+            party_slot: *party_index,
+            pokemon: *pokemon_id,
+        })
         .unwrap_or(ReplacementSelection::NoLegalReplacement);
 
     let illegal = ReplacementSelection::selected(PartyIndex::ZERO, occurrence.pokemon);
@@ -1078,7 +1067,7 @@ fn m6d_faulted_inputs_fail_closed_without_mutating_their_input() -> TestResult {
             .find(|(_, member)| !member.fainted)
             .map(|(index, member)| {
                 ReplacementSelection::selected(
-                    PartyIndex::try_from(index).expect("reserve index fits six party slots"),
+                    PartyIndex::try_from(index as u64).expect("reserve index fits six slots"),
                     member.id,
                 )
             })
@@ -1209,7 +1198,6 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
 fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids() -> TestResult {
     for &seed in &SEEDS {
         let mut rng = CaseRng::new(seed);
-        let unit = behavior_unit();
         let owner = PokemonId::new(safe(700 + seed % 5));
         let mut state = ScheduledEffectsState::default();
         let mut delivered: BTreeSet<u64> = BTreeSet::new();
@@ -1222,8 +1210,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
                 let event_id = next_event_id;
                 next_event_id += 1;
                 let request = DelayedEffectRequest {
-                    event_id,
-                    source_behavior_unit: unit,
+                    source_behavior_unit: behavior_unit(),
                     owner: pokemon_scope(owner),
                     stored_target: None,
                     delay_turns: rng.range(1, 3) as u32,
@@ -1235,7 +1222,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
                 };
                 let outcome =
                     schedule_delayed_effect(&state, turn as u32, request).map_err(|error| {
-                        fail(
+                            fail(
                             seed,
                             "scheduled-effects",
                             &[],
@@ -1248,7 +1235,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
             // Weather/terrain ownership stays coherent under seeded replacement.
             if rng.flip() {
                 let field_request = FieldConditionRequest {
-                    source_behavior_unit: unit,
+                    source_behavior_unit: behavior_unit(),
                     owner: MechanicScope::Battle,
                     duration_turns: rng.range(1, 4) as u16,
                 };
@@ -1349,7 +1336,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
             0,
             DelayedEffectRequest {
                 event_id: 1,
-                source_behavior_unit: unit,
+                source_behavior_unit: behavior_unit(),
                 owner: pokemon_scope(owner),
                 stored_target: None,
                 delay_turns: 1,
@@ -1363,7 +1350,6 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
             "a consumed stable event id was reused for seed {seed}"
         );
     }
-    Ok(())
 }
 
 #[test]
@@ -1554,7 +1540,7 @@ fn m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministical
 
         for _step in 0..rng.range(4, 10) {
             let owner = *rng.pick(&owners);
-            let origin = *rng.pick(&origins);
+            let origin = rng.pick(&origins).clone();
             let remaining = if rng.flip() {
                 None
             } else {
@@ -1565,7 +1551,6 @@ fn m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministical
                 slot: *rng.pick(&[AbilitySlot::Active, AbilitySlot::Passive0]),
                 origin,
                 remaining_turns: remaining,
-                suppressibility: AbilitySuppressibility::Suppressible,
                 current_ability: INTIMIDATE_ABILITY_ID,
             };
             let transition = apply_slot_suppression(&state, &request).map_err(|error| {
@@ -1637,7 +1622,7 @@ fn m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministical
             for entry in state.slot_suppressions.iter() {
                 assert_ne!(entry.remaining_turns, Some(0), "zero windows are invalid");
                 assert!(
-                    triples.insert((entry.owner, entry.slot, entry.origin)),
+                    triples.insert((entry.owner, entry.slot, entry.origin.clone())),
                     "overlapping identical origins must refresh instead of stacking"
                 );
             }
@@ -1648,7 +1633,6 @@ fn m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministical
 
 #[test]
 fn m6d_snapshot_continuation_reproduces_uninterrupted_campaign_digests_exactly() -> TestResult {
-    for &seed in &SEEDS {
         let generated = generated_single_battle(seed, 2)?;
         let case = format!("{}/continuation", generated.label);
 
