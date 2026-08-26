@@ -175,8 +175,15 @@ pub enum GuardFamilyStateError {
 }
 
 impl GuardFamilyState {
-    /// Total validation: schema, active-guard coherence, and ordinal
-    /// monotonicity.
+    /// Total validation: schema, active-guard coherence, then ordinal
+    /// boundaries.
+    ///
+    /// Fail-closed precedence: intrinsic vector structure (scope fit,
+    /// strict creation order, duplicate owners/kinds) is proven before the
+    /// allocator boundary is consulted, so a malformed guard list reports
+    /// its structural violation even when the fixture's ordinal counter is
+    /// also stale. The boundary pass then rejects zero ordinals and any
+    /// ordinal at or beyond `next_creation_ordinal`.
     pub fn validate(&self) -> Result<(), GuardFamilyStateError> {
         if self.schema_version != GUARD_FAMILY_STATE_SCHEMA_VERSION {
             return Err(GuardFamilyStateError::SchemaVersion {
@@ -188,16 +195,12 @@ impl GuardFamilyState {
             return Err(GuardFamilyStateError::ZeroNextCreationOrdinal);
         }
 
+        // Pass 1: intrinsic structure of both guard vectors.
         let mut previous_ordinal: Option<SafeU53> = None;
         let mut previous_owner: Option<&MechanicScope> = None;
         for entry in &self.self_guards {
             if !matches!(entry.owner, MechanicScope::Pokemon { .. }) {
                 return Err(GuardFamilyStateError::SelfGuardOwnerNotAPokemon);
-            }
-            if entry.creation_ordinal == SafeU53::ZERO
-                || entry.creation_ordinal >= self.next_creation_ordinal
-            {
-                return Err(GuardFamilyStateError::CreationOrdinalNotAhead);
             }
             if previous_ordinal.is_some_and(|ordinal| entry.creation_ordinal <= ordinal) {
                 return Err(GuardFamilyStateError::GuardsOutOfOrder);
@@ -215,11 +218,6 @@ impl GuardFamilyState {
             let MechanicScope::Side { side } = entry.owner else {
                 return Err(GuardFamilyStateError::SideGuardOwnerNotASide);
             };
-            if entry.creation_ordinal == SafeU53::ZERO
-                || entry.creation_ordinal >= self.next_creation_ordinal
-            {
-                return Err(GuardFamilyStateError::CreationOrdinalNotAhead);
-            }
             if previous_ordinal.is_some_and(|ordinal| entry.creation_ordinal <= ordinal) {
                 return Err(GuardFamilyStateError::GuardsOutOfOrder);
             }
@@ -230,6 +228,17 @@ impl GuardFamilyState {
             previous_kind_side = Some((entry.kind, side));
         }
 
+        // Pass 2: allocator boundary over every minted ordinal.
+        for ordinal in self
+            .self_guards
+            .iter()
+            .chain(self.side_guards.iter())
+            .map(|entry| entry.creation_ordinal)
+        {
+            if ordinal == SafeU53::ZERO || ordinal >= self.next_creation_ordinal {
+                return Err(GuardFamilyStateError::CreationOrdinalNotAhead);
+            }
+        }
         Self::validate_owner_vector(
             &self.enduring_owners,
             GuardFamilyStateError::EndureOwnersOutOfOrder,
