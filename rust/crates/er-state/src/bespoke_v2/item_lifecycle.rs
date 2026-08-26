@@ -319,6 +319,18 @@ mod tests {
         }
     }
 
+    /// A default state with the next-ID/ordinal cursors raised so fixtures
+    /// can hold instances without tripping the ahead-of-cursor invariants
+    /// before the property under test is reached.
+    fn seeded() -> ItemLifecycleStateV2 {
+        let mut state = ItemLifecycleStateV2::default();
+        state.next_instance_id = 3;
+        state.next_creation_ordinal =
+            SafeU53::new(3).expect("test creation cursor fits SafeU53");
+        state.next_ledger_ordinal = SafeU53::new(3).expect("test ledger cursor fits SafeU53");
+        state
+    }
+
     #[test]
     fn default_state_validates_and_rejects_schema_drift() {
         assert_eq!(ItemLifecycleStateV2::default().validate(), Ok(()));
@@ -335,7 +347,7 @@ mod tests {
 
     #[test]
     fn duplicate_owner_slot_is_rejected() {
-        let mut state = ItemLifecycleStateV2::default();
+        let mut state = seeded();
         state.instances.push(instance(1, 7, "SITRUS_BERRY"));
         // Same owner+key under a different instance ID violates slot
         // uniqueness even though instance IDs stay ordered.
@@ -351,7 +363,7 @@ mod tests {
 
     #[test]
     fn out_of_order_instances_are_rejected() {
-        let mut state = ItemLifecycleStateV2::default();
+        let mut state = seeded();
         state.instances.push(instance(2, 7, "SITRUS_BERRY"));
         state.instances.push(instance(1, 8, "ORAN_BERRY"));
         assert_eq!(
@@ -380,12 +392,12 @@ mod tests {
         let mut state = ItemLifecycleStateV2::default();
         state.suppressions.push(ItemSuppressionV2 {
             holder: holder(3),
-            registry_key: "ORAN_BERRY".to_owned(),
+            registry_key: "SITRUS_BERRY".to_owned(),
             expiry_turn: 4,
         });
         state.suppressions.push(ItemSuppressionV2 {
             holder: holder(3),
-            registry_key: "SITRUS_BERRY".to_owned(),
+            registry_key: "ORAN_BERRY".to_owned(),
             expiry_turn: 2,
         });
         assert_eq!(
