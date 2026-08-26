@@ -550,10 +550,10 @@ fn plain_u64(
 ///   pinned primitives with provenance attached;
 /// - kit-clone records copy the already-compiled content of their source
 ///   identity, which `compiled` (ascending catalog order) must contain.
-pub fn compile_species_entry_with_context<'a>(
+pub fn compile_species_entry_with_context(
     entry: &Value,
     table: &AbilityTable,
-    compiled: &'a [ResolvedSpeciesMetadata],
+    compiled: &[ResolvedSpeciesMetadata],
 ) -> Result<ResolvedSpeciesMetadata, SpeciesFormParityError> {
     let id = plain_u64(entry, "species", "id")?;
     let identity = format!("species {id}");
@@ -980,7 +980,7 @@ fn register_base(
     base: &FormIdentityV2,
 ) -> Result<FormsStateV2, SpeciesFormParityError> {
     FormsStateV2::default()
-        .register_battler(scope.clone(), base.clone())
+        .register_battler(*scope, base.clone())
         .map_err(|error| SpeciesFormParityError::StateInvariant(error.to_string()))
 }
 
