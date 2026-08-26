@@ -402,15 +402,43 @@ mod tests {
         state
             .upsert(TransformCopyEntryV2::cleared(subject(7)))
             .expect("first insert");
-        assert_eq!(
-            state.upsert(TransformCopyEntryV2::cleared(subject(7))),
-            Err(TransformFormCopyStateError::EntriesOutOfOrder)
-        );
+        // Upsert on an already-registered subject is a validated
+        // replace-by-design: one entry per stable identity, still valid.
+        state
+            .upsert(TransformCopyEntryV2::cleared(subject(7)))
+            .expect("same-subject upsert must replace in place");
+        assert_eq!(state.entries.len(), 1);
+
         let mut torn = TransformCopyEntryV2::cleared(subject(9));
         torn.copied = Some(valid_copied());
         assert_eq!(
             state.upsert(torn),
             Err(TransformFormCopyStateError::OverlayShapeMismatch)
+        );
+
+        // Canonical ordering guards raw entry vectors (direct construction
+        // or deserialization): duplicates and descending subjects fail.
+        let duplicated = TransformFormCopyStateV2 {
+            schema_version: TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION,
+            entries: vec![
+                TransformCopyEntryV2::cleared(subject(5)),
+                TransformCopyEntryV2::cleared(subject(5)),
+            ],
+        };
+        assert_eq!(
+            duplicated.validate(),
+            Err(TransformFormCopyStateError::EntriesOutOfOrder)
+        );
+        let descending = TransformFormCopyStateV2 {
+            schema_version: TRANSFORM_FORM_COPY_STATE_SCHEMA_VERSION,
+            entries: vec![
+                TransformCopyEntryV2::cleared(subject(9)),
+                TransformCopyEntryV2::cleared(subject(5)),
+            ],
+        };
+        assert_eq!(
+            descending.validate(),
+            Err(TransformFormCopyStateError::EntriesOutOfOrder)
         );
     }
 }
