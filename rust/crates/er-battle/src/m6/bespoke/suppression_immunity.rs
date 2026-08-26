@@ -306,7 +306,7 @@ pub fn advance_suppression_turns(
     let mut retained = Vec::with_capacity(next.slot_suppressions.len());
     for entry in next.slot_suppressions.drain(..) {
         match entry.remaining_turns {
-            Some(turns) if turns == 1 => {
+            Some(1) => {
                 removed.push(RemovedSuppression {
                     owner: entry.owner,
                     slot: entry.slot,
@@ -587,7 +587,7 @@ pub fn lapse_volatile_tags(
     let mut retained = Vec::with_capacity(next.volatile_tags.len());
     for instance in next.volatile_tags.drain(..) {
         match instance.remaining_turns {
-            Some(turns) if turns == 1 => expired.push(ExpiredTag {
+            Some(1) => expired.push(ExpiredTag {
                 owner: instance.owner,
                 subject: instance.subject,
                 creation_ordinal: instance.creation_ordinal,
@@ -656,10 +656,10 @@ pub fn clear_volatile_tags(
         .collect::<Vec<_>>();
     if matches!(event, VolatileCleanupEvent::SwitchOut(_)) {
         for instance in &retained {
-            if let VolatileTagSubject::MajorStatus(kind) = &instance.subject {
-                if !preserved_major_statuses.contains(kind) {
-                    preserved_major_statuses.push(*kind);
-                }
+            if let VolatileTagSubject::MajorStatus(kind) = &instance.subject
+                && !preserved_major_statuses.contains(kind)
+            {
+                preserved_major_statuses.push(*kind);
             }
         }
     }

@@ -680,17 +680,16 @@ pub fn lapse_field_conditions(
     let mut log = Vec::new();
     let mut lapse = |condition: Option<FieldConditionInstance>,
                      expired: ScheduledEffectsLogEntry| {
-        match condition {
-            Some(mut condition) => {
-                condition.remaining_turns -= 1;
-                if condition.remaining_turns == 0 {
-                    log.push(expired);
-                    None
-                } else {
-                    Some(condition)
-                }
+        if let Some(mut condition) = condition {
+            condition.remaining_turns -= 1;
+            if condition.remaining_turns == 0 {
+                log.push(expired);
+                None
+            } else {
+                Some(condition)
             }
-            None => None,
+        } else {
+            None
         }
     };
     prepared.weather = lapse(
