@@ -127,13 +127,69 @@ fn boundary_crossed(
     let point = u64::from(numerator) * u64::from(max_hp);
     before > point && after <= point
 }
-
 /// Remaining boss bars: ceiling of `hp / max_hp * segments_total`.
 fn segment_count(hp: u32, max_hp: u32, segments_total: u8) -> u8 {
-    let scaled =
-        (u64::from(hp) * u64::from(segments_total) + u64::from(max_hp) - 1) / u64::from(max_hp);
+    let scaled = u64::from(hp)
+        .saturating_mul(u64::from(segments_total))
+        .div_ceil(u64::from(max_hp));
     scaled.min(u64::from(segments_total)) as u8
 }
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DispatchRegistryClassificationErrorV1 {
+    Unclassified,
+}
+
+/// Classifies one frozen registry key into its closed handler kind.
+///
+/// Classification is a pure function of key shape: `RNG:` sites split by
+/// callee, `attr:` registrations split by ability versus move attribute, and
+/// bare dispatcher callees split by dispatch surface. Anything else is a
+/// residual and must fail the build.
+fn classify_dispatch_registry_key(
+    registry_key: &str,
+) -> Result<FixedDispatchHandlerKindV1, DispatchRegistryClassificationErrorV1> {
+    if let Some(site) = registry_key.strip_prefix("RNG:") {
+        let callee = site
+            .rsplit(':')
+            .next()
+            .ok_or(DispatchRegistryClassificationErrorV1::Unclassified)?;
+        return if callee.ends_with(".randBattleSeedInt") || callee == "randBattleSeedInt" {
+            Ok(FixedDispatchHandlerKindV1::BattleSeedDraw)
+        } else if callee == "randSeedShuffle" {
+            Ok(FixedDispatchHandlerKindV1::SeedShuffle)
+        } else if callee == "randSeedInt" {
+            Ok(FixedDispatchHandlerKindV1::RunSeedDraw)
+        } else if callee == "localRng?.integerInRange" {
+            Ok(FixedDispatchHandlerKindV1::LocalRangeDraw)
+        } else {
+            Err(DispatchRegistryClassificationErrorV1::Unclassified)
+        };
+    }
+    if let Some(attr_name) = registry_key.rsplit(":attr:").next()
+        && registry_key.contains(":attr:")
+    {
+        return if attr_name.ends_with("AbAttr") {
+            Ok(FixedDispatchHandlerKindV1::AbilityAttributeRegistration)
+        } else {
+            Ok(FixedDispatchHandlerKindV1::MoveAttributeRegistration)
+        };
+    }
+    let callee = registry_key
+        .rsplit(':')
+        .next()
+        .ok_or(DispatchRegistryClassificationErrorV1::Unclassified)?;
+    if callee == "applyAbAttrs" || callee == "applyFilteredAbAttrs" {
+        Ok(FixedDispatchHandlerKindV1::AbilityAttributeDispatch)
+    } else if callee == "applyMoveAttrs" {
+        Ok(FixedDispatchHandlerKindV1::MoveAttributeDispatch)
+    } else if callee.starts_with("globalScene.applyModifier") {
+        Ok(FixedDispatchHandlerKindV1::ModifierDispatch)
+    } else {
+        Err(DispatchRegistryClassificationErrorV1::Unclassified)
+    }
+}
+
 
 /// Applies one damage amount against the boss and resolves every resulting
 /// threshold crossing, including multi-threshold hits, in canonical order.
@@ -349,13 +405,13 @@ pub fn admit_boss_rng_draw(
             result: admission.result.get(),
         });
     }
-    if let Some(previous) = state.last_rng_sequence {
-        if admission.sequence.get() <= previous.get() {
-            return Err(BossMechanicErrorV1::RngSequenceNotAdvancing {
-                sequence: admission.sequence.get(),
-                previous: previous.get(),
-            });
-        }
+    if let Some(previous) = state.last_rng_sequence
+        && admission.sequence.get() <= previous.get()
+    {
+        return Err(BossMechanicErrorV1::RngSequenceNotAdvancing {
+            sequence: admission.sequence.get(),
+            previous: previous.get(),
+        });
     }
     let mut updated = state.clone();
     updated.rng_admissions = updated
@@ -492,17 +548,25 @@ pub fn non_mechanical_domain_for_registry_key(registry_key: &str) -> Option<NonM
         .map(|(_, domain)| *domain)
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum DispatchRegistryClassificationErrorV1 {
+    Unclassified,
+}
+
 /// Classifies one frozen registry key into its closed handler kind.
 ///
 /// Classification is a pure function of key shape: `RNG:` sites split by
 /// callee, `attr:` registrations split by ability versus move attribute, and
 /// bare dispatcher callees split by dispatch surface. Anything else is a
 /// residual and must fail the build.
-pub fn classify_dispatch_registry_key(
+fn classify_dispatch_registry_key(
     registry_key: &str,
-) -> Result<FixedDispatchHandlerKindV1, ()> {
+) -> Result<FixedDispatchHandlerKindV1, DispatchRegistryClassificationErrorV1> {
     if let Some(site) = registry_key.strip_prefix("RNG:") {
-        let callee = site.rsplit(':').next().ok_or(())?;
+        let callee = site
+            .rsplit(':')
+            .next()
+            .ok_or(DispatchRegistryClassificationErrorV1::Unclassified)?;
         return if callee.ends_with(".randBattleSeedInt") || callee == "randBattleSeedInt" {
             Ok(FixedDispatchHandlerKindV1::BattleSeedDraw)
         } else if callee == "randSeedShuffle" {
@@ -512,19 +576,22 @@ pub fn classify_dispatch_registry_key(
         } else if callee == "localRng?.integerInRange" {
             Ok(FixedDispatchHandlerKindV1::LocalRangeDraw)
         } else {
-            Err(())
+            Err(DispatchRegistryClassificationErrorV1::Unclassified)
         };
     }
-    if let Some(attr_name) = registry_key.rsplit(":attr:").next() {
-        if registry_key.contains(":attr:") {
-            return if attr_name.ends_with("AbAttr") {
-                Ok(FixedDispatchHandlerKindV1::AbilityAttributeRegistration)
-            } else {
-                Ok(FixedDispatchHandlerKindV1::MoveAttributeRegistration)
-            };
-        }
+    if let Some(attr_name) = registry_key.rsplit(":attr:").next()
+        && registry_key.contains(":attr:")
+    {
+        return if attr_name.ends_with("AbAttr") {
+            Ok(FixedDispatchHandlerKindV1::AbilityAttributeRegistration)
+        } else {
+            Ok(FixedDispatchHandlerKindV1::MoveAttributeRegistration)
+        };
     }
-    let callee = registry_key.rsplit(':').next().ok_or(())?;
+    let callee = registry_key
+        .rsplit(':')
+        .next()
+        .ok_or(DispatchRegistryClassificationErrorV1::Unclassified)?;
     if callee == "applyAbAttrs" || callee == "applyFilteredAbAttrs" {
         Ok(FixedDispatchHandlerKindV1::AbilityAttributeDispatch)
     } else if callee == "applyMoveAttrs" {
@@ -532,9 +599,10 @@ pub fn classify_dispatch_registry_key(
     } else if callee.starts_with("globalScene.applyModifier") {
         Ok(FixedDispatchHandlerKindV1::ModifierDispatch)
     } else {
-        Err(())
+        Err(DispatchRegistryClassificationErrorV1::Unclassified)
     }
 }
+
 
 /// Builds the canonical central registry from the gross `BESPOKE` unit set
 /// and the exact sibling claims.
@@ -584,7 +652,7 @@ pub fn build_custom_dispatch_registry(
                 registry_key: unit.registry_key.clone(),
                 handler,
             }),
-            Err(()) => {
+            Err(DispatchRegistryClassificationErrorV1::Unclassified) => {
                 return Err(DispatchRegistryBuildErrorV1::UnclassifiedUnit {
                     provenance_hash: unit.provenance_hash.clone(),
                 });

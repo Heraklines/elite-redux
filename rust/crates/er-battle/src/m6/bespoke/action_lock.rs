@@ -127,7 +127,7 @@ pub fn acquire_action_lock(
     }
     let lock = ActionLockStateV2 {
         stage: request.stage,
-        owner: request.owner.clone(),
+        owner: request.owner,
         locked_move_id: request.locked_move_id,
         source_behavior_unit: request.source_behavior_unit.clone(),
         remaining_turns: request.duration_turns,
