@@ -1599,9 +1599,6 @@ impl CampaignPump {
     }
 }
 
-fn self_dropped(pump: &CampaignPump, operation_id: &str) -> bool {
-    pump.dropped_commit_ops.contains(operation_id)
-}
 
 fn operation_id_str(operation_id: &er_types::OperationId) -> &str {
     operation_id.as_str()

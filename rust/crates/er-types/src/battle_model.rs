@@ -203,7 +203,7 @@ pub enum BattleStat {
     Evasion,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PokemonTyping {
     pub primary: PokemonType,

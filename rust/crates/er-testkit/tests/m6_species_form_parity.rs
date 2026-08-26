@@ -39,7 +39,7 @@ use er_battle::m6::system::species_form_parity::{
     verify_identity_closure,
 };
 use er_content::m6_catalog::{CatalogEffectKind, SemanticCatalogV1};
-use er_content::m6_pack::species_gap::{
+use er_content::pack::m6_pack::species_gap::{
     self, ErGapSpeciesClass, ErGapSpeciesSource, validate_derivation,
 };
 use er_state::bespoke_v2::forms::{FormIdentityV2, FormsStateV2};
@@ -47,7 +47,7 @@ use er_state::bespoke_v2::transform_imposter::{
     TRANSFORM_COPIED_PP_CAP, TransformCopiedAbilitiesV2, TransformCopiedGenderV2,
     TransformCopyTriggerV2, TransformFormCopyStateV2,
 };
-use er_types::SafeU53;
+use er_types::{BehaviorSourceId, SafeU53};
 use er_types::battle_ids::{AbilityId, BattleSide, FieldSlot, MoveId, PokemonId};
 use er_types::battle_model::{BattleStats, BattleTyping, StatStages};
 use er_types::mechanics::MechanicScope;
@@ -524,7 +524,7 @@ fn resolution_fails_closed_on_tampered_oracle_values() {
         .expect("the frozen catalog carries the RATTATA_ALOLAN alias");
     assert!(matches!(
         compile_species_entry_with_context(&species_entries[alias_position], &table, &[]),
-        Err(E::UnknownGapCopySource { id: 10143, source: 2019 })
+        Err(E::UnknownGapCopySource { id: 10143, source_id: 2019 })
     ));
 
     // A divergence between the pinned derivation key and the oracle key

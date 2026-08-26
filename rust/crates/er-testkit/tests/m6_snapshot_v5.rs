@@ -151,6 +151,7 @@ fn compiled_identity() -> TestResult<CompiledIdentity> {
     }
     behavior_units.sort();
     behavior_units.dedup();
+    let classification_count = classifications.len();
 
     let mut pack = BattleContentPackV3 {
         schema_version: M6_BATTLE_CONTENT_PACK_SCHEMA_VERSION,
@@ -175,7 +176,6 @@ fn compiled_identity() -> TestResult<CompiledIdentity> {
         type_chart: er_content::pack::selected_type_chart(),
     };
     pack.content_hash = pack.compute_content_hash()?;
-    let classification_count = classifications.len();
     let mut target_programs = Vec::new();
     for ordinal in 1..=classification_count {
         target_programs.push(MechanicsProgramId::try_from_u64(u64::try_from(ordinal)?)?);
@@ -1665,6 +1665,7 @@ fn run_recovery_campaign(boundary: RecoveryBoundaryKind) -> TestResult {
         doubles_config()?
     };
     let script = campaign(boundary);
+    let mut native = BattlePair::new(config, Arc::clone(&content))?;
     for step in &script.setup {
         native.apply(step.clone())?;
     }
@@ -1732,6 +1733,7 @@ fn run_recovery_campaign(boundary: RecoveryBoundaryKind) -> TestResult {
 fn held_key_envelope_wire() -> TestResult<String> {
     let content = Arc::new(selected_content_pack()?);
     let script = campaign(RecoveryBoundaryKind::HeldKey);
+    let mut pair = BattlePair::new(doubles_config()?, Arc::clone(&content))?;
     for step in &script.setup {
         pair.apply(step.clone())?;
     }

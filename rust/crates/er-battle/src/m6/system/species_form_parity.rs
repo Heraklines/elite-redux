@@ -25,7 +25,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use er_content::m6_pack::species_gap::{
+use er_content::pack::m6_pack::species_gap::{
     self, ErGapDerivationError, ErGapSpeciesClass, ErGapSpeciesSource,
 };
 use er_content::species::SpeciesBaseStats;
@@ -126,9 +126,9 @@ pub enum SpeciesFormParityError {
     )]
     GapKeyBindingMismatch { id: u64, record: String, oracle: String },
     #[error(
-        "species {id}: copy-source species {source} is not compiled ahead of the gap identity"
+        "species {id}: copy-source species {source_id} is not compiled ahead of the gap identity"
     )]
-    UnknownGapCopySource { id: u64, source: u64 },
+    UnknownGapCopySource { id: u64, source_id: u64 },
     #[error("species {id}: pinned derivation failed: {source}")]
     GapDerivation {
         id: u64,
@@ -634,7 +634,7 @@ pub fn compile_species_entry_with_context<'a>(
                     .find(|entry| entry.id == *source_species)
                     .ok_or(SpeciesFormParityError::UnknownGapCopySource {
                         id,
-                        source: *source_species,
+                        source_id: *source_species,
                     })?;
                 match &source_metadata.content {
                     SpeciesContentEvidence::Extracted(content) => (**content).clone(),

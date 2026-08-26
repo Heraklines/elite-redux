@@ -95,12 +95,12 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 /// Deterministic corpus: every test iterates exactly these seeds so CI is
 /// reproducible and any failure names one replayable seed.
 const SEEDS: [u64; 16] = [
-    0xA11CE_0001_0000_0001,
-    0xB0B5E_0002_0000_0002,
-    0xC0FFEE_0003_0000_0003,
-    0xD10C5_0004_0000_0004,
-    0xE6605_0005_0000_0005,
-    0xFACADE_0006_0000_0006,
+    0xA11C_E001_0000_0001,
+    0xB0B5_E002_0000_0002,
+    0xC0FF_EE03_0000_0003,
+    0xD10C_5004_0000_0004,
+    0xE660_5005_0000_0005,
+    0xFACE_DE06_0000_0006,
     0x5EED_0007_0000_0007,
     0xB105_F00D_0008_0008,
     0xCAFE_BABE_0009_0009,
@@ -1210,6 +1210,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
                 let event_id = next_event_id;
                 next_event_id += 1;
                 let request = DelayedEffectRequest {
+                    event_id,
                     source_behavior_unit: behavior_unit(),
                     owner: pokemon_scope(owner),
                     stored_target: None,
@@ -1350,6 +1351,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
             "a consumed stable event id was reused for seed {seed}"
         );
     }
+    Ok(())
 }
 
 #[test]
@@ -1552,6 +1554,7 @@ fn m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministical
                 origin,
                 remaining_turns: remaining,
                 current_ability: INTIMIDATE_ABILITY_ID,
+                suppressibility: AbilitySuppressibility::Suppressible,
             };
             let transition = apply_slot_suppression(&state, &request).map_err(|error| {
                 fail(
@@ -1633,6 +1636,7 @@ fn m6d_suppression_overlays_preserve_ability_identity_and_expire_deterministical
 
 #[test]
 fn m6d_snapshot_continuation_reproduces_uninterrupted_campaign_digests_exactly() -> TestResult {
+    for &seed in &SEEDS {
         let generated = generated_single_battle(seed, 2)?;
         let case = format!("{}/continuation", generated.label);
 
