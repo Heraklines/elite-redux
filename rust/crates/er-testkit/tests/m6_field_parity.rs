@@ -14,11 +14,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 
 use er_battle::m6::system::field_parity::{
-    evaluate_witness, field_inventory, first_divergence, probe_unsupported_identity,
-    resolve_field_subject, run_arena_condition_lifecycle, run_cycle_lifecycle,
-    run_major_status_lifecycle, run_tag_lifecycle, ArenaConditionScenario, CycleScenario,
-    FieldCoverage, FieldDomain, FieldLifecycleReport, FieldLifecycleStep,
-    FieldSubject, MajorStatusScenario, TagScenario, WitnessAssertion,
+    evaluate_witness, field_inventory, first_divergence, resolve_field_subject,
+    run_arena_condition_lifecycle, run_cycle_lifecycle, run_faint_substate_lifecycle,
+    run_frostbite_lifecycle, run_major_status_lifecycle, run_sentinel_lifecycle,
+    run_tag_lifecycle, ArenaConditionScenario, CycleScenario, FieldCoverage, FieldDomain,
+    FieldLifecycleReport, FieldLifecycleStep, FieldSubject,
+    MajorStatusLane, MajorStatusScenario, TagScenario, WitnessAssertion,
     FIELD_PARITY_SCHEMA_VERSION,
 };
 use er_content::m6_catalog::SemanticCatalogV1;
@@ -121,14 +122,6 @@ const FIELD_DOMAINS: [(BehaviorUnitKind, FieldDomain, usize); 6] = [
         FieldDomain::PositionalTag,
         3,
     ),
-];
-
-const FAIL_CLOSED_SUBJECT_KEYS: [&str; 5] = [
-    "MAJOR_STATUS:NONE",
-    "MAJOR_STATUS:TOXIC",
-    "MAJOR_STATUS:SLEEP",
-    "MAJOR_STATUS:ORACLE_CODE_5",
-    "MAJOR_STATUS:ORACLE_CODE_7",
 ];
 
 fn owner() -> Result<PokemonId, Box<dyn Error>> {
@@ -239,6 +232,7 @@ fn major_status_scenario() -> Result<MajorStatusScenario, Box<dyn Error>> {
         },
         chance: None,
         exercise_rng_gate: false,
+        sleep_window: 3,
         max_hp: 100,
         hp: 80,
     })
@@ -248,17 +242,27 @@ fn major_status_scenario() -> Result<MajorStatusScenario, Box<dyn Error>> {
 /// its domain's production driver.
 fn run_campaign(index: usize, subject: &FieldSubject) -> Result<FieldLifecycleReport, Box<dyn Error>> {
     let report = match subject {
-        FieldSubject::MajorStatus(inner) => {
-            let kind = inner.kernel_status().ok_or("unsupported status reached driver")?;
-            let mut runtime =
-                seeded_runtime(&format!("m6d-field-status-{index}"))?;
-            run_major_status_lifecycle(
-                &mut runtime,
-                &fresh_suppression(),
-                kind,
-                &major_status_scenario()?,
-            )?
-        }
+        FieldSubject::MajorStatus(inner) => match inner.parity_lane() {
+            MajorStatusLane::Admitted(kind) => {
+                let mut runtime = seeded_runtime(&format!("m6d-field-status-{index}"))?;
+                run_major_status_lifecycle(
+                    &mut runtime,
+                    &fresh_suppression(),
+                    kind,
+                    &major_status_scenario()?,
+                )?
+            }
+            MajorStatusLane::Sentinel => run_sentinel_lifecycle()?,
+            MajorStatusLane::FrostbiteTag => {
+                run_frostbite_lifecycle(&fresh_suppression(), owner()?)?
+            }
+            MajorStatusLane::FaintSubstate => {
+                run_faint_substate_lifecycle(&fresh_suppression(), owner()?)?
+            }
+            MajorStatusLane::Unsupported => {
+                return Err("unsupported identity reached the campaign driver".into())
+            }
+        },
         FieldSubject::VolatileTag { registry_key } => run_tag_lifecycle(
             &fresh_suppression(),
             VolatileTagSubject::BattlerTag {
@@ -354,9 +358,8 @@ fn field_inventory_is_exactly_once_with_zero_residual() -> Result<(), Box<dyn Er
         assert_eq!(count, expected, "domain count drift for {domain:?}");
     }
 
-    // Zero residual: every unit carries either a proven or an explicit
-    // fail-closed verdict; fail-closed identities are exactly the known
-    // unsupported major-status slice.
+    // Zero residual, zero fail-closed: every one of the 195 field units is
+    // proven through its exact production carrier.
     let fail_closed: Vec<&str> = inventory
         .iter()
         .filter_map(|entry| match &entry.coverage {
@@ -364,20 +367,12 @@ fn field_inventory_is_exactly_once_with_zero_residual() -> Result<(), Box<dyn Er
             FieldCoverage::FailClosed { .. } => Some(entry.subject_key.as_str()),
         })
         .collect();
-    let mut fail_closed_sorted = fail_closed.clone();
-    fail_closed_sorted.sort_unstable();
-    let mut expected_fail_closed = FAIL_CLOSED_SUBJECT_KEYS.to_vec();
-    expected_fail_closed.sort_unstable();
-    assert_eq!(fail_closed_sorted, expected_fail_closed);
+    assert_eq!(fail_closed, Vec::<&str>::new(), "unexpected fail-closed units");
     let proven = inventory
         .iter()
         .filter(|entry| matches!(entry.coverage, FieldCoverage::Proven))
         .count();
-    assert_eq!(
-        proven + fail_closed.len(),
-        total,
-        "residual units outside both verdicts"
-    );
+    assert_eq!(proven, total, "every field unit must be proven");
     Ok(())
 }
 
@@ -394,12 +389,10 @@ fn field_lifecycles_satisfy_every_frozen_witness() -> Result<(), Box<dyn Error>>
     let mut reports = BTreeMap::new();
     for (index, entry) in inventory.iter().enumerate() {
         let resolved = resolve_field_subject(&entry.unit.source)?;
-        let report = match &entry.coverage {
-            FieldCoverage::Proven => run_campaign(index, &resolved)?,
-            FieldCoverage::FailClosed { reason } => {
-                probe_unsupported_identity(&resolved, reason.clone())
-            }
-        };
+        if !matches!(entry.coverage, FieldCoverage::Proven) {
+            return Err(format!("unit {} failed closed", entry.subject_key).into());
+        }
+        let report = run_campaign(index, &resolved)?;
 
         let witness = plan.get(&entry.unit).ok_or("unit without witness")?;
         let positive = witness
@@ -428,14 +421,8 @@ fn field_lifecycles_satisfy_every_frozen_witness() -> Result<(), Box<dyn Error>>
                     entry.subject_key
                 );
             }
-            FieldCoverage::FailClosed { reason } => {
-                assert_eq!(report.steps.len(), 1, "fail-closed probe grew steps");
-                match &report.steps[0] {
-                    FieldLifecycleStep::UnsupportedIdentityRejected { reason: recorded, .. } => {
-                        assert_eq!(recorded.as_str(), reason.as_str(), "fail-closed reason drift");
-                    }
-                    other => panic!("expected fail-closed rejection, got {other:?}"),
-                }
+            FieldCoverage::FailClosed { .. } => {
+                return Err("fail-closed units must never reach witness evaluation".into());
             }
         }
         reports.insert(entry.unit.clone(), report);
@@ -694,6 +681,162 @@ fn first_divergence_localizes_exact_step_including_false_conditions() -> Result<
     assert_eq!(
         first_divergence(&weather.steps, &terrain.steps),
         Some(er_battle::m6::system::field_parity::FieldDivergence { index: 0 })
+    );
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Acceptance: exact expanded-lane semantics for toxic/sleep/freeze/sentinel
+// ---------------------------------------------------------------------------
+
+#[test]
+fn expanded_status_lane_semantics_are_exact() -> Result<(), Box<dyn Error>> {
+    use er_battle::status::{
+        advance_sleep, apply_major_status, apply_sleep_window, cure_major_status,
+        resolve_frostbite_chip, resolve_toxic_residual, roll_sleep_window, FrostbiteChipOutcome,
+        SleepGateOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
+        StatusRejection, StatusResidualInput, StatusResidualOutcome,
+    };
+    use er_rng::audit::{RngCallsiteId, RngReason};
+    use er_types::battle_model::{PokemonType, PokemonTyping, StatusKind, StatusState};
+
+    let normal = PokemonTyping {
+        primary: PokemonType::Normal,
+        secondary: None,
+    };
+    let clean = || StatusState {
+        kind: StatusKind::None,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: None,
+    };
+
+    // Toxic: admitted through the expanded lane, Steel-immune like poison.
+    let toxic_applied = match apply_major_status(StatusApplicationInput {
+        requested: StatusKind::Toxic,
+        current: clean(),
+        target_types: normal,
+        powder: false,
+        bypass: StatusBypass::None,
+    })? {
+        StatusApplicationOutcome::Applied { mutation } => mutation,
+        other => panic!("toxic admission produced {other:?}"),
+    };
+    assert_eq!(toxic_applied.after.kind, StatusKind::Toxic);
+    assert!(
+        matches!(
+            apply_major_status(StatusApplicationInput {
+                requested: StatusKind::Toxic,
+                current: clean(),
+                target_types: PokemonTyping {
+                    primary: PokemonType::Steel,
+                    secondary: None,
+                },
+                powder: false,
+                bypass: StatusBypass::None,
+            })?,
+            StatusApplicationOutcome::Rejected {
+                reason: StatusRejection::TypeImmunity { .. }
+            }
+        ),
+        "steel target must reject toxic"
+    );
+
+    // Exact oracle escalation: damage = max(1, floor(maxHp * count / 16))
+    // with the counter incremented before each tick.
+    let mut count = 0_u16;
+    let mut hp = 100_u32;
+    let mut damages = Vec::new();
+    for _ in 0..3 {
+        match resolve_toxic_residual(StatusResidualInput {
+            status: StatusState {
+                kind: StatusKind::Toxic,
+                toxic_turn_count: count,
+                sleep_turns_remaining: None,
+            },
+            hp,
+            max_hp: 100,
+        })? {
+            StatusResidualOutcome::Applied { mutation } => {
+                damages.push(mutation.damage);
+                count = mutation.status_after.toxic_turn_count;
+                hp = mutation.hp_after;
+            }
+            other => panic!("toxic residual produced {other:?}"),
+        }
+    }
+    assert_eq!(damages, vec![6, 12, 18], "toxic ramp diverged");
+
+    // Sleep: zero windows are invalid, valid windows decrement per attempt
+    // and wake exactly into the cleared sentinel.
+    assert!(matches!(
+        apply_sleep_window(clean(), normal, false, 0),
+        Err(er_battle::status::StatusError::InvalidStatusState {
+            status: StatusKind::Sleep
+        })
+    ));
+    let mut sleeping = match apply_sleep_window(clean(), normal, false, 3)? {
+        StatusApplicationOutcome::Applied { mutation } => mutation.after,
+        other => panic!("sleep admission produced {other:?}"),
+    };
+    assert_eq!(sleeping.sleep_turns_remaining, Some(3));
+    let mut gate_sequence = Vec::new();
+    loop {
+        match advance_sleep(&mut sleeping) {
+            SleepGateOutcome::StillAsleep { remaining } => {
+                gate_sequence.push(remaining);
+            }
+            SleepGateOutcome::Woke => {
+                gate_sequence.push(0);
+                break;
+            }
+            SleepGateOutcome::NotAsleep => panic!("sleep gate lost its sleeper"),
+        }
+    }
+    assert_eq!(gate_sequence, vec![2, 1, 0]);
+    assert_eq!(sleeping.kind, StatusKind::None);
+    assert_eq!(sleeping.sleep_turns_remaining, None);
+
+    // FREEZE carrier chip: maxHp/16 with minimum one, HP-capped.
+    match resolve_frostbite_chip(80, 100)? {
+        FrostbiteChipOutcome::Chipped { damage } => assert_eq!(damage, 6),
+        other => panic!("frostbite chip produced {other:?}"),
+    }
+    match resolve_frostbite_chip(15, 15)? {
+        FrostbiteChipOutcome::Chipped { damage } => assert_eq!(damage, 1),
+        other => panic!("frostbite chip produced {other:?}"),
+    }
+
+    // Cures write the cleared sentinel; curing a cleared target rejects.
+    let cured = cure_major_status(StatusState {
+        kind: StatusKind::Burn,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: None,
+    })?;
+    match cured {
+        StatusApplicationOutcome::Applied { mutation } => {
+            assert_eq!(mutation.before.kind, StatusKind::Burn);
+            assert_eq!(mutation.after.kind, StatusKind::None);
+        }
+        other => panic!("cure produced {other:?}"),
+    }
+    assert!(matches!(
+        cure_major_status(clean())?,
+        StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::IntrinsicSentinel
+        }
+    ));
+
+    // The sleep window rolls on the battle stream under the frozen
+    // status-duration callsite identity, inside the oracle range [2, 4].
+    let mut runtime = seeded_runtime("m6d-field-sleep-window")?;
+    let draws_before = runtime.audit_entries().len();
+    let window = roll_sleep_window(&mut runtime)?;
+    assert!((2..=4).contains(&window));
+    let audit = &runtime.audit_entries()[draws_before..];
+    assert_eq!(audit.len(), 1, "sleep window must draw exactly once");
+    assert_eq!(
+        audit[0].callsite_id.as_str(),
+        RngCallsiteId::mechanics(RngReason::StatusDuration).as_str()
     );
     Ok(())
 }

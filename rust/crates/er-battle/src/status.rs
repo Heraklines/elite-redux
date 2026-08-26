@@ -66,6 +66,19 @@ pub enum StatusRejection {
     },
     /// Grass rejects a powder move in the selected slice.
     PowderImmunity { immune_type: PokemonType },
+    /// Oracle `StatusEffect.NONE` is the intrinsic cleared sentinel: it is
+    /// never admitted as a condition; cures write it (`trySetStatus` returns
+    /// false for the falsy effect).
+    IntrinsicSentinel,
+    /// Oracle `StatusEffect.SLEEP` admission requires its rolled window;
+    /// admitting without one is a typed no-mutation rejection.
+    SleepWindowRequired,
+    /// Oracle `StatusEffect.FREEZE` never lands as a major status: every
+    /// freeze source reroutes to the ER_FROSTBITE battler tag.
+    ReroutedToFrostbiteTag,
+    /// Oracle `StatusEffect.FAINT` routes to the faint substate (the fainted
+    /// flag and faint cleanup ordering), never through status admission.
+    RoutedToFaintSubstate,
 }
 
 /// Result of one status admission/chance attempt.
@@ -441,4 +454,329 @@ fn validate_status_state(status: StatusState) -> Result<(), StatusError> {
         }),
         StatusKind::None | StatusKind::Burn | StatusKind::Poison | StatusKind::Paralysis => Ok(()),
     }
+}
+
+// ---------------------------------------------------------------------------
+// M6 expanded major-status lane — full oracle `StatusEffect` closure
+// ---------------------------------------------------------------------------
+//
+// The M3 slice above stays exactly as pinned by its tests; the expanded lane
+// adds the remaining frozen identities with their exact oracle semantics:
+//
+// - TOXIC shares the poison type-immunity table (Poison and Steel targets)
+//   and ramps post-turn damage to `maxHp * toxicTurnCount / 16` after the
+//   per-turn counter increment (`PostTurnStatusEffectPhase`).
+// - SLEEP rolls its window `randBattleSeedIntRange(2, 4)` inclusive at
+//   admission; each move attempt decrements the window first and wakes at
+//   zero (`MovePhase.checkSleep`). It has no post-turn residual.
+// - FREEZE never lands as a status: `trySetStatus` reroutes every freeze
+//   source to the ER_FROSTBITE battler tag, which chips `maxHp/16` per turn
+//   end, persists until cured, and blocks Ice-type targets.
+// - NONE is the intrinsic cleared sentinel written by cures; it is never
+//   admitted as a condition.
+// - FAINT routes to the faint substate (the fainted flag plus faint cleanup),
+//   never through status admission.
+
+/// Expanded type-immunity resolution over the admissible identity closure.
+/// Toxic shares the poison immunities; sleep has none.
+pub fn expanded_status_type_immunity(
+    status: StatusKind,
+    target_types: PokemonTyping,
+) -> Result<Option<PokemonType>, StatusError> {
+    let blocked = |primary: PokemonType, secondary: Option<PokemonType>, gate: PokemonType| {
+        if primary == gate {
+            return Ok(Some(primary));
+        }
+        Ok(secondary.filter(|secondary| *secondary == gate))
+    };
+    match status {
+        StatusKind::None | StatusKind::Sleep => Ok(None),
+        StatusKind::Poison | StatusKind::Toxic => {
+            if target_types.primary == PokemonType::Poison
+                || target_types.primary == PokemonType::Steel
+            {
+                return Ok(Some(target_types.primary));
+            }
+            Ok(target_types.secondary.filter(|secondary| {
+                *secondary == PokemonType::Poison || *secondary == PokemonType::Steel
+            }))
+        }
+        StatusKind::Paralysis => blocked(
+            target_types.primary,
+            target_types.secondary,
+            PokemonType::Electric,
+        ),
+        StatusKind::Burn => blocked(
+            target_types.primary,
+            target_types.secondary,
+            PokemonType::Fire,
+        ),
+    }
+}
+
+/// Canonical companion-field shape for one live major status in the expanded
+/// lane: toxic carries only its ramp counter, sleep only its window, every
+/// other kind neither.
+fn canonical_companions(kind: StatusKind, current: StatusState) -> Result<(), StatusError> {
+    match kind {
+        StatusKind::None | StatusKind::Paralysis | StatusKind::Burn | StatusKind::Poison => {
+            if current.toxic_turn_count != 0 || current.sleep_turns_remaining.is_some() {
+                return Err(StatusError::InvalidStatusState { status: kind });
+            }
+        }
+        StatusKind::Toxic => {
+            if current.sleep_turns_remaining.is_some() {
+                return Err(StatusError::InvalidStatusState { status: kind });
+            }
+        }
+        StatusKind::Sleep => {
+            if current.toxic_turn_count != 0 {
+                return Err(StatusError::InvalidStatusState { status: kind });
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Expanded admission for one major status over a clean-or-statusful target:
+/// poison, toxic, paralysis and burn admit through this lane; sleep requires
+/// its rolled window via [`apply_sleep_window`]; NONE is rejected as the
+/// intrinsic sentinel, FREEZE is rejected as rerouted to the frostbite tag
+/// lane, both without mutating anything.
+pub fn apply_major_status(
+    input: StatusApplicationInput,
+) -> Result<StatusApplicationOutcome, StatusError> {
+    if input.bypass != StatusBypass::None {
+        return Err(StatusError::UnsupportedBypass { bypass: input.bypass });
+    }
+    match input.requested {
+        StatusKind::None => {
+            return Ok(StatusApplicationOutcome::Rejected {
+                reason: StatusRejection::IntrinsicSentinel,
+            })
+        }
+        StatusKind::Sleep => {
+            return Ok(StatusApplicationOutcome::Rejected {
+                reason: StatusRejection::SleepWindowRequired,
+            })
+        }
+        StatusKind::Burn | StatusKind::Paralysis | StatusKind::Poison | StatusKind::Toxic => {}
+    }
+    canonical_companions(input.current.kind, input.current)?;
+    if input.current.kind != StatusKind::None {
+        return Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::ExistingMajorStatus {
+                existing: input.current.kind,
+            },
+        });
+    }
+    if input.powder && powder_immunity(input.target_types) {
+        return Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::PowderImmunity {
+                immune_type: PokemonType::Grass,
+            },
+        });
+    }
+    if let Some(immune_type) = expanded_status_type_immunity(input.requested, input.target_types)? {
+        return Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::TypeImmunity {
+                status: input.requested,
+                immune_type,
+            },
+        });
+    }
+    let after = StatusState {
+        kind: input.requested,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: None,
+    };
+    Ok(StatusApplicationOutcome::Applied {
+        mutation: StatusMutation {
+            before: input.current,
+            after,
+        },
+    })
+}
+
+/// Rolls the oracle sleep window `randBattleSeedIntRange(2, 4)` inclusive on
+/// the battle stream under the frozen status-duration callsite identity.
+pub fn roll_sleep_window(runtime: &mut RngRuntime) -> Result<u16, StatusError> {
+    let draw = runtime.battle_integer_in_range(
+        SafeU53::new(2)?,
+        SafeU53::new(4)?,
+        RngReason::StatusDuration,
+        RngCallsiteId::mechanics(RngReason::StatusDuration),
+    )?;
+    // The inclusive [2, 4] window always fits u16 by construction.
+    let window = u16::try_from(draw.get())
+        .expect("status-duration range draw stays within [2, 4]");
+    Ok(window)
+}
+
+/// Admits sleep with an explicit pre-rolled window (oracle default
+/// `[2, 4]`). A zero window is not a canonical sleep state.
+pub fn apply_sleep_window(
+    current: StatusState,
+    target_types: PokemonTyping,
+    powder: bool,
+    window: u16,
+) -> Result<StatusApplicationOutcome, StatusError> {
+    canonical_companions(current.kind, current)?;
+    if current.kind != StatusKind::None {
+        return Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::ExistingMajorStatus {
+                existing: current.kind,
+            },
+        });
+    }
+    if powder && powder_immunity(target_types) {
+        return Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::PowderImmunity {
+                immune_type: PokemonType::Grass,
+            },
+        });
+    }
+    if window == 0 {
+        return Err(StatusError::InvalidStatusState {
+            status: StatusKind::Sleep,
+        });
+    }
+    let after = StatusState {
+        kind: StatusKind::Sleep,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: Some(window),
+    };
+    Ok(StatusApplicationOutcome::Applied {
+        mutation: StatusMutation {
+            before: current,
+            after,
+        },
+    })
+}
+
+/// Outcome of one move attempt against a sleeping battler
+/// (`MovePhase.checkSleep`).
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SleepGateOutcome {
+    /// The target is not asleep; no state changed.
+    NotAsleep,
+    /// The decremented window reached zero and the target woke into the
+    /// cleared sentinel.
+    Woke,
+    /// The target stays asleep with the remaining window.
+    StillAsleep { remaining: u16 },
+}
+
+/// Advances one move attempt against sleep: the window decrements first and
+/// the target wakes when it reaches zero.
+pub fn advance_sleep(status: &mut StatusState) -> SleepGateOutcome {
+    if status.kind != StatusKind::Sleep {
+        return SleepGateOutcome::NotAsleep;
+    }
+    let remaining = status.sleep_turns_remaining.unwrap_or(0);
+    if remaining <= 1 {
+        *status = StatusState {
+            kind: StatusKind::None,
+            toxic_turn_count: 0,
+            sleep_turns_remaining: None,
+        };
+        return SleepGateOutcome::Woke;
+    }
+    status.sleep_turns_remaining = Some(remaining - 1);
+    SleepGateOutcome::StillAsleep {
+        remaining: remaining - 1,
+    }
+}
+
+/// Oracle toxic residual: the ramp counter increments first, then damage is
+/// `toDmgValue(maxHp * count / 16)` with the minimum-one floor shared by the
+/// whole residual family.
+pub fn resolve_toxic_residual(
+    input: StatusResidualInput,
+) -> Result<StatusResidualOutcome, StatusError> {
+    if input.max_hp == 0 {
+        return Err(StatusError::InvalidMaxHp);
+    }
+    if input.hp > input.max_hp {
+        return Err(StatusError::InvalidHp);
+    }
+    if input.hp == 0 {
+        return Ok(StatusResidualOutcome::TargetFainted {
+            status: input.status,
+            hp: input.hp,
+        });
+    }
+    let next_count = input
+        .status
+        .toxic_turn_count
+        .checked_add(1)
+        .ok_or(StatusError::TurnCountOverflow)?;
+    let raw_amount = u64::from(input.max_hp) * u64::from(next_count) / 16;
+    let residual_amount = u32::try_from(raw_amount).unwrap_or(u32::MAX);
+    let damage = residual_amount.max(1).min(input.hp);
+    let status_after = StatusState {
+        kind: StatusKind::Toxic,
+        toxic_turn_count: next_count,
+        sleep_turns_remaining: None,
+    };
+    Ok(StatusResidualOutcome::Applied {
+        mutation: StatusResidualMutation {
+            status_before: input.status,
+            status_after,
+            hp_before: input.hp,
+            hp_after: input.hp - damage,
+            residual_amount,
+            damage,
+        },
+    })
+}
+
+/// Outcome of one ER_FROSTBITE turn-end chip.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum FrostbiteChipOutcome {
+    /// The chip landed with the capped damage.
+    Chipped { damage: u32 },
+    /// A fainted carrier takes no chip.
+    TargetFainted,
+}
+
+/// ER_FROSTBITE turn-end chip: `toDmgValue(maxHp / 16)` with the shared
+/// minimum-one floor, capped at current HP.
+pub fn resolve_frostbite_chip(hp: u32, max_hp: u32) -> Result<FrostbiteChipOutcome, StatusError> {
+    if max_hp == 0 {
+        return Err(StatusError::InvalidMaxHp);
+    }
+    if hp > max_hp {
+        return Err(StatusError::InvalidHp);
+    }
+    if hp == 0 {
+        return Ok(FrostbiteChipOutcome::TargetFainted);
+    }
+    let amount = (max_hp / 16).max(1);
+    Ok(FrostbiteChipOutcome::Chipped {
+        damage: amount.min(hp),
+    })
+}
+
+/// Production cure write (`Pokemon.cureStatus`): replaces any live major
+/// status with the cleared sentinel. Curing an already-cleared target is the
+/// oracle no-op, surfaced as a rejection instead of a fake mutation.
+pub fn cure_major_status(current: StatusState) -> Result<StatusApplicationOutcome, StatusError> {
+    canonical_companions(current.kind, current)?;
+    if current.kind == StatusKind::None {
+        return Ok(StatusApplicationOutcome::Rejected {
+            reason: StatusRejection::IntrinsicSentinel,
+        });
+    }
+    let after = StatusState {
+        kind: StatusKind::None,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: None,
+    };
+    Ok(StatusApplicationOutcome::Applied {
+        mutation: StatusMutation {
+            before: current,
+            after,
+        },
+    })
 }

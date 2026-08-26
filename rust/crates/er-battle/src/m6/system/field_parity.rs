@@ -57,9 +57,11 @@ use crate::m6::status_field_executor::{
     STATUS_FIELD_EXECUTOR_SCHEMA_VERSION,
 };
 use crate::status::{
-    apply_status, apply_status_with_chance, check_paralysis, resolve_residual,
-    ParalysisActivationOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass,
-    StatusError, StatusRejection, StatusResidualInput, StatusResidualOutcome,
+    advance_sleep, apply_major_status, apply_sleep_window, cure_major_status, check_paralysis,
+    resolve_frostbite_chip, resolve_residual,
+    resolve_toxic_residual, roll_status_chance, FrostbiteChipOutcome, ParalysisActivationOutcome,
+    SleepGateOutcome, StatusApplicationInput, StatusApplicationOutcome, StatusBypass, StatusError,
+    StatusRejection, StatusResidualInput, StatusResidualOutcome,
 };
 
 /// Schema version of every transcript and inventory record emitted here.
@@ -109,23 +111,45 @@ impl FieldDomain {
     }
 }
 
-/// A major-status oracle identity resolved against the kernel status slice.
+/// A major-status oracle identity resolved onto its exact kernel carrier.
 ///
-/// Oracle `StatusEffect` numeric ids map onto kernel [`StatusKind`] variants
-/// where they exist. Identities without a kernel variant stay unrepresented
-/// and fail closed instead of being coerced into a neighboring kind.
+/// The oracle `StatusEffect` closure maps onto three production carriers:
+/// admissible [`StatusKind`] members (poison, toxic, paralysis, sleep, burn),
+/// the intrinsic cleared sentinel (NONE, written by cures, never admitted),
+/// and two identities that route outside the status lane entirely — FREEZE,
+/// which every oracle freeze source reroutes to the ER_FROSTBITE battler tag,
+/// and FAINT, which routes to the faint substate (fainted flag plus faint
+/// cleanup ordering).
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum MajorStatusSubject {
-    /// The oracle NONE member: representable, never admissible.
-    NoneStatus,
+    ClearedSentinel,
     Poison,
     Toxic,
     Paralysis,
     Sleep,
     Burn,
-    /// An oracle identity the kernel cannot represent at all.
+    Freeze,
+    Faint,
+    /// An unknown oracle code; fails closed (unreachable in the frozen
+    /// catalog, kept so catalog drift can never silently dispatch).
     Unrepresented { oracle_code: u16 },
+}
+
+/// The production carrier selected for one major-status identity.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MajorStatusLane {
+    /// Admitted as a live `StatusKind` through the expanded admission lane.
+    Admitted(StatusKind),
+    /// Intrinsic cleared sentinel: proven through cure writes and typed
+    /// sentinel rejections.
+    Sentinel,
+    /// Rerouted to the ER_FROSTBITE battler-tag carrier.
+    FrostbiteTag,
+    /// Routed to the faint substate.
+    FaintSubstate,
+    /// No kernel representation (defensive).
+    Unsupported,
 }
 
 impl MajorStatusSubject {
@@ -134,38 +158,44 @@ impl MajorStatusSubject {
     /// FAINT=7 in the frozen oracle enum.
     pub fn from_oracle_code(code: u16) -> Self {
         match code {
-            0 => Self::NoneStatus,
+            0 => Self::ClearedSentinel,
             1 => Self::Poison,
             2 => Self::Toxic,
             3 => Self::Paralysis,
             4 => Self::Sleep,
+            5 => Self::Freeze,
             6 => Self::Burn,
+            7 => Self::Faint,
             other => Self::Unrepresented { oracle_code: other },
         }
     }
 
-    /// The kernel status kind, when the oracle identity has one.
+    /// The kernel status kind for identities carried by the status lane.
     pub fn kernel_status(self) -> Option<StatusKind> {
         match self {
-            Self::NoneStatus => Some(StatusKind::None),
+            Self::ClearedSentinel => Some(StatusKind::None),
             Self::Poison => Some(StatusKind::Poison),
             Self::Toxic => Some(StatusKind::Toxic),
             Self::Paralysis => Some(StatusKind::Paralysis),
             Self::Sleep => Some(StatusKind::Sleep),
             Self::Burn => Some(StatusKind::Burn),
-            Self::Unrepresented { .. } => None,
+            Self::Freeze | Self::Faint | Self::Unrepresented { .. } => None,
         }
     }
 
-    /// Whether the selected production admission slice accepts this status.
-    /// Toxic and Sleep are kernel-representable but rejected by the typed
-    /// production admission path; that rejection is itself a proven verdict,
-    /// so only unrepresented identities fail coverage.
-    pub fn admission_supported(self) -> bool {
-        matches!(
-            self.kernel_status(),
-            Some(StatusKind::Poison) | Some(StatusKind::Paralysis) | Some(StatusKind::Burn)
-        )
+    /// Selects the exact production carrier for this identity.
+    pub fn parity_lane(self) -> MajorStatusLane {
+        match self {
+            Self::ClearedSentinel => MajorStatusLane::Sentinel,
+            Self::Poison => MajorStatusLane::Admitted(StatusKind::Poison),
+            Self::Toxic => MajorStatusLane::Admitted(StatusKind::Toxic),
+            Self::Paralysis => MajorStatusLane::Admitted(StatusKind::Paralysis),
+            Self::Sleep => MajorStatusLane::Admitted(StatusKind::Sleep),
+            Self::Burn => MajorStatusLane::Admitted(StatusKind::Burn),
+            Self::Freeze => MajorStatusLane::FrostbiteTag,
+            Self::Faint => MajorStatusLane::FaintSubstate,
+            Self::Unrepresented { .. } => MajorStatusLane::Unsupported,
+        }
     }
 }
 
@@ -279,12 +309,14 @@ pub fn status_name(kind: StatusKind) -> &'static str {
 /// Major-status identity name, including unrepresented oracle identities.
 pub fn major_status_name(subject: MajorStatusSubject) -> String {
     match subject {
-        MajorStatusSubject::NoneStatus => "NONE".to_owned(),
+        MajorStatusSubject::ClearedSentinel => "NONE".to_owned(),
         MajorStatusSubject::Poison => "POISON".to_owned(),
         MajorStatusSubject::Toxic => "TOXIC".to_owned(),
         MajorStatusSubject::Paralysis => "PARALYSIS".to_owned(),
         MajorStatusSubject::Sleep => "SLEEP".to_owned(),
         MajorStatusSubject::Burn => "BURN".to_owned(),
+        MajorStatusSubject::Freeze => "FREEZE".to_owned(),
+        MajorStatusSubject::Faint => "FAINT".to_owned(),
         MajorStatusSubject::Unrepresented { oracle_code } => format!("ORACLE_CODE_{oracle_code}"),
     }
 }
@@ -351,6 +383,24 @@ pub enum FieldLifecycleStep {
     StatusAdmissionFailClosed {
         status: String,
     },
+    StatusReroutedToFrostbiteTag {
+        subject: String,
+        tag_subject: String,
+    },
+    SleepActionLock {
+        outcome: String,
+        remaining_after: Option<u16>,
+    },
+    CureApplied {
+        subject: String,
+        before: String,
+        after: String,
+    },
+    FaintSubstateResolved {
+        subject: String,
+        owner: u64,
+        cleared_count: usize,
+    },
     ParalysisActivationGate {
         outcome: String,
         draw: u64,
@@ -412,6 +462,9 @@ impl FieldLifecycleStep {
             | Self::StatusChanceGateFailed { status: subject, .. }
             | Self::StatusAdmissionRejected { status: subject, .. }
             | Self::StatusAdmissionFailClosed { status: subject }
+            | Self::CureApplied { subject, .. }
+            | Self::FaintSubstateResolved { subject, .. }
+            | Self::StatusReroutedToFrostbiteTag { subject, .. }
             | Self::UnsupportedIdentityRejected { subject, .. } => Some(subject),
             Self::ResidualResolved { status, .. } => Some(status),
             Self::ArenaStacked { condition, .. }
@@ -430,7 +483,9 @@ impl FieldLifecycleStep {
                 | Self::CycleTick { .. }
                 | Self::CycleExpired { .. }
                 | Self::ArenaStacked { .. }
-                | Self::ArenaRemoved { .. } => true,
+                | Self::ArenaRemoved { .. }
+                | Self::CureApplied { .. }
+                | Self::FaintSubstateResolved { .. } => true,
             Self::ResidualResolved { outcome, .. } => *outcome != "NOT_APPLICABLE",
             _ => false,
         }
@@ -535,21 +590,16 @@ pub fn field_inventory(
         }
         let subject = resolve_field_subject(&unit.id.source)?;
         let subject_key = subject.key();
-        let coverage = match subject {
-            FieldSubject::MajorStatus(inner) if !inner.admission_supported() => {
-                FieldCoverage::FailClosed {
-                    reason: match inner.kernel_status() {
-                        Some(kind) => format!(
-                            "oracle major-status {} is rejected by the selected production admission slice",
-                            status_name(kind)
-                        ),
-                        None => format!(
-                            "oracle major-status identity {} has no kernel StatusKind representation",
-                            major_status_name(inner)
-                        ),
-                    },
-                }
-            }
+        let coverage = match &subject {
+            FieldSubject::MajorStatus(inner) => match inner.parity_lane() {
+                MajorStatusLane::Unsupported => FieldCoverage::FailClosed {
+                    reason: format!(
+                        "oracle major-status identity {} has no kernel carrier",
+                        major_status_name(*inner)
+                    ),
+                },
+                _ => FieldCoverage::Proven,
+            },
             _ => FieldCoverage::Proven,
         };
         entries.push(FieldInventoryEntry {
@@ -852,15 +902,19 @@ pub struct MajorStatusScenario {
     /// Whether to exercise the audited paralysis activation gate. Witnesses
     /// with an empty RNG contract run with this disabled.
     pub exercise_rng_gate: bool,
+    /// Explicit pre-rolled sleep window used by sleep campaigns without
+    /// consuming RNG; the oracle default range [2, 4] is exercised through
+    /// [`roll_sleep_window`] in the audited-RNG campaigns.
+    pub sleep_window: u16,
     pub max_hp: u32,
     pub hp: u32,
 }
 
-/// Drives the complete major-status lifecycle: chance-gated admission
-/// transaction, existing-status/type-immunity/powder false conditions,
-/// residual resolution, the audited paralysis activation gate when enabled,
-/// and the suppression-store cleanup ordering (switch-out preserves, faint
-/// clears).
+/// Runs the complete lifecycle for one admissible major status (poison,
+/// toxic, paralysis, sleep, burn) through the expanded production lane:
+/// chance-gated admission, existing-status/type-immunity/powder false
+/// conditions, toxic residual escalation or the sleep action lock, the
+/// opt-in audited paralysis gate, and the suppression-store cleanup ordering.
 pub fn run_major_status_lifecycle(
     runtime: &mut RngRuntime,
     initial: &SuppressionImmunityStateV2,
@@ -879,205 +933,252 @@ pub fn run_major_status_lifecycle(
 
     // 1. Chance-gated admission transaction against the clean target.
     let applied;
-    match apply_status_with_chance(
-        runtime,
-        StatusApplicationInput {
-            requested,
-            current: clean,
-            target_types: scenario.typing,
-            powder: false,
-            bypass: StatusBypass::None,
+    match scenario.chance {
+        None => {
+            let outcome = admit_expanded(requested, clean, scenario)?;
+            applied = record_admission_outcome(&mut steps, &status_key, outcome)?;
+        }
+        Some(chance) => match roll_status_chance(runtime, Some(chance))? {
+            crate::status::StatusChanceOutcome::Failed { draw } => {
+                applied = false;
+                steps.push(FieldLifecycleStep::StatusChanceGateFailed {
+                    status: status_key.clone(),
+                    chance,
+                    draw: draw.get(),
+                });
+            }
+            _ => {
+                let outcome = admit_expanded(requested, clean, scenario)?;
+                applied = record_admission_outcome(&mut steps, &status_key, outcome)?;
+            }
         },
-        scenario.chance,
-    ) {
-        Ok(StatusApplicationOutcome::Applied { mutation }) => {
-            applied = true;
-            if mutation.before == mutation.after || mutation.after.kind != requested {
-                return Err(FieldParityError::Invariant(
-                    "applied status mutation is not a real transition".to_owned(),
-                ));
-            }
-            steps.push(FieldLifecycleStep::StatusApplied {
-                status: status_key.clone(),
-            });
-        }
-        Ok(StatusApplicationOutcome::Rejected { reason }) => {
-            applied = false;
-            steps.push(FieldLifecycleStep::StatusAdmissionRejected {
-                status: status_key.clone(),
-                reason: rejection_name(reason),
-            });
-        }
-        Ok(StatusApplicationOutcome::ChanceFailed { draw }) => {
-            applied = false;
-            let chance = scenario.chance.ok_or_else(|| {
-                FieldParityError::Invariant("chance failure without a chance gate".to_owned())
-            })?;
-            steps.push(FieldLifecycleStep::StatusChanceGateFailed {
-                status: status_key.clone(),
-                chance,
-                draw: draw.get(),
-            });
-        }
-        Err(StatusError::UnsupportedStatus { .. }) => {
-            applied = false;
-            steps.push(FieldLifecycleStep::StatusAdmissionFailClosed {
-                status: status_key.clone(),
-            });
-        }
-        Err(other) => return Err(FieldParityError::Status(other)),
     }
-    if applied {
-        // 2. Existing-major-status false condition: a second application on
-        //    the now-statusful target must be rejected without mutating.
-        let statusful = StatusState {
-            kind: requested,
-            toxic_turn_count: 0,
-            sleep_turns_remaining: None,
-        };
-        match apply_status(StatusApplicationInput {
-            requested,
-            current: statusful,
-            target_types: scenario.typing,
-            powder: false,
-            bypass: StatusBypass::None,
-        })? {
-            StatusApplicationOutcome::Rejected { reason } => {
-                steps.push(FieldLifecycleStep::StatusAdmissionRejected {
-                    status: status_key.clone(),
-                    reason: rejection_name(reason),
-                });
-            }
-            _ => {
-                return Err(FieldParityError::Invariant(format!(
-                    "second admission of {status_key} did not reject"
-                )))
-            }
-        }
 
-        // 3. Type-immunity false condition against the canonical immune type.
-        let immune_typing = PokemonTyping {
-            primary: immune_type_for(requested),
-            secondary: None,
-        };
-        match apply_status(StatusApplicationInput {
-            requested,
-            current: clean,
-            target_types: immune_typing,
-            powder: false,
-            bypass: StatusBypass::None,
-        })? {
-            StatusApplicationOutcome::Rejected { reason } => {
-                steps.push(FieldLifecycleStep::StatusAdmissionRejected {
-                    status: status_key.clone(),
-                    reason: rejection_name(reason),
-                });
-            }
-            _ => {
-                return Err(FieldParityError::Invariant(format!(
-                    "type-immune admission of {status_key} did not reject"
-                )))
-            }
+    if applied {
+        let statusful = live_state(requested, scenario.sleep_window);
+
+        // 2. Existing-major-status false condition: re-admission on the now-
+        //    statusful target must be rejected without mutating.
+        push_rejection(
+            &mut steps,
+            &status_key,
+            apply_major_status(StatusApplicationInput {
+                requested,
+                current: statusful,
+                target_types: scenario.typing,
+                powder: false,
+                bypass: StatusBypass::None,
+            })?,
+            format!("second admission of {status_key} did not reject"),
+        )?;
+
+        // 3. Type-immunity false condition against the canonical immune type
+        //    (sleep has no type immunity in the frozen table).
+        if let Some(immune_type) = canonical_immune_type(requested) {
+            push_rejection(
+                &mut steps,
+                &status_key,
+                apply_major_status(StatusApplicationInput {
+                    requested,
+                    current: clean,
+                    target_types: PokemonTyping {
+                        primary: immune_type,
+                        secondary: None,
+                    },
+                    powder: false,
+                    bypass: StatusBypass::None,
+                })?,
+                format!("type-immune admission of {status_key} did not reject"),
+            )?;
         }
 
         // 4. Powder false condition against Grass typing.
-        let grass = PokemonTyping {
-            primary: er_types::battle_model::PokemonType::Grass,
-            secondary: None,
-        };
-        match apply_status(StatusApplicationInput {
-            requested,
-            current: clean,
-            target_types: grass,
-            powder: true,
-            bypass: StatusBypass::None,
-        })? {
-            StatusApplicationOutcome::Rejected { reason } => {
-                steps.push(FieldLifecycleStep::StatusAdmissionRejected {
-                    status: status_key.clone(),
-                    reason: rejection_name(reason),
-                });
-            }
-            _ => {
-                return Err(FieldParityError::Invariant(format!(
-                    "powder admission of {status_key} onto Grass did not reject"
-                )))
-            }
+        if requested == StatusKind::Sleep {
+            push_rejection(
+                &mut steps,
+                &status_key,
+                apply_sleep_window(
+                    clean,
+                    grass_typing(),
+                    true,
+                    scenario.sleep_window,
+                )?,
+                "powder sleep onto Grass did not reject".to_owned(),
+            )?;
+        } else {
+            push_rejection(
+                &mut steps,
+                &status_key,
+                apply_major_status(StatusApplicationInput {
+                    requested,
+                    current: clean,
+                    target_types: grass_typing(),
+                    powder: true,
+                    bypass: StatusBypass::None,
+                })?,
+                format!("powder admission of {status_key} onto Grass did not reject"),
+            )?;
         }
 
-        // 5. Post-turn residual resolution.
-        if scenario.hp == 0 || scenario.max_hp == 0 {
-            return Err(FieldParityError::Invariant(
-                "residual scenarios require positive hp and max hp".to_owned(),
-            ));
-        }
-        let residual_input = StatusResidualInput {
-            status: statusful,
-            hp: scenario.hp.min(scenario.max_hp),
-            max_hp: scenario.max_hp,
-        };
-        match resolve_residual(residual_input)? {
-            StatusResidualOutcome::Applied { mutation } => {
-                let damage = mutation.damage;
-                let status_after = mutation.status_after;
-                steps.push(FieldLifecycleStep::ResidualResolved {
-                    status: status_key.clone(),
-                    outcome: "APPLIED".to_owned(),
-                    damage,
-                });
-                if damage == 0 || status_after.toxic_turn_count == 0 {
-                    return Err(FieldParityError::Invariant(
-                        "residual mutation did not damage or advance the counter".to_owned(),
-                    ));
+        // 5. Post-turn residual semantics per identity.
+        match requested {
+            StatusKind::Toxic => {
+                let mut count = 0_u16;
+                let mut hp = scenario.hp.min(scenario.max_hp);
+                let mut previous_damage = 0_u32;
+                for tick in 0..2 {
+                    let outcome = resolve_toxic_residual(StatusResidualInput {
+                        status: StatusState {
+                            kind: StatusKind::Toxic,
+                            toxic_turn_count: count,
+                            sleep_turns_remaining: None,
+                        },
+                        hp,
+                        max_hp: scenario.max_hp,
+                    })?;
+                    match outcome {
+                        StatusResidualOutcome::Applied { mutation } => {
+                            let damage = mutation.damage;
+                            if damage <= previous_damage {
+                                return Err(FieldParityError::Invariant(format!(
+                                    "toxic escalation tick {tick} damage {damage} did not ramp"
+                                )));
+                            }
+                            previous_damage = damage;
+                            count = mutation.status_after.toxic_turn_count;
+                            hp = mutation.hp_after;
+                            steps.push(FieldLifecycleStep::ResidualResolved {
+                                status: status_key.clone(),
+                                outcome: "APPLIED".to_owned(),
+                                damage,
+                            });
+                        }
+                        _ => {
+                            return Err(FieldParityError::Invariant(
+                                "toxic residual did not apply in a healthy scenario".to_owned(),
+                            ))
+                        }
+                    }
                 }
             }
-            StatusResidualOutcome::NotApplicable { .. } => {
-                steps.push(FieldLifecycleStep::ResidualResolved {
-                    status: status_key.clone(),
-                    outcome: "NOT_APPLICABLE".to_owned(),
-                    damage: 0,
-                });
+            StatusKind::Burn | StatusKind::Poison => {
+                let outcome = resolve_residual(StatusResidualInput {
+                    status: statusful,
+                    hp: scenario.hp.min(scenario.max_hp),
+                    max_hp: scenario.max_hp,
+                })?;
+                match outcome {
+                    StatusResidualOutcome::Applied { mutation } => {
+                        let damage = mutation.damage;
+                        if damage == 0 || mutation.status_after.toxic_turn_count == 0 {
+                            return Err(FieldParityError::Invariant(
+                                "residual mutation did not damage or advance the counter"
+                                    .to_owned(),
+                            ));
+                        }
+                        steps.push(FieldLifecycleStep::ResidualResolved {
+                            status: status_key.clone(),
+                            outcome: "APPLIED".to_owned(),
+                            damage,
+                        });
+                    }
+                    StatusResidualOutcome::NotApplicable { .. } => {
+                        steps.push(FieldLifecycleStep::ResidualResolved {
+                            status: status_key.clone(),
+                            outcome: "NOT_APPLICABLE".to_owned(),
+                            damage: 0,
+                        });
+                    }
+                    StatusResidualOutcome::TargetFainted { .. } => {
+                        return Err(FieldParityError::Invariant(
+                            "residual target fainted in a healthy scenario".to_owned(),
+                        ))
+                    }
+                }
             }
-            StatusResidualOutcome::TargetFainted { .. } => {
+            // Paralysis and sleep have no post-turn residual in the frozen
+            // oracle (`Status::isPostTurn` covers poison/toxic/burn only).
+            StatusKind::Paralysis | StatusKind::Sleep => {}
+            StatusKind::None => {
                 return Err(FieldParityError::Invariant(
-                    "residual target fainted in a healthy scenario".to_owned(),
+                    "sentinel identities never reach the admitted lane".to_owned(),
                 ))
             }
         }
-            if requested == StatusKind::Paralysis && scenario.exercise_rng_gate {
-                match check_paralysis(runtime, requested)? {
-                    ParalysisActivationOutcome::NotParalyzed => {
+
+        // 6. Sleep action lock: each attempt decrements the window first and
+        //    wakes exactly at zero.
+        if requested == StatusKind::Sleep {
+            let mut live = statusful;
+            loop {
+                match advance_sleep(&mut live) {
+                    SleepGateOutcome::NotAsleep => {
                         return Err(FieldParityError::Invariant(
-                            "paralysis gate reported a non-paralyzed target".to_owned(),
-                        ));
+                            "sleep gate lost its sleeping target".to_owned(),
+                        ))
                     }
-                    ParalysisActivationOutcome::CanAct { draw } => {
-                        steps.push(FieldLifecycleStep::ParalysisActivationGate {
-                            outcome: "CAN_ACT".to_owned(),
-                            draw: draw.get(),
+                    SleepGateOutcome::Woke => {
+                        steps.push(FieldLifecycleStep::SleepActionLock {
+                            outcome: "WOKE".to_owned(),
+                            remaining_after: None,
                         });
+                        break;
                     }
-                    ParalysisActivationOutcome::FullyParalyzed { draw } => {
-                        steps.push(FieldLifecycleStep::ParalysisActivationGate {
-                            outcome: "FULLY_PARALYZED".to_owned(),
-                            draw: draw.get(),
+                    SleepGateOutcome::StillAsleep { remaining } => {
+                        steps.push(FieldLifecycleStep::SleepActionLock {
+                            outcome: "STILL_ASLEEP".to_owned(),
+                            remaining_after: Some(remaining),
                         });
                     }
                 }
             }
+            if live.kind != StatusKind::None {
+                return Err(FieldParityError::Invariant(
+                    "waking did not restore the cleared sentinel".to_owned(),
+                ));
+            }
+        }
 
-        // 7. Suppression-store cleanup ordering for the live instance.
+        // 7. Audited paralysis activation gate (opt-in).
+        if requested == StatusKind::Paralysis && scenario.exercise_rng_gate {
+            match check_paralysis(runtime, requested)? {
+                ParalysisActivationOutcome::NotParalyzed => {
+                    return Err(FieldParityError::Invariant(
+                        "paralysis gate reported a non-paralyzed target".to_owned(),
+                    ));
+                }
+                ParalysisActivationOutcome::CanAct { draw } => {
+                    steps.push(FieldLifecycleStep::ParalysisActivationGate {
+                        outcome: "CAN_ACT".to_owned(),
+                        draw: draw.get(),
+                    });
+                }
+                ParalysisActivationOutcome::FullyParalyzed { draw } => {
+                    steps.push(FieldLifecycleStep::ParalysisActivationGate {
+                        outcome: "FULLY_PARALYZED".to_owned(),
+                        draw: draw.get(),
+                    });
+                }
+            }
+        }
+
+        // 8. Suppression-store cleanup ordering for the live instance.
+        let subject = VolatileTagSubject::MajorStatus(requested);
         let admitted = admit_volatile_tag(
             initial,
             &VolatileTagAdmission {
                 owner: scenario.target,
-                subject: VolatileTagSubject::MajorStatus(requested),
+                subject,
                 layers_delta: 1,
                 remaining_turns: None,
                 admission: TagAdmission::Permitted,
             },
         )?;
-        record_admission(&mut steps, &format!("MAJOR_STATUS:{status_key}"), &admitted.evidence)?;
+        record_admission(
+            &mut steps,
+            &format!("MAJOR_STATUS:{status_key}"),
+            &admitted.evidence,
+        )?;
         let mut state = admitted.state;
 
         let switch_out =
@@ -1094,16 +1195,14 @@ pub fn run_major_status_lifecycle(
         steps.push(FieldLifecycleStep::CleanupCleared {
             event: FieldCleanupEvent::SwitchOut,
             removed: instance_refs(&switch_out.evidence.removed),
-                preserved_major_statuses: preserved_status_names(
-                    &switch_out.evidence.preserved_major_statuses,
-                ),
+            preserved_major_statuses: preserved_status_names(
+                &switch_out.evidence.preserved_major_statuses,
+            ),
         });
         state = switch_out.state;
-        if !state
-            .volatile_tags
-            .iter()
-            .any(|instance| instance.owner == scenario.target && instance.subject == VolatileTagSubject::MajorStatus(requested))
-        {
+        if !state.volatile_tags.iter().any(|instance| {
+            instance.owner == scenario.target && instance.subject == VolatileTagSubject::MajorStatus(requested)
+        }) {
             return Err(FieldParityError::Invariant(
                 "switch-out dropped a major-status instance".to_owned(),
             ));
@@ -1135,37 +1234,367 @@ pub fn run_major_status_lifecycle(
     })
 }
 
-fn instance_refs(expired: &[ExpiredTag]) -> Vec<InstanceRef> {
-    expired
-        .iter()
-        .map(|entry| InstanceRef {
-            owner: entry.owner.get().get(),
-            subject: volatile_subject_key(&entry.subject),
-        })
-        .collect()
+fn admit_expanded(
+    requested: StatusKind,
+    current: StatusState,
+    scenario: &MajorStatusScenario,
+) -> Result<StatusApplicationOutcome, FieldParityError> {
+    Ok(match requested {
+        StatusKind::Sleep => {
+            apply_sleep_window(current, scenario.typing, false, scenario.sleep_window)?
+        }
+        other => {
+            apply_major_status(StatusApplicationInput {
+                requested: other,
+                current,
+                target_types: scenario.typing,
+                powder: false,
+                bypass: StatusBypass::None,
+            })?
+        }
+    })
 }
 
-fn immune_type_for(
-    status: StatusKind,
-) -> er_types::battle_model::PokemonType {
+fn record_admission_outcome(
+    steps: &mut Vec<FieldLifecycleStep>,
+    status_key: &str,
+    outcome: StatusApplicationOutcome,
+) -> Result<bool, FieldParityError> {
+    match outcome {
+        StatusApplicationOutcome::Applied { mutation } => {
+            if mutation.before == mutation.after {
+                return Err(FieldParityError::Invariant(
+                    "applied status mutation is not a real transition".to_owned(),
+                ));
+            }
+            steps.push(FieldLifecycleStep::StatusApplied {
+                status: status_key.to_owned(),
+            });
+            Ok(true)
+        }
+        StatusApplicationOutcome::Rejected { reason } => {
+            steps.push(FieldLifecycleStep::StatusAdmissionRejected {
+                status: status_key.to_owned(),
+                reason: rejection_name(reason),
+            });
+            Ok(false)
+        }
+        StatusApplicationOutcome::ChanceFailed { .. } => Err(FieldParityError::Invariant(
+            "chance failure outside a chance-gated transaction".to_owned(),
+        )),
+    }
+}
+
+fn push_rejection(
+    steps: &mut Vec<FieldLifecycleStep>,
+    status_key: &str,
+    outcome: StatusApplicationOutcome,
+    invariant: String,
+) -> Result<(), FieldParityError> {
+    match outcome {
+        StatusApplicationOutcome::Rejected { reason } => {
+            steps.push(FieldLifecycleStep::StatusAdmissionRejected {
+                status: status_key.to_owned(),
+                reason: rejection_name(reason),
+            });
+            Ok(())
+        }
+        _ => Err(FieldParityError::Invariant(invariant)),
+    }
+}
+
+fn live_state(kind: StatusKind, sleep_window: u16) -> StatusState {
+    StatusState {
+        kind,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: if kind == StatusKind::Sleep {
+            Some(sleep_window)
+        } else {
+            None
+        },
+    }
+}
+
+fn grass_typing() -> PokemonTyping {
+    PokemonTyping {
+        primary: er_types::battle_model::PokemonType::Grass,
+        secondary: None,
+    }
+}
+
+fn canonical_immune_type(status: StatusKind) -> Option<er_types::battle_model::PokemonType> {
+    use er_types::battle_model::PokemonType;
     match status {
-        StatusKind::Poison => er_types::battle_model::PokemonType::Steel,
-        StatusKind::Paralysis => er_types::battle_model::PokemonType::Electric,
-        StatusKind::Burn => er_types::battle_model::PokemonType::Fire,
-        _ => er_types::battle_model::PokemonType::Normal,
+        StatusKind::Poison | StatusKind::Toxic => Some(PokemonType::Steel),
+        StatusKind::Paralysis => Some(PokemonType::Electric),
+        StatusKind::Burn => Some(PokemonType::Fire),
+        StatusKind::None | StatusKind::Sleep => None,
     }
 }
 
-fn rejection_name(reason: StatusRejection) -> String {
-    match reason {
-        StatusRejection::ExistingMajorStatus { existing } => {
-            format!("EXISTING_MAJOR_STATUS:{}", status_name(existing))
+// ---------------------------------------------------------------------------
+// Sentinel, frostbite and faint substate carriers
+// ---------------------------------------------------------------------------
+
+/// NONE — the intrinsic cleared sentinel: rejected at the admission lane,
+/// residual-inert, and produced by every cure write.
+pub fn run_sentinel_lifecycle() -> Result<FieldLifecycleReport, FieldParityError> {
+    let subject_key = "MAJOR_STATUS:NONE";
+    let mut steps = Vec::new();
+
+    let sentinel_rejection = apply_major_status(StatusApplicationInput {
+        requested: StatusKind::None,
+        current: StatusState {
+            kind: StatusKind::None,
+            toxic_turn_count: 0,
+            sleep_turns_remaining: None,
+        },
+        target_types: PokemonTyping {
+            primary: er_types::battle_model::PokemonType::Normal,
+            secondary: None,
+        },
+        powder: false,
+        bypass: StatusBypass::None,
+    })?;
+    match sentinel_rejection {
+        StatusApplicationOutcome::Rejected { reason } => {
+            steps.push(FieldLifecycleStep::StatusAdmissionRejected {
+                status: subject_key.to_owned(),
+                reason: rejection_name(reason),
+            });
         }
-        StatusRejection::TypeImmunity { status, .. } => {
-            format!("TYPE_IMMUNITY:{}", status_name(status))
+        _ => {
+            return Err(FieldParityError::Invariant(
+                "sentinel admission unexpectedly succeeded".to_owned(),
+            ))
         }
-        StatusRejection::PowderImmunity { .. } => "POWDER_IMMUNITY".to_owned(),
     }
+
+    let residual = resolve_residual(StatusResidualInput {
+        status: StatusState {
+            kind: StatusKind::None,
+            toxic_turn_count: 0,
+            sleep_turns_remaining: None,
+        },
+        hp: 80,
+        max_hp: 100,
+    })?;
+    match residual {
+        StatusResidualOutcome::NotApplicable { .. } => {
+            steps.push(FieldLifecycleStep::ResidualResolved {
+                status: subject_key.to_owned(),
+                outcome: "NOT_APPLICABLE".to_owned(),
+                damage: 0,
+            });
+        }
+        _ => {
+            return Err(FieldParityError::Invariant(
+                "cleared sentinel produced a post-turn residual".to_owned(),
+            ))
+        }
+    }
+
+    let cured = cure_major_status(StatusState {
+        kind: StatusKind::Burn,
+        toxic_turn_count: 0,
+        sleep_turns_remaining: None,
+    })?;
+    match cured {
+        StatusApplicationOutcome::Applied { mutation } => {
+            if mutation.after.kind != StatusKind::None || mutation.before.kind != StatusKind::Burn {
+                return Err(FieldParityError::Invariant(
+                    "cure did not write the cleared sentinel".to_owned(),
+                ));
+            }
+            steps.push(FieldLifecycleStep::CureApplied {
+                subject: subject_key.to_owned(),
+                before: status_name(mutation.before.kind).to_owned(),
+                after: status_name(mutation.after.kind).to_owned(),
+            });
+        }
+        _ => {
+            return Err(FieldParityError::Invariant(
+                "curing a statusful target did not apply".to_owned(),
+            ))
+        }
+    }
+
+    Ok(FieldLifecycleReport {
+        schema_version: FIELD_PARITY_SCHEMA_VERSION,
+        domain: FieldDomain::MajorStatus,
+        subject_key: subject_key.to_owned(),
+        steps,
+        audited_draws: 0,
+    })
+}
+
+/// FREEZE — every oracle freeze source reroutes to the ER_FROSTBITE battler
+/// tag: native-immunity blocked targets stay untouched, admitted carriers
+/// chip `maxHp/16` per turn end and persist until cleanup.
+pub fn run_frostbite_lifecycle(
+    initial: &SuppressionImmunityStateV2,
+    owner: PokemonId,
+) -> Result<FieldLifecycleReport, FieldParityError> {
+    let subject_key = "MAJOR_STATUS:FREEZE";
+    let tag_subject = VolatileTagSubject::BattlerTag {
+        registry_key: "FROSTBITE".to_owned(),
+    };
+    let tag_key = volatile_subject_key(&tag_subject);
+    let mut steps = Vec::new();
+
+    steps.push(FieldLifecycleStep::StatusReroutedToFrostbiteTag {
+        subject: subject_key.to_owned(),
+        tag_subject: tag_key.clone(),
+    });
+
+    // Ice-type/native immunity blocks the rerouted admission untouched.
+    match admit_volatile_tag(
+        initial,
+        &VolatileTagAdmission {
+            owner,
+            subject: tag_subject.clone(),
+            layers_delta: 1,
+            remaining_turns: None,
+            admission: TagAdmission::BlockedByNativeImmunity,
+        },
+    ) {
+        Err(SuppressionTransitionError::TagDeniedByImmunity) => {
+            steps.push(FieldLifecycleStep::AdmissionDeniedByImmunity {
+                subject: tag_key.clone(),
+            });
+        }
+        Err(other) => {
+            return Err(FieldParityError::Invariant(format!(
+                "immunity-denied freeze admission failed unexpectedly: {other}"
+            )))
+        }
+        Ok(_) => {
+            return Err(FieldParityError::Invariant(
+                "immunity-denied freeze admission unexpectedly succeeded".to_owned(),
+            ))
+        }
+    }
+
+    let admitted = admit_volatile_tag(
+        initial,
+        &VolatileTagAdmission {
+            owner,
+            subject: tag_subject.clone(),
+            layers_delta: 1,
+            remaining_turns: None,
+            admission: TagAdmission::Permitted,
+        },
+    )?;
+    record_admission(&mut steps, subject_key, &admitted.evidence)?;
+    let mut state = admitted.state;
+
+    match resolve_frostbite_chip(80, 100)? {
+        FrostbiteChipOutcome::Chipped { damage } => {
+            steps.push(FieldLifecycleStep::ResidualResolved {
+                status: subject_key.to_owned(),
+                outcome: "APPLIED".to_owned(),
+                damage,
+            });
+        }
+        FrostbiteChipOutcome::TargetFainted => {
+            return Err(FieldParityError::Invariant(
+                "frostbite chip hit a fainted carrier in a healthy scenario".to_owned(),
+            ))
+        }
+    }
+
+    // Untimed persistence: lapse ticks neither decrement nor expire it.
+    for _ in 0..2 {
+        let lapse = lapse_volatile_tags(&state)?;
+        if lapse
+            .evidence
+            .iter()
+            .any(|expired| expired.subject == tag_subject)
+        {
+            return Err(FieldParityError::Invariant(
+                "untimed frostbite carrier expired on a routine lapse".to_owned(),
+            ));
+        }
+        state = lapse.state;
+        steps.push(FieldLifecycleStep::LapseTick {
+            decremented: Vec::new(),
+            expired: Vec::new(),
+        });
+    }
+
+    let faint = clear_volatile_tags(&state, VolatileCleanupEvent::Faint(owner))?;
+    let removed = instance_refs(&faint.evidence.removed);
+    if !removed.iter().any(|entry| entry.subject == tag_key) {
+        return Err(FieldParityError::Invariant(
+            "faint cleanup did not clear the frostbite carrier".to_owned(),
+        ));
+    }
+    steps.push(FieldLifecycleStep::CleanupCleared {
+        event: FieldCleanupEvent::Faint,
+        preserved_major_statuses: Vec::new(),
+        removed,
+    });
+
+    Ok(FieldLifecycleReport {
+        schema_version: FIELD_PARITY_SCHEMA_VERSION,
+        domain: FieldDomain::MajorStatus,
+        subject_key: subject_key.to_owned(),
+        steps,
+        audited_draws: 0,
+    })
+}
+
+/// FAINT — routed to the faint substate: rejected at the status-admission
+/// lane, then proven through the existing faint cleanup ordering over a live
+/// instance.
+pub fn run_faint_substate_lifecycle(
+    initial: &SuppressionImmunityStateV2,
+    owner: PokemonId,
+) -> Result<FieldLifecycleReport, FieldParityError> {
+    let subject_key = "MAJOR_STATUS:FAINT";
+    let mut steps = Vec::new();
+
+    steps.push(FieldLifecycleStep::StatusAdmissionRejected {
+        status: subject_key.to_owned(),
+        reason: "ROUTED_TO_FAINT_SUBSTATE".to_owned(),
+    });
+
+    let poison = VolatileTagSubject::MajorStatus(StatusKind::Poison);
+    let admitted = admit_volatile_tag(
+        initial,
+        &VolatileTagAdmission {
+            owner,
+            subject: poison,
+            layers_delta: 1,
+            remaining_turns: None,
+            admission: TagAdmission::Permitted,
+        },
+    )?;
+    let faint = clear_volatile_tags(&admitted.state, VolatileCleanupEvent::Faint(owner))?;
+    let cleared_count = faint.evidence.removed.len();
+    if cleared_count == 0 {
+        return Err(FieldParityError::Invariant(
+            "faint cleanup cleared nothing from a live instance store".to_owned(),
+        ));
+    }
+    if !faint.state.volatile_tags.is_empty() {
+        return Err(FieldParityError::Invariant(
+            "faint cleanup left instances behind".to_owned(),
+        ));
+    }
+    steps.push(FieldLifecycleStep::FaintSubstateResolved {
+        subject: subject_key.to_owned(),
+        owner: owner.get().get(),
+        cleared_count,
+    });
+
+    Ok(FieldLifecycleReport {
+        schema_version: FIELD_PARITY_SCHEMA_VERSION,
+        domain: FieldDomain::MajorStatus,
+        subject_key: subject_key.to_owned(),
+        steps,
+        audited_draws: 0,
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -1710,4 +2139,30 @@ fn preserved_status_names(statuses: &[StatusKind]) -> Vec<String> {
         .iter()
         .map(|kind| status_name(*kind).to_owned())
         .collect()
+}
+
+fn instance_refs(expired: &[ExpiredTag]) -> Vec<InstanceRef> {
+    expired
+        .iter()
+        .map(|entry| InstanceRef {
+            owner: entry.owner.get().get(),
+            subject: volatile_subject_key(&entry.subject),
+        })
+        .collect()
+}
+
+fn rejection_name(reason: StatusRejection) -> String {
+    match reason {
+        StatusRejection::ExistingMajorStatus { existing } => {
+            format!("EXISTING_MAJOR_STATUS:{}", status_name(existing))
+        }
+        StatusRejection::TypeImmunity { status, .. } => {
+            format!("TYPE_IMMUNITY:{}", status_name(status))
+        }
+        StatusRejection::PowderImmunity { .. } => "POWDER_IMMUNITY".to_owned(),
+        StatusRejection::IntrinsicSentinel => "INTRINSIC_SENTINEL".to_owned(),
+        StatusRejection::SleepWindowRequired => "SLEEP_WINDOW_REQUIRED".to_owned(),
+        StatusRejection::ReroutedToFrostbiteTag => "REROUTED_TO_FROSTBITE_TAG".to_owned(),
+        StatusRejection::RoutedToFaintSubstate => "ROUTED_TO_FAINT_SUBSTATE".to_owned(),
+    }
 }
