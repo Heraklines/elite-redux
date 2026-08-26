@@ -340,6 +340,13 @@
   "SPECIES_RIBOMBEE": {
     "hidden": 118
   },
+  "SPECIES_SALAMENCE_MEGA": {
+    "innates": [
+      5459,
+      5066,
+      5101
+    ]
+  },
   "SPECIES_SAWSBUCK": {
     "ability1": 91,
     "ability2": 92,

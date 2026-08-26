@@ -12,6 +12,7 @@ import { speciesStarterCosts } from "#balance/starters";
 import { tmSpecies } from "#balance/tm-species-map";
 import { speciesTmMoves } from "#balance/tms";
 import { registerErEditorMon } from "#data/elite-redux/init-elite-redux-custom-species";
+import { isNewPokemonContentEnabled } from "#data/elite-redux/er-new-pokemon-gate";
 import { EggTier } from "#enums/egg-type";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
@@ -571,6 +572,9 @@ export interface InjectErFakemonPitchSpeciesResult {
 
 export function injectErFakemonPitchSpecies(): InjectErFakemonPitchSpeciesResult {
   const result: InjectErFakemonPitchSpeciesResult = { registered: 0, skipped: 0, evolutionEdges: 0 };
+  if (!isNewPokemonContentEnabled()) {
+    return result;
+  }
   const evolutions = pokemonEvolutions as Record<number, SpeciesEvolution[]>;
 
   for (const def of ER_FAKEMON_PITCH_SPECIES) {
@@ -620,6 +624,9 @@ function cloneLevelMoves(sourceId: number, additions: ReadonlyArray<readonly [nu
 }
 
 export function applyErFakemonPitchLearnsets(): number {
+  if (!isNewPokemonContentEnabled()) {
+    return 0;
+  }
   const table = pokemonSpeciesLevelMoves as Record<number, [number, number][]>;
   for (const def of ER_FAKEMON_PITCH_SPECIES) {
     table[def.id] = cloneLevelMoves(def.learnsetSource, def.learnsetAdditions);
@@ -628,6 +635,9 @@ export function applyErFakemonPitchLearnsets(): number {
 }
 
 export function applyErFakemonPitchEggMoves(): number {
+  if (!isNewPokemonContentEnabled()) {
+    return 0;
+  }
   let wired = 0;
   for (const def of ER_FAKEMON_PITCH_SPECIES) {
     if (def.eggMoveSource === undefined) {
@@ -640,6 +650,9 @@ export function applyErFakemonPitchEggMoves(): number {
 }
 
 export function applyErFakemonPitchTmCompatibility(): number {
+  if (!isNewPokemonContentEnabled()) {
+    return 0;
+  }
   type FormTmEntry = [SpeciesId, ...string[]];
   const bySpecies = speciesTmMoves as Record<number, (MoveId | [unknown, MoveId])[]>;
   const byMove = tmSpecies as Record<number, (SpeciesId | FormTmEntry)[]>;

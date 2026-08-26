@@ -152,6 +152,7 @@ import { TypeConversionAbAttr, TypeConversionPowerBoostAbAttr } from "#data/elit
 import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilities";
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
+import { isGatedNewPokemonAbilityId, isNewPokemonContentEnabled } from "#data/elite-redux/er-new-pokemon-gate";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
@@ -243,6 +244,9 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
   for (const draft of ER_ABILITIES) {
     const pokerogueId = ER_ID_MAP.abilities[draft.id];
     if (pokerogueId === undefined) {
+      continue;
+    }
+    if (!isNewPokemonContentEnabled() && isGatedNewPokemonAbilityId(pokerogueId)) {
       continue;
     }
     if (pokerogueId < VANILLA_ID_CUTOFF) {
@@ -733,7 +737,9 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
   // definitions are repeated below and skipped by existingIds after this first
   // registration; their final constituent attrs are still populated by the
   // post-init manual-composite pass.
-  manualDrafts.push(...ER_FAKEMON_PITCH_ABILITIES);
+  if (isNewPokemonContentEnabled()) {
+    manualDrafts.push(...ER_FAKEMON_PITCH_ABILITIES);
+  }
   // Newcomer BATCH 2 — the TWO residual parked placeholders (Meteor Mass,
   // Inverse Room) the codex batch does not define. Named + battle-inert so each
   // mon carries the correctly-named slot; flagged for the designer.
@@ -749,6 +755,9 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
   // wireEliteReduxManualComposites (init.ts, after the composite refresh) so
   // every constituent — ER-custom and rebalance-patched vanilla — is final.
   for (const def of Object.values(MANUAL_COMPOSITE_PARTS)) {
+    if (!isNewPokemonContentEnabled() && isGatedNewPokemonAbilityId(def.id)) {
+      continue;
+    }
     manualDrafts.push({
       draft: { id: def.id, name: def.name, description: def.description, archetype: "unknown" },
       pokerogueId: def.id,

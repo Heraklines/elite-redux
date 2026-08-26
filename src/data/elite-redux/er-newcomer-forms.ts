@@ -54,6 +54,10 @@ import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import { ER_SPORE_BED_ABILITY_ID } from "#data/elite-redux/abilities/spore-bed";
 import { ER_MYCELIAL_NETWORK_ABILITY_ID } from "#data/elite-redux/abilities/mycelial-network";
 import { ER_LAST_HOST_ABILITY_ID } from "#data/elite-redux/abilities/last-host";
+import {
+  isGatedNewPokemonFormSlug,
+  isNewPokemonContentEnabled,
+} from "#data/elite-redux/er-new-pokemon-gate";
 import { ER_CLEANSING_LIGHT_ABILITY_ID } from "#data/elite-redux/abilities/cleansing-light";
 import { ER_QUICKENING_GRACE_ABILITY_ID } from "#data/elite-redux/abilities/quickening-grace";
 import {
@@ -756,6 +760,9 @@ export function applyNewcomerLearnsetAdditions(): number {
   const table = pokemonSpeciesLevelMoves as Record<number, LevelMoves>;
   let added = 0;
   for (const def of ER_NEWCOMER_FORMS) {
+    if (!isNewPokemonContentEnabled() && isGatedNewPokemonFormSlug(def.slug)) {
+      continue;
+    }
     if (!def.learnMoves || def.learnMoves.length === 0) {
       continue;
     }
@@ -909,6 +916,9 @@ function registerFormChangeEdge(def: NewcomerFormDef, result: InjectNewcomerForm
 export function injectNewcomerForms(): InjectNewcomerFormsResult {
   const result: InjectNewcomerFormsResult = { injected: 0, skippedExisting: 0, edgesRegistered: 0, errors: [] };
   for (const def of ER_NEWCOMER_FORMS) {
+    if (!isNewPokemonContentEnabled() && isGatedNewPokemonFormSlug(def.slug)) {
+      continue;
+    }
     const species = getPokemonSpecies(def.baseSpecies as SpeciesId);
     if (!species) {
       result.errors.push(`newcomer form ${def.formName}: base species ${def.baseSpecies} not found`);
