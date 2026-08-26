@@ -495,13 +495,13 @@ async function runCodex(payload, emit) {
     }
     if (turnError) {
       const info = errorInfo(turnError);
+      const fallbackMessage = /network|connection|timed out|temporarily unavailable/i.test(info.message);
       throw Object.assign(new Error(info.message), {
-        fallback: [
-          "UsageLimitExceeded",
-          "Unauthorized",
-          "HttpConnectionFailed",
-          "ResponseStreamConnectionFailed",
-        ].includes(info.type),
+        fallback:
+          fallbackMessage
+          || ["UsageLimitExceeded", "Unauthorized", "HttpConnectionFailed", "ResponseStreamConnectionFailed"].includes(
+            info.type,
+          ),
         reauthRequired: info.type === "Unauthorized",
       });
     }
