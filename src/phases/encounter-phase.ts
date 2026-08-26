@@ -2427,11 +2427,34 @@ export class EncounterPhase extends BattlePhase {
       // keeps its fresh-versus intro path; its loaded launch still uses the presentation-only branch above.
       playerPresentationReady = materializeCoopLoadedPlayerFieldReady(presentationBoundaryIsLive);
     } else {
-      const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
       // Multi-format: the local player side's capacity drives how many leads summon /
       // get a switch prompt. Binary -> 1 (single) or 2 (double); triple -> 3.
       const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
       const multiFormat = playerCapacity > 1;
+      const party = globalScene.getPlayerParty();
+
+      // A battle can end on the same action that faints one of the player's
+      // active Pokémon. Victory then correctly skips a replacement prompt, but
+      // the fainted member can remain in the next encounter's active party
+      // prefix. SummonPhase is party-indexed, so asking it to summon slot 0 in
+      // that state silently targets the fainted Pokémon; the enemy then loops
+      // through targetless turns until the synchronous phase chain overflows.
+      // Normalize the active prefix before deriving any summon slots, just as
+      // the loaded-encounter repair above already does.
+      for (let i = 0; i < Math.min(playerCapacity, party.length); i++) {
+        if (!party[i].isAllowedInBattle() && party[i].isOnField()) {
+          party[i].leaveField();
+        }
+      }
+      compactEligiblePartyIntoActiveSlots(party, playerCapacity, pokemon => pokemon.isAllowedInBattle());
+      const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
+
+      if (availablePartyMembers.length === 0) {
+        globalScene.phaseManager.clearPhaseQueue();
+        globalScene.phaseManager.unshiftNew("GameOverPhase");
+        this.completeEncounterEnd();
+        return;
+      }
 
       if (!availablePartyMembers[0].isOnField()) {
         globalScene.phaseManager.pushNew("SummonPhase", 0);
@@ -2446,7 +2469,6 @@ export class EncounterPhase extends BattlePhase {
       // orphans are invisible to them - enumerate the PARTY by index. `ReturnPhase` is
       // party-indexed (PartyMemberPokemonPhase.getPokemon -> party[i]), so it recalls the correct
       // mon regardless of the new arrangement.
-      const party = globalScene.getPlayerParty();
       for (let i = playerCapacity; i < party.length; i++) {
         if (party[i]?.isOnField()) {
           globalScene.phaseManager.pushNew("ReturnPhase", i);

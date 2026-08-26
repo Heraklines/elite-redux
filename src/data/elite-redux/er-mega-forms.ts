@@ -11,7 +11,7 @@
 // target ER species id (the mega form's own ER species record, which carries
 // its stats/types/abilities/innates) + the pokerogue formKey to inject.
 // This DATA-DRIVEN table replaces the fragile name-suffix guessing so all ER
-// megas get a form, including ER-custom (Redux) megas. 294 forms.
+// megas get a form, including ER-custom (Redux) megas. 296 forms.
 // =============================================================================
 
 export interface ErMegaFormEntry {
@@ -254,6 +254,8 @@ export const ER_MEGA_FORMS: readonly ErMegaFormEntry[] = [
   { baseErId: 1744, targetErId: 2167, formKey: "mega", formName: "Mega" }, // Oricorio Pom Pom -> Oricorio Mega
   { baseErId: 1745, targetErId: 2167, formKey: "mega", formName: "Mega" }, // Oricorio Pau -> Oricorio Mega
   { baseErId: 1746, targetErId: 2167, formKey: "mega", formName: "Mega" }, // Oricorio Sensu -> Oricorio Mega
+  { baseErId: 1782, targetErId: 1784, formKey: "primal", formName: "Ultra" }, // Necrozma Dusk Mane -> Necrozma Ultra
+  { baseErId: 1783, targetErId: 1784, formKey: "primal", formName: "Ultra" }, // Necrozma Dawn Wings -> Necrozma Ultra
   { baseErId: 1785, targetErId: 1901, formKey: "mega", formName: "Mega" }, // Magearna Original -> Magearna Mega
   { baseErId: 1788, targetErId: 2207, formKey: "mega", formName: "Mega" }, // Toxtricity Low Key -> Toxtricity Mega
   { baseErId: 1805, targetErId: 2186, formKey: "mega", formName: "Mega" }, // Urshifu Rapid Strike Style -> Urshifu Rapid Strike Style Mega

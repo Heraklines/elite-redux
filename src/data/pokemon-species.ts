@@ -18,6 +18,7 @@ import type { GrowthRate } from "#data/exp";
 import { Gender } from "#data/gender";
 import { AbilityId } from "#enums/ability-id";
 import { DexAttr } from "#enums/dex-attr";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { EvoLevelThresholdKind } from "#enums/evo-level-threshold-kind";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -1258,6 +1259,12 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
   getName(formIndex?: number): string {
     if (formIndex !== undefined && this.forms.length > 0) {
       const form = this.forms[formIndex];
+      if (
+        form.formKey === SpeciesFormKey.PRIMAL
+        && (this.speciesId === ErSpeciesId.NECROZMA_DUSK_MANE || this.speciesId === ErSpeciesId.NECROZMA_DAWN_WINGS)
+      ) {
+        return getPokemonSpecies(ErSpeciesId.NECROZMA_ULTRA as SpeciesId).name;
+      }
       let key: string | undefined;
       switch (form.formKey) {
         case SpeciesFormKey.MEGA:
@@ -1328,6 +1335,12 @@ export class PokemonSpecies extends PokemonSpeciesForm implements Localizable {
     // branch below and leaks the raw i18n key "regionalForm." onto the info panel.
     if (formKey === "") {
       return "";
+    }
+    if (
+      formKey === SpeciesFormKey.PRIMAL
+      && (this.speciesId === ErSpeciesId.NECROZMA_DUSK_MANE || this.speciesId === ErSpeciesId.NECROZMA_DAWN_WINGS)
+    ) {
+      return append ? getPokemonSpecies(ErSpeciesId.NECROZMA_ULTRA as SpeciesId).name : "Ultra";
     }
     const formText = toPascalCase(formKey);
     // ER customs (id >= 10000) aren't in the SpeciesId enum, so SpeciesId[id]
