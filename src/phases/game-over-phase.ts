@@ -24,6 +24,7 @@ import {
   setCommunityRunState,
   setFounderRunState,
 } from "#data/elite-redux/er-community-run-state";
+import { isErEndlessContinuationActive } from "#data/elite-redux/er-endless-continuation";
 import { restoreErEndlessBattleOverlays } from "#data/elite-redux/er-endless-rift-runtime";
 import { getFunModeConfig, isFunDebugModeActive } from "#data/elite-redux/er-fun-mode";
 import {
@@ -106,6 +107,7 @@ export class GameOverPhase extends BattlePhase {
     // Failsafe if players somehow skip floor 200 in classic mode
     if (
       globalScene.gameMode.isClassic
+      && !isErEndlessContinuationActive()
       && globalScene.currentBattle.waveIndex > (isErSprintMode(globalScene.gameMode.modeId) ? 100 : 200)
     ) {
       this.isVictory = true;

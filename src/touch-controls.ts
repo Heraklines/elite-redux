@@ -68,7 +68,7 @@ export class TouchControl {
 
       // prevent pointer event from also firing (undefined just sets presence of custom attribute)
       if (event.currentTarget instanceof HTMLElement) {
-        event.currentTarget.dataset.skipPointerEvent = undefined;
+        event.currentTarget.dataset.skipPointerDown = undefined;
       }
     });
     node.addEventListener("pointerdown", event => {
@@ -82,7 +82,7 @@ export class TouchControl {
 
     node.addEventListener("touchcancel", (event: TouchEvent) => {
       if (event.currentTarget instanceof HTMLElement && "skipPointerDown" in event.currentTarget.dataset) {
-        delete event.currentTarget.dataset.skipPointerEvent;
+        delete event.currentTarget.dataset.skipPointerDown;
       }
     });
 
@@ -91,7 +91,7 @@ export class TouchControl {
       this.touchButtonUp(node, key, event.target?.["id"]);
       if (event.currentTarget instanceof HTMLElement && "skipPointerDown" in event.currentTarget.dataset) {
         // allow pointer event to once again fire
-        delete event.currentTarget.dataset.skipPointerEvent;
+        delete event.currentTarget.dataset.skipPointerDown;
         event.currentTarget.dataset.skipPointerUp = undefined;
       }
     });

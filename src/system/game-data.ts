@@ -7309,10 +7309,11 @@ export class GameData {
    * @returns The number of classic wins after incrementing.
    */
   incrementRibbonCount(species: PokemonSpecies, forStarter = false): number {
+    const ribbonOwnerSpecies = getPokemonSpecies(erMegaTargetToBaseSpeciesId(species.speciesId) ?? species.speciesId);
     if (isFunDebugModeActive(globalScene.gameMode?.isFun)) {
-      return this.getStarterDataEntry(species.getRootSpeciesId(forStarter)).classicWinCount ?? 0;
+      return this.getStarterDataEntry(ribbonOwnerSpecies.getRootSpeciesId(forStarter)).classicWinCount ?? 0;
     }
-    const speciesIdToIncrement: SpeciesId = species.getRootSpeciesId(forStarter);
+    const speciesIdToIncrement = ribbonOwnerSpecies.getRootSpeciesId(forStarter);
     const starterEntry = this.getStarterDataEntry(speciesIdToIncrement);
 
     if (!starterEntry.classicWinCount) {

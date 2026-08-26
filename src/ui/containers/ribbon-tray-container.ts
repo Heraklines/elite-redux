@@ -2,7 +2,7 @@ import { globalScene } from "#app/global-scene";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { Button } from "#enums/buttons";
 import { RibbonData, type RibbonFlag } from "#system/ribbons/ribbon-data";
-import { ribbonFlagToAssetKey } from "#system/ribbons/ribbon-methods";
+import { getRibbonOwnerSpeciesId, ribbonFlagToAssetKey } from "#system/ribbons/ribbon-methods";
 import type { MessageUiHandler } from "#ui/message-ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { getAvailableRibbons, getRibbonKey, orderedRibbons } from "#utils/ribbon-utils";
@@ -106,8 +106,9 @@ export class RibbonTray extends Phaser.GameObjects.Container {
 
   open(species: PokemonSpecies): boolean {
     const ribbons: RibbonFlag[] = (this.ribbons = []);
+    const ribbonOwnerId = getRibbonOwnerSpeciesId(species.speciesId);
 
-    this.ribbonData = globalScene.gameData.dexData[species.speciesId].ribbons;
+    this.ribbonData = globalScene.gameData.dexData[ribbonOwnerId].ribbons;
 
     this.trayIcons = [];
     let index = 0;
@@ -116,7 +117,7 @@ export class RibbonTray extends Phaser.GameObjects.Container {
     const availableOrderedRibbons = orderedRibbons.filter(r => availableRibbons.includes(r));
 
     // Classic win count (always 0 for evolutions)
-    const classicWinCount = globalScene.gameData.starterData[species.speciesId]?.classicWinCount ?? 0;
+    const classicWinCount = globalScene.gameData.getStarterDataEntry(ribbonOwnerId).classicWinCount ?? 0;
 
     for (const ribbon of availableOrderedRibbons) {
       // TODO: eventually, write a save migrator to fix the ribbon save data and get rid of these two conditions

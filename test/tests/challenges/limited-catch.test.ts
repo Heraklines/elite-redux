@@ -1,3 +1,4 @@
+import { resetErRunPacing, setErRunPacing } from "#data/elite-redux/er-run-pacing";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveId } from "#enums/move-id";
@@ -7,7 +8,7 @@ import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { runMysteryEncounterToEnd } from "#test/utils/encounter-test-utils";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 describe("Challenges - Limited Catch", () => {
   let phaserGame: Phaser.Game;
@@ -31,6 +32,10 @@ describe("Challenges - Limited Catch", () => {
       .startingModifier([{ name: "MASTER_BALL", count: 1 }]);
   });
 
+  afterEach(() => {
+    resetErRunPacing();
+  });
+
   it("should allow wild Pokémon to be caught on X1 waves", async () => {
     game.override.startingWave(31);
     await game.challengeMode.startBattle(SpeciesId.NUZLEAF);
@@ -49,6 +54,17 @@ describe("Challenges - Limited Catch", () => {
     await game.toEndOfTurn();
 
     expect(game.scene.getPlayerParty()).toHaveLength(1);
+  });
+
+  it("uses Sprint's five-wave chapter starts for party catches", async () => {
+    game.override.startingWave(6);
+    await game.challengeMode.startBattle(SpeciesId.NUZLEAF);
+    setErRunPacing("sprint");
+
+    game.doThrowPokeball(PokeballType.MASTER_BALL);
+    await game.toEndOfTurn();
+
+    expect(game.scene.getPlayerParty()).toHaveLength(2);
   });
 
   it("should allow gift Pokémon from Mystery Encounters to be added to party", async () => {

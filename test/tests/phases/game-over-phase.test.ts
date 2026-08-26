@@ -1,3 +1,4 @@
+import { initializeErEndlessContinuation, resetErEndlessContinuation } from "#data/elite-redux/er-endless-continuation";
 import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
 import { MoveId } from "#enums/move-id";
@@ -6,7 +7,7 @@ import { Unlockables } from "#enums/unlockables";
 import { achvs } from "#system/achv";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("Game Over Phase", () => {
   let phaserGame: Phaser.Game;
@@ -30,6 +31,10 @@ describe("Game Over Phase", () => {
       .startingWave(200)
       .startingBiome(BiomeId.END)
       .startingLevel(10000);
+  });
+
+  afterEach(() => {
+    resetErEndlessContinuation();
   });
 
   it("winning a run should give rewards", async () => {
@@ -69,5 +74,22 @@ describe("Game Over Phase", () => {
     expect(game.scene.gameData.unlocks[Unlockables.ENDLESS_MODE]).toBe(false);
     expect(game.scene.validateAchv).not.toHaveBeenCalledWith(achvs.CLASSIC_VICTORY);
     expect(game.scene.gameData.achvUnlocks[achvs.CLASSIC_VICTORY.id]).toBeFalsy();
+  });
+
+  it("does not turn a post-game Endless loss into a Classic victory", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    vi.spyOn(game.scene.gameData, "getSession").mockResolvedValue(null);
+    game.scene.currentBattle.waveIndex = 201;
+    game.scene.enableRetries = false;
+    initializeErEndlessContinuation(200, "endless-loss-regression");
+    vi.spyOn(game.scene, "validateAchv");
+
+    game.move.select(MoveId.MEMENTO);
+    await game.phaseInterceptor.to("PostGameOverPhase", false);
+
+    expect(game.phaseInterceptor.log.includes("GameOverPhase")).toBe(true);
+    expect(game.phaseInterceptor.log.includes("UnlockPhase")).toBe(false);
+    expect(game.phaseInterceptor.log.includes("RibbonModifierRewardPhase")).toBe(false);
+    expect(game.scene.validateAchv).not.toHaveBeenCalledWith(achvs.CLASSIC_VICTORY);
   });
 });

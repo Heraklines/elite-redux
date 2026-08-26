@@ -49,6 +49,7 @@ import { UiMode } from "#enums/ui-mode";
 import { UiTheme } from "#enums/ui-theme";
 import type { Variant } from "#sprites/variant";
 import { getVariantIcon, getVariantTint } from "#sprites/variant";
+import { getRibbonOwnerSpeciesId } from "#system/ribbons/ribbon-methods";
 import { SettingKeyboard } from "#system/settings-keyboard";
 import type { BiomeTierTimeOfDay } from "#types/biomes";
 import type { DexEntry } from "#types/dex-data";
@@ -837,6 +838,7 @@ export class PokedexPageUiHandler extends MessageUiHandler {
   private getMenuText(): string {
     const isSeen = this.isSeen();
     const isStarterCaught = !!this.isCaught(this.getStarterSpecies(this.species));
+    const ribbonOwnerId = getRibbonOwnerSpeciesId(this.species.speciesId);
 
     return this.menuOptions
       .map(o => {
@@ -845,10 +847,10 @@ export class PokedexPageUiHandler extends MessageUiHandler {
           !isSeen
           || (!isStarterCaught && (o === MenuOptions.NATURES || o === MenuOptions.RIBBONS))
           || (this.tmMoves.length === 0 && o === MenuOptions.TM_MOVES)
-          || (!globalScene.gameData.dexData[this.species.speciesId].ribbons.getRibbons()
+          || (!globalScene.gameData.dexData[ribbonOwnerId].ribbons.getRibbons()
             && o === MenuOptions.RIBBONS
             && !globalScene.showMissingRibbons
-            && !globalScene.gameData.starterData[this.species.speciesId]?.classicWinCount);
+            && !globalScene.gameData.getStarterDataEntry(ribbonOwnerId).classicWinCount);
         const color = getTextColor(isDark ? TextStyle.SHADOW_TEXT : TextStyle.SETTINGS_VALUE, false);
         const shadow = getTextColor(isDark ? TextStyle.SHADOW_TEXT : TextStyle.SETTINGS_VALUE, true);
         return `[shadow=${shadow}][color=${color}]${label}[/color][/shadow]`;
@@ -1952,9 +1954,10 @@ export class PokedexPageUiHandler extends MessageUiHandler {
               break;
             }
 
-            const hasRibbons = globalScene.gameData.dexData[this.species.speciesId]?.ribbons.getRibbons();
+            const ribbonOwnerId = getRibbonOwnerSpeciesId(this.species.speciesId);
+            const hasRibbons = globalScene.gameData.dexData[ribbonOwnerId]?.ribbons.getRibbons();
             const { showMissingRibbons } = globalScene;
-            const classicWinCount = globalScene.gameData.starterData[this.species.speciesId]?.classicWinCount;
+            const classicWinCount = globalScene.gameData.getStarterDataEntry(ribbonOwnerId).classicWinCount;
 
             if (!hasRibbons && !showMissingRibbons && !classicWinCount) {
               ui.showText(i18next.t("pokedexUiHandler:noRibbons"));

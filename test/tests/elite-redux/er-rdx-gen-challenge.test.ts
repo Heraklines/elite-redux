@@ -14,6 +14,7 @@
 
 import { SingleGenerationChallenge } from "#data/challenge";
 import { allSpecies } from "#data/data-lists";
+import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import { BooleanHolder } from "#utils/common";
@@ -61,5 +62,15 @@ describe.skipIf(!RUN)("ER RDX mono-gen challenge (#408)", () => {
     // Any fixed wave: the challenge must decline to override (return false)
     // rather than index a 9-entry table at [9].
     expect(challenge.applyFixedBattle(115, {} as never)).toBe(false);
+  });
+
+  it("keeps a custom evolution of a vanilla regional line in that line's generation", () => {
+    const challenge = new SingleGenerationChallenge();
+    challenge.value = 7;
+    const valid = new BooleanHolder(true);
+
+    challenge.applyStarterChoice(getPokemonSpecies(ErSpeciesId.PENTADUG_ALOLAN), valid);
+
+    expect(valid.value).toBe(true);
   });
 });

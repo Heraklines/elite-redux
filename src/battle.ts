@@ -113,6 +113,13 @@ export class Battle {
    * {@linkcode globalScene.arena.playerFaints} is the corresponding faint counter for the player and needs to be save across waves (reset every arena encounter).
    */
   public enemyFaints = 0;
+  /**
+   * Solo wave-clear settlement is emitted exactly once even when one spread hit
+   * queues several Faint/Victory phases before any of them can run.
+   * Each VictoryPhase still awards EXP for its own faint; only the shared
+   * BattleEnd/reward/biome/NewBattle tail is one-shot.
+   */
+  public victoryTailClaimed = false;
   public playerFaintsHistory: FaintLogEntry[] = [];
   public enemyFaintsHistory: FaintLogEntry[] = [];
 

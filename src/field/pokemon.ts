@@ -1594,7 +1594,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const formIndex = useIllusion && this.summonData.illusion ? this.summonData.illusion.formIndex : this.formIndex;
 
     if (species.forms && species.forms.length > 0) {
-      return species.forms[formIndex];
+      // Saved/randomized form state can briefly outlive the species it was
+      // indexed against (notably Fun Mode evolution/form shuffles). Returning
+      // undefined here makes the next typing lookup crash on `.type1` and can
+      // strand the run during trainer construction. The base form is the same
+      // compatibility fallback already used by fusion-form reconstruction.
+      return species.forms[formIndex] ?? species.forms[0];
     }
 
     return species;
@@ -3653,8 +3658,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         : selfIdentity;
     const unlockOwnerIdentity =
       resolveOmniformUnlockOwnerIdentity(slotOwnerIdentity.speciesId, slotOwnerIdentity.formIndex) ?? slotOwnerIdentity;
-    const owner = getPokemonSpecies(unlockOwnerIdentity.speciesId);
-    return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;
+    return globalScene.gameData.getStarterDataEntry(unlockOwnerIdentity.speciesId).passiveAttr ?? 0;
   }
 
   public canApplyAbility(

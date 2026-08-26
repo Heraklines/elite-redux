@@ -6,6 +6,7 @@ import { defaultStarterSpeciesAndEvolutions } from "#balance/pokemon-evolutions"
 import { type StarterSpeciesId, speciesStarterCosts } from "#balance/starters";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { ER_COLOR_HEX, erSpeciesMatchesColor } from "#data/elite-redux/er-monocolor";
+import { isErChapterStartWave } from "#data/elite-redux/er-run-pacing";
 import { ER_COLOR_NAMES } from "#data/elite-redux/er-species-colors";
 import { isErLineLegalForUsageTier, preloadErUsageTiers } from "#data/elite-redux/er-usage-tiers";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -457,9 +458,19 @@ export abstract class Challenge {
  */
 const ER_RDX_CHALLENGE_GEN = 10;
 
-/** The generation the mono-gen challenge sees: ER customs count as RDX (10). */
+/**
+ * The generation the mono-gen challenge sees.
+ *
+ * Standalone ER lines count as RDX (10), but an ER custom evolution/form whose
+ * line starts with a vanilla species inherits that line's real generation. For
+ * example, Alolan Diglett -> Alolan Dugtrio -> Pentadug Alolan must remain Gen 7
+ * for the whole run instead of becoming illegal as soon as it evolves.
+ */
 function erChallengeGeneration(species: PokemonSpecies): number {
-  return species.speciesId >= 10000 ? ER_RDX_CHALLENGE_GEN : species.generation;
+  const baseId = erMegaTargetToBaseSpeciesId(species.speciesId) ?? species.speciesId;
+  const baseSpecies = getPokemonSpecies(baseId);
+  const rootSpecies = getPokemonSpecies(baseSpecies.getRootSpeciesId());
+  return rootSpecies.speciesId >= 10000 ? ER_RDX_CHALLENGE_GEN : rootSpecies.generation;
 }
 
 export class SingleGenerationChallenge extends Challenge {
@@ -1209,7 +1220,7 @@ export class LimitedCatchChallenge extends Challenge {
         globalScene.currentBattle.mysteryEncounter?.encounterType === MysteryEncounterType.TELEPORTING_HIJINKS
         && globalScene.currentBattle.mysteryEncounter.selectedOption
           !== globalScene.currentBattle.mysteryEncounter.options[2]; // don't allow catch when not choosing biome change option
-      const isFirstWave = pokemon.metWave % 10 === 1;
+      const isFirstWave = isErChapterStartWave(pokemon.metWave);
       isValid.value = isTeleporter || isFirstWave;
       return true;
     }

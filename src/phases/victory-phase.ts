@@ -180,6 +180,18 @@ export class VictoryPhase extends PokemonPhase {
       .getEnemyParty()
       .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)));
     if (retainedResolvedVictory || endlessRaidBossDefeated || (!endlessRaid && ordinaryEnemySideDefeated)) {
+      // A spread KO can queue one VictoryPhase per faint while every target is
+      // already marked fainted. All of those phases must award their own EXP,
+      // but only the first may schedule the shared wave-clear tail. Duplicate
+      // tails advanced two battles, destroyed the newly-created trainer sprite,
+      // and reset postgame Endless runs to the title screen. Co-op retains its
+      // separately addressed settlement protocol and is intentionally untouched.
+      if (!globalScene.gameMode.isCoop && this.coopSourceWave == null) {
+        if (globalScene.currentBattle.victoryTailClaimed) {
+          return this.end();
+        }
+        globalScene.currentBattle.victoryTailClaimed = true;
+      }
       if (globalScene.currentBattle.trainer && hasErGhostOverride(globalScene.currentBattle.trainer)) {
         reportErEndlessGhostEncounter("player-win");
       }
@@ -353,7 +365,6 @@ export class VictoryPhase extends PokemonPhase {
           erRouting
           && fireBiomeShop
           && !biomeEnding
-          && !sprintClassic
           && !isCoopAuthoritativeGuest()
           && !hasErEndlessRift("no-sanctuary")
           && isMoodyAutomaticBiomeHealingEnabled()

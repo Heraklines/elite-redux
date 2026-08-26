@@ -437,9 +437,10 @@ export function checkSpeciesValidForChallenge(species: PokemonSpecies, props: De
     return true;
   }
 
+  const currentFormKey = species.forms[props.formIndex]?.formKey ?? "";
   const result = pokemonFormChanges[species.speciesId].some(f1 => {
     // Exclude form changes that require the mon to be on the field to begin with
-    if (!("item" in f1.trigger)) {
+    if (!("item" in f1.trigger) || f1.preFormKey !== currentFormKey) {
       return false;
     }
 
