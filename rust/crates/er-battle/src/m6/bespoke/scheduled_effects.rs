@@ -569,9 +569,11 @@ pub fn set_weather(
 pub fn clear_weather(state: &ScheduledEffectsState) -> Result<FieldOutcome, ScheduledEffectsError> {
     let mut prepared = state.clone();
     let cleared = prepared.weather.take().is_some();
-    let log = cleared
-        .then(|| vec![ScheduledEffectsLogEntry::WeatherCleared])
-        .unwrap_or_default();
+    let log = if cleared {
+        vec![ScheduledEffectsLogEntry::WeatherCleared]
+    } else {
+        Vec::new()
+    };
     finish_field(prepared, log)
 }
 
@@ -608,9 +610,11 @@ pub fn set_terrain(
 pub fn clear_terrain(state: &ScheduledEffectsState) -> Result<FieldOutcome, ScheduledEffectsError> {
     let mut prepared = state.clone();
     let cleared = prepared.terrain.take().is_some();
-    let log = cleared
-        .then(|| vec![ScheduledEffectsLogEntry::TerrainCleared])
-        .unwrap_or_default();
+    let log = if cleared {
+        vec![ScheduledEffectsLogEntry::TerrainCleared]
+    } else {
+        Vec::new()
+    };
     finish_field(prepared, log)
 }
 
@@ -701,13 +705,13 @@ pub fn lapse_field_conditions(
         ScheduledEffectsLogEntry::TerrainExpired,
     );
     for condition in &state.arena_tags {
-        if condition.remaining_turns == 1 {
-            if let Some(tag) = condition.kind.arena_tag() {
-                log.push(ScheduledEffectsLogEntry::ArenaTagExpired {
-                    tag,
-                    owner: condition.owner,
-                });
-            }
+        if condition.remaining_turns == 1
+            && let Some(tag) = condition.kind.arena_tag()
+        {
+            log.push(ScheduledEffectsLogEntry::ArenaTagExpired {
+                tag,
+                owner: condition.owner,
+            });
         }
     }
     for condition in &mut prepared.arena_tags {

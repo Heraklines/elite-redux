@@ -46,7 +46,9 @@ impl TopologyFacts {
     pub fn validate(&self) -> Result<(), PivotRedirectError> {
         let mut seen = BTreeSet::new();
         for facts in self.slots.values() {
-            if let Some(pokemon) = facts.occupant && !seen.insert(pokemon) {
+            if let Some(pokemon) = facts.occupant
+                && !seen.insert(pokemon)
+            {
                 return Err(PivotRedirectError::DuplicateFieldOccupant { pokemon });
             }
         }
