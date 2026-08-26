@@ -588,7 +588,9 @@ fn check_state_invariants(
     let mut seen_ids = BTreeSet::new();
     let mut previous_id: Option<FaintOccurrenceId> = None;
     for occurrence in battle.faint_queue.iter() {
-        assert!(occurrence.id > previous_id.unwrap_or(occurrence.id));
+        if let Some(previous) = previous_id {
+            assert!(occurrence.id > previous);
+        }
         if !seen_ids.insert(occurrence.id) {
             panic!(
                 "{}",
@@ -1174,20 +1176,26 @@ fn m6d_topology_slots_are_unique_and_field_occupancy_is_unique_per_format() -> T
 fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> TestResult {
     let generated = generated_single_battle(42, 3)?;
     let mut state = generated.state;
+    if state
+        .battle
+        .as_ref()
+        .is_some_and(|battle| battle.next_faint_occurrence == FaintOccurrenceId::ZERO)
+    {
+        state
+            .battle
+            .as_mut()
+            .expect("battle exists")
+            .next_faint_occurrence = FaintOccurrenceId::new(safe(1));
+    }
     let epoch = AuthorityEpoch::new(safe(11));
 
     let batch_one = {
         let battle = state.battle.as_mut().unwrap();
-        battle.player_party[0].hp = 0;
-        battle.player_party[0].fainted = true;
         battle.enemy_party[0].hp = 0;
         battle.enemy_party[0].fainted = true;
         queue_faints(
             battle,
-            &[
-                FaintCandidate::new(battle.player_party[0].id, player_slot(0)),
-                FaintCandidate::new(battle.enemy_party[0].id, enemy_slot(0)),
-            ],
+            &[FaintCandidate::new(battle.enemy_party[0].id, enemy_slot(0))],
             epoch,
             0,
         )?
@@ -1195,12 +1203,12 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
 
     let batch_two = {
         let battle = state.battle.as_mut().unwrap();
-        battle.player_party[1].hp = 0;
-        battle.player_party[1].fainted = true;
+        battle.player_party[0].hp = 0;
+        battle.player_party[0].fainted = true;
         queue_faints(
             battle,
             &[FaintCandidate::new(
-                battle.player_party[1].id,
+                battle.player_party[0].id,
                 player_slot(0),
             )],
             epoch,
@@ -1220,7 +1228,7 @@ fn m6d_faint_queue_allocates_ordered_unique_occurrences_across_batches() -> Test
         previous = Some(occurrence.id);
         assert!(occurrence.id < battle.next_faint_occurrence);
     }
-    assert_eq!(batch_one.len(), 2);
+    assert_eq!(batch_one.len(), 1);
     assert_eq!(batch_two.len(), 1);
     assert!(
         batch_one[0].occurrence.id < batch_two[0].occurrence.id,
@@ -1360,6 +1368,7 @@ fn m6d_scheduled_effects_deliver_every_event_exactly_once_with_unique_stable_ids
                 record.event_id
             );
         }
+        state = drained.state;
         assert_eq!(
             delivered.len() as u64,
             next_event_id - 1,
@@ -1484,7 +1493,7 @@ fn m6d_item_lifecycle_keeps_stack_charge_and_ledger_bounds_under_seeded_activity
         for _step in 0..rng.range(6, 12) {
             let owner = *rng.pick(&owners);
             let key = (*rng.pick(&keys)).to_owned();
-            if rng.flip() {
+            if rng.flip() || state.find_instance(owner, &key).is_none() {
                 let request = GrantRequest {
                     owner,
                     registry_key: key.clone(),

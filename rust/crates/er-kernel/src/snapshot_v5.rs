@@ -139,7 +139,7 @@ pub enum SnapshotV5Error {
     #[error("mechanic state schema version must be {expected}, got {actual}")]
     MechanicStateSchemaVersion { expected: u32, actual: u32 },
     #[error("GameStateV4 runtime snapshot is invalid: {0}")]
-    Runtime(#[from] M6RuntimeError),
+    StateOwner(#[from] M6RuntimeError),
     #[error("input-router snapshot is invalid: {0}")]
     Input(SnapshotError),
     #[error("scheduler snapshot is invalid: {0}")]

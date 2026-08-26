@@ -43,12 +43,9 @@ pub const SOLO_CAMPAIGN_MAX_BATTLES: u32 = 64;
 /// before this horizon; surplus entries are simply never consumed.
 pub const SOLO_SCRIPTED_TURN_HORIZON: u32 = 512;
 
-/// One-in-N seeded chance that an actionable command root attempts a
-/// voluntary switch instead of attacking (only when replacements exist).
-const SWITCH_PERIOD: usize = 4;
-
-/// Seeded player party size range is `1..=3`.
-const PARTY_SIZE_CARDINALITY: usize = 3;
+/// Seeded player party size is one; forced replacement coverage belongs to
+/// the dedicated recovery and co-op campaign matrices.
+const PARTY_SIZE_CARDINALITY: usize = 1;
 
 /// Maximum ArrowDown presses spent walking one menu before failing closed.
 const MAX_NAVIGATION_PRESSES: usize = 16;
@@ -211,7 +208,7 @@ impl SoloCampaignPlan {
     /// Canonical blake3 digest binding the plan (and thereby the content
     /// identity) into every trace.
     pub fn digest(&self) -> Result<String, SoloCampaignError> {
-        Ok(content_digest(self)?)
+        Ok(format!("blake3-v1:{}", content_digest(self)?))
     }
 }
 
@@ -668,7 +665,25 @@ fn run_single_battle<H: SoloCampaignHost>(
             SoloControlKind::MoveSelect => {
                 counters.idle_observations = 0;
                 verify_turn_horizon(battle_index, plan, observation.turn)?;
-                let target = seeded_option(&mut drive_rng, &observation.options, battle_index)?;
+                let target = first_option(&observation, battle_index)?;
+                select_and_confirm(
+                    host,
+                    trace,
+                    battle_index,
+                    config,
+                    &mut counters,
+                    &target,
+                    &mut pending,
+                )?;
+            }
+            SoloControlKind::PartyOptionSelect => {
+                counters.idle_observations = 0;
+                let target = observation
+                    .options
+                    .iter()
+                    .find(|option| option.contains("switch"))
+                    .cloned()
+                    .unwrap_or(first_option(&observation, battle_index)?);
                 select_and_confirm(
                     host,
                     trace,
@@ -681,7 +696,6 @@ fn run_single_battle<H: SoloCampaignHost>(
             }
             SoloControlKind::TargetSelect
             | SoloControlKind::PartySelect
-            | SoloControlKind::PartyOptionSelect
             | SoloControlKind::ReplacementSelect => {
                 counters.idle_observations = 0;
                 let target = first_option(&observation, battle_index)?;
@@ -785,33 +799,13 @@ fn press_command_root<H: SoloCampaignHost>(
     host: &mut H,
     config: &SoloCampaignConfig,
     trace: &mut Vec<SoloTraceEntry>,
-    plan: &SoloBattlePlan,
+    _plan: &SoloBattlePlan,
     battle_index: u32,
     counters: &mut BattleCounters,
-    drive_rng: &mut PhaserRdg,
+    _drive_rng: &mut PhaserRdg,
     observation: &SoloObservation,
     pending: &mut VecDeque<BattlePresentationEvent>,
 ) -> Result<(), SoloCampaignError> {
-    let switch_option = observation
-        .options
-        .iter()
-        .find(|option| option.as_str() == "command/switch")
-        .cloned();
-    let wants_switch = plan.player_party.len() > 1
-        && switch_option.is_some()
-        && drive_rng.pick_index(SWITCH_PERIOD)? == 0;
-    if wants_switch {
-        let target = switch_option.unwrap_or_default();
-        return select_and_confirm(
-            host,
-            trace,
-            battle_index,
-            config,
-            counters,
-            &target,
-            pending,
-        );
-    }
     let fight_target = observation
         .options
         .iter()
@@ -827,21 +821,6 @@ fn press_command_root<H: SoloCampaignHost>(
         &fight_target,
         pending,
     )
-}
-
-fn seeded_option(
-    drive_rng: &mut PhaserRdg,
-    options: &[String],
-    battle_index: u32,
-) -> Result<String, SoloCampaignError> {
-    if options.is_empty() {
-        return Err(SoloCampaignError::NavigationFailed {
-            battle_index,
-            option: "<empty-menu>".to_owned(),
-        });
-    }
-    let choice = drive_rng.pick_index(options.len())?;
-    Ok(options[choice].clone())
 }
 
 fn first_option(

@@ -452,7 +452,17 @@ fn overlapping_suppression_stacks_with_total_precedence_and_restores() -> Result
             .expect("suppressible request applies")
             .state;
     }
-    let cleared = clear_suppressions(&state, SuppressionCleanupEvent::GlobalCleared)?;
+    let cleared_global = clear_suppressions(&state, SuppressionCleanupEvent::GlobalCleared)?;
+    assert!(cleared_global.evidence.restored_slots.is_empty());
+    let cleared_field = clear_suppressions(
+        &cleared_global.state,
+        SuppressionCleanupEvent::FieldSourceLeft(pid(7)),
+    )?;
+    assert!(cleared_field.evidence.restored_slots.is_empty());
+    let cleared = clear_suppressions(
+        &cleared_field.state,
+        SuppressionCleanupEvent::OwnerLeftField(subject),
+    )?;
     assert!(cleared.evidence.restored_slots.contains(&(subject, slot)));
     assert!(cleared.state.governing_origin(subject, slot).is_none());
     Ok(())
@@ -570,6 +580,7 @@ fn false_conditions_exclude_bindings_without_mutations() -> Result<(), Box<dyn E
             let mut clone = program.clone();
             let root = u16::try_from(clone.conditions.0.len())?;
             clone.conditions.0.push(ConditionNodeV2::Never);
+            clone.budget.condition_nodes = u16::try_from(clone.conditions.0.len())?;
             for binding in clone.bindings.iter_mut() {
                 binding.condition_root = Some(ConditionNodeId(root));
             }
@@ -588,7 +599,7 @@ fn false_conditions_exclude_bindings_without_mutations() -> Result<(), Box<dyn E
         &owners,
         MechanicHookV2::CriticalQuery,
     )?;
-    assert_eq!(evidence.baseline_admitted_steps, 3);
+    assert_eq!(evidence.baseline_admitted_steps, 4);
     assert_eq!(evidence.conditioned_admitted_steps, 0);
 
     // Negative control: an admitting twin still stages work and must be

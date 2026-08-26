@@ -148,9 +148,7 @@ fn query_input(value: &QueryValue) -> Result<i64, QueryExecutionError> {
         QueryValue::Unsigned(value) => {
             i64::try_from(*value).map_err(|_| QueryExecutionError::Overflow)
         }
-        QueryValue::Ratio(value) => {
-            i64::try_from(value.numerator).map_err(|_| QueryExecutionError::Overflow)
-        }
+        QueryValue::Ratio(value) => Ok(value.numerator),
         QueryValue::TypeId(value) | QueryValue::CategoryId(value) | QueryValue::TargetId(value) => {
             Ok(i64::from(*value))
         }

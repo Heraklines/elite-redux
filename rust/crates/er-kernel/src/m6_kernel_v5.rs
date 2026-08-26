@@ -159,8 +159,8 @@ impl GameKernelV5 {
 
 #[derive(Debug, Error)]
 pub enum M6KernelV5Error {
-    #[error("V4 runtime failed: {0}")]
-    Runtime(#[from] M6RuntimeError),
+    #[error("V4 state owner failed: {0}")]
+    StateOwner(#[from] M6RuntimeError),
     #[error("Snapshot V5 failed: {0}")]
     Snapshot(#[from] SnapshotV5Error),
     #[error("input-router snapshot failed: {0}")]

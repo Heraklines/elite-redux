@@ -19,13 +19,10 @@
 //!   in [`RELEASE_QUALIFICATION_CEILINGS_V1`] and are compared through typed
 //!   [`QualificationReport`] values for the hosted workflow.
 //!
-//! This module is compiled both inside `er-sim` and directly into the
-//! `er-testkit` M6 performance integration test through `#[path]`, so it may
-//! depend only on crates shared by both dependency sets and must never name
-//! its parent crate.
-// Compiled both as an `er-sim` library module and directly into the
-// `er-testkit` M6 performance integration test; helpers that are public API
-// in the former can read as unused in the latter.
+//! This test-only support module owns filesystem and wall-clock benchmark
+//! orchestration. Production crates remain deterministic and environment-free.
+//! It is compiled directly into the `er-testkit` M6 performance integration
+//! test.
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, VecDeque};
@@ -220,14 +217,6 @@ pub enum BenchmarkProfile {
 }
 
 impl BenchmarkProfile {
-    pub const fn current() -> Self {
-        if cfg!(debug_assertions) {
-            Self::Debug
-        } else {
-            Self::Release
-        }
-    }
-
     pub const fn name(self) -> &'static str {
         match self {
             Self::Debug => "debug",

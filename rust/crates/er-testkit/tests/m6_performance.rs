@@ -7,10 +7,10 @@
 //! enforced exclusively when the hosted workflow sets
 //! [`m6_benchmark::HOSTED_ENFORCEMENT_ENV`].
 //!
-//! The benchmark workloads are shared with `er-sim`, which does not depend on
-//! this crate, so the module is compiled in place from its owned source file.
+//! The benchmark workloads are test-only support code compiled directly into
+//! this integration test.
 
-#[path = "../../er-sim/src/m6_benchmark.rs"]
+#[path = "support/m6_benchmark.rs"]
 mod m6_benchmark;
 
 use std::error::Error;
@@ -25,6 +25,13 @@ use m6_benchmark::{
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+fn current_profile() -> BenchmarkProfile {
+    if cfg!(debug_assertions) {
+        BenchmarkProfile::Debug
+    } else {
+        BenchmarkProfile::Release
+    }
+}
 
 fn is_lower_hex(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
@@ -36,7 +43,7 @@ fn deterministic_pair(
     workload_id: &'static str,
     run: impl Fn(BenchmarkProfile) -> Result<WorkloadMeasurement, m6_benchmark::BenchmarkError>,
 ) -> TestResult<WorkloadMeasurement> {
-    let profile = BenchmarkProfile::current();
+    let profile = current_profile();
     let first = run(profile)?;
     let second = run(profile)?;
     assert_measurements_deterministic(&first, &second)?;
@@ -244,8 +251,9 @@ fn release_ceiling_table_is_closed_over_workloads() {
 
 #[test]
 fn qualification_report_is_machine_readable_and_fails_uncovered() -> TestResult {
-    let measurements = run_all_workloads(BenchmarkProfile::current())?;
-    let report = qualification_report(BenchmarkProfile::current(), &measurements)?;
+    let profile = current_profile();
+    let measurements = run_all_workloads(profile)?;
+    let report = qualification_report(profile, &measurements)?;
     assert_eq!(
         report.comparisons.len(),
         RELEASE_QUALIFICATION_CEILINGS_V1.len()
@@ -257,7 +265,7 @@ fn qualification_report_is_machine_readable_and_fails_uncovered() -> TestResult 
     assert!(rendered_measurements.contains("\"checksum\""));
 
     // A report missing any covered workload must fail closed.
-    let partial = qualification_report(BenchmarkProfile::current(), &measurements[..1])?;
+    let partial = qualification_report(profile, &measurements[..1])?;
     assert!(!partial.passed);
 
     // Timing is asserted only when the hosted workflow demands enforcement.

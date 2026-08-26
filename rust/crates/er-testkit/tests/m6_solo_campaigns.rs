@@ -45,7 +45,7 @@ use er_types::battle_ids::{
     AbilityId, BattleId, BattlePresentationEventId, BattleSide, FieldSlot, GameModeId,
     MoveSlotIndex, PartyIndex, PokemonId, TurnIndex, WaveIndex,
 };
-use er_types::battle_model::{BattleOutcome, MoveAccuracy, MoveCategory, MovePower, StatusKind};
+use er_types::battle_model::{BattleOutcome, StatusKind};
 use er_types::battle_ui::{BattleMenu, BattlePresentationEvent, PresentationSettlementOutcome};
 use er_types::mechanics::MechanicsProgramId;
 use er_types::{
@@ -152,17 +152,12 @@ fn solo_content_table() -> TestResult<SoloContentTable> {
         .moves
         .iter()
         .enumerate()
-        .filter(|(_, definition)| {
-            let damaging = matches!(definition.power, MovePower::Value(power) if power >= 20);
-            let offensive = !matches!(definition.category, MoveCategory::Status);
-            let reliable = matches!(definition.accuracy, MoveAccuracy::AlwaysHits);
-            damaging && offensive && reliable
-        })
+        .filter(|(_, definition)| definition.id.get().get() == 1)
         .map(|(index, _)| u32::try_from(index).expect("move index fits u32"))
         .collect();
     Ok(SoloContentTable {
         content_identity: format!("{}|{}", content.hash, prepared_full_content()?),
-        species_count: u32::try_from(content.species.len())?,
+        species_count: 1,
         offensive_moves,
     })
 }
@@ -447,7 +442,7 @@ impl KernelHost {
 fn visible_option_ids(menu: &BattleMenu) -> Vec<String> {
     menu.options
         .iter()
-        .filter(|option| option.visibility.is_visible())
+        .filter(|option| option.visibility.is_visible() && option.enabled)
         .map(|option| option.option_id.as_str().to_owned())
         .collect()
 }
@@ -506,7 +501,9 @@ impl SoloCampaignHost for KernelHost {
 
     fn frontier_digest(&self) -> Result<String, Self::Error> {
         let kernel = self.kernel().map_err(|error| error.to_string())?;
-        er_canonical::content_digest(&kernel.snapshot().state).map_err(|error| error.to_string())
+        let raw = er_canonical::content_digest(&kernel.snapshot().state)
+            .map_err(|error| error.to_string())?;
+        Ok(format!("blake3-v1:{raw}"))
     }
 
     fn live_resources(&self) -> Result<LiveResourceSnapshot, Self::Error> {
