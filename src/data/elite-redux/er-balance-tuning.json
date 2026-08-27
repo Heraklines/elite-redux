@@ -3,6 +3,9 @@
   "er.ai.experimentalHell": 1,
   "er.ai.sharpnessElite": 0.8,
   "er.ai.sharpnessHell": 0.95,
+  "er.favour.byChallenge": {
+    "GHOST_TRAINERS": 8
+  },
   "er.money.streakCapPct": 12,
   "vanilla.catch.ballMult": {
     "greatBall": 1.7,
