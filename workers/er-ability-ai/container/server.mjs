@@ -315,26 +315,34 @@ function componentIdsForRole(searchContext, role) {
 }
 
 function componentSelectionSchemaForRole(searchContext, role) {
-  const schema = structuredClone(componentPartSelectionSchema);
   const componentIds = componentIdsForRole(searchContext, role);
-  schema.properties.componentId.enum = componentIds;
-  const parameterProperties = {};
+  const variants = [];
   for (const component of searchContext.components) {
     if (!componentIds.includes(component.componentId)) {
       continue;
     }
+    const schema = structuredClone(componentPartSelectionSchema);
+    schema.properties.componentId.enum = [component.componentId];
+    schema.properties.partIndex.enum =
+      role === "hook"
+        ? [null]
+        : role === "condition"
+          ? component.selectableParts.conditionIndexes
+          : component.selectableParts.effectIndexes;
+    const parameterProperties = {};
     for (const parameter of component.rule.parameters || []) {
       if (parameter.path) {
         parameterProperties[parameter.path] = parameterValueSchema;
       }
     }
+    schema.properties.parameterOverrides = {
+      type: "object",
+      properties: parameterProperties,
+      additionalProperties: false,
+    };
+    variants.push(schema);
   }
-  schema.properties.parameterOverrides = {
-    type: "object",
-    properties: parameterProperties,
-    additionalProperties: false,
-  };
-  return schema;
+  return variants.length > 0 ? { anyOf: variants } : null;
 }
 
 function catalogEnum(values, extras = []) {
@@ -370,16 +378,14 @@ function assemblyPlanSchemaForSearch(searchContext, catalog) {
   const componentConditionSchema = componentSelectionSchemaForRole(searchContext, "condition");
   const componentEffectSchema = componentSelectionSchemaForRole(searchContext, "effect");
   const primitiveSchemas = primitiveSchemasForCatalog(catalog);
-  ruleProperties.prerequisiteHooks.items = hookSchema;
-  ruleProperties.hook = hookSchema;
-  ruleProperties.conditions.items.anyOf =
-    componentConditionSchema.properties.componentId.enum.length > 0
-      ? [componentConditionSchema, primitiveSchemas.conditionSchema]
-      : [primitiveSchemas.conditionSchema];
-  ruleProperties.effects.items.anyOf =
-    componentEffectSchema.properties.componentId.enum.length > 0
-      ? [componentEffectSchema, primitiveSchemas.effectSchema]
-      : [primitiveSchemas.effectSchema];
+  ruleProperties.prerequisiteHooks.items = hookSchema || componentPartSelectionSchema;
+  ruleProperties.hook = hookSchema || componentPartSelectionSchema;
+  ruleProperties.conditions.items.anyOf = componentConditionSchema
+    ? [componentConditionSchema, primitiveSchemas.conditionSchema]
+    : [primitiveSchemas.conditionSchema];
+  ruleProperties.effects.items.anyOf = componentEffectSchema
+    ? [componentEffectSchema, primitiveSchemas.effectSchema]
+    : [primitiveSchemas.effectSchema];
   const primitiveRuleProperties = schema.properties.draft.properties.rules.items.properties;
   primitiveRuleProperties.conditions.items = primitiveSchemas.conditionSchema;
   primitiveRuleProperties.effects.items = primitiveSchemas.effectSchema;
