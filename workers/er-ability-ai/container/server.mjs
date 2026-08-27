@@ -768,9 +768,9 @@ async function runCodex(payload, emit) {
 }
 
 async function runNimModel(model, body, payload) {
-  let lastError = new Error("The ability builder is temporarily unavailable");
-  for (let attempt = 0; attempt < 3; attempt++) {
-    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+  let response;
+  try {
+    response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${nimKey}`,
@@ -782,31 +782,23 @@ async function runNimModel(model, body, payload) {
         model,
         ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
       }),
+      signal: AbortSignal.timeout(60_000),
     });
-    if (!response.ok) {
-      lastError = new Error(`The ability builder could not complete the request (${response.status})`);
-      if (response.status === 429 || response.status >= 500) {
-        await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
-        continue;
-      }
-      throw lastError;
-    }
-    const resultBody = await response.json();
-    const content = messageContentText(resultBody?.choices?.[0]?.message?.content).replace(
-      /<think>[\s\S]*?<\/think>/gi,
-      "",
-    );
-    try {
-      const result = stripNulls(extractJson(content, "fallback model", false));
-      normalizeScriptedMoveTargets(result, payload);
-      validateSources(result, payload);
-      return result;
-    } catch (error) {
-      lastError = error;
-      break;
-    }
+  } catch {
+    throw new Error("The backup model timed out");
   }
-  throw lastError;
+  if (!response.ok) {
+    throw new Error(`The ability builder could not complete the request (${response.status})`);
+  }
+  const resultBody = await response.json();
+  const content = messageContentText(resultBody?.choices?.[0]?.message?.content).replace(
+    /<think>[\s\S]*?<\/think>/gi,
+    "",
+  );
+  const result = stripNulls(extractJson(content, "fallback model", false));
+  normalizeScriptedMoveTargets(result, payload);
+  validateSources(result, payload);
+  return result;
 }
 
 async function runNim(payload, emit) {
