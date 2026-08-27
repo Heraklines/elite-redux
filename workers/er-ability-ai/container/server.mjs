@@ -77,7 +77,7 @@ const filterSchema = {
 const simpleConditionSchema = {
   type: "object",
   properties: {
-    kind: { type: "string" },
+    kind: { type: "string", enum: ["holder-hp", "holder-status", "other-status", "weather", "terrain", "move"] },
     minPercent: { type: ["number", "null"] },
     maxPercent: { type: ["number", "null"] },
     status: { type: ["string", "null"] },
@@ -92,9 +92,12 @@ const simpleConditionSchema = {
 const simpleEffectSchema = {
   type: "object",
   properties: {
-    kind: { type: "string" },
-    target: { type: ["string", "null"] },
-    stat: { type: ["string", "null"] },
+    kind: {
+      type: "string",
+      enum: ["stat-stage", "status", "heal-percent", "cure-status", "set-weather", "set-terrain"],
+    },
+    target: { enum: [null, "holder", "other", "holder-side", "opposing-side"] },
+    stat: { enum: [null, "ATK", "DEF", "SPATK", "SPDEF", "SPD", "ACC", "EVA"] },
     stages: { type: ["integer", "null"] },
     status: { type: ["string", "null"] },
     percent: { type: ["number", "null"] },
@@ -108,7 +111,7 @@ const simpleEffectSchema = {
 const modifierSchema = {
   type: "object",
   properties: {
-    kind: { type: "string" },
+    kind: { type: "string", enum: ["move-power", "received-damage", "stat-multiplier", "priority"] },
     multiplier: { type: ["number", "null"] },
     stat: { type: ["string", "null"] },
     amount: { type: ["integer", "null"] },
@@ -166,7 +169,10 @@ const outputSchema = {
             type: "object",
             properties: {
               key: { type: "string", pattern: "^[a-z0-9-]{1,40}$" },
-              trigger: { type: "string" },
+              trigger: {
+                type: "string",
+                enum: ["on-entry", "after-attack", "after-hit", "after-ko", "end-turn", "after-faint"],
+              },
               chance: { type: "number", minimum: 1, maximum: 100 },
               conditionLogic: { type: "string", enum: ["all", "any"] },
               conditions: { type: "array", items: simpleConditionSchema, maxItems: 8 },
@@ -1429,6 +1435,86 @@ function expandAssemblyPlan(result, searchContext) {
   };
 }
 
+function normalizedPrimitiveAlias(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function normalizePrimitiveAliases(result) {
+  const triggerAliases = {
+    "after-landing-a-move": "after-attack",
+    "after-landing-a-hit": "after-attack",
+    "after-attacking": "after-attack",
+    "after-being-hit": "after-hit",
+    "on-entry": "on-entry",
+    "end-of-turn": "end-turn",
+  };
+  const conditionAliases = {
+    "move-filter": "move",
+    "move-condition": "move",
+    hp: "holder-hp",
+    status: "holder-status",
+  };
+  const effectAliases = {
+    stat: "stat-stage",
+    "stat-change": "stat-stage",
+    "change-stat-stages": "stat-stage",
+    heal: "heal-percent",
+    "apply-status": "status",
+  };
+  const targetAliases = {
+    self: "holder",
+    user: "holder",
+    target: "other",
+    opponent: "other",
+    foe: "other",
+  };
+  const statAliases = {
+    atk: "ATK",
+    attack: "ATK",
+    def: "DEF",
+    defense: "DEF",
+    spatk: "SPATK",
+    "special-attack": "SPATK",
+    spdef: "SPDEF",
+    "special-defense": "SPDEF",
+    spd: "SPD",
+    speed: "SPD",
+    acc: "ACC",
+    accuracy: "ACC",
+    eva: "EVA",
+    evasion: "EVA",
+  };
+  for (const rule of result.blueprint.rules || []) {
+    const triggerKey = normalizedPrimitiveAlias(rule.trigger);
+    rule.trigger = triggerAliases[triggerKey] || rule.trigger;
+    for (const condition of rule.conditions || []) {
+      const kindKey = normalizedPrimitiveAlias(condition.kind);
+      condition.kind = conditionAliases[kindKey] || condition.kind;
+      if (condition.filter) {
+        condition.filter.type = condition.filter.type?.toUpperCase() || condition.filter.type;
+        condition.filter.category = condition.filter.category?.toUpperCase() || condition.filter.category;
+        condition.filter.flag =
+          condition.filter.flag?.toUpperCase().replace(/[^A-Z0-9]+/g, "_") || condition.filter.flag;
+      }
+    }
+    for (const effect of rule.effects || []) {
+      const kindKey = normalizedPrimitiveAlias(effect.kind);
+      const targetKey = normalizedPrimitiveAlias(effect.target);
+      const statKey = normalizedPrimitiveAlias(effect.stat);
+      effect.kind = effectAliases[kindKey] || effect.kind;
+      effect.target = targetAliases[targetKey] || effect.target;
+      effect.stat = statAliases[statKey] || effect.stat;
+      effect.status = effect.status?.toUpperCase() || effect.status;
+      effect.weather = effect.weather?.toUpperCase() || effect.weather;
+      effect.terrain = effect.terrain?.toUpperCase() || effect.terrain;
+    }
+  }
+}
+
 function _catalogSearchPrompt(payload) {
   return `Plan exhaustive searches over a closed Pokemon ability catalog. Return exactly one JSON object matching CATALOG SEARCH PLAN SCHEMA. Request 4-12 focused searches that together cover every clause in the user's request. Search scopes are components, abilities, and moves. Component roles are hook, condition, effect, parameter, or any. Search semantic mechanic terms likely to occur in labels and class names, such as "on entry", "scripted move", "contact", "stat stage", or "weather". Search a named move in moves and search its mechanism separately in components. Search a named complete ability in abilities. Do not create the ability yet.
 
@@ -1758,6 +1844,7 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
 async function runNimModel(model, body, payload, searchContext, emit) {
   let plan = await requestNimJson(model, body, assemblyPlanSchema, "ability model", 60_000);
   let result = expandAssemblyPlan(plan, searchContext);
+  normalizePrimitiveAliases(result);
   try {
     normalizeRuntimeSourceReferences(result, payload);
     normalizeComponentRuleHooks(result);
@@ -1781,6 +1868,7 @@ async function runNimModel(model, body, payload, searchContext, emit) {
     };
     plan = await requestNimJson(model, repairBody, assemblyPlanSchema, "ability repair model", 45_000);
     result = expandAssemblyPlan(plan, searchContext);
+    normalizePrimitiveAliases(result);
   }
   normalizeRuntimeSourceReferences(result, payload);
   normalizeComponentRuleHooks(result);
