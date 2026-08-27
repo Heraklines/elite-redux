@@ -819,6 +819,7 @@ async function runNim(payload, emit) {
     temperature: 0.1,
     max_tokens: 6000,
     stream: false,
+    guided_json: outputSchema,
   };
   let lastError = new Error("The ability builder is temporarily unavailable");
   for (const [modelIndex, model] of models.entries()) {
