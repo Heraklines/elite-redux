@@ -620,6 +620,20 @@ function promptRequestsSelfTarget(prompt) {
   );
 }
 
+function normalizeComponentRuleHooks(result) {
+  for (const rule of result.blueprint?.componentRules || []) {
+    const seen = new Set([sourceKey(rule.hook)]);
+    rule.prerequisiteHooks = (rule.prerequisiteHooks || []).filter(hook => {
+      const key = sourceKey(hook);
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }
+}
+
 function normalizeScriptedMoveTargets(result, payload) {
   if (promptRequestsSelfTarget(payload.prompt)) {
     return;
@@ -757,6 +771,7 @@ async function runCodex(payload, emit) {
       });
     }
     const result = stripNulls(extractJson(finalText));
+    normalizeComponentRuleHooks(result);
     normalizeScriptedMoveTargets(result, payload);
     validateSources(result, payload);
     return result;
@@ -796,6 +811,7 @@ async function runNimModel(model, body, payload) {
     "",
   );
   const result = stripNulls(extractJson(content, "fallback model", false));
+  normalizeComponentRuleHooks(result);
   normalizeScriptedMoveTargets(result, payload);
   validateSources(result, payload);
   return result;
