@@ -5202,5 +5202,153 @@
     ],
     "trainerClass": "WHITNEY",
     "weight": 100
+  },
+  "TRAINER_70031": {
+    "battleBgm": "battle_johto_gym",
+    "battleType": "triple",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70031,
+    "maxWave": 90,
+    "minWave": 70,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "NIGHT_SHADE",
+          "DISABLE",
+          "DESTINY_BOND",
+          "DARK_VOID"
+        ],
+        "species": 93,
+        "vitamins": {
+          "def": 1,
+          "hp": 2,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "REVIVER_SEED"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "EERIE_FOG",
+          "DREAM_EATER",
+          "HYPNOSIS",
+          "HELPING_HAND"
+        ],
+        "species": 93
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10018
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SPELL_TAG"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "HYPNOSIS",
+          "NIGHTMARE",
+          "DREAM_EATER",
+          "PROTECT"
+        ],
+        "species": 94,
+        "vitamins": {
+          "hp": 3
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "EERIE_FOG",
+          "OMINOUS_WIND",
+          "EERIE_SPELL",
+          "DRAINING_KISS"
+        ],
+        "species": 429,
+        "vitamins": {
+          "spatk": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "ER_BUG_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "SHADOW_SNEAK",
+          "HEAL_BLOCK",
+          "STRENGTH_SAP",
+          "LEECH_LIFE"
+        ],
+        "species": 47,
+        "vitamins": {
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "WEATHER_BALL",
+          "DRAINING_KISS",
+          "WILL_O_WISP",
+          "EERIE_FOG"
+        ],
+        "species": 351,
+        "vitamins": {
+          "def": 1,
+          "hp": 3,
+          "spatk": 1,
+          "spd": 1
+        }
+      }
+    ],
+    "trainerClass": "MORTY",
+    "weight": 100
   }
 }
