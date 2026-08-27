@@ -2761,7 +2761,7 @@
   ],
   "SPECIES_OMANYTE": [
     "FREEZE_DRY",
-    "GIGA_DRAIN",
+    "SOLAR_BEAM",
     "POWER_GEM",
     "STEAM_ERUPTION"
   ],
@@ -3198,10 +3198,10 @@
     "ELECTRO_DRIFT"
   ],
   "SPECIES_RALTS": [
-    "PSYBLADE",
+    "FIERY_DANCE",
     "BITTER_BLADE",
     "NO_RETREAT",
-    "MULTI_ATTACK"
+    "BOOMBURST"
   ],
   "SPECIES_RALTS_REDUX": [
     "CALM_MIND",
@@ -3744,9 +3744,9 @@
     "EARTH_POWER"
   ],
   "SPECIES_SNORUNT": [
-    "SPARKLY_SWIRL",
-    "NASTY_PLOT",
-    "EARTH_POWER",
+    "CHILLER",
+    "RAGING_SOULS",
+    "BLUE_MOON",
     "BLOOD_MOON"
   ],
   "SPECIES_SNORUNT_REDUX": [
