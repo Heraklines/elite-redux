@@ -332,6 +332,20 @@ function isBehaviorDeclaration(node, kind) {
 }
 
 function domainFor(path, symbol, owner) {
+  if (
+    /(?:battle-anims|effects-display|effect-flyout|er-biome-backgrounds|er-shiny-lab-effects|er-shiny-lab-fx|er-trainer-fx|reward-rate-visuals)\.ts$/u.test(
+      path,
+    )
+  ) {
+    return "PRESENTATION";
+  }
+  if (
+    /^(?:src\/battle\.ts|src\/data\/abilities\/|src\/data\/battler-tags\.ts|src\/data\/elite-redux\/abilities\/|src\/data\/elite-redux\/ability-upgrades\/attrs\/|src\/data\/elite-redux\/archetypes\/|src\/data\/elite-redux\/move-archetype-dispatcher\.ts|src\/data\/moves\/|src\/data\/positional-tags\/)/u.test(
+      path,
+    )
+  ) {
+    return "BATTLE";
+  }
   const evidence = `${path} ${symbol} ${owner ?? ""}`.replace(/([a-z0-9])([A-Z])/gu, "$1 $2").toLowerCase();
   const tokens = new Set(evidence.split(/[^a-z0-9]+/gu).filter(Boolean));
   for (const [domain, names] of DOMAIN_RULES) {
