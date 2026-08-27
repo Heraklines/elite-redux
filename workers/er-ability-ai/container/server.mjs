@@ -12,8 +12,8 @@ const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
-const nimModel = process.env.NVIDIA_NIM_MODEL || "qwen/qwen3-coder-480b-a35b-instruct";
-const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimModel = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "poolside/laguna-xs-2.1";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 let activeTurn = null;
 let generationBusy = false;
@@ -540,6 +540,18 @@ function validateSources(result, payload) {
     }
   }
   const blueprint = result.blueprint;
+  if (!blueprint || typeof blueprint !== "object") {
+    throw new Error("The model did not return an ability blueprint");
+  }
+  const componentCount =
+    (blueprint.includes?.length || 0)
+    + (blueprint.mechanics?.length || 0)
+    + (blueprint.componentRules?.length || 0)
+    + (blueprint.rules?.length || 0)
+    + (blueprint.modifiers?.length || 0);
+  if (componentCount === 0) {
+    throw new Error("The model returned an empty ability blueprint");
+  }
   for (const id of blueprint.includes || []) {
     if (!abilityIds.has(Number(id))) {
       throw new Error(`The model referenced unknown ability #${id}`);
@@ -893,7 +905,7 @@ async function runNim(payload, emit) {
   if (!nimKey) {
     throw new Error("The ability builder is temporarily unavailable");
   }
-  emit({ type: "status", message: "Retrying the request" });
+  emit({ type: "status", message: "Preparing the requested ability" });
   const models = [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
   const body = {
     messages: [
@@ -957,13 +969,10 @@ async function generate(request, response) {
     emit({ type: "status", message: "Matching the request to available ability components" });
     let result;
     try {
+      result = await runNim(payload, emit);
+    } catch {
+      emit({ type: "status", message: "Retrying the request" });
       result = await runCodex(payload, emit);
-    } catch (error) {
-      if (error.fallback && nimKey) {
-        result = await runNim(payload, emit);
-      } else {
-        throw error;
-      }
     }
     emit({ type: "result", ...result });
   } catch (error) {

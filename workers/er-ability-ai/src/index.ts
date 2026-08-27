@@ -10,6 +10,7 @@ interface Env {
   CODEX_MODEL: string;
   CODEX_EFFORT: string;
   NVIDIA_NIM_MODEL: string;
+  NVIDIA_NIM_FALLBACK_MODEL: string;
 }
 
 interface StoredAuth {
@@ -90,6 +91,7 @@ export class AbilityAiContainer extends Container<Env> {
       CODEX_EFFORT: runtimeEnv.CODEX_EFFORT,
       NVIDIA_NIM_API_KEY: runtimeEnv.NVIDIA_NIM_API_KEY ?? "",
       NVIDIA_NIM_MODEL: runtimeEnv.NVIDIA_NIM_MODEL,
+      NVIDIA_NIM_FALLBACK_MODEL: runtimeEnv.NVIDIA_NIM_FALLBACK_MODEL,
     };
   }
 
