@@ -9,6 +9,7 @@ pub mod internal_event;
 pub mod m6;
 pub mod m7_content;
 pub mod m7_material;
+pub mod m7_progression_control;
 pub mod m7_runtime;
 // The local adapter remains production source while its kernel integration
 // seam is staged; its contract tests include this source directly.

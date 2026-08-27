@@ -35,7 +35,7 @@ pub struct GameKernelV6 {
 #[derive(Debug, Error)]
 pub enum GameKernelV6Error {
     #[error("GameRuntimeV5 failed: {0}")]
-    Runtime(String),
+    StateOwner(String),
     #[error("Snapshot V6 failed: {0}")]
     Snapshot(String),
     #[error("snapshot transaction bytes are invalid or collide")]
@@ -54,7 +54,7 @@ impl GameKernelV6 {
         terminal: Option<TerminalState>,
     ) -> Result<Self, GameKernelV6Error> {
         let runtime = GameRuntimeV5::new(state, content)
-            .map_err(|error| GameKernelV6Error::Runtime(error.to_string()))?;
+            .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         let kernel = Self {
             runtime,
             input_router,
@@ -102,7 +102,7 @@ impl GameKernelV6 {
             },
             content,
         )
-        .map_err(|error| GameKernelV6Error::Runtime(error.to_string()))?;
+        .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         Ok(Self {
             runtime,
             input_router: snapshot.input_router,
@@ -156,7 +156,7 @@ impl GameKernelV6 {
         let prepared = self
             .runtime
             .resolve_and_apply_authoritative_turn(operation_id, commands, authority)
-            .map_err(|error| GameKernelV6Error::Runtime(error.to_string()))?;
+            .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         self.pending_presentations
             .extend(prepared.material.presentation.clone());
         self.advance_replay_sequence()?;
@@ -168,11 +168,11 @@ impl GameKernelV6 {
         bytes: &[u8],
     ) -> Result<MaterialApplyResultV5, GameKernelV6Error> {
         let material = BattleTurnMaterialV5::decode_canonical(bytes)
-            .map_err(|error| GameKernelV6Error::Runtime(error.to_string()))?;
+            .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         let result = self
             .runtime
             .apply_material_bytes(bytes)
-            .map_err(|error| GameKernelV6Error::Runtime(error.to_string()))?;
+            .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
         if result == MaterialApplyResultV5::Applied {
             self.pending_presentations.extend(material.presentation);
             self.advance_replay_sequence()?;
@@ -202,7 +202,7 @@ impl GameKernelV6 {
 
 impl From<GameRuntimeV5Error> for GameKernelV6Error {
     fn from(error: GameRuntimeV5Error) -> Self {
-        Self::Runtime(error.to_string())
+        Self::StateOwner(error.to_string())
     }
 }
 
