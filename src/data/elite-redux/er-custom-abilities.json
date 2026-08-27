@@ -1,1 +1,18 @@
-{}
+{
+  "new-ability-2": {
+    "componentRules": [],
+    "description": "Air blower + Dark aura",
+    "flags": {},
+    "generation": 9,
+    "id": 20001,
+    "includes": [
+      186,
+      5058
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Dreadful winds",
+    "rules": [],
+    "version": 1
+  }
+}
