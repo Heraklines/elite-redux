@@ -1,9 +1,13 @@
 //! Complete directly restorable M7 snapshot and replay trace schemas.
 
+use std::collections::BTreeSet;
+
 use er_battle::m7_resolver::BattlePresentationCueV5;
 use er_protocol::ProtocolRuntimeSnapshotV2;
 use er_state::m7_state::GameStateV5;
-use er_types::{GameContentIdentity, OperationId, RawInputEvent, SafeU53, SeatId, TerminalState};
+use er_types::{
+    GameContentIdentity, OperationId, PhysicalKey, RawInputEvent, SafeU53, SeatId, TerminalState,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -25,6 +29,7 @@ pub struct RestorableKernelSnapshotV6 {
     pub prepared_transactions: Vec<PreparedTransactionSnapshotV1>,
     pub replay_sequence: SafeU53,
     pub terminal: Option<TerminalState>,
+    pub pressed_keys: BTreeSet<PhysicalKey>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

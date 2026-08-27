@@ -13,6 +13,7 @@ members = [
     "crates/er-ai",
     "crates/er-scenario",
     "crates/er-save",
+    "crates/er-env",
     "crates/er-battle",
     "crates/er-game",
     "crates/er-kernel",

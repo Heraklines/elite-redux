@@ -210,6 +210,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-env"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-game",
+ "er-kernel",
+ "er-protocol",
+ "er-state",
+ "er-types",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "er-game"
 version = "0.1.0"
 dependencies = [

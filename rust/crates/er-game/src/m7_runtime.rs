@@ -6,7 +6,9 @@ use std::sync::Arc;
 use er_battle::m7_resolver::{BattleTransitionV5, BattleV5Error, TurnAuthorityContextV1};
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
-use er_types::{GameContentIdentity, OperationId};
+use er_types::ui::CancelPolicy;
+use er_types::ui_menu::NavigationDirection;
+use er_types::{GameContentIdentity, GameControlKindV2, MenuOptionId, OperationId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -28,6 +30,16 @@ pub struct PreparedTurnV5 {
     pub candidate: GameStateV5,
     pub material: BattleTurnMaterialV5,
     pub bytes: Vec<u8>,
+}
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GameControlIntentV2 {
+    Selected {
+        kind: GameControlKindV2,
+        option: MenuOptionId,
+    },
+    Cancelled {
+        kind: GameControlKindV2,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -51,6 +63,8 @@ pub enum GameRuntimeV5Error {
     OperationCollision,
     #[error("authority candidate differs from the state installed by the common material applier")]
     CandidateMismatch,
+    #[error("active game control is missing, blocked, or invalid")]
+    Control,
 }
 
 impl GameRuntimeV5 {
@@ -98,6 +112,86 @@ impl GameRuntimeV5 {
 
     pub fn state(&self) -> &GameStateV5 {
         &self.state
+    }
+    pub fn navigate_control(
+        &mut self,
+        direction: NavigationDirection,
+    ) -> Result<(), GameRuntimeV5Error> {
+        let run = self
+            .state
+            .active_run
+            .as_mut()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        let menu = run
+            .control
+            .menu
+            .as_mut()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        if !run.control.actionable {
+            return Err(GameRuntimeV5Error::Control);
+        }
+        let selected = menu.selected_option_id.clone();
+        let next = menu
+            .navigation
+            .iter()
+            .find(|edge| edge.from == selected && edge.direction == direction)
+            .map(|edge| edge.to.clone())
+            .ok_or(GameRuntimeV5Error::Control)?;
+        menu.selected_option_id = next;
+        self.state
+            .validate()
+            .map_err(|error| GameRuntimeV5Error::State(error.to_string()))
+    }
+
+    pub fn submit_control(&self) -> Result<GameControlIntentV2, GameRuntimeV5Error> {
+        let run = self
+            .state
+            .active_run
+            .as_ref()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        let menu = run
+            .control
+            .menu
+            .as_ref()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        if !run.control.actionable
+            || !menu
+                .options
+                .iter()
+                .any(|option| option.option_id == menu.selected_option_id && option.enabled)
+        {
+            return Err(GameRuntimeV5Error::Control);
+        }
+        Ok(GameControlIntentV2::Selected {
+            kind: run.control.kind,
+            option: menu.selected_option_id.clone(),
+        })
+    }
+
+    pub fn cancel_control(&self) -> Result<GameControlIntentV2, GameRuntimeV5Error> {
+        let run = self
+            .state
+            .active_run
+            .as_ref()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        let menu = run
+            .control
+            .menu
+            .as_ref()
+            .ok_or(GameRuntimeV5Error::Control)?;
+        if !run.control.actionable || matches!(menu.cancel, CancelPolicy::Disabled) {
+            return Err(GameRuntimeV5Error::Control);
+        }
+        match &menu.cancel {
+            CancelPolicy::Select(option) => Ok(GameControlIntentV2::Selected {
+                kind: run.control.kind,
+                option: option.clone(),
+            }),
+            CancelPolicy::Close | CancelPolicy::Back => Ok(GameControlIntentV2::Cancelled {
+                kind: run.control.kind,
+            }),
+            CancelPolicy::Disabled => Err(GameRuntimeV5Error::Control),
+        }
     }
 
     pub fn content(&self) -> &Arc<PreparedGameContentV1> {

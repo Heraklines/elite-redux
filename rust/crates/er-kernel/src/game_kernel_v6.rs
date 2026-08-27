@@ -1,18 +1,20 @@
 //! M7 kernel owner over GameRuntimeV5 and complete deterministic environment state.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use er_battle::m7_resolver::{BattlePresentationCueV5, TurnAuthorityContextV1};
 use er_game::m7_content::PreparedGameContentV1;
 use er_game::m7_material::{BattleTurnMaterialV5, MaterialApplyResultV5};
 use er_game::m7_runtime::{
-    GameRuntimeSnapshotV5, GameRuntimeV5, GameRuntimeV5Error, PreparedTurnV5,
+    GameControlIntentV2, GameRuntimeSnapshotV5, GameRuntimeV5, GameRuntimeV5Error, PreparedTurnV5,
 };
-use er_protocol::ProtocolRuntimeSnapshotV2;
+use er_protocol::{ProtocolRuntimeSnapshotV2, ScheduledTimer};
 use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
-use er_types::{OperationId, SafeU53, TerminalState};
+use er_types::input::{InputFocus, PhysicalKey, RawInputEvent};
+use er_types::ui_menu::NavigationDirection;
+use er_types::{GameControlKindV2, MenuOptionId, OperationId, SafeU53, TerminalState};
 use thiserror::Error;
 
 use crate::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
@@ -20,11 +22,23 @@ use crate::snapshot_v6::{
     PreparedTransactionSnapshotV1, RESTORABLE_KERNEL_SNAPSHOT_SCHEMA_VERSION_V6,
     RestorableKernelSnapshotV6, SnapshotV6Error,
 };
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum KernelControlEffectV6 {
+    Navigated,
+    Selected {
+        kind: GameControlKindV2,
+        option: MenuOptionId,
+    },
+    Cancelled {
+        kind: GameControlKindV2,
+    },
+}
 
 #[derive(Clone, Debug)]
 pub struct GameKernelV6 {
     runtime: GameRuntimeV5,
     input_router: InputRouterSnapshotV2,
+    pressed_keys: BTreeSet<PhysicalKey>,
     scheduler: KernelSchedulerSnapshotV2,
     protocol: ProtocolRuntimeSnapshotV2,
     pending_presentations: Vec<BattlePresentationCueV5>,
@@ -58,6 +72,7 @@ impl GameKernelV6 {
         let kernel = Self {
             runtime,
             input_router,
+            pressed_keys: BTreeSet::new(),
             scheduler,
             protocol,
             pending_presentations: Vec::new(),
@@ -106,6 +121,7 @@ impl GameKernelV6 {
         Ok(Self {
             runtime,
             input_router: snapshot.input_router,
+            pressed_keys: snapshot.pressed_keys,
             scheduler: snapshot.scheduler,
             protocol: snapshot.protocol,
             pending_presentations: snapshot.pending_presentations,
@@ -134,6 +150,7 @@ impl GameKernelV6 {
             content_identity: runtime.content_identity,
             game_state: runtime.state,
             input_router: self.input_router.clone(),
+            pressed_keys: self.pressed_keys.clone(),
             scheduler: self.scheduler.clone(),
             protocol: self.protocol.clone(),
             pending_presentations: self.pending_presentations.clone(),
@@ -145,6 +162,132 @@ impl GameKernelV6 {
 
     pub fn state(&self) -> &GameStateV5 {
         self.runtime.state()
+    }
+    pub fn raw_input(
+        &mut self,
+        event: RawInputEvent,
+    ) -> Result<Option<KernelControlEffectV6>, GameKernelV6Error> {
+        match event {
+            RawInputEvent::KeyDown {
+                code,
+                browser_repeat,
+                focus,
+                ..
+            } => {
+                if focus != InputFocus::Game
+                    || browser_repeat
+                    || !self.pressed_keys.insert(code.clone())
+                {
+                    return Ok(None);
+                }
+                self.handle_physical_key(code)
+            }
+            RawInputEvent::KeyUp { code } => {
+                self.pressed_keys.remove(&code);
+                Ok(None)
+            }
+            RawInputEvent::GamepadDown { button } => self.handle_gamepad_button(button),
+            RawInputEvent::GamepadUp { .. } => Ok(None),
+            RawInputEvent::FocusChanged(InputFocus::TextEntry) | RawInputEvent::WindowBlurred => {
+                self.pressed_keys.clear();
+                Ok(None)
+            }
+            RawInputEvent::FocusChanged(InputFocus::Game) | RawInputEvent::WindowFocused => {
+                Ok(None)
+            }
+        }
+    }
+    pub fn advance_time(
+        &mut self,
+        milliseconds: SafeU53,
+    ) -> Result<Vec<ScheduledTimer>, GameKernelV6Error> {
+        let mut retained = Vec::with_capacity(self.scheduler.timers.len());
+        let mut fired = Vec::new();
+        for mut timer in std::mem::take(&mut self.scheduler.timers) {
+            let paused = self.scheduler.pauses.iter().any(|pause| {
+                pause.endpoint == timer.registration.endpoint
+                    && pause.time_class == timer.registration.time_class
+                    && !pause.reasons.is_empty()
+            });
+            if paused {
+                retained.push(timer);
+                continue;
+            }
+            if milliseconds >= timer.remaining_active_ms {
+                fired.push(timer.registration);
+                continue;
+            }
+            let remaining = timer
+                .remaining_active_ms
+                .get()
+                .checked_sub(milliseconds.get())
+                .and_then(|value| SafeU53::new(value).ok())
+                .ok_or(GameKernelV6Error::Transaction)?;
+            timer.remaining_active_ms = remaining;
+            retained.push(timer);
+        }
+        self.scheduler.timers = retained;
+        Ok(fired)
+    }
+
+    fn handle_physical_key(
+        &mut self,
+        code: PhysicalKey,
+    ) -> Result<Option<KernelControlEffectV6>, GameKernelV6Error> {
+        match code {
+            PhysicalKey::ArrowUp => self.navigate(NavigationDirection::Up),
+            PhysicalKey::ArrowDown => self.navigate(NavigationDirection::Down),
+            PhysicalKey::ArrowLeft => self.navigate(NavigationDirection::Left),
+            PhysicalKey::ArrowRight => self.navigate(NavigationDirection::Right),
+            PhysicalKey::Enter | PhysicalKey::Space => self
+                .runtime
+                .submit_control()
+                .map(intent_effect)
+                .map(Some)
+                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
+            PhysicalKey::Escape | PhysicalKey::Backspace => self
+                .runtime
+                .cancel_control()
+                .map(intent_effect)
+                .map(Some)
+                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
+            _ => Ok(None),
+        }
+    }
+
+    fn handle_gamepad_button(
+        &mut self,
+        button: u16,
+    ) -> Result<Option<KernelControlEffectV6>, GameKernelV6Error> {
+        match button {
+            12 => self.navigate(NavigationDirection::Up),
+            13 => self.navigate(NavigationDirection::Down),
+            14 => self.navigate(NavigationDirection::Left),
+            15 => self.navigate(NavigationDirection::Right),
+            0 => self
+                .runtime
+                .submit_control()
+                .map(intent_effect)
+                .map(Some)
+                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
+            1 => self
+                .runtime
+                .cancel_control()
+                .map(intent_effect)
+                .map(Some)
+                .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),
+            _ => Ok(None),
+        }
+    }
+
+    fn navigate(
+        &mut self,
+        direction: NavigationDirection,
+    ) -> Result<Option<KernelControlEffectV6>, GameKernelV6Error> {
+        self.runtime
+            .navigate_control(direction)
+            .map_err(|error| GameKernelV6Error::StateOwner(error.to_string()))?;
+        Ok(Some(KernelControlEffectV6::Navigated))
     }
 
     pub fn resolve_authoritative_turn(
@@ -197,6 +340,15 @@ impl GameKernelV6 {
 
     pub fn clear_presentations(&mut self) {
         self.pending_presentations.clear();
+    }
+}
+
+fn intent_effect(intent: GameControlIntentV2) -> KernelControlEffectV6 {
+    match intent {
+        GameControlIntentV2::Selected { kind, option } => {
+            KernelControlEffectV6::Selected { kind, option }
+        }
+        GameControlIntentV2::Cancelled { kind } => KernelControlEffectV6::Cancelled { kind },
     }
 }
 
