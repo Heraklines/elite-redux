@@ -1952,7 +1952,9 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
               ...body,
               model,
               guided_json: schema,
-              ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 512 } : {}),
+              ...(model === "nvidia/nemotron-3-nano-30b-a3b"
+                ? { chat_template_kwargs: { enable_thinking: false } }
+                : {}),
             },
       ),
       signal: AbortSignal.timeout(timeoutMs),
@@ -1975,7 +1977,8 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
 }
 
 async function runNimModel(model, body, payload, searchContext, planSchema, emit) {
-  let plan = await requestNimJson(model, body, planSchema, "ability model", 60_000);
+  const generationTimeout = model === "deepseek-ai/deepseek-v4-flash-0731" ? 25_000 : 60_000;
+  let plan = await requestNimJson(model, body, planSchema, "ability model", generationTimeout);
   let result;
   try {
     result = expandAssemblyPlan(plan, searchContext);
