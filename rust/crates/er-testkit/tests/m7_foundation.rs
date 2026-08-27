@@ -8,14 +8,25 @@ const RESOLVER: &str = include_str!("../../er-battle/src/m7_resolver.rs");
 const GAME_CONTENT: &str = include_str!("../../er-game/src/m7_content.rs");
 const GAME_MATERIAL: &str = include_str!("../../er-game/src/m7_material.rs");
 const GAME_RUNTIME: &str = include_str!("../../er-game/src/m7_runtime.rs");
+const RUN_EXECUTOR: &str = include_str!("../../er-game/src/m7_run_executor.rs");
+const PROGRESSION_CONTROL: &str = include_str!("../../er-game/src/m7_progression_control.rs");
+const GAME_KERNEL: &str = include_str!("../../er-kernel/src/game_kernel_v6.rs");
 const STATE: &str = include_str!("../../er-state/src/m7_state.rs");
 const RUN_IR: &str = include_str!("../../er-types/src/m7_run_ir.rs");
 const SCENARIO: &str = include_str!("../../er-scenario/src/lib.rs");
+const SCENARIO_RUNTIME: &str = include_str!("../../er-scenario/src/runtime.rs");
 const PROGRESSION: &str = include_str!("../../er-progression/src/lib.rs");
+const PROGRESSION_RUNTIME: &str = include_str!("../../er-progression/src/progression.rs");
+const LIFECYCLE_RUNTIME: &str = include_str!("../../er-progression/src/lifecycle.rs");
+const LIFECYCLE_MATERIAL: &str = include_str!("../../er-progression/src/material.rs");
 const WORLD: &str = include_str!("../../er-world/src/lib.rs");
+const WORLD_RUNTIME: &str = include_str!("../../er-world/src/runtime.rs");
 const AI: &str = include_str!("../../er-ai/src/lib.rs");
+const SHOWDOWN: &str = include_str!("../../er-ai/src/showdown.rs");
 const SAVE: &str = include_str!("../../er-save/src/lib.rs");
 const SNAPSHOT: &str = include_str!("../../er-kernel/src/snapshot_v6.rs");
+const ENVIRONMENT: &str = include_str!("../../er-env/src/lib.rs");
+const WASM: &str = include_str!("../../er-wasm/src/m7_parity.rs");
 
 fn assert_wire_type<T: Serialize + DeserializeOwned + Debug + PartialEq>() {}
 
@@ -88,14 +99,25 @@ fn new_canonical_surfaces_exclude_escape_hatches() {
         GAME_CONTENT,
         GAME_MATERIAL,
         GAME_RUNTIME,
+        RUN_EXECUTOR,
+        PROGRESSION_CONTROL,
+        GAME_KERNEL,
         STATE,
         RUN_IR,
         SCENARIO,
+        SCENARIO_RUNTIME,
         PROGRESSION,
+        PROGRESSION_RUNTIME,
+        LIFECYCLE_RUNTIME,
+        LIFECYCLE_MATERIAL,
         WORLD,
+        WORLD_RUNTIME,
         AI,
+        SHOWDOWN,
         SAVE,
         SNAPSHOT,
+        ENVIRONMENT,
+        WASM,
     ];
     for source in sources {
         for forbidden in [
@@ -110,6 +132,7 @@ fn new_canonical_surfaces_exclude_escape_hatches() {
             "std::time::Instant",
             "std::fs",
             "std::net",
+            "saturating_",
         ] {
             assert!(
                 !source.contains(forbidden),

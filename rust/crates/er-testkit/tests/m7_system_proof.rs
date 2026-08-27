@@ -73,6 +73,7 @@ use er_types::{
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
 };
+use er_world::runtime::advance_wave;
 use er_world::{
     BiomeDefinitionV1, EncounterDefinitionV1, EncounterKindV1, GameModeDefinitionV1,
     PokemonBuildV1, RouteDefinitionV1, WORLD_CONTENT_PACK_SCHEMA_VERSION_V1, WeightedEncounterV1,
@@ -680,5 +681,22 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         runtime.submit_control()?,
         GameControlIntentV2::Selected { .. }
     ));
+    Ok(())
+}
+
+#[test]
+fn two_hundred_wave_run_is_deterministic_to_terminal() -> TestResult {
+    let content = prepared_content()?;
+    let initial = game_state(&content)?;
+    let mut first = initial.clone();
+    let mut second = initial;
+    for _ in 0..200 {
+        first = advance_wave(&first, &content.world)?;
+        second = advance_wave(&second, &content.world)?;
+        assert_eq!(first, second);
+    }
+    let run = first.active_run.as_ref().ok_or("missing run")?;
+    assert_eq!(run.outcome, RunOutcome::Victory);
+    assert_eq!(run.control.kind, er_types::GameControlKindV2::Complete);
     Ok(())
 }
