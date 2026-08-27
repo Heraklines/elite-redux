@@ -1073,7 +1073,7 @@ function relevantModelContext(payload) {
       category: move.category,
       power: move.power,
     })),
-    components: candidates.slice(0, 48).map(candidate => ({
+    components: candidates.slice(0, 16).map(candidate => ({
       ability: {
         id: candidate.ability.id,
         name: candidate.ability.name,
@@ -1087,8 +1087,8 @@ function relevantModelContext(payload) {
 function modelPrompt(payload) {
   const compactCatalog = compactModelCatalog(payload);
   const relevantContext = relevantModelContext(payload);
-  const abilityIndex = payload.abilityIndex.map(ability => [ability.id, ability.name, ability.description || ""]);
-  const moveIndex = (payload.moveIndex || []).map(move => [move.id, move.name, move.type, move.category, move.power]);
+  const abilityIndex = payload.abilityIndex.map(ability => [ability.id, ability.name]);
+  const moveIndex = (payload.moveIndex || []).map(move => [move.id, move.name]);
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one JSON object and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, or unsupported mechanics. Build one Ability Studio blueprint matching OUTPUT JSON SCHEMA. Before returning, verify that the blueprint has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
@@ -1096,8 +1096,8 @@ Triggers, conditions, and effects are independent. Recombine them freely. compon
 Copy every runtime source identity exactly from FULL RUNTIME COMPONENT CATALOG. The catalog is compact but complete. A trailing $ in the legend means an index into COMPONENT STRINGS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
 COMPACT CATALOG LEGEND:
-FULL ABILITY INDEX row = [abilityId, name, description].
-FULL MOVE CATALOG row = [moveId, name, type, category, power].
+FULL ABILITY INDEX row = [abilityId, name].
+FULL MOVE CATALOG row = [moveId, name]. Requested moves are expanded with type, category, and normal power in REQUEST-MATCHED COMPONENTS.
 FULL RUNTIME COMPONENT row = [abilityId, attrIndex, attrType$, ruleLabel$, hookId$, hookLabel$, hookMode, parameters, conditions, effects]. hookMode 0 means event and 1 means calculation.
 Parameter row = [path$, label$, control$, optional, min, max, optionsRef, sourceValue]. Every listed parameter is editable. optional is 0 or 1; null means no bound, option set, or source value.
 Condition row = [label$, kind$, required, conditionIndex]. required is 0 or 1. conditionIndex is present only for kind ability.
