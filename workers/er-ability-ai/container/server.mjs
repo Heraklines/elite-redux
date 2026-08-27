@@ -614,6 +614,48 @@ function modelPrompt(payload) {
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; all runtime component references belong in componentRules. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Copy each runtime source identity exactly from componentCandidates. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, add parameterOverrides using only parameters marked editable, their exact path, and the advertised value type/range/options. Move parameters must use an id from RELEVANT MOVES. A reference to the holder in a trigger describes the ability owner, not the move target. Leave optional targeting booleans unset unless the request explicitly specifies a target; damaging scripted moves normally target an opponent. Chance is a percentage from 1 to 100 and should be 100 unless the request explicitly asks for a chance. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT MOVES:\n${JSON.stringify(payload.moveIndex || [])}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
 }
 
+function promptRequestsSelfTarget(prompt) {
+  return /\b(?:target(?:s|ed|ing)?|hit(?:s|ting)?|affect(?:s|ed|ing)?|cast(?:s|ing)?|use(?:s|d|ing)?)\s+(?:the\s+)?(?:holder|user|itself|self)\b|\b(?:on|at)\s+(?:the\s+)?(?:holder|user|itself|self)\b/i.test(
+    prompt,
+  );
+}
+
+function normalizeScriptedMoveTargets(result, payload) {
+  if (promptRequestsSelfTarget(payload.prompt)) {
+    return;
+  }
+  const moves = new Map((payload.moveIndex || []).map(move => [Number(move.id), move]));
+  const blueprint = result.blueprint || {};
+  const sources = [
+    ...(blueprint.mechanics || []),
+    ...(blueprint.componentRules || []).flatMap(rule => [
+      ...(rule.prerequisiteHooks || []),
+      rule.hook,
+      ...(rule.conditions || []),
+      ...(rule.effects || []),
+    ]),
+  ].filter(Boolean);
+  let corrected = false;
+  for (const source of sources) {
+    const overrides = source.parameterOverrides;
+    if (source.attrType !== "PostSummonScriptedMoveAbAttr" || overrides?.["opts.targetsSelf"] !== true) {
+      continue;
+    }
+    const move = moves.get(Number(overrides["opts.moveId"]));
+    if (!move || Number(move.power) <= 0) {
+      continue;
+    }
+    source.parameterOverrides = Object.fromEntries(
+      Object.entries(overrides).filter(([path]) => path !== "opts.targetsSelf"),
+    );
+    corrected = true;
+  }
+  if (corrected) {
+    result.explanation =
+      "Created a validated ability draft from the available runtime components and requested parameters.";
+  }
+}
+
 async function runCodex(payload, emit) {
   await rpc.start();
   const account = await rpc.request("account/read", { refreshToken: true });
@@ -690,7 +732,7 @@ async function runCodex(payload, emit) {
         new Promise((_, reject) =>
           setTimeout(
             () => reject(Object.assign(new Error("Ability generation timed out"), { fallback: true })),
-            120_000,
+            45_000,
           ),
         ),
       ]);
@@ -715,6 +757,7 @@ async function runCodex(payload, emit) {
       });
     }
     const result = stripNulls(extractJson(finalText));
+    normalizeScriptedMoveTargets(result, payload);
     validateSources(result, payload);
     return result;
   } finally {
@@ -755,6 +798,7 @@ async function runNimModel(model, body, payload) {
     );
     try {
       const result = stripNulls(extractJson(content, "fallback model", false));
+      normalizeScriptedMoveTargets(result, payload);
       validateSources(result, payload);
       return result;
     } catch (error) {
