@@ -5352,6 +5352,7 @@
     "weight": 100
   },
   "TRAINER_70032": {
+    "battleBgm": "battle_johto_gym",
     "battleType": "single",
     "challenge": "none",
     "difficulties": [
@@ -5502,6 +5503,7 @@
     "weight": 100
   },
   "TRAINER_70033": {
+    "battleBgm": "battle_johto_gym",
     "battleType": "double",
     "challenge": "none",
     "difficulties": [
@@ -5633,6 +5635,326 @@
       }
     ],
     "trainerClass": "JASMINE",
+    "weight": 100
+  },
+  "TRAINER_70034": {
+    "battleBgm": "battle_johto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70034,
+    "maxWave": 135,
+    "minWave": 125,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "NEVER_MELT_ICE"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FREEZY_FROST",
+          "MEGA_DRAIN",
+          "EARTH_POWER",
+          "CHILLING_WATER"
+        ],
+        "species": 10765,
+        "vitamins": {
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "level": null,
+        "moves": [
+          "DIVE",
+          "AVALANCHE",
+          "ELECTRIFY",
+          "SLACK_OFF"
+        ],
+        "species": 87,
+        "vitamins": {
+          "hp": 3,
+          "spd": 3
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "HARD_STONE"
+          },
+          {
+            "count": 1,
+            "item": "ER_GROUND_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ICE_BALL",
+          "MOUNTAIN_CHUNK",
+          "STOMP",
+          "HAIL"
+        ],
+        "species": 473,
+        "vitamins": {
+          "atk": 1,
+          "def": 1,
+          "hp": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "MULTI_LENS"
+          },
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "WIDE_LENS"
+          },
+          {
+            "count": 1,
+            "item": "ER_ICE_GEM"
+          },
+          {
+            "count": 1,
+            "item": "NEVER_MELT_ICE"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "AQUA_JET",
+          "BLIZZARD",
+          "DRACO_METEOR",
+          "RLNA"
+        ],
+        "species": 10032,
+        "vitamins": {
+          "hp": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10489
+        },
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SILVER_POWDER"
+          },
+          {
+            "count": 2,
+            "item": "ER_BUG_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "LEECH_LIFE",
+          "FLASH_FREEZE",
+          "ICICLE_SPEAR",
+          "BUBBLE_BEAM"
+        ],
+        "shiny": {
+          "around": "icespikes"
+        },
+        "species": 10049,
+        "vitamins": {
+          "def": 1,
+          "hp": 1,
+          "spatk": 1,
+          "spd": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "RLA",
+          "RLNA",
+          "RLA",
+          "RLNA"
+        ],
+        "species": 378,
+        "vitamins": {
+          "def": 2,
+          "hp": 2,
+          "spdef": 2
+        }
+      }
+    ],
+    "trainerClass": "PRYCE",
+    "weight": 100
+  },
+  "TRAINER_70035": {
+    "battleBgm": "battle_kanto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "youngster",
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70035,
+    "maxWave": 160,
+    "minWave": 150,
+    "name": "Leader",
+    "team": [
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "WRAP",
+          "DRAGON_BREATH",
+          "EXTREME_SPEED",
+          "RAIN_DANCE"
+        ],
+        "species": 148,
+        "vitamins": {
+          "hp": 5,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "SHELL_BELL"
+          },
+          {
+            "count": 1,
+            "item": "ER_DRAGON_GEM"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RAIN_DANCE",
+          "CHILLING_WATER",
+          "CRUNCH",
+          "DRACONIC_FANGS"
+        ],
+        "species": 10521,
+        "vitamins": {
+          "atk": 1,
+          "def": 1,
+          "hp": 1,
+          "spatk": 1,
+          "spd": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 1,
+        "level": null,
+        "moves": [
+          "RAIN_DANCE",
+          "WATER_PULSE",
+          "DRACO_METEOR",
+          "FLIP_TURN"
+        ],
+        "species": 230,
+        "vitamins": {
+          "spatk": 2,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "DRACO_METEOR",
+          "LASH_OUT",
+          "HYDRO_PUMP",
+          "SCALE_SHOT"
+        ],
+        "species": 10508,
+        "vitamins": {
+          "atk": 1,
+          "def": 2,
+          "spatk": 2,
+          "spd": 1,
+          "spdef": 2
+        }
+      },
+      {
+        "abilitySlot": 2,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "FLY",
+          "SHARPEN",
+          "SKULL_BASH",
+          "DIVE"
+        ],
+        "species": 10026,
+        "vitamins": {
+          "atk": 3,
+          "def": 1,
+          "hp": 3,
+          "spd": 1,
+          "spdef": 1
+        }
+      }
+    ],
+    "trainerClass": "CLAIR",
     "weight": 100
   }
 }
