@@ -18,6 +18,9 @@ const pacing = "src/data/elite-redux/er-run-pacing.ts";
 const notoriety = "src/data/elite-redux/er-biome-notoriety.ts";
 const mapEvents = "src/data/elite-redux/er-map-events.ts";
 const mapNodes = "src/data/elite-redux/er-map-nodes.ts";
+const fairyLuck = "src/data/elite-redux/er-fairy-luck.ts";
+const gameMode = "src/game-mode.ts";
+const arena = "src/field/arena.ts";
 const implemented = [
   [routing, 53, "erBiomeRoutingActive", "er_world::runtime::roll_next_biome_nodes"],
   [routing, 77, "erRecordBiomeEntry", "er_world::runtime::record_biome_entry"],
@@ -83,6 +86,11 @@ const implemented = [
   [mapNodes, 79, "recordErBiomeVisited", "er_world::runtime::record_map_biome_visited"],
   [mapNodes, 90, "getErBiomeHistory", "er_state::m7_state::WorldStateV1::biome_history"],
   [mapNodes, 97, "clearErBiomeNodes", "er_world::runtime::clear_biome_map_nodes"],
+  [fairyLuck, 60, "erFairyLuckWavesLeft", "er_world::runtime::fairy_luck_waves_left"],
+  [gameMode, 233, "getStartingBiome", "er_world::runtime::starting_biome"],
+  [gameMode, 246, "getWaveForDifficulty", "er_world::runtime::wave_for_difficulty"],
+  [gameMode, 452, "isWaveFinal", "er_world::runtime::is_wave_final"],
+  [arena, 89, "erLegendMinWave", "er_world::runtime::legend_min_wave"],
 ];
 
 function fail(message) {

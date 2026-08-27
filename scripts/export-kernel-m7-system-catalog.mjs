@@ -345,6 +345,24 @@ function domainFor(path, symbol, owner) {
   ) {
     return "PRESENTATION";
   }
+  if (path === "src/field/arena-base.ts" && symbol === "setBiome") {
+    return "PRESENTATION";
+  }
+  if (path === "src/data/elite-redux/er-reset-wave.ts" && symbol === "reloadCurrentWave") {
+    return "PLATFORM";
+  }
+  if (
+    path === "src/data/elite-redux/er-training-cache.ts"
+    && symbol === "recordErTrainingCacheWave"
+  ) {
+    return "RUN_META";
+  }
+  if (
+    path === "src/data/elite-redux/er-ward-stones.ts"
+    && symbol === "SPAWN_FROM_WAVE"
+  ) {
+    return "INVENTORY_ECONOMY";
+  }
   if (
     (path === "src/field/arena.ts" && ["setBiomeWeather", "setBiomeTerrain"].includes(symbol))
     || (path === "src/field/pokemon.ts"

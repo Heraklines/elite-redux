@@ -81,17 +81,18 @@ use er_world::runtime::{
     AuditedWorldRng, NotorietyScaleV1, PacingRatioV1, WorldRuntimeError, add_treasure_fragments,
     advance_wave, biome_end_rule, biome_should_end, chart_onward_routes, consume_carried_weather,
     consume_map_travel_target, consume_treasure_fragments_for_reward, early_wave_move_power_ratio,
-    final_wave, is_chapter_start_wave, is_checkpoint_wave, is_major_checkpoint_wave,
-    map_upgrade_tier, mark_biome_stay, mark_leave_biome, notoriety_boss_chance_pct,
-    notoriety_bst_bonus, notoriety_trainer_chance_pct, plan_biome_structure, progression_wave,
-    record_biome_entry, reveal_next_pending_node, roll_next_biome_nodes,
-    set_any_biome_travel_target, set_carried_weather, should_raise_crossroads, story_source_wave,
-    visible_route_node_count,
+    fairy_luck_waves_left, final_wave, grant_fairy_luck, is_chapter_start_wave, is_checkpoint_wave,
+    is_major_checkpoint_wave, is_wave_final, legend_min_wave, map_upgrade_tier, mark_biome_stay,
+    mark_leave_biome, notoriety_boss_chance_pct, notoriety_bst_bonus, notoriety_trainer_chance_pct,
+    plan_biome_structure, progression_wave, record_biome_entry, reveal_next_pending_node,
+    roll_next_biome_nodes, set_any_biome_travel_target, set_carried_weather,
+    should_raise_crossroads, starting_biome, story_source_wave, temporary_fairy_luck,
+    visible_route_node_count, wave_for_difficulty,
 };
 use er_world::{
     BiomeDefinitionV1, BiomeRouteLinkV1, EncounterDefinitionV1, EncounterKindV1,
-    GameModeDefinitionV1, PokemonBuildV1, RouteDefinitionV1, WORLD_CONTENT_PACK_SCHEMA_VERSION_V1,
-    WeightedEncounterV1, WeightedRouteV1, WorldContentPackV1,
+    GameModeDefinitionV1, PokemonBuildV1, RouteDefinitionV1, TerminalWavePolicyV1,
+    WORLD_CONTENT_PACK_SCHEMA_VERSION_V1, WeightedEncounterV1, WeightedRouteV1, WorldContentPackV1,
 };
 
 const ORACLE: &str = "399d5d368f0b5642ebf8f45bd8a5e73350fa4de7";
@@ -215,6 +216,9 @@ fn world_pack() -> WorldContentPackV1 {
             key: "classic".to_owned(),
             first_wave: 1,
             terminal_wave: Some(200),
+            terminal_policy: TerminalWavePolicyV1::Exact(200),
+            difficulty_base_offset: 0,
+            difficulty_curve_interval: None,
             route: RouteNodeId::new(safe(1)),
             allows_coop: true,
             branching_routes: true,
@@ -483,6 +487,8 @@ fn game_state(content: &PreparedGameContentV1) -> TestResult<GameStateV5> {
                 treasure_fragments: 0,
                 carried_weather: None,
                 biome_history: vec![BiomeId::new(safe(1))],
+                fairy_luck_bonus: 0,
+                fairy_luck_expiry_wave: None,
             },
             scenario: None,
             quests: QuestStateV1::default(),
@@ -785,9 +791,23 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
             .treasure_fragments,
         1
     );
+    let fairy = grant_fairy_luck(&entered, 6, 12, WaveIndex::new(safe(1))?)?;
+    let fairy_world = &fairy.active_run.as_ref().ok_or("missing run")?.world;
+    assert_eq!(
+        temporary_fairy_luck(fairy_world, WaveIndex::new(safe(1))?),
+        6
+    );
+    assert_eq!(
+        fairy_luck_waves_left(fairy_world, WaveIndex::new(safe(1))?),
+        13
+    );
+    assert_eq!(
+        temporary_fairy_luck(fairy_world, WaveIndex::new(safe(14))?),
+        0
+    );
 
     let mut length_rng = ScriptedWorldRng::new(vec![0, 18]);
-    let planned = plan_biome_structure(&entered, &content.world, &mut length_rng)?;
+    let planned = plan_biome_structure(&fairy, &content.world, &mut length_rng)?;
     assert_eq!(planned.draws.len(), 2);
     assert_eq!(
         planned
@@ -825,6 +845,14 @@ fn branching_routes_and_biome_structure_are_canonical_state() -> TestResult {
             denominator: 1,
         }
     );
+    assert_eq!(starting_biome(mode, &content.world)?, BiomeId::new(safe(1)));
+    assert_eq!(wave_for_difficulty(mode, 12, false)?, 12);
+    assert!(is_wave_final(mode, 200));
+    assert!(!is_wave_final(mode, 199));
+    assert_eq!(legend_min_wave(580), 65);
+    assert_eq!(legend_min_wave(600), 70);
+    assert_eq!(legend_min_wave(660), 85);
+    assert_eq!(legend_min_wave(680), 90);
     assert!(is_checkpoint_wave(mode, 10));
     assert!(is_chapter_start_wave(mode, 11));
     assert!(is_major_checkpoint_wave(mode, 50));

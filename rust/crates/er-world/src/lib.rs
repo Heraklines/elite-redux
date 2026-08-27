@@ -12,6 +12,14 @@ use thiserror::Error;
 
 pub const WORLD_CONTENT_PACK_SCHEMA_VERSION_V1: u32 = 1;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
+pub enum TerminalWavePolicyV1 {
+    Exact(u32),
+    Interval(u32),
+    Never,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GameModeDefinitionV1 {
@@ -19,6 +27,9 @@ pub struct GameModeDefinitionV1 {
     pub key: String,
     pub first_wave: u32,
     pub terminal_wave: Option<u32>,
+    pub terminal_policy: TerminalWavePolicyV1,
+    pub difficulty_base_offset: u32,
+    pub difficulty_curve_interval: Option<u32>,
     pub route: RouteNodeId,
     pub allows_coop: bool,
     pub branching_routes: bool,
@@ -168,6 +179,18 @@ impl WorldContentPackV1 {
             if mode.key.is_empty()
                 || mode.first_wave == 0
                 || mode.terminal_wave.is_some_and(|end| end < mode.first_wave)
+                || match mode.terminal_policy {
+                    TerminalWavePolicyV1::Exact(wave) => {
+                        wave == 0 || mode.terminal_wave != Some(wave)
+                    }
+                    TerminalWavePolicyV1::Interval(interval) => {
+                        interval == 0 || mode.terminal_wave.is_some()
+                    }
+                    TerminalWavePolicyV1::Never => mode.terminal_wave.is_some(),
+                }
+                || mode
+                    .difficulty_curve_interval
+                    .is_some_and(|interval| interval == 0)
                 || mode.finale_routing_start_wave.is_some_and(|start| {
                     start < mode.first_wave || mode.terminal_wave.is_some_and(|end| start > end)
                 })

@@ -107,6 +107,51 @@ pub fn final_wave(mode: &crate::GameModeDefinitionV1) -> Option<u32> {
     mode.terminal_wave
 }
 
+pub fn starting_biome(
+    mode: &crate::GameModeDefinitionV1,
+    content: &PreparedWorldContentV1,
+) -> Result<BiomeId, WorldRuntimeError> {
+    content
+        .route(mode.route)
+        .map(|route| route.biome)
+        .ok_or(WorldRuntimeError::Content)
+}
+
+pub fn wave_for_difficulty(
+    mode: &crate::GameModeDefinitionV1,
+    wave: u32,
+    ignore_curve_changes: bool,
+) -> Result<u32, WorldRuntimeError> {
+    let mut result = wave
+        .checked_add(mode.difficulty_base_offset)
+        .ok_or(WorldRuntimeError::Wave)?;
+    if !ignore_curve_changes {
+        if let Some(interval) = mode.difficulty_curve_interval {
+            result = result
+                .checked_add(wave / interval)
+                .ok_or(WorldRuntimeError::Wave)?;
+        }
+        result = result
+            .checked_mul(mode.progression_scale)
+            .ok_or(WorldRuntimeError::Wave)?;
+    }
+    Ok(result)
+}
+
+pub fn is_wave_final(mode: &crate::GameModeDefinitionV1, wave: u32) -> bool {
+    match mode.terminal_policy {
+        crate::TerminalWavePolicyV1::Exact(terminal) => wave == terminal,
+        crate::TerminalWavePolicyV1::Interval(interval) => wave > 0 && wave % interval == 0,
+        crate::TerminalWavePolicyV1::Never => false,
+    }
+}
+
+pub fn legend_min_wave(base_stat_total: u32) -> u32 {
+    let delta = base_stat_total.saturating_sub(540);
+    let rounded_quarters = delta.saturating_add(2) / 4;
+    55_u32.saturating_add(rounded_quarters).clamp(55, 90)
+}
+
 pub fn progression_wave(
     mode: &crate::GameModeDefinitionV1,
     run_wave: u32,
@@ -503,6 +548,50 @@ pub fn consume_treasure_fragments_for_reward(
     }
     world.treasure_fragments -= TREASURE_FRAGMENTS_FOR_REWARD;
     Ok((validate_after(after)?, true))
+}
+
+pub fn grant_fairy_luck(
+    before: &GameStateV5,
+    bonus: u32,
+    duration: u32,
+    current_wave: WaveIndex,
+) -> Result<GameStateV5, WorldRuntimeError> {
+    let expiry = current_wave
+        .get()
+        .get()
+        .checked_add(u64::from(duration))
+        .and_then(|value| SafeU53::new(value).ok())
+        .and_then(|value| WaveIndex::new(value).ok())
+        .ok_or(WorldRuntimeError::Wave)?;
+    update_world(before, |world| {
+        world.fairy_luck_bonus = bonus;
+        world.fairy_luck_expiry_wave = Some(expiry);
+    })
+}
+
+pub fn temporary_fairy_luck(world: &WorldStateV1, current_wave: WaveIndex) -> u32 {
+    if world.fairy_luck_bonus == 0
+        || world
+            .fairy_luck_expiry_wave
+            .is_none_or(|expiry| current_wave > expiry)
+    {
+        0
+    } else {
+        world.fairy_luck_bonus
+    }
+}
+
+pub fn fairy_luck_waves_left(world: &WorldStateV1, current_wave: WaveIndex) -> u64 {
+    if temporary_fairy_luck(world, current_wave) == 0 {
+        return 0;
+    }
+    world.fairy_luck_expiry_wave.map_or(0, |expiry| {
+        expiry
+            .get()
+            .get()
+            .saturating_sub(current_wave.get().get())
+            .saturating_add(1)
+    })
 }
 
 pub fn onward_biomes(

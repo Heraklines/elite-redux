@@ -288,6 +288,8 @@ pub struct WorldStateV1 {
     pub treasure_fragments: u32,
     pub carried_weather: Option<WeatherKind>,
     pub biome_history: Vec<BiomeId>,
+    pub fairy_luck_bonus: u32,
+    pub fairy_luck_expiry_wave: Option<WaveIndex>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
