@@ -6016,6 +6016,7 @@
     "weight": 100
   },
   "TRAINER_70036": {
+    "battleBgm": "battle_kanto_gym",
     "battleType": "single",
     "challenge": "none",
     "defeatDialogue": "Told ya!",
