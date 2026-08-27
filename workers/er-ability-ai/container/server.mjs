@@ -316,7 +316,24 @@ function componentIdsForRole(searchContext, role) {
 
 function componentSelectionSchemaForRole(searchContext, role) {
   const schema = structuredClone(componentPartSelectionSchema);
-  schema.properties.componentId.enum = componentIdsForRole(searchContext, role);
+  const componentIds = componentIdsForRole(searchContext, role);
+  schema.properties.componentId.enum = componentIds;
+  const parameterProperties = {};
+  for (const component of searchContext.components) {
+    if (!componentIds.includes(component.componentId)) {
+      continue;
+    }
+    for (const parameter of component.rule.parameters || []) {
+      if (parameter.path) {
+        parameterProperties[parameter.path] = parameterValueSchema;
+      }
+    }
+  }
+  schema.properties.parameterOverrides = {
+    type: "object",
+    properties: parameterProperties,
+    additionalProperties: false,
+  };
   return schema;
 }
 

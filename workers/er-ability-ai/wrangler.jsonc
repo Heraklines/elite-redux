@@ -9,7 +9,7 @@
     "CODEX_MODEL": "gpt-5.6-luna",
     "CODEX_EFFORT": "medium",
     "CODEX_AUTH_BOOTSTRAP_VERSION": "2026-08-26-1",
-    "ABILITY_AI_RUNTIME_VERSION": "2026-08-28-3",
+    "ABILITY_AI_RUNTIME_VERSION": "2026-08-28-4",
     "NVIDIA_NIM_MODEL": "nvidia/nemotron-3-nano-30b-a3b",
     "NVIDIA_NIM_FALLBACK_MODEL": "nvidia/nemotron-3-nano-30b-a3b"
   },
