@@ -42,6 +42,36 @@ pub const INVENTORY_STATE_SCHEMA_VERSION_V1: u32 = 1;
 pub const WORLD_STATE_SCHEMA_VERSION_V1: u32 = 1;
 pub const SCENARIO_RUNTIME_SCHEMA_VERSION_V1: u32 = 1;
 
+mod ordered_map_serde {
+    use std::collections::BTreeMap;
+
+    use serde::{Deserialize, Deserializer, Serialize, Serializer, de::Error as _};
+
+    pub fn serialize<K, V, S>(value: &BTreeMap<K, V>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        K: Ord + Serialize,
+        V: Serialize,
+        S: Serializer,
+    {
+        value.iter().collect::<Vec<_>>().serialize(serializer)
+    }
+
+    pub fn deserialize<'de, K, V, D>(deserializer: D) -> Result<BTreeMap<K, V>, D::Error>
+    where
+        K: Deserialize<'de> + Ord,
+        V: Deserialize<'de>,
+        D: Deserializer<'de>,
+    {
+        let entries = Vec::<(K, V)>::deserialize(deserializer)?;
+        if entries.windows(2).any(|pair| pair[0].0 >= pair[1].0) {
+            return Err(D::Error::custom(
+                "ordered map entries must be sorted and unique",
+            ));
+        }
+        Ok(entries.into_iter().collect())
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AchievementProgress {
@@ -91,6 +121,7 @@ pub struct ProfileStateV1 {
     pub unlocks: Vec<UnlockId>,
     pub achievements: Vec<AchievementProgress>,
     pub challenges: Vec<ChallengeProgress>,
+    #[serde(with = "ordered_map_serde")]
     pub flags: BTreeMap<ProfileFlagId, bool>,
     pub statistics: ProfileStatistics,
     pub dex: DexState,
@@ -212,6 +243,7 @@ pub struct ScenarioRuntimeStateV1 {
     pub schema_version: u32,
     pub scenario: ScenarioId,
     pub node: ScenarioNodeId,
+    #[serde(with = "ordered_map_serde")]
     pub flags: BTreeMap<RunFlagId, bool>,
     pub visit_count: SafeU53,
 }
@@ -219,6 +251,7 @@ pub struct ScenarioRuntimeStateV1 {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct QuestStateV1 {
+    #[serde(with = "ordered_map_serde")]
     pub progress: BTreeMap<QuestId, SafeU53>,
     pub completed: BTreeSet<QuestId>,
 }
@@ -226,6 +259,7 @@ pub struct QuestStateV1 {
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FactionStateV1 {
+    #[serde(with = "ordered_map_serde")]
     pub standing: BTreeMap<FactionId, i64>,
 }
 
@@ -306,6 +340,7 @@ pub struct RunStateV3 {
     pub progression_queue: ProgressionQueueV2,
     pub battle: Option<BattleStateV5>,
     pub control: GameControlPlanV2,
+    #[serde(with = "ordered_map_serde")]
     pub flags: BTreeMap<RunFlagId, bool>,
     pub outcome: RunOutcome,
 }

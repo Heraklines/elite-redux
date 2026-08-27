@@ -89,6 +89,26 @@ pub struct GameReplayV1 {
     pub events: Vec<ReplayEventEnvelopeV1>,
     pub expected_digests: Vec<String>,
 }
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReplayDivergenceV1 {
+    pub sequence: SafeU53,
+    pub expected_digest: String,
+    pub actual_digest: String,
+    pub event: ReplayEventV1,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReplayReportV1 {
+    pub applied_events: usize,
+    pub divergence: Option<ReplayDivergenceV1>,
+}
+
+pub trait ReplayMachineV1 {
+    type Error: std::fmt::Display;
+
+    fn apply(&mut self, event: &ReplayEventV1) -> Result<(), Self::Error>;
+    fn mechanical_digest(&self) -> Result<String, Self::Error>;
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum SaveStorageEffectV1 {
@@ -114,6 +134,8 @@ pub enum SaveError {
     Decode(String),
     #[error("replay schema, event order, payload, or digest closure is invalid")]
     Replay,
+    #[error("replay machine failed: {0}")]
+    ReplayMachine(String),
     #[error("storage slot names and failures cannot be empty")]
     StorageKey,
 }
@@ -221,6 +243,37 @@ impl GameReplayV1 {
         }
         Ok(())
     }
+}
+pub fn replay_first_divergence_v1<M: ReplayMachineV1>(
+    replay: &GameReplayV1,
+    content_identity: &GameContentIdentity,
+    machine: &mut M,
+) -> Result<ReplayReportV1, SaveError> {
+    replay.validate(content_identity)?;
+    for (index, envelope) in replay.events.iter().enumerate() {
+        machine
+            .apply(&envelope.event)
+            .map_err(|error| SaveError::ReplayMachine(error.to_string()))?;
+        let actual = machine
+            .mechanical_digest()
+            .map_err(|error| SaveError::ReplayMachine(error.to_string()))?;
+        let expected = &replay.expected_digests[index];
+        if &actual != expected {
+            return Ok(ReplayReportV1 {
+                applied_events: index + 1,
+                divergence: Some(ReplayDivergenceV1 {
+                    sequence: envelope.sequence,
+                    expected_digest: expected.clone(),
+                    actual_digest: actual,
+                    event: envelope.event.clone(),
+                }),
+            });
+        }
+    }
+    Ok(ReplayReportV1 {
+        applied_events: replay.events.len(),
+        divergence: None,
+    })
 }
 
 impl SaveStorageEffectV1 {

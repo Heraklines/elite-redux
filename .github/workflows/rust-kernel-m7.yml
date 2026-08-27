@@ -76,11 +76,13 @@ jobs:
           cargo test -p er-state m7_state
           cargo test -p er-scenario
           cargo test -p er-ai
+          cargo test -p er-progression
           cargo test -p er-save
           cargo test -p er-content-compiler --lib m7
           cargo test -p er-game --lib m7_content
           cargo test -p er-kernel --lib snapshot_v6
           cargo test -p er-testkit --test m7_foundation
+          cargo test -p er-testkit --test m7_system_proof
 
   m7-full-content-cutover:
     name: M7 direct full-content dispatch closure
