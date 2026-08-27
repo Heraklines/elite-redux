@@ -621,24 +621,37 @@ function promptRequestsSelfTarget(prompt) {
 }
 
 function normalizeRuntimeSource(source, candidates) {
-  if (
-    !source
-    || !Number.isInteger(source.abilityId)
-    || candidates.some(candidate => sourceKey(candidate) === sourceKey(source))
-  ) {
+  if (!source || !Number.isInteger(source.abilityId)) {
     return;
   }
-  const matches = candidates.filter(candidate => candidate.attrType === source.attrType);
+  const matches = candidates.filter(candidate => candidate.source.attrType === source.attrType);
   if (matches.length === 0) {
     return;
   }
-  const candidate = matches.find(match => match.abilityId === source.abilityId) || matches[0];
-  source.abilityId = candidate.abilityId;
-  source.attrIndex = candidate.attrIndex;
-  source.attrType = candidate.attrType;
-  if (source.kind && candidate.kind) {
-    source.kind = candidate.kind;
-    source.conditionIndex = candidate.conditionIndex;
+  const candidate =
+    candidates.find(match => sourceKey(match.source) === sourceKey(source))
+    || matches.find(match => match.source.abilityId === source.abilityId)
+    || matches[0];
+  source.abilityId = candidate.source.abilityId;
+  source.attrIndex = candidate.source.attrIndex;
+  source.attrType = candidate.source.attrType;
+  if (source.kind && candidate.source.kind) {
+    source.kind = candidate.source.kind;
+    source.conditionIndex = candidate.source.conditionIndex;
+  }
+  const allowedPaths = new Set((candidate.parameters || []).map(parameter => parameter.path));
+  if (source.parameterOverrides) {
+    source.parameterOverrides = Object.fromEntries(
+      Object.entries(source.parameterOverrides).map(([path, value]) => {
+        if (!allowedPaths.has(path) && allowedPaths.has(`opts.${path}`)) {
+          return [`opts.${path}`, value];
+        }
+        if (!allowedPaths.has(path) && path.startsWith("opts.") && allowedPaths.has(path.slice(5))) {
+          return [path.slice(5), value];
+        }
+        return [path, value];
+      }),
+    );
   }
 }
 
@@ -648,9 +661,16 @@ function normalizeRuntimeSourceReferences(result, payload) {
   const effects = [];
   for (const ability of payload.componentCandidates || []) {
     for (const rule of ability.rules || []) {
-      hooks.push(rule.source);
-      conditions.push(...(rule.conditions || []).map(condition => condition.source));
-      effects.push(...(rule.effects || []).map(effect => effect.source));
+      hooks.push({ source: rule.source, parameters: rule.parameters });
+      conditions.push(
+        ...(rule.conditions || []).map(condition => ({ source: condition.source, parameters: rule.parameters })),
+      );
+      effects.push(
+        ...(rule.effects || []).map(effect => ({
+          source: effect.source,
+          parameters: effect.parameters || rule.parameters,
+        })),
+      );
     }
   }
   for (const source of result.blueprint?.mechanics || []) {
