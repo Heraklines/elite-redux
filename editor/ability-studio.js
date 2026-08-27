@@ -159,6 +159,52 @@
     return [...new Set(prompt.toLowerCase().match(/[a-z0-9]+/g) || [])].filter(term => term.length > 2).slice(0, 40);
   }
 
+  function compactAiParameter(parameter) {
+    return Object.fromEntries(
+      ["path", "label", "value", "rawValue", "control", "editable", "optional", "min", "max", "options"]
+        .filter(key => Object.hasOwn(parameter, key))
+        .map(key => [key, parameter[key]]),
+    );
+  }
+
+  function aiComponentSignature(rule) {
+    return JSON.stringify([
+      rule.source.attrType,
+      rule.hook.id,
+      (rule.conditions || []).map(condition => [condition.kind, condition.source?.attrType]),
+      (rule.effects || []).map(effect => [effect.kind, effect.source?.attrType]),
+      (rule.parameters || []).map(parameter => [parameter.path, parameter.control, parameter.editable]),
+    ]);
+  }
+
+  function compactAiComponentRule(rule) {
+    return {
+      label: rule.label,
+      summary: rule.summary,
+      source: rule.source,
+      hook: {
+        id: rule.hook.id,
+        label: rule.hook.label,
+        mode: rule.hook.mode,
+      },
+      parameters: (rule.parameters || []).map(compactAiParameter),
+      conditions: (rule.conditions || []).map(condition => ({
+        label: condition.label,
+        summary: condition.summary,
+        kind: condition.kind,
+        required: condition.required,
+        source: condition.source,
+      })),
+      effects: (rule.effects || []).map(effect => ({
+        label: effect.label,
+        summary: effect.summary,
+        kind: effect.kind,
+        scope: effect.scope,
+        source: effect.source,
+      })),
+    };
+  }
+
   function aiComponentContext(prompt) {
     const normalizedPrompt = prompt.toLowerCase();
     const terms = aiSearchTerms(prompt);
@@ -180,8 +226,21 @@
       }
     }
     matches.sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name));
+    const selected = [];
+    const signatures = new Set();
+    for (const match of matches) {
+      const signature = aiComponentSignature(match.rule);
+      if (signatures.has(signature)) {
+        continue;
+      }
+      signatures.add(signature);
+      selected.push(match);
+      if (selected.length >= 8) {
+        break;
+      }
+    }
     const grouped = new Map();
-    for (const { ability, rule } of matches.slice(0, 16)) {
+    for (const { ability, rule } of selected) {
       if (!grouped.has(ability.id)) {
         grouped.set(ability.id, {
           id: ability.id,
@@ -190,15 +249,7 @@
           rules: [],
         });
       }
-      grouped.get(ability.id).rules.push({
-        id: rule.id,
-        label: rule.label,
-        summary: rule.summary,
-        source: rule.source,
-        hook: rule.hook,
-        conditions: rule.conditions,
-        effects: rule.effects,
-      });
+      grouped.get(ability.id).rules.push(compactAiComponentRule(rule));
     }
     return [...grouped.values()];
   }
@@ -222,7 +273,7 @@
       })
       .filter(({ score }) => score > 0)
       .sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name))
-      .slice(0, 48)
+      .slice(0, 16)
       .map(({ ability }) => ({
         id: ability.id,
         name: ability.name,
@@ -243,7 +294,7 @@
       })
       .filter(({ score }) => score > 0)
       .sort((left, right) => right.score - left.score || left.move.name.localeCompare(right.move.name))
-      .slice(0, 80)
+      .slice(0, 16)
       .map(({ move }) => ({
         id: move.id,
         name: move.name,
