@@ -2,7 +2,7 @@
 
 use std::collections::VecDeque;
 
-use er_types::{GameActionResultV1, GameControlKindV2, SafeU53};
+use er_types::{GameActionResultV1, GameControlKindV2, SafeU53, TimerId};
 use thiserror::Error;
 
 use crate::m7_runtime::GameControlIntentV2;
@@ -18,6 +18,9 @@ pub enum GameInternalEventV1 {
         kind: GameControlKindV2,
         revision: SafeU53,
     },
+    TimerFired {
+        timer_id: TimerId,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -26,8 +29,8 @@ pub enum GameInternalEventKindV1 {
     ControlCancelled,
     TransitionApplied,
     ControlInstalled,
+    TimerFired,
 }
-
 #[derive(Clone, Debug, Eq, Error, PartialEq)]
 pub enum GameInternalEventQueueErrorV1 {
     #[error("M7 internal event budget exceeded after {processed} events")]
@@ -60,6 +63,7 @@ impl GameInternalEventV1 {
             Self::ControlCancelled(_) => GameInternalEventKindV1::ControlCancelled,
             Self::TransitionApplied(_) => GameInternalEventKindV1::TransitionApplied,
             Self::ControlInstalled { .. } => GameInternalEventKindV1::ControlInstalled,
+            Self::TimerFired { .. } => GameInternalEventKindV1::TimerFired,
         }
     }
 }
@@ -122,7 +126,7 @@ impl GameInternalEventQueueV1 {
 
 #[cfg(test)]
 mod tests {
-    use er_types::{GameControlKindV2, SafeU53};
+    use er_types::{GameControlKindV2, SafeU53, TimerId};
 
     use super::{
         GAME_INTERNAL_EVENT_BUDGET_V1, GameInternalEventKindV1, GameInternalEventQueueErrorV1,
@@ -136,24 +140,32 @@ mod tests {
             kind: GameControlKindV2::Reward,
             revision: SafeU53::ZERO,
         });
+        queue.push_back(GameInternalEventV1::TimerFired {
+            timer_id: TimerId::new(SafeU53::new(1).expect("timer")),
+        });
         assert_eq!(
             queue.pop_front().expect("pop").map(|event| event.kind()),
             Some(GameInternalEventKindV1::ControlInstalled)
         );
+        assert_eq!(
+            queue.pop_front().expect("pop").map(|event| event.kind()),
+            Some(GameInternalEventKindV1::TimerFired)
+        );
         assert!(queue.is_quiescent());
-        assert_eq!(queue.processed(), 1);
+        assert_eq!(queue.processed(), 2);
 
+        let mut budgeted = GameInternalEventQueueV1::default();
         for _ in 0..=GAME_INTERNAL_EVENT_BUDGET_V1 {
-            queue.push_back(GameInternalEventV1::ControlInstalled {
+            budgeted.push_back(GameInternalEventV1::ControlInstalled {
                 kind: GameControlKindV2::Reward,
                 revision: SafeU53::ZERO,
             });
         }
-        for _ in 1..GAME_INTERNAL_EVENT_BUDGET_V1 {
-            queue.pop_front().expect("within budget");
+        for _ in 0..GAME_INTERNAL_EVENT_BUDGET_V1 {
+            budgeted.pop_front().expect("within budget");
         }
         assert_eq!(
-            queue.pop_front(),
+            budgeted.pop_front(),
             Err(GameInternalEventQueueErrorV1::BudgetExceeded {
                 processed: GAME_INTERNAL_EVENT_BUDGET_V1,
             })

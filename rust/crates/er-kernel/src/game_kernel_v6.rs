@@ -242,6 +242,23 @@ impl GameKernelV6 {
             retained.push(timer);
         }
         self.scheduler.timers = retained;
+        for timer in &fired {
+            let mut queue = GameInternalEventQueueV1::new(GameInternalEventV1::TimerFired {
+                timer_id: timer.timer_id,
+            });
+            let Some(GameInternalEventV1::TimerFired { timer_id }) = queue
+                .pop_front()
+                .map_err(|_| GameKernelV6Error::Transaction)?
+            else {
+                return Err(GameKernelV6Error::Transaction);
+            };
+            if timer_id != timer.timer_id {
+                return Err(GameKernelV6Error::Transaction);
+            }
+            queue
+                .validate_quiescent()
+                .map_err(|_| GameKernelV6Error::Transaction)?;
+        }
         Ok(fired)
     }
 
@@ -336,6 +353,9 @@ impl GameKernelV6 {
                     }
                 }
                 GameInternalEventV1::ControlCancelled(_) => {
+                    return Err(GameKernelV6Error::Transaction);
+                }
+                GameInternalEventV1::TimerFired { .. } => {
                     return Err(GameKernelV6Error::Transaction);
                 }
             }
