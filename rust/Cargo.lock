@@ -390,6 +390,7 @@ dependencies = [
  "er-canonical",
  "er-content",
  "er-content-compiler",
+ "er-env",
  "er-game",
  "er-kernel",
  "er-mechanics",

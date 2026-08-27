@@ -28,6 +28,7 @@ workspace = true
 er-ai = { path = "../er-ai" }
 er-content-compiler = { path = "../er-content-compiler" }
 er-wasm = { path = "../er-wasm" }
+er-env = { path = "../er-env" }
 er-progression = { path = "../er-progression" }
 er-save = { path = "../er-save" }
 er-scenario = { path = "../er-scenario" }

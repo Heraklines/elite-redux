@@ -24,7 +24,7 @@ pub struct RestorableKernelSnapshotV6 {
     pub game_state: GameStateV5,
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
-    pub protocol: ProtocolRuntimeSnapshotV2,
+    pub protocol: Option<ProtocolRuntimeSnapshotV2>,
     pub pending_presentations: Vec<BattlePresentationCueV5>,
     pub prepared_transactions: Vec<PreparedTransactionSnapshotV1>,
     pub replay_sequence: SafeU53,
@@ -124,9 +124,11 @@ impl RestorableKernelSnapshotV6 {
         self.scheduler
             .validate()
             .map_err(SnapshotV6Error::Scheduler)?;
-        self.protocol
-            .validate()
-            .map_err(|error| SnapshotV6Error::Protocol(error.to_string()))?;
+        if let Some(protocol) = &self.protocol {
+            protocol
+                .validate()
+                .map_err(|error| SnapshotV6Error::Protocol(error.to_string()))?;
+        }
         for pair in self.prepared_transactions.windows(2) {
             if pair[0].operation_id >= pair[1].operation_id {
                 return Err(SnapshotV6Error::Transaction);

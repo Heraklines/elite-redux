@@ -40,7 +40,7 @@ pub struct GameKernelV6 {
     input_router: InputRouterSnapshotV2,
     pressed_keys: BTreeSet<PhysicalKey>,
     scheduler: KernelSchedulerSnapshotV2,
-    protocol: ProtocolRuntimeSnapshotV2,
+    protocol: Option<ProtocolRuntimeSnapshotV2>,
     pending_presentations: Vec<BattlePresentationCueV5>,
     replay_sequence: SafeU53,
     terminal: Option<TerminalState>,
@@ -63,7 +63,7 @@ impl GameKernelV6 {
         content: Arc<PreparedGameContentV1>,
         input_router: InputRouterSnapshotV2,
         scheduler: KernelSchedulerSnapshotV2,
-        protocol: ProtocolRuntimeSnapshotV2,
+        protocol: Option<ProtocolRuntimeSnapshotV2>,
         replay_sequence: SafeU53,
         terminal: Option<TerminalState>,
     ) -> Result<Self, GameKernelV6Error> {

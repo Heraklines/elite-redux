@@ -11,6 +11,7 @@ use er_content::pack::m6_pack::{
     BattleContentPackV3, BehaviorClassificationManifestV2, BespokeManifestV2, FieldContentV1,
 };
 use er_content::pack::{m6_prepared::prepare_content, selected_type_chart};
+use er_env::{EnvironmentKernelComponentsV1, GameEffect, GameEnvironment};
 use er_game::m7_content::{
     GAME_CONTENT_BUNDLE_SCHEMA_VERSION_V1, GameBehaviorClassificationV1, GameContentBundleV1,
     META_CONTENT_PACK_SCHEMA_VERSION_V1, MetaContentPackV1, PreparedGameContentV1,
@@ -19,6 +20,7 @@ use er_game::m7_content::{
 use er_game::m7_progression_control::capture_control;
 use er_game::m7_run_executor::{RunExecutionContextV1, execute_run_hook_v1};
 use er_game::m7_runtime::{GameControlIntentV2, GameRuntimeV5};
+use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
 use er_progression::material::{
     LifecycleMaterialApplyV1, LifecycleMaterialV1, apply_lifecycle_material_v1,
     apply_serialized_lifecycle_material_v1,
@@ -49,9 +51,9 @@ use er_types::run_ids::{
 use er_types::run_model::RunOutcome;
 use er_types::{
     AiPolicyId, BattleContentPackHashV3, CatalogHash, GameBehaviorStatus, GameBehaviorUnitId,
-    GameContentBundleHash, InventoryItemId, OperationId, OracleSha, RunCondition, RunConditionId,
-    RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget, RunProgramId, RunProgramV1,
-    SafeU53, ScenarioId, ScenarioNodeId, SeatId,
+    GameContentBundleHash, InputFocus, InventoryItemId, OperationId, OracleSha, PhysicalKey,
+    RawInputEvent, RunCondition, RunConditionId, RunFlagId, RunHook, RunHookBinding, RunOperation,
+    RunProgramBudget, RunProgramId, RunProgramV1, SafeU53, ScenarioId, ScenarioNodeId, SeatId,
 };
 use er_world::{
     BiomeDefinitionV1, EncounterDefinitionV1, EncounterKindV1, GameModeDefinitionV1,
@@ -428,6 +430,54 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         GameSaveV1::decode_canonical(&save_bytes, content.identity())?,
         save
     );
+
+    let mut environment = GameEnvironment::new_run(
+        state.clone(),
+        content.clone(),
+        EnvironmentKernelComponentsV1 {
+            input_router: InputRouterSnapshotV2 {
+                focus: InputFocus::Game,
+                pressed: Vec::new(),
+                suppressed_printable_keys: Vec::new(),
+                held_buttons: Vec::new(),
+                locks: Vec::new(),
+                repeats: Vec::new(),
+                disposed: false,
+            },
+            scheduler: KernelSchedulerSnapshotV2 {
+                next_timer_id: None,
+                timers: Vec::new(),
+                pauses: Vec::new(),
+                disposed: false,
+            },
+            protocol: None,
+            replay_sequence: SafeU53::ZERO,
+            terminal: None,
+        },
+    )?;
+    assert_eq!(
+        environment.raw_input(RawInputEvent::KeyDown {
+            code: PhysicalKey::ArrowDown,
+            printable: false,
+            browser_repeat: false,
+            focus: InputFocus::Game,
+        })?,
+        vec![GameEffect::Navigated]
+    );
+    environment.raw_input(RawInputEvent::KeyUp {
+        code: PhysicalKey::ArrowDown,
+    })?;
+    assert!(matches!(
+        environment
+            .raw_input(RawInputEvent::KeyDown {
+                code: PhysicalKey::Space,
+                printable: true,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            })?
+            .as_slice(),
+        [GameEffect::Selected { .. }]
+    ));
 
     let mut runtime = GameRuntimeV5::new(state, content)?;
     runtime.navigate_control(er_types::ui_menu::NavigationDirection::Down)?;

@@ -18,7 +18,7 @@ use thiserror::Error;
 pub struct EnvironmentKernelComponentsV1 {
     pub input_router: InputRouterSnapshotV2,
     pub scheduler: KernelSchedulerSnapshotV2,
-    pub protocol: ProtocolRuntimeSnapshotV2,
+    pub protocol: Option<ProtocolRuntimeSnapshotV2>,
     pub replay_sequence: SafeU53,
     pub terminal: Option<TerminalState>,
 }
