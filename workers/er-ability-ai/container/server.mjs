@@ -1170,7 +1170,7 @@ function blueprintHasStatChange(result, expected) {
   return (result.blueprint.rules || []).some(rule =>
     (rule.effects || []).some(
       effect =>
-        effect.kind === "stat"
+        effect.kind === "stat-stage"
         && effect.target === expected.target
         && effect.stat === expected.stat
         && Number(effect.stages) === expected.stages,
