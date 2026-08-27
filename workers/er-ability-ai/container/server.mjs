@@ -1365,6 +1365,15 @@ function executeCatalogSearch(payload, rawPlan) {
     })),
     components: [...components.values()].slice(0, 120).map((component, index) => ({
       componentId: `c${index}`,
+      selectableParts: {
+        hook: Boolean(component.rule.source),
+        conditionIndexes: (component.rule.conditions || [])
+          .map((condition, conditionIndex) => (condition.source ? conditionIndex : null))
+          .filter(conditionIndex => conditionIndex !== null),
+        effectIndexes: (component.rule.effects || [])
+          .map((effect, effectIndex) => (effect.source ? effectIndex : null))
+          .filter(effectIndex => effectIndex !== null),
+      },
       ...component,
     })),
     abilities: [...abilities.values()].slice(0, 48),
@@ -1533,7 +1542,7 @@ function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix catalog component selections with configurable primitive conditions and effects. Prefer primitive rules whenever PRIMITIVE CATALOG expresses the requested mechanic exactly. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher. Use includes only when the user explicitly wants the complete existing ability.
 
-The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId. For hooks set partIndex to null. For a condition or effect set partIndex to its zero-based position in that component's conditions or effects array. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId and selectableParts. A component is valid as a hook only when selectableParts.hook is true. A condition or effect partIndex must appear in selectableParts.conditionIndexes or selectableParts.effectIndexes for that role. For hooks set partIndex to null. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
 Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
 
@@ -1843,9 +1852,10 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
 
 async function runNimModel(model, body, payload, searchContext, emit) {
   let plan = await requestNimJson(model, body, assemblyPlanSchema, "ability model", 60_000);
-  let result = expandAssemblyPlan(plan, searchContext);
-  normalizePrimitiveAliases(result);
+  let result;
   try {
+    result = expandAssemblyPlan(plan, searchContext);
+    normalizePrimitiveAliases(result);
     normalizeRuntimeSourceReferences(result, payload);
     normalizeComponentRuleHooks(result);
     normalizeScriptedMoveTargets(result, payload);
