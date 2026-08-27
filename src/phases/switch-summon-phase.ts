@@ -54,6 +54,22 @@ export function resolvePlayerSwitchSlot(
   );
 }
 
+/**
+ * Revalidate an enemy switch against the party's CURRENT ordering/state.
+ * Enemy commands can queue a switch before an earlier action KOs and transposes
+ * the intended reserve. Never summon the fainted/stale entry now occupying that
+ * slot; fall through to the trainer's next legal reserve.
+ */
+export function resolveEnemySwitchSlot(party: readonly Pokemon[], requestedSlot: number, battlerCount: number): number {
+  const requested = party[requestedSlot];
+  if (requestedSlot >= battlerCount && requested?.isAllowedInBattle() === true && !requested.isOnField()) {
+    return requestedSlot;
+  }
+  return party.findIndex(
+    (pokemon, index) => index >= battlerCount && pokemon.isAllowedInBattle() && !pokemon.isOnField(),
+  );
+}
+
 export class SwitchSummonPhase extends SummonPhase {
   public readonly phaseName: "SwitchSummonPhase" | "ReturnPhase" = "SwitchSummonPhase";
   private readonly switchType: SwitchType;
@@ -212,9 +228,10 @@ export class SwitchSummonPhase extends SummonPhase {
 
   switchAndSummon() {
     const party = this.player ? this.getParty() : globalScene.getEnemyParty();
+    const battlerCount = globalScene.currentBattle.getBattlerCount();
     const resolvedSlotIndex = this.player
-      ? resolvePlayerSwitchSlot(party, this.slotIndex, globalScene.currentBattle.getBattlerCount())
-      : this.slotIndex;
+      ? resolvePlayerSwitchSlot(party, this.slotIndex, battlerCount)
+      : resolveEnemySwitchSlot(party, this.slotIndex, battlerCount);
     const switchedInPokemon: Pokemon | undefined = party[resolvedSlotIndex];
     this.lastPokemon = this.getPokemon();
 

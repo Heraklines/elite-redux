@@ -420,8 +420,13 @@ function toPokemonPort(pokemon: Pokemon): MoodyLivePokemonPort {
       pokemon.hp = Math.min(pokemon.getMaxHp(), pokemon.hp + Math.max(1, Math.floor(before * fraction)));
       pokemon.updateInfo(true).catch(() => undefined);
     },
-    applyHpDebt: amount => {
-      pokemon.hp = Math.min(pokemon.hp, Math.max(1, pokemon.getMaxHp() - Math.max(0, Math.floor(amount))));
+    applyHpDebt: _amount => {
+      // The coordinator persists `bloodDebts` before executing this port, so
+      // getMaxHp() ALREADY includes the new debt. Subtracting `amount` again
+      // charged the current HP twice on purchase. Clamp once to the newly
+      // derived maximum; the saved debt continues to drive getMaxHp() until
+      // the biome reset.
+      pokemon.hp = Math.min(pokemon.hp, pokemon.getMaxHp());
       pokemon.updateInfo(true).catch(() => undefined);
     },
     revive: (hpFraction, extraHealthSegments, allStatStages) => {

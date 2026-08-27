@@ -177,8 +177,8 @@ export const ER_ROCKY_HELMET_TYPE = (): ModifierType =>
   );
 
 // --- move-effect-phase helpers ---------------------------------------------
-/** Life Orb recoil: ~1/10 max HP to the user after a damaging hit connects. */
-export function applyErLifeOrbRecoil(user: Pokemon, damageDealt: number): void {
+/** Mark a damaging Life Orb move for one recoil payment after all hits/targets resolve. */
+export function queueErLifeOrbRecoil(user: Pokemon, damageDealt: number): void {
   if (damageDealt <= 0) {
     return;
   }
@@ -187,8 +187,17 @@ export function applyErLifeOrbRecoil(user: Pokemon, damageDealt: number): void {
     user.isPlayer(),
   );
   if (hasOrb) {
-    user.damageAndUpdate(toDmgValue(user.getMaxHp() / 10), { result: HitResult.INDIRECT });
+    user.turnData.erLifeOrbRecoilPending = true;
   }
+}
+
+/** Pay (and clear) one queued Life Orb recoil for the completed move. */
+export function applyPendingErLifeOrbRecoil(user: Pokemon): void {
+  if (!user.turnData.erLifeOrbRecoilPending) {
+    return;
+  }
+  user.turnData.erLifeOrbRecoilPending = false;
+  user.damageAndUpdate(toDmgValue(user.getMaxHp() / 10), { result: HitResult.INDIRECT });
 }
 
 /** Rocky Helmet: a contact attacker takes 1/6 of its max HP. */

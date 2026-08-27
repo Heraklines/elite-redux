@@ -7,6 +7,7 @@ import {
 } from "#data/elite-redux/moody/moody-runtime-game-adapter";
 import {
   createMoodyLiveExecutionTarget,
+  resetMoodyCoordinatorLiveCadence,
   runMoodyCoordinatorLive,
 } from "#data/elite-redux/moody/moody-runtime-live-adapter";
 import { createMoodyModeState, resetMoodyModeState, restoreMoodyModeState } from "#data/elite-redux/moody/moody-state";
@@ -27,6 +28,12 @@ function partyPokemon(id: number, maxHp: number): Pokemon {
     isFainted: vi.fn(() => false),
     updateInfo: vi.fn(async () => undefined),
   } as unknown as Pokemon;
+}
+
+function debtAwarePartyPokemon(id: number, baseMaxHp: number): Pokemon {
+  const pokemon = partyPokemon(id, baseMaxHp);
+  pokemon.getMaxHp = vi.fn(() => Math.max(1, baseMaxHp - getMoodyCoordinatorHpDebt(id)));
+  return pokemon;
 }
 
 function threat(pokemonId: number, fieldTurns: number, damageDealt: number) {
@@ -110,6 +117,31 @@ describe("Moody release blocker: usage-ranked debt and inventory", () => {
     };
 
     expect(debtFor(ModifierTier.MASTER)).toBeGreaterThan(debtFor(ModifierTier.GREAT));
+  });
+
+  it("keeps Blood Debt through battle/turn cadence and clears it only at a biome transition", () => {
+    restoreEconomyState("blood-market");
+    installEconomyScene([partyPokemon(1, 200), partyPokemon(2, 200)]);
+    notifyMoodyCoordinatorMarketPurchase(ModifierTier.ULTRA, "blood");
+    const debt = getMoodyCoordinatorHpDebt(2);
+
+    expect(debt).toBeGreaterThan(0);
+    expect(resetMoodyCoordinatorLiveCadence("battle")).toBe(true);
+    expect(getMoodyCoordinatorHpDebt(2)).toBe(debt);
+
+    notifyMoodyCoordinatorBiomeTransition();
+    expect(getMoodyCoordinatorHpDebt(2)).toBe(0);
+  });
+
+  it("clamps current HP to the debt-adjusted maximum exactly once", () => {
+    restoreEconomyState("blood-market");
+    const debtor = debtAwarePartyPokemon(2, 200);
+    installEconomyScene([partyPokemon(1, 200), debtor]);
+
+    notifyMoodyCoordinatorMarketPurchase(ModifierTier.ULTRA, "blood");
+
+    expect(getMoodyCoordinatorHpDebt(2)).toBeGreaterThan(0);
+    expect(debtor.hp).toBe(debtor.getMaxHp());
   });
 
   it("splits a tier-scaled bill between the two most-used Pokemon", () => {
@@ -223,6 +255,17 @@ describe("Moody release blocker: Recycler variants", () => {
       null,
       expect.objectContaining({ improvedBaseWeights: true, applyLuckAfterward: true }),
     );
+  });
+
+  it("does not re-arm Recycler when the same reward screen reopens from a nested item", () => {
+    const continuation = Object.create(SelectModifierPhase.prototype) as SelectModifierPhase;
+    Object.assign(continuation, { rerollCount: 0, isCopy: true });
+    const initializes = Reflect.get(continuation as object, "initializesRewardScreenLifecycle") as () => boolean;
+    expect(Reflect.apply(initializes, continuation, [])).toBe(false);
+
+    const fresh = Object.create(SelectModifierPhase.prototype) as SelectModifierPhase;
+    Object.assign(fresh, { rerollCount: 0, isCopy: false });
+    expect(Reflect.apply(initializes, fresh, [])).toBe(true);
   });
 
   it("makes an Upcycler result at least one tier higher than the strongest destroyed offer", () => {

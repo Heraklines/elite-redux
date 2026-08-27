@@ -26,7 +26,7 @@ import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { TrainerType } from "#enums/trainer-type";
 import type { Pokemon } from "#field/pokemon";
-import { resolvePlayerSwitchSlot, SwitchSummonPhase } from "#phases/switch-summon-phase";
+import { resolveEnemySwitchSlot, resolvePlayerSwitchSlot, SwitchSummonPhase } from "#phases/switch-summon-phase";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -42,6 +42,16 @@ describe("ER simultaneous player double-KO replacement", () => {
     // Slot 3 was the first pick. By the time the second summon executes it is
     // already on the field, so slot 4 must be used instead.
     expect(resolvePlayerSwitchSlot(party, 3, 2)).toBe(4);
+  });
+
+  it("replaces a stale enemy switch slot that now contains the fainted former lead", () => {
+    const mon = (allowed: boolean, onField: boolean): Pokemon =>
+      ({ isAllowedInBattle: () => allowed, isOnField: () => onField }) as unknown as Pokemon;
+    const party = [mon(true, true), mon(true, true), mon(false, false), mon(true, false), mon(true, false)];
+
+    // The AI originally selected reserve slot 2. An earlier KO/replacement
+    // transposed the fainted lead into that slot before this queued switch ran.
+    expect(resolveEnemySwitchSlot(party, 2, 2)).toBe(3);
   });
 });
 

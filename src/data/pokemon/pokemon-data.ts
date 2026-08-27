@@ -657,6 +657,8 @@ export class PokemonTurnData {
   public hitsLeft = -1;
   public totalDamageDealt = 0;
   public singleHitDamageDealt = 0;
+  /** A damaging Life Orb move pays recoil once after its final hit/target resolves. */
+  public erLifeOrbRecoilPending = false;
   public damageTaken = 0;
   /**
    * An array containing data about attacks received this turn, in FIFO order.

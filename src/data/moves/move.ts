@@ -9552,20 +9552,29 @@ export class RandomMoveAttr extends CallMoveAttr {
    * @param args Unused
    */
   override apply(user: Pokemon, target: Pokemon, _move: Move, args: any[]): boolean {
-    // TODO: Move this into the constructor to avoid constructing this every call
-    const moveIds = getEnumValues(MoveId).map(m =>
-      !this.invalidMoves.has(m) && !allMoves[m].name.endsWith(" (N)") ? m : MoveId.NONE,
-    );
-    let moveId: MoveId = MoveId.NONE;
-    const moveStatus = new BooleanHolder(true);
-    do {
-      moveId = this.getMoveOverride() ?? moveIds[user.randBattleSeedInt(moveIds.length)];
-      moveStatus.value = moveId !== MoveId.NONE;
+    // Editor/generated enum changes can briefly leave a MoveId without a
+    // registered Move. Metronome used to dereference `.name` on that hole and
+    // crash the whole battle before it even rolled a move. Build a finite pool
+    // from registered moves only; also remove rejected challenge candidates so
+    // a restrictive challenge cannot spin forever.
+    const moveIds = getEnumValues(MoveId).filter(moveId => {
+      const candidate = allMoves[moveId];
+      return candidate != null && !this.invalidMoves.has(moveId) && !candidate.name.endsWith(" (N)");
+    });
+    const override = this.getMoveOverride();
+    const candidates = override == null ? moveIds : moveIds.includes(override) ? [override] : [];
+    while (candidates.length > 0) {
+      const index = override == null ? user.randBattleSeedInt(candidates.length) : 0;
+      const moveId = candidates.splice(index, 1)[0];
+      const moveStatus = new BooleanHolder(true);
       if (user.isPlayer()) {
         applyChallenges(ChallengeType.POKEMON_MOVE, moveId, moveStatus);
       }
-    } while (!moveStatus.value);
-    return super.apply(user, target, allMoves[moveId], args);
+      if (moveStatus.value) {
+        return super.apply(user, target, allMoves[moveId], args);
+      }
+    }
+    return false;
   }
 }
 

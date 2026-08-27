@@ -65,6 +65,20 @@ describe("Moves - Metronome", () => {
     expect(player.isFullHp()).toBeFalsy();
   });
 
+  it("ignores an unregistered MoveId instead of crashing while building its roll pool", async () => {
+    await game.classicMode.startBattle(SpeciesId.REGIELEKI);
+    vi.spyOn(randomMoveAttr, "getMoveOverride").mockReturnValue(MoveId.SPLASH);
+    const savedMove = allMoves[MoveId.TACKLE];
+    const mutableMoves = allMoves as unknown as Array<(typeof allMoves)[number] | undefined>;
+    try {
+      mutableMoves[MoveId.TACKLE] = undefined;
+      game.move.select(MoveId.METRONOME);
+      await expect(game.toNextTurn()).resolves.not.toThrow();
+    } finally {
+      mutableMoves[MoveId.TACKLE] = savedMove;
+    }
+  });
+
   it("should recharge after using recharge move", async () => {
     await game.classicMode.startBattle(SpeciesId.REGIELEKI);
     const player = game.field.getPlayerPokemon();

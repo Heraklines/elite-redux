@@ -33,6 +33,9 @@ export class MoveEndPhase extends PokemonPhase {
     // which this Phase would promptly destroy
     if (pokemon) {
       pokemon.turnData.hitsLeft = -1;
+      // Defensive cleanup for interrupted/overridden move flows. A completed
+      // damaging move normally settles this in MoveEffectPhase.end().
+      pokemon.turnData.erLifeOrbRecoilPending = false;
     }
 
     if (!this.wasFollowUp && pokemon?.isActive(true)) {

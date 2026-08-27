@@ -2050,7 +2050,15 @@ export class SelectModifierPhase extends BattlePhase {
       this.customModifierSettings,
       rerollTierPolicy.allowLuckUpgrades,
     );
-    return this.rerollCount === 0 ? applyMoodyCoordinatorRewardOptions(options) : options;
+    return this.initializesRewardScreenLifecycle() ? applyMoodyCoordinatorRewardOptions(options) : options;
+  }
+
+  /** True only for a genuinely new reward screen, never its back-out continuation. */
+  protected initializesRewardScreenLifecycle(): boolean {
+    // A continuation copy is the SAME reward screen reopened after backing out
+    // of a TM/capsule/etc. Resetting reward-screen cadence here re-armed
+    // Recycler and let the same nested item path be farmed repeatedly.
+    return this.rerollCount === 0 && !this.isCopy;
   }
 
   /**

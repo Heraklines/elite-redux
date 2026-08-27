@@ -38,7 +38,11 @@ import {
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { applyErEndlessContagion, recordErEndlessMoveOutcome } from "#data/elite-redux/er-endless-rift-runtime";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
-import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
+import {
+  applyErRockyHelmet,
+  applyPendingErLifeOrbRecoil,
+  queueErLifeOrbRecoil,
+} from "#data/elite-redux/er-recreated-items";
 import {
   erApplyBlunderPolicyOnMiss,
   erApplyTacticalSwitchOnHit,
@@ -974,7 +978,7 @@ export class MoveEffectPhase extends PokemonPhase {
     // move.chance >= 1) do NOT incur Life Orb recoil.
     const sheerForceSuppressesRecoil = user.hasAbility(AbilityId.SHEER_FORCE) && this.move.chance >= 1;
     if (!sheerForceSuppressesRecoil && !this.isMoodyCoordinatorSpectral(user)) {
-      applyErLifeOrbRecoil(user, finalDmg);
+      queueErLifeOrbRecoil(user, finalDmg);
     }
     if (!this.isMoodyCoordinatorSpectral(user)) {
       applyErRockyHelmet(user, target, this.move, finalDmg);
@@ -1248,6 +1252,12 @@ export class MoveEffectPhase extends PokemonPhase {
     finishReductionMove(user, this.move);
     finishSetlistMove(user, this.move);
     finishTwoFacedMove(user, this.move);
+
+    // Life Orb is a once-per-move cost. Damage is processed once per target
+    // and once per strike, so charging at the damage chokepoint made spread and
+    // multi-hit moves pay repeatedly. Settle the single queued payment only
+    // after the move's final strike has resolved.
+    applyPendingErLifeOrbRecoil(user);
 
     /**
      * All hits of the move have resolved by now.
