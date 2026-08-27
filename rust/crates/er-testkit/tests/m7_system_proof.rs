@@ -70,6 +70,9 @@ use er_types::{
     RawInputEvent, RunCondition, RunConditionId, RunFlagId, RunHook, RunHookBinding, RunOperation,
     RunProgramBudget, RunProgramId, RunProgramV1, SafeU53, ScenarioId, ScenarioNodeId, SeatId,
 };
+use er_wasm::m7_parity::{
+    LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
+};
 use er_world::{
     BiomeDefinitionV1, EncounterDefinitionV1, EncounterKindV1, GameModeDefinitionV1,
     PokemonBuildV1, RouteDefinitionV1, WORLD_CONTENT_PACK_SCHEMA_VERSION_V1, WeightedEncounterV1,
@@ -603,6 +606,14 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         LifecycleMaterialApplyV1::Applied
     );
     assert_eq!(host, replica);
+    let wasm_boundary = apply_lifecycle_boundary_native(LifecycleBoundaryRequestV1 {
+        content_identity: content.identity().clone(),
+        before: state.clone(),
+        material_bytes: bytes.clone(),
+    })
+    .map_err(std::io::Error::other)?;
+    assert_eq!(wasm_boundary.result, MaterialBoundaryResultV1::Applied);
+    assert_eq!(wasm_boundary.after, host);
 
     let save = GameSaveV1::new(
         content.identity(),

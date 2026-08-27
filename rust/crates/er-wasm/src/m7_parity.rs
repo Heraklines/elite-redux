@@ -7,6 +7,7 @@ use er_game::m7_content::{GameContentBundleV1, PreparedGameContentV1};
 use er_game::m7_material::MaterialApplyResultV5;
 use er_game::m7_runtime::GameRuntimeV5;
 use er_kernel::snapshot_v6::{KernelTraceV6, RestorableKernelSnapshotV6};
+use er_progression::material::{LifecycleMaterialApplyV1, apply_serialized_lifecycle_material_v1};
 use er_state::m7_state::GameStateV5;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -15,6 +16,13 @@ use wasm_bindgen::prelude::*;
 #[serde(deny_unknown_fields)]
 pub struct MaterialBoundaryRequestV1 {
     pub bundle: GameContentBundleV1,
+    pub before: GameStateV5,
+    pub material_bytes: Vec<u8>,
+}
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LifecycleBoundaryRequestV1 {
+    pub content_identity: er_types::GameContentIdentity,
     pub before: GameStateV5,
     pub material_bytes: Vec<u8>,
 }
@@ -53,11 +61,35 @@ pub fn apply_material_boundary_native(
         after: runtime.state().clone(),
     })
 }
+pub fn apply_lifecycle_boundary_native(
+    request: LifecycleBoundaryRequestV1,
+) -> Result<MaterialBoundaryResponseV1, String> {
+    let mut state = request.before;
+    let result = apply_serialized_lifecycle_material_v1(
+        &mut state,
+        &request.content_identity,
+        &request.material_bytes,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(MaterialBoundaryResponseV1 {
+        result: match result {
+            LifecycleMaterialApplyV1::Applied => MaterialBoundaryResultV1::Applied,
+            LifecycleMaterialApplyV1::Duplicate => MaterialBoundaryResultV1::Duplicate,
+        },
+        after: state,
+    })
+}
 
 #[wasm_bindgen]
 pub fn apply_m7_material_json(input: &str) -> Result<String, JsValue> {
     let request: MaterialBoundaryRequestV1 = serde_json::from_str(input).map_err(js_error)?;
     let response = apply_material_boundary_native(request).map_err(js_error)?;
+    canonicalize(&response).map_err(js_error)
+}
+#[wasm_bindgen]
+pub fn apply_m7_lifecycle_material_json(input: &str) -> Result<String, JsValue> {
+    let request: LifecycleBoundaryRequestV1 = serde_json::from_str(input).map_err(js_error)?;
+    let response = apply_lifecycle_boundary_native(request).map_err(js_error)?;
     canonicalize(&response).map_err(js_error)
 }
 

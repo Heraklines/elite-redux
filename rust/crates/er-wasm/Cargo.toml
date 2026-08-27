@@ -18,6 +18,7 @@ er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
 er-game = { path = "../er-game" }
 er-kernel = { path = "../er-kernel" }
+er-progression = { path = "../er-progression" }
 er-protocol = { path = "../er-protocol" }
 er-rng = { path = "../er-rng" }
 er-state = { path = "../er-state" }
