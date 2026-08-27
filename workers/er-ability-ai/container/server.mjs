@@ -890,12 +890,84 @@ function validateSources(result, payload) {
   }
 }
 
+function compactModelCatalog(payload) {
+  const strings = [];
+  const stringIds = new Map();
+  const stringId = value => {
+    if (value == null) {
+      return null;
+    }
+    const text = String(value);
+    if (!stringIds.has(text)) {
+      stringIds.set(text, strings.length);
+      strings.push(text);
+    }
+    return stringIds.get(text);
+  };
+  const components = [];
+  for (const ability of payload.componentCandidates) {
+    for (const rule of ability.rules || []) {
+      const source = rule.source || {};
+      const parameters = (rule.parameters || []).map(parameter => [
+        stringId(parameter.path || parameter.key),
+        stringId(parameter.label),
+        stringId(parameter.control),
+        parameter.optional === true ? 1 : 0,
+        parameter.min ?? null,
+        parameter.max ?? null,
+        parameter.optionsRef ?? null,
+        Object.hasOwn(parameter, "rawValue") ? parameter.rawValue : parameter.value,
+      ]);
+      const conditions = (rule.conditions || []).map(condition => [
+        stringId(condition.label),
+        stringId(condition.kind),
+        condition.required === true ? 1 : 0,
+        condition.source?.conditionIndex ?? null,
+      ]);
+      const effects = (rule.effects || []).map(effect => [
+        stringId(effect.label),
+        stringId(effect.kind),
+        stringId(effect.scope),
+      ]);
+      components.push([
+        ability.id,
+        source.attrIndex,
+        stringId(source.attrType),
+        stringId(rule.label),
+        stringId(rule.hook?.id),
+        stringId(rule.hook?.label),
+        rule.hook?.mode === "calculation" ? 1 : 0,
+        parameters,
+        conditions,
+        effects,
+      ]);
+    }
+  }
+  return {
+    strings,
+    optionSets: (payload.componentOptionSets || []).map(options => options.map(option => [option.value, option.label])),
+    components,
+  };
+}
+
 function modelPrompt(payload) {
+  const compactCatalog = compactModelCatalog(payload);
+  const abilityIndex = payload.abilityIndex.map(ability => [ability.id, ability.name, ability.description || ""]);
+  const moveIndex = (payload.moveIndex || []).map(move => [move.id, move.name, move.type, move.category, move.power]);
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one JSON object and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, or unsupported mechanics. Build one Ability Studio blueprint matching OUTPUT JSON SCHEMA. Before returning, verify that the blueprint has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
 
-Copy every runtime source identity exactly from FULL RUNTIME COMPONENT CATALOG. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, use parameterOverrides with only parameters marked editable, their exact path, and the advertised value type/range. A parameter optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+Copy every runtime source identity exactly from FULL RUNTIME COMPONENT CATALOG. The catalog is compact but complete. A trailing $ in the legend means an index into COMPONENT STRINGS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+
+COMPACT CATALOG LEGEND:
+FULL ABILITY INDEX row = [abilityId, name, description].
+FULL MOVE CATALOG row = [moveId, name, type, category, power].
+FULL RUNTIME COMPONENT row = [abilityId, attrIndex, attrType$, ruleLabel$, hookId$, hookLabel$, hookMode, parameters, conditions, effects]. hookMode 0 means event and 1 means calculation.
+Parameter row = [path$, label$, control$, optional, min, max, optionsRef, sourceValue]. Every listed parameter is editable. optional is 0 or 1; null means no bound, option set, or source value.
+Condition row = [label$, kind$, required, conditionIndex]. required is 0 or 1. conditionIndex is present only for kind ability.
+Effect row = [label$, kind$, scope$].
+For a runtime row, reconstruct its source as {"abilityId":row[0],"attrIndex":row[1],"attrType":COMPONENT_STRINGS[row[2]]}. Its hook id, label, and mode come from row[4], row[5], and row[6]. Conditions and effects use the same source; add the advertised conditionIndex only to an ability condition source.
 
 CURRENT DRAFT (optional reference only):
 ${JSON.stringify(payload.currentBlueprint || null)}
@@ -904,16 +976,19 @@ PRIMITIVE CATALOG:
 ${JSON.stringify(payload.primitiveCatalog)}
 
 FULL ABILITY INDEX:
-${JSON.stringify(payload.abilityIndex)}
+${JSON.stringify(abilityIndex)}
 
 FULL MOVE CATALOG:
-${JSON.stringify(payload.moveIndex || [])}
+${JSON.stringify(moveIndex)}
 
 COMPONENT OPTION SETS:
-${JSON.stringify(payload.componentOptionSets || [])}
+${JSON.stringify(compactCatalog.optionSets)}
+
+COMPONENT STRINGS:
+${JSON.stringify(compactCatalog.strings)}
 
 FULL RUNTIME COMPONENT CATALOG:
-${JSON.stringify(payload.componentCandidates)}
+${JSON.stringify(compactCatalog.components)}
 
 VALID OUTPUT EXAMPLES:
 ${JSON.stringify(blueprintExamples)}
@@ -1218,14 +1293,21 @@ async function runNim(payload, emit) {
   }
   emit({ type: "status", message: "Preparing the requested ability" });
   const models = [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
+  const systemContent =
+    "Return only one JSON object matching the requested schema. Do not include markdown or hidden reasoning.";
+  const userContent = `${modelPrompt(payload)}\n\nOUTPUT JSON SCHEMA:\n${JSON.stringify(outputSchema)}`;
+  const inputCharacters = systemContent.length + userContent.length;
+  console.log(JSON.stringify({ event: "ability-model-input", inputCharacters }));
+  if (inputCharacters > 1_000_000) {
+    throw new Error("The complete ability catalog exceeds the model input limit");
+  }
   const body = {
     messages: [
       {
         role: "system",
-        content:
-          "Return only one JSON object matching the requested schema. Do not include markdown or hidden reasoning.",
+        content: systemContent,
       },
-      { role: "user", content: `${modelPrompt(payload)}\n\nOUTPUT JSON SCHEMA:\n${JSON.stringify(outputSchema)}` },
+      { role: "user", content: userContent },
     ],
     temperature: 0.1,
     max_tokens: 6000,
