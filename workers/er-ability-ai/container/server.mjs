@@ -1073,7 +1073,7 @@ function relevantModelContext(payload) {
       category: move.category,
       power: move.power,
     })),
-    components: candidates.slice(0, 160).map(candidate => ({
+    components: candidates.slice(0, 48).map(candidate => ({
       ability: {
         id: candidate.ability.id,
         name: candidate.ability.name,
@@ -1402,7 +1402,7 @@ async function runNimModel(model, body, payload) {
               ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
             },
       ),
-      signal: AbortSignal.timeout(120_000),
+      signal: AbortSignal.timeout(model === "deepseek-ai/deepseek-v4-flash-0731" ? 150_000 : 120_000),
     });
   } catch {
     throw new Error("The backup model timed out");
