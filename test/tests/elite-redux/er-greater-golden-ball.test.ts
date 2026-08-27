@@ -1,4 +1,5 @@
 import { modifierTypes } from "#data/data-lists";
+import { bargainSinAvailable } from "#data/elite-redux/er-bargain-sins";
 import { SpeciesId } from "#enums/species-id";
 import { ExtraModifierModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
@@ -51,5 +52,25 @@ describe.skipIf(!RUN)("ER Greater Golden Ball (granted to the run)", () => {
     const count = new NumberHolder(3);
     game.scene.applyModifiers(ExtraModifierModifier, true, count);
     expect(count.value).toBe(5); // the normal reward shows base 3 + 2 = 5 options
+  });
+
+  it("offers Greed only when the complete +2 Greater Golden Ball reward fits", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+
+    expect(bargainSinAvailable("greed")).toBe(true);
+
+    // One normal Golden Ball leaves exactly two slots: the promise is payable.
+    const normalBall = () =>
+      modifierTypes.GOLDEN_POKEBALL().withIdFromFunc(modifierTypes.GOLDEN_POKEBALL).newModifier();
+    await game.scene.addModifier(normalBall());
+    expect(bargainSinAvailable("greed")).toBe(true);
+
+    // At +2 only one slot remains. Greed must disappear rather than wiping a
+    // mon's candy for a reward whose advertised +2 cannot be granted.
+    await game.scene.addModifier(normalBall());
+    expect(bargainSinAvailable("greed")).toBe(false);
+
+    await game.scene.addModifier(normalBall());
+    expect(bargainSinAvailable("greed")).toBe(false);
   });
 });

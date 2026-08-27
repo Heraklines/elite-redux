@@ -68,4 +68,18 @@ describe("Reward shop - Shop cursor target with an empty shop row (#853)", () =>
     // The shop row really was empty on that wave (the trigger condition held).
     expect(handler.shopOptionsRows.length).toBe(0);
   });
+
+  it("recovers from an invalid saved cursor target instead of leaving the reward screen inert", async () => {
+    // Settings normally validate this enum, but legacy/corrupt save material and
+    // future dynamic rows must fail open onto the rewards row rather than throw
+    // inside the async animation chain before input is armed.
+    game.scene.shopCursorTarget = 999;
+
+    await game.classicMode.startBattle(SpeciesId.FEEBAS);
+    game.move.select(MoveId.SPLASH);
+    await game.doKillOpponents();
+    await game.toNextWave();
+
+    expect(game.scene.currentBattle.waveIndex).toBe(8);
+  });
 });

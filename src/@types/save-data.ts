@@ -195,6 +195,12 @@ export interface SessionSaveData {
    */
   erLastGenericTrainerType?: TrainerType;
   /**
+   * Recent ordinary wild species, newest first. Used to avoid immediately
+   * repeating the same rare encounter across adjacent waves. Optional for
+   * backwards compatibility; legacy saves start with an empty history.
+   */
+  erRecentWildSpecies?: SpeciesId[];
+  /**
    * ER editor custom-trainer keys already encountered in this run. Kept
    * separate from the regular ER trainer registry because the key spaces and
    * selection systems are independent.

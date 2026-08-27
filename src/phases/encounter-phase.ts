@@ -1324,7 +1324,18 @@ export class EncounterPhase extends BattlePhase {
         if (battle.battleType === BattleType.TRAINER) {
           battle.enemyParty[e] = battle.trainer?.genPartyMember(e)!; // TODO:: is the bang correct here?
         } else {
-          let enemySpecies = globalScene.randomSpecies(battle.waveIndex, level, true);
+          const excludedWildSpecies = [
+            ...globalScene.erRecentWildSpecies,
+            ...battle.enemyParty.map(pokemon => pokemon.species.speciesId),
+          ];
+          let enemySpecies = globalScene.randomSpecies(
+            battle.waveIndex,
+            level,
+            true,
+            undefined,
+            false,
+            excludedWildSpecies,
+          );
           const endlessRaid = isErEndlessRaidWave(battle.waveIndex);
           let endlessRaidFormIndex = 0;
           if (endlessRaid) {

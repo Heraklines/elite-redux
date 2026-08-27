@@ -542,35 +542,54 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         // before the animations have completed, causing errors).
         Promise.allSettled([...shopAnimPromises, ...rewardAnimAllSettledPromises]).then(() => {
           const updateCursorTarget = () => {
-            if (globalScene.shopCursorTarget === ShopCursorTarget.CHECK_TEAM) {
-              this.setRowCursor(0);
-              this.setCursor(2);
-            } else if (globalScene.shopCursorTarget === ShopCursorTarget.SHOP && this.shopOptionsRows.length === 0) {
-              // #853: fall back to the rewards row whenever there is NO shop row to land on.
-              // This covers both a mode with no shop (`!hasShop`, which leaves shopOptionsRows
-              // empty) AND a shop-enabled mode whose shop row is empty THIS wave (a x10 boss
-              // wave, or a `shopNoHeal` biome like the Wasteland). Without this, setRowCursor(SHOP)
-              // -> getRowItems(SHOP) dereferences shopOptionsRows.at(-1) (undefined) and throws
-              // inside this .then() chain, so the error surfaces as an unhandled rejection (no
-              // console error) and awaitingActionInput is never set: the reward screen renders but
-              // never accepts input -> silent soft-lock ("page froze completely after shop").
-              this.setRowCursor(ShopCursorTarget.REWARDS);
-              this.setCursor(0);
-            } else {
-              this.setRowCursor(globalScene.shopCursorTarget);
+            try {
+              if (globalScene.shopCursorTarget === ShopCursorTarget.CHECK_TEAM) {
+                this.setRowCursor(0);
+                this.setCursor(2);
+              } else if (globalScene.shopCursorTarget === ShopCursorTarget.SHOP && this.shopOptionsRows.length === 0) {
+                // #853: fall back to the rewards row whenever there is NO shop row to land on.
+                // This covers both a mode with no shop (`!hasShop`, which leaves shopOptionsRows
+                // empty) AND a shop-enabled mode whose shop row is empty THIS wave (a x10 boss
+                // wave, or a `shopNoHeal` biome like the Wasteland).
+                this.setRowCursor(ShopCursorTarget.REWARDS);
+                this.setCursor(0);
+              } else {
+                this.setRowCursor(globalScene.shopCursorTarget);
+                this.setCursor(0);
+              }
+            } catch (error) {
+              // A stale/corrupt cursor target or unexpectedly short option row must
+              // never prevent awaitingActionInput from being armed. Recover onto the
+              // free-reward row (whose empty state has a Continue button) and report
+              // the bad state for the next Send Logs capture.
+              console.warn("[reward-shop] invalid initial cursor target; recovered to rewards", error);
+              this.rowCursor = ShopCursorTarget.REWARDS;
+              this.cursor = -1;
               this.setCursor(0);
             }
           };
 
-          updateCursorTarget();
-
-          handleTutorial(Tutorial.SELECT_ITEM).then(res => {
-            if (res) {
-              updateCursorTarget();
-            }
+          const armInput = () => {
             this.awaitingActionInput = true;
             this.onActionInput = args[2];
-          });
+          };
+
+          updateCursorTarget();
+
+          handleTutorial(Tutorial.SELECT_ITEM)
+            .then(res => {
+              if (res) {
+                updateCursorTarget();
+              }
+            })
+            .catch(error => {
+              // Tutorial presentation is cosmetic. A rejected tutorial promise
+              // previously left a perfectly rendered reward screen permanently
+              // unable to accept input.
+              console.warn("[reward-shop] item tutorial failed; continuing without it", error);
+              updateCursorTarget();
+            })
+            .finally(armInput);
         });
       });
     });
@@ -683,7 +702,16 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
       this.modifierContainer.add(this.cursorObj);
     }
 
-    const options = this.rowCursor === 1 ? this.options : this.shopOptionsRows.at(-(this.rowCursor - 1))!;
+    const options = this.rowCursor === 1 ? this.options : this.shopOptionsRows.at(-(this.rowCursor - 1));
+
+    if (this.rowCursor > 1 && options == null) {
+      // Defensive recovery for a stale row cursor. The ordinary entry path
+      // already prevents this (#853), but a malformed saved setting or a future
+      // dynamic shop mutation must not turn it into an unhandled rejection.
+      this.rowCursor = ShopCursorTarget.REWARDS;
+      this.cursor = -1;
+      return this.setCursor(0);
+    }
 
     this.cursorObj.setScale(this.rowCursor === 1 ? 2 : this.rowCursor >= 2 ? 1.5 : 1);
 
@@ -693,7 +721,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     // re-shows it, non-item rows fall back to the normal message text.
     this.hideItemDescription();
     if (this.rowCursor) {
-      if (this.rowCursor === 1 && options.length === 0) {
+      if (this.rowCursor === 1 && options!.length === 0) {
         // Continue button when no shop items
         this.cursorObj.setScale(1.25);
         this.cursorObj.setPosition(
@@ -705,7 +733,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         return ret;
       }
 
-      const sliceWidth = globalScene.scaledCanvas.width / (options.length + 2);
+      if (this.cursor < 0 || this.cursor >= options!.length) {
+        this.cursor = Math.max(0, Math.min(this.cursor, options!.length - 1));
+      }
+
+      const sliceWidth = globalScene.scaledCanvas.width / (options!.length + 2);
       if (this.rowCursor < 2) {
         // Cursor on free items
         this.cursorObj.setPosition(
@@ -723,7 +755,7 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
         );
       }
 
-      const type = options[this.cursor].modifierTypeOption.type;
+      const type = options![this.cursor].modifierTypeOption.type;
       if (type) {
         this.showItemDescription(type.getDescription());
       }

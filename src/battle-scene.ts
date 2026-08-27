@@ -512,6 +512,8 @@ export class BattleScene extends SceneBase {
   public trainer: Phaser.GameObjects.Sprite;
   public lastEnemyTrainer: Trainer | null;
   public currentBattle: Battle;
+  /** Recent ordinary wild species, newest first (two triple encounters max). */
+  public erRecentWildSpecies: SpeciesId[] = [];
   public pokeballCounts: PokeballCounts;
   public money: number;
   public pokemonInfoContainer: PokemonInfoContainer;
@@ -1847,6 +1849,19 @@ export class BattleScene extends SceneBase {
 
     const lastBattle: Battle | null = this.currentBattle;
     const maxExpLevel = this.getMaxExpLevel();
+
+    if (fromSession) {
+      // Session history intentionally excludes the currently saved battle. It
+      // is appended only after that battle finishes, exactly like a live run.
+      this.erRecentWildSpecies = [...new Set(fromSession.erRecentWildSpecies ?? [])]
+        .filter(speciesId => Number.isSafeInteger(speciesId) && speciesId > 0)
+        .slice(0, 6);
+    } else if (lastBattle?.battleType === BattleType.WILD && lastBattle.mysteryEncounter == null) {
+      const justSeen = lastBattle.enemyParty.map(pokemon => pokemon.species.speciesId);
+      this.erRecentWildSpecies = [...new Set([...justSeen, ...this.erRecentWildSpecies])].slice(0, 6);
+    } else if (lastBattle == null) {
+      this.erRecentWildSpecies = [];
+    }
 
     this.lastEnemyTrainer = lastBattle?.trainer ?? null;
     this.lastMysteryEncounter = lastBattle?.mysteryEncounter;
@@ -3492,9 +3507,17 @@ export class BattleScene extends SceneBase {
     fromArenaPool = false,
     speciesFilter?: PokemonSpeciesFilter,
     filterAllEvolutions = false,
+    excludedArenaSpecies: readonly SpeciesId[] = [],
   ): PokemonSpecies {
     if (fromArenaPool) {
-      return this.arena.randomSpecies(waveIndex, level, 0, getPartyLuckValue(this.party));
+      return this.arena.randomSpecies(
+        waveIndex,
+        level,
+        0,
+        getPartyLuckValue(this.party),
+        undefined,
+        excludedArenaSpecies,
+      );
     }
 
     // TODO: simplify this?

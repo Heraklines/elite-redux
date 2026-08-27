@@ -40,7 +40,7 @@ describe("ER early high-BST wild gate (Ace/Elite)", () => {
     (globalScene.arena as any).checkLegendBST(getPokemonSpecies(speciesId), wave);
 
   test("Ace: a 600-BST mon (Garchomp) is gated before wave 55, allowed after", async () => {
-    await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
     setErDifficulty("ace");
     expect(shouldReroll(SpeciesId.GARCHOMP, 10)).toBe(true);
     expect(shouldReroll(SpeciesId.GARCHOMP, 54)).toBe(true);
@@ -50,13 +50,13 @@ describe("ER early high-BST wild gate (Ace/Elite)", () => {
   });
 
   test("Elite: same gate applies", async () => {
-    await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
     setErDifficulty("elite");
     expect(shouldReroll(SpeciesId.GARCHOMP, 10)).toBe(true);
   });
 
   test("Hell: high-BST mons are NOT gated by the ER rule (early power spikes allowed)", async () => {
-    await game.classicMode.startBattle([SpeciesId.BULBASAUR]);
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
     setErDifficulty("hell");
     // Garchomp is not a legend, so the only thing that could gate it is the ER
     // Ace/Elite rule — which is off in Hell.
@@ -99,5 +99,17 @@ describe("ER early high-BST wild gate (Ace/Elite)", () => {
     setErDifficulty("hell");
     const hell = globalScene.arena.randomSpecies(13, 60);
     expect(hell.speciesId).toBe(SpeciesId.GARCHOMP);
+  });
+
+  test("adjacent wild encounters downgrade a repeat-only rare tier instead of repeating it", async () => {
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR);
+    setErDifficulty("hell");
+    // Every non-common tier contains only the recently seen Uxie. The repeat
+    // guard must walk down to the first legal alternative instead of returning
+    // Uxie again (the production Cave streak shape).
+    stubPools([SpeciesId.MAGIKARP], [SpeciesId.UXIE]);
+
+    const species = globalScene.arena.randomSpecies(86, 10, 0, 0, undefined, [SpeciesId.UXIE]);
+    expect(species.speciesId).toBe(SpeciesId.MAGIKARP);
   });
 });

@@ -25,7 +25,7 @@ import { getLevelTotalExp } from "#data/exp";
 import { AbilityId } from "#enums/ability-id";
 import { Stat } from "#enums/stat";
 import type { PlayerPokemon } from "#field/pokemon";
-import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
+import { ExtraModifierModifier, PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import type { ModifierType, ModifierTypeGenerator } from "#modifiers/modifier-type";
 import { randSeedInt, randSeedShuffle } from "#utils/common";
 
@@ -81,8 +81,19 @@ export function bargainHeldCount(pokemon: PlayerPokemon): number {
 export function bargainSinAvailable(key: BargainSinKey): boolean {
   const party = globalScene.getPlayerParty();
   switch (key) {
-    case "greed":
-      return party.length > 0;
+    case "greed": {
+      // Greed promises a Greater Golden Ball (+2 reward choices). Normal and
+      // Greater Golden Balls intentionally share the same +3 total cap, so do
+      // not offer the deal unless both promised stacks fit. Previously a
+      // player at +2/+3 could surrender all of a mon's candy only for the
+      // persistent-modifier add to fail or partially overflow into a generic
+      // fallback reward.
+      const held = globalScene.findModifier(m => m instanceof ExtraModifierModifier) as
+        | ExtraModifierModifier
+        | undefined;
+      const capacity = held?.getCountUnderMax() ?? 3;
+      return party.length > 0 && capacity >= 2;
+    }
     case "gluttony":
     case "wrath":
     case "sloth":

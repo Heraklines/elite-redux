@@ -846,7 +846,14 @@ export class Arena {
   // TODO: Remove the `attempt` parameter
   // TODO: The only place that doesn't pass an explicit `luckValue` parameter is Illusion's enemy overrides;
   // remove parameter & replace with `globalScene.getLuckValue` in a future refactor
-  public randomSpecies(waveIndex: number, level: number, attempt = 0, luckValue = 0, isBoss?: boolean): PokemonSpecies {
+  public randomSpecies(
+    waveIndex: number,
+    level: number,
+    attempt = 0,
+    luckValue = 0,
+    isBoss?: boolean,
+    excludedSpecies: readonly SpeciesId[] = [],
+  ): PokemonSpecies {
     const overrideSpecies = globalScene.gameMode.getOverrideSpecies(waveIndex);
     if (overrideSpecies) {
       return overrideSpecies;
@@ -882,21 +889,38 @@ export class Arena {
       tier--;
     }
 
-    const tierPool = this.pokemonPool[tier];
+    let tierPool = this.pokemonPool[tier];
+    const excluded = new Set(excludedSpecies);
+    let selectableTierPool = tierPool.filter(speciesId => !excluded.has(speciesId));
+
+    // A singleton rare tier (Cave's Boss Super Rare Uxie is the live example)
+    // must not force the same species on adjacent waves. Prefer the next lower
+    // rarity that contains an alternative. If the entire biome is a singleton,
+    // retain the original pool rather than making generation impossible.
+    while (selectableTierPool.length === 0 && tier > BiomePoolTier.COMMON) {
+      console.log(`Downgraded repeat-only tier from ${BiomePoolTier[tier]} to ${BiomePoolTier[tier - 1]}`);
+      tier--;
+      tierPool = this.pokemonPool[tier];
+      selectableTierPool = tierPool.filter(speciesId => !excluded.has(speciesId));
+    }
+    if (selectableTierPool.length === 0) {
+      selectableTierPool = [...tierPool];
+    }
+
     let species: PokemonSpecies;
-    if (tierPool.length === 0) {
+    if (selectableTierPool.length === 0) {
       species = globalScene.randomSpecies(waveIndex, level);
     } else {
-      const encounterWeights = tierPool.map(speciesId =>
+      const encounterWeights = selectableTierPool.map(speciesId =>
         getEncounterSpeciesWeightMultiplier(getPokemonSpecies(speciesId)),
       );
       if (encounterWeights.every(weight => weight === 1)) {
-        species = getPokemonSpecies(randSeedItem(tierPool));
+        species = getPokemonSpecies(randSeedItem(selectableTierPool));
       } else {
         const weightedIndices = new Map<number, number>(
           encounterWeights.map((weight, index) => [index, Math.max(1, Math.round(weight * 1000))]),
         );
-        species = getPokemonSpecies(tierPool[weightedPick(weightedIndices)]);
+        species = getPokemonSpecies(selectableTierPool[weightedPick(weightedIndices)]);
       }
     }
 
@@ -905,13 +929,13 @@ export class Arena {
     // time re-draw from those (Alolan/Galarian/etc). Elite/Hell only - the
     // Ace/Youngster pure-vanilla roll is untouched.
     if (
-      tierPool.length > 0
+      selectableTierPool.length > 0
       && getErBiomeRule(this.biomeId)?.regionalBoost
       && !isErVanillaDifficulty()
       && !species.isRegional()
       && randSeedInt(2) === 0
     ) {
-      const regionalPool = tierPool.filter(id => getPokemonSpecies(id).isRegional());
+      const regionalPool = selectableTierPool.filter(id => getPokemonSpecies(id).isRegional());
       if (regionalPool.length > 0) {
         species = getPokemonSpecies(randSeedItem(regionalPool));
       }
@@ -922,7 +946,7 @@ export class Arena {
     // Attempt to retry 10 times if generated a LegendLike with an incompatible level
     if (regen && attempt < 10) {
       console.log("Incompatible level: regenerating...");
-      return this.randomSpecies(waveIndex, level, ++attempt, luckValue, isBoss);
+      return this.randomSpecies(waveIndex, level, ++attempt, luckValue, isBoss, excludedSpecies);
     }
     // ER (#395, hole 1): the 10-attempt cap used to KEEP the offender when the
     // rerolls kept landing on gated species - guaranteed whenever a tier pool

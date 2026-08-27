@@ -2069,6 +2069,7 @@ export class GameData {
       // doesn't wipe the no-repeat tracking and re-field the same trainers.
       erUsedTrainerKeys: getErUsedTrainerKeys(),
       erLastGenericTrainerType: getLastGenericTrainerType() ?? undefined,
+      erRecentWildSpecies: [...globalScene.erRecentWildSpecies],
       // ER custom trainers use separate authored keys and one-per-window density.
       // Persist both sets so refresh/Continue cannot repeat a trainer or consume
       // adjacent waves from the same spawn window.
