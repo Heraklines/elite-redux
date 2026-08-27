@@ -660,6 +660,17 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         })?,
         vec![GameEffect::Navigated]
     );
+    environment = GameEnvironment::from_snapshot(environment.snapshot(), content.clone())?;
+    assert!(
+        environment
+            .raw_input(RawInputEvent::KeyDown {
+                code: PhysicalKey::ArrowDown,
+                printable: false,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            })?
+            .is_empty()
+    );
     environment.raw_input(RawInputEvent::KeyUp {
         code: PhysicalKey::ArrowDown,
     })?;
