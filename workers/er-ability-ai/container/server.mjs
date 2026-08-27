@@ -210,7 +210,7 @@ const outputSchema = {
   additionalProperties: false,
 };
 
-const catalogSearchPlanSchema = {
+const _catalogSearchPlanSchema = {
   type: "object",
   properties: {
     queries: {
@@ -234,7 +234,68 @@ const catalogSearchPlanSchema = {
   additionalProperties: false,
 };
 
-const blueprintExamples = [
+const componentPartSelectionSchema = {
+  type: "object",
+  properties: {
+    componentId: { type: "string", pattern: "^c[0-9]+$" },
+    partIndex: { type: ["integer", "null"], minimum: 0 },
+    parameterOverrides: parameterOverridesSchema,
+  },
+  required: ["componentId", "partIndex", "parameterOverrides"],
+  additionalProperties: false,
+};
+
+const assemblyPlanSchema = {
+  type: "object",
+  properties: {
+    explanation: { type: "string", minLength: 1, maxLength: 1000 },
+    draft: {
+      type: "object",
+      properties: {
+        name: { type: "string", minLength: 2, maxLength: 40 },
+        description: { type: "string", minLength: 2, maxLength: 500 },
+        generation: { type: "integer", minimum: 1, maximum: 9 },
+        includes: { type: "array", items: { type: "integer", minimum: 1 }, maxItems: 12 },
+        componentRules: {
+          type: "array",
+          maxItems: 32,
+          items: {
+            type: "object",
+            properties: {
+              key: { type: "string", pattern: "^[a-z0-9-]{1,48}$" },
+              prerequisiteHooks: { type: "array", items: componentPartSelectionSchema, maxItems: 7 },
+              hook: componentPartSelectionSchema,
+              chance: { type: "number", minimum: 1, maximum: 100 },
+              conditionLogic: { type: "string", enum: ["all", "any"] },
+              conditions: {
+                type: "array",
+                items: { anyOf: [componentPartSelectionSchema, simpleConditionSchema] },
+                maxItems: 16,
+              },
+              effects: {
+                type: "array",
+                items: { anyOf: [componentPartSelectionSchema, simpleEffectSchema] },
+                minItems: 1,
+                maxItems: 8,
+              },
+            },
+            required: ["key", "prerequisiteHooks", "hook", "chance", "conditionLogic", "conditions", "effects"],
+            additionalProperties: false,
+          },
+        },
+        rules: outputSchema.properties.blueprint.properties.rules,
+        modifiers: outputSchema.properties.blueprint.properties.modifiers,
+        flags: outputSchema.properties.blueprint.properties.flags,
+      },
+      required: ["name", "description", "generation", "includes", "componentRules", "rules", "modifiers", "flags"],
+      additionalProperties: false,
+    },
+  },
+  required: ["explanation", "draft"],
+  additionalProperties: false,
+};
+
+const _blueprintExamples = [
   {
     explanation: "Burn contact targets after attacking.",
     blueprint: {
@@ -1162,17 +1223,17 @@ function requestedMoveEntries(payload) {
 }
 
 function defaultCatalogSearchPlan(payload) {
-  const queries = [{ scope: "components", role: "any", query: payload.prompt, limit: 24 }];
+  const queries = [{ scope: "components", role: "any", query: payload.prompt, limit: 16 }];
   const clauses = payload.prompt
     .split(/[,;]|\b(?:and then|then|additionally|also)\b/gi)
     .map(clause => clause.trim())
     .filter(clause => clause.length >= 4 && clause.length <= 120);
   for (const clause of clauses.slice(0, 6)) {
-    queries.push({ scope: "components", role: "any", query: clause, limit: 12 });
+    queries.push({ scope: "components", role: "any", query: clause, limit: 8 });
   }
   for (const move of requestedMoveEntries(payload)) {
     queries.push({ scope: "moves", role: "any", query: move.name, limit: 4 });
-    queries.push({ scope: "components", role: "effect", query: `scripted move ${payload.prompt}`, limit: 16 });
+    queries.push({ scope: "components", role: "effect", query: `scripted move ${payload.prompt}`, limit: 10 });
   }
   for (const ability of payload.abilityIndex || []) {
     const name = normalizedSearchText(ability.name);
@@ -1296,13 +1357,79 @@ function executeCatalogSearch(payload, rawPlan) {
       category: move.category,
       power: move.power,
     })),
-    components: [...components.values()].slice(0, 120),
+    components: [...components.values()].slice(0, 120).map((component, index) => ({
+      componentId: `c${index}`,
+      ...component,
+    })),
     abilities: [...abilities.values()].slice(0, 48),
     moves: [...moves.values()].slice(0, 48),
   };
 }
 
-function catalogSearchPrompt(payload) {
+function expandComponentSelection(selection, searchContext, role) {
+  const component = searchContext.components.find(candidate => candidate.componentId === selection?.componentId);
+  if (!component) {
+    throw new Error(`Unknown catalog component ${selection?.componentId || "missing"}`);
+  }
+  let source;
+  if (role === "condition") {
+    source = component.rule.conditions?.[selection.partIndex ?? 0]?.source;
+  } else if (role === "effect") {
+    source = component.rule.effects?.[selection.partIndex ?? 0]?.source;
+  } else {
+    source = component.rule.source;
+  }
+  if (!source) {
+    throw new Error(`${selection.componentId} has no selectable ${role}`);
+  }
+  const expanded = { ...source };
+  if (selection.parameterOverrides && Object.keys(selection.parameterOverrides).length > 0) {
+    expanded.parameterOverrides = selection.parameterOverrides;
+  }
+  return expanded;
+}
+
+function expandAssemblyPart(part, searchContext, role) {
+  if (part && Object.hasOwn(part, "componentId")) {
+    return expandComponentSelection(part, searchContext, role);
+  }
+  return part;
+}
+
+function expandAssemblyPlan(result, searchContext) {
+  const draft = result?.draft;
+  if (!draft) {
+    throw new Error("The model returned an empty ability blueprint");
+  }
+  return {
+    explanation: result.explanation,
+    blueprint: {
+      version: 1,
+      id: 20000,
+      name: draft.name,
+      description: draft.description,
+      generation: draft.generation,
+      includes: draft.includes || [],
+      mechanics: [],
+      componentRules: (draft.componentRules || []).map(rule => ({
+        key: rule.key,
+        prerequisiteHooks: (rule.prerequisiteHooks || []).map(selection =>
+          expandComponentSelection(selection, searchContext, "hook"),
+        ),
+        hook: expandComponentSelection(rule.hook, searchContext, "hook"),
+        chance: rule.chance,
+        conditionLogic: rule.conditionLogic,
+        conditions: (rule.conditions || []).map(part => expandAssemblyPart(part, searchContext, "condition")),
+        effects: (rule.effects || []).map(part => expandAssemblyPart(part, searchContext, "effect")),
+      })),
+      rules: draft.rules || [],
+      modifiers: draft.modifiers || [],
+      flags: draft.flags,
+    },
+  };
+}
+
+function _catalogSearchPrompt(payload) {
   return `Plan exhaustive searches over a closed Pokemon ability catalog. Return exactly one JSON object matching CATALOG SEARCH PLAN SCHEMA. Request 4-12 focused searches that together cover every clause in the user's request. Search scopes are components, abilities, and moves. Component roles are hook, condition, effect, parameter, or any. Search semantic mechanic terms likely to occur in labels and class names, such as "on entry", "scripted move", "contact", "stat stage", or "weather". Search a named move in moves and search its mechanism separately in components. Search a named complete ability in abilities. Do not create the ability yet.
 
 PRIMITIVE CATALOG:
@@ -1312,15 +1439,15 @@ USER REQUEST:
 ${payload.prompt}
 
 CATALOG SEARCH PLAN SCHEMA:
-${JSON.stringify(catalogSearchPlanSchema)}`;
+${JSON.stringify(_catalogSearchPlanSchema)}`;
 }
 
 function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null)) {
-  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one JSON object and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, or unsupported mechanics. Build one Ability Studio blueprint matching OUTPUT JSON SCHEMA. Before returning, verify that the blueprint has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
+  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one compact assembly plan matching ASSEMBLY PLAN SCHEMA and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, runtime class names, ability ids for runtime components, or unsupported mechanics. The worker expands catalog component IDs into exact runtime objects after your response. Before returning, verify that the draft has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
 
-Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
+Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix catalog component selections with configurable primitive conditions and effects. Prefer primitive rules whenever PRIMITIVE CATALOG expresses the requested mechanic exactly. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher. Use includes only when the user explicitly wants the complete existing ability.
 
-The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Copy every runtime source identity exactly from CATALOG SEARCH RESULTS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId. For hooks set partIndex to null. For a condition or effect set partIndex to its zero-based position in that component's conditions or effects array. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
 Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
 
@@ -1333,16 +1460,16 @@ ${JSON.stringify(payload.primitiveCatalog)}
 COMPONENT OPTION SETS:
 ${JSON.stringify(payload.componentOptionSets || [])}
 
-CATALOG SEARCH RESULTS:
+CATALOG SEARCH RESULTS (every component has a short componentId for selection):
 ${JSON.stringify(searchContext)}
-
-VALID OUTPUT EXAMPLES:
-${JSON.stringify(blueprintExamples)}
 
 FINAL REQUEST TO IMPLEMENT:
 ${payload.prompt}
 
-Return exactly one non-empty JSON blueprint for that request. Use only catalog values and source identities.`;
+ASSEMBLY PLAN SCHEMA:
+${JSON.stringify(assemblyPlanSchema)}
+
+Return exactly one non-empty assembly plan for that request. Use only primitive values and catalog componentIds.`;
 }
 
 function promptRequestsSelfTarget(prompt) {
@@ -1606,7 +1733,7 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
               ...body,
               model,
               guided_json: schema,
-              ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
+              ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 512 } : {}),
             },
       ),
       signal: AbortSignal.timeout(timeoutMs),
@@ -1628,24 +1755,9 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
   return stripNulls(extractJson(content, source, false));
 }
 
-async function runNimSearchPlan(model, payload) {
-  const body = {
-    messages: [
-      {
-        role: "system",
-        content: "Return only one JSON catalog search plan. Do not include markdown or hidden reasoning.",
-      },
-      { role: "user", content: catalogSearchPrompt(payload) },
-    ],
-    temperature: 0,
-    max_tokens: 1200,
-    stream: false,
-  };
-  return requestNimJson(model, body, catalogSearchPlanSchema, "catalog search planner", 45_000);
-}
-
-async function runNimModel(model, body, payload, emit) {
-  let result = await requestNimJson(model, body, outputSchema, "ability model", 120_000);
+async function runNimModel(model, body, payload, searchContext, emit) {
+  let plan = await requestNimJson(model, body, assemblyPlanSchema, "ability model", 60_000);
+  let result = expandAssemblyPlan(plan, searchContext);
   try {
     normalizeRuntimeSourceReferences(result, payload);
     normalizeComponentRuleHooks(result);
@@ -1659,15 +1771,16 @@ async function runNimModel(model, body, payload, emit) {
       ...body,
       messages: [
         ...body.messages,
-        { role: "assistant", content: JSON.stringify(result) },
+        { role: "assistant", content: JSON.stringify(plan) },
         {
           role: "user",
-          content: `The draft was rejected by deterministic validation: ${error.message || String(error)}. Return a corrected complete blueprint. Use only advertised parameter paths. Represent stat changes as a separate primitive rule unless the search results advertise an exact stat-change runtime component. Preserve every requested clause.`,
+          content: `The assembly plan was rejected by deterministic validation: ${error.message || String(error)}. Return a corrected complete assembly plan. Use only componentIds from the search results and only advertised parameter paths. Represent stat changes as a separate primitive rule unless the search results advertise an exact stat-change component. Preserve every requested clause.`,
         },
       ],
       temperature: 0,
     };
-    result = await requestNimJson(model, repairBody, outputSchema, "ability repair model", 90_000);
+    plan = await requestNimJson(model, repairBody, assemblyPlanSchema, "ability repair model", 45_000);
+    result = expandAssemblyPlan(plan, searchContext);
   }
   normalizeRuntimeSourceReferences(result, payload);
   normalizeComponentRuleHooks(result);
@@ -1683,21 +1796,14 @@ async function runNim(payload, emit) {
   }
   const models = [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
   emit({ type: "status", message: "Searching the complete ability catalog" });
-  let searchPlan;
-  try {
-    searchPlan = await runNimSearchPlan(nimModel, payload);
-  } catch (error) {
-    console.error(JSON.stringify({ event: "ability-search-plan-failed", message: error.message || String(error) }));
-    searchPlan = defaultCatalogSearchPlan(payload);
-  }
-  const searchContext = executeCatalogSearch(payload, searchPlan);
+  const searchContext = executeCatalogSearch(payload, null);
   emit({
     type: "status",
     message: `Building from ${searchContext.components.length} matched runtime mechanics`,
   });
   const systemContent =
-    "Return only one JSON object matching the requested schema. Do not include markdown or hidden reasoning.";
-  const userContent = `${modelPrompt(payload, searchContext)}\n\nOUTPUT JSON SCHEMA:\n${JSON.stringify(outputSchema)}`;
+    "Return only one compact JSON assembly plan matching the requested schema. Do not include markdown or hidden reasoning.";
+  const userContent = modelPrompt(payload, searchContext);
   const inputCharacters = systemContent.length + userContent.length;
   console.log(JSON.stringify({ event: "ability-model-input", inputCharacters }));
   if (inputCharacters > 1_000_000) {
@@ -1712,7 +1818,7 @@ async function runNim(payload, emit) {
       { role: "user", content: userContent },
     ],
     temperature: 0.1,
-    max_tokens: 6000,
+    max_tokens: 3000,
     stream: false,
   };
   let lastError = new Error("The ability builder is temporarily unavailable");
@@ -1721,7 +1827,7 @@ async function runNim(payload, emit) {
       emit({ type: "status", message: "Trying the backup model" });
     }
     try {
-      return await runNimModel(model, body, payload, emit);
+      return await runNimModel(model, body, payload, searchContext, emit);
     } catch (error) {
       console.error(JSON.stringify({ event: "ability-model-failed", model, message: error.message || String(error) }));
       emit({ type: "diagnostic", model, message: error.message || String(error) });
