@@ -8,8 +8,8 @@ use er_state::mechanic_state_v2::MechanicStateStoreV2;
 use er_types::battle_ids::PokemonId;
 use er_types::run_ids::Money;
 use er_types::{
-    GameControlKindV2, RunCondition, RunConditionId, RunHook, RunOperation, RunProgramV1,
-    RunSelector, RunSelectorId, RunValue, RunValueId, SafeU53,
+    GameControlKindV2, RunCondition, RunConditionId, RunHook, RunOperation, RunProgramId,
+    RunProgramV1, RunSelector, RunSelectorId, RunValue, RunValueId, SafeU53,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -43,6 +43,8 @@ pub struct RunOperationEvidenceV1 {
 pub enum RunExecutionError {
     #[error("game state is invalid: {0}")]
     State(String),
+    #[error("run program {0} does not exist")]
+    UnknownProgram(RunProgramId),
     #[error("run program condition, selector, value, or operation reference is invalid")]
     Reference,
     #[error("run operation cannot apply to the current state")]
@@ -65,33 +67,76 @@ pub fn execute_run_hook_v1(
     let mut after = before.clone();
     let mut evidence = Vec::new();
     for program in &content.run.pack().programs {
-        for binding in program.hooks.iter().filter(|binding| binding.hook == hook) {
-            if !evaluate_condition(program, binding.condition, &after, &context)? {
-                continue;
-            }
-            let start = binding.first_operation as usize;
-            let end = binding
-                .first_operation
-                .checked_add(binding.operation_count)
-                .map(|value| value as usize)
-                .ok_or(RunExecutionError::Reference)?;
-            let operations = program
-                .operations
-                .get(start..end)
-                .ok_or(RunExecutionError::Reference)?;
-            for (offset, operation) in operations.iter().enumerate() {
-                apply_operation(program, operation, &mut after, &context, content)?;
-                evidence.push(RunOperationEvidenceV1 {
-                    program: program.id,
-                    source: program.source.clone(),
-                    hook,
-                    operation_ordinal: u32::try_from(start + offset)
-                        .map_err(|_| RunExecutionError::Overflow)?,
-                    operation: operation.clone(),
-                });
-            }
+        execute_program_bindings(program, hook, &context, content, &mut after, &mut evidence)?;
+    }
+    finish_transition(after, evidence)
+}
+
+/// Executes one content-selected program through the same closed IR interpreter as global hooks.
+///
+/// Menus bind an option to a numeric `RunProgramId`; adapters only deliver raw input and never
+/// interpret the selected program.
+pub fn execute_run_program_hook_v1(
+    before: &GameStateV5,
+    content: &PreparedGameContentV1,
+    program_id: RunProgramId,
+    hook: RunHook,
+    context: RunExecutionContextV1,
+) -> Result<RunExecutionTransitionV1, RunExecutionError> {
+    before
+        .validate()
+        .map_err(|error| RunExecutionError::State(error.to_string()))?;
+    let program = content
+        .run
+        .program(program_id)
+        .ok_or(RunExecutionError::UnknownProgram(program_id))?;
+    let mut after = before.clone();
+    let mut evidence = Vec::new();
+    execute_program_bindings(program, hook, &context, content, &mut after, &mut evidence)?;
+    finish_transition(after, evidence)
+}
+
+fn execute_program_bindings(
+    program: &RunProgramV1,
+    hook: RunHook,
+    context: &RunExecutionContextV1,
+    content: &PreparedGameContentV1,
+    after: &mut GameStateV5,
+    evidence: &mut Vec<RunOperationEvidenceV1>,
+) -> Result<(), RunExecutionError> {
+    for binding in program.hooks.iter().filter(|binding| binding.hook == hook) {
+        if !evaluate_condition(program, binding.condition, after, context)? {
+            continue;
+        }
+        let start = binding.first_operation as usize;
+        let end = binding
+            .first_operation
+            .checked_add(binding.operation_count)
+            .map(|value| value as usize)
+            .ok_or(RunExecutionError::Reference)?;
+        let operations = program
+            .operations
+            .get(start..end)
+            .ok_or(RunExecutionError::Reference)?;
+        for (offset, operation) in operations.iter().enumerate() {
+            apply_operation(program, operation, after, context, content)?;
+            evidence.push(RunOperationEvidenceV1 {
+                program: program.id,
+                source: program.source.clone(),
+                hook,
+                operation_ordinal: u32::try_from(start + offset)
+                    .map_err(|_| RunExecutionError::Overflow)?,
+                operation: operation.clone(),
+            });
         }
     }
+    Ok(())
+}
+
+fn finish_transition(
+    after: GameStateV5,
+    evidence: Vec<RunOperationEvidenceV1>,
+) -> Result<RunExecutionTransitionV1, RunExecutionError> {
     after
         .validate()
         .map_err(|error| RunExecutionError::State(error.to_string()))?;

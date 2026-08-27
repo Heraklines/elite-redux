@@ -64,11 +64,14 @@ use er_types::run_ids::{
     BiomeId, EncounterId, Experience, GameRunId, GrowthRateId, Money, NatureId, RouteNodeId,
 };
 use er_types::run_model::RunOutcome;
+use er_types::ui::CancelPolicy;
+use er_types::ui_menu::{LogicalMenu, LogicalMenuOption};
 use er_types::{
     AiPolicyId, BattleContentPackHashV3, CatalogHash, GameBehaviorStatus, GameBehaviorUnitId,
-    GameContentBundleHash, InputFocus, InventoryItemId, OperationId, OracleSha, PhysicalKey,
-    RawInputEvent, RunCondition, RunConditionId, RunFlagId, RunHook, RunHookBinding, RunOperation,
-    RunProgramBudget, RunProgramId, RunProgramV1, SafeU53, ScenarioId, ScenarioNodeId, SeatId,
+    GameContentBundleHash, GameControlKindV2, GameControlPlanV2, InputFocus, InventoryItemId,
+    MenuOptionId, OperationId, OracleSha, PhysicalKey, RawInputEvent, RunCondition, RunConditionId,
+    RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget, RunProgramId, RunProgramV1,
+    SafeU53, ScenarioId, ScenarioNodeId, SeatId,
 };
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
@@ -627,8 +630,31 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         save
     );
 
+    let mut environment_state = state.clone();
+    let program_option = MenuOptionId::new("program/1")?;
+    let run = environment_state
+        .active_run
+        .as_mut()
+        .ok_or("missing active run")?;
+    run.control = GameControlPlanV2 {
+        schema_version: er_types::GAME_CONTROL_PLAN_SCHEMA_VERSION_V2,
+        revision: safe(2),
+        kind: GameControlKindV2::ModeSelect,
+        owner_seat: Some(SeatId::new(safe(1))),
+        menu: Some(LogicalMenu::new(
+            MenuInstanceId::new(safe(2)),
+            SeatId::new(safe(1)),
+            "m7/program-control",
+            program_option.clone(),
+            vec![LogicalMenuOption::new(program_option.clone(), true, None)?],
+            Vec::new(),
+            CancelPolicy::Disabled,
+        )?),
+        actionable: true,
+    };
+    environment_state.validate()?;
     let mut environment = GameEnvironment::new_run(
-        state.clone(),
+        environment_state.clone(),
         content.clone(),
         EnvironmentKernelComponentsV1 {
             input_router: InputRouterSnapshotV2 {
@@ -651,28 +677,40 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
             terminal: None,
         },
     )?;
+    assert!(matches!(
+        environment
+            .raw_input(RawInputEvent::KeyDown {
+                code: PhysicalKey::Space,
+                printable: true,
+                browser_repeat: false,
+                focus: InputFocus::Game,
+            })?
+            .as_slice(),
+        [GameEffect::Selected { .. }]
+    ));
     assert_eq!(
-        environment.raw_input(RawInputEvent::KeyDown {
-            code: PhysicalKey::ArrowDown,
-            printable: false,
-            browser_repeat: false,
-            focus: InputFocus::Game,
-        })?,
-        vec![GameEffect::Navigated]
+        environment
+            .snapshot()
+            .game_state
+            .active_run
+            .as_ref()
+            .and_then(|run| run.flags.get(&RunFlagId::new(safe(1))))
+            .copied(),
+        Some(true)
     );
     environment = GameEnvironment::from_snapshot(environment.snapshot(), content.clone())?;
     assert!(
         environment
             .raw_input(RawInputEvent::KeyDown {
-                code: PhysicalKey::ArrowDown,
-                printable: false,
+                code: PhysicalKey::Space,
+                printable: true,
                 browser_repeat: false,
                 focus: InputFocus::Game,
             })?
             .is_empty()
     );
     environment.raw_input(RawInputEvent::KeyUp {
-        code: PhysicalKey::ArrowDown,
+        code: PhysicalKey::Space,
     })?;
     assert!(matches!(
         environment
@@ -686,12 +724,20 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         [GameEffect::Selected { .. }]
     ));
 
-    let mut runtime = GameRuntimeV5::new(state, content)?;
-    runtime.navigate_control(er_types::ui_menu::NavigationDirection::Down)?;
+    let mut runtime = GameRuntimeV5::new(environment_state, content)?;
     assert!(matches!(
-        runtime.submit_control()?,
+        runtime.select_control()?,
         GameControlIntentV2::Selected { .. }
     ));
+    assert_eq!(
+        runtime
+            .state()
+            .active_run
+            .as_ref()
+            .and_then(|run| run.flags.get(&RunFlagId::new(safe(1))))
+            .copied(),
+        Some(true)
+    );
     Ok(())
 }
 

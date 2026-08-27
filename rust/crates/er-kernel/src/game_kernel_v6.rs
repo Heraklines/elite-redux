@@ -241,7 +241,7 @@ impl GameKernelV6 {
             PhysicalKey::ArrowRight => self.navigate(NavigationDirection::Right),
             PhysicalKey::Enter | PhysicalKey::Space => self
                 .runtime
-                .submit_control()
+                .select_control()
                 .map(intent_effect)
                 .map(Some)
                 .map_err(|error| GameKernelV6Error::StateOwner(error.to_string())),

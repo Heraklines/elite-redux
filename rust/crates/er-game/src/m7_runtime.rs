@@ -8,13 +8,18 @@ use er_state::m7_state::GameStateV5;
 use er_types::battle_command::CommandSet;
 use er_types::ui::CancelPolicy;
 use er_types::ui_menu::NavigationDirection;
-use er_types::{GameContentIdentity, GameControlKindV2, MenuOptionId, OperationId};
+use er_types::{
+    GameContentIdentity, GameControlKindV2, MenuOptionId, OperationId, RunHook, RunProgramId,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::m7_content::PreparedGameContentV1;
 use crate::m7_material::{
     BattleTurnMaterialV5, MaterialApplyResultV5, MaterialV5Error, apply_serialized_turn_material_v5,
+};
+use crate::m7_run_executor::{
+    RunExecutionContextV1, RunExecutionError, execute_run_program_hook_v1,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -65,6 +70,10 @@ pub enum GameRuntimeV5Error {
     CandidateMismatch,
     #[error("active game control is missing, blocked, or invalid")]
     Control,
+    #[error("control option does not encode a valid canonical action")]
+    ControlAction,
+    #[error("run control execution failed: {0}")]
+    RunExecution(String),
 }
 
 impl GameRuntimeV5 {
@@ -168,6 +177,29 @@ impl GameRuntimeV5 {
         })
     }
 
+    /// Applies one selected logical option inside the canonical runtime.
+    ///
+    /// Content-driven run controls encode a typed `RunProgramId` as `program/{id}`. The kernel
+    /// invokes this method after raw-key reduction; adapters never receive a causal intent.
+    pub fn select_control(&mut self) -> Result<GameControlIntentV2, GameRuntimeV5Error> {
+        let intent = self.submit_control()?;
+        let GameControlIntentV2::Selected { kind, option } = &intent else {
+            return Err(GameRuntimeV5Error::ControlAction);
+        };
+        let program_id = program_option(option).ok_or(GameRuntimeV5Error::ControlAction)?;
+        let hook = control_hook(*kind).ok_or(GameRuntimeV5Error::ControlAction)?;
+        let transition = execute_run_program_hook_v1(
+            &self.state,
+            &self.content,
+            program_id,
+            hook,
+            RunExecutionContextV1::default(),
+        )
+        .map_err(|error| GameRuntimeV5Error::RunExecution(error.to_string()))?;
+        self.state = transition.after_state;
+        Ok(intent)
+    }
+
     pub fn cancel_control(&self) -> Result<GameControlIntentV2, GameRuntimeV5Error> {
         let run = self
             .state
@@ -258,6 +290,39 @@ impl GameRuntimeV5 {
     }
 }
 
+fn program_option(option: &MenuOptionId) -> Option<RunProgramId> {
+    let value = option.as_str().strip_prefix("program/")?;
+    let numeric = value.parse::<u64>().ok()?;
+    RunProgramId::try_from_u64(numeric).ok()
+}
+
+fn control_hook(kind: GameControlKindV2) -> Option<RunHook> {
+    match kind {
+        GameControlKindV2::Title
+        | GameControlKindV2::ModeSelect
+        | GameControlKindV2::StarterSelect => Some(RunHook::RunStarted),
+        GameControlKindV2::Reward | GameControlKindV2::Market => Some(RunHook::RewardSelected),
+        GameControlKindV2::Scenario => Some(RunHook::ScenarioChoiceCommitted),
+        GameControlKindV2::Quest => Some(RunHook::QuestAdvanced),
+        GameControlKindV2::Faction => Some(RunHook::FactionStandingChanged),
+        GameControlKindV2::Biome | GameControlKindV2::Route => Some(RunHook::BiomeExited),
+        GameControlKindV2::BattleCommand
+        | GameControlKindV2::BattleMove
+        | GameControlKindV2::BattleTarget
+        | GameControlKindV2::BattleSwitch
+        | GameControlKindV2::BattleReplacement
+        | GameControlKindV2::Capture
+        | GameControlKindV2::FullParty
+        | GameControlKindV2::Progression
+        | GameControlKindV2::MoveLearn
+        | GameControlKindV2::Evolution
+        | GameControlKindV2::Fusion
+        | GameControlKindV2::Save
+        | GameControlKindV2::Waiting
+        | GameControlKindV2::Complete => None,
+    }
+}
+
 pub fn resolve_turn_v5(
     before: &GameStateV5,
     commands: &CommandSet,
@@ -283,5 +348,11 @@ fn validate_state(
 impl From<MaterialV5Error> for GameRuntimeV5Error {
     fn from(error: MaterialV5Error) -> Self {
         Self::Material(error.to_string())
+    }
+}
+
+impl From<RunExecutionError> for GameRuntimeV5Error {
+    fn from(error: RunExecutionError) -> Self {
+        Self::RunExecution(error.to_string())
     }
 }
