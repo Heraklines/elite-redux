@@ -371,7 +371,23 @@ function primitiveSchemasForCatalog(catalog) {
   return { conditionSchema, effectSchema, modifierSchema: modifierSchemaForCatalog };
 }
 
-function assemblyPlanSchemaForSearch(searchContext, catalog) {
+function isPrimitiveStatRuleRequest(payload) {
+  const prompt = normalizedSearchText(payload.prompt);
+  const namesAbility = (payload.abilityIndex || []).some(ability => {
+    const name = normalizedSearchText(ability.name);
+    return name.length >= 3 && prompt.includes(name);
+  });
+  return (
+    requestedMoveEntries(payload).length === 0
+    && !namesAbility
+    && /\b(?:raise|lower|boost|drop|increase|decrease)\b/.test(prompt)
+    && /\b(?:attack|defense|special attack|special defense|speed|accuracy|evasion|atk|def|spatk|spdef|spd)\b/.test(
+      prompt,
+    )
+  );
+}
+
+function assemblyPlanSchemaForSearch(searchContext, catalog, payload) {
   const schema = structuredClone(assemblyPlanSchema);
   const ruleProperties = schema.properties.draft.properties.componentRules.items.properties;
   const hookSchema = componentSelectionSchemaForRole(searchContext, "hook");
@@ -390,6 +406,9 @@ function assemblyPlanSchemaForSearch(searchContext, catalog) {
   primitiveRuleProperties.conditions.items = primitiveSchemas.conditionSchema;
   primitiveRuleProperties.effects.items = primitiveSchemas.effectSchema;
   schema.properties.draft.properties.modifiers.items = primitiveSchemas.modifierSchema;
+  if (isPrimitiveStatRuleRequest(payload)) {
+    schema.properties.draft.properties.componentRules.maxItems = 0;
+  }
   return schema;
 }
 
@@ -1649,6 +1668,7 @@ Triggers, conditions, and effects are independent. Recombine them freely. compon
 The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Select a runtime hook, condition, or effect only by its componentId and selectableParts. A component is valid as a hook only when selectableParts.hook is true. A condition or effect partIndex must appear in selectableParts.conditionIndexes or selectableParts.effectIndexes for that role. For hooks set partIndex to null. Use parameterOverrides only with paths advertised by the selected component's parameters. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
 Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
+${isPrimitiveStatRuleRequest(payload) ? "This request is fully expressible as a primitive stat-stage rule. Leave componentRules empty and implement it only in draft.rules." : ""}
 
 CURRENT DRAFT (optional reference only):
 ${JSON.stringify(payload.currentBlueprint || null)}
@@ -2003,7 +2023,7 @@ async function runNim(payload, emit) {
     type: "status",
     message: `Building from ${searchContext.components.length} matched runtime mechanics`,
   });
-  const planSchema = assemblyPlanSchemaForSearch(searchContext, payload.primitiveCatalog || {});
+  const planSchema = assemblyPlanSchemaForSearch(searchContext, payload.primitiveCatalog || {}, payload);
   const systemContent =
     "Return only one compact JSON assembly plan matching the requested schema. Do not include markdown or hidden reasoning.";
   const userContent = modelPrompt(payload, searchContext, planSchema);
