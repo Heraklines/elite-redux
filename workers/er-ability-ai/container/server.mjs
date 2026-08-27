@@ -1319,8 +1319,7 @@ async function runNimModel(model, body, payload) {
           ? {
               ...body,
               model,
-              max_tokens: 12_000,
-              chat_template_kwargs: { thinking: true, reasoning_effort: "high" },
+              chat_template_kwargs: { thinking: false },
             }
           : {
               ...body,
