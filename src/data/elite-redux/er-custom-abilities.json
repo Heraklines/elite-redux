@@ -98,5 +98,21 @@
     "name": "Extermination Vector",
     "rules": [],
     "version": 1
+  },
+  "new-ability-5": {
+    "componentRules": [],
+    "description": "Volt Absorb + Battle Armor",
+    "flags": {},
+    "generation": 9,
+    "id": 20004,
+    "includes": [
+      10,
+      4
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Exo Armor",
+    "rules": [],
+    "version": 1
   }
 }
