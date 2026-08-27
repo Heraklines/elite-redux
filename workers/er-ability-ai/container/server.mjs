@@ -1969,11 +1969,28 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
     );
   }
   const resultBody = await response.json();
-  const content = messageContentText(resultBody?.choices?.[0]?.message?.content).replace(
-    /<think>[\s\S]*?<\/think>/gi,
-    "",
-  );
-  return stripNulls(extractJson(content, source, false));
+  const choice = resultBody?.choices?.[0];
+  const message = choice?.message;
+  const contentCandidates = [message?.content, message?.reasoning_content, message?.reasoning]
+    .map(messageContentText)
+    .filter(Boolean);
+  const content = (contentCandidates[0] || "").replace(/<think>[\s\S]*?<\/think>/gi, "");
+  try {
+    return stripNulls(extractJson(content, source, false));
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "ability-model-invalid-output",
+        model,
+        finishReason: choice?.finish_reason,
+        contentType: Array.isArray(message?.content) ? "array" : typeof message?.content,
+        contentLength: content.length,
+        preview: content.slice(0, 400),
+        tail: content.slice(-400),
+      }),
+    );
+    throw error;
+  }
 }
 
 async function runNimModel(model, body, payload, searchContext, planSchema, emit) {
