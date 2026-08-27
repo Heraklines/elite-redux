@@ -50,6 +50,12 @@ import {
   extractCommunitySuggestionAchievementIds,
   validateCommunitySuggestion,
 } from "./community-suggestions";
+import {
+  GHOST_PUBLIC_MODERATION_REVISION,
+  isDisallowedPublicUsername,
+  moderateGhostPresentation,
+  moderateGhostUsername,
+} from "./ghost-public-moderation";
 import { extractLeaderboardStats } from "./leaderboard-stats";
 import {
   applyResultReport,
@@ -389,6 +395,9 @@ async function handleRegister(request: Request, env: Env, cors: Record<string, s
   }
   if (username.length > 30) {
     return text("Username must be at most 30 characters.", 400, cors);
+  }
+  if (isDisallowedPublicUsername(username)) {
+    return text("That username is unavailable.", 400, cors);
   }
   if (password.length < minPass) {
     return text(`Password must be at least ${minPass} characters.`, 400, cors);
@@ -2242,7 +2251,9 @@ async function handleRunCreate(
   // store only when it round-trips as valid JSON under the cap (never a truncated
   // fragment), else null. The encountering client sanitises it before applying.
   const presentationStr =
-    run.presentation && typeof run.presentation === "object" ? JSON.stringify(run.presentation) : null;
+    run.presentation && typeof run.presentation === "object"
+      ? JSON.stringify(moderateGhostPresentation(run.presentation))
+      : null;
   const presentationBlob = presentationStr && presentationStr.length <= 4096 ? presentationStr : null;
   // ER (relics): the run's active relics at capture. Stored verbatim (opaque JSON,
   // size-capped); sampled ghosts receive this blob so the client can restore it.
@@ -2745,7 +2756,7 @@ function runSampleRowToGhost(row: RunSampleRow, fallbackDifficulty = ""): Record
     return {
       id: row.id,
       sourceUserId: String(row.user_id),
-      trainerName: row.username ?? "Trainer",
+      trainerName: moderateGhostUsername(row.username ?? "Trainer"),
       difficulty: row.difficulty ?? fallbackDifficulty,
       mode: row.mode ?? undefined,
       pacing,
@@ -2757,7 +2768,7 @@ function runSampleRowToGhost(row: RunSampleRow, fallbackDifficulty = ""): Record
       opponentName: row.opponent_name ?? undefined,
       opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
       challenges: row.challenges ? JSON.parse(row.challenges) : undefined,
-      presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
+      presentation: row.presentation ? moderateGhostPresentation(JSON.parse(row.presentation)) : undefined,
       relics: row.relics ? JSON.parse(row.relics) : undefined,
     };
   } catch {
@@ -2896,7 +2907,7 @@ async function handleRunSample(
   const requireSavedItems = url.searchParams.get("requireSavedItems") === "1";
   const victoriesOnly = url.searchParams.get("victoriesOnly") === "1";
   if (minWave > GHOST_SAMPLE_MAX_WAVE) {
-    return json({ teams: [] }, 200, cors);
+    return json({ teams: [], moderationRevision: GHOST_PUBLIC_MODERATION_REVISION }, 200, cors);
   }
   // Pool from EVERYONE, across all difficulties — a ghost can come from any
   // player's run of any difficulty, as long as it got deep enough (wave >=
@@ -2982,7 +2993,7 @@ async function handleRunSample(
     env,
     (results ?? []).map(row => runSampleRowToGhost(row, difficulty)).filter(t => t !== null),
   );
-  return json({ teams }, 200, cors);
+  return json({ teams, moderationRevision: GHOST_PUBLIC_MODERATION_REVISION }, 200, cors);
 }
 
 /** Other victorious, item-bearing runs from the owner of one opaque source run. */
@@ -2996,7 +3007,7 @@ async function handleRunLineage(
   const requested = Number.parseInt(url.searchParams.get("count") ?? "", 10);
   const count = Number.isFinite(requested) ? Math.min(Math.max(requested, 1), 4) : 4;
   if (!sourceRunId || sourceRunId.length > 160) {
-    return json({ teams: [] }, 200, cors);
+    return json({ teams: [], moderationRevision: GHOST_PUBLIC_MODERATION_REVISION }, 200, cors);
   }
   await ensureRunStatColumns(env);
   const source = await env.DB.prepare(
@@ -3010,7 +3021,7 @@ async function handleRunLineage(
     .bind(sourceRunId, auth.uid, GHOST_SAMPLE_MAX_WAVE)
     .first<{ user_id: number }>();
   if (source == null) {
-    return json({ teams: [] }, 200, cors);
+    return json({ teams: [], moderationRevision: GHOST_PUBLIC_MODERATION_REVISION }, 200, cors);
   }
   const cols =
     "id, user_id, username, outcome, difficulty, mode, pacing, wave, progression_wave, created_at, player_team, opponent_name, opponent_team, challenges, presentation, relics";
@@ -3028,7 +3039,7 @@ async function handleRunLineage(
     env,
     (results ?? []).map(row => runSampleRowToGhost(row)).filter(team => team !== null),
   );
-  return json({ teams }, 200, cors);
+  return json({ teams, moderationRevision: GHOST_PUBLIC_MODERATION_REVISION }, 200, cors);
 }
 
 /**
@@ -3081,7 +3092,7 @@ async function handleRunDeadliest(
       return ghost == null ? null : { ...ghost, kills: row.kills ?? 0 };
     })
     .filter(t => t !== null);
-  return json({ teams }, 200, cors);
+  return json({ teams, moderationRevision: GHOST_PUBLIC_MODERATION_REVISION }, 200, cors);
 }
 
 // #endregion
