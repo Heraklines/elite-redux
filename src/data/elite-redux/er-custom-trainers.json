@@ -6014,5 +6014,211 @@
     ],
     "trainerClass": "CLAIR",
     "weight": 100
+  },
+  "TRAINER_70036": {
+    "battleType": "single",
+    "challenge": "none",
+    "defeatDialogue": "Told ya!",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70036,
+    "introDialogue": "blah blah balh better than you blah blah blah blah blah",
+    "maxWave": 199,
+    "minWave": 150,
+    "name": "Buttface",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "SUBSTITUTE",
+              "ROOST",
+              "AIR_SLASH",
+              "HEAT_WAVE"
+            ],
+            "species": 10098,
+            "vitamins": {
+              "atk": 1,
+              "hp": 2,
+              "spatk": 1,
+              "spd": 2
+            },
+            "weight": 1
+          },
+          {
+            "abilitySlot": 1,
+            "level": null,
+            "moves": [
+              "RAZOR_WIND",
+              "GUST",
+              "OMINOUS_WIND",
+              "ENERGY_WAVE"
+            ],
+            "species": 18,
+            "weight": 2
+          }
+        ]
+      },
+      {
+        "variants": [
+          {
+            "abilitySlot": 2,
+            "level": null,
+            "moves": [
+              "EERIE_SPELL",
+              "ZAP_CANNON",
+              "TRI_ATTACK",
+              "CALM_MIND"
+            ],
+            "species": 65,
+            "vitamins": {
+              "spatk": 2,
+              "spd": 1
+            },
+            "weight": 2
+          },
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "PSYCHIC",
+              "PROTECT",
+              "DAZZLING_GLEAM",
+              "HIDDEN_POWER"
+            ],
+            "species": 10099,
+            "vitamins": {
+              "def": 1,
+              "spatk": 2,
+              "spd": 1,
+              "spdef": 1
+            },
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          },
+          {
+            "count": 1,
+            "item": "LEFTOVERS"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "METAL_BURST",
+          "JAGGED_HORNS",
+          "MEGAHORN",
+          "RLNA"
+        ],
+        "species": 112,
+        "vitamins": {
+          "atk": 1,
+          "def": 3,
+          "spdef": 3
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "level": null,
+        "moves": [
+          "FIRE_FANG",
+          "DEFOG",
+          "SHADOW_FANGS",
+          "WATERFALL"
+        ],
+        "species": 10538,
+        "vitamins": {
+          "atk": 1,
+          "def": 2,
+          "hp": 2,
+          "spatk": 1,
+          "spd": 1,
+          "spdef": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 3,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 3,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "ER_GRASS_GEM"
+          },
+          {
+            "count": 1,
+            "item": "MIRACLE_SEED"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "GIGA_DRAIN",
+          "EXTRASENSORY",
+          "BERRY_SMASH",
+          "RLNA"
+        ],
+        "species": 10682,
+        "vitamins": {
+          "def": 3,
+          "hp": 3,
+          "spdef": 3
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "BLACK_BELT"
+          },
+          {
+            "count": 2,
+            "item": "QUICK_CLAW"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ACCELEROCK",
+          "FLARE_BLITZ",
+          "EXTREME_SPEED",
+          "DOUBLE_KICK"
+        ],
+        "species": 10610,
+        "vitamins": {
+          "atk": 3,
+          "def": 1,
+          "hp": 1
+        }
+      }
+    ],
+    "trainerClass": "BLUE",
+    "victoryDialogue": "I let you winout of pity!",
+    "weight": 80
   }
 }
