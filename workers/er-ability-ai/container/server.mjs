@@ -1423,10 +1423,13 @@ function expandComponentSelection(selection, searchContext, role) {
     throw new Error(`Unknown catalog component ${selection?.componentId || "missing"}`);
   }
   let source;
+  let selectedPart;
   if (role === "condition") {
-    source = component.rule.conditions?.[selection.partIndex ?? 0]?.source;
+    selectedPart = component.rule.conditions?.[selection.partIndex ?? 0];
+    source = selectedPart?.source;
     if (!source && component.selectableParts.conditionIndexes.length === 1) {
-      source = component.rule.conditions[component.selectableParts.conditionIndexes[0]].source;
+      selectedPart = component.rule.conditions[component.selectableParts.conditionIndexes[0]];
+      source = selectedPart.source;
     }
   } else if (role === "effect") {
     source = component.rule.effects?.[selection.partIndex ?? 0]?.source;
@@ -1440,6 +1443,9 @@ function expandComponentSelection(selection, searchContext, role) {
     throw new Error(`${selection.componentId} has no selectable ${role}`);
   }
   const expanded = { ...source };
+  if (role === "condition") {
+    expanded.kind = selectedPart.kind;
+  }
   if (selection.parameterOverrides && Object.keys(selection.parameterOverrides).length > 0) {
     expanded.parameterOverrides = selection.parameterOverrides;
   }
