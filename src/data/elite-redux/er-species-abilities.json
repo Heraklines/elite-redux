@@ -331,6 +331,11 @@
       5099
     ]
   },
+  "SPECIES_MEWTWO_MEGA_Y": {
+    "ability1": 20000,
+    "ability2": 20000,
+    "hidden": 20000
+  },
   "SPECIES_MUNCHLAX": {
     "ability1": 118
   },
