@@ -890,6 +890,72 @@ function validateSources(result, payload) {
   }
 }
 
+function requestedMoveIds(payload) {
+  const prompt = normalizedSearchText(payload.prompt);
+  return (payload.moveIndex || [])
+    .filter(move => {
+      const name = normalizedSearchText(move.name);
+      return name.length >= 3 && prompt.includes(name);
+    })
+    .map(move => Number(move.id));
+}
+
+function blueprintMoveIds(result, payload) {
+  const parametersBySource = new Map();
+  for (const ability of payload.componentCandidates) {
+    for (const rule of ability.rules || []) {
+      parametersBySource.set(sourceKey(rule.source), rule.parameters || []);
+      for (const condition of rule.conditions || []) {
+        parametersBySource.set(sourceKey(condition.source), rule.parameters || []);
+      }
+      for (const effect of rule.effects || []) {
+        parametersBySource.set(sourceKey(effect.source), effect.parameters || rule.parameters || []);
+      }
+    }
+  }
+  const ids = new Set();
+  const collect = source => {
+    if (!source) {
+      return;
+    }
+    for (const parameter of parametersBySource.get(sourceKey(source)) || []) {
+      if (parameter.control !== "move" && parameter.control !== "move-list") {
+        continue;
+      }
+      const path = parameter.path || parameter.key;
+      const value = Object.hasOwn(source.parameterOverrides || {}, path)
+        ? source.parameterOverrides[path]
+        : Object.hasOwn(parameter, "rawValue")
+          ? parameter.rawValue
+          : parameter.value;
+      for (const moveId of Array.isArray(value) ? value : [value]) {
+        if (Number.isInteger(Number(moveId))) {
+          ids.add(Number(moveId));
+        }
+      }
+    }
+  };
+  for (const rule of result.blueprint.componentRules || []) {
+    collect(rule.hook);
+    rule.conditions?.forEach(collect);
+    rule.effects?.forEach(collect);
+  }
+  return ids;
+}
+
+function validatePromptRequirements(result, payload) {
+  const requiredMoves = requestedMoveIds(payload);
+  if (requiredMoves.length === 0) {
+    return;
+  }
+  const usedMoves = blueprintMoveIds(result, payload);
+  const missingMove = requiredMoves.find(moveId => !usedMoves.has(moveId));
+  if (missingMove !== undefined) {
+    const move = payload.moveIndex.find(candidate => Number(candidate.id) === missingMove);
+    throw new Error(`Generated draft omitted the requested move ${move?.name || missingMove}`);
+  }
+}
+
 function compactModelCatalog(payload) {
   const strings = [];
   const stringIds = new Map();
@@ -950,8 +1016,77 @@ function compactModelCatalog(payload) {
   };
 }
 
+function normalizedSearchText(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function componentSearchScore(query, terms, rule) {
+  const text = normalizedSearchText(JSON.stringify(rule));
+  let score = terms.reduce((total, term) => total + (text.includes(term) ? Math.min(term.length, 8) : 0), 0);
+  if (/\bon entry\b|\bswitch(?:es|ed|ing)? in\b/.test(query) && /on entry|post summon/.test(text)) {
+    score += 40;
+  }
+  if (/\bafter (?:landing|using)\b|\bafter attack/.test(query) && /after landing|post attack/.test(text)) {
+    score += 40;
+  }
+  if (/\bend of (?:each |the )?turn\b/.test(query) && /end of each turn|post turn/.test(text)) {
+    score += 40;
+  }
+  if (/\bcontact\b/.test(query) && /contact/.test(text)) {
+    score += 24;
+  }
+  if (/\b(?:raise|lower|boost|drop)\b/.test(query) && /stat stage|stage change/.test(text)) {
+    score += 24;
+  }
+  return score;
+}
+
+function relevantModelContext(payload) {
+  const query = normalizedSearchText(payload.prompt);
+  const terms = [...new Set(query.split(" ").filter(term => term.length >= 3))];
+  const requestedMoves = (payload.moveIndex || []).filter(move => {
+    const name = normalizedSearchText(move.name);
+    return name.length >= 3 && query.includes(name);
+  });
+  const candidates = [];
+  for (const ability of payload.componentCandidates) {
+    for (const rule of ability.rules || []) {
+      let score = componentSearchScore(query, terms, rule);
+      if (
+        requestedMoves.length > 0
+        && (rule.parameters || []).some(parameter => parameter.control === "move" || parameter.control === "move-list")
+      ) {
+        score += 60;
+      }
+      candidates.push({ ability, rule, score });
+    }
+  }
+  candidates.sort((left, right) => right.score - left.score);
+  return {
+    requestedMoves: requestedMoves.map(move => ({
+      id: move.id,
+      name: move.name,
+      type: move.type,
+      category: move.category,
+      power: move.power,
+    })),
+    components: candidates.slice(0, 160).map(candidate => ({
+      ability: {
+        id: candidate.ability.id,
+        name: candidate.ability.name,
+        description: candidate.ability.description,
+      },
+      rule: candidate.rule,
+    })),
+  };
+}
+
 function modelPrompt(payload) {
   const compactCatalog = compactModelCatalog(payload);
+  const relevantContext = relevantModelContext(payload);
   const abilityIndex = payload.abilityIndex.map(ability => [ability.id, ability.name, ability.description || ""]);
   const moveIndex = (payload.moveIndex || []).map(move => [move.id, move.name, move.type, move.category, move.power]);
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one JSON object and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, or unsupported mechanics. Build one Ability Studio blueprint matching OUTPUT JSON SCHEMA. Before returning, verify that the blueprint has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
@@ -989,6 +1124,9 @@ ${JSON.stringify(compactCatalog.strings)}
 
 FULL RUNTIME COMPONENT CATALOG:
 ${JSON.stringify(compactCatalog.components)}
+
+REQUEST-MATCHED COMPONENTS (expanded copies from the complete catalog; prefer these when they match the request):
+${JSON.stringify(relevantContext)}
 
 VALID OUTPUT EXAMPLES:
 ${JSON.stringify(blueprintExamples)}
@@ -1230,6 +1368,7 @@ async function runCodex(payload, emit) {
     normalizeComponentRuleHooks(result);
     normalizeScriptedMoveTargets(result, payload);
     validateSources(result, payload);
+    validatePromptRequirements(result, payload);
     return result;
   } finally {
     activeTurn = null;
@@ -1284,6 +1423,7 @@ async function runNimModel(model, body, payload) {
   normalizeComponentRuleHooks(result);
   normalizeScriptedMoveTargets(result, payload);
   validateSources(result, payload);
+  validatePromptRequirements(result, payload);
   return result;
 }
 
