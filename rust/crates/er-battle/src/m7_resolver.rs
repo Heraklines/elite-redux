@@ -20,10 +20,13 @@ use er_types::battle_model::{
     ResolvedActionKind, SingleTypeMultiplier,
 };
 use er_types::mechanics::MechanicsProgramId;
-use er_types::{BehaviorSourceId, BehaviorUnitId, GameControlKindV2, SafeU53};
+use er_types::{
+    BehaviorClassificationKindV2, BehaviorSourceId, BehaviorUnitId, GameControlKindV2, SafeU53,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::m6::bespoke::handlers_for;
 use crate::m6::{
     MechanicsContextV2, MechanicsOperationEvidenceV2, QueryValueV2, execute_hook_v2,
     execute_query_v2,
@@ -125,8 +128,57 @@ pub enum BattleV5Error {
     Rng(String),
     #[error("numeric battle calculation overflowed")]
     Overflow,
+    #[error("prepared content contains unsupported behavior")]
+    UnsupportedContent,
+    #[error("compiled or bespoke dispatch closure is invalid")]
+    DispatchClosure,
     #[error("canonical digest failed: {0}")]
     Digest(String),
+}
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct V5DispatchClosure {
+    pub compiled_behaviors: usize,
+    pub bespoke_behaviors: usize,
+    pub bespoke_handlers: usize,
+}
+
+pub fn verify_v5_dispatch_closure(
+    content: &PreparedBattleContentV3,
+) -> Result<V5DispatchClosure, BattleV5Error> {
+    let mut compiled_behaviors = 0;
+    let mut bespoke_behaviors = 0;
+    let mut bespoke_handlers = 0;
+    for classification in &content.pack().classifications.0 {
+        match classification.kind {
+            BehaviorClassificationKindV2::Compiled => {
+                for program in &classification.programs {
+                    content
+                        .program(*program)
+                        .map_err(|error| BattleV5Error::Content(error.to_string()))?;
+                }
+                compiled_behaviors += 1;
+            }
+            BehaviorClassificationKindV2::Bespoke => {
+                let mechanic = classification
+                    .bespoke
+                    .ok_or(BattleV5Error::DispatchClosure)?;
+                let handlers = handlers_for(mechanic);
+                if handlers.is_empty() {
+                    return Err(BattleV5Error::DispatchClosure);
+                }
+                bespoke_behaviors += 1;
+                bespoke_handlers += handlers.len();
+            }
+            BehaviorClassificationKindV2::Unsupported => {
+                return Err(BattleV5Error::UnsupportedContent);
+            }
+        }
+    }
+    Ok(V5DispatchClosure {
+        compiled_behaviors,
+        bespoke_behaviors,
+        bespoke_handlers,
+    })
 }
 
 #[derive(Clone)]
@@ -144,6 +196,7 @@ pub fn resolve_turn_v5(
     content: &PreparedBattleContentV3,
     authority: &TurnAuthorityContextV1,
 ) -> Result<BattleTransitionV5, BattleV5Error> {
+    verify_v5_dispatch_closure(content)?;
     before
         .validate()
         .map_err(|error| BattleV5Error::State(error.to_string()))?;

@@ -43,6 +43,8 @@ fn direct_resolver_uses_prepared_m6_ir_without_legacy_projection() {
         "RngCallsiteId::accuracy",
         "RngCallsiteId::critical_hit",
         "RngCallsiteId::damage_variance",
+        "verify_v5_dispatch_closure",
+        "handlers_for",
     ] {
         assert!(
             RESOLVER.contains(required),
