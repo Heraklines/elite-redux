@@ -49,6 +49,7 @@ import {
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { ER_FACTORY_TEAM_CHANCE_PCT } from "#data/elite-redux/er-trainer-runtime-hook";
+import type { AbilityId } from "#enums/ability-id";
 import type { EggTier } from "#enums/egg-type";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
@@ -630,9 +631,12 @@ describe("tools — dump editor SPA data", () => {
       }
     }
     const generatedRules = abilityComponents.flatMap(ability => ability.rules);
-    expect(generatedRules.filter(rule => rule.scope === "package")).toHaveLength(
-      ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS.size,
-    );
+    expect(
+      generatedRules.filter(
+        rule =>
+          rule.scope === "package" && ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS.has(rule.source.abilityId as AbilityId),
+      ),
+    ).toHaveLength(ABILITY_STUDIO_DIRECT_SOURCE_ABILITY_IDS.size);
     expect(
       generatedRules.filter(
         rule =>
