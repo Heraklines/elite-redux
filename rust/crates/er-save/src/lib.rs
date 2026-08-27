@@ -27,6 +27,14 @@ struct SaveChecksumView<'a> {
     profile: &'a ProfileStateV1,
     run: &'a Option<RunStateV3>,
 }
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TypeScriptSaveEnvelopeV1 {
+    pub schema_version: u32,
+    pub game_content_hash: String,
+    pub profile: ProfileStateV1,
+    pub run: Option<RunStateV3>,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -138,8 +146,29 @@ pub enum SaveError {
     ReplayMachine(String),
     #[error("storage slot names and failures cannot be empty")]
     StorageKey,
+    #[error("TypeScript save migration failed: {0}")]
+    Migration(String),
 }
 
+pub fn migrate_typescript_save_v1(
+    bytes: &[u8],
+    content_identity: &GameContentIdentity,
+) -> Result<GameSaveV1, SaveError> {
+    let source: TypeScriptSaveEnvelopeV1 =
+        serde_json::from_slice(bytes).map_err(|error| SaveError::Migration(error.to_string()))?;
+    if source.schema_version != 1 {
+        return Err(SaveError::Migration(format!(
+            "unsupported TypeScript save schema {}",
+            source.schema_version
+        )));
+    }
+    let source_hash = GameContentBundleHash::parse(source.game_content_hash)
+        .map_err(|error| SaveError::Migration(error.to_string()))?;
+    if source_hash != content_identity.content_hash {
+        return Err(SaveError::ContentHash);
+    }
+    GameSaveV1::new(content_identity, source.profile, source.run)
+}
 impl GameSaveV1 {
     pub fn new(
         content_identity: &GameContentIdentity,

@@ -177,6 +177,31 @@ jobs:
         working-directory: rust
         run: cargo test --workspace --all-targets
 
+  m7-performance:
+    name: M7 release headless performance proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/
+            /test/kernel-fixtures/
+            /schemas/kernel/
+          submodules: false
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            rust/target
+          key: m7-performance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('rust/rust-toolchain.toml', 'rust/Cargo.lock') }}
+      - name: Run release headless system proof
+        working-directory: rust
+        run: cargo test --release -p er-testkit --test m7_system_proof
+
   m7-g27-foundation-aggregate:
     name: M7 G27 foundation aggregate
     needs:
@@ -185,6 +210,7 @@ jobs:
       - m7-full-content-cutover
       - m7-native-wasm-cutover
       - m7-m0-m6-regression
+      - m7-performance
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
