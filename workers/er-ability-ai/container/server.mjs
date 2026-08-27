@@ -510,6 +510,36 @@ function validateSources(result, payload) {
       throw new Error(`The model referenced unknown ability #${id}`);
     }
   }
+  const componentRuleKeys = new Set((blueprint.componentRules || []).map(rule => rule.key));
+  const migratedMechanics = (blueprint.mechanics || []).map((source, index) => {
+    const key = sourceKey(source);
+    const hook = hooks.get(key);
+    const effect = effects.get(key);
+    if (!hook || !effect) {
+      throw new Error(`The model referenced an unavailable runtime component (${key})`);
+    }
+    validateParameterOverrides(source, effect.parameters || hook.parameters, payload, `DO ${key}`);
+    let ruleKey = `ai-mechanic-${index + 1}`;
+    while (componentRuleKeys.has(ruleKey)) {
+      ruleKey = `${ruleKey}-migrated`;
+    }
+    componentRuleKeys.add(ruleKey);
+    return {
+      key: ruleKey,
+      prerequisiteHooks: [],
+      hook: {
+        abilityId: source.abilityId,
+        attrIndex: source.attrIndex,
+        attrType: source.attrType,
+      },
+      chance: 100,
+      conditionLogic: "all",
+      conditions: [],
+      effects: [{ ...source }],
+    };
+  });
+  blueprint.mechanics = [];
+  blueprint.componentRules = [...(blueprint.componentRules || []), ...migratedMechanics];
   for (const rule of blueprint.componentRules || []) {
     for (const hook of [...(rule.prerequisiteHooks || []), rule.hook]) {
       const candidate = hooks.get(sourceKey(hook));
@@ -546,7 +576,7 @@ function validateSources(result, payload) {
 }
 
 function modelPrompt(payload) {
-  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Copy each runtime source identity exactly from componentCandidates. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, add parameterOverrides using only parameters marked editable, their exact path, and the advertised value type/range/options. Move parameters must use an id from RELEVANT MOVES. Chance is a percentage from 1 to 100 and should be 100 unless the request explicitly asks for a chance. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT MOVES:\n${JSON.stringify(payload.moveIndex || [])}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
+  return `You assemble Elite Redux Pokemon abilities from a closed catalog. Do not write code, commands, files, or unsupported mechanics. Build exactly one Ability Studio blueprint. Triggers, conditions, and effects are independent: componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; all runtime component references belong in componentRules. Prefer componentRules when a supplied runtime trigger is needed. Recombine configurable primitives freely. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the whole existing ability. Copy each runtime source identity exactly from componentCandidates. Set conditionIndex only for kind "ability"; use null for kind "holder" or "event". To customize a source, add parameterOverrides using only parameters marked editable, their exact path, and the advertised value type/range/options. Move parameters must use an id from RELEVANT MOVES. Chance is a percentage from 1 to 100 and should be 100 unless the request explicitly asks for a chance. Primitive conditions and effects must use the primitive catalog. If the request cannot be represented exactly, build the closest safe draft and state the limitation in explanation. Keep the ability description player-facing and precise.\n\nREQUEST:\n${payload.prompt}\n\nCURRENT DRAFT (optional reference only):\n${JSON.stringify(payload.currentBlueprint || null)}\n\nPRIMITIVE CATALOG:\n${JSON.stringify(payload.primitiveCatalog)}\n\nABILITY INDEX:\n${JSON.stringify(payload.abilityIndex)}\n\nRELEVANT MOVES:\n${JSON.stringify(payload.moveIndex || [])}\n\nRELEVANT RUNTIME COMPONENTS:\n${JSON.stringify(payload.componentCandidates)}`;
 }
 
 async function runCodex(payload, emit) {

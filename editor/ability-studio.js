@@ -261,6 +261,33 @@
     blueprint.includes = Array.isArray(blueprint.includes) ? blueprint.includes.map(Number) : [];
     blueprint.mechanics = Array.isArray(blueprint.mechanics) ? blueprint.mechanics : [];
     blueprint.componentRules = Array.isArray(blueprint.componentRules) ? blueprint.componentRules : [];
+    const migratedMechanics = [];
+    const componentRuleKeys = new Set(blueprint.componentRules.map(rule => rule.key));
+    blueprint.mechanics = blueprint.mechanics.filter((reference, index) => {
+      if (!resolveComponent(reference) || !componentEffectsByKey.has(componentSourceKey(reference))) {
+        return true;
+      }
+      let ruleKey = `ai-mechanic-${index + 1}`;
+      while (componentRuleKeys.has(ruleKey)) {
+        ruleKey = `${ruleKey}-migrated`;
+      }
+      componentRuleKeys.add(ruleKey);
+      migratedMechanics.push({
+        key: ruleKey,
+        prerequisiteHooks: [],
+        hook: {
+          abilityId: reference.abilityId,
+          attrIndex: reference.attrIndex,
+          attrType: reference.attrType,
+        },
+        chance: 100,
+        conditionLogic: "all",
+        conditions: [],
+        effects: [clone(reference)],
+      });
+      return false;
+    });
+    blueprint.componentRules.push(...migratedMechanics);
     blueprint.rules = Array.isArray(blueprint.rules) ? blueprint.rules : [];
     blueprint.modifiers = Array.isArray(blueprint.modifiers) ? blueprint.modifiers : [];
     blueprint.flags = blueprint.flags && typeof blueprint.flags === "object" ? blueprint.flags : {};
