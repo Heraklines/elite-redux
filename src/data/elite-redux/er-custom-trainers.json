@@ -274,7 +274,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70003,
     "introDialogue": "Some say I'm not ready. Look at me now, I'm Calvin, and I'm a wall before the League! Ready for a real challenge?",
     "maxWave": 199,
@@ -749,7 +749,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70007,
     "maxWave": 110,
     "minWave": 95,
@@ -1232,7 +1232,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70010,
     "introDialogue": "I hope you dont get unlucky and recive full hard mode for this battle",
     "maxWave": 160,
