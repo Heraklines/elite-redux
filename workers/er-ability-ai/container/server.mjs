@@ -12,8 +12,8 @@ const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
-const nimModel = process.env.NVIDIA_NIM_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
-const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimModel = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 const maxGenerateBodyBytes = 8_388_608;
 let activeTurn = null;
@@ -967,6 +967,58 @@ function blueprintMoveIds(result, payload) {
   return ids;
 }
 
+function requestedStatChanges(prompt) {
+  const statIds = {
+    accuracy: "ACC",
+    attack: "ATK",
+    defense: "DEF",
+    evasion: "EVA",
+    "special attack": "SPATK",
+    "special defense": "SPDEF",
+    speed: "SPD",
+  };
+  const changes = [];
+  const pattern =
+    /\b(raise|raises|boost|boosts|increase|increases|lower|lowers|drop|drops)\b([^.;,]{0,60}?)\b(special attack|special defense|attack|defense|speed|accuracy|evasion)\b\s+by\s+(\d+)\s+stages?/gi;
+  for (const match of prompt.matchAll(pattern)) {
+    const direction = /^(?:lower|lowers|drop|drops)$/i.test(match[1]) ? -1 : 1;
+    const target = /\b(?:target|opponent|foe|enemy)\b/i.test(match[2]) ? "other" : "holder";
+    changes.push({ target, stat: statIds[match[3].toLowerCase()], stages: direction * Number(match[4]) });
+  }
+  return changes;
+}
+
+function blueprintHasStatChange(result, expected) {
+  return (result.blueprint.rules || []).some(rule =>
+    (rule.effects || []).some(
+      effect =>
+        effect.kind === "stat"
+        && effect.target === expected.target
+        && effect.stat === expected.stat
+        && Number(effect.stages) === expected.stages,
+    ),
+  );
+}
+
+function blueprintMovePower(result, moveId) {
+  const sources = [];
+  for (const rule of result.blueprint.componentRules || []) {
+    sources.push(rule.hook, ...(rule.prerequisiteHooks || []), ...(rule.conditions || []), ...(rule.effects || []));
+  }
+  for (const source of sources) {
+    const overrides = source?.parameterOverrides || {};
+    const moveEntry = Object.entries(overrides).find(([path]) => /(?:^|\.)(?:move|moveId)$/i.test(path));
+    if (Number(moveEntry?.[1]) !== moveId) {
+      continue;
+    }
+    const powerEntry = Object.entries(overrides).find(([path]) => /(?:power|basePower)$/i.test(path));
+    if (powerEntry) {
+      return Number(powerEntry[1]);
+    }
+  }
+  return null;
+}
+
 function validatePromptRequirements(result, payload) {
   const prompt = normalizedSearchText(payload.prompt);
   for (const abilityId of result.blueprint.includes || []) {
@@ -974,6 +1026,13 @@ function validatePromptRequirements(result, payload) {
     const name = normalizedSearchText(ability?.name);
     if (!name || !prompt.includes(name)) {
       throw new Error(`Generated draft included unrelated ability ${ability?.name || abilityId}`);
+    }
+  }
+  for (const expected of requestedStatChanges(payload.prompt)) {
+    if (!blueprintHasStatChange(result, expected)) {
+      throw new Error(
+        `Generated draft omitted the requested ${expected.target} ${expected.stat} ${expected.stages > 0 ? "+" : ""}${expected.stages} stage change`,
+      );
     }
   }
   const requiredMoves = requestedMoveIds(payload);
@@ -985,6 +1044,15 @@ function validatePromptRequirements(result, payload) {
   if (missingMove !== undefined) {
     const move = payload.moveIndex.find(candidate => Number(candidate.id) === missingMove);
     throw new Error(`Generated draft omitted the requested move ${move?.name || missingMove}`);
+  }
+  const powerMatch = payload.prompt.match(/\b(\d{1,3})\s*(?:BP|base power)\b/i);
+  if (powerMatch) {
+    const expectedPower = Number(powerMatch[1]);
+    const wrongPowerMove = requiredMoves.find(moveId => blueprintMovePower(result, moveId) !== expectedPower);
+    if (wrongPowerMove !== undefined) {
+      const move = payload.moveIndex.find(candidate => Number(candidate.id) === wrongPowerMove);
+      throw new Error(`Generated draft did not set ${move?.name || wrongPowerMove} to ${expectedPower} BP`);
+    }
   }
 }
 
@@ -1576,8 +1644,31 @@ async function runNimSearchPlan(model, payload) {
   return requestNimJson(model, body, catalogSearchPlanSchema, "catalog search planner", 45_000);
 }
 
-async function runNimModel(model, body, payload) {
-  const result = await requestNimJson(model, body, outputSchema, "ability model", 120_000);
+async function runNimModel(model, body, payload, emit) {
+  let result = await requestNimJson(model, body, outputSchema, "ability model", 120_000);
+  try {
+    normalizeRuntimeSourceReferences(result, payload);
+    normalizeComponentRuleHooks(result);
+    normalizeScriptedMoveTargets(result, payload);
+    validateSources(result, payload);
+    validatePromptRequirements(result, payload);
+    return result;
+  } catch (error) {
+    emit({ type: "status", message: "Correcting a rejected draft" });
+    const repairBody = {
+      ...body,
+      messages: [
+        ...body.messages,
+        { role: "assistant", content: JSON.stringify(result) },
+        {
+          role: "user",
+          content: `The draft was rejected by deterministic validation: ${error.message || String(error)}. Return a corrected complete blueprint. Use only advertised parameter paths. Represent stat changes as a separate primitive rule unless the search results advertise an exact stat-change runtime component. Preserve every requested clause.`,
+        },
+      ],
+      temperature: 0,
+    };
+    result = await requestNimJson(model, repairBody, outputSchema, "ability repair model", 90_000);
+  }
   normalizeRuntimeSourceReferences(result, payload);
   normalizeComponentRuleHooks(result);
   normalizeScriptedMoveTargets(result, payload);
@@ -1594,7 +1685,7 @@ async function runNim(payload, emit) {
   emit({ type: "status", message: "Searching the complete ability catalog" });
   let searchPlan;
   try {
-    searchPlan = await runNimSearchPlan(nimFallbackModel || nimModel, payload);
+    searchPlan = await runNimSearchPlan(nimModel, payload);
   } catch (error) {
     console.error(JSON.stringify({ event: "ability-search-plan-failed", message: error.message || String(error) }));
     searchPlan = defaultCatalogSearchPlan(payload);
@@ -1630,7 +1721,7 @@ async function runNim(payload, emit) {
       emit({ type: "status", message: "Trying the backup model" });
     }
     try {
-      return await runNimModel(model, body, payload);
+      return await runNimModel(model, body, payload, emit);
     } catch (error) {
       console.error(JSON.stringify({ event: "ability-model-failed", model, message: error.message || String(error) }));
       emit({ type: "diagnostic", model, message: error.message || String(error) });
