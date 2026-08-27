@@ -5,6 +5,7 @@ interface Env {
   AUTH_ENCRYPTION_KEY: string;
   CODEX_AUTH_BOOTSTRAP?: string;
   CODEX_AUTH_BOOTSTRAP_VERSION: string;
+  ABILITY_AI_RUNTIME_VERSION: string;
   NVIDIA_NIM_API_KEY?: string;
   ALLOWED_ORIGINS: string;
   CODEX_MODEL: string;
@@ -240,7 +241,9 @@ export default {
     const headers = new Headers(request.headers);
     headers.delete("Cookie");
     const internalRequest = new Request(request, { headers });
-    const response = await getContainer(env.ABILITY_AI, "editor-primary").fetch(internalRequest);
+    const response = await getContainer(env.ABILITY_AI, `editor-primary-${env.ABILITY_AI_RUNTIME_VERSION}`).fetch(
+      internalRequest,
+    );
     return withCors(response, origin, env);
   },
 } satisfies ExportedHandler<Env>;
