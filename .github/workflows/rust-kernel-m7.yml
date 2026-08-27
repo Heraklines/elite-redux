@@ -3,9 +3,16 @@ name: Rust Kernel M7 Gate
 on:
   push:
     branches:
-      - arch/rust-kernel-m7
+      - arch/rust-kernel-m7-g27
+      - arch/rust-kernel-m7-g28
+      - arch/rust-kernel-m7-g29a
+      - arch/rust-kernel-m7-g29b
+      - arch/rust-kernel-m7-g29c
+      - arch/rust-kernel-m7-g29
+      - arch/rust-kernel-m7-g30
     paths:
       - ".github/workflows/rust-kernel-m7.yml"
+      - ".github/workflows/rust-kernel-m7-focused.yml"
       - "rust/**"
       - "scripts/*kernel-m7*"
       - "test/kernel-fixtures/m7/**"

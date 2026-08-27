@@ -233,7 +233,13 @@ Failure discards the clone. State, revision, RNG, scheduler, control, protocol, 
 
 Authority and replica both deserialize and apply identical canonical bytes through the same production applier. The authority does not adopt an in-memory candidate directly. The replica never resolves or generates options.
 
-Material V5 binds schema, oracle SHA, game content hash, operation ID, authority epoch/revision, before/after digests, accepted intent, mutations, RNG before/after, complete after-state, next control, and ordered presentation plan.
+`GameMaterialV5` is the only canonical installation envelope. It is closed over battle turns,
+battle replacement, run actions, progression, capture, party, world, scenario, and terminal
+transitions. Every variant binds schema, oracle/content identity, operation ID, authority
+seat/revision, before/after digests, accepted typed action, mutation and RNG evidence, complete
+after-state, next control, and ordered presentation plan. `apply_game_material_v5` decodes
+canonical bytes and is role-neutral. Solo authority, co-op authority, and replicas use this same
+applier.
 
 ## AI
 
@@ -258,6 +264,38 @@ Every returned command is a member of `legal_commands`. Policies are bounded and
 ## Controls and raw input
 
 `GameControlPlanV2` covers title/mode, starter choice, battle command/move/target/switch/replacement, capture, full-party resolution, progression and move learning, evolution/fusion, reward/market, scenario/quest/faction, biome/route, save confirmation, and terminal states.
+
+`GameControlPlanV2.menu` is a `GameMenuV2`. Every `GameMenuOptionV2` carries stable renderer
+identity/layout plus one closed `GameActionV1`. Renderer/environment projections strip the action
+and expose only option identity, enabled/visible state, and navigation. Production code must not
+derive actions by parsing `MenuOptionId`.
+
+`GameActionContextV1` binds the operation ID, authority seat/revision, and menu instance. An
+actionable control must carry a context matching its menu owner, revision, and instance.
+
+```rust
+pub enum GameActionV1 {
+    ExecuteRunProgram { program: RunProgramId, hook: RunHook, context: RunExecutionContextV2 },
+    Battle { action: BattleUiActionV1 },
+    Capture { action: CaptureActionV1 },
+    Party { action: PartyActionV1 },
+    Progression { action: ProgressionActionV1 },
+    MoveLearning { action: MoveLearningActionV1 },
+    Evolution { action: EvolutionActionV1 },
+    Fusion { action: FusionActionV1 },
+    Inventory { action: InventoryActionV1 },
+    Reward { action: RewardActionV1 },
+    World { action: WorldActionV1 },
+    Scenario { action: ScenarioGameActionV1 },
+    Save { action: SaveActionV1 },
+    Terminal { action: TerminalActionV1 },
+}
+```
+
+One external input creates a transaction-local `GameInternalEventQueueV1`. FIFO order is
+deterministic, the budget is 4,096 events, and the live runtime is swapped only after quiescent
+validation. Authority reducers may prepare and apply material. Replica reducers may only prepare
+proposals and await authority material.
 
 Every option has stable identity and explicit directional navigation. Held input is bound to a control/menu instance and cannot cross replacement. Representative tests and CLI use physical keydown/keyup only; semantic action injection is unavailable.
 
