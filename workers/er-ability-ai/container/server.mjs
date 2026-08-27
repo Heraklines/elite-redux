@@ -956,66 +956,6 @@ function validatePromptRequirements(result, payload) {
   }
 }
 
-function compactModelCatalog(payload) {
-  const strings = [];
-  const stringIds = new Map();
-  const stringId = value => {
-    if (value == null) {
-      return null;
-    }
-    const text = String(value);
-    if (!stringIds.has(text)) {
-      stringIds.set(text, strings.length);
-      strings.push(text);
-    }
-    return stringIds.get(text);
-  };
-  const components = [];
-  for (const ability of payload.componentCandidates) {
-    for (const rule of ability.rules || []) {
-      const source = rule.source || {};
-      const parameters = (rule.parameters || []).map(parameter => [
-        stringId(parameter.path || parameter.key),
-        stringId(parameter.label),
-        stringId(parameter.control),
-        parameter.optional === true ? 1 : 0,
-        parameter.min ?? null,
-        parameter.max ?? null,
-        parameter.optionsRef ?? null,
-        Object.hasOwn(parameter, "rawValue") ? parameter.rawValue : parameter.value,
-      ]);
-      const conditions = (rule.conditions || []).map(condition => [
-        stringId(condition.label),
-        stringId(condition.kind),
-        condition.required === true ? 1 : 0,
-        condition.source?.conditionIndex ?? null,
-      ]);
-      const effects = (rule.effects || []).map(effect => [
-        stringId(effect.label),
-        stringId(effect.kind),
-        stringId(effect.scope),
-      ]);
-      components.push([
-        ability.id,
-        source.attrIndex,
-        stringId(source.attrType),
-        stringId(rule.label),
-        stringId(rule.hook?.id),
-        stringId(rule.hook?.label),
-        rule.hook?.mode === "calculation" ? 1 : 0,
-        parameters,
-        conditions,
-        effects,
-      ]);
-    }
-  }
-  return {
-    strings,
-    optionSets: (payload.componentOptionSets || []).map(options => options.map(option => [option.value, option.label])),
-    components,
-  };
-}
-
 function normalizedSearchText(value) {
   return String(value || "")
     .toLowerCase()
@@ -1073,7 +1013,7 @@ function relevantModelContext(payload) {
       category: move.category,
       power: move.power,
     })),
-    components: candidates.slice(0, 16).map(candidate => ({
+    components: candidates.slice(0, 64).map(candidate => ({
       ability: {
         id: candidate.ability.id,
         name: candidate.ability.name,
@@ -1085,7 +1025,6 @@ function relevantModelContext(payload) {
 }
 
 function modelPrompt(payload) {
-  const compactCatalog = compactModelCatalog(payload);
   const relevantContext = relevantModelContext(payload);
   const abilityIndex = payload.abilityIndex.map(ability => [ability.id, ability.name]);
   const moveIndex = (payload.moveIndex || []).map(move => [move.id, move.name]);
@@ -1093,16 +1032,10 @@ function modelPrompt(payload) {
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
 
-Copy every runtime source identity exactly from FULL RUNTIME COMPONENT CATALOG. The catalog is compact but complete. A trailing $ in the legend means an index into COMPONENT STRINGS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+The server searched the complete runtime catalog before this request and expanded the strongest matching components below. Copy every runtime source identity exactly from REQUEST-MATCHED COMPONENTS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
-COMPACT CATALOG LEGEND:
 FULL ABILITY INDEX row = [abilityId, name].
 FULL MOVE CATALOG row = [moveId, name]. Requested moves are expanded with type, category, and normal power in REQUEST-MATCHED COMPONENTS.
-FULL RUNTIME COMPONENT row = [abilityId, attrIndex, attrType$, ruleLabel$, hookId$, hookLabel$, hookMode, parameters, conditions, effects]. hookMode 0 means event and 1 means calculation.
-Parameter row = [path$, label$, control$, optional, min, max, optionsRef, sourceValue]. Every listed parameter is editable. optional is 0 or 1; null means no bound, option set, or source value.
-Condition row = [label$, kind$, required, conditionIndex]. required is 0 or 1. conditionIndex is present only for kind ability.
-Effect row = [label$, kind$, scope$].
-For a runtime row, reconstruct its source as {"abilityId":row[0],"attrIndex":row[1],"attrType":COMPONENT_STRINGS[row[2]]}. Its hook id, label, and mode come from row[4], row[5], and row[6]. Conditions and effects use the same source; add the advertised conditionIndex only to an ability condition source.
 
 CURRENT DRAFT (optional reference only):
 ${JSON.stringify(payload.currentBlueprint || null)}
@@ -1117,13 +1050,7 @@ FULL MOVE CATALOG:
 ${JSON.stringify(moveIndex)}
 
 COMPONENT OPTION SETS:
-${JSON.stringify(compactCatalog.optionSets)}
-
-COMPONENT STRINGS:
-${JSON.stringify(compactCatalog.strings)}
-
-FULL RUNTIME COMPONENT CATALOG:
-${JSON.stringify(compactCatalog.components)}
+${JSON.stringify(payload.componentOptionSets || [])}
 
 REQUEST-MATCHED COMPONENTS (expanded copies from the complete catalog; prefer these when they match the request):
 ${JSON.stringify(relevantContext)}
