@@ -5952,6 +5952,64 @@
           "spd": 1,
           "spdef": 1
         }
+      },
+      {
+        "abilitySlot": 1,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "DRAGON_FANG"
+          },
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SITRUS_BERRY"
+          },
+          {
+            "count": 2,
+            "item": "FOCUS_BAND"
+          },
+          {
+            "count": 2,
+            "item": "SCOPE_LENS"
+          },
+          {
+            "count": 2,
+            "item": "WIDE_LENS"
+          }
+        ],
+        "insanity": {
+          "ability": 5516,
+          "innates": [
+            5695,
+            5978,
+            5425
+          ]
+        },
+        "level": null,
+        "moves": [
+          "BADDY_BAD",
+          "ZIPPY_ZAP",
+          "RAIN_DANCE",
+          "OUTRAGE"
+        ],
+        "shiny": {
+          "around": "holyrays",
+          "name": "Cove King💀",
+          "surface": "dripgold"
+        },
+        "species": 70023,
+        "vitamins": {
+          "atk": 2,
+          "def": 2,
+          "hp": 2,
+          "spatk": 2,
+          "spd": 2,
+          "spdef": 2
+        }
       }
     ],
     "trainerClass": "CLAIR",
