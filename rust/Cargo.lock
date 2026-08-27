@@ -184,6 +184,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "er-cli"
+version = "0.1.0"
+dependencies = [
+ "er-canonical",
+ "er-env",
+ "er-game",
+ "er-kernel",
+ "er-save",
+ "er-state",
+ "er-types",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "er-content"
 version = "0.1.0"
 dependencies = [
