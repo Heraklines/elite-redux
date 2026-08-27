@@ -994,7 +994,7 @@ function validateSources(result, payload) {
       if (!Number.isInteger(condition.abilityId)) {
         continue;
       }
-      if (condition.kind !== "ability") {
+      if (condition.kind && condition.kind !== "ability") {
         condition.conditionIndex = undefined;
       }
       const key = `${sourceKey(condition)}:${condition.kind}:${condition.conditionIndex ?? ""}`;
