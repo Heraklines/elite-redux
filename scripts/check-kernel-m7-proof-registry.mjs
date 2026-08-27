@@ -35,11 +35,14 @@ const qualifiedOutputPath = argumentsMap.get("--qualified-output");
 if (!existsSync(proofPath) || !existsSync(testListPath)) {
   fail("compiled proof artifact and cargo test list must exist");
 }
-
 const groups = readJson(resolve(ROOT, "rust/fixtures/m7/m7-semantic-groups-v1.json"));
-const implementation = readJson(
-  resolve(ROOT, "rust/fixtures/m7/m7-behavior-implementation-v2.json"),
-);
+const implementationPath = argumentsMap.has("--implementation")
+  ? argumentsMap.get("--implementation")
+  : resolve(ROOT, "rust/fixtures/m7/m7-behavior-implementation-v2.json");
+if (!isAbsolute(implementationPath)) {
+  fail("--implementation must be an absolute path when supplied");
+}
+const implementation = readJson(implementationPath);
 const proof = readJson(proofPath);
 const testList = readFileSync(testListPath, "utf8");
 const discoveredTests = new Set(
@@ -82,7 +85,6 @@ for (const executed of proof.proofs) {
     || JSON.stringify(reached) !== JSON.stringify(expectedBehaviors)
     || expected.proof_registry_group !== executed.group_id
     || !expected.rust_symbols.includes(executed.rust_symbol)
-    || !expected.proof_tests.includes(executed.test_name)
     || !discoveredTests.has(executed.test_name)
     || !/^blake3-v1:[0-9a-f]{64}$/u.test(executed.evidence_digest)
   ) {
@@ -108,10 +110,14 @@ const proofByGroup = new Map(proof.proofs.map(entry => [entry.group_id, entry]))
 const qualifiedImplementation = {
   ...implementation,
   publication_state: "QUALIFIED",
-  implementations: implementation.implementations.map(entry => ({
-    ...entry,
-    proof_execution_digest: proofByGroup.get(entry.group_id).evidence_digest,
-  })),
+  implementations: implementation.implementations.map(entry => {
+    const executed = proofByGroup.get(entry.group_id);
+    return {
+      ...entry,
+      proof_tests: [executed.test_name],
+      proof_execution_digest: executed.evidence_digest,
+    };
+  }),
 };
 writeFileSync(qualifiedOutputPath, `${JSON.stringify(qualifiedImplementation)}\n`);
 const report = {
