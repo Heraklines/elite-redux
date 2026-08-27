@@ -407,7 +407,7 @@ function assemblyPlanSchemaForSearch(searchContext, catalog, payload) {
   primitiveRuleProperties.effects.items = primitiveSchemas.effectSchema;
   schema.properties.draft.properties.modifiers.items = primitiveSchemas.modifierSchema;
   if (isPrimitiveStatRuleRequest(payload)) {
-    schema.properties.draft.properties.componentRules.maxItems = 0;
+    schema.properties.draft.properties.componentRules = { type: "array", maxItems: 0 };
   }
   return schema;
 }
