@@ -1,4 +1,5 @@
 //! M7 Pokémon lifecycle and progression content.
+pub mod lifecycle;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -58,6 +59,7 @@ pub struct SpeciesProgressionDefinitionV1 {
     pub form: u16,
     pub growth_rate: er_types::run_ids::GrowthRateId,
     pub base_friendship: u16,
+    pub catch_rate: u16,
     pub allowed_natures: Vec<NatureId>,
     pub level_moves: Vec<LevelMoveV1>,
     pub reminder_moves: Vec<MoveId>,
@@ -130,10 +132,10 @@ impl ProgressionContentPackV1 {
         let evolution_ids: std::collections::BTreeSet<_> =
             self.evolutions.iter().map(|entry| entry.id).collect();
         for definition in &self.species {
-            if definition
-                .level_moves
-                .windows(2)
-                .any(|pair| (pair[0].level, pair[0].move_id) >= (pair[1].level, pair[1].move_id))
+            if definition.catch_rate == 0
+                || definition.level_moves.windows(2).any(|pair| {
+                    (pair[0].level, pair[0].move_id) >= (pair[1].level, pair[1].move_id)
+                })
                 || !strictly_sorted(&definition.reminder_moves)
                 || !strictly_sorted(&definition.tm_moves)
                 || !strictly_sorted(&definition.allowed_natures)

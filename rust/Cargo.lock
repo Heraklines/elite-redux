@@ -260,6 +260,7 @@ dependencies = [
 name = "er-progression"
 version = "0.1.0"
 dependencies = [
+ "er-state",
  "er-types",
  "serde",
  "thiserror",
