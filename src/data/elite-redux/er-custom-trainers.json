@@ -5213,7 +5213,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70031,
     "maxWave": 90,
     "minWave": 70,
@@ -5361,7 +5361,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70032,
     "maxWave": 110,
     "minWave": 95,
@@ -5512,7 +5512,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70033,
     "maxWave": 120,
     "minWave": 110,
@@ -5647,7 +5647,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70034,
     "maxWave": 135,
     "minWave": 125,
@@ -5832,7 +5832,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70035,
     "maxWave": 160,
     "minWave": 150,
@@ -6025,7 +6025,7 @@
       "elite",
       "hell"
     ],
-    "endless": false,
+    "endless": true,
     "id": 70036,
     "introDialogue": "blah blah balh better than you blah blah blah blah blah",
     "maxWave": 199,
