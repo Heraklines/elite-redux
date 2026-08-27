@@ -181,7 +181,7 @@
     }
     matches.sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name));
     const grouped = new Map();
-    for (const { ability, rule } of matches.slice(0, 100)) {
+    for (const { ability, rule } of matches.slice(0, 32)) {
       if (!grouped.has(ability.id)) {
         grouped.set(ability.id, {
           id: ability.id,
@@ -201,6 +201,33 @@
       });
     }
     return [...grouped.values()];
+  }
+
+  function aiAbilityContext(prompt, componentCandidates) {
+    const normalizedPrompt = prompt.toLowerCase();
+    const terms = aiSearchTerms(prompt);
+    const componentAbilityIds = new Set(componentCandidates.map(ability => ability.id));
+    return getAbilityCatalog()
+      .map(ability => {
+        const name = String(ability.name || "").toLowerCase();
+        const description = String(ability.description || ability.desc || "").toLowerCase();
+        const score =
+          (name && normalizedPrompt.includes(name) ? 100 : 0)
+          + (componentAbilityIds.has(ability.id) ? 20 : 0)
+          + terms.reduce(
+            (total, term) => total + (name.includes(term) ? 10 : 0) + (description.includes(term) ? 2 : 0),
+            0,
+          );
+        return { ability, score };
+      })
+      .filter(({ score }) => score > 0)
+      .sort((left, right) => right.score - left.score || left.ability.name.localeCompare(right.ability.name))
+      .slice(0, 80)
+      .map(({ ability }) => ({
+        id: ability.id,
+        name: ability.name,
+        description: ability.description || ability.desc || "",
+      }));
   }
 
   function aiMoveContext(prompt) {
@@ -377,6 +404,7 @@
     aiAbortController = new AbortController();
     refreshInspector();
     try {
+      const componentCandidates = aiComponentContext(prompt);
       const response = await aiRequest(
         "/generate",
         {
@@ -384,12 +412,8 @@
           prompt,
           currentBlueprint: currentEntry() ? clone(currentEntry()) : null,
           primitiveCatalog,
-          abilityIndex: getAbilityCatalog().map(ability => ({
-            id: ability.id,
-            name: ability.name,
-            description: ability.description || ability.desc || "",
-          })),
-          componentCandidates: aiComponentContext(prompt),
+          abilityIndex: aiAbilityContext(prompt, componentCandidates),
+          componentCandidates,
           moveIndex: aiMoveContext(prompt),
         },
         aiAbortController.signal,
