@@ -371,6 +371,16 @@
       118
     ]
   },
+  "SPECIES_YVELTAL_MEGA": {
+    "ability1": 5144,
+    "ability2": 5144,
+    "hidden": 5144,
+    "innates": [
+      20001,
+      5108,
+      231
+    ]
+  },
   "SPECIES_ZORUA": {
     "ability1": 5285,
     "ability2": 194,
