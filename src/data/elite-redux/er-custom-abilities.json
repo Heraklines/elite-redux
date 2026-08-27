@@ -32,5 +32,21 @@
     "name": "Dreadful winds",
     "rules": [],
     "version": 1
+  },
+  "new-ability-3": {
+    "componentRules": [],
+    "description": "Ambush + Volt Rush",
+    "flags": {},
+    "generation": 9,
+    "id": 20002,
+    "includes": [
+      5171,
+      5166
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Ultra Recon Hunter",
+    "rules": [],
+    "version": 1
   }
 }
