@@ -12,8 +12,8 @@ const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
-const nimModel = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
-const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
+const nimModel = process.env.NVIDIA_NIM_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 const maxGenerateBodyBytes = 8_388_608;
 let activeTurn = null;
@@ -207,6 +207,30 @@ const outputSchema = {
     },
   },
   required: ["explanation", "blueprint"],
+  additionalProperties: false,
+};
+
+const catalogSearchPlanSchema = {
+  type: "object",
+  properties: {
+    queries: {
+      type: "array",
+      minItems: 1,
+      maxItems: 12,
+      items: {
+        type: "object",
+        properties: {
+          scope: { type: "string", enum: ["components", "abilities", "moves"] },
+          role: { type: "string", enum: ["any", "hook", "condition", "effect", "parameter"] },
+          query: { type: "string", minLength: 2, maxLength: 120 },
+          limit: { type: "integer", minimum: 1, maximum: 24 },
+        },
+        required: ["scope", "role", "query", "limit"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["queries"],
   additionalProperties: false,
 };
 
@@ -971,9 +995,67 @@ function normalizedSearchText(value) {
     .trim();
 }
 
-function componentSearchScore(query, terms, rule) {
-  const text = normalizedSearchText(JSON.stringify(rule));
+const catalogSearchStopWords = new Set([
+  "ability",
+  "after",
+  "against",
+  "also",
+  "and",
+  "create",
+  "does",
+  "each",
+  "from",
+  "holder",
+  "into",
+  "move",
+  "opponent",
+  "pokemon",
+  "stage",
+  "target",
+  "that",
+  "the",
+  "then",
+  "this",
+  "uses",
+  "when",
+  "with",
+]);
+
+function catalogSearchTerms(value) {
+  return [
+    ...new Set(
+      normalizedSearchText(value)
+        .split(" ")
+        .filter(term => term.length >= 3 && !catalogSearchStopWords.has(term)),
+    ),
+  ];
+}
+
+function componentRoleValue(rule, role) {
+  if (role === "hook") {
+    return { label: rule.label, hook: rule.hook, source: rule.source };
+  }
+  if (role === "condition") {
+    return rule.conditions || [];
+  }
+  if (role === "effect") {
+    return { label: rule.label, effects: rule.effects || [], source: rule.source };
+  }
+  if (role === "parameter") {
+    return rule.parameters || [];
+  }
+  return rule;
+}
+
+function componentSearchScore(query, terms, rule, role = "any", requestedMoves = []) {
+  const text = normalizedSearchText(JSON.stringify(componentRoleValue(rule, role)));
+  if (!text) {
+    return 0;
+  }
   let score = terms.reduce((total, term) => total + (text.includes(term) ? Math.min(term.length, 8) : 0), 0);
+  if (query.length >= 4 && text.includes(query)) {
+    score += 80;
+  }
   if (/\bon entry\b|\bswitch(?:es|ed|ing)? in\b/.test(query) && /on entry|post summon/.test(text)) {
     score += 40;
   }
@@ -989,31 +1071,156 @@ function componentSearchScore(query, terms, rule) {
   if (/\b(?:raise|lower|boost|drop)\b/.test(query) && /stat stage|stage change/.test(text)) {
     score += 24;
   }
+  if (requestedMoves.length > 0) {
+    const controls = new Set((rule.parameters || []).map(parameter => parameter.control));
+    if (controls.has("move")) {
+      score += 100;
+      if (/scripted move|post summon|post attack/.test(text)) {
+        score += 60;
+      }
+    } else if (controls.has("move-list")) {
+      score += 20;
+    }
+  }
   return score;
 }
 
-function relevantModelContext(payload) {
+function requestedMoveEntries(payload) {
   const query = normalizedSearchText(payload.prompt);
-  const terms = [...new Set(query.split(" ").filter(term => term.length >= 3))];
-  const requestedMoves = (payload.moveIndex || []).filter(move => {
+  return (payload.moveIndex || []).filter(move => {
     const name = normalizedSearchText(move.name);
     return name.length >= 3 && query.includes(name);
   });
-  const candidates = [];
-  for (const ability of payload.componentCandidates) {
-    for (const rule of ability.rules || []) {
-      let score = componentSearchScore(query, terms, rule);
-      if (
-        requestedMoves.length > 0
-        && (rule.parameters || []).some(parameter => parameter.control === "move" || parameter.control === "move-list")
-      ) {
-        score += 60;
-      }
-      candidates.push({ ability, rule, score });
+}
+
+function defaultCatalogSearchPlan(payload) {
+  const queries = [{ scope: "components", role: "any", query: payload.prompt, limit: 24 }];
+  const clauses = payload.prompt
+    .split(/[,;]|\b(?:and then|then|additionally|also)\b/gi)
+    .map(clause => clause.trim())
+    .filter(clause => clause.length >= 4 && clause.length <= 120);
+  for (const clause of clauses.slice(0, 6)) {
+    queries.push({ scope: "components", role: "any", query: clause, limit: 12 });
+  }
+  for (const move of requestedMoveEntries(payload)) {
+    queries.push({ scope: "moves", role: "any", query: move.name, limit: 4 });
+    queries.push({ scope: "components", role: "effect", query: `scripted move ${payload.prompt}`, limit: 16 });
+  }
+  for (const ability of payload.abilityIndex || []) {
+    const name = normalizedSearchText(ability.name);
+    if (name.length >= 3 && normalizedSearchText(payload.prompt).includes(name)) {
+      queries.push({ scope: "abilities", role: "any", query: ability.name, limit: 4 });
     }
   }
-  candidates.sort((left, right) => right.score - left.score);
+  return { queries: queries.slice(0, 12) };
+}
+
+function normalizeCatalogSearchPlan(plan, payload) {
+  const combined = [
+    ...defaultCatalogSearchPlan(payload).queries,
+    ...(Array.isArray(plan?.queries) ? plan.queries : []),
+  ];
+  const queries = [];
+  const seen = new Set();
+  for (const raw of combined) {
+    const scope = ["components", "abilities", "moves"].includes(raw?.scope) ? raw.scope : "components";
+    const role = ["any", "hook", "condition", "effect", "parameter"].includes(raw?.role) ? raw.role : "any";
+    const query = String(raw?.query || "")
+      .trim()
+      .slice(0, 120);
+    if (query.length < 2) {
+      continue;
+    }
+    const key = `${scope}:${role}:${normalizedSearchText(query)}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    queries.push({ scope, role, query, limit: Math.max(1, Math.min(24, Number(raw.limit) || 12)) });
+  }
+  return { queries: queries.slice(0, 20) };
+}
+
+function catalogValueScore(query, value) {
+  const normalizedQuery = normalizedSearchText(query);
+  const text = normalizedSearchText(JSON.stringify(value));
+  const terms = catalogSearchTerms(normalizedQuery);
+  let score = terms.reduce((total, term) => total + (text.includes(term) ? Math.min(term.length, 8) : 0), 0);
+  if (text.includes(normalizedQuery)) {
+    score += 80;
+  }
+  return score;
+}
+
+function executeCatalogSearch(payload, rawPlan) {
+  const plan = normalizeCatalogSearchPlan(rawPlan, payload);
+  const requestedMoves = requestedMoveEntries(payload);
+  const components = new Map();
+  const abilities = new Map();
+  const moves = new Map();
+  const searches = [];
+  let componentRuleCount = 0;
+  for (const ability of payload.componentCandidates || []) {
+    componentRuleCount += (ability.rules || []).length;
+  }
+  for (const search of plan.queries) {
+    const query = normalizedSearchText(search.query);
+    if (search.scope === "components") {
+      const terms = catalogSearchTerms(query);
+      const matches = [];
+      for (const ability of payload.componentCandidates || []) {
+        for (const [ruleIndex, rule] of (ability.rules || []).entries()) {
+          const score = componentSearchScore(query, terms, rule, search.role, requestedMoves);
+          if (score > 0) {
+            matches.push({ ability, rule, ruleIndex, score });
+          }
+        }
+      }
+      matches.sort((left, right) => right.score - left.score);
+      for (const match of matches.slice(0, search.limit)) {
+        const key = `${match.ability.id}:${match.ruleIndex}`;
+        components.set(key, {
+          ability: {
+            id: match.ability.id,
+            name: match.ability.name,
+            description: match.ability.description,
+          },
+          rule: match.rule,
+        });
+      }
+      searches.push({ ...search, matches: Math.min(matches.length, search.limit) });
+    } else if (search.scope === "abilities") {
+      const matches = (payload.abilityIndex || [])
+        .map(ability => ({ ability, score: catalogValueScore(query, ability) }))
+        .filter(match => match.score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, search.limit);
+      for (const match of matches) {
+        abilities.set(Number(match.ability.id), match.ability);
+      }
+      searches.push({ ...search, matches: matches.length });
+    } else {
+      const matches = (payload.moveIndex || [])
+        .map(move => ({ move, score: catalogValueScore(query, move) }))
+        .filter(match => match.score > 0)
+        .sort((left, right) => right.score - left.score)
+        .slice(0, search.limit);
+      for (const match of matches) {
+        moves.set(Number(match.move.id), match.move);
+      }
+      searches.push({ ...search, matches: matches.length });
+    }
+  }
+  for (const move of requestedMoves) {
+    moves.set(Number(move.id), move);
+  }
   return {
+    catalogCounts: {
+      abilities: (payload.abilityIndex || []).length,
+      componentRules: componentRuleCount,
+      moves: (payload.moveIndex || []).length,
+    },
+    searches,
     requestedMoves: requestedMoves.map(move => ({
       id: move.id,
       name: move.name,
@@ -1021,31 +1228,33 @@ function relevantModelContext(payload) {
       category: move.category,
       power: move.power,
     })),
-    components: candidates.slice(0, 64).map(candidate => ({
-      ability: {
-        id: candidate.ability.id,
-        name: candidate.ability.name,
-        description: candidate.ability.description,
-      },
-      rule: candidate.rule,
-    })),
+    components: [...components.values()].slice(0, 120),
+    abilities: [...abilities.values()].slice(0, 48),
+    moves: [...moves.values()].slice(0, 48),
   };
 }
 
-function modelPrompt(payload) {
-  const relevantContext = relevantModelContext(payload);
-  const abilityIndex = payload.abilityIndex.map(ability => [ability.id, ability.name]);
-  const moveIndex = (payload.moveIndex || []).map(move => [move.id, move.name]);
+function catalogSearchPrompt(payload) {
+  return `Plan exhaustive searches over a closed Pokemon ability catalog. Return exactly one JSON object matching CATALOG SEARCH PLAN SCHEMA. Request 4-12 focused searches that together cover every clause in the user's request. Search scopes are components, abilities, and moves. Component roles are hook, condition, effect, parameter, or any. Search semantic mechanic terms likely to occur in labels and class names, such as "on entry", "scripted move", "contact", "stat stage", or "weather". Search a named move in moves and search its mechanism separately in components. Search a named complete ability in abilities. Do not create the ability yet.
+
+PRIMITIVE CATALOG:
+${JSON.stringify(payload.primitiveCatalog)}
+
+USER REQUEST:
+${payload.prompt}
+
+CATALOG SEARCH PLAN SCHEMA:
+${JSON.stringify(catalogSearchPlanSchema)}`;
+}
+
+function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null)) {
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one JSON object and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, or unsupported mechanics. Build one Ability Studio blueprint matching OUTPUT JSON SCHEMA. Before returning, verify that the blueprint has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix runtime component references with configurable primitive conditions and effects. Keep mechanics empty; put runtime references in componentRules. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher, preserving their real runtime arguments and eligibility checks. Direct-engine capability packages can be activated by any WHEN hook for the rest of the battle. Use includes only when the user explicitly wants the complete existing ability.
 
-The server searched the complete runtime catalog before this request and expanded the strongest matching components below. Copy every runtime source identity exactly from REQUEST-MATCHED COMPONENTS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from FULL MOVE CATALOG. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
+The worker executed every requested search against the complete runtime catalog and expanded the exact matches below. Copy every runtime source identity exactly from CATALOG SEARCH RESULTS. Set conditionIndex only for kind "ability"; omit it for kind "holder" or "event". To customize a source, use parameterOverrides with only advertised parameters, their exact path, and the advertised value type/range. An optionsRef points to the zero-based list in COMPONENT OPTION SETS; choose the option value, never its label. Move parameters must use an id from the move matches in CATALOG SEARCH RESULTS. Leave optional parameters absent unless requested. A trigger's holder is the ability owner, not the move target. Damaging scripted moves normally target an opponent. Chance is 1-100 and defaults to 100 unless requested. Primitive conditions and effects must use PRIMITIVE CATALOG. If the request cannot be represented exactly, create the closest safe draft and state the limitation in explanation. Keep name and description player-facing and precise.
 
-Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If REQUEST-MATCHED COMPONENTS lists a requested move, use a runtime component whose editable parameter control is "move" or "move-list" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter. Never add an included ability unless the user explicitly names that complete ability.
-
-FULL ABILITY INDEX row = [abilityId, name].
-FULL MOVE CATALOG row = [moveId, name]. Requested moves are expanded with type, category, and normal power in REQUEST-MATCHED COMPONENTS.
+Every requested clause must appear in the mechanics. Distinct WHEN clauses require distinct rules. If CATALOG SEARCH RESULTS lists a requested move, use a runtime component whose editable parameter control is "move" and set its parameterOverrides to that move id; set an advertised power parameter when the request specifies BP. Never approximate a scripted move with a primitive move filter or a move-list status proc. Never add an included ability unless the user explicitly names that complete ability and it appears in the ability matches.
 
 CURRENT DRAFT (optional reference only):
 ${JSON.stringify(payload.currentBlueprint || null)}
@@ -1053,17 +1262,11 @@ ${JSON.stringify(payload.currentBlueprint || null)}
 PRIMITIVE CATALOG:
 ${JSON.stringify(payload.primitiveCatalog)}
 
-FULL ABILITY INDEX:
-${JSON.stringify(abilityIndex)}
-
-FULL MOVE CATALOG:
-${JSON.stringify(moveIndex)}
-
 COMPONENT OPTION SETS:
 ${JSON.stringify(payload.componentOptionSets || [])}
 
-REQUEST-MATCHED COMPONENTS (expanded copies from the complete catalog; prefer these when they match the request):
-${JSON.stringify(relevantContext)}
+CATALOG SEARCH RESULTS:
+${JSON.stringify(searchContext)}
 
 VALID OUTPUT EXAMPLES:
 ${JSON.stringify(blueprintExamples)}
@@ -1200,7 +1403,7 @@ function normalizeScriptedMoveTargets(result, payload) {
   }
 }
 
-async function runCodex(payload, emit) {
+async function _runCodex(payload, emit) {
   await rpc.start();
   const account = await rpc.request("account/read", { refreshToken: true });
   if (!account?.account || account.account.type !== "chatgpt") {
@@ -1314,7 +1517,7 @@ async function runCodex(payload, emit) {
   }
 }
 
-async function runNimModel(model, body, payload) {
+async function requestNimJson(model, body, schema, source, timeoutMs) {
   let response;
   try {
     response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
@@ -1334,14 +1537,14 @@ async function runNimModel(model, body, payload) {
           : {
               ...body,
               model,
-              guided_json: outputSchema,
+              guided_json: schema,
               ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
             },
       ),
-      signal: AbortSignal.timeout(model === "deepseek-ai/deepseek-v4-flash-0731" ? 150_000 : 120_000),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {
-    throw new Error("The backup model timed out");
+    throw new Error(`The ${source} timed out`);
   }
   if (!response.ok) {
     const providerError = (await response.text().catch(() => "")).replace(/\s+/g, " ").trim().slice(0, 1000);
@@ -1354,7 +1557,27 @@ async function runNimModel(model, body, payload) {
     /<think>[\s\S]*?<\/think>/gi,
     "",
   );
-  const result = stripNulls(extractJson(content, "fallback model", false));
+  return stripNulls(extractJson(content, source, false));
+}
+
+async function runNimSearchPlan(model, payload) {
+  const body = {
+    messages: [
+      {
+        role: "system",
+        content: "Return only one JSON catalog search plan. Do not include markdown or hidden reasoning.",
+      },
+      { role: "user", content: catalogSearchPrompt(payload) },
+    ],
+    temperature: 0,
+    max_tokens: 1200,
+    stream: false,
+  };
+  return requestNimJson(model, body, catalogSearchPlanSchema, "catalog search planner", 45_000);
+}
+
+async function runNimModel(model, body, payload) {
+  const result = await requestNimJson(model, body, outputSchema, "ability model", 120_000);
   normalizeRuntimeSourceReferences(result, payload);
   normalizeComponentRuleHooks(result);
   normalizeScriptedMoveTargets(result, payload);
@@ -1367,11 +1590,23 @@ async function runNim(payload, emit) {
   if (!nimKey) {
     throw new Error("The ability builder is temporarily unavailable");
   }
-  emit({ type: "status", message: "Preparing the requested ability" });
   const models = [...new Set([nimModel, nimFallbackModel].filter(Boolean))];
+  emit({ type: "status", message: "Searching the complete ability catalog" });
+  let searchPlan;
+  try {
+    searchPlan = await runNimSearchPlan(nimFallbackModel || nimModel, payload);
+  } catch (error) {
+    console.error(JSON.stringify({ event: "ability-search-plan-failed", message: error.message || String(error) }));
+    searchPlan = defaultCatalogSearchPlan(payload);
+  }
+  const searchContext = executeCatalogSearch(payload, searchPlan);
+  emit({
+    type: "status",
+    message: `Building from ${searchContext.components.length} matched runtime mechanics`,
+  });
   const systemContent =
     "Return only one JSON object matching the requested schema. Do not include markdown or hidden reasoning.";
-  const userContent = `${modelPrompt(payload)}\n\nOUTPUT JSON SCHEMA:\n${JSON.stringify(outputSchema)}`;
+  const userContent = `${modelPrompt(payload, searchContext)}\n\nOUTPUT JSON SCHEMA:\n${JSON.stringify(outputSchema)}`;
   const inputCharacters = systemContent.length + userContent.length;
   console.log(JSON.stringify({ event: "ability-model-input", inputCharacters }));
   if (inputCharacters > 1_000_000) {
@@ -1448,13 +1683,7 @@ async function generate(request, response) {
   const emit = event => ndjson(response, event);
   try {
     emit({ type: "status", message: "Matching the request to available ability components" });
-    let result;
-    try {
-      result = await runNim(payload, emit);
-    } catch {
-      emit({ type: "status", message: "Retrying the request" });
-      result = await runCodex(payload, emit);
-    }
+    const result = await runNim(payload, emit);
     emit({ type: "result", ...result });
   } catch (error) {
     emit({
