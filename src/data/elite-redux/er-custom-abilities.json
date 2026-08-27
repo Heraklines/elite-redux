@@ -48,5 +48,55 @@
     "name": "Ultra Recon Hunter",
     "rules": [],
     "version": 1
+  },
+  "new-ability-4": {
+    "componentRules": [
+      {
+        "chance": 100,
+        "conditionLogic": "all",
+        "conditions": [],
+        "effects": [
+          {
+            "abilityId": 5350,
+            "attrIndex": 1,
+            "attrType": "ChanceStatusOnAttackAbAttr",
+            "parameterOverrides": {
+              "chance": 100,
+              "contactRequired": false
+            }
+          },
+          {
+            "abilityId": 5306,
+            "attrIndex": 1,
+            "attrType": "ChanceBattlerTagOnAttackAbAttr",
+            "parameterOverrides": {
+              "chance": 100,
+              "contactRequired": false
+            }
+          }
+        ],
+        "hook": {
+          "abilityId": 5161,
+          "attrIndex": 0,
+          "attrType": "AbsorbantAbAttr"
+        },
+        "key": "component-1",
+        "prerequisiteHooks": []
+      }
+    ],
+    "description": "Attacks always Paralyze & curse, Attacks ignore type immunity.",
+    "flags": {},
+    "generation": 9,
+    "id": 20003,
+    "includes": [
+      5188,
+      5023,
+      5087
+    ],
+    "mechanics": [],
+    "modifiers": [],
+    "name": "Extermination Vector",
+    "rules": [],
+    "version": 1
   }
 }
