@@ -142,7 +142,7 @@ const expectedDomains = new Map([
   ["WORLD", "world_behavior_count"],
 ]);
 for (const [domain, key] of expectedDomains) {
-  const count = game.domain_counts[domain];
+  const count = game.domain_counts[domain] ?? 0;
   if (key === "save_field_owner_behavior_count" || key === "scenario_only_behavior_count") {
     if (!Number.isSafeInteger(count) || count < 0) {
       fail(`invalid ${domain} domain count`);

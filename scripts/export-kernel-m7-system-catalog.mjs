@@ -96,12 +96,15 @@ const DOMAIN_RULES = [
     ],
   ],
   ["SCENARIO", ["mystery", "scenario", "scenarios", "scripted-event", "encounter-event"]],
-  ["QUEST_FACTION", ["quest", "quests", "faction", "factions", "domain", "domains", "notoriety", "standing"]],
+  ["QUEST_FACTION", ["quest", "quests", "faction", "factions", "domain", "domains", "standing"]],
   [
     "AI_MODES",
     ["ai", "moody", "ghost", "showdown", "trainer", "trainers", "boss", "game-mode", "challenge", "daily", "endless"],
   ],
-  ["WORLD", ["biome", "biomes", "encounter", "encounters", "route", "routes", "wave", "waves", "world", "spawn"]],
+  [
+    "WORLD",
+    ["biome", "biomes", "encounter", "encounters", "notoriety", "route", "routes", "wave", "waves", "world", "spawn"],
+  ],
   [
     "BATTLE",
     [
