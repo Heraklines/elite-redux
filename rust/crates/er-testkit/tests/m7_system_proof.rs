@@ -58,7 +58,7 @@ use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
 use er_types::battle_command::CommandCollectionState;
 use er_types::battle_ids::{
     AbilityId, BattleFormat, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId,
-    MenuInstanceId, MoveId, PokemonId, SpeciesId, WaveIndex,
+    MenuInstanceId, MoveId, PartyIndex, PokemonId, SpeciesId, WaveIndex,
 };
 use er_types::battle_model::{
     AbilityLoadout, BattleOutcome, BattleStats, GlobalAbilitySuppressionState, PokemonType,
@@ -70,12 +70,14 @@ use er_types::run_ids::{
 };
 use er_types::run_model::RunOutcome;
 use er_types::{
-    AiPolicyId, BattleContentPackHashV3, CatalogHash, GameActionContextV1, GameActionV1,
-    GameBehaviorStatus, GameBehaviorUnitId, GameContentBundleHash, GameControlKindV2,
-    GameControlPlanV2, GameMenuCancelV2, GameMenuOptionV2, GameMenuV2, InputFocus, InventoryItemId,
-    MenuOptionId, OperationId, OracleSha, PhysicalKey, RawInputEvent, RunCondition, RunConditionId,
-    RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding, RunOperation, RunProgramBudget,
-    RunProgramId, RunProgramV1, SafeU53, ScenarioId, ScenarioNodeId, SeatId,
+    AiPolicyId, BattleContentPackHashV3, BattleUiActionV1, CaptureActionV1, CatalogHash,
+    GameActionContextV1, GameActionV1, GameBehaviorStatus, GameBehaviorUnitId,
+    GameContentBundleHash, GameControlKindV2, GameControlPlanV2, GameMenuCancelV2,
+    GameMenuOptionV2, GameMenuV2, InputFocus, InventoryItemId, MenuOptionId, OperationId,
+    OracleSha, PartyActionV1, PhysicalKey, ProgressionActionV1, RawInputEvent, RunCondition,
+    RunConditionId, RunExecutionContextV2, RunFlagId, RunHook, RunHookBinding, RunOperation,
+    RunProgramBudget, RunProgramId, RunProgramV1, SafeU53, ScenarioGameActionV1, ScenarioId,
+    ScenarioNodeId, SeatId, TerminalActionV1, WorldActionV1,
 };
 use er_wasm::m7_parity::{
     LifecycleBoundaryRequestV1, MaterialBoundaryResultV1, apply_lifecycle_boundary_native,
@@ -964,6 +966,80 @@ fn run_program_material_save_and_control_paths_agree() -> TestResult {
         MaterialApplyResultV5::Duplicate
     );
 
+    let material_cases = vec![
+        (
+            GameActionMaterialKindV1::Progression,
+            GameActionV1::Progression {
+                action: ProgressionActionV1::AcceptTask { sequence: safe(1) },
+            },
+        ),
+        (
+            GameActionMaterialKindV1::Capture,
+            GameActionV1::Capture {
+                action: CaptureActionV1::Decline,
+            },
+        ),
+        (
+            GameActionMaterialKindV1::Party,
+            GameActionV1::Party {
+                action: PartyActionV1::Cancel,
+            },
+        ),
+        (
+            GameActionMaterialKindV1::World,
+            GameActionV1::World {
+                action: WorldActionV1::Stay,
+            },
+        ),
+        (
+            GameActionMaterialKindV1::Scenario,
+            GameActionV1::Scenario {
+                action: ScenarioGameActionV1::Advance {
+                    node: ScenarioNodeId::new(safe(1)),
+                },
+            },
+        ),
+        (
+            GameActionMaterialKindV1::Terminal,
+            GameActionV1::Terminal {
+                action: TerminalActionV1::ReturnToTitle,
+            },
+        ),
+        (
+            GameActionMaterialKindV1::BattleReplacement,
+            GameActionV1::Battle {
+                action: BattleUiActionV1::SelectReplacement {
+                    occurrence: FaintOccurrenceId::new(safe(1)),
+                    field: FieldSlot::new(BattleSide::Player, 0)?,
+                    party_slot: PartyIndex::new(0)?,
+                },
+            },
+        ),
+    ];
+    for (ordinal, (kind, action)) in material_cases.into_iter().enumerate() {
+        let material = GameActionMaterialV1::new(
+            GameActionContextV1 {
+                operation_id: OperationId::new(format!("m7/material/{ordinal}"))?,
+                authority_seat: SeatId::new(safe(1)),
+                authority_revision: safe(1),
+                menu_instance: MenuInstanceId::new(safe(1)),
+            },
+            &content,
+            &state,
+            action,
+            Vec::new(),
+            Vec::new(),
+            transition.after_state.clone(),
+            Vec::new(),
+        )?;
+        let bytes = GameMaterialV5::from_action(kind, material).canonical_bytes()?;
+        let mut applied = state.clone();
+        assert_eq!(
+            apply_game_material_v5(&mut applied, &content, &bytes)?,
+            MaterialApplyResultV5::Applied
+        );
+        assert_eq!(applied, transition.after_state);
+    }
     let material = LifecycleMaterialV1::new(
         OperationId::new("m7/lifecycle/system-proof")?,
         SeatId::new(safe(1)),

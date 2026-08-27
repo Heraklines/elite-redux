@@ -233,8 +233,31 @@ pub struct GameActionMaterialV1 {
     pub presentation: Vec<GamePresentationCueV1>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BattleReplacementMaterialV5 {
+    pub material: GameActionMaterialV1,
+}
+
+impl BattleReplacementMaterialV5 {
+    pub fn validate(&self, content: &PreparedGameContentV1) -> Result<(), MaterialV5Error> {
+        if !matches!(
+            self.material.accepted_action,
+            GameActionV1::Battle {
+                action: er_types::BattleUiActionV1::SelectReplacement { .. }
+            }
+        ) {
+            return Err(MaterialV5Error::Action(
+                "replacement material requires SelectReplacement".to_owned(),
+            ));
+        }
+        self.material.validate(content)
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum GameActionMaterialKindV1 {
+    BattleReplacement,
     RunAction,
     Progression,
     Capture,
@@ -252,6 +275,7 @@ pub enum GameActionMaterialKindV1 {
 )]
 pub enum GameMaterialV5 {
     BattleTurn(BattleTurnMaterialV5),
+    BattleReplacement(BattleReplacementMaterialV5),
     RunAction(GameActionMaterialV1),
     Progression(GameActionMaterialV1),
     Capture(GameActionMaterialV1),
@@ -331,6 +355,9 @@ impl GameActionMaterialV1 {
 impl GameMaterialV5 {
     pub fn from_action(kind: GameActionMaterialKindV1, material: GameActionMaterialV1) -> Self {
         match kind {
+            GameActionMaterialKindV1::BattleReplacement => {
+                Self::BattleReplacement(BattleReplacementMaterialV5 { material })
+            }
             GameActionMaterialKindV1::RunAction => Self::RunAction(material),
             GameActionMaterialKindV1::Progression => Self::Progression(material),
             GameActionMaterialKindV1::Capture => Self::Capture(material),
@@ -344,6 +371,7 @@ impl GameMaterialV5 {
     pub fn operation_id(&self) -> &OperationId {
         match self {
             Self::BattleTurn(material) => &material.operation_id,
+            Self::BattleReplacement(material) => &material.material.context.operation_id,
             Self::RunAction(material)
             | Self::Progression(material)
             | Self::Capture(material)
@@ -372,19 +400,67 @@ impl GameMaterialV5 {
     pub fn validate(&self, content: &PreparedGameContentV1) -> Result<(), MaterialV5Error> {
         match self {
             Self::BattleTurn(material) => material.validate(content),
+            Self::BattleReplacement(material) => material.validate(content),
             Self::RunAction(material)
-            | Self::Progression(material)
-            | Self::Capture(material)
-            | Self::Party(material)
-            | Self::World(material)
-            | Self::Scenario(material)
-            | Self::Terminal(material) => material.validate(content),
+                if matches!(
+                    material.accepted_action,
+                    GameActionV1::ExecuteRunProgram { .. }
+                ) =>
+            {
+                material.validate(content)
+            }
+            Self::Progression(material)
+                if matches!(
+                    material.accepted_action,
+                    GameActionV1::Progression { .. }
+                        | GameActionV1::MoveLearning { .. }
+                        | GameActionV1::Evolution { .. }
+                        | GameActionV1::Fusion { .. }
+                ) =>
+            {
+                material.validate(content)
+            }
+            Self::Capture(material)
+                if matches!(material.accepted_action, GameActionV1::Capture { .. }) =>
+            {
+                material.validate(content)
+            }
+            Self::Party(material)
+                if matches!(material.accepted_action, GameActionV1::Party { .. }) =>
+            {
+                material.validate(content)
+            }
+            Self::World(material)
+                if matches!(material.accepted_action, GameActionV1::World { .. }) =>
+            {
+                material.validate(content)
+            }
+            Self::Scenario(material)
+                if matches!(material.accepted_action, GameActionV1::Scenario { .. }) =>
+            {
+                material.validate(content)
+            }
+            Self::Terminal(material)
+                if matches!(material.accepted_action, GameActionV1::Terminal { .. }) =>
+            {
+                material.validate(content)
+            }
+            Self::RunAction(_)
+            | Self::Progression(_)
+            | Self::Capture(_)
+            | Self::Party(_)
+            | Self::World(_)
+            | Self::Scenario(_)
+            | Self::Terminal(_) => Err(MaterialV5Error::Action(
+                "material variant differs from accepted action".to_owned(),
+            )),
         }
     }
 
     pub fn before_digest(&self) -> &str {
         match self {
             Self::BattleTurn(material) => &material.before_digest,
+            Self::BattleReplacement(material) => &material.material.before_digest,
             Self::RunAction(material)
             | Self::Progression(material)
             | Self::Capture(material)
@@ -398,6 +474,7 @@ impl GameMaterialV5 {
     pub fn after_digest(&self) -> &str {
         match self {
             Self::BattleTurn(material) => &material.after_digest,
+            Self::BattleReplacement(material) => &material.material.after_digest,
             Self::RunAction(material)
             | Self::Progression(material)
             | Self::Capture(material)
@@ -411,6 +488,7 @@ impl GameMaterialV5 {
     pub fn after_state(&self) -> &GameStateV5 {
         match self {
             Self::BattleTurn(material) => &material.after_state,
+            Self::BattleReplacement(material) => &material.material.after_state,
             Self::RunAction(material)
             | Self::Progression(material)
             | Self::Capture(material)
@@ -424,6 +502,7 @@ impl GameMaterialV5 {
     pub fn battle_presentation(&self) -> Option<&[BattlePresentationCueV5]> {
         match self {
             Self::BattleTurn(material) => Some(&material.presentation),
+            Self::BattleReplacement(_) => None,
             Self::RunAction(_)
             | Self::Progression(_)
             | Self::Capture(_)
