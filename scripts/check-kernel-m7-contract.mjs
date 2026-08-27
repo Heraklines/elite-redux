@@ -57,11 +57,23 @@ function assertEqual(actual, expected, label) {
 function readJson(path) {
   return JSON.parse(readFileSync(resolve(ROOT, path), "utf8"));
 }
+function canonicalize(value) {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value)
+        .sort()
+        .map(key => [key, canonicalize(value[key])]),
+    );
+  }
+  return value;
+}
 
 function fileSha256(path) {
-  return createHash("sha256")
-    .update(readFileSync(resolve(ROOT, path)))
-    .digest("hex");
+  const bytes = `${JSON.stringify(canonicalize(readJson(path)))}\n`;
+  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function uniqueIds(entries, label) {
