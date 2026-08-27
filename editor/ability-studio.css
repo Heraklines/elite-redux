@@ -175,7 +175,7 @@
 }
 .as-workspace {
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   background: #0d1016;
 }
 .as-entry {
@@ -259,11 +259,16 @@
   gap: 10px;
 }
 .as-rule-card {
+  position: relative;
+  z-index: 1;
   min-width: 0;
-  overflow: hidden;
+  overflow: visible;
   border: 1px solid #303949;
   border-radius: 4px;
   background: #121720;
+}
+.as-rule-card:focus-within {
+  z-index: 40;
 }
 .as-rule-card > header {
   display: grid;
