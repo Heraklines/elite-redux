@@ -257,9 +257,9 @@ jobs:
           node scripts/classify-kernel-m5-oracle-refresh.mjs \
             --oracle-sha "$M7_ORACLE_SHA" \
             --legacy-m3 rust/fixtures/m3/oracle \
-            --fresh-m3 artifacts/fresh-m3/m7-m3-oracle-a \
+            --fresh-m3 artifacts/fresh-m3 \
             --legacy-m4 rust/fixtures/m4/oracle \
-            --fresh-m4 artifacts/fresh-m4/m7-m4-oracle-a \
+            --fresh-m4 artifacts/fresh-m4 \
             --output "$GITHUB_WORKSPACE/artifacts/m7-oracle-fixture-drift-v1.json"
       - uses: actions/upload-artifact@v6
         with:
