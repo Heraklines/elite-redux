@@ -4824,5 +4824,128 @@
     "trainerSprite": "trainer_n_masters_ex_1",
     "victoryDialogue": "Your Pokémon... It was just saying how much it likes you—and how it's happy to be with you.",
     "weight": 1
+  },
+  "TRAINER_70028": {
+    "battleBgm": "battle_johto_gym",
+    "battleType": "single",
+    "challenge": "none",
+    "difficulties": [
+      "ace",
+      "elite",
+      "hell"
+    ],
+    "endless": false,
+    "id": 70028,
+    "maxWave": 30,
+    "minWave": 15,
+    "name": "Leader",
+    "team": [
+      {
+        "variants": [
+          {
+            "abilitySlot": 0,
+            "level": null,
+            "moves": [
+              "WHIRLWIND",
+              "HYPNOSIS",
+              "AIR_SLASH",
+              "FLY"
+            ],
+            "species": 163,
+            "vitamins": {
+              "spd": 1
+            },
+            "weight": 2
+          },
+          {
+            "abilitySlot": 2,
+            "heldItems": [
+              {
+                "count": 1,
+                "item": "FOCUS_BAND"
+              }
+            ],
+            "level": null,
+            "moves": [
+              "EXTRASENSORY",
+              "AEROBLAST",
+              "MOONBLAST",
+              "INVERSE_ROOM"
+            ],
+            "species": 164,
+            "vitamins": {
+              "spatk": 1,
+              "spd": 1
+            },
+            "weight": 1
+          }
+        ]
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "ENIGMA_BERRY"
+          },
+          {
+            "count": 1,
+            "item": "SHARP_BEAK"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RLA",
+          "AERIAL_ACE",
+          "DUAL_WINGBEAT",
+          "RLNA"
+        ],
+        "species": 17
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 2,
+            "item": "LUM_BERRY"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "RLA",
+          "BLOOD_SHOT",
+          "DRILL_PECK",
+          "RLNA"
+        ],
+        "species": 198,
+        "vitamins": {
+          "atk": 1,
+          "spd": 1
+        }
+      },
+      {
+        "abilitySlot": 0,
+        "heldItems": [
+          {
+            "count": 1,
+            "item": "EVIOLITE"
+          }
+        ],
+        "level": null,
+        "moves": [
+          "ACROBATICS",
+          "AGILITY",
+          "BANEFUL_BUNKER",
+          "EARTHQUAKE"
+        ],
+        "species": 207,
+        "vitamins": {
+          "def": 1,
+          "spdef": 1
+        }
+      }
+    ],
+    "trainerClass": "FALKNER",
+    "weight": 100
   }
 }
