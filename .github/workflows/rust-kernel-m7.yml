@@ -202,6 +202,32 @@ jobs:
         working-directory: rust
         run: cargo test --release -p er-testkit --test m7_system_proof
 
+  m7-g29-system-closure:
+    name: M7 G29 complete system closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /rust/fixtures/m7/
+            /rust/crates/er-testkit/tests/
+            /scripts/check-kernel-m7-closure.mjs
+          submodules: false
+      - name: Require zero behavior gaps and complete campaigns
+        run: |
+          node scripts/check-kernel-m7-closure.mjs \
+            --report "$RUNNER_TEMP/m7-closure-report.json"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: m7-closure-report
+          path: ${{ runner.temp }}/m7-closure-report.json
+          if-no-files-found: error
+          retention-days: 30
+
   m7-g27-foundation-aggregate:
     name: M7 G27 foundation aggregate
     needs:
@@ -215,3 +241,13 @@ jobs:
     timeout-minutes: 5
     steps:
       - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed foundation qualification"
+
+  m7-g30-aggregate:
+    name: M7 G30 final aggregate
+    needs:
+      - m7-g27-foundation-aggregate
+      - m7-g29-system-closure
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - run: printf '%s\n' "M7 exact SHA $GITHUB_SHA passed complete G30 qualification"
