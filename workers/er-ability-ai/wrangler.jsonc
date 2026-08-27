@@ -17,7 +17,7 @@
     {
       "class_name": "AbilityAiContainer",
       "image": "./Dockerfile",
-      "max_instances": 1,
+      "max_instances": 2,
       "instance_type": "basic",
       "constraints": {
         "regions": ["WEUR"]
