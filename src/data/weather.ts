@@ -1,6 +1,7 @@
 import type { SuppressWeatherEffectAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { abilityStudioRuntimeComponentIsActive } from "#data/elite-redux/ability-studio/runtime-capabilities";
 import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import { WeatherType } from "#enums/weather-type";
@@ -178,10 +179,26 @@ export class Weather {
     const field = globalScene.getField(true);
 
     for (const pokemon of field) {
-      const suppressWeatherEffectAbAttr: SuppressWeatherEffectAbAttr | null =
-        pokemon.getAbilityAttrs("SuppressWeatherEffectAbAttr")[0] ?? null;
-      if (suppressWeatherEffectAbAttr && (!this.isImmutable() || suppressWeatherEffectAbAttr.affectsImmutable)) {
-        return true;
+      // Do not ask for every *active* attr on the holder here. Weather-gated
+      // abilities (Sand Veil, Swift Swim, etc.) evaluate their condition by
+      // calling this method, so getAbilityAttrs(..., true) recursively entered
+      // weather suppression until the stack overflowed during PostSummon.
+      // Inspect only sources that can actually suppress weather, then apply the
+      // ordinary source gates to those candidates.
+      for (const source of pokemon.getAbilitySources()) {
+        const suppressAttrs = source.ability.getAttrs("SuppressWeatherEffectAbAttr");
+        if (suppressAttrs.length === 0) {
+          continue;
+        }
+        if (!pokemon.canApplyAbilitySource(source.ability, source.passive, source.passiveSlot ?? 0, false, false)) {
+          continue;
+        }
+        const suppressWeatherEffectAbAttr: SuppressWeatherEffectAbAttr | undefined = suppressAttrs.find(attr =>
+          abilityStudioRuntimeComponentIsActive(attr, pokemon),
+        );
+        if (suppressWeatherEffectAbAttr && (!this.isImmutable() || suppressWeatherEffectAbAttr.affectsImmutable)) {
+          return true;
+        }
       }
     }
 
