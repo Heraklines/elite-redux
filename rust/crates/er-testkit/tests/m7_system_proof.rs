@@ -21,6 +21,9 @@ use er_game::m7_progression_control::capture_control;
 use er_game::m7_run_executor::{RunExecutionContextV1, execute_run_hook_v1};
 use er_game::m7_runtime::{GameControlIntentV2, GameRuntimeV5};
 use er_kernel::snapshot::{InputRouterSnapshotV2, KernelSchedulerSnapshotV2};
+use er_progression::lifecycle::{
+    AuditedCaptureRng, CaptureDestinationV1, CaptureOutcomeV1, LifecycleError, attempt_capture,
+};
 use er_progression::material::{
     LifecycleMaterialApplyV1, LifecycleMaterialV1, apply_lifecycle_material_v1,
     apply_serialized_lifecycle_material_v1,
@@ -37,14 +40,26 @@ use er_scenario::{
     SCENARIO_GRAPH_SCHEMA_VERSION_V1, ScenarioContentPackV1, ScenarioGraphV1, ScenarioNode,
     ScenarioNodeEntryV1,
 };
+use er_state::field::{FieldSlotState, FieldState};
 use er_state::m7_state::{
-    DexState, FactionStateV1, GAME_STATE_SCHEMA_VERSION_V5, GameStateV5,
-    INVENTORY_STATE_SCHEMA_VERSION_V1, InventoryEntryV1, InventoryStateV1,
-    PROFILE_STATE_SCHEMA_VERSION_V1, ProfileStateV1, ProfileStatistics, ProgressionQueueV2,
-    QuestStateV1, RUN_STATE_SCHEMA_VERSION_V3, RunStateV3, WORLD_STATE_SCHEMA_VERSION_V1,
-    WorldStateV1,
+    BATTLE_STATE_SCHEMA_VERSION_V5, BattleStateV5, DexState, EvolutionStateV1, FactionStateV1,
+    GAME_STATE_SCHEMA_VERSION_V5, GameStateV5, INVENTORY_STATE_SCHEMA_VERSION_V1, InventoryEntryV1,
+    InventoryStateV1, POKEMON_STATE_SCHEMA_VERSION_V5, PROFILE_STATE_SCHEMA_VERSION_V1,
+    PokemonStateV5, ProfileStateV1, ProfileStatistics, ProgressionQueueV2, QuestStateV1,
+    RUN_STATE_SCHEMA_VERSION_V3, RunStateV3, WORLD_STATE_SCHEMA_VERSION_V1, WorldStateV1,
 };
-use er_types::battle_ids::{GameModeId, MenuInstanceId, MoveId, SpeciesId, WaveIndex};
+use er_state::mechanic_state_v2::MechanicStateStoreV2;
+use er_state::pokemon_v2::{Iv, PermanentStatBonuses};
+use er_types::battle_command::CommandCollectionState;
+use er_types::battle_ids::{
+    AbilityId, BattleFormat, BattleId, BattleSide, FaintOccurrenceId, FieldSlot, GameModeId,
+    MenuInstanceId, MoveId, PokemonId, SpeciesId, WaveIndex,
+};
+use er_types::battle_model::{
+    AbilityLoadout, BattleOutcome, BattleStats, GlobalAbilitySuppressionState, PokemonType,
+    PokemonTyping, StatStages, StatusKind, StatusState, TerrainKind, TerrainState, WeatherKind,
+    WeatherState,
+};
 use er_types::run_ids::{
     BiomeId, EncounterId, Experience, GameRunId, GrowthRateId, Money, NatureId, RouteNodeId,
 };
@@ -375,6 +390,175 @@ fn game_state(content: &PreparedGameContentV1) -> TestResult<GameStateV5> {
     };
     state.validate()?;
     Ok(state)
+}
+
+fn pokemon_state(id: u64, owner: Option<SeatId>) -> TestResult<PokemonStateV5> {
+    Ok(PokemonStateV5 {
+        schema_version: POKEMON_STATE_SCHEMA_VERSION_V5,
+        id: PokemonId::new(safe(id)),
+        owner_seat: owner,
+        species_id: SpeciesId::new(safe(1)),
+        form_index: 0,
+        level: 5,
+        experience: Experience::new(safe(125)),
+        types: PokemonTyping {
+            primary: PokemonType::Normal,
+            secondary: None,
+        },
+        stats: BattleStats {
+            hp: 20,
+            attack: 10,
+            defense: 10,
+            special_attack: 10,
+            special_defense: 10,
+            speed: 10,
+        },
+        hp: 20,
+        max_hp: 20,
+        status: StatusState {
+            kind: StatusKind::None,
+            toxic_turn_count: 0,
+            sleep_turns_remaining: None,
+        },
+        stat_stages: StatStages {
+            attack: 0,
+            defense: 0,
+            special_attack: 0,
+            special_defense: 0,
+            speed: 0,
+            accuracy: 0,
+            evasion: 0,
+        },
+        moves: [None; 4],
+        abilities: AbilityLoadout {
+            active: AbilityId::new(safe(1)),
+            passives: [None; 3],
+            active_suppressed: false,
+            passive_suppressed: [false; 3],
+        },
+        ivs: [Iv::new(31)?; 6],
+        nature: NatureId::new(0),
+        effective_nature: NatureId::new(0),
+        friendship: 70,
+        permanent_bonuses: PermanentStatBonuses {
+            hp: 0,
+            attack: 0,
+            defense: 0,
+            special_attack: 0,
+            special_defense: 0,
+            speed: 0,
+        },
+        pause_evolutions: false,
+        held_items: Vec::new(),
+        mechanics: MechanicStateStoreV2::default(),
+        fusion: None,
+        evolution: EvolutionStateV1 {
+            last_completed: None,
+            cancelled: Vec::new(),
+        },
+        tera_type: None,
+        shiny: false,
+        variant: 0,
+        capture: None,
+        fainted: false,
+    })
+}
+
+fn game_state_with_battle(content: &PreparedGameContentV1) -> TestResult<GameStateV5> {
+    let mut state = game_state(content)?;
+    let run = state.active_run.as_mut().ok_or("missing run")?;
+    let player = pokemon_state(1, Some(SeatId::new(safe(1))))?;
+    let enemy = pokemon_state(2, None)?;
+    run.party.push(player);
+    let format = BattleFormat::single();
+    let player_slot = FieldSlot::new(BattleSide::Player, 0)?;
+    let enemy_slot = FieldSlot::new(BattleSide::Enemy, 0)?;
+    let field = FieldState::new_for_format(
+        &format,
+        vec![
+            FieldSlotState::new(player_slot, Some(PokemonId::new(safe(1)))),
+            FieldSlotState::new(enemy_slot, Some(PokemonId::new(safe(2)))),
+        ],
+    )?;
+    let mut rng = RngRuntime::from_run_seed("m7-capture-proof");
+    let battle_rng = rng.initialize_battle("m7-capture-wave", run.wave)?;
+    run.run_rng = rng.run_state();
+    run.battle = Some(BattleStateV5 {
+        schema_version: BATTLE_STATE_SCHEMA_VERSION_V5,
+        battle_id: BattleId::new(safe(1)),
+        wave: run.wave,
+        wave_seed: "m7-capture-wave".to_owned(),
+        turn: battle_rng.turn,
+        format,
+        authority_seat: SeatId::new(safe(1)),
+        enemy_party: vec![enemy],
+        field,
+        weather: WeatherState {
+            kind: WeatherKind::None,
+            remaining_turns: 0,
+        },
+        terrain: TerrainState {
+            kind: TerrainKind::None,
+            remaining_turns: 0,
+        },
+        arena_conditions: Vec::new(),
+        global_ability_suppression: GlobalAbilitySuppressionState {
+            ignore_abilities: false,
+            source: None,
+        },
+        battle_rng,
+        command_state: CommandCollectionState {
+            frontier: Vec::new(),
+            tombstones: Vec::new(),
+        },
+        mechanics: MechanicStateStoreV2::default(),
+        faint_queue: Vec::new(),
+        next_faint_occurrence: FaintOccurrenceId::new(safe(1)),
+        outcome: BattleOutcome::Ongoing,
+    });
+    state.validate()?;
+    Ok(state)
+}
+
+struct CaptureZero;
+
+impl AuditedCaptureRng for CaptureZero {
+    fn draw_capture(&mut self, _upper_exclusive: u32) -> Result<u32, LifecycleError> {
+        Ok(0)
+    }
+}
+
+#[test]
+fn capture_consumes_ball_and_moves_enemy_into_party() -> TestResult {
+    let content = prepared_content()?;
+    let state = game_state_with_battle(&content)?;
+    let transition = attempt_capture(
+        &state,
+        &content.progression,
+        PokemonId::new(safe(2)),
+        InventoryItemId::new(safe(1)),
+        SeatId::new(safe(1)),
+        &mut CaptureZero,
+    )?;
+    assert_eq!(
+        transition.outcome,
+        CaptureOutcomeV1::Captured {
+            destination: CaptureDestinationV1::Party,
+        }
+    );
+    let run = transition
+        .after_state
+        .active_run
+        .as_ref()
+        .ok_or("missing run")?;
+    assert_eq!(run.party.len(), 2);
+    assert!(run.inventory.entries.is_empty());
+    assert!(
+        run.battle
+            .as_ref()
+            .is_some_and(|battle| battle.enemy_party.is_empty())
+    );
+    Ok(())
 }
 
 #[test]
