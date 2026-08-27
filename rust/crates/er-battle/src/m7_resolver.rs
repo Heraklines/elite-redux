@@ -463,7 +463,11 @@ fn execute_move(
         }
         let target = pokemon_mut(run, target_id).ok_or(BattleV5Error::Target)?;
         let before_hp = target.hp;
-        target.hp = target.hp.saturating_sub(damage);
+        target.hp = if damage >= target.hp {
+            0
+        } else {
+            target.hp - damage
+        };
         target.fainted = target.hp == 0;
         mutations.push(BattleMutation::HpChanged {
             pokemon: target_id,

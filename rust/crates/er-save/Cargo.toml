@@ -1,5 +1,5 @@
 [package]
-name = "er-content-compiler"
+name = "er-save"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,12 +7,11 @@ publish = false
 
 [dependencies]
 er-canonical = { path = "../er-canonical" }
-er-content = { path = "../er-content" }
-er-game = { path = "../er-game" }
-er-mechanics = { path = "../er-mechanics" }
+er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 thiserror.workspace = true
 
 [lints]

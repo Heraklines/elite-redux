@@ -9,3 +9,4 @@
 //! embeds, or executes script content.
 
 pub mod m6;
+pub mod m7;
