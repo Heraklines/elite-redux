@@ -6311,6 +6311,11 @@
       },
       {
         "abilitySlot": 0,
+        "fusion": {
+          "abilitySlot": 0,
+          "formIndex": 0,
+          "species": 10253
+        },
         "heldItems": [
           {
             "count": 1,
@@ -6323,13 +6328,17 @@
           {
             "count": 1,
             "item": "LEFTOVERS"
+          },
+          {
+            "count": 1,
+            "item": "ER_ELECTRIC_GEM"
           }
         ],
         "level": null,
         "moves": [
           "BELLY_DRUM",
           "BATON_PASS",
-          "EXTREME_SPEED",
+          "JUDGMENT",
           "REST"
         ],
         "sanityOff": true,
