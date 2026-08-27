@@ -2024,9 +2024,12 @@ async function runNim(payload, emit) {
     message: `Building from ${searchContext.components.length} matched runtime mechanics`,
   });
   const planSchema = assemblyPlanSchemaForSearch(searchContext, payload.primitiveCatalog || {}, payload);
+  const modelSearchContext = isPrimitiveStatRuleRequest(payload)
+    ? { ...searchContext, components: [], abilities: [], moves: [] }
+    : searchContext;
   const systemContent =
     "Return only one compact JSON assembly plan matching the requested schema. Do not include markdown or hidden reasoning.";
-  const userContent = modelPrompt(payload, searchContext, planSchema);
+  const userContent = modelPrompt(payload, modelSearchContext, planSchema);
   const inputCharacters = systemContent.length + userContent.length;
   console.log(JSON.stringify({ event: "ability-model-input", inputCharacters }));
   if (inputCharacters > 1_000_000) {
