@@ -719,3 +719,83 @@ fn remove_persistent_pokemon(
     run.storage.remove(index);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use er_types::SafeU53;
+    use er_types::battle_model::BattleStat;
+    use er_types::run_ids::{Experience, NatureId};
+    use proptest::prelude::*;
+
+    use crate::NatureDefinitionV1;
+
+    use super::{hp_stat, level_for_experience, other_stat};
+
+    fn experience(value: u64) -> Experience {
+        Experience::new(SafeU53::new(value).expect("safe experience"))
+    }
+
+    #[test]
+    fn level_boundaries_use_the_last_reached_threshold() {
+        let thresholds = vec![
+            experience(0),
+            experience(0),
+            experience(100),
+            experience(300),
+            experience(600),
+        ];
+        assert_eq!(level_for_experience(&thresholds, experience(99)), Ok(1));
+        assert_eq!(level_for_experience(&thresholds, experience(100)), Ok(2));
+        assert_eq!(level_for_experience(&thresholds, experience(600)), Ok(4));
+    }
+
+    proptest! {
+        #[test]
+        fn hp_stat_is_monotonic_for_supported_inputs(
+            base in 1_u32..=255,
+            iv in 0_u8..=31,
+            bonus in 0_u32..=255,
+            level in 1_u64..=200,
+        ) {
+            let current = hp_stat(base, iv, bonus, level).expect("bounded stat");
+            let next = hp_stat(base, iv, bonus, level + 1).expect("bounded next stat");
+            prop_assert!(next >= current);
+        }
+
+        #[test]
+        fn beneficial_nature_never_reduces_its_stat(
+            base in 1_u32..=255,
+            iv in 0_u8..=31,
+            bonus in 0_u32..=255,
+            level in 1_u64..=200,
+        ) {
+            let neutral = NatureDefinitionV1 {
+                id: NatureId::new(0),
+                increased_stat: None,
+                decreased_stat: None,
+            };
+            let beneficial = NatureDefinitionV1 {
+                id: NatureId::new(1),
+                increased_stat: Some(BattleStat::Attack),
+                decreased_stat: Some(BattleStat::Defense),
+            };
+            let neutral_value = other_stat(
+                base,
+                iv,
+                bonus,
+                level,
+                BattleStat::Attack,
+                &neutral,
+            ).expect("neutral stat");
+            let boosted = other_stat(
+                base,
+                iv,
+                bonus,
+                level,
+                BattleStat::Attack,
+                &beneficial,
+            ).expect("boosted stat");
+            prop_assert!(boosted >= neutral_value);
+        }
+    }
+}

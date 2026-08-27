@@ -6,11 +6,16 @@ rust-version.workspace = true
 publish = false
 
 [dependencies]
+er-canonical = { path = "../er-canonical" }
 er-content = { path = "../er-content" }
 er-state = { path = "../er-state" }
 er-types = { path = "../er-types" }
+serde_json.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
 
 [lints]
 workspace = true
