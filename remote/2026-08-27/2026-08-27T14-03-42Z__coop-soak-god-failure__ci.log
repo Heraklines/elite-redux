@@ -1,0 +1,367 @@
+{
+  "invariant": "no-park",
+  "seed": 20260827,
+  "wave": 9,
+  "detail": "wave driving threw (strand/stall): PhaseInterceptor.to(\"CoopTurnCommitPhase\") did not reach its target (soft-lock / freeze?): stuck at phase \"CommandPhase\", UI mode MESSAGE (=0), interceptor state \"running\". runTarget=true, promptTarget=\"CoopTurnCommitPhase\".\nOriginal: Timed out in waitUntil!",
+  "replay": "SOAK_SEED=20260827",
+  "phaseState": {
+    "hostPhase": "CommandPhase",
+    "guestPhase": "CommandPhase",
+    "hostInteractionCounter": 9,
+    "guestInteractionCounter": 9,
+    "hostWave": 9,
+    "hostBattleType": 0,
+    "hostPlayerField": [
+      {
+        "id": 287394523,
+        "battlerIndex": 0,
+        "speciesId": 890,
+        "speciesName": "Eternatus",
+        "hp": 2062,
+        "maxHp": 2065,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2788324681,
+        "battlerIndex": 1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "hostEnemyField": [
+      {
+        "id": 645353110,
+        "battlerIndex": 2,
+        "speciesId": 734,
+        "speciesName": "Yungoos",
+        "hp": 23,
+        "maxHp": 23,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 281,
+            "ppUsed": 0
+          },
+          {
+            "id": 884,
+            "ppUsed": 0
+          },
+          {
+            "id": 162,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1319767129,
+        "battlerIndex": 3,
+        "speciesId": 819,
+        "speciesName": "Skwovet",
+        "hp": 26,
+        "maxHp": 26,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 5067,
+            "ppUsed": 0
+          },
+          {
+            "id": 254,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ],
+    "guestPlayerField": [
+      {
+        "id": 287394523,
+        "battlerIndex": -1,
+        "speciesId": 890,
+        "speciesName": "Eternatus",
+        "hp": 2062,
+        "maxHp": 2065,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "host"
+      },
+      {
+        "id": 2788324681,
+        "battlerIndex": -1,
+        "speciesId": 384,
+        "speciesName": "Rayquaza",
+        "hp": 1715,
+        "maxHp": 1715,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 34,
+            "ppUsed": 0
+          },
+          {
+            "id": 247,
+            "ppUsed": 0
+          },
+          {
+            "id": 53,
+            "ppUsed": 0
+          },
+          {
+            "id": 85,
+            "ppUsed": 0
+          }
+        ],
+        "coopOwner": "guest"
+      }
+    ],
+    "guestEnemyField": [
+      {
+        "id": 645353110,
+        "battlerIndex": -1,
+        "speciesId": 734,
+        "speciesName": "Yungoos",
+        "hp": 23,
+        "maxHp": 23,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 158,
+            "ppUsed": 0
+          },
+          {
+            "id": 281,
+            "ppUsed": 0
+          },
+          {
+            "id": 884,
+            "ppUsed": 0
+          },
+          {
+            "id": 162,
+            "ppUsed": 0
+          }
+        ]
+      },
+      {
+        "id": 1319767129,
+        "battlerIndex": -1,
+        "speciesId": 819,
+        "speciesName": "Skwovet",
+        "hp": 26,
+        "maxHp": 26,
+        "fainted": false,
+        "status": 0,
+        "statStages": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "moves": [
+          {
+            "id": 33,
+            "ppUsed": 0
+          },
+          {
+            "id": 5067,
+            "ppUsed": 0
+          },
+          {
+            "id": 254,
+            "ppUsed": 0
+          },
+          {
+            "id": 111,
+            "ppUsed": 0
+          }
+        ]
+      }
+    ]
+  },
+  "actionScript": [
+    "SKIP mysteryEncounterDisabledV1",
+    "content seed=coop-soak-20260827 preseeded=false",
+    "wave 1 turn 1: committed frontier omitted seat 1; guest remained a replay spectator until host action",
+    "wave 1: host slot move=53 guest slot move=0",
+    "wave 1 turn 1: progress enemyHp=[16:0/14] playerHp=[890:2065/2065]",
+    "wave 1: reward shop owner=host leave",
+    "wave 2 turn 1: replay guest crossed cmd:2:1 through real public COMMAND=opened",
+    "wave 2: host slot move=53 guest slot move=85",
+    "wave 2 turn 1: progress enemyHp=[734:0/16,504:0/16] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 2: reward shop owner=guest take-nonparty",
+    "wave 3 turn 1: replay guest crossed cmd:3:1 through real public COMMAND=opened",
+    "wave 3: host slot move=53 guest slot move=34",
+    "wave 3 turn 1: progress enemyHp=[924:0/16,504:0/16] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 3: reward shop owner=host take-nonparty",
+    "wave 4 turn 1: replay guest crossed cmd:4:1 through real public COMMAND=opened",
+    "wave 4: host slot move=85 guest slot move=53",
+    "wave 4 turn 1: progress enemyHp=[174:0/22,734:0/16] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 4: reward shop owner=guest leave",
+    "wave 5 turn 1: replay guest crossed cmd:5:1 through real public COMMAND=opened",
+    "wave 5: TRAINER (fixed)",
+    "wave 5: host slot move=34 guest slot move=34",
+    "wave 5 turn 1: progress enemyHp=[161:0/18,265:0/18] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 5: reward shop owner=host take-nonparty",
+    "wave 5: guest chose Crossroads Leave through public UI",
+    "wave 5: guest drove World Map via public UI=true and both consumed 1830747509830734:1:BIOME_PICK:9700005",
+    "wave 6 turn 1: replay guest crossed cmd:6:1 through real public COMMAND=opened",
+    "wave 6: BIOME 0->1",
+    "wave 6: host slot move=34 guest slot move=53",
+    "wave 6 turn 1: progress enemyHp=[399:0/23,915:0/19] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 6: reward shop owner=host take-nonparty",
+    "wave 7 turn 1: replay guest crossed cmd:7:1 through real public COMMAND=opened",
+    "wave 7: host slot move=34 guest slot move=53",
+    "wave 7 turn 1: progress enemyHp=[161:0/20,819:0/23] playerHp=[890:2062/2065,384:1715/1715]",
+    "wave 7: reward shop owner=guest leave",
+    "wave 8 turn 1: replay guest crossed cmd:8:1 through real public COMMAND=opened",
+    "wave 8: TRAINER (fixed)",
+    "wave 8: host slot move=85 guest slot move=85",
+    "wave 8 turn 1: progress enemyHp=[4:0/25,731:0/22] playerHp=[890:2065/2065,384:1715/1715]",
+    "wave 8: reward shop owner=host leave",
+    "wave 9 turn 1: replay guest crossed cmd:9:1 through real public COMMAND=opened",
+    "wave 9 turn 1: host SWITCH -> party[2]",
+    "wave 9: host slot move=85 guest slot move=85"
+  ]
+}
