@@ -1952,9 +1952,7 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
               ...body,
               model,
               guided_json: schema,
-              ...(model === "nvidia/nemotron-3-nano-30b-a3b"
-                ? { chat_template_kwargs: { enable_thinking: false } }
-                : {}),
+              ...(model.startsWith("nvidia/nemotron-3-") ? { chat_template_kwargs: { enable_thinking: false } } : {}),
             },
       ),
       signal: AbortSignal.timeout(timeoutMs),
