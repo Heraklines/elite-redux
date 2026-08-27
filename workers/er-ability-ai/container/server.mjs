@@ -13,7 +13,7 @@ const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
 const nimModel = process.env.NVIDIA_NIM_MODEL || "qwen/qwen3-coder-480b-a35b-instruct";
-const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "meta/llama-3.3-70b-instruct";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 let activeTurn = null;
 let generationBusy = false;
@@ -734,7 +734,11 @@ async function runNimModel(model, body, payload) {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      body: JSON.stringify({ ...body, model }),
+      body: JSON.stringify({
+        ...body,
+        model,
+        ...(model === "nvidia/nemotron-3-nano-30b-a3b" ? { reasoning_budget: 2048 } : {}),
+      }),
     });
     if (!response.ok) {
       lastError = new Error(`The ability builder could not complete the request (${response.status})`);

@@ -10,7 +10,7 @@
     "CODEX_EFFORT": "medium",
     "CODEX_AUTH_BOOTSTRAP_VERSION": "2026-08-26-1",
     "NVIDIA_NIM_MODEL": "poolside/laguna-xs-2.1",
-    "NVIDIA_NIM_FALLBACK_MODEL": "meta/llama-3.3-70b-instruct"
+    "NVIDIA_NIM_FALLBACK_MODEL": "nvidia/nemotron-3-nano-30b-a3b"
   },
   "containers": [
     {
