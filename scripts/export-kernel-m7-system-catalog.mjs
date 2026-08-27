@@ -136,24 +136,27 @@ function sourceLocation(sourceFile, node, oracleRoot) {
     column: point.character + 1,
   };
 }
+function astText(node, sourceFile) {
+  return node.getText(sourceFile).replace(/\r\n?/gu, "\n");
+}
 
 function declarationName(node, sourceFile) {
   if (node.name) {
-    return node.name.getText(sourceFile);
+    return astText(node.name, sourceFile);
   }
   if (ts.isConstructorDeclaration(node)) {
     return "constructor";
   }
   const parent = node.parent;
   if (ts.isVariableDeclaration(parent) && parent.name) {
-    return parent.name.getText(sourceFile);
+    return astText(parent.name, sourceFile);
   }
   if (ts.isPropertyAssignment(parent) && parent.name) {
-    return parent.name.getText(sourceFile);
+    return astText(parent.name, sourceFile);
   }
   if (ts.isCallExpression(parent)) {
     const expression = parent.expression;
-    const call = ts.isPropertyAccessExpression(expression) ? expression.name.text : expression.getText(sourceFile);
+    const call = ts.isPropertyAccessExpression(expression) ? expression.name.text : astText(expression, sourceFile);
     const argument = parent.arguments.indexOf(node);
     return `${call}[${argument}]`;
   }
@@ -167,7 +170,7 @@ function ownerName(node, sourceFile) {
       (ts.isClassDeclaration(current) || ts.isInterfaceDeclaration(current) || ts.isTypeAliasDeclaration(current))
       && current.name
     ) {
-      return current.name.getText(sourceFile);
+      return astText(current.name, sourceFile);
     }
     current = current.parent;
   }
@@ -208,11 +211,22 @@ function callbackIsBehavior(node) {
     return false;
   }
   const expression = parent.expression;
-  const name = ts.isPropertyAccessExpression(expression) ? expression.name.text : expression.getText();
+  const name = ts.isPropertyAccessExpression(expression)
+    ? expression.name.text
+    : astText(expression, expression.getSourceFile());
   return (
     CALLBACK_CONTEXT_NAMES.has(name)
     || /(?:callback|handler|predicate|selector|factory|builder|effect|condition|policy)/iu.test(name)
   );
+}
+function isBehaviorDeclaration(node, kind) {
+  if (!kind) {
+    return false;
+  }
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+    return callbackIsBehavior(node);
+  }
+  return true;
 }
 
 function domainFor(path, symbol, owner) {
@@ -244,14 +258,14 @@ function behaviorId(oracleSha, source, kind, owner, symbol) {
 }
 
 function propertyType(node, sourceFile) {
-  return node.type?.getText(sourceFile) ?? "unknown";
+  return node.type ? astText(node.type, sourceFile) : "unknown";
 }
 
 function inventorySourceFile(sourceFile, oracleRoot, oracleSha, catalog) {
   const path = normalizedPath(oracleRoot, sourceFile.fileName);
   const visit = node => {
     const kind = declarationKind(node);
-    if (kind && ((!ts.isArrowFunction(node) && !ts.isFunctionExpression(node)) || callbackIsBehavior(node))) {
+    if (isBehaviorDeclaration(node, kind)) {
       const source = sourceLocation(sourceFile, node, oracleRoot);
       const symbol = declarationName(node, sourceFile);
       const owner = ownerName(node, sourceFile);
@@ -277,7 +291,7 @@ function inventorySourceFile(sourceFile, oracleRoot, oracleSha, catalog) {
     ) {
       const source = sourceLocation(sourceFile, node, oracleRoot);
       const owner = ownerName(node, sourceFile);
-      const field = node.name?.getText(sourceFile) ?? "anonymous";
+      const field = node.name ? astText(node.name, sourceFile) : "anonymous";
       const type = propertyType(node, sourceFile);
       catalog.saveFields.push({
         id: createHash("sha256")
