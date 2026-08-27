@@ -12,8 +12,8 @@ const authPath = `${codexHome}/auth.json`;
 const instanceId = randomUUID();
 const codexModel = process.env.CODEX_MODEL || "gpt-5.6-luna";
 const codexEffort = process.env.CODEX_EFFORT || "high";
-const nimModel = process.env.NVIDIA_NIM_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
-const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimModel = process.env.NVIDIA_NIM_MODEL || "nvidia/nemotron-3-nano-30b-a3b";
+const nimFallbackModel = process.env.NVIDIA_NIM_FALLBACK_MODEL || "deepseek-ai/deepseek-v4-flash-0731";
 const nimKey = process.env.NVIDIA_NIM_API_KEY || "";
 const maxGenerateBodyBytes = 8_388_608;
 let activeTurn = null;
@@ -1388,6 +1388,7 @@ async function runNim(payload, emit) {
       return await runNimModel(model, body, payload);
     } catch (error) {
       console.error(JSON.stringify({ event: "ability-model-failed", model, message: error.message || String(error) }));
+      emit({ type: "diagnostic", model, message: error.message || String(error) });
       lastError = error;
     }
   }
