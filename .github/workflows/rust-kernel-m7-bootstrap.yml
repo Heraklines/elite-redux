@@ -261,6 +261,8 @@ jobs:
             --legacy-m4 rust/fixtures/m4/oracle \
             --fresh-m4 artifacts/fresh-m4 \
             --output "$GITHUB_WORKSPACE/artifacts/m7-oracle-fixture-drift-v1.json"
+          diff -u rust/fixtures/m7/m7-oracle-fixture-drift-v1.json \
+            "$GITHUB_WORKSPACE/artifacts/m7-oracle-fixture-drift-v1.json"
       - uses: actions/upload-artifact@v6
         with:
           name: m7-oracle-drift

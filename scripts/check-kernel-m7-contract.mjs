@@ -100,6 +100,7 @@ const files = [
   ["legacy_bridge_audit_sha256", "rust/fixtures/m7/legacy-bridge-audit-v1.json"],
   ["m6_catalog_drift_sha256", "rust/fixtures/m7/m6-catalog-drift-v1.json"],
   ["m6_semantic_drift_sha256", "rust/fixtures/m7/m6-semantic-drift-v1.json"],
+  ["historical_oracle_drift_sha256", "rust/fixtures/m7/m7-oracle-fixture-drift-v1.json"],
 ];
 for (const [key, path] of files) {
   assertEqual(fileSha256(path), required(contract, key), path);
@@ -208,6 +209,7 @@ for (const witness of witnesses.witnesses) {
 
 const architecture = readJson("rust/fixtures/m7/performance-security-audit-v1.json");
 const legacy = readJson("rust/fixtures/m7/legacy-bridge-audit-v1.json");
+const historicalDrift = readJson("rust/fixtures/m7/m7-oracle-fixture-drift-v1.json");
 assertEqual(
   architecture.error_count,
   required(contract, "initial_architecture_error_count"),
@@ -217,6 +219,26 @@ assertEqual(
   legacy.occurrence_count,
   required(contract, "initial_legacy_bridge_occurrence_count"),
   "legacy baseline occurrences",
+);
+assertEqual(
+  historicalDrift.m3.counts.SEMANTIC_CHANGE,
+  required(contract, "m3_semantic_drift_count"),
+  "M3 semantic drift count",
+);
+assertEqual(
+  historicalDrift.m3.counts.PROVENANCE_ONLY,
+  required(contract, "m3_provenance_drift_count"),
+  "M3 provenance drift count",
+);
+assertEqual(
+  historicalDrift.m4.counts.SEMANTIC_CHANGE,
+  required(contract, "m4_semantic_drift_count"),
+  "M4 semantic drift count",
+);
+assertEqual(
+  historicalDrift.m4.counts.PROVENANCE_ONLY,
+  required(contract, "m4_provenance_drift_count"),
+  "M4 provenance drift count",
 );
 for (const key of [
   "final_unclassified_behavior_count",

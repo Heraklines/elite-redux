@@ -46,6 +46,7 @@ performance_security_audit_sha256 = "9175f6442675bfb77cfa3bb24d6527fafa581b8a9ff
 legacy_bridge_audit_sha256 = "d0d49ee44be048f33c013d49025dfa4c35d3851a67d09e76b64a2dd58b6d208e"
 m6_catalog_drift_sha256 = "f2aed28d79f366efb20a75dc2cd86cce6f3e7cc3785a6ac67e15f73f49ea7dfb"
 m6_semantic_drift_sha256 = "2b5a7025ca27891a0e1a700c7e28a5d1e5f2bad25c65b63ec8cefd1db12be520"
+historical_oracle_drift_sha256 = "413f67c610df6a054cc0ce8efd56852d9329fa51a4326c9bf7fdad7c9963817c"
 
 source_file_count = 1449
 game_behavior_count = 25657
@@ -68,6 +69,10 @@ initial_m7_gap_count = 19232
 initial_legacy_bridge_occurrence_count = 67
 initial_architecture_error_count = 98
 
+m3_semantic_drift_count = 39
+m3_provenance_drift_count = 1
+m4_semantic_drift_count = 8
+m4_provenance_drift_count = 2
 final_unclassified_behavior_count = 0
 final_unsupported_behavior_count = 0
 final_pending_bespoke_count = 0
