@@ -1,11 +1,13 @@
 //! M7 Pokémon lifecycle and progression content.
 pub mod lifecycle;
+pub mod progression;
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use er_types::battle_ids::{MoveId, SpeciesId};
-use er_types::run_ids::NatureId;
+use er_types::battle_model::BattleStat;
+use er_types::run_ids::{Experience, GrowthRateId, NatureId};
 use er_types::{CatalogHash, EvolutionId, InventoryItemId, OracleSha};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -51,6 +53,20 @@ pub struct LevelMoveV1 {
     pub level: u16,
     pub move_id: MoveId,
 }
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GrowthRateDefinitionV1 {
+    pub id: GrowthRateId,
+    pub experience_by_level: Vec<Experience>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NatureDefinitionV1 {
+    pub id: NatureId,
+    pub increased_stat: Option<BattleStat>,
+    pub decreased_stat: Option<BattleStat>,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -73,6 +89,8 @@ pub struct ProgressionContentPackV1 {
     pub schema_version: u32,
     pub oracle_sha: OracleSha,
     pub content_hash: CatalogHash,
+    pub growth_rates: Vec<GrowthRateDefinitionV1>,
+    pub natures: Vec<NatureDefinitionV1>,
     pub capture_balls: Vec<CaptureBallDefinitionV1>,
     pub species: Vec<SpeciesProgressionDefinitionV1>,
     pub evolutions: Vec<EvolutionDefinitionV1>,
@@ -82,6 +100,8 @@ pub struct ProgressionContentPackV1 {
 pub struct PreparedProgressionContentV1 {
     pack: Arc<ProgressionContentPackV1>,
     capture_ball_indexes: BTreeMap<InventoryItemId, usize>,
+    growth_rate_indexes: BTreeMap<GrowthRateId, usize>,
+    nature_indexes: BTreeMap<NatureId, usize>,
     species_indexes: BTreeMap<(SpeciesId, u16), usize>,
     evolution_indexes: BTreeMap<EvolutionId, usize>,
 }
@@ -98,6 +118,8 @@ pub enum ProgressionContentError {
     Species,
     #[error("evolution definition is invalid or references unknown content")]
     Evolution,
+    #[error("growth-rate or nature definition is invalid")]
+    GrowthNature,
     #[error("progression content pack is empty")]
     Empty,
 }
@@ -110,12 +132,34 @@ impl ProgressionContentPackV1 {
                 actual: self.schema_version,
             });
         }
-        if self.capture_balls.is_empty() || self.species.is_empty() {
+        if self.capture_balls.is_empty()
+            || self.species.is_empty()
+            || self.growth_rates.is_empty()
+            || self.natures.is_empty()
+        {
             return Err(ProgressionContentError::Empty);
         }
         require_sorted_by(&self.capture_balls, |entry| entry.item)?;
         require_sorted_by(&self.species, |entry| (entry.species, entry.form))?;
         require_sorted_by(&self.evolutions, |entry| entry.id)?;
+        require_sorted_by(&self.growth_rates, |entry| entry.id)?;
+        require_sorted_by(&self.natures, |entry| entry.id)?;
+        for growth in &self.growth_rates {
+            if growth.experience_by_level.len() < 101
+                || growth.experience_by_level[0] != Experience::ZERO
+                || growth
+                    .experience_by_level
+                    .windows(2)
+                    .any(|pair| pair[0] > pair[1])
+            {
+                return Err(ProgressionContentError::GrowthNature);
+            }
+        }
+        if self.natures.iter().any(|nature| {
+            nature.increased_stat.is_some() && nature.increased_stat == nature.decreased_stat
+        }) {
+            return Err(ProgressionContentError::GrowthNature);
+        }
         for ball in &self.capture_balls {
             if ball.registry_key.is_empty()
                 || ball.catch_multiplier_numerator == 0
@@ -131,8 +175,17 @@ impl ProgressionContentPackV1 {
             .collect();
         let evolution_ids: std::collections::BTreeSet<_> =
             self.evolutions.iter().map(|entry| entry.id).collect();
+        let growth_rates: std::collections::BTreeSet<_> =
+            self.growth_rates.iter().map(|entry| entry.id).collect();
+        let natures: std::collections::BTreeSet<_> =
+            self.natures.iter().map(|entry| entry.id).collect();
         for definition in &self.species {
-            if definition.catch_rate == 0
+            if !growth_rates.contains(&definition.growth_rate)
+                || definition
+                    .allowed_natures
+                    .iter()
+                    .any(|nature| !natures.contains(nature))
+                || definition.catch_rate == 0
                 || definition.level_moves.windows(2).any(|pair| {
                     (pair[0].level, pair[0].move_id) >= (pair[1].level, pair[1].move_id)
                 })
@@ -171,6 +224,18 @@ impl PreparedProgressionContentV1 {
             .enumerate()
             .map(|(index, entry)| (entry.item, index))
             .collect();
+        let growth_rate_indexes = pack
+            .growth_rates
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (entry.id, index))
+            .collect();
+        let nature_indexes = pack
+            .natures
+            .iter()
+            .enumerate()
+            .map(|(index, entry)| (entry.id, index))
+            .collect();
         let species_indexes = pack
             .species
             .iter()
@@ -186,6 +251,8 @@ impl PreparedProgressionContentV1 {
         Ok(Self {
             pack,
             capture_ball_indexes,
+            growth_rate_indexes,
+            nature_indexes,
             species_indexes,
             evolution_indexes,
         })
@@ -199,6 +266,17 @@ impl PreparedProgressionContentV1 {
         self.capture_ball_indexes
             .get(&id)
             .and_then(|index| self.pack.capture_balls.get(*index))
+    }
+    pub fn growth_rate(&self, id: GrowthRateId) -> Option<&GrowthRateDefinitionV1> {
+        self.growth_rate_indexes
+            .get(&id)
+            .and_then(|index| self.pack.growth_rates.get(*index))
+    }
+
+    pub fn nature(&self, id: NatureId) -> Option<&NatureDefinitionV1> {
+        self.nature_indexes
+            .get(&id)
+            .and_then(|index| self.pack.natures.get(*index))
     }
 
     pub fn species(

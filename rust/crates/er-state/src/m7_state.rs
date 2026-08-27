@@ -108,9 +108,15 @@ pub struct CaptureMetadataV1 {
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FusionStateV1 {
-    pub partner_species: SpeciesId,
-    pub partner_form: u16,
-    pub partner_ability: er_types::battle_ids::AbilityId,
+    pub partner: Box<PokemonStateV5>,
+    pub origin: FusionOriginV1,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE", tag = "kind", content = "value")]
+pub enum FusionOriginV1 {
+    Party { index: u8 },
+    Storage { slot: StorageSlotId },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -398,6 +404,15 @@ impl PokemonStateV5 {
                 pokemon: self.id,
                 reason: error.to_string(),
             })?;
+        if let Some(fusion) = &self.fusion {
+            if fusion.partner.id == self.id || fusion.partner.fusion.is_some() {
+                return Err(M7StateError::Pokemon {
+                    pokemon: self.id,
+                    reason: "fusion partner identity invariant".to_owned(),
+                });
+            }
+            fusion.partner.validate()?;
+        }
         let mut previous_item = None;
         for item in &self.held_items {
             if item.registry_key.is_empty()
@@ -497,6 +512,11 @@ impl RunStateV3 {
             if !ids.insert(pokemon.id) {
                 return Err(M7StateError::DuplicatePokemon(pokemon.id));
             }
+            if let Some(fusion) = &pokemon.fusion {
+                if !ids.insert(fusion.partner.id) {
+                    return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
+                }
+            }
         }
         let mut storage_slots = BTreeSet::new();
         for stored in &self.storage {
@@ -506,6 +526,11 @@ impl RunStateV3 {
             }
             if !ids.insert(stored.pokemon.id) {
                 return Err(M7StateError::DuplicatePokemon(stored.pokemon.id));
+            }
+            if let Some(fusion) = &stored.pokemon.fusion {
+                if !ids.insert(fusion.partner.id) {
+                    return Err(M7StateError::DuplicatePokemon(fusion.partner.id));
+                }
             }
         }
         validate_inventory(&self.inventory)?;
