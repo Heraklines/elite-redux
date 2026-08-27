@@ -620,6 +620,56 @@ function promptRequestsSelfTarget(prompt) {
   );
 }
 
+function normalizeRuntimeSource(source, candidates) {
+  if (
+    !source
+    || !Number.isInteger(source.abilityId)
+    || candidates.some(candidate => sourceKey(candidate) === sourceKey(source))
+  ) {
+    return;
+  }
+  const matches = candidates.filter(candidate => candidate.attrType === source.attrType);
+  if (matches.length === 0) {
+    return;
+  }
+  const candidate = matches.find(match => match.abilityId === source.abilityId) || matches[0];
+  source.abilityId = candidate.abilityId;
+  source.attrIndex = candidate.attrIndex;
+  source.attrType = candidate.attrType;
+  if (source.kind && candidate.kind) {
+    source.kind = candidate.kind;
+    source.conditionIndex = candidate.conditionIndex;
+  }
+}
+
+function normalizeRuntimeSourceReferences(result, payload) {
+  const hooks = [];
+  const conditions = [];
+  const effects = [];
+  for (const ability of payload.componentCandidates || []) {
+    for (const rule of ability.rules || []) {
+      hooks.push(rule.source);
+      conditions.push(...(rule.conditions || []).map(condition => condition.source));
+      effects.push(...(rule.effects || []).map(effect => effect.source));
+    }
+  }
+  for (const source of result.blueprint?.mechanics || []) {
+    normalizeRuntimeSource(source, effects);
+  }
+  for (const rule of result.blueprint?.componentRules || []) {
+    normalizeRuntimeSource(rule.hook, hooks);
+    for (const source of rule.prerequisiteHooks || []) {
+      normalizeRuntimeSource(source, hooks);
+    }
+    for (const source of rule.conditions || []) {
+      normalizeRuntimeSource(source, conditions);
+    }
+    for (const source of rule.effects || []) {
+      normalizeRuntimeSource(source, effects);
+    }
+  }
+}
+
 function normalizeComponentRuleHooks(result) {
   for (const rule of result.blueprint?.componentRules || []) {
     const seen = new Set([sourceKey(rule.hook)]);
@@ -771,6 +821,7 @@ async function runCodex(payload, emit) {
       });
     }
     const result = stripNulls(extractJson(finalText));
+    normalizeRuntimeSourceReferences(result, payload);
     normalizeComponentRuleHooks(result);
     normalizeScriptedMoveTargets(result, payload);
     validateSources(result, payload);
@@ -811,6 +862,7 @@ async function runNimModel(model, body, payload) {
     "",
   );
   const result = stripNulls(extractJson(content, "fallback model", false));
+  normalizeRuntimeSourceReferences(result, payload);
   normalizeComponentRuleHooks(result);
   normalizeScriptedMoveTargets(result, payload);
   validateSources(result, payload);
