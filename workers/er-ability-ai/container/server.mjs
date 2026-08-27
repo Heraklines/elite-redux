@@ -301,6 +301,42 @@ const assemblyPlanSchema = {
   additionalProperties: false,
 };
 
+function componentIdsForRole(searchContext, role) {
+  return searchContext.components
+    .filter(component => {
+      if (role === "hook") {
+        return component.selectableParts.hook;
+      }
+      const indexes =
+        role === "condition" ? component.selectableParts.conditionIndexes : component.selectableParts.effectIndexes;
+      return indexes.length > 0;
+    })
+    .map(component => component.componentId);
+}
+
+function componentSelectionSchemaForRole(searchContext, role) {
+  const schema = structuredClone(componentPartSelectionSchema);
+  schema.properties.componentId.enum = componentIdsForRole(searchContext, role);
+  return schema;
+}
+
+function assemblyPlanSchemaForSearch(searchContext) {
+  const schema = structuredClone(assemblyPlanSchema);
+  const ruleProperties = schema.properties.draft.properties.componentRules.items.properties;
+  const hookSchema = componentSelectionSchemaForRole(searchContext, "hook");
+  const conditionSchema = componentSelectionSchemaForRole(searchContext, "condition");
+  const effectSchema = componentSelectionSchemaForRole(searchContext, "effect");
+  ruleProperties.prerequisiteHooks.items = hookSchema;
+  ruleProperties.hook = hookSchema;
+  ruleProperties.conditions.items.anyOf =
+    conditionSchema.properties.componentId.enum.length > 0
+      ? [conditionSchema, simpleConditionSchema]
+      : [simpleConditionSchema];
+  ruleProperties.effects.items.anyOf =
+    effectSchema.properties.componentId.enum.length > 0 ? [effectSchema, simpleEffectSchema] : [simpleEffectSchema];
+  return schema;
+}
+
 const _blueprintExamples = [
   {
     explanation: "Burn contact targets after attacking.",
@@ -1389,8 +1425,14 @@ function expandComponentSelection(selection, searchContext, role) {
   let source;
   if (role === "condition") {
     source = component.rule.conditions?.[selection.partIndex ?? 0]?.source;
+    if (!source && component.selectableParts.conditionIndexes.length === 1) {
+      source = component.rule.conditions[component.selectableParts.conditionIndexes[0]].source;
+    }
   } else if (role === "effect") {
     source = component.rule.effects?.[selection.partIndex ?? 0]?.source;
+    if (!source && component.selectableParts.effectIndexes.length === 1) {
+      source = component.rule.effects[component.selectableParts.effectIndexes[0]].source;
+    }
   } else {
     source = component.rule.source;
   }
@@ -1537,7 +1579,7 @@ CATALOG SEARCH PLAN SCHEMA:
 ${JSON.stringify(_catalogSearchPlanSchema)}`;
 }
 
-function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null)) {
+function modelPrompt(payload, searchContext = executeCatalogSearch(payload, null), planSchema = assemblyPlanSchema) {
   return `You assemble Elite Redux Pokemon abilities from a closed catalog. Return exactly one compact assembly plan matching ASSEMBLY PLAN SCHEMA and nothing else: no markdown, commentary, or code fences. Never write code, commands, files, runtime class names, ability ids for runtime components, or unsupported mechanics. The worker expands catalog component IDs into exact runtime objects after your response. Before returning, verify that the draft has at least one include, componentRule, primitive rule, or modifier and that every componentRule has one hook and at least one effect.
 
 Triggers, conditions, and effects are independent. Recombine them freely. componentRules may mix catalog component selections with configurable primitive conditions and effects. Prefer primitive rules whenever PRIMITIVE CATALOG expresses the requested mechanic exactly. Event IF components can be observed under their native dispatcher and consumed by any WHEN hook. Hook-bound DO/THEN components can be armed by any WHEN hook and execute once through their native dispatcher. Use includes only when the user explicitly wants the complete existing ability.
@@ -1562,7 +1604,7 @@ FINAL REQUEST TO IMPLEMENT:
 ${payload.prompt}
 
 ASSEMBLY PLAN SCHEMA:
-${JSON.stringify(assemblyPlanSchema)}
+${JSON.stringify(planSchema)}
 
 Return exactly one non-empty assembly plan for that request. Use only primitive values and catalog componentIds.`;
 }
@@ -1850,8 +1892,8 @@ async function requestNimJson(model, body, schema, source, timeoutMs) {
   return stripNulls(extractJson(content, source, false));
 }
 
-async function runNimModel(model, body, payload, searchContext, emit) {
-  let plan = await requestNimJson(model, body, assemblyPlanSchema, "ability model", 60_000);
+async function runNimModel(model, body, payload, searchContext, planSchema, emit) {
+  let plan = await requestNimJson(model, body, planSchema, "ability model", 60_000);
   let result;
   try {
     result = expandAssemblyPlan(plan, searchContext);
@@ -1876,7 +1918,7 @@ async function runNimModel(model, body, payload, searchContext, emit) {
       ],
       temperature: 0,
     };
-    plan = await requestNimJson(model, repairBody, assemblyPlanSchema, "ability repair model", 45_000);
+    plan = await requestNimJson(model, repairBody, planSchema, "ability repair model", 45_000);
     result = expandAssemblyPlan(plan, searchContext);
     normalizePrimitiveAliases(result);
   }
@@ -1899,9 +1941,10 @@ async function runNim(payload, emit) {
     type: "status",
     message: `Building from ${searchContext.components.length} matched runtime mechanics`,
   });
+  const planSchema = assemblyPlanSchemaForSearch(searchContext);
   const systemContent =
     "Return only one compact JSON assembly plan matching the requested schema. Do not include markdown or hidden reasoning.";
-  const userContent = modelPrompt(payload, searchContext);
+  const userContent = modelPrompt(payload, searchContext, planSchema);
   const inputCharacters = systemContent.length + userContent.length;
   console.log(JSON.stringify({ event: "ability-model-input", inputCharacters }));
   if (inputCharacters > 1_000_000) {
@@ -1925,7 +1968,7 @@ async function runNim(payload, emit) {
       emit({ type: "status", message: "Trying the backup model" });
     }
     try {
-      return await runNimModel(model, body, payload, searchContext, emit);
+      return await runNimModel(model, body, payload, searchContext, planSchema, emit);
     } catch (error) {
       console.error(JSON.stringify({ event: "ability-model-failed", model, message: error.message || String(error) }));
       emit({ type: "diagnostic", model, message: error.message || String(error) });
